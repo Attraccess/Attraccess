@@ -86,14 +86,13 @@ export function UpdateNotificationBanner() {
             </Button>
             <Button variant="primary"
               size="sm"
-              endContent={<ExternalLink size={14} />}
               as="a"
               href={updateDocsPath}
               target="_blank"
               rel="noopener noreferrer"
             >
               {t('howToUpdate')}
-            </Button>
+            <ExternalLink size={14} /></Button>
             <Button variant="ghost"
               size="sm"
               isIconOnly
@@ -106,7 +105,7 @@ export function UpdateNotificationBanner() {
         </div>
       </div>
 
-      <Modal isOpen={isReleaseNotesOpen} onOpenChange={setIsReleaseNotesOpen} size="2xl" scrollBehavior="inside">
+      <Modal isOpen={isReleaseNotesOpen} onOpenChange={setIsReleaseNotesOpen} size="lg">
         <ModalBackdrop />
         <ModalContainer>
           <ModalDialog>
@@ -128,10 +127,9 @@ export function UpdateNotificationBanner() {
                     href={release.htmlUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    endContent={<ExternalLink size={14} />}
                   >
                     {release.tagName}
-                  </Button>
+                  <ExternalLink size={14} /></Button>
                   <Button variant="primary" onPress={close}>
                     {t('close')}
                   </Button>

@@ -6,7 +6,6 @@ import { PageHeader } from '../../components/pageHeader'; // Assuming PageHeader
 import { Link } from 'react-router-dom'; // For edit button link
 import { TableDataLoadingIndicator } from '../../components/tableComponents';
 import { EmptyState } from '../../components/emptyState';
-import { useReactQueryStatusToHeroUiTableLoadingState } from '../../hooks/useReactQueryStatusToHeroUiTableLoadingState';
 
 import en from './en.json';
 import de from './de.json';
@@ -15,8 +14,6 @@ import { useMemo } from 'react';
 export function EmailTemplatesPage() {
   const { t } = useTranslations({ en, de });
   const { data: emailTemplates, status: fetchStatus } = useEmailTemplatesServiceEmailTemplateControllerFindAll();
-
-  const loadingState = useReactQueryStatusToHeroUiTableLoadingState(fetchStatus);
 
   const tableItems = useMemo(() => {
     return (emailTemplates ?? []).map((item) => ({
@@ -29,7 +26,6 @@ export function EmailTemplatesPage() {
           to={`/email-templates/${item.type}`}
           isIconOnly
           aria-label={t('editButton')}
-          startContent={<Edit3 size={18} />}
         />
       ),
     }));
@@ -47,9 +43,7 @@ export function EmailTemplatesPage() {
         </TableHeader>
         <TableBody
           items={tableItems}
-          loadingState={loadingState}
-          loadingContent={<TableDataLoadingIndicator />}
-          emptyContent={<EmptyState />}
+          renderEmptyState={() => <EmptyState />}
         >
           {(item) => (
             <TableRow key={item.key} id={item.key}>

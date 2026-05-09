@@ -25,7 +25,6 @@ import de from './de.json';
 import en from './en.json';
 import { CalendarClockIcon, PencilIcon, PlusIcon, TrashIcon } from 'lucide-react';
 import { EmptyState } from '../../../../components/emptyState';
-import { useReactQueryStatusToHeroUiTableLoadingState } from '../../../../hooks/useReactQueryStatusToHeroUiTableLoadingState';
 import { useQueryClient } from '@tanstack/react-query';
 import { MaintenanceScheduleUpsertModal } from './upsert';
 import { ScheduleDeleteModal } from './ScheduleDeleteModal';
@@ -91,8 +90,6 @@ export function MaintenanceSchedules(props: Props & Omit<CardProps, 'children'>)
       },
     });
 
-  const tableLoadingState = useReactQueryStatusToHeroUiTableLoadingState(fetchStatus);
-
   const handleEnabledChange = (schedule: ResourceMaintenanceSchedule, enabled: boolean) => {
     updateSchedule({
       resourceId,
@@ -115,8 +112,7 @@ export function MaintenanceSchedules(props: Props & Omit<CardProps, 'children'>)
                   onPress={open}
                   size="sm"
                   title={t('actions.add')}
-                  startContent={<PlusIcon className="w-4 h-4" />}
-                >
+                ><PlusIcon className="w-4 h-4" />
                   {t('actions.add')}
                 </Button>
               )}
@@ -126,18 +122,17 @@ export function MaintenanceSchedules(props: Props & Omit<CardProps, 'children'>)
       </CardHeader>
 
       <CardContent>
-        <Table removeWrapper aria-label={t('table.ariaLabel')}>
+        <Table aria-label={t('table.ariaLabel')}>
           <TableHeader>
             <TableColumn>{t('table.columns.name')}</TableColumn>
             <TableColumn>{t('table.columns.triggerType')}</TableColumn>
             <TableColumn>{t('table.columns.configSummary')}</TableColumn>
             <TableColumn>{t('table.columns.enabled')}</TableColumn>
-            <TableColumn align="end">{t('table.columns.actions')}</TableColumn>
+            <TableColumn>{t('table.columns.actions')}</TableColumn>
           </TableHeader>
           <TableBody<ResourceMaintenanceSchedule>
             items={schedules}
-            loadingState={tableLoadingState}
-            emptyContent={<EmptyState message={t('empty')} />}
+            renderEmptyState={() => <EmptyState message={t('empty')} />}
           >
             {(schedule) => (
               <TableRow key={schedule.id} id={schedule.id}>
@@ -152,13 +147,12 @@ export function MaintenanceSchedules(props: Props & Omit<CardProps, 'children'>)
                     aria-label={schedule.enabled ? 'Disable' : 'Enable'}
                   />
                 </TableCell>
-                <TableCell align="right">
+                <TableCell>
                   <MaintenanceScheduleUpsertModal resourceId={resourceId} scheduleId={schedule.id}>
                     {(open: () => void) => (
                       <Button variant="ghost"
                         onPress={open}
                         isIconOnly
-                        startContent={<PencilIcon className="w-4 h-4" />}
                         title={t('actions.edit')}
                       />
                     )}
@@ -168,7 +162,6 @@ export function MaintenanceSchedules(props: Props & Omit<CardProps, 'children'>)
                       <Button variant="danger-soft"
                         onPress={open}
                         isIconOnly
-                        startContent={<TrashIcon className="w-4 h-4" />}
                         title={t('actions.delete')}
                       />
                     )}

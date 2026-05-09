@@ -111,7 +111,7 @@ export function InviteUserModal(props: Props) {
       {children(open)}
       <Modal isOpen={isOpen} onOpenChange={(o) => { if (!o) close(); }}>
         <ModalBackdrop />
-        <ModalContainer size={tab === 'single' ? 'sm' : '3xl'} scrollBehavior="inside">
+        <ModalContainer size={tab === 'single' ? 'sm' : '3xl'}>
           <ModalDialog>
             {() => (<>
           <ModalHeader>

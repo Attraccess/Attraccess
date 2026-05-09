@@ -120,9 +120,8 @@ export function UploadPluginModal({ isOpen, onClose }: UploadPluginModalProps) {
                   onPress={handleUpload}
                   isPending={isPending}
                   isDisabled={!selectedFile || isFileInvalid}
-                  startContent={<Upload size={18} />}
                   data-cy="upload-plugin-modal-upload-button"
-                >
+                ><Upload size={18} />
                   {t('upload')}
                 </Button>
               </ModalFooter>

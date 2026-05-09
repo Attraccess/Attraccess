@@ -281,7 +281,7 @@ export function FormEditorPage() {
 
             <Accordion
               selectionMode="single"
-              variant="bordered"
+              variant="outline"
               onSelectionChange={setExpandedFieldKey}
               selectedKeys={expandedFieldKey}
             >

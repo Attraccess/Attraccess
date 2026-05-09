@@ -194,8 +194,7 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
                 <AccordionItem
                   key={group.translationKey} id={group.translationKey}
                   title={t('groups.' + group.translationKey + '.label')}
-                  startContent={<group.icon size={16} />}
-                >
+                ><group.icon size={16} />
                   {group.items.map((item) => (
                     <NavLink
                       key={item.path}
@@ -214,15 +213,14 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
         {/* Helpful Links */}
         <div className="py-4">
           <nav className="px-2 space-y-1">
-            <Accordion isCompact>
+            <Accordion>
               {sidebarEndGroups.map((group) => (
                 <AccordionItem
                   key={group.translationKey} id={group.translationKey}
                   title={t('endItems.groups.' + group.translationKey + '.label')}
-                  startContent={<group.icon size={16} />}
-                  isCompact
+
                   className="text-sm"
-                >
+                ><group.icon size={16} />
                   {group.items.map((item) => (
                     <NavLink
                       key={item.path}
@@ -245,7 +243,7 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
                 data-cy={`sidebar-nav-${item.path?.replace('/', '')}`}
                 size="sm"
                 isExternal={item.isExternal}
-                showAnchorIcon={false}
+
               />
             ))}
           </nav>
@@ -268,39 +266,35 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
                   </Button>
                 </DropdownTrigger>
                 <DropdownMenu data-cy="sidebar-settings-dropdown-menu">
-                  <DropdownItem key="language-label" id="language-label" isDisabled startContent={<Languages className="h-4 w-4" />}>
+                  <DropdownItem key="language-label" id="language-label" isDisabled><Languages className="h-4 w-4" />
                     {t('language')}
                   </DropdownItem>
                   <DropdownItem
                     key="language-en" id="language-en"
                     onPress={() => setLanguage('en')}
-                    endContent={language === 'en' ? <Check className="h-4 w-4" /> : null}
                     data-cy="sidebar-language-en"
                   >
                     {t('languages.en')}
-                  </DropdownItem>
+                  language === 'en' ? <Check className="h-4 w-4" /> : null</DropdownItem>
                   <DropdownItem
                     key="language-de" id="language-de"
                     onPress={() => setLanguage('de')}
-                    endContent={language === 'de' ? <Check className="h-4 w-4" /> : null}
                     data-cy="sidebar-language-de"
                   >
                     {t('languages.de')}
-                  </DropdownItem>
+                  language === 'de' ? <Check className="h-4 w-4" /> : null</DropdownItem>
                   <DropdownItem
                     key="account" id="account"
                     onPress={() => navigate('/account')}
-                    startContent={<User className="h-4 w-4" />}
                     data-cy="sidebar-account-button"
-                  >
+                  ><User className="h-4 w-4" />
                     {t('account')}
                   </DropdownItem>
                   <DropdownItem
                     key="logout" id="logout"
                     onPress={() => logout()}
-                    startContent={<LogOut />}
                     data-cy="sidebar-logout-button"
-                  >
+                  ><LogOut />
                     {t('logout')}
                   </DropdownItem>
                 </DropdownMenu>

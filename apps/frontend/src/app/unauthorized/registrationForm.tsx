@@ -206,13 +206,12 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
         <Button variant="primary"
           fullWidth
           type="submit"
-          endContent={<ArrowRight className="group-hover:translate-x-1 transition-transform" />}
           isPending={isPending}
           isDisabled={!canSubmit}
           data-cy="registration-form-create-account-button"
         >
           {isPending ? t('creatingAccount') : t('createAccountButton')}
-        </Button>
+        <ArrowRight className="group-hover:translate-x-1 transition-transform" /></Button>
       </form>
 
       <Modal
@@ -221,7 +220,7 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
         data-cy="registration-form-success-modal"
       >
         <ModalBackdrop />
-        <ModalContainer scrollBehavior="inside">
+        <ModalContainer>
           <ModalDialog>
             {({ close }) => (
             <>

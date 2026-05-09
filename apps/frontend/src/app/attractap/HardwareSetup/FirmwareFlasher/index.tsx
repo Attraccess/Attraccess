@@ -138,7 +138,7 @@ export function FirmwareFlasher(props: Props) {
           value={flashProgress}
           minValue={0}
           maxValue={100}
-          showValueLabel={true}
+
         >
           <ProgressBarTrack>
             <ProgressBarFill />

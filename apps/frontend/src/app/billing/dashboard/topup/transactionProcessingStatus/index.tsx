@@ -93,7 +93,7 @@ export function TransactionProcessingCard(props: Props) {
             value={COUNTER_MAX_VALUE - counter}
             minValue={0}
             maxValue={COUNTER_MAX_VALUE}
-            showValueLabel={true}
+
           >
             <ProgressCircleTrack>
               <ProgressCircleTrackCircle />

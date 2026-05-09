@@ -49,7 +49,7 @@ export function ResourceQrCode(props: Props & Omit<ButtonProps, 'children' | 'st
 
   return (
     <>
-      <Button {...buttonProps} onPress={open} startContent={<QrCodeIcon size={buttonIconSize} />}>
+      <Button {...buttonProps} onPress={open}><QrCodeIcon size={buttonIconSize} />
         {t('button.label')}
       </Button>
 

@@ -31,9 +31,8 @@ export function MqttServersPage() {
         actions={
           <Button variant="ghost"
             onPress={handleAddNewServer}
-            startContent={<Plus size={16} />}
             data-cy="mqtt-servers-page-add-new-server-button"
-          >
+          ><Plus size={16} />
             {t('addNewServer')}
           </Button>
         }

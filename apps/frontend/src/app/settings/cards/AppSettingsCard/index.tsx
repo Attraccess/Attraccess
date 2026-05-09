@@ -21,7 +21,7 @@ export function AppSettingsCard({ variant, onNext }: AppSettingsCardProps) {
 
   const licenseChip =
     variant === 'standalone' && settings ? (
-      <Chip color={settings.app.licenseKeyConfigured ? 'success' : 'warning'} variant="flat">
+      <Chip color={settings.app.licenseKeyConfigured ? 'success' : 'warning'} variant="soft">
         <div className="flex items-center gap-2">
           {settings.app.licenseKeyConfigured ? <CheckIcon size={16} /> : <XIcon size={16} />}
           {settings.app.licenseKeyConfigured

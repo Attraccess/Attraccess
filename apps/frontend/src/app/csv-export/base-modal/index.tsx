@@ -16,7 +16,6 @@ import {
 import { QueryStatus } from '@tanstack/react-query';
 import { EmptyState } from '../../../components/emptyState';
 import { TableDataLoadingIndicator } from '../../../components/tableComponents';
-import { useReactQueryStatusToHeroUiTableLoadingState } from '../../../hooks/useReactQueryStatusToHeroUiTableLoadingState';
 import { RotateCwIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import de from './de.json';
@@ -119,8 +118,6 @@ export function BaseCsvExportModal<TData extends Row>(props: Props<TData>) {
     a.click();
   }, [selectedColumns, itemRows, filename]);
 
-  const loadingState = useReactQueryStatusToHeroUiTableLoadingState(queryStatus);
-
   return (
     <>
       <ModalBody>
@@ -134,7 +131,7 @@ export function BaseCsvExportModal<TData extends Row>(props: Props<TData>) {
             items={columns}
             label={t('inputs.columns.label')}
             selectionMode="multiple"
-            variant="flat"
+            variant="soft"
             onSelectionChange={(keys) => {
               setSelectedColumnKeys(Array.from(keys as Set<string>));
             }}
@@ -151,12 +148,11 @@ export function BaseCsvExportModal<TData extends Row>(props: Props<TData>) {
         <div className="flex gap-4">
           {refetch && (
             <Button variant="secondary"
-              endContent={<RotateCwIcon className={'w-4 h-4 ' + (queryStatus === 'pending' ? 'animate-spin' : '')} />}
               onPress={() => refetch()}
               data-cy="resource-usage-export-refresh-button"
             >
               {t('actions.refetch')}
-            </Button>
+            <RotateCwIcon className={'w-4 h-4 ' + (queryStatus === 'pending' ? 'animate-spin' : '')} /></Button>
           )}
 
           {(options ?? []).map((option) => (
@@ -172,7 +168,7 @@ export function BaseCsvExportModal<TData extends Row>(props: Props<TData>) {
         </div>
 
         <Table
-          isCompact
+
           isVirtualized
           maxTableHeight={500}
           rowHeight={40}
@@ -184,9 +180,7 @@ export function BaseCsvExportModal<TData extends Row>(props: Props<TData>) {
           </TableHeader>
           <TableBody
             items={itemRows}
-            loadingState={loadingState}
-            loadingContent={<TableDataLoadingIndicator />}
-            emptyContent={<EmptyState />}
+            renderEmptyState={() => <EmptyState />}
           >
             {(row) => (
               <TableRow key={row.key} id={row.key}>

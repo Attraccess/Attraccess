@@ -55,7 +55,6 @@ export function Toolbar({
                   <Button
                     size="sm"
                     variant="ghost"
-                    startContent={<ListFilterIcon size={18} className={cn(highlightFilter && 'animate-pulse')} />}
                     isIconOnly
                     onPress={onOpen}
                   />
@@ -69,7 +68,7 @@ export function Toolbar({
 
         <ResourceScanner>
           {(onOpen: () => void) => (
-            <Button variant="ghost" radius="full" onPress={onOpen} startContent={<ScanQrCodeIcon />} isIconOnly />
+            <Button variant="ghost" radius="full" onPress={onOpen} isIconOnly />
           )}
         </ResourceScanner>
       </div>
@@ -82,10 +81,9 @@ export function Toolbar({
                 <Button variant="primary"
                   radius="full"
                   onPress={onOpen}
-                  startContent={<PlusIcon size={18} />}
                   size="sm"
                   data-cy="toolbar-open-create-resource-modal-button"
-                >
+                ><PlusIcon size={18} />
                   {t('addResource')}
                 </Button>
               )}

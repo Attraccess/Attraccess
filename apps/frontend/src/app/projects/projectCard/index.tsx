@@ -11,7 +11,7 @@ export function ProjectCard(props: Props) {
   const { project, archivedLabel } = props;
 
   return (
-    <Card isPressable shadow="sm" as={Link} href={`/projects/${project.id}`}>
+    <Card as={Link} href={`/projects/${project.id}`}>
       <CardContent className="overflow-visible p-0">
         <img
           alt={project.name}
@@ -23,7 +23,7 @@ export function ProjectCard(props: Props) {
         <div className="flex w-full items-center justify-between gap-2">
           <b className="text-ellipsis overflow-hidden line-clamp-1">{project.name}</b>
           {project.archivedAt && (
-            <Chip size="sm" variant="flat" color="warning">
+            <Chip size="sm" variant="soft" color="warning">
               {archivedLabel ?? 'Archived'}
             </Chip>
           )}

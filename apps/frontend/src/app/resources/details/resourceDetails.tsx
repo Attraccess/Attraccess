@@ -111,9 +111,8 @@ function ResourceDetailsComponent() {
         <p className="text-gray-500 mb-4">{t('error.resourceNotFound.description')}</p>
         <Button variant="ghost"
           onPress={() => navigate('/resources')}
-          startContent={<ArrowLeft className="w-4 h-4" />}
           data-cy="back-to-resources-button"
-        >
+        ><ArrowLeft className="w-4 h-4" />
           {t('error.resourceNotFound.backToResources')}
         </Button>
       </div>
@@ -134,10 +133,9 @@ function ResourceDetailsComponent() {
             <DocumentationModal resourceId={resourceId}>
               {(onOpenDocumentation) => (
                 <Button variant="ghost"
-                  startContent={<BookOpen className="w-4 h-4" />}
                   onPress={onOpenDocumentation}
                   data-cy="documentation-button"
-                >
+                ><BookOpen className="w-4 h-4" />
                   {t('actions.documentation')}
                 </Button>
               )}
@@ -150,18 +148,16 @@ function ResourceDetailsComponent() {
                 <Button variant="ghost"
                   as={Link}
                   href={`/resources/${resourceId}/flows`}
-                  startContent={<WorkflowIcon className="w-4 h-4" />}
                   data-cy="flows-button"
-                >
+                ><WorkflowIcon className="w-4 h-4" />
                   {t('navItems.flows')}
                 </Button>
 
                 <Button variant="ghost"
                   as={Link}
                   href={`/resources/${resourceId}/forms`}
-                  startContent={<ListChecks className="w-4 h-4" />}
                   data-cy="forms-button"
-                >
+                ><ListChecks className="w-4 h-4" />
                   {t('navItems.forms')}
                 </Button>
 
@@ -169,9 +165,8 @@ function ResourceDetailsComponent() {
                   {(onOpen) => (
                     <Button variant="ghost"
                       onPress={onOpen}
-                      startContent={<PenSquareIcon className="w-4 h-4" />}
                       data-cy="edit-resource-button"
-                    >
+                    ><PenSquareIcon className="w-4 h-4" />
                       {t('actions.edit')}
                     </Button>
                   )}
@@ -179,9 +174,8 @@ function ResourceDetailsComponent() {
 
                 <Button variant="danger-soft"
                   onPress={open}
-                  startContent={<Trash className="w-4 h-4" />}
                   data-cy="delete-resource-button"
-                >
+                ><Trash className="w-4 h-4" />
                   {t('actions.delete')}
                 </Button>
               </>

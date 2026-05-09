@@ -85,7 +85,7 @@ export function ApiKeyCard(props: Omit<CardProps, 'children'>) {
           actions={
             <Chip
               color={isLoadingConfiguration ? 'default' : configuration?.enabled ? 'success' : 'warning'}
-              variant="flat"
+              variant="soft"
             >
               <div className="flex items-center gap-2">
                 {isLoadingConfiguration ? (
@@ -124,7 +124,7 @@ export function ApiKeyCard(props: Omit<CardProps, 'children'>) {
           />
 
           <small>
-            <Link isExternal href={sumUpApiKeyUrl} target="_blank" rel="noopener noreferrer">
+            <Link href={sumUpApiKeyUrl} target="_blank" rel="noopener noreferrer">
               {sumUpApiKeyUrl}
             </Link>
           </small>

@@ -167,9 +167,8 @@ function DocumentationEditorComponent() {
           </Button>
           <Button variant="secondary"
             onPress={() => navigate('/resources')}
-            startContent={<ArrowLeft size={16} />}
             data-cy="documentation-editor-error-back-to-resources-button"
-          >
+          ><ArrowLeft size={16} />
             {t('actions.backToResources')}
           </Button>
         </CardFooter>
@@ -190,9 +189,8 @@ function DocumentationEditorComponent() {
         <CardFooter className="justify-center">
           <Button variant="secondary"
             onPress={() => navigate('/resources')}
-            startContent={<ArrowLeft size={16} />}
             data-cy="documentation-editor-not-found-back-to-resources-button"
-          >
+          ><ArrowLeft size={16} />
             {t('actions.backToResources')}
           </Button>
         </CardFooter>
@@ -210,9 +208,8 @@ function DocumentationEditorComponent() {
           <Button variant="primary"
             onPress={handleSave}
             isPending={updateResource.isPending}
-            startContent={<Save className="w-4 h-4" />}
             data-cy="documentation-editor-header-save-button"
-          >
+          ><Save className="w-4 h-4" />
             {t('actions.save')}
           </Button>
         }

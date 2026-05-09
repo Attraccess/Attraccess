@@ -12,7 +12,6 @@ import { AttractapSelect } from '../AttractapSelect';
 import { useToastMessage } from '../../../components/toastProvider';
 import { TableDataLoadingIndicator } from '../../../components/tableComponents';
 import { EmptyState } from '../../../components/emptyState';
-import { useReactQueryStatusToHeroUiTableLoadingState } from '../../../hooks/useReactQueryStatusToHeroUiTableLoadingState';
 
 import de from './de.json';
 import en from './en.json';
@@ -108,10 +107,9 @@ const NfcCardTableCell = (props: NfcCardTableCellProps) => {
       <div className="flex gap-2 flex-row flex-wrap">
         <Button variant="danger-soft"
           size="sm"
-          startContent={<Trash2Icon />}
           onPress={() => props.onDeleteClick()}
           data-cy={`nfc-card-table-cell-delete-button-${props.card.id}`}
-        >
+        ><Trash2Icon />
           {t('nfcCardsTable.actions.delete')}
         </Button>
         {props.card.isActive ? (
@@ -119,10 +117,9 @@ const NfcCardTableCell = (props: NfcCardTableCellProps) => {
             {(onOpen) => (
               <Button variant="tertiary"
                 size="sm"
-                startContent={<XIcon />}
                 onPress={onOpen}
                 data-cy={`nfc-card-table-cell-deactivate-button-${props.card.id}`}
-              >
+              ><XIcon />
                 {t('nfcCardsTable.actions.deactivate')}
               </Button>
             )}
@@ -132,10 +129,9 @@ const NfcCardTableCell = (props: NfcCardTableCellProps) => {
             {(onOpen) => (
               <Button variant="tertiary"
                 size="sm"
-                startContent={<CheckIcon />}
                 onPress={onOpen}
                 data-cy={`nfc-card-table-cell-activate-button-${props.card.id}`}
-              >
+              ><CheckIcon />
                 {t('nfcCardsTable.actions.activate')}
               </Button>
             )}
@@ -192,8 +188,7 @@ const EnrollNfcCardButton = () => {
       <Button variant="ghost"
         onPress={() => setShow(true)}
         data-cy="enroll-nfc-card-button-trigger"
-        startContent={<PlusIcon />}
-      >
+      ><PlusIcon />
         {t('enroll')}
       </Button>
       <Modal isOpen={show} onOpenChange={(open) => { if (!open) setShow(false); }} data-cy="enroll-nfc-card-modal">
@@ -247,8 +242,6 @@ export function NfcCardList() {
     refetchInterval: 5000,
   });
 
-  const loadingState = useReactQueryStatusToHeroUiTableLoadingState(fetchStatus);
-
   const toast = useToastMessage();
 
   useEffect(() => {
@@ -279,7 +272,7 @@ export function NfcCardList() {
           <>
             <EnrollNfcCardButton />
             {hasPermission('canManageResources') && (
-              <Button variant="ghost" onPress={() => navigate('/attractap/readers')} startContent={<ServerIcon />}>
+              <Button variant="ghost" onPress={() => navigate('/attractap/readers')}><ServerIcon />
                 {t('readers')}
               </Button>
             )}
@@ -307,9 +300,7 @@ export function NfcCardList() {
         </TableHeader>
         <TableBody
           items={cards ?? []}
-          loadingState={loadingState}
-          loadingContent={<TableDataLoadingIndicator />}
-          emptyContent={<EmptyState />}
+          renderEmptyState={() => <EmptyState />}
         >
           {(card) => (
             <TableRow

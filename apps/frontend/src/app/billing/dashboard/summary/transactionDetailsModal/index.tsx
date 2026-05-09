@@ -69,7 +69,7 @@ export function TransactionDetailsModal(props: Props) {
       {children && children(open)}
       <Modal isOpen={isOpen} onOpenChange={setOpen}>
         <ModalBackdrop />
-        <ModalContainer size="2xl">
+        <ModalContainer size="lg">
           <ModalDialog>
             {() => (<>
           <ModalHeader>
@@ -119,7 +119,7 @@ export function TransactionDetailsModal(props: Props) {
                   </div>
                   <div>
                     <div className="text-small text-default-500">{t('meta.status')}</div>
-                    <Chip color={statusColor(transaction.status)} size="sm" variant="flat">
+                    <Chip color={statusColor(transaction.status)} size="sm" variant="soft">
                       {t('status.' + transaction.status)}
                     </Chip>
                   </div>
@@ -164,13 +164,13 @@ export function TransactionDetailsModal(props: Props) {
 
                 <div>
                   <div className="mb-2 font-semibold">{t('items.title')}</div>
-                  <Table removeWrapper aria-label="Transaction items">
+                  <Table aria-label="Transaction items">
                     <TableHeader>
                       <TableColumn>{t('items.columns.name')}</TableColumn>
                       <TableColumn>{t('items.columns.description')}</TableColumn>
-                      <TableColumn align="end">{t('items.columns.quantity')}</TableColumn>
-                      <TableColumn align="end">{t('items.columns.unitPrice')}</TableColumn>
-                      <TableColumn align="end">{t('items.columns.subtotal')}</TableColumn>
+                      <TableColumn>{t('items.columns.quantity')}</TableColumn>
+                      <TableColumn>{t('items.columns.unitPrice')}</TableColumn>
+                      <TableColumn>{t('items.columns.subtotal')}</TableColumn>
                     </TableHeader>
                     <TableBody emptyContent={t('items.empty')}>
                       {(transaction.items ?? []).map((item) => (

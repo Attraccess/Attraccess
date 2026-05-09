@@ -59,19 +59,17 @@ export function SumUpReadersCard(props: Omit<CardProps, 'children'>) {
       </CardHeader>
 
       <CardContent>
-        <Table removeWrapper aria-label={t('table.ariaLabel')}>
+        <Table aria-label={t('table.ariaLabel')}>
           <TableHeader>
             <TableColumn>{t('table.columns.name')}</TableColumn>
             <TableColumn>{t('table.columns.device')}</TableColumn>
             <TableColumn>{t('table.columns.status')}</TableColumn>
-            <TableColumn align="end">{t('table.columns.actions')}</TableColumn>
+            <TableColumn>{t('table.columns.actions')}</TableColumn>
           </TableHeader>
           {/* the mapping of the language into the readers is to trick heroui to re-render when the language changes */}
           <TableBody
             items={(readers ?? []).map((reader) => ({ ...reader, language }))}
-            loadingState={isLoadingReaders ? 'loading' : 'idle'}
-            loadingContent={<TableDataLoadingIndicator />}
-            emptyContent={<EmptyState />}
+            renderEmptyState={() => <EmptyState />}
           >
             {(reader) => (
               <TableRow key={reader.id} id={reader.id}>
@@ -83,9 +81,8 @@ export function SumUpReadersCard(props: Omit<CardProps, 'children'>) {
                     {(onOpen) => (
                       <Button variant="danger-soft"
                         size="sm"
-                        startContent={<Trash2Icon className="w-4 h-4" />}
                         onPress={onOpen}
-                      >
+                      ><Trash2Icon className="w-4 h-4" />
                         {t('table.actions.deleteReader')}
                       </Button>
                     )}

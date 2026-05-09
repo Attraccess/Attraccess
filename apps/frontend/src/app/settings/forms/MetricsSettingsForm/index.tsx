@@ -317,18 +317,16 @@ export function MetricsSettingsForm() {
 
       <div className="flex gap-2 flex-wrap">
         <Button variant="primary"
-          startContent={metricsSettings?.apiKeyConfigured ? <RefreshCwIcon size={16} /> : <KeyIcon size={16} />}
           onPress={handleGenerate}
           isPending={isGenerating}
-        >
+        >metricsSettings?.apiKeyConfigured ? <RefreshCwIcon size={16} /> : <KeyIcon size={16} />
           {metricsSettings?.apiKeyConfigured ? t('rerollButton') : t('generateButton')}
         </Button>
 
         {metricsSettings?.apiKeyConfigured && (
           <Button variant="danger-soft"
-            startContent={<Trash2Icon size={16} />}
             onPress={removeModal.open}
-          >
+          ><Trash2Icon size={16} />
             {t('removeButton')}
           </Button>
         )}

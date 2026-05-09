@@ -12,7 +12,7 @@ export function MetricsSettingsCard() {
   const { data: metricsSettings } = useSettingsServiceGetMetricsSettings();
 
   const statusChip = metricsSettings ? (
-    <Chip color={metricsSettings.apiKeyConfigured ? 'success' : 'warning'} variant="flat">
+    <Chip color={metricsSettings.apiKeyConfigured ? 'success' : 'warning'} variant="soft">
       <div className="flex items-center gap-2">
         {metricsSettings.apiKeyConfigured ? <CheckIcon size={16} /> : <XIcon size={16} />}
         {metricsSettings.apiKeyConfigured

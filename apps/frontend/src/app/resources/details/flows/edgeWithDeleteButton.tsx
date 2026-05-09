@@ -51,7 +51,6 @@ export function EdgeWithDeleteButton(props: EdgeProps) {
             }}
             onPress={removeEdge}
             isIconOnly
-            startContent={<Trash2Icon />}
           />
         )}
       </EdgeLabelRenderer>

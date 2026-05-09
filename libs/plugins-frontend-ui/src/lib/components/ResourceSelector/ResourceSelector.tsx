@@ -44,10 +44,10 @@ export function ResourceSelector(props: Readonly<Props>) {
         onSelectionChange={(keys) => onSelectionChange(Array.from(keys as Set<number>).map((key) => Number(key)))}
         selectionMode={multiple ? 'multiple' : 'single'}
         color="primary"
-        removeWrapper
+
       >
         <TableHeader>
-          <TableColumn align="start" className="w-full">
+          <TableColumn className="w-full">
             {t('table.columns.name.header')}
           </TableColumn>
         </TableHeader>

@@ -20,7 +20,7 @@ export function FirmwareSelector(props: Props) {
         </ProgressCircle>
       )}
       {firmwares?.map((firmware) => (
-        <Card onPress={() => props.onSelect(firmware)} isPressable key={`${firmware.name}-${firmware.variant}`}>
+        <Card onPress={() => props.onSelect(firmware)} key={`${firmware.name}-${firmware.variant}`}>
           <CardHeader>
             <PageHeader title={firmware.friendlyName} noMargin />
           </CardHeader>

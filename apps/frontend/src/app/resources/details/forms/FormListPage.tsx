@@ -54,7 +54,7 @@ export function FormListPage() {
           {forms.map((form) => (
             <Card
               key={form.id}
-              isPressable
+
               onPress={() => navigate(`/resources/${resourceId}/forms/${form.id}`)}
               className="border border-default-200 dark:border-default-100"
             >
@@ -62,17 +62,17 @@ export function FormListPage() {
                 <p className="text-base font-semibold text-default-700">{form.name}</p>
                 <div className="flex flex-wrap gap-2">
                   {form.isRequiredOnResourceUsageStart && (
-                    <Chip size="sm" color="primary" variant="flat">
+                    <Chip size="sm" color="primary" variant="soft">
                       {t('list.badges.start')}
                     </Chip>
                   )}
                   {form.isRequiredOnResourceUsageTakeOver && (
-                    <Chip size="sm" color="warning" variant="flat">
+                    <Chip size="sm" color="warning" variant="soft">
                       {t('list.badges.takeover')}
                     </Chip>
                   )}
                   {form.isRequiredOnResourceUsageEnd && (
-                    <Chip size="sm" color="secondary" variant="flat">
+                    <Chip size="sm" color="secondary" variant="soft">
                       {t('list.badges.end')}
                     </Chip>
                   )}

@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Table, TableHeader, TableBody, TableRow, Pagination } from '@heroui/react';
+import { Table, TableHeader, TableBody, TableRow } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { generateHeaderColumns } from './utils/tableHeaders';
 import { generateRowCells } from './utils/tableRows';
@@ -13,10 +13,10 @@ import {
 import { useAuth } from '../../../../../hooks/useAuth';
 import { TableDataLoadingIndicator } from '../../../../../components/tableComponents';
 import { EmptyState } from '../../../../../components/emptyState';
-import { useReactQueryStatusToHeroUiTableLoadingState } from '../../../../../hooks/useReactQueryStatusToHeroUiTableLoadingState';
 import { ProjectsSelect } from '../../../../../components/projectsSelect';
 import en from './utils/translations/en.json';
 import de from './utils/translations/de.json';
+import { SimplePagination } from '../../../../../components/simplePagination';
 
 interface HistoryTableProps {
   resourceId: number;
@@ -114,8 +114,6 @@ export const HistoryTable = ({
     return generateHeaderColumns(t, resource, showAllUsers, canManageResources);
   }, [t, showAllUsers, canManageResources, resource]);
 
-  const loadingState = useReactQueryStatusToHeroUiTableLoadingState(fetchStatus);
-
   const totalPages = useMemo(() => {
     if (!usageHistory?.total) {
       return 1;
@@ -151,17 +149,16 @@ export const HistoryTable = ({
   }
 
   return (
+    <>
     <Table
       aria-label={t('table.ariaLabel')}
-      shadow="none"
+
       data-cy="resource-usage-history-table"
-      bottomContent={isFetchedUsageHistory && <Pagination total={totalPages} page={page} onChange={handlePageChange} />}
+
     >
       <TableHeader>{headerColumns}</TableHeader>
       <TableBody
-        loadingState={loadingState}
-        loadingContent={<TableDataLoadingIndicator />}
-        emptyContent={<EmptyState />}
+        renderEmptyState={() => <EmptyState />}
       >
         {filteredHistory.map((session: ResourceUsage) => (
           <TableRow
@@ -186,5 +183,7 @@ export const HistoryTable = ({
         ))}
       </TableBody>
     </Table>
+    <SimplePagination total={totalPages} page={page} onChange={handlePageChange} />
+    </>
   );
 };

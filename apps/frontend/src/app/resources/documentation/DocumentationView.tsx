@@ -58,16 +58,14 @@ function DocumentationViewComponent() {
         <CardFooter className="flex justify-center gap-4">
           <Button variant="primary"
             onPress={() => refetchResource()}
-            startContent={<RefreshCw size={16} />}
             data-cy="documentation-view-error-retry-button"
-          >
+          ><RefreshCw size={16} />
             {t('actions.retry')}
           </Button>
           <Button variant="secondary"
             onPress={() => navigate('/resources')}
-            startContent={<ArrowLeft size={16} />}
             data-cy="documentation-view-error-back-to-resources-button"
-          >
+          ><ArrowLeft size={16} />
             {t('actions.backToResources')}
           </Button>
         </CardFooter>
@@ -88,9 +86,8 @@ function DocumentationViewComponent() {
         <CardFooter className="justify-center">
           <Button variant="secondary"
             onPress={() => navigate('/resources')}
-            startContent={<ArrowLeft size={16} />}
             data-cy="documentation-view-not-found-back-to-resources-button"
-          >
+          ><ArrowLeft size={16} />
             {t('actions.backToResources')}
           </Button>
         </CardFooter>
@@ -109,19 +106,17 @@ function DocumentationViewComponent() {
             {canManageResources && (
               <Button variant="secondary"
                 onPress={handleEditDocumentation}
-                startContent={<Edit size={16} />}
                 data-cy="documentation-view-header-edit-button"
-              >
+              ><Edit size={16} />
                 {t('actions.edit')}
               </Button>
             )}
             <Button variant="secondary"
               onPress={() => refetchResource()}
               isPending={isFetching}
-              startContent={<RefreshCw size={16} />}
               aria-label={t('actions.refresh')}
               data-cy="documentation-view-header-refresh-button"
-            >
+            ><RefreshCw size={16} />
               {t('actions.refresh')}
             </Button>
           </div>

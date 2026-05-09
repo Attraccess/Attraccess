@@ -38,10 +38,7 @@ export function IntroducerManagement(props: Readonly<IntroducerManagementProps &
           onAddToSelection={onGrantIntroducer}
           addToSelectionIsLoading={isGranting}
           selectedUserIsLoading={isLoadingIntroducers}
-          tableProps={{
-            removeWrapper: true,
-            shadow: 'none',
-          }}
+          tableProps={{}}
           actions={[
             {
               key: 'revoke',

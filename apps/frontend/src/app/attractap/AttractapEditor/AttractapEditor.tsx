@@ -91,7 +91,7 @@ export function AttractapEditor(props: Readonly<Props>) {
         data-cy="attractap-editor-modal"
       >
         <ModalBackdrop />
-        <ModalContainer placement="top-center">
+        <ModalContainer placement="top">
           <ModalDialog>
             {() => (
               <>

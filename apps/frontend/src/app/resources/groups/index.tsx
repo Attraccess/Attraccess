@@ -16,7 +16,6 @@ import {
   CardProps,
   Checkbox,
   Link,
-  Pagination,
   Table,
   TableBody,
   TableCell,
@@ -30,10 +29,10 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { GroupIcon, PlusIcon } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '../../../components/pageHeader';
-import { useReactQueryStatusToHeroUiTableLoadingState } from '../../../hooks/useReactQueryStatusToHeroUiTableLoadingState';
 import en from './en.json';
 import de from './de.json';
 import { ResourceGroupUpsertModal } from '../../resource-groups/upsertModal/resourceGroupUpsertModal';
+import { SimplePagination } from '../../../components/simplePagination';
 
 interface ManageResourceGroupsProps {
   resourceId: number;
@@ -49,8 +48,6 @@ export function ManageResourceGroups({
   const { data: resource } = useResourcesServiceGetOneResourceById({ id: resourceId });
 
   const { data: groups, status: fetchStatus, isFetched: isFetchedGroups } = useResourcesServiceResourceGroupsGetMany();
-
-  const loadingState = useReactQueryStatusToHeroUiTableLoadingState(fetchStatus);
 
   const { mutateAsync: addResourceToGroup } = useResourcesServiceResourceGroupsAddResource();
 
@@ -143,10 +140,9 @@ export function ManageResourceGroups({
                 <Button variant="secondary"
                   radius="full"
                   onPress={onOpen}
-                  startContent={<PlusIcon size={18} />}
                   size="sm"
                   data-cy="toolbar-open-create-resource-group-modal-button"
-                >
+                ><PlusIcon size={18} />
                   {t('addGroup')}
                 </Button>
               )}
@@ -157,13 +153,9 @@ export function ManageResourceGroups({
       <CardContent>
         <Table
           aria-label={t('table.ariaLabel')}
-          shadow="none"
-          removeWrapper
-          bottomContent={
-            isFetchedGroups && (
-              <Pagination isCompact showControls page={page} total={totalPages} onChange={(page) => setPage(page)} />
-            )
-          }
+
+
+
         >
           <TableHeader>
             <TableColumn>{t('columns.group')}</TableColumn>
@@ -171,9 +163,7 @@ export function ManageResourceGroups({
           </TableHeader>
           <TableBody
             items={currentPage}
-            loadingState={loadingState}
-            loadingContent={<TableDataLoadingIndicator />}
-            emptyContent={<EmptyState />}
+            renderEmptyState={() => <EmptyState />}
           >
             {(group) => (
               <TableRow
@@ -191,7 +181,7 @@ export function ManageResourceGroups({
                     color={isAdded(group) ? 'danger' : 'primary'}
                     isSelected={isAdded(group)}
                   />
-                  <Link size="lg" href={`/resource-groups/${group.id}`} showAnchorIcon>
+                  <Link size="lg" href={`/resource-groups/${group.id}`}>
                     {t('actions.openGroup')}
                   </Link>
                 </TableCell>

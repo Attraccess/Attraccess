@@ -13,7 +13,6 @@ import {
 import { useToastMessage } from '../../../components/toastProvider';
 import { PageHeader } from '../../../components/pageHeader';
 import { AttractapHardwareSetup } from '../HardwareSetup';
-import { useReactQueryStatusToHeroUiTableLoadingState } from '../../../hooks/useReactQueryStatusToHeroUiTableLoadingState';
 import { WebSerialConsole } from '../HardwareSetup/WebSerialConsole';
 import { useNow } from '../../../hooks/useNow';
 
@@ -36,8 +35,6 @@ export function AttractapList() {
   } = useAttractapServiceGetReaders(undefined, {
     refetchInterval: 5000,
   });
-
-  const loadingState = useReactQueryStatusToHeroUiTableLoadingState(fetchStatus);
 
   const toast = useToastMessage();
 
@@ -118,26 +115,24 @@ export function AttractapList() {
                 {(onOpenSerialConsole) => (
                   <Dropdown>
                     <DropdownTrigger>
-                      <Button variant="ghost" startContent={<MoreVertical className="w-4 h-4" />}>
+                      <Button variant="ghost"><MoreVertical className="w-4 h-4" />
                         {t('page.actions.menu')}
                       </Button>
                     </DropdownTrigger>
                     <DropdownMenu aria-label="Attractap actions">
                       <DropdownItem
                         key="serial-console" id="serial-console"
-                        startContent={<LogsIcon className="w-4 h-4" />}
                         onPress={onOpenSerialConsole}
                         data-cy="attractap-list-open-console-button"
-                      >
+                      ><LogsIcon className="w-4 h-4" />
                         {t('page.actions.openSerialConsole')}
                       </DropdownItem>
 
                       <DropdownItem
                         key="hardware-setup" id="hardware-setup"
-                        startContent={<CpuIcon className="w-4 h-4" />}
                         onPress={onOpenHardwareSetup}
                         data-cy="attractap-list-open-flasher-button"
-                      >
+                      ><CpuIcon className="w-4 h-4" />
                         {t('page.actions.openHardwareSetup')}
                       </DropdownItem>
                     </DropdownMenu>
@@ -176,7 +171,7 @@ export function AttractapList() {
               <Table
                 aria-label={`${tableIndex === 0 ? 'active' : 'stale'} attractaps`}
                 data-cy={`attractap-list-table-${tableIndex === 0 ? 'active' : 'stale'}`}
-                removeWrapper
+
               >
                 <TableHeader>
                   <TableColumn>{t('table.columns.name')}</TableColumn>
@@ -186,9 +181,7 @@ export function AttractapList() {
                 </TableHeader>
                 <TableBody
                   items={readers ?? []}
-                  loadingState={loadingState}
-                  loadingContent={<TableDataLoadingIndicator />}
-                  emptyContent={<EmptyState />}
+                  renderEmptyState={() => <EmptyState />}
                 >
                   {(reader) => (
                     <TableRow key={reader.id} id={reader.id} className={tableIndex === 1 ? 'border-l-8 border-l-warning' : ''}>
@@ -202,21 +195,19 @@ export function AttractapList() {
                       <TableCell className="flex-row flex">
                         <Button variant="ghost"
                           size="sm"
-                          startContent={<PencilIcon className="w-4 h-4" />}
                           onPress={() => setOpenedReaderEditor(reader.id)}
                           data-cy={`attractap-list-edit-reader-button-${reader.id}`}
-                        >
+                        ><PencilIcon className="w-4 h-4" />
                           {t('table.actions.editReader')}
                         </Button>
 
                         <AttractapDeleteModal readerId={reader.id}>
                           {(onOpen) => (
                             <Button variant="danger-soft"
-                              startContent={<Trash2Icon className="w-4 h-4" />}
                               size="sm"
                               onPress={onOpen}
                               data-cy={`attractap-list-delete-reader-button-${reader.id}`}
-                            >
+                            ><Trash2Icon className="w-4 h-4" />
                               {t('table.actions.deleteReader')}
                             </Button>
                           )}

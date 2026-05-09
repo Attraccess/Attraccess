@@ -130,9 +130,8 @@ export function ActiveSessionDisplay({ resourceId, startTime }: ActiveSessionDis
         <ButtonGroup fullWidth color="danger">
           <Button
             isPending={endSession.isPending}
-            startContent={<StopCircle className="w-4 h-4" />}
             onPress={immediatelyEndSession}
-          >
+          ><StopCircle className="w-4 h-4" />
             {t('endSession')}
           </Button>
           <Dropdown placement="bottom-end">

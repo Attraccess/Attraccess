@@ -100,7 +100,7 @@ export function EditEmailTemplatePage() {
           defaultValue={body}
           onChange={(value) => setBody(value ?? '')}
         />
-        <Link href="https://documentation.mjml.io/" isExternal showAnchorIcon>
+        <Link href="https://documentation.mjml.io/">
           {t('form.mjmlDocumentation')}
         </Link>
       </>
@@ -134,7 +134,7 @@ export function EditEmailTemplatePage() {
           <Card className="flex-1">
             <CardHeader className="flex flex-row justify-between">
               <span>{t('sections.template')}</span>
-              <Button isIconOnly startContent={<ExpandIcon />} onPress={() => setEditorIsExpanded(true)} />
+              <Button isIconOnly onPress={() => setEditorIsExpanded(true)} />
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
               {editor}
