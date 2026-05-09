@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { Alert, Button, Form } from '@heroui/react';
+import { Alert, AlertContent, AlertDescription, Button, Form } from '@heroui/react';
 import { KeyRoundIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useQueryClient } from '@tanstack/react-query';
@@ -73,7 +73,11 @@ export function LicenseStep({ onSuccess }: LicenseStepProps) {
         icon={<KeyRoundIcon size={18} />}
         noMargin
       />
-      <Alert color="primary" variant="flat" description={t('intro')} />
+      <Alert status="default" >
+        <AlertContent>
+          <AlertDescription>{t('intro')}</AlertDescription>
+        </AlertContent>
+      </Alert>
       <CommunityLicenseButton onAccept={setLicenseKey} isDisabled={isPending} />
       <Form
         ref={formRef}

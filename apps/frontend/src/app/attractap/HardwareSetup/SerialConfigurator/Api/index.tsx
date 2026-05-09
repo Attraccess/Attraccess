@@ -1,5 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Alert, Button, cn, ProgressCircle, ProgressCircleFillCircle, ProgressCircleTrack, ProgressCircleTrackCircle } from "@heroui/react";
+import { Alert, AlertContent, AlertTitle, Button, ProgressCircle, ProgressCircleFillCircle, ProgressCircleTrack, ProgressCircleTrackCircle, cn } from '@heroui/react';
 import { useCallback, useMemo, useState } from 'react';
 import { getBaseUrl } from '../../../../../api';
 import { PageHeader } from '../../../../../components/pageHeader';
@@ -152,7 +152,10 @@ export function AttractapSerialConfiguratorApi({
         }
       />
 
-      <Alert color={alertColor} title={alertTitle}>
+      <Alert status={alertColor}>
+        <AlertContent>
+          <AlertTitle>{alertTitle}</AlertTitle>
+        </AlertContent>
         {alertDescription}
         {status?.status === 'authenticated' && (
           <Button variant="primary" onPress={handleOpenDeviceSettings}>
@@ -162,7 +165,10 @@ export function AttractapSerialConfiguratorApi({
       </Alert>
 
       {apiDataMatchesServer === false && (
-        <Alert color="primary" title={t('apiDataDoesNotMatchesServer.alert.title')}>
+        <Alert status="default">
+          <AlertContent>
+            <AlertTitle>{t('apiDataDoesNotMatchesServer.alert.title')}</AlertTitle>
+          </AlertContent>
           <div className="flex flex-row flex-wrap gap-4">
             <div>{t('apiDataDoesNotMatchesServer.alert.description')}</div>
             <Button variant="primary" onPress={() => updateApiData()} isPending={isUpdatingApi}>

@@ -1,22 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  Alert,
-  Button,
-  Dropdown,
-  DropdownTrigger,
-  DropdownMenu,
-  DropdownItem,
-  Table,
-  TableBody,
-  TableCell,
-  TableColumn,
-  TableHeader,
-  TableRow,
-  Card,
-  CardHeader,
-  CardContent,
-  Chip,
-} from '@heroui/react';
+import { Alert, AlertContent, AlertDescription, Button, Card, CardContent, CardHeader, Chip, Dropdown, DropdownItem, DropdownMenu, DropdownTrigger, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from '@heroui/react';
 import { ArrowRightIcon, CpuIcon, LogsIcon, MoreVertical, PencilIcon, Trash2Icon } from 'lucide-react';
 import { TableDataLoadingIndicator } from '../../../components/tableComponents';
 import { EmptyState } from '../../../components/emptyState';
@@ -166,8 +149,10 @@ export function AttractapList() {
         }
       />
 
-      <Alert color="danger" className="mb-4">
-        {t('workInProgress')}
+      <Alert status="danger" className="mb-4">
+        <AlertContent>
+          <AlertDescription>{t('workInProgress')}</AlertDescription>
+        </AlertContent>
       </Alert>
 
       <AttractapEditor

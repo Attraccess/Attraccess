@@ -2,7 +2,7 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 
 import de from './de.json';
 import en from './en.json';
-import { Alert, Button } from '@heroui/react';
+import { Alert, AlertContent, AlertTitle, Button } from '@heroui/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useState } from 'react';
 import { useReliableServerAvailability } from '../../hooks/useReliableServerAvailability';
@@ -37,14 +37,17 @@ export function ServerNotAvailable() {
     setIsLoading(false);
   }, [queryClient]);
 
+  if (!isServerLikelyDown) {
+    return null;
+  }
+
   return (
-    <Alert
+    <Alert status="danger"
       className="sticky top-6 z-50 m-6 mt-0 w-auto"
-      color="danger"
-      title={t('title')}
-      variant="faded"
-      isVisible={isServerLikelyDown}
     >
+      <AlertContent>
+        <AlertTitle>{t('title')}</AlertTitle>
+      </AlertContent>
       <p>{t('description')}</p>
       <Button onPress={reload} isPending={isLoading}>
         {t('actions.reload')}

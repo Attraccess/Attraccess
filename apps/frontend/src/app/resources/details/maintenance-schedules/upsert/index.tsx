@@ -1,4 +1,4 @@
-import { Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Button, TextField, Label, Input, Switch, Form, Alert, Select, ListBoxItem, useOverlayState } from "@heroui/react";
+import { Alert, AlertContent, AlertTitle, Button, Form, Input, Label, ListBoxItem, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Select, Switch, TextField, useOverlayState } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -303,7 +303,10 @@ export function MaintenanceScheduleUpsertModal(props: Props) {
               </Switch>
 
               {error && (
-                <Alert color="danger" title={t('alert.error.title')} variant="flat">
+                <Alert status="danger">
+                  <AlertContent>
+                    <AlertTitle>{t('alert.error.title')}</AlertTitle>
+                  </AlertContent>
                   {(error as Error).message}
                 </Alert>
               )}

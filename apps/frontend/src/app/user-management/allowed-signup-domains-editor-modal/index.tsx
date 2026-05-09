@@ -4,7 +4,7 @@ import {
   useUsersServiceGetLocalSignupDomainWhitelist,
   useUsersServiceSetLocalSignupDomainWhitelist,
 } from '@attraccess/react-query-client';
-import { Alert, Button, TextField, Label, Input, InputGroup, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow, useOverlayState } from '@heroui/react';
+import { Alert, AlertContent, AlertDescription, Button, Input, InputGroup, Label, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow, TextField, useOverlayState } from '@heroui/react';
 import { EmptyState } from '../../../components/emptyState';
 import { PageHeader } from '../../../components/pageHeader';
 import { TableDataLoadingIndicator } from '../../../components/tableComponents';
@@ -112,8 +112,10 @@ export function AllowedSignupDomainsEditorModal(props: Props) {
           </ModalHeader>
 
           <ModalBody>
-            <Alert variant="flat" color="warning" className="whitespace-pre-wrap">
-              {t('noteAboutNoneAndWildcard')}
+            <Alert status="warning" className="whitespace-pre-wrap">
+              <AlertContent>
+                <AlertDescription>{t('noteAboutNoneAndWildcard')}</AlertDescription>
+              </AlertContent>
             </Alert>
             <TextField value={domainToAdd} onChange={setDomainToAdd}>
               <Label>{t('inputs.addDomain.label')}</Label>

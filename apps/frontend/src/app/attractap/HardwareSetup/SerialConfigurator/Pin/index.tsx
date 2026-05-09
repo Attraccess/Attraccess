@@ -1,5 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Alert, Button, TextField, Label, Input, cn } from '@heroui/react';
+import { Alert, AlertContent, AlertDescription, Button, Input, Label, TextField, cn } from '@heroui/react';
 import { useCallback, useState, type FormEvent } from 'react';
 import { PageHeader } from '../../../../../components/pageHeader';
 import { useAttractapSerialComm } from '../Auth';
@@ -104,7 +104,11 @@ export function AttractapSerialConfiguratorPin({ className, mode = 'change' }: A
           <Label>{t('fields.confirmPin')}</Label>
           <Input maxLength={4} inputMode="numeric" required />
         </TextField>
-        {error && <Alert color="danger">{error}</Alert>}
+        {error && <Alert status="danger">
+          <AlertContent>
+            <AlertDescription>{error}</AlertDescription>
+          </AlertContent>
+        </Alert>}
         <div className="flex gap-2">
           <Button variant="primary" type="submit" isPending={isSubmitting}>
             {t('submit')}

@@ -1,4 +1,4 @@
-import { Alert, Button } from '@heroui/react';
+import { Alert, AlertContent, AlertDescription, AlertTitle, Button } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 
 import de from './de.json';
@@ -16,17 +16,15 @@ export function NoResourcesFound(props: Props) {
   });
   return (
     <div>
-      <Alert
-        variant="faded"
-        color="warning"
-        title={t('alert.title')}
-        description={t('alert.description')}
-        endContent={
-          <Button variant="danger-soft" className="ml-4" onPress={onClearFilterAndSearch} size="sm">
-            {t('alert.clear')}
-          </Button>
-        }
-      />
+      <Alert status="warning">
+        <AlertContent>
+          <AlertTitle>{t('alert.title')}</AlertTitle>
+          <AlertDescription>{t('alert.description')}</AlertDescription>
+        </AlertContent>
+        <Button variant="danger-soft" className="ml-4" onPress={onClearFilterAndSearch} size="sm">
+          {t('alert.clear')}
+        </Button>
+      </Alert>
     </div>
   );
 }

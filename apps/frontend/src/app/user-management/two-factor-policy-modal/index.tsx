@@ -5,7 +5,7 @@ import {
   useTwoFactorAuthenticationServiceGetTwoFactorPolicy,
   useTwoFactorAuthenticationServiceSetTwoFactorPolicy,
 } from '@attraccess/react-query-client';
-import { Alert, Button, ListBoxItem, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Select, Selection, useOverlayState } from "@heroui/react";
+import { Alert, AlertContent, AlertDescription, AlertTitle, Button, ListBoxItem, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Select, Selection, useOverlayState } from '@heroui/react';
 import { Settings2Icon } from 'lucide-react';
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { PageHeader } from '../../../components/pageHeader';
@@ -116,7 +116,12 @@ export function TwoFactorPolicyModal(props: Props) {
                   <PageHeader title={t('title')} subtitle={t('subtitle')} icon={<Settings2Icon />} noMargin={true} />
                 </ModalHeader>
                 <ModalBody>
-                  <Alert color="warning" variant="flat" title={t('warning.title')} description={t('warning.description')} />
+                  <Alert status="warning" >
+                    <AlertContent>
+                      <AlertTitle>{t('warning.title')}</AlertTitle>
+                      <AlertDescription>{t('warning.description')}</AlertDescription>
+                    </AlertContent>
+                  </Alert>
                   <Select
                     label={t('inputs.policy.label')}
                     selectedKeys={selectedPolicy ? new Set([selectedPolicy]) : new Set([])}

@@ -1,4 +1,4 @@
-import { Alert, Button, TextField, Label, Input, Skeleton } from '@heroui/react';
+import { Alert, AlertContent, AlertDescription, AlertTitle, Button, Input, Label, Skeleton, TextField } from '@heroui/react';
 import { QRCode } from 'react-qrcode-logo';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -97,7 +97,12 @@ export function TwoFactorCard() {
         <div className="text-sm text-default-500">{status?.enabled ? t('status.enabled') : t('status.disabled')}</div>
       </div>
 
-      {policyWarning && <Alert color="warning" title={t('policy.title')} description={policyWarning} />}
+      {policyWarning && <Alert status="warning" >
+        <AlertContent>
+          <AlertTitle>{t('policy.title')}</AlertTitle>
+          <AlertDescription>{policyWarning}</AlertDescription>
+        </AlertContent>
+      </Alert>}
 
       {showSetup && (
         <div className="flex flex-col gap-4">
