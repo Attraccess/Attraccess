@@ -159,12 +159,11 @@ function DocumentationEditorComponent() {
           <p className="text-danger">{resourceError instanceof Error ? resourceError.message : t('error.unknown')}</p>
         </CardContent>
         <CardFooter className="flex justify-center gap-4">
-          <Button onPress={() => refetchResource()} color="primary" data-cy="documentation-editor-error-retry-button">
+          <Button variant="primary" onPress={() => refetchResource()} data-cy="documentation-editor-error-retry-button">
             {t('actions.retry')}
           </Button>
-          <Button
+          <Button variant="secondary"
             onPress={() => navigate('/resources')}
-            variant="flat"
             startContent={<ArrowLeft size={16} />}
             data-cy="documentation-editor-error-back-to-resources-button"
           >
@@ -186,9 +185,8 @@ function DocumentationEditorComponent() {
           <p>{t('notFound.message')}</p>
         </CardContent>
         <CardFooter className="justify-center">
-          <Button
+          <Button variant="secondary"
             onPress={() => navigate('/resources')}
-            variant="flat"
             startContent={<ArrowLeft size={16} />}
             data-cy="documentation-editor-not-found-back-to-resources-button"
           >
@@ -206,10 +204,9 @@ function DocumentationEditorComponent() {
         subtitle={resource.name}
         backTo={`/resources/${resourceId}`}
         actions={
-          <Button
-            color="primary"
+          <Button variant="primary"
             onPress={handleSave}
-            isLoading={updateResource.isPending}
+            isPending={updateResource.isPending}
             startContent={<Save className="w-4 h-4" />}
             data-cy="documentation-editor-header-save-button"
           >
@@ -283,18 +280,16 @@ function DocumentationEditorComponent() {
         </CardContent>
         <CardFooter>
           <div className="flex justify-end space-x-2">
-            <Button
-              variant="light"
+            <Button variant="ghost"
               onPress={() => navigate(`/resources/${resourceId}`)}
               isDisabled={updateResource.isPending}
               data-cy="documentation-editor-footer-cancel-button"
             >
               {t('actions.cancel')}
             </Button>
-            <Button
-              color="primary"
+            <Button variant="primary"
               onPress={handleSave}
-              isLoading={updateResource.isPending}
+              isPending={updateResource.isPending}
               data-cy="documentation-editor-footer-save-button"
             >
               {t('actions.save')}

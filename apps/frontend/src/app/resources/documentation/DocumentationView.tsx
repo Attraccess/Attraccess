@@ -56,17 +56,15 @@ function DocumentationViewComponent() {
           <p className="text-danger">{resourceError instanceof Error ? resourceError.message : t('error.unknown')}</p>
         </CardContent>
         <CardFooter className="flex justify-center gap-4">
-          <Button
+          <Button variant="primary"
             onPress={() => refetchResource()}
-            color="primary"
             startContent={<RefreshCw size={16} />}
             data-cy="documentation-view-error-retry-button"
           >
             {t('actions.retry')}
           </Button>
-          <Button
+          <Button variant="secondary"
             onPress={() => navigate('/resources')}
-            variant="flat"
             startContent={<ArrowLeft size={16} />}
             data-cy="documentation-view-error-back-to-resources-button"
           >
@@ -88,9 +86,8 @@ function DocumentationViewComponent() {
           <p>{t('notFound.message')}</p>
         </CardContent>
         <CardFooter className="justify-center">
-          <Button
+          <Button variant="secondary"
             onPress={() => navigate('/resources')}
-            variant="flat"
             startContent={<ArrowLeft size={16} />}
             data-cy="documentation-view-not-found-back-to-resources-button"
           >
@@ -110,9 +107,7 @@ function DocumentationViewComponent() {
         actions={
           <div className="flex gap-2">
             {canManageResources && (
-              <Button
-                color="primary"
-                variant="flat"
+              <Button variant="secondary"
                 onPress={handleEditDocumentation}
                 startContent={<Edit size={16} />}
                 data-cy="documentation-view-header-edit-button"
@@ -120,10 +115,9 @@ function DocumentationViewComponent() {
                 {t('actions.edit')}
               </Button>
             )}
-            <Button
-              variant="flat"
+            <Button variant="secondary"
               onPress={() => refetchResource()}
-              isLoading={isFetching}
+              isPending={isFetching}
               startContent={<RefreshCw size={16} />}
               aria-label={t('actions.refresh')}
               data-cy="documentation-view-header-refresh-button"

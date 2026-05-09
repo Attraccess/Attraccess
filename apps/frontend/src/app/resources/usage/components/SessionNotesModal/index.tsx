@@ -56,7 +56,7 @@ export const SessionNotesModal = ({ isOpen, onClose, onConfirm, mode, isSubmitti
               </ModalBody>
 
               <ModalFooter>
-                <Button variant="bordered" onPress={close} disabled={isSubmitting}>
+                <Button variant="outline" onPress={close} disabled={isSubmitting}>
                   {t('cancel')}
                 </Button>
                 <Button onPress={handleConfirm} disabled={isSubmitting}>

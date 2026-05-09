@@ -47,10 +47,8 @@ export function PasswordResetForm({ onGoBack }: PasswordResetFormProps) {
       <div>
         <h2 className="text-3xl font-bold">{t('title')}</h2>
         <p className="mt-2 text-gray-600 dark:text-gray-300">
-          <Button
+          <Button variant="secondary"
             onPress={onGoBack}
-            variant="light"
-            color="secondary"
             startContent={<ArrowLeft />}
             data-cy="password-reset-form-go-back-button"
           >
@@ -66,12 +64,11 @@ export function PasswordResetForm({ onGoBack }: PasswordResetFormProps) {
         data-cy="password-reset-form-email-input"
       />
 
-      <Button
+      <Button variant="primary"
         onPress={() => requestPasswordReset({ requestBody: { email } })}
         fullWidth
-        color="primary"
         endContent={memoizedArrowRight}
-        isLoading={isPending}
+        isPending={isPending}
         isDisabled={isPending}
         data-cy="password-reset-form-submit-button"
       >

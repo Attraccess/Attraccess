@@ -83,7 +83,7 @@ export function VerifyEmail() {
             <p className="text-sm text-gray-600 dark:text-gray-400 text-center">{t('success.message')}</p>
           </CardContent>
           <CardFooter>
-            <Button fullWidth color="primary" onPress={() => navigate('/')} data-cy="verify-email-success-login-button">
+            <Button variant="primary" fullWidth onPress={() => navigate('/')} data-cy="verify-email-success-login-button">
               {t('success.goToLogin')}
             </Button>
           </CardFooter>
@@ -108,18 +108,16 @@ export function VerifyEmail() {
             />
           </CardContent>
           <CardFooter className="flex flex-col gap-2">
-            <Button
+            <Button variant="primary"
               fullWidth
-              color="primary"
               onPress={activateEmail}
               isDisabled={verifyEmail.isPending}
               data-cy="verify-email-error-try-again-button"
             >
               {t('error.tryAgain')}
             </Button>
-            <Button
+            <Button variant="outline"
               fullWidth
-              variant="bordered"
               onPress={() => navigate('/')}
               data-cy="verify-email-error-back-to-login-button"
             >

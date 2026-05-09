@@ -56,7 +56,7 @@ function Content(props: ContentProps) {
       <div className="flex flex-col gap-4">
         <Alert color="primary">{t('connect.description')}</Alert>
 
-        <Button color="primary" onPress={() => espTools.current.connectToDevice()} fullWidth>
+        <Button variant="primary" onPress={() => espTools.current.connectToDevice()} fullWidth>
           {t('connect.button.label')}
         </Button>
       </div>

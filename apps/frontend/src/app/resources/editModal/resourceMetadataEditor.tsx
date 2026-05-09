@@ -142,9 +142,8 @@ export function ResourceMetadataEditor({ t, value, onChange }: ResourceMetadataE
           <p className="text-sm font-semibold text-default-600">{t('inputs.metadata.label')}</p>
           <p className="text-xs text-default-500">{t('inputs.metadata.description')}</p>
         </div>
-        <Button
+        <Button variant="secondary"
           size="sm"
-          variant="flat"
           startContent={<Plus className="w-4 h-4" />}
           className="w-full sm:w-auto whitespace-nowrap"
           onPress={handleAddEntry}
@@ -174,10 +173,8 @@ export function ResourceMetadataEditor({ t, value, onChange }: ResourceMetadataE
                 onChange={(event) => handleValueChange(entry.id, event.target.value)}
                 className="flex-1"
               />
-              <Button
+              <Button variant="danger-soft"
                 size="sm"
-                variant="light"
-                color="danger"
                 startContent={<Trash2 className="w-4 h-4" />}
                 className="w-full sm:w-auto"
                 onPress={() => handleRemoveEntry(entry.id)}

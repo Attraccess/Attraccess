@@ -49,7 +49,7 @@ export function SumUpReadersCard(props: Omit<CardProps, 'children'>) {
           actions={
             <SumUpReadersPairing>
               {(onOpen) => (
-                <Button size="sm" color="primary" onPress={onOpen}>
+                <Button variant="primary" size="sm" onPress={onOpen}>
                   {t('actions.pairReader')}
                 </Button>
               )}
@@ -81,12 +81,10 @@ export function SumUpReadersCard(props: Omit<CardProps, 'children'>) {
                 <TableCell>
                   <SumUpReaderDeleteModal readerId={reader.id} readerName={reader.name}>
                     {(onOpen) => (
-                      <Button
+                      <Button variant="danger-soft"
                         size="sm"
                         startContent={<Trash2Icon className="w-4 h-4" />}
-                        variant="light"
                         onPress={onOpen}
-                        color="danger"
                       >
                         {t('table.actions.deleteReader')}
                       </Button>

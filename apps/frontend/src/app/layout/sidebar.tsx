@@ -164,8 +164,7 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
         <div className="flex items-center justify-between h-16 px-4">
           <Logo data-cy="sidebar-home-link" />
 
-          <Button
-            variant="light"
+          <Button variant="ghost"
             aria-label="Close sidebar"
             isIconOnly
             className="md:hidden"
@@ -264,7 +263,7 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
               </div>
               <Dropdown data-cy="sidebar-settings-dropdown" placement="top-end">
                 <DropdownTrigger>
-                  <Button variant="light" aria-label="Settings" isIconOnly data-cy="sidebar-settings-button">
+                  <Button variant="ghost" aria-label="Settings" isIconOnly data-cy="sidebar-settings-button">
                     <Settings className="h-5 w-5" />
                   </Button>
                 </DropdownTrigger>

@@ -32,9 +32,8 @@ export function PageHeader({
     <div className={cn('flex items-center w-full justify-between mb-8 flex-wrap gap-y-8', noMargin && 'mb-0')}>
       <div className="flex items-center">
         {(backTo || onBack) && (
-          <Button
+          <Button variant="ghost"
             onPress={() => (backTo ? navigate(backTo) : onBack?.())}
-            variant="ghost"
             isIconOnly
             aria-label="Go back"
             className="mr-4"

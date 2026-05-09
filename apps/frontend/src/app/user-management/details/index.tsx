@@ -242,9 +242,7 @@ export function UserManagementDetailsPage() {
               </CardHeader>
               <CardContent className="flex flex-col gap-4">
                 <p className="text-sm text-default-500">{t('delete.description')}</p>
-                <Button
-                  color="danger"
-                  variant="flat"
+                <Button variant="danger-soft"
                   onPress={open}
                   isDisabled={isSelf}
                   data-cy="admin-delete-user-open-modal"
@@ -269,13 +267,12 @@ export function UserManagementDetailsPage() {
                   <p className="text-sm text-default-500">{t('delete.modal.description')}</p>
                 </ModalBody>
                 <ModalFooter>
-                  <Button variant="light" onPress={modalClose} isDisabled={isDeleting}>
+                  <Button variant="ghost" onPress={modalClose} isDisabled={isDeleting}>
                     {t('delete.actions.cancel')}
                   </Button>
-                  <Button
-                    color="danger"
+                  <Button variant="danger"
                     onPress={() => user && deleteUser({ id: user.id })}
-                    isLoading={isDeleting}
+                    isPending={isDeleting}
                     data-cy="admin-delete-user-confirm-button"
                   >
                     {t('delete.actions.confirm')}

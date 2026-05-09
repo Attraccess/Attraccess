@@ -106,9 +106,7 @@ const NfcCardTableCell = (props: NfcCardTableCellProps) => {
   if (props.header === 'actions') {
     return (
       <div className="flex gap-2 flex-row flex-wrap">
-        <Button
-          variant="light"
-          color="danger"
+        <Button variant="danger-soft"
           size="sm"
           startContent={<Trash2Icon />}
           onPress={() => props.onDeleteClick()}
@@ -119,11 +117,9 @@ const NfcCardTableCell = (props: NfcCardTableCellProps) => {
         {props.card.isActive ? (
           <NfcCardDeactivateModal cardId={props.card.id}>
             {(onOpen) => (
-              <Button
+              <Button variant="tertiary"
                 size="sm"
                 startContent={<XIcon />}
-                variant="light"
-                color="warning"
                 onPress={onOpen}
                 data-cy={`nfc-card-table-cell-deactivate-button-${props.card.id}`}
               >
@@ -134,11 +130,9 @@ const NfcCardTableCell = (props: NfcCardTableCellProps) => {
         ) : (
           <NfcCardActivateModal cardId={props.card.id}>
             {(onOpen) => (
-              <Button
+              <Button variant="tertiary"
                 size="sm"
                 startContent={<CheckIcon />}
-                variant="light"
-                color="success"
                 onPress={onOpen}
                 data-cy={`nfc-card-table-cell-activate-button-${props.card.id}`}
               >
@@ -195,8 +189,7 @@ const EnrollNfcCardButton = () => {
 
   return (
     <>
-      <Button
-        variant="light"
+      <Button variant="ghost"
         onPress={() => setShow(true)}
         data-cy="enroll-nfc-card-button-trigger"
         startContent={<PlusIcon />}
@@ -286,7 +279,7 @@ export function NfcCardList() {
           <>
             <EnrollNfcCardButton />
             {hasPermission('canManageResources') && (
-              <Button variant="light" onPress={() => navigate('/attractap/readers')} startContent={<ServerIcon />}>
+              <Button variant="ghost" onPress={() => navigate('/attractap/readers')} startContent={<ServerIcon />}>
                 {t('readers')}
               </Button>
             )}

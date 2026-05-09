@@ -144,10 +144,9 @@ export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({ user, ss
       </CardContent>
 
       <CardFooter className="flex justify-end">
-        <Button
-          color="primary"
+        <Button variant="primary"
           onPress={handleSave}
-          isLoading={isSavingPermissions}
+          isPending={isSavingPermissions}
           isDisabled={allPermissionsSsoManaged}
           data-cy="user-permission-form-save-button"
         >

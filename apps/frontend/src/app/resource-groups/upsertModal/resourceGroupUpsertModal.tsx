@@ -204,18 +204,15 @@ export function ResourceGroupUpsertModal(props: Readonly<Props>) {
                 </ModalBody>
 
                 <ModalFooter>
-                  <Button
-                    variant="flat"
-                    color="default"
+                  <Button variant="secondary"
                     onPress={close}
                     data-cy="resource-group-upsert-modal-cancel-button"
                   >
                     {t('cancelButton')}
                   </Button>
-                  <Button
-                    color="primary"
+                  <Button variant="primary"
                     type="submit"
-                    isLoading={mutation.isPending}
+                    isPending={mutation.isPending}
                     data-cy="resource-group-upsert-modal-submit-button"
                   >
                     {isEditMode ? t('updateButton') : t('createButton')}

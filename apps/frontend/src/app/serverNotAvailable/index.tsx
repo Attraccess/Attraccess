@@ -46,7 +46,7 @@ export function ServerNotAvailable() {
       isVisible={isServerLikelyDown}
     >
       <p>{t('description')}</p>
-      <Button onPress={reload} isLoading={isLoading}>
+      <Button onPress={reload} isPending={isLoading}>
         {t('actions.reload')}
       </Button>
     </Alert>

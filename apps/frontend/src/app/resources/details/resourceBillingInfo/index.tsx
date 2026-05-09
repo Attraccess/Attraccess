@@ -127,7 +127,7 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
           actions={
             <ResourceBillingInfoEditor resourceId={resourceId}>
               {(onOpen) => (
-                <Button size="sm" color="primary" isIconOnly startContent={<Edit2Icon size={12} />} onPress={onOpen} />
+                <Button variant="primary" size="sm" isIconOnly startContent={<Edit2Icon size={12} />} onPress={onOpen} />
               )}
             </ResourceBillingInfoEditor>
           }

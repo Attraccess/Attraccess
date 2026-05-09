@@ -110,7 +110,7 @@ export function FirmwareFlasher(props: Props) {
   if (flashProgress === 0 && logLines.length === 0 && !flashError) {
     return (
       <div className="space-y-4">
-        <Button isLoading={isFlashing} onPress={flashFirmware} color="primary">
+        <Button variant="primary" isPending={isFlashing} onPress={flashFirmware}>
           {t('action.flash')}
         </Button>
       </div>
@@ -123,7 +123,7 @@ export function FirmwareFlasher(props: Props) {
         <Alert title={t('errors.' + flashError.type)} color="danger" className="flex-row flex-wrap flex-gap-2">
           <div>{(flashError.details as string) || 'Unknown error occurred'}</div>
 
-          <Button size="sm" color="primary" onPress={flashFirmware}>
+          <Button variant="primary" size="sm" onPress={flashFirmware}>
             {t('action.retryFlash')}
           </Button>
         </Alert>

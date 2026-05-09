@@ -53,10 +53,10 @@ export function DeleteConfirmationModal({
                 </div>
               </ModalBody>
               <ModalFooter>
-                <Button variant="light" onPress={close} data-cy="cancel-button">
+                <Button variant="ghost" onPress={close} data-cy="cancel-button">
                   {t('cancelButton')}
                 </Button>
-                <Button data-cy="delete-button" onPress={() => onConfirm()} isLoading={isDeleting} color="danger">
+                <Button variant="danger" data-cy="delete-button" onPress={() => onConfirm()} isPending={isDeleting}>
                   {t('deleteButton')}
                 </Button>
               </ModalFooter>

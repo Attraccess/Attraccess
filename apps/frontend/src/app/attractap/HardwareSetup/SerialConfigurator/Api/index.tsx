@@ -155,7 +155,7 @@ export function AttractapSerialConfiguratorApi({
       <Alert color={alertColor} title={alertTitle}>
         {alertDescription}
         {status?.status === 'authenticated' && (
-          <Button onPress={handleOpenDeviceSettings} color="primary">
+          <Button variant="primary" onPress={handleOpenDeviceSettings}>
             {t('status.authenticated.openDeviceSettings.button')}
           </Button>
         )}
@@ -165,7 +165,7 @@ export function AttractapSerialConfiguratorApi({
         <Alert color="primary" title={t('apiDataDoesNotMatchesServer.alert.title')}>
           <div className="flex flex-row flex-wrap gap-4">
             <div>{t('apiDataDoesNotMatchesServer.alert.description')}</div>
-            <Button onPress={() => updateApiData()} color="primary" isLoading={isUpdatingApi}>
+            <Button variant="primary" onPress={() => updateApiData()} isPending={isUpdatingApi}>
               {t('apiDataDoesNotMatchesServer.alert.button')}
             </Button>
           </div>

@@ -60,7 +60,7 @@ export function FlowButtons(props: Props) {
           onPress={() => {
             pressButton({ resourceId, buttonId: node.id });
           }}
-          isLoading={pendingButtons.includes(node.id)}
+          isPending={pendingButtons.includes(node.id)}
           className="w-full min-w-0 max-w-full"
         >
           <span className="block whitespace-normal break-words text-center">

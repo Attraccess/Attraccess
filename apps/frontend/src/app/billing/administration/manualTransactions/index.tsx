@@ -96,7 +96,7 @@ export function ManualTransactionsCard(props: Props & Omit<CardProps, 'children'
       </CardContent>
 
       <CardFooter>
-        <Button color="primary" onPress={handleCreateTransaction} isLoading={isCreatingManualTransaction}>
+        <Button variant="primary" onPress={handleCreateTransaction} isPending={isCreatingManualTransaction}>
           {t('actions.createTransaction')}
         </Button>
       </CardFooter>

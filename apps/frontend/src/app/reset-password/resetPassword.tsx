@@ -60,9 +60,8 @@ export function ResetPassword() {
             <p className="text-sm text-gray-600 dark:text-gray-400 text-center">{t('success.message')}</p>
           </CardContent>
           <CardFooter>
-            <Button
+            <Button variant="primary"
               fullWidth
-              color="primary"
               onPress={() => navigate('/')}
               data-cy="reset-password-success-go-to-login-button"
             >
@@ -111,7 +110,7 @@ export function ResetPassword() {
           />
         </CardContent>
         <CardFooter>
-          <Button fullWidth color="primary" type="submit" data-cy="reset-password-submit-button">
+          <Button variant="primary" fullWidth type="submit" data-cy="reset-password-submit-button">
             {t('submit')}
           </Button>
         </CardFooter>

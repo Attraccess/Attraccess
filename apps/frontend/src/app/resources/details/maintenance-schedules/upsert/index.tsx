@@ -327,10 +327,9 @@ export function MaintenanceScheduleUpsertModal(props: Props) {
           </ModalBody>
 
           <ModalFooter>
-            <Button
+            <Button variant="primary"
               onPress={onSubmit}
-              color="primary"
-              isLoading={isCreating || isUpdating}
+              isPending={isCreating || isUpdating}
             >
               {t('actions.save')}
             </Button>

@@ -163,7 +163,7 @@ export function ResourceMaintenanceUpsertModal(props: Props) {
                 </ModalBody>
 
                 <ModalFooter>
-                  <Button onPress={onSubmit} color="primary" type="submit" isLoading={isCreating}>
+                  <Button variant="primary" onPress={onSubmit} type="submit" isPending={isCreating}>
                     {t('actions.save')}
                   </Button>
                 </ModalFooter>

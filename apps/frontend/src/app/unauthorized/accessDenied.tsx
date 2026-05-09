@@ -43,9 +43,7 @@ export const AccessDenied = memo(function AccessDeniedComponent() {
         <CardFooter className="flex flex-col gap-2">
           {/* Action Buttons */}
 
-          <Button
-            color="primary"
-            variant="solid"
+          <Button variant="primary"
             startContent={<ArrowLeft className="w-4 h-4" />}
             onPress={handleGoBack}
             fullWidth
@@ -54,9 +52,7 @@ export const AccessDenied = memo(function AccessDeniedComponent() {
             {t('goBack')}
           </Button>
 
-          <Button
-            color="default"
-            variant="bordered"
+          <Button variant="outline"
             startContent={<Home className="w-4 h-4" />}
             onPress={handleGoHome}
             fullWidth

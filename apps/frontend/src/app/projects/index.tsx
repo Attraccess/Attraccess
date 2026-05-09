@@ -166,19 +166,16 @@ export function ProjectsListPage() {
         </div>
         <div className="text-tiny text-default-400">{new Date(invitation.createdAt).toLocaleString()}</div>
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <Button
-            color="primary"
+          <Button variant="primary"
             size="sm"
-            isLoading={acceptingInvitationId === invitation.id}
+            isPending={acceptingInvitationId === invitation.id}
             onPress={() => handleAccept(invitation.id)}
           >
             {t('invitations.actions.accept')}
           </Button>
-          <Button
-            variant="light"
-            color="danger"
+          <Button variant="danger-soft"
             size="sm"
-            isLoading={decliningInvitationId === invitation.id}
+            isPending={decliningInvitationId === invitation.id}
             onPress={() => handleDecline(invitation.id)}
           >
             {t('invitations.actions.decline')}
@@ -211,7 +208,7 @@ export function ProjectsListPage() {
             </Switch>
             <UpsertProjectModal>
               {(onOpen) => (
-                <Button onPress={onOpen} startContent={<PlusIcon size="24" />} variant="light">
+                <Button variant="ghost" onPress={onOpen} startContent={<PlusIcon size="24" />}>
                   {t('actions.create')}
                 </Button>
               )}

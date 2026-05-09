@@ -55,14 +55,17 @@ export function Toolbar({
                   onHideEmptyResourceGroupsChanged={filterProps.onHideEmptyResourceGroupsChanged}
                 >
                   {({ onOpen }) => (
-                    <Button
-                      size="sm"
-                      variant="light"
-                      startContent={<ListFilterIcon size={18} className={cn(highlightFilter && 'animate-pulse')} />}
-                      isIconOnly
-                      color={highlightFilter ? 'danger' : undefined}
-                      onPress={onOpen}
-                    />
+                    <>
+                      {/* TODO(heroui-v3): map dynamic color/variant to new variant prop */}
+                      <Button
+                        size="sm"
+                        variant="light"
+                        startContent={<ListFilterIcon size={18} className={cn(highlightFilter && 'animate-pulse')} />}
+                        isIconOnly
+                        color={highlightFilter ? 'danger' : undefined}
+                        onPress={onOpen}
+                      />
+                    </>
                   )}
                 </ResourceFilter>
                 <SearchIcon size={18} />
@@ -78,7 +81,7 @@ export function Toolbar({
 
         <ResourceScanner>
           {(onOpen: () => void) => (
-            <Button variant="light" radius="full" onPress={onOpen} startContent={<ScanQrCodeIcon />} isIconOnly />
+            <Button variant="ghost" radius="full" onPress={onOpen} startContent={<ScanQrCodeIcon />} isIconOnly />
           )}
         </ResourceScanner>
       </div>
@@ -88,11 +91,10 @@ export function Toolbar({
           <div className="flex items-center gap-2 mr-1 hidden md:flex">
             <ResourceEditModal onUpdated={(resource) => navigate(`/resources/${resource.id}`)} closeOnSuccess>
               {(onOpen: () => void) => (
-                <Button
+                <Button variant="primary"
                   radius="full"
                   onPress={onOpen}
                   startContent={<PlusIcon size={18} />}
-                  color="primary"
                   size="sm"
                   data-cy="toolbar-open-create-resource-modal-button"
                 >

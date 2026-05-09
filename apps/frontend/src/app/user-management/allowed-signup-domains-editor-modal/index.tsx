@@ -122,7 +122,7 @@ export function AllowedSignupDomainsEditorModal(props: Props) {
               value={domainToAdd}
               type="string"
               endContent={
-                <Button onPress={onAddDomain} variant="light" color="primary" isIconOnly startContent={<PlusIcon />} />
+                <Button variant="ghost" onPress={onAddDomain} isIconOnly startContent={<PlusIcon />} />
               }
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
@@ -146,11 +146,9 @@ export function AllowedSignupDomainsEditorModal(props: Props) {
                   <TableRow key={domain.value} id={domain.value}>
                     <TableCell className="w-full">{domain.value}</TableCell>
                     <TableCell className="flex-row flex">
-                      <Button
+                      <Button variant="danger-soft"
                         startContent={<Trash2Icon className="w-4 h-4" />}
                         size="sm"
-                        color="danger"
-                        variant="light"
                         onPress={() => onRemoveDomain(domain.value)}
                       >
                         {t('table.actions.removeDomain')}
@@ -163,7 +161,7 @@ export function AllowedSignupDomainsEditorModal(props: Props) {
           </ModalBody>
 
           <ModalFooter>
-            <Button onPress={onSave} isLoading={isSaving} color="primary">
+            <Button variant="primary" onPress={onSave} isPending={isSaving}>
               {t('actions.save.label')}
             </Button>
           </ModalFooter>

@@ -118,11 +118,11 @@ export function AttractapSerialConfiguratorPin({ className, mode = 'change' }: A
         />
         {error && <Alert color="danger">{error}</Alert>}
         <div className="flex gap-2">
-          <Button color="primary" type="submit" isLoading={isSubmitting}>
+          <Button variant="primary" type="submit" isPending={isSubmitting}>
             {t('submit')}
           </Button>
           {mode === 'change' && (
-            <Button color="secondary" variant="light" onPress={handleForgetPin}>
+            <Button variant="secondary" onPress={handleForgetPin}>
               {t('actions.logout')}
             </Button>
           )}

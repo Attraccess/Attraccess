@@ -91,7 +91,7 @@ export function KeycloakDiscoveryDialog(props: Props) {
                   <Input label={t('realm')} value={realm} onChange={(e) => setRealm(e.target.value)} />
                 </ModalBody>
                 <ModalFooter>
-                  <Button color="primary" onPress={discover} isLoading={isDiscovering}>
+                  <Button variant="primary" onPress={discover} isPending={isDiscovering}>
                     {t('discover')}
                   </Button>
                 </ModalFooter>

@@ -33,7 +33,7 @@ export function FormListPage() {
         subtitle={t('list.subtitle')}
         backTo={`/resources/${resourceId}`}
         actions={
-          <Button as={RouterLink} to={`/resources/${resourceId}/forms/new`} color="primary">
+          <Button variant="primary" as={RouterLink} to={`/resources/${resourceId}/forms/new`}>
             {t('list.create')}
           </Button>
         }

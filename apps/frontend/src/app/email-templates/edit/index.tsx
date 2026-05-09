@@ -170,10 +170,10 @@ export function EditEmailTemplatePage() {
         </div>
 
         <div className="flex flex-row gap-4 w-full justify-end">
-          <Button type="button" variant="light" onPress={() => navigate('/email-templates')}>
+          <Button variant="ghost" type="button" onPress={() => navigate('/email-templates')}>
             {t('actions.cancel')}
           </Button>
-          <Button type="submit" color="primary" isLoading={updateTemplate.isPending}>
+          <Button variant="primary" type="submit" isPending={updateTemplate.isPending}>
             {t('actions.save')}
           </Button>
         </div>

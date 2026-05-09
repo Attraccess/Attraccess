@@ -122,7 +122,7 @@ export function RefundModal(props: Props) {
                 </ModalBody>
 
                 <ModalFooter>
-                  <Button color="primary" onPress={onSubmit} isLoading={isRefunding}>
+                  <Button variant="primary" onPress={onSubmit} isPending={isRefunding}>
                     {t('actions.refund')}
                   </Button>
                 </ModalFooter>

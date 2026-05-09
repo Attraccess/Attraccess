@@ -373,9 +373,10 @@ function FlowsPageInner() {
           <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
 
           <Panel position="top-right" className="flex flex-row flex-wrap gap-2">
+            {/* TODO(heroui-v3): map dynamic color/variant to new variant prop */}
             <Button
               isIconOnly
-              isLoading={isSaving}
+              isPending={isSaving}
               startContent={saveSucceeded && !flowHasChanged ? <CheckIcon /> : <SaveIcon />}
               onPress={save}
               isDisabled={!flowHasChanged}
@@ -398,7 +399,7 @@ function FlowsPageInner() {
               onSelect={addStartNode}
               resourceId={Number(resourceId)}
             >
-              {(open) => <Button color="primary" isIconOnly startContent={<PlusIcon />} onPress={open} />}
+              {(open) => <Button variant="primary" isIconOnly startContent={<PlusIcon />} onPress={open} />}
             </NodePickerModal>
           </Panel>
         </ReactFlow>

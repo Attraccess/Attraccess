@@ -55,7 +55,7 @@ export function NfcCardDeactivateModal(props: Props) {
                 <ModalBody>{t('description')}</ModalBody>
                 <ModalFooter>
                   <Button onPress={close}>{t('cancel')}</Button>
-                  <Button onPress={onDeactivate} isLoading={isPending}>
+                  <Button onPress={onDeactivate} isPending={isPending}>
                     {t('deactivate')}
                   </Button>
                 </ModalFooter>

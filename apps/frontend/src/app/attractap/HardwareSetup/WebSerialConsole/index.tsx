@@ -84,7 +84,7 @@ export function WebSerialConsole({ children }: Props) {
                   {isConnected && (
                     <>
                       <Terminal logLines={output.split('\n')} maxHeight="30vh" />
-                      <Button color="warning" variant="light" onPress={onReset}>
+                      <Button variant="tertiary" onPress={onReset}>
                         {t('actions.reset')}
                       </Button>
                     </>

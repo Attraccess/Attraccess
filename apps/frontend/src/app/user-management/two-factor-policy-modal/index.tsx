@@ -136,7 +136,7 @@ export function TwoFactorPolicyModal(props: Props) {
                   {selectedOption && <div className="text-sm text-default-500">{selectedOption.description}</div>}
                 </ModalBody>
                 <ModalFooter>
-                  <Button onPress={onSave} isLoading={isSaving} color="primary" isDisabled={!selectedPolicy}>
+                  <Button variant="primary" onPress={onSave} isPending={isSaving} isDisabled={!selectedPolicy}>
                     {t('actions.save.label')}
                   </Button>
                 </ModalFooter>

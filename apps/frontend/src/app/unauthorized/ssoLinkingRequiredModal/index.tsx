@@ -118,7 +118,7 @@ export function SSOLinkingRequiredModal(props: Props) {
         </ModalBody>
 
         <ModalFooter>
-          <Button color="primary" onPress={linkUser} isLoading={linkingIsLoading}>
+          <Button variant="primary" onPress={linkUser} isPending={linkingIsLoading}>
             {t('actions.link')}
           </Button>
         </ModalFooter>

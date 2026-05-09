@@ -66,7 +66,7 @@ function LoginFormHeader(props: LoginFormProps & { isLocalSignupEnabled: boolean
       {isLocalSignupEnabled && (
         <p className="mt-2 text-gray-600 dark:text-gray-300">
           {t('noAccount')}{' '}
-          <Button onPress={onNeedsAccount} variant="light" color="secondary" data-cy="login-form-sign-up-button">
+          <Button variant="secondary" onPress={onNeedsAccount} data-cy="login-form-sign-up-button">
             {t('signUpButton')}
           </Button>
         </p>
@@ -167,22 +167,19 @@ function LoginFormContent(props: LoginFormProps & { t: TFunction; tExists: TExis
         data-cy="login-form-two-factor-input"
       />
       <div className="flex items-center justify-between">
-        <Button
+        <Button variant="secondary"
           onPress={onForgotPassword}
-          variant="light"
-          color="secondary"
           isDisabled={isPending}
           data-cy="login-form-forgot-password-button"
         >
           {t('forgotPassword')}
         </Button>
       </div>
-      <Button
+      <Button variant="primary"
         type="submit"
         fullWidth
-        color="primary"
         endContent={memoizedArrowRight}
-        isLoading={isPending}
+        isPending={isPending}
         isDisabled={isPending}
         data-cy="login-form-sign-in-button"
       >

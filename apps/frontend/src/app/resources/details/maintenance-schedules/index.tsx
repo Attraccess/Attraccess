@@ -111,9 +111,8 @@ export function MaintenanceSchedules(props: Props & Omit<CardProps, 'children'>)
           actions={
             <MaintenanceScheduleUpsertModal resourceId={resourceId}>
               {(open: () => void) => (
-                <Button
+                <Button variant="primary"
                   onPress={open}
-                  color="primary"
                   size="sm"
                   title={t('actions.add')}
                   startContent={<PlusIcon className="w-4 h-4" />}
@@ -156,10 +155,9 @@ export function MaintenanceSchedules(props: Props & Omit<CardProps, 'children'>)
                 <TableCell align="right">
                   <MaintenanceScheduleUpsertModal resourceId={resourceId} scheduleId={schedule.id}>
                     {(open: () => void) => (
-                      <Button
+                      <Button variant="ghost"
                         onPress={open}
                         isIconOnly
-                        variant="light"
                         startContent={<PencilIcon className="w-4 h-4" />}
                         title={t('actions.edit')}
                       />
@@ -167,11 +165,9 @@ export function MaintenanceSchedules(props: Props & Omit<CardProps, 'children'>)
                   </MaintenanceScheduleUpsertModal>
                   <ScheduleDeleteModal resourceId={resourceId} schedule={schedule}>
                     {(open: () => void) => (
-                      <Button
+                      <Button variant="danger-soft"
                         onPress={open}
                         isIconOnly
-                        variant="light"
-                        color="danger"
                         startContent={<TrashIcon className="w-4 h-4" />}
                         title={t('actions.delete')}
                       />
