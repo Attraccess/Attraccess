@@ -1,4 +1,4 @@
-import { Button, Form, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalHeader, Tab, Tabs, useOverlayState } from '@heroui/react';
+import { Button, Form, TextField, Label, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalHeader, Tab, Tabs, useOverlayState } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
@@ -142,15 +142,10 @@ export function InviteUserModal(props: Props) {
                       max: USERNAME_RULES.maxLength,
                     })}
                   />
-                  <Input
-                    label={t('inputs.email.label')}
-                    name="email"
-                    type="email"
-                    isRequired
-                    required
-                    value={email}
-                    onValueChange={setEmail}
-                  />
+                  <TextField isRequired value={email} onChange={setEmail}>
+                    <Label>{t('inputs.email.label')}</Label>
+                    <Input name="email" type="email" required />
+                  </TextField>
 
                   <div className="flex justify-end w-full">
                     <Button variant="primary" type="submit" isPending={isPending} isDisabled={!canSubmit}>

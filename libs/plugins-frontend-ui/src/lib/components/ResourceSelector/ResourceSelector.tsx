@@ -1,6 +1,6 @@
 import { useTranslations } from '../../i18n';
 import { useResourcesServiceGetAllResources } from '@attraccess/react-query-client';
-import { Input, Spinner, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from '@heroui/react';
+import { TextField, InputGroup, Input, Spinner, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from '@heroui/react';
 import { useState, PropsWithChildren } from 'react';
 import de from './ResourceSelector.de.json';
 import en from './ResourceSelector.en.json';
@@ -32,15 +32,12 @@ export function ResourceSelector(props: Readonly<Props>) {
 
   return (
     <div className="flex flex-col gap-2">
-      <Input
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        label={t('search.label')}
-        placeholder={t('search.placeholder')}
-        className="w-full"
-        variant="flat"
-        endContent={isResourceSearchLoading ? <Spinner /> : null}
-      />
+      <TextField value={search} onChange={setSearch} aria-label={t('search.label')} className="w-full">
+        <InputGroup>
+          <Input placeholder={t('search.placeholder')} />
+          {isResourceSearchLoading ? <Spinner /> : null}
+        </InputGroup>
+      </TextField>
       <Table
         aria-label={t('table.ariaLabel')}
         selectedKeys={selection.map((id) => id.toString())}

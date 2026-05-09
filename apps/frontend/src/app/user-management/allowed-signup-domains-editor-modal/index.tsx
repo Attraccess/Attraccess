@@ -4,7 +4,7 @@ import {
   useUsersServiceGetLocalSignupDomainWhitelist,
   useUsersServiceSetLocalSignupDomainWhitelist,
 } from '@attraccess/react-query-client';
-import { Alert, Button, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow, useOverlayState } from '@heroui/react';
+import { Alert, Button, TextField, Label, Input, InputGroup, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow, useOverlayState } from '@heroui/react';
 import { EmptyState } from '../../../components/emptyState';
 import { PageHeader } from '../../../components/pageHeader';
 import { TableDataLoadingIndicator } from '../../../components/tableComponents';
@@ -115,21 +115,20 @@ export function AllowedSignupDomainsEditorModal(props: Props) {
             <Alert variant="flat" color="warning" className="whitespace-pre-wrap">
               {t('noteAboutNoneAndWildcard')}
             </Alert>
-            <Input
-              ref={addDomainInputRef}
-              label={t('inputs.addDomain.label')}
-              onValueChange={setDomainToAdd}
-              value={domainToAdd}
-              type="string"
-              endContent={
+            <TextField value={domainToAdd} onChange={setDomainToAdd}>
+              <Label>{t('inputs.addDomain.label')}</Label>
+              <InputGroup>
+                <Input
+                  ref={addDomainInputRef}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      onAddDomain();
+                    }
+                  }}
+                />
                 <Button variant="ghost" onPress={onAddDomain} isIconOnly startContent={<PlusIcon />} />
-              }
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  onAddDomain();
-                }
-              }}
-            />
+              </InputGroup>
+            </TextField>
 
             <Table removeWrapper aria-label={t('table.ariaLabel')}>
               <TableHeader>

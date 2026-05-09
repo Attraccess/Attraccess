@@ -2,6 +2,8 @@ import {
   Badge,
   Button,
   Chip,
+  TextField,
+  Label,
   Input,
   Table,
   TableBody,
@@ -287,12 +289,14 @@ export function CsvInvite({ onSuccess, onError }: Props) {
               key: header,
             }))}
           />
-          <Input
+          <TextField
             className="flex-1"
-            label={t('inputs.yesValue')}
             value={mapping.yesValue}
-            onValueChange={(value) => updatePermissionYesValue(permission as keyof SystemPermissions, value)}
-          />
+            onChange={(value) => updatePermissionYesValue(permission as keyof SystemPermissions, value)}
+          >
+            <Label>{t('inputs.yesValue')}</Label>
+            <Input />
+          </TextField>
         </div>
       ))}
 
