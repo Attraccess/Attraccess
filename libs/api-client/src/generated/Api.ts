@@ -10,6 +10,17 @@
  * ---------------------------------------------------------------
  */
 
+export enum ResourceHealthSource {
+  Payload = "payload",
+  Heartbeat = "heartbeat",
+  Manual = "manual",
+}
+
+export enum ResourceHealthStatus {
+  Healthy = "healthy",
+  Unhealthy = "unhealthy",
+}
+
 /** The type of the log entry */
 export enum ResourceFlowLogType {
   FlowStart = "flow.start",
@@ -40,6 +51,8 @@ export enum ResourceFlowNodeType {
   ProcessingSetPayload = "processing.set-payload",
   ProcessingMqttWaitForMessage = "processing.mqtt.waitForMessage",
   ProcessingError = "processing.error",
+  OutputResourceHealthHeartbeat = "output.resource.health.heartbeat",
+  OutputResourceHealthSet = "output.resource.health.set",
 }
 
 export enum SumUpReaderStatus {
@@ -570,8 +583,8 @@ export interface SSOProviderOIDCConfiguration {
    */
   clientSecret: string;
   /**
-   * Optional list of OIDC scopes to request
-   * @example ["openid","email","profile"]
+   * Optional list of OIDC scopes to request. The `openid` scope is added automatically and does not need to be listed here.
+   * @example ["email","profile"]
    */
   scopes?: string[];
   /**
@@ -2904,6 +2917,50 @@ export interface ResourceFlowNode {
   resource?: Resource;
 }
 
+export interface ResourceHealthStateDto {
+  /**
+   * The health record id
+   * @example 1
+   */
+  id: number;
+  /**
+   * The resource ID this state belongs to
+   * @example 1
+   */
+  resourceId: number;
+  /**
+   * Identifier for the source reporting health (empty for the resource default).
+   * @example "Shelly"
+   */
+  identifier: string;
+  status: ResourceHealthStatus;
+  /** @example "not connected" */
+  reason?: string | null;
+  source: ResourceHealthSource;
+  /**
+   * When the state was last reported
+   * @format date-time
+   */
+  lastReportedAt: string;
+}
+
+export interface ResourceHealthSummaryDto {
+  /**
+   * The resource ID
+   * @example 1
+   */
+  resourceId: number;
+  /**
+   * Whether the resource is currently considered healthy
+   * @example true
+   */
+  isHealthy: boolean;
+  /** Individual health state entries (one per identifier). Empty if no entries exist yet. */
+  entries: ResourceHealthStateDto[];
+  /** Subset of entries that are unhealthy (convenience for clients showing warnings). */
+  unhealthyEntries: ResourceHealthStateDto[];
+}
+
 export interface ProjectAccessInfoDto {
   /** Whether the authenticated user owns the project */
   isOwner: boolean;
@@ -4574,6 +4631,19 @@ export interface GetButtonsParams {
 }
 
 export type GetButtonsData = ResourceFlowNode[];
+
+export interface GetResourceHealthParams {
+  resourceId: number;
+}
+
+export type GetResourceHealthData = ResourceHealthSummaryDto;
+
+export interface ClearResourceHealthEntryParams {
+  resourceId: number;
+  entryId: number;
+}
+
+export type ClearResourceHealthEntryData = any;
 
 export interface FindManyProjectsParams {
   /**
@@ -7681,6 +7751,45 @@ export namespace ResourceFlows {
     export type RequestBody = never;
     export type RequestHeaders = {};
     export type ResponseBody = GetButtonsData;
+  }
+}
+
+export namespace ResourceHealth {
+  /**
+   * @description Returns the current health state for the resource, including any per-source entries (e.g. heartbeat, payload-derived). Resources without any health-related flow nodes are reported as healthy.
+   * @tags Resource Health
+   * @name GetResourceHealth
+   * @summary Get health summary for a resource
+   * @request GET:/api/resources/{resourceId}/health
+   * @secure
+   */
+  export namespace GetResourceHealth {
+    export type RequestParams = {
+      resourceId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetResourceHealthData;
+  }
+
+  /**
+   * @description Deletes a single health state entry. Use this to clear a stuck unhealthy state when the originating flow node was deleted or its identifier changed. Requires maintenance management permission.
+   * @tags Resource Health
+   * @name ClearResourceHealthEntry
+   * @summary Clear a health entry (manually mark healthy)
+   * @request DELETE:/api/resources/{resourceId}/health/entries/{entryId}
+   * @secure
+   */
+  export namespace ClearResourceHealthEntry {
+    export type RequestParams = {
+      resourceId: number;
+      entryId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = ClearResourceHealthEntryData;
   }
 }
 
@@ -11843,6 +11952,48 @@ export class Api<
         method: "GET",
         secure: true,
         format: "json",
+        ...params,
+      }),
+  };
+  resourceHealth = {
+    /**
+     * @description Returns the current health state for the resource, including any per-source entries (e.g. heartbeat, payload-derived). Resources without any health-related flow nodes are reported as healthy.
+     *
+     * @tags Resource Health
+     * @name GetResourceHealth
+     * @summary Get health summary for a resource
+     * @request GET:/api/resources/{resourceId}/health
+     * @secure
+     */
+    getResourceHealth: (
+      { resourceId }: GetResourceHealthParams,
+      params: RequestParams = {},
+    ) =>
+      this.request<GetResourceHealthData, void>({
+        path: `/api/resources/${resourceId}/health`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description Deletes a single health state entry. Use this to clear a stuck unhealthy state when the originating flow node was deleted or its identifier changed. Requires maintenance management permission.
+     *
+     * @tags Resource Health
+     * @name ClearResourceHealthEntry
+     * @summary Clear a health entry (manually mark healthy)
+     * @request DELETE:/api/resources/{resourceId}/health/entries/{entryId}
+     * @secure
+     */
+    clearResourceHealthEntry: (
+      { resourceId, entryId }: ClearResourceHealthEntryParams,
+      params: RequestParams = {},
+    ) =>
+      this.request<ClearResourceHealthEntryData, void>({
+        path: `/api/resources/${resourceId}/health/entries/${entryId}`,
+        method: "DELETE",
+        secure: true,
         ...params,
       }),
   };
