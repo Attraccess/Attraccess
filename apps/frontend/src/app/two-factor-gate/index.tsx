@@ -30,7 +30,7 @@ export function TwoFactorGate({ children }: TwoFactorGateProps) {
           <TwoFactorCard />
           {gate.canSkip && (
             <div className="flex justify-end">
-              <Button variant="light" onPress={gate.clearSetupIntent}>
+              <Button variant="ghost" onPress={gate.clearSetupIntent}>
                 {t('skip')}
               </Button>
             </div>

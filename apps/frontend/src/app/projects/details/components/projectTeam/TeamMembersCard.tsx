@@ -84,13 +84,11 @@ export function TeamMembersCard(props: Readonly<TeamMembersCardProps>) {
           <Chip size="sm" variant="flat">
             {t(`roles.${member.role}` as const)}
           </Chip>
-          <Button
-            color="danger"
+          <Button variant="danger-soft"
             size="sm"
-            variant="light"
             isIconOnly
             aria-label={t('actions.remove')}
-            isLoading={removingMemberId === member.id}
+            isPending={removingMemberId === member.id}
             onPress={async () => {
               setRemovingMemberId(member.id);
               await removeMember({ id: projectId, memberId: member.id });

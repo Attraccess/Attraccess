@@ -172,7 +172,7 @@ export function UpsertProjectModal(props: Props) {
                 </ModalBody>
 
                 <ModalFooter>
-                  <Button color="primary" onPress={onSubmit} isLoading={isSaving}>
+                  <Button variant="primary" onPress={onSubmit} isPending={isSaving}>
                     {projectId ? t('actions.update.label') : t('actions.create.label')}
                   </Button>
                 </ModalFooter>

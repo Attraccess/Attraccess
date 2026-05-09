@@ -135,7 +135,7 @@ export function AttractapList() {
                 {(onOpenSerialConsole) => (
                   <Dropdown>
                     <DropdownTrigger>
-                      <Button variant="light" startContent={<MoreVertical className="w-4 h-4" />}>
+                      <Button variant="ghost" startContent={<MoreVertical className="w-4 h-4" />}>
                         {t('page.actions.menu')}
                       </Button>
                     </DropdownTrigger>
@@ -215,10 +215,9 @@ export function AttractapList() {
                       </TableCell>
                       <TableCell className="whitespace-nowrap">{formatDateTime(reader.lastConnection)}</TableCell>
                       <TableCell className="flex-row flex">
-                        <Button
+                        <Button variant="ghost"
                           size="sm"
                           startContent={<PencilIcon className="w-4 h-4" />}
-                          variant="light"
                           onPress={() => setOpenedReaderEditor(reader.id)}
                           data-cy={`attractap-list-edit-reader-button-${reader.id}`}
                         >
@@ -227,11 +226,9 @@ export function AttractapList() {
 
                         <AttractapDeleteModal readerId={reader.id}>
                           {(onOpen) => (
-                            <Button
+                            <Button variant="danger-soft"
                               startContent={<Trash2Icon className="w-4 h-4" />}
                               size="sm"
-                              color="danger"
-                              variant="light"
                               onPress={onOpen}
                               data-cy={`attractap-list-delete-reader-button-${reader.id}`}
                             >

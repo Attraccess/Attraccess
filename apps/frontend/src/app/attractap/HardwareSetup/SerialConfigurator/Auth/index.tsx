@@ -258,7 +258,7 @@ export function AttractapSerialCommGate({ children }: PropsWithChildren) {
           required
         />
         {error && <Alert color="danger">{error}</Alert>}
-        <Button color="primary" type="submit" isLoading={isSubmitting}>
+        <Button variant="primary" type="submit" isPending={isSubmitting}>
           {t('enterPin.submit')}
         </Button>
       </form>

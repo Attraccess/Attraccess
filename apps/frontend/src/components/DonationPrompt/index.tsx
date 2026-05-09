@@ -109,13 +109,13 @@ export function DonationPrompt() {
           <div className="text-sm text-default-600 dark:text-default-400">{t('body')}</div>
         </DrawerBody>
         <DrawerFooter className="flex flex-wrap gap-2 justify-end">
-          <Button color="primary" startContent={<HeartHandshake size={16} />} onPress={onDonate}>
+          <Button variant="primary" startContent={<HeartHandshake size={16} />} onPress={onDonate}>
             {t('actions.donate')}
           </Button>
-          <Button variant="flat" startContent={<Share2 size={16} />} onPress={onShare}>
+          <Button variant="secondary" startContent={<Share2 size={16} />} onPress={onShare}>
             {t('actions.share')}
           </Button>
-          <Button variant="light" onPress={onHideForMonth}>
+          <Button variant="ghost" onPress={onHideForMonth}>
             {t('actions.hideForMonth')}
           </Button>
         </DrawerFooter>

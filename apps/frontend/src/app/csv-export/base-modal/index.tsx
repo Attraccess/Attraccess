@@ -150,9 +150,7 @@ export function BaseCsvExportModal<TData extends Row>(props: Props<TData>) {
 
         <div className="flex gap-4">
           {refetch && (
-            <Button
-              variant="light"
-              color="secondary"
+            <Button variant="secondary"
               endContent={<RotateCwIcon className={'w-4 h-4 ' + (queryStatus === 'pending' ? 'animate-spin' : '')} />}
               onPress={() => refetch()}
               data-cy="resource-usage-export-refresh-button"

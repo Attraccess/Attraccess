@@ -82,7 +82,7 @@ export function NodeEditor(props: Props) {
                 </ModalBody>
 
                 <ModalFooter>
-                  <Button color="primary" onPress={onSave}>
+                  <Button variant="primary" onPress={onSave}>
                     {t('editor.buttons.save')}
                   </Button>
                 </ModalFooter>

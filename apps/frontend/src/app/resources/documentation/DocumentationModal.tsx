@@ -74,9 +74,7 @@ function DocumentationModalComponent({ resourceId, children }: Readonly<Document
       return (
         <div className="flex flex-col items-center gap-4 p-4">
           <p className="text-danger">{error instanceof Error ? error.message : t('error.unknown')}</p>
-          <Button
-            color="primary"
-            variant="flat"
+          <Button variant="secondary"
             onPress={() => refetch()}
             startContent={<RefreshCw size={16} />}
             data-cy="documentation-modal-error-retry-button"
@@ -149,10 +147,9 @@ function DocumentationModalComponent({ resourceId, children }: Readonly<Document
                   <div>{t('title')}</div>
                   <div className="flex gap-1">
                     {canManageResources && (
-                      <Button
+                      <Button variant="secondary"
                         isIconOnly
                         size="sm"
-                        variant="flat"
                         onPress={handleEditDocumentation}
                         aria-label={t('actions.edit')}
                         data-cy="documentation-modal-edit-button"
@@ -160,10 +157,9 @@ function DocumentationModalComponent({ resourceId, children }: Readonly<Document
                         <Edit size={16} />
                       </Button>
                     )}
-                    <Button
+                    <Button variant="secondary"
                       isIconOnly
                       size="sm"
-                      variant="flat"
                       onPress={toggleFullscreen}
                       aria-label={isFullscreen ? t('actions.exitFullscreen') : t('actions.fullscreen')}
                       data-cy="documentation-modal-fullscreen-button"
@@ -171,10 +167,9 @@ function DocumentationModalComponent({ resourceId, children }: Readonly<Document
                       {isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
                     </Button>
 
-                    <Button
+                    <Button variant="secondary"
                       isIconOnly
                       size="sm"
-                      variant="flat"
                       onPress={handleOpenInNewTab}
                       aria-label={t('actions.openInNewTab')}
                       data-cy="documentation-modal-open-in-new-tab-button"
@@ -183,12 +178,11 @@ function DocumentationModalComponent({ resourceId, children }: Readonly<Document
                     </Button>
 
                     {resource?.documentationType === 'url' && (
-                      <Button
+                      <Button variant="secondary"
                         isIconOnly
                         size="sm"
-                        variant="flat"
                         onPress={() => refetch()}
-                        isLoading={isFetching}
+                        isPending={isFetching}
                         aria-label={t('actions.refresh')}
                         data-cy="documentation-modal-refresh-button"
                       >
@@ -199,7 +193,7 @@ function DocumentationModalComponent({ resourceId, children }: Readonly<Document
                 </ModalHeader>
                 <ModalBody>{renderDocumentationContent()}</ModalBody>
                 <ModalFooter>
-                  <Button color="primary" variant="light" onPress={close} data-cy="documentation-modal-close-button">
+                  <Button variant="ghost" onPress={close} data-cy="documentation-modal-close-button">
                     {t('actions.close')}
                   </Button>
                 </ModalFooter>

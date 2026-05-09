@@ -95,7 +95,7 @@ export function AuthentikDiscoveryDialog(props: Props) {
                   />
                 </ModalBody>
                 <ModalFooter>
-                  <Button color="primary" onPress={discover} isLoading={isDiscovering}>
+                  <Button variant="primary" onPress={discover} isPending={isDiscovering}>
                     {t('discover')}
                   </Button>
                 </ModalFooter>

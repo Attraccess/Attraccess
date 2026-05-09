@@ -244,10 +244,9 @@ export function MetricsSettingsForm() {
       classNames={{ input: 'font-mono text-sm' }}
       endContent={
         <Tooltip content={t('copyButton')}>
-          <Button
+          <Button variant="ghost"
             isIconOnly
             size="sm"
-            variant="light"
             onPress={handleCopyEndpoint}
             aria-label={t('copyButton')}
           >
@@ -288,10 +287,9 @@ export function MetricsSettingsForm() {
           classNames={{ input: 'font-mono text-sm' }}
           endContent={
             <Tooltip content={t('copyButton')}>
-              <Button
+              <Button variant="ghost"
                 isIconOnly
                 size="sm"
-                variant="light"
                 onPress={handleCopyKey}
                 aria-label={t('copyButton')}
               >
@@ -307,9 +305,7 @@ export function MetricsSettingsForm() {
         {thresholdSection}
 
         <div className="flex gap-2">
-          <Button
-            color="primary"
-            variant="flat"
+          <Button variant="secondary"
             onPress={() => setGeneratedKey(null)}
           >
             {t('doneButton')}
@@ -326,19 +322,16 @@ export function MetricsSettingsForm() {
       {endpointSection}
 
       <div className="flex gap-2 flex-wrap">
-        <Button
-          color="primary"
+        <Button variant="primary"
           startContent={metricsSettings?.apiKeyConfigured ? <RefreshCwIcon size={16} /> : <KeyIcon size={16} />}
           onPress={handleGenerate}
-          isLoading={isGenerating}
+          isPending={isGenerating}
         >
           {metricsSettings?.apiKeyConfigured ? t('rerollButton') : t('generateButton')}
         </Button>
 
         {metricsSettings?.apiKeyConfigured && (
-          <Button
-            color="danger"
-            variant="flat"
+          <Button variant="danger-soft"
             startContent={<Trash2Icon size={16} />}
             onPress={removeModal.open}
           >
@@ -364,10 +357,10 @@ export function MetricsSettingsForm() {
                   <p>{t('confirmReroll.description')}</p>
                 </ModalBody>
                 <ModalFooter>
-                  <Button variant="light" onPress={close}>
+                  <Button variant="ghost" onPress={close}>
                     {t('confirmReroll.cancel')}
                   </Button>
-                  <Button color="warning" onPress={() => generateApiKey()} isLoading={isGenerating}>
+                  <Button variant="tertiary" onPress={() => generateApiKey()} isPending={isGenerating}>
                     {t('confirmReroll.confirm')}
                   </Button>
                 </ModalFooter>
@@ -390,10 +383,10 @@ export function MetricsSettingsForm() {
                   <p>{t('confirmRemove.description')}</p>
                 </ModalBody>
                 <ModalFooter>
-                  <Button variant="light" onPress={close}>
+                  <Button variant="ghost" onPress={close}>
                     {t('confirmRemove.cancel')}
                   </Button>
-                  <Button color="danger" onPress={() => deleteApiKey()} isLoading={isDeleting}>
+                  <Button variant="danger" onPress={() => deleteApiKey()} isPending={isDeleting}>
                     {t('confirmRemove.confirm')}
                   </Button>
                 </ModalFooter>

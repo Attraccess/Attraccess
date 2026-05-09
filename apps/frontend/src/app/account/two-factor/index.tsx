@@ -101,7 +101,7 @@ export function TwoFactorCard() {
 
       {showSetup && (
         <div className="flex flex-col gap-4">
-          <Button onPress={handleStartSetup} isLoading={isSettingUp} isDisabled={isBusy}>
+          <Button onPress={handleStartSetup} isPending={isSettingUp} isDisabled={isBusy}>
             {setupData ? t('setup.regenerateButton') : t('setup.startButton')}
           </Button>
 
@@ -131,7 +131,7 @@ export function TwoFactorCard() {
                 isDisabled={isBusy}
               />
 
-              <Button onPress={handleVerify} isLoading={isVerifying} isDisabled={isBusy || !setupCode.trim()}>
+              <Button onPress={handleVerify} isPending={isVerifying} isDisabled={isBusy || !setupCode.trim()}>
                 {t('setup.verifyButton')}
               </Button>
             </div>
@@ -151,7 +151,7 @@ export function TwoFactorCard() {
             maxLength={6}
             isDisabled={isBusy}
           />
-          <Button color="danger" onPress={handleDisable} isLoading={isDisabling} isDisabled={isBusy || !disableCode.trim()}>
+          <Button variant="danger" onPress={handleDisable} isPending={isDisabling} isDisabled={isBusy || !disableCode.trim()}>
             {t('disable.button')}
           </Button>
         </div>

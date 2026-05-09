@@ -161,7 +161,7 @@ export function ResourceBillingInfoEditor(props: Props) {
                   </Form>
                 </ModalBody>
                 <ModalFooter>
-                  <Button onPress={onSubmit} color="primary" isLoading={isSaving}>
+                  <Button variant="primary" onPress={onSubmit} isPending={isSaving}>
                     {t('actions.save')}
                   </Button>
                 </ModalFooter>

@@ -147,20 +147,18 @@ export function GroupDetailsForm(props: Readonly<GroupDetailsFormProps & Omit<Ca
             minRows={3}
           />
 
-          <Button
+          <Button variant="primary"
             type="submit"
-            color="primary"
             startContent={<Save size={16} />}
-            isLoading={isUpdating}
+            isPending={isUpdating}
             isDisabled={!name.trim() || isUpdating}
             className="w-full"
           >
             {t('form.buttons.save')}
           </Button>
 
-          <Button
+          <Button variant="danger"
             className="w-full"
-            color="danger"
             startContent={<Trash2Icon className="w-4 h-4" />}
             onPress={() => setShowDeleteConfirmation(true)}
           >

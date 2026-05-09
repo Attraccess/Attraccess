@@ -206,10 +206,9 @@ export function SmtpSettingsForm({ variant, endpoint, onNext }: SmtpSettingsForm
         onValueChange={setSmtpFrom}
         isRequired
       />
-      <Button
-        color="primary"
+      <Button variant="primary"
         onPress={handleSubmit}
-        isLoading={isSaving}
+        isPending={isSaving}
         isDisabled={showLoading}
       >
         {variant === 'wizard' ? t('actions.next') : t('actions.save')}

@@ -137,10 +137,10 @@ export function InviteProjectMemberModal(props: Readonly<InviteProjectMemberModa
                   </Select>
                 </ModalBody>
                 <ModalFooter>
-                  <Button variant="light" onPress={close} isDisabled={isPending}>
+                  <Button variant="ghost" onPress={close} isDisabled={isPending}>
                     {t('actions.cancel')}
                   </Button>
-                  <Button color="primary" onPress={onInvite} isDisabled={!selectedUser} isLoading={isPending}>
+                  <Button variant="primary" onPress={onInvite} isDisabled={!selectedUser} isPending={isPending}>
                     {t('actions.invite')}
                   </Button>
                 </ModalFooter>

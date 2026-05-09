@@ -29,8 +29,7 @@ export function MqttServersPage() {
       <PageHeader
         title={t('title')}
         actions={
-          <Button
-            variant="light"
+          <Button variant="ghost"
             onPress={handleAddNewServer}
             startContent={<Plus size={16} />}
             data-cy="mqtt-servers-page-add-new-server-button"

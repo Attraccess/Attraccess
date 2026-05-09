@@ -75,8 +75,7 @@ export function PluginsList() {
       <Card className="w-full" data-cy="plugins-list-card">
         <CardHeader className="flex justify-between items-center">
           <h1 className="text-xl font-bold">{t('title')}</h1>
-          <Button
-            color="primary"
+          <Button variant="primary"
             startContent={<Upload size={18} />}
             onPress={() => setUploadModalOpen(true)}
             data-cy="plugins-list-upload-plugin-button"
@@ -109,10 +108,8 @@ export function PluginsList() {
                   <TableCell>{plugin.pluginDirectory || '-'}</TableCell>
                   <TableCell>
                     <Tooltip content={t('deleteTooltip')}>
-                      <Button
+                      <Button variant="danger-soft"
                         isIconOnly
-                        variant="light"
-                        color="danger"
                         onPress={() => handleDeleteClick(plugin.id)}
                         data-cy={`plugins-list-delete-plugin-button-${plugin.id}`}
                       >
@@ -145,18 +142,16 @@ export function PluginsList() {
                     })}
                   </ModalBody>
                   <ModalFooter>
-                    <Button
-                      variant="flat"
+                    <Button variant="secondary"
                       onPress={close}
                       isDisabled={isDeleting}
                       data-cy="plugins-list-delete-confirmation-cancel-button"
                     >
                       {t('deleteConfirmation.cancel')}
                     </Button>
-                    <Button
-                      color="danger"
+                    <Button variant="danger"
                       onPress={handleDeleteConfirm}
-                      isLoading={isDeleting}
+                      isPending={isDeleting}
                       data-cy="plugins-list-delete-confirmation-delete-button"
                     >
                       {t('deleteConfirmation.delete')}

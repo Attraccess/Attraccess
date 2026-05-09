@@ -93,10 +93,9 @@ export function LicenseStep({ onSuccess }: LicenseStepProps) {
         />
         <input type="submit" hidden />
       </Form>
-      <Button
-        color="primary"
+      <Button variant="primary"
         onPress={handleSubmit}
-        isLoading={isPending}
+        isPending={isPending}
         isDisabled={!licenseKey.trim()}
       >
         {t('actions.save')}

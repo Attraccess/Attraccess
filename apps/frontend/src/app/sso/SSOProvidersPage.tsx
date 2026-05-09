@@ -35,8 +35,7 @@ export const SSOProvidersPage: React.FC = () => {
         subtitle={t('subtitle')}
         backTo="/users"
         actions={
-          <Button
-            color="primary"
+          <Button variant="primary"
             startContent={<Plus size={16} />}
             onPress={handleAddNewProvider}
             data-cy="sso-providers-page-header-add-new-provider-button"

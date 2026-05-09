@@ -249,7 +249,7 @@ export function CsvInvite({ onSuccess, onError }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
-      <Button onPress={selectFile} variant="flat" color="primary">
+      <Button variant="secondary" onPress={selectFile}>
         {selectedFile ? selectedFile.name : t('inputs.file')}
       </Button>
 
@@ -325,7 +325,7 @@ export function CsvInvite({ onSuccess, onError }: Props) {
             <Badge color="danger" variant="flat">
               {t('errors.title')} ({rowErrors.length})
             </Badge>
-            <Button size="sm" variant="light" onPress={() => submit({ ignoreFailed: true })}>
+            <Button variant="ghost" size="sm" onPress={() => submit({ ignoreFailed: true })}>
               {t('actions.inviteIgnore')}
             </Button>
           </div>
@@ -353,11 +353,11 @@ export function CsvInvite({ onSuccess, onError }: Props) {
 
       <div className="flex justify-end w-full gap-2">
         {rowErrors.length > 0 && (
-          <Button variant="flat" onPress={() => submit({ ignoreFailed: true })} isLoading={isPending}>
+          <Button variant="secondary" onPress={() => submit({ ignoreFailed: true })} isPending={isPending}>
             {t('actions.inviteIgnore')}
           </Button>
         )}
-        <Button color="primary" onPress={() => submit()} isLoading={isPending}>
+        <Button variant="primary" onPress={() => submit()} isPending={isPending}>
           {t('actions.invite')}
         </Button>
       </div>

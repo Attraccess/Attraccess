@@ -666,9 +666,8 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                 <TableCell>
                   <div className="flex items-center gap-2">
                     <Tooltip content={t('edit')}>
-                      <Button
+                      <Button variant="ghost"
                         size="sm"
-                        variant="ghost"
                         isIconOnly
                         onPress={() => handleEdit(provider)}
                         data-cy={`sso-provider-edit-button-${provider.id}`}
@@ -677,11 +676,9 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                       </Button>
                     </Tooltip>
                     <Tooltip content={t('deleteText')}>
-                      <Button
+                      <Button variant="danger-soft"
                         size="sm"
-                        variant="ghost"
                         isIconOnly
-                        color="danger"
                         onPress={() => handleDelete(provider.id)}
                         data-cy={`sso-provider-delete-button-${provider.id}`}
                       >
@@ -748,7 +745,7 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                               {(onOpenKeycloakDiscovery) => (
                                 <Dropdown>
                                   <DropdownTrigger>
-                                    <Button variant="light" startContent={<MoreVertical className="w-4 h-4" />}>
+                                    <Button variant="ghost" startContent={<MoreVertical className="w-4 h-4" />}>
                                       {t('autoDiscovery.label')}
                                     </Button>
                                   </DropdownTrigger>
@@ -837,10 +834,9 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                         data-cy="sso-provider-form-oidc-client-secret-input"
                         endContent={
                           <Tooltip content={showClientSecret ? t('hideClientSecret') : t('showClientSecret')}>
-                            <Button
+                            <Button variant="ghost"
                               isIconOnly
                               size="sm"
-                              variant="light"
                               onPress={() => setShowClientSecret(!showClientSecret)}
                               data-cy="sso-provider-form-oidc-toggle-client-secret-button"
                             >
@@ -962,10 +958,9 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                           <Tooltip
                             content={showSamlProvisioningSecret ? t('hideSamlProvisioningSecret') : t('showSamlProvisioningSecret')}
                           >
-                            <Button
+                            <Button variant="ghost"
                               isIconOnly
                               size="sm"
-                              variant="light"
                               onPress={() => setShowSamlProvisioningSecret(!showSamlProvisioningSecret)}
                               data-cy="sso-provider-form-saml-provisioning-secret-toggle-button"
                             >
@@ -1069,9 +1064,8 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                             description={hasSetupUrls ? t('authentikRedirectRegexDescription') : t('setupUrlPending')}
                             endContent={
                               hasSetupUrls ? (
-                                <Button
+                                <Button variant="ghost"
                                   size="sm"
-                                  variant="light"
                                   onPress={() => handleCopyLoginUrl(authentikRedirectRegexPattern)}
                                   startContent={<Copy size={24} />}
                                   data-cy="sso-provider-form-authentik-regex-copy-button"
@@ -1097,9 +1091,8 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                           }
                           endContent={
                             hasSetupUrls ? (
-                              <Button
+                              <Button variant="ghost"
                                 size="sm"
-                                variant="light"
                                 onPress={isSamlProvider ? handleCopySamlCallbackUrl : handleCopyOidcCallbackUrl}
                                 startContent={<Copy size={24} />}
                                 data-cy="sso-provider-form-callback-url-copy-button"
@@ -1129,14 +1122,13 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                 </div>
               </ModalBody>
               <ModalFooter>
-                <Button variant="flat" onPress={close} data-cy="sso-provider-form-cancel-button">
+                <Button variant="secondary" onPress={close} data-cy="sso-provider-form-cancel-button">
                   {t('cancel')}
                 </Button>
-                <Button
-                  color="primary"
+                <Button variant="primary"
                   onPress={handleSubmit}
                   isDisabled={isSaveDisabled}
-                  isLoading={isMutationPending}
+                  isPending={isMutationPending}
                   data-cy="sso-provider-form-save-button"
                 >
                   {t('save')}

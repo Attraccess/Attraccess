@@ -55,10 +55,10 @@ export function AttractapSerialConfiguratorNetwork({ className }: { className?: 
         noMargin
         actions={
           <div className="flex items-center gap-2">
-            <Button size="sm" onPress={handleRefresh} isLoading={isFetchingConfiguration}>
+            <Button size="sm" onPress={handleRefresh} isPending={isFetchingConfiguration}>
               {t('actions.refreshStatus')}
             </Button>
-            <Button size="sm" onPress={handleRefresh} isLoading={isFetchingConfiguration}>
+            <Button size="sm" onPress={handleRefresh} isPending={isFetchingConfiguration}>
               {t('actions.refreshWifi')}
             </Button>
             {isFetchingConfiguration && (
@@ -117,10 +117,9 @@ export function AttractapSerialConfiguratorNetwork({ className }: { className?: 
         onChange={(e) => setWifiPassword(e.target.value)}
         autoComplete="off"
       />
-      <Button
+      <Button variant="primary"
         onPress={handleSetWifiCredentials}
-        color="primary"
-        isLoading={isWifiConnecting}
+        isPending={isWifiConnecting}
         isDisabled={!selectedWifiSSID}
       >
         {t('setCredentials.label')}

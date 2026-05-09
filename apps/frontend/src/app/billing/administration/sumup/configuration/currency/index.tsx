@@ -101,7 +101,7 @@ export function CurrencyCard(props: Omit<CardProps, 'children'>) {
         </Form>
 
         <CardFooter>
-          <Button color="primary" onPress={onSubmitConfiguration} isLoading={isPendingSetConfiguration}>
+          <Button variant="primary" onPress={onSubmitConfiguration} isPending={isPendingSetConfiguration}>
             {t('actions.save')}
           </Button>
         </CardFooter>

@@ -116,14 +116,13 @@ function renderOptionsByType(
                 size="sm"
                 ref={index === currentOptions.length - 1 ? (lastOptionInputRef as React.Ref<HTMLInputElement>) : undefined}
               />
-              <Button isIconOnly size="sm" variant="light" color="danger" onPress={() => handleRemoveOption(index)}>
+              <Button variant="danger-soft" isIconOnly size="sm" onPress={() => handleRemoveOption(index)}>
                 <X className="w-4 h-4" />
               </Button>
             </div>
           ))}
-          <Button
+          <Button variant="secondary"
             size="sm"
-            variant="flat"
             startContent={<Plus className="w-4 h-4" />}
             onPress={handleAddOption}
             isDisabled={currentOptions.length >= 12}

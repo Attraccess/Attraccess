@@ -91,10 +91,10 @@ export function MarkDoneModal(props: Props) {
                   </Form>
                 </ModalBody>
                 <ModalFooter>
-                  <Button variant="light" onPress={close}>
+                  <Button variant="ghost" onPress={close}>
                     {t('actions.markDone.modal.cancel')}
                   </Button>
-                  <Button color="primary" onPress={onSubmit} isLoading={isPending}>
+                  <Button variant="primary" onPress={onSubmit} isPending={isPending}>
                     {t('actions.markDone.modal.confirm')}
                   </Button>
                 </ModalFooter>

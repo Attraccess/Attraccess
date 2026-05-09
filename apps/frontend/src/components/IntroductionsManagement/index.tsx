@@ -69,7 +69,7 @@ export function IntroductionsManagement(props: Readonly<IntroductionsManagementP
         {
           key: 'grant-revoke',
           label: user.hasValidIntroduction ? t('actions.revoke') : t('actions.grant'),
-          isLoading: isRevoking ?? isGranting,
+          isPending: isRevoking ?? isGranting,
           onClick: (user) => {
             setSelectedUser(user);
             setComment(undefined);

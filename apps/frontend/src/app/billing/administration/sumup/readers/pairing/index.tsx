@@ -99,7 +99,7 @@ export function SumUpReadersPairing(props: Props) {
                 </ModalBody>
 
                 <ModalFooter>
-                  <Button color="primary" onPress={onSubmit} isLoading={isPairingReader}>
+                  <Button variant="primary" onPress={onSubmit} isPending={isPairingReader}>
                     {t('actions.pair')}
                   </Button>
                 </ModalFooter>

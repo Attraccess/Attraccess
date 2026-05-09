@@ -215,13 +215,12 @@ export function CreateMqttServerForm(props?: Readonly<CreateMqttServerPageProps>
       </Select>
 
       <div className="flex justify-end space-x-3 mt-4">
-        <Button color="default" variant="flat" onPress={handleCancel} data-cy="create-mqtt-server-form-cancel-button">
+        <Button variant="secondary" onPress={handleCancel} data-cy="create-mqtt-server-form-cancel-button">
           {t('cancel')}
         </Button>
-        <Button
-          color="primary"
+        <Button variant="primary"
           type="submit"
-          isLoading={createMqttServer.isPending}
+          isPending={createMqttServer.isPending}
           data-cy="create-mqtt-server-form-create-button"
         >
           {t('create')}
@@ -249,9 +248,8 @@ export function CreateMqttServerPage(props?: Readonly<CreateMqttServerPageProps>
       <CardHeader>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Button
+            <Button variant="ghost"
               isIconOnly
-              variant="light"
               onPress={handleCancel}
               aria-label={t('back')}
               data-cy="create-mqtt-server-page-back-button"

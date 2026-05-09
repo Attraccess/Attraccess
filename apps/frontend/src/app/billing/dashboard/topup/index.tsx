@@ -204,10 +204,9 @@ export function BillingDashboardTopupCard(props: Props) {
       </CardContent>
 
       <CardFooter>
-        <Button
-          color="primary"
+        <Button variant="primary"
           onPress={onSubmit}
-          isLoading={isPendingTopUpWithSumUpReader}
+          isPending={isPendingTopUpWithSumUpReader}
           isDisabled={!readerId || amount === 0}
         >
           {t('actions.topUp', { amount: formatNumber(amount), currency: configuration?.currency })}

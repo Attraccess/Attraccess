@@ -145,10 +145,9 @@ export function AppSettingsForm({ variant, endpoint, onNext }: AppSettingsFormPr
           <CommunityLicenseButton onAccept={setLicenseKey} isDisabled={isSaving} />
         </>
       )}
-      <Button
-        color="primary"
+      <Button variant="primary"
         onPress={handleSubmit}
-        isLoading={isSaving}
+        isPending={isSaving}
         isDisabled={showLoading}
       >
         {variant === 'wizard' ? t('actions.next') : t('actions.save')}

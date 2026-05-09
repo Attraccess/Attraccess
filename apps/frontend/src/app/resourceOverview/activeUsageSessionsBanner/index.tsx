@@ -206,10 +206,10 @@ export function ActiveUsageSessionsBanner({ onShowMySessions }: ActiveUsageSessi
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 w-full">
           <div className="flex flex-1">{t('description', { count: activeCount })}</div>
           <div className="flex flex-shrink gap-2">
-            <Button color="primary" size="sm" onPress={onShowMySessions}>
+            <Button variant="primary" size="sm" onPress={onShowMySessions}>
               {t('showMine')}
             </Button>
-            <Button color="danger" size="sm" variant="flat" onPress={openConfirmModal}>
+            <Button variant="danger-soft" size="sm" onPress={openConfirmModal}>
               {t('endAll')}
             </Button>
           </div>
@@ -284,12 +284,11 @@ export function ActiveUsageSessionsBanner({ onShowMySessions }: ActiveUsageSessi
                 </ModalBody>
                 {!allCompleted && (
                   <ModalFooter>
-                    <Button variant="light" onPress={close} isDisabled={isEndingAll}>
+                    <Button variant="ghost" onPress={close} isDisabled={isEndingAll}>
                       {t('modal.cancel')}
                     </Button>
-                    <Button
-                      color="danger"
-                      isLoading={isEndingAll}
+                    <Button variant="danger"
+                      isPending={isEndingAll}
                       isDisabled={isLoadingResources || activeResources.length === 0}
                       onPress={confirmEndAll}
                     >

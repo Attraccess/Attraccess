@@ -105,15 +105,14 @@ export const UserManagementPage: React.FC = () => {
           <>
             <InviteUserModal>
               {(onOpen) => (
-                <Button variant="light" onPress={onOpen} startContent={<UserPlusIcon className="w-4 h-4" />} size="md">
+                <Button variant="ghost" onPress={onOpen} startContent={<UserPlusIcon className="w-4 h-4" />} size="md">
                   {t('actions.inviteUser')}
                 </Button>
               )}
             </InviteUserModal>
             <TwoFactorPolicyModal>
               {(onOpenTwoFactorPolicy) => (
-                <Button
-                  variant="light"
+                <Button variant="ghost"
                   onPress={onOpenTwoFactorPolicy}
                   startContent={<ShieldCheckIcon className="w-4 h-4" />}
                   size="md"
@@ -124,14 +123,13 @@ export const UserManagementPage: React.FC = () => {
             </TwoFactorPolicyModal>
             <AllowedSignupDomainsEditorModal>
               {(onOpen) => (
-                <Button variant="light" onPress={onOpen} startContent={<Settings2Icon className="w-4 h-4" />} size="md">
+                <Button variant="ghost" onPress={onOpen} startContent={<Settings2Icon className="w-4 h-4" />} size="md">
                   {t('actions.editAllowedSignupDomains')}
                 </Button>
               )}
             </AllowedSignupDomainsEditorModal>
             {license?.modules.includes('sso') ? (
-              <Button
-                variant="light"
+              <Button variant="ghost"
                 onPress={() => navigate('/sso/providers')}
                 startContent={<KeyIcon className="w-4 h-4" />}
                 size="md"

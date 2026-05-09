@@ -101,9 +101,7 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
               className="w-full"
             />
           </div>
-          <Button
-            variant="flat"
-            color="primary"
+          <Button variant="secondary"
             onPress={() => setIsCreateServerOpen(true)}
             data-cy="mqtt-server-select-create-button"
             isIconOnly
@@ -270,11 +268,9 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
                     className="flex-1"
                     isRequired={true}
                   />
-                  <Button
+                  <Button variant="danger-soft"
                     size="sm"
                     isIconOnly
-                    variant="flat"
-                    color="danger"
                     onPress={() =>
                       onChange(
                         Object.fromEntries(
@@ -295,9 +291,8 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
           <div className="flex flex-col gap-2">
             {!hideLabel && <small>{t('nodes.' + nodeType + '.config.' + name + '.label')}</small>}
             {content}
-            <Button
+            <Button variant="secondary"
               size="sm"
-              variant="flat"
               startContent={<PlusIcon size={16} />}
               onPress={() => onChange({ ...value, '': '' })}
             >
@@ -373,11 +368,9 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
                       ) : null}
                     </div>
                     <div className="row-span-2 flex items-start p-2">
-                      <Button
+                      <Button variant="danger-soft"
                         size="sm"
                         isIconOnly
-                        variant="flat"
-                        color="danger"
                         onPress={() => {
                           const copy = (arrayValue as Array<unknown>).filter((_, i) => i !== index);
                           onChange(copy as TValue);
@@ -416,7 +409,7 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
         <div className="flex flex-col gap-2 w-full">
           {!hideLabel && <small>{t('nodes.' + nodeType + '.config.' + name + '.label')}</small>}
           {content}
-          <Button size="sm" variant="flat" startContent={<PlusIcon size={16} />} onPress={handleAdd}>
+          <Button variant="secondary" size="sm" startContent={<PlusIcon size={16} />} onPress={handleAdd}>
             {addText}
           </Button>
         </div>

@@ -109,9 +109,8 @@ function ResourceDetailsComponent() {
       <div className="max-w-7xl mx-auto px-4 flex flex-col items-center justify-center min-h-screen">
         <h2 className="text-xl font-semibold mb-2">{t('error.resourceNotFound.title')}</h2>
         <p className="text-gray-500 mb-4">{t('error.resourceNotFound.description')}</p>
-        <Button
+        <Button variant="ghost"
           onPress={() => navigate('/resources')}
-          variant="light"
           startContent={<ArrowLeft className="w-4 h-4" />}
           data-cy="back-to-resources-button"
         >
@@ -134,8 +133,7 @@ function ResourceDetailsComponent() {
           <>
             <DocumentationModal resourceId={resourceId}>
               {(onOpenDocumentation) => (
-                <Button
-                  variant="light"
+                <Button variant="ghost"
                   startContent={<BookOpen className="w-4 h-4" />}
                   onPress={onOpenDocumentation}
                   data-cy="documentation-button"
@@ -149,20 +147,18 @@ function ResourceDetailsComponent() {
               <>
                 <ResourceQrCode resourceId={resourceId} variant="light" buttonIconSize={16} />
 
-                <Button
+                <Button variant="ghost"
                   as={Link}
                   href={`/resources/${resourceId}/flows`}
-                  variant="light"
                   startContent={<WorkflowIcon className="w-4 h-4" />}
                   data-cy="flows-button"
                 >
                   {t('navItems.flows')}
                 </Button>
 
-                <Button
+                <Button variant="ghost"
                   as={Link}
                   href={`/resources/${resourceId}/forms`}
-                  variant="light"
                   startContent={<ListChecks className="w-4 h-4" />}
                   data-cy="forms-button"
                 >
@@ -171,9 +167,8 @@ function ResourceDetailsComponent() {
 
                 <ResourceEditModal resourceId={resourceId} closeOnSuccess>
                   {(onOpen) => (
-                    <Button
+                    <Button variant="ghost"
                       onPress={onOpen}
-                      variant="light"
                       startContent={<PenSquareIcon className="w-4 h-4" />}
                       data-cy="edit-resource-button"
                     >
@@ -182,10 +177,8 @@ function ResourceDetailsComponent() {
                   )}
                 </ResourceEditModal>
 
-                <Button
+                <Button variant="danger-soft"
                   onPress={open}
-                  color="danger"
-                  variant="light"
                   startContent={<Trash className="w-4 h-4" />}
                   data-cy="delete-resource-button"
                 >

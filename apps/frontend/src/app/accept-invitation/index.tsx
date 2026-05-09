@@ -115,7 +115,7 @@ export function AcceptInvitation() {
           }}
         />
 
-        <Button color="primary" isLoading={isPending} type="submit">
+        <Button variant="primary" isPending={isPending} type="submit">
           {t('actions.acceptInvitation')}
         </Button>
       </Form>

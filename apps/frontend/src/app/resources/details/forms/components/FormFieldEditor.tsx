@@ -63,10 +63,8 @@ export function FormFieldEditor(props: FormFieldEditorProps) {
         <Switch isSelected={field.isRequired} onValueChange={(value) => onChange({ ...field, isRequired: value })}>
           {t('fields.required')}
         </Switch>
-        <Button
+        <Button variant="danger-soft"
           size="sm"
-          variant="light"
-          color="danger"
           startContent={<Trash2 className="w-4 h-4" />}
           onPress={onRemove}
         >

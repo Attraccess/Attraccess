@@ -164,21 +164,18 @@ function PendingInvitationRow(props: Readonly<PendingInvitationRowProps>) {
         {invitation.inviter && <span>{invitation.inviter.username}</span>}
       </div>
       <div className="flex items-center justify-end gap-2">
-        <Button
+        <Button variant="ghost"
           size="sm"
-          variant="light"
           startContent={<RefreshCcwIcon className="size-4" />}
-          isLoading={isLoadingResend}
+          isPending={isLoadingResend}
           onPress={onResend}
         >
           {t('actions.resend')}
         </Button>
-        <Button
+        <Button variant="danger-soft"
           size="sm"
-          variant="light"
-          color="danger"
           startContent={<XIcon className="size-4" />}
-          isLoading={isLoadingCancel}
+          isPending={isLoadingCancel}
           onPress={onCancel}
         >
           {t('actions.cancel')}

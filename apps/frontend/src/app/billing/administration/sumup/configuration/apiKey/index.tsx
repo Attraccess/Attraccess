@@ -133,7 +133,7 @@ export function ApiKeyCard(props: Omit<CardProps, 'children'>) {
         </Form>
       </CardContent>
       <CardFooter>
-        <Button color="primary" onPress={onSubmitApiKey} isLoading={isPendingSetSumUpApiKey}>
+        <Button variant="primary" onPress={onSubmitApiKey} isPending={isPendingSetSumUpApiKey}>
           {t('actions.save')}
         </Button>
       </CardFooter>

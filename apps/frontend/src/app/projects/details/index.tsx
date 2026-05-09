@@ -149,8 +149,7 @@ export function ProjectDetailsPage() {
         actions={
           project?.access.isOwner && (
             <>
-              <Button
-                variant="light"
+              <Button variant="ghost"
                 as={Link}
                 href={`/projects/${projectId}/team`}
                 startContent={<UsersIcon className="size-4" />}
@@ -159,37 +158,31 @@ export function ProjectDetailsPage() {
               </Button>
               <UpsertProjectModal projectId={projectId}>
                 {(onOpen) => (
-                  <Button onPress={onOpen} startContent={<Edit2Icon className="size-4" />} variant="light">
+                  <Button variant="ghost" onPress={onOpen} startContent={<Edit2Icon className="size-4" />}>
                     {t('actions.update.label')}
                   </Button>
                 )}
               </UpsertProjectModal>
               {project.archivedAt ? (
-                <Button
+                <Button variant="tertiary"
                   onPress={() => unarchiveProject({ id: projectId })}
                   startContent={<ArchiveRestoreIcon className="size-4" />}
-                  variant="light"
-                  color="warning"
-                  isLoading={isUnarchiving}
+                  isPending={isUnarchiving}
                 >
                   {t('actions.unarchive.label')}
                 </Button>
               ) : (
-                <Button
+                <Button variant="tertiary"
                   onPress={() => archiveProject({ id: projectId })}
                   startContent={<ArchiveIcon className="size-4" />}
-                  variant="light"
-                  color="warning"
-                  isLoading={isArchiving}
+                  isPending={isArchiving}
                 >
                   {t('actions.archive.label')}
                 </Button>
               )}
-              <Button
+              <Button variant="danger-soft"
                 onPress={() => setShowDeleteConfirmationModal(true)}
                 startContent={<Trash2Icon className="size-4" />}
-                color="danger"
-                variant="light"
               >
                 {t('actions.delete.label')}
               </Button>

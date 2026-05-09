@@ -226,7 +226,7 @@ export function FormEditorPage() {
         backTo={`/resources/${resourceId}/forms`}
         actions={
           !isCreateMode && (
-            <Button color="danger" variant="light" onPress={() => setDeleteModalOpen(true)}>
+            <Button variant="danger-soft" onPress={() => setDeleteModalOpen(true)}>
               {t('editor.delete')}
             </Button>
           )
@@ -313,17 +313,16 @@ export function FormEditorPage() {
 
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-default-700">{t('editor.fieldsTitle')}</h2>
-              <Button size="sm" variant="flat" onPress={addField}>
+              <Button variant="secondary" size="sm" onPress={addField}>
                 {t('editor.addField')}
               </Button>
             </div>
 
             <div className="flex items-center justify-between pt-2">
               {hasUnsavedChanges && <span className="text-sm text-warning-500">{t('editor.unsaved')}</span>}
-              <Button
-                color="primary"
+              <Button variant="primary"
                 onPress={handleSave}
-                isLoading={createForm.isPending || updateForm.isPending}
+                isPending={createForm.isPending || updateForm.isPending}
                 isDisabled={!form.name || form.fields.length === 0}
               >
                 {t('editor.save')}

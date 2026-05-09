@@ -83,10 +83,9 @@ export const SetPasswordForm: React.FC<SetPasswordFormProps & Omit<HTMLAttribute
       />
 
       <div className="flex w-full justify-end">
-        <Button
-          color="primary"
+        <Button variant="primary"
           onPress={handleSubmit}
-          isLoading={isSettingPassword}
+          isPending={isSettingPassword}
           data-cy="set-password-form-save-button"
           isDisabled={passwordTooShort || passwordsDontMatch}
         >

@@ -170,9 +170,8 @@ export function AttraccessNode(props: Props) {
                 <Button size="sm" isIconOnly startContent={<Edit2Icon size={12} />} onPress={openEditor} />
               )}
               {!previewMode && (
-                <Button
+                <Button variant="danger"
                   isIconOnly
-                  color="danger"
                   size="sm"
                   startContent={<Trash2Icon size={12} />}
                   onPress={userWantsToDelete}

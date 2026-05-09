@@ -27,7 +27,7 @@ export function VerifyEmailStep({ onCorrectAdminDetails }: VerifyEmailStepProps)
 
       <Alert color="primary" variant="flat" description={t('message')} />
 
-      <Button color="primary" onPress={() => navigate('/', { replace: true })}>
+      <Button variant="primary" onPress={() => navigate('/', { replace: true })}>
         {t('actions.goToLogin')}
       </Button>
 

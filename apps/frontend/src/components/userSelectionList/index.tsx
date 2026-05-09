@@ -107,10 +107,9 @@ export function UserSelectionList<TUser extends User = User>(props: Readonly<Pro
         autocompleteProps={{ size: 'sm' }}
         afterSelection={
           userSearchSelection && (
-            <Button
+            <Button variant="primary"
               onPress={onAddUser}
-              color="primary"
-              isLoading={addToSelectionIsLoading}
+              isPending={addToSelectionIsLoading}
               isIconOnly
               startContent={<PlusIcon className="w-4 h-4" />}
             />

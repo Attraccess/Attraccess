@@ -72,7 +72,7 @@ export default function AccountPage() {
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             <p className="text-sm text-default-500">{t('deleteAccount.description')}</p>
-            <Button color="danger" variant="flat" onPress={open} data-cy="delete-account-open-modal">
+            <Button variant="danger-soft" onPress={open} data-cy="delete-account-open-modal">
               {t('deleteAccount.actions.request')}
             </Button>
           </CardContent>
@@ -92,13 +92,12 @@ export default function AccountPage() {
                   <p className="text-sm text-default-500">{t('deleteAccount.modal.description')}</p>
                 </ModalBody>
                 <ModalFooter>
-                  <Button variant="light" onPress={close} isDisabled={isRequestingDelete}>
+                  <Button variant="ghost" onPress={close} isDisabled={isRequestingDelete}>
                     {t('deleteAccount.actions.cancel')}
                   </Button>
-                  <Button
-                    color="danger"
+                  <Button variant="danger"
                     onPress={() => requestDelete()}
-                    isLoading={isRequestingDelete}
+                    isPending={isRequestingDelete}
                     data-cy="delete-account-confirm-button"
                   >
                     {t('deleteAccount.actions.confirm')}

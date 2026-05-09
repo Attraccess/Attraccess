@@ -80,7 +80,7 @@ export function ChangeUsernameForm({ userId, ...divProps }: Props & Omit<HTMLAtt
     <div {...divProps} className={cn(divProps.className, 'flex flex-col gap-4')}>
       <Input label={t('username.label')} value={username} onValueChange={setUsername} isDisabled={isLoadingUser} />
       <div className="flex w-full justify-end">
-        <Button isLoading={isPending} onPress={onSubmit} color="primary">
+        <Button variant="primary" isPending={isPending} onPress={onSubmit}>
           {t('actions.save')}
         </Button>
       </div>

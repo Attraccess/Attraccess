@@ -104,7 +104,7 @@ export const UsageNotesModal = memo(
             )}
           </ModalBody>
           <ModalFooter>
-            <Button color="primary" variant="light" onPress={onClose}>
+            <Button variant="ghost" onPress={onClose}>
               {t('close')}
             </Button>
           </ModalFooter>

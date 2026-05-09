@@ -123,9 +123,8 @@ export function EditMqttServerPage() {
         <CardHeader>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Button
+              <Button variant="ghost"
                 isIconOnly
-                variant="light"
                 onPress={handleCancel}
                 aria-label={t('back')}
                 data-cy="edit-mqtt-server-page-back-button"
@@ -297,18 +296,15 @@ export function EditMqttServerPage() {
             </div>
 
             <div className="flex justify-end space-x-3">
-              <Button
-                color="default"
-                variant="flat"
+              <Button variant="secondary"
                 onPress={handleCancel}
                 data-cy="edit-mqtt-server-form-cancel-button"
               >
                 {t('cancel')}
               </Button>
-              <Button
-                color="primary"
+              <Button variant="primary"
                 type="submit"
-                isLoading={updateMqttServer.isPending}
+                isPending={updateMqttServer.isPending}
                 data-cy="edit-mqtt-server-form-update-button"
               >
                 {t('update')}

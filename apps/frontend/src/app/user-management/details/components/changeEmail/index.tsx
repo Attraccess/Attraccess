@@ -71,7 +71,7 @@ export function ChangeEmailForm({ userId, ...divProps }: Props & Omit<HTMLAttrib
     <div {...divProps} className={cn(divProps.className, 'flex flex-col gap-4')}>
       <Input type="email" label={t('email.label')} value={email} onValueChange={setEmail} />
       <div className="flex w-full justify-end">
-        <Button isLoading={isPending} onPress={onSubmit} color="primary" isDisabled={!isEmailValid || isPending}>
+        <Button variant="primary" isPending={isPending} onPress={onSubmit} isDisabled={!isEmailValid || isPending}>
           {t('actions.save')}
         </Button>
       </div>

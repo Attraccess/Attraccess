@@ -26,9 +26,7 @@ export function CommunityLicenseButton({ onAccept, isDisabled, ...rest }: Commun
 
   return (
     <>
-      <Button
-        variant="flat"
-        color="secondary"
+      <Button variant="secondary"
         onPress={open}
         isDisabled={isDisabled}
         startContent={<HeartHandshakeIcon size={16} />}
@@ -65,10 +63,10 @@ export function CommunityLicenseButton({ onAccept, isDisabled, ...rest }: Commun
                   <Alert color="warning" variant="flat" description={t('modal.commercialNotice')} />
                 </ModalBody>
                 <ModalFooter>
-                  <Button variant="light" onPress={modalClose} data-cy="community-license-cancel">
+                  <Button variant="ghost" onPress={modalClose} data-cy="community-license-cancel">
                     {t('modal.cancel')}
                   </Button>
-                  <Button color="primary" onPress={handleConfirm} data-cy="community-license-confirm">
+                  <Button variant="primary" onPress={handleConfirm} data-cy="community-license-confirm">
                     {t('modal.confirm')}
                   </Button>
                 </ModalFooter>

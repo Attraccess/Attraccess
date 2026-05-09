@@ -20,7 +20,7 @@ export function BillingDashboardPage() {
         icon={<ChartNoAxesCombinedIcon />}
         actions={
           hasPermission('canManageBilling') && (
-            <Button as={Link} href="/billing/administration" variant="light" startContent={<Settings2Icon />}>
+            <Button variant="ghost" as={Link} href="/billing/administration" startContent={<Settings2Icon />}>
               {t('actions.administration')}
             </Button>
           )

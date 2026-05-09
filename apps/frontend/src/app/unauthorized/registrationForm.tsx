@@ -138,7 +138,7 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
         <h2 className="text-3xl font-bold">{t('title')}</h2>
         <p className="mt-2 text-gray-600 dark:text-gray-300">
           {t('hasAccount')}{' '}
-          <Button onPress={onHasAccount} variant="light" color="secondary" data-cy="registration-form-sign-in-button">
+          <Button variant="secondary" onPress={onHasAccount} data-cy="registration-form-sign-in-button">
             {t('signInButton')}
           </Button>
         </p>
@@ -211,12 +211,11 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
           onValueChange={setPasswordConfirmation}
         />
 
-        <Button
-          color="primary"
+        <Button variant="primary"
           fullWidth
           type="submit"
           endContent={<ArrowRight className="group-hover:translate-x-1 transition-transform" />}
-          isLoading={isPending}
+          isPending={isPending}
           isDisabled={!canSubmit}
           data-cy="registration-form-create-account-button"
         >
@@ -247,15 +246,13 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
                 <Alert color="primary" variant="flat" title={t('twoFactor.title')} description={t('twoFactor.description')} />
               </ModalBody>
               <ModalFooter>
-                <Button
-                  variant="light"
+                <Button variant="ghost"
                   onPress={close}
                   data-cy="registration-form-success-modal-close-button"
                 >
                   {t('success.closeButton')}
                 </Button>
-                <Button
-                  color="primary"
+                <Button variant="primary"
                   onPress={() => {
                     markTwoFactorSetupIntent();
                     close();

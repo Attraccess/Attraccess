@@ -88,9 +88,8 @@ export function MaintenanceManagement(props: Props & Omit<CardProps, 'children'>
               </Switch>
               <ResourceMaintenanceUpsertModal resourceId={resourceId}>
                 {(open) => (
-                  <Button
+                  <Button variant="primary"
                     onPress={open}
-                    color="primary"
                     size="sm"
                     title={t('actions.create.title')}
                     startContent={<PlusIcon className="w-4 h-4" />}
@@ -151,13 +150,11 @@ export function MaintenanceManagement(props: Props & Omit<CardProps, 'children'>
                   {maintenance.isActive && (
                     <MarkDoneModal resourceId={resourceId} maintenanceId={maintenance.id}>
                       {(openMarkDone: () => void) => (
-                        <Button
+                        <Button variant="tertiary"
                           isIconOnly
                           startContent={<CheckCircleIcon className="w-4 h-4" />}
                           title={t('actions.markDone.title')}
                           onPress={openMarkDone}
-                          color="success"
-                          variant="light"
                         />
                       )}
                     </MarkDoneModal>

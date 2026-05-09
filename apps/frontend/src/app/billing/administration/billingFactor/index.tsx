@@ -93,7 +93,7 @@ export function ManageBillingFactorCard(props: Props & Omit<CardProps, 'children
       </CardContent>
 
       <CardFooter>
-        <Button color="primary" onPress={handleUpdate} isLoading={isChangingBillingFactor}>
+        <Button variant="primary" onPress={handleUpdate} isPending={isChangingBillingFactor}>
           {t('actions.update')}
         </Button>
       </CardFooter>

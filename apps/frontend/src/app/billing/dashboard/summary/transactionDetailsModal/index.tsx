@@ -79,7 +79,7 @@ export function TransactionDetailsModal(props: Props) {
               actions={
                 <RefundModal transactionId={transactionId}>
                   {(onOpen) => (
-                    <Button color="danger" variant="light" onPress={onOpen}>
+                    <Button variant="danger-soft" onPress={onOpen}>
                       {t('actions.refund')}
                     </Button>
                   )}

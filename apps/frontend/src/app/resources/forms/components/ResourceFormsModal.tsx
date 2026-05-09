@@ -160,10 +160,10 @@ export function ResourceFormsModal({ isOpen, action, forms, onSubmit, onCancel }
             ))}
           </ModalBody>
           <ModalFooter>
-            <Button variant="light" onPress={onCancel}>
+            <Button variant="ghost" onPress={onCancel}>
               {t('modal.cancel')}
             </Button>
-            <Button color="primary" onPress={handleSubmit}>
+            <Button variant="primary" onPress={handleSubmit}>
               {t('modal.submit')}
             </Button>
           </ModalFooter>

@@ -153,7 +153,7 @@ export function InviteUserModal(props: Props) {
                   />
 
                   <div className="flex justify-end w-full">
-                    <Button color="primary" type="submit" isLoading={isPending} isDisabled={!canSubmit}>
+                    <Button variant="primary" type="submit" isPending={isPending} isDisabled={!canSubmit}>
                       {t('actions.invite')}
                     </Button>
                   </div>

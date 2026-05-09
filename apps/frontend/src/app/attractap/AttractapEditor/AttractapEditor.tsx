@@ -128,9 +128,8 @@ export function AttractapEditor(props: Readonly<Props>) {
                   />
                 </ModalBody>
                 <ModalFooter>
-                  <Button
+                  <Button variant="secondary"
                     type="button"
-                    color="secondary"
                     onPress={() => {
                       props.onCancel();
                     }}
@@ -141,7 +140,7 @@ export function AttractapEditor(props: Readonly<Props>) {
                   </Button>
                   <Button
                     type="submit"
-                    isLoading={updateReaderMutation.isPending}
+                    isPending={updateReaderMutation.isPending}
                     onPress={save}
                     data-cy="attractap-editor-save-button"
                   >

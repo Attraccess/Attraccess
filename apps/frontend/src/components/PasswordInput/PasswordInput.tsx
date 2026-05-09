@@ -40,10 +40,9 @@ export const PasswordInput: React.FC<PasswordInputProps & Required<Pick<InputPro
   const endContent = (
     <div className="flex items-center gap-1">
       <Tooltip content={showPassword ? t('hidePassword') : t('showPassword')}>
-        <Button
+        <Button variant="ghost"
           isIconOnly
           size="sm"
-          variant="light"
           onPress={togglePasswordVisibility}
           aria-label={showPassword ? t('hidePassword') : t('showPassword')}
           data-cy="password-input-toggle-button"

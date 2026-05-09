@@ -106,7 +106,7 @@ export function ConfirmDeleteAccount() {
             <p className="text-sm text-gray-600 dark:text-gray-400 text-center">{t('success.message')}</p>
           </CardContent>
           <CardFooter>
-            <Button fullWidth color="primary" onPress={() => navigate('/')} data-cy="confirm-delete-success-button">
+            <Button variant="primary" fullWidth onPress={() => navigate('/')} data-cy="confirm-delete-success-button">
               {t('success.backToLogin')}
             </Button>
           </CardFooter>
@@ -127,9 +127,8 @@ export function ConfirmDeleteAccount() {
           </CardContent>
           <CardFooter className="flex flex-col gap-2">
             {allowRetry && (
-              <Button
+              <Button variant="primary"
                 fullWidth
-                color="primary"
                 onPress={() => confirm(true)}
                 isDisabled={confirmDelete.isPending}
                 data-cy="confirm-delete-error-try-again-button"
@@ -137,9 +136,8 @@ export function ConfirmDeleteAccount() {
                 {t('error.tryAgain')}
               </Button>
             )}
-            <Button
+            <Button variant="outline"
               fullWidth
-              variant="bordered"
               onPress={() => navigate('/')}
               data-cy="confirm-delete-error-back-button"
             >

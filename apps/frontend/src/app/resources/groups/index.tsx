@@ -140,11 +140,10 @@ export function ManageResourceGroups({
           actions={
             <ResourceGroupUpsertModal onUpserted={onGroupCreated}>
               {(onOpen: () => void) => (
-                <Button
+                <Button variant="secondary"
                   radius="full"
                   onPress={onOpen}
                   startContent={<PlusIcon size={18} />}
-                  color="secondary"
                   size="sm"
                   data-cy="toolbar-open-create-resource-group-modal-button"
                 >

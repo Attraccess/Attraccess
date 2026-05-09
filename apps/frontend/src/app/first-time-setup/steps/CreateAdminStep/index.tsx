@@ -170,10 +170,9 @@ export function CreateAdminStep({ onSuccess, isOverwrite }: CreateAdminStepProps
         />
         <input type="submit" hidden />
       </Form>
-      <Button
-        color="primary"
+      <Button variant="primary"
         onPress={handleSubmit}
-        isLoading={isPending}
+        isPending={isPending}
         isDisabled={!canSubmit}
       >
         {isPending ? t('creating') : t('actions.create')}
