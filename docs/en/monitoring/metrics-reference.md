@@ -162,14 +162,14 @@ sum by (job_name) (rate(attraccess_cron_job_runs_total{status="failure"}[15m]))
 
 | Metric | Type | Labels | Description |
 |--------|------|--------|-------------|
-| `attraccess_db_query_duration_seconds` | Histogram | `entity`, `method` | Duration of database write operations |
+| `attraccess_db_query_duration_seconds` | Histogram | `entity`, `method` | Duration of database queries (`select`, `insert`, `update`, `delete`, `other`) |
 | `attraccess_db_query_errors_total` | Counter | `entity`, `method`, `error_type` | Database query errors |
 | `attraccess_db_slow_queries_total` | Counter | `entity`, `method` | Queries exceeding the slow-query threshold |
 | `attraccess_db_pool_size` | Gauge | -- | Configured connection pool size |
 
 **Duration buckets:** 1ms, 5ms, 10ms, 25ms, 50ms, 100ms, 250ms, 500ms, 1s, 2.5s, 5s
 
-The TypeORM `EntitySubscriber` covers `insert`, `update`, `remove`, and `softRemove`. Read paths (`find`, `findOne`, ...) are not measured -- this is a known TypeORM `EntitySubscriber` limitation.
+All SQL passing through the TypeORM `QueryRunner` is timed -- reads (`find`, `findOne`, `getMany`) and writes alike. Housekeeping statements (`BEGIN`, `COMMIT`, `ROLLBACK`, `SAVEPOINT`, `RELEASE`, `PRAGMA`) are skipped. The `entity` label is parsed from the SQL `FROM` / `INTO` / `UPDATE` clause; statements that do not match a table fall back to `entity="unknown"`.
 
 **Disabled by default** (high cardinality). Enable via Admin Settings -> Metrics -> Toggles -> Database.
 

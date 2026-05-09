@@ -181,6 +181,7 @@ describe('Monitoring configuration consistency', () => {
       'grafana/dashboards/attraccess-websocket.json',
       'grafana/dashboards/attraccess-cron.json',
       'grafana/dashboards/attraccess-database.json',
+      'grafana/dashboards/attraccess-flow.json',
     ];
 
     const dashboards = dashboardFiles.map((path) => ({ path, json: loadJson(path) }));

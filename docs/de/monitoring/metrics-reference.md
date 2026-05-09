@@ -162,14 +162,14 @@ sum by (job_name) (rate(attraccess_cron_job_runs_total{status="failure"}[15m]))
 
 | Metrik | Typ | Labels | Beschreibung |
 |--------|-----|--------|--------------|
-| `attraccess_db_query_duration_seconds` | Histogram | `entity`, `method` | Dauer von Datenbank-Schreibvorgängen |
+| `attraccess_db_query_duration_seconds` | Histogram | `entity`, `method` | Dauer von Datenbank-Abfragen (`select`, `insert`, `update`, `delete`, `other`) |
 | `attraccess_db_query_errors_total` | Counter | `entity`, `method`, `error_type` | Datenbank-Abfragefehler |
 | `attraccess_db_slow_queries_total` | Counter | `entity`, `method` | Abfragen, die den Slow-Query-Schwellwert überschreiten |
 | `attraccess_db_pool_size` | Gauge | -- | Konfigurierte Größe des Verbindungspools |
 
 **Dauer-Buckets:** 1ms, 5ms, 10ms, 25ms, 50ms, 100ms, 250ms, 500ms, 1s, 2.5s, 5s
 
-Der TypeORM-`EntitySubscriber` deckt `insert`, `update`, `remove` und `softRemove` ab. Lesepfade (`find`, `findOne`, ...) werden nicht erfasst -- dies ist eine bekannte Einschränkung des TypeORM-`EntitySubscriber`.
+Sämtliches SQL, das durch den TypeORM-`QueryRunner` läuft, wird gemessen -- Lesevorgänge (`find`, `findOne`, `getMany`) ebenso wie Schreibvorgänge. Wartungs-Statements (`BEGIN`, `COMMIT`, `ROLLBACK`, `SAVEPOINT`, `RELEASE`, `PRAGMA`) werden übersprungen. Das `entity`-Label wird aus der SQL-`FROM` / `INTO` / `UPDATE`-Klausel geparst; Statements ohne erkennbare Tabelle landen unter `entity="unknown"`.
 
 **Standardmäßig deaktiviert** (hohe Kardinalität). Aktivieren über Admin-Einstellungen -> Metriken -> Toggles -> Datenbank.
 

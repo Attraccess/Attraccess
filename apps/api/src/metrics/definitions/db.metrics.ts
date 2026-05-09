@@ -26,7 +26,7 @@ export function createDbMetrics(registry: Registry): DbMetrics {
     }),
     slowQueriesTotal: new Counter({
       name: 'attraccess_db_slow_queries_total',
-      help: 'Total number of slow database queries (over 500ms)',
+      help: 'Total number of slow database queries (above the configured slow query threshold)',
       labelNames: ['entity', 'method'],
       registers: [registry],
     }),

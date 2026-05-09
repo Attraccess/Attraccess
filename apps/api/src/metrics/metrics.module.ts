@@ -27,7 +27,7 @@ import { createFlowMetrics } from './definitions/flow.metrics';
 import { HttpMetricsInterceptor } from './instrumentation/http/http.interceptor';
 import { WsMetricsInterceptor } from './instrumentation/ws/ws.interceptor';
 import { CronTimer } from './instrumentation/cron/cron.helper';
-import { DbMetricsSubscriber } from './instrumentation/db/db.subscriber';
+import { DbMetricsInstrumentation } from './instrumentation/db/db.instrumentation';
 import { ExternalCallTimer } from './instrumentation/external/external.helper';
 import { SseInstrumentation } from './instrumentation/sse/sse.helper';
 import { FlowTimer } from './instrumentation/flow/flow.helper';
@@ -54,7 +54,7 @@ const definitionProviders = [
     MetricsGuard,
     MetricsToggleService,
     CronTimer,
-    DbMetricsSubscriber,
+    DbMetricsInstrumentation,
     ExternalCallTimer,
     SseInstrumentation,
     FlowTimer,
