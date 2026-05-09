@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Modal, ModalContent } from '../../utils/heroui-compat';
-import { Button, ModalBody, ModalFooter, ModalHeader } from '@heroui/react';
+import { Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { ArrowUpCircle, ExternalLink, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -110,33 +109,40 @@ export function UpdateNotificationBanner() {
       </div>
 
       <Modal isOpen={isReleaseNotesOpen} onOpenChange={setIsReleaseNotesOpen} size="2xl" scrollBehavior="inside">
-        <ModalContent>
-          <ModalHeader>{t('releaseNotesModalTitle', { version: release.version })}</ModalHeader>
-          <ModalBody>
-            {release.body?.trim() ? (
-              <div className="prose prose-sm dark:prose-invert max-w-none">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{release.body}</ReactMarkdown>
-              </div>
-            ) : (
-              <div className="text-default-500">{t('releaseNotesFallback')}</div>
+        <ModalBackdrop />
+        <ModalContainer>
+          <ModalDialog>
+            {({ close }) => (
+              <>
+                <ModalHeader>{t('releaseNotesModalTitle', { version: release.version })}</ModalHeader>
+                <ModalBody>
+                  {release.body?.trim() ? (
+                    <div className="prose prose-sm dark:prose-invert max-w-none">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{release.body}</ReactMarkdown>
+                    </div>
+                  ) : (
+                    <div className="text-default-500">{t('releaseNotesFallback')}</div>
+                  )}
+                </ModalBody>
+                <ModalFooter className="flex-wrap gap-2 justify-between">
+                  <Button
+                    as="a"
+                    href={release.htmlUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    variant="flat"
+                    endContent={<ExternalLink size={14} />}
+                  >
+                    {release.tagName}
+                  </Button>
+                  <Button color="primary" onPress={close}>
+                    {t('close')}
+                  </Button>
+                </ModalFooter>
+              </>
             )}
-          </ModalBody>
-          <ModalFooter className="flex-wrap gap-2 justify-between">
-            <Button
-              as="a"
-              href={release.htmlUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              variant="flat"
-              endContent={<ExternalLink size={14} />}
-            >
-              {release.tagName}
-            </Button>
-            <Button color="primary" onPress={onCloseReleaseNotes}>
-              {t('close')}
-            </Button>
-          </ModalFooter>
-        </ModalContent>
+          </ModalDialog>
+        </ModalContainer>
       </Modal>
     </>
   );
