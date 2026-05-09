@@ -1,6 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { CircularProgress } from "../../../../../utils/heroui-compat";
-import { Alert, Button, cn } from "@heroui/react";
+import { Alert, Button, cn, ProgressCircle, ProgressCircleFillCircle, ProgressCircleTrack, ProgressCircleTrackCircle } from "@heroui/react";
 import { useCallback, useMemo, useState } from 'react';
 import { getBaseUrl } from '../../../../../api';
 import { PageHeader } from '../../../../../components/pageHeader';
@@ -139,7 +138,12 @@ export function AttractapSerialConfiguratorApi({
         title={<span onDoubleClick={manualUpdateApiData}>{t('title')}</span>}
         actions={
           isFetchingConfiguration || isUpdatingApi ? (
-            <CircularProgress isIndeterminate />
+            <ProgressCircle isIndeterminate>
+              <ProgressCircleTrack>
+                <ProgressCircleTrackCircle />
+                <ProgressCircleFillCircle />
+              </ProgressCircleTrack>
+            </ProgressCircle>
           ) : (
             <Button size="sm" onPress={handleRefresh}>
               {t('actions.refreshStatus')}

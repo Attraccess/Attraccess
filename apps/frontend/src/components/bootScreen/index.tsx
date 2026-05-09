@@ -1,5 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Progress } from "../../utils/heroui-compat";
+import { ProgressBar, ProgressBarFill, ProgressBarTrack } from "@heroui/react";
 import { UnauthorizedLayout } from '../../app/unauthorized/unauthorized-layout/layout';
 import { PageHeader } from '../pageHeader';
 
@@ -12,7 +12,11 @@ export function BootScreen() {
   return (
     <UnauthorizedLayout>
       <PageHeader title={t('title')} subtitle={t('subtitle')} />
-      <Progress isIndeterminate aria-label={t('progress.ariaLabel')} />
+      <ProgressBar isIndeterminate aria-label={t('progress.ariaLabel')}>
+        <ProgressBarTrack>
+          <ProgressBarFill />
+        </ProgressBarTrack>
+      </ProgressBar>
     </UnauthorizedLayout>
   );
 }

@@ -1,5 +1,4 @@
-import { Button, Card, CardContent, CardFooter, CardHeader, CardProps } from "@heroui/react";
-import { NumberInput } from "../../../../utils/heroui-compat";
+import { Button, Card, CardContent, CardFooter, CardHeader, CardProps, NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput } from "@heroui/react";
 import { PageHeader } from '../../../../components/pageHeader';
 import { HandCoinsIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -87,7 +86,13 @@ export function ManualTransactionsCard(props: Props & Omit<CardProps, 'children'
       </CardHeader>
 
       <CardContent className="flex flex-col gap-4">
-        <NumberInput label={t('inputs.amount')} value={amount} onValueChange={(value) => setAmount(value)} />
+        <NumberField aria-label={t('inputs.amount')} value={amount} onChange={(value) => setAmount(value)}>
+          <NumberFieldGroup>
+            <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
+            <NumberFieldInput />
+            <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
+          </NumberFieldGroup>
+        </NumberField>
       </CardContent>
 
       <CardFooter>

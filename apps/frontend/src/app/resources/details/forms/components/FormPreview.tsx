@@ -1,5 +1,4 @@
-import { Card, CardContent, CardHeader, Input, Select, Switch, Textarea } from "@heroui/react";
-import { SelectItem } from "../../../../../utils/heroui-compat";
+import { Card, CardContent, CardHeader, Input, ListBoxItem, Select, Switch, Textarea } from "@heroui/react";
 import { FormFieldType } from '@attraccess/react-query-client';
 import { EditableFormField, TextFieldOptions, NumberFieldOptions, SelectFieldOptions } from '../types';
 
@@ -73,7 +72,7 @@ function renderPreviewSelect(options: SelectFieldOptions, t: (key: string) => st
   return (
     <Select placeholder={t('preview.selectPlaceholder')} aria-label={fieldName}>
       {items.map((option) => (
-        <SelectItem key={option} id={option}>{option}</SelectItem>
+        <ListBoxItem key={option} id={option}>{option}</ListBoxItem>
       ))}
     </Select>
   );

@@ -1,7 +1,6 @@
 import { AttractapFirmware, useAttractapServiceGetFirmwareBinary } from '@attraccess/react-query-client';
-import { CircularProgress, Progress } from "../../../../utils/heroui-compat";
 import { ESPTools, ESPToolsErrorType } from '../../../../utils/esp-tools';
-import { Accordion, AccordionItem, Alert, Button } from "@heroui/react";
+import { Accordion, AccordionItem, Alert, Button, ProgressBar, ProgressBarFill, ProgressBarTrack, ProgressCircle, ProgressCircleFillCircle, ProgressCircleTrack, ProgressCircleTrackCircle } from "@heroui/react";
 import { useCallback, useState } from 'react';
 import { useToastMessage } from '../../../../components/toastProvider';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -98,7 +97,12 @@ export function FirmwareFlasher(props: Props) {
   if (isDownloadingFirmware) {
     return (
       <div className="flex flex-col items-center justify-center h-full">
-        <CircularProgress isIndeterminate label={t('downloading.label')} />
+        <ProgressCircle isIndeterminate aria-label={t('downloading.label')}>
+          <ProgressCircleTrack>
+            <ProgressCircleTrackCircle />
+            <ProgressCircleFillCircle />
+          </ProgressCircleTrack>
+        </ProgressCircle>
       </div>
     );
   }
@@ -126,13 +130,17 @@ export function FirmwareFlasher(props: Props) {
       )}
 
       {!flashError && (
-        <Progress
+        <ProgressBar
           isIndeterminate={flashProgress === 0}
           value={flashProgress}
           minValue={0}
           maxValue={100}
           showValueLabel={true}
-        />
+        >
+          <ProgressBarTrack>
+            <ProgressBarFill />
+          </ProgressBarTrack>
+        </ProgressBar>
       )}
 
       <Accordion>

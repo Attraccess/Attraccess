@@ -1,6 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { CircularProgress } from "../../../../../utils/heroui-compat";
-import { Alert, Button, Input } from "@heroui/react";
+import { Alert, Button, Input, ProgressCircle, ProgressCircleFillCircle, ProgressCircleTrack, ProgressCircleTrackCircle } from "@heroui/react";
 import {
   createContext,
   useCallback,
@@ -233,7 +232,12 @@ export function AttractapSerialCommGate({ children }: PropsWithChildren) {
   if (pinIsSet === null) {
     return (
       <div className="w-full flex flex-col items-center justify-center">
-        <CircularProgress isIndeterminate label={t('loading')} />
+        <ProgressCircle isIndeterminate aria-label={t('loading')}>
+        <ProgressCircleTrack>
+          <ProgressCircleTrackCircle />
+          <ProgressCircleFillCircle />
+        </ProgressCircleTrack>
+      </ProgressCircle>
       </div>
     );
   }

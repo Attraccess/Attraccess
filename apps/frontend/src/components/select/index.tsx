@@ -1,5 +1,4 @@
-import { Select as HeroUiSelect, SelectProps as HeroUiSelectProps, SharedSelection } from "@heroui/react";
-import { SelectItem as HeroUiSelectItem } from "../../utils/heroui-compat";
+import { Select as HeroUiSelect, SelectProps as HeroUiSelectProps, SharedSelection, ListBoxItem as HeroUiSelectItem } from "@heroui/react";
 import { ReactNode, useCallback, useEffect, useState } from 'react';
 
 interface SelectItem {
