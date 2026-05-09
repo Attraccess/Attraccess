@@ -1,0 +1,150 @@
+# Coolify-ready production docker-compose for Attraccess.
+# Uses Coolify magic env conventions: SERVICE_FQDN_*, SERVICE_URL_*,
+# SERVICE_USER_*, SERVICE_PASSWORD_*, SERVICE_BASE64_*. See
+# https://coolify.io/docs/knowledge-base/docker/compose for details.
+#
+# Stack: rabbitmq (AMQP+MQTT), zigbee2mqtt, attraccess, prometheus, grafana.
+#
+# Sidecar configs (Prometheus rules, Grafana provisioning, dashboards) ship
+# bundled inside the attraccess image at /app/share/monitoring/. The
+# monitoring-init service copies them into named volumes on stack startup,
+# so this compose file deploys standalone — no repo checkout required.
+#
+# NOTE: zigbee2mqtt has no `devices:` mapping by default (host-specific).
+# To pass a Zigbee adapter, use a Coolify compose override or extend with
+# a docker-compose.override.yml exposing e.g. /dev/ttyACM0.
+
+services:
+  attraccess:
+    image: ${ATTRACCESS_IMAGE:-ghcr.io/attraccess/attraccess:latest}
+    restart: unless-stopped
+    environment:
+      - SERVICE_FQDN_ATTRACCESS_3000
+      - ATTRACCESS_URL=$SERVICE_URL_ATTRACCESS
+      - ATTRACCESS_PUBLIC_INTERNET_URL=${ATTRACCESS_PUBLIC_INTERNET_URL:-$SERVICE_URL_ATTRACCESS}
+      - AUTH_SESSION_SECRET=$SERVICE_BASE64_64_AUTHSESSION
+      - TZ=${TZ:-UTC}
+      - LOG_LEVELS=${LOG_LEVELS:-error,warn,log}
+    volumes:
+      - attraccess-storage:/app/storage
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "require('net').connect(3000,'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  rabbitmq:
+    image: rabbitmq:4.3.0-management
+    restart: unless-stopped
+    hostname: rabbitmq
+    command: '/bin/bash -c "rabbitmq-plugins enable --offline rabbitmq_mqtt rabbitmq_web_mqtt rabbitmq_amqp1_0; rabbitmq-server"'
+    environment:
+      - SERVICE_FQDN_RABBITMQ_15672
+      - RABBITMQ_DEFAULT_USER=$SERVICE_USER_RABBITMQ
+      - RABBITMQ_DEFAULT_PASS=$SERVICE_PASSWORD_RABBITMQ
+      - RABBITMQ_HOST=%
+    ports:
+      - '${RABBITMQ_MQTT_PORT:-1883}:1883'
+      - '${RABBITMQ_MQTT_WS_PORT:-15675}:15675'
+      - '${RABBITMQ_AMQP_PORT:-5672}:5672'
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', '-q', 'ping']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  zigbee2mqtt:
+    image: ghcr.io/koenkk/zigbee2mqtt:2.10.1
+    restart: unless-stopped
+    environment:
+      - SERVICE_FQDN_ZIGBEE2MQTT_8080
+      - TZ=${TZ:-UTC}
+    volumes:
+      - zigbee2mqtt-data:/app/data
+      - /run/udev:/run/udev:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -q --spider http://127.0.0.1:8080 || exit 1']
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  monitoring-init:
+    image: ${ATTRACCESS_IMAGE:-ghcr.io/attraccess/attraccess:latest}
+    restart: 'no'
+    entrypoint: ['/bin/sh', '-c']
+    environment:
+      - PROMETHEUS_METRICS_API_KEY=${PROMETHEUS_METRICS_API_KEY:-}
+    command:
+      - >
+        set -e &&
+        cp -rT /app/share/monitoring/prometheus /prometheus-config &&
+        if [ -n "$$PROMETHEUS_METRICS_API_KEY" ]; then
+          sed -i "s|# bearer_token: '<your-metrics-api-key>'|bearer_token: '$$PROMETHEUS_METRICS_API_KEY'|" /prometheus-config/prometheus.yml;
+        fi &&
+        cp -rT /app/share/monitoring/grafana/provisioning /grafana-provisioning &&
+        cp -rT /app/share/monitoring/grafana/dashboards /grafana-dashboards
+    volumes:
+      - prometheus-config:/prometheus-config
+      - grafana-provisioning:/grafana-provisioning
+      - grafana-dashboards:/grafana-dashboards
+
+  prometheus:
+    image: prom/prometheus:v3.11.3
+    restart: unless-stopped
+    environment:
+      - SERVICE_FQDN_PROMETHEUS_9090
+    volumes:
+      - prometheus-data:/prometheus
+      - prometheus-config:/etc/prometheus:ro
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-30d}'
+      - '--web.enable-lifecycle'
+    depends_on:
+      monitoring-init:
+        condition: service_completed_successfully
+      attraccess:
+        condition: service_healthy
+
+  grafana:
+    image: grafana/grafana:13.0.1
+    restart: unless-stopped
+    environment:
+      - SERVICE_FQDN_GRAFANA_3000
+      - GF_SERVER_ROOT_URL=$SERVICE_URL_GRAFANA
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - grafana-provisioning:/etc/grafana/provisioning:ro
+      - grafana-dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      monitoring-init:
+        condition: service_completed_successfully
+      prometheus:
+        condition: service_started
+
+volumes:
+  attraccess-storage:
+  rabbitmq-data:
+  zigbee2mqtt-data:
+  prometheus-data:
+  prometheus-config:
+  grafana-data:
+  grafana-provisioning:
+  grafana-dashboards:
