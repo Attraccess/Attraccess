@@ -1,7 +1,7 @@
 import en from './en.json';
 import de from './de.json';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Button, Form, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, useOverlayState } from '@heroui/react';
+import { Button, Form, TextField, Label, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, useOverlayState } from '@heroui/react';
 import { PageHeader } from '../../../../../../components/pageHeader';
 import { PasswordInput } from '../../../../../../components/PasswordInput';
 import { useCallback, useRef, useState } from 'react';
@@ -92,7 +92,10 @@ export function SumUpReadersPairing(props: Props) {
                       maxLength={9}
                     />
 
-                    <Input label={t('inputs.name')} value={name} onValueChange={setName} autoComplete="off" isRequired />
+                    <TextField value={name} onChange={setName} isRequired>
+                      <Label>{t('inputs.name')}</Label>
+                      <Input autoComplete="off" />
+                    </TextField>
 
                     <input type="submit" hidden />
                   </Form>

@@ -1,4 +1,4 @@
-import { Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Button, Input, Switch, Form, Alert, Select, ListBoxItem, useOverlayState } from "@heroui/react";
+import { Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Button, TextField, Label, Input, Switch, Form, Alert, Select, ListBoxItem, useOverlayState } from "@heroui/react";
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -230,12 +230,10 @@ export function MaintenanceScheduleUpsertModal(props: Props) {
 
           <ModalBody>
             <Form ref={formRef} onSubmit={(e) => { e.preventDefault(); onSubmit(); }}>
-              <Input
-                label={t('inputs.name.label')}
-                value={name}
-                onValueChange={setName}
-                placeholder="e.g. Monthly check"
-              />
+              <TextField value={name} onChange={setName}>
+                <Label>{t('inputs.name.label')}</Label>
+                <Input placeholder="e.g. Monthly check" />
+              </TextField>
 
               <Select
                 label={t('inputs.triggerType.label')}
@@ -252,14 +250,10 @@ export function MaintenanceScheduleUpsertModal(props: Props) {
 
               {triggerType === ResourceMaintenanceScheduleTriggerType.USAGE_HOURS && (
                 <>
-                  <Input
-                    type="number"
-                    label={t('inputs.duration.label')}
-                    value={usageHoursDuration}
-                    onValueChange={setUsageHoursDuration}
-                    min={1}
-                    isRequired
-                  />
+                  <TextField value={usageHoursDuration} onChange={setUsageHoursDuration} isRequired>
+                    <Label>{t('inputs.duration.label')}</Label>
+                    <Input type="number" min={1} />
+                  </TextField>
                   <Select
                     label={t('inputs.unit.label')}
                     selectedKeys={[usageHoursUnit]}
@@ -276,26 +270,18 @@ export function MaintenanceScheduleUpsertModal(props: Props) {
               )}
 
               {triggerType === ResourceMaintenanceScheduleTriggerType.USAGE_COUNT && (
-                <Input
-                  type="number"
-                  label={t('inputs.thresholdSessions.label')}
-                  value={thresholdSessions}
-                  onValueChange={setThresholdSessions}
-                  min={1}
-                  isRequired
-                />
+                <TextField value={thresholdSessions} onChange={setThresholdSessions} isRequired>
+                  <Label>{t('inputs.thresholdSessions.label')}</Label>
+                  <Input type="number" min={1} />
+                </TextField>
               )}
 
               {triggerType === ResourceMaintenanceScheduleTriggerType.TIME_INTERVAL && (
                 <>
-                  <Input
-                    type="number"
-                    label={t('inputs.duration.label')}
-                    value={timeIntervalDuration}
-                    onValueChange={setTimeIntervalDuration}
-                    min={1}
-                    placeholder="e.g. 30"
-                  />
+                  <TextField value={timeIntervalDuration} onChange={setTimeIntervalDuration}>
+                    <Label>{t('inputs.duration.label')}</Label>
+                    <Input type="number" min={1} placeholder="e.g. 30" />
+                  </TextField>
                   <Select
                     label={t('inputs.unit.label')}
                     selectedKeys={[timeIntervalUnit]}

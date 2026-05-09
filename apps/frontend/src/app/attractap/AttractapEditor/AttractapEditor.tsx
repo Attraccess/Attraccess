@@ -2,7 +2,7 @@ import { useTranslations, ResourceSelector } from '@attraccess/plugins-frontend-
 import de from './AttractapEditor.de.json';
 import en from './AttractapEditor.en.json';
 import { Button, Form, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalHeader, ModalHeading, ModalFooter, Divider, Slider } from '@heroui/react';
-import { Input } from '@heroui/react';
+import { TextField, Label, Input } from '@heroui/react';
 import { useCallback, useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -99,14 +99,10 @@ export function AttractapEditor(props: Readonly<Props>) {
                   <ModalHeading>{t('title')}</ModalHeading>
                 </ModalHeader>
                 <ModalBody>
-                  <Input
-                    label={t('readerName')}
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder={t('enterReaderName')}
-                    className="w-full"
-                    data-cy="attractap-editor-name-input"
-                  />
+                  <TextField value={name} onChange={setName} className="w-full">
+                    <Label>{t('readerName')}</Label>
+                    <Input placeholder={t('enterReaderName')} data-cy="attractap-editor-name-input" />
+                  </TextField>
                   {reader?.firmware.capabilities.hasLeds && (
                     <Slider
                       label={t('ledBrightness')}

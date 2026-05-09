@@ -1,4 +1,4 @@
-import { Button, Input } from '@heroui/react';
+import { Button, TextField, Input } from '@heroui/react';
 import { Plus, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { TFunction } from '@attraccess/plugins-frontend-ui';
@@ -158,21 +158,25 @@ export function ResourceMetadataEditor({ t, value, onChange }: ResourceMetadataE
         <div className="space-y-2">
           {entries.map((entry, index) => (
             <div key={entry.id} className="flex flex-col sm:flex-row gap-2 sm:items-center">
-              <Input
+              <TextField
                 value={entry.key}
-                placeholder={t('inputs.metadata.key.placeholder')}
+                onChange={(v) => handleKeyChange(entry.id, v)}
                 aria-label={t('inputs.metadata.key.label')}
-                onChange={(event) => handleKeyChange(entry.id, event.target.value)}
                 className="flex-1"
-                ref={index === entries.length - 1 ? lastKeyInputRef : undefined}
-              />
-              <Input
+              >
+                <Input
+                  placeholder={t('inputs.metadata.key.placeholder')}
+                  ref={index === entries.length - 1 ? lastKeyInputRef : undefined}
+                />
+              </TextField>
+              <TextField
                 value={entry.value}
-                placeholder={t('inputs.metadata.value.placeholder')}
+                onChange={(v) => handleValueChange(entry.id, v)}
                 aria-label={t('inputs.metadata.value.label')}
-                onChange={(event) => handleValueChange(entry.id, event.target.value)}
                 className="flex-1"
-              />
+              >
+                <Input placeholder={t('inputs.metadata.value.placeholder')} />
+              </TextField>
               <Button variant="danger-soft"
                 size="sm"
                 startContent={<Trash2 className="w-4 h-4" />}

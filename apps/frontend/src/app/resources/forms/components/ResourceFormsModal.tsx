@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Input, ListBoxItem, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Select, Selection, Switch, Textarea } from "@heroui/react";
+import { Button, TextField, FieldError, Input, ListBoxItem, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Select, Selection, Switch, Textarea } from "@heroui/react";
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { FormFieldType, FormResponseDto, FormSubmissionRequestDto } from '@attraccess/react-query-client';
 import {
@@ -194,12 +194,10 @@ function renderFieldInput(
       return renderSelectInput(selectOptions ?? [], value, onChange, error, t, field.name);
     default:
       return (
-        <Input
-          value={(value as string) ?? ''}
-          onChange={(event) => onChange(event.target.value)}
-          isInvalid={Boolean(error)}
-          errorMessage={error ?? undefined}
-        />
+        <TextField value={(value as string) ?? ''} onChange={onChange as (v: string) => void} isInvalid={Boolean(error)}>
+          <Input />
+          {error && <FieldError>{error}</FieldError>}
+        </TextField>
       );
   }
 }
@@ -271,13 +269,10 @@ function renderTextInput(
   }
 
   return (
-    <Input
-      value={(value as string) ?? ''}
-      placeholder={options.placeholder ?? ''}
-      onChange={(event) => onChange(event.target.value)}
-      isInvalid={Boolean(error)}
-      errorMessage={error ?? undefined}
-    />
+    <TextField value={(value as string) ?? ''} onChange={onChange as (v: string) => void} isInvalid={Boolean(error)}>
+      <Input placeholder={options.placeholder ?? ''} />
+      {error && <FieldError>{error}</FieldError>}
+    </TextField>
   );
 }
 
@@ -292,16 +287,10 @@ function renderNumberInput(
   const step = typeof options.step === 'number' ? options.step : undefined;
 
   return (
-    <Input
-      type="number"
-      min={min}
-      max={max}
-      step={step}
-      value={(value as string) ?? ''}
-      onChange={(event) => onChange(event.target.value)}
-      isInvalid={Boolean(error)}
-      errorMessage={error ?? undefined}
-    />
+    <TextField value={(value as string) ?? ''} onChange={onChange as (v: string) => void} isInvalid={Boolean(error)}>
+      <Input type="number" min={min} max={max} step={step} />
+      {error && <FieldError>{error}</FieldError>}
+    </TextField>
   );
 }
 

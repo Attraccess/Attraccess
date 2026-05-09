@@ -1,5 +1,5 @@
 import { ResourceFlowNodeDto, useBillingServiceGetBillingConfiguration } from '@attraccess/react-query-client';
-import { Autocomplete, Button, Card, CardContent, Input, ListBoxItem, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalHeader, NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput, Switch, Textarea } from "@heroui/react";
+import { Autocomplete, Button, Card, CardContent, TextField, Label, Input, ListBoxItem, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalHeader, NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput, Switch, Textarea } from "@heroui/react";
 import { MqttServerSelect } from '../../../../../../../components/mqttServerSelect';
 import { PlusIcon, XIcon } from 'lucide-react';
 import { TFunction } from '@attraccess/plugins-frontend-ui';
@@ -74,15 +74,12 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
   const [isCreateServerOpen, setIsCreateServerOpen] = useState(false);
 
   if (!configuration && schema.isCurrency) {
+    const currencyLabel = t('nodes.' + nodeType + '.config.' + name + '.label');
     return (
-      <Input
-        type="text"
-        isDisabled
-        label={!hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined}
-        placeholder={hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined}
-        description={description}
-        isRequired={isRequired}
-      />
+      <TextField isDisabled isRequired={isRequired}>
+        {!hideLabel && <Label>{currencyLabel}</Label>}
+        <Input type="text" placeholder={hideLabel ? currencyLabel : undefined} />
+      </TextField>
     );
   }
 
@@ -174,16 +171,14 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
       }
 
       return (
-        <Input
-          type="text"
+        <TextField
           isRequired={isRequired}
-          label={!hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined}
-          placeholder={hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined}
-          value={value ? String(value) : undefined}
-          defaultValue={schema.default ? String(schema.default) : undefined}
-          onValueChange={(newValue) => onChange(newValue as TValue)}
-          description={description}
-        />
+          value={value ? String(value) : ''}
+          onChange={(newValue) => onChange(newValue as TValue)}
+        >
+          {!hideLabel && <Label>{t('nodes.' + nodeType + '.config.' + name + '.label')}</Label>}
+          <Input type="text" placeholder={hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined} defaultValue={schema.default ? String(schema.default) : undefined} />
+        </TextField>
       );
     case 'integer':
     case 'number': {
@@ -252,22 +247,22 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
             <div className="flex flex-col gap-2">
               {Object.entries(value as Record<string, unknown>).map(([key, currentValueOfKey], index) => (
                 <div key={index} className="flex gap-2 items-center">
-                  <Input
-                    size="sm"
-                    placeholder="Header name"
+                  <TextField
                     value={key}
-                    onValueChange={(newKey) => onChange({ ...value, [key]: undefined, [newKey]: currentValueOfKey })}
+                    onChange={(newKey) => onChange({ ...value, [key]: undefined, [newKey]: currentValueOfKey })}
+                    isRequired
                     className="flex-1"
-                    isRequired={true}
-                  />
-                  <Input
-                    size="sm"
-                    placeholder="Header value"
+                  >
+                    <Input size="sm" placeholder="Header name" />
+                  </TextField>
+                  <TextField
                     value={currentValueOfKey as string}
-                    onValueChange={(newValueOfKey) => onChange({ ...value, [key]: newValueOfKey })}
+                    onChange={(newValueOfKey) => onChange({ ...value, [key]: newValueOfKey })}
+                    isRequired
                     className="flex-1"
-                    isRequired={true}
-                  />
+                  >
+                    <Input size="sm" placeholder="Header value" />
+                  </TextField>
                   <Button variant="danger-soft"
                     size="sm"
                     isIconOnly

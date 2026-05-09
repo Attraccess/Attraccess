@@ -20,6 +20,8 @@ import {
   CardContent,
   CardHeader,
   Divider,
+  TextField,
+  Label,
   Input,
   Selection,
   Spinner,
@@ -237,13 +239,14 @@ export function FormEditorPage() {
         <Card>
           <CardContent className="space-y-6">
             <div className="grid gap-4 md:grid-cols-2">
-              <Input
-                label={t('editor.nameLabel')}
-                placeholder={t('editor.namePlaceholder')}
-                value={form.name}
-                onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
+              <TextField
                 isRequired
-              />
+                value={form.name}
+                onChange={(v) => setForm((prev) => ({ ...prev, name: v }))}
+              >
+                <Label>{t('editor.nameLabel')}</Label>
+                <Input placeholder={t('editor.namePlaceholder')} />
+              </TextField>
             </div>
 
             <div className="grid gap-2">

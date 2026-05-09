@@ -1,5 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Alert, Button, Input, cn } from '@heroui/react';
+import { Alert, Button, TextField, Label, Input, cn } from '@heroui/react';
 import { useCallback, useState, type FormEvent } from 'react';
 import { PageHeader } from '../../../../../components/pageHeader';
 import { useAttractapSerialComm } from '../Auth';
@@ -91,31 +91,19 @@ export function AttractapSerialConfiguratorPin({ className, mode = 'change' }: A
       <PageHeader noMargin title={t('title')} />
       <form className="flex flex-col gap-3" onSubmit={handleChangePin}>
         {mode === 'change' && (
-          <Input
-            label={t('fields.currentPin')}
-            value={currentPin}
-            onChange={(e) => setCurrentPin(e.target.value)}
-            maxLength={4}
-            inputMode="numeric"
-            required
-          />
+          <TextField value={currentPin} onChange={setCurrentPin}>
+            <Label>{t('fields.currentPin')}</Label>
+            <Input maxLength={4} inputMode="numeric" required />
+          </TextField>
         )}
-        <Input
-          label={t('fields.newPin')}
-          value={newPin}
-          onChange={(e) => setNewPin(e.target.value)}
-          maxLength={4}
-          inputMode="numeric"
-          required
-        />
-        <Input
-          label={t('fields.confirmPin')}
-          value={confirmPin}
-          onChange={(e) => setConfirmPin(e.target.value)}
-          maxLength={4}
-          inputMode="numeric"
-          required
-        />
+        <TextField value={newPin} onChange={setNewPin}>
+          <Label>{t('fields.newPin')}</Label>
+          <Input maxLength={4} inputMode="numeric" required />
+        </TextField>
+        <TextField value={confirmPin} onChange={setConfirmPin}>
+          <Label>{t('fields.confirmPin')}</Label>
+          <Input maxLength={4} inputMode="numeric" required />
+        </TextField>
         {error && <Alert color="danger">{error}</Alert>}
         <div className="flex gap-2">
           <Button variant="primary" type="submit" isPending={isSubmitting}>

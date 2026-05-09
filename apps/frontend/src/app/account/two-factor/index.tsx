@@ -1,4 +1,4 @@
-import { Alert, Button, Input, Skeleton } from '@heroui/react';
+import { Alert, Button, TextField, Label, Input, Skeleton } from '@heroui/react';
 import { QRCode } from 'react-qrcode-logo';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -112,24 +112,15 @@ export function TwoFactorCard() {
                 <div className="text-xs text-default-500">{t('setup.scanHint')}</div>
               </div>
 
-              <Input
-                label={t('setup.secretLabel')}
-                value={setupData.secret}
-                readOnly
-                variant="bordered"
-                description={t('setup.secretHint')}
-              />
+              <TextField value={setupData.secret} isReadOnly>
+                <Label>{t('setup.secretLabel')}</Label>
+                <Input />
+              </TextField>
 
-              <Input
-                label={t('setup.codeLabel')}
-                value={setupCode}
-                onValueChange={setSetupCode}
-                variant="bordered"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                maxLength={6}
-                isDisabled={isBusy}
-              />
+              <TextField value={setupCode} onChange={setSetupCode} isDisabled={isBusy}>
+                <Label>{t('setup.codeLabel')}</Label>
+                <Input inputMode="numeric" autoComplete="one-time-code" maxLength={6} />
+              </TextField>
 
               <Button onPress={handleVerify} isPending={isVerifying} isDisabled={isBusy || !setupCode.trim()}>
                 {t('setup.verifyButton')}
@@ -141,16 +132,10 @@ export function TwoFactorCard() {
 
       {!showSetup && (
         <div className="flex flex-col gap-4">
-          <Input
-            label={t('disable.codeLabel')}
-            value={disableCode}
-            onValueChange={setDisableCode}
-            variant="bordered"
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            maxLength={6}
-            isDisabled={isBusy}
-          />
+          <TextField value={disableCode} onChange={setDisableCode} isDisabled={isBusy}>
+            <Label>{t('disable.codeLabel')}</Label>
+            <Input inputMode="numeric" autoComplete="one-time-code" maxLength={6} />
+          </TextField>
           <Button variant="danger" onPress={handleDisable} isPending={isDisabling} isDisabled={isBusy || !disableCode.trim()}>
             {t('disable.button')}
           </Button>

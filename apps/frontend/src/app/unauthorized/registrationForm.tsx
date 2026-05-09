@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { ArrowRight, Mail } from 'lucide-react';
-import { Alert, Button, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, useOverlayState } from '@heroui/react';
+import { Alert, Button, TextField, Label, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, useOverlayState } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PasswordInput } from '../../components/PasswordInput';
 import { UsernameInput, USERNAME_RULES, useUsernameValidation } from '../../components/UsernameInput';
@@ -162,18 +162,10 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
           isRequired
         />
 
-        <Input
-          id="email"
-          name="email"
-          type="email"
-          label={t('email')}
-          required
-
-          data-cy="registration-form-email-input"
-          isRequired
-          value={email}
-          onValueChange={setEmail}
-        />
+        <TextField isRequired value={email} onChange={setEmail}>
+          <Label>{t('email')}</Label>
+          <Input id="email" name="email" type="email" required data-cy="registration-form-email-input" />
+        </TextField>
 
         <PasswordInput
           id="password"
