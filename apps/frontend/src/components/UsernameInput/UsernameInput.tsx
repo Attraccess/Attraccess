@@ -38,6 +38,7 @@ export function useUsernameValidation(username: string, messages: UsernameValida
 
 type UsernameInputProps = {
   value: string;
+  onChange?: (value: string) => void;
   onValueChange?: (value: string) => void;
   label?: React.ReactNode;
   description?: React.ReactNode;
