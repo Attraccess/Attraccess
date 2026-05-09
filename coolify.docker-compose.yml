@@ -87,10 +87,15 @@ services:
     image: ${ATTRACCESS_IMAGE:-ghcr.io/attraccess/attraccess:latest}
     restart: 'no'
     entrypoint: ['/bin/sh', '-c']
+    environment:
+      - PROMETHEUS_METRICS_API_KEY=${PROMETHEUS_METRICS_API_KEY:-}
     command:
       - >
         set -e &&
         cp -rT /app/share/monitoring/prometheus /prometheus-config &&
+        if [ -n "$$PROMETHEUS_METRICS_API_KEY" ]; then
+          sed -i "s|# bearer_token: '<your-metrics-api-key>'|bearer_token: '$$PROMETHEUS_METRICS_API_KEY'|" /prometheus-config/prometheus.yml;
+        fi &&
         cp -rT /app/share/monitoring/grafana/provisioning /grafana-provisioning &&
         cp -rT /app/share/monitoring/grafana/dashboards /grafana-dashboards
     volumes:

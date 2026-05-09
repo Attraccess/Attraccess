@@ -28,8 +28,8 @@ A short-lived `monitoring-init` helper service runs the same image, copies these
 
 Use [`coolify.docker-compose.yml`](https://github.com/Attraccess/Attraccess/blob/main/coolify.docker-compose.yml) from the repo root. Coolify auto-generates the FQDN routing, Grafana admin user/password, and session secrets via `SERVICE_FQDN_*`, `SERVICE_USER_*`, `SERVICE_PASSWORD_*`, and `SERVICE_BASE64_*` env conventions. After the stack is deployed:
 
-1. Generate a metrics API key in **Attraccess > Settings > Metrics & Monitoring** ([setup guide](monitoring/setup.md))
-2. Configure the bearer token in the bundled `prometheus.yml` (see [Setting the Bearer Token](#setting-the-bearer-token) below)
+1. Generate a metrics API key in **Attraccess > Settings > Metrics & Monitoring** ([setup guide](monitoring/setup.md)) and copy it (the value is shown only once)
+2. In Coolify, add `PROMETHEUS_METRICS_API_KEY=<your-key>` as a service environment variable, then redeploy the stack — `monitoring-init` injects the bearer token into the Prometheus config on every start (see [Setting the Bearer Token](#setting-the-bearer-token) below)
 3. Open Grafana at the FQDN Coolify assigned and log in with the auto-generated `SERVICE_USER_GRAFANA` / `SERVICE_PASSWORD_GRAFANA` (visible in the Coolify service env tab)
 
 Datasource and dashboards are provisioned automatically — no manual Grafana configuration required.
@@ -46,10 +46,15 @@ services:
     image: ghcr.io/attraccess/attraccess:latest
     restart: 'no'
     entrypoint: ['/bin/sh', '-c']
+    environment:
+      - PROMETHEUS_METRICS_API_KEY=${PROMETHEUS_METRICS_API_KEY:-}
     command:
       - >
         set -e &&
         cp -rT /app/share/monitoring/prometheus /prometheus-config &&
+        if [ -n "$$PROMETHEUS_METRICS_API_KEY" ]; then
+          sed -i "s|# bearer_token: '<your-metrics-api-key>'|bearer_token: '$$PROMETHEUS_METRICS_API_KEY'|" /prometheus-config/prometheus.yml;
+        fi &&
         cp -rT /app/share/monitoring/grafana/provisioning /grafana-provisioning &&
         cp -rT /app/share/monitoring/grafana/dashboards /grafana-dashboards
     volumes:
@@ -103,38 +108,30 @@ volumes:
 |----------|---------|-------------|
 | `GRAFANA_ADMIN_USER` | `admin` | Grafana admin username (only applied on first init — see Troubleshooting) |
 | `GRAFANA_ADMIN_PASSWORD` | `attraccess` | Grafana admin password (only applied on first init — see Troubleshooting) |
+| `PROMETHEUS_METRICS_API_KEY` | _(unset)_ | Bearer token Prometheus uses to scrape Attraccess. When set, `monitoring-init` injects it into `prometheus.yml`. Leave unset on first deploy, then mint a key in Attraccess and add it. |
 
 > [!WARNING]
 > Change the default Grafana password before deploying to production.
 
 ## Setting the Bearer Token
 
-The bundled `prometheus.yml` ships with the bearer token commented out — Prometheus needs it to authenticate against Attraccess `/api/metrics`.
+The bundled `prometheus.yml` ships with the bearer token commented out — Prometheus needs it to authenticate against Attraccess `/api/metrics`. Because Attraccess only displays the metrics API key once at creation, the workflow is one-way: mint the key in the Attraccess UI, then push it into the stack as an environment variable.
 
-After your first deploy:
+1. Deploy the stack without `PROMETHEUS_METRICS_API_KEY`. Attraccess starts; Prometheus scrapes will return `401` until step 3 — that is expected.
+2. In **Attraccess > Settings > Metrics & Monitoring**, generate a metrics API key and copy it (the value is shown only once).
+3. Set `PROMETHEUS_METRICS_API_KEY=<your-key>` as an environment variable on the stack:
+   - **Coolify**: add it in the service env tab and trigger a redeploy.
+   - **Manual compose**: add it to your `.env` file (or export it in the shell), then `docker compose up -d --force-recreate monitoring-init prometheus`.
+4. On startup, `monitoring-init` runs:
 
-1. Generate a metrics API key in Attraccess (see [setup guide](monitoring/setup.md))
-2. Edit `prometheus.yml` inside the `prometheus-config` volume to add the bearer token:
-
-   ```bash
-   docker compose exec prometheus sh -c 'apk add --no-cache vi 2>/dev/null; vi /etc/prometheus/prometheus.yml'
+   ```sh
+   sed -i "s|# bearer_token: '<your-metrics-api-key>'|bearer_token: '$PROMETHEUS_METRICS_API_KEY'|" /prometheus-config/prometheus.yml
    ```
 
-   Or replace the file from the host:
-
-   ```bash
-   docker run --rm -v <stack>_prometheus-config:/data -i busybox sh -c \
-     'sed -i "s|# bearer_token: .*|bearer_token: \"<your-key>\"|; s|^    # bearer_token|    bearer_token|" /data/prometheus.yml'
-   ```
-
-3. Reload Prometheus:
-
-   ```bash
-   docker compose exec prometheus wget -qO- --post-data='' http://127.0.0.1:9090/-/reload
-   ```
+   Prometheus then mounts the rewritten config read-only and authenticates successfully.
 
 > [!NOTE]
-> The `monitoring-init` service overwrites `prometheus.yml` on every stack start, so any manual bearer-token edit is wiped on redeploy. Re-apply it after each deploy until automated env-var templating lands.
+> `monitoring-init` runs on every stack start and re-templates the file from the bundled image, so the bearer token is reapplied automatically as long as `PROMETHEUS_METRICS_API_KEY` stays set. Rotating the key requires minting a new one in Attraccess, updating the env var, and redeploying.
 
 ### Bundled Scrape Config
 
@@ -253,7 +250,7 @@ By default, Prometheus is only exposed internally (no `ports` mapping). If you n
 
 | Problem | Solution |
 |---------|----------|
-| Prometheus shows target as "DOWN" with `401` | Bearer token missing or wrong — generate a new key in Attraccess and re-apply to `prometheus.yml` in the `prometheus-config` volume, then reload Prometheus |
+| Prometheus shows target as "DOWN" with `401` | Bearer token missing or wrong — set `PROMETHEUS_METRICS_API_KEY` to the value generated in Attraccess and redeploy the stack so `monitoring-init` re-templates the config |
 | Prometheus shows target as "DOWN" with no auth error | Verify the `attraccess` service is reachable from the Prometheus container (network, hostname `attraccess:3000`) |
 | No data in Grafana dashboards | Confirm Prometheus is running and scraping. Check the targets page at `http://prometheus:9090/targets` |
 | Grafana login bounces back to login page | `GF_SERVER_ROOT_URL` is wrong — must be the full external URL with scheme (`https://...`), no port suffix when behind a reverse proxy |
