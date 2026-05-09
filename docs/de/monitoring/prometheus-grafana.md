@@ -26,11 +26,11 @@ Ein kurzlebiger Hilfsdienst `monitoring-init` startet dasselbe Image, kopiert di
 
 ## Coolify-Deployment
 
-Verwenden Sie [`coolify.docker-compose.yml`](https://github.com/Attraccess/Attraccess/blob/main/coolify.docker-compose.yml) aus dem Repo-Root. Coolify generiert FQDN-Routing, Grafana-Admin-Zugangsdaten und Session-Secrets automatisch über die Magic-Env-Konventionen `SERVICE_FQDN_*`, `SERVICE_USER_*`, `SERVICE_PASSWORD_*` und `SERVICE_BASE64_*`. Nach dem Deployment:
+Verwenden Sie [`coolify.docker-compose.yml`](https://github.com/Attraccess/Attraccess/blob/main/coolify.docker-compose.yml) aus dem Repo-Root. Coolify generiert FQDN-Routing und Session-Secrets automatisch über die Magic-Env-Konventionen `SERVICE_FQDN_*`, `SERVICE_URL_*` und `SERVICE_BASE64_*`. Nach dem Deployment:
 
 1. Erstellen Sie einen Metriken-API-Schlüssel unter **Attraccess > Einstellungen > Metrics & Monitoring** ([Einrichtung](monitoring/setup.md)) und kopieren Sie ihn (der Wert wird nur einmal angezeigt)
 2. Setzen Sie in Coolify die Umgebungsvariable `PROMETHEUS_METRICS_API_KEY=<Ihr-Schlüssel>` für den Service und triggern Sie ein Redeploy — `monitoring-init` schreibt den Bearer-Token bei jedem Start in die Prometheus-Konfiguration (siehe [Bearer-Token setzen](#bearer-token-setzen))
-3. Öffnen Sie Grafana unter der von Coolify zugewiesenen FQDN und melden Sie sich mit dem automatisch generierten `SERVICE_USER_GRAFANA` / `SERVICE_PASSWORD_GRAFANA` an (sichtbar im Coolify-Service-Env-Tab)
+3. Öffnen Sie Grafana unter der von Coolify zugewiesenen FQDN und melden Sie sich mit `admin` / `admin` an. Grafana erzwingt einen Passwortwechsel beim ersten Login. Um Zugangsdaten vorzubelegen, überschreiben Sie `GRAFANA_ADMIN_USER` und `GRAFANA_ADMIN_PASSWORD` im Coolify-Env-Tab vor dem ersten Deploy.
 
 Datenquelle und Dashboards werden automatisch provisioniert — keine manuelle Grafana-Konfiguration nötig.
 
