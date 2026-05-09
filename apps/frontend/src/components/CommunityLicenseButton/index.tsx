@@ -1,5 +1,4 @@
-import { Alert, Button, ModalBody, ModalFooter, ModalHeader } from '@heroui/react';
-import { Modal, ModalContent, useDisclosure } from '../../utils/heroui-compat';
+import { Alert, Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, useOverlayState } from '@heroui/react';
 import { HeartHandshakeIcon } from 'lucide-react';
 import { I18nTransComponent, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
@@ -18,11 +17,11 @@ export interface CommunityLicenseButtonProps {
 
 export function CommunityLicenseButton({ onAccept, isDisabled, ...rest }: CommunityLicenseButtonProps) {
   const { t } = useTranslations({ en, de });
-  const { isOpen, onOpen, onClose } = useDisclosure();
+  const { isOpen, open, close } = useOverlayState();
 
   const handleConfirm = () => {
     onAccept(COMMUNITY_LICENSE_KEY);
-    onClose();
+    close();
   };
 
   return (
@@ -30,46 +29,53 @@ export function CommunityLicenseButton({ onAccept, isDisabled, ...rest }: Commun
       <Button
         variant="flat"
         color="secondary"
-        onPress={onOpen}
+        onPress={open}
         isDisabled={isDisabled}
         startContent={<HeartHandshakeIcon size={16} />}
         data-cy={rest['data-cy'] ?? 'community-license-button'}
       >
         {t('button')}
       </Button>
-      <Modal isOpen={isOpen} onClose={onClose} scrollBehavior="inside">
-        <ModalContent>
-          <ModalHeader>{t('modal.title')}</ModalHeader>
-          <ModalBody>
-            <p className="text-sm">
-              <I18nTransComponent
-                t={t}
-                i18nKey="modal.question"
-                components={{
-                  link: (
-                    <a
-                      href={LICENSE_URL}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-primary underline"
-                    >
-                      LICENSE.md
-                    </a>
-                  ),
-                }}
-              />
-            </p>
-            <Alert color="warning" variant="flat" description={t('modal.commercialNotice')} />
-          </ModalBody>
-          <ModalFooter>
-            <Button variant="light" onPress={onClose} data-cy="community-license-cancel">
-              {t('modal.cancel')}
-            </Button>
-            <Button color="primary" onPress={handleConfirm} data-cy="community-license-confirm">
-              {t('modal.confirm')}
-            </Button>
-          </ModalFooter>
-        </ModalContent>
+      <Modal isOpen={isOpen} onOpenChange={(o) => { if (!o) close(); }} scrollBehavior="inside">
+        <ModalBackdrop />
+        <ModalContainer>
+          <ModalDialog>
+            {({ close: modalClose }) => (
+              <>
+                <ModalHeader>{t('modal.title')}</ModalHeader>
+                <ModalBody>
+                  <p className="text-sm">
+                    <I18nTransComponent
+                      t={t}
+                      i18nKey="modal.question"
+                      components={{
+                        link: (
+                          <a
+                            href={LICENSE_URL}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary underline"
+                          >
+                            LICENSE.md
+                          </a>
+                        ),
+                      }}
+                    />
+                  </p>
+                  <Alert color="warning" variant="flat" description={t('modal.commercialNotice')} />
+                </ModalBody>
+                <ModalFooter>
+                  <Button variant="light" onPress={modalClose} data-cy="community-license-cancel">
+                    {t('modal.cancel')}
+                  </Button>
+                  <Button color="primary" onPress={handleConfirm} data-cy="community-license-confirm">
+                    {t('modal.confirm')}
+                  </Button>
+                </ModalFooter>
+              </>
+            )}
+          </ModalDialog>
+        </ModalContainer>
       </Modal>
     </>
   );

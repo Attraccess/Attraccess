@@ -1,7 +1,5 @@
 import { DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Modal, ModalContent } from '../../../utils/heroui-compat';
-import { ModalHeader, ModalBody, ModalFooter } from '@heroui/react';
-import { Button, Pagination, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from '@heroui/react';
+import { Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Pagination, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from '@heroui/react';
 import { useMemo, useState } from 'react';
 import { TableDataLoadingIndicator } from '../../../components/tableComponents';
 import { EmptyState } from '../../../components/emptyState';
@@ -45,49 +43,56 @@ export function IntroductionHistoryModal(props: Readonly<Props>) {
   }, [orderedHistory, page, rowsPerPage]);
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} scrollBehavior="inside">
-      <ModalContent>
-        <ModalHeader>{t('modal.title')}</ModalHeader>
-        <ModalBody>
-          <Table
-            aria-label={t('table.ariaLabel')}
-            bottomContent={
-              <div className="flex w-full justify-center">
-                <Pagination isCompact showControls page={page} total={totalPages} onChange={(page) => setPage(page)} />
-              </div>
-            }
-          >
-            <TableHeader>
-              <TableColumn>{t('table.columns.date')}</TableColumn>
-              <TableColumn>{t('table.columns.action')}</TableColumn>
-              <TableColumn>{t('table.columns.comment')}</TableColumn>
-            </TableHeader>
-            <TableBody
-              items={currentPage}
-              loadingState={isLoading ? 'loading' : 'idle'}
-              loadingContent={<TableDataLoadingIndicator />}
-              emptyContent={<EmptyState />}
-            >
-              {(item) => (
-                <TableRow key={item.id} id={item.id}>
-                  <TableCell>
-                    <DateTimeDisplay date={item.createdAt} />
-                  </TableCell>
-                  <TableCell>
-                    <IntroductionStatusChip isValid={item.action === 'grant'} />
-                  </TableCell>
-                  <TableCell>
-                    <blockquote className="text-sm whitespace-pre-wrap">{item.comment}</blockquote>
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </ModalBody>
-        <ModalFooter>
-          <Button onPress={onClose}>{t('modal.closeButton')}</Button>
-        </ModalFooter>
-      </ModalContent>
+    <Modal isOpen={isOpen} onOpenChange={(o) => { if (!o) onClose(); }} scrollBehavior="inside">
+      <ModalBackdrop />
+      <ModalContainer>
+        <ModalDialog>
+          {({ close }) => (
+            <>
+              <ModalHeader>{t('modal.title')}</ModalHeader>
+              <ModalBody>
+                <Table
+                  aria-label={t('table.ariaLabel')}
+                  bottomContent={
+                    <div className="flex w-full justify-center">
+                      <Pagination isCompact showControls page={page} total={totalPages} onChange={(page) => setPage(page)} />
+                    </div>
+                  }
+                >
+                  <TableHeader>
+                    <TableColumn>{t('table.columns.date')}</TableColumn>
+                    <TableColumn>{t('table.columns.action')}</TableColumn>
+                    <TableColumn>{t('table.columns.comment')}</TableColumn>
+                  </TableHeader>
+                  <TableBody
+                    items={currentPage}
+                    loadingState={isLoading ? 'loading' : 'idle'}
+                    loadingContent={<TableDataLoadingIndicator />}
+                    emptyContent={<EmptyState />}
+                  >
+                    {(item) => (
+                      <TableRow key={item.id} id={item.id}>
+                        <TableCell>
+                          <DateTimeDisplay date={item.createdAt} />
+                        </TableCell>
+                        <TableCell>
+                          <IntroductionStatusChip isValid={item.action === 'grant'} />
+                        </TableCell>
+                        <TableCell>
+                          <blockquote className="text-sm whitespace-pre-wrap">{item.comment}</blockquote>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </ModalBody>
+              <ModalFooter>
+                <Button onPress={close}>{t('modal.closeButton')}</Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalDialog>
+      </ModalContainer>
     </Modal>
   );
 }

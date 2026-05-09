@@ -1,5 +1,4 @@
-import { Button, Form, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalHeader, Tab, Tabs } from '@heroui/react';
-import { useDisclosure } from '../../../utils/heroui-compat';
+import { Button, Form, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalHeader, Tab, Tabs, useOverlayState } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
@@ -19,7 +18,7 @@ interface Props {
 
 export function InviteUserModal(props: Props) {
   const { children } = props;
-  const { isOpen, onOpen, onClose } = useDisclosure();
+  const { isOpen, open, close } = useOverlayState();
   const { t, tExists } = useTranslations({
     en: {
       ...en,
@@ -72,7 +71,7 @@ export function InviteUserModal(props: Props) {
         queryKey: [useUsersServiceFindManyKey],
       });
       resetSingleInviteForm();
-      onClose();
+      close();
     },
     onError: (error) => {
       toast.apiError({
@@ -109,8 +108,8 @@ export function InviteUserModal(props: Props) {
 
   return (
     <>
-      {children(onOpen)}
-      <Modal isOpen={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+      {children(open)}
+      <Modal isOpen={isOpen} onOpenChange={(o) => { if (!o) close(); }}>
         <ModalBackdrop />
         <ModalContainer size={tab === 'single' ? 'sm' : '3xl'} scrollBehavior="inside">
           <ModalDialog>
@@ -163,7 +162,7 @@ export function InviteUserModal(props: Props) {
 
               <Tab key="csv" title={t('tabs.csv')}>
                 <CsvInvite
-                  onSuccess={onClose}
+                  onSuccess={close}
                   onError={(error) =>
                     toast.apiError({
                       error: error as ApiError,
