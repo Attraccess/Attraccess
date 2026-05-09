@@ -66,20 +66,18 @@ export function BalenaPage() {
           <CardContent className="flex flex-col gap-4">
             {/* TODO(heroui-v3): map dynamic color/variant to new variant prop */}
             <Button
-              startContent={<RefreshCcwIcon />}
               color="primary"
               onPress={onClickReboot}
               variant={rebootIsConfirmed ? 'solid' : 'bordered'}
-            >
+            ><RefreshCcwIcon />
               {rebootIsConfirmed ? 'Confirm Reboot' : 'Reboot'}
             </Button>
             {/* TODO(heroui-v3): map dynamic color/variant to new variant prop */}
             <Button
-              startContent={<PowerIcon />}
               color="danger"
               onPress={onClickShutdown}
               variant={shutdownIsConfirmed ? 'solid' : 'bordered'}
-            >
+            ><PowerIcon />
               {shutdownIsConfirmed ? 'Confirm Shutdown' : 'Shutdown'}
             </Button>
           </CardContent>

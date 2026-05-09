@@ -9,7 +9,6 @@ import {
   TableBody,
   TableRow,
   TableCell,
-  Pagination,
 } from '@heroui/react';
 import { DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useProjectsServiceGetProjectUsageHistory, ResourceUsage } from '@attraccess/react-query-client';
@@ -17,10 +16,10 @@ import en from './en.json';
 import de from './de.json';
 import { TableDataLoadingIndicator } from '../../../../../components/tableComponents';
 import { EmptyState } from '../../../../../components/emptyState';
-import { useReactQueryStatusToHeroUiTableLoadingState } from '../../../../../hooks/useReactQueryStatusToHeroUiTableLoadingState';
 import { UsageNotesModal } from '../../../../resources/usage/components/UsageNotesModal';
 import { AttraccessUser } from '@attraccess/plugins-frontend-ui';
 import { HistoryHeader } from '../../../../resources/usage/components/HistoryHeader';
+import { SimplePagination } from '../../../../../components/simplePagination';
 
 type ProjectUsageHistoryProps = {
   projectId: number;
@@ -39,8 +38,6 @@ export function ProjectUsageHistory({ projectId }: ProjectUsageHistoryProps) {
     page,
     limit: ROWS_PER_PAGE,
   });
-
-  const loadingState = useReactQueryStatusToHeroUiTableLoadingState(status);
 
   const totalPages = useMemo(() => {
     if (!data?.total) {
@@ -76,20 +73,10 @@ export function ProjectUsageHistory({ projectId }: ProjectUsageHistoryProps) {
         <CardContent>
           <Table
             aria-label={t('history.title')}
-            shadow="none"
-            removeWrapper
+
+
             data-cy="project-usage-history-table"
-            bottomContent={
-              data?.total ? (
-                <Pagination
-                  page={page}
-                  total={totalPages}
-                  showControls
-                  onChange={(nextPage) => setPage(nextPage)}
-                  className="justify-center"
-                />
-              ) : null
-            }
+
           >
             <TableHeader>
               <TableColumn>{t('history.columns.resource')}</TableColumn>
@@ -100,9 +87,7 @@ export function ProjectUsageHistory({ projectId }: ProjectUsageHistoryProps) {
             </TableHeader>
             <TableBody
               items={data?.data ?? []}
-              loadingState={loadingState}
-              loadingContent={<TableDataLoadingIndicator />}
-              emptyContent={<EmptyState message={t('history.empty')} />}
+              renderEmptyState={() => <EmptyState message={t('history.empty')} />}
             >
               {(session: ResourceUsage) => (
                 <TableRow

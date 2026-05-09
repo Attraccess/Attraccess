@@ -34,7 +34,6 @@ export function Terminal(props: Props) {
         <Button
           className={cn('sticky bottom-0 left-[100%]', autoScroll ? 'animate-pulse' : '')}
           isIconOnly
-          startContent={<ArrowDownToLineIcon />}
           onPress={() => setAutoScroll(!autoScroll)}
         />
       </div>

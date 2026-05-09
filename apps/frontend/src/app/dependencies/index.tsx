@@ -106,7 +106,7 @@ export function Dependencies() {
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-sm"
-                  showAnchorIcon
+
                 >
                   {getDomainFromUrl(dependency.url)}
                 </Link>

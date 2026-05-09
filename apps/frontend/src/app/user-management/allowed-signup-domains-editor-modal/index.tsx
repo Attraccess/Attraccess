@@ -8,7 +8,6 @@ import { Alert, AlertContent, AlertDescription, Button, Input, InputGroup, Label
 import { EmptyState } from '../../../components/emptyState';
 import { PageHeader } from '../../../components/pageHeader';
 import { TableDataLoadingIndicator } from '../../../components/tableComponents';
-import { useReactQueryStatusToHeroUiTableLoadingState } from '../../../hooks/useReactQueryStatusToHeroUiTableLoadingState';
 import { PlusIcon, Settings2Icon, Trash2Icon } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import en from './en.json';
@@ -41,8 +40,6 @@ export function AllowedSignupDomainsEditorModal(props: Props) {
   useEffect(() => {
     setEditedDomains(allowedSignupDomains ?? []);
   }, [allowedSignupDomains]);
-
-  const loadingState = useReactQueryStatusToHeroUiTableLoadingState(status);
 
   const addDomainInputRef = useRef<HTMLInputElement>(null);
 
@@ -128,30 +125,27 @@ export function AllowedSignupDomainsEditorModal(props: Props) {
                     }
                   }}
                 />
-                <Button variant="ghost" onPress={onAddDomain} isIconOnly startContent={<PlusIcon />} />
+                <Button variant="ghost" onPress={onAddDomain} isIconOnly />
               </InputGroup>
             </TextField>
 
-            <Table removeWrapper aria-label={t('table.ariaLabel')}>
+            <Table aria-label={t('table.ariaLabel')}>
               <TableHeader>
                 <TableColumn>{t('table.columns.domain')}</TableColumn>
                 <TableColumn>{t('table.columns.actions')}</TableColumn>
               </TableHeader>
               <TableBody
                 items={(editedDomains ?? []).map((domain) => ({ value: domain }))}
-                loadingState={loadingState}
-                loadingContent={<TableDataLoadingIndicator />}
-                emptyContent={<EmptyState />}
+                renderEmptyState={() => <EmptyState />}
               >
                 {(domain) => (
                   <TableRow key={domain.value} id={domain.value}>
                     <TableCell className="w-full">{domain.value}</TableCell>
                     <TableCell className="flex-row flex">
                       <Button variant="danger-soft"
-                        startContent={<Trash2Icon className="w-4 h-4" />}
                         size="sm"
                         onPress={() => onRemoveDomain(domain.value)}
-                      >
+                      ><Trash2Icon className="w-4 h-4" />
                         {t('table.actions.removeDomain')}
                       </Button>
                     </TableCell>

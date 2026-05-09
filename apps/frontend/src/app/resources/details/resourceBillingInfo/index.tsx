@@ -127,7 +127,7 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
           actions={
             <ResourceBillingInfoEditor resourceId={resourceId}>
               {(onOpen) => (
-                <Button variant="primary" size="sm" isIconOnly startContent={<Edit2Icon size={12} />} onPress={onOpen} />
+                <Button variant="primary" size="sm" isIconOnly onPress={onOpen} />
               )}
             </ResourceBillingInfoEditor>
           }
@@ -136,10 +136,10 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
       </CardHeader>
 
       <CardContent>
-        <Table hideHeader removeWrapper aria-label={t('table.ariaLabel')}>
+        <Table hideHeader aria-label={t('table.ariaLabel')}>
           <TableHeader>
             <TableColumn> </TableColumn>
-            <TableColumn align="end"> </TableColumn>
+            <TableColumn> </TableColumn>
           </TableHeader>
           <TableBody>
             <TableRow className="border-b-4 border-divider">

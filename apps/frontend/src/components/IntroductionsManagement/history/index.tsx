@@ -1,5 +1,5 @@
 import { DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Pagination, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from '@heroui/react';
+import { Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from '@heroui/react';
 import { useMemo, useState } from 'react';
 import { TableDataLoadingIndicator } from '../../../components/tableComponents';
 import { EmptyState } from '../../../components/emptyState';
@@ -8,6 +8,7 @@ import { ResourceIntroductionHistoryItem } from '@attraccess/react-query-client'
 
 import en from './en.json';
 import de from './de.json';
+import { SimplePagination } from '../../../components/simplePagination';
 
 interface Props {
   isOpen: boolean;
@@ -43,7 +44,7 @@ export function IntroductionHistoryModal(props: Readonly<Props>) {
   }, [orderedHistory, page, rowsPerPage]);
 
   return (
-    <Modal isOpen={isOpen} onOpenChange={(o) => { if (!o) onClose(); }} scrollBehavior="inside">
+    <Modal isOpen={isOpen} onOpenChange={(o) => { if (!o) onClose(); }}>
       <ModalBackdrop />
       <ModalContainer>
         <ModalDialog>
@@ -53,11 +54,7 @@ export function IntroductionHistoryModal(props: Readonly<Props>) {
               <ModalBody>
                 <Table
                   aria-label={t('table.ariaLabel')}
-                  bottomContent={
-                    <div className="flex w-full justify-center">
-                      <Pagination isCompact showControls page={page} total={totalPages} onChange={(page) => setPage(page)} />
-                    </div>
-                  }
+
                 >
                   <TableHeader>
                     <TableColumn>{t('table.columns.date')}</TableColumn>
@@ -66,9 +63,7 @@ export function IntroductionHistoryModal(props: Readonly<Props>) {
                   </TableHeader>
                   <TableBody
                     items={currentPage}
-                    loadingState={isLoading ? 'loading' : 'idle'}
-                    loadingContent={<TableDataLoadingIndicator />}
-                    emptyContent={<EmptyState />}
+                    renderEmptyState={() => <EmptyState />}
                   >
                     {(item) => (
                       <TableRow key={item.id} id={item.id}>

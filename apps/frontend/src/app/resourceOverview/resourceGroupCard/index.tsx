@@ -11,7 +11,6 @@ import {
   CardHeader,
   CardProps,
   Image,
-  Pagination,
   Skeleton,
   Table,
   TableBody,
@@ -32,10 +31,10 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useAuth } from '../../../hooks/useAuth';
 import { useDebounce } from '../../../hooks/useDebounce';
 import { FilterProps } from '../filterProps';
-import { useReactQueryStatusToHeroUiTableLoadingState } from '../../../hooks/useReactQueryStatusToHeroUiTableLoadingState';
 
 import en from './en.json';
 import de from './de.json';
+import { SimplePagination } from '../../../components/simplePagination';
 
 interface Props {
   groupId: number | 'none';
@@ -74,8 +73,6 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
     page,
     limit: perPage,
   });
-
-  const loadingState = useReactQueryStatusToHeroUiTableLoadingState(fetchStatus);
 
   const totalPages = useMemo(() => {
     if (!resources?.total) {
@@ -144,7 +141,6 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
           <Button
             onPress={() => navigate(`/resource-groups/${groupId}`)}
             isIconOnly
-            startContent={<Settings2Icon />}
             aria-label={t('actions.openGroupSettings')}
           />
         )}
@@ -152,8 +148,8 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
 
       <CardContent>
         <Table
-          shadow="none"
-          removeWrapper
+
+
           aria-label={tableAriaLabel}
           onRowAction={(key) => navigate(`/resources/${key}`)}
         >
@@ -167,9 +163,7 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
           </TableHeader>
           <TableBody
             items={resources?.data ?? []}
-            loadingState={loadingState}
-            loadingContent={<TableDataLoadingIndicator />}
-            emptyContent={<EmptyState />}
+            renderEmptyState={() => <EmptyState />}
           >
             {(resource) => (
               <TableRow key={resource.id} id={resource.id} className="cursor-pointer hover:bg-primary-50 transition-bg duration-300">
@@ -201,7 +195,7 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
 
       <CardFooter className="flex w-full justify-center">
         {isFetchedResources && (
-          <Pagination isCompact showControls page={page} total={totalPages} onChange={(page) => setPage(page)} />
+          <SimplePagination showControls page={page} total={totalPages} onChange={(page) => setPage(page)} />
         )}
       </CardFooter>
     </Card>

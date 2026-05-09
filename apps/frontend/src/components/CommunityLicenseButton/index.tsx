@@ -29,12 +29,11 @@ export function CommunityLicenseButton({ onAccept, isDisabled, ...rest }: Commun
       <Button variant="secondary"
         onPress={open}
         isDisabled={isDisabled}
-        startContent={<HeartHandshakeIcon size={16} />}
         data-cy={rest['data-cy'] ?? 'community-license-button'}
-      >
+      ><HeartHandshakeIcon size={16} />
         {t('button')}
       </Button>
-      <Modal isOpen={isOpen} onOpenChange={(o) => { if (!o) close(); }} scrollBehavior="inside">
+      <Modal isOpen={isOpen} onOpenChange={(o) => { if (!o) close(); }}>
         <ModalBackdrop />
         <ModalContainer>
           <ModalDialog>

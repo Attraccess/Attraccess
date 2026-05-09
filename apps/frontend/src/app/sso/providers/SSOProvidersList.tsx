@@ -21,7 +21,6 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { TableDataLoadingIndicator } from '../../../components/tableComponents';
 import { EmptyState } from '../../../components/emptyState';
-import { useReactQueryStatusToHeroUiTableLoadingState } from '../../../hooks/useReactQueryStatusToHeroUiTableLoadingState';
 import en from './en.json';
 import de from './de.json';
 import { AuthentikDiscoveryDialog } from './discovery/authentik';
@@ -106,8 +105,6 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
   const [samlPermissionMappingsInput, setSamlPermissionMappingsInput] =
     useState<Record<PermissionKey, string>>(emptyPermissionMappingsInput);
   const queryClient = useQueryClient();
-
-  const loadingState = useReactQueryStatusToHeroUiTableLoadingState(fetchStatus);
 
   const { success, error: showError } = useToastMessage();
   const createSSOProvider = useAuthenticationServiceCreateOneSsoProvider({
@@ -621,9 +618,7 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
           </TableHeader>
           <TableBody
             items={providers}
-            loadingState={loadingState}
-            loadingContent={<TableDataLoadingIndicator />}
-            emptyContent={<EmptyState />}
+            renderEmptyState={() => <EmptyState />}
           >
             {(provider) => (
               <TableRow key={provider.id} id={provider.id}>
@@ -678,7 +673,7 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
         data-cy="sso-provider-form-modal"
       >
         <ModalBackdrop />
-        <ModalContainer size="2xl" scrollBehavior="inside">
+        <ModalContainer size="lg">
           <ModalDialog>
             {({ close }) => (
             <>
@@ -718,7 +713,7 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                               {(onOpenKeycloakDiscovery) => (
                                 <Dropdown>
                                   <DropdownTrigger>
-                                    <Button variant="ghost" startContent={<MoreVertical className="w-4 h-4" />}>
+                                    <Button variant="ghost"><MoreVertical className="w-4 h-4" />
                                       {t('autoDiscovery.label')}
                                     </Button>
                                   </DropdownTrigger>
@@ -973,9 +968,8 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                                 <Button variant="ghost"
                                   size="sm"
                                   onPress={() => handleCopyLoginUrl(authentikRedirectRegexPattern)}
-                                  startContent={<Copy size={24} />}
                                   data-cy="sso-provider-form-authentik-regex-copy-button"
-                                >
+                                ><Copy size={24} />
                                   {t('copy')}
                                 </Button>
                               </InputGroup>
@@ -993,9 +987,8 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                               <Button variant="ghost"
                                 size="sm"
                                 onPress={isSamlProvider ? handleCopySamlCallbackUrl : handleCopyOidcCallbackUrl}
-                                startContent={<Copy size={24} />}
                                 data-cy="sso-provider-form-callback-url-copy-button"
-                              >
+                              ><Copy size={24} />
                                 {t('copy')}
                               </Button>
                             </InputGroup>
@@ -1014,12 +1007,12 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
 
                       <div className="flex flex-wrap gap-3 text-xs">
                         {docsSsoProvidersUrl && (
-                          <Link href={docsSsoProvidersUrl} isExternal showAnchorIcon>
+                          <Link href={docsSsoProvidersUrl}>
                             {t('docsSsoProviders')}
                           </Link>
                         )}
                         {docsAuthentikPermissionsUrl && (
-                          <Link href={docsAuthentikPermissionsUrl} isExternal showAnchorIcon>
+                          <Link href={docsAuthentikPermissionsUrl}>
                             {t('docsAuthentikPermissions')}
                           </Link>
                         )}

@@ -26,7 +26,6 @@ import { MarkDoneModal } from './mark-done';
 import { CheckCircleIcon, CogIcon, ConstructionIcon, PlusIcon } from 'lucide-react';
 import { useNow } from '../../../../hooks/useNow';
 import { EmptyState } from '../../../../components/emptyState';
-import { useReactQueryStatusToHeroUiTableLoadingState } from '../../../../hooks/useReactQueryStatusToHeroUiTableLoadingState';
 
 interface Props {
   resourceId: number;
@@ -72,8 +71,6 @@ export function MaintenanceManagement(props: Props & Omit<CardProps, 'children'>
     [maintenances?.data, now],
   );
 
-  const tableLoadingState = useReactQueryStatusToHeroUiTableLoadingState(fetchStatus);
-
   return (
     <Card {...cardProps}>
       <CardHeader>
@@ -92,8 +89,7 @@ export function MaintenanceManagement(props: Props & Omit<CardProps, 'children'>
                     onPress={open}
                     size="sm"
                     title={t('actions.create.title')}
-                    startContent={<PlusIcon className="w-4 h-4" />}
-                  >
+                  ><PlusIcon className="w-4 h-4" />
                     {t('actions.create.label')}
                   </Button>
                 )}
@@ -104,7 +100,7 @@ export function MaintenanceManagement(props: Props & Omit<CardProps, 'children'>
       </CardHeader>
 
       <CardContent>
-        <Table removeWrapper aria-label={t('table.ariaLabel')}>
+        <Table aria-label={t('table.ariaLabel')}>
           <TableHeader>
             <TableColumn>{t('table.columns.start')}</TableColumn>
             <TableColumn>{t('table.columns.end')}</TableColumn>
@@ -116,7 +112,7 @@ export function MaintenanceManagement(props: Props & Omit<CardProps, 'children'>
               <CogIcon />
             </TableColumn>
           </TableHeader>
-          <TableBody items={maintenanceWithStatus} loadingState={tableLoadingState} emptyContent={<EmptyState />}>
+          <TableBody items={maintenanceWithStatus} renderEmptyState={() => <EmptyState />}>
             {(maintenance) => (
               <TableRow
                 className={cn(
@@ -146,13 +142,12 @@ export function MaintenanceManagement(props: Props & Omit<CardProps, 'children'>
                     '—'
                   )}
                 </TableCell>
-                <TableCell align="right">
+                <TableCell>
                   {maintenance.isActive && (
                     <MarkDoneModal resourceId={resourceId} maintenanceId={maintenance.id}>
                       {(openMarkDone: () => void) => (
                         <Button variant="tertiary"
                           isIconOnly
-                          startContent={<CheckCircleIcon className="w-4 h-4" />}
                           title={t('actions.markDone.title')}
                           onPress={openMarkDone}
                         />

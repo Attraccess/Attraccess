@@ -200,7 +200,7 @@ export function UserManagementDetailsPage() {
               <CardContent>
                 {ssoDetails.length === 0 ? (
                   <div className="flex items-center gap-2">
-                    <Chip color="default" variant="flat">
+                    <Chip color="default" variant="soft">
                       {t('sso.notLinked')}
                     </Chip>
                     <span className="text-sm text-default-500">{t('sso.notLinkedHint')}</span>

@@ -44,20 +44,18 @@ export const AccessDenied = memo(function AccessDeniedComponent() {
           {/* Action Buttons */}
 
           <Button variant="primary"
-            startContent={<ArrowLeft className="w-4 h-4" />}
             onPress={handleGoBack}
             fullWidth
             data-cy="access-denied-go-back-button"
-          >
+          ><ArrowLeft className="w-4 h-4" />
             {t('goBack')}
           </Button>
 
           <Button variant="outline"
-            startContent={<Home className="w-4 h-4" />}
             onPress={handleGoHome}
             fullWidth
             data-cy="access-denied-go-home-button"
-          >
+          ><Home className="w-4 h-4" />
             {t('goHome')}
           </Button>
         </CardFooter>

@@ -377,29 +377,27 @@ function FlowsPageInner() {
             <Button
               isIconOnly
               isPending={isSaving}
-              startContent={saveSucceeded && !flowHasChanged ? <CheckIcon /> : <SaveIcon />}
               onPress={save}
               isDisabled={!flowHasChanged}
               color={saveFailed ? 'danger' : flowHasChanged ? 'primary' : 'default'}
             />
-            <Button isIconOnly startContent={<UploadIcon />} onPress={handleImportClick} aria-label={t('actions.import')} />
+            <Button isIconOnly onPress={handleImportClick} aria-label={t('actions.import')} />
             <Button
               isIconOnly
-              startContent={<DownloadIcon />}
               onPress={handleExport}
               aria-label={t('actions.export')}
             />
             <LogViewer resourceId={Number(resourceId)}>
-              {(open) => <Button isIconOnly startContent={<LogsIcon />} onPress={open} />}
+              {(open) => <Button isIconOnly onPress={open} />}
             </LogViewer>
 
-            <Button isIconOnly startContent={<LayoutGridIcon />} onPress={layout} />
+            <Button isIconOnly onPress={layout} />
             <NodePickerModal
               tNodeTranslations={tNodeTranslations}
               onSelect={addStartNode}
               resourceId={Number(resourceId)}
             >
-              {(open) => <Button variant="primary" isIconOnly startContent={<PlusIcon />} onPress={open} />}
+              {(open) => <Button variant="primary" isIconOnly onPress={open} />}
             </NodePickerModal>
           </Panel>
         </ReactFlow>

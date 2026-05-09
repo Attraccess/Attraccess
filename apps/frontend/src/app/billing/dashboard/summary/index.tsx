@@ -6,7 +6,6 @@ import {
   CardProps,
   Chip,
   cn,
-  Pagination,
   Skeleton,
   Spinner,
   Table,
@@ -31,6 +30,7 @@ import { CreditCardIcon, ReceiptTextIcon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { dbCurrencyToUserCurrency } from '@attraccess/shared';
 import { TransactionDetailsModal } from './transactionDetailsModal';
+import { SimplePagination } from '../../../../components/simplePagination';
 
 interface Props {
   transactionsPerPage?: number;
@@ -187,29 +187,19 @@ export function SummaryCard(props: Omit<CardProps, 'children'> & Props) {
 
         <Table
           aria-label={t('transactions.table.ariaLabel')}
-          removeWrapper
-          bottomContent={
-            isFetchedTransactions && (
-              <Pagination
-                isCompact
-                showControls
-                page={transactionsPage}
-                total={totalAmountOfTransactionsPages}
-                onChange={(page) => setTransactionsPage(page)}
-              />
-            )
-          }
+
+
           onRowAction={(key) => openDetails(key as number)}
         >
           <TableHeader>
-            <TableColumn align="start">{t('transactions.table.columns.id')}</TableColumn>
-            <TableColumn align="start">{t('transactions.table.columns.dateTime')}</TableColumn>
-            <TableColumn align="start">{t('transactions.table.columns.status')}</TableColumn>
-            <TableColumn align="start" className="w-full">
+            <TableColumn>{t('transactions.table.columns.id')}</TableColumn>
+            <TableColumn>{t('transactions.table.columns.dateTime')}</TableColumn>
+            <TableColumn>{t('transactions.table.columns.status')}</TableColumn>
+            <TableColumn className="w-full">
               {t('transactions.table.columns.details')}
             </TableColumn>
-            <TableColumn align="end">{t('transactions.table.columns.amount')}</TableColumn>
-            <TableColumn align="end">{t('transactions.table.columns.actions')}</TableColumn>
+            <TableColumn>{t('transactions.table.columns.amount')}</TableColumn>
+            <TableColumn>{t('transactions.table.columns.actions')}</TableColumn>
           </TableHeader>
           <TableBody items={transactions?.data ?? []} isLoading={isLoadingTransactions}>
             {(transaction) => (

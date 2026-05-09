@@ -288,9 +288,8 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
             {content}
             <Button variant="secondary"
               size="sm"
-              startContent={<PlusIcon size={16} />}
               onPress={() => onChange({ ...value, '': '' })}
-            >
+            ><PlusIcon size={16} />
               {t('nodes.' + nodeType + '.config.' + name + '.add')}
             </Button>
           </div>
@@ -404,7 +403,7 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
         <div className="flex flex-col gap-2 w-full">
           {!hideLabel && <small>{t('nodes.' + nodeType + '.config.' + name + '.label')}</small>}
           {content}
-          <Button variant="secondary" size="sm" startContent={<PlusIcon size={16} />} onPress={handleAdd}>
+          <Button variant="secondary" size="sm" onPress={handleAdd}><PlusIcon size={16} />
             {addText}
           </Button>
         </div>

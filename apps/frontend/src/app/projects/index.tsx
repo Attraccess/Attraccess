@@ -160,7 +160,7 @@ export function ProjectsListPage() {
               {t('invitations.invitedBy', { username: invitation.inviter?.username ?? '—' })}
             </p>
           </div>
-          <Chip size="sm" variant="flat">
+          <Chip size="sm" variant="soft">
             {t(`invitations.roles.${invitation.requestedRole}` as const)}
           </Chip>
         </div>
@@ -208,7 +208,7 @@ export function ProjectsListPage() {
             </Switch>
             <UpsertProjectModal>
               {(onOpen) => (
-                <Button variant="ghost" onPress={onOpen} startContent={<PlusIcon size="24" />}>
+                <Button variant="ghost" onPress={onOpen}><PlusIcon size="24" />
                   {t('actions.create')}
                 </Button>
               )}

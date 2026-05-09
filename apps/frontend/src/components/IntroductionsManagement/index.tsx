@@ -119,10 +119,7 @@ export function IntroductionsManagement(props: Readonly<IntroductionsManagementP
           rowClassName={(user) =>
             user.hasValidIntroduction ? 'border-l-8 border-l-success' : 'border-l-8 border-l-danger'
           }
-          tableProps={{
-            removeWrapper: true,
-            shadow: 'none',
-          }}
+          tableProps={{}}
           actions={Actions}
         />
 

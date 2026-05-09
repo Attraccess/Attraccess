@@ -30,7 +30,7 @@ export function MachineStartControls({
         placeholder={t('machine.project.placeholder')}
       />
       <ButtonGroup fullWidth color="primary">
-        <Button isPending={isStarting} startContent={<PlayIcon className="w-4 h-4" />} onPress={onStart}>
+        <Button isPending={isStarting} onPress={onStart}><PlayIcon className="w-4 h-4" />
           {t('machine.startSession')}
         </Button>
         <Dropdown placement="bottom-end">

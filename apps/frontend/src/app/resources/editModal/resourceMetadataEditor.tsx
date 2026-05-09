@@ -144,10 +144,9 @@ export function ResourceMetadataEditor({ t, value, onChange }: ResourceMetadataE
         </div>
         <Button variant="secondary"
           size="sm"
-          startContent={<Plus className="w-4 h-4" />}
           className="w-full sm:w-auto whitespace-nowrap"
           onPress={handleAddEntry}
-        >
+        ><Plus className="w-4 h-4" />
           {t('inputs.metadata.actions.add')}
         </Button>
       </div>
@@ -179,10 +178,9 @@ export function ResourceMetadataEditor({ t, value, onChange }: ResourceMetadataE
               </TextField>
               <Button variant="danger-soft"
                 size="sm"
-                startContent={<Trash2 className="w-4 h-4" />}
                 className="w-full sm:w-auto"
                 onPress={() => handleRemoveEntry(entry.id)}
-              >
+              ><Trash2 className="w-4 h-4" />
                 {t('inputs.metadata.actions.remove')}
               </Button>
             </div>

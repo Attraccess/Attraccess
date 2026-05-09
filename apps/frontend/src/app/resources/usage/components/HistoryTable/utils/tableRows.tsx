@@ -42,7 +42,7 @@ export function generateRowCells(
         <DurationDisplay
           minutes={session.usageInMinutes >= 0 ? session.usageInMinutes : null}
           alternativeText={
-            <Chip color="primary" variant="flat">
+            <Chip color="primary" variant="soft">
               {t('rows.machine.inProgress')}
             </Chip>
           }

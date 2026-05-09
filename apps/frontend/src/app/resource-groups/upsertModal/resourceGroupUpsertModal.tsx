@@ -172,7 +172,7 @@ export function ResourceGroupUpsertModal(props: Readonly<Props>) {
         data-cy="resource-group-upsert-modal"
       >
         <ModalBackdrop />
-        <ModalContainer placement="top-center">
+        <ModalContainer placement="top">
           <ModalDialog>
             {({ close }) => (
               <Form onSubmit={handleSubmit}>

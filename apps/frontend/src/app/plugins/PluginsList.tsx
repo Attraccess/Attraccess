@@ -6,7 +6,6 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { UploadPluginModal } from './UploadPluginModal';
 import { useToastMessage } from '../../components/toastProvider';
 import { EmptyState } from '../../components/emptyState';
-import { useReactQueryStatusToHeroUiTableLoadingState } from '../../hooks/useReactQueryStatusToHeroUiTableLoadingState';
 import { TableDataLoadingIndicator } from '../../components/tableComponents';
 
 import de from './PluginsList.de.json';
@@ -18,8 +17,6 @@ export function PluginsList() {
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [pluginToDelete, setPluginToDelete] = useState<string | null>(null);
   const toast = useToastMessage();
-
-  const loadingState = useReactQueryStatusToHeroUiTableLoadingState(fetchStatus);
 
   const { mutate: deletePlugin, isPending: isDeleting } = usePluginsServiceDeletePlugin({
     onSuccess: () => {
@@ -78,10 +75,9 @@ export function PluginsList() {
         <CardHeader className="flex justify-between items-center">
           <h1 className="text-xl font-bold">{t('title')}</h1>
           <Button variant="primary"
-            startContent={<Upload size={18} />}
             onPress={() => setUploadModalOpen(true)}
             data-cy="plugins-list-upload-plugin-button"
-          >
+          ><Upload size={18} />
             {t('uploadButton')}
           </Button>
         </CardHeader>
@@ -95,15 +91,13 @@ export function PluginsList() {
             </TableHeader>
             <TableBody
               items={plugins}
-              loadingState={loadingState}
-              loadingContent={<TableDataLoadingIndicator />}
-              emptyContent={<EmptyState />}
+              renderEmptyState={() => <EmptyState />}
             >
               {(plugin) => (
                 <TableRow key={plugin.name} id={plugin.name}>
                   <TableCell>{plugin.name}</TableCell>
                   <TableCell>
-                    <Chip size="sm" variant="flat" color="primary">
+                    <Chip size="sm" variant="soft" color="primary">
                       {plugin.version}
                     </Chip>
                   </TableCell>

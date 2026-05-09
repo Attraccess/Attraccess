@@ -27,7 +27,7 @@ export function TeamInviteCard(props: Readonly<TeamInviteCardProps>) {
       <CardContent>
         <InviteProjectMemberModal projectId={projectId}>
           {(onOpen) => (
-            <Button variant="primary" onPress={onOpen} startContent={<UserPlus2Icon className="size-4" />}>
+            <Button variant="primary" onPress={onOpen}><UserPlus2Icon className="size-4" />
               {t('sections.invite.cta')}
             </Button>
           )}

@@ -61,9 +61,8 @@ export function FormFieldEditor(props: FormFieldEditorProps) {
         </Switch>
         <Button variant="danger-soft"
           size="sm"
-          startContent={<Trash2 className="w-4 h-4" />}
           onPress={onRemove}
-        >
+        ><Trash2 className="w-4 h-4" />
           {t('editor.deleteField')}
         </Button>
       </div>

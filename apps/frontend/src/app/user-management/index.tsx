@@ -9,7 +9,6 @@ import {
   Chip,
   TextField,
   Input,
-  Pagination,
   Table,
   TableBody,
   TableCell,
@@ -46,6 +45,7 @@ import { AllowedSignupDomainsEditorModal } from './allowed-signup-domains-editor
 import { TwoFactorPolicyModal } from './two-factor-policy-modal';
 import { InviteUserModal } from './invite-user-modal';
 import { useNavigate } from 'react-router-dom';
+import { SimplePagination } from '../../components/simplePagination';
 
 export const UserManagementPage: React.FC = () => {
   const { t } = useTranslations({ en, de });
@@ -106,7 +106,7 @@ export const UserManagementPage: React.FC = () => {
           <>
             <InviteUserModal>
               {(onOpen) => (
-                <Button variant="ghost" onPress={onOpen} startContent={<UserPlusIcon className="w-4 h-4" />} size="md">
+                <Button variant="ghost" onPress={onOpen} size="md"><UserPlusIcon className="w-4 h-4" />
                   {t('actions.inviteUser')}
                 </Button>
               )}
@@ -115,16 +115,15 @@ export const UserManagementPage: React.FC = () => {
               {(onOpenTwoFactorPolicy) => (
                 <Button variant="ghost"
                   onPress={onOpenTwoFactorPolicy}
-                  startContent={<ShieldCheckIcon className="w-4 h-4" />}
                   size="md"
-                >
+                ><ShieldCheckIcon className="w-4 h-4" />
                   {t('actions.twoFactorPolicy')}
                 </Button>
               )}
             </TwoFactorPolicyModal>
             <AllowedSignupDomainsEditorModal>
               {(onOpen) => (
-                <Button variant="ghost" onPress={onOpen} startContent={<Settings2Icon className="w-4 h-4" />} size="md">
+                <Button variant="ghost" onPress={onOpen} size="md"><Settings2Icon className="w-4 h-4" />
                   {t('actions.editAllowedSignupDomains')}
                 </Button>
               )}
@@ -132,9 +131,8 @@ export const UserManagementPage: React.FC = () => {
             {license?.modules.includes('sso') ? (
               <Button variant="ghost"
                 onPress={() => navigate('/sso/providers')}
-                startContent={<KeyIcon className="w-4 h-4" />}
                 size="md"
-              >
+              ><KeyIcon className="w-4 h-4" />
                 {t('actions.sso')}
               </Button>
             ) : null}
@@ -148,7 +146,7 @@ export const UserManagementPage: React.FC = () => {
             <Input placeholder={t('table.inputs.search')} />
           </TextField>
 
-          <Table removeWrapper aria-label={t('table.ariaLabel')} onRowAction={(key) => navigate(`/users/${key}`)}>
+          <Table aria-label={t('table.ariaLabel')} onRowAction={(key) => navigate(`/users/${key}`)}>
             <TableHeader>
               <TableColumn width="0" className="hidden md:table-cell">
                 {t('table.columns.isEmailVerified')}
@@ -164,9 +162,7 @@ export const UserManagementPage: React.FC = () => {
 
             <TableBody
               items={searchResult?.data ?? []}
-              loadingState={fetchState}
-              emptyContent={<EmptyState />}
-              loadingContent={<TableDataLoadingIndicator />}
+              renderEmptyState={() => <EmptyState />}
             >
               {(user) => {
                 const ssoDetails =
@@ -244,7 +240,7 @@ export const UserManagementPage: React.FC = () => {
                             <Tooltip key={permission.key} content={permission.label} showArrow placement="top">
                               <Chip
                                 size="sm"
-                                variant="flat"
+                                variant="soft"
                                 color="primary"
                                 className="min-w-0 px-2"
                                 data-cy={`user-permission-chip-${permission.key}`}
@@ -270,7 +266,7 @@ export const UserManagementPage: React.FC = () => {
 
         <CardFooter className="flex w-full justify-end">
           {isFetchedSearchResult && (
-            <Pagination isCompact showControls page={page} total={totalPages} onChange={(page) => setPage(page)} />
+            <SimplePagination showControls page={page} total={totalPages} onChange={(page) => setPage(page)} />
           )}
         </CardFooter>
       </Card>

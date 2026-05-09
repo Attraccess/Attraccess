@@ -201,7 +201,7 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
         data-cy="resource-edit-modal"
       >
         <ModalBackdrop />
-        <ModalContainer size="3xl">
+        <ModalContainer size="full">
           <ModalDialog>
             {({ close }) => (
               <>

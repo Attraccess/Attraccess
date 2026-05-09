@@ -300,14 +300,14 @@ export function CsvInvite({ onSuccess, onError }: Props) {
         </div>
       ))}
 
-      <Table aria-label="csv-invite-table" data-cy="csv-invite-table" removeWrapper>
+      <Table aria-label="csv-invite-table" data-cy="csv-invite-table">
         <TableHeader>
           <TableColumn>{t('preview.columns.index')}</TableColumn>
           <TableColumn>{t('preview.columns.username')}</TableColumn>
           <TableColumn>{t('preview.columns.email')}</TableColumn>
           <TableColumn>{t('preview.columns.permissions.label')}</TableColumn>
         </TableHeader>
-        <TableBody items={previewUsers} emptyContent={<EmptyState />}>
+        <TableBody items={previewUsers} renderEmptyState={() => <EmptyState />}>
           {(user) => (
             <TableRow key={user.index} id={user.index}>
               <TableCell>#{user.index}</TableCell>
@@ -326,7 +326,7 @@ export function CsvInvite({ onSuccess, onError }: Props) {
       {rowErrors.length > 0 && (
         <div className="flex flex-col gap-2 border border-default-200 rounded-medium p-3">
           <div className="flex items-center justify-between">
-            <Badge color="danger" variant="flat">
+            <Badge color="danger" variant="soft">
               {t('errors.title')} ({rowErrors.length})
             </Badge>
             <Button variant="ghost" size="sm" onPress={() => submit({ ignoreFailed: true })}>
@@ -334,7 +334,7 @@ export function CsvInvite({ onSuccess, onError }: Props) {
             </Button>
           </div>
 
-          <Table removeWrapper aria-label="csv-invite-errors">
+          <Table aria-label="csv-invite-errors">
             <TableHeader>
               <TableColumn>{t('errors.columns.row')}</TableColumn>
               <TableColumn>{t('errors.columns.field')}</TableColumn>

@@ -76,9 +76,8 @@ function DocumentationModalComponent({ resourceId, children }: Readonly<Document
           <p className="text-danger">{error instanceof Error ? error.message : t('error.unknown')}</p>
           <Button variant="secondary"
             onPress={() => refetch()}
-            startContent={<RefreshCw size={16} />}
             data-cy="documentation-modal-error-retry-button"
-          >
+          ><RefreshCw size={16} />
             {t('actions.retry')}
           </Button>
         </div>

@@ -163,13 +163,12 @@ function LoginFormContent(props: LoginFormProps & { t: TFunction; tExists: TExis
       <Button variant="primary"
         type="submit"
         fullWidth
-        endContent={memoizedArrowRight}
         isPending={isPending}
         isDisabled={isPending}
         data-cy="login-form-sign-in-button"
       >
         {isPending ? t('signingIn') : t('signInButton')}
-      </Button>
+      memoizedArrowRight</Button>
 
       {errorTitle && (
         <Alert status="danger" data-cy="login-form-error-alert" >

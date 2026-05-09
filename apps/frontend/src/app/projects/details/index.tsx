@@ -128,7 +128,7 @@ export function ProjectDetailsPage() {
             <span className="flex items-center gap-2">
               {project.name}
               {project.archivedAt && (
-                <Chip size="sm" variant="flat" color="warning" startContent={<ArchiveIcon className="size-3" />}>
+                <Chip size="sm" variant="soft" color="warning"><ArchiveIcon className="size-3" />
                   {t('archivedBadge')}
                 </Chip>
               )}
@@ -152,13 +152,12 @@ export function ProjectDetailsPage() {
               <Button variant="ghost"
                 as={Link}
                 href={`/projects/${projectId}/team`}
-                startContent={<UsersIcon className="size-4" />}
-              >
+              ><UsersIcon className="size-4" />
                 {t('actions.members.label')}
               </Button>
               <UpsertProjectModal projectId={projectId}>
                 {(onOpen) => (
-                  <Button variant="ghost" onPress={onOpen} startContent={<Edit2Icon className="size-4" />}>
+                  <Button variant="ghost" onPress={onOpen}><Edit2Icon className="size-4" />
                     {t('actions.update.label')}
                   </Button>
                 )}
@@ -166,24 +165,21 @@ export function ProjectDetailsPage() {
               {project.archivedAt ? (
                 <Button variant="tertiary"
                   onPress={() => unarchiveProject({ id: projectId })}
-                  startContent={<ArchiveRestoreIcon className="size-4" />}
                   isPending={isUnarchiving}
-                >
+                ><ArchiveRestoreIcon className="size-4" />
                   {t('actions.unarchive.label')}
                 </Button>
               ) : (
                 <Button variant="tertiary"
                   onPress={() => archiveProject({ id: projectId })}
-                  startContent={<ArchiveIcon className="size-4" />}
                   isPending={isArchiving}
-                >
+                ><ArchiveIcon className="size-4" />
                   {t('actions.archive.label')}
                 </Button>
               )}
               <Button variant="danger-soft"
                 onPress={() => setShowDeleteConfirmationModal(true)}
-                startContent={<Trash2Icon className="size-4" />}
-              >
+              ><Trash2Icon className="size-4" />
                 {t('actions.delete.label')}
               </Button>
             </>

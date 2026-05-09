@@ -204,9 +204,8 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
             <ButtonGroup fullWidth color="warning">
               <Button
                 isPending={startSession.isPending}
-                startContent={<UserX className="w-4 h-4" />}
                 onPress={handleImmediateTakeover}
-              >
+              ><UserX className="w-4 h-4" />
                 {t('takeover.button')}
               </Button>
               <Dropdown placement="bottom-end">
@@ -235,9 +234,8 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
             <ButtonGroup fullWidth color="danger">
               <Button
                 isPending={startSession.isPending}
-                startContent={<UserX className="w-4 h-4" />}
                 onPress={handleImmediateStopOtherUserSession}
-              >
+              ><UserX className="w-4 h-4" />
                 {t('stopOtherUserSession.button')}
               </Button>
               <Dropdown placement="bottom-end">

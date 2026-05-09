@@ -28,26 +28,23 @@ export function DoorControls({
       <Button variant="danger"
         className="flex-1"
         isPending={lockIsPending}
-        startContent={<LockIcon className="w-4 h-4" />}
         onPress={onLock}
-      >
+      ><LockIcon className="w-4 h-4" />
         {t('door.lock')}
       </Button>
       <Button variant="primary"
         className="flex-1"
         isPending={unlockIsPending}
-        startContent={<LockIcon className="w-4 h-4" />}
         onPress={onUnlock}
-      >
+      ><LockIcon className="w-4 h-4" />
         {t('door.unlock')}
       </Button>
       {separateUnlockAndUnlatch && onUnlatch && (
         <Button variant="secondary"
           className="flex-1"
           isPending={unlatchIsPending}
-          startContent={<LockIcon className="w-4 h-4" />}
           onPress={onUnlatch}
-        >
+        ><LockIcon className="w-4 h-4" />
           {t('door.unlatch')}
         </Button>
       )}

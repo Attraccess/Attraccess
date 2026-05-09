@@ -119,7 +119,7 @@ export function TeamPendingInvitesCard(props: Readonly<TeamPendingInvitesCardPro
     <Card>
       <CardHeader className="flex items-center justify-between gap-4">
         <p className="text-large font-semibold">{t('sections.pending.title')}</p>
-        <Chip size="sm" variant="flat">
+        <Chip size="sm" variant="soft">
           {pendingInvitations.length}
         </Chip>
       </CardHeader>
@@ -153,7 +153,7 @@ function PendingInvitationRow(props: Readonly<PendingInvitationRowProps>) {
     <div className="flex flex-col gap-2 rounded-medium border border-default-200 p-3">
       <div className="flex items-center justify-between gap-3">
         <AttraccessUser user={invitation.invitedUser} />
-        <Chip size="sm" color={statusColor[invitation.status]} variant="flat">
+        <Chip size="sm" color={statusColor[invitation.status]} variant="soft">
           {t(`statuses.${invitation.status}` as const)}
         </Chip>
       </div>
@@ -166,18 +166,16 @@ function PendingInvitationRow(props: Readonly<PendingInvitationRowProps>) {
       <div className="flex items-center justify-end gap-2">
         <Button variant="ghost"
           size="sm"
-          startContent={<RefreshCcwIcon className="size-4" />}
           isPending={isLoadingResend}
           onPress={onResend}
-        >
+        ><RefreshCcwIcon className="size-4" />
           {t('actions.resend')}
         </Button>
         <Button variant="danger-soft"
           size="sm"
-          startContent={<XIcon className="size-4" />}
           isPending={isLoadingCancel}
           onPress={onCancel}
-        >
+        ><XIcon className="size-4" />
           {t('actions.cancel')}
         </Button>
       </div>

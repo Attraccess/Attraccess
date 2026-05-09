@@ -21,7 +21,7 @@ export function SmtpSettingsCard({ variant, onNext }: SmtpSettingsCardProps) {
 
   const passwordChip =
     variant === 'standalone' && settings ? (
-      <Chip color={settings.smtp.passConfigured ? 'success' : 'warning'} variant="flat">
+      <Chip color={settings.smtp.passConfigured ? 'success' : 'warning'} variant="soft">
         <div className="flex items-center gap-2">
           {settings.smtp.passConfigured ? <CheckIcon size={16} /> : <XIcon size={16} />}
           {settings.smtp.passConfigured

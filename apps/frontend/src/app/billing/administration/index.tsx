@@ -22,7 +22,7 @@ export function BillingAdministrationPage() {
         title={t('title')}
         icon={<BanknoteIcon />}
         actions={
-          <Button variant="ghost" as={Link} href="/billing/administration/sumup" startContent={<SumUpIcon />}>
+          <Button variant="ghost" as={Link} href="/billing/administration/sumup"><SumUpIcon />
             {t('actions.sumupSettings')}
           </Button>
         }
