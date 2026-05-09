@@ -1,5 +1,4 @@
-import { Accordion, AccordionItem, Divider, Drawer, DrawerBody, DrawerContent, DrawerHeader, Textarea } from '@heroui/react';
-import { useDisclosure } from '../../../../../utils/heroui-compat';
+import { Accordion, AccordionItem, Divider, Drawer, DrawerBody, DrawerContent, DrawerHeader, Textarea, useOverlayState } from '@heroui/react';
 import { PageHeader } from '../../../../../components/pageHeader';
 import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
@@ -23,7 +22,7 @@ interface Props {
 }
 
 export function LogViewer(props: Props) {
-  const { isOpen, onOpenChange, onOpen } = useDisclosure();
+  const { isOpen, setOpen, open } = useOverlayState();
 
   const { t } = useTranslations({
     de: {
@@ -86,8 +85,8 @@ export function LogViewer(props: Props) {
 
   return (
     <>
-      {props.children(onOpen)}
-      <Drawer isOpen={isOpen} onOpenChange={onOpenChange}>
+      {props.children(open)}
+      <Drawer isOpen={isOpen} onOpenChange={setOpen}>
         <DrawerContent>
           <DrawerHeader>
             <PageHeader title={t('title')} noMargin />

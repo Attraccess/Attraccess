@@ -1,6 +1,5 @@
 import { ResourceFlowNodeSchemaDto } from '@attraccess/react-query-client';
-import { useDisclosure } from '../../../../../../utils/heroui-compat';
-import { Button, Form, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader } from '@heroui/react';
+import { Button, Form, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, useOverlayState } from '@heroui/react';
 import { useNodeId, useNodesData } from '@xyflow/react';
 import { PageHeader } from '../../../../../../components/pageHeader';
 import { useFlowContext } from '../../flowContext';
@@ -16,7 +15,7 @@ interface Props {
 
 export function NodeEditor(props: Props) {
   const { tNodeTranslations: t, schema } = props;
-  const { isOpen, onOpen, onOpenChange, onClose } = useDisclosure();
+  const { isOpen, open, setOpen, close } = useOverlayState();
 
   const nodeId = useNodeId();
   const currentData = useNodesData(nodeId as string);
@@ -38,8 +37,8 @@ export function NodeEditor(props: Props) {
     }
 
     updateNodeData(nodeId as string, data);
-    onClose();
-  }, [nodeId, data, updateNodeData, onClose]);
+    close();
+  }, [nodeId, data, updateNodeData, close]);
 
   const onInputChange = useCallback((propertyName: string, value: unknown) => {
     setData((prev) => ({ ...prev, [propertyName]: value }));
@@ -47,8 +46,8 @@ export function NodeEditor(props: Props) {
 
   return (
     <>
-      {props.children(onOpen)}
-      <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
+      {props.children(open)}
+      <Modal isOpen={isOpen} onOpenChange={setOpen}>
         <ModalBackdrop />
         <ModalContainer>
           <ModalDialog>

@@ -1,5 +1,4 @@
-import { Accordion, AccordionItem, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading } from '@heroui/react';
-import { useDisclosure } from '../../../../../utils/heroui-compat';
+import { Accordion, AccordionItem, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, useOverlayState } from '@heroui/react';
 import { useCallback, useMemo } from 'react';
 import { TFunction, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { ResourceFlowNodeSchemaDto, useResourceFlowsServiceGetNodeSchemas } from '@attraccess/react-query-client';
@@ -20,7 +19,7 @@ interface NodeGroup {
 }
 
 export function NodePickerModal(props: Props) {
-  const { isOpen, onOpenChange, onClose, onOpen } = useDisclosure();
+  const { isOpen, setOpen, close, open } = useOverlayState();
 
   const { t } = useTranslations({
     de,
@@ -78,15 +77,15 @@ export function NodePickerModal(props: Props) {
   const onSelect = useCallback(
     (nodeType: string) => {
       props.onSelect(nodeType);
-      onClose();
+      close();
     },
-    [props, onClose],
+    [props, close],
   );
 
   return (
     <>
-      {props.children(onOpen)}
-      <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
+      {props.children(open)}
+      <Modal isOpen={isOpen} onOpenChange={setOpen}>
         <ModalBackdrop />
         <ModalContainer size="4xl">
           <ModalDialog>

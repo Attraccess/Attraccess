@@ -1,6 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { useDisclosure } from '../../../utils/heroui-compat';
-import { Alert, Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalHeader } from '@heroui/react';
+import { Alert, Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalHeader, useOverlayState } from '@heroui/react';
 import { PageHeader } from '../../../components/pageHeader';
 import { FirmwareSelector } from './FirmwareSelector';
 import { FirmwareFlasher } from './FirmwareFlasher';
@@ -113,13 +112,13 @@ export function AttractapHardwareSetup(props: Props) {
     en,
   });
 
-  const { isOpen, onOpen, onOpenChange, onClose } = useDisclosure();
+  const { isOpen, open, setOpen, close, toggle } = useOverlayState();
   const [state, setState] = useState<State>('init');
 
   const onBack = useCallback(() => {
     switch (state) {
       case 'init':
-        onOpenChange();
+        toggle();
         break;
 
       case 'select':
@@ -138,15 +137,15 @@ export function AttractapHardwareSetup(props: Props) {
         throw new Error(`Unknown state: ${exhaustiveCheck}`);
       }
     }
-  }, [state, onOpenChange]);
+  }, [state, toggle]);
 
   return (
     <>
-      {children(onOpen)}
+      {children(open)}
 
       <Modal
         isOpen={isOpen}
-        onOpenChange={onOpenChange}
+        onOpenChange={setOpen}
       >
         <ModalBackdrop />
         <ModalContainer size={state === 'configure' ? '5xl' : undefined}>
@@ -161,9 +160,9 @@ export function AttractapHardwareSetup(props: Props) {
                   <Content
                     state={state}
                     setState={setState}
-                    onClose={onOpenChange}
+                    onClose={close}
                     openDeviceSettings={(deviceId) => {
-                      onClose();
+                      close();
                       openDeviceSettings(deviceId);
                     }}
                   />

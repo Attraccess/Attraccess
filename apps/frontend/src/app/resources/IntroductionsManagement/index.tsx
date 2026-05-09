@@ -1,6 +1,5 @@
 import { useCallback, useState } from 'react';
-import { useDisclosure } from '../../../utils/heroui-compat';
-import { Card, CardContent, CardProps } from '@heroui/react';
+import { Card, CardContent, CardProps, useOverlayState } from '@heroui/react';
 import { AlertCircle } from 'lucide-react';
 import {
   UseAccessControlServiceResourceIntroductionsGetHistoryKeyFn,
@@ -31,7 +30,7 @@ export function ResourceIntroductionsManagement(
   const queryClient = useQueryClient();
 
   const [userIdForHistoryModal, setUserIdForHistoryModal] = useState<number | null>(null);
-  const { isOpen: isHistoryModalOpen, onOpen: onHistoryModalOpen, onClose: onHistoryModalClose } = useDisclosure();
+  const { isOpen: isHistoryModalOpen, open: onHistoryModalOpen, close: onHistoryModalClose } = useOverlayState();
 
   const {
     data: introductions,

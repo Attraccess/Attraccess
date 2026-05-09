@@ -1,5 +1,4 @@
-import { Button, Form, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Textarea } from '@heroui/react';
-import { useDisclosure } from '../../../utils/heroui-compat';
+import { Button, Form, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Textarea, useOverlayState } from '@heroui/react';
 import { PageHeader } from '../../../components/pageHeader';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
@@ -29,7 +28,7 @@ interface Props {
 export function UpsertProjectModal(props: Props) {
   const { children, projectId } = props;
 
-  const { isOpen, onOpen, onOpenChange, onClose } = useDisclosure();
+  const { isOpen, open, setOpen, close } = useOverlayState();
   const { t, tExists } = useTranslations({
     en: {
       ...en,
@@ -61,9 +60,9 @@ export function UpsertProjectModal(props: Props) {
       queryClient.invalidateQueries({
         queryKey: UseProjectsServiceFindOneProjectKeyFn({ id: project.id }),
       });
-      onClose();
+      close();
     },
-    [t, queryClient, onClose, toast],
+    [t, queryClient, close, toast],
   );
 
   const onSaveError = useCallback(
@@ -135,8 +134,8 @@ export function UpsertProjectModal(props: Props) {
 
   return (
     <>
-      {children(onOpen)}
-      <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
+      {children(open)}
+      <Modal isOpen={isOpen} onOpenChange={setOpen}>
         <ModalBackdrop />
         <ModalContainer>
           <ModalDialog>

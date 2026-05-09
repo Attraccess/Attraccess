@@ -1,5 +1,4 @@
-import { Button, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader } from '@heroui/react';
-import { useDisclosure } from '../../../../../utils/heroui-compat';
+import { Button, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, useOverlayState } from '@heroui/react';
 import { OpenIDConfiguration } from '../OpenIDC.data';
 import { PageHeader } from '../../../../../components/pageHeader';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -19,7 +18,7 @@ interface Props {
 
 export function KeycloakDiscoveryDialog(props: Props) {
   const { onDiscovery, children: activator } = props;
-  const { isOpen, onOpen, onClose } = useDisclosure();
+  const { isOpen, open, close } = useOverlayState();
   const [host, setHost] = useState('');
   const [realm, setRealm] = useState('');
   const [isDiscovering, setIsDiscovering] = useState(false);
@@ -61,7 +60,7 @@ export function KeycloakDiscoveryDialog(props: Props) {
 
       const config: OpenIDConfiguration = await response.json();
       onDiscovery(config);
-      onClose();
+      close();
       toast.success({ title: t('success.title'), description: t('success.description') });
     } catch (error) {
       toast.apiError({
@@ -73,12 +72,12 @@ export function KeycloakDiscoveryDialog(props: Props) {
     } finally {
       setIsDiscovering(false);
     }
-  }, [host, realm, toast, t, tExists, onDiscovery, onClose]);
+  }, [host, realm, toast, t, tExists, onDiscovery, close]);
 
   return (
     <>
-      {activator(onOpen)}
-      <Modal isOpen={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+      {activator(open)}
+      <Modal isOpen={isOpen} onOpenChange={(o) => { if (!o) close(); }}>
         <ModalBackdrop />
         <ModalContainer>
           <ModalDialog>

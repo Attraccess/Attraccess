@@ -1,5 +1,4 @@
-import { Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader } from '@heroui/react';
-import { useDisclosure } from '../../../../utils/heroui-compat';
+import { Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, useOverlayState } from '@heroui/react';
 import de from './de.json';
 import en from './en.json';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -26,12 +25,12 @@ export function NfcCardDeactivateModal(props: Props) {
     en,
   });
 
-  const { onOpen, isOpen, onOpenChange, onClose } = useDisclosure();
+  const { open, isOpen, setOpen, close } = useOverlayState();
 
   const { mutate, isPending } = useAttractapServiceToggleCardActive({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: UseAttractapServiceGetAllCardsKeyFn() });
-      onClose();
+      close();
     },
   });
 
@@ -42,9 +41,9 @@ export function NfcCardDeactivateModal(props: Props) {
   return (
     <>
       {activator(() => {
-        onOpen();
+        open();
       })}
-      <Modal isOpen={isOpen} onOpenChange={onOpenChange} data-cy="nfc-card-deactivate-modal">
+      <Modal isOpen={isOpen} onOpenChange={setOpen} data-cy="nfc-card-deactivate-modal">
         <ModalBackdrop />
         <ModalContainer>
           <ModalDialog>

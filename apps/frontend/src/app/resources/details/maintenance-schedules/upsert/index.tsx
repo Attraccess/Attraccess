@@ -1,5 +1,4 @@
-import { Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Button, Input, Switch, Form, Alert, Select } from "@heroui/react";
-import { SelectItem, useDisclosure } from "../../../../../utils/heroui-compat";
+import { Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Button, Input, Switch, Form, Alert, Select, ListBoxItem, useOverlayState } from "@heroui/react";
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -30,7 +29,7 @@ const TRIGGER_OPTIONS = [
 
 export function MaintenanceScheduleUpsertModal(props: Props) {
   const { resourceId, scheduleId, children: activator } = props;
-  const { isOpen, onOpen, onOpenChange, onClose } = useDisclosure();
+  const { isOpen, open, setOpen, close } = useOverlayState();
 
   const { t } = useTranslations({ de, en });
 
@@ -92,8 +91,8 @@ export function MaintenanceScheduleUpsertModal(props: Props) {
     queryClient.invalidateQueries({
       queryKey: [useResourceMaintenanceSchedulesServiceFindMaintenanceSchedulesKey],
     });
-    onClose();
-  }, [queryClient, onClose]);
+    close();
+  }, [queryClient, close]);
 
   const { mutate: createSchedule, isPending: isCreating, error: createError } =
     useResourceMaintenanceSchedulesServiceCreateMaintenanceSchedule({
@@ -215,8 +214,8 @@ export function MaintenanceScheduleUpsertModal(props: Props) {
 
   return (
     <>
-      {activator(onOpen)}
-      <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
+      {activator(open)}
+      <Modal isOpen={isOpen} onOpenChange={setOpen}>
         <ModalBackdrop />
         <ModalContainer>
           <ModalDialog>
@@ -247,7 +246,7 @@ export function MaintenanceScheduleUpsertModal(props: Props) {
                 }}
               >
                 {TRIGGER_OPTIONS.map((opt) => (
-                  <SelectItem key={opt.value} id={opt.value}>{t(`triggerType.${opt.labelKey}`)}</SelectItem>
+                  <ListBoxItem key={opt.value} id={opt.value}>{t(`triggerType.${opt.labelKey}`)}</ListBoxItem>
                 ))}
               </Select>
 
@@ -270,7 +269,7 @@ export function MaintenanceScheduleUpsertModal(props: Props) {
                     }}
                   >
                     {Object.values(UsageDurationUnit).map((unit) => (
-                      <SelectItem key={unit} id={unit}>{t(`inputs.unit.${unit}`)}</SelectItem>
+                      <ListBoxItem key={unit} id={unit}>{t(`inputs.unit.${unit}`)}</ListBoxItem>
                     ))}
                   </Select>
                 </>
@@ -306,7 +305,7 @@ export function MaintenanceScheduleUpsertModal(props: Props) {
                     }}
                   >
                     {Object.values(UsageDurationUnit).map((unit) => (
-                      <SelectItem key={unit} id={unit}>{t(`inputs.unit.${unit}`)}</SelectItem>
+                      <ListBoxItem key={unit} id={unit}>{t(`inputs.unit.${unit}`)}</ListBoxItem>
                     ))}
                   </Select>
                   <p className="text-sm text-default-500">{t('inputs.timeIntervalEvaluationNote')}</p>

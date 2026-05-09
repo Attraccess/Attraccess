@@ -1,5 +1,4 @@
-import { Button, Chip, Divider, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalHeader, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from '@heroui/react';
-import { useDisclosure } from '../../../../../utils/heroui-compat';
+import { Button, Chip, Divider, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalHeader, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow, useOverlayState } from '@heroui/react';
 import de from './de.json';
 import en from './en.json';
 import { AttraccessUser, useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -27,7 +26,7 @@ export function TransactionDetailsModal(props: Props) {
 
   const { t, tExists } = useTranslations({ en, de });
 
-  const { onOpen, isOpen, onOpenChange, onClose } = useDisclosure({ onClose: onCloseProp });
+  const { open, isOpen, setOpen, close } = useOverlayState({ onOpenChange: (o) => { if (!o) onCloseProp?.(); } });
 
   useEffect(() => {
     if (isOpenProp === undefined) {
@@ -35,11 +34,11 @@ export function TransactionDetailsModal(props: Props) {
     }
 
     if (isOpenProp) {
-      onOpen();
+      open();
     } else {
-      onClose();
+      close();
     }
-  }, [isOpenProp, onOpen, onClose]);
+  }, [isOpenProp, open, close]);
 
   const { data: transaction } = useBillingServiceGetBillingTransaction({ transactionId });
   const { data: configuration } = useBillingServiceGetBillingConfiguration();
@@ -67,8 +66,8 @@ export function TransactionDetailsModal(props: Props) {
 
   return (
     <>
-      {children && children(onOpen)}
-      <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
+      {children && children(open)}
+      <Modal isOpen={isOpen} onOpenChange={setOpen}>
         <ModalBackdrop />
         <ModalContainer size="2xl">
           <ModalDialog>

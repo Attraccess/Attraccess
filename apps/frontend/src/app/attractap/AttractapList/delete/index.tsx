@@ -1,6 +1,6 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 
-import { useDisclosure } from '../../../../utils/heroui-compat';
+import { useOverlayState } from '@heroui/react';
 import de from './de.json';
 import en from './en.json';
 import { DeleteConfirmationModal } from '../../../../components/deleteConfirmationModal';
@@ -23,12 +23,12 @@ export function AttractapDeleteModal(props: Props) {
     en,
   });
 
-  const { onOpen, onClose, isOpen } = useDisclosure();
+  const { open, close, isOpen } = useOverlayState();
 
   const { mutate, isPending } = useAttractapServiceDeleteReader({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: UseAttractapServiceGetReadersKeyFn() });
-      onClose();
+      close();
     },
   });
 
@@ -38,10 +38,10 @@ export function AttractapDeleteModal(props: Props) {
 
   return (
     <>
-      {activator(onOpen)}
+      {activator(open)}
       <DeleteConfirmationModal
         isOpen={isOpen}
-        onClose={onClose}
+        onClose={close}
         onConfirm={onConfirm}
         itemName={t('itemName')}
         isDeleting={isPending}

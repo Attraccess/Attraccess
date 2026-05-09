@@ -1,7 +1,7 @@
 import { ResourceFlowLogType, ResourceFlowNodeSchemaDto } from '@attraccess/react-query-client';
-import { useDisclosure } from '../../../../../utils/heroui-compat';
+
 import { NodeProps } from '@xyflow/react';
-import { Button, Card, CardContent, CardHeader, cn, Tooltip } from '@heroui/react';
+import { Button, Card, CardContent, CardHeader, cn, Tooltip, useOverlayState } from '@heroui/react';
 import { Handle, NodeToolbar, Position, useNodeId } from '@xyflow/react';
 import { Edit2Icon, Trash2Icon, TriangleAlertIcon } from 'lucide-react';
 import { useFlowContext } from '../flowContext';
@@ -86,9 +86,9 @@ export function AttraccessNode(props: Props) {
 
   const {
     isOpen: showDeleteConfirmation,
-    onOpen: userWantsToDelete,
-    onClose: userDoesNotWantToDelete,
-  } = useDisclosure();
+    open: userWantsToDelete,
+    close: userDoesNotWantToDelete,
+  } = useOverlayState();
 
   const isSelected = props.node?.selected ?? false;
 

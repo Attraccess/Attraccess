@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState, useRef } from 'react';
-import { useDisclosure } from '../../../utils/heroui-compat';
-import { Button, Form, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading } from '@heroui/react';
+import { Button, Form, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, useOverlayState } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './resourceGroupUpsertModal.en.json';
 import de from './resourceGroupUpsertModal.de.json';
@@ -34,7 +33,7 @@ interface Props {
 }
 
 export function ResourceGroupUpsertModal(props: Readonly<Props>) {
-  const { isOpen, onOpen, onOpenChange, onClose: closeDisclosure } = useDisclosure();
+  const { isOpen, open, setOpen, close: closeDisclosure } = useOverlayState();
   const { t } = useTranslations({
     en,
     de,
@@ -166,10 +165,10 @@ export function ResourceGroupUpsertModal(props: Readonly<Props>) {
 
   return (
     <>
-      {props.children(onOpen)}
+      {props.children(open)}
       <Modal
         isOpen={isOpen}
-        onOpenChange={onOpenChange}
+        onOpenChange={setOpen}
         data-cy="resource-group-upsert-modal"
       >
         <ModalBackdrop />

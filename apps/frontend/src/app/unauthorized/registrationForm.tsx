@@ -1,8 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { useDisclosure } from '../../utils/heroui-compat';
 import { ArrowRight, Mail } from 'lucide-react';
-import { Alert, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader } from '@heroui/react';
-import { Button } from '@heroui/react';
+import { Alert, Button, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, useOverlayState } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PasswordInput } from '../../components/PasswordInput';
 import { UsernameInput, USERNAME_RULES, useUsernameValidation } from '../../components/UsernameInput';
@@ -37,7 +35,7 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
 
   const queryClient = useQueryClient();
   const [registeredEmail, setRegisteredEmail] = useState<string>('');
-  const { isOpen, onOpen, onOpenChange } = useDisclosure();
+  const { isOpen, open, setOpen } = useOverlayState();
   const toast = useToastMessage();
 
   const [username, setUsername] = useState<string>('');
@@ -94,7 +92,7 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
       queryClient.invalidateQueries({
         queryKey: [useUsersServiceFindManyKey],
       });
-      onOpen();
+      open();
     },
     onError: (error) => {
       toast.apiError({
@@ -228,7 +226,7 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
 
       <Modal
         isOpen={isOpen}
-        onOpenChange={onOpenChange}
+        onOpenChange={setOpen}
         data-cy="registration-form-success-modal"
       >
         <ModalBackdrop />

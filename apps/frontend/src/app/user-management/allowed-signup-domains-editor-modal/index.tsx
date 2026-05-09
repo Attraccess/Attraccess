@@ -1,11 +1,10 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { useDisclosure } from '../../../utils/heroui-compat';
 import {
   ApiError,
   useUsersServiceGetLocalSignupDomainWhitelist,
   useUsersServiceSetLocalSignupDomainWhitelist,
 } from '@attraccess/react-query-client';
-import { Alert, Button, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from '@heroui/react';
+import { Alert, Button, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow, useOverlayState } from '@heroui/react';
 import { EmptyState } from '../../../components/emptyState';
 import { PageHeader } from '../../../components/pageHeader';
 import { TableDataLoadingIndicator } from '../../../components/tableComponents';
@@ -23,7 +22,7 @@ interface Props {
 }
 
 export function AllowedSignupDomainsEditorModal(props: Props) {
-  const { isOpen, onOpen, onOpenChange, onClose } = useDisclosure();
+  const { isOpen, open, setOpen, close } = useOverlayState();
   const { t, tExists } = useTranslations({
     de: {
       ...de,
@@ -84,7 +83,7 @@ export function AllowedSignupDomainsEditorModal(props: Props) {
         title: t('actions.save.success.title'),
         description: t('actions.save.success.description'),
       });
-      onClose();
+      close();
     },
     onError: (error) => {
       toast.apiError({
@@ -102,8 +101,8 @@ export function AllowedSignupDomainsEditorModal(props: Props) {
 
   return (
     <>
-      {props.children(onOpen)}
-      <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
+      {props.children(open)}
+      <Modal isOpen={isOpen} onOpenChange={setOpen}>
         <ModalBackdrop />
         <ModalContainer>
           <ModalDialog>

@@ -1,8 +1,7 @@
 import en from './en.json';
-import { useDisclosure } from '../../../../../../utils/heroui-compat';
 import de from './de.json';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Button, Form, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader } from '@heroui/react';
+import { Button, Form, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, useOverlayState } from '@heroui/react';
 import { PageHeader } from '../../../../../../components/pageHeader';
 import { PasswordInput } from '../../../../../../components/PasswordInput';
 import { useCallback, useRef, useState } from 'react';
@@ -31,7 +30,7 @@ export function SumUpReadersPairing(props: Props) {
   const toast = useToastMessage();
   const queryClient = useQueryClient();
 
-  const { isOpen, onOpen, onOpenChange, onClose } = useDisclosure();
+  const { isOpen, open, setOpen, close } = useOverlayState();
   const { mutate: pairReader, isPending: isPairingReader } = useBillingServicePairSumUpReader({
     onSuccess: () => {
       toast.success({
@@ -39,7 +38,7 @@ export function SumUpReadersPairing(props: Props) {
         description: t('success.toast.description'),
       });
       queryClient.invalidateQueries({ queryKey: [useBillingServiceGetSumUpReadersKey] });
-      onClose();
+      close();
     },
     onError: (error: Error) => {
       toast.apiError({
@@ -70,9 +69,9 @@ export function SumUpReadersPairing(props: Props) {
 
   return (
     <>
-      {children(onOpen)}
+      {children(open)}
 
-      <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
+      <Modal isOpen={isOpen} onOpenChange={setOpen}>
         <ModalBackdrop />
         <ModalContainer>
           <ModalDialog>
