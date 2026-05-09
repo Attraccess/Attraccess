@@ -1,6 +1,6 @@
 
 import { DeleteConfirmationModal } from '../../../../components/deleteConfirmationModal';
-import { useDisclosure } from '../../../../utils/heroui-compat';
+import { useOverlayState } from '@heroui/react';
 import {
   useResourceMaintenanceSchedulesServiceDeleteMaintenanceSchedule,
   useResourceMaintenanceSchedulesServiceFindMaintenanceSchedulesKey,
@@ -17,7 +17,7 @@ interface Props {
 
 export function ScheduleDeleteModal(props: Props) {
   const { resourceId, schedule, children } = props;
-  const { isOpen, onOpen, onOpenChange, onClose } = useDisclosure();
+  const { isOpen, open, close } = useOverlayState();
   const queryClient = useQueryClient();
 
   const { mutate: deleteSchedule, isPending: isDeleting } =
@@ -26,7 +26,7 @@ export function ScheduleDeleteModal(props: Props) {
         queryClient.invalidateQueries({
           queryKey: [useResourceMaintenanceSchedulesServiceFindMaintenanceSchedulesKey],
         });
-        onClose();
+        close();
       },
     });
 
@@ -38,12 +38,11 @@ export function ScheduleDeleteModal(props: Props) {
 
   return (
     <>
-      {children(onOpen)}
+      {children(open)}
       <DeleteConfirmationModal
         isOpen={isOpen}
-        onOpenChange={onOpenChange}
         onConfirm={onConfirm}
-        onClose={onClose}
+        onClose={close}
         itemName={itemName}
         isDeleting={isDeleting}
       />

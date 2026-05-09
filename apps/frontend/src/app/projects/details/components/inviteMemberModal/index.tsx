@@ -1,6 +1,5 @@
 import { ReactNode, useCallback, useMemo, useState } from 'react';
-import { SelectItem, useDisclosure } from "../../../../../utils/heroui-compat";
-import { Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Select, Selection } from "@heroui/react";
+import { Button, ListBoxItem, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Select, Selection, useOverlayState } from "@heroui/react";
 import { useQueryClient } from '@tanstack/react-query';
 import {
   UseProjectsServiceListProjectInvitationsKeyFn,
@@ -25,7 +24,7 @@ type InviteProjectMemberModalProps = {
 
 export function InviteProjectMemberModal(props: Readonly<InviteProjectMemberModalProps>) {
   const { projectId, children } = props;
-  const { isOpen, onOpen, onClose } = useDisclosure();
+  const { isOpen, open, close } = useOverlayState();
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [role, setRole] = useState<ProjectMember['role']>(ProjectMemberRole.VIEWER);
   const queryClient = useQueryClient();
@@ -58,7 +57,7 @@ export function InviteProjectMemberModal(props: Readonly<InviteProjectMemberModa
         description: t('success.description', { username: invitation.invitedUser?.username ?? '' }),
       });
       invalidateCollaboratorQueries();
-      onClose();
+      close();
       resetState();
     },
     onError: (error) => {
@@ -94,20 +93,20 @@ export function InviteProjectMemberModal(props: Readonly<InviteProjectMemberModa
   }, [createInvitation, projectId, role, selectedUser]);
 
   const handleOpenChange = useCallback(
-    (open: boolean) => {
-      if (!open) {
+    (isOpen: boolean) => {
+      if (!isOpen) {
         resetState();
-        onClose();
+        close();
         return;
       }
-      onOpen();
+      open();
     },
-    [onOpen, onClose, resetState],
+    [open, close, resetState],
   );
 
   return (
     <>
-      {children(onOpen)}
+      {children(open)}
       <Modal isOpen={isOpen} onOpenChange={handleOpenChange}>
         <ModalBackdrop />
         <ModalContainer>
@@ -133,7 +132,7 @@ export function InviteProjectMemberModal(props: Readonly<InviteProjectMemberModa
                     disallowEmptySelection
                   >
                     {roleOptions.map((value) => (
-                      <SelectItem key={value} id={value}>{t(`roles.${value}`)}</SelectItem>
+                      <ListBoxItem key={value} id={value}>{t(`roles.${value}`)}</ListBoxItem>
                     ))}
                   </Select>
                 </ModalBody>

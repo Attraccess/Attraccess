@@ -1,6 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { useDisclosure } from '../../../../utils/heroui-compat';
-import { DrawerBody, Drawer, DrawerContent, DrawerHeader, Switch } from '@heroui/react';
+import { DrawerBody, Drawer, DrawerContent, DrawerHeader, Switch, useOverlayState } from '@heroui/react';
 
 import de from './de.json';
 import en from './en.json';
@@ -12,7 +11,7 @@ interface Props {
 
 export function ResourceFilter(props: Props & Omit<FilterProps, 'onSearchChanged' | 'search'>) {
   const { children, ...filterProps } = props;
-  const { isOpen, onOpenChange, onOpen } = useDisclosure();
+  const { isOpen, setOpen, open } = useOverlayState();
 
   const { t } = useTranslations({
     de,
@@ -21,8 +20,8 @@ export function ResourceFilter(props: Props & Omit<FilterProps, 'onSearchChanged
 
   return (
     <>
-      {children({ onOpen })}
-      <Drawer isOpen={isOpen} onOpenChange={onOpenChange}>
+      {children({ onOpen: open })}
+      <Drawer isOpen={isOpen} onOpenChange={setOpen}>
         <DrawerContent>
           <DrawerHeader>{t('drawer.title')}</DrawerHeader>
           <DrawerBody>

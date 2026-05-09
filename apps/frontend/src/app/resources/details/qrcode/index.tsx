@@ -1,5 +1,4 @@
-import { Button, ButtonProps, Link, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader } from '@heroui/react';
-import { useDisclosure } from '../../../../utils/heroui-compat';
+import { Button, ButtonProps, Link, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, useOverlayState } from '@heroui/react';
 import { PageHeader } from '../../../../components/pageHeader';
 import { QrCodeIcon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
@@ -35,7 +34,7 @@ export function ResourceQrCode(props: Props & Omit<ButtonProps, 'children' | 'st
   }, [id, resourceId]);
 
   const [action, setAction] = useState<QrCodeAction>(QrCodeAction.View);
-  const { isOpen, onOpen, onOpenChange } = useDisclosure();
+  const { isOpen, open, setOpen } = useOverlayState();
 
   const qrCodeUrl = useMemo(() => {
     const url = new URL(window.location.origin);
@@ -50,11 +49,11 @@ export function ResourceQrCode(props: Props & Omit<ButtonProps, 'children' | 'st
 
   return (
     <>
-      <Button {...buttonProps} onPress={onOpen} startContent={<QrCodeIcon size={buttonIconSize} />}>
+      <Button {...buttonProps} onPress={open} startContent={<QrCodeIcon size={buttonIconSize} />}>
         {t('button.label')}
       </Button>
 
-      <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
+      <Modal isOpen={isOpen} onOpenChange={setOpen}>
         <ModalBackdrop />
         <ModalContainer>
           <ModalDialog>

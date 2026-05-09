@@ -4,8 +4,7 @@ import {
   UseBillingServiceGetResourceBillingConfigurationKeyFn,
   useBillingServiceUpdateResourceBillingConfiguration,
 } from '@attraccess/react-query-client';
-import { NumberInput, useDisclosure } from "../../../../../utils/heroui-compat";
-import { Button, Form, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader } from "@heroui/react";
+import { Button, Form, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput, useOverlayState } from "@heroui/react";
 import { PageHeader } from '../../../../../components/pageHeader';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
@@ -26,7 +25,7 @@ interface Props {
 export function ResourceBillingInfoEditor(props: Props) {
   const { resourceId } = props;
 
-  const { isOpen, onOpen, onOpenChange, onClose } = useDisclosure();
+  const { isOpen, open, setOpen, close } = useOverlayState();
   const { t, tExists } = useTranslations({
     en: {
       ...en,
@@ -51,7 +50,7 @@ export function ResourceBillingInfoEditor(props: Props) {
       queryClient.invalidateQueries({
         queryKey: UseBillingServiceGetResourceBillingConfigurationKeyFn({ resourceId }),
       });
-      onClose();
+      close();
     },
     onError: (error: Error) => {
       toast.apiError({
@@ -120,8 +119,8 @@ export function ResourceBillingInfoEditor(props: Props) {
 
   return (
     <>
-      {props.children(onOpen)}
-      <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
+      {props.children(open)}
+      <Modal isOpen={isOpen} onOpenChange={setOpen}>
         <ModalBackdrop />
         <ModalContainer>
           <ModalDialog>
@@ -132,24 +131,32 @@ export function ResourceBillingInfoEditor(props: Props) {
                 </ModalHeader>
                 <ModalBody>
                   <Form onSubmit={onSubmit}>
-                    <NumberInput
-                      label={t('inputs.creditsPerUsage.label', { currency: configuration.currency })}
-                      description={t('inputs.creditsPerUsage.description')}
+                    <NumberField
+                      aria-label={t('inputs.creditsPerUsage.label', { currency: configuration.currency })}
                       value={creditsPerUsage}
                       minValue={0}
-                      onValueChange={(value) => setCreditsPerUsage(value)}
-                      isClearable
+                      onChange={(value) => setCreditsPerUsage(value)}
                       defaultValue={0}
-                    />
-                    <NumberInput
-                      label={t('inputs.creditsPerMinute.label', { currency: configuration.currency })}
-                      description={t('inputs.creditsPerMinute.description')}
+                    >
+                      <NumberFieldGroup>
+                        <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
+                        <NumberFieldInput />
+                        <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
+                      </NumberFieldGroup>
+                    </NumberField>
+                    <NumberField
+                      aria-label={t('inputs.creditsPerMinute.label', { currency: configuration.currency })}
                       value={creditsPerMinute}
                       minValue={0}
-                      onValueChange={(value) => setCreditsPerMinute(value)}
-                      isClearable
+                      onChange={(value) => setCreditsPerMinute(value)}
                       defaultValue={0}
-                    />
+                    >
+                      <NumberFieldGroup>
+                        <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
+                        <NumberFieldInput />
+                        <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
+                      </NumberFieldGroup>
+                    </NumberField>
                     <input hidden type="submit" />
                   </Form>
                 </ModalBody>

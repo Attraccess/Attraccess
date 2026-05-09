@@ -1,6 +1,5 @@
 import { PageHeader } from '../../components/pageHeader';
-import { useDisclosure } from '../../utils/heroui-compat';
-import { Button, Card, CardContent, CardHeader, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading } from '@heroui/react';
+import { Button, Card, CardContent, CardHeader, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, useOverlayState } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
@@ -22,7 +21,7 @@ export default function AccountPage() {
 
   const { user: me } = useAuth();
   const toast = useToastMessage();
-  const { isOpen, onOpen, onClose } = useDisclosure();
+  const { isOpen, open, close, setOpen } = useOverlayState();
 
   const { mutate: requestDelete, isPending: isRequestingDelete } = useUsersServiceRequestDeleteAccount({
     onSuccess: () => {
@@ -30,7 +29,7 @@ export default function AccountPage() {
         title: t('deleteAccount.toast.title'),
         description: t('deleteAccount.toast.description'),
       });
-      onClose();
+      close();
     },
     onError: (error) => {
       toast.apiError({
@@ -73,14 +72,14 @@ export default function AccountPage() {
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             <p className="text-sm text-default-500">{t('deleteAccount.description')}</p>
-            <Button color="danger" variant="flat" onPress={onOpen} data-cy="delete-account-open-modal">
+            <Button color="danger" variant="flat" onPress={open} data-cy="delete-account-open-modal">
               {t('deleteAccount.actions.request')}
             </Button>
           </CardContent>
         </Card>
       </div>
 
-      <Modal isOpen={isOpen} onOpenChange={(open) => (open ? onOpen() : onClose())}>
+      <Modal isOpen={isOpen} onOpenChange={setOpen}>
         <ModalBackdrop />
         <ModalContainer>
           <ModalDialog>

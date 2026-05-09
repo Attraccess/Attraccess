@@ -1,6 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { NumberInput, useDisclosure } from '../../../../../../utils/heroui-compat';
-import { Button, Form, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader } from "@heroui/react";
+import { Button, Form, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput, useOverlayState } from "@heroui/react";
 import { PageHeader } from '../../../../../../components/pageHeader';
 import en from './en.json';
 import de from './de.json';
@@ -39,7 +38,7 @@ export function RefundModal(props: Props) {
     },
   });
 
-  const { onOpen, isOpen, onOpenChange, onClose } = useDisclosure();
+  const { open, isOpen, setOpen, close } = useOverlayState();
   const toast = useToastMessage();
   const queryClient = useQueryClient();
 
@@ -64,7 +63,7 @@ export function RefundModal(props: Props) {
       queryClient.invalidateQueries({
         queryKey: UseBillingServiceGetBillingBalanceKeyFn({ userId: transaction?.userId ?? 0 }),
       });
-      onClose();
+      close();
     },
     onError: (error) => {
       toast.apiError({
@@ -92,8 +91,8 @@ export function RefundModal(props: Props) {
 
   return (
     <>
-      {children && children(onOpen)}
-      <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
+      {children && children(open)}
+      <Modal isOpen={isOpen} onOpenChange={setOpen}>
         <ModalBackdrop />
         <ModalContainer size="xs">
           <ModalDialog>
@@ -105,13 +104,19 @@ export function RefundModal(props: Props) {
 
                 <ModalBody>
                   <Form onSubmit={onSubmit}>
-                    <NumberInput
-                      label={t('inputs.amount')}
+                    <NumberField
+                      aria-label={t('inputs.amount')}
                       value={dbCurrencyToUserCurrency(amount, configuration.minorUnit)}
-                      onValueChange={(value) => setAmount(userCurrencyToDbCurrency(value, configuration.minorUnit))}
+                      onChange={(value) => setAmount(userCurrencyToDbCurrency(value, configuration.minorUnit))}
                       minValue={0}
                       maxValue={dbCurrencyToUserCurrency(Math.abs(transaction.amount), configuration.minorUnit)}
-                    />
+                    >
+                      <NumberFieldGroup>
+                        <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
+                        <NumberFieldInput />
+                        <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
+                      </NumberFieldGroup>
+                    </NumberField>
                     <input type="submit" hidden />
                   </Form>
                 </ModalBody>

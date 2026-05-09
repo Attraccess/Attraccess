@@ -8,7 +8,7 @@ import {
   useUsersServiceDeleteUser,
   useUsersServiceGetOneUserById,
 } from '@attraccess/react-query-client';
-import { Modal, ModalContent, useDisclosure } from '../../../utils/heroui-compat';
+
 import { PageHeader } from '../../../components/pageHeader';
 import { useNavigate, useParams } from 'react-router-dom';
 import { UserPermissionForm } from './components/permissionsForm';
@@ -19,7 +19,7 @@ import { ChangeEmailForm } from './components/changeEmail';
 
 import en from './en.json';
 import de from './de.json';
-import { Button, Card, CardContent, CardHeader, Chip, Divider, ModalBody, ModalFooter, ModalHeader } from '@heroui/react';
+import { Button, Card, CardContent, CardHeader, Chip, Divider, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, useOverlayState } from '@heroui/react';
 import { useToastMessage } from '../../../components/toastProvider';
 import API_ERROR_TRANSLATIONS_EN from '../../../global-translations/api-errors.en.json';
 import API_ERROR_TRANSLATIONS_DE from '../../../global-translations/api-errors.de.json';
@@ -37,7 +37,7 @@ export function UserManagementDetailsPage() {
 
   const navigate = useNavigate();
   const toast = useToastMessage();
-  const { isOpen, onOpen, onClose } = useDisclosure();
+  const { isOpen, open, close, setOpen } = useOverlayState();
   const { user: me } = useAuth();
 
   const id = parseInt(idParam || '', 10);
@@ -245,7 +245,7 @@ export function UserManagementDetailsPage() {
                 <Button
                   color="danger"
                   variant="flat"
-                  onPress={onOpen}
+                  onPress={open}
                   isDisabled={isSelf}
                   data-cy="admin-delete-user-open-modal"
                 >
@@ -258,30 +258,33 @@ export function UserManagementDetailsPage() {
         )}
       </div>
 
-      <Modal isOpen={isOpen} onOpenChange={(open) => (open ? onOpen() : onClose())}>
-        <ModalContent>
-          {() => (
-            <>
-              <ModalHeader>{t('delete.modal.title')}</ModalHeader>
-              <ModalBody>
-                <p className="text-sm text-default-500">{t('delete.modal.description')}</p>
-              </ModalBody>
-              <ModalFooter>
-                <Button variant="light" onPress={onClose} isDisabled={isDeleting}>
-                  {t('delete.actions.cancel')}
-                </Button>
-                <Button
-                  color="danger"
-                  onPress={() => user && deleteUser({ id: user.id })}
-                  isLoading={isDeleting}
-                  data-cy="admin-delete-user-confirm-button"
-                >
-                  {t('delete.actions.confirm')}
-                </Button>
-              </ModalFooter>
-            </>
-          )}
-        </ModalContent>
+      <Modal isOpen={isOpen} onOpenChange={setOpen}>
+        <ModalBackdrop />
+        <ModalContainer>
+          <ModalDialog>
+            {({ close: modalClose }) => (
+              <>
+                <ModalHeader>{t('delete.modal.title')}</ModalHeader>
+                <ModalBody>
+                  <p className="text-sm text-default-500">{t('delete.modal.description')}</p>
+                </ModalBody>
+                <ModalFooter>
+                  <Button variant="light" onPress={modalClose} isDisabled={isDeleting}>
+                    {t('delete.actions.cancel')}
+                  </Button>
+                  <Button
+                    color="danger"
+                    onPress={() => user && deleteUser({ id: user.id })}
+                    isLoading={isDeleting}
+                    data-cy="admin-delete-user-confirm-button"
+                  >
+                    {t('delete.actions.confirm')}
+                  </Button>
+                </ModalFooter>
+              </>
+            )}
+          </ModalDialog>
+        </ModalContainer>
       </Modal>
     </div>
   );

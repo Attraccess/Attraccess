@@ -1,6 +1,5 @@
 import React, { useState, forwardRef, useImperativeHandle, useCallback } from 'react';
-import { useDisclosure } from '../../../utils/heroui-compat';
-import { Button, Table, TableHeader, TableColumn, TableBody, TableRow, TableCell, Tooltip, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Divider, Card, CardContent, CardHeader, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Textarea, Switch, Link } from '@heroui/react';
+import { Button, Table, TableHeader, TableColumn, TableBody, TableRow, TableCell, Tooltip, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Divider, Card, CardContent, CardHeader, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Textarea, Switch, Link, useOverlayState } from '@heroui/react';
 import { Pencil, Trash, Key, FileCode, Eye, EyeOff, MoreVertical, Copy, Info } from 'lucide-react';
 import { useToastMessage } from '../../../components/toastProvider';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -93,7 +92,7 @@ export interface SSOProvidersListRef {
 export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentPropsWithoutRef<'div'>>((props, ref) => {
   const { t } = useTranslations({ en, de });
   const { data: providers, status: fetchStatus, error } = useAuthenticationServiceGetAllSsoProviders();
-  const { isOpen, onOpen, onClose, onOpenChange } = useDisclosure();
+  const { isOpen, open, close, setOpen } = useOverlayState();
   const [editingProvider, setEditingProvider] = useState<SSOProvider | null>(null);
   const [formValues, setFormValues] = useState<CreateSSOProviderDto>(defaultProviderValues);
   const [showClientSecret, setShowClientSecret] = useState(false);
@@ -337,7 +336,7 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
     setOidcPermissionMappingsInput(emptyPermissionMappingsInput);
     setSamlPermissionMappingsInput(emptyPermissionMappingsInput);
     setShowSamlProvisioningSecret(false);
-    onOpen();
+    open();
   };
 
   // Expose methods to parent component via ref
@@ -347,7 +346,7 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
 
   const handleEdit = (provider: SSOProvider) => {
     setEditingProvider(provider);
-    onOpen();
+    open();
   };
 
   const handleDelete = async (id: number) => {
@@ -617,7 +616,7 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
           description: t('providerCreatedDesc'),
         });
       }
-      onClose();
+      close();
 
       // Invalidate query after successful submission - Already handled by onSuccess handlers
       // queryClient.invalidateQueries({
@@ -704,7 +703,7 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
       {/* Main Provider Form Modal */}
       <Modal
         isOpen={isOpen}
-        onOpenChange={onOpenChange}
+        onOpenChange={setOpen}
         data-cy="sso-provider-form-modal"
       >
         <ModalBackdrop />

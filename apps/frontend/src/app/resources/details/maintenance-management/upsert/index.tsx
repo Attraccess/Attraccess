@@ -1,6 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { useDisclosure } from '../../../../../utils/heroui-compat';
-import { Textarea, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalHeader, Button, ModalFooter, Alert, Form, DatePicker, Switch } from '@heroui/react';
+import { Textarea, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalHeader, Button, ModalFooter, Alert, Form, DatePicker, Switch, useOverlayState } from '@heroui/react';
 import de from './de.json';
 import en from './en.json';
 import { PageHeader } from '../../../../../components/pageHeader';
@@ -28,7 +27,7 @@ export function ResourceMaintenanceUpsertModal(props: Props) {
     en,
   });
 
-  const { isOpen, onOpen, onOpenChange, onClose } = useDisclosure();
+  const { isOpen, open, setOpen, close } = useOverlayState();
 
   const queryClient = useQueryClient();
   const formRef = useRef<HTMLFormElement>(null);
@@ -70,8 +69,8 @@ export function ResourceMaintenanceUpsertModal(props: Props) {
     queryClient.invalidateQueries({
       queryKey: [useResourceMaintenancesServiceFindMaintenancesKey],
     });
-    onClose();
-  }, [queryClient, onClose]);
+    close();
+  }, [queryClient, close]);
 
   const {
     mutate: createMaintenanceMutation,
@@ -109,8 +108,8 @@ export function ResourceMaintenanceUpsertModal(props: Props) {
 
   return (
     <>
-      {activator(onOpen)}
-      <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
+      {activator(open)}
+      <Modal isOpen={isOpen} onOpenChange={setOpen}>
         <ModalBackdrop />
         <ModalContainer>
           <ModalDialog>

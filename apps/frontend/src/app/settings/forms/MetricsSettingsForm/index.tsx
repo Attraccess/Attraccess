@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { useDisclosure } from '../../../../utils/heroui-compat';
-import { Button, Divider, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Spinner, Tooltip } from '@heroui/react';
+import { Button, Divider, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Spinner, Tooltip, useOverlayState } from '@heroui/react';
 import { AlertTriangleIcon, ClipboardCopyIcon, KeyIcon, RefreshCwIcon, Trash2Icon } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -48,14 +47,8 @@ export function MetricsSettingsForm() {
 
   const { data: metricsSettings, isLoading } = useSettingsServiceGetMetricsSettings();
 
-  useEffect(() => {
-    if (metricsSettings?.slowQueryThresholdSeconds !== undefined) {
-      setThresholdInput(metricsSettings.slowQueryThresholdSeconds);
-    }
-  }, [metricsSettings?.slowQueryThresholdSeconds]);
-
-  const rerollModal = useDisclosure();
-  const removeModal = useDisclosure();
+  const rerollModal = useOverlayState();
+  const removeModal = useOverlayState();
 
   const metricsEndpointUrl = useMemo(() => `${window.location.origin}/api/metrics`, []);
 
@@ -67,7 +60,7 @@ export function MetricsSettingsForm() {
         title: t('keyGenerated.title'),
         description: t('keyGenerated.description'),
       });
-      rerollModal.onClose();
+      rerollModal.close();
     },
   });
 
@@ -79,7 +72,7 @@ export function MetricsSettingsForm() {
         title: t('keyRemoved.title'),
         description: t('keyRemoved.description'),
       });
-      removeModal.onClose();
+      removeModal.close();
     },
   });
 
@@ -141,7 +134,7 @@ export function MetricsSettingsForm() {
 
   const handleGenerate = useCallback(() => {
     if (metricsSettings?.apiKeyConfigured) {
-      rerollModal.onOpen();
+      rerollModal.open();
     } else {
       generateApiKey();
     }
@@ -347,7 +340,7 @@ export function MetricsSettingsForm() {
             color="danger"
             variant="flat"
             startContent={<Trash2Icon size={16} />}
-            onPress={removeModal.onOpen}
+            onPress={removeModal.open}
           >
             {t('removeButton')}
           </Button>
@@ -358,7 +351,7 @@ export function MetricsSettingsForm() {
       {togglesSection}
       {thresholdSection}
 
-      <Modal isOpen={rerollModal.isOpen} onOpenChange={(open) => { if (!open) rerollModal.onClose(); }}>
+      <Modal isOpen={rerollModal.isOpen} onOpenChange={(o) => { if (!o) rerollModal.close(); }}>
         <ModalBackdrop />
         <ModalContainer>
           <ModalDialog>
@@ -384,7 +377,7 @@ export function MetricsSettingsForm() {
         </ModalContainer>
       </Modal>
 
-      <Modal isOpen={removeModal.isOpen} onOpenChange={(open) => { if (!open) removeModal.onClose(); }}>
+      <Modal isOpen={removeModal.isOpen} onOpenChange={(o) => { if (!o) removeModal.close(); }}>
         <ModalBackdrop />
         <ModalContainer>
           <ModalDialog>

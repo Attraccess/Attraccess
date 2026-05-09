@@ -1,6 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { useDisclosure } from '../../../../../utils/heroui-compat';
-import { Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Button, Textarea, Form, Alert } from '@heroui/react';
+import { Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Button, Textarea, Form, Alert, useOverlayState } from '@heroui/react';
 import de from '../de.json';
 import en from '../en.json';
 import {
@@ -18,7 +17,7 @@ interface Props {
 
 export function MarkDoneModal(props: Props) {
   const { resourceId, maintenanceId, children } = props;
-  const { isOpen, onOpen, onOpenChange, onClose } = useDisclosure();
+  const { isOpen, open, setOpen, close } = useOverlayState();
   const queryClient = useQueryClient();
   const formRef = useRef<HTMLFormElement>(null);
   const [notes, setNotes] = useState('');
@@ -33,8 +32,8 @@ export function MarkDoneModal(props: Props) {
       queryKey: [useResourceMaintenancesServiceFindMaintenancesKey],
     });
     setNotes('');
-    onClose();
-  }, [queryClient, onClose]);
+    close();
+  }, [queryClient, close]);
 
   const { mutate: finishMaintenance, isPending, error } = useResourceMaintenancesServiceFinishMaintenance({
     onSuccess,
@@ -49,16 +48,16 @@ export function MarkDoneModal(props: Props) {
   }, [finishMaintenance, resourceId, maintenanceId, notes]);
 
   const onOpenChangeHandler = useCallback(
-    (open: boolean) => {
-      if (!open) setNotes('');
-      onOpenChange();
+    (isOpen: boolean) => {
+      if (!isOpen) setNotes('');
+      setOpen(isOpen);
     },
-    [onOpenChange]
+    [setOpen]
   );
 
   return (
     <>
-      {children(onOpen)}
+      {children(open)}
       <Modal isOpen={isOpen} onOpenChange={onOpenChangeHandler}>
         <ModalBackdrop />
         <ModalContainer>

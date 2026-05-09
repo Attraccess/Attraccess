@@ -1,10 +1,8 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { useDisclosure } from '../../../utils/heroui-compat';
+import { Button, Spinner, Link, useOverlayState } from '@heroui/react';
 import { useAuth } from '../../../hooks/useAuth';
 import { useToastMessage } from '../../../components/toastProvider';
 import { ArrowLeft, BookOpen, ListChecks, PenSquareIcon, ShapesIcon, Trash, WorkflowIcon } from 'lucide-react';
-import { Button } from '@heroui/react';
-import { Spinner, Link } from '@heroui/react';
 
 import { ResourceUsageSession } from '../usage/resourceUsageSession';
 import { ResourceUsageHistory } from '../usage/resourceUsageHistory';
@@ -42,7 +40,7 @@ function ResourceDetailsComponent() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const { isOpen, onOpen, onOpenChange } = useDisclosure();
+  const { isOpen, open, setOpen } = useOverlayState();
 
   const { hasPermission, user } = useAuth();
   const { success, error: showError } = useToastMessage();
@@ -185,7 +183,7 @@ function ResourceDetailsComponent() {
                 </ResourceEditModal>
 
                 <Button
-                  onPress={onOpen}
+                  onPress={open}
                   color="danger"
                   variant="light"
                   startContent={<Trash className="w-4 h-4" />}
@@ -257,8 +255,7 @@ function ResourceDetailsComponent() {
       {canManageResources && (
         <DeleteConfirmationModal
           isOpen={isOpen}
-          onOpenChange={onOpenChange}
-          onClose={() => onOpenChange()}
+          onClose={close}
           onConfirm={handleDelete}
           itemName={resource.name}
           data-cy="delete-confirmation-modal"

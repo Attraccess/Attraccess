@@ -1,5 +1,4 @@
-import { Alert, Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalHeader } from '@heroui/react';
-import { useDisclosure } from '../../../../utils/heroui-compat';
+import { Alert, Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalHeader, useOverlayState } from '@heroui/react';
 import { useCallback, useRef, useState } from 'react';
 import { ESPTools, ESPToolsErrorType } from '../../../../utils/esp-tools';
 import { PageHeader } from '../../../../components/pageHeader';
@@ -14,7 +13,7 @@ interface Props {
 }
 
 export function WebSerialConsole({ children }: Props) {
-  const { isOpen, onOpen, onOpenChange } = useDisclosure();
+  const { isOpen, open, setOpen } = useOverlayState();
 
   const { t } = useTranslations({
     de,
@@ -57,9 +56,9 @@ export function WebSerialConsole({ children }: Props) {
 
   return (
     <>
-      {children(onOpen)}
+      {children(open)}
 
-      <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
+      <Modal isOpen={isOpen} onOpenChange={setOpen}>
         <ModalBackdrop />
         <ModalContainer size="3xl">
           <ModalDialog>

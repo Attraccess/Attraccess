@@ -1,6 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { useDisclosure } from '../../../utils/heroui-compat';
-import { Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Spinner, Alert } from '@heroui/react';
+import { Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Spinner, Alert, useOverlayState } from '@heroui/react';
 import { useNavigate } from 'react-router-dom';
 import { useToastMessage } from '../../../components/toastProvider';
 import en from './translations/list/en.json';
@@ -62,7 +61,7 @@ export function MqttServerList() {
   const navigate = useNavigate();
   const { success, error: showError } = useToastMessage();
   const queryClient = useQueryClient();
-  const { isOpen, onOpen, onClose } = useDisclosure();
+  const { isOpen, open, close, setOpen } = useOverlayState();
   const [serverToDelete, setServerToDelete] = useState<number | null>(null);
 
   // Fetch MQTT servers
@@ -78,7 +77,7 @@ export function MqttServerList() {
       queryClient.invalidateQueries({
         queryKey: [useMqttServiceMqttServersGetAllKey],
       });
-      onClose();
+      close();
     },
     onError: (err) => {
       showError({
@@ -94,7 +93,7 @@ export function MqttServerList() {
 
   const handleDeleteServer = (serverId: number) => {
     setServerToDelete(serverId);
-    onOpen();
+    open();
   };
 
   const confirmDelete = async () => {
@@ -144,7 +143,7 @@ export function MqttServerList() {
         ))}
       </div>
 
-      <Modal isOpen={isOpen} onOpenChange={(open) => { if (!open) onClose(); }} data-cy="mqtt-server-list-delete-confirmation-modal">
+      <Modal isOpen={isOpen} onOpenChange={(o) => { if (!o) close(); }} data-cy="mqtt-server-list-delete-confirmation-modal">
         <ModalBackdrop />
         <ModalContainer>
           <ModalDialog>

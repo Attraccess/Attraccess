@@ -1,6 +1,5 @@
 import { memo, useCallback, useState, useEffect } from 'react';
-import { useDisclosure } from '../../../utils/heroui-compat';
-import { Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Spinner } from '@heroui/react';
+import { Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Spinner, useOverlayState } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { Edit, ExternalLink, Maximize, Minimize, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -17,7 +16,7 @@ interface DocumentationModalProps {
 }
 
 function DocumentationModalComponent({ resourceId, children }: Readonly<DocumentationModalProps>) {
-  const { isOpen, onOpen, onOpenChange } = useDisclosure();
+  const { isOpen, open, setOpen } = useOverlayState();
   const [isFullscreen, setIsFullscreen] = useState(false);
   const navigate = useNavigate();
 
@@ -134,11 +133,11 @@ function DocumentationModalComponent({ resourceId, children }: Readonly<Document
 
   return (
     <>
-      {children(onOpen)}
+      {children(open)}
 
       <Modal
         isOpen={isOpen}
-        onOpenChange={onOpenChange}
+        onOpenChange={setOpen}
         data-cy="documentation-modal"
       >
         <ModalBackdrop />

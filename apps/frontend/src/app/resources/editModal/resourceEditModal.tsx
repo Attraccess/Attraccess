@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useDisclosure } from '../../../utils/heroui-compat';
-import { Button, Form, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Tab, Tabs } from '@heroui/react';
+import { Button, Form, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Tab, Tabs, useOverlayState } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './resourceEditModal.en.json';
 import de from './resourceEditModal.de.json';
@@ -39,7 +38,7 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
     en,
     de,
   });
-  const { isOpen, onOpen, onOpenChange, onClose } = useDisclosure();
+  const { isOpen, open, setOpen, close } = useOverlayState();
 
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -78,7 +77,7 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
       }
 
       if (props.closeOnSuccess) {
-        onClose();
+        close();
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -195,10 +194,10 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
 
   return (
     <>
-      {props.children?.(onOpen)}
+      {props.children?.(open)}
       <Modal
         isOpen={isOpen}
-        onOpenChange={onOpenChange}
+        onOpenChange={setOpen}
         data-cy="resource-edit-modal"
       >
         <ModalBackdrop />

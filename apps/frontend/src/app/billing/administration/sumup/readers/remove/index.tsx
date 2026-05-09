@@ -1,5 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { useDisclosure } from '../../../../../../utils/heroui-compat';
+import { useOverlayState } from '@heroui/react';
 import de from './de.json';
 import en from './en.json';
 import {
@@ -36,11 +36,11 @@ export function SumUpReaderDeleteModal(props: Props) {
   const toast = useToastMessage();
   const queryClient = useQueryClient();
 
-  const { onOpen, onClose, isOpen } = useDisclosure();
+  const { open, close, isOpen } = useOverlayState();
   const { mutate: removeReader, isPending: isRemovingReader } = useBillingServiceRemoveSumUpReader({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [useBillingServiceGetSumUpReadersKey] });
-      onClose();
+      close();
     },
     onError: (error: Error) => {
       toast.apiError({
@@ -58,10 +58,10 @@ export function SumUpReaderDeleteModal(props: Props) {
 
   return (
     <>
-      {activator(onOpen)}
+      {activator(open)}
       <DeleteConfirmationModal
         isOpen={isOpen}
-        onClose={onClose}
+        onClose={close}
         onConfirm={onConfirm}
         isDeleting={isRemovingReader}
         itemName={readerName}
