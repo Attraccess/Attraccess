@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Button, Separator, TextField, Label, Input, InputGroup, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Spinner, Tooltip, TooltipContent, TooltipTrigger, useOverlayState } from '@heroui/react';
+import { Button, Chip, NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput, Separator, Switch, TextField, Label, Input, InputGroup, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Spinner, Tooltip, TooltipContent, TooltipTrigger, useOverlayState } from '@heroui/react';
 import { AlertTriangleIcon, ClipboardCopyIcon, KeyIcon, RefreshCwIcon, Trash2Icon } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -174,7 +174,7 @@ export function MetricsSettingsForm() {
 
   const togglesSection = metricsSettings?.toggles ? (
     <div className="flex flex-col gap-3">
-      <Divider />
+      <Separator />
       <SectionHeading title={t('toggles.title')} description={t('toggles.description')} />
       <div className="flex flex-col gap-2">
         {TOGGLE_ORDER.map((subsystem) => (
@@ -182,15 +182,15 @@ export function MetricsSettingsForm() {
             key={subsystem}
             data-testid={`metrics-toggle-${subsystem}`}
             isSelected={metricsSettings.toggles[subsystem]}
-            onValueChange={(value) => handleToggleChange(subsystem, value)}
+            onChange={(value) => handleToggleChange(subsystem, value)}
             isDisabled={isUpdatingToggles && pendingToggle !== null}
-            classNames={{ base: 'inline-flex flex-row-reverse items-start justify-between max-w-full w-full' }}
+            className="inline-flex flex-row-reverse items-start justify-between max-w-full w-full"
           >
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-2 text-sm font-medium">
                 {t(`toggles.${subsystem}.label`)}
                 {subsystem === 'db' && (
-                  <Chip size="sm" color="warning" variant="flat">
+                  <Chip size="sm" color="warning">
                     {t('toggles.highCostBadge')}
                   </Chip>
                 )}
@@ -205,22 +205,25 @@ export function MetricsSettingsForm() {
 
   const thresholdSection = metricsSettings ? (
     <div className="flex flex-col gap-3">
-      <Divider />
+      <Separator />
       <SectionHeading title={t('slowQueryThreshold.title')} description={t('slowQueryThreshold.description')} />
-      <NumberInput
-        label={t('slowQueryThreshold.label')}
+      <NumberField
         value={thresholdInput}
-        onValueChange={setThresholdInput}
+        onChange={setThresholdInput}
         minValue={0}
         step={0.1}
-        variant="bordered"
-        endContent={
+        aria-label={t('slowQueryThreshold.label')}
+      >
+        <Label>{t('slowQueryThreshold.label')}</Label>
+        <NumberFieldGroup>
+          <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
+          <NumberFieldInput />
+          <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
           <Button
+            variant="primary"
             size="sm"
-            color="primary"
-            variant="flat"
             onPress={handleSaveThreshold}
-            isLoading={isSavingThreshold}
+            isPending={isSavingThreshold}
             isDisabled={
               thresholdInput === undefined ||
               Number.isNaN(thresholdInput) ||
@@ -230,8 +233,8 @@ export function MetricsSettingsForm() {
           >
             {t('slowQueryThreshold.saveButton')}
           </Button>
-        }
-      />
+        </NumberFieldGroup>
+      </NumberField>
     </div>
   ) : null;
 
