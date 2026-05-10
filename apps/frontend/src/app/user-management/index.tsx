@@ -37,8 +37,6 @@ import {
   useUsersServiceFindMany,
 } from '@attraccess/react-query-client';
 import { EmptyState } from '../../components/emptyState';
-import { TableDataLoadingIndicator } from '../../components/tableComponents';
-import { useReactQueryStatusToHeroUiTableLoadingState } from '../../hooks/useReactQueryStatusToHeroUiTableLoadingState';
 
 import en from './en.json';
 import de from './de.json';
@@ -62,11 +60,8 @@ export const UserManagementPage: React.FC = () => {
 
   const {
     data: searchResult,
-    status: fetchStatus,
     isFetched: isFetchedSearchResult,
   } = useUsersServiceFindMany({ limit, page, search: debouncedSearch });
-
-  const fetchState = useReactQueryStatusToHeroUiTableLoadingState(fetchStatus);
 
   const totalPages = useMemo(() => {
     if (!searchResult?.total) {

@@ -37,7 +37,7 @@ export function UserManagementDetailsPage() {
 
   const navigate = useNavigate();
   const toast = useToastMessage();
-  const { isOpen, open, close, setOpen } = useOverlayState();
+  const { isOpen, open, setOpen } = useOverlayState();
   const { user: me } = useAuth();
 
   const id = parseInt(idParam || '', 10);

@@ -17,7 +17,7 @@ export function MqttServerSelect(
     >,
 ) {
   const { selectedId, onSelectionChange, placeholder, ...selectProps } = props;
-  const { data: servers, isLoading } = useMqttServiceMqttServersGetAll();
+  const { data: servers } = useMqttServiceMqttServersGetAll();
 
   return (
     <Select

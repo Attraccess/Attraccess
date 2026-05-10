@@ -1,5 +1,5 @@
 import { ReactNode, useCallback, useMemo, useState } from 'react';
-import { Button, ListBoxItem, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Select, Selection, useOverlayState } from "@heroui/react";
+import { Button, ListBoxItem, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Select, useOverlayState } from "@heroui/react";
 import { useQueryClient } from '@tanstack/react-query';
 import {
   UseProjectsServiceListProjectInvitationsKeyFn,
@@ -72,15 +72,6 @@ export function InviteProjectMemberModal(props: Readonly<InviteProjectMemberModa
 
   const roleOptions = useMemo(() => Object.values(ProjectMemberRole), []);
 
-  const onSelectionChange = useCallback(
-    (keys: Selection) => {
-      const value = Array.from(keys)[0] as ProjectMember['role'] | undefined;
-      if (value) {
-        setRole(value);
-      }
-    },
-    [setRole],
-  );
 
   const onInvite = useCallback(async () => {
     if (!selectedUser) {
@@ -126,7 +117,7 @@ export function InviteProjectMemberModal(props: Readonly<InviteProjectMemberModa
                     }
                   />
                   <label className="text-sm font-medium">{t('inputs.role')}</label>
-                  <Select>
+                  <Select selectedKey={role} onSelectionChange={(key) => { if (key) setRole(key as ProjectMember['role']); }}>
                     {roleOptions.map((value) => (
                       <ListBoxItem key={value} id={value}>{t(`roles.${value}`)}</ListBoxItem>
                     ))}

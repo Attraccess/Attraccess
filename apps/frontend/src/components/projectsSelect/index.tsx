@@ -20,7 +20,7 @@ export function ProjectsSelect(props: Props) {
   const { value, onValueChange, onChange, includeUnassignedOption, unassignedLabel, isDisabled, includeArchived, ...selectProps } = props;
   const handleChange = onValueChange ?? onChange ?? (() => undefined);
 
-  const { data: projects, isLoading } = useProjectsServiceFindManyProjects({
+  const { data: projects } = useProjectsServiceFindManyProjects({
     includeArchived,
   });
   const resolvedValue = value ?? undefined;

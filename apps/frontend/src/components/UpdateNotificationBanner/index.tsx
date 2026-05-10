@@ -53,7 +53,6 @@ export function UpdateNotificationBanner() {
   }, [updateStatus]);
 
   const onOpenReleaseNotes = useCallback(() => setIsReleaseNotesOpen(true), []);
-  const onCloseReleaseNotes = useCallback(() => setIsReleaseNotesOpen(false), []);
 
   if (!shouldRender || !updateStatus?.latestRelease || !updateStatus.latestVersion) {
     return null;

@@ -1,10 +1,8 @@
 import { useEmailTemplatesServiceEmailTemplateControllerFindAll } from '@attraccess/react-query-client';
 import { Table, TableHeader, TableColumn, TableBody, TableRow, TableCell, Button } from '@heroui/react';
-import { Edit3, Mail } from 'lucide-react'; // Mail for PageHeader icon
+import { Mail } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PageHeader } from '../../components/pageHeader'; // Assuming PageHeader exists
-import { Link } from 'react-router-dom'; // For edit button link
-import { TableDataLoadingIndicator } from '../../components/tableComponents';
 import { EmptyState } from '../../components/emptyState';
 
 import en from './en.json';
@@ -13,7 +11,7 @@ import { useMemo } from 'react';
 
 export function EmailTemplatesPage() {
   const { t } = useTranslations({ en, de });
-  const { data: emailTemplates, status: fetchStatus } = useEmailTemplatesServiceEmailTemplateControllerFindAll();
+  const { data: emailTemplates } = useEmailTemplatesServiceEmailTemplateControllerFindAll();
 
   const tableItems = useMemo(() => {
     return (emailTemplates ?? []).map((item) => ({

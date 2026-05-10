@@ -6,7 +6,7 @@ import { ChartNoAxesCombinedIcon, Settings2Icon } from 'lucide-react';
 import { SummaryCard } from './summary';
 import { BillingDashboardTopupCard } from './topup';
 import { useAuth } from '../../../hooks/useAuth';
-import { Button, Link } from '@heroui/react';
+import { Button } from '@heroui/react';
 import { useNavigate } from 'react-router-dom';
 
 export function BillingDashboardPage() {

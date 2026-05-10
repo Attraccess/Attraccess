@@ -1,5 +1,6 @@
 import { DateTimeDisplay, useNumberFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
+  Button,
   Card,
   CardContent,
   CardHeader,
@@ -30,7 +31,6 @@ import { CreditCardIcon, ReceiptTextIcon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { dbCurrencyToUserCurrency } from '@attraccess/shared';
 import { TransactionDetailsModal } from './transactionDetailsModal';
-import { SimplePagination } from '../../../../components/simplePagination';
 
 interface Props {
   transactionsPerPage?: number;
@@ -55,12 +55,10 @@ export function SummaryCard(props: Omit<CardProps, 'children'> & Props) {
     },
   );
 
-  const [transactionsPage, setTransactionsPage] = useState(1);
+  const [transactionsPage] = useState(1);
 
   const {
     data: transactions,
-    isLoading: isLoadingTransactions,
-    isFetched: isFetchedTransactions,
   } = useBillingServiceGetBillingTransactions(
     { userId: userId ?? 0, page: transactionsPage, limit: transactionsPerPage },
     undefined,
@@ -135,10 +133,6 @@ export function SummaryCard(props: Omit<CardProps, 'children'> & Props) {
     [t, transactions],
   );
 
-  const totalAmountOfTransactionsPages = useMemo(() => {
-    return Math.ceil((transactions?.total ?? 0) / transactionsPerPage);
-  }, [transactions?.total, transactionsPerPage]);
-
   const statusColor = useCallback((status: BillingTransaction['status']) => {
     switch (status) {
       case BillingTransactionStatus.PENDING:
@@ -156,11 +150,6 @@ export function SummaryCard(props: Omit<CardProps, 'children'> & Props) {
 
   const [openedTransactionId, setOpenedTransactionId] = useState<number | undefined>(undefined);
   const [isOpenDetails, setIsOpenDetails] = useState(false);
-
-  const openDetails = useCallback((transactionId: number) => {
-    setOpenedTransactionId(transactionId);
-    setIsOpenDetails(true);
-  }, []);
 
   if (!configuration) {
     return <Skeleton className="h-10 w-full" />;
@@ -221,7 +210,9 @@ export function SummaryCard(props: Omit<CardProps, 'children'> & Props) {
                   {formatNumber(dbCurrencyToUserCurrency(transaction.amount, configuration.minorUnit))}
                 </TableCell>
                 <TableCell>
-                  <ReceiptTextIcon />
+                  <Button isIconOnly variant="ghost" onPress={() => { setOpenedTransactionId(transaction.id); setIsOpenDetails(true); }}>
+                    <ReceiptTextIcon />
+                  </Button>
                 </TableCell>
               </TableRow>
             )}

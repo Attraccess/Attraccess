@@ -57,7 +57,7 @@ export function MqttServerList() {
   const navigate = useNavigate();
   const { success, error: showError } = useToastMessage();
   const queryClient = useQueryClient();
-  const { isOpen, open, close, setOpen } = useOverlayState();
+  const { isOpen, open, close: closeDeleteModal } = useOverlayState();
   const [serverToDelete, setServerToDelete] = useState<number | null>(null);
 
   // Fetch MQTT servers
@@ -73,7 +73,7 @@ export function MqttServerList() {
       queryClient.invalidateQueries({
         queryKey: [useMqttServiceMqttServersGetAllKey],
       });
-      close();
+      closeDeleteModal();
     },
     onError: (err) => {
       showError({
@@ -143,7 +143,7 @@ export function MqttServerList() {
         ))}
       </div>
 
-      <Modal isOpen={isOpen} onOpenChange={(o) => { if (!o) close(); }} data-cy="mqtt-server-list-delete-confirmation-modal">
+      <Modal isOpen={isOpen} onOpenChange={(o) => { if (!o) closeDeleteModal(); }} data-cy="mqtt-server-list-delete-confirmation-modal">
         <ModalBackdrop />
         <ModalContainer>
           <ModalDialog>

@@ -18,7 +18,6 @@ import { useTheme } from '@heroui/react';
 import { usePtrStore } from '../../../../stores/ptr.store';
 import Dagre from '@dagrejs/dagre';
 import { Button } from '@heroui/react';
-import { CheckIcon, LayoutGridIcon, LogsIcon, PlusIcon, SaveIcon, Download as DownloadIcon, Upload as UploadIcon } from 'lucide-react';
 import { nanoid } from 'nanoid';
 import { NodePickerModal } from './nodePickerModal';
 import { FlowProvider, useFlowContext } from './flowContext';
@@ -121,7 +120,6 @@ function FlowsPageInner() {
 
   const {
     mutate: saveFlow,
-    isSuccess: saveSucceeded,
     isError: saveFailed,
     isPending: isSaving,
   } = useResourceFlowsServiceSaveResourceFlow({

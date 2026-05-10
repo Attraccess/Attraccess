@@ -20,7 +20,6 @@ import {
   useBillingServiceGetSumUpConfiguration,
   useBillingServiceGetSumUpReaders,
 } from '@attraccess/react-query-client';
-import { TableDataLoadingIndicator } from '../../../../../components/tableComponents';
 import { EmptyState } from '../../../../../components/emptyState';
 import { SumUpReadersPairing } from './pairing';
 import { SumUpReaderDeleteModal } from './remove';
@@ -28,7 +27,7 @@ import { SumUpReaderDeleteModal } from './remove';
 export function SumUpReadersCard(props: Omit<CardProps, 'children'>) {
   const { t, language } = useTranslations({ en, de });
 
-  const { data: readers, isLoading: isLoadingReaders } = useBillingServiceGetSumUpReaders(undefined, {
+  const { data: readers } = useBillingServiceGetSumUpReaders(undefined, {
     refetchInterval: 5000,
   });
 

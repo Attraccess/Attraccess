@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardProps, Table, TableHeader, TableBody, TableRow, TableCell, TableColumn, Button, cn, Skeleton, NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput } from "@heroui/react";
-import { CreditCard, Edit2Icon } from 'lucide-react';
+import { CreditCard } from 'lucide-react';
 import {
   useBillingServiceGetBillingBalance,
   useBillingServiceGetBillingConfiguration,

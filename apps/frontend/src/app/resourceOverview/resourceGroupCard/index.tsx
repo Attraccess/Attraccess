@@ -18,14 +18,13 @@ import {
   TableHeader,
   TableRow,
 } from '@heroui/react';
-import { TableDataLoadingIndicator } from '../../../components/tableComponents';
 import { EmptyState } from '../../../components/emptyState';
 import { PageHeader } from '../../../components/pageHeader';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { filenameToUrl } from '../../../api';
 import { StatusChip } from './statusChip';
-import { ChevronRightIcon, Settings2Icon } from 'lucide-react';
+import { ChevronRightIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useAuth } from '../../../hooks/useAuth';
 import { useDebounce } from '../../../hooks/useDebounce';

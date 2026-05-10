@@ -15,7 +15,6 @@ import {
 } from '@heroui/react';
 import { QueryStatus } from '@tanstack/react-query';
 import { EmptyState } from '../../../components/emptyState';
-import { TableDataLoadingIndicator } from '../../../components/tableComponents';
 import { RotateCwIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import de from './de.json';

@@ -23,7 +23,6 @@ import {
   TableHeader,
   TableRow,
 } from '@heroui/react';
-import { TableDataLoadingIndicator } from '../../../components/tableComponents';
 import { EmptyState } from '../../../components/emptyState';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { GroupIcon, PlusIcon } from 'lucide-react';
@@ -32,7 +31,6 @@ import { PageHeader } from '../../../components/pageHeader';
 import en from './en.json';
 import de from './de.json';
 import { ResourceGroupUpsertModal } from '../../resource-groups/upsertModal/resourceGroupUpsertModal';
-import { SimplePagination } from '../../../components/simplePagination';
 
 interface ManageResourceGroupsProps {
   resourceId: number;
@@ -47,7 +45,7 @@ export function ManageResourceGroups({
 
   const { data: resource } = useResourcesServiceGetOneResourceById({ id: resourceId });
 
-  const { data: groups, status: fetchStatus, isFetched: isFetchedGroups } = useResourcesServiceResourceGroupsGetMany();
+  const { data: groups } = useResourcesServiceResourceGroupsGetMany();
 
   const { mutateAsync: addResourceToGroup } = useResourcesServiceResourceGroupsAddResource();
 
@@ -105,11 +103,8 @@ export function ManageResourceGroups({
       });
   }, [groups, resource, isAdded]);
 
-  const [page, setPage] = useState(1);
+  const [page] = useState(1);
   const perPage = 10;
-  const totalPages = useMemo(() => {
-    return Math.ceil((groupsWithResource?.length ?? 0) / perPage);
-  }, [groupsWithResource]);
 
   const currentPage = useMemo(() => {
     if (!groupsWithResource) {

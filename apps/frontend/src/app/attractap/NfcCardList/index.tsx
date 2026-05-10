@@ -10,7 +10,6 @@ import {
 } from '@attraccess/react-query-client';
 import { AttractapSelect } from '../AttractapSelect';
 import { useToastMessage } from '../../../components/toastProvider';
-import { TableDataLoadingIndicator } from '../../../components/tableComponents';
 import { EmptyState } from '../../../components/emptyState';
 
 import de from './de.json';
@@ -237,7 +236,6 @@ export function NfcCardList() {
   const {
     data: cards,
     error: cardsError,
-    status: fetchStatus,
   } = useAttractapServiceGetAllCards(undefined, {
     refetchInterval: 5000,
   });

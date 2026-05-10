@@ -68,11 +68,6 @@ export function UploadPluginModal({ isOpen, onClose }: UploadPluginModalProps) {
     }
   };
 
-  const handleCancel = () => {
-    resetForm();
-    onClose();
-  };
-
   return (
     <Modal isOpen={isOpen} onOpenChange={(open) => { if (!open) onClose(); }} data-cy="upload-plugin-modal">
       <ModalBackdrop />

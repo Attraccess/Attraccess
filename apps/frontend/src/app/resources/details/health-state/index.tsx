@@ -1,5 +1,5 @@
 import { Alert, AlertContent, AlertDescription, AlertTitle, Button } from '@heroui/react';
-import { AlertTriangleIcon, CheckCircleIcon } from 'lucide-react';
+import { CheckCircleIcon } from 'lucide-react';
 import {
   ResourceHealthStateDto,
   useResourceHealthServiceClearResourceHealthEntry,

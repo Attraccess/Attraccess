@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { Button } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -37,10 +37,7 @@ export function PasswordResetForm({ onGoBack }: PasswordResetFormProps) {
     },
   });
 
-  const memoizedArrowRight = useMemo(
-    () => <ArrowRight className="group-hover:translate-x-1 transition-transform" />,
-    [],
-  );
+  const arrowRight = <ArrowRight className="group-hover:translate-x-1 transition-transform" />;
 
   return (
     <>
@@ -69,7 +66,7 @@ export function PasswordResetForm({ onGoBack }: PasswordResetFormProps) {
         data-cy="password-reset-form-submit-button"
       >
         {t('mainButton')}
-      memoizedArrowRight</Button>
+      {arrowRight}</Button>
     </>
   );
 }
