@@ -137,14 +137,14 @@ describe('config-ui', () => {
 
     it('should define a prometheus service that depends_on config-ui', () => {
       const section = extractServiceBlock(content, 'prometheus');
-      expect(section).toMatch(/depends_on:[\s\S]*?-\s*config-ui/);
+      expect(section).toMatch(/depends_on:[\s\S]*?config-ui:/);
       expect(section).toContain('prometheus-config:/etc/prometheus:ro');
     });
 
     it('should define a grafana service mounting monitoring/grafana provisioning', () => {
       const section = extractServiceBlock(content, 'grafana');
-      expect(section).toContain('./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro');
-      expect(section).toContain('./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro');
+      expect(section).toContain('grafana-provisioning:/etc/grafana/provisioning:ro');
+      expect(section).toContain('grafana-dashboards:/var/lib/grafana/dashboards:ro');
     });
   });
 

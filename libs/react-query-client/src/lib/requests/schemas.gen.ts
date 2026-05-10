@@ -658,8 +658,8 @@ export const $SSOProviderOIDCConfiguration = {
             writeOnly: true
         },
         scopes: {
-            description: 'Optional list of OIDC scopes to request',
-            example: ['openid', 'email', 'profile'],
+            description: 'Optional list of OIDC scopes to request. The `openid` scope is added automatically and does not need to be listed here.',
+            example: ['email', 'profile'],
             type: 'array',
             items: {
                 type: 'string'

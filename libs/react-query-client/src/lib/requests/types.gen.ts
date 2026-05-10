@@ -407,7 +407,7 @@ export type SSOProviderOIDCConfiguration = {
      */
     clientSecret: string;
     /**
-     * Optional list of OIDC scopes to request
+     * Optional list of OIDC scopes to request. The `openid` scope is added automatically and does not need to be listed here.
      */
     scopes?: Array<(string)>;
     /**

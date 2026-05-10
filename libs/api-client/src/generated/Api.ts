@@ -583,8 +583,8 @@ export interface SSOProviderOIDCConfiguration {
    */
   clientSecret: string;
   /**
-   * Optional list of OIDC scopes to request
-   * @example ["openid","email","profile"]
+   * Optional list of OIDC scopes to request. The `openid` scope is added automatically and does not need to be listed here.
+   * @example ["email","profile"]
    */
   scopes?: string[];
   /**
