@@ -22,7 +22,7 @@ export function ResourceGroupEditPage() {
   } = useResourcesServiceResourceGroupsGetOne({ id: numericGroupId }, undefined, { enabled: !!groupId });
 
   if (isLoading) {
-    return <Spinner size="lg" />;
+    return <Spinner />;
   }
 
   if (error || !group) {

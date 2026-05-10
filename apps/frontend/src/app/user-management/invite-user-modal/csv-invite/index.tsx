@@ -329,7 +329,7 @@ export function CsvInvite({ onSuccess, onError }: Props) {
             <Badge color="danger" variant="soft">
               {t('errors.title')} ({rowErrors.length})
             </Badge>
-            <Button variant="ghost" size="sm" onPress={() => submit({ ignoreFailed: true })}>
+            <Button variant="ghost" onPress={() => submit({ ignoreFailed: true })}>
               {t('actions.inviteIgnore')}
             </Button>
           </div>

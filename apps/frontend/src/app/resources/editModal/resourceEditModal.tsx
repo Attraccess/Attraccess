@@ -201,7 +201,7 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
         data-cy="resource-edit-modal"
       >
         <ModalBackdrop />
-        <ModalContainer size="full">
+        <ModalContainer>
           <ModalDialog>
             {({ close }) => (
               <>
@@ -230,9 +230,9 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
 
                     <div className="flex flex-col gap-2 w-full">
                       <Tabs
-                        onSelectionChange={(key) => setField('type', key as UpdateResourceDto['type'])}
+
                         selectedKey={formData.type}
-                        destroyInactiveTabPanel={false}
+
                       >
                         <Tab key="machine" title={t('inputs.type.options.machine')}>
                           <MachineTab t={t} formData={formData} setField={setField} />

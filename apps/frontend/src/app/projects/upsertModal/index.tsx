@@ -1,4 +1,4 @@
-import { Button, Form, TextField, Label, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Textarea, useOverlayState } from '@heroui/react';
+import { Button, Form, TextField, Label, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, TextArea, useOverlayState } from '@heroui/react';
 import { PageHeader } from '../../../components/pageHeader';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
@@ -157,11 +157,11 @@ export function UpsertProjectModal(props: Props) {
                       <Label>{t('inputs.name.label')}</Label>
                       <Input name="name" />
                     </TextField>
-                    <Textarea
-                      label={t('inputs.description.label')}
+                    <TextArea
+                     
                       name="description"
                       value={description}
-                      onValueChange={setDescription}
+                      onChange={setDescription}
                     />
                     <ImageUpload
                       id="project-logo-image-upload"

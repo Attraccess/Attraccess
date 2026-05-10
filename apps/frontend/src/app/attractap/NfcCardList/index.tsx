@@ -106,7 +106,7 @@ const NfcCardTableCell = (props: NfcCardTableCellProps) => {
     return (
       <div className="flex gap-2 flex-row flex-wrap">
         <Button variant="danger-soft"
-          size="sm"
+
           onPress={() => props.onDeleteClick()}
           data-cy={`nfc-card-table-cell-delete-button-${props.card.id}`}
         ><Trash2Icon />
@@ -116,7 +116,7 @@ const NfcCardTableCell = (props: NfcCardTableCellProps) => {
           <NfcCardDeactivateModal cardId={props.card.id}>
             {(onOpen) => (
               <Button variant="tertiary"
-                size="sm"
+
                 onPress={onOpen}
                 data-cy={`nfc-card-table-cell-deactivate-button-${props.card.id}`}
               ><XIcon />
@@ -128,7 +128,7 @@ const NfcCardTableCell = (props: NfcCardTableCellProps) => {
           <NfcCardActivateModal cardId={props.card.id}>
             {(onOpen) => (
               <Button variant="tertiary"
-                size="sm"
+
                 onPress={onOpen}
                 data-cy={`nfc-card-table-cell-activate-button-${props.card.id}`}
               ><CheckIcon />

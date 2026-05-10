@@ -106,7 +106,7 @@ export const UserManagementPage: React.FC = () => {
           <>
             <InviteUserModal>
               {(onOpen) => (
-                <Button variant="ghost" onPress={onOpen} size="md"><UserPlusIcon className="w-4 h-4" />
+                <Button variant="ghost" onPress={onOpen}><UserPlusIcon className="w-4 h-4" />
                   {t('actions.inviteUser')}
                 </Button>
               )}
@@ -115,7 +115,7 @@ export const UserManagementPage: React.FC = () => {
               {(onOpenTwoFactorPolicy) => (
                 <Button variant="ghost"
                   onPress={onOpenTwoFactorPolicy}
-                  size="md"
+
                 ><ShieldCheckIcon className="w-4 h-4" />
                   {t('actions.twoFactorPolicy')}
                 </Button>
@@ -123,7 +123,7 @@ export const UserManagementPage: React.FC = () => {
             </TwoFactorPolicyModal>
             <AllowedSignupDomainsEditorModal>
               {(onOpen) => (
-                <Button variant="ghost" onPress={onOpen} size="md"><Settings2Icon className="w-4 h-4" />
+                <Button variant="ghost" onPress={onOpen}><Settings2Icon className="w-4 h-4" />
                   {t('actions.editAllowedSignupDomains')}
                 </Button>
               )}
@@ -131,7 +131,7 @@ export const UserManagementPage: React.FC = () => {
             {license?.modules.includes('sso') ? (
               <Button variant="ghost"
                 onPress={() => navigate('/sso/providers')}
-                size="md"
+
               ><KeyIcon className="w-4 h-4" />
                 {t('actions.sso')}
               </Button>
@@ -146,7 +146,7 @@ export const UserManagementPage: React.FC = () => {
             <Input placeholder={t('table.inputs.search')} />
           </TextField>
 
-          <Table aria-label={t('table.ariaLabel')} onRowAction={(key) => navigate(`/users/${key}`)}>
+          <Table aria-label={t('table.ariaLabel')}>
             <TableHeader>
               <TableColumn width="0" className="hidden md:table-cell">
                 {t('table.columns.isEmailVerified')}
@@ -239,9 +239,9 @@ export const UserManagementPage: React.FC = () => {
                           .map((permission) => (
                             <Tooltip key={permission.key} content={permission.label} showArrow placement="top">
                               <Chip
-                                size="sm"
+
                                 variant="soft"
-                                color="primary"
+                                color="accent"
                                 className="min-w-0 px-2"
                                 data-cy={`user-permission-chip-${permission.key}`}
                               >

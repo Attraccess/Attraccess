@@ -97,7 +97,7 @@ export function AcceptInvitation() {
           autoComplete="new-password"
           label={t('inputs.password.label')}
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          onChange={(setPassword)}
           required
           isRequired
         />
@@ -106,7 +106,7 @@ export function AcceptInvitation() {
           autoComplete="new-password"
           label={t('inputs.confirmPassword.label')}
           value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
+          onChange={(setConfirmPassword)}
           required
           isRequired
           validate={() => {

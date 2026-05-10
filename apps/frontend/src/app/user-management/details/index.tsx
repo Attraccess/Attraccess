@@ -19,7 +19,7 @@ import { ChangeEmailForm } from './components/changeEmail';
 
 import en from './en.json';
 import de from './de.json';
-import { Button, Card, CardContent, CardHeader, Chip, Divider, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, useOverlayState } from '@heroui/react';
+import { Button, Card, CardContent, CardHeader, Chip, Separator, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, useOverlayState } from '@heroui/react';
 import { useToastMessage } from '../../../components/toastProvider';
 import API_ERROR_TRANSLATIONS_EN from '../../../global-translations/api-errors.en.json';
 import API_ERROR_TRANSLATIONS_DE from '../../../global-translations/api-errors.de.json';
@@ -192,7 +192,7 @@ export function UserManagementDetailsPage() {
                 <PageHeader title={t('sso.title')} noMargin />
                 <Chip
                   color={ssoDetails.length > 0 ? 'primary' : 'default'}
-                  variant={ssoDetails.length > 0 ? 'flat' : 'bordered'}
+                  variant={ssoDetails.length > 0  ? 'secondary' : 'outline'}
                 >
                   {ssoDetails.length > 0 ? t('sso.linked', { count: ssoDetails.length }) : t('sso.notLinkedChip')}
                 </Chip>
@@ -227,7 +227,7 @@ export function UserManagementDetailsPage() {
                             <span className="text-xs uppercase tracking-wide text-default-500">{t('sso.userId')}</span>
                             <div className="font-mono text-xs text-default-800 break-all">{detail.ssoSubject ?? '-'}</div>
                           </div>
-                          {index < ssoDetails.length - 1 ? <Divider /> : null}
+                          {index < ssoDetails.length - 1 ? <Separator /> : null}
                         </div>
                       );
                     })}

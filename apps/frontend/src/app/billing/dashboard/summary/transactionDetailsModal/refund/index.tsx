@@ -94,7 +94,7 @@ export function RefundModal(props: Props) {
       {children && children(open)}
       <Modal isOpen={isOpen} onOpenChange={setOpen}>
         <ModalBackdrop />
-        <ModalContainer size="xs">
+        <ModalContainer>
           <ModalDialog>
             {() => (
               <>

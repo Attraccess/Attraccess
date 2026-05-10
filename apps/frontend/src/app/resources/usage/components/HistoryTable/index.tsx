@@ -56,7 +56,7 @@ const ProjectAssignmentCell = ({
     <div onClick={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()}>
       <ProjectsSelect
         value={projectId ?? undefined}
-        onValueChange={onChange}
+        onChange={onChange}
         placeholder={placeholder}
         includeUnassignedOption
         unassignedLabel={unassignedLabel}

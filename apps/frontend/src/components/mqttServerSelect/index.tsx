@@ -26,7 +26,6 @@ export function MqttServerSelect(
       selectedKey={selectedId?.toString() ?? ''}
       onSelectionChange={(key) => onSelectionChange(Number(key))}
       data-cy="mqtt-server-select"
-      isLoading={isLoading}
       {...selectProps}
     />
   );

@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Button, Spinner, Textarea } from '@heroui/react';
+import { Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Button, Spinner, TextArea } from '@heroui/react';
 import { FormFieldType, ResourceUsage, ResourceUsageAction } from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './translations/en';
@@ -54,7 +54,7 @@ export const UsageNotesModal = memo(
                       <ProjectsSelect
                         label={t('projectSelectLabel')}
                         value={resolveProjectId(session)}
-                        onValueChange={(projectId) => onProjectChange(session, projectId)}
+                        onChange={(projectId) => onProjectChange(session, projectId)}
                         placeholder={projectPlaceholder}
                         includeUnassignedOption
                         unassignedLabel={projectPlaceholder}
@@ -66,19 +66,19 @@ export const UsageNotesModal = memo(
                   </div>
                 )}
 
-                <Textarea
-                  labelPlacement="outside"
+                <TextArea
+                 
                   value={session.startNotes || t('noNotesProvided')}
-                  label={t('startNotes')}
-                  readOnly
+                 
+                  isReadOnly
                 />
 
                 {session.endTime && (
-                  <Textarea
-                    labelPlacement="outside"
+                  <TextArea
+                   
                     value={session.endNotes || t('noNotesProvided')}
-                    label={t('endNotes')}
-                    readOnly
+                   
+                    isReadOnly
                   />
                 )}
 
@@ -99,7 +99,7 @@ export const UsageNotesModal = memo(
               </div>
             ) : (
               <div className="flex justify-center py-4">
-                <Spinner size="md" color="primary" />
+                <Spinner color="accent" />
               </div>
             )}
           </ModalBody>

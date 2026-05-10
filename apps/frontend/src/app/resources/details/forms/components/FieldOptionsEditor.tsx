@@ -52,7 +52,7 @@ function renderOptionsByType(
           </TextField>
           <Switch
             isSelected={Boolean(textOptions.multiline)}
-            onValueChange={(value) => updateOptions({ multiline: value })}
+            onChange={(value) => updateOptions({ multiline: value })}
           >
             {t('fields.options.text.multiline')}
           </Switch>
@@ -113,18 +113,18 @@ function renderOptionsByType(
             <div key={index} className="flex gap-2 items-center">
               <TextField value={option} onChange={(v) => handleOptionChange(index, v)}>
                 <Input
-                  size="sm"
+
                   placeholder={t('fields.options.select.optionPlaceholder')}
                   ref={index === currentOptions.length - 1 ? (lastOptionInputRef as React.Ref<HTMLInputElement>) : undefined}
                 />
               </TextField>
-              <Button variant="danger-soft" isIconOnly size="sm" onPress={() => handleRemoveOption(index)}>
+              <Button variant="danger-soft" isIconOnly onPress={() => handleRemoveOption(index)}>
                 <X className="w-4 h-4" />
               </Button>
             </div>
           ))}
           <Button variant="secondary"
-            size="sm"
+
             onPress={handleAddOption}
             isDisabled={currentOptions.length >= 12}
           ><Plus className="w-4 h-4" />

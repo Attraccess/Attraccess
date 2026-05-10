@@ -81,11 +81,11 @@ export function TeamMembersCard(props: Readonly<TeamMembersCardProps>) {
       >
         <AttraccessUser user={member.user} />
         <div className="flex items-center gap-2">
-          <Chip size="sm" variant="soft">
+          <Chip variant="soft">
             {t(`roles.${member.role}` as const)}
           </Chip>
           <Button variant="danger-soft"
-            size="sm"
+
             isIconOnly
             aria-label={t('actions.remove')}
             isPending={removingMemberId === member.id}
@@ -113,7 +113,7 @@ export function TeamMembersCard(props: Readonly<TeamMembersCardProps>) {
       <CardContent className="space-y-4">
         <div className="flex items-center justify-between gap-4 rounded-medium border border-default-200 p-3">
           {data?.owner ? <AttraccessUser user={data.owner} /> : <Skeleton className="h-10 w-full" />}
-          <Chip size="sm" color="primary" variant="soft">
+          <Chip color="accent" variant="soft">
             {t('owner')}
           </Chip>
         </div>

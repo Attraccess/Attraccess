@@ -53,7 +53,7 @@ export function Toolbar({
               >
                 {({ onOpen }) => (
                   <Button
-                    size="sm"
+
                     variant="ghost"
                     isIconOnly
                     onPress={onOpen}
@@ -68,7 +68,7 @@ export function Toolbar({
 
         <ResourceScanner>
           {(onOpen: () => void) => (
-            <Button variant="ghost" radius="full" onPress={onOpen} isIconOnly />
+            <Button variant="ghost" onPress={onOpen} isIconOnly />
           )}
         </ResourceScanner>
       </div>
@@ -79,9 +79,9 @@ export function Toolbar({
             <ResourceEditModal onUpdated={(resource) => navigate(`/resources/${resource.id}`)} closeOnSuccess>
               {(onOpen: () => void) => (
                 <Button variant="primary"
-                  radius="full"
+
                   onPress={onOpen}
-                  size="sm"
+
                   data-cy="toolbar-open-create-resource-modal-button"
                 ><PlusIcon size={18} />
                   {t('addResource')}

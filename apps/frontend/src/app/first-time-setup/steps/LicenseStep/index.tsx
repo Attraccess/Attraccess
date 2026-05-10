@@ -91,7 +91,7 @@ export function LicenseStep({ onSuccess }: LicenseStepProps) {
           label={t('inputs.licenseKey.label')}
           description={t('inputs.licenseKey.description')}
           value={licenseKey}
-          onValueChange={setLicenseKey}
+          onChange={setLicenseKey}
           autoComplete="off"
           isRequired
         />

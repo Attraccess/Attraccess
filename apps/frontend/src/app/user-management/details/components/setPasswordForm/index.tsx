@@ -65,7 +65,7 @@ export const SetPasswordForm: React.FC<SetPasswordFormProps & Omit<HTMLAttribute
       <PasswordInput
         label={t('newPassword')}
         value={password}
-        onValueChange={setPassword}
+        onChange={setPassword}
         data-cy="set-password-form-new-password"
         errorMessage={t('errors.passwordTooShort')}
         isInvalid={passwordTooShort && passwordWasEntered}
@@ -75,7 +75,7 @@ export const SetPasswordForm: React.FC<SetPasswordFormProps & Omit<HTMLAttribute
       <PasswordInput
         label={t('confirmPassword')}
         value={confirmPassword}
-        onValueChange={setConfirmPassword}
+        onChange={setConfirmPassword}
         data-cy="set-password-form-confirm-password"
         errorMessage={t('errors.passwordsDoNotMatch')}
         isInvalid={passwordsDontMatch && passwordWasEntered}

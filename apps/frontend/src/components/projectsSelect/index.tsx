@@ -38,12 +38,11 @@ export function ProjectsSelect(props: Props) {
           onValueChange(undefined);
           return;
         }
-
         const parsed = Number(key);
         onValueChange(Number.isNaN(parsed) ? undefined : parsed);
       }}
       data-cy="projects-select"
-      isLoading={isLoading}
+
       aria-label={props.ariaLabel ?? 'Projects Select'}
     />
   );

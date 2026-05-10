@@ -25,24 +25,24 @@ export function MachineStartControls({
       <p className="text-gray-500 dark:text-gray-400">{t('machine.noActiveSession')}</p>
       <ProjectsSelect
         value={selectedProjectId}
-        onValueChange={onProjectChange}
+        onChange={onProjectChange}
         label={t('machine.project.label')}
         placeholder={t('machine.project.placeholder')}
       />
-      <ButtonGroup fullWidth color="primary">
+      <ButtonGroup fullWidth>
         <Button isPending={isStarting} onPress={onStart}><PlayIcon className="w-4 h-4" />
           {t('machine.startSession')}
         </Button>
-        <Dropdown placement="bottom-end">
+        <Dropdown>
           <DropdownTrigger>
             <Button isIconOnly>
               <ChevronDownIcon />
             </Button>
           </DropdownTrigger>
-          <DropdownMenu disallowEmptySelection aria-label={t('machine.alternativeStartSessionOptionsMenu.label')}>
+          <DropdownMenu aria-label={t('machine.alternativeStartSessionOptionsMenu.label')}>
             <DropdownItem
               key="startWithNotes" id="startWithNotes"
-              description={t('machine.alternativeStartSessionOptionsMenu.startWithNotes.description')}
+             
               onPress={onStartWithNotes}
             >
               {t('machine.alternativeStartSessionOptionsMenu.startWithNotes.label')}

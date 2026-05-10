@@ -194,7 +194,7 @@ export function AttractapList() {
                       <TableCell className="whitespace-nowrap">{formatDateTime(reader.lastConnection)}</TableCell>
                       <TableCell className="flex-row flex">
                         <Button variant="ghost"
-                          size="sm"
+
                           onPress={() => setOpenedReaderEditor(reader.id)}
                           data-cy={`attractap-list-edit-reader-button-${reader.id}`}
                         ><PencilIcon className="w-4 h-4" />
@@ -204,7 +204,7 @@ export function AttractapList() {
                         <AttractapDeleteModal readerId={reader.id}>
                           {(onOpen) => (
                             <Button variant="danger-soft"
-                              size="sm"
+
                               onPress={onOpen}
                               data-cy={`attractap-list-delete-reader-button-${reader.id}`}
                             ><Trash2Icon className="w-4 h-4" />

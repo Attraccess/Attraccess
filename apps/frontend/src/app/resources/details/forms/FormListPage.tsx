@@ -33,7 +33,7 @@ export function FormListPage() {
         subtitle={t('list.subtitle')}
         backTo={`/resources/${resourceId}`}
         actions={
-          <Button variant="primary" as={RouterLink} to={`/resources/${resourceId}/forms/new`}>
+          <Button variant="primary">
             {t('list.create')}
           </Button>
         }
@@ -41,7 +41,7 @@ export function FormListPage() {
 
       {isLoading && (
         <div className="flex justify-center py-10">
-          <Spinner size="lg" />
+          <Spinner />
         </div>
       )}
 
@@ -55,24 +55,24 @@ export function FormListPage() {
             <Card
               key={form.id}
 
-              onPress={() => navigate(`/resources/${resourceId}/forms/${form.id}`)}
+              onClick={() => navigate(`/resources/${resourceId}/forms/${form.id}`)}
               className="border border-default-200 dark:border-default-100"
             >
               <CardHeader className="flex flex-col items-start gap-2">
                 <p className="text-base font-semibold text-default-700">{form.name}</p>
                 <div className="flex flex-wrap gap-2">
                   {form.isRequiredOnResourceUsageStart && (
-                    <Chip size="sm" color="primary" variant="soft">
+                    <Chip color="accent" variant="soft">
                       {t('list.badges.start')}
                     </Chip>
                   )}
                   {form.isRequiredOnResourceUsageTakeOver && (
-                    <Chip size="sm" color="warning" variant="soft">
+                    <Chip color="warning" variant="soft">
                       {t('list.badges.takeover')}
                     </Chip>
                   )}
                   {form.isRequiredOnResourceUsageEnd && (
-                    <Chip size="sm" color="secondary" variant="soft">
+                    <Chip color="secondary" variant="soft">
                       {t('list.badges.end')}
                     </Chip>
                   )}

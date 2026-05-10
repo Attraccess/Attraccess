@@ -1,5 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Button, Card, CardHeader, TextField, Label, Input, Checkbox, Form, ListBoxItem, Select } from "@heroui/react";
+import { Button, Card, CardHeader, TextField, Label, Input, Checkbox, Form, ListBoxItem, Select, SelectTrigger, SelectValue, SelectIndicator, SelectPopover } from "@heroui/react";
 import { ArrowLeft } from 'lucide-react';
 import { PasswordInput } from '../../../components/PasswordInput';
 import { useNavigate } from 'react-router-dom';
@@ -121,52 +121,46 @@ export function CreateMqttServerForm(props?: Readonly<CreateMqttServerPageProps>
         id="useTls"
         name="useTls"
         isSelected={formValues.useTls}
-        onValueChange={(checked) => setFormValues((prev) => ({ ...prev, useTls: checked }))}
+        onChange={(checked) => setFormValues((prev) => ({ ...prev, useTls: checked }))}
         data-cy="create-mqtt-server-form-use-tls-checkbox"
       >
         {t('useTls')}
       </Checkbox>
 
       <Select
-        label={t('defaultPublishQosLabel')}
-        selectedKeys={new Set([String(formValues.defaultPublishQos ?? 0)])}
-        onSelectionChange={(keys) => {
-          if (keys === 'all') return;
-          const key = Array.from(keys)[0];
-          setFormValues((prev) => ({ ...prev, defaultPublishQos: Number(key) }));
-        }}
-        disallowEmptySelection
+        onSelectionChange={(key) => setFormValues((prev) => ({ ...prev, defaultPublishQos: Number(key) }))}
         data-cy="create-mqtt-server-form-default-publish-qos-input"
       >
-        {qosOptions.map((option) => (
-          <ListBoxItem key={String(option)} id={String(option)}>{t(`qosOption.${option}`)}</ListBoxItem>
-        ))}
+        <Label>{t('defaultPublishQosLabel')}</Label>
+        <SelectTrigger><SelectValue /><SelectIndicator /></SelectTrigger>
+        <SelectPopover>
+          {qosOptions.map((option) => (
+            <ListBoxItem key={String(option)} id={String(option)}>{t(`qosOption.${option}`)}</ListBoxItem>
+          ))}
+        </SelectPopover>
       </Select>
 
       <Checkbox
         id="defaultPublishRetain"
         name="defaultPublishRetain"
         isSelected={!!formValues.defaultPublishRetain}
-        onValueChange={(checked) => setFormValues((prev) => ({ ...prev, defaultPublishRetain: checked }))}
+        onChange={(checked) => setFormValues((prev) => ({ ...prev, defaultPublishRetain: checked }))}
         data-cy="create-mqtt-server-form-default-publish-retain-checkbox"
       >
         {t('defaultPublishRetainLabel')}
       </Checkbox>
 
       <Select
-        label={t('defaultSubscribeQosLabel')}
-        selectedKeys={new Set([String(formValues.defaultSubscribeQos ?? 0)])}
-        onSelectionChange={(keys) => {
-          if (keys === 'all') return;
-          const key = Array.from(keys)[0];
-          setFormValues((prev) => ({ ...prev, defaultSubscribeQos: Number(key) }));
-        }}
-        disallowEmptySelection
+        onSelectionChange={(key) => setFormValues((prev) => ({ ...prev, defaultSubscribeQos: Number(key) }))}
         data-cy="create-mqtt-server-form-default-subscribe-qos-input"
       >
-        {qosOptions.map((option) => (
-          <ListBoxItem key={String(option)} id={String(option)}>{t(`qosOption.${option}`)}</ListBoxItem>
-        ))}
+        <Label>{t('defaultSubscribeQosLabel')}</Label>
+        <SelectTrigger><SelectValue /><SelectIndicator /></SelectTrigger>
+        <SelectPopover>
+          {qosOptions.map((option) => (
+            <ListBoxItem key={String(option)} id={String(option)}>{t(`qosOption.${option}`)}</ListBoxItem>
+          ))}
+        </SelectPopover>
       </Select>
 
       <div className="flex justify-end space-x-3 mt-4">

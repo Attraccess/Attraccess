@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Card, CardHeader, CardContent, CardProps, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Textarea, Button, Form, useOverlayState } from '@heroui/react';
+import { Card, CardHeader, CardContent, CardProps, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, TextArea, Button, Form, useOverlayState } from '@heroui/react';
 import { HistoryIcon, ShieldCheckIcon } from 'lucide-react';
 import { ResourceIntroduction, User } from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -138,10 +138,10 @@ export function IntroductionsManagement(props: Readonly<IntroductionsManagementP
                         onCommentModalSubmit();
                       }}
                     >
-                      <Textarea
-                        label={t('commentModal.label')}
+                      <TextArea
+                       
                         value={comment}
-                        onChange={(e) => setComment(e.target.value)}
+                        onChange={(setComment)}
                       />
 
                       <button type="submit" hidden />

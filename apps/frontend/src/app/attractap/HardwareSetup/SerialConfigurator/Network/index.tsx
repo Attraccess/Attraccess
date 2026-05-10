@@ -55,10 +55,10 @@ export function AttractapSerialConfiguratorNetwork({ className }: { className?: 
         noMargin
         actions={
           <div className="flex items-center gap-2">
-            <Button size="sm" onPress={handleRefresh} isPending={isFetchingConfiguration}>
+            <Button onPress={handleRefresh} isPending={isFetchingConfiguration}>
               {t('actions.refreshStatus')}
             </Button>
-            <Button size="sm" onPress={handleRefresh} isPending={isFetchingConfiguration}>
+            <Button onPress={handleRefresh} isPending={isFetchingConfiguration}>
               {t('actions.refreshWifi')}
             </Button>
             {isFetchingConfiguration && (
@@ -117,9 +117,9 @@ export function AttractapSerialConfiguratorNetwork({ className }: { className?: 
         defaultItems={networkSelectItems}
         label={t('ssidSelect.label')}
         defaultSelectedKey={selectedWifiSSID ?? undefined}
-        onSelectionChange={(ssid) => setSelectedWifiSSID((ssid as string) ?? null)}
+
         onInputChange={(value) => setSelectedWifiSSID(value)}
-        isLoading={isFetchingConfiguration}
+
         inputValue={selectedWifiSSID ?? ''}
       >
         {(item) => <ListBoxItem key={item.key} id={item.key}>{item.label}</ListBoxItem>}
@@ -127,7 +127,7 @@ export function AttractapSerialConfiguratorNetwork({ className }: { className?: 
       <PasswordInput
         label={t('password.label')}
         value={wifiPassword ?? ''}
-        onChange={(e) => setWifiPassword(e.target.value)}
+        onChange={(setWifiPassword)}
         autoComplete="off"
       />
       <Button variant="primary"

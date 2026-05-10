@@ -145,7 +145,7 @@ export function AttractapSerialConfiguratorApi({
               </ProgressCircleTrack>
             </ProgressCircle>
           ) : (
-            <Button size="sm" onPress={handleRefresh}>
+            <Button onPress={handleRefresh}>
               {t('actions.refreshStatus')}
             </Button>
           )

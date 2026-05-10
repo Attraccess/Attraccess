@@ -7,7 +7,7 @@ export function DoorTab(props: EditorTabProps) {
     <div className="flex flex-col gap-2">
       <Switch
         isSelected={formData.separateUnlockAndUnlatch}
-        onValueChange={(value) => setField('separateUnlockAndUnlatch', value)}
+        onChange={(value) => setField('separateUnlockAndUnlatch', value)}
         data-cy="resource-edit-modal-separate-unlock-and-unlatch-switch"
       >
         <div className="flex flex-col">

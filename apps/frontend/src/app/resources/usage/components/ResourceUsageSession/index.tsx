@@ -77,7 +77,7 @@ export function ResourceUsageSession({
     if (isLoading) {
       return (
         <div className="flex justify-center py-4">
-          <Spinner size="md" color="primary" />
+          <Spinner color="accent" />
         </div>
       );
     }

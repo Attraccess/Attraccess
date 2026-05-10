@@ -132,7 +132,7 @@ export function SmtpSettingsForm({ variant, endpoint, onNext }: SmtpSettingsForm
   if (showLoading) {
     return (
       <div className="flex items-center gap-2 text-sm text-default-500">
-        <Spinner size="sm" />
+        <Spinner />
         {t('loading')}
       </div>
     );
@@ -183,7 +183,7 @@ export function SmtpSettingsForm({ variant, endpoint, onNext }: SmtpSettingsForm
       </TextField>
       <Switch
         isSelected={smtpSecure}
-        onValueChange={setSmtpSecure}
+        onChange={setSmtpSecure}
         isDisabled={smtpService !== SmtpServiceType.SMTP}
       >
         {t('inputs.secure.label')}
@@ -197,7 +197,7 @@ export function SmtpSettingsForm({ variant, endpoint, onNext }: SmtpSettingsForm
         label={t('inputs.pass.label')}
         description={t('inputs.pass.description')}
         value={smtpPass}
-        onValueChange={setSmtpPass}
+        onChange={setSmtpPass}
         autoComplete="off"
       />
       <TextField isRequired value={smtpFrom} onChange={setSmtpFrom}>

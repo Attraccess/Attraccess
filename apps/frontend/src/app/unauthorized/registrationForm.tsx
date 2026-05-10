@@ -155,7 +155,7 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
           })}
           validationMessages={usernameValidationMessages}
           value={username}
-          onValueChange={setUsername}
+          onChange={setUsername}
           required
 
           data-cy="registration-form-username-input"
@@ -182,7 +182,7 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
             return true;
           }}
           value={password ?? ''}
-          onValueChange={setPassword}
+          onChange={setPassword}
         />
 
         <PasswordInput
@@ -200,7 +200,7 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
             return true;
           }}
           value={passwordConfirmation ?? ''}
-          onValueChange={setPasswordConfirmation}
+          onChange={setPasswordConfirmation}
         />
 
         <Button variant="primary"

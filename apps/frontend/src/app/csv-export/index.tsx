@@ -63,7 +63,7 @@ export function CsvExport() {
             <RangeCalendar
               onChange={(value) => setDateRange(value)}
               id="date-range"
-              showMonthAndYearPickers
+
               aria-label={t('rangeCalendar.label')}
               data-cy="csv-export-range-calendar"
             />
@@ -99,7 +99,7 @@ export function CsvExport() {
         data-cy="csv-export-modal"
       >
         <ModalBackdrop />
-        <ModalContainer size="full">
+        <ModalContainer>
           <ModalDialog>
             {() => (
               <>

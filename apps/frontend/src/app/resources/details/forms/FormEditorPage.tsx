@@ -19,7 +19,7 @@ import {
   Card,
   CardContent,
   CardHeader,
-  Divider,
+  Separator,
   TextField,
   Label,
   Input,
@@ -215,7 +215,7 @@ export function FormEditorPage() {
   if (!isCreateMode && isLoadingForm) {
     return (
       <div className="flex justify-center py-10">
-        <Spinner size="lg" />
+        <Spinner />
       </div>
     );
   }
@@ -252,25 +252,25 @@ export function FormEditorPage() {
             <div className="grid gap-2">
               <Switch
                 isSelected={form.isRequiredOnResourceUsageStart}
-                onValueChange={(value) => setForm((prev) => ({ ...prev, isRequiredOnResourceUsageStart: value }))}
+                onChange={(value) => setForm((prev) => ({ ...prev, isRequiredOnResourceUsageStart: value }))}
               >
                 {t('editor.resourceUsageStart')}
               </Switch>
               <Switch
                 isSelected={form.isRequiredOnResourceUsageTakeOver}
-                onValueChange={(value) => setForm((prev) => ({ ...prev, isRequiredOnResourceUsageTakeOver: value }))}
+                onChange={(value) => setForm((prev) => ({ ...prev, isRequiredOnResourceUsageTakeOver: value }))}
               >
                 {t('editor.resourceUsageTakeover')}
               </Switch>
               <Switch
                 isSelected={form.isRequiredOnResourceUsageEnd}
-                onValueChange={(value) => setForm((prev) => ({ ...prev, isRequiredOnResourceUsageEnd: value }))}
+                onChange={(value) => setForm((prev) => ({ ...prev, isRequiredOnResourceUsageEnd: value }))}
               >
                 {t('editor.resourceUsageEnd')}
               </Switch>
             </div>
 
-            <Divider />
+            <Separator />
 
             {form.fields.length === 0 && (
               <div className="rounded-lg border border-dashed border-default-200 p-6 text-center">
@@ -280,10 +280,10 @@ export function FormEditorPage() {
             )}
 
             <Accordion
-              selectionMode="single"
+
               variant="outline"
-              onSelectionChange={setExpandedFieldKey}
-              selectedKeys={expandedFieldKey}
+
+
             >
               {form.fields.map((field, index) => {
                 const key = `field-${field.id ?? field._id}`;
@@ -316,7 +316,7 @@ export function FormEditorPage() {
 
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-default-700">{t('editor.fieldsTitle')}</h2>
-              <Button variant="secondary" size="sm" onPress={addField}>
+              <Button variant="secondary" onPress={addField}>
                 {t('editor.addField')}
               </Button>
             </div>

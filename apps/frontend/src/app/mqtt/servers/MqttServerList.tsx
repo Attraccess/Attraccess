@@ -34,14 +34,14 @@ function ServerListItem({ id, name, host, port, onEdit, onDelete, t }: ServerLis
       </div>
       <div className="space-x-2">
         <Button variant="secondary"
-          size="sm"
+
           onPress={() => onEdit(id)}
           data-cy={`mqtt-server-list-item-edit-button-${id}`}
         >
           {t('editServer')}
         </Button>
         <Button variant="danger-soft"
-          size="sm"
+
           onPress={() => onDelete(id)}
           data-cy={`mqtt-server-list-item-delete-button-${id}`}
         >
@@ -101,7 +101,7 @@ export function MqttServerList() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-4">
-        <Spinner size="lg" color="primary" data-cy="mqtt-server-list-loading-spinner" />
+        <Spinner color="accent" data-cy="mqtt-server-list-loading-spinner" />
       </div>
     );
   }

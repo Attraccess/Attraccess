@@ -37,7 +37,7 @@ import { UnauthorizedLayout } from '../unauthorized/unauthorized-layout/layout';
 const coreRoutes: RouteConfig[] = [
   {
     path: '/',
-    element: <Navigate to="/resources" replace />,
+    element: <Navigate replace />,
     authRequired: true,
   },
   {
@@ -141,7 +141,7 @@ const coreRoutes: RouteConfig[] = [
   },
   {
     path: '/attractap',
-    element: <Navigate to="/attractap/nfc-cards" replace />,
+    element: <Navigate replace />,
     authRequired: true,
   },
   {

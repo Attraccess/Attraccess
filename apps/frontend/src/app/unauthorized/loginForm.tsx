@@ -48,7 +48,7 @@ export function LoginForm(props: LoginFormProps) {
   return (
     <>
       <LoginFormHeader {...props} isLocalSignupEnabled={isLocalSignupEnabled?.value ?? false} t={t} />
-      <Accordion variant="splitted" className="w-full">
+      <Accordion variant="default" className="w-full">
         <AccordionItem title={t('accordion.title')} indicator={<LogInIcon />} className="bg-default-100">
           <LoginFormContent {...props} t={t} tExists={tExists} />
         </AccordionItem>

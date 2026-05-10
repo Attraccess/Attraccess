@@ -143,7 +143,7 @@ export function AllowedSignupDomainsEditorModal(props: Props) {
                     <TableCell className="w-full">{domain.value}</TableCell>
                     <TableCell className="flex-row flex">
                       <Button variant="danger-soft"
-                        size="sm"
+
                         onPress={() => onRemoveDomain(domain.value)}
                       ><Trash2Icon className="w-4 h-4" />
                         {t('table.actions.removeDomain')}

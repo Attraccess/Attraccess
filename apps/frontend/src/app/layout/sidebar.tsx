@@ -12,7 +12,7 @@ import {
   Accordion,
   AccordionItem,
   LinkProps,
-  Divider,
+  Separator,
 } from '@heroui/react';
 import { useAllRoutes } from '../routes';
 import { SystemPermissions } from '@attraccess/react-query-client';
@@ -35,8 +35,8 @@ function NavLink(
       {...props}
       target={(props.target ?? props.isExternal) ? '_blank' : undefined}
       className="flex items-center px-2 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700"
-      color="foreground"
-      underline="none"
+      
+     
     >
       <span className="mr-3">{props.icon}</span>
       <span className="flex-1">{props.label}</span>
@@ -175,7 +175,7 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
           </Button>
         </div>
 
-        <Divider />
+        <Separator />
 
         {/* Sidebar Navigation */}
         <div className="flex-grow overflow-y-auto py-4">
@@ -189,7 +189,7 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
                 data-cy={`sidebar-nav-${item.path?.replace('/', '')}`}
               />
             ))}
-            <Accordion defaultSelectedKeys={['##default##']}>
+            <Accordion>
               {otherGroups.map((group) => (
                 <AccordionItem
                   key={group.translationKey} id={group.translationKey}
@@ -228,7 +228,7 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
                       icon={<item.icon size={16} />}
                       label={t('endItems.groups.' + group.translationKey + '.items.' + item.translationKey)}
                       isExternal={item.isExternal}
-                      size="sm"
+
                     />
                   ))}
                 </AccordionItem>
@@ -241,7 +241,7 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
                 icon={<item.icon size={16} />}
                 label={t('endItems.' + item.translationKey)}
                 data-cy={`sidebar-nav-${item.path?.replace('/', '')}`}
-                size="sm"
+
                 isExternal={item.isExternal}
 
               />
@@ -249,7 +249,7 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
           </nav>
         </div>
 
-        <Divider />
+        <Separator />
 
         {/* User section at bottom */}
         <div className="p-4">
@@ -259,7 +259,7 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
                 <User className="h-4 w-4 mr-2" />
                 <span>{user.username}</span>
               </div>
-              <Dropdown data-cy="sidebar-settings-dropdown" placement="top-end">
+              <Dropdown data-cy="sidebar-settings-dropdown">
                 <DropdownTrigger>
                   <Button variant="ghost" aria-label="Settings" isIconOnly data-cy="sidebar-settings-button">
                     <Settings className="h-5 w-5" />

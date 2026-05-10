@@ -143,7 +143,7 @@ export function ResourceMetadataEditor({ t, value, onChange }: ResourceMetadataE
           <p className="text-xs text-default-500">{t('inputs.metadata.description')}</p>
         </div>
         <Button variant="secondary"
-          size="sm"
+
           className="w-full sm:w-auto whitespace-nowrap"
           onPress={handleAddEntry}
         ><Plus className="w-4 h-4" />
@@ -177,7 +177,7 @@ export function ResourceMetadataEditor({ t, value, onChange }: ResourceMetadataE
                 <Input placeholder={t('inputs.metadata.value.placeholder')} />
               </TextField>
               <Button variant="danger-soft"
-                size="sm"
+
                 className="w-full sm:w-auto"
                 onPress={() => handleRemoveEntry(entry.id)}
               ><Trash2 className="w-4 h-4" />

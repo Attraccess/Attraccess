@@ -128,7 +128,7 @@ export function ProjectDetailsPage() {
             <span className="flex items-center gap-2">
               {project.name}
               {project.archivedAt && (
-                <Chip size="sm" variant="soft" color="warning"><ArchiveIcon className="size-3" />
+                <Chip variant="soft" color="warning"><ArchiveIcon className="size-3" />
                   {t('archivedBadge')}
                 </Chip>
               )}
@@ -150,7 +150,7 @@ export function ProjectDetailsPage() {
           project?.access.isOwner && (
             <>
               <Button variant="ghost"
-                as={Link}
+
                 href={`/projects/${projectId}/team`}
               ><UsersIcon className="size-4" />
                 {t('actions.members.label')}
