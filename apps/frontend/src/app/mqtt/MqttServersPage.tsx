@@ -17,7 +17,7 @@ export function MqttServersPage() {
 
   // Redirect if user doesn't have permission
   if (!canManageMqtt) {
-    return <Navigate />;
+    return <Navigate to="/" />;
   }
 
   const handleAddNewServer = () => {

@@ -72,7 +72,7 @@ export function FormListPage() {
                     </Chip>
                   )}
                   {form.isRequiredOnResourceUsageEnd && (
-                    <Chip color="secondary" variant="soft">
+                    <Chip color="default" variant="soft">
                       {t('list.badges.end')}
                     </Chip>
                   )}

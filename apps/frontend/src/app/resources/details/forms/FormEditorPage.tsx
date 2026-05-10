@@ -15,6 +15,10 @@ import {
 import {
   Accordion,
   AccordionItem,
+  AccordionHeading,
+  AccordionTrigger,
+  AccordionPanel,
+  AccordionBody,
   Button,
   Card,
   CardContent,
@@ -279,36 +283,32 @@ export function FormEditorPage() {
               </div>
             )}
 
-            <Accordion
-
-              variant="outline"
-
-
-            >
+            <Accordion>
               {form.fields.map((field, index) => {
                 const key = `field-${field.id ?? field._id}`;
                 const typeLabel = t(`fields.types.${field.type}`);
 
                 return (
-                  <AccordionItem
-                    key={key} id={key}
-                    aria-label={`${t('fields.label')} #${index + 1}`}
-                    title={
-                      <div className="flex flex-col text-start">
-                        <span className="text-sm font-semibold text-default-700">
-                          <i className="font-thin">#{index + 1}</i> {field.name || t('fields.placeholder.label')}
-                        </span>
-                        <span className="text-xs text-default-400">{typeLabel}</span>
-                      </div>
-                    }
-                  >
-                    <FormFieldEditor
-                      field={field}
-                      onChange={(value) => updateField(index, value)}
-                      onRemove={() => removeField(index)}
-                      t={t}
-                      labelInputRef={index === form.fields.length - 1 ? lastLabelInputRef : undefined}
-                    />
+                  <AccordionItem key={key} id={key} aria-label={`${t('fields.label')} #${index + 1}`}>
+                    <AccordionHeading>
+                      <AccordionTrigger>
+                        <div className="flex flex-col text-start">
+                          <span className="text-sm font-semibold text-default-700">
+                            <i className="font-thin">#{index + 1}</i> {field.name || t('fields.placeholder.label')}
+                          </span>
+                          <span className="text-xs text-default-400">{typeLabel}</span>
+                        </div>
+                      </AccordionTrigger>
+                    </AccordionHeading>
+                    <AccordionPanel><AccordionBody>
+                      <FormFieldEditor
+                        field={field}
+                        onChange={(value) => updateField(index, value)}
+                        onRemove={() => removeField(index)}
+                        t={t}
+                        labelInputRef={index === form.fields.length - 1 ? lastLabelInputRef : undefined}
+                      />
+                    </AccordionBody></AccordionPanel>
                   </AccordionItem>
                 );
               })}
@@ -346,7 +346,6 @@ export function FormEditorPage() {
 
       <DeleteConfirmationModal
         isOpen={deleteModalOpen}
-        onOpenChange={setDeleteModalOpen}
         onClose={() => setDeleteModalOpen(false)}
         onConfirm={handleDelete}
         itemName={formResponse?.name ?? ''}

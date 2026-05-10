@@ -180,15 +180,11 @@ export function EditMqttServerPage() {
               </div>
 
               <div>
+                <label className="text-sm font-medium">{t('defaultPublishQosLabel')}</label>
                 <Select
-                  label={t('defaultPublishQosLabel')}
-
-                  onSelectionChange={(keys) => {
-                    if (keys === 'all') return;
-                    const key = Array.from(keys)[0];
+                  onSelectionChange={(key) => {
                     setFormValues((prev) => ({ ...prev, defaultPublishQos: Number(key) }));
                   }}
-                 
                   data-cy="edit-mqtt-server-form-default-publish-qos-input"
                 >
                   {qosOptions.map((option) => (
@@ -210,15 +206,11 @@ export function EditMqttServerPage() {
               </div>
 
               <div>
+                <label className="text-sm font-medium">{t('defaultSubscribeQosLabel')}</label>
                 <Select
-                  label={t('defaultSubscribeQosLabel')}
-
-                  onSelectionChange={(keys) => {
-                    if (keys === 'all') return;
-                    const key = Array.from(keys)[0];
+                  onSelectionChange={(key) => {
                     setFormValues((prev) => ({ ...prev, defaultSubscribeQos: Number(key) }));
                   }}
-                 
                   data-cy="edit-mqtt-server-form-default-subscribe-qos-input"
                 >
                   {qosOptions.map((option) => (

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button, Drawer, DrawerBody, DrawerContent, DrawerFooter, DrawerHeader } from '@heroui/react';
+import { Button, Drawer, DrawerBackdrop, DrawerBody, DrawerContent, DrawerFooter, DrawerHeader } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { HeartHandshake, Share2 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
@@ -95,12 +95,9 @@ export function DonationPrompt() {
     <Drawer
       isOpen={isVisible}
       onOpenChange={(open) => setIsVisible(open)}
-      placement="bottom"
-
-      backdrop="blur"
-      isDismissable={false}
     >
-      <DrawerContent className="w-full max-w-[680px]" style={{ margin: '0 auto' }}>
+      <DrawerBackdrop isDismissable={false} />
+      <DrawerContent placement="bottom" className="w-full max-w-[680px] mx-auto">
         <DrawerHeader className="flex flex-col gap-1">
           <div className="text-base font-semibold">{t('title')}</div>
           <div className="text-sm text-default-500">{t('subtitle')}</div>

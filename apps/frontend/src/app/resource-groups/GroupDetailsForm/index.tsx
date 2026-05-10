@@ -137,11 +137,9 @@ export function GroupDetailsForm(props: Readonly<GroupDetailsFormProps & Omit<Ca
           </TextField>
 
           <TextArea
-           
             placeholder={t('form.fields.description.placeholder')}
             value={description}
-            onChange={setDescription}
-            minRows={3}
+            onChange={(e) => setDescription(e.target.value)}
           />
 
           <Button variant="primary"

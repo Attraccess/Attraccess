@@ -6,6 +6,7 @@ import { ManualTransactionsCard } from './manualTransactions';
 import { useState } from 'react';
 import { User } from '@attraccess/react-query-client';
 import { Button, Card, CardContent, CardHeader, Link } from '@heroui/react';
+import { useNavigate } from 'react-router-dom';
 import { SummaryCard } from '../dashboard/summary';
 import { SumUpIcon } from '../../../components/icons/sumup.icon';
 import { BanknoteIcon } from 'lucide-react';
@@ -13,6 +14,7 @@ import { ManageBillingFactorCard } from './billingFactor';
 
 export function BillingAdministrationPage() {
   const { t } = useTranslations({ en, de });
+  const navigate = useNavigate();
 
   const [user, setUser] = useState<User | null>(null);
 
@@ -22,7 +24,7 @@ export function BillingAdministrationPage() {
         title={t('title')}
         icon={<BanknoteIcon />}
         actions={
-          <Button variant="ghost" href="/billing/administration/sumup"><SumUpIcon />
+          <Button variant="ghost" onPress={() => navigate('/billing/administration/sumup')}><SumUpIcon />
             {t('actions.sumupSettings')}
           </Button>
         }

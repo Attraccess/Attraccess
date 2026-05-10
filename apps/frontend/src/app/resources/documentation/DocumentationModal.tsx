@@ -126,7 +126,7 @@ function DocumentationModalComponent({ resourceId, children }: Readonly<Document
     return <p className="text-center text-default-400 p-4">{t('noDocumentation')}</p>;
   }, [isLoading, isFetching, isError, error, resource, refetch, t]);
 
-  const modalSize = isFullscreen ? 'full' : '5xl';
+  const modalSize = isFullscreen ? 'full' : 'lg';
 
   return (
     <>

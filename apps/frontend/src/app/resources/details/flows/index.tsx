@@ -379,7 +379,7 @@ function FlowsPageInner() {
               isPending={isSaving}
               onPress={save}
               isDisabled={!flowHasChanged}
-              color={saveFailed ? 'danger' : flowHasChanged ? 'primary' : 'default'}
+              variant={saveFailed ? 'danger-soft' : flowHasChanged ? 'primary' : 'ghost'}
             />
             <Button isIconOnly onPress={handleImportClick} aria-label={t('actions.import')} />
             <Button

@@ -156,7 +156,7 @@ export function AttractapHardwareSetup(props: Props) {
         onOpenChange={setOpen}
       >
         <ModalBackdrop />
-        <ModalContainer size={state === 'configure' ? '5xl' : undefined}>
+        <ModalContainer size={state === 'configure' ? 'lg' : undefined}>
           <ModalDialog>
             {() => (
               <>

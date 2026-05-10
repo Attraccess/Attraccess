@@ -125,12 +125,8 @@ export function InviteProjectMemberModal(props: Readonly<InviteProjectMemberModa
                       selectedUser ? <span className="text-tiny text-default-500">{selectedUser.username}</span> : null
                     }
                   />
-                  <Select
-                    label={t('inputs.role')}
-
-
-                   
-                  >
+                  <label className="text-sm font-medium">{t('inputs.role')}</label>
+                  <Select>
                     {roleOptions.map((value) => (
                       <ListBoxItem key={value} id={value}>{t(`roles.${value}`)}</ListBoxItem>
                     ))}

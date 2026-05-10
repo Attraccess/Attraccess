@@ -161,7 +161,7 @@ export function UpsertProjectModal(props: Props) {
                      
                       name="description"
                       value={description}
-                      onChange={setDescription}
+                      onChange={(e) => setDescription(e.target.value)}
                     />
                     <ImageUpload
                       id="project-logo-image-upload"

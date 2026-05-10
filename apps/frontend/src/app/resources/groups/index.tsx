@@ -173,12 +173,10 @@ export function ManageResourceGroups({
                 <TableCell className="w-full">{group.name}</TableCell>
                 <TableCell className="text-right flex items-center gap-2">
                   <Checkbox
-
                     onChange={() => {
                       handleGroupClick(group);
                     }}
                     aria-label={group.name}
-                    color={isAdded(group) ? 'danger' : 'primary'}
                     isSelected={isAdded(group)}
                   />
                   <Link href={`/resource-groups/${group.id}`}>

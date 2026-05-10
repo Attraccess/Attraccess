@@ -19,7 +19,9 @@ import historyTableDe from './components/HistoryTable/utils/translations/de.json
 
 type ResourceUsageHistoryProps = {
   resourceId: number;
-} & React.ComponentProps<typeof Card>;
+  className?: string;
+  [key: string]: unknown;
+};
 
 // Main component
 export function ResourceUsageHistory({ resourceId, ...rest }: ResourceUsageHistoryProps) {

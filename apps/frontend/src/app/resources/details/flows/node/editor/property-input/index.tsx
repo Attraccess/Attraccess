@@ -90,11 +90,10 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
           <div className="flex-grow min-w-0">
             <MqttServerSelect
               selectedId={value as number}
-
+              onSelectionChange={(id) => onChange(id as TValue)}
               label={!hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined}
               ariaLabel={t('nodes.' + nodeType + '.config.' + name + '.label')}
               isRequired={isRequired}
-              description={description}
               className="w-full"
             />
           </div>
@@ -140,32 +139,30 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
     case 'string':
       if (schema.enum) {
         return (
-          <Autocomplete
-            isRequired={isRequired}
-            defaultSelectedKey={String(value ?? schema.default ?? '')}
-            onSelectionChange={(newValue) => onChange(newValue as TValue)}
-            label={!hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined}
-            description={description}
-          >
-            {schema.enum.map((enumValue) => (
-              <ListBoxItem key={enumValue} id={enumValue}>
-                {t('nodes.' + nodeType + '.config.' + name + '.enum.' + enumValue)}
-              </ListBoxItem>
-            ))}
-          </Autocomplete>
+          <div className="flex flex-col gap-1">
+            {!hideLabel && <label className="text-sm font-medium">{t('nodes.' + nodeType + '.config.' + name + '.label')}</label>}
+            <Autocomplete
+              defaultSelectedKey={String(value ?? schema.default ?? '')}
+              onSelectionChange={(newValue) => onChange(newValue as TValue)}
+            >
+              {schema.enum.map((enumValue) => (
+                <ListBoxItem key={enumValue} id={enumValue}>
+                  {t('nodes.' + nodeType + '.config.' + name + '.enum.' + enumValue)}
+                </ListBoxItem>
+              ))}
+            </Autocomplete>
+          </div>
         );
       }
 
       if (schema.stringVariant === 'multiline') {
         return (
           <TextArea
-            isRequired={isRequired}
-           
+            required={isRequired}
             placeholder={hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined}
             value={value ? String(value) : undefined}
             defaultValue={schema.default ? String(schema.default) : undefined}
-            onChange={(newValue) => onChange(newValue as TValue)}
-            description={description}
+            onChange={(e) => onChange(e.target.value as TValue)}
           />
         );
       }
@@ -189,25 +186,22 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
           value !== undefined ? String(value) : schema.default !== undefined ? String(schema.default) : undefined;
 
         return (
-          <Autocomplete
-            isRequired={isRequired}
-            defaultSelectedKey={selectedKey}
-            onSelectionChange={(newValue) => {
-              if (newValue === null) {
-                return;
-              }
-              const parsedValue = typeof newValue === 'number' ? newValue : Number(newValue);
-              setValue(parsedValue as TValue);
-            }}
-            label={!hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined}
-            description={description}
-          >
-            {enumValues.map((enumValue) => (
-              <ListBoxItem key={String(enumValue)} id={String(enumValue)}>
-                {t('nodes.' + nodeType + '.config.' + name + '.enum.' + enumValue)}
-              </ListBoxItem>
-            ))}
-          </Autocomplete>
+          <div className="flex flex-col gap-1">
+            {!hideLabel && <label className="text-sm font-medium">{t('nodes.' + nodeType + '.config.' + name + '.label')}</label>}
+            <Autocomplete
+              defaultSelectedKey={selectedKey}
+              onSelectionChange={(newValue) => {
+                if (newValue === null) return;
+                setValue((typeof newValue === 'number' ? newValue : Number(newValue)) as TValue);
+              }}
+            >
+              {enumValues.map((enumValue) => (
+                <ListBoxItem key={String(enumValue)} id={String(enumValue)}>
+                  {t('nodes.' + nodeType + '.config.' + name + '.enum.' + enumValue)}
+                </ListBoxItem>
+              ))}
+            </Autocomplete>
+          </div>
         );
       }
 

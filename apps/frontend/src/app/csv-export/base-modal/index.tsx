@@ -124,14 +124,8 @@ export function BaseCsvExportModal<TData extends Row>(props: Props<TData>) {
         <label className="text-sm font-medium">{t('inputs.columns.label')}</label>
         <ListboxWrapper>
           <ListBox
-            classNames={{
-              list: 'max-h-[200px] overflow-scroll',
-            }}
-
             items={columns}
-            label={t('inputs.columns.label')}
-
-            variant="soft"
+            variant="default"
             onSelectionChange={(keys) => {
               setSelectedColumnKeys(Array.from(keys as Set<string>));
             }}

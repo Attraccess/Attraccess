@@ -16,6 +16,8 @@ import {
   TableHeader,
   TableRow,
   Tooltip,
+  TooltipContent,
+  TooltipTrigger,
 } from '@heroui/react';
 import {
   Users,
@@ -198,10 +200,13 @@ export const UserManagementPage: React.FC = () => {
                     <TableCell className="hidden md:table-cell">{user.externalIdentifier}</TableCell>
                     <TableCell className="text-center">
                       {isSsoLinked ? (
-                        <Tooltip content={t('table.ssoLinked', { providers: ssoProviderNames || '-' })} showArrow placement="top">
-                          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary-100 text-primary-700">
-                            <KeyIcon className="w-3.5 h-3.5" />
-                          </span>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary-100 text-primary-700">
+                              <KeyIcon className="w-3.5 h-3.5" />
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent showArrow>{t('table.ssoLinked', { providers: ssoProviderNames || '-' })}</TooltipContent>
                         </Tooltip>
                       ) : (
                         <span className="text-default-300">-</span>
@@ -237,16 +242,18 @@ export const UserManagementPage: React.FC = () => {
                         ]
                           .filter((permission) => permission.enabled)
                           .map((permission) => (
-                            <Tooltip key={permission.key} content={permission.label} showArrow placement="top">
-                              <Chip
-
-                                variant="soft"
-                                color="accent"
-                                className="min-w-0 px-2"
-                                data-cy={`user-permission-chip-${permission.key}`}
-                              >
-                                {permission.icon}
-                              </Chip>
+                            <Tooltip key={permission.key}>
+                              <TooltipTrigger>
+                                <Chip
+                                  variant="soft"
+                                  color="accent"
+                                  className="min-w-0 px-2"
+                                  data-cy={`user-permission-chip-${permission.key}`}
+                                >
+                                  {permission.icon}
+                                </Chip>
+                              </TooltipTrigger>
+                              <TooltipContent showArrow>{permission.label}</TooltipContent>
                             </Tooltip>
                           ))}
                         {![

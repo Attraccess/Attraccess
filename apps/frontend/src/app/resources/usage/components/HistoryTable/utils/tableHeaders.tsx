@@ -1,18 +1,15 @@
 import { type ReactElement } from 'react';
-import { TableColumn, type TableColumnProps, type TableHeaderProps } from '@heroui/react';
+import { TableColumn, type TableColumnProps } from '@heroui/react';
 import { TFunction } from '@attraccess/plugins-frontend-ui';
 import { Resource } from '@attraccess/react-query-client';
 
-/**
- * Generates table header columns based on user permissions
- */
 export function generateHeaderColumns(
   t: TFunction,
   resource: Resource,
   showAllUsers: boolean,
   canManageResources: boolean,
-): TableHeaderProps<unknown>['children'] {
-  const headers: ReactElement<TableColumnProps<unknown>>[] = [];
+): ReactElement<TableColumnProps>[] {
+  const headers: ReactElement<TableColumnProps>[] = [];
 
   // Only show user column if we're showing all users (requires canManageResources)
   if (canManageResources && showAllUsers) {

@@ -261,9 +261,8 @@ function renderTextInput(
       <TextArea
         value={(value as string) ?? ''}
         placeholder={options.placeholder ?? ''}
-        onChange={onChange}
-        isInvalid={Boolean(error)}
-        errorMessage={error ?? undefined}
+        onChange={(e) => onChange(e.target.value)}
+        aria-invalid={Boolean(error)}
       />
     );
   }
@@ -309,8 +308,8 @@ function renderBooleanInput(
         <Switch
           isSelected={isChecked}
           onChange={(checked) => onChange(checked)}
-          color={error ? 'danger' : 'primary'}
           aria-label={t('modal.booleanLabel')}
+          className={error ? 'text-danger' : undefined}
         />
         <span className="text-xs text-default-500">{t('modal.booleanYes')}</span>
       </div>
@@ -338,12 +337,8 @@ function renderSelectInput(
 
   return (
     <Select
-
-
       placeholder={options.length ? t('modal.selectPlaceholder') : t('modal.selectUnavailable')}
       isDisabled={!options.length}
-      isInvalid={Boolean(error)}
-      errorMessage={error ?? undefined}
       aria-label={fieldName}
     >
       {options.map((option) => (

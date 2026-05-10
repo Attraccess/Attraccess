@@ -141,7 +141,7 @@ export function IntroductionsManagement(props: Readonly<IntroductionsManagementP
                       <TextArea
                        
                         value={comment}
-                        onChange={(setComment)}
+                        onChange={(e) => setComment(e.target.value)}
                       />
 
                       <button type="submit" hidden />

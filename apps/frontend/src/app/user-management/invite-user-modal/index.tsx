@@ -1,4 +1,4 @@
-import { Button, Form, TextField, Label, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalHeader, Tab, Tabs, useOverlayState } from '@heroui/react';
+import { Button, Form, TextField, Label, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalHeader, Tab, TabList, TabPanel, Tabs, useOverlayState } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
@@ -111,7 +111,7 @@ export function InviteUserModal(props: Props) {
       {children(open)}
       <Modal isOpen={isOpen} onOpenChange={(o) => { if (!o) close(); }}>
         <ModalBackdrop />
-        <ModalContainer size={tab === 'single' ? 'sm' : '3xl'}>
+        <ModalContainer size={tab === 'single' ? 'sm' : 'lg'}>
           <ModalDialog>
             {() => (<>
           <ModalHeader>
@@ -120,7 +120,11 @@ export function InviteUserModal(props: Props) {
 
           <ModalBody>
             <Tabs selectedKey={tab}>
-              <Tab key="single" title={t('tabs.single')}>
+              <TabList>
+                <Tab id="single">{t('tabs.single')}</Tab>
+                <Tab id="csv">{t('tabs.csv')}</Tab>
+              </TabList>
+              <TabPanel id="single">
                 <Form
                   ref={formRef}
                   onSubmit={(e) => {
@@ -133,7 +137,6 @@ export function InviteUserModal(props: Props) {
                     label={t('inputs.username.label')}
                     name="username"
                     isRequired
-                    required
                     value={username}
                     onChange={setUsername}
                     validationMessages={usernameValidationMessages}
@@ -153,9 +156,8 @@ export function InviteUserModal(props: Props) {
                     </Button>
                   </div>
                 </Form>
-              </Tab>
-
-              <Tab key="csv" title={t('tabs.csv')}>
+              </TabPanel>
+              <TabPanel id="csv">
                 <CsvInvite
                   onSuccess={close}
                   onError={(error) =>
@@ -167,7 +169,7 @@ export function InviteUserModal(props: Props) {
                     })
                   }
                 />
-              </Tab>
+              </TabPanel>
             </Tabs>
           </ModalBody>
             </>)}

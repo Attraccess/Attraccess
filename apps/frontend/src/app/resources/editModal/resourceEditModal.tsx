@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Button, Form, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Tab, Tabs, useOverlayState } from '@heroui/react';
+import { Button, Form, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Tab, TabList, TabPanel, Tabs, useOverlayState } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './resourceEditModal.en.json';
 import de from './resourceEditModal.de.json';
@@ -229,17 +229,17 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
                     </div>
 
                     <div className="flex flex-col gap-2 w-full">
-                      <Tabs
-
-                        selectedKey={formData.type}
-
-                      >
-                        <Tab key="machine" title={t('inputs.type.options.machine')}>
+                      <Tabs selectedKey={formData.type}>
+                        <TabList>
+                          <Tab id="machine">{t('inputs.type.options.machine')}</Tab>
+                          <Tab id="door">{t('inputs.type.options.door')}</Tab>
+                        </TabList>
+                        <TabPanel id="machine">
                           <MachineTab t={t} formData={formData} setField={setField} />
-                        </Tab>
-                        <Tab key="door" title={t('inputs.type.options.door')}>
+                        </TabPanel>
+                        <TabPanel id="door">
                           <DoorTab t={t} formData={formData} setField={setField} />
-                        </Tab>
+                        </TabPanel>
                       </Tabs>
                     </div>
 

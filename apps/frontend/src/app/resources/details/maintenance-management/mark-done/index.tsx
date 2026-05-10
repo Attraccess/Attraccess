@@ -76,11 +76,9 @@ export function MarkDoneModal(props: Props) {
                     }}
                   >
                     <TextArea
-                     
                       placeholder={t('actions.markDone.modal.notesPlaceholder')}
-                      description={t('actions.markDone.modal.notesOptional')}
                       value={notes}
-                      onChange={setNotes}
+                      onChange={(e) => setNotes(e.target.value)}
                     />
                     {error ? (
                       <Alert status="danger">

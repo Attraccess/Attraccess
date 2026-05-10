@@ -42,9 +42,8 @@ export function IntroducerManagement(props: Readonly<IntroducerManagementProps &
           actions={[
             {
               key: 'revoke',
-              color: 'danger',
               isIconOnly: true,
-              isLoading: isRevoking,
+              isPending: isRevoking,
               startContent: <Trash2Icon className="w-4 h-4" />,
               onClick: (userToRevoke) => {
                 onRevokeIntroducer(userToRevoke);

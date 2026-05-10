@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Button, Separator, TextField, Label, Input, InputGroup, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Spinner, Tooltip, useOverlayState } from '@heroui/react';
+import { Button, Separator, TextField, Label, Input, InputGroup, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Spinner, Tooltip, TooltipContent, TooltipTrigger, useOverlayState } from '@heroui/react';
 import { AlertTriangleIcon, ClipboardCopyIcon, KeyIcon, RefreshCwIcon, Trash2Icon } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -240,15 +240,17 @@ export function MetricsSettingsForm() {
       <Label>{t('endpointLabel')}</Label>
       <InputGroup>
         <Input className="font-mono text-sm" />
-        <Tooltip content={t('copyButton')}>
-          <Button variant="ghost"
-            isIconOnly
-
-            onPress={handleCopyEndpoint}
-            aria-label={t('copyButton')}
-          >
-            <ClipboardCopyIcon size={16} />
-          </Button>
+        <Tooltip>
+          <TooltipTrigger>
+            <Button variant="ghost"
+              isIconOnly
+              onPress={handleCopyEndpoint}
+              aria-label={t('copyButton')}
+            >
+              <ClipboardCopyIcon size={16} />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{t('copyButton')}</TooltipContent>
         </Tooltip>
       </InputGroup>
     </TextField>
@@ -280,15 +282,17 @@ export function MetricsSettingsForm() {
           <Label>{t('apiKeyLabel')}</Label>
           <InputGroup>
             <Input className="font-mono text-sm" />
-            <Tooltip content={t('copyButton')}>
-              <Button variant="ghost"
-                isIconOnly
-
-                onPress={handleCopyKey}
-                aria-label={t('copyButton')}
-              >
-                <ClipboardCopyIcon size={16} />
-              </Button>
+            <Tooltip>
+              <TooltipTrigger>
+                <Button variant="ghost"
+                  isIconOnly
+                  onPress={handleCopyKey}
+                  aria-label={t('copyButton')}
+                >
+                  <ClipboardCopyIcon size={16} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{t('copyButton')}</TooltipContent>
             </Tooltip>
           </InputGroup>
         </TextField>

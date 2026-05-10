@@ -30,5 +30,5 @@ export function ResourceGroupIntroductionHistoryModal(props: Readonly<Props>) {
     }
   }, [isOpen, refetch]);
 
-  return <IntroductionHistoryModal isOpen={isOpen} onClose={onClose} history={history ?? []} />;
+  return <IntroductionHistoryModal isOpen={isOpen} onClose={onClose} history={history ?? []} isLoading={isLoading} />;
 }

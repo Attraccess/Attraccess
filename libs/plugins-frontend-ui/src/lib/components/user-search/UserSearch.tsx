@@ -1,7 +1,7 @@
-// User search autocomplete component using HeroUI v3 Autocomplete compound
+// User search component with debounced text input and user selection display
 // FEATURE: User search with async loading and selection display
-import { HTMLAttributes, useCallback, useEffect, useMemo, useState } from 'react';
-import { Autocomplete, AutocompleteTrigger, AutocompleteValue, AutocompleteClearButton, AutocompleteIndicator, AutocompletePopover, Label, ListBoxItem } from '@heroui/react';
+import { HTMLAttributes, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Input, Label, TextField } from '@heroui/react';
 import { useTranslations } from '../../i18n';
 import { AttraccessUser } from '../attraccess-user/AttraccessUser';
 import { User, useUsersServiceFindMany, useUsersServiceGetOneUserById } from '@attraccess/react-query-client';
@@ -20,17 +20,19 @@ interface UserSearchProps {
 }
 
 export function UserSearch(props: Readonly<UserSearchProps>) {
-  const { label, placeholder, onSelectionChange, autocompleteProps, afterAutocomplete, wrapperProps, afterSelection } =
-    props;
+  const { label, placeholder, onSelectionChange, afterAutocomplete, wrapperProps, afterSelection } = props;
 
   const { t } = useTranslations({ en, de });
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const datalistId = useRef(`user-search-datalist-${Math.random().toString(36).slice(2)}`);
+
   const handleClearSelection = useCallback(() => {
     setSelectedKey(null);
     setSearchTerm('');
   }, []);
+
   const selectedUserId = useMemo(() => (selectedKey ? Number(selectedKey) : null), [selectedKey]);
 
   const searchUsers = useUsersServiceFindMany({ search: searchTerm, limit: 10, page: 1 });
@@ -51,32 +53,35 @@ export function UserSearch(props: Readonly<UserSearchProps>) {
     onSelectionChange(users.find((user) => user.id === selectedUserId) ?? null);
   }, [selectedUserId, onSelectionChange, users]);
 
+  const handleInputChange = useCallback(
+    (value: string) => {
+      setSearchTerm(value);
+      const matched = users.find((u) => u.username === value);
+      if (matched) {
+        setSelectedKey(String(matched.id));
+      } else {
+        setSelectedKey(null);
+      }
+    },
+    [users],
+  );
+
   return (
     <div {...wrapperProps}>
       <div className="flex gap-2 items-center">
-        <Autocomplete<User>
-          items={users}
-          selectedKey={selectedKey}
-
-          inputValue={searchTerm}
-          onInputChange={setSearchTerm}
-          size={autocompleteProps?.size}
-        >
+        <TextField value={selectedUser ? selectedUser.username : searchTerm} onChange={handleInputChange} className="flex-1">
           <Label>{label ?? t('label')}</Label>
-          <AutocompleteTrigger>
-            <AutocompleteValue placeholder={placeholder ?? t('placeholder')} />
-            <AutocompleteClearButton onClick={handleClearSelection} />
-            <AutocompleteIndicator />
-          </AutocompleteTrigger>
-          <AutocompletePopover>
+          <Input
+            list={datalistId.current}
+            placeholder={placeholder ?? t('placeholder')}
+            onBlur={() => { if (!selectedUser && searchTerm) handleClearSelection(); }}
+          />
+          <datalist id={datalistId.current}>
             {users.map((user) => (
-              <ListBoxItem key={String(user.id)} id={String(user.id)} textValue={user.username}>
-                <AttraccessUser user={user} />
-              </ListBoxItem>
+              <option key={user.id} value={user.username} />
             ))}
-          </AutocompletePopover>
-        </Autocomplete>
-
+          </datalist>
+        </TextField>
         {afterAutocomplete}
       </div>
 
