@@ -1240,9 +1240,50 @@ export interface FirstTimeSetupStatusDto {
   stepsCompleted: FirstTimeSetupStepsDto;
 }
 
+export interface MetricsTogglesDto {
+  /** Whether HTTP request timing metrics are enabled */
+  http: boolean;
+  /** Whether WebSocket message timing metrics are enabled */
+  ws: boolean;
+  /** Whether cron job timing metrics are enabled */
+  cron: boolean;
+  /** Whether database query timing metrics are enabled (high cardinality) */
+  db: boolean;
+  /** Whether external call timing metrics are enabled */
+  external: boolean;
+  /** Whether Server-Sent Events metrics are enabled */
+  sse: boolean;
+  /** Whether resource flow execution metrics are enabled */
+  flow: boolean;
+}
+
 export interface MetricsSettingsDto {
   /** Whether a metrics API key is configured */
   apiKeyConfigured: boolean;
+  /** Per-subsystem metrics timing toggles */
+  toggles: MetricsTogglesDto;
+}
+
+export interface UpdateMetricsTogglesDto {
+  /** Whether HTTP request timing metrics are enabled */
+  http?: boolean;
+  /** Whether WebSocket message timing metrics are enabled */
+  ws?: boolean;
+  /** Whether cron job timing metrics are enabled */
+  cron?: boolean;
+  /** Whether database query timing metrics are enabled (high cardinality) */
+  db?: boolean;
+  /** Whether external call timing metrics are enabled */
+  external?: boolean;
+  /** Whether Server-Sent Events metrics are enabled */
+  sse?: boolean;
+  /** Whether resource flow execution metrics are enabled */
+  flow?: boolean;
+}
+
+export interface UpdateMetricsSettingsDto {
+  /** Per-subsystem metrics toggles update */
+  toggles?: UpdateMetricsTogglesDto;
 }
 
 export interface GenerateMetricsApiKeyResponseDto {
@@ -4013,6 +4054,8 @@ export type ApplyFirstTimeSetupSettingsData = SystemSettingsDto;
 
 export type GetMetricsSettingsData = MetricsSettingsDto;
 
+export type UpdateMetricsSettingsData = MetricsSettingsDto;
+
 export type GenerateMetricsApiKeyData = GenerateMetricsApiKeyResponseDto;
 
 export type DeleteMetricsApiKeyData = MetricsSettingsDto;
@@ -6151,6 +6194,22 @@ export namespace Settings {
     export type RequestBody = never;
     export type RequestHeaders = {};
     export type ResponseBody = GetMetricsSettingsData;
+  }
+
+  /**
+   * No description
+   * @tags Settings
+   * @name UpdateMetricsSettings
+   * @summary Update metrics settings
+   * @request PATCH:/api/settings/metrics
+   * @secure
+   */
+  export namespace UpdateMetricsSettings {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = UpdateMetricsSettingsDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = UpdateMetricsSettingsData;
   }
 
   /**
@@ -10248,6 +10307,29 @@ export class Api<
         path: `/api/settings/metrics`,
         method: "GET",
         secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Settings
+     * @name UpdateMetricsSettings
+     * @summary Update metrics settings
+     * @request PATCH:/api/settings/metrics
+     * @secure
+     */
+    updateMetricsSettings: (
+      data: UpdateMetricsSettingsDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<UpdateMetricsSettingsData, void>({
+        path: `/api/settings/metrics`,
+        method: "PATCH",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
         format: "json",
         ...params,
       }),

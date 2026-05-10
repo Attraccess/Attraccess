@@ -14,6 +14,8 @@ import { SumupTransactionCallbackDto, SumupTransactionEventType } from './dto/su
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { LiveNotificationsService } from './liveNotificationsService';
 import { BillingService } from './billing.service';
+import { CronTimer } from '../metrics/instrumentation/cron/cron.helper';
+import { ExternalCallTimer } from '../metrics/instrumentation/external/external.helper';
 
 export const SUMUP_TOPUP_TRANSACTION_PREFIX = 'sumup_topup_transaction';
 
@@ -31,13 +33,17 @@ export class SumUpService {
     private readonly billingTransactionRepository: Repository<BillingTransaction>,
     private readonly liveNotificationsService: LiveNotificationsService,
     private readonly billingService: BillingService,
+    private readonly cronTimer: CronTimer,
+    private readonly externalCallTimer: ExternalCallTimer,
   ) {}
 
   async setApiKey(token: string): Promise<void> {
     const sumUp = new SumUp({ apiKey: token });
     let merchantCode: string;
     try {
-      const me = await sumUp.get<{ merchant_code: string }>({ path: '/v0.1/me' });
+      const me = await this.externalCallTimer.time('sumup', 'me', () =>
+        sumUp.get<{ merchant_code: string }>({ path: '/v0.1/me' }),
+      );
       merchantCode = me.merchant_code;
     } catch (error) {
       this.logger.error('Invalid API key', { error });
@@ -98,13 +104,17 @@ export class SumUpService {
   async getMerchant(): Promise<SumUpMerchantDto> {
     const sumUp = await this.getSumUp();
     const merchantCode = await this.getMerchantCode();
-    return await sumUp.merchants.get(merchantCode) as unknown as SumUpMerchantDto;
+    return (await this.externalCallTimer.time('sumup', 'merchant', () =>
+      sumUp.merchants.get(merchantCode),
+    )) as unknown as SumUpMerchantDto;
   }
 
   async getReaders(): Promise<SumUpReaderDto[]> {
     const sumUp = await this.getSumUp();
     const merchantCode = await this.getMerchantCode();
-    const response = await sumUp.readers.list(merchantCode);
+    const response = await this.externalCallTimer.time('sumup', 'readers_list', () =>
+      sumUp.readers.list(merchantCode),
+    );
     return response.items as unknown as SumUpReaderDto[];
   }
 
@@ -113,7 +123,9 @@ export class SumUpService {
     const merchantCode = await this.getMerchantCode();
 
     try {
-      return await sumUp.readers.create(merchantCode, { pairing_code: pairingCode.toUpperCase(), name }) as unknown as SumUpReaderDto;
+      return (await this.externalCallTimer.time('sumup', 'readers_create', () =>
+        sumUp.readers.create(merchantCode, { pairing_code: pairingCode.toUpperCase(), name }),
+      )) as unknown as SumUpReaderDto;
     } catch (error) {
       this.logger.error('Failed to pair reader', { error });
       throw new BadRequestException(error.error?.message ?? error.message ?? 'Failed to pair reader');
@@ -124,15 +136,16 @@ export class SumUpService {
     const sumUp = await this.getSumUp();
     const merchantCode = await this.getMerchantCode();
 
-    try {
-      await sumUp.readers.delete(merchantCode, readerId);
-    } catch (error) {
-      if (error.message.includes('SumUpError: Unexpected non-json response')) {
-        return;
+    await this.externalCallTimer.time('sumup', 'readers_delete', async () => {
+      try {
+        return await sumUp.readers.delete(merchantCode, readerId);
+      } catch (error) {
+        if (error instanceof Error && error.message.includes('SumUpError: Unexpected non-json response')) {
+          return;
+        }
+        throw error;
       }
-
-      throw error;
-    }
+    });
   }
 
   async topUpWithReader(userId: number, readerId: string, amount: number): Promise<BillingTransaction> {
@@ -153,15 +166,17 @@ export class SumUpService {
     }
 
     try {
-      const checkout = await sumUp.readers.createCheckout(merchantCode, readerId, {
-        description: 'Attraccess Top-up',
-        total_amount: {
-          currency,
-          value: amount,
-          minor_unit: minorUnit,
-        },
-        ...(returnUrl ? { return_url: returnUrl } : {}),
-      });
+      const checkout = await this.externalCallTimer.time('sumup', 'checkout', () =>
+        sumUp.readers.createCheckout(merchantCode, readerId, {
+          description: 'Attraccess Top-up',
+          total_amount: {
+            currency,
+            value: amount,
+            minor_unit: minorUnit,
+          },
+          ...(returnUrl ? { return_url: returnUrl } : {}),
+        }),
+      );
 
       const transaction = await this.billingTransactionRepository.save({
         userId,
@@ -210,9 +225,11 @@ export class SumUpService {
 
     const sumup = await this.getSumUp();
     const merchantCode = await this.getMerchantCode();
-    const sumUpTransactionData = await sumup.transactions.get(merchantCode, {
-      client_transaction_id: sumupTransactionId,
-    });
+    const sumUpTransactionData = await this.externalCallTimer.time('sumup', 'transactions', () =>
+      sumup.transactions.get(merchantCode, {
+        client_transaction_id: sumupTransactionId,
+      }),
+    );
 
     switch (sumUpTransactionData.status) {
       case 'CANCELLED':
@@ -251,37 +268,39 @@ export class SumUpService {
 
   @Cron(CronExpression.EVERY_30_SECONDS)
   async processPendingTransactions(): Promise<void> {
-    if (!this.hasPendingTransactions) {
-      return;
-    }
-
-    this.logger.debug('processPendingTransactions: starting');
-
-    const transactions = await this.billingTransactionRepository.findBy({
-      status: BillingTransactionStatus.Pending,
-    });
-
-    this.logger.debug(`processPendingTransactions: found ${transactions.length} pending transactions`);
-
-    const consideredTransactions = transactions.filter((transaction) =>
-      transaction.externalReference?.startsWith(SUMUP_TOPUP_TRANSACTION_PREFIX),
-    );
-
-    this.hasPendingTransactions = consideredTransactions.length > 0;
-
-    for (const transaction of consideredTransactions) {
-      const transactionId = transaction.externalReference.split(':')[1];
-      if (!transactionId) {
-        this.logger.error(`Stored sumup transaction ID is invalid, ${transaction.externalReference}`);
-        transaction.status = BillingTransactionStatus.Failed;
-        const updatedTransaction = await this.billingTransactionRepository.save(transaction);
-        this.liveNotificationsService.notifyTransactionUpdate(updatedTransaction);
-        continue;
+    await this.cronTimer.time('sumup_poll', async () => {
+      if (!this.hasPendingTransactions) {
+        return;
       }
 
-      await this.updateTransactionStatusBySumupServer(transactionId);
-    }
+      this.logger.debug('processPendingTransactions: starting');
 
-    this.logger.debug('processPendingTransactions: finished');
+      const transactions = await this.billingTransactionRepository.findBy({
+        status: BillingTransactionStatus.Pending,
+      });
+
+      this.logger.debug(`processPendingTransactions: found ${transactions.length} pending transactions`);
+
+      const consideredTransactions = transactions.filter((transaction) =>
+        transaction.externalReference?.startsWith(SUMUP_TOPUP_TRANSACTION_PREFIX),
+      );
+
+      this.hasPendingTransactions = consideredTransactions.length > 0;
+
+      for (const transaction of consideredTransactions) {
+        const transactionId = transaction.externalReference.split(':')[1];
+        if (!transactionId) {
+          this.logger.error(`Stored sumup transaction ID is invalid, ${transaction.externalReference}`);
+          transaction.status = BillingTransactionStatus.Failed;
+          const updatedTransaction = await this.billingTransactionRepository.save(transaction);
+          this.liveNotificationsService.notifyTransactionUpdate(updatedTransaction);
+          continue;
+        }
+
+        await this.updateTransactionStatusBySumupServer(transactionId);
+      }
+
+      this.logger.debug('processPendingTransactions: finished');
+    });
   }
 }

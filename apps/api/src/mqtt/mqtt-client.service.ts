@@ -8,6 +8,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MqttMessageEvent } from './mqtt-message.event';
 import { EncryptionService } from '../encryption/encryption.service';
 import { MetricsService } from '../metrics/metrics.service';
+import { ExternalCallTimer } from '../metrics/instrumentation/external/external.helper';
 
 @Injectable()
 export class MqttClientService implements OnModuleDestroy {
@@ -22,6 +23,7 @@ export class MqttClientService implements OnModuleDestroy {
     private readonly eventEmitter: EventEmitter2,
     private readonly encryptionService: EncryptionService,
     private readonly metricsService: MetricsService,
+    private readonly externalCallTimer: ExternalCallTimer,
   ) {}
 
   async onModuleDestroy() {
@@ -195,17 +197,22 @@ export class MqttClientService implements OnModuleDestroy {
 
       const qos: 0 | 1 | 2 = (options?.qos ?? (server.defaultPublishQos as 0 | 1 | 2) ?? 0) as 0 | 1 | 2;
       const retain: boolean = options?.retain ?? Boolean(server.defaultPublishRetain ?? false);
-      return new Promise((resolve, reject) => {
-        client.publish(topic, message, { qos, retain }, (error) => {
-          if (error) {
-            this.logger.error(`Failed to publish to topic ${topic}: ${error.message}`);
-            reject(error);
-          } else {
-            this.logger.debug(`Published to topic ${topic}: ${message}`);
-            resolve();
-          }
-        });
-      });
+      return this.externalCallTimer.time(
+        'mqtt',
+        'publish',
+        () =>
+          new Promise<void>((resolve, reject) => {
+            client.publish(topic, message, { qos, retain }, (error) => {
+              if (error) {
+                this.logger.error(`Failed to publish to topic ${topic}: ${error.message}`);
+                reject(error);
+              } else {
+                this.logger.debug(`Published to topic ${topic}: ${message}`);
+                resolve();
+              }
+            });
+          }),
+      );
     } catch (error) {
       this.logger.error(`Failed to publish to MQTT server ${serverId}`, error);
       throw error;
@@ -231,7 +238,20 @@ export class MqttClientService implements OnModuleDestroy {
         this.mqttServerRepository.findOneBy({ id: serverId }),
       ]);
       const effectiveQos: 0 | 1 | 2 = (qos ?? (server?.defaultSubscribeQos as 0 | 1 | 2) ?? 0) as 0 | 1 | 2;
-      client.subscribe(topic, { qos: effectiveQos });
+      await this.externalCallTimer.time(
+        'mqtt',
+        'subscribe',
+        () =>
+          new Promise<void>((resolve, reject) => {
+            client.subscribe(topic, { qos: effectiveQos }, (err) => {
+              if (err) {
+                reject(err);
+              } else {
+                resolve();
+              }
+            });
+          }),
+      );
     } catch (error) {
       // Do not throw: the client will keep trying to connect and will subscribe on next connect
       this.logger.warn(

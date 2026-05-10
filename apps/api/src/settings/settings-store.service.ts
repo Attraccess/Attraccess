@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Setting } from '@attraccess/database-entities';
 import { Repository } from 'typeorm';
 import { EncryptionService } from '../encryption/encryption.service';
-import { SETTINGS_CACHE_TTL_MS } from './constants';
+import { APP_PARENT, SETTINGS_CACHE_TTL_MS } from './constants';
 
 type CachedSetting = {
   value: string | null;
@@ -21,6 +21,10 @@ export class SettingsStoreService {
     private readonly settingRepository: Repository<Setting>,
     private readonly encryptionService: EncryptionService,
   ) {}
+
+  async get(key: string): Promise<string | null> {
+    return this.getPlainSetting(APP_PARENT, key);
+  }
 
   async getPlainSetting(
     parent: string,

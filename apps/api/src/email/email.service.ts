@@ -16,6 +16,7 @@ import { MjmlService } from '../email-template/mjml.service';
 import { EntityManager } from 'typeorm';
 import { SettingsService } from '../settings/settings.service';
 import { MetricsService } from '../metrics/metrics.service';
+import { ExternalCallTimer } from '../metrics/instrumentation/external/external.helper';
 
 @Injectable()
 export class EmailService {
@@ -26,6 +27,7 @@ export class EmailService {
     private readonly emailTemplateService: EmailTemplateService,
     private readonly mjmlService: MjmlService,
     private readonly metricsService: MetricsService,
+    private readonly externalCallTimer: ExternalCallTimer,
   ) {
     this.logger.debug('Initializing EmailService');
     this.logger.debug('EmailService initialized');
@@ -60,12 +62,14 @@ export class EmailService {
       this.logger.debug(
         `Sending email to: ${user.email} using ${templateType} template with subject: ${dbTemplate.subject}`,
       );
-      await transporter.sendMail({
-        to: user.email,
-        from,
-        subject,
-        html: body,
-      });
+      await this.externalCallTimer.time('smtp', 'send', () =>
+        transporter.sendMail({
+          to: user.email,
+          from,
+          subject,
+          html: body,
+        }),
+      );
       if (typeof transporter.close === 'function') {
         transporter.close();
       }

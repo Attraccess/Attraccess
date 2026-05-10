@@ -8,6 +8,7 @@ import { Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { EncryptionService } from '../encryption/encryption.service';
 import { MetricsService } from '../metrics/metrics.service';
+import { ExternalCallTimer } from '../metrics/instrumentation/external/external.helper';
 
 // Interface to access private members for testing
 interface MqttClientServicePrivate {
@@ -104,6 +105,10 @@ describe('MqttClientService', () => {
           useValue: {
             mqttServersHealthy: { set: jest.fn() },
           },
+        },
+        {
+          provide: ExternalCallTimer,
+          useValue: { time: <T,>(_t: string, _o: string, fn: () => Promise<T>) => fn() },
         },
       ],
     }).compile();

@@ -11,6 +11,7 @@ import { SessionService, SessionMetadata } from './session.service';
 import { Session, User } from '@attraccess/database-entities';
 import { TokenHashService } from '../../encryption/token-hash.service';
 import { MetricsService } from '../../metrics/metrics.service';
+import { CronTimer } from '../../metrics/instrumentation/cron/cron.helper';
 
 describe('SessionService', () => {
   let service: SessionService;
@@ -64,6 +65,7 @@ describe('SessionService', () => {
             authActiveSessions: { inc: jest.fn(), dec: jest.fn(), set: jest.fn() },
           },
         },
+        { provide: CronTimer, useValue: { time: <T,>(_n: string, fn: () => Promise<T>) => fn() } },
       ],
     }).compile();
 

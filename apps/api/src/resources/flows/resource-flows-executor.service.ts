@@ -56,6 +56,8 @@ import { MqttMessageEvent as MqttMessageReceivedEvent } from '../../mqtt/mqtt-me
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { FlowExecutionError } from './errors/flow-execution.error';
 import { ResourceHealthService } from '../health/resource-health.service';
+import { CronTimer } from '../../metrics/instrumentation/cron/cron.helper';
+import { FlowTimer } from '../../metrics/instrumentation/flow/flow.helper';
 
 // Handlebars helpers
 Handlebars.registerHelper('json', (value: unknown) => {
@@ -133,6 +135,8 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     private readonly billingTransactionItemRepository: Repository<BillingTransactionItem>,
     private readonly eventEmitter: EventEmitter2,
     private readonly resourceHealthService: ResourceHealthService,
+    private readonly cronTimer: CronTimer,
+    private readonly flowTimer: FlowTimer,
   ) {
     const flowConfig = this.configService.get<FlowConfigType>('flow');
     this.logTTLDays = flowConfig.FLOW_LOG_TTL_DAYS;
@@ -305,23 +309,25 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
 
   @Cron('0 2 * * *') // Daily at 2 AM
   async cleanupOldFlowLogs() {
-    try {
-      const cutoffDate = new Date(Date.now() - this.logTTLDays * 24 * 60 * 60 * 1000);
+    await this.cronTimer.time('flow_daily_cleanup', async () => {
+      try {
+        const cutoffDate = new Date(Date.now() - this.logTTLDays * 24 * 60 * 60 * 1000);
 
-      this.logger.log(
-        `Starting cleanup of flow logs older than ${this.logTTLDays} days (before ${cutoffDate.toISOString()})`,
-      );
+        this.logger.log(
+          `Starting cleanup of flow logs older than ${this.logTTLDays} days (before ${cutoffDate.toISOString()})`,
+        );
 
-      const result = await this.flowLogRepository.delete({
-        createdAt: LessThan(cutoffDate),
-      });
+        const result = await this.flowLogRepository.delete({
+          createdAt: LessThan(cutoffDate),
+        });
 
-      const deletedCount = result.affected || 0;
-      this.logger.log(`Successfully cleaned up ${deletedCount} old flow log entries`);
-    } catch (error) {
-      this.logger.error('Failed to cleanup old flow logs', error.stack);
-      throw error;
-    }
+        const deletedCount = result.affected || 0;
+        this.logger.log(`Successfully cleaned up ${deletedCount} old flow log entries`);
+      } catch (error) {
+        this.logger.error('Failed to cleanup old flow logs', error.stack);
+        throw error;
+      }
+    });
   }
 
   @OnEvent(ResourceUsageEvent.EVENT_NAME)
@@ -475,41 +481,105 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
   ): Promise<NodeProcessingResult[]> {
     const nodes = Array.isArray(node) ? node : [node];
 
-    this.logger.debug(`Processing nodes: ${nodes.map((n) => `ID:${n.id} Type:${n.type}`).join(', ')}`);
+    return this.flowTimer.timeFlow(nodes[0].type, async () => {
+      this.logger.debug(`Processing nodes: ${nodes.map((n) => `ID:${n.id} Type:${n.type}`).join(', ')}`);
 
-    const flowRunId = `${randomBytes(3).toString('base64url').slice(0, 3)}-${randomBytes(3).toString('base64url').slice(0, 3)}-${randomBytes(3).toString('base64url').slice(0, 3)}`;
+      const flowRunId = `${randomBytes(3).toString('base64url').slice(0, 3)}-${randomBytes(3)
+        .toString('base64url')
+        .slice(0, 3)}-${randomBytes(3).toString('base64url').slice(0, 3)}`;
 
-    await this.createFlowLog({
-      flowRunId,
-      nodeId: null,
-      resourceId: nodes[0].resourceId,
-      type: ResourceFlowLogType.FLOW_START,
+      await this.createFlowLog({
+        flowRunId,
+        nodeId: null,
+        resourceId: nodes[0].resourceId,
+        type: ResourceFlowLogType.FLOW_START,
+      });
+
+      let leafResults: NodeProcessingResult[] = [];
+      try {
+        const results = await Promise.all(
+          nodes.map((node) => {
+            return this.processNode(flowRunId, node, data, transactionManager, resourceContextCache);
+          }),
+        );
+        leafResults = results.flat();
+        this.logger.log(`Successfully processed all ${nodes.length} flow nodes`);
+      } catch (error) {
+        this.logger.error(`Failed to process flow nodes`, error.stack);
+        throw error;
+      } finally {
+        await this.createFlowLog(
+          {
+            flowRunId,
+            nodeId: null,
+            resourceId: nodes[0].resourceId,
+            type: ResourceFlowLogType.FLOW_COMPLETED,
+          },
+          transactionManager,
+        );
+      }
+      return leafResults;
     });
+  }
 
-    let leafResults: NodeProcessingResult[] = [];
-    try {
-      const results = await Promise.all(
-        nodes.map((node) => {
-          return this.processNode(flowRunId, node, data, transactionManager, resourceContextCache);
-        }),
-      );
-      leafResults = results.flat();
-      this.logger.log(`Successfully processed all ${nodes.length} flow nodes`);
-    } catch (error) {
-      this.logger.error(`Failed to process flow nodes`, error.stack);
-      throw error;
-    } finally {
-      await this.createFlowLog(
-        {
-          flowRunId,
-          nodeId: null,
-          resourceId: nodes[0].resourceId,
-          type: ResourceFlowLogType.FLOW_COMPLETED,
-        },
-        transactionManager,
-      );
+  private async dispatchNode(
+    node: ResourceFlowNode,
+    input: object,
+    transactionManager?: EntityManager,
+  ): Promise<NodeProcessingResult> {
+    switch (node.type) {
+      case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED:
+      case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED:
+      case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER:
+      case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLOCKED:
+      case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_LOCKED:
+      case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLATCHED:
+      case ResourceFlowNodeType.INPUT_BUTTON:
+      case ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED:
+      case ResourceFlowNodeType.INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY:
+        return { payload: input };
+
+      case ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT:
+        return this.processHeartbeatNode(node, input);
+
+      case ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_SET:
+        return this.processHealthSetNode(node, input);
+
+      case ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS:
+        return this.processBillingSetAdditionalItemsNode(node, input, transactionManager);
+
+      case ResourceFlowNodeType.PROCESSING_WAIT:
+        return this.processWaitNode(node, input, transactionManager);
+
+      case ResourceFlowNodeType.OUTPUT_HTTP_SEND_REQUEST:
+        return this.processHttpSendRequestNode(node, input, transactionManager);
+
+      case ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE:
+        return this.processMqttSendMessageNode(node, input, transactionManager);
+
+      case ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION:
+        return this.processEndUsageSessionNode(node, input, transactionManager);
+
+      case ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_TRACK_ACTIVITY:
+        return this.processActivityTrackActivityNode(node, input);
+
+      case ResourceFlowNodeType.PROCESSING_IF:
+        return this.processIfNode(node, input, transactionManager);
+
+      case ResourceFlowNodeType.PROCESSING_SET_PAYLOAD:
+        return this.processSetPayloadNode(node, input, transactionManager);
+
+      case ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE:
+        return this.processMqttWaitForMessageNode(node, input, transactionManager);
+
+      case ResourceFlowNodeType.PROCESSING_ERROR:
+        return this.processErrorNode(node, input, transactionManager);
+
+      default: {
+        const exhaustiveCheck: never = node.type;
+        throw new Error(`Unknown node type: ${exhaustiveCheck}`);
+      }
     }
-    return leafResults;
   }
 
   private async processNode(
@@ -545,74 +615,9 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
         transactionManager,
       );
 
-      switch (node.type) {
-        case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED:
-        case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED:
-        case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER:
-        case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLOCKED:
-        case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_LOCKED:
-        case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLATCHED:
-        case ResourceFlowNodeType.INPUT_BUTTON:
-        case ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED:
-        case ResourceFlowNodeType.INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY:
-          responseOfNode = {
-            payload: input,
-          };
-          break;
-
-        case ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT:
-          responseOfNode = await this.processHeartbeatNode(node, input);
-          break;
-
-        case ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_SET:
-          responseOfNode = await this.processHealthSetNode(node, input);
-          break;
-
-        case ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS:
-          responseOfNode = await this.processBillingSetAdditionalItemsNode(node, input, transactionManager);
-          break;
-
-        case ResourceFlowNodeType.PROCESSING_WAIT:
-          responseOfNode = await this.processWaitNode(node, input, transactionManager);
-          break;
-
-        case ResourceFlowNodeType.OUTPUT_HTTP_SEND_REQUEST:
-          responseOfNode = await this.processHttpSendRequestNode(node, input, transactionManager);
-          break;
-
-        case ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE:
-          responseOfNode = await this.processMqttSendMessageNode(node, input, transactionManager);
-          break;
-
-        case ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION:
-          responseOfNode = await this.processEndUsageSessionNode(node, input, transactionManager);
-          break;
-
-        case ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_TRACK_ACTIVITY:
-          responseOfNode = await this.processActivityTrackActivityNode(node, input);
-          break;
-
-        case ResourceFlowNodeType.PROCESSING_IF:
-          responseOfNode = await this.processIfNode(node, input, transactionManager);
-          break;
-
-        case ResourceFlowNodeType.PROCESSING_SET_PAYLOAD:
-          responseOfNode = await this.processSetPayloadNode(node, input, transactionManager);
-          break;
-
-        case ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE:
-          responseOfNode = await this.processMqttWaitForMessageNode(node, input, transactionManager);
-          break;
-
-        case ResourceFlowNodeType.PROCESSING_ERROR:
-          responseOfNode = await this.processErrorNode(node, input, transactionManager);
-          break;
-
-        default: {
-          const exhaustiveCheck: never = node.type;
-          throw new Error(`Unknown node type: ${exhaustiveCheck}`);
-        }
-      }
+      responseOfNode = await this.flowTimer.timeNode(node.type, () =>
+        this.dispatchNode(node, input, transactionManager),
+      );
 
       const processingTime = Date.now() - startTime;
       this.logger.debug(`Successfully processed flow node ID: ${node.id} (Type: ${node.type}) in ${processingTime}ms`);
@@ -1089,53 +1094,55 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
 
   @Cron(CronExpression.EVERY_MINUTE)
   public async checkResourceActivity() {
-    const now = new Date();
+    await this.cronTimer.time('flow_minute_tick', async () => {
+      const now = new Date();
 
-    const onResourceInactivityNodes = await this.flowNodeRepository
-      .createQueryBuilder('node')
-      .innerJoin(
-        ResourceUsage,
-        'usage',
-        'usage.resourceId = node.resourceId AND usage.endTime IS NULL AND usage.isFinalized = TRUE AND usage.usageAction = :usageAction',
-        { usageAction: ResourceUsageAction.Usage },
-      )
-      .where('node.type = :type', { type: ResourceFlowNodeType.INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY })
-      .distinct(true)
-      .getMany();
+      const onResourceInactivityNodes = await this.flowNodeRepository
+        .createQueryBuilder('node')
+        .innerJoin(
+          ResourceUsage,
+          'usage',
+          'usage.resourceId = node.resourceId AND usage.endTime IS NULL AND usage.isFinalized = TRUE AND usage.usageAction = :usageAction',
+          { usageAction: ResourceUsageAction.Usage },
+        )
+        .where('node.type = :type', { type: ResourceFlowNodeType.INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY })
+        .distinct(true)
+        .getMany();
 
-    await Promise.all(
-      onResourceInactivityNodes.map(async (node) => {
-        const parsedData = InputResourceActivityNoActivityNodeDataSchema.safeParse(node.data);
-        if (!parsedData.success) {
-          this.logger.warn(
-            `Skipping resource inactivity node ${node.id} for resource flow of resource ${node.resourceId} because of invalid data: ${parsedData.error.message}`,
+      await Promise.all(
+        onResourceInactivityNodes.map(async (node) => {
+          const parsedData = InputResourceActivityNoActivityNodeDataSchema.safeParse(node.data);
+          if (!parsedData.success) {
+            this.logger.warn(
+              `Skipping resource inactivity node ${node.id} for resource flow of resource ${node.resourceId} because of invalid data: ${parsedData.error.message}`,
+            );
+            return;
+          }
+
+          const { minInactivityMinutes } = parsedData.data;
+
+          const lastActivity = this.resourceActivity.get(node.resourceId);
+          if (!lastActivity) {
+            this.resourceActivity.set(node.resourceId, now);
+            return;
+          }
+
+          const millisSinceLastActivity = now.getTime() - lastActivity.getTime();
+          const minutesSinceLastActivity = millisSinceLastActivity / 1000 / 60;
+
+          if (minutesSinceLastActivity < minInactivityMinutes) {
+            return;
+          }
+
+          this.logger.debug(
+            `Resource ${node.resourceId} has been inactive for ${minutesSinceLastActivity} minutes, triggering inactivity node`,
           );
-          return;
-        }
+          await this.startFlow(node, { payload: {} });
 
-        const { minInactivityMinutes } = parsedData.data;
-
-        const lastActivity = this.resourceActivity.get(node.resourceId);
-        if (!lastActivity) {
           this.resourceActivity.set(node.resourceId, now);
-          return;
-        }
-
-        const millisSinceLastActivity = now.getTime() - lastActivity.getTime();
-        const minutesSinceLastActivity = millisSinceLastActivity / 1000 / 60;
-
-        if (minutesSinceLastActivity < minInactivityMinutes) {
-          return;
-        }
-
-        this.logger.debug(
-          `Resource ${node.resourceId} has been inactive for ${minutesSinceLastActivity} minutes, triggering inactivity node`,
-        );
-        await this.startFlow(node, { payload: {} });
-
-        this.resourceActivity.set(node.resourceId, now);
-      }),
-    );
+        }),
+      );
+    });
   }
 
   private compileTemplate(template: string, data: object): string {

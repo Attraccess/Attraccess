@@ -36,6 +36,9 @@ import { ResourceFormsService } from '../../resources/forms/forms.service';
 import { FormSubmissionRequestDto } from '../../resources/forms/dto/form-submission-request.dto';
 import { ResourceUsageFormRequestPayload } from './websocket.types';
 import { MetricsService } from '../../metrics/metrics.service';
+import { MetricsToggleService } from '../../metrics/settings/metrics-toggle.service';
+import { WS_METRICS } from '../../metrics/definitions/tokens';
+import { ATTRACTAP_GATEWAY_LABEL, WsMetrics } from '../../metrics/definitions/ws.metrics';
 
 @WebSocketGateway({ path: '/api/attractap/websocket' })
 export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnect {
@@ -86,6 +89,14 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
   @Inject(MetricsService)
   private metricsService: MetricsService;
+
+  @Inject(WS_METRICS)
+  private wsMetrics: WsMetrics;
+
+  @Inject(MetricsToggleService)
+  private metricsToggle: MetricsToggleService;
+
+  private readonly connectedAt = new WeakMap<object, bigint>();
 
   private makeStringLVGLReady(input: string): string {
     if (!input) return input;
@@ -152,6 +163,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   }
 
   public async handleConnection(client: WebSocket) {
+    this.connectedAt.set(client as unknown as object, process.hrtime.bigint());
     this.logger.log('Client connected via WebSocket');
 
     try {
@@ -310,6 +322,13 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   }
 
   public async handleDisconnect(socket: AuthenticatedWebSocket) {
+    const connectedAt = this.connectedAt.get(socket as unknown as object);
+    this.connectedAt.delete(socket as unknown as object);
+    if (connectedAt !== undefined && this.metricsToggle.isEnabledCached('ws')) {
+      const seconds = Number(process.hrtime.bigint() - connectedAt) / 1e9;
+      this.wsMetrics.connectionDuration.observe({ gateway: ATTRACTAP_GATEWAY_LABEL }, seconds);
+    }
+
     this.logger.debug(`Client ${socket.id} disconnected.`);
 
     await this.clientResponseAwaitersMutex.runExclusive(async () => {
