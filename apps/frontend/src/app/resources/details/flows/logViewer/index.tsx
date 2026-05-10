@@ -1,4 +1,4 @@
-import { Accordion, AccordionItem, Divider, Drawer, DrawerBody, DrawerContent, DrawerHeader, Textarea, useOverlayState } from '@heroui/react';
+import { Accordion, AccordionItem, Separator, Drawer, DrawerBody, DrawerContent, DrawerHeader, TextArea, useOverlayState } from '@heroui/react';
 import { PageHeader } from '../../../../../components/pageHeader';
 import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
@@ -107,13 +107,13 @@ export function LogViewer(props: Props) {
                       {logsOfRun.map((log) => (
                         <AccordionItem key={`${runId}-${log.id}`} title={log.title}>
                           {log.payload && (
-                            <Textarea isReadOnly value={JSON.stringify(JSON.parse(log.payload), null, 2)} />
+                            <TextArea isReadOnly value={JSON.stringify(JSON.parse(log.payload), null, 2)} />
                           )}
                         </AccordionItem>
                       ))}
                     </Accordion>
                   </div>
-                  {index < self.length - 1 && <Divider className="my-4" />}
+                  {index < self.length - 1 && <Separator className="my-4" />}
                 </div>
               ))}
             </div>

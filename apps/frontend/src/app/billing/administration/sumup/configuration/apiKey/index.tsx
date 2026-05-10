@@ -89,7 +89,7 @@ export function ApiKeyCard(props: Omit<CardProps, 'children'>) {
             >
               <div className="flex items-center gap-2">
                 {isLoadingConfiguration ? (
-                  <Spinner size="sm" />
+                  <Spinner />
                 ) : configuration?.enabled ? (
                   <CheckIcon size={16} />
                 ) : (
@@ -118,7 +118,7 @@ export function ApiKeyCard(props: Omit<CardProps, 'children'>) {
             label={t('inputs.apiKey.label')}
             description={t('inputs.apiKey.description')}
             value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
+            onChange={(setApiKey)}
             autoComplete="off"
             isRequired
           />

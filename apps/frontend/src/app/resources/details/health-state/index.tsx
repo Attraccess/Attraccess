@@ -88,7 +88,7 @@ export function ResourceHealthWarning({ resourceId }: Props) {
               {canManage && (
                 <div className="mt-2">
                   <Button variant="danger-soft"
-                    size="sm"
+
                     onPress={() => handleClear(entry.id)}
                     isPending={clearEntry.isPending}
                   ><CheckCircleIcon size={16} />

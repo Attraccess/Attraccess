@@ -1,4 +1,4 @@
-import { Button, Chip, Divider, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalHeader, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow, useOverlayState } from '@heroui/react';
+import { Button, Chip, Separator, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalHeader, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow, useOverlayState } from '@heroui/react';
 import de from './de.json';
 import en from './en.json';
 import { AttraccessUser, useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -69,7 +69,7 @@ export function TransactionDetailsModal(props: Props) {
       {children && children(open)}
       <Modal isOpen={isOpen} onOpenChange={setOpen}>
         <ModalBackdrop />
-        <ModalContainer size="lg">
+        <ModalContainer>
           <ModalDialog>
             {() => (<>
           <ModalHeader>
@@ -119,7 +119,7 @@ export function TransactionDetailsModal(props: Props) {
                   </div>
                   <div>
                     <div className="text-small text-default-500">{t('meta.status')}</div>
-                    <Chip color={statusColor(transaction.status)} size="sm" variant="soft">
+                    <Chip color={statusColor(transaction.status)} variant="soft">
                       {t('status.' + transaction.status)}
                     </Chip>
                   </div>
@@ -160,7 +160,7 @@ export function TransactionDetailsModal(props: Props) {
                   )}
                 </div>
 
-                <Divider />
+                <Separator />
 
                 <div>
                   <div className="mb-2 font-semibold">{t('items.title')}</div>
@@ -172,7 +172,7 @@ export function TransactionDetailsModal(props: Props) {
                       <TableColumn>{t('items.columns.unitPrice')}</TableColumn>
                       <TableColumn>{t('items.columns.subtotal')}</TableColumn>
                     </TableHeader>
-                    <TableBody emptyContent={t('items.empty')}>
+                    <TableBody renderEmptyState={() => t('items.empty')}>
                       {(transaction.items ?? []).map((item) => (
                         <TableRow key={item.id} id={item.id}>
                           <TableCell>
@@ -183,7 +183,7 @@ export function TransactionDetailsModal(props: Props) {
                               <div className="text-tiny text-default-400">{item.externalReference}</div>
                             )}
                           </TableCell>
-                          <TableCell className="max-w-[28ch] truncate" title={item.description ?? undefined}>
+                          <TableCell className="max-w-[28ch] truncate">
                             {item.description}
                           </TableCell>
                           <TableCell className="text-right">{item.quantity}</TableCell>

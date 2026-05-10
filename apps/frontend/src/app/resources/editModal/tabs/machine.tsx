@@ -8,7 +8,7 @@ export function MachineTab(props: EditorTabProps) {
     <div className="flex flex-col gap-2">
       <Switch
         isSelected={formData.allowTakeOver}
-        onValueChange={(value) => setField('allowTakeOver', value)}
+        onChange={(value) => setField('allowTakeOver', value)}
         data-cy="resource-edit-modal-allow-takeover-switch"
       >
         <div className="flex flex-col">

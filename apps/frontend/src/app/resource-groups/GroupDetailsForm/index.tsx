@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Card, CardHeader, CardContent, TextField, Label, Input, Textarea, Button, Spinner, CardProps } from '@heroui/react';
+import { Card, CardHeader, CardContent, TextField, Label, Input, TextArea, Button, Spinner, CardProps } from '@heroui/react';
 import { Save, Edit3, Trash2Icon } from 'lucide-react';
 import {
   useResourcesServiceResourceGroupsGetOne,
@@ -100,7 +100,7 @@ export function GroupDetailsForm(props: Readonly<GroupDetailsFormProps & Omit<Ca
       <Card {...rest}>
         <CardContent>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px 0' }}>
-            <Spinner size="sm" />
+            <Spinner />
             <span style={{ marginLeft: '8px', opacity: 0.7 }}>{t('states.loading')}</span>
           </div>
         </CardContent>
@@ -136,11 +136,11 @@ export function GroupDetailsForm(props: Readonly<GroupDetailsFormProps & Omit<Ca
             <Input placeholder={t('form.fields.name.placeholder')} />
           </TextField>
 
-          <Textarea
-            label={t('form.fields.description.label')}
+          <TextArea
+           
             placeholder={t('form.fields.description.placeholder')}
             value={description}
-            onValueChange={setDescription}
+            onChange={setDescription}
             minRows={3}
           />
 

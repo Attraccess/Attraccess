@@ -1,7 +1,7 @@
 import { useTranslations, ResourceSelector } from '@attraccess/plugins-frontend-ui';
 import de from './AttractapEditor.de.json';
 import en from './AttractapEditor.en.json';
-import { Button, Form, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalHeader, ModalHeading, ModalFooter, Divider, Slider } from '@heroui/react';
+import { Button, Form, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalHeader, ModalHeading, ModalFooter, Separator, Slider } from '@heroui/react';
 import { TextField, Label, Input } from '@heroui/react';
 import { useCallback, useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -115,21 +115,21 @@ export function AttractapEditor(props: Readonly<Props>) {
                       data-cy="attractap-editor-led-brightness-slider"
                     />
                   )}
-                  <Divider className="my-6" />
+                  <Separator className="my-6" />
                   <ResourceSelector
                     selection={connectedResourceIds}
-                    onSelectionChange={(selection) => setConnectedResourceIds(selection)}
+
                     data-cy="attractap-editor-resource-selector"
                     multiple={reader?.firmware.capabilities.resourceSelection ?? true}
                   />
                 </ModalBody>
                 <ModalFooter>
                   <Button variant="secondary"
-                    type="button"
+
                     onPress={() => {
                       props.onCancel();
                     }}
-                    disabled={updateReaderMutation.isPending}
+                    isDisabled={updateReaderMutation.isPending}
                     data-cy="attractap-editor-cancel-button"
                   >
                     {t('cancel')}

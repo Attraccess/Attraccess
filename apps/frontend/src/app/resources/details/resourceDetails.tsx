@@ -99,7 +99,7 @@ function ResourceDetailsComponent() {
   if (isLoadingResource) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <Spinner size="lg" color="primary" data-cy="resource-details-loading-spinner" />
+        <Spinner color="accent" data-cy="resource-details-loading-spinner" />
       </div>
     );
   }
@@ -143,10 +143,10 @@ function ResourceDetailsComponent() {
 
             {canManageResources && (
               <>
-                <ResourceQrCode resourceId={resourceId} variant="light" buttonIconSize={16} />
+                <ResourceQrCode resourceId={resourceId} variant="ghost" buttonIconSize={16} />
 
                 <Button variant="ghost"
-                  as={Link}
+
                   href={`/resources/${resourceId}/flows`}
                   data-cy="flows-button"
                 ><WorkflowIcon className="w-4 h-4" />
@@ -154,7 +154,7 @@ function ResourceDetailsComponent() {
                 </Button>
 
                 <Button variant="ghost"
-                  as={Link}
+
                   href={`/resources/${resourceId}/forms`}
                   data-cy="forms-button"
                 ><ListChecks className="w-4 h-4" />

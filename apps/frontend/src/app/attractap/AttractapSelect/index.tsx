@@ -45,7 +45,6 @@ export function AttractapSelect(props: Props) {
       selectedKey={props.selection ? props.selection.toString() : ''}
       onSelectionChange={(key) => props.onSelectionChange(Number(key))}
       data-cy="attractap-select"
-      isLoading={isLoading}
     />
   );
 }

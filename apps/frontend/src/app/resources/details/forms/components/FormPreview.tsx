@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, Input, ListBoxItem, Select, Switch, Textarea } from "@heroui/react";
+import { Card, CardContent, CardHeader, Input, ListBoxItem, Select, Switch, TextArea } from "@heroui/react";
 import { FormFieldType } from '@attraccess/react-query-client';
 import { EditableFormField, TextFieldOptions, NumberFieldOptions, SelectFieldOptions } from '../types';
 
@@ -53,7 +53,7 @@ function renderPreviewField(field: EditableFormField, t: (key: string) => string
 
 function renderPreviewText(options: TextFieldOptions) {
   if (options.multiline) {
-    return <Textarea placeholder={options.placeholder ?? '…'} />;
+    return <TextArea placeholder={options.placeholder ?? '…'} />;
   }
 
   return <Input placeholder={options.placeholder ?? '…'} />;

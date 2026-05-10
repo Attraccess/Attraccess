@@ -127,23 +127,23 @@ export function ActiveSessionDisplay({ resourceId, startTime }: ActiveSessionDis
 
         <FlowButtons resourceId={resourceId} />
 
-        <ButtonGroup fullWidth color="danger">
+        <ButtonGroup fullWidth>
           <Button
             isPending={endSession.isPending}
             onPress={immediatelyEndSession}
           ><StopCircle className="w-4 h-4" />
             {t('endSession')}
           </Button>
-          <Dropdown placement="bottom-end">
+          <Dropdown>
             <DropdownTrigger>
               <Button isIconOnly>
                 <ChevronDownIcon />
               </Button>
             </DropdownTrigger>
-            <DropdownMenu disallowEmptySelection aria-label={t('alternativeEndSessionOptionsMenu.label')}>
+            <DropdownMenu aria-label={t('alternativeEndSessionOptionsMenu.label')}>
               <DropdownItem
                 key="endWithNotes" id="endWithNotes"
-                description={t('alternativeEndSessionOptionsMenu.endWithNotes.description')}
+               
                 onPress={handleOpenEndSessionModal}
               >
                 {t('alternativeEndSessionOptionsMenu.endWithNotes.label')}

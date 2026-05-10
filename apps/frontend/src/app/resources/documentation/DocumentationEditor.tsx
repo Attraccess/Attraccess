@@ -15,7 +15,7 @@ import {
   Spinner,
   Tab,
   Tabs,
-  Textarea,
+  TextArea,
 } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { ArrowLeft, Save } from 'lucide-react';
@@ -146,7 +146,7 @@ function DocumentationEditorComponent() {
   if (isLoadingResource) {
     return (
       <div className="flex justify-center items-center h-[50vh]">
-        <Spinner size="lg" label={t('loading')} data-cy="documentation-editor-loading-spinner" />
+        <Spinner data-cy="documentation-editor-loading-spinner" />
       </div>
     );
   }
@@ -218,10 +218,10 @@ function DocumentationEditorComponent() {
       <Card className="mt-6">
         <CardHeader>
           <RadioGroup
-            label={t('documentationType.label')}
+           
             orientation="horizontal"
             value={documentationType}
-            onValueChange={setDocumentationType as (value: string) => void}
+            onChange={setDocumentationType as (value: string) => void}
             isDisabled={updateResource.isPending}
             data-cy="documentation-editor-type-radiogroup"
           >
@@ -237,15 +237,15 @@ function DocumentationEditorComponent() {
           {documentationType === DocumentationType.MARKDOWN && (
             <Tabs
               selectedKey={selectedTab}
-              onSelectionChange={(key) => setSelectedTab((key ?? '').toString())}
+
               data-cy="documentation-editor-markdown-tabs"
             >
               <Tab key="edit" title={t('edit')} data-cy="documentation-editor-markdown-edit-tab">
-                <Textarea
-                  label={t('markdownContent.label')}
+                <TextArea
+                 
                   placeholder={t('markdownContent.placeholder')}
                   value={markdownContent}
-                  onChange={(e) => setMarkdownContent(e.target.value)}
+                  onChange={(setMarkdownContent)}
                   minRows={15}
                   isInvalid={!!validationErrors.markdown}
                   errorMessage={validationErrors.markdown}

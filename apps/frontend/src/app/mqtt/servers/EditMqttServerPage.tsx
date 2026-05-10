@@ -99,7 +99,7 @@ export function EditMqttServerPage() {
   if (isLoadingServer) {
     return (
       <div className="max-w-7xl mx-auto px-4 py-8 flex justify-center">
-        <Spinner size="lg" color="primary" data-cy="edit-mqtt-server-page-loading-spinner" />
+        <Spinner color="accent" data-cy="edit-mqtt-server-page-loading-spinner" />
       </div>
     );
   }
@@ -171,7 +171,7 @@ export function EditMqttServerPage() {
                   id="useTls"
                   name="useTls"
                   isSelected={formValues.useTls}
-                  onValueChange={(checked) => setFormValues((prev) => ({ ...prev, useTls: checked }))}
+                  onChange={(checked) => setFormValues((prev) => ({ ...prev, useTls: checked }))}
                   data-cy="edit-mqtt-server-form-use-tls-checkbox"
                 />
                 <label htmlFor="useTls" className="text-sm">
@@ -182,13 +182,13 @@ export function EditMqttServerPage() {
               <div>
                 <Select
                   label={t('defaultPublishQosLabel')}
-                  selectedKeys={new Set([String(formValues.defaultPublishQos ?? 0)])}
+
                   onSelectionChange={(keys) => {
                     if (keys === 'all') return;
                     const key = Array.from(keys)[0];
                     setFormValues((prev) => ({ ...prev, defaultPublishQos: Number(key) }));
                   }}
-                  disallowEmptySelection
+                 
                   data-cy="edit-mqtt-server-form-default-publish-qos-input"
                 >
                   {qosOptions.map((option) => (
@@ -202,7 +202,7 @@ export function EditMqttServerPage() {
                   id="defaultPublishRetain"
                   name="defaultPublishRetain"
                   isSelected={!!formValues.defaultPublishRetain}
-                  onValueChange={(checked) => setFormValues((prev) => ({ ...prev, defaultPublishRetain: checked }))}
+                  onChange={(checked) => setFormValues((prev) => ({ ...prev, defaultPublishRetain: checked }))}
                   data-cy="edit-mqtt-server-form-default-publish-retain-checkbox"
                 >
                   {t('defaultPublishRetainLabel')}
@@ -212,13 +212,13 @@ export function EditMqttServerPage() {
               <div>
                 <Select
                   label={t('defaultSubscribeQosLabel')}
-                  selectedKeys={new Set([String(formValues.defaultSubscribeQos ?? 0)])}
+
                   onSelectionChange={(keys) => {
                     if (keys === 'all') return;
                     const key = Array.from(keys)[0];
                     setFormValues((prev) => ({ ...prev, defaultSubscribeQos: Number(key) }));
                   }}
-                  disallowEmptySelection
+                 
                   data-cy="edit-mqtt-server-form-default-subscribe-qos-input"
                 >
                   {qosOptions.map((option) => (

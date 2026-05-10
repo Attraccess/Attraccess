@@ -1,5 +1,5 @@
 import React, { useState, forwardRef, useImperativeHandle, useCallback } from 'react';
-import { Button, Table, TableHeader, TableColumn, TableBody, TableRow, TableCell, Tooltip, TextField, Label, Input, InputGroup, Description, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Divider, Card, CardContent, CardHeader, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Textarea, Switch, Link, useOverlayState } from '@heroui/react';
+import { Button, Table, TableHeader, TableColumn, TableBody, TableRow, TableCell, Tooltip, TextField, Label, Input, InputGroup, Description, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Separator, Card, CardContent, CardHeader, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, TextArea, Switch, Link, useOverlayState } from '@heroui/react';
 import { Pencil, Trash, Key, FileCode, Eye, EyeOff, MoreVertical, Copy, Info } from 'lucide-react';
 import { useToastMessage } from '../../../components/toastProvider';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -636,7 +636,7 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                   <div className="flex items-center gap-2">
                     <Tooltip content={t('edit')}>
                       <Button variant="ghost"
-                        size="sm"
+
                         isIconOnly
                         onPress={() => handleEdit(provider)}
                         data-cy={`sso-provider-edit-button-${provider.id}`}
@@ -646,7 +646,7 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                     </Tooltip>
                     <Tooltip content={t('deleteText')}>
                       <Button variant="danger-soft"
-                        size="sm"
+
                         isIconOnly
                         onPress={() => handleDelete(provider.id)}
                         data-cy={`sso-provider-delete-button-${provider.id}`}
@@ -673,7 +673,7 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
         data-cy="sso-provider-form-modal"
       >
         <ModalBackdrop />
-        <ModalContainer size="lg">
+        <ModalContainer>
           <ModalDialog>
             {({ close }) => (
             <>
@@ -693,14 +693,14 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                     items={Object.values(SSOProviderType).map((type) => ({ key: type, label: type }))}
                     label={t('type')}
                     selectedKey={formValues.type}
-                    onSelectionChange={(key) => handleSelectChange(key as SSOProviderType)}
+
                     isRequired
                     data-cy="sso-provider-form-type-select"
                   />
 
                   {formValues.type === SSOProviderType.OIDC && (
                     <>
-                      <Divider className="my-4" />
+                      <Separator className="my-4" />
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
                           <FileCode size={16} />
@@ -773,7 +773,7 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                           <Tooltip content={showClientSecret ? t('hideClientSecret') : t('showClientSecret')}>
                             <Button variant="ghost"
                               isIconOnly
-                              size="sm"
+
                               onPress={() => setShowClientSecret(!showClientSecret)}
                               data-cy="sso-provider-form-oidc-toggle-client-secret-button"
                             >
@@ -783,7 +783,7 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                         </InputGroup>
                       </TextField>
 
-                      <Divider className="my-2" />
+                      <Separator className="my-2" />
                       <TextField value={scopesInput} onChange={setScopesInput}>
                         <Label>{t('scopes')}</Label>
                         <Input placeholder="openid, email, profile" data-cy="sso-provider-form-oidc-scopes-input" />
@@ -797,7 +797,7 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                         <Input placeholder="email, emails[0].value, upn" data-cy="sso-provider-form-oidc-email-claims-input" />
                       </TextField>
 
-                      <Divider className="my-2" />
+                      <Separator className="my-2" />
                       <div className="flex items-center gap-2 mb-2">
                         <Key size={16} />
                         <span className="font-semibold">{t('permissionMappings')}</span>
@@ -817,7 +817,7 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                   )}
                   {formValues.type === SSOProviderType.SAML && (
                     <>
-                      <Divider className="my-4" />
+                      <Separator className="my-4" />
                       <div className="flex items-center gap-2 mb-2">
                         <FileCode size={16} />
                         <span className="font-semibold">{t('samlConfiguration')}</span>
@@ -833,8 +833,8 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                         <Input placeholder={window.location.origin ?? ''} data-cy="sso-provider-form-saml-issuer-input" />
                       </TextField>
 
-                      <Textarea
-                        label={t('certificate')}
+                      <TextArea
+                       
                         name="samlConfiguration.certificate"
                         value={formValues.samlConfiguration?.certificate ?? ''}
                         onChange={(e) => setSaml('certificate', e.target.value)}
@@ -863,7 +863,7 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                           <Tooltip content={showSamlProvisioningSecret ? t('hideSamlProvisioningSecret') : t('showSamlProvisioningSecret')}>
                             <Button variant="ghost"
                               isIconOnly
-                              size="sm"
+
                               onPress={() => setShowSamlProvisioningSecret(!showSamlProvisioningSecret)}
                               data-cy="sso-provider-form-saml-provisioning-secret-toggle-button"
                             >
@@ -874,7 +874,7 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                         <Description>{t('samlProvisioningSecretHint')}</Description>
                       </TextField>
 
-                      <Divider className="my-2" />
+                      <Separator className="my-2" />
                       <div className="flex items-center gap-2 mb-2">
                         <Key size={16} />
                         <span className="font-semibold">{t('permissionMappings')}</span>
@@ -891,8 +891,8 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                         </TextField>
                       ))}
 
-                      <Textarea
-                        label={t('spSigningCertificate')}
+                      <TextArea
+                       
                         name="samlConfiguration.spSigningCertificate"
                         value={formValues.samlConfiguration?.spSigningCertificate ?? ''}
                         onChange={(e) => setSaml('spSigningCertificate', e.target.value)}
@@ -902,8 +902,8 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                       />
                       <p className="text-xs text-default-500">{t('spSigningCertificateHint')}</p>
 
-                      <Textarea
-                        label={t('spSigningPrivateKey')}
+                      <TextArea
+                       
                         name="samlConfiguration.spSigningPrivateKey"
                         value={formValues.samlConfiguration?.spSigningPrivateKey ?? ''}
                         onChange={(e) => setSaml('spSigningPrivateKey', e.target.value)}
@@ -920,28 +920,28 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <Switch
                           isSelected={formValues.samlConfiguration?.signRequest ?? false}
-                          onValueChange={(value) => handleSamlToggleChange('signRequest', value)}
+                          onChange={(value) => handleSamlToggleChange('signRequest', value)}
                           data-cy="sso-provider-form-saml-sign-request-switch"
                         >
                           {t('signRequest')}
                         </Switch>
                         <Switch
                           isSelected={formValues.samlConfiguration?.wantAssertionsSigned ?? false}
-                          onValueChange={(value) => handleSamlToggleChange('wantAssertionsSigned', value)}
+                          onChange={(value) => handleSamlToggleChange('wantAssertionsSigned', value)}
                           data-cy="sso-provider-form-saml-assertions-signed-switch"
                         >
                           {t('wantAssertionsSigned')}
                         </Switch>
                         <Switch
                           isSelected={formValues.samlConfiguration?.wantAuthnResponseSigned ?? true}
-                          onValueChange={(value) => handleSamlToggleChange('wantAuthnResponseSigned', value)}
+                          onChange={(value) => handleSamlToggleChange('wantAuthnResponseSigned', value)}
                           data-cy="sso-provider-form-saml-response-signed-switch"
                         >
                           {t('wantAuthnResponseSigned')}
                         </Switch>
                         <Switch
                           isSelected={formValues.samlConfiguration?.forceAuthn ?? false}
-                          onValueChange={(value) => handleSamlToggleChange('forceAuthn', value)}
+                          onChange={(value) => handleSamlToggleChange('forceAuthn', value)}
                           data-cy="sso-provider-form-saml-force-authn-switch"
                         >
                           {t('forceAuthn')}
@@ -950,7 +950,7 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                     </>
                   )}
 
-                  <Divider className="my-4" />
+                  <Separator className="my-4" />
                   <Card className="border border-default-200" data-cy="sso-provider-form-setup-card">
                     <CardHeader className="flex items-center gap-2">
                       <Info size={16} />
@@ -966,7 +966,7 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                               <InputGroup>
                                 <Input data-cy="sso-provider-form-authentik-regex" />
                                 <Button variant="ghost"
-                                  size="sm"
+
                                   onPress={() => handleCopyLoginUrl(authentikRedirectRegexPattern)}
                                   data-cy="sso-provider-form-authentik-regex-copy-button"
                                 ><Copy size={24} />
@@ -985,7 +985,7 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                             <InputGroup>
                               <Input data-cy="sso-provider-form-callback-url" />
                               <Button variant="ghost"
-                                size="sm"
+
                                 onPress={isSamlProvider ? handleCopySamlCallbackUrl : handleCopyOidcCallbackUrl}
                                 data-cy="sso-provider-form-callback-url-copy-button"
                               ><Copy size={24} />

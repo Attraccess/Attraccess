@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Button, Divider, TextField, Label, Input, InputGroup, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Spinner, Tooltip, useOverlayState } from '@heroui/react';
+import { Button, Separator, TextField, Label, Input, InputGroup, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Spinner, Tooltip, useOverlayState } from '@heroui/react';
 import { AlertTriangleIcon, ClipboardCopyIcon, KeyIcon, RefreshCwIcon, Trash2Icon } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -166,7 +166,7 @@ export function MetricsSettingsForm() {
   if (isLoading) {
     return (
       <div className="flex items-center gap-2 text-sm text-default-500">
-        <Spinner size="sm" />
+        <Spinner />
         {t('loading')}
       </div>
     );
@@ -243,7 +243,7 @@ export function MetricsSettingsForm() {
         <Tooltip content={t('copyButton')}>
           <Button variant="ghost"
             isIconOnly
-            size="sm"
+
             onPress={handleCopyEndpoint}
             aria-label={t('copyButton')}
           >
@@ -256,13 +256,13 @@ export function MetricsSettingsForm() {
 
   const setupGuideSection = (
     <div className="flex flex-col gap-3">
-      <Divider />
+      <Separator />
       <h4 className="text-sm font-semibold">{t('setupGuide.title')}</h4>
       <p className="text-sm text-default-500">{t('setupGuide.description')}</p>
       <CodeBlock>{prometheusSnippet}</CodeBlock>
       <p className="text-xs text-default-400">{t('setupGuide.bearerNote')}</p>
 
-      <Divider />
+      <Separator />
       <h4 className="text-sm font-semibold">{t('setupGuide.grafanaTitle')}</h4>
       <p className="text-sm text-default-500">{t('setupGuide.grafanaDescription')}</p>
     </div>
@@ -283,7 +283,7 @@ export function MetricsSettingsForm() {
             <Tooltip content={t('copyButton')}>
               <Button variant="ghost"
                 isIconOnly
-                size="sm"
+
                 onPress={handleCopyKey}
                 aria-label={t('copyButton')}
               >

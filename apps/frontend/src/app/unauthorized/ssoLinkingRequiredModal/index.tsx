@@ -116,7 +116,7 @@ export function SSOLinkingRequiredModal(props: Props) {
           <PasswordInput
             label={t('inputs.password.label')}
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(setPassword)}
             autoComplete="current-password"
           />
         </ModalBody>

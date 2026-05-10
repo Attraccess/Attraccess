@@ -237,9 +237,9 @@ export function MaintenanceScheduleUpsertModal(props: Props) {
 
               <Select
                 label={t('inputs.triggerType.label')}
-                selectedKeys={[triggerType]}
-                onSelectionChange={(keys) => {
-                  const v = Array.from(keys)[0] as ResourceMaintenanceScheduleTriggerType;
+
+                onSelectionChange={(key) => {
+                  const v = Array.from(key)[0] as ResourceMaintenanceScheduleTriggerType;
                   if (v) setTriggerType(v);
                 }}
               >
@@ -256,9 +256,9 @@ export function MaintenanceScheduleUpsertModal(props: Props) {
                   </TextField>
                   <Select
                     label={t('inputs.unit.label')}
-                    selectedKeys={[usageHoursUnit]}
-                    onSelectionChange={(keys) => {
-                      const v = Array.from(keys)[0] as UsageDurationUnit;
+
+                    onSelectionChange={(key) => {
+                      const v = Array.from(key)[0] as UsageDurationUnit;
                       if (v) setUsageHoursUnit(v);
                     }}
                   >
@@ -284,9 +284,9 @@ export function MaintenanceScheduleUpsertModal(props: Props) {
                   </TextField>
                   <Select
                     label={t('inputs.unit.label')}
-                    selectedKeys={[timeIntervalUnit]}
-                    onSelectionChange={(keys) => {
-                      const v = Array.from(keys)[0] as UsageDurationUnit;
+
+                    onSelectionChange={(key) => {
+                      const v = Array.from(key)[0] as UsageDurationUnit;
                       if (v) setTimeIntervalUnit(v);
                     }}
                   >
@@ -298,7 +298,7 @@ export function MaintenanceScheduleUpsertModal(props: Props) {
                 </>
               )}
 
-              <Switch isSelected={enabled} onValueChange={setEnabled}>
+              <Switch isSelected={enabled} onChange={setEnabled}>
                 {t('inputs.enabled.label')}
               </Switch>
 

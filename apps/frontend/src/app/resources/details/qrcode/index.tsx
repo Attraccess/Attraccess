@@ -67,11 +67,11 @@ export function ResourceQrCode(props: Props & Omit<ButtonProps, 'children' | 'st
                   <Select
                     selectedKey={action}
                     onSelectionChange={(key) => setAction(key as QrCodeAction)}
+                    label={t('modal.action.label')}
                     items={Object.values(QrCodeAction).map((val) => ({
                       key: val,
                       label: t(`modal.action.${val}`),
                     }))}
-                    label={t('modal.action.label')}
                   />
                   <QRCode
                     value={qrCodeUrl}

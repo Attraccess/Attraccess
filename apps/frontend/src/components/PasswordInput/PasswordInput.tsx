@@ -57,7 +57,7 @@ export const PasswordInput: React.FC<PasswordInputProps> = ({
             <Button
               variant="ghost"
               isIconOnly
-              size="sm"
+
               onPress={() => setShowPassword((v) => !v)}
               aria-label={showPassword ? t('hidePassword') : t('showPassword')}
               data-cy="password-input-toggle-button"

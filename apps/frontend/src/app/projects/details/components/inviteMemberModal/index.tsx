@@ -120,16 +120,16 @@ export function InviteProjectMemberModal(props: Readonly<InviteProjectMemberModa
                   <p className="text-small text-default-500">{t('description')}</p>
                   <UserSearch
                     label={t('inputs.user')}
-                    onSelectionChange={setSelectedUser}
+
                     afterSelection={
                       selectedUser ? <span className="text-tiny text-default-500">{selectedUser.username}</span> : null
                     }
                   />
                   <Select
                     label={t('inputs.role')}
-                    selectedKeys={[role]}
-                    onSelectionChange={onSelectionChange}
-                    disallowEmptySelection
+
+
+                   
                   >
                     {roleOptions.map((value) => (
                       <ListBoxItem key={value} id={value}>{t(`roles.${value}`)}</ListBoxItem>

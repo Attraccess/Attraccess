@@ -1,5 +1,5 @@
 import { ResourceFlowNodeDto, useBillingServiceGetBillingConfiguration } from '@attraccess/react-query-client';
-import { Autocomplete, Button, Card, CardContent, TextField, Label, Input, ListBoxItem, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalHeader, NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput, Switch, Textarea } from "@heroui/react";
+import { Autocomplete, Button, Card, CardContent, TextField, Label, Input, ListBoxItem, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalHeader, NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput, Switch, TextArea } from "@heroui/react";
 import { MqttServerSelect } from '../../../../../../../components/mqttServerSelect';
 import { PlusIcon, XIcon } from 'lucide-react';
 import { TFunction } from '@attraccess/plugins-frontend-ui';
@@ -90,7 +90,7 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
           <div className="flex-grow min-w-0">
             <MqttServerSelect
               selectedId={value as number}
-              onSelectionChange={(newValue) => onChange(newValue as TValue)}
+
               label={!hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined}
               ariaLabel={t('nodes.' + nodeType + '.config.' + name + '.label')}
               isRequired={isRequired}
@@ -158,13 +158,13 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
 
       if (schema.stringVariant === 'multiline') {
         return (
-          <Textarea
+          <TextArea
             isRequired={isRequired}
-            label={!hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined}
+           
             placeholder={hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined}
             value={value ? String(value) : undefined}
             defaultValue={schema.default ? String(schema.default) : undefined}
-            onValueChange={(newValue) => onChange(newValue as TValue)}
+            onChange={(newValue) => onChange(newValue as TValue)}
             description={description}
           />
         );
@@ -196,7 +196,6 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
               if (newValue === null) {
                 return;
               }
-
               const parsedValue = typeof newValue === 'number' ? newValue : Number(newValue);
               setValue(parsedValue as TValue);
             }}
@@ -253,7 +252,7 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
                     isRequired
                     className="flex-1"
                   >
-                    <Input size="sm" placeholder="Header name" />
+                    <Input placeholder="Header name" />
                   </TextField>
                   <TextField
                     value={currentValueOfKey as string}
@@ -261,10 +260,10 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
                     isRequired
                     className="flex-1"
                   >
-                    <Input size="sm" placeholder="Header value" />
+                    <Input placeholder="Header value" />
                   </TextField>
                   <Button variant="danger-soft"
-                    size="sm"
+
                     isIconOnly
                     onPress={() =>
                       onChange(
@@ -287,7 +286,7 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
             {!hideLabel && <small>{t('nodes.' + nodeType + '.config.' + name + '.label')}</small>}
             {content}
             <Button variant="secondary"
-              size="sm"
+
               onPress={() => onChange({ ...value, '': '' })}
             ><PlusIcon size={16} />
               {t('nodes.' + nodeType + '.config.' + name + '.add')}
@@ -363,7 +362,7 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
                     </div>
                     <div className="row-span-2 flex items-start p-2">
                       <Button variant="danger-soft"
-                        size="sm"
+
                         isIconOnly
                         onPress={() => {
                           const copy = (arrayValue as Array<unknown>).filter((_, i) => i !== index);
@@ -403,7 +402,7 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
         <div className="flex flex-col gap-2 w-full">
           {!hideLabel && <small>{t('nodes.' + nodeType + '.config.' + name + '.label')}</small>}
           {content}
-          <Button variant="secondary" size="sm" onPress={handleAdd}><PlusIcon size={16} />
+          <Button variant="secondary" onPress={handleAdd}><PlusIcon size={16} />
             {addText}
           </Button>
         </div>
@@ -412,7 +411,7 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
 
     case 'boolean':
       return (
-        <Switch isSelected={value as boolean} onValueChange={(newValue) => onChange(newValue as TValue)}>
+        <Switch isSelected={value as boolean} onChange={(newValue) => onChange(newValue as TValue)}>
           {!hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : null}
         </Switch>
       );

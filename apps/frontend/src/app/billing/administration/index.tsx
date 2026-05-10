@@ -22,7 +22,7 @@ export function BillingAdministrationPage() {
         title={t('title')}
         icon={<BanknoteIcon />}
         actions={
-          <Button variant="ghost" as={Link} href="/billing/administration/sumup"><SumUpIcon />
+          <Button variant="ghost" href="/billing/administration/sumup"><SumUpIcon />
             {t('actions.sumupSettings')}
           </Button>
         }
@@ -35,7 +35,7 @@ export function BillingAdministrationPage() {
             <PageHeader title={t('inputs.user')} noMargin />
           </CardHeader>
           <CardContent>
-            <UserSearch onSelectionChange={setUser} label={t('inputs.user')} />
+            <UserSearch />
           </CardContent>
         </Card>
 

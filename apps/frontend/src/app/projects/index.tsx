@@ -160,21 +160,21 @@ export function ProjectsListPage() {
               {t('invitations.invitedBy', { username: invitation.inviter?.username ?? '—' })}
             </p>
           </div>
-          <Chip size="sm" variant="soft">
+          <Chip variant="soft">
             {t(`invitations.roles.${invitation.requestedRole}` as const)}
           </Chip>
         </div>
         <div className="text-tiny text-default-400">{new Date(invitation.createdAt).toLocaleString()}</div>
         <div className="flex flex-wrap items-center justify-end gap-2">
           <Button variant="primary"
-            size="sm"
+
             isPending={acceptingInvitationId === invitation.id}
             onPress={() => handleAccept(invitation.id)}
           >
             {t('invitations.actions.accept')}
           </Button>
           <Button variant="danger-soft"
-            size="sm"
+
             isPending={decliningInvitationId === invitation.id}
             onPress={() => handleDecline(invitation.id)}
           >
@@ -203,7 +203,7 @@ export function ProjectsListPage() {
         icon={<FolderIcon />}
         actions={
           <div className="flex flex-wrap items-center gap-3">
-            <Switch isSelected={includeArchived} onValueChange={setIncludeArchived}>
+            <Switch isSelected={includeArchived} onChange={setIncludeArchived}>
               {t('filters.includeArchived')}
             </Switch>
             <UpsertProjectModal>

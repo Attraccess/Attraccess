@@ -60,7 +60,7 @@ export function WebSerialConsole({ children }: Props) {
 
       <Modal isOpen={isOpen} onOpenChange={setOpen}>
         <ModalBackdrop />
-        <ModalContainer size="full">
+        <ModalContainer>
           <ModalDialog>
             {() => (
               <>

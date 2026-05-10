@@ -65,7 +65,7 @@ function DocumentationModalComponent({ resourceId, children }: Readonly<Document
     if (isLoading || isFetching) {
       return (
         <div className="flex justify-center p-4">
-          <Spinner size="lg" label={t('loading')} color="primary" data-cy="documentation-modal-loading-spinner" />
+          <Spinner color="accent" data-cy="documentation-modal-loading-spinner" />
         </div>
       );
     }
@@ -148,7 +148,7 @@ function DocumentationModalComponent({ resourceId, children }: Readonly<Document
                     {canManageResources && (
                       <Button variant="secondary"
                         isIconOnly
-                        size="sm"
+
                         onPress={handleEditDocumentation}
                         aria-label={t('actions.edit')}
                         data-cy="documentation-modal-edit-button"
@@ -158,7 +158,7 @@ function DocumentationModalComponent({ resourceId, children }: Readonly<Document
                     )}
                     <Button variant="secondary"
                       isIconOnly
-                      size="sm"
+
                       onPress={toggleFullscreen}
                       aria-label={isFullscreen ? t('actions.exitFullscreen') : t('actions.fullscreen')}
                       data-cy="documentation-modal-fullscreen-button"
@@ -168,7 +168,7 @@ function DocumentationModalComponent({ resourceId, children }: Readonly<Document
 
                     <Button variant="secondary"
                       isIconOnly
-                      size="sm"
+
                       onPress={handleOpenInNewTab}
                       aria-label={t('actions.openInNewTab')}
                       data-cy="documentation-modal-open-in-new-tab-button"
@@ -179,7 +179,7 @@ function DocumentationModalComponent({ resourceId, children }: Readonly<Document
                     {resource?.documentationType === 'url' && (
                       <Button variant="secondary"
                         isIconOnly
-                        size="sm"
+
                         onPress={() => refetch()}
                         isPending={isFetching}
                         aria-label={t('actions.refresh')}

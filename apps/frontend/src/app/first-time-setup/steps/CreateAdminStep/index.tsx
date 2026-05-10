@@ -138,7 +138,7 @@ export function CreateAdminStep({ onSuccess, isOverwrite }: CreateAdminStepProps
           })}
           validationMessages={usernameValidationMessages}
           value={username}
-          onValueChange={setUsername}
+          onChange={setUsername}
           isRequired
         />
         <TextField value={email} onChange={setEmail} isRequired>
@@ -148,7 +148,7 @@ export function CreateAdminStep({ onSuccess, isOverwrite }: CreateAdminStepProps
         <PasswordInput
           label={t('password')}
           value={password ?? ''}
-          onValueChange={(v) => setPassword(v || null)}
+          onChange={(v) => setPassword(v || null)}
           autoComplete="new-password"
           isRequired
           validate={() =>
@@ -158,7 +158,7 @@ export function CreateAdminStep({ onSuccess, isOverwrite }: CreateAdminStepProps
         <PasswordInput
           label={t('passwordConfirmation')}
           value={passwordConfirmation ?? ''}
-          onValueChange={(v) => setPasswordConfirmation(v || null)}
+          onChange={(v) => setPasswordConfirmation(v || null)}
           autoComplete="new-password"
           isRequired
           validate={() =>

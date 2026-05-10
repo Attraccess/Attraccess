@@ -1,5 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Alert, AlertContent, AlertDescription, Button, Form, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Textarea, useOverlayState } from '@heroui/react';
+import { Alert, AlertContent, AlertDescription, Button, Form, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, TextArea, useOverlayState } from '@heroui/react';
 import de from '../de.json';
 import en from '../en.json';
 import {
@@ -75,12 +75,12 @@ export function MarkDoneModal(props: Props) {
                       onSubmit();
                     }}
                   >
-                    <Textarea
-                      label={t('actions.markDone.modal.notesLabel')}
+                    <TextArea
+                     
                       placeholder={t('actions.markDone.modal.notesPlaceholder')}
                       description={t('actions.markDone.modal.notesOptional')}
                       value={notes}
-                      onValueChange={setNotes}
+                      onChange={setNotes}
                     />
                     {error ? (
                       <Alert status="danger">

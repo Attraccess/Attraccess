@@ -97,7 +97,7 @@ export function PluginsList() {
                 <TableRow key={plugin.name} id={plugin.name}>
                   <TableCell>{plugin.name}</TableCell>
                   <TableCell>
-                    <Chip size="sm" variant="soft" color="primary">
+                    <Chip variant="soft" color="accent">
                       {plugin.version}
                     </Chip>
                   </TableCell>

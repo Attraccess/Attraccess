@@ -81,12 +81,12 @@ export function UpdateNotificationBanner() {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" size="sm" onPress={onOpenReleaseNotes}>
+            <Button variant="secondary" onPress={onOpenReleaseNotes}>
               {t('viewReleaseNotes')}
             </Button>
             <Button variant="primary"
-              size="sm"
-              as="a"
+
+
               href={updateDocsPath}
               target="_blank"
               rel="noopener noreferrer"
@@ -94,7 +94,7 @@ export function UpdateNotificationBanner() {
               {t('howToUpdate')}
             <ExternalLink size={14} /></Button>
             <Button variant="ghost"
-              size="sm"
+
               isIconOnly
               aria-label={t('dismissThisVersion')}
               onPress={onDismiss}
@@ -105,7 +105,7 @@ export function UpdateNotificationBanner() {
         </div>
       </div>
 
-      <Modal isOpen={isReleaseNotesOpen} onOpenChange={setIsReleaseNotesOpen} size="lg">
+      <Modal isOpen={isReleaseNotesOpen} onOpenChange={setIsReleaseNotesOpen}>
         <ModalBackdrop />
         <ModalContainer>
           <ModalDialog>
@@ -123,7 +123,7 @@ export function UpdateNotificationBanner() {
                 </ModalBody>
                 <ModalFooter className="flex-wrap gap-2 justify-between">
                   <Button variant="secondary"
-                    as="a"
+
                     href={release.htmlUrl}
                     target="_blank"
                     rel="noopener noreferrer"

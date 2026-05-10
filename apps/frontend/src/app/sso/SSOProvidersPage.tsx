@@ -19,7 +19,7 @@ export const SSOProvidersPage: React.FC = () => {
 
   // Redirect if user doesn't have permission
   if (!canManageSSO) {
-    return <Navigate to="/" />;
+    return <Navigate />;
   }
 
   const handleAddNewProvider = () => {

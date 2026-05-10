@@ -103,7 +103,7 @@ export function AppSettingsForm({ variant, endpoint, onNext }: AppSettingsFormPr
   if (showLoading) {
     return (
       <div className="flex items-center gap-2 text-sm text-default-500">
-        <Spinner size="sm" />
+        <Spinner />
         {t('loading')}
       </div>
     );
@@ -134,7 +134,7 @@ export function AppSettingsForm({ variant, endpoint, onNext }: AppSettingsFormPr
             label={t('inputs.licenseKey.label')}
             description={t('inputs.licenseKey.description')}
             value={licenseKey}
-            onValueChange={setLicenseKey}
+            onChange={setLicenseKey}
             autoComplete="off"
           />
           <CommunityLicenseButton onAccept={setLicenseKey} isDisabled={isSaving} />

@@ -40,7 +40,7 @@ function DocumentationViewComponent() {
   if (isLoadingResource) {
     return (
       <div className="flex justify-center items-center h-[50vh]">
-        <Spinner size="lg" label={t('loading')} data-cy="documentation-view-loading-spinner" />
+        <Spinner data-cy="documentation-view-loading-spinner" />
       </div>
     );
   }
@@ -130,7 +130,7 @@ function DocumentationViewComponent() {
         <CardContent className="relative">
           {isFetching && (
             <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-10">
-              <Spinner size="lg" data-cy="documentation-view-fetching-spinner" />
+              <Spinner data-cy="documentation-view-fetching-spinner" />
             </div>
           )}
 

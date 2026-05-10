@@ -80,15 +80,15 @@ export function MaintenanceManagement(props: Props & Omit<CardProps, 'children'>
           noMargin
           actions={
             <>
-              <Switch isSelected={includePast} onValueChange={setIncludePast}>
+              <Switch isSelected={includePast} onChange={setIncludePast}>
                 {t('filters.includePast')}
               </Switch>
               <ResourceMaintenanceUpsertModal resourceId={resourceId}>
                 {(open) => (
                   <Button variant="primary"
                     onPress={open}
-                    size="sm"
-                    title={t('actions.create.title')}
+
+                   
                   ><PlusIcon className="w-4 h-4" />
                     {t('actions.create.label')}
                   </Button>
@@ -126,13 +126,13 @@ export function MaintenanceManagement(props: Props & Omit<CardProps, 'children'>
                 <TableCell>
                   <DateTimeDisplay date={maintenance.endTime} />
                 </TableCell>
-                <TableCell className="overflow-hidden text-ellipsis" title={formatReason(maintenance.reason)}>
+                <TableCell className="overflow-hidden text-ellipsis">
                   <MaintenanceReasonDisplay reason={maintenance.reason} />
                 </TableCell>
-                <TableCell title={(maintenance.createdByUser as { username?: string } | undefined)?.username ?? ''}>
+                <TableCell>
                   {(maintenance.createdByUser as { username?: string } | undefined)?.username ?? '—'}
                 </TableCell>
-                <TableCell title={(maintenance.completedByUser as { username?: string } | undefined)?.username ?? ''}>
+                <TableCell>
                   {(maintenance.completedByUser as { username?: string } | undefined)?.username ?? '—'}
                 </TableCell>
                 <TableCell>
@@ -148,7 +148,7 @@ export function MaintenanceManagement(props: Props & Omit<CardProps, 'children'>
                       {(openMarkDone: () => void) => (
                         <Button variant="tertiary"
                           isIconOnly
-                          title={t('actions.markDone.title')}
+                         
                           onPress={openMarkDone}
                         />
                       )}

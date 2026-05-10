@@ -141,7 +141,7 @@ export function EditEmailTemplatePage() {
 
               <Modal isOpen={editorIsExpanded} onOpenChange={setEditorIsExpanded}>
                 <ModalBackdrop />
-                <ModalContainer size="full">
+                <ModalContainer>
                   <ModalDialog>
                     {({ close }) => (
                       <>
@@ -173,7 +173,7 @@ export function EditEmailTemplatePage() {
         </div>
 
         <div className="flex flex-row gap-4 w-full justify-end">
-          <Button variant="ghost" type="button" onPress={() => navigate('/email-templates')}>
+          <Button variant="ghost" onPress={() => navigate('/email-templates')}>
             {t('actions.cancel')}
           </Button>
           <Button variant="primary" type="submit" isPending={updateTemplate.isPending}>

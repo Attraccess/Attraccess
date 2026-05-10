@@ -103,7 +103,7 @@ export function FirstTimeSetupPage() {
   if (isCheckingSetup) {
     return (
       <div className="flex items-center gap-2 text-sm text-default-500">
-        <Spinner size="sm" />
+        <Spinner />
         {t('loading')}
       </div>
     );
@@ -118,10 +118,10 @@ export function FirstTimeSetupPage() {
       />
 
       <Accordion
-        variant="splitted"
-        selectionMode="single"
-        selectedKeys={new Set([currentStep])}
-        onSelectionChange={handleAccordionSelectionChange}
+        variant="default"
+
+
+
         className="w-full"
       >
         <AccordionItem

@@ -124,9 +124,9 @@ export function TwoFactorPolicyModal(props: Props) {
                   </Alert>
                   <Select
                     label={t('inputs.policy.label')}
-                    selectedKeys={selectedPolicy ? new Set([selectedPolicy]) : new Set([])}
-                    onSelectionChange={onSelectionChange}
-                    disallowEmptySelection
+
+
+                   
                     isDisabled={isLoading}
                   >
                     {policyOptions.map((option) => (

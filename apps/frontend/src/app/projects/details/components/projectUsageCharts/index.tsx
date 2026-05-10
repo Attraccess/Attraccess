@@ -235,13 +235,13 @@ export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
                         dataKey="sessions"
                         fill={BAR_COLORS.sessions.base}
                         name={t('tooltip.sessions')}
-                        radius={6}
+
                         activeBar={
                           <Rectangle
                             fill={BAR_COLORS.sessions.active}
                             stroke={BAR_COLORS.sessions.base}
                             strokeWidth={2}
-                            radius={8}
+
                           />
                         }
                       />
@@ -249,13 +249,13 @@ export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
                         dataKey="minutes"
                         fill={BAR_COLORS.minutes.base}
                         name={t('tooltip.minutes')}
-                        radius={6}
+
                         activeBar={
                           <Rectangle
                             fill={BAR_COLORS.minutes.active}
                             stroke={BAR_COLORS.minutes.base}
                             strokeWidth={2}
-                            radius={8}
+
                           />
                         }
                       />

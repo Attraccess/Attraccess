@@ -110,8 +110,8 @@ export function MaintenanceSchedules(props: Props & Omit<CardProps, 'children'>)
               {(open: () => void) => (
                 <Button variant="primary"
                   onPress={open}
-                  size="sm"
-                  title={t('actions.add')}
+
+                 
                 ><PlusIcon className="w-4 h-4" />
                   {t('actions.add')}
                 </Button>
@@ -142,7 +142,7 @@ export function MaintenanceSchedules(props: Props & Omit<CardProps, 'children'>)
                 <TableCell>
                   <Switch
                     isSelected={schedule.enabled}
-                    onValueChange={(enabled) => handleEnabledChange(schedule, enabled)}
+                    onChange={(enabled) => handleEnabledChange(schedule, enabled)}
                     isDisabled={isUpdating}
                     aria-label={schedule.enabled ? 'Disable' : 'Enable'}
                   />
@@ -153,7 +153,7 @@ export function MaintenanceSchedules(props: Props & Omit<CardProps, 'children'>)
                       <Button variant="ghost"
                         onPress={open}
                         isIconOnly
-                        title={t('actions.edit')}
+                       
                       />
                     )}
                   </MaintenanceScheduleUpsertModal>
@@ -162,7 +162,7 @@ export function MaintenanceSchedules(props: Props & Omit<CardProps, 'children'>)
                       <Button variant="danger-soft"
                         onPress={open}
                         isIconOnly
-                        title={t('actions.delete')}
+                       
                       />
                     )}
                   </ScheduleDeleteModal>

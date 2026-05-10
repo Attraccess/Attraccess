@@ -167,12 +167,12 @@ export function AttraccessNode(props: Props) {
           <NodeToolbar isVisible={data?.forceToolbarVisible || undefined} position={data?.toolbarPosition}>
             <div className="flex flex-row gap-2">
               {isEditable && (
-                <Button size="sm" isIconOnly onPress={openEditor} />
+                <Button isIconOnly onPress={openEditor} />
               )}
               {!previewMode && (
                 <Button variant="danger"
                   isIconOnly
-                  size="sm"
+
                   onPress={userWantsToDelete}
                 />
               )}

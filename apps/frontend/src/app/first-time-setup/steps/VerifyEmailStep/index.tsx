@@ -37,7 +37,7 @@ export function VerifyEmailStep({ onCorrectAdminDetails }: VerifyEmailStepProps)
 
       {onCorrectAdminDetails && (
         <Link
-          as="button"
+
           className="text-sm cursor-pointer self-center"
           onPress={onCorrectAdminDetails}
           data-testid="wrong-admin-details-link"

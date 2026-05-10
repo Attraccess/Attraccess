@@ -21,7 +21,7 @@ export function NoResourcesFound(props: Props) {
           <AlertTitle>{t('alert.title')}</AlertTitle>
           <AlertDescription>{t('alert.description')}</AlertDescription>
         </AlertContent>
-        <Button variant="danger-soft" className="ml-4" onPress={onClearFilterAndSearch} size="sm">
+        <Button variant="danger-soft" className="ml-4" onPress={onClearFilterAndSearch}>
           {t('alert.clear')}
         </Button>
       </Alert>

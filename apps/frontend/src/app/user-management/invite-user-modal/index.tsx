@@ -119,7 +119,7 @@ export function InviteUserModal(props: Props) {
           </ModalHeader>
 
           <ModalBody>
-            <Tabs onSelectionChange={(key) => setTab(key as 'single' | 'csv')} selectedKey={tab}>
+            <Tabs selectedKey={tab}>
               <Tab key="single" title={t('tabs.single')}>
                 <Form
                   ref={formRef}
@@ -135,7 +135,7 @@ export function InviteUserModal(props: Props) {
                     isRequired
                     required
                     value={username}
-                    onValueChange={setUsername}
+                    onChange={setUsername}
                     validationMessages={usernameValidationMessages}
                     description={t('inputs.username.description', {
                       min: USERNAME_RULES.minLength,

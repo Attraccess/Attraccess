@@ -189,7 +189,7 @@ export function ActiveUsageSessionsBanner({ onShowMySessions }: ActiveUsageSessi
             <AlertTitle>{t('loadingTitle')}</AlertTitle>
           </AlertContent>
           <div className="flex items-center gap-2">
-            <Spinner size="sm" />
+            <Spinner />
             <span>{t('loadingDescription')}</span>
           </div>
         </Alert>
@@ -212,10 +212,10 @@ export function ActiveUsageSessionsBanner({ onShowMySessions }: ActiveUsageSessi
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 w-full">
           <div className="flex flex-1">{t('description', { count: activeCount })}</div>
           <div className="flex flex-shrink gap-2">
-            <Button variant="primary" size="sm" onPress={onShowMySessions}>
+            <Button variant="primary" onPress={onShowMySessions}>
               {t('showMine')}
             </Button>
-            <Button variant="danger-soft" size="sm" onPress={openConfirmModal}>
+            <Button variant="danger-soft" onPress={openConfirmModal}>
               {t('endAll')}
             </Button>
           </div>
@@ -227,7 +227,7 @@ export function ActiveUsageSessionsBanner({ onShowMySessions }: ActiveUsageSessi
         onOpenChange={(open) => { if (!open && !isEndingAll) setIsModalOpen(false); }}
       >
         <ModalBackdrop isDismissable={!isEndingAll} />
-        <ModalContainer size="lg">
+        <ModalContainer>
           <ModalDialog>
             {({ close }) => (
               <>
@@ -247,7 +247,7 @@ export function ActiveUsageSessionsBanner({ onShowMySessions }: ActiveUsageSessi
                   </div>
                 ) : isLoadingResources ? (
                   <div className="flex items-center gap-2 py-2">
-                    <Spinner size="sm" /> {t('modal.loadingList')}
+                    <Spinner /> {t('modal.loadingList')}
                   </div>
                 ) : (
                   <div className="space-y-2">

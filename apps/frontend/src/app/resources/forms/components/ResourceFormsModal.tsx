@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Button, TextField, FieldError, Input, ListBoxItem, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Select, Selection, Switch, Textarea } from "@heroui/react";
+import { Button, TextField, FieldError, Input, ListBoxItem, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Select, Selection, Switch, TextArea } from "@heroui/react";
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { FormFieldType, FormResponseDto, FormSubmissionRequestDto } from '@attraccess/react-query-client';
 import {
@@ -118,7 +118,7 @@ export function ResourceFormsModal({ isOpen, action, forms, onSubmit, onCancel }
   return (
     <Modal isOpen={isOpen} onOpenChange={(open) => { if (!open) onCancel(); }}>
       <ModalBackdrop />
-      <ModalContainer size="lg">
+      <ModalContainer>
         <ModalDialog>
           {({ close }) => (<>
           <ModalHeader className="flex flex-col gap-1">
@@ -258,10 +258,10 @@ function renderTextInput(
 ) {
   if (options.multiline) {
     return (
-      <Textarea
+      <TextArea
         value={(value as string) ?? ''}
         placeholder={options.placeholder ?? ''}
-        onChange={(event) => onChange(event.target.value)}
+        onChange={onChange}
         isInvalid={Boolean(error)}
         errorMessage={error ?? undefined}
       />
@@ -308,7 +308,7 @@ function renderBooleanInput(
         <span className="text-xs text-default-500">{t('modal.booleanNo')}</span>
         <Switch
           isSelected={isChecked}
-          onValueChange={(checked) => onChange(checked)}
+          onChange={(checked) => onChange(checked)}
           color={error ? 'danger' : 'primary'}
           aria-label={t('modal.booleanLabel')}
         />
@@ -338,8 +338,8 @@ function renderSelectInput(
 
   return (
     <Select
-      selectedKeys={selected}
-      onSelectionChange={handleSelectionChange}
+
+
       placeholder={options.length ? t('modal.selectPlaceholder') : t('modal.selectUnavailable')}
       isDisabled={!options.length}
       isInvalid={Boolean(error)}

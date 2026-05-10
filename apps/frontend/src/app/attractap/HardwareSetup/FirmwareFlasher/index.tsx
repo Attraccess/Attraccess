@@ -126,7 +126,7 @@ export function FirmwareFlasher(props: Props) {
           </AlertContent>
           <div>{(flashError.details as string) || 'Unknown error occurred'}</div>
 
-          <Button variant="primary" size="sm" onPress={flashFirmware}>
+          <Button variant="primary" onPress={flashFirmware}>
             {t('action.retryFlash')}
           </Button>
         </Alert>

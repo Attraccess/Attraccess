@@ -1,5 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Alert, AlertContent, AlertTitle, Button, DatePicker, Form, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Switch, Textarea, useOverlayState } from '@heroui/react';
+import { Alert, AlertContent, AlertTitle, Button, DatePicker, Form, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Switch, TextArea, useOverlayState } from '@heroui/react';
 import de from './de.json';
 import en from './en.json';
 import { PageHeader } from '../../../../../components/pageHeader';
@@ -122,19 +122,19 @@ export function ResourceMaintenanceUpsertModal(props: Props) {
                 <ModalBody>
                   <Form onSubmit={onSubmit} ref={formRef}>
                     <DatePicker
-                      label={t('inputs.startTime.label')}
+                     
                       value={startTime}
                       isRequired
                       hideTimeZone
                       onChange={setStartTime}
                     />
 
-                    <Switch isSelected={hasEndDate} onValueChange={onHasEndDateChange}>
+                    <Switch isSelected={hasEndDate} onChange={onHasEndDateChange}>
                       {t('inputs.hasEndDate.label')}
                     </Switch>
                     {hasEndDate && (
                       <DatePicker
-                        label={t('inputs.endTime.label')}
+                       
                         value={endTime}
                         isRequired
                         hideTimeZone
@@ -149,7 +149,7 @@ export function ResourceMaintenanceUpsertModal(props: Props) {
                           {t('inputs.reason.displayedToUsers')}: <MaintenanceReasonDisplay reason={reason} />
                         </p>
                       ) : null}
-                      <Textarea value={reason} onChange={(e) => setReason(e.target.value)} />
+                      <TextArea value={reason} onChange={(setReason)} />
                     </div>
 
                     {error ? (

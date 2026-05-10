@@ -22,8 +22,8 @@ export function EmailTemplatesPage() {
       subject: item.subject,
       actions: (
         <Button variant="ghost"
-          as={Link}
-          to={`/email-templates/${item.type}`}
+
+
           isIconOnly
           aria-label={t('editButton')}
         />

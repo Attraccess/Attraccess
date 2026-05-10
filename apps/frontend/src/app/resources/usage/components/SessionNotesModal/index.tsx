@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading } from '@heroui/react';
 import { Button } from '@heroui/react';
-import { Textarea } from '@heroui/react';
+import { TextArea } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './translations/en';
 import de from './translations/de';
@@ -44,7 +44,7 @@ export const SessionNotesModal = ({ isOpen, onClose, onConfirm, mode, isSubmitti
                   <label htmlFor="notes" className="text-sm font-medium">
                     {t('notesLabel')}
                   </label>
-                  <Textarea
+                  <TextArea
                     id="notes"
                     placeholder={t('notesPlaceholder')}
                     value={notes}
@@ -56,10 +56,10 @@ export const SessionNotesModal = ({ isOpen, onClose, onConfirm, mode, isSubmitti
               </ModalBody>
 
               <ModalFooter>
-                <Button variant="outline" onPress={close} disabled={isSubmitting}>
+                <Button variant="outline" onPress={close} isDisabled={isSubmitting}>
                   {t('cancel')}
                 </Button>
-                <Button onPress={handleConfirm} disabled={isSubmitting}>
+                <Button onPress={handleConfirm} isDisabled={isSubmitting}>
                   {isSubmitting ? t('processing') : t('confirm')}
                 </Button>
               </ModalFooter>

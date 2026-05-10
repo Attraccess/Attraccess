@@ -96,7 +96,7 @@ export function DonationPrompt() {
       isOpen={isVisible}
       onOpenChange={(open) => setIsVisible(open)}
       placement="bottom"
-      size="xs"
+
       backdrop="blur"
       isDismissable={false}
     >

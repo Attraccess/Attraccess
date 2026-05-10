@@ -138,9 +138,9 @@ export function ManageResourceGroups({
             <ResourceGroupUpsertModal onUpserted={onGroupCreated}>
               {(onOpen: () => void) => (
                 <Button variant="secondary"
-                  radius="full"
+
                   onPress={onOpen}
-                  size="sm"
+
                   data-cy="toolbar-open-create-resource-group-modal-button"
                 ><PlusIcon size={18} />
                   {t('addGroup')}
@@ -173,15 +173,15 @@ export function ManageResourceGroups({
                 <TableCell className="w-full">{group.name}</TableCell>
                 <TableCell className="text-right flex items-center gap-2">
                   <Checkbox
-                    size="lg"
-                    onValueChange={() => {
+
+                    onChange={() => {
                       handleGroupClick(group);
                     }}
                     aria-label={group.name}
                     color={isAdded(group) ? 'danger' : 'primary'}
                     isSelected={isAdded(group)}
                   />
-                  <Link size="lg" href={`/resource-groups/${group.id}`}>
+                  <Link href={`/resource-groups/${group.id}`}>
                     {t('actions.openGroup')}
                   </Link>
                 </TableCell>

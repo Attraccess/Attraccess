@@ -133,8 +133,8 @@ export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({ user, ss
           <Switch
             key={permission}
             isSelected={permissions[permission as keyof SystemPermissions]}
-            onValueChange={handlePermissionChange(permission as keyof SystemPermissions)}
-            color="primary"
+            onChange={handlePermissionChange(permission as keyof SystemPermissions)}
+           
             isDisabled={isPermissionSsoManaged(permission)}
             data-cy={`user-permission-form-${permission}-checkbox`}
           >

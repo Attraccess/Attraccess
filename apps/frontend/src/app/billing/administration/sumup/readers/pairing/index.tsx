@@ -85,7 +85,7 @@ export function SumUpReadersPairing(props: Props) {
                     <PasswordInput
                       label={t('inputs.pairingCode')}
                       value={pairingCode}
-                      onValueChange={setPairingCode}
+                      onChange={setPairingCode}
                       autoComplete="off"
                       isRequired
                       minLength={8}

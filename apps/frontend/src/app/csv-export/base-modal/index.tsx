@@ -2,8 +2,8 @@ import { ListboxWrapper, useTranslations } from '@attraccess/plugins-frontend-ui
 import {
   Button,
   Checkbox,
-  Listbox,
-  ListboxItem,
+  ListBox,
+  ListBoxItem,
   ModalBody,
   ModalFooter,
   TableBody,
@@ -123,14 +123,14 @@ export function BaseCsvExportModal<TData extends Row>(props: Props<TData>) {
       <ModalBody>
         <label className="text-sm font-medium">{t('inputs.columns.label')}</label>
         <ListboxWrapper>
-          <Listbox
+          <ListBox
             classNames={{
               list: 'max-h-[200px] overflow-scroll',
             }}
-            selectedKeys={selectedColumnKeys}
+
             items={columns}
             label={t('inputs.columns.label')}
-            selectionMode="multiple"
+
             variant="soft"
             onSelectionChange={(keys) => {
               setSelectedColumnKeys(Array.from(keys as Set<string>));
@@ -138,11 +138,11 @@ export function BaseCsvExportModal<TData extends Row>(props: Props<TData>) {
             data-cy="resource-usage-export-columns-listbox"
           >
             {(column) => (
-              <ListboxItem key={column.key} textValue={column.label}>
+              <ListBoxItem key={column.key} textValue={column.label}>
                 {column.label}
-              </ListboxItem>
+              </ListBoxItem>
             )}
-          </Listbox>
+          </ListBox>
         </ListboxWrapper>
 
         <div className="flex gap-4">
@@ -159,7 +159,7 @@ export function BaseCsvExportModal<TData extends Row>(props: Props<TData>) {
             <Checkbox
               key={option.key}
               isSelected={option.value}
-              onValueChange={(nextValue) => setOption?.(option.key, nextValue)}
+              onChange={(nextValue) => setOption?.(option.key, nextValue)}
               data-cy="resource-usage-export-grouping-checkbox"
             >
               {option.label}
@@ -169,9 +169,9 @@ export function BaseCsvExportModal<TData extends Row>(props: Props<TData>) {
 
         <Table
 
-          isVirtualized
-          maxTableHeight={500}
-          rowHeight={40}
+
+
+
           data-cy="resource-usage-export-table"
           aria-label={t('table.ariaLabel')}
         >

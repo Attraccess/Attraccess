@@ -151,7 +151,6 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
 
 
           aria-label={tableAriaLabel}
-          onRowAction={(key) => navigate(`/resources/${key}`)}
         >
           <TableHeader>
             <TableColumn width="0">{t('columns.image')}</TableColumn>

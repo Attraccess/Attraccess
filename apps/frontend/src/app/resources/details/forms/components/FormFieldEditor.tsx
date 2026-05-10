@@ -1,4 +1,4 @@
-import { Button, TextField, Label, Input, ListBoxItem, Select, Switch, Textarea } from "@heroui/react";
+import { Button, TextField, Label, Input, ListBoxItem, Select, Switch, TextArea } from "@heroui/react";
 import { Trash2 } from 'lucide-react';
 import { FormFieldType } from '@attraccess/react-query-client';
 import { EditableFormField, createDefaultFieldOptions } from '../types';
@@ -43,9 +43,9 @@ export function FormFieldEditor(props: FormFieldEditorProps) {
 
         <Select
           label={t('fields.type')}
-          selectedKeys={[field.type]}
-          onSelectionChange={(keys) => {
-            const [value] = Array.from(keys) as FormFieldType[];
+
+          onSelectionChange={(key) => {
+            const [value] = Array.from(key) as FormFieldType[];
             handleTypeChange(value ?? FormFieldType.TEXT);
           }}
         >
@@ -56,19 +56,19 @@ export function FormFieldEditor(props: FormFieldEditorProps) {
       </div>
 
       <div className="flex items-center justify-between">
-        <Switch isSelected={field.isRequired} onValueChange={(value) => onChange({ ...field, isRequired: value })}>
+        <Switch isSelected={field.isRequired} onChange={(value) => onChange({ ...field, isRequired: value })}>
           {t('fields.required')}
         </Switch>
         <Button variant="danger-soft"
-          size="sm"
+
           onPress={onRemove}
         ><Trash2 className="w-4 h-4" />
           {t('editor.deleteField')}
         </Button>
       </div>
 
-      <Textarea
-        label={t('fields.description')}
+      <TextArea
+       
         placeholder={t('fields.placeholder.description')}
         value={field.description ?? ''}
         onChange={(event) => onChange({ ...field, description: event.target.value })}

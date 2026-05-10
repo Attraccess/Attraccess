@@ -25,18 +25,18 @@ export function ResourceFilter(props: Props & Omit<FilterProps, 'onSearchChanged
         <DrawerContent>
           <DrawerHeader>{t('drawer.title')}</DrawerHeader>
           <DrawerBody>
-            <Switch isSelected={filterProps.onlyInUseByMe} onValueChange={filterProps.onOnlyInUseByMeChanged}>
+            <Switch isSelected={filterProps.onlyInUseByMe} onChange={filterProps.onOnlyInUseByMeChanged}>
               {t('drawer.options.onlyInUseByMe')}
             </Switch>
             <Switch
               isSelected={filterProps.onlyWithPermissions}
-              onValueChange={filterProps.onOnlyWithPermissionsChanged}
+              onChange={filterProps.onOnlyWithPermissionsChanged}
             >
               {t('drawer.options.onlyWithPermissions')}
             </Switch>
             <Switch
               isSelected={filterProps.hideEmptyResourceGroups}
-              onValueChange={filterProps.onHideEmptyResourceGroupsChanged}
+              onChange={filterProps.onHideEmptyResourceGroupsChanged}
             >
               {t('drawer.options.hideEmptyResourceGroups')}
             </Switch>

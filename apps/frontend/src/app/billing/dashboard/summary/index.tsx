@@ -189,7 +189,7 @@ export function SummaryCard(props: Omit<CardProps, 'children'> & Props) {
           aria-label={t('transactions.table.ariaLabel')}
 
 
-          onRowAction={(key) => openDetails(key as number)}
+
         >
           <TableHeader>
             <TableColumn>{t('transactions.table.columns.id')}</TableColumn>
@@ -201,7 +201,7 @@ export function SummaryCard(props: Omit<CardProps, 'children'> & Props) {
             <TableColumn>{t('transactions.table.columns.amount')}</TableColumn>
             <TableColumn>{t('transactions.table.columns.actions')}</TableColumn>
           </TableHeader>
-          <TableBody items={transactions?.data ?? []} isLoading={isLoadingTransactions}>
+          <TableBody items={transactions?.data ?? []}>
             {(transaction) => (
               <TableRow key={transaction.id} id={transaction.id} className="wrap-none cursor-pointer">
                 <TableCell>{transaction.id}</TableCell>

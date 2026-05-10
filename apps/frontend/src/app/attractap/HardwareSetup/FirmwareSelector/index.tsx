@@ -20,13 +20,13 @@ export function FirmwareSelector(props: Props) {
         </ProgressCircle>
       )}
       {firmwares?.map((firmware) => (
-        <Card onPress={() => props.onSelect(firmware)} key={`${firmware.name}-${firmware.variant}`}>
+        <Card onClick={() => props.onSelect(firmware)} key={`${firmware.name}-${firmware.variant}`}>
           <CardHeader>
             <PageHeader title={firmware.friendlyName} noMargin />
           </CardHeader>
           <CardContent className="flex flex-wrap gap-2 flex-row">
             {firmware.variantFriendlyName.split(',').map((variantFeature) => (
-              <Chip color="primary" key={`${firmware.name}-${firmware.variant}-${variantFeature}`}>
+              <Chip color="accent" key={`${firmware.name}-${firmware.variant}-${variantFeature}`}>
                 {variantFeature}
               </Chip>
             ))}

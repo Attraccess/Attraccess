@@ -87,7 +87,7 @@ export function ResetPassword() {
           <PasswordInput
             label={t('inputs.password')}
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(setPassword)}
             className="mb-4"
             minLength={8}
             required
@@ -97,7 +97,7 @@ export function ResetPassword() {
           <PasswordInput
             label={t('inputs.confirmPassword')}
             value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
+            onChange={(setConfirmPassword)}
             required
             validate={() => {
               if (password !== confirmPassword) {

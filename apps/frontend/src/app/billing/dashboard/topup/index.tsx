@@ -122,7 +122,7 @@ export function BillingDashboardTopupCard(props: Props) {
           <PageHeader title={title ?? t('title')} subtitle={subtitle ?? t('subtitle')} icon={<SumUpIcon />} noMargin />
         </CardHeader>
         <CardContent className="flex justify-center py-8">
-          <Spinner label={t('loading')} />
+          <Spinner />
         </CardContent>
       </Card>
     );
