@@ -131,10 +131,7 @@ function LoginFormContent(props: LoginFormProps & { t: TFunction; tExists: TExis
     [login],
   );
 
-  const memoizedArrowRight = useMemo(
-    () => <ArrowRight className="group-hover:translate-x-1 transition-transform" />,
-    [],
-  );
+  const arrowRight = <ArrowRight className="group-hover:translate-x-1 transition-transform" />;
 
   return (
     <form className="space-y-6" onSubmit={handleSubmit} data-cy="login-form">
@@ -173,7 +170,7 @@ function LoginFormContent(props: LoginFormProps & { t: TFunction; tExists: TExis
         data-cy="login-form-sign-in-button"
       >
         {isPending ? t('signingIn') : t('signInButton')}
-      memoizedArrowRight</Button>
+        {arrowRight}</Button>
 
       {errorTitle && (
         <Alert status="danger" data-cy="login-form-error-alert" >

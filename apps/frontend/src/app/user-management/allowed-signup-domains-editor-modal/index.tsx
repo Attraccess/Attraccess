@@ -7,8 +7,7 @@ import {
 import { Alert, AlertContent, AlertDescription, Button, Input, InputGroup, Label, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow, TextField, useOverlayState } from '@heroui/react';
 import { EmptyState } from '../../../components/emptyState';
 import { PageHeader } from '../../../components/pageHeader';
-import { TableDataLoadingIndicator } from '../../../components/tableComponents';
-import { PlusIcon, Settings2Icon, Trash2Icon } from 'lucide-react';
+import { Settings2Icon, Trash2Icon } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import en from './en.json';
 import de from './de.json';
@@ -21,7 +20,7 @@ interface Props {
 }
 
 export function AllowedSignupDomainsEditorModal(props: Props) {
-  const { isOpen, open, setOpen, close } = useOverlayState();
+  const { isOpen, open, setOpen, close: closeModal } = useOverlayState();
   const { t, tExists } = useTranslations({
     de: {
       ...de,
@@ -33,7 +32,7 @@ export function AllowedSignupDomainsEditorModal(props: Props) {
     },
   });
 
-  const { data: allowedSignupDomains, status } = useUsersServiceGetLocalSignupDomainWhitelist();
+  const { data: allowedSignupDomains } = useUsersServiceGetLocalSignupDomainWhitelist();
 
   const [domainToAdd, setDomainToAdd] = useState<string>('');
   const [editedDomains, setEditedDomains] = useState<string[]>(allowedSignupDomains ?? []);
@@ -80,7 +79,7 @@ export function AllowedSignupDomainsEditorModal(props: Props) {
         title: t('actions.save.success.title'),
         description: t('actions.save.success.description'),
       });
-      close();
+      closeModal();
     },
     onError: (error) => {
       toast.apiError({

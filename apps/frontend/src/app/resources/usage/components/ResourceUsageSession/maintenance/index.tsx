@@ -6,7 +6,6 @@ import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-front
 import { MaintenanceReasonDisplay } from '../../../../../../components/MaintenanceReasonDisplay';
 import { StartSessionControls } from '../../StartSessionControls';
 import { Alert, AlertContent, AlertDescription, AlertTitle } from '@heroui/react';
-import { ConstructionIcon } from 'lucide-react';
 
 import de from './de.json';
 import en from './en.json';

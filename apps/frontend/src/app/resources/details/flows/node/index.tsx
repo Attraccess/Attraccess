@@ -3,7 +3,7 @@ import { ResourceFlowLogType, ResourceFlowNodeSchemaDto } from '@attraccess/reac
 import { NodeProps } from '@xyflow/react';
 import { Button, Card, CardContent, CardHeader, cn, Tooltip, TooltipContent, TooltipTrigger, useOverlayState } from '@heroui/react';
 import { Handle, NodeToolbar, Position, useNodeId } from '@xyflow/react';
-import { Edit2Icon, Trash2Icon, TriangleAlertIcon } from 'lucide-react';
+import { TriangleAlertIcon } from 'lucide-react';
 import { useFlowContext } from '../flowContext';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { DeleteConfirmationModal } from '../../../../../components/deleteConfirmationModal';

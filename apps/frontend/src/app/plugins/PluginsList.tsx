@@ -6,13 +6,12 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { UploadPluginModal } from './UploadPluginModal';
 import { useToastMessage } from '../../components/toastProvider';
 import { EmptyState } from '../../components/emptyState';
-import { TableDataLoadingIndicator } from '../../components/tableComponents';
 
 import de from './PluginsList.de.json';
 import en from './PluginsList.en.json';
 
 export function PluginsList() {
-  const { data: plugins, status: fetchStatus } = usePluginsServiceGetPlugins();
+  const { data: plugins } = usePluginsServiceGetPlugins();
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [pluginToDelete, setPluginToDelete] = useState<string | null>(null);
@@ -57,11 +56,6 @@ export function PluginsList() {
     } catch (error) {
       console.error('Failed to delete plugin:', error);
     }
-  };
-
-  const handleDeleteCancel = () => {
-    setDeleteModalOpen(false);
-    setPluginToDelete(null);
   };
 
   return (

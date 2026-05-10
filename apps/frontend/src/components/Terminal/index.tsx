@@ -1,5 +1,4 @@
 import { Button, cn } from '@heroui/react';
-import { ArrowDownToLineIcon } from 'lucide-react';
 import { useState } from 'react';
 
 interface Props {

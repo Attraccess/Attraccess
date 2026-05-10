@@ -41,11 +41,6 @@ interface Props<TValue> {
 export function PropertyInput<TValue>(props: Props<TValue>) {
   const { name, isRequired, schema, tNodeTranslations: t, nodeType, value, onChange, hideLabel } = props;
 
-  let description = undefined;
-  if (schema.overrideWithInput) {
-    description = t('nodes.genericConfig.overridableByInput', { fieldName: schema.overrideWithInput });
-  }
-
   const { data: configuration } = useBillingServiceGetBillingConfiguration();
 
   const parsedValue = useMemo(() => {

@@ -14,7 +14,7 @@ import {
   TableRow,
 } from '@heroui/react';
 import { PageHeader } from '../../../../components/pageHeader';
-import { MaintenanceReasonDisplay, useFormattedMaintenanceReason } from '../../../../components/MaintenanceReasonDisplay';
+import { MaintenanceReasonDisplay } from '../../../../components/MaintenanceReasonDisplay';
 import { ResourceMaintenance, useResourceMaintenancesServiceFindMaintenances } from '@attraccess/react-query-client';
 import { useMemo, useState } from 'react';
 import { DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -23,7 +23,7 @@ import de from './de.json';
 import en from './en.json';
 import { ResourceMaintenanceUpsertModal } from './upsert';
 import { MarkDoneModal } from './mark-done';
-import { CheckCircleIcon, CogIcon, ConstructionIcon, PlusIcon } from 'lucide-react';
+import { CogIcon, ConstructionIcon, PlusIcon } from 'lucide-react';
 import { useNow } from '../../../../hooks/useNow';
 import { EmptyState } from '../../../../components/emptyState';
 
@@ -39,11 +39,9 @@ export function MaintenanceManagement(props: Props & Omit<CardProps, 'children'>
     en,
   });
 
-  const formatReason = useFormattedMaintenanceReason({});
-
   const [includePast, setIncludePast] = useState(false);
 
-  const { data: maintenances, status: fetchStatus } = useResourceMaintenancesServiceFindMaintenances({
+  const { data: maintenances } = useResourceMaintenancesServiceFindMaintenances({
     resourceId,
     includePast,
     includeActive: true,

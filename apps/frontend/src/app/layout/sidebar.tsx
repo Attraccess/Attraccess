@@ -56,7 +56,7 @@ interface SidebarProps {
 
 export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
   const { logout, user } = useAuth();
-  const { t, language, setLanguage } = useTranslations({
+  const { t, setLanguage } = useTranslations({
     en,
     de,
   });

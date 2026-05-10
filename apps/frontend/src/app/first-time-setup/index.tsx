@@ -1,7 +1,7 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Accordion, AccordionItem, AccordionHeading, AccordionTrigger, AccordionPanel, AccordionBody, Selection, Spinner } from '@heroui/react';
+import { Accordion, AccordionItem, AccordionHeading, AccordionTrigger, AccordionPanel, AccordionBody, Spinner } from '@heroui/react';
 import { CheckCircle2Icon, Settings2Icon } from 'lucide-react';
 import { PageHeader } from '../../components/pageHeader';
 import { AppSettingsForm } from '../settings/forms/AppSettingsForm';
@@ -16,9 +16,6 @@ import { useSettingsServiceGetFirstTimeSetupStatus } from '@attraccess/react-que
 const WIZARD_STEPS = ['step-1', 'step-2', 'step-3', 'step-4', 'step-5'] as const;
 type WizardStepKey = (typeof WIZARD_STEPS)[number];
 
-function isWizardStepKey(key: string): key is WizardStepKey {
-  return WIZARD_STEPS.includes(key as WizardStepKey);
-}
 
 export function FirstTimeSetupPage() {
   const { t } = useTranslations({ en, de });
@@ -81,25 +78,6 @@ export function FirstTimeSetupPage() {
   const adminEmailVerified = !!setupStatus?.stepsCompleted?.adminEmailVerified;
   const isAdminStepOverwrite = stepCompleted[3] && !adminEmailVerified;
 
-  const currentStepIndex = WIZARD_STEPS.indexOf(currentStep);
-
-  const handleAccordionSelectionChange = useCallback(
-    (keys: Selection) => {
-      const keySet = typeof keys === 'string' ? new Set<string>() : keys;
-      const newKey = Array.from(keySet)[0];
-      if (newKey == null || typeof newKey !== 'string' || !isWizardStepKey(newKey)) return;
-      const newIndex = WIZARD_STEPS.indexOf(newKey);
-      const goingBack = newIndex < currentStepIndex;
-      const goingToNext = newIndex === currentStepIndex + 1;
-      const currentDone = stepCompleted[currentStepIndex];
-      const allowed = goingBack || (goingToNext && currentDone) || newIndex === currentStepIndex;
-      if (allowed) {
-        setCurrentStep(newKey);
-      }
-    },
-    [currentStepIndex, stepCompleted]
-  );
-
   if (isCheckingSetup) {
     return (
       <div className="flex items-center gap-2 text-sm text-default-500">
@@ -119,9 +97,11 @@ export function FirstTimeSetupPage() {
 
       <Accordion
         variant="default"
-
-
-
+        expandedKeys={[currentStep]}
+        onExpandedChange={(keys) => {
+          const arr = [...keys];
+          if (arr.length > 0) setCurrentStep(arr[arr.length - 1] as WizardStepKey);
+        }}
         className="w-full"
       >
         <AccordionItem key="step-1" id="step-1" aria-label={t('steps.app')}>

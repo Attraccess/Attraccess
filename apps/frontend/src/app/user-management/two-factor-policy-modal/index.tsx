@@ -5,7 +5,7 @@ import {
   useTwoFactorAuthenticationServiceGetTwoFactorPolicy,
   useTwoFactorAuthenticationServiceSetTwoFactorPolicy,
 } from '@attraccess/react-query-client';
-import { Alert, AlertContent, AlertDescription, AlertTitle, Button, ListBoxItem, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Select, Selection, useOverlayState } from '@heroui/react';
+import { Alert, AlertContent, AlertDescription, AlertTitle, Button, ListBoxItem, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Select, useOverlayState } from '@heroui/react';
 import { Settings2Icon } from 'lucide-react';
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { PageHeader } from '../../../components/pageHeader';
@@ -71,13 +71,6 @@ export function TwoFactorPolicyModal(props: Props) {
     [policyOptions, selectedPolicy],
   );
 
-  const onSelectionChange = useCallback((keys: Selection) => {
-    const [value] = Array.from(keys as Set<string>);
-    if (value) {
-      setSelectedPolicy(value as TwoFactorPolicy);
-    }
-  }, []);
-
   const { mutate: savePolicy, isPending: isSaving } = useTwoFactorAuthenticationServiceSetTwoFactorPolicy({
     onSuccess: () => {
       toast.success({
@@ -123,7 +116,7 @@ export function TwoFactorPolicyModal(props: Props) {
                     </AlertContent>
                   </Alert>
                   <label className="text-sm font-medium">{t('inputs.policy.label')}</label>
-                  <Select isDisabled={isLoading}>
+                  <Select isDisabled={isLoading} selectedKey={selectedPolicy} onSelectionChange={(key) => { if (key) setSelectedPolicy(key as TwoFactorPolicy); }}>
                     {policyOptions.map((option) => (
                       <ListBoxItem key={option.value} id={option.value} textValue={option.label}>
                         <div className="flex flex-col gap-1">

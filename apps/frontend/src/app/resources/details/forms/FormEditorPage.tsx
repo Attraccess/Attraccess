@@ -73,7 +73,7 @@ export function FormEditorPage() {
 
   const [form, setForm] = useState<EditableForm>({ ...EMPTY_FORM, fields: [] });
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  const [expandedFieldKey, setExpandedFieldKey] = useState<Selection | undefined>(undefined);
+  const [, setExpandedFieldKey] = useState<Selection | undefined>(undefined);
 
   useEffect(() => {
     if (formResponse) {

@@ -11,7 +11,6 @@ import {
   ResourceUsageAction,
 } from '@attraccess/react-query-client';
 import { useAuth } from '../../../../../hooks/useAuth';
-import { TableDataLoadingIndicator } from '../../../../../components/tableComponents';
 import { EmptyState } from '../../../../../components/emptyState';
 import { ProjectsSelect } from '../../../../../components/projectsSelect';
 import en from './utils/translations/en.json';
@@ -89,8 +88,6 @@ export const HistoryTable = ({
   const {
     data: usageHistory,
     error,
-    status: fetchStatus,
-    isFetched: isFetchedUsageHistory,
   } = useResourcesServiceResourceUsageGetHistory(
     {
       resourceId,

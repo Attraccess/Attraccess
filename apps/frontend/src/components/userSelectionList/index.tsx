@@ -14,7 +14,6 @@ import {
 import { ReactNode, useCallback, useMemo, useState } from 'react';
 import { SimplePagination } from '../simplePagination';
 import { PlusIcon } from 'lucide-react';
-import { TableDataLoadingIndicator } from '../tableComponents';
 import { EmptyState } from '../emptyState';
 
 import de from './de.json';
@@ -49,7 +48,6 @@ interface Props<TUser> {
 export function UserSelectionList<TUser extends User = User>(props: Readonly<Props<TUser>>) {
   const {
     selectedUsers,
-    selectedUserIsLoading,
     onAddToSelection,
     addToSelectionIsLoading,
     actions,
@@ -104,7 +102,7 @@ export function UserSelectionList<TUser extends User = User>(props: Readonly<Pro
     <div className="flex flex-col gap-2">
       <UserSearch
         wrapperProps={{ className: 'w-full' }}
-
+        onSelectionChange={setUserSearchSelection}
         autocompleteProps={{ size: 'sm' }}
         afterSelection={
           userSearchSelection && (

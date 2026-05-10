@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import {
   Card,
   CardContent,
@@ -14,12 +14,10 @@ import { DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-u
 import { useProjectsServiceGetProjectUsageHistory, ResourceUsage } from '@attraccess/react-query-client';
 import en from './en.json';
 import de from './de.json';
-import { TableDataLoadingIndicator } from '../../../../../components/tableComponents';
 import { EmptyState } from '../../../../../components/emptyState';
 import { UsageNotesModal } from '../../../../resources/usage/components/UsageNotesModal';
 import { AttraccessUser } from '@attraccess/plugins-frontend-ui';
 import { HistoryHeader } from '../../../../resources/usage/components/HistoryHeader';
-import { SimplePagination } from '../../../../../components/simplePagination';
 
 type ProjectUsageHistoryProps = {
   projectId: number;
@@ -29,22 +27,15 @@ const ROWS_PER_PAGE = 10;
 
 export function ProjectUsageHistory({ projectId }: ProjectUsageHistoryProps) {
   const { t } = useTranslations({ en, de });
-  const [page, setPage] = useState(1);
+  const [page] = useState(1);
   const [selectedSession, setSelectedSession] = useState<ResourceUsage | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const { data, status } = useProjectsServiceGetProjectUsageHistory({
+  const { data } = useProjectsServiceGetProjectUsageHistory({
     id: projectId,
     page,
     limit: ROWS_PER_PAGE,
   });
-
-  const totalPages = useMemo(() => {
-    if (!data?.total) {
-      return 1;
-    }
-    return Math.max(1, Math.ceil(data.total / ROWS_PER_PAGE));
-  }, [data?.total]);
 
   const handleRowAction = useCallback(
     (session: ResourceUsage) => {

@@ -1,14 +1,12 @@
 import { DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from '@heroui/react';
 import { useMemo, useState } from 'react';
-import { TableDataLoadingIndicator } from '../../../components/tableComponents';
 import { EmptyState } from '../../../components/emptyState';
 import { IntroductionStatusChip } from '../../IntroductionStatusChip';
 import { ResourceIntroductionHistoryItem } from '@attraccess/react-query-client';
 
 import en from './en.json';
 import de from './de.json';
-import { SimplePagination } from '../../../components/simplePagination';
 
 interface Props {
   isOpen: boolean;
@@ -17,7 +15,7 @@ interface Props {
   history: ResourceIntroductionHistoryItem[];
 }
 export function IntroductionHistoryModal(props: Readonly<Props>) {
-  const { isOpen, history, isLoading, onClose } = props;
+  const { isOpen, history, onClose } = props;
 
   const { t } = useTranslations({ en, de });
 
@@ -30,11 +28,7 @@ export function IntroductionHistoryModal(props: Readonly<Props>) {
   }, [history]);
 
   const rowsPerPage = 10;
-  const [page, setPage] = useState(1);
-
-  const totalPages = useMemo(() => {
-    return Math.ceil(orderedHistory.length / rowsPerPage) || 1;
-  }, [rowsPerPage, orderedHistory]);
+  const [page] = useState(1);
 
   const currentPage = useMemo(() => {
     const start = (page - 1) * rowsPerPage;

@@ -19,7 +19,6 @@ import {
   useAuthenticationServiceGetOneSsoProviderByIdKey,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
-import { TableDataLoadingIndicator } from '../../../components/tableComponents';
 import { EmptyState } from '../../../components/emptyState';
 import en from './en.json';
 import de from './de.json';
@@ -90,8 +89,8 @@ export interface SSOProvidersListRef {
 
 export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentPropsWithoutRef<'div'>>((props, ref) => {
   const { t } = useTranslations({ en, de });
-  const { data: providers, status: fetchStatus, error } = useAuthenticationServiceGetAllSsoProviders();
-  const { isOpen, open, close, setOpen } = useOverlayState();
+  const { data: providers, error } = useAuthenticationServiceGetAllSsoProviders();
+  const { isOpen, open, close: closeProviderModal, setOpen } = useOverlayState();
   const [editingProvider, setEditingProvider] = useState<SSOProvider | null>(null);
   const [formValues, setFormValues] = useState<CreateSSOProviderDto>(defaultProviderValues);
   const [showClientSecret, setShowClientSecret] = useState(false);
@@ -587,7 +586,7 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
           description: t('providerCreatedDesc'),
         });
       }
-      close();
+      closeProviderModal();
 
       // Invalidate query after successful submission - Already handled by onSuccess handlers
       // queryClient.invalidateQueries({

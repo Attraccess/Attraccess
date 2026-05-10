@@ -12,7 +12,7 @@ interface Props {
 }
 
 export function AttractapSelect(props: Props) {
-  const { data: readers, isLoading } = useAttractapServiceGetReaders();
+  const { data: readers } = useAttractapServiceGetReaders();
 
   const [now, setNow] = useState(Date.now());
   useEffect(() => {

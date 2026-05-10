@@ -104,7 +104,7 @@ export function InviteUserModal(props: Props) {
     });
   }, [inviteUser, trimmedEmail, trimmedUsername, usernameError]);
 
-  const [tab, setTab] = useState<'single' | 'csv'>('single');
+  const [tab] = useState<'single' | 'csv'>('single');
 
   return (
     <>

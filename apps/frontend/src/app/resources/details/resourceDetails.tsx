@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { Button, Spinner, Link, useOverlayState } from '@heroui/react';
+import { Button, Spinner, useOverlayState } from '@heroui/react';
 import { useAuth } from '../../../hooks/useAuth';
 import { useToastMessage } from '../../../components/toastProvider';
 import { ArrowLeft, BookOpen, ListChecks, PenSquareIcon, ShapesIcon, Trash, WorkflowIcon } from 'lucide-react';
@@ -40,7 +40,7 @@ function ResourceDetailsComponent() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const { isOpen, open, setOpen } = useOverlayState();
+  const { isOpen, open, close: closeDeleteModal } = useOverlayState();
 
   const { hasPermission, user } = useAuth();
   const { success, error: showError } = useToastMessage();
@@ -240,7 +240,7 @@ function ResourceDetailsComponent() {
       {canManageResources && (
         <DeleteConfirmationModal
           isOpen={isOpen}
-          onClose={close}
+          onClose={closeDeleteModal}
           onConfirm={handleDelete}
           itemName={resource.name}
           data-cy="delete-confirmation-modal"

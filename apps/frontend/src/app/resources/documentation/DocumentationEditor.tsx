@@ -50,7 +50,7 @@ function DocumentationEditorComponent() {
   const [documentationType, setDocumentationType] = useState<DocumentationType | ''>('');
   const [markdownContent, setMarkdownContent] = useState('');
   const [urlContent, setUrlContent] = useState('');
-  const [selectedTab, setSelectedTab] = useState('edit');
+  const [selectedTab] = useState('edit');
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
   // Get resource query key for cache operations

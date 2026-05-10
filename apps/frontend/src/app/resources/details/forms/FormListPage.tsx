@@ -1,5 +1,5 @@
 import { Button, Card, CardContent, CardFooter, CardHeader, Chip, Spinner } from '@heroui/react';
-import { useNavigate, useParams, Link as RouterLink } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PageHeader } from '../../../../components/pageHeader';
 import { EmptyState } from '../../../../components/emptyState';

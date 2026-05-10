@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Button, TextField, FieldError, Input, ListBoxItem, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Select, Selection, Switch, TextArea } from "@heroui/react";
+import { Button, TextField, FieldError, Input, ListBoxItem, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Select, Switch, TextArea } from "@heroui/react";
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { FormFieldType, FormResponseDto, FormSubmissionRequestDto } from '@attraccess/react-query-client';
 import {
@@ -326,20 +326,15 @@ function renderSelectInput(
   t: (key: string) => string,
   fieldName: string,
 ) {
-  const selected = typeof value === 'string' && options.includes(value) ? new Set([value]) : new Set<string>();
-  const handleSelectionChange = (keys: Selection) => {
-    if (keys === 'all') {
-      return;
-    }
-    const first = keys.values().next().value as string | undefined;
-    onChange(first ?? '');
-  };
+  const selectedKey = typeof value === 'string' && options.includes(value) ? value : '';
 
   return (
     <Select
       placeholder={options.length ? t('modal.selectPlaceholder') : t('modal.selectUnavailable')}
       isDisabled={!options.length}
       aria-label={fieldName}
+      selectedKey={selectedKey}
+      onSelectionChange={(key) => onChange(key as string ?? '')}
     >
       {options.map((option) => (
         <ListBoxItem key={option} id={option}>{option}</ListBoxItem>
