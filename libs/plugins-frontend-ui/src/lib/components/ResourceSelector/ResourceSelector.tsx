@@ -40,8 +40,14 @@ export function ResourceSelector(props: Readonly<Props>) {
       <TableRoot aria-label={t('table.ariaLabel')}>
         <TableContent
           selectionMode={multiple ? 'multiple' : 'single'}
-
-
+          selectedKeys={new Set(selection.map(String))}
+          onSelectionChange={(keys) => {
+            if (keys === 'all') {
+              onSelectionChange((resourceSearchResults?.data ?? []).map((r) => r.id));
+              return;
+            }
+            onSelectionChange(Array.from(keys).map((k) => Number(k)));
+          }}
         >
           <TableHeader>
             <TableColumn className="w-full">
