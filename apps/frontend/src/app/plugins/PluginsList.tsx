@@ -1,6 +1,6 @@
 import { usePluginsServiceDeletePlugin, usePluginsServiceGetPlugins } from '@attraccess/react-query-client';
 import { useState } from 'react';
-import { Alert, AlertContent, AlertDescription, Button, Card, CardContent, CardHeader, Chip, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow, Tooltip } from '@heroui/react';
+import { Alert, AlertContent, AlertDescription, Button, Card, CardContent, CardHeader, Chip, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow, Tooltip, TooltipContent, TooltipTrigger } from '@heroui/react';
 import { Trash2, Upload } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { UploadPluginModal } from './UploadPluginModal';
@@ -103,14 +103,17 @@ export function PluginsList() {
                   </TableCell>
                   <TableCell>{plugin.pluginDirectory || '-'}</TableCell>
                   <TableCell>
-                    <Tooltip content={t('deleteTooltip')}>
-                      <Button variant="danger-soft"
-                        isIconOnly
-                        onPress={() => handleDeleteClick(plugin.id)}
-                        data-cy={`plugins-list-delete-plugin-button-${plugin.id}`}
-                      >
-                        <Trash2 size={18} />
-                      </Button>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <Button variant="danger-soft"
+                          isIconOnly
+                          onPress={() => handleDeleteClick(plugin.id)}
+                          data-cy={`plugins-list-delete-plugin-button-${plugin.id}`}
+                        >
+                          <Trash2 size={18} />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>{t('deleteTooltip')}</TooltipContent>
                     </Tooltip>
                   </TableCell>
                 </TableRow>

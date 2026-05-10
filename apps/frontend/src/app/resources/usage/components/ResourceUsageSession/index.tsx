@@ -22,7 +22,9 @@ type ResourceUsageSessionProps = {
   resourceId: number;
   resource: Resource;
   insufficientBalanceDesiredAmount?: number;
-} & Omit<React.ComponentProps<typeof Card>, 'resource'>;
+  className?: string;
+  [key: string]: unknown;
+};
 
 export function ResourceUsageSession({
   resourceId,

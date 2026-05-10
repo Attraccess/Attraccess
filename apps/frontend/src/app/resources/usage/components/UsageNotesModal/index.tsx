@@ -70,7 +70,7 @@ export const UsageNotesModal = memo(
                  
                   value={session.startNotes || t('noNotesProvided')}
                  
-                  isReadOnly
+                  readOnly
                 />
 
                 {session.endTime && (
@@ -78,7 +78,7 @@ export const UsageNotesModal = memo(
                    
                     value={session.endNotes || t('noNotesProvided')}
                    
-                    isReadOnly
+                    readOnly
                   />
                 )}
 

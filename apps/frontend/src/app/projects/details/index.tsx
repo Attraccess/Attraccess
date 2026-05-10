@@ -150,8 +150,7 @@ export function ProjectDetailsPage() {
           project?.access.isOwner && (
             <>
               <Button variant="ghost"
-
-                href={`/projects/${projectId}/team`}
+                onPress={() => navigate(`/projects/${projectId}/team`)}
               ><UsersIcon className="size-4" />
                 {t('actions.members.label')}
               </Button>

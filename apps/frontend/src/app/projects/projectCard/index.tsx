@@ -11,7 +11,7 @@ export function ProjectCard(props: Props) {
   const { project, archivedLabel } = props;
 
   return (
-    <Card href={`/projects/${project.id}`}>
+    <Link href={`/projects/${project.id}`} className="block"><Card>
       <CardContent className="overflow-visible p-0">
         <img
           alt={project.name}
@@ -32,6 +32,6 @@ export function ProjectCard(props: Props) {
           {project.description}
         </p>
       </CardFooter>
-    </Card>
+    </Card></Link>
   );
 }

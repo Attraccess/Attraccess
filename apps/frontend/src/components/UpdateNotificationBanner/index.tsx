@@ -84,15 +84,11 @@ export function UpdateNotificationBanner() {
             <Button variant="secondary" onPress={onOpenReleaseNotes}>
               {t('viewReleaseNotes')}
             </Button>
-            <Button variant="primary"
-
-
-              href={updateDocsPath}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              {t('howToUpdate')}
-            <ExternalLink size={14} /></Button>
+            <a href={updateDocsPath} target="_blank" rel="noopener noreferrer">
+              <Button variant="primary">
+                {t('howToUpdate')}
+              <ExternalLink size={14} /></Button>
+            </a>
             <Button variant="ghost"
 
               isIconOnly
@@ -122,14 +118,11 @@ export function UpdateNotificationBanner() {
                   )}
                 </ModalBody>
                 <ModalFooter className="flex-wrap gap-2 justify-between">
-                  <Button variant="secondary"
-
-                    href={release.htmlUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    {release.tagName}
-                  <ExternalLink size={14} /></Button>
+                  <a href={release.htmlUrl} target="_blank" rel="noopener noreferrer">
+                    <Button variant="secondary">
+                      {release.tagName}
+                    <ExternalLink size={14} /></Button>
+                  </a>
                   <Button variant="primary" onPress={close}>
                     {t('close')}
                   </Button>

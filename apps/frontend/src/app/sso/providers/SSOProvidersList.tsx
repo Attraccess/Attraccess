@@ -1,5 +1,5 @@
 import React, { useState, forwardRef, useImperativeHandle, useCallback } from 'react';
-import { Button, Table, TableHeader, TableColumn, TableBody, TableRow, TableCell, Tooltip, TextField, Label, Input, InputGroup, Description, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Separator, Card, CardContent, CardHeader, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, TextArea, Switch, Link, useOverlayState } from '@heroui/react';
+import { Button, Table, TableHeader, TableColumn, TableBody, TableRow, TableCell, Tooltip, TooltipTrigger, TooltipContent, TextField, Label, Input, InputGroup, Description, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Separator, Card, CardContent, CardHeader, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, TextArea, Switch, Link, useOverlayState } from '@heroui/react';
 import { Pencil, Trash, Key, FileCode, Eye, EyeOff, MoreVertical, Copy, Info } from 'lucide-react';
 import { useToastMessage } from '../../../components/toastProvider';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -634,25 +634,29 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                 <TableCell>{provider.type}</TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2">
-                    <Tooltip content={t('edit')}>
-                      <Button variant="ghost"
-
-                        isIconOnly
-                        onPress={() => handleEdit(provider)}
-                        data-cy={`sso-provider-edit-button-${provider.id}`}
-                      >
-                        <Pencil size={16} />
-                      </Button>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <Button variant="ghost"
+                          isIconOnly
+                          onPress={() => handleEdit(provider)}
+                          data-cy={`sso-provider-edit-button-${provider.id}`}
+                        >
+                          <Pencil size={16} />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>{t('edit')}</TooltipContent>
                     </Tooltip>
-                    <Tooltip content={t('deleteText')}>
-                      <Button variant="danger-soft"
-
-                        isIconOnly
-                        onPress={() => handleDelete(provider.id)}
-                        data-cy={`sso-provider-delete-button-${provider.id}`}
-                      >
-                        <Trash size={16} />
-                      </Button>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <Button variant="danger-soft"
+                          isIconOnly
+                          onPress={() => handleDelete(provider.id)}
+                          data-cy={`sso-provider-delete-button-${provider.id}`}
+                        >
+                          <Trash size={16} />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>{t('deleteText')}</TooltipContent>
                     </Tooltip>
                   </div>
                 </TableCell>
@@ -689,14 +693,16 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                     <Input placeholder="e.g. Company OIDC" data-cy="sso-provider-form-name-input" />
                   </TextField>
 
-                  <Select
-                    items={Object.values(SSOProviderType).map((type) => ({ key: type, label: type }))}
-                    label={t('type')}
-                    selectedKey={formValues.type}
-
-                    isRequired
-                    data-cy="sso-provider-form-type-select"
-                  />
+                  <div className="flex flex-col gap-1">
+                    <label className="text-sm font-medium">{t('type')}</label>
+                    <Select
+                      items={Object.values(SSOProviderType).map((type) => ({ key: type, label: type }))}
+                      selectedKey={formValues.type}
+                      onSelectionChange={(key) => { if (key) handleSelectChange(key as SSOProviderType); }}
+                      isRequired
+                      data-cy="sso-provider-form-type-select"
+                    />
+                  </div>
 
                   {formValues.type === SSOProviderType.OIDC && (
                     <>
@@ -770,15 +776,17 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                         <Label>{t('clientSecret')}</Label>
                         <InputGroup>
                           <Input type={showClientSecret ? 'text' : 'password'} placeholder="••••••••••••••••" data-cy="sso-provider-form-oidc-client-secret-input" />
-                          <Tooltip content={showClientSecret ? t('hideClientSecret') : t('showClientSecret')}>
-                            <Button variant="ghost"
-                              isIconOnly
-
-                              onPress={() => setShowClientSecret(!showClientSecret)}
-                              data-cy="sso-provider-form-oidc-toggle-client-secret-button"
-                            >
-                              {showClientSecret ? <EyeOff size={16} /> : <Eye size={16} />}
-                            </Button>
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <Button variant="ghost"
+                                isIconOnly
+                                onPress={() => setShowClientSecret(!showClientSecret)}
+                                data-cy="sso-provider-form-oidc-toggle-client-secret-button"
+                              >
+                                {showClientSecret ? <EyeOff size={16} /> : <Eye size={16} />}
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>{showClientSecret ? t('hideClientSecret') : t('showClientSecret')}</TooltipContent>
                           </Tooltip>
                         </InputGroup>
                       </TextField>
@@ -834,13 +842,11 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                       </TextField>
 
                       <TextArea
-                       
                         name="samlConfiguration.certificate"
                         value={formValues.samlConfiguration?.certificate ?? ''}
                         onChange={(e) => setSaml('certificate', e.target.value)}
                         placeholder="MIICmzCCAYMCBg..."
-                        minRows={4}
-                        isRequired
+                        required
                         data-cy="sso-provider-form-saml-certificate-input"
                       />
                       <p className="text-xs text-default-500">{t('certificateHint')}</p>
@@ -860,15 +866,17 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                         <Label>{t('samlProvisioningSecret')}</Label>
                         <InputGroup>
                           <Input type={showSamlProvisioningSecret ? 'text' : 'password'} placeholder="••••••••••••••••" data-cy="sso-provider-form-saml-provisioning-secret-input" />
-                          <Tooltip content={showSamlProvisioningSecret ? t('hideSamlProvisioningSecret') : t('showSamlProvisioningSecret')}>
-                            <Button variant="ghost"
-                              isIconOnly
-
-                              onPress={() => setShowSamlProvisioningSecret(!showSamlProvisioningSecret)}
-                              data-cy="sso-provider-form-saml-provisioning-secret-toggle-button"
-                            >
-                              {showSamlProvisioningSecret ? <EyeOff size={16} /> : <Eye size={16} />}
-                            </Button>
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <Button variant="ghost"
+                                isIconOnly
+                                onPress={() => setShowSamlProvisioningSecret(!showSamlProvisioningSecret)}
+                                data-cy="sso-provider-form-saml-provisioning-secret-toggle-button"
+                              >
+                                {showSamlProvisioningSecret ? <EyeOff size={16} /> : <Eye size={16} />}
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>{showSamlProvisioningSecret ? t('hideSamlProvisioningSecret') : t('showSamlProvisioningSecret')}</TooltipContent>
                           </Tooltip>
                         </InputGroup>
                         <Description>{t('samlProvisioningSecretHint')}</Description>
@@ -892,23 +900,19 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                       ))}
 
                       <TextArea
-                       
                         name="samlConfiguration.spSigningCertificate"
                         value={formValues.samlConfiguration?.spSigningCertificate ?? ''}
                         onChange={(e) => setSaml('spSigningCertificate', e.target.value)}
                         placeholder="MIICmzCCAYMCBg..."
-                        minRows={4}
                         data-cy="sso-provider-form-saml-sp-certificate-input"
                       />
                       <p className="text-xs text-default-500">{t('spSigningCertificateHint')}</p>
 
                       <TextArea
-                       
                         name="samlConfiguration.spSigningPrivateKey"
                         value={formValues.samlConfiguration?.spSigningPrivateKey ?? ''}
                         onChange={(e) => setSaml('spSigningPrivateKey', e.target.value)}
                         placeholder="-----BEGIN PRIVATE KEY-----"
-                        minRows={4}
                         data-cy="sso-provider-form-saml-sp-private-key-input"
                       />
                       <p className="text-xs text-default-500">

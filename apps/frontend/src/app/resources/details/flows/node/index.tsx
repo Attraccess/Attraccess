@@ -1,7 +1,7 @@
 import { ResourceFlowLogType, ResourceFlowNodeSchemaDto } from '@attraccess/react-query-client';
 
 import { NodeProps } from '@xyflow/react';
-import { Button, Card, CardContent, CardHeader, cn, Tooltip, useOverlayState } from '@heroui/react';
+import { Button, Card, CardContent, CardHeader, cn, Tooltip, TooltipContent, TooltipTrigger, useOverlayState } from '@heroui/react';
 import { Handle, NodeToolbar, Position, useNodeId } from '@xyflow/react';
 import { Edit2Icon, Trash2Icon, TriangleAlertIcon } from 'lucide-react';
 import { useFlowContext } from '../flowContext';
@@ -185,29 +185,30 @@ export function AttraccessNode(props: Props) {
                   <span className="font-bold text-sm truncate">{t('nodes.' + schema.type + '.title')}</span>
                 </div>
                 {!previewMode && (
-                  <Tooltip
-                    content={
-                      processingState === ProcessingState.PROCESSING
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <span
+                        className={cn(
+                          'w-2 h-2 rounded-full shrink-0',
+                          processingState === ProcessingState.PROCESSING
+                            ? 'bg-blue-500 animate-pulse'
+                            : processingState === ProcessingState.COMPLETED
+                              ? 'bg-green-500'
+                              : processingState === ProcessingState.FAILED
+                                ? 'bg-red-500'
+                                : 'bg-default-400',
+                        )}
+                      />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {processingState === ProcessingState.PROCESSING
                         ? 'Processing'
                         : processingState === ProcessingState.COMPLETED
                           ? 'Completed'
                           : processingState === ProcessingState.FAILED
                             ? 'Failed'
-                            : 'Idle'
-                    }
-                  >
-                    <span
-                      className={cn(
-                        'w-2 h-2 rounded-full shrink-0',
-                        processingState === ProcessingState.PROCESSING
-                          ? 'bg-blue-500 animate-pulse'
-                          : processingState === ProcessingState.COMPLETED
-                            ? 'bg-green-500'
-                            : processingState === ProcessingState.FAILED
-                              ? 'bg-red-500'
-                              : 'bg-default-400',
-                      )}
-                    />
+                            : 'Idle'}
+                    </TooltipContent>
                   </Tooltip>
                 )}
               </div>
@@ -243,22 +244,27 @@ export function AttraccessNode(props: Props) {
 
           {!previewMode &&
             targetHandlesWithStyles.map(({ id: handleId, label, style }) => (
-              <Tooltip content={label} key={handleId} isDisabled={!label}>
-                <Handle
-                  key={handleId}
-                  type="target"
-                  position={Position.Top}
-                  className="!w-4 !h-4"
-                  style={style}
-                  id={handleId}
-                />
+              <Tooltip key={handleId} isDisabled={!label}>
+                <TooltipTrigger>
+                  <Handle
+                    type="target"
+                    position={Position.Top}
+                    className="!w-4 !h-4"
+                    style={style}
+                    id={handleId}
+                  />
+                </TooltipTrigger>
+                <TooltipContent>{label}</TooltipContent>
               </Tooltip>
             ))}
           <div style={{ position: 'relative', marginInline: '25px' }}>
             {!previewMode &&
               sourceHandlesWithStyles.map(({ id: handleId, label, style }) => (
-                <Tooltip content={label} key={handleId} isDisabled={!label}>
-                  <Handle style={style} type="source" position={Position.Bottom} className="!w-4 !h-4" id={handleId} />
+                <Tooltip key={handleId} isDisabled={!label}>
+                  <TooltipTrigger>
+                    <Handle style={style} type="source" position={Position.Bottom} className="!w-4 !h-4" id={handleId} />
+                  </TooltipTrigger>
+                  <TooltipContent>{label}</TooltipContent>
                 </Tooltip>
               ))}
           </div>

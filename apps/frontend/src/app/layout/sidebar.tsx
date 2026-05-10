@@ -11,6 +11,10 @@ import {
   Link,
   Accordion,
   AccordionItem,
+  AccordionHeading,
+  AccordionTrigger,
+  AccordionPanel,
+  AccordionBody,
   LinkProps,
   Separator,
 } from '@heroui/react';
@@ -193,17 +197,23 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
               {otherGroups.map((group) => (
                 <AccordionItem
                   key={group.translationKey} id={group.translationKey}
-                  title={t('groups.' + group.translationKey + '.label')}
-                ><group.icon size={16} />
-                  {group.items.map((item) => (
-                    <NavLink
-                      key={item.path}
-                      href={item.path}
-                      icon={<item.icon size={16} />}
-                      label={t('groups.' + group.translationKey + '.items.' + item.translationKey)}
-                      data-cy={`sidebar-nav-${item.path?.replace('/', '')}`}
-                    />
-                  ))}
+                >
+                  <AccordionHeading>
+                    <AccordionTrigger><group.icon size={16} />{t('groups.' + group.translationKey + '.label')}</AccordionTrigger>
+                  </AccordionHeading>
+                  <AccordionPanel>
+                    <AccordionBody>
+                      {group.items.map((item) => (
+                        <NavLink
+                          key={item.path}
+                          href={item.path}
+                          icon={<item.icon size={16} />}
+                          label={t('groups.' + group.translationKey + '.items.' + item.translationKey)}
+                          data-cy={`sidebar-nav-${item.path?.replace('/', '')}`}
+                        />
+                      ))}
+                    </AccordionBody>
+                  </AccordionPanel>
                 </AccordionItem>
               ))}
             </Accordion>
@@ -217,20 +227,24 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
               {sidebarEndGroups.map((group) => (
                 <AccordionItem
                   key={group.translationKey} id={group.translationKey}
-                  title={t('endItems.groups.' + group.translationKey + '.label')}
-
                   className="text-sm"
-                ><group.icon size={16} />
-                  {group.items.map((item) => (
-                    <NavLink
-                      key={item.path}
-                      href={item.path}
-                      icon={<item.icon size={16} />}
-                      label={t('endItems.groups.' + group.translationKey + '.items.' + item.translationKey)}
-                      isExternal={item.isExternal}
-
-                    />
-                  ))}
+                >
+                  <AccordionHeading>
+                    <AccordionTrigger><group.icon size={16} />{t('endItems.groups.' + group.translationKey + '.label')}</AccordionTrigger>
+                  </AccordionHeading>
+                  <AccordionPanel>
+                    <AccordionBody>
+                      {group.items.map((item) => (
+                        <NavLink
+                          key={item.path}
+                          href={item.path}
+                          icon={<item.icon size={16} />}
+                          label={t('endItems.groups.' + group.translationKey + '.items.' + item.translationKey)}
+                          isExternal={item.isExternal}
+                        />
+                      ))}
+                    </AccordionBody>
+                  </AccordionPanel>
                 </AccordionItem>
               ))}
             </Accordion>

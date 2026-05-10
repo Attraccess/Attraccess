@@ -188,7 +188,7 @@ export function ImageUpload({
           id={id}
           accept={ALLOWED_MIME_TYPES.join(',')}
           onChange={handleFileChange}
-          isDisabled={disabled}
+          disabled={disabled}
           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
         />
 

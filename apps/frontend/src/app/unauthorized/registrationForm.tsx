@@ -156,8 +156,6 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
           validationMessages={usernameValidationMessages}
           value={username}
           onChange={setUsername}
-          required
-
           data-cy="registration-form-username-input"
           isRequired
         />

@@ -235,12 +235,10 @@ export function MaintenanceScheduleUpsertModal(props: Props) {
                 <Input placeholder="e.g. Monthly check" />
               </TextField>
 
+              <label className="text-sm font-medium">{t('inputs.triggerType.label')}</label>
               <Select
-                label={t('inputs.triggerType.label')}
-
                 onSelectionChange={(key) => {
-                  const v = Array.from(key)[0] as ResourceMaintenanceScheduleTriggerType;
-                  if (v) setTriggerType(v);
+                  if (key) setTriggerType(key as ResourceMaintenanceScheduleTriggerType);
                 }}
               >
                 {TRIGGER_OPTIONS.map((opt) => (
@@ -254,12 +252,10 @@ export function MaintenanceScheduleUpsertModal(props: Props) {
                     <Label>{t('inputs.duration.label')}</Label>
                     <Input type="number" min={1} />
                   </TextField>
+                  <label className="text-sm font-medium">{t('inputs.unit.label')}</label>
                   <Select
-                    label={t('inputs.unit.label')}
-
                     onSelectionChange={(key) => {
-                      const v = Array.from(key)[0] as UsageDurationUnit;
-                      if (v) setUsageHoursUnit(v);
+                      if (key) setUsageHoursUnit(key as UsageDurationUnit);
                     }}
                   >
                     {Object.values(UsageDurationUnit).map((unit) => (
@@ -282,12 +278,10 @@ export function MaintenanceScheduleUpsertModal(props: Props) {
                     <Label>{t('inputs.duration.label')}</Label>
                     <Input type="number" min={1} placeholder="e.g. 30" />
                   </TextField>
+                  <label className="text-sm font-medium">{t('inputs.unit.label')}</label>
                   <Select
-                    label={t('inputs.unit.label')}
-
                     onSelectionChange={(key) => {
-                      const v = Array.from(key)[0] as UsageDurationUnit;
-                      if (v) setTimeIntervalUnit(v);
+                      if (key) setTimeIntervalUnit(key as UsageDurationUnit);
                     }}
                   >
                     {Object.values(UsageDurationUnit).map((unit) => (

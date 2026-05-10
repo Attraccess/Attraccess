@@ -22,9 +22,11 @@ function SSOLoginButton(props: Readonly<SSOLoginButtonProps>) {
   const loginHref = useCallbackURL(provider.id, provider.type);
 
   return (
-    <Button href={loginHref} target="_self" fullWidth data-cy={`sso-login-button-${provider.name}`}>
-      {t('loginWith', { provider: provider.name })}
-    </Button>
+    <a href={loginHref} target="_self" className="w-full block" data-cy={`sso-login-button-${provider.name}`}>
+      <Button fullWidth>
+        {t('loginWith', { provider: provider.name })}
+      </Button>
+    </a>
   );
 }
 

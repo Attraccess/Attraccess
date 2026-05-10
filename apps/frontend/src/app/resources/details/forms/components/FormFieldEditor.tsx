@@ -41,12 +41,10 @@ export function FormFieldEditor(props: FormFieldEditorProps) {
           <Input placeholder={t('fields.placeholder.label')} ref={labelInputRef as React.Ref<HTMLInputElement> | undefined} />
         </TextField>
 
+        <label className="text-sm font-medium">{t('fields.type')}</label>
         <Select
-          label={t('fields.type')}
-
           onSelectionChange={(key) => {
-            const [value] = Array.from(key) as FormFieldType[];
-            handleTypeChange(value ?? FormFieldType.TEXT);
+            handleTypeChange((key as FormFieldType) ?? FormFieldType.TEXT);
           }}
         >
           {FIELD_TYPE_OPTIONS.map((option) => (

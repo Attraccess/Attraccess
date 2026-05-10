@@ -1,6 +1,6 @@
 import { AttractapFirmware, useAttractapServiceGetFirmwareBinary } from '@attraccess/react-query-client';
 import { ESPTools, ESPToolsErrorType } from '../../../../utils/esp-tools';
-import { Accordion, AccordionItem, Alert, AlertContent, AlertTitle, Button, ProgressBar, ProgressBarFill, ProgressBarTrack, ProgressCircle, ProgressCircleFillCircle, ProgressCircleTrack, ProgressCircleTrackCircle } from '@heroui/react';
+import { Accordion, AccordionItem, AccordionHeading, AccordionTrigger, AccordionPanel, AccordionBody, Alert, AlertContent, AlertTitle, Button, ProgressBar, ProgressBarFill, ProgressBarTrack, ProgressCircle, ProgressCircleFillCircle, ProgressCircleTrack, ProgressCircleTrackCircle } from '@heroui/react';
 import { useCallback, useState } from 'react';
 import { useToastMessage } from '../../../../components/toastProvider';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -147,8 +147,9 @@ export function FirmwareFlasher(props: Props) {
       )}
 
       <Accordion>
-        <AccordionItem key="terminal" id="terminal" title={t('terminal.title')}>
-          <Terminal logLines={logLines} maxHeight="30vh" />
+        <AccordionItem key="terminal" id="terminal">
+          <AccordionHeading><AccordionTrigger>{t('terminal.title')}</AccordionTrigger></AccordionHeading>
+          <AccordionPanel><AccordionBody><Terminal logLines={logLines} maxHeight="30vh" /></AccordionBody></AccordionPanel>
         </AccordionItem>
       </Accordion>
     </div>

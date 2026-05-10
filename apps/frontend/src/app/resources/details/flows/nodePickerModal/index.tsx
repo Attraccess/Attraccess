@@ -1,4 +1,4 @@
-import { Accordion, AccordionItem, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, useOverlayState } from '@heroui/react';
+import { Accordion, AccordionItem, AccordionHeading, AccordionTrigger, AccordionPanel, AccordionBody, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, useOverlayState } from '@heroui/react';
 import { useCallback, useMemo } from 'react';
 import { TFunction, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { ResourceFlowNodeSchemaDto, useResourceFlowsServiceGetNodeSchemas } from '@attraccess/react-query-client';
@@ -97,22 +97,25 @@ export function NodePickerModal(props: Props) {
                 <ModalBody className="flex flex-col gap-4">
                   <Accordion defaultExpandedKeys={nodeGroups.map((_, index) => index.toString())}>
                     {nodeGroups.map((group, index) => (
-                      <AccordionItem key={index} id={index} title={t('nodeType.' + group.category)}>
-                        <div className="flex flex-row flex-wrap gap-4">
-                          {group.nodes.map((nodeSchema) => (
-                            <div
-                              key={nodeSchema.type}
-                              onClick={() => onSelect(nodeSchema.type)}
-                              className="cursor-pointer hover:bg-primary-50 transition-bg duration-300"
-                            >
-                              <AttraccessNode
-                                tNodeTranslations={props.tNodeTranslations}
-                                schema={nodeSchema}
-                                previewMode={true}
-                              />
-                            </div>
-                          ))}
-                        </div>
+                      <AccordionItem key={index} id={index}>
+                        <AccordionHeading><AccordionTrigger>{t('nodeType.' + group.category)}</AccordionTrigger></AccordionHeading>
+                        <AccordionPanel><AccordionBody>
+                          <div className="flex flex-row flex-wrap gap-4">
+                            {group.nodes.map((nodeSchema) => (
+                              <div
+                                key={nodeSchema.type}
+                                onClick={() => onSelect(nodeSchema.type)}
+                                className="cursor-pointer hover:bg-primary-50 transition-bg duration-300"
+                              >
+                                <AttraccessNode
+                                  tNodeTranslations={props.tNodeTranslations}
+                                  schema={nodeSchema}
+                                  previewMode={true}
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        </AccordionBody></AccordionPanel>
                       </AccordionItem>
                     ))}
                   </Accordion>

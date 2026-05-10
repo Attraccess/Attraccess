@@ -1,7 +1,7 @@
 import { useTranslations, ResourceSelector } from '@attraccess/plugins-frontend-ui';
 import de from './AttractapEditor.de.json';
 import en from './AttractapEditor.en.json';
-import { Button, Form, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalHeader, ModalHeading, ModalFooter, Separator, Slider } from '@heroui/react';
+import { Button, Form, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalHeader, ModalHeading, ModalFooter, Separator, Slider, SliderTrack, SliderFill, SliderThumb } from '@heroui/react';
 import { TextField, Label, Input } from '@heroui/react';
 import { useCallback, useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -105,7 +105,6 @@ export function AttractapEditor(props: Readonly<Props>) {
                   </TextField>
                   {reader?.firmware.capabilities.hasLeds && (
                     <Slider
-                      label={t('ledBrightness')}
                       step={1}
                       minValue={0}
                       maxValue={255}
@@ -113,12 +112,15 @@ export function AttractapEditor(props: Readonly<Props>) {
                       onChange={(val) => setLedBrightness(val as number)}
                       className="w-full"
                       data-cy="attractap-editor-led-brightness-slider"
-                    />
+                    >
+                      <Label>{t('ledBrightness')}</Label>
+                      <SliderTrack><SliderFill /><SliderThumb /></SliderTrack>
+                    </Slider>
                   )}
                   <Separator className="my-6" />
                   <ResourceSelector
                     selection={connectedResourceIds}
-
+                    onSelectionChange={setConnectedResourceIds}
                     data-cy="attractap-editor-resource-selector"
                     multiple={reader?.firmware.capabilities.resourceSelection ?? true}
                   />

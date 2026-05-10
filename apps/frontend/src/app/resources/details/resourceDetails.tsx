@@ -146,16 +146,14 @@ function ResourceDetailsComponent() {
                 <ResourceQrCode resourceId={resourceId} variant="ghost" buttonIconSize={16} />
 
                 <Button variant="ghost"
-
-                  href={`/resources/${resourceId}/flows`}
+                  onPress={() => navigate(`/resources/${resourceId}/flows`)}
                   data-cy="flows-button"
                 ><WorkflowIcon className="w-4 h-4" />
                   {t('navItems.flows')}
                 </Button>
 
                 <Button variant="ghost"
-
-                  href={`/resources/${resourceId}/forms`}
+                  onPress={() => navigate(`/resources/${resourceId}/forms`)}
                   data-cy="forms-button"
                 ><ListChecks className="w-4 h-4" />
                   {t('navItems.forms')}

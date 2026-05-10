@@ -48,7 +48,7 @@ export const SessionNotesModal = ({ isOpen, onClose, onConfirm, mode, isSubmitti
                     id="notes"
                     placeholder={t('notesPlaceholder')}
                     value={notes}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNotes(e.target.value)}
+                    onChange={(e) => setNotes(e.target.value)}
                     className="w-full"
                   />
                   <p className="text-xs text-gray-500">{t('notesOptional')}</p>
@@ -56,7 +56,7 @@ export const SessionNotesModal = ({ isOpen, onClose, onConfirm, mode, isSubmitti
               </ModalBody>
 
               <ModalFooter>
-                <Button variant="outline" onPress={close} isDisabled={isSubmitting}>
+                <Button variant="ghost" onPress={close} isDisabled={isSubmitting}>
                   {t('cancel')}
                 </Button>
                 <Button onPress={handleConfirm} isDisabled={isSubmitting}>

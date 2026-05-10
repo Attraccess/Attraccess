@@ -122,13 +122,8 @@ export function TwoFactorPolicyModal(props: Props) {
                       <AlertDescription>{t('warning.description')}</AlertDescription>
                     </AlertContent>
                   </Alert>
-                  <Select
-                    label={t('inputs.policy.label')}
-
-
-                   
-                    isDisabled={isLoading}
-                  >
+                  <label className="text-sm font-medium">{t('inputs.policy.label')}</label>
+                  <Select isDisabled={isLoading}>
                     {policyOptions.map((option) => (
                       <ListBoxItem key={option.value} id={option.value} textValue={option.label}>
                         <div className="flex flex-col gap-1">

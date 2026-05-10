@@ -1,5 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Alert, AlertContent, AlertTitle, Autocomplete, Button, ListBoxItem, ProgressBar, ProgressBarFill, ProgressBarTrack, ProgressCircle, ProgressCircleFillCircle, ProgressCircleTrack, ProgressCircleTrackCircle, cn } from '@heroui/react';
+import { Alert, AlertContent, AlertTitle, Button, Label, ProgressBar, ProgressBarFill, ProgressBarTrack, ProgressCircle, ProgressCircleFillCircle, ProgressCircleTrack, ProgressCircleTrackCircle, TextField, Input, cn } from '@heroui/react';
 import { useMemo, useState } from 'react';
 import { PasswordInput } from '../../../../../components/PasswordInput';
 import { PageHeader } from '../../../../../components/pageHeader';
@@ -112,18 +112,15 @@ export function AttractapSerialConfiguratorNetwork({ className }: { className?: 
         </Alert>
       )}
 
-      <Autocomplete
-        allowsCustomValue
-        defaultItems={networkSelectItems}
-        label={t('ssidSelect.label')}
-        defaultSelectedKey={selectedWifiSSID ?? undefined}
-
-        onInputChange={(value) => setSelectedWifiSSID(value)}
-
-        inputValue={selectedWifiSSID ?? ''}
-      >
-        {(item) => <ListBoxItem key={item.key} id={item.key}>{item.label}</ListBoxItem>}
-      </Autocomplete>
+      <TextField value={selectedWifiSSID ?? ''} onChange={setSelectedWifiSSID}>
+        <Label>{t('ssidSelect.label')}</Label>
+        <Input list="wifi-ssid-list" />
+        <datalist id="wifi-ssid-list">
+          {networkSelectItems.map((item) => (
+            <option key={item.key} value={item.key}>{item.label}</option>
+          ))}
+        </datalist>
+      </TextField>
       <PasswordInput
         label={t('password.label')}
         value={wifiPassword ?? ''}

@@ -191,8 +191,8 @@ export function UserManagementDetailsPage() {
               <CardHeader className="flex items-center justify-between">
                 <PageHeader title={t('sso.title')} noMargin />
                 <Chip
-                  color={ssoDetails.length > 0 ? 'primary' : 'default'}
-                  variant={ssoDetails.length > 0  ? 'secondary' : 'outline'}
+                  color={ssoDetails.length > 0 ? 'accent' : 'default'}
+                  variant={ssoDetails.length > 0 ? 'secondary' : 'primary'}
                 >
                   {ssoDetails.length > 0 ? t('sso.linked', { count: ssoDetails.length }) : t('sso.notLinkedChip')}
                 </Chip>

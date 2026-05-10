@@ -14,6 +14,8 @@ import {
   RadioGroup,
   Spinner,
   Tab,
+  TabList,
+  TabPanel,
   Tabs,
   TextArea,
 } from '@heroui/react';
@@ -237,23 +239,23 @@ function DocumentationEditorComponent() {
           {documentationType === DocumentationType.MARKDOWN && (
             <Tabs
               selectedKey={selectedTab}
-
               data-cy="documentation-editor-markdown-tabs"
             >
-              <Tab key="edit" title={t('edit')} data-cy="documentation-editor-markdown-edit-tab">
+              <TabList>
+                <Tab id="edit" data-cy="documentation-editor-markdown-edit-tab">{t('edit')}</Tab>
+                <Tab id="preview" data-cy="documentation-editor-markdown-preview-tab">{t('preview')}</Tab>
+              </TabList>
+              <TabPanel id="edit">
                 <TextArea
-                 
                   placeholder={t('markdownContent.placeholder')}
                   value={markdownContent}
-                  onChange={(setMarkdownContent)}
-                  minRows={15}
-                  isInvalid={!!validationErrors.markdown}
-                  errorMessage={validationErrors.markdown}
-                  isDisabled={updateResource.isPending}
+                  onChange={(e) => setMarkdownContent(e.target.value)}
+                  aria-invalid={!!validationErrors.markdown}
+                  disabled={updateResource.isPending}
                   data-cy="documentation-editor-markdown-textarea"
                 />
-              </Tab>
-              <Tab key="preview" title={t('preview')} data-cy="documentation-editor-markdown-preview-tab">
+              </TabPanel>
+              <TabPanel id="preview">
                 <div className="border rounded p-4 min-h-[300px] prose max-w-none">
                   {markdownContent ? (
                     <ReactMarkdown>{markdownContent}</ReactMarkdown>
@@ -261,7 +263,7 @@ function DocumentationEditorComponent() {
                     <p className="text-default-400 italic">{t('markdownContent.placeholder')}</p>
                   )}
                 </div>
-              </Tab>
+              </TabPanel>
             </Tabs>
           )}
 

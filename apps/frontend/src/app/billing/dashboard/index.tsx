@@ -7,9 +7,11 @@ import { SummaryCard } from './summary';
 import { BillingDashboardTopupCard } from './topup';
 import { useAuth } from '../../../hooks/useAuth';
 import { Button, Link } from '@heroui/react';
+import { useNavigate } from 'react-router-dom';
 
 export function BillingDashboardPage() {
   const { t } = useTranslations({ en, de });
+  const navigate = useNavigate();
 
   const { hasPermission } = useAuth();
 
@@ -20,7 +22,7 @@ export function BillingDashboardPage() {
         icon={<ChartNoAxesCombinedIcon />}
         actions={
           hasPermission('canManageBilling') && (
-            <Button variant="ghost" href="/billing/administration"><Settings2Icon />
+            <Button variant="ghost" onPress={() => navigate('/billing/administration')}><Settings2Icon />
               {t('actions.administration')}
             </Button>
           )

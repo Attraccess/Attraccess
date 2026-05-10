@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo } from 'react';
 import { ArrowRight, LogInIcon } from 'lucide-react';
-import { Accordion, AccordionItem, AlertContent, AlertDescription, AlertTitle, Description, Input, Label, Skeleton, TextField } from '@heroui/react';
+import { Accordion, AccordionItem, AccordionHeading, AccordionTrigger, AccordionPanel, AccordionBody, AlertContent, AlertDescription, AlertTitle, Description, Input, Label, Skeleton, TextField } from '@heroui/react';
 import { Button } from '@heroui/react';
 import { Alert } from '@heroui/react';
 import { TExists, TFunction, useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -49,8 +49,13 @@ export function LoginForm(props: LoginFormProps) {
     <>
       <LoginFormHeader {...props} isLocalSignupEnabled={isLocalSignupEnabled?.value ?? false} t={t} />
       <Accordion variant="default" className="w-full">
-        <AccordionItem title={t('accordion.title')} indicator={<LogInIcon />} className="bg-default-100">
-          <LoginFormContent {...props} t={t} tExists={tExists} />
+        <AccordionItem className="bg-default-100">
+          <AccordionHeading>
+            <AccordionTrigger><LogInIcon className="mr-2" />{t('accordion.title')}</AccordionTrigger>
+          </AccordionHeading>
+          <AccordionPanel><AccordionBody>
+            <LoginFormContent {...props} t={t} tExists={tExists} />
+          </AccordionBody></AccordionPanel>
         </AccordionItem>
       </Accordion>
     </>
