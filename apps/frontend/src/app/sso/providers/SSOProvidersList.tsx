@@ -31,11 +31,13 @@ import {
   DropdownTrigger,
   DropdownMenu,
   DropdownItem,
+  DropdownPopover,
   TextArea,
   Switch,
   Link,
   useOverlayState,
 } from '@heroui/react';
+import { buttonVariants } from '@heroui/styles';
 import { Pencil, Trash, Key, FileCode, Eye, EyeOff, MoreVertical, Copy, Info } from 'lucide-react';
 import { useToastMessage } from '../../../components/toastProvider';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -752,31 +754,31 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                                 <KeycloakDiscoveryDialog onDiscovery={onAutoDiscovery}>
                                   {(onOpenKeycloakDiscovery) => (
                                     <Dropdown>
-                                      <DropdownTrigger>
-                                        <Button variant="ghost">
-                                          <MoreVertical className="w-4 h-4" />
-                                          {t('autoDiscovery.label')}
-                                        </Button>
+                                      <DropdownTrigger className={buttonVariants({ variant: 'ghost' })}>
+                                        <MoreVertical className="w-4 h-4" />
+                                        {t('autoDiscovery.label')}
                                       </DropdownTrigger>
-                                      <DropdownMenu aria-label="OIDC auto discovery options">
-                                        <DropdownItem
-                                          key="authentik"
-                                          id="authentik"
-                                          onPress={onOpenAuthentikDiscovery}
-                                          data-cy="sso-provider-form-authentik-discovery-button"
-                                        >
-                                          {t('autoDiscovery.authentik')}
-                                        </DropdownItem>
+                                      <DropdownPopover>
+                                        <DropdownMenu aria-label="OIDC auto discovery options">
+                                          <DropdownItem
+                                            key="authentik"
+                                            id="authentik"
+                                            onPress={onOpenAuthentikDiscovery}
+                                            data-cy="sso-provider-form-authentik-discovery-button"
+                                          >
+                                            {t('autoDiscovery.authentik')}
+                                          </DropdownItem>
 
-                                        <DropdownItem
-                                          key="keycloak"
-                                          id="keycloak"
-                                          onPress={onOpenKeycloakDiscovery}
-                                          data-cy="sso-provider-form-keycloak-discovery-button"
-                                        >
-                                          {t('autoDiscovery.keycloak')}
-                                        </DropdownItem>
-                                      </DropdownMenu>
+                                          <DropdownItem
+                                            key="keycloak"
+                                            id="keycloak"
+                                            onPress={onOpenKeycloakDiscovery}
+                                            data-cy="sso-provider-form-keycloak-discovery-button"
+                                          >
+                                            {t('autoDiscovery.keycloak')}
+                                          </DropdownItem>
+                                        </DropdownMenu>
+                                      </DropdownPopover>
                                     </Dropdown>
                                   )}
                                 </KeycloakDiscoveryDialog>

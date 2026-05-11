@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
-import { Button, ButtonGroup, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from '@heroui/react';
+import { Button, ButtonGroup, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, DropdownPopover } from '@heroui/react';
+import { buttonVariants } from '@heroui/styles';
 import { StopCircle, ChevronDownIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../../../components/toastProvider';
@@ -135,20 +136,19 @@ export function ActiveSessionDisplay({ resourceId, startTime }: ActiveSessionDis
             {t('endSession')}
           </Button>
           <Dropdown>
-            <DropdownTrigger>
-              <Button isIconOnly>
-                <ChevronDownIcon />
-              </Button>
+            <DropdownTrigger className={buttonVariants({ isIconOnly: true })}>
+              <ChevronDownIcon />
             </DropdownTrigger>
-            <DropdownMenu aria-label={t('alternativeEndSessionOptionsMenu.label')}>
-              <DropdownItem
-                key="endWithNotes" id="endWithNotes"
-               
-                onPress={handleOpenEndSessionModal}
-              >
-                {t('alternativeEndSessionOptionsMenu.endWithNotes.label')}
-              </DropdownItem>
-            </DropdownMenu>
+            <DropdownPopover>
+              <DropdownMenu aria-label={t('alternativeEndSessionOptionsMenu.label')}>
+                <DropdownItem
+                  key="endWithNotes" id="endWithNotes"
+                  onPress={handleOpenEndSessionModal}
+                >
+                  {t('alternativeEndSessionOptionsMenu.endWithNotes.label')}
+                </DropdownItem>
+              </DropdownMenu>
+            </DropdownPopover>
           </Dropdown>
         </ButtonGroup>
       </div>
