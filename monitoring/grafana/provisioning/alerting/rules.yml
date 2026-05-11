@@ -1,0 +1,409 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: attraccess
+    folder: Attraccess Alerts
+    interval: 1m
+    rules:
+      - uid: attraccess-service-down
+        title: AttractapServiceDown
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: attraccess-prometheus
+            model:
+              datasource:
+                type: prometheus
+                uid: attraccess-prometheus
+              editorMode: code
+              expr: up{job="attraccess"}
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 0
+              to: 0
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 0
+              to: 0
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - evaluator:
+                    params: [1]
+                    type: lt
+                  operator:
+                    type: and
+                  query:
+                    params: [C]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              expression: B
+              refId: C
+              type: threshold
+        for: 2m
+        annotations:
+          summary: Attraccess service is down
+          description: The Attraccess API has been unreachable for more than 2 minutes.
+        labels:
+          severity: critical
+        isPaused: false
+        noDataState: Alerting
+        execErrState: Error
+
+      - uid: attraccess-high-http-error-rate
+        title: HighHttpErrorRate
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: attraccess-prometheus
+            model:
+              datasource:
+                type: prometheus
+                uid: attraccess-prometheus
+              editorMode: code
+              expr: sum(rate(attraccess_http_requests_total{job="attraccess", status_code=~"5.."}[5m])) / sum(rate(attraccess_http_requests_total{job="attraccess"}[5m]))
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 0
+              to: 0
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 0
+              to: 0
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - evaluator:
+                    params: [0.05]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [C]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              expression: B
+              refId: C
+              type: threshold
+        for: 5m
+        annotations:
+          summary: High HTTP 5xx error rate
+          description: More than 5% of HTTP requests are returning 5xx errors over the last 5 minutes.
+        labels:
+          severity: warning
+        isPaused: false
+        noDataState: NoData
+        execErrState: Error
+
+      - uid: attraccess-high-request-latency
+        title: HighRequestLatency
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: attraccess-prometheus
+            model:
+              datasource:
+                type: prometheus
+                uid: attraccess-prometheus
+              editorMode: code
+              expr: histogram_quantile(0.95, sum(rate(attraccess_http_request_duration_seconds_bucket{job="attraccess"}[5m])) by (le))
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 0
+              to: 0
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 0
+              to: 0
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - evaluator:
+                    params: [2]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [C]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              expression: B
+              refId: C
+              type: threshold
+        for: 5m
+        annotations:
+          summary: High request latency (p95 > 2s)
+          description: The 95th percentile request latency has exceeded 2 seconds for the last 5 minutes.
+        labels:
+          severity: warning
+        isPaused: false
+        noDataState: NoData
+        execErrState: Error
+
+      - uid: attraccess-scrape-failures
+        title: ScrapeFailures
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: attraccess-prometheus
+            model:
+              datasource:
+                type: prometheus
+                uid: attraccess-prometheus
+              editorMode: code
+              expr: up{job="attraccess"}
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 0
+              to: 0
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 0
+              to: 0
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - evaluator:
+                    params: [1]
+                    type: lt
+                  operator:
+                    type: and
+                  query:
+                    params: [C]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              expression: B
+              refId: C
+              type: threshold
+        for: 5m
+        annotations:
+          summary: Prometheus scrape failures
+          description: Prometheus has been unable to scrape the Attraccess metrics endpoint for 5 minutes.
+        labels:
+          severity: warning
+        isPaused: false
+        noDataState: Alerting
+        execErrState: Error
+
+      - uid: attraccess-high-failed-login-rate
+        title: HighFailedLoginRate
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: attraccess-prometheus
+            model:
+              datasource:
+                type: prometheus
+                uid: attraccess-prometheus
+              editorMode: code
+              expr: sum(rate(attraccess_auth_login_total{job="attraccess", status="fail"}[5m]))
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 0
+              to: 0
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 0
+              to: 0
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - evaluator:
+                    params: [1]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [C]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              expression: B
+              refId: C
+              type: threshold
+        for: 5m
+        annotations:
+          summary: High rate of failed login attempts
+          description: More than 1 failed login attempt per second over the last 5 minutes.
+        labels:
+          severity: warning
+        isPaused: false
+        noDataState: NoData
+        execErrState: Error
+
+      - uid: attraccess-overdue-maintenance
+        title: OverdueMaintenance
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: attraccess-prometheus
+            model:
+              datasource:
+                type: prometheus
+                uid: attraccess-prometheus
+              editorMode: code
+              expr: attraccess_resource_maintenance_overdue{job="attraccess"}
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 0
+              to: 0
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 0
+              to: 0
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - evaluator:
+                    params: [0]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [C]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              expression: B
+              refId: C
+              type: threshold
+        for: 1h
+        annotations:
+          summary: Resources with overdue maintenance
+          description: '{{ $values.B.Value }} resources have overdue maintenance.'
+        labels:
+          severity: warning
+        isPaused: false
+        noDataState: NoData
+        execErrState: Error
