@@ -5,6 +5,7 @@ groups:
     name: attraccess
     folder: Attraccess Alerts
     interval: 1m
+    disableProvenance: true
     rules:
       - uid: attraccess-service-down
         title: AttractapServiceDown
