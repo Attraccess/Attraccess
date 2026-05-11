@@ -46,6 +46,37 @@ describe('DbMetricsInstrumentation', () => {
     expect(driver.createQueryRunner).toBe(patched);
   });
 
+  it('does not double-wrap a cached runner across createQueryRunner calls', async () => {
+    let queryCalls = 0;
+    const cachedRunner: FakeRunner = {
+      query: async () => {
+        queryCalls += 1;
+        return [];
+      },
+    };
+    const registry = new Registry();
+    const metrics = createDbMetrics(registry);
+    const toggle = {
+      isEnabledCached: jest.fn().mockReturnValue(true),
+      getSlowQueryThresholdSecondsCached: jest.fn().mockReturnValue(0.5),
+    } as unknown as MetricsToggleService;
+    const driver: FakeDriver = {
+      createQueryRunner: () => cachedRunner,
+    };
+    const dataSource = { driver } as unknown as DataSource;
+    const instrumentation = new DbMetricsInstrumentation(metrics, toggle, dataSource);
+    instrumentation.install(dataSource);
+
+    for (let i = 0; i < 200; i += 1) {
+      (driver.createQueryRunner('master') as unknown as QueryRunner);
+    }
+    await (cachedRunner.query as (sql: string) => Promise<unknown>)('SELECT * FROM "user"');
+
+    expect(queryCalls).toBe(1);
+    const text = await registry.metrics();
+    expect(text).toContain('attraccess_db_query_duration_seconds_count{entity="user",method="select"} 1');
+  });
+
   it('records select duration with parsed entity from FROM clause', async () => {
     const { instrumentation, dataSource, driver, registry } = setup();
     instrumentation.install(dataSource);

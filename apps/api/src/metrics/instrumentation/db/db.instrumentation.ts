@@ -24,6 +24,8 @@ interface PatchableDriver {
   [PATCH_FLAG]?: boolean;
 }
 
+const patchedRunners = new WeakSet<QueryRunner>();
+
 @Injectable()
 export class DbMetricsInstrumentation implements OnModuleInit {
   constructor(
@@ -43,6 +45,10 @@ export class DbMetricsInstrumentation implements OnModuleInit {
     const observe = this.observe.bind(this);
     driver.createQueryRunner = (mode: 'master' | 'slave') => {
       const runner = original(mode);
+      if (patchedRunners.has(runner)) {
+        return runner;
+      }
+      patchedRunners.add(runner);
       const originalQuery = runner.query.bind(runner) as (
         sql: string,
         parameters?: unknown[],
