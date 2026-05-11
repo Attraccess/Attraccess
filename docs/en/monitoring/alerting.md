@@ -149,3 +149,44 @@ Rocket.Chat incoming webhooks also accept Slack-shaped payloads — same trick a
 [Apprise](https://github.com/caronc/apprise) exposes one HTTP endpoint that fans out to 80+ notification services (Twilio, Pushbullet, XMPP, IRC, etc.).
 - **URL**: `https://<apprise-host>/notify/<token>`
 - **HTTP Method**: POST
+
+## Testing alerts
+
+Every contact point has a **Test** button in the editor. It sends a synthetic alert through the same path your real alerts would take. Use this to confirm:
+- The webhook URL / SMTP credentials are correct
+- Your channel renders the message acceptably
+- There's no firewall in the way
+
+For an end-to-end test that actually fires a real rule, stop the Attraccess container for more than 2 minutes. `AttractapServiceDown` will fire `critical` and route through your contact point.
+
+## Silences and mute timings
+
+Both live under **Alerting → Silences** and **Alerting → Notification policies → Mute timings**:
+- **Silences** are one-off mutes ("don't page me about X for the next 4 hours"). Use during planned maintenance.
+- **Mute timings** are recurring windows ("never page on Sundays 02:00–06:00 UTC"). Attach them to the root policy in **Notification policies**.
+
+Neither is provisioned — configure both in the UI as needed.
+
+## Troubleshooting
+
+**Alert fires in Prometheus `/alerts` but not in Grafana**
+
+Most likely the rule failed to load. Check `docker logs grafana | grep provisioning.alerting`. Common causes:
+- Datasource UID typo in `rules.yml` — must match the UID in `monitoring/grafana/provisioning/datasources/prometheus.yml` exactly (`attraccess-prometheus`).
+- Duplicate rule UID in the Grafana database from a previous run. Wipe the `grafana-data` volume and redeploy.
+
+**Contact-point Test button fails**
+
+- Webhook URL: 401/403 → token wrong. 404 → URL path typo. Connection refused → network/firewall.
+- Email: check `docker logs grafana | grep smtp`. The most common failure is `GF_SMTP_STARTTLS_POLICY` mismatching what your relay expects.
+- Discord: Discord rate-limits webhooks; a 429 response means slow down.
+
+**"This object is provisioned and read-only" warning in the UI**
+
+The provisioning files ship with `disableProvenance: true` on every item, so this should not appear. If it does, verify the flag is set in your local `rules.yml`/`policies.yml`/`contact-points.yml` and redeploy.
+
+**No notifications during expected outages**
+
+- Check **Alerting → Alert rules** — is the rule firing? If not, the underlying metric may be absent on a fresh install with no traffic yet.
+- Check **Alerting → History** for whether Grafana attempted delivery.
+- Inspect `docker logs grafana | grep -i alert` for delivery errors.
