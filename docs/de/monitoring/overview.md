@@ -48,9 +48,11 @@ Der Metriken-Endpunkt ist durch einen API-Schlüssel geschützt. Prometheus auth
 1. [Metriken-Endpunkt aktivieren und API-Schlüssel generieren](monitoring/setup.md)
 2. [Prometheus und Grafana konfigurieren](monitoring/prometheus-grafana.md)
 3. [Verfügbare Metriken erkunden](monitoring/metrics-reference.md)
+4. [Alarmierung und Benachrichtigungen konfigurieren](monitoring/alerting.md)
 
 ## Siehe auch
 
 - [Einrichtung](monitoring/setup.md) -- Metriken aktivieren und API-Schlüssel generieren
 - [Prometheus & Grafana](monitoring/prometheus-grafana.md) -- Konfiguration und Docker-Compose-Einrichtung
 - [Metriken-Referenz](monitoring/metrics-reference.md) -- Vollständige Liste aller Metriken
+- [Alarmierung](monitoring/alerting.md) -- Benachrichtigungen für die vorkonfigurierten Alarmregeln einrichten
