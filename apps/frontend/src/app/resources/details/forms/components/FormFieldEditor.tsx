@@ -1,4 +1,5 @@
-import { Button, TextField, Label, Input, ListBoxItem, Select, Switch, TextArea } from "@heroui/react";
+import { Button, TextField, Label, Input, Switch, TextArea } from "@heroui/react";
+import { Select } from '../../../../../components/select';
 import { Trash2 } from 'lucide-react';
 import { FormFieldType } from '@attraccess/react-query-client';
 import { EditableFormField, createDefaultFieldOptions } from '../types';
@@ -41,16 +42,14 @@ export function FormFieldEditor(props: FormFieldEditorProps) {
           <Input placeholder={t('fields.placeholder.label')} ref={labelInputRef as React.Ref<HTMLInputElement> | undefined} />
         </TextField>
 
-        <label className="text-sm font-medium">{t('fields.type')}</label>
         <Select
+          label={t('fields.type')}
+          selectedKey={field.type}
           onSelectionChange={(key) => {
             handleTypeChange((key as FormFieldType) ?? FormFieldType.TEXT);
           }}
-        >
-          {FIELD_TYPE_OPTIONS.map((option) => (
-            <ListBoxItem key={option.value} id={option.value}>{t(option.labelKey)}</ListBoxItem>
-          ))}
-        </Select>
+          items={FIELD_TYPE_OPTIONS.map((option) => ({ key: option.value, label: t(option.labelKey) }))}
+        />
       </div>
 
       <div className="flex items-center justify-between">

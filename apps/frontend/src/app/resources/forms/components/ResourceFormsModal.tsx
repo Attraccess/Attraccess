@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Button, TextField, FieldError, Input, ListBoxItem, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Select, Switch, TextArea } from "@heroui/react";
+import { Button, TextField, FieldError, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Switch, TextArea } from "@heroui/react";
+import { Select } from '../../../../components/select';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { FormFieldType, FormResponseDto, FormSubmissionRequestDto } from '@attraccess/react-query-client';
 import {
@@ -334,12 +335,9 @@ function renderSelectInput(
       isDisabled={!options.length}
       aria-label={fieldName}
       selectedKey={selectedKey}
-      onSelectionChange={(key) => onChange(key as string ?? '')}
-    >
-      {options.map((option) => (
-        <ListBoxItem key={option} id={option}>{option}</ListBoxItem>
-      ))}
-    </Select>
+      onSelectionChange={(key) => onChange(key ?? '')}
+      items={options.map((option) => ({ key: option, label: option }))}
+    />
   );
 }
 

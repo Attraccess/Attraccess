@@ -1,4 +1,5 @@
-import { Alert, AlertContent, AlertTitle, Button, Form, Input, Label, ListBoxItem, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Select, Switch, TextField, useOverlayState } from '@heroui/react';
+import { Alert, AlertContent, AlertTitle, Button, Form, Input, Label, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Switch, TextField, useOverlayState } from '@heroui/react';
+import { Select } from '../../../../../components/select';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -235,16 +236,14 @@ export function MaintenanceScheduleUpsertModal(props: Props) {
                 <Input placeholder="e.g. Monthly check" />
               </TextField>
 
-              <label className="text-sm font-medium">{t('inputs.triggerType.label')}</label>
               <Select
+                label={t('inputs.triggerType.label')}
+                selectedKey={triggerType}
                 onSelectionChange={(key) => {
                   if (key) setTriggerType(key as ResourceMaintenanceScheduleTriggerType);
                 }}
-              >
-                {TRIGGER_OPTIONS.map((opt) => (
-                  <ListBoxItem key={opt.value} id={opt.value}>{t(`triggerType.${opt.labelKey}`)}</ListBoxItem>
-                ))}
-              </Select>
+                items={TRIGGER_OPTIONS.map((opt) => ({ key: opt.value, label: t(`triggerType.${opt.labelKey}`) }))}
+              />
 
               {triggerType === ResourceMaintenanceScheduleTriggerType.USAGE_HOURS && (
                 <>
@@ -252,16 +251,14 @@ export function MaintenanceScheduleUpsertModal(props: Props) {
                     <Label>{t('inputs.duration.label')}</Label>
                     <Input type="number" min={1} />
                   </TextField>
-                  <label className="text-sm font-medium">{t('inputs.unit.label')}</label>
                   <Select
+                    label={t('inputs.unit.label')}
+                    selectedKey={usageHoursUnit}
                     onSelectionChange={(key) => {
                       if (key) setUsageHoursUnit(key as UsageDurationUnit);
                     }}
-                  >
-                    {Object.values(UsageDurationUnit).map((unit) => (
-                      <ListBoxItem key={unit} id={unit}>{t(`inputs.unit.${unit}`)}</ListBoxItem>
-                    ))}
-                  </Select>
+                    items={Object.values(UsageDurationUnit).map((unit) => ({ key: unit, label: t(`inputs.unit.${unit}`) }))}
+                  />
                 </>
               )}
 
@@ -278,16 +275,14 @@ export function MaintenanceScheduleUpsertModal(props: Props) {
                     <Label>{t('inputs.duration.label')}</Label>
                     <Input type="number" min={1} placeholder="e.g. 30" />
                   </TextField>
-                  <label className="text-sm font-medium">{t('inputs.unit.label')}</label>
                   <Select
+                    label={t('inputs.unit.label')}
+                    selectedKey={timeIntervalUnit}
                     onSelectionChange={(key) => {
                       if (key) setTimeIntervalUnit(key as UsageDurationUnit);
                     }}
-                  >
-                    {Object.values(UsageDurationUnit).map((unit) => (
-                      <ListBoxItem key={unit} id={unit}>{t(`inputs.unit.${unit}`)}</ListBoxItem>
-                    ))}
-                  </Select>
+                    items={Object.values(UsageDurationUnit).map((unit) => ({ key: unit, label: t(`inputs.unit.${unit}`) }))}
+                  />
                   <p className="text-sm text-default-500">{t('inputs.timeIntervalEvaluationNote')}</p>
                 </>
               )}

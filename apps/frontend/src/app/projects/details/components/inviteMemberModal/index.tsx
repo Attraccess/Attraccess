@@ -1,5 +1,6 @@
 import { ReactNode, useCallback, useMemo, useState } from 'react';
-import { Button, ListBoxItem, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Select, useOverlayState } from "@heroui/react";
+import { Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, useOverlayState } from "@heroui/react";
+import { Select } from '../../../../../components/select';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   UseProjectsServiceListProjectInvitationsKeyFn,
@@ -116,12 +117,12 @@ export function InviteProjectMemberModal(props: Readonly<InviteProjectMemberModa
                       selectedUser ? <span className="text-tiny text-default-500">{selectedUser.username}</span> : null
                     }
                   />
-                  <label className="text-sm font-medium">{t('inputs.role')}</label>
-                  <Select selectedKey={role} onSelectionChange={(key) => { if (key) setRole(key as ProjectMember['role']); }}>
-                    {roleOptions.map((value) => (
-                      <ListBoxItem key={value} id={value}>{t(`roles.${value}`)}</ListBoxItem>
-                    ))}
-                  </Select>
+                  <Select
+                    label={t('inputs.role')}
+                    selectedKey={role}
+                    onSelectionChange={(key) => { if (key) setRole(key as ProjectMember['role']); }}
+                    items={roleOptions.map((value) => ({ key: value, label: t(`roles.${value}`) }))}
+                  />
                 </ModalBody>
                 <ModalFooter>
                   <Button variant="ghost" onPress={close} isDisabled={isPending}>
