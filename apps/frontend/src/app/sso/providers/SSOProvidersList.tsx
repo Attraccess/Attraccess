@@ -8,7 +8,6 @@ import {
   TableRow,
   TableCell,
   Tooltip,
-  TooltipTrigger,
   TooltipContent,
   TextField,
   Label,
@@ -669,29 +668,25 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                 <TableCell>
                   <div className="flex items-center gap-2">
                     <Tooltip>
-                      <TooltipTrigger>
-                        <Button
-                          variant="ghost"
-                          isIconOnly
-                          onPress={() => handleEdit(provider)}
-                          data-cy={`sso-provider-edit-button-${provider.id}`}
-                        >
-                          <Pencil size={16} />
-                        </Button>
-                      </TooltipTrigger>
+                      <Button
+                        variant="ghost"
+                        isIconOnly
+                        onPress={() => handleEdit(provider)}
+                        data-cy={`sso-provider-edit-button-${provider.id}`}
+                      >
+                        <Pencil size={16} />
+                      </Button>
                       <TooltipContent>{t('edit')}</TooltipContent>
                     </Tooltip>
                     <Tooltip>
-                      <TooltipTrigger>
-                        <Button
-                          variant="danger-soft"
-                          isIconOnly
-                          onPress={() => handleDelete(provider.id)}
-                          data-cy={`sso-provider-delete-button-${provider.id}`}
-                        >
-                          <Trash size={16} />
-                        </Button>
-                      </TooltipTrigger>
+                      <Button
+                        variant="danger-soft"
+                        isIconOnly
+                        onPress={() => handleDelete(provider.id)}
+                        data-cy={`sso-provider-delete-button-${provider.id}`}
+                      >
+                        <Trash size={16} />
+                      </Button>
                       <TooltipContent>{t('deleteText')}</TooltipContent>
                     </Tooltip>
                   </div>
@@ -856,16 +851,14 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                                 data-cy="sso-provider-form-oidc-client-secret-input"
                               />
                               <Tooltip>
-                                <TooltipTrigger>
-                                  <Button
-                                    variant="ghost"
-                                    isIconOnly
-                                    onPress={() => setShowClientSecret(!showClientSecret)}
-                                    data-cy="sso-provider-form-oidc-toggle-client-secret-button"
-                                  >
-                                    {showClientSecret ? <EyeOff size={16} /> : <Eye size={16} />}
-                                  </Button>
-                                </TooltipTrigger>
+                                <Button
+                                  variant="ghost"
+                                  isIconOnly
+                                  onPress={() => setShowClientSecret(!showClientSecret)}
+                                  data-cy="sso-provider-form-oidc-toggle-client-secret-button"
+                                >
+                                  {showClientSecret ? <EyeOff size={16} /> : <Eye size={16} />}
+                                </Button>
                                 <TooltipContent>
                                   {showClientSecret ? t('hideClientSecret') : t('showClientSecret')}
                                 </TooltipContent>
@@ -990,16 +983,14 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                                 data-cy="sso-provider-form-saml-provisioning-secret-input"
                               />
                               <Tooltip>
-                                <TooltipTrigger>
-                                  <Button
-                                    variant="ghost"
-                                    isIconOnly
-                                    onPress={() => setShowSamlProvisioningSecret(!showSamlProvisioningSecret)}
-                                    data-cy="sso-provider-form-saml-provisioning-secret-toggle-button"
-                                  >
-                                    {showSamlProvisioningSecret ? <EyeOff size={16} /> : <Eye size={16} />}
-                                  </Button>
-                                </TooltipTrigger>
+                                <Button
+                                  variant="ghost"
+                                  isIconOnly
+                                  onPress={() => setShowSamlProvisioningSecret(!showSamlProvisioningSecret)}
+                                  data-cy="sso-provider-form-saml-provisioning-secret-toggle-button"
+                                >
+                                  {showSamlProvisioningSecret ? <EyeOff size={16} /> : <Eye size={16} />}
+                                </Button>
                                 <TooltipContent>
                                   {showSamlProvisioningSecret
                                     ? t('hideSamlProvisioningSecret')

@@ -25,7 +25,6 @@ import {
   TableRow,
   Tooltip,
   TooltipContent,
-  TooltipTrigger,
 } from '@heroui/react';
 import { Trash2, Upload } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -123,16 +122,14 @@ export function PluginsList() {
                   <TableCell>{plugin.pluginDirectory || '-'}</TableCell>
                   <TableCell>
                     <Tooltip>
-                      <TooltipTrigger>
-                        <Button
-                          variant="danger-soft"
-                          isIconOnly
-                          onPress={() => handleDeleteClick(plugin.id)}
-                          data-cy={`plugins-list-delete-plugin-button-${plugin.id}`}
-                        >
-                          <Trash2 size={18} />
-                        </Button>
-                      </TooltipTrigger>
+                      <Button
+                        variant="danger-soft"
+                        isIconOnly
+                        onPress={() => handleDeleteClick(plugin.id)}
+                        data-cy={`plugins-list-delete-plugin-button-${plugin.id}`}
+                      >
+                        <Trash2 size={18} />
+                      </Button>
                       <TooltipContent>{t('deleteTooltip')}</TooltipContent>
                     </Tooltip>
                   </TableCell>

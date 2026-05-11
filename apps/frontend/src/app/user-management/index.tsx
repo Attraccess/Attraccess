@@ -196,7 +196,7 @@ export const UserManagementPage: React.FC = () => {
                     <TableCell className="text-center">
                       {isSsoLinked ? (
                         <Tooltip>
-                          <TooltipTrigger>
+                          <TooltipTrigger tabIndex={0}>
                             <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary-100 text-primary-700">
                               <KeyIcon className="w-3.5 h-3.5" />
                             </span>
@@ -238,7 +238,7 @@ export const UserManagementPage: React.FC = () => {
                           .filter((permission) => permission.enabled)
                           .map((permission) => (
                             <Tooltip key={permission.key}>
-                              <TooltipTrigger>
+                              <TooltipTrigger tabIndex={0}>
                                 <Chip
                                   variant="soft"
                                   color="accent"

@@ -186,7 +186,7 @@ export function AttraccessNode(props: Props) {
                 </div>
                 {!previewMode && (
                   <Tooltip>
-                    <TooltipTrigger>
+                    <TooltipTrigger tabIndex={0}>
                       <span
                         className={cn(
                           'w-2 h-2 rounded-full shrink-0',
@@ -245,7 +245,7 @@ export function AttraccessNode(props: Props) {
           {!previewMode &&
             targetHandlesWithStyles.map(({ id: handleId, label, style }) => (
               <Tooltip key={handleId} isDisabled={!label}>
-                <TooltipTrigger>
+                <TooltipTrigger tabIndex={0}>
                   <Handle
                     type="target"
                     position={Position.Top}
@@ -261,7 +261,7 @@ export function AttraccessNode(props: Props) {
             {!previewMode &&
               sourceHandlesWithStyles.map(({ id: handleId, label, style }) => (
                 <Tooltip key={handleId} isDisabled={!label}>
-                  <TooltipTrigger>
+                  <TooltipTrigger tabIndex={0}>
                     <Handle style={style} type="source" position={Position.Bottom} className="!w-4 !h-4" id={handleId} />
                   </TooltipTrigger>
                   <TooltipContent>{label}</TooltipContent>
