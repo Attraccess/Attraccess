@@ -235,7 +235,9 @@
       "typeorm@0.3.29": "patches/typeorm@0.3.29.patch"
     },
     "overrides": {
-      "@internationalized/date": "3.12.1"
+      "@internationalized/date": "3.12.1",
+      "react": "19.2.6",
+      "react-dom": "19.2.6"
     }
   }
 }
