@@ -103,3 +103,49 @@ Create a service in PagerDuty with an Events API v2 integration, copy the integr
 - **Integration**: OpsGenie
 - **API Key**: from OpsGenie integrations tab
 - **API URL**: leave blank for default
+
+## Open-source / maker channels via generic webhook
+
+Pick the **Webhook** integration in the contact-point editor, then use the URL and HTTP method below. Grafana POSTs a JSON body shaped like the [Grafana webhook payload](https://grafana.com/docs/grafana/latest/alerting/configure-notifications/manage-contact-points/integrations/webhook-notifier/).
+
+Many services accept this directly; for those that need a different shape, a small bridge (e.g., an [Apprise](https://github.com/caronc/apprise) instance, a [Hookshot](https://matrix-org.github.io/matrix-hookshot/latest/) container, or a one-liner reverse proxy) translates the payload.
+
+### ntfy.sh
+
+- **URL**: `https://ntfy.sh/<your-topic>` (self-host or use the public service)
+- **HTTP Method**: POST
+- **Authorization**: none, or Basic Auth if your ntfy instance requires it
+- Body templating: leave default — ntfy displays the JSON as-is in its UI. For prettier output, run ntfy behind a script that pulls `commonAnnotations.summary`.
+
+### Gotify
+
+- **URL**: `https://<gotify-host>/message?token=<app-token>`
+- **HTTP Method**: POST
+- Body templating: leave default.
+
+### Matrix (via matrix-hookshot)
+
+Hookshot exposes a generic webhook endpoint per room.
+- In Hookshot's room admin: create a generic webhook, copy the URL.
+- **URL**: hookshot URL
+- **HTTP Method**: POST
+
+### Signal (via signal-cli-rest-api)
+
+Run [`signal-cli-rest-api`](https://github.com/bbernhard/signal-cli-rest-api) alongside Grafana. Use the Webhook integration with a small bridge that posts to `/v2/send`. The Grafana payload schema is documented above; a 10-line Node/Python sidecar is typically enough.
+
+### Mattermost
+
+Mattermost incoming webhooks accept Slack-shaped payloads. Either:
+- Use the **Slack** integration in Grafana and point its webhook URL at Mattermost (`https://mattermost.example.com/hooks/...`), or
+- Use the **Webhook** integration with default body for Mattermost's generic format.
+
+### Rocket.Chat
+
+Rocket.Chat incoming webhooks also accept Slack-shaped payloads — same trick as Mattermost.
+
+### Apprise (catch-all bridge)
+
+[Apprise](https://github.com/caronc/apprise) exposes one HTTP endpoint that fans out to 80+ notification services (Twilio, Pushbullet, XMPP, IRC, etc.).
+- **URL**: `https://<apprise-host>/notify/<token>`
+- **HTTP Method**: POST
