@@ -5,7 +5,21 @@ import {
   useTwoFactorAuthenticationServiceGetTwoFactorPolicy,
   useTwoFactorAuthenticationServiceSetTwoFactorPolicy,
 } from '@attraccess/react-query-client';
-import { Alert, AlertContent, AlertDescription, AlertTitle, Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, useOverlayState } from '@heroui/react';
+import {
+  Alert,
+  AlertContent,
+  AlertDescription,
+  AlertTitle,
+  Button,
+  Modal,
+  ModalBackdrop,
+  ModalBody,
+  ModalContainer,
+  ModalDialog,
+  ModalFooter,
+  ModalHeader,
+  useOverlayState,
+} from '@heroui/react';
 import { Select } from '../../../components/select';
 import { Settings2Icon } from 'lucide-react';
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
@@ -101,48 +115,51 @@ export function TwoFactorPolicyModal(props: Props) {
     <>
       {props.children(open)}
       <Modal isOpen={isOpen} onOpenChange={setOpen}>
-        <ModalBackdrop />
-        <ModalContainer>
-          <ModalDialog>
-            {() => (
-              <>
-                <ModalHeader>
-                  <PageHeader title={t('title')} subtitle={t('subtitle')} icon={<Settings2Icon />} noMargin={true} />
-                </ModalHeader>
-                <ModalBody>
-                  <Alert status="warning" >
-                    <AlertContent>
-                      <AlertTitle>{t('warning.title')}</AlertTitle>
-                      <AlertDescription>{t('warning.description')}</AlertDescription>
-                    </AlertContent>
-                  </Alert>
-                  <Select
-                    label={t('inputs.policy.label')}
-                    isDisabled={isLoading}
-                    selectedKey={selectedPolicy ?? undefined}
-                    onSelectionChange={(key) => { if (key) setSelectedPolicy(key as TwoFactorPolicy); }}
-                    items={policyOptions.map((option) => ({
-                      key: option.value,
-                      textValue: option.label,
-                      label: (
-                        <div className="flex flex-col gap-1">
-                          <span>{option.label}</span>
-                          <span className="text-xs text-default-500">{option.description}</span>
-                        </div>
-                      ),
-                    }))}
-                  />
-                  {selectedOption && <div className="text-sm text-default-500">{selectedOption.description}</div>}
-                </ModalBody>
-                <ModalFooter>
-                  <Button variant="primary" onPress={onSave} isPending={isSaving} isDisabled={!selectedPolicy}>
-                    {t('actions.save.label')}
-                  </Button>
-                </ModalFooter>
-              </>
-            )}
-          </ModalDialog>
-        </ModalContainer>
+        <ModalBackdrop>
+          <ModalContainer>
+            <ModalDialog>
+              {() => (
+                <>
+                  <ModalHeader>
+                    <PageHeader title={t('title')} subtitle={t('subtitle')} icon={<Settings2Icon />} noMargin={true} />
+                  </ModalHeader>
+                  <ModalBody>
+                    <Alert status="warning">
+                      <AlertContent>
+                        <AlertTitle>{t('warning.title')}</AlertTitle>
+                        <AlertDescription>{t('warning.description')}</AlertDescription>
+                      </AlertContent>
+                    </Alert>
+                    <Select
+                      label={t('inputs.policy.label')}
+                      isDisabled={isLoading}
+                      selectedKey={selectedPolicy ?? undefined}
+                      onSelectionChange={(key) => {
+                        if (key) setSelectedPolicy(key as TwoFactorPolicy);
+                      }}
+                      items={policyOptions.map((option) => ({
+                        key: option.value,
+                        textValue: option.label,
+                        label: (
+                          <div className="flex flex-col gap-1">
+                            <span>{option.label}</span>
+                            <span className="text-xs text-default-500">{option.description}</span>
+                          </div>
+                        ),
+                      }))}
+                    />
+                    {selectedOption && <div className="text-sm text-default-500">{selectedOption.description}</div>}
+                  </ModalBody>
+                  <ModalFooter>
+                    <Button variant="primary" onPress={onSave} isPending={isSaving} isDisabled={!selectedPolicy}>
+                      {t('actions.save.label')}
+                    </Button>
+                  </ModalFooter>
+                </>
+              )}
+            </ModalDialog>
+          </ModalContainer>
+        </ModalBackdrop>
       </Modal>
     </>
   );

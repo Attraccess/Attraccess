@@ -17,20 +17,26 @@ export function InsufficientBalanceModal(props: Props) {
   const { t } = useTranslations({ en, de });
 
   return (
-    <Modal isOpen={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <ModalBackdrop />
-      <ModalContainer>
-        <ModalDialog>
-          {() => (
-            <BillingDashboardTopupCard
-              title={t('title')}
-              subtitle={t('description')}
-              desiredAmount={desiredAmount}
-              onProcessingComplete={onClose}
-            />
-          )}
-        </ModalDialog>
-      </ModalContainer>
+    <Modal
+      isOpen={isOpen}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
+      <ModalBackdrop>
+        <ModalContainer>
+          <ModalDialog>
+            {() => (
+              <BillingDashboardTopupCard
+                title={t('title')}
+                subtitle={t('description')}
+                desiredAmount={desiredAmount}
+                onProcessingComplete={onClose}
+              />
+            )}
+          </ModalDialog>
+        </ModalContainer>
+      </ModalBackdrop>
     </Modal>
   );
 }

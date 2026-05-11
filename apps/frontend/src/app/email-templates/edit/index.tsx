@@ -6,7 +6,25 @@ import {
   useEmailTemplatesServiceEmailTemplateControllerPreviewMjml,
   EmailTemplateType,
 } from '@attraccess/react-query-client';
-import { Button, Card, CardContent, CardHeader, TextField, Label, Input, Form, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Link } from '@heroui/react';
+import {
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  TextField,
+  Label,
+  Input,
+  Form,
+  Modal,
+  ModalBackdrop,
+  ModalBody,
+  ModalContainer,
+  ModalDialog,
+  ModalFooter,
+  ModalHeader,
+  ModalHeading,
+  Link,
+} from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PageHeader } from '../../../components/pageHeader';
 import Editor from '@monaco-editor/react';
@@ -99,9 +117,7 @@ export function EditEmailTemplatePage() {
           defaultValue={body}
           onChange={(value) => setBody(value ?? '')}
         />
-        <Link href="https://documentation.mjml.io/">
-          {t('form.mjmlDocumentation')}
-        </Link>
+        <Link href="https://documentation.mjml.io/">{t('form.mjmlDocumentation')}</Link>
       </>
     );
   }, [body, theme, subject, t]);
@@ -139,22 +155,23 @@ export function EditEmailTemplatePage() {
               {editor}
 
               <Modal isOpen={editorIsExpanded} onOpenChange={setEditorIsExpanded}>
-                <ModalBackdrop />
-                <ModalContainer>
-                  <ModalDialog>
-                    {({ close }) => (
-                      <>
-                        <ModalHeader>
-                          <ModalHeading>{t('templateType.' + templateType)}</ModalHeading>
-                        </ModalHeader>
-                        <ModalBody>{editor}</ModalBody>
-                        <ModalFooter>
-                          <Button onPress={close}>{t('actions.close')}</Button>
-                        </ModalFooter>
-                      </>
-                    )}
-                  </ModalDialog>
-                </ModalContainer>
+                <ModalBackdrop>
+                  <ModalContainer>
+                    <ModalDialog>
+                      {({ close }) => (
+                        <>
+                          <ModalHeader>
+                            <ModalHeading>{t('templateType.' + templateType)}</ModalHeading>
+                          </ModalHeader>
+                          <ModalBody>{editor}</ModalBody>
+                          <ModalFooter>
+                            <Button onPress={close}>{t('actions.close')}</Button>
+                          </ModalFooter>
+                        </>
+                      )}
+                    </ModalDialog>
+                  </ModalContainer>
+                </ModalBackdrop>
               </Modal>
             </CardContent>
           </Card>

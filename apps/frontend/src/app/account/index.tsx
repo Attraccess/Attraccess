@@ -1,5 +1,19 @@
 import { PageHeader } from '../../components/pageHeader';
-import { Button, Card, CardContent, CardHeader, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, useOverlayState } from '@heroui/react';
+import {
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  Modal,
+  ModalBackdrop,
+  ModalBody,
+  ModalContainer,
+  ModalDialog,
+  ModalFooter,
+  ModalHeader,
+  ModalHeading,
+  useOverlayState,
+} from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
@@ -80,33 +94,35 @@ export default function AccountPage() {
       </div>
 
       <Modal isOpen={isOpen} onOpenChange={setOpen}>
-        <ModalBackdrop />
-        <ModalContainer>
-          <ModalDialog>
-            {({ close }) => (
-              <>
-                <ModalHeader>
-                  <ModalHeading>{t('deleteAccount.modal.title')}</ModalHeading>
-                </ModalHeader>
-                <ModalBody>
-                  <p className="text-sm text-default-500">{t('deleteAccount.modal.description')}</p>
-                </ModalBody>
-                <ModalFooter>
-                  <Button variant="ghost" onPress={close} isDisabled={isRequestingDelete}>
-                    {t('deleteAccount.actions.cancel')}
-                  </Button>
-                  <Button variant="danger"
-                    onPress={() => requestDelete()}
-                    isPending={isRequestingDelete}
-                    data-cy="delete-account-confirm-button"
-                  >
-                    {t('deleteAccount.actions.confirm')}
-                  </Button>
-                </ModalFooter>
-              </>
-            )}
-          </ModalDialog>
-        </ModalContainer>
+        <ModalBackdrop>
+          <ModalContainer>
+            <ModalDialog>
+              {({ close }) => (
+                <>
+                  <ModalHeader>
+                    <ModalHeading>{t('deleteAccount.modal.title')}</ModalHeading>
+                  </ModalHeader>
+                  <ModalBody>
+                    <p className="text-sm text-default-500">{t('deleteAccount.modal.description')}</p>
+                  </ModalBody>
+                  <ModalFooter>
+                    <Button variant="ghost" onPress={close} isDisabled={isRequestingDelete}>
+                      {t('deleteAccount.actions.cancel')}
+                    </Button>
+                    <Button
+                      variant="danger"
+                      onPress={() => requestDelete()}
+                      isPending={isRequestingDelete}
+                      data-cy="delete-account-confirm-button"
+                    >
+                      {t('deleteAccount.actions.confirm')}
+                    </Button>
+                  </ModalFooter>
+                </>
+              )}
+            </ModalDialog>
+          </ModalContainer>
+        </ModalBackdrop>
       </Modal>
     </div>
   );

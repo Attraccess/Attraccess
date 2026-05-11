@@ -1,5 +1,14 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader } from '@heroui/react';
+import {
+  Button,
+  Modal,
+  ModalBackdrop,
+  ModalBody,
+  ModalContainer,
+  ModalDialog,
+  ModalFooter,
+  ModalHeader,
+} from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { ArrowUpCircle, ExternalLink, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -86,14 +95,10 @@ export function UpdateNotificationBanner() {
             <a href={updateDocsPath} target="_blank" rel="noopener noreferrer">
               <Button variant="primary">
                 {t('howToUpdate')}
-              <ExternalLink size={14} /></Button>
+                <ExternalLink size={14} />
+              </Button>
             </a>
-            <Button variant="ghost"
-
-              isIconOnly
-              aria-label={t('dismissThisVersion')}
-              onPress={onDismiss}
-            >
+            <Button variant="ghost" isIconOnly aria-label={t('dismissThisVersion')} onPress={onDismiss}>
               <X size={16} />
             </Button>
           </div>
@@ -101,35 +106,37 @@ export function UpdateNotificationBanner() {
       </div>
 
       <Modal isOpen={isReleaseNotesOpen} onOpenChange={setIsReleaseNotesOpen}>
-        <ModalBackdrop />
-        <ModalContainer>
-          <ModalDialog>
-            {({ close }) => (
-              <>
-                <ModalHeader>{t('releaseNotesModalTitle', { version: release.version })}</ModalHeader>
-                <ModalBody>
-                  {release.body?.trim() ? (
-                    <div className="prose prose-sm dark:prose-invert max-w-none">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{release.body}</ReactMarkdown>
-                    </div>
-                  ) : (
-                    <div className="text-default-500">{t('releaseNotesFallback')}</div>
-                  )}
-                </ModalBody>
-                <ModalFooter className="flex-wrap gap-2 justify-between">
-                  <a href={release.htmlUrl} target="_blank" rel="noopener noreferrer">
-                    <Button variant="secondary">
-                      {release.tagName}
-                    <ExternalLink size={14} /></Button>
-                  </a>
-                  <Button variant="primary" onPress={close}>
-                    {t('close')}
-                  </Button>
-                </ModalFooter>
-              </>
-            )}
-          </ModalDialog>
-        </ModalContainer>
+        <ModalBackdrop>
+          <ModalContainer>
+            <ModalDialog>
+              {({ close }) => (
+                <>
+                  <ModalHeader>{t('releaseNotesModalTitle', { version: release.version })}</ModalHeader>
+                  <ModalBody>
+                    {release.body?.trim() ? (
+                      <div className="prose prose-sm dark:prose-invert max-w-none">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{release.body}</ReactMarkdown>
+                      </div>
+                    ) : (
+                      <div className="text-default-500">{t('releaseNotesFallback')}</div>
+                    )}
+                  </ModalBody>
+                  <ModalFooter className="flex-wrap gap-2 justify-between">
+                    <a href={release.htmlUrl} target="_blank" rel="noopener noreferrer">
+                      <Button variant="secondary">
+                        {release.tagName}
+                        <ExternalLink size={14} />
+                      </Button>
+                    </a>
+                    <Button variant="primary" onPress={close}>
+                      {t('close')}
+                    </Button>
+                  </ModalFooter>
+                </>
+              )}
+            </ModalDialog>
+          </ModalContainer>
+        </ModalBackdrop>
       </Modal>
     </>
   );

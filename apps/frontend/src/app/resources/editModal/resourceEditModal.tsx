@@ -1,5 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Button, Form, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Tab, TabList, TabPanel, Tabs, useOverlayState } from '@heroui/react';
+import {
+  Button,
+  Form,
+  Modal,
+  ModalBackdrop,
+  ModalBody,
+  ModalContainer,
+  ModalDialog,
+  ModalFooter,
+  ModalHeader,
+  ModalHeading,
+  Tab,
+  TabList,
+  TabPanel,
+  Tabs,
+  useOverlayState,
+} from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './resourceEditModal.en.json';
 import de from './resourceEditModal.de.json';
@@ -195,84 +211,83 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
   return (
     <>
       {props.children?.(open)}
-      <Modal
-        isOpen={isOpen}
-        onOpenChange={setOpen}
-        data-cy="resource-edit-modal"
-      >
-        <ModalBackdrop />
-        <ModalContainer>
-          <ModalDialog>
-            {({ close }) => (
-              <>
-                <ModalHeader>
-                  <ModalHeading>{t(`modalTitle.${props.resourceId ? 'update' : 'create'}`)}</ModalHeading>
-                </ModalHeader>
+      <Modal isOpen={isOpen} onOpenChange={setOpen} data-cy="resource-edit-modal">
+        <ModalBackdrop>
+          <ModalContainer>
+            <ModalDialog>
+              {({ close }) => (
+                <>
+                  <ModalHeader>
+                    <ModalHeading>{t(`modalTitle.${props.resourceId ? 'update' : 'create'}`)}</ModalHeading>
+                  </ModalHeader>
 
-                <ModalBody className="w-full space-y-4">
-                  <Form
-                    ref={formRef}
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      onSubmit();
-                    }}
-                    className="grid grid-cols-1 lg:grid-cols-2 gap-4 w-full"
-                  >
-                    <div className="flex flex-col gap-2 w-full">
-                      <SharedDataTab
-                        t={t}
-                        formData={formData}
-                        setField={setField}
-                        onImageSelected={onImageSelected}
-                        resource={resource}
-                      />
-                    </div>
+                  <ModalBody className="w-full space-y-4">
+                    <Form
+                      ref={formRef}
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        onSubmit();
+                      }}
+                      className="grid grid-cols-1 lg:grid-cols-2 gap-4 w-full"
+                    >
+                      <div className="flex flex-col gap-2 w-full">
+                        <SharedDataTab
+                          t={t}
+                          formData={formData}
+                          setField={setField}
+                          onImageSelected={onImageSelected}
+                          resource={resource}
+                        />
+                      </div>
 
-                    <div className="flex flex-col gap-2 w-full">
-                      <Tabs selectedKey={formData.type}>
-                        <TabList>
-                          <Tab id="machine">{t('inputs.type.options.machine')}</Tab>
-                          <Tab id="door">{t('inputs.type.options.door')}</Tab>
-                        </TabList>
-                        <TabPanel id="machine">
-                          <MachineTab t={t} formData={formData} setField={setField} />
-                        </TabPanel>
-                        <TabPanel id="door">
-                          <DoorTab t={t} formData={formData} setField={setField} />
-                        </TabPanel>
-                      </Tabs>
-                    </div>
+                      <div className="flex flex-col gap-2 w-full">
+                        <Tabs selectedKey={formData.type}>
+                          <TabList>
+                            <Tab id="machine">{t('inputs.type.options.machine')}</Tab>
+                            <Tab id="door">{t('inputs.type.options.door')}</Tab>
+                          </TabList>
+                          <TabPanel id="machine">
+                            <MachineTab t={t} formData={formData} setField={setField} />
+                          </TabPanel>
+                          <TabPanel id="door">
+                            <DoorTab t={t} formData={formData} setField={setField} />
+                          </TabPanel>
+                        </Tabs>
+                      </div>
 
-                    <div className="lg:col-span-2">
-                      <ResourceMetadataEditor
-                        t={t}
-                        value={formData.metadata}
-                        onChange={(value) => setField('metadata', value)}
-                      />
-                    </div>
-                  </Form>
-                </ModalBody>
+                      <div className="lg:col-span-2">
+                        <ResourceMetadataEditor
+                          t={t}
+                          value={formData.metadata}
+                          onChange={(value) => setField('metadata', value)}
+                        />
+                      </div>
+                    </Form>
+                  </ModalBody>
 
-                <ModalFooter className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center w-full">
-                  <Button variant="outline"
-                    className="w-full sm:w-auto min-w-full sm:min-w-fit"
-                    onPress={close}
-                    data-cy="resource-edit-modal-cancel-button"
-                  >
-                    {t('buttons.cancel')}
-                  </Button>
-                  <Button variant="primary"
-                    className="w-full sm:w-auto min-w-full sm:min-w-fit"
-                    onPress={onSubmit}
-                    data-cy={`resource-edit-modal-${props.resourceId ? 'update' : 'create'}-button`}
-                  >
-                    {props.resourceId ? t('buttons.update') : t('buttons.create')}
-                  </Button>
-                </ModalFooter>
-              </>
-            )}
-          </ModalDialog>
-        </ModalContainer>
+                  <ModalFooter className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center w-full">
+                    <Button
+                      variant="outline"
+                      className="w-full sm:w-auto min-w-full sm:min-w-fit"
+                      onPress={close}
+                      data-cy="resource-edit-modal-cancel-button"
+                    >
+                      {t('buttons.cancel')}
+                    </Button>
+                    <Button
+                      variant="primary"
+                      className="w-full sm:w-auto min-w-full sm:min-w-fit"
+                      onPress={onSubmit}
+                      data-cy={`resource-edit-modal-${props.resourceId ? 'update' : 'create'}-button`}
+                    >
+                      {props.resourceId ? t('buttons.update') : t('buttons.create')}
+                    </Button>
+                  </ModalFooter>
+                </>
+              )}
+            </ModalDialog>
+          </ModalContainer>
+        </ModalBackdrop>
       </Modal>
     </>
   );

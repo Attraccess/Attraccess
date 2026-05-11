@@ -1,5 +1,17 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Alert, AlertContent, AlertDescription, Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalHeader, useOverlayState } from '@heroui/react';
+import {
+  Alert,
+  AlertContent,
+  AlertDescription,
+  Button,
+  Modal,
+  ModalBackdrop,
+  ModalBody,
+  ModalContainer,
+  ModalDialog,
+  ModalHeader,
+  useOverlayState,
+} from '@heroui/react';
 import { PageHeader } from '../../../components/pageHeader';
 import { FirmwareSelector } from './FirmwareSelector';
 import { FirmwareFlasher } from './FirmwareFlasher';
@@ -151,34 +163,37 @@ export function AttractapHardwareSetup(props: Props) {
     <>
       {children(open)}
 
-      <Modal
-        isOpen={isOpen}
-        onOpenChange={setOpen}
-      >
-        <ModalBackdrop />
-        <ModalContainer size={state === 'configure' ? 'lg' : undefined}>
-          <ModalDialog>
-            {() => (
-              <>
-                <ModalHeader>
-                  <PageHeader title={t('title.' + state)} subtitle={t('subtitle.' + state)} noMargin onBack={onBack} />
-                </ModalHeader>
+      <Modal isOpen={isOpen} onOpenChange={setOpen}>
+        <ModalBackdrop>
+          <ModalContainer size={state === 'configure' ? 'lg' : undefined}>
+            <ModalDialog>
+              {() => (
+                <>
+                  <ModalHeader>
+                    <PageHeader
+                      title={t('title.' + state)}
+                      subtitle={t('subtitle.' + state)}
+                      noMargin
+                      onBack={onBack}
+                    />
+                  </ModalHeader>
 
-                <ModalBody className="mb-4">
-                  <Content
-                    state={state}
-                    setState={setState}
-                    onClose={close}
-                    openDeviceSettings={(deviceId) => {
-                      close();
-                      openDeviceSettings(deviceId);
-                    }}
-                  />
-                </ModalBody>
-              </>
-            )}
-          </ModalDialog>
-        </ModalContainer>
+                  <ModalBody className="mb-4">
+                    <Content
+                      state={state}
+                      setState={setState}
+                      onClose={close}
+                      openDeviceSettings={(deviceId) => {
+                        close();
+                        openDeviceSettings(deviceId);
+                      }}
+                    />
+                  </ModalBody>
+                </>
+              )}
+            </ModalDialog>
+          </ModalContainer>
+        </ModalBackdrop>
       </Modal>
     </>
   );

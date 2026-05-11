@@ -19,7 +19,22 @@ import { ChangeEmailForm } from './components/changeEmail';
 
 import en from './en.json';
 import de from './de.json';
-import { Button, Card, CardContent, CardHeader, Chip, Separator, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, useOverlayState } from '@heroui/react';
+import {
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  Chip,
+  Separator,
+  Modal,
+  ModalBackdrop,
+  ModalBody,
+  ModalContainer,
+  ModalDialog,
+  ModalFooter,
+  ModalHeader,
+  useOverlayState,
+} from '@heroui/react';
 import { useToastMessage } from '../../../components/toastProvider';
 import API_ERROR_TRANSLATIONS_EN from '../../../global-translations/api-errors.en.json';
 import API_ERROR_TRANSLATIONS_DE from '../../../global-translations/api-errors.de.json';
@@ -158,7 +173,11 @@ export function UserManagementDetailsPage() {
         {user && (
           <>
             <div className="w-full">
-              <UserPermissionForm user={user} ssoManagedProviders={ssoManagedProviders} ssoManagedPermissionKeys={ssoManagedPermissionKeys} />
+              <UserPermissionForm
+                user={user}
+                ssoManagedProviders={ssoManagedProviders}
+                ssoManagedPermissionKeys={ssoManagedPermissionKeys}
+              />
             </div>
             <Card className="w-full">
               <CardHeader>
@@ -213,19 +232,24 @@ export function UserManagementDetailsPage() {
                         providerName ??
                         (detail.providerType && detail.providerId
                           ? `${detail.providerType} #${detail.providerId}`
-                          : detail.providerType ?? '-');
-                      const itemKey = `${detail.providerId ?? 'unknown'}-${detail.ssoSubject ?? 'unknown'}-${detail.providerType ?? 'unknown'
-                        }`;
+                          : (detail.providerType ?? '-'));
+                      const itemKey = `${detail.providerId ?? 'unknown'}-${detail.ssoSubject ?? 'unknown'}-${
+                        detail.providerType ?? 'unknown'
+                      }`;
                       return (
                         <div key={itemKey} className="flex flex-col gap-2">
                           <div className="flex flex-col gap-1">
-                            <span className="text-xs uppercase tracking-wide text-default-500">{t('sso.provider')}</span>
+                            <span className="text-xs uppercase tracking-wide text-default-500">
+                              {t('sso.provider')}
+                            </span>
                             <div className="text-sm font-semibold text-default-900 break-words">{providerLabel}</div>
                             <div className="text-xs text-default-500">{detail.providerType ?? '-'}</div>
                           </div>
                           <div className="flex flex-col gap-1">
                             <span className="text-xs uppercase tracking-wide text-default-500">{t('sso.userId')}</span>
-                            <div className="font-mono text-xs text-default-800 break-all">{detail.ssoSubject ?? '-'}</div>
+                            <div className="font-mono text-xs text-default-800 break-all">
+                              {detail.ssoSubject ?? '-'}
+                            </div>
                           </div>
                           {index < ssoDetails.length - 1 ? <Separator /> : null}
                         </div>
@@ -242,11 +266,7 @@ export function UserManagementDetailsPage() {
               </CardHeader>
               <CardContent className="flex flex-col gap-4">
                 <p className="text-sm text-default-500">{t('delete.description')}</p>
-                <Button variant="danger-soft"
-                  onPress={open}
-                  isDisabled={isSelf}
-                  data-cy="admin-delete-user-open-modal"
-                >
+                <Button variant="danger-soft" onPress={open} isDisabled={isSelf} data-cy="admin-delete-user-open-modal">
                   {t('delete.actions.open')}
                 </Button>
                 {isSelf ? <p className="text-xs text-default-400">{t('delete.selfDisabled')}</p> : null}
@@ -257,31 +277,33 @@ export function UserManagementDetailsPage() {
       </div>
 
       <Modal isOpen={isOpen} onOpenChange={setOpen}>
-        <ModalBackdrop />
-        <ModalContainer>
-          <ModalDialog>
-            {({ close: modalClose }) => (
-              <>
-                <ModalHeader>{t('delete.modal.title')}</ModalHeader>
-                <ModalBody>
-                  <p className="text-sm text-default-500">{t('delete.modal.description')}</p>
-                </ModalBody>
-                <ModalFooter>
-                  <Button variant="ghost" onPress={modalClose} isDisabled={isDeleting}>
-                    {t('delete.actions.cancel')}
-                  </Button>
-                  <Button variant="danger"
-                    onPress={() => user && deleteUser({ id: user.id })}
-                    isPending={isDeleting}
-                    data-cy="admin-delete-user-confirm-button"
-                  >
-                    {t('delete.actions.confirm')}
-                  </Button>
-                </ModalFooter>
-              </>
-            )}
-          </ModalDialog>
-        </ModalContainer>
+        <ModalBackdrop>
+          <ModalContainer>
+            <ModalDialog>
+              {({ close: modalClose }) => (
+                <>
+                  <ModalHeader>{t('delete.modal.title')}</ModalHeader>
+                  <ModalBody>
+                    <p className="text-sm text-default-500">{t('delete.modal.description')}</p>
+                  </ModalBody>
+                  <ModalFooter>
+                    <Button variant="ghost" onPress={modalClose} isDisabled={isDeleting}>
+                      {t('delete.actions.cancel')}
+                    </Button>
+                    <Button
+                      variant="danger"
+                      onPress={() => user && deleteUser({ id: user.id })}
+                      isPending={isDeleting}
+                      data-cy="admin-delete-user-confirm-button"
+                    >
+                      {t('delete.actions.confirm')}
+                    </Button>
+                  </ModalFooter>
+                </>
+              )}
+            </ModalDialog>
+          </ModalContainer>
+        </ModalBackdrop>
       </Modal>
     </div>
   );

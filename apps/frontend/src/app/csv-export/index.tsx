@@ -1,5 +1,20 @@
 import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Button, Card, CardContent, CardFooter, CardHeader, DateValue, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalHeader, RangeCalendar, RangeValue } from '@heroui/react';
+import {
+  Button,
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  DateValue,
+  Modal,
+  ModalBackdrop,
+  ModalBody,
+  ModalContainer,
+  ModalDialog,
+  ModalHeader,
+  RangeCalendar,
+  RangeValue,
+} from '@heroui/react';
 import de from './de.json';
 import en from './en.json';
 import { useCallback, useMemo, useRef, useState } from 'react';
@@ -63,7 +78,6 @@ export function CsvExport() {
             <RangeCalendar
               onChange={(value) => setDateRange(value)}
               id="date-range"
-
               aria-label={t('rangeCalendar.label')}
               data-cy="csv-export-range-calendar"
             />
@@ -95,36 +109,39 @@ export function CsvExport() {
 
       <Modal
         isOpen={showExport}
-        onOpenChange={(open) => { if (!open) setShowExport(false); }}
+        onOpenChange={(open) => {
+          if (!open) setShowExport(false);
+        }}
         data-cy="csv-export-modal"
       >
-        <ModalBackdrop />
-        <ModalContainer>
-          <ModalDialog>
-            {() => (
-              <>
-                <ModalHeader>
-                  <div>
-                    {activeExportKey && t(`exports.${activeExportKey}.title`)}
-                    <br />
-                    <small>
-                      {t('exports.modal.subtitle', { start: dateRangeStartFormatted, end: dateRangeEndFormatted })}
-                    </small>
-                  </div>
-                </ModalHeader>
+        <ModalBackdrop>
+          <ModalContainer>
+            <ModalDialog>
+              {() => (
+                <>
+                  <ModalHeader>
+                    <div>
+                      {activeExportKey && t(`exports.${activeExportKey}.title`)}
+                      <br />
+                      <small>
+                        {t('exports.modal.subtitle', { start: dateRangeStartFormatted, end: dateRangeEndFormatted })}
+                      </small>
+                    </div>
+                  </ModalHeader>
 
-                <ModalBody>
-                  {activeExport && (
-                    <activeExport.component
-                      start={dateRange?.start?.toDate(getLocalTimeZone()) ?? now.current}
-                      end={dateRange?.end?.toDate(getLocalTimeZone()) ?? now.current}
-                    />
-                  )}
-                </ModalBody>
-              </>
-            )}
-          </ModalDialog>
-        </ModalContainer>
+                  <ModalBody>
+                    {activeExport && (
+                      <activeExport.component
+                        start={dateRange?.start?.toDate(getLocalTimeZone()) ?? now.current}
+                        end={dateRange?.end?.toDate(getLocalTimeZone()) ?? now.current}
+                      />
+                    )}
+                  </ModalBody>
+                </>
+              )}
+            </ModalDialog>
+          </ModalContainer>
+        </ModalBackdrop>
       </Modal>
     </>
   );

@@ -4,7 +4,30 @@ import {
   useUsersServiceGetLocalSignupDomainWhitelist,
   useUsersServiceSetLocalSignupDomainWhitelist,
 } from '@attraccess/react-query-client';
-import { Alert, AlertContent, AlertDescription, Button, Input, InputGroup, Label, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow, TextField, useOverlayState } from '@heroui/react';
+import {
+  Alert,
+  AlertContent,
+  AlertDescription,
+  Button,
+  Input,
+  InputGroup,
+  Label,
+  Modal,
+  ModalBackdrop,
+  ModalBody,
+  ModalContainer,
+  ModalDialog,
+  ModalFooter,
+  ModalHeader,
+  Table,
+  TableBody,
+  TableCell,
+  TableColumn,
+  TableHeader,
+  TableRow,
+  TextField,
+  useOverlayState,
+} from '@heroui/react';
 import { EmptyState } from '../../../components/emptyState';
 import { PageHeader } from '../../../components/pageHeader';
 import { Settings2Icon, Trash2Icon } from 'lucide-react';
@@ -99,69 +122,70 @@ export function AllowedSignupDomainsEditorModal(props: Props) {
     <>
       {props.children(open)}
       <Modal isOpen={isOpen} onOpenChange={setOpen}>
-        <ModalBackdrop />
-        <ModalContainer>
-          <ModalDialog>
-            {() => (<>
-          <ModalHeader>
-            <PageHeader title={t('title')} subtitle={t('subtitle')} icon={<Settings2Icon />} noMargin={true} />
-          </ModalHeader>
+        <ModalBackdrop>
+          <ModalContainer>
+            <ModalDialog>
+              {() => (
+                <>
+                  <ModalHeader>
+                    <PageHeader title={t('title')} subtitle={t('subtitle')} icon={<Settings2Icon />} noMargin={true} />
+                  </ModalHeader>
 
-          <ModalBody>
-            <Alert status="warning" className="whitespace-pre-wrap">
-              <AlertContent>
-                <AlertDescription>{t('noteAboutNoneAndWildcard')}</AlertDescription>
-              </AlertContent>
-            </Alert>
-            <TextField value={domainToAdd} onChange={setDomainToAdd}>
-              <Label>{t('inputs.addDomain.label')}</Label>
-              <InputGroup>
-                <Input
-                  ref={addDomainInputRef}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      onAddDomain();
-                    }
-                  }}
-                />
-                <Button variant="ghost" onPress={onAddDomain} isIconOnly />
-              </InputGroup>
-            </TextField>
+                  <ModalBody>
+                    <Alert status="warning" className="whitespace-pre-wrap">
+                      <AlertContent>
+                        <AlertDescription>{t('noteAboutNoneAndWildcard')}</AlertDescription>
+                      </AlertContent>
+                    </Alert>
+                    <TextField value={domainToAdd} onChange={setDomainToAdd}>
+                      <Label>{t('inputs.addDomain.label')}</Label>
+                      <InputGroup>
+                        <Input
+                          ref={addDomainInputRef}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              onAddDomain();
+                            }
+                          }}
+                        />
+                        <Button variant="ghost" onPress={onAddDomain} isIconOnly />
+                      </InputGroup>
+                    </TextField>
 
-            <Table aria-label={t('table.ariaLabel')}>
-              <TableHeader>
-                <TableColumn>{t('table.columns.domain')}</TableColumn>
-                <TableColumn>{t('table.columns.actions')}</TableColumn>
-              </TableHeader>
-              <TableBody
-                items={(editedDomains ?? []).map((domain) => ({ value: domain }))}
-                renderEmptyState={() => <EmptyState />}
-              >
-                {(domain) => (
-                  <TableRow key={domain.value} id={domain.value}>
-                    <TableCell className="w-full">{domain.value}</TableCell>
-                    <TableCell className="flex-row flex">
-                      <Button variant="danger-soft"
+                    <Table aria-label={t('table.ariaLabel')}>
+                      <TableHeader>
+                        <TableColumn>{t('table.columns.domain')}</TableColumn>
+                        <TableColumn>{t('table.columns.actions')}</TableColumn>
+                      </TableHeader>
+                      <TableBody
+                        items={(editedDomains ?? []).map((domain) => ({ value: domain }))}
+                        renderEmptyState={() => <EmptyState />}
+                      >
+                        {(domain) => (
+                          <TableRow key={domain.value} id={domain.value}>
+                            <TableCell className="w-full">{domain.value}</TableCell>
+                            <TableCell className="flex-row flex">
+                              <Button variant="danger-soft" onPress={() => onRemoveDomain(domain.value)}>
+                                <Trash2Icon className="w-4 h-4" />
+                                {t('table.actions.removeDomain')}
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </ModalBody>
 
-                        onPress={() => onRemoveDomain(domain.value)}
-                      ><Trash2Icon className="w-4 h-4" />
-                        {t('table.actions.removeDomain')}
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </ModalBody>
-
-          <ModalFooter>
-            <Button variant="primary" onPress={onSave} isPending={isSaving}>
-              {t('actions.save.label')}
-            </Button>
-          </ModalFooter>
-            </>)}
-          </ModalDialog>
-        </ModalContainer>
+                  <ModalFooter>
+                    <Button variant="primary" onPress={onSave} isPending={isSaving}>
+                      {t('actions.save.label')}
+                    </Button>
+                  </ModalFooter>
+                </>
+              )}
+            </ModalDialog>
+          </ModalContainer>
+        </ModalBackdrop>
       </Modal>
     </>
   );

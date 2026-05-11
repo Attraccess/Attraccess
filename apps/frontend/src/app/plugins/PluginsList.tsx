@@ -1,6 +1,32 @@
 import { usePluginsServiceDeletePlugin, usePluginsServiceGetPlugins } from '@attraccess/react-query-client';
 import { useState } from 'react';
-import { Alert, AlertContent, AlertDescription, Button, Card, CardContent, CardHeader, Chip, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow, Tooltip, TooltipContent, TooltipTrigger } from '@heroui/react';
+import {
+  Alert,
+  AlertContent,
+  AlertDescription,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  Chip,
+  Modal,
+  ModalBackdrop,
+  ModalBody,
+  ModalContainer,
+  ModalDialog,
+  ModalFooter,
+  ModalHeader,
+  ModalHeading,
+  Table,
+  TableBody,
+  TableCell,
+  TableColumn,
+  TableHeader,
+  TableRow,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@heroui/react';
 import { Trash2, Upload } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { UploadPluginModal } from './UploadPluginModal';
@@ -68,10 +94,12 @@ export function PluginsList() {
       <Card className="w-full" data-cy="plugins-list-card">
         <CardHeader className="flex justify-between items-center">
           <h1 className="text-xl font-bold">{t('title')}</h1>
-          <Button variant="primary"
+          <Button
+            variant="primary"
             onPress={() => setUploadModalOpen(true)}
             data-cy="plugins-list-upload-plugin-button"
-          ><Upload size={18} />
+          >
+            <Upload size={18} />
             {t('uploadButton')}
           </Button>
         </CardHeader>
@@ -83,10 +111,7 @@ export function PluginsList() {
               <TableColumn>{t('columns.directory')}</TableColumn>
               <TableColumn>{t('columns.actions')}</TableColumn>
             </TableHeader>
-            <TableBody
-              items={plugins}
-              renderEmptyState={() => <EmptyState />}
-            >
+            <TableBody items={plugins} renderEmptyState={() => <EmptyState />}>
               {(plugin) => (
                 <TableRow key={plugin.name} id={plugin.name}>
                   <TableCell>{plugin.name}</TableCell>
@@ -99,7 +124,8 @@ export function PluginsList() {
                   <TableCell>
                     <Tooltip>
                       <TooltipTrigger>
-                        <Button variant="danger-soft"
+                        <Button
+                          variant="danger-soft"
                           isIconOnly
                           onPress={() => handleDeleteClick(plugin.id)}
                           data-cy={`plugins-list-delete-plugin-button-${plugin.id}`}
@@ -121,39 +147,42 @@ export function PluginsList() {
           onOpenChange={setDeleteModalOpen}
           data-cy="plugins-list-delete-confirmation-modal"
         >
-          <ModalBackdrop />
-          <ModalContainer>
-            <ModalDialog>
-              {({ close }) => (
-                <>
-                  <ModalHeader>
-                    <ModalHeading>{t('deleteConfirmation.title')}</ModalHeading>
-                  </ModalHeader>
-                  <ModalBody>
-                    {t('deleteConfirmation.message', {
-                      pluginName: plugins?.find((plugin) => plugin.id === pluginToDelete)?.name,
-                    })}
-                  </ModalBody>
-                  <ModalFooter>
-                    <Button variant="secondary"
-                      onPress={close}
-                      isDisabled={isDeleting}
-                      data-cy="plugins-list-delete-confirmation-cancel-button"
-                    >
-                      {t('deleteConfirmation.cancel')}
-                    </Button>
-                    <Button variant="danger"
-                      onPress={handleDeleteConfirm}
-                      isPending={isDeleting}
-                      data-cy="plugins-list-delete-confirmation-delete-button"
-                    >
-                      {t('deleteConfirmation.delete')}
-                    </Button>
-                  </ModalFooter>
-                </>
-              )}
-            </ModalDialog>
-          </ModalContainer>
+          <ModalBackdrop>
+            <ModalContainer>
+              <ModalDialog>
+                {({ close }) => (
+                  <>
+                    <ModalHeader>
+                      <ModalHeading>{t('deleteConfirmation.title')}</ModalHeading>
+                    </ModalHeader>
+                    <ModalBody>
+                      {t('deleteConfirmation.message', {
+                        pluginName: plugins?.find((plugin) => plugin.id === pluginToDelete)?.name,
+                      })}
+                    </ModalBody>
+                    <ModalFooter>
+                      <Button
+                        variant="secondary"
+                        onPress={close}
+                        isDisabled={isDeleting}
+                        data-cy="plugins-list-delete-confirmation-cancel-button"
+                      >
+                        {t('deleteConfirmation.cancel')}
+                      </Button>
+                      <Button
+                        variant="danger"
+                        onPress={handleDeleteConfirm}
+                        isPending={isDeleting}
+                        data-cy="plugins-list-delete-confirmation-delete-button"
+                      >
+                        {t('deleteConfirmation.delete')}
+                      </Button>
+                    </ModalFooter>
+                  </>
+                )}
+              </ModalDialog>
+            </ModalContainer>
+          </ModalBackdrop>
         </Modal>
 
         <UploadPluginModal isOpen={uploadModalOpen} onClose={() => setUploadModalOpen(false)} />
