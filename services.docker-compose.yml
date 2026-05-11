@@ -171,6 +171,8 @@ services:
       - '--web.enable-lifecycle'
 
   grafana:
+    # Alert rules ship pre-provisioned. Configure delivery in the Grafana UI:
+    # Alerting > Contact points > edit "attraccess-default". See docs/en/monitoring/alerting.md.
     image: grafana/grafana:13.0.1
     ports:
       - '3001:3001'
