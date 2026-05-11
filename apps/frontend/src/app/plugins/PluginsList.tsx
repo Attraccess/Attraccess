@@ -21,6 +21,7 @@ import {
   TableBody,
   TableCell,
   TableColumn,
+  TableContent,
   TableHeader,
   TableRow,
   Tooltip,
@@ -103,7 +104,8 @@ export function PluginsList() {
           </Button>
         </CardHeader>
         <CardContent>
-          <Table aria-label="Plugins table" data-cy="plugins-list-table">
+          <Table data-cy="plugins-list-table">
+            <TableContent aria-label="Plugins table">
             <TableHeader>
               <TableColumn>{t('columns.name')}</TableColumn>
               <TableColumn>{t('columns.version')}</TableColumn>
@@ -136,6 +138,7 @@ export function PluginsList() {
                 </TableRow>
               )}
             </TableBody>
+            </TableContent>
           </Table>
         </CardContent>
 

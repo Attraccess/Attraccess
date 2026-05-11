@@ -9,6 +9,7 @@ import {
   TableBody,
   TableCell,
   TableColumn,
+  TableContent,
   TableHeader,
   TableRow,
 } from '@heroui/react';
@@ -122,7 +123,8 @@ export function MaintenanceSchedules(props: Props & Omit<CardProps, 'children'>)
       </CardHeader>
 
       <CardContent>
-        <Table aria-label={t('table.ariaLabel')}>
+        <Table>
+          <TableContent aria-label={t('table.ariaLabel')}>
           <TableHeader>
             <TableColumn>{t('table.columns.name')}</TableColumn>
             <TableColumn>{t('table.columns.triggerType')}</TableColumn>
@@ -170,6 +172,7 @@ export function MaintenanceSchedules(props: Props & Omit<CardProps, 'children'>)
               </TableRow>
             )}
           </TableBody>
+          </TableContent>
         </Table>
       </CardContent>
     </Card>

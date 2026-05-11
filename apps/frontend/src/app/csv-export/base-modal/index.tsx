@@ -7,6 +7,7 @@ import {
   ModalBody,
   ModalFooter,
   TableBody,
+  TableContent,
   TableHeader,
   TableRow,
   Table,
@@ -158,7 +159,8 @@ export function BaseCsvExportModal<TData extends Row>(props: Props<TData>) {
           ))}
         </div>
 
-        <Table data-cy="resource-usage-export-table" aria-label={t('table.ariaLabel')}>
+        <Table data-cy="resource-usage-export-table">
+          <TableContent aria-label={t('table.ariaLabel')}>
           <TableHeader columns={selectedColumns}>
             {(column) => (
               <TableColumn key={column.key} id={column.key}>
@@ -177,6 +179,7 @@ export function BaseCsvExportModal<TData extends Row>(props: Props<TData>) {
               </TableRow>
             )}
           </TableBody>
+          </TableContent>
         </Table>
       </ModalBody>
       <ModalFooter>

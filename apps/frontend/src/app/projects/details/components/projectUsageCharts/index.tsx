@@ -7,6 +7,7 @@ import {
   TableBody,
   TableCell,
   TableColumn,
+  TableContent,
   TableHeader,
   TableRow,
 } from '@heroui/react';
@@ -265,7 +266,8 @@ export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
                   <Skeleton className="h-full w-full" />
                 )}
               </div>
-              <Table aria-label={t('charts.topResources.table.ariaLabel')}>
+              <Table>
+                <TableContent aria-label={t('charts.topResources.table.ariaLabel')}>
                 <TableHeader>
                   <TableColumn>{t('charts.topResources.columns.resource')}</TableColumn>
                   <TableColumn>{t('charts.topResources.columns.sessions')}</TableColumn>
@@ -288,6 +290,7 @@ export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
                     </TableRow>
                   ))}
                 </TableBody>
+                </TableContent>
               </Table>
             </>
           )}

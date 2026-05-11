@@ -1,5 +1,5 @@
 import { useEmailTemplatesServiceEmailTemplateControllerFindAll } from '@attraccess/react-query-client';
-import { Table, TableHeader, TableColumn, TableBody, TableRow, TableCell, Button } from '@heroui/react';
+import { Table, TableContent, TableHeader, TableColumn, TableBody, TableRow, TableCell, Button } from '@heroui/react';
 import { Mail } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PageHeader } from '../../components/pageHeader'; // Assuming PageHeader exists
@@ -33,8 +33,9 @@ export function EmailTemplatesPage() {
     <>
       <PageHeader title={t('title')} subtitle={t('subtitle')} icon={<Mail className="w-6 h-6" />} />
 
-      <Table aria-label="Email templates table">
-        <TableHeader>
+      <Table>
+        <TableContent aria-label="Email templates table">
+          <TableHeader>
           <TableColumn>{t('columns.type')}</TableColumn>
           <TableColumn>{t('columns.subject')}</TableColumn>
           <TableColumn>{t('columns.actions')}</TableColumn>
@@ -51,6 +52,7 @@ export function EmailTemplatesPage() {
             </TableRow>
           )}
         </TableBody>
+        </TableContent>
       </Table>
     </>
   );

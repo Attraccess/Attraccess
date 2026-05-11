@@ -12,6 +12,7 @@ import {
   TableBody,
   TableCell,
   TableColumn,
+  TableContent,
   TableHeader,
   TableRow,
 } from '@heroui/react';
@@ -66,7 +67,8 @@ export function IntroductionHistoryModal(props: Readonly<Props>) {
               <>
                 <ModalHeader>{t('modal.title')}</ModalHeader>
                 <ModalBody>
-                  <Table aria-label={t('table.ariaLabel')}>
+                  <Table>
+                    <TableContent aria-label={t('table.ariaLabel')}>
                     <TableHeader>
                       <TableColumn>{t('table.columns.date')}</TableColumn>
                       <TableColumn>{t('table.columns.action')}</TableColumn>
@@ -87,6 +89,7 @@ export function IntroductionHistoryModal(props: Readonly<Props>) {
                         </TableRow>
                       )}
                     </TableBody>
+                    </TableContent>
                   </Table>
                 </ModalBody>
                 <ModalFooter>

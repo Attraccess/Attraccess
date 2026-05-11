@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, CardProps, Table, TableHeader, TableBody, TableRow, TableCell, TableColumn, Button, cn, Skeleton, NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput } from "@heroui/react";
+import { Card, CardContent, CardHeader, CardProps, Table, TableContent, TableHeader, TableBody, TableRow, TableCell, TableColumn, Button, cn, Skeleton, NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput } from "@heroui/react";
 import { CreditCard } from 'lucide-react';
 import {
   useBillingServiceGetBillingBalance,
@@ -136,7 +136,8 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
       </CardHeader>
 
       <CardContent>
-        <Table aria-label={t('table.ariaLabel')}>
+        <Table>
+          <TableContent aria-label={t('table.ariaLabel')}>
           <TableHeader>
             <TableColumn> </TableColumn>
             <TableColumn> </TableColumn>
@@ -218,6 +219,7 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
               </TableCell>
             </TableRow>
           </TableBody>
+          </TableContent>
         </Table>
       </CardContent>
     </Card>

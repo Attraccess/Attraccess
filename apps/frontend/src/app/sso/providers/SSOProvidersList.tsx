@@ -7,6 +7,7 @@ import {
   TableBody,
   TableRow,
   TableCell,
+  TableContent,
   Tooltip,
   TooltipContent,
   TextField,
@@ -645,7 +646,8 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
   return (
     <>
       {providers && providers.length > 0 ? (
-        <Table aria-label={t('table.ariaLabel')} data-cy="sso-providers-table">
+        <Table data-cy="sso-providers-table">
+          <TableContent aria-label={t('table.ariaLabel')}>
           <TableHeader>
             <TableColumn>{t('id')}</TableColumn>
             <TableColumn>{t('name')}</TableColumn>
@@ -694,6 +696,7 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
               </TableRow>
             )}
           </TableBody>
+          </TableContent>
         </Table>
       ) : (
         <div className="text-center p-8 rounded-lg border dark:border-gray-700 border-gray-200">

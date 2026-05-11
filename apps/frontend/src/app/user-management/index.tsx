@@ -13,6 +13,7 @@ import {
   TableBody,
   TableCell,
   TableColumn,
+  TableContent,
   TableHeader,
   TableRow,
   Tooltip,
@@ -143,7 +144,8 @@ export const UserManagementPage: React.FC = () => {
             <Input placeholder={t('table.inputs.search')} />
           </TextField>
 
-          <Table aria-label={t('table.ariaLabel')}>
+          <Table>
+            <TableContent aria-label={t('table.ariaLabel')}>
             <TableHeader>
               <TableColumn width="0" className="hidden md:table-cell">
                 {t('table.columns.isEmailVerified')}
@@ -263,6 +265,7 @@ export const UserManagementPage: React.FC = () => {
                 );
               }}
             </TableBody>
+            </TableContent>
           </Table>
         </CardContent>
 
