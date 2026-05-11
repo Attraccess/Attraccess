@@ -1,5 +1,16 @@
 import { memo, useCallback, useState, useEffect } from 'react';
-import { Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Spinner, useOverlayState } from '@heroui/react';
+import {
+  Button,
+  Modal,
+  ModalBackdrop,
+  ModalBody,
+  ModalContainer,
+  ModalDialog,
+  ModalFooter,
+  ModalHeader,
+  Spinner,
+  useOverlayState,
+} from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { Edit, ExternalLink, Maximize, Minimize, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -74,10 +85,8 @@ function DocumentationModalComponent({ resourceId, children }: Readonly<Document
       return (
         <div className="flex flex-col items-center gap-4 p-4">
           <p className="text-danger">{error instanceof Error ? error.message : t('error.unknown')}</p>
-          <Button variant="secondary"
-            onPress={() => refetch()}
-            data-cy="documentation-modal-error-retry-button"
-          ><RefreshCw size={16} />
+          <Button variant="secondary" onPress={() => refetch()} data-cy="documentation-modal-error-retry-button">
+            <RefreshCw size={16} />
             {t('actions.retry')}
           </Button>
         </div>
@@ -132,74 +141,71 @@ function DocumentationModalComponent({ resourceId, children }: Readonly<Document
     <>
       {children(open)}
 
-      <Modal
-        isOpen={isOpen}
-        onOpenChange={setOpen}
-        data-cy="documentation-modal"
-      >
-        <ModalBackdrop />
-        <ModalContainer size={modalSize}>
-          <ModalDialog>
-            {({ close }) => (
-              <>
-                <ModalHeader className="flex justify-between items-center">
-                  <div>{t('title')}</div>
-                  <div className="flex gap-1">
-                    {canManageResources && (
-                      <Button variant="secondary"
+      <Modal isOpen={isOpen} onOpenChange={setOpen} data-cy="documentation-modal">
+        <ModalBackdrop>
+          <ModalContainer size={modalSize}>
+            <ModalDialog>
+              {({ close }) => (
+                <>
+                  <ModalHeader className="flex justify-between items-center">
+                    <div>{t('title')}</div>
+                    <div className="flex gap-1">
+                      {canManageResources && (
+                        <Button
+                          variant="secondary"
+                          isIconOnly
+                          onPress={handleEditDocumentation}
+                          aria-label={t('actions.edit')}
+                          data-cy="documentation-modal-edit-button"
+                        >
+                          <Edit size={16} />
+                        </Button>
+                      )}
+                      <Button
+                        variant="secondary"
                         isIconOnly
-
-                        onPress={handleEditDocumentation}
-                        aria-label={t('actions.edit')}
-                        data-cy="documentation-modal-edit-button"
+                        onPress={toggleFullscreen}
+                        aria-label={isFullscreen ? t('actions.exitFullscreen') : t('actions.fullscreen')}
+                        data-cy="documentation-modal-fullscreen-button"
                       >
-                        <Edit size={16} />
+                        {isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
                       </Button>
-                    )}
-                    <Button variant="secondary"
-                      isIconOnly
 
-                      onPress={toggleFullscreen}
-                      aria-label={isFullscreen ? t('actions.exitFullscreen') : t('actions.fullscreen')}
-                      data-cy="documentation-modal-fullscreen-button"
-                    >
-                      {isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
-                    </Button>
-
-                    <Button variant="secondary"
-                      isIconOnly
-
-                      onPress={handleOpenInNewTab}
-                      aria-label={t('actions.openInNewTab')}
-                      data-cy="documentation-modal-open-in-new-tab-button"
-                    >
-                      <ExternalLink size={16} />
-                    </Button>
-
-                    {resource?.documentationType === 'url' && (
-                      <Button variant="secondary"
+                      <Button
+                        variant="secondary"
                         isIconOnly
-
-                        onPress={() => refetch()}
-                        isPending={isFetching}
-                        aria-label={t('actions.refresh')}
-                        data-cy="documentation-modal-refresh-button"
+                        onPress={handleOpenInNewTab}
+                        aria-label={t('actions.openInNewTab')}
+                        data-cy="documentation-modal-open-in-new-tab-button"
                       >
-                        <RefreshCw size={16} />
+                        <ExternalLink size={16} />
                       </Button>
-                    )}
-                  </div>
-                </ModalHeader>
-                <ModalBody>{renderDocumentationContent()}</ModalBody>
-                <ModalFooter>
-                  <Button variant="ghost" onPress={close} data-cy="documentation-modal-close-button">
-                    {t('actions.close')}
-                  </Button>
-                </ModalFooter>
-              </>
-            )}
-          </ModalDialog>
-        </ModalContainer>
+
+                      {resource?.documentationType === 'url' && (
+                        <Button
+                          variant="secondary"
+                          isIconOnly
+                          onPress={() => refetch()}
+                          isPending={isFetching}
+                          aria-label={t('actions.refresh')}
+                          data-cy="documentation-modal-refresh-button"
+                        >
+                          <RefreshCw size={16} />
+                        </Button>
+                      )}
+                    </div>
+                  </ModalHeader>
+                  <ModalBody>{renderDocumentationContent()}</ModalBody>
+                  <ModalFooter>
+                    <Button variant="ghost" onPress={close} data-cy="documentation-modal-close-button">
+                      {t('actions.close')}
+                    </Button>
+                  </ModalFooter>
+                </>
+              )}
+            </ModalDialog>
+          </ModalContainer>
+        </ModalBackdrop>
       </Modal>
     </>
   );

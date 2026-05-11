@@ -1,5 +1,16 @@
 import { ReactNode, useCallback, useMemo, useState } from 'react';
-import { Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, useOverlayState } from "@heroui/react";
+import {
+  Button,
+  Modal,
+  ModalBackdrop,
+  ModalBody,
+  ModalContainer,
+  ModalDialog,
+  ModalFooter,
+  ModalHeader,
+  ModalHeading,
+  useOverlayState,
+} from '@heroui/react';
 import { Select } from '../../../../../components/select';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -73,7 +84,6 @@ export function InviteProjectMemberModal(props: Readonly<InviteProjectMemberModa
 
   const roleOptions = useMemo(() => Object.values(ProjectMemberRole), []);
 
-
   const onInvite = useCallback(async () => {
     if (!selectedUser) {
       return;
@@ -100,42 +110,46 @@ export function InviteProjectMemberModal(props: Readonly<InviteProjectMemberModa
     <>
       {children(open)}
       <Modal isOpen={isOpen} onOpenChange={handleOpenChange}>
-        <ModalBackdrop />
-        <ModalContainer>
-          <ModalDialog>
-            {({ close }) => (
-              <>
-                <ModalHeader>
-                  <ModalHeading>{t('title')}</ModalHeading>
-                </ModalHeader>
-                <ModalBody className="gap-4">
-                  <p className="text-small text-default-500">{t('description')}</p>
-                  <UserSearch
-                    label={t('inputs.user')}
-
-                    afterSelection={
-                      selectedUser ? <span className="text-tiny text-default-500">{selectedUser.username}</span> : null
-                    }
-                  />
-                  <Select
-                    label={t('inputs.role')}
-                    selectedKey={role}
-                    onSelectionChange={(key) => { if (key) setRole(key as ProjectMember['role']); }}
-                    items={roleOptions.map((value) => ({ key: value, label: t(`roles.${value}`) }))}
-                  />
-                </ModalBody>
-                <ModalFooter>
-                  <Button variant="ghost" onPress={close} isDisabled={isPending}>
-                    {t('actions.cancel')}
-                  </Button>
-                  <Button variant="primary" onPress={onInvite} isDisabled={!selectedUser} isPending={isPending}>
-                    {t('actions.invite')}
-                  </Button>
-                </ModalFooter>
-              </>
-            )}
-          </ModalDialog>
-        </ModalContainer>
+        <ModalBackdrop>
+          <ModalContainer>
+            <ModalDialog>
+              {({ close }) => (
+                <>
+                  <ModalHeader>
+                    <ModalHeading>{t('title')}</ModalHeading>
+                  </ModalHeader>
+                  <ModalBody className="gap-4">
+                    <p className="text-small text-default-500">{t('description')}</p>
+                    <UserSearch
+                      label={t('inputs.user')}
+                      afterSelection={
+                        selectedUser ? (
+                          <span className="text-tiny text-default-500">{selectedUser.username}</span>
+                        ) : null
+                      }
+                    />
+                    <Select
+                      label={t('inputs.role')}
+                      selectedKey={role}
+                      onSelectionChange={(key) => {
+                        if (key) setRole(key as ProjectMember['role']);
+                      }}
+                      items={roleOptions.map((value) => ({ key: value, label: t(`roles.${value}`) }))}
+                    />
+                  </ModalBody>
+                  <ModalFooter>
+                    <Button variant="ghost" onPress={close} isDisabled={isPending}>
+                      {t('actions.cancel')}
+                    </Button>
+                    <Button variant="primary" onPress={onInvite} isDisabled={!selectedUser} isPending={isPending}>
+                      {t('actions.invite')}
+                    </Button>
+                  </ModalFooter>
+                </>
+              )}
+            </ModalDialog>
+          </ModalContainer>
+        </ModalBackdrop>
       </Modal>
     </>
   );

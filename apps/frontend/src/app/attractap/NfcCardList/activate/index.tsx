@@ -1,4 +1,14 @@
-import { Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, useOverlayState } from '@heroui/react';
+import {
+  Button,
+  Modal,
+  ModalBackdrop,
+  ModalBody,
+  ModalContainer,
+  ModalDialog,
+  ModalFooter,
+  ModalHeader,
+  useOverlayState,
+} from '@heroui/react';
 import de from './de.json';
 import en from './en.json';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -44,25 +54,26 @@ export function NfcCardActivateModal(props: Props) {
         open();
       })}
       <Modal isOpen={isOpen} onOpenChange={setOpen} data-cy="nfc-card-activate-modal">
-        <ModalBackdrop />
-        <ModalContainer>
-          <ModalDialog>
-            {({ close }) => (
-              <>
-                <ModalHeader>
-                  <PageHeader title={t('title')} noMargin />
-                </ModalHeader>
-                <ModalBody>{t('description')}</ModalBody>
-                <ModalFooter>
-                  <Button onPress={close}>{t('cancel')}</Button>
-                  <Button onPress={onActivate} isPending={isPending}>
-                    {t('activate')}
-                  </Button>
-                </ModalFooter>
-              </>
-            )}
-          </ModalDialog>
-        </ModalContainer>
+        <ModalBackdrop>
+          <ModalContainer>
+            <ModalDialog>
+              {({ close }) => (
+                <>
+                  <ModalHeader>
+                    <PageHeader title={t('title')} noMargin />
+                  </ModalHeader>
+                  <ModalBody>{t('description')}</ModalBody>
+                  <ModalFooter>
+                    <Button onPress={close}>{t('cancel')}</Button>
+                    <Button onPress={onActivate} isPending={isPending}>
+                      {t('activate')}
+                    </Button>
+                  </ModalFooter>
+                </>
+              )}
+            </ModalDialog>
+          </ModalContainer>
+        </ModalBackdrop>
       </Modal>
     </>
   );

@@ -1,6 +1,23 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { ArrowRight, Mail } from 'lucide-react';
-import { Alert, AlertContent, AlertDescription, AlertTitle, Button, Input, Label, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, TextField, useOverlayState } from '@heroui/react';
+import {
+  Alert,
+  AlertContent,
+  AlertDescription,
+  AlertTitle,
+  Button,
+  Input,
+  Label,
+  Modal,
+  ModalBackdrop,
+  ModalBody,
+  ModalContainer,
+  ModalDialog,
+  ModalFooter,
+  ModalHeader,
+  TextField,
+  useOverlayState,
+} from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PasswordInput } from '../../components/PasswordInput';
 import { UsernameInput, USERNAME_RULES, useUsernameValidation } from '../../components/UsernameInput';
@@ -201,7 +218,8 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
           onChange={setPasswordConfirmation}
         />
 
-        <Button variant="primary"
+        <Button
+          variant="primary"
           fullWidth
           type="submit"
           isPending={isPending}
@@ -209,58 +227,54 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
           data-cy="registration-form-create-account-button"
         >
           {isPending ? t('creatingAccount') : t('createAccountButton')}
-        <ArrowRight className="group-hover:translate-x-1 transition-transform" /></Button>
+          <ArrowRight className="group-hover:translate-x-1 transition-transform" />
+        </Button>
       </form>
 
-      <Modal
-        isOpen={isOpen}
-        onOpenChange={setOpen}
-        data-cy="registration-form-success-modal"
-      >
-        <ModalBackdrop />
-        <ModalContainer>
-          <ModalDialog>
-            {({ close }) => (
-            <>
-              <ModalHeader className="flex flex-col gap-1">
-                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100 dark:bg-green-900">
-                  <Mail className="h-6 w-6 text-green-600 dark:text-green-300" />
-                </div>
-                <div className="text-center">{t('success.title')}</div>
-              </ModalHeader>
-              <ModalBody>
-                <p className="text-center text-gray-500 dark:text-gray-400">
-                  {t('success.message').replace('{email}', registeredEmail)}
-                </p>
-                <Alert status="default" >
-                  <AlertContent>
-                    <AlertTitle>{t('twoFactor.title')}</AlertTitle>
-                    <AlertDescription>{t('twoFactor.description')}</AlertDescription>
-                  </AlertContent>
-                </Alert>
-              </ModalBody>
-              <ModalFooter>
-                <Button variant="ghost"
-                  onPress={close}
-                  data-cy="registration-form-success-modal-close-button"
-                >
-                  {t('success.closeButton')}
-                </Button>
-                <Button variant="primary"
-                  onPress={() => {
-                    markTwoFactorSetupIntent();
-                    close();
-                    onHasAccount();
-                  }}
-                  data-cy="registration-form-success-modal-two-factor-button"
-                >
-                  {t('twoFactor.action')}
-                </Button>
-              </ModalFooter>
-            </>
-          )}
-          </ModalDialog>
-        </ModalContainer>
+      <Modal isOpen={isOpen} onOpenChange={setOpen} data-cy="registration-form-success-modal">
+        <ModalBackdrop>
+          <ModalContainer>
+            <ModalDialog>
+              {({ close }) => (
+                <>
+                  <ModalHeader className="flex flex-col gap-1">
+                    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100 dark:bg-green-900">
+                      <Mail className="h-6 w-6 text-green-600 dark:text-green-300" />
+                    </div>
+                    <div className="text-center">{t('success.title')}</div>
+                  </ModalHeader>
+                  <ModalBody>
+                    <p className="text-center text-gray-500 dark:text-gray-400">
+                      {t('success.message').replace('{email}', registeredEmail)}
+                    </p>
+                    <Alert status="default">
+                      <AlertContent>
+                        <AlertTitle>{t('twoFactor.title')}</AlertTitle>
+                        <AlertDescription>{t('twoFactor.description')}</AlertDescription>
+                      </AlertContent>
+                    </Alert>
+                  </ModalBody>
+                  <ModalFooter>
+                    <Button variant="ghost" onPress={close} data-cy="registration-form-success-modal-close-button">
+                      {t('success.closeButton')}
+                    </Button>
+                    <Button
+                      variant="primary"
+                      onPress={() => {
+                        markTwoFactorSetupIntent();
+                        close();
+                        onHasAccount();
+                      }}
+                      data-cy="registration-form-success-modal-two-factor-button"
+                    >
+                      {t('twoFactor.action')}
+                    </Button>
+                  </ModalFooter>
+                </>
+              )}
+            </ModalDialog>
+          </ModalContainer>
+        </ModalBackdrop>
       </Modal>
     </>
   );

@@ -1,4 +1,23 @@
-import { Alert, AlertContent, AlertDescription, Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow, cn } from '@heroui/react';
+import {
+  Alert,
+  AlertContent,
+  AlertDescription,
+  Button,
+  Modal,
+  ModalBackdrop,
+  ModalBody,
+  ModalContainer,
+  ModalDialog,
+  ModalFooter,
+  ModalHeader,
+  Table,
+  TableBody,
+  TableCell,
+  TableColumn,
+  TableHeader,
+  TableRow,
+  cn,
+} from '@heroui/react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AttraccessUser, DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
@@ -46,37 +65,44 @@ const NfcCardDeleteModal = (props: DeleteModalProps) => {
   }, [props.cardId, resetNfcCard, readerId]);
 
   return (
-    <Modal isOpen={props.show} onOpenChange={(open) => { if (!open) props.close(); }} data-cy="nfc-card-delete-modal">
-      <ModalBackdrop />
-      <ModalContainer>
-        <ModalDialog>
-          {({ close }) => (
-            <>
-              <ModalHeader>
-                <h1>{t('nfcCardsTable.deleteModal.title')}</h1>
-              </ModalHeader>
-              <ModalBody>
-                <p>{t('nfcCardsTable.deleteModal.description', { id: props.cardId })}</p>
-                <AttractapSelect
-                  label={t('nfcCardsTable.deleteModal.readerLabel')}
-                  placeholder={t('nfcCardsTable.deleteModal.readerPlaceholder')}
-                  selection={readerId}
-                  onSelectionChange={(readerId) => setReaderId(readerId ?? null)}
-                  data-cy="nfc-card-delete-modal-reader-select"
-                />
-              </ModalBody>
-              <ModalFooter>
-                <Button onPress={close} data-cy="nfc-card-delete-modal-cancel-button">
-                  {t('nfcCardsTable.deleteModal.cancel')}
-                </Button>
-                <Button isDisabled={!readerId} onPress={deleteCard} data-cy="nfc-card-delete-modal-delete-button">
-                  {t('nfcCardsTable.deleteModal.delete')} ID: {!readerId ? 'null' : readerId}
-                </Button>
-              </ModalFooter>
-            </>
-          )}
-        </ModalDialog>
-      </ModalContainer>
+    <Modal
+      isOpen={props.show}
+      onOpenChange={(open) => {
+        if (!open) props.close();
+      }}
+      data-cy="nfc-card-delete-modal"
+    >
+      <ModalBackdrop>
+        <ModalContainer>
+          <ModalDialog>
+            {({ close }) => (
+              <>
+                <ModalHeader>
+                  <h1>{t('nfcCardsTable.deleteModal.title')}</h1>
+                </ModalHeader>
+                <ModalBody>
+                  <p>{t('nfcCardsTable.deleteModal.description', { id: props.cardId })}</p>
+                  <AttractapSelect
+                    label={t('nfcCardsTable.deleteModal.readerLabel')}
+                    placeholder={t('nfcCardsTable.deleteModal.readerPlaceholder')}
+                    selection={readerId}
+                    onSelectionChange={(readerId) => setReaderId(readerId ?? null)}
+                    data-cy="nfc-card-delete-modal-reader-select"
+                  />
+                </ModalBody>
+                <ModalFooter>
+                  <Button onPress={close} data-cy="nfc-card-delete-modal-cancel-button">
+                    {t('nfcCardsTable.deleteModal.cancel')}
+                  </Button>
+                  <Button isDisabled={!readerId} onPress={deleteCard} data-cy="nfc-card-delete-modal-delete-button">
+                    {t('nfcCardsTable.deleteModal.delete')} ID: {!readerId ? 'null' : readerId}
+                  </Button>
+                </ModalFooter>
+              </>
+            )}
+          </ModalDialog>
+        </ModalContainer>
+      </ModalBackdrop>
     </Modal>
   );
 };
@@ -104,21 +130,23 @@ const NfcCardTableCell = (props: NfcCardTableCellProps) => {
   if (props.header === 'actions') {
     return (
       <div className="flex gap-2 flex-row flex-wrap">
-        <Button variant="danger-soft"
-
+        <Button
+          variant="danger-soft"
           onPress={() => props.onDeleteClick()}
           data-cy={`nfc-card-table-cell-delete-button-${props.card.id}`}
-        ><Trash2Icon />
+        >
+          <Trash2Icon />
           {t('nfcCardsTable.actions.delete')}
         </Button>
         {props.card.isActive ? (
           <NfcCardDeactivateModal cardId={props.card.id}>
             {(onOpen) => (
-              <Button variant="tertiary"
-
+              <Button
+                variant="tertiary"
                 onPress={onOpen}
                 data-cy={`nfc-card-table-cell-deactivate-button-${props.card.id}`}
-              ><XIcon />
+              >
+                <XIcon />
                 {t('nfcCardsTable.actions.deactivate')}
               </Button>
             )}
@@ -126,11 +154,12 @@ const NfcCardTableCell = (props: NfcCardTableCellProps) => {
         ) : (
           <NfcCardActivateModal cardId={props.card.id}>
             {(onOpen) => (
-              <Button variant="tertiary"
-
+              <Button
+                variant="tertiary"
                 onPress={onOpen}
                 data-cy={`nfc-card-table-cell-activate-button-${props.card.id}`}
-              ><CheckIcon />
+              >
+                <CheckIcon />
                 {t('nfcCardsTable.actions.activate')}
               </Button>
             )}
@@ -184,44 +213,53 @@ const EnrollNfcCardButton = () => {
 
   return (
     <>
-      <Button variant="ghost"
-        onPress={() => setShow(true)}
-        data-cy="enroll-nfc-card-button-trigger"
-      ><PlusIcon />
+      <Button variant="ghost" onPress={() => setShow(true)} data-cy="enroll-nfc-card-button-trigger">
+        <PlusIcon />
         {t('enroll')}
       </Button>
-      <Modal isOpen={show} onOpenChange={(open) => { if (!open) setShow(false); }} data-cy="enroll-nfc-card-modal">
-        <ModalBackdrop />
-        <ModalContainer>
-          <ModalDialog>
-            {({ close }) => (
-              <>
-                <ModalHeader>
-                  <h1>{t('enrollModal.title')}</h1>
-                </ModalHeader>
-                <ModalBody>
-                  <p>{t('enrollModal.description')}</p>
-                  <AttractapSelect
-                    label={t('enrollModal.readerLabel')}
-                    placeholder={t('enrollModal.readerPlaceholder')}
-                    selection={readerId}
-                    onSelectionChange={(readerId) => setReaderId(readerId ?? null)}
-                    data-cy="enroll-nfc-card-modal-reader-select"
-                    requiredCapabilities={{ cardEnrollment: true }}
-                  />
-                </ModalBody>
-                <ModalFooter>
-                  <Button onPress={close} data-cy="enroll-nfc-card-modal-cancel-button">
-                    {t('enrollModal.cancel')}
-                  </Button>
-                  <Button isDisabled={!readerId} onPress={enrollNfcCard} data-cy="enroll-nfc-card-modal-enroll-button">
-                    {t('enrollModal.enroll')}
-                  </Button>
-                </ModalFooter>
-              </>
-            )}
-          </ModalDialog>
-        </ModalContainer>
+      <Modal
+        isOpen={show}
+        onOpenChange={(open) => {
+          if (!open) setShow(false);
+        }}
+        data-cy="enroll-nfc-card-modal"
+      >
+        <ModalBackdrop>
+          <ModalContainer>
+            <ModalDialog>
+              {({ close }) => (
+                <>
+                  <ModalHeader>
+                    <h1>{t('enrollModal.title')}</h1>
+                  </ModalHeader>
+                  <ModalBody>
+                    <p>{t('enrollModal.description')}</p>
+                    <AttractapSelect
+                      label={t('enrollModal.readerLabel')}
+                      placeholder={t('enrollModal.readerPlaceholder')}
+                      selection={readerId}
+                      onSelectionChange={(readerId) => setReaderId(readerId ?? null)}
+                      data-cy="enroll-nfc-card-modal-reader-select"
+                      requiredCapabilities={{ cardEnrollment: true }}
+                    />
+                  </ModalBody>
+                  <ModalFooter>
+                    <Button onPress={close} data-cy="enroll-nfc-card-modal-cancel-button">
+                      {t('enrollModal.cancel')}
+                    </Button>
+                    <Button
+                      isDisabled={!readerId}
+                      onPress={enrollNfcCard}
+                      data-cy="enroll-nfc-card-modal-enroll-button"
+                    >
+                      {t('enrollModal.enroll')}
+                    </Button>
+                  </ModalFooter>
+                </>
+              )}
+            </ModalDialog>
+          </ModalContainer>
+        </ModalBackdrop>
       </Modal>
     </>
   );
@@ -233,10 +271,7 @@ export function NfcCardList() {
     en,
   });
 
-  const {
-    data: cards,
-    error: cardsError,
-  } = useAttractapServiceGetAllCards(undefined, {
+  const { data: cards, error: cardsError } = useAttractapServiceGetAllCards(undefined, {
     refetchInterval: 5000,
   });
 
@@ -270,7 +305,8 @@ export function NfcCardList() {
           <>
             <EnrollNfcCardButton />
             {hasPermission('canManageResources') && (
-              <Button variant="ghost" onPress={() => navigate('/attractap/readers')}><ServerIcon />
+              <Button variant="ghost" onPress={() => navigate('/attractap/readers')}>
+                <ServerIcon />
                 {t('readers')}
               </Button>
             )}
@@ -293,16 +329,16 @@ export function NfcCardList() {
       <Table aria-label={t('nfcCards')} data-cy="nfc-card-list-table">
         <TableHeader>
           {headers.map((header) => (
-            <TableColumn key={header} id={header}>{t('nfcCardsTable.headers.' + header)}</TableColumn>
+            <TableColumn key={header} id={header}>
+              {t('nfcCardsTable.headers.' + header)}
+            </TableColumn>
           ))}
         </TableHeader>
-        <TableBody
-          items={cards ?? []}
-          renderEmptyState={() => <EmptyState />}
-        >
+        <TableBody items={cards ?? []} renderEmptyState={() => <EmptyState />}>
           {(card) => (
             <TableRow
-              key={card.id} id={card.id}
+              key={card.id}
+              id={card.id}
               className={cn('border-l-4', card.isActive ? 'border-l-success' : 'border-l-warning')}
             >
               {headers.map((header) => (

@@ -1,4 +1,17 @@
-import { Button, TextField, Label, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, useOverlayState } from '@heroui/react';
+import {
+  Button,
+  TextField,
+  Label,
+  Input,
+  Modal,
+  ModalBackdrop,
+  ModalBody,
+  ModalContainer,
+  ModalDialog,
+  ModalFooter,
+  ModalHeader,
+  useOverlayState,
+} from '@heroui/react';
 import { OpenIDConfiguration } from '../OpenIDC.data';
 import { PageHeader } from '../../../../../components/pageHeader';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -77,34 +90,40 @@ export function KeycloakDiscoveryDialog(props: Props) {
   return (
     <>
       {activator(open)}
-      <Modal isOpen={isOpen} onOpenChange={(o) => { if (!o) close(); }}>
-        <ModalBackdrop />
-        <ModalContainer>
-          <ModalDialog>
-            {({ close }) => (
-              <>
-                <ModalHeader>
-                  <PageHeader noMargin title={t('title')} />
-                </ModalHeader>
-                <ModalBody>
-                  <TextField value={host} onChange={setHost}>
-                    <Label>{t('host')}</Label>
-                    <Input />
-                  </TextField>
-                  <TextField value={realm} onChange={setRealm}>
-                    <Label>{t('realm')}</Label>
-                    <Input />
-                  </TextField>
-                </ModalBody>
-                <ModalFooter>
-                  <Button variant="primary" onPress={discover} isPending={isDiscovering}>
-                    {t('discover')}
-                  </Button>
-                </ModalFooter>
-              </>
-            )}
-          </ModalDialog>
-        </ModalContainer>
+      <Modal
+        isOpen={isOpen}
+        onOpenChange={(o) => {
+          if (!o) close();
+        }}
+      >
+        <ModalBackdrop>
+          <ModalContainer>
+            <ModalDialog>
+              {({ close }) => (
+                <>
+                  <ModalHeader>
+                    <PageHeader noMargin title={t('title')} />
+                  </ModalHeader>
+                  <ModalBody>
+                    <TextField value={host} onChange={setHost}>
+                      <Label>{t('host')}</Label>
+                      <Input />
+                    </TextField>
+                    <TextField value={realm} onChange={setRealm}>
+                      <Label>{t('realm')}</Label>
+                      <Input />
+                    </TextField>
+                  </ModalBody>
+                  <ModalFooter>
+                    <Button variant="primary" onPress={discover} isPending={isDiscovering}>
+                      {t('discover')}
+                    </Button>
+                  </ModalFooter>
+                </>
+              )}
+            </ModalDialog>
+          </ModalContainer>
+        </ModalBackdrop>
       </Modal>
     </>
   );

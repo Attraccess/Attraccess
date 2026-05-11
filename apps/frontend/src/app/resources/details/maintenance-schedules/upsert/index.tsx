@@ -1,4 +1,22 @@
-import { Alert, AlertContent, AlertTitle, Button, Form, Input, Label, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Switch, TextField, useOverlayState } from '@heroui/react';
+import {
+  Alert,
+  AlertContent,
+  AlertTitle,
+  Button,
+  Form,
+  Input,
+  Label,
+  Modal,
+  ModalBackdrop,
+  ModalBody,
+  ModalContainer,
+  ModalDialog,
+  ModalFooter,
+  ModalHeader,
+  Switch,
+  TextField,
+  useOverlayState,
+} from '@heroui/react';
 import { Select } from '../../../../../components/select';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -8,7 +26,7 @@ import {
   useResourceMaintenanceSchedulesServiceFindMaintenanceSchedulesKey,
   useResourceMaintenanceSchedulesServiceGetMaintenanceSchedule,
   useResourceMaintenanceSchedulesServiceUpdateMaintenanceSchedule,
-  UsageDurationUnit
+  UsageDurationUnit,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '../../../../../components/pageHeader';
@@ -39,7 +57,7 @@ export function MaintenanceScheduleUpsertModal(props: Props) {
 
   const [name, setName] = useState('');
   const [triggerType, setTriggerType] = useState<ResourceMaintenanceScheduleTriggerType>(
-    ResourceMaintenanceScheduleTriggerType.USAGE_HOURS
+    ResourceMaintenanceScheduleTriggerType.USAGE_HOURS,
   );
   const [usageHoursDuration, setUsageHoursDuration] = useState<string>('100');
   const [usageHoursUnit, setUsageHoursUnit] = useState<UsageDurationUnit>(UsageDurationUnit.HOURS);
@@ -51,7 +69,7 @@ export function MaintenanceScheduleUpsertModal(props: Props) {
   const { data: existingSchedule } = useResourceMaintenanceSchedulesServiceGetMaintenanceSchedule(
     { resourceId, scheduleId: scheduleId ?? 0 },
     undefined,
-    { enabled: isOpen && scheduleId != null }
+    { enabled: isOpen && scheduleId != null },
   );
 
   useEffect(() => {
@@ -71,21 +89,11 @@ export function MaintenanceScheduleUpsertModal(props: Props) {
     setName(existingSchedule.name ?? '');
     setTriggerType(existingSchedule.triggerType);
     setEnabled(existingSchedule.enabled);
-    setUsageHoursDuration(
-      existingSchedule.usageHoursConfig?.duration?.toString() ?? '100'
-    );
-    setUsageHoursUnit(
-      existingSchedule.usageHoursConfig?.unit ?? UsageDurationUnit.HOURS
-    );
-    setThresholdSessions(
-      existingSchedule.usageCountConfig?.thresholdSessions?.toString() ?? '50'
-    );
-    setTimeIntervalDuration(
-      existingSchedule.timeIntervalConfig?.duration?.toString() ?? '500'
-    );
-    setTimeIntervalUnit(
-      (existingSchedule.timeIntervalConfig?.unit as UsageDurationUnit) ?? UsageDurationUnit.HOURS
-    );
+    setUsageHoursDuration(existingSchedule.usageHoursConfig?.duration?.toString() ?? '100');
+    setUsageHoursUnit(existingSchedule.usageHoursConfig?.unit ?? UsageDurationUnit.HOURS);
+    setThresholdSessions(existingSchedule.usageCountConfig?.thresholdSessions?.toString() ?? '50');
+    setTimeIntervalDuration(existingSchedule.timeIntervalConfig?.duration?.toString() ?? '500');
+    setTimeIntervalUnit((existingSchedule.timeIntervalConfig?.unit as UsageDurationUnit) ?? UsageDurationUnit.HOURS);
   }, [existingSchedule, scheduleId, isOpen]);
 
   const onSaveSuccess = useCallback(() => {
@@ -95,15 +103,21 @@ export function MaintenanceScheduleUpsertModal(props: Props) {
     close();
   }, [queryClient, close]);
 
-  const { mutate: createSchedule, isPending: isCreating, error: createError } =
-    useResourceMaintenanceSchedulesServiceCreateMaintenanceSchedule({
-      onSuccess: onSaveSuccess,
-    });
+  const {
+    mutate: createSchedule,
+    isPending: isCreating,
+    error: createError,
+  } = useResourceMaintenanceSchedulesServiceCreateMaintenanceSchedule({
+    onSuccess: onSaveSuccess,
+  });
 
-  const { mutate: updateSchedule, isPending: isUpdating, error: updateError } =
-    useResourceMaintenanceSchedulesServiceUpdateMaintenanceSchedule({
-      onSuccess: onSaveSuccess,
-    });
+  const {
+    mutate: updateSchedule,
+    isPending: isUpdating,
+    error: updateError,
+  } = useResourceMaintenanceSchedulesServiceUpdateMaintenanceSchedule({
+    onSuccess: onSaveSuccess,
+  });
 
   const error = (createError ?? updateError) as Error | undefined;
 
@@ -217,104 +231,119 @@ export function MaintenanceScheduleUpsertModal(props: Props) {
     <>
       {activator(open)}
       <Modal isOpen={isOpen} onOpenChange={setOpen}>
-        <ModalBackdrop />
-        <ModalContainer>
-          <ModalDialog>
-            {() => (<>
-          <ModalHeader>
-            <PageHeader
-              icon={<CalendarClockIcon />}
-              title={scheduleId != null ? t('titleEdit') : t('titleCreate')}
-              noMargin
-            />
-          </ModalHeader>
-
-          <ModalBody>
-            <Form ref={formRef} onSubmit={(e) => { e.preventDefault(); onSubmit(); }}>
-              <TextField value={name} onChange={setName}>
-                <Label>{t('inputs.name.label')}</Label>
-                <Input placeholder="e.g. Monthly check" />
-              </TextField>
-
-              <Select
-                label={t('inputs.triggerType.label')}
-                selectedKey={triggerType}
-                onSelectionChange={(key) => {
-                  if (key) setTriggerType(key as ResourceMaintenanceScheduleTriggerType);
-                }}
-                items={TRIGGER_OPTIONS.map((opt) => ({ key: opt.value, label: t(`triggerType.${opt.labelKey}`) }))}
-              />
-
-              {triggerType === ResourceMaintenanceScheduleTriggerType.USAGE_HOURS && (
+        <ModalBackdrop>
+          <ModalContainer>
+            <ModalDialog>
+              {() => (
                 <>
-                  <TextField value={usageHoursDuration} onChange={setUsageHoursDuration} isRequired>
-                    <Label>{t('inputs.duration.label')}</Label>
-                    <Input type="number" min={1} />
-                  </TextField>
-                  <Select
-                    label={t('inputs.unit.label')}
-                    selectedKey={usageHoursUnit}
-                    onSelectionChange={(key) => {
-                      if (key) setUsageHoursUnit(key as UsageDurationUnit);
-                    }}
-                    items={Object.values(UsageDurationUnit).map((unit) => ({ key: unit, label: t(`inputs.unit.${unit}`) }))}
-                  />
+                  <ModalHeader>
+                    <PageHeader
+                      icon={<CalendarClockIcon />}
+                      title={scheduleId != null ? t('titleEdit') : t('titleCreate')}
+                      noMargin
+                    />
+                  </ModalHeader>
+
+                  <ModalBody>
+                    <Form
+                      ref={formRef}
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        onSubmit();
+                      }}
+                    >
+                      <TextField value={name} onChange={setName}>
+                        <Label>{t('inputs.name.label')}</Label>
+                        <Input placeholder="e.g. Monthly check" />
+                      </TextField>
+
+                      <Select
+                        label={t('inputs.triggerType.label')}
+                        selectedKey={triggerType}
+                        onSelectionChange={(key) => {
+                          if (key) setTriggerType(key as ResourceMaintenanceScheduleTriggerType);
+                        }}
+                        items={TRIGGER_OPTIONS.map((opt) => ({
+                          key: opt.value,
+                          label: t(`triggerType.${opt.labelKey}`),
+                        }))}
+                      />
+
+                      {triggerType === ResourceMaintenanceScheduleTriggerType.USAGE_HOURS && (
+                        <>
+                          <TextField value={usageHoursDuration} onChange={setUsageHoursDuration} isRequired>
+                            <Label>{t('inputs.duration.label')}</Label>
+                            <Input type="number" min={1} />
+                          </TextField>
+                          <Select
+                            label={t('inputs.unit.label')}
+                            selectedKey={usageHoursUnit}
+                            onSelectionChange={(key) => {
+                              if (key) setUsageHoursUnit(key as UsageDurationUnit);
+                            }}
+                            items={Object.values(UsageDurationUnit).map((unit) => ({
+                              key: unit,
+                              label: t(`inputs.unit.${unit}`),
+                            }))}
+                          />
+                        </>
+                      )}
+
+                      {triggerType === ResourceMaintenanceScheduleTriggerType.USAGE_COUNT && (
+                        <TextField value={thresholdSessions} onChange={setThresholdSessions} isRequired>
+                          <Label>{t('inputs.thresholdSessions.label')}</Label>
+                          <Input type="number" min={1} />
+                        </TextField>
+                      )}
+
+                      {triggerType === ResourceMaintenanceScheduleTriggerType.TIME_INTERVAL && (
+                        <>
+                          <TextField value={timeIntervalDuration} onChange={setTimeIntervalDuration}>
+                            <Label>{t('inputs.duration.label')}</Label>
+                            <Input type="number" min={1} placeholder="e.g. 30" />
+                          </TextField>
+                          <Select
+                            label={t('inputs.unit.label')}
+                            selectedKey={timeIntervalUnit}
+                            onSelectionChange={(key) => {
+                              if (key) setTimeIntervalUnit(key as UsageDurationUnit);
+                            }}
+                            items={Object.values(UsageDurationUnit).map((unit) => ({
+                              key: unit,
+                              label: t(`inputs.unit.${unit}`),
+                            }))}
+                          />
+                          <p className="text-sm text-default-500">{t('inputs.timeIntervalEvaluationNote')}</p>
+                        </>
+                      )}
+
+                      <Switch isSelected={enabled} onChange={setEnabled}>
+                        {t('inputs.enabled.label')}
+                      </Switch>
+
+                      {error && (
+                        <Alert status="danger">
+                          <AlertContent>
+                            <AlertTitle>{t('alert.error.title')}</AlertTitle>
+                          </AlertContent>
+                          {(error as Error).message}
+                        </Alert>
+                      )}
+
+                      <button type="submit" hidden />
+                    </Form>
+                  </ModalBody>
+
+                  <ModalFooter>
+                    <Button variant="primary" onPress={onSubmit} isPending={isCreating || isUpdating}>
+                      {t('actions.save')}
+                    </Button>
+                  </ModalFooter>
                 </>
               )}
-
-              {triggerType === ResourceMaintenanceScheduleTriggerType.USAGE_COUNT && (
-                <TextField value={thresholdSessions} onChange={setThresholdSessions} isRequired>
-                  <Label>{t('inputs.thresholdSessions.label')}</Label>
-                  <Input type="number" min={1} />
-                </TextField>
-              )}
-
-              {triggerType === ResourceMaintenanceScheduleTriggerType.TIME_INTERVAL && (
-                <>
-                  <TextField value={timeIntervalDuration} onChange={setTimeIntervalDuration}>
-                    <Label>{t('inputs.duration.label')}</Label>
-                    <Input type="number" min={1} placeholder="e.g. 30" />
-                  </TextField>
-                  <Select
-                    label={t('inputs.unit.label')}
-                    selectedKey={timeIntervalUnit}
-                    onSelectionChange={(key) => {
-                      if (key) setTimeIntervalUnit(key as UsageDurationUnit);
-                    }}
-                    items={Object.values(UsageDurationUnit).map((unit) => ({ key: unit, label: t(`inputs.unit.${unit}`) }))}
-                  />
-                  <p className="text-sm text-default-500">{t('inputs.timeIntervalEvaluationNote')}</p>
-                </>
-              )}
-
-              <Switch isSelected={enabled} onChange={setEnabled}>
-                {t('inputs.enabled.label')}
-              </Switch>
-
-              {error && (
-                <Alert status="danger">
-                  <AlertContent>
-                    <AlertTitle>{t('alert.error.title')}</AlertTitle>
-                  </AlertContent>
-                  {(error as Error).message}
-                </Alert>
-              )}
-
-              <button type="submit" hidden />
-            </Form>
-          </ModalBody>
-
-          <ModalFooter>
-            <Button variant="primary"
-              onPress={onSubmit}
-              isPending={isCreating || isUpdating}
-            >
-              {t('actions.save')}
-            </Button>
-          </ModalFooter>
-            </>)}
-          </ModalDialog>
-        </ModalContainer>
+            </ModalDialog>
+          </ModalContainer>
+        </ModalBackdrop>
       </Modal>
     </>
   );

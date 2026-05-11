@@ -1,6 +1,20 @@
 import { usePluginsServiceUploadPlugin } from '@attraccess/react-query-client';
 import { useState, useRef } from 'react';
-import { Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, TextField, FieldError, Input, Description } from '@heroui/react';
+import {
+  Button,
+  Modal,
+  ModalBackdrop,
+  ModalBody,
+  ModalContainer,
+  ModalDialog,
+  ModalFooter,
+  ModalHeader,
+  ModalHeading,
+  TextField,
+  FieldError,
+  Input,
+  Description,
+} from '@heroui/react';
 import { Upload } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './UploadPluginModal.en.json';
@@ -69,61 +83,71 @@ export function UploadPluginModal({ isOpen, onClose }: UploadPluginModalProps) {
   };
 
   return (
-    <Modal isOpen={isOpen} onOpenChange={(open) => { if (!open) onClose(); }} data-cy="upload-plugin-modal">
-      <ModalBackdrop />
-      <ModalContainer>
-        <ModalDialog>
-          {({ close }) => (
-            <>
-              <ModalHeader>
-                <ModalHeading>{t('title')}</ModalHeading>
-              </ModalHeader>
-              <ModalBody>
-                <div className="space-y-4">
-                  <p>{t('description')}</p>
+    <Modal
+      isOpen={isOpen}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+      data-cy="upload-plugin-modal"
+    >
+      <ModalBackdrop>
+        <ModalContainer>
+          <ModalDialog>
+            {({ close }) => (
+              <>
+                <ModalHeader>
+                  <ModalHeading>{t('title')}</ModalHeading>
+                </ModalHeader>
+                <ModalBody>
+                  <div className="space-y-4">
+                    <p>{t('description')}</p>
 
-                  <TextField isInvalid={isFileInvalid}>
-                    <Input
-                      type="file"
-                      ref={fileInputRef}
-                      accept=".zip"
-                      onChange={handleFileChange}
-                      data-cy="upload-plugin-modal-file-input"
-                    />
-                    <Description>{t('fileInputDescription')}</Description>
-                    {isFileInvalid && <FieldError>{t('errors.invalidFile')}</FieldError>}
-                  </TextField>
+                    <TextField isInvalid={isFileInvalid}>
+                      <Input
+                        type="file"
+                        ref={fileInputRef}
+                        accept=".zip"
+                        onChange={handleFileChange}
+                        data-cy="upload-plugin-modal-file-input"
+                      />
+                      <Description>{t('fileInputDescription')}</Description>
+                      {isFileInvalid && <FieldError>{t('errors.invalidFile')}</FieldError>}
+                    </TextField>
 
-                  {selectedFile && (
-                    <div className="py-2 px-4 bg-gray-100 dark:bg-gray-800 rounded-md">
-                      <p className="text-sm">
-                        <span className="font-semibold">{t('selectedFile')}:</span> {selectedFile.name}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </ModalBody>
-              <ModalFooter>
-                <Button variant="secondary"
-                  onPress={close}
-                  isDisabled={isPending}
-                  data-cy="upload-plugin-modal-cancel-button"
-                >
-                  {t('cancel')}
-                </Button>
-                <Button variant="primary"
-                  onPress={handleUpload}
-                  isPending={isPending}
-                  isDisabled={!selectedFile || isFileInvalid}
-                  data-cy="upload-plugin-modal-upload-button"
-                ><Upload size={18} />
-                  {t('upload')}
-                </Button>
-              </ModalFooter>
-            </>
-          )}
-        </ModalDialog>
-      </ModalContainer>
+                    {selectedFile && (
+                      <div className="py-2 px-4 bg-gray-100 dark:bg-gray-800 rounded-md">
+                        <p className="text-sm">
+                          <span className="font-semibold">{t('selectedFile')}:</span> {selectedFile.name}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </ModalBody>
+                <ModalFooter>
+                  <Button
+                    variant="secondary"
+                    onPress={close}
+                    isDisabled={isPending}
+                    data-cy="upload-plugin-modal-cancel-button"
+                  >
+                    {t('cancel')}
+                  </Button>
+                  <Button
+                    variant="primary"
+                    onPress={handleUpload}
+                    isPending={isPending}
+                    isDisabled={!selectedFile || isFileInvalid}
+                    data-cy="upload-plugin-modal-upload-button"
+                  >
+                    <Upload size={18} />
+                    {t('upload')}
+                  </Button>
+                </ModalFooter>
+              </>
+            )}
+          </ModalDialog>
+        </ModalContainer>
+      </ModalBackdrop>
     </Modal>
   );
 }

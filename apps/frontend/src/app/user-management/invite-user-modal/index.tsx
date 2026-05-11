@@ -1,4 +1,21 @@
-import { Button, Form, TextField, Label, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalHeader, Tab, TabList, TabPanel, Tabs, useOverlayState } from '@heroui/react';
+import {
+  Button,
+  Form,
+  TextField,
+  Label,
+  Input,
+  Modal,
+  ModalBackdrop,
+  ModalBody,
+  ModalContainer,
+  ModalDialog,
+  ModalHeader,
+  Tab,
+  TabList,
+  TabPanel,
+  Tabs,
+  useOverlayState,
+} from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
@@ -109,72 +126,80 @@ export function InviteUserModal(props: Props) {
   return (
     <>
       {children(open)}
-      <Modal isOpen={isOpen} onOpenChange={(o) => { if (!o) close(); }}>
-        <ModalBackdrop />
-        <ModalContainer size={tab === 'single' ? 'sm' : 'lg'}>
-          <ModalDialog>
-            {() => (<>
-          <ModalHeader>
-            <PageHeader title={t('title')} noMargin />
-          </ModalHeader>
+      <Modal
+        isOpen={isOpen}
+        onOpenChange={(o) => {
+          if (!o) close();
+        }}
+      >
+        <ModalBackdrop>
+          <ModalContainer size={tab === 'single' ? 'sm' : 'lg'}>
+            <ModalDialog>
+              {() => (
+                <>
+                  <ModalHeader>
+                    <PageHeader title={t('title')} noMargin />
+                  </ModalHeader>
 
-          <ModalBody>
-            <Tabs selectedKey={tab}>
-              <TabList>
-                <Tab id="single">{t('tabs.single')}</Tab>
-                <Tab id="csv">{t('tabs.csv')}</Tab>
-              </TabList>
-              <TabPanel id="single">
-                <Form
-                  ref={formRef}
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    onSubmit();
-                  }}
-                  className="flex flex-col gap-4"
-                >
-                  <UsernameInput
-                    label={t('inputs.username.label')}
-                    name="username"
-                    isRequired
-                    value={username}
-                    onChange={setUsername}
-                    validationMessages={usernameValidationMessages}
-                    description={t('inputs.username.description', {
-                      min: USERNAME_RULES.minLength,
-                      max: USERNAME_RULES.maxLength,
-                    })}
-                  />
-                  <TextField isRequired value={email} onChange={setEmail}>
-                    <Label>{t('inputs.email.label')}</Label>
-                    <Input name="email" type="email" required />
-                  </TextField>
+                  <ModalBody>
+                    <Tabs selectedKey={tab}>
+                      <TabList>
+                        <Tab id="single">{t('tabs.single')}</Tab>
+                        <Tab id="csv">{t('tabs.csv')}</Tab>
+                      </TabList>
+                      <TabPanel id="single">
+                        <Form
+                          ref={formRef}
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            onSubmit();
+                          }}
+                          className="flex flex-col gap-4"
+                        >
+                          <UsernameInput
+                            label={t('inputs.username.label')}
+                            name="username"
+                            isRequired
+                            value={username}
+                            onChange={setUsername}
+                            validationMessages={usernameValidationMessages}
+                            description={t('inputs.username.description', {
+                              min: USERNAME_RULES.minLength,
+                              max: USERNAME_RULES.maxLength,
+                            })}
+                          />
+                          <TextField isRequired value={email} onChange={setEmail}>
+                            <Label>{t('inputs.email.label')}</Label>
+                            <Input name="email" type="email" required />
+                          </TextField>
 
-                  <div className="flex justify-end w-full">
-                    <Button variant="primary" type="submit" isPending={isPending} isDisabled={!canSubmit}>
-                      {t('actions.invite')}
-                    </Button>
-                  </div>
-                </Form>
-              </TabPanel>
-              <TabPanel id="csv">
-                <CsvInvite
-                  onSuccess={close}
-                  onError={(error) =>
-                    toast.apiError({
-                      error: error as ApiError,
-                      t,
-                      tExists,
-                      baseTranslationKey: 'api',
-                    })
-                  }
-                />
-              </TabPanel>
-            </Tabs>
-          </ModalBody>
-            </>)}
-          </ModalDialog>
-        </ModalContainer>
+                          <div className="flex justify-end w-full">
+                            <Button variant="primary" type="submit" isPending={isPending} isDisabled={!canSubmit}>
+                              {t('actions.invite')}
+                            </Button>
+                          </div>
+                        </Form>
+                      </TabPanel>
+                      <TabPanel id="csv">
+                        <CsvInvite
+                          onSuccess={close}
+                          onError={(error) =>
+                            toast.apiError({
+                              error: error as ApiError,
+                              t,
+                              tExists,
+                              baseTranslationKey: 'api',
+                            })
+                          }
+                        />
+                      </TabPanel>
+                    </Tabs>
+                  </ModalBody>
+                </>
+              )}
+            </ModalDialog>
+          </ModalContainer>
+        </ModalBackdrop>
       </Modal>
     </>
   );

@@ -140,12 +140,10 @@ export function BaseCsvExportModal<TData extends Row>(props: Props<TData>) {
 
         <div className="flex gap-4">
           {refetch && (
-            <Button variant="secondary"
-              onPress={() => refetch()}
-              data-cy="resource-usage-export-refresh-button"
-            >
+            <Button variant="secondary" onPress={() => refetch()} data-cy="resource-usage-export-refresh-button">
               {t('actions.refetch')}
-            <RotateCwIcon className={'w-4 h-4 ' + (queryStatus === 'pending' ? 'animate-spin' : '')} /></Button>
+              <RotateCwIcon className={'w-4 h-4 ' + (queryStatus === 'pending' ? 'animate-spin' : '')} />
+            </Button>
           )}
 
           {(options ?? []).map((option) => (
@@ -160,21 +158,15 @@ export function BaseCsvExportModal<TData extends Row>(props: Props<TData>) {
           ))}
         </div>
 
-        <Table
-
-
-
-
-          data-cy="resource-usage-export-table"
-          aria-label={t('table.ariaLabel')}
-        >
+        <Table data-cy="resource-usage-export-table" aria-label={t('table.ariaLabel')}>
           <TableHeader columns={selectedColumns}>
-            {(column) => <TableColumn key={column.key} id={column.key}>{column.label}</TableColumn>}
+            {(column) => (
+              <TableColumn key={column.key} id={column.key}>
+                {column.label}
+              </TableColumn>
+            )}
           </TableHeader>
-          <TableBody
-            items={itemRows}
-            renderEmptyState={() => <EmptyState />}
-          >
+          <TableBody items={itemRows} renderEmptyState={() => <EmptyState />}>
             {(row) => (
               <TableRow key={row.key} id={row.key}>
                 {row.columns.map((column) => (

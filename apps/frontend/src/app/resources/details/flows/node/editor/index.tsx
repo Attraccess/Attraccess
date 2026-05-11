@@ -1,5 +1,16 @@
 import { ResourceFlowNodeSchemaDto } from '@attraccess/react-query-client';
-import { Button, Form, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, useOverlayState } from '@heroui/react';
+import {
+  Button,
+  Form,
+  Modal,
+  ModalBackdrop,
+  ModalBody,
+  ModalContainer,
+  ModalDialog,
+  ModalFooter,
+  ModalHeader,
+  useOverlayState,
+} from '@heroui/react';
 import { useNodeId, useNodesData } from '@xyflow/react';
 import { PageHeader } from '../../../../../../components/pageHeader';
 import { useFlowContext } from '../../flowContext';
@@ -48,48 +59,49 @@ export function NodeEditor(props: Props) {
     <>
       {props.children(open)}
       <Modal isOpen={isOpen} onOpenChange={setOpen}>
-        <ModalBackdrop />
-        <ModalContainer>
-          <ModalDialog>
-            {() => (
-              <>
-                <ModalHeader>
-                  <PageHeader
-                    title={t('nodes.' + schema.type + '.title')}
-                    subtitle={t('nodes.' + schema.type + '.description')}
-                    noMargin
-                  />
-                </ModalHeader>
+        <ModalBackdrop>
+          <ModalContainer>
+            <ModalDialog>
+              {() => (
+                <>
+                  <ModalHeader>
+                    <PageHeader
+                      title={t('nodes.' + schema.type + '.title')}
+                      subtitle={t('nodes.' + schema.type + '.description')}
+                      noMargin
+                    />
+                  </ModalHeader>
 
-                <ModalBody className="flex flex-col gap-2">
-                  <Form onSubmit={onSave} ref={formRef}>
-                    {Object.entries(schema.configSchema.properties as Record<string, Property<unknown>>).map(
-                      ([propertyName, property]) => (
-                        <PropertyInput
-                          key={propertyName}
-                          isRequired={(schema.configSchema.required as string[])?.includes(propertyName)}
-                          nodeType={schema.type}
-                          tNodeTranslations={t}
-                          name={propertyName}
-                          schema={property}
-                          value={data[propertyName]}
-                          onChange={(value) => onInputChange(propertyName, value)}
-                        />
-                      ),
-                    )}
-                    <input hidden type="submit" />
-                  </Form>
-                </ModalBody>
+                  <ModalBody className="flex flex-col gap-2">
+                    <Form onSubmit={onSave} ref={formRef}>
+                      {Object.entries(schema.configSchema.properties as Record<string, Property<unknown>>).map(
+                        ([propertyName, property]) => (
+                          <PropertyInput
+                            key={propertyName}
+                            isRequired={(schema.configSchema.required as string[])?.includes(propertyName)}
+                            nodeType={schema.type}
+                            tNodeTranslations={t}
+                            name={propertyName}
+                            schema={property}
+                            value={data[propertyName]}
+                            onChange={(value) => onInputChange(propertyName, value)}
+                          />
+                        ),
+                      )}
+                      <input hidden type="submit" />
+                    </Form>
+                  </ModalBody>
 
-                <ModalFooter>
-                  <Button variant="primary" onPress={onSave}>
-                    {t('editor.buttons.save')}
-                  </Button>
-                </ModalFooter>
-              </>
-            )}
-          </ModalDialog>
-        </ModalContainer>
+                  <ModalFooter>
+                    <Button variant="primary" onPress={onSave}>
+                      {t('editor.buttons.save')}
+                    </Button>
+                  </ModalFooter>
+                </>
+              )}
+            </ModalDialog>
+          </ModalContainer>
+        </ModalBackdrop>
       </Modal>
     </>
   );

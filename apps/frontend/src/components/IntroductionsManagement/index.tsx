@@ -1,5 +1,21 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Card, CardHeader, CardContent, CardProps, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, TextArea, Button, Form, useOverlayState } from '@heroui/react';
+import {
+  Card,
+  CardHeader,
+  CardContent,
+  CardProps,
+  Modal,
+  ModalBackdrop,
+  ModalBody,
+  ModalContainer,
+  ModalDialog,
+  ModalFooter,
+  ModalHeader,
+  TextArea,
+  Button,
+  Form,
+  useOverlayState,
+} from '@heroui/react';
 import { HistoryIcon, ShieldCheckIcon } from 'lucide-react';
 import { ResourceIntroduction, User } from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -123,38 +139,40 @@ export function IntroductionsManagement(props: Readonly<IntroductionsManagementP
           actions={Actions}
         />
 
-        <Modal isOpen={commentModalIsOpen} onOpenChange={(o) => { if (!o) closeCommentModal(); }}>
-          <ModalBackdrop />
-          <ModalContainer>
-            <ModalDialog>
-              {() => (
-                <>
-                  <ModalHeader>{t('commentModal.title')}</ModalHeader>
+        <Modal
+          isOpen={commentModalIsOpen}
+          onOpenChange={(o) => {
+            if (!o) closeCommentModal();
+          }}
+        >
+          <ModalBackdrop>
+            <ModalContainer>
+              <ModalDialog>
+                {() => (
+                  <>
+                    <ModalHeader>{t('commentModal.title')}</ModalHeader>
 
-                  <ModalBody>
-                    <Form
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        onCommentModalSubmit();
-                      }}
-                    >
-                      <TextArea
-                       
-                        value={comment}
-                        onChange={(e) => setComment(e.target.value)}
-                      />
+                    <ModalBody>
+                      <Form
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          onCommentModalSubmit();
+                        }}
+                      >
+                        <TextArea value={comment} onChange={(e) => setComment(e.target.value)} />
 
-                      <button type="submit" hidden />
-                    </Form>
-                  </ModalBody>
+                        <button type="submit" hidden />
+                      </Form>
+                    </ModalBody>
 
-                  <ModalFooter>
-                    <Button onPress={onCommentModalSubmit}>{t('commentModal.submit')}</Button>
-                  </ModalFooter>
-                </>
-              )}
-            </ModalDialog>
-          </ModalContainer>
+                    <ModalFooter>
+                      <Button onPress={onCommentModalSubmit}>{t('commentModal.submit')}</Button>
+                    </ModalFooter>
+                  </>
+                )}
+              </ModalDialog>
+            </ModalContainer>
+          </ModalBackdrop>
         </Modal>
       </CardContent>
     </Card>

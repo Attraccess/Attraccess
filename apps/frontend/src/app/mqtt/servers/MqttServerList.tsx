@@ -1,5 +1,20 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Alert, AlertContent, AlertDescription, Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Spinner, useOverlayState } from '@heroui/react';
+import {
+  Alert,
+  AlertContent,
+  AlertDescription,
+  Button,
+  Modal,
+  ModalBackdrop,
+  ModalBody,
+  ModalContainer,
+  ModalDialog,
+  ModalFooter,
+  ModalHeader,
+  ModalHeading,
+  Spinner,
+  useOverlayState,
+} from '@heroui/react';
 import { useNavigate } from 'react-router-dom';
 import { useToastMessage } from '../../../components/toastProvider';
 import en from './translations/list/en.json';
@@ -33,15 +48,11 @@ function ServerListItem({ id, name, host, port, onEdit, onDelete, t }: ServerLis
         </p>
       </div>
       <div className="space-x-2">
-        <Button variant="secondary"
-
-          onPress={() => onEdit(id)}
-          data-cy={`mqtt-server-list-item-edit-button-${id}`}
-        >
+        <Button variant="secondary" onPress={() => onEdit(id)} data-cy={`mqtt-server-list-item-edit-button-${id}`}>
           {t('editServer')}
         </Button>
-        <Button variant="danger-soft"
-
+        <Button
+          variant="danger-soft"
           onPress={() => onDelete(id)}
           data-cy={`mqtt-server-list-item-delete-button-${id}`}
         >
@@ -143,37 +154,46 @@ export function MqttServerList() {
         ))}
       </div>
 
-      <Modal isOpen={isOpen} onOpenChange={(o) => { if (!o) closeDeleteModal(); }} data-cy="mqtt-server-list-delete-confirmation-modal">
-        <ModalBackdrop />
-        <ModalContainer>
-          <ModalDialog>
-            {({ close }) => (
-              <>
-                <ModalHeader>
-                  <ModalHeading>{t('deleteServer')}</ModalHeading>
-                </ModalHeader>
-                <ModalBody>
-                  <p>{t('deleteConfirmation')}</p>
-                </ModalBody>
-                <ModalFooter>
-                  <Button variant="secondary"
-                    onPress={close}
-                    data-cy="mqtt-server-list-delete-confirmation-cancel-button"
-                  >
-                    {t('cancel')}
-                  </Button>
-                  <Button variant="danger"
-                    onPress={confirmDelete}
-                    isPending={deleteServer.isPending}
-                    data-cy="mqtt-server-list-delete-confirmation-delete-button"
-                  >
-                    {t('deleteServer')}
-                  </Button>
-                </ModalFooter>
-              </>
-            )}
-          </ModalDialog>
-        </ModalContainer>
+      <Modal
+        isOpen={isOpen}
+        onOpenChange={(o) => {
+          if (!o) closeDeleteModal();
+        }}
+        data-cy="mqtt-server-list-delete-confirmation-modal"
+      >
+        <ModalBackdrop>
+          <ModalContainer>
+            <ModalDialog>
+              {({ close }) => (
+                <>
+                  <ModalHeader>
+                    <ModalHeading>{t('deleteServer')}</ModalHeading>
+                  </ModalHeader>
+                  <ModalBody>
+                    <p>{t('deleteConfirmation')}</p>
+                  </ModalBody>
+                  <ModalFooter>
+                    <Button
+                      variant="secondary"
+                      onPress={close}
+                      data-cy="mqtt-server-list-delete-confirmation-cancel-button"
+                    >
+                      {t('cancel')}
+                    </Button>
+                    <Button
+                      variant="danger"
+                      onPress={confirmDelete}
+                      isPending={deleteServer.isPending}
+                      data-cy="mqtt-server-list-delete-confirmation-delete-button"
+                    >
+                      {t('deleteServer')}
+                    </Button>
+                  </ModalFooter>
+                </>
+              )}
+            </ModalDialog>
+          </ModalContainer>
+        </ModalBackdrop>
       </Modal>
     </>
   );

@@ -1,5 +1,22 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Alert, AlertContent, AlertTitle, Button, DatePicker, Form, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Switch, TextArea, useOverlayState } from '@heroui/react';
+import {
+  Alert,
+  AlertContent,
+  AlertTitle,
+  Button,
+  DatePicker,
+  Form,
+  Modal,
+  ModalBackdrop,
+  ModalBody,
+  ModalContainer,
+  ModalDialog,
+  ModalFooter,
+  ModalHeader,
+  Switch,
+  TextArea,
+  useOverlayState,
+} from '@heroui/react';
 import de from './de.json';
 import en from './en.json';
 import { PageHeader } from '../../../../../components/pageHeader';
@@ -96,84 +113,65 @@ export function ResourceMaintenanceUpsertModal(props: Props) {
         reason,
       },
     });
-  }, [
-    createMaintenanceMutation,
-    startTime,
-    endTime,
-    reason,
-    resourceId,
-    hasEndDate,
-    dateValueToAbsoluteString,
-  ]);
+  }, [createMaintenanceMutation, startTime, endTime, reason, resourceId, hasEndDate, dateValueToAbsoluteString]);
 
   return (
     <>
       {activator(open)}
       <Modal isOpen={isOpen} onOpenChange={setOpen}>
-        <ModalBackdrop />
-        <ModalContainer>
-          <ModalDialog>
-            {() => (
-              <>
-                <ModalHeader>
-                  <PageHeader icon={<CalendarIcon />} title={t('title')} noMargin />
-                </ModalHeader>
+        <ModalBackdrop>
+          <ModalContainer>
+            <ModalDialog>
+              {() => (
+                <>
+                  <ModalHeader>
+                    <PageHeader icon={<CalendarIcon />} title={t('title')} noMargin />
+                  </ModalHeader>
 
-                <ModalBody>
-                  <Form onSubmit={onSubmit} ref={formRef}>
-                    <DatePicker
-                     
-                      value={startTime}
-                      isRequired
-                      hideTimeZone
-                      onChange={setStartTime}
-                    />
+                  <ModalBody>
+                    <Form onSubmit={onSubmit} ref={formRef}>
+                      <DatePicker value={startTime} isRequired hideTimeZone onChange={setStartTime} />
 
-                    <Switch isSelected={hasEndDate} onChange={onHasEndDateChange}>
-                      {t('inputs.hasEndDate.label')}
-                    </Switch>
-                    {hasEndDate && (
-                      <DatePicker
-                       
-                        value={endTime}
-                        isRequired
-                        hideTimeZone
-                        onChange={setEndTime}
-                      />
-                    )}
+                      <Switch isSelected={hasEndDate} onChange={onHasEndDateChange}>
+                        {t('inputs.hasEndDate.label')}
+                      </Switch>
+                      {hasEndDate && <DatePicker value={endTime} isRequired hideTimeZone onChange={setEndTime} />}
 
-                    <div>
-                      <label className="text-sm font-medium text-foreground mb-1 block">{t('inputs.reason.label')}</label>
-                      {reason ? (
-                        <p className="text-sm text-default-500 mb-2">
-                          {t('inputs.reason.displayedToUsers')}: <MaintenanceReasonDisplay reason={reason} />
-                        </p>
+                      <div>
+                        <label className="text-sm font-medium text-foreground mb-1 block">
+                          {t('inputs.reason.label')}
+                        </label>
+                        {reason ? (
+                          <p className="text-sm text-default-500 mb-2">
+                            {t('inputs.reason.displayedToUsers')}: <MaintenanceReasonDisplay reason={reason} />
+                          </p>
+                        ) : null}
+                        <TextArea value={reason} onChange={(e) => setReason(e.target.value)} />
+                      </div>
+
+                      {error ? (
+                        <Alert status="danger">
+                          <AlertContent>
+                            <AlertTitle>{t('alert.error.title')}</AlertTitle>
+                          </AlertContent>
+                          {(error as Error).message}
+                        </Alert>
                       ) : null}
-                      <TextArea value={reason} onChange={(e) => setReason(e.target.value)} />
-                    </div>
 
-                    {error ? (
-                      <Alert status="danger">
-                        <AlertContent>
-                          <AlertTitle>{t('alert.error.title')}</AlertTitle>
-                        </AlertContent>
-                        {(error as Error).message}
-                      </Alert>
-                    ) : null}
+                      <button type="submit" hidden />
+                    </Form>
+                  </ModalBody>
 
-                    <button type="submit" hidden />
-                  </Form>
-                </ModalBody>
-
-                <ModalFooter>
-                  <Button variant="primary" onPress={onSubmit} type="submit" isPending={isCreating}>
-                    {t('actions.save')}
-                  </Button>
-                </ModalFooter>
-              </>
-            )}
-          </ModalDialog>
-        </ModalContainer>
+                  <ModalFooter>
+                    <Button variant="primary" onPress={onSubmit} type="submit" isPending={isCreating}>
+                      {t('actions.save')}
+                    </Button>
+                  </ModalFooter>
+                </>
+              )}
+            </ModalDialog>
+          </ModalContainer>
+        </ModalBackdrop>
       </Modal>
     </>
   );

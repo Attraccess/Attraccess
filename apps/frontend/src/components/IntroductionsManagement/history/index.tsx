@@ -1,5 +1,20 @@
 import { DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from '@heroui/react';
+import {
+  Button,
+  Modal,
+  ModalBackdrop,
+  ModalBody,
+  ModalContainer,
+  ModalDialog,
+  ModalFooter,
+  ModalHeader,
+  Table,
+  TableBody,
+  TableCell,
+  TableColumn,
+  TableHeader,
+  TableRow,
+} from '@heroui/react';
 import { useMemo, useState } from 'react';
 import { EmptyState } from '../../../components/emptyState';
 import { IntroductionStatusChip } from '../../IntroductionStatusChip';
@@ -38,50 +53,50 @@ export function IntroductionHistoryModal(props: Readonly<Props>) {
   }, [orderedHistory, page, rowsPerPage]);
 
   return (
-    <Modal isOpen={isOpen} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <ModalBackdrop />
-      <ModalContainer>
-        <ModalDialog>
-          {({ close }) => (
-            <>
-              <ModalHeader>{t('modal.title')}</ModalHeader>
-              <ModalBody>
-                <Table
-                  aria-label={t('table.ariaLabel')}
-
-                >
-                  <TableHeader>
-                    <TableColumn>{t('table.columns.date')}</TableColumn>
-                    <TableColumn>{t('table.columns.action')}</TableColumn>
-                    <TableColumn>{t('table.columns.comment')}</TableColumn>
-                  </TableHeader>
-                  <TableBody
-                    items={currentPage}
-                    renderEmptyState={() => <EmptyState />}
-                  >
-                    {(item) => (
-                      <TableRow key={item.id} id={item.id}>
-                        <TableCell>
-                          <DateTimeDisplay date={item.createdAt} />
-                        </TableCell>
-                        <TableCell>
-                          <IntroductionStatusChip isValid={item.action === 'grant'} />
-                        </TableCell>
-                        <TableCell>
-                          <blockquote className="text-sm whitespace-pre-wrap">{item.comment}</blockquote>
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </ModalBody>
-              <ModalFooter>
-                <Button onPress={close}>{t('modal.closeButton')}</Button>
-              </ModalFooter>
-            </>
-          )}
-        </ModalDialog>
-      </ModalContainer>
+    <Modal
+      isOpen={isOpen}
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+    >
+      <ModalBackdrop>
+        <ModalContainer>
+          <ModalDialog>
+            {({ close }) => (
+              <>
+                <ModalHeader>{t('modal.title')}</ModalHeader>
+                <ModalBody>
+                  <Table aria-label={t('table.ariaLabel')}>
+                    <TableHeader>
+                      <TableColumn>{t('table.columns.date')}</TableColumn>
+                      <TableColumn>{t('table.columns.action')}</TableColumn>
+                      <TableColumn>{t('table.columns.comment')}</TableColumn>
+                    </TableHeader>
+                    <TableBody items={currentPage} renderEmptyState={() => <EmptyState />}>
+                      {(item) => (
+                        <TableRow key={item.id} id={item.id}>
+                          <TableCell>
+                            <DateTimeDisplay date={item.createdAt} />
+                          </TableCell>
+                          <TableCell>
+                            <IntroductionStatusChip isValid={item.action === 'grant'} />
+                          </TableCell>
+                          <TableCell>
+                            <blockquote className="text-sm whitespace-pre-wrap">{item.comment}</blockquote>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </ModalBody>
+                <ModalFooter>
+                  <Button onPress={close}>{t('modal.closeButton')}</Button>
+                </ModalFooter>
+              </>
+            )}
+          </ModalDialog>
+        </ModalContainer>
+      </ModalBackdrop>
     </Modal>
   );
 }

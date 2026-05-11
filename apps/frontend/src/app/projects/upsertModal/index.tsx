@@ -1,4 +1,19 @@
-import { Button, Form, TextField, Label, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, TextArea, useOverlayState } from '@heroui/react';
+import {
+  Button,
+  Form,
+  TextField,
+  Label,
+  Input,
+  Modal,
+  ModalBackdrop,
+  ModalBody,
+  ModalContainer,
+  ModalDialog,
+  ModalFooter,
+  ModalHeader,
+  TextArea,
+  useOverlayState,
+} from '@heroui/react';
 import { PageHeader } from '../../../components/pageHeader';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
@@ -136,53 +151,53 @@ export function UpsertProjectModal(props: Props) {
     <>
       {children(open)}
       <Modal isOpen={isOpen} onOpenChange={setOpen}>
-        <ModalBackdrop />
-        <ModalContainer>
-          <ModalDialog>
-            {() => (
-              <>
-                <ModalHeader>
-                  <PageHeader title={projectId ? t('title.update') : t('title.create')} noMargin />
-                </ModalHeader>
+        <ModalBackdrop>
+          <ModalContainer>
+            <ModalDialog>
+              {() => (
+                <>
+                  <ModalHeader>
+                    <PageHeader title={projectId ? t('title.update') : t('title.create')} noMargin />
+                  </ModalHeader>
 
-                <ModalBody>
-                  <Form
-                    ref={formRef}
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      onSubmit();
-                    }}
-                  >
-                    <TextField value={name} onChange={setName}>
-                      <Label>{t('inputs.name.label')}</Label>
-                      <Input name="name" />
-                    </TextField>
-                    <TextArea
-                     
-                      name="description"
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                    />
-                    <ImageUpload
-                      id="project-logo-image-upload"
-                      label={t('inputs.logo.label')}
-                      onChange={setLogo}
-                      autoScale={{ maxWidth: 600, maxHeight: 600 }}
-                      currentImageUrl={existingProject?.logo ? filenameToUrl(existingProject.logo) : undefined}
-                    />
-                    <input type="submit" hidden />
-                  </Form>
-                </ModalBody>
+                  <ModalBody>
+                    <Form
+                      ref={formRef}
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        onSubmit();
+                      }}
+                    >
+                      <TextField value={name} onChange={setName}>
+                        <Label>{t('inputs.name.label')}</Label>
+                        <Input name="name" />
+                      </TextField>
+                      <TextArea
+                        name="description"
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                      />
+                      <ImageUpload
+                        id="project-logo-image-upload"
+                        label={t('inputs.logo.label')}
+                        onChange={setLogo}
+                        autoScale={{ maxWidth: 600, maxHeight: 600 }}
+                        currentImageUrl={existingProject?.logo ? filenameToUrl(existingProject.logo) : undefined}
+                      />
+                      <input type="submit" hidden />
+                    </Form>
+                  </ModalBody>
 
-                <ModalFooter>
-                  <Button variant="primary" onPress={onSubmit} isPending={isSaving}>
-                    {projectId ? t('actions.update.label') : t('actions.create.label')}
-                  </Button>
-                </ModalFooter>
-              </>
-            )}
-          </ModalDialog>
-        </ModalContainer>
+                  <ModalFooter>
+                    <Button variant="primary" onPress={onSubmit} isPending={isSaving}>
+                      {projectId ? t('actions.update.label') : t('actions.create.label')}
+                    </Button>
+                  </ModalFooter>
+                </>
+              )}
+            </ModalDialog>
+          </ModalContainer>
+        </ModalBackdrop>
       </Modal>
     </>
   );

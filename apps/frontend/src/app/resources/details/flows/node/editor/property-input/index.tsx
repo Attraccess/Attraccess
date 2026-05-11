@@ -1,5 +1,25 @@
 import { ResourceFlowNodeDto, useBillingServiceGetBillingConfiguration } from '@attraccess/react-query-client';
-import { Button, Card, CardContent, TextField, Label, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalHeader, NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput, Switch, TextArea } from "@heroui/react";
+import {
+  Button,
+  Card,
+  CardContent,
+  TextField,
+  Label,
+  Input,
+  Modal,
+  ModalBackdrop,
+  ModalBody,
+  ModalContainer,
+  ModalDialog,
+  ModalHeader,
+  NumberField,
+  NumberFieldDecrementButton,
+  NumberFieldGroup,
+  NumberFieldIncrementButton,
+  NumberFieldInput,
+  Switch,
+  TextArea,
+} from '@heroui/react';
 import { Select } from '../../../../../../../components/select';
 import { MqttServerSelect } from '../../../../../../../components/mqttServerSelect';
 import { PlusIcon, XIcon } from 'lucide-react';
@@ -93,7 +113,8 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
               className="w-full"
             />
           </div>
-          <Button variant="secondary"
+          <Button
+            variant="secondary"
             onPress={() => setIsCreateServerOpen(true)}
             data-cy="mqtt-server-select-create-button"
             isIconOnly
@@ -104,28 +125,29 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
         </div>
 
         <Modal isOpen={isCreateServerOpen} onOpenChange={setIsCreateServerOpen}>
-          <ModalBackdrop />
-          <ModalContainer>
-            <ModalDialog>
-              {({ close }) => (
-                <>
-                  <ModalHeader>{t('nodes.genericConfig.createMqttServer')}</ModalHeader>
-                  <ModalBody>
-                    <CreateMqttServerForm
-                      onSuccess={(server) => {
-                        onChange(server.id as TValue);
-                        setIsCreateServerOpen(false);
-                      }}
-                      onCancel={() => {
-                        setIsCreateServerOpen(false);
-                        close();
-                      }}
-                    />
-                  </ModalBody>
-                </>
-              )}
-            </ModalDialog>
-          </ModalContainer>
+          <ModalBackdrop>
+            <ModalContainer>
+              <ModalDialog>
+                {({ close }) => (
+                  <>
+                    <ModalHeader>{t('nodes.genericConfig.createMqttServer')}</ModalHeader>
+                    <ModalBody>
+                      <CreateMqttServerForm
+                        onSuccess={(server) => {
+                          onChange(server.id as TValue);
+                          setIsCreateServerOpen(false);
+                        }}
+                        onCancel={() => {
+                          setIsCreateServerOpen(false);
+                          close();
+                        }}
+                      />
+                    </ModalBody>
+                  </>
+                )}
+              </ModalDialog>
+            </ModalContainer>
+          </ModalBackdrop>
         </Modal>
       </>
     );
@@ -167,7 +189,11 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
           onChange={(newValue) => onChange(newValue as TValue)}
         >
           {!hideLabel && <Label>{t('nodes.' + nodeType + '.config.' + name + '.label')}</Label>}
-          <Input type="text" placeholder={hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined} defaultValue={schema.default ? String(schema.default) : undefined} />
+          <Input
+            type="text"
+            placeholder={hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined}
+            defaultValue={schema.default ? String(schema.default) : undefined}
+          />
         </TextField>
       );
     case 'integer':
@@ -198,7 +224,11 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
       return (
         <NumberField
           isRequired={isRequired}
-          aria-label={!hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : t('nodes.' + nodeType + '.config.' + name + '.label')}
+          aria-label={
+            !hideLabel
+              ? t('nodes.' + nodeType + '.config.' + name + '.label')
+              : t('nodes.' + nodeType + '.config.' + name + '.label')
+          }
           value={Number(parsedValue)}
           defaultValue={schema.default ? Number(schema.default) : undefined}
           onChange={(newValue) => setValue(newValue as TValue)}
@@ -246,8 +276,8 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
                   >
                     <Input placeholder="Header value" />
                   </TextField>
-                  <Button variant="danger-soft"
-
+                  <Button
+                    variant="danger-soft"
                     isIconOnly
                     onPress={() =>
                       onChange(
@@ -269,10 +299,8 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
           <div className="flex flex-col gap-2">
             {!hideLabel && <small>{t('nodes.' + nodeType + '.config.' + name + '.label')}</small>}
             {content}
-            <Button variant="secondary"
-
-              onPress={() => onChange({ ...value, '': '' })}
-            ><PlusIcon size={16} />
+            <Button variant="secondary" onPress={() => onChange({ ...value, '': '' })}>
+              <PlusIcon size={16} />
               {t('nodes.' + nodeType + '.config.' + name + '.add')}
             </Button>
           </div>
@@ -345,8 +373,8 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
                       ) : null}
                     </div>
                     <div className="row-span-2 flex items-start p-2">
-                      <Button variant="danger-soft"
-
+                      <Button
+                        variant="danger-soft"
                         isIconOnly
                         onPress={() => {
                           const copy = (arrayValue as Array<unknown>).filter((_, i) => i !== index);
@@ -386,7 +414,8 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
         <div className="flex flex-col gap-2 w-full">
           {!hideLabel && <small>{t('nodes.' + nodeType + '.config.' + name + '.label')}</small>}
           {content}
-          <Button variant="secondary" onPress={handleAdd}><PlusIcon size={16} />
+          <Button variant="secondary" onPress={handleAdd}>
+            <PlusIcon size={16} />
             {addText}
           </Button>
         </div>

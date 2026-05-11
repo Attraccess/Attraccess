@@ -1,5 +1,21 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Button, Form, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput, useOverlayState } from "@heroui/react";
+import {
+  Button,
+  Form,
+  Modal,
+  ModalBackdrop,
+  ModalBody,
+  ModalContainer,
+  ModalDialog,
+  ModalFooter,
+  ModalHeader,
+  NumberField,
+  NumberFieldDecrementButton,
+  NumberFieldGroup,
+  NumberFieldIncrementButton,
+  NumberFieldInput,
+  useOverlayState,
+} from '@heroui/react';
 import { PageHeader } from '../../../../../../components/pageHeader';
 import en from './en.json';
 import de from './de.json';
@@ -93,43 +109,44 @@ export function RefundModal(props: Props) {
     <>
       {children && children(open)}
       <Modal isOpen={isOpen} onOpenChange={setOpen}>
-        <ModalBackdrop />
-        <ModalContainer>
-          <ModalDialog>
-            {() => (
-              <>
-                <ModalHeader>
-                  <PageHeader title={t('title')} noMargin />
-                </ModalHeader>
+        <ModalBackdrop>
+          <ModalContainer>
+            <ModalDialog>
+              {() => (
+                <>
+                  <ModalHeader>
+                    <PageHeader title={t('title')} noMargin />
+                  </ModalHeader>
 
-                <ModalBody>
-                  <Form onSubmit={onSubmit}>
-                    <NumberField
-                      aria-label={t('inputs.amount')}
-                      value={dbCurrencyToUserCurrency(amount, configuration.minorUnit)}
-                      onChange={(value) => setAmount(userCurrencyToDbCurrency(value, configuration.minorUnit))}
-                      minValue={0}
-                      maxValue={dbCurrencyToUserCurrency(Math.abs(transaction.amount), configuration.minorUnit)}
-                    >
-                      <NumberFieldGroup>
-                        <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
-                        <NumberFieldInput />
-                        <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
-                      </NumberFieldGroup>
-                    </NumberField>
-                    <input type="submit" hidden />
-                  </Form>
-                </ModalBody>
+                  <ModalBody>
+                    <Form onSubmit={onSubmit}>
+                      <NumberField
+                        aria-label={t('inputs.amount')}
+                        value={dbCurrencyToUserCurrency(amount, configuration.minorUnit)}
+                        onChange={(value) => setAmount(userCurrencyToDbCurrency(value, configuration.minorUnit))}
+                        minValue={0}
+                        maxValue={dbCurrencyToUserCurrency(Math.abs(transaction.amount), configuration.minorUnit)}
+                      >
+                        <NumberFieldGroup>
+                          <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
+                          <NumberFieldInput />
+                          <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
+                        </NumberFieldGroup>
+                      </NumberField>
+                      <input type="submit" hidden />
+                    </Form>
+                  </ModalBody>
 
-                <ModalFooter>
-                  <Button variant="primary" onPress={onSubmit} isPending={isRefunding}>
-                    {t('actions.refund')}
-                  </Button>
-                </ModalFooter>
-              </>
-            )}
-          </ModalDialog>
-        </ModalContainer>
+                  <ModalFooter>
+                    <Button variant="primary" onPress={onSubmit} isPending={isRefunding}>
+                      {t('actions.refund')}
+                    </Button>
+                  </ModalFooter>
+                </>
+              )}
+            </ModalDialog>
+          </ModalContainer>
+        </ModalBackdrop>
       </Modal>
     </>
   );

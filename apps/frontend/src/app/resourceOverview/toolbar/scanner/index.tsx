@@ -1,4 +1,3 @@
-
 import { Scanner, IDetectedBarcode, boundingBox } from '@yudiel/react-qr-scanner';
 import { Modal, ModalBackdrop, ModalContainer, ModalDialog, useOverlayState } from '@heroui/react';
 import { useToastMessage } from '../../../../components/toastProvider';
@@ -45,12 +44,11 @@ export function ResourceScanner(props: Props) {
     <>
       {props.children(open)}
       <Modal isOpen={isOpen} onOpenChange={setOpen}>
-        <ModalBackdrop />
-        <ModalContainer>
-          <ModalDialog>
-            {() => <Scanner onScan={onScan} components={{ tracker: boundingBox }} />}
-          </ModalDialog>
-        </ModalContainer>
+        <ModalBackdrop>
+          <ModalContainer>
+            <ModalDialog>{() => <Scanner onScan={onScan} components={{ tracker: boundingBox }} />}</ModalDialog>
+          </ModalContainer>
+        </ModalBackdrop>
       </Modal>
     </>
   );

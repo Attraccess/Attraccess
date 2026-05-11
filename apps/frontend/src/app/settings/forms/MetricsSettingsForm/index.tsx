@@ -1,5 +1,32 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Button, Chip, NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput, Separator, Switch, TextField, Label, Input, InputGroup, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Spinner, Tooltip, TooltipContent, TooltipTrigger, useOverlayState } from '@heroui/react';
+import {
+  Button,
+  Chip,
+  NumberField,
+  NumberFieldDecrementButton,
+  NumberFieldGroup,
+  NumberFieldIncrementButton,
+  NumberFieldInput,
+  Separator,
+  Switch,
+  TextField,
+  Label,
+  Input,
+  InputGroup,
+  Modal,
+  ModalBackdrop,
+  ModalBody,
+  ModalContainer,
+  ModalDialog,
+  ModalFooter,
+  ModalHeader,
+  ModalHeading,
+  Spinner,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+  useOverlayState,
+} from '@heroui/react';
 import { AlertTriangleIcon, ClipboardCopyIcon, KeyIcon, RefreshCwIcon, Trash2Icon } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -110,18 +137,21 @@ export function MetricsSettingsForm() {
     },
   });
 
-  const handleCopyText = useCallback(async (text: string, successTitle: string, successDescription: string) => {
-    if (!navigator?.clipboard?.writeText) {
-      toast.error({ title: t('copyFailed.title'), description: t('copyFailed.description') });
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(text);
-      toast.success({ title: successTitle, description: successDescription });
-    } catch {
-      toast.error({ title: t('copyFailed.title'), description: t('copyFailed.description') });
-    }
-  }, [toast, t]);
+  const handleCopyText = useCallback(
+    async (text: string, successTitle: string, successDescription: string) => {
+      if (!navigator?.clipboard?.writeText) {
+        toast.error({ title: t('copyFailed.title'), description: t('copyFailed.description') });
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(text);
+        toast.success({ title: successTitle, description: successDescription });
+      } catch {
+        toast.error({ title: t('copyFailed.title'), description: t('copyFailed.description') });
+      }
+    },
+    [toast, t],
+  );
 
   const handleCopyKey = useCallback(async () => {
     if (!generatedKey) return;
@@ -245,11 +275,7 @@ export function MetricsSettingsForm() {
         <Input className="font-mono text-sm" />
         <Tooltip>
           <TooltipTrigger>
-            <Button variant="ghost"
-              isIconOnly
-              onPress={handleCopyEndpoint}
-              aria-label={t('copyButton')}
-            >
+            <Button variant="ghost" isIconOnly onPress={handleCopyEndpoint} aria-label={t('copyButton')}>
               <ClipboardCopyIcon size={16} />
             </Button>
           </TooltipTrigger>
@@ -287,11 +313,7 @@ export function MetricsSettingsForm() {
             <Input className="font-mono text-sm" />
             <Tooltip>
               <TooltipTrigger>
-                <Button variant="ghost"
-                  isIconOnly
-                  onPress={handleCopyKey}
-                  aria-label={t('copyButton')}
-                >
+                <Button variant="ghost" isIconOnly onPress={handleCopyKey} aria-label={t('copyButton')}>
                   <ClipboardCopyIcon size={16} />
                 </Button>
               </TooltipTrigger>
@@ -306,9 +328,7 @@ export function MetricsSettingsForm() {
         {thresholdSection}
 
         <div className="flex gap-2">
-          <Button variant="secondary"
-            onPress={() => setGeneratedKey(null)}
-          >
+          <Button variant="secondary" onPress={() => setGeneratedKey(null)}>
             {t('doneButton')}
           </Button>
         </div>
@@ -323,17 +343,14 @@ export function MetricsSettingsForm() {
       {endpointSection}
 
       <div className="flex gap-2 flex-wrap">
-        <Button variant="primary"
-          onPress={handleGenerate}
-          isPending={isGenerating}
-        >metricsSettings?.apiKeyConfigured ? <RefreshCwIcon size={16} /> : <KeyIcon size={16} />
+        <Button variant="primary" onPress={handleGenerate} isPending={isGenerating}>
+          metricsSettings?.apiKeyConfigured ? <RefreshCwIcon size={16} /> : <KeyIcon size={16} />
           {metricsSettings?.apiKeyConfigured ? t('rerollButton') : t('generateButton')}
         </Button>
 
         {metricsSettings?.apiKeyConfigured && (
-          <Button variant="danger-soft"
-            onPress={removeModal.open}
-          ><Trash2Icon size={16} />
+          <Button variant="danger-soft" onPress={removeModal.open}>
+            <Trash2Icon size={16} />
             {t('removeButton')}
           </Button>
         )}
@@ -343,56 +360,68 @@ export function MetricsSettingsForm() {
       {togglesSection}
       {thresholdSection}
 
-      <Modal isOpen={rerollModal.isOpen} onOpenChange={(o) => { if (!o) rerollModal.close(); }}>
-        <ModalBackdrop />
-        <ModalContainer>
-          <ModalDialog>
-            {({ close }) => (
-              <>
-                <ModalHeader>
-                  <ModalHeading>{t('confirmReroll.title')}</ModalHeading>
-                </ModalHeader>
-                <ModalBody>
-                  <p>{t('confirmReroll.description')}</p>
-                </ModalBody>
-                <ModalFooter>
-                  <Button variant="ghost" onPress={close}>
-                    {t('confirmReroll.cancel')}
-                  </Button>
-                  <Button variant="tertiary" onPress={() => generateApiKey()} isPending={isGenerating}>
-                    {t('confirmReroll.confirm')}
-                  </Button>
-                </ModalFooter>
-              </>
-            )}
-          </ModalDialog>
-        </ModalContainer>
+      <Modal
+        isOpen={rerollModal.isOpen}
+        onOpenChange={(o) => {
+          if (!o) rerollModal.close();
+        }}
+      >
+        <ModalBackdrop>
+          <ModalContainer>
+            <ModalDialog>
+              {({ close }) => (
+                <>
+                  <ModalHeader>
+                    <ModalHeading>{t('confirmReroll.title')}</ModalHeading>
+                  </ModalHeader>
+                  <ModalBody>
+                    <p>{t('confirmReroll.description')}</p>
+                  </ModalBody>
+                  <ModalFooter>
+                    <Button variant="ghost" onPress={close}>
+                      {t('confirmReroll.cancel')}
+                    </Button>
+                    <Button variant="tertiary" onPress={() => generateApiKey()} isPending={isGenerating}>
+                      {t('confirmReroll.confirm')}
+                    </Button>
+                  </ModalFooter>
+                </>
+              )}
+            </ModalDialog>
+          </ModalContainer>
+        </ModalBackdrop>
       </Modal>
 
-      <Modal isOpen={removeModal.isOpen} onOpenChange={(o) => { if (!o) removeModal.close(); }}>
-        <ModalBackdrop />
-        <ModalContainer>
-          <ModalDialog>
-            {({ close }) => (
-              <>
-                <ModalHeader>
-                  <ModalHeading>{t('confirmRemove.title')}</ModalHeading>
-                </ModalHeader>
-                <ModalBody>
-                  <p>{t('confirmRemove.description')}</p>
-                </ModalBody>
-                <ModalFooter>
-                  <Button variant="ghost" onPress={close}>
-                    {t('confirmRemove.cancel')}
-                  </Button>
-                  <Button variant="danger" onPress={() => deleteApiKey()} isPending={isDeleting}>
-                    {t('confirmRemove.confirm')}
-                  </Button>
-                </ModalFooter>
-              </>
-            )}
-          </ModalDialog>
-        </ModalContainer>
+      <Modal
+        isOpen={removeModal.isOpen}
+        onOpenChange={(o) => {
+          if (!o) removeModal.close();
+        }}
+      >
+        <ModalBackdrop>
+          <ModalContainer>
+            <ModalDialog>
+              {({ close }) => (
+                <>
+                  <ModalHeader>
+                    <ModalHeading>{t('confirmRemove.title')}</ModalHeading>
+                  </ModalHeader>
+                  <ModalBody>
+                    <p>{t('confirmRemove.description')}</p>
+                  </ModalBody>
+                  <ModalFooter>
+                    <Button variant="ghost" onPress={close}>
+                      {t('confirmRemove.cancel')}
+                    </Button>
+                    <Button variant="danger" onPress={() => deleteApiKey()} isPending={isDeleting}>
+                      {t('confirmRemove.confirm')}
+                    </Button>
+                  </ModalFooter>
+                </>
+              )}
+            </ModalDialog>
+          </ModalContainer>
+        </ModalBackdrop>
       </Modal>
     </div>
   );
