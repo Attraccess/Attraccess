@@ -1,6 +1,6 @@
 // Simple single-selection wrapper over HeroUI v3 Select compound component
 // FEATURE: Select utility wrapping v3 compound for consistent single-select API
-import { Select as HeroUiSelect, SelectTrigger, SelectValue, SelectIndicator, SelectPopover, Label, ListBoxItem } from "@heroui/react";
+import { Select as HeroUiSelect, SelectTrigger, SelectValue, SelectIndicator, SelectPopover, ListBox, ListBoxItem, Label } from "@heroui/react";
 import { ReactNode } from 'react';
 
 interface SelectItem {
@@ -40,11 +40,13 @@ export function Select({ selectedKey, onSelectionChange, items, label, placehold
         <SelectIndicator />
       </SelectTrigger>
       <SelectPopover>
-        {items.map((item) => (
-          <ListBoxItem key={item.key} id={item.key} textValue={String(item.label)} data-cy={`select-item-${item.key}`}>
-            {item.label}
-          </ListBoxItem>
-        ))}
+        <ListBox>
+          {items.map((item) => (
+            <ListBoxItem key={item.key} id={item.key} textValue={String(item.label)} data-cy={`select-item-${item.key}`}>
+              {item.label}
+            </ListBoxItem>
+          ))}
+        </ListBox>
       </SelectPopover>
     </HeroUiSelect>
   );
