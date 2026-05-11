@@ -58,14 +58,11 @@ const definitionProviders = [
     ExternalCallTimer,
     SseInstrumentation,
     FlowTimer,
+    WsMetricsInterceptor,
     ...definitionProviders,
     {
       provide: APP_INTERCEPTOR,
       useClass: HttpMetricsInterceptor,
-    },
-    {
-      provide: APP_INTERCEPTOR,
-      useClass: WsMetricsInterceptor,
     },
     {
       provide: METRICS_TOGGLE_INVALIDATOR,
@@ -79,6 +76,7 @@ const definitionProviders = [
     ExternalCallTimer,
     SseInstrumentation,
     FlowTimer,
+    WsMetricsInterceptor,
     HTTP_METRICS,
     WS_METRICS,
     CRON_METRICS,
