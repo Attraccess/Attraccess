@@ -48,9 +48,11 @@ The metrics endpoint is protected by an API key. Prometheus authenticates using 
 1. [Enable the metrics endpoint and generate an API key](monitoring/setup.md)
 2. [Configure Prometheus and Grafana](monitoring/prometheus-grafana.md)
 3. [Explore the available metrics](monitoring/metrics-reference.md)
+4. [Configure alerting and notifications](monitoring/alerting.md)
 
 ## See Also
 
 - [Setup Guide](monitoring/setup.md) -- Enable metrics and generate API keys
 - [Prometheus & Grafana](monitoring/prometheus-grafana.md) -- Configuration and Docker Compose setup
 - [Metrics Reference](monitoring/metrics-reference.md) -- Complete list of all metrics
+- [Alerting](monitoring/alerting.md) -- Configure notifications for the pre-provisioned alert rules
