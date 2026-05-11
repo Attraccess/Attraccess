@@ -8,6 +8,7 @@ import {
   DropdownTrigger,
   DropdownMenu,
   DropdownItem,
+  DropdownPopover,
   Link,
   Accordion,
   AccordionItem,
@@ -18,6 +19,7 @@ import {
   LinkProps,
   Separator,
 } from '@heroui/react';
+import { buttonVariants } from '@heroui/styles';
 import { useAllRoutes } from '../routes';
 import { SystemPermissions } from '@attraccess/react-query-client';
 import de from './sidebar.de.json';
@@ -56,7 +58,7 @@ interface SidebarProps {
 
 export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
   const { logout, user } = useAuth();
-  const { t, setLanguage } = useTranslations({
+  const { t, language, setLanguage } = useTranslations({
     en,
     de,
   });
@@ -274,44 +276,57 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
                 <span>{user.username}</span>
               </div>
               <Dropdown data-cy="sidebar-settings-dropdown">
-                <DropdownTrigger>
-                  <Button variant="ghost" aria-label="Settings" isIconOnly data-cy="sidebar-settings-button">
-                    <Settings className="h-5 w-5" />
-                  </Button>
+                <DropdownTrigger
+                  aria-label="Settings"
+                  data-cy="sidebar-settings-button"
+                  className={buttonVariants({ variant: 'ghost', isIconOnly: true })}
+                >
+                  <Settings className="h-5 w-5" />
                 </DropdownTrigger>
-                <DropdownMenu data-cy="sidebar-settings-dropdown-menu">
-                  <DropdownItem key="language-label" id="language-label" isDisabled><Languages className="h-4 w-4" />
-                    {t('language')}
-                  </DropdownItem>
-                  <DropdownItem
-                    key="language-en" id="language-en"
-                    onPress={() => setLanguage('en')}
-                    data-cy="sidebar-language-en"
-                  >
-                    {t('languages.en')}
-                  language === 'en' ? <Check className="h-4 w-4" /> : null</DropdownItem>
-                  <DropdownItem
-                    key="language-de" id="language-de"
-                    onPress={() => setLanguage('de')}
-                    data-cy="sidebar-language-de"
-                  >
-                    {t('languages.de')}
-                  language === 'de' ? <Check className="h-4 w-4" /> : null</DropdownItem>
-                  <DropdownItem
-                    key="account" id="account"
-                    onPress={() => navigate('/account')}
-                    data-cy="sidebar-account-button"
-                  ><User className="h-4 w-4" />
-                    {t('account')}
-                  </DropdownItem>
-                  <DropdownItem
-                    key="logout" id="logout"
-                    onPress={() => logout()}
-                    data-cy="sidebar-logout-button"
-                  ><LogOut />
-                    {t('logout')}
-                  </DropdownItem>
-                </DropdownMenu>
+                <DropdownPopover>
+                  <DropdownMenu data-cy="sidebar-settings-dropdown-menu">
+                    <DropdownItem key="language-label" id="language-label" isDisabled>
+                      <Languages className="h-4 w-4" />
+                      {t('language')}
+                    </DropdownItem>
+                    <DropdownItem
+                      key="language-en"
+                      id="language-en"
+                      onPress={() => setLanguage('en')}
+                      data-cy="sidebar-language-en"
+                    >
+                      {t('languages.en')}
+                      {language === 'en' ? <Check className="h-4 w-4" /> : null}
+                    </DropdownItem>
+                    <DropdownItem
+                      key="language-de"
+                      id="language-de"
+                      onPress={() => setLanguage('de')}
+                      data-cy="sidebar-language-de"
+                    >
+                      {t('languages.de')}
+                      {language === 'de' ? <Check className="h-4 w-4" /> : null}
+                    </DropdownItem>
+                    <DropdownItem
+                      key="account"
+                      id="account"
+                      onPress={() => navigate('/account')}
+                      data-cy="sidebar-account-button"
+                    >
+                      <User className="h-4 w-4" />
+                      {t('account')}
+                    </DropdownItem>
+                    <DropdownItem
+                      key="logout"
+                      id="logout"
+                      onPress={() => logout()}
+                      data-cy="sidebar-logout-button"
+                    >
+                      <LogOut />
+                      {t('logout')}
+                    </DropdownItem>
+                  </DropdownMenu>
+                </DropdownPopover>
               </Dropdown>
             </div>
           )}

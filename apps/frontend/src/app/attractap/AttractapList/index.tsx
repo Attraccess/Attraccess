@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, AlertContent, AlertDescription, Button, Card, CardContent, CardHeader, Chip, Dropdown, DropdownItem, DropdownMenu, DropdownTrigger, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from '@heroui/react';
+import { Alert, AlertContent, AlertDescription, Button, Card, CardContent, CardHeader, Chip, Dropdown, DropdownItem, DropdownMenu, DropdownPopover, DropdownTrigger, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from '@heroui/react';
+import { buttonVariants } from '@heroui/styles';
 import { ArrowRightIcon, CpuIcon, LogsIcon, MoreVertical, PencilIcon, Trash2Icon } from 'lucide-react';
 import { EmptyState } from '../../../components/emptyState';
 import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -112,28 +113,29 @@ export function AttractapList() {
               <WebSerialConsole>
                 {(onOpenSerialConsole) => (
                   <Dropdown>
-                    <DropdownTrigger>
-                      <Button variant="ghost"><MoreVertical className="w-4 h-4" />
-                        {t('page.actions.menu')}
-                      </Button>
+                    <DropdownTrigger className={buttonVariants({ variant: 'ghost' })}>
+                      <MoreVertical className="w-4 h-4" />
+                      {t('page.actions.menu')}
                     </DropdownTrigger>
-                    <DropdownMenu aria-label="Attractap actions">
-                      <DropdownItem
-                        key="serial-console" id="serial-console"
-                        onPress={onOpenSerialConsole}
-                        data-cy="attractap-list-open-console-button"
-                      ><LogsIcon className="w-4 h-4" />
-                        {t('page.actions.openSerialConsole')}
-                      </DropdownItem>
+                    <DropdownPopover>
+                      <DropdownMenu aria-label="Attractap actions">
+                        <DropdownItem
+                          key="serial-console" id="serial-console"
+                          onPress={onOpenSerialConsole}
+                          data-cy="attractap-list-open-console-button"
+                        ><LogsIcon className="w-4 h-4" />
+                          {t('page.actions.openSerialConsole')}
+                        </DropdownItem>
 
-                      <DropdownItem
-                        key="hardware-setup" id="hardware-setup"
-                        onPress={onOpenHardwareSetup}
-                        data-cy="attractap-list-open-flasher-button"
-                      ><CpuIcon className="w-4 h-4" />
-                        {t('page.actions.openHardwareSetup')}
-                      </DropdownItem>
-                    </DropdownMenu>
+                        <DropdownItem
+                          key="hardware-setup" id="hardware-setup"
+                          onPress={onOpenHardwareSetup}
+                          data-cy="attractap-list-open-flasher-button"
+                        ><CpuIcon className="w-4 h-4" />
+                          {t('page.actions.openHardwareSetup')}
+                        </DropdownItem>
+                      </DropdownMenu>
+                    </DropdownPopover>
                   </Dropdown>
                 )}
               </WebSerialConsole>
