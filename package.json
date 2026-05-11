@@ -48,7 +48,7 @@
     "@sumup/sdk": "^0.1.5",
     "@tailwindcss/typography": "^0.5.19",
     "@tailwindcss/vite": "^4.3.0",
-    "@tanstack/react-query": "^5.100.9",
+    "@tanstack/react-query": "^5.100.10",
     "@types/decompress": "^4.2.7",
     "@types/multer": "^2.1.0",
     "@types/uuid": "^11.0.0",
