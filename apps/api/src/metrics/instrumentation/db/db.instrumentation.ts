@@ -18,14 +18,13 @@ interface ParsedSql {
 const SKIP_VERBS = new Set(['begin', 'commit', 'rollback', 'savepoint', 'release', 'pragma']);
 
 const PATCH_FLAG = '__attraccessDbMetricsPatched';
-const RUNNER_PATCH_FLAG = '__attraccessDbMetricsRunnerPatched';
 
 interface PatchableDriver {
   createQueryRunner: (mode: 'master' | 'slave') => QueryRunner;
   [PATCH_FLAG]?: boolean;
 }
 
-type PatchableRunner = QueryRunner & { [RUNNER_PATCH_FLAG]?: boolean };
+const patchedRunners = new WeakSet<QueryRunner>();
 
 @Injectable()
 export class DbMetricsInstrumentation implements OnModuleInit {
@@ -45,10 +44,11 @@ export class DbMetricsInstrumentation implements OnModuleInit {
     const original = driver.createQueryRunner.bind(driver);
     const observe = this.observe.bind(this);
     driver.createQueryRunner = (mode: 'master' | 'slave') => {
-      const runner = original(mode) as PatchableRunner;
-      if (runner[RUNNER_PATCH_FLAG]) {
+      const runner = original(mode);
+      if (patchedRunners.has(runner)) {
         return runner;
       }
+      patchedRunners.add(runner);
       const originalQuery = runner.query.bind(runner) as (
         sql: string,
         parameters?: unknown[],
@@ -61,7 +61,6 @@ export class DbMetricsInstrumentation implements OnModuleInit {
         }
         return observe(parsed, () => originalQuery(sql, parameters, useStructuredResult));
       }) as unknown as QueryRunner['query'];
-      runner[RUNNER_PATCH_FLAG] = true;
       return runner;
     };
     driver[PATCH_FLAG] = true;
