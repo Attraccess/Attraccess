@@ -1,4 +1,5 @@
-import { Card, CardContent, CardHeader, Input, ListBoxItem, Select, Switch, TextArea } from "@heroui/react";
+import { Card, CardContent, CardHeader, Input, Switch, TextArea } from "@heroui/react";
+import { Select } from '../../../../../components/select';
 import { FormFieldType } from '@attraccess/react-query-client';
 import { EditableFormField, TextFieldOptions, NumberFieldOptions, SelectFieldOptions } from '../types';
 
@@ -70,11 +71,11 @@ function renderPreviewNumber(options: NumberFieldOptions) {
 function renderPreviewSelect(options: SelectFieldOptions, t: (key: string) => string, fieldName: string) {
   const items = options.options ?? [];
   return (
-    <Select placeholder={t('preview.selectPlaceholder')} aria-label={fieldName}>
-      {items.map((option) => (
-        <ListBoxItem key={option} id={option}>{option}</ListBoxItem>
-      ))}
-    </Select>
+    <Select
+      placeholder={t('preview.selectPlaceholder')}
+      aria-label={fieldName}
+      items={items.map((option) => ({ key: option, label: option }))}
+    />
   );
 }
 

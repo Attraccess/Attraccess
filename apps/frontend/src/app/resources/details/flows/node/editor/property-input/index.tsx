@@ -1,5 +1,6 @@
 import { ResourceFlowNodeDto, useBillingServiceGetBillingConfiguration } from '@attraccess/react-query-client';
-import { Autocomplete, Button, Card, CardContent, TextField, Label, Input, ListBoxItem, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalHeader, NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput, Switch, TextArea } from "@heroui/react";
+import { Button, Card, CardContent, TextField, Label, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalHeader, NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput, Switch, TextArea } from "@heroui/react";
+import { Select } from '../../../../../../../components/select';
 import { MqttServerSelect } from '../../../../../../../components/mqttServerSelect';
 import { PlusIcon, XIcon } from 'lucide-react';
 import { TFunction } from '@attraccess/plugins-frontend-ui';
@@ -134,19 +135,16 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
     case 'string':
       if (schema.enum) {
         return (
-          <div className="flex flex-col gap-1">
-            {!hideLabel && <label className="text-sm font-medium">{t('nodes.' + nodeType + '.config.' + name + '.label')}</label>}
-            <Autocomplete
-              defaultSelectedKey={String(value ?? schema.default ?? '')}
-              onSelectionChange={(newValue) => onChange(newValue as TValue)}
-            >
-              {schema.enum.map((enumValue) => (
-                <ListBoxItem key={enumValue} id={enumValue}>
-                  {t('nodes.' + nodeType + '.config.' + name + '.enum.' + enumValue)}
-                </ListBoxItem>
-              ))}
-            </Autocomplete>
-          </div>
+          <Select
+            label={!hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined}
+            aria-label={t('nodes.' + nodeType + '.config.' + name + '.label')}
+            selectedKey={String(value ?? schema.default ?? '')}
+            onSelectionChange={(newValue) => onChange(newValue as TValue)}
+            items={schema.enum.map((enumValue) => ({
+              key: String(enumValue),
+              label: t('nodes.' + nodeType + '.config.' + name + '.enum.' + enumValue),
+            }))}
+          />
         );
       }
 
@@ -181,22 +179,19 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
           value !== undefined ? String(value) : schema.default !== undefined ? String(schema.default) : undefined;
 
         return (
-          <div className="flex flex-col gap-1">
-            {!hideLabel && <label className="text-sm font-medium">{t('nodes.' + nodeType + '.config.' + name + '.label')}</label>}
-            <Autocomplete
-              defaultSelectedKey={selectedKey}
-              onSelectionChange={(newValue) => {
-                if (newValue === null) return;
-                setValue((typeof newValue === 'number' ? newValue : Number(newValue)) as TValue);
-              }}
-            >
-              {enumValues.map((enumValue) => (
-                <ListBoxItem key={String(enumValue)} id={String(enumValue)}>
-                  {t('nodes.' + nodeType + '.config.' + name + '.enum.' + enumValue)}
-                </ListBoxItem>
-              ))}
-            </Autocomplete>
-          </div>
+          <Select
+            label={!hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined}
+            aria-label={t('nodes.' + nodeType + '.config.' + name + '.label')}
+            selectedKey={selectedKey}
+            onSelectionChange={(newValue) => {
+              if (newValue == null) return;
+              setValue(Number(newValue) as TValue);
+            }}
+            items={enumValues.map((enumValue) => ({
+              key: String(enumValue),
+              label: t('nodes.' + nodeType + '.config.' + name + '.enum.' + enumValue),
+            }))}
+          />
         );
       }
 

@@ -1,5 +1,6 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Button, Card, CardHeader, TextField, Label, Input, Checkbox, ListBoxItem, Spinner, Switch, Select } from "@heroui/react";
+import { Button, Card, CardHeader, TextField, Label, Input, Checkbox, Spinner, Switch } from "@heroui/react";
+import { Select } from '../../../components/select';
 import { ArrowLeft } from 'lucide-react';
 import { PasswordInput } from '../../../components/PasswordInput';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -179,19 +180,15 @@ export function EditMqttServerPage() {
                 </label>
               </div>
 
-              <div>
-                <label className="text-sm font-medium">{t('defaultPublishQosLabel')}</label>
-                <Select
-                  onSelectionChange={(key) => {
-                    setFormValues((prev) => ({ ...prev, defaultPublishQos: Number(key) }));
-                  }}
-                  data-cy="edit-mqtt-server-form-default-publish-qos-input"
-                >
-                  {qosOptions.map((option) => (
-                    <ListBoxItem key={String(option)} id={String(option)}>{t(`qosOption.${option}`)}</ListBoxItem>
-                  ))}
-                </Select>
-              </div>
+              <Select
+                label={t('defaultPublishQosLabel')}
+                selectedKey={String(formValues.defaultPublishQos ?? 0)}
+                onSelectionChange={(key) => {
+                  setFormValues((prev) => ({ ...prev, defaultPublishQos: Number(key) }));
+                }}
+                data-cy="edit-mqtt-server-form-default-publish-qos-input"
+                items={qosOptions.map((option) => ({ key: String(option), label: t(`qosOption.${option}`) }))}
+              />
 
               <div className="flex items-center space-x-2">
                 <Switch
@@ -205,19 +202,15 @@ export function EditMqttServerPage() {
                 </Switch>
               </div>
 
-              <div>
-                <label className="text-sm font-medium">{t('defaultSubscribeQosLabel')}</label>
-                <Select
-                  onSelectionChange={(key) => {
-                    setFormValues((prev) => ({ ...prev, defaultSubscribeQos: Number(key) }));
-                  }}
-                  data-cy="edit-mqtt-server-form-default-subscribe-qos-input"
-                >
-                  {qosOptions.map((option) => (
-                    <ListBoxItem key={String(option)} id={String(option)}>{t(`qosOption.${option}`)}</ListBoxItem>
-                  ))}
-                </Select>
-              </div>
+              <Select
+                label={t('defaultSubscribeQosLabel')}
+                selectedKey={String(formValues.defaultSubscribeQos ?? 0)}
+                onSelectionChange={(key) => {
+                  setFormValues((prev) => ({ ...prev, defaultSubscribeQos: Number(key) }));
+                }}
+                data-cy="edit-mqtt-server-form-default-subscribe-qos-input"
+                items={qosOptions.map((option) => ({ key: String(option), label: t(`qosOption.${option}`) }))}
+              />
             </div>
 
             <div className="flex justify-end space-x-3">

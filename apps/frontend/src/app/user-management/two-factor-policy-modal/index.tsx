@@ -5,7 +5,8 @@ import {
   useTwoFactorAuthenticationServiceGetTwoFactorPolicy,
   useTwoFactorAuthenticationServiceSetTwoFactorPolicy,
 } from '@attraccess/react-query-client';
-import { Alert, AlertContent, AlertDescription, AlertTitle, Button, ListBoxItem, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Select, useOverlayState } from '@heroui/react';
+import { Alert, AlertContent, AlertDescription, AlertTitle, Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, useOverlayState } from '@heroui/react';
+import { Select } from '../../../components/select';
 import { Settings2Icon } from 'lucide-react';
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { PageHeader } from '../../../components/pageHeader';
@@ -115,17 +116,22 @@ export function TwoFactorPolicyModal(props: Props) {
                       <AlertDescription>{t('warning.description')}</AlertDescription>
                     </AlertContent>
                   </Alert>
-                  <label className="text-sm font-medium">{t('inputs.policy.label')}</label>
-                  <Select isDisabled={isLoading} selectedKey={selectedPolicy} onSelectionChange={(key) => { if (key) setSelectedPolicy(key as TwoFactorPolicy); }}>
-                    {policyOptions.map((option) => (
-                      <ListBoxItem key={option.value} id={option.value} textValue={option.label}>
+                  <Select
+                    label={t('inputs.policy.label')}
+                    isDisabled={isLoading}
+                    selectedKey={selectedPolicy ?? undefined}
+                    onSelectionChange={(key) => { if (key) setSelectedPolicy(key as TwoFactorPolicy); }}
+                    items={policyOptions.map((option) => ({
+                      key: option.value,
+                      textValue: option.label,
+                      label: (
                         <div className="flex flex-col gap-1">
                           <span>{option.label}</span>
                           <span className="text-xs text-default-500">{option.description}</span>
                         </div>
-                      </ListBoxItem>
-                    ))}
-                  </Select>
+                      ),
+                    }))}
+                  />
                   {selectedOption && <div className="text-sm text-default-500">{selectedOption.description}</div>}
                 </ModalBody>
                 <ModalFooter>

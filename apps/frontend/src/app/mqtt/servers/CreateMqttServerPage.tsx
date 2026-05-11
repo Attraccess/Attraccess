@@ -1,5 +1,6 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Button, Card, CardHeader, TextField, Label, Input, Checkbox, Form, ListBoxItem, Select, SelectTrigger, SelectValue, SelectIndicator, SelectPopover } from "@heroui/react";
+import { Button, Card, CardHeader, TextField, Label, Input, Checkbox, Form } from "@heroui/react";
+import { Select } from '../../../components/select';
 import { ArrowLeft } from 'lucide-react';
 import { PasswordInput } from '../../../components/PasswordInput';
 import { useNavigate } from 'react-router-dom';
@@ -128,17 +129,12 @@ export function CreateMqttServerForm(props?: Readonly<CreateMqttServerPageProps>
       </Checkbox>
 
       <Select
+        label={t('defaultPublishQosLabel')}
+        selectedKey={String(formValues.defaultPublishQos ?? 0)}
         onSelectionChange={(key) => setFormValues((prev) => ({ ...prev, defaultPublishQos: Number(key) }))}
         data-cy="create-mqtt-server-form-default-publish-qos-input"
-      >
-        <Label>{t('defaultPublishQosLabel')}</Label>
-        <SelectTrigger><SelectValue /><SelectIndicator /></SelectTrigger>
-        <SelectPopover>
-          {qosOptions.map((option) => (
-            <ListBoxItem key={String(option)} id={String(option)}>{t(`qosOption.${option}`)}</ListBoxItem>
-          ))}
-        </SelectPopover>
-      </Select>
+        items={qosOptions.map((option) => ({ key: String(option), label: t(`qosOption.${option}`) }))}
+      />
 
       <Checkbox
         id="defaultPublishRetain"
@@ -151,17 +147,12 @@ export function CreateMqttServerForm(props?: Readonly<CreateMqttServerPageProps>
       </Checkbox>
 
       <Select
+        label={t('defaultSubscribeQosLabel')}
+        selectedKey={String(formValues.defaultSubscribeQos ?? 0)}
         onSelectionChange={(key) => setFormValues((prev) => ({ ...prev, defaultSubscribeQos: Number(key) }))}
         data-cy="create-mqtt-server-form-default-subscribe-qos-input"
-      >
-        <Label>{t('defaultSubscribeQosLabel')}</Label>
-        <SelectTrigger><SelectValue /><SelectIndicator /></SelectTrigger>
-        <SelectPopover>
-          {qosOptions.map((option) => (
-            <ListBoxItem key={String(option)} id={String(option)}>{t(`qosOption.${option}`)}</ListBoxItem>
-          ))}
-        </SelectPopover>
-      </Select>
+        items={qosOptions.map((option) => ({ key: String(option), label: t(`qosOption.${option}`) }))}
+      />
 
       <div className="flex justify-end space-x-3 mt-4">
         <Button variant="secondary" onPress={handleCancel} data-cy="create-mqtt-server-form-cancel-button">

@@ -6,11 +6,13 @@ import { ReactNode } from 'react';
 interface SelectItem {
   key: string;
   label: ReactNode;
+  textValue?: string;
 }
 
 export interface Props {
-  selectedKey: string;
-  onSelectionChange: (key: string) => unknown;
+  selectedKey?: string;
+  defaultSelectedKey?: string;
+  onSelectionChange?: (key: string) => unknown;
   items: SelectItem[];
   label?: ReactNode;
   placeholder?: string;
@@ -22,11 +24,12 @@ export interface Props {
   isLoading?: boolean;
 }
 
-export function Select({ selectedKey, onSelectionChange, items, label, placeholder, className, isDisabled, isRequired, 'aria-label': ariaLabel, 'data-cy': dataCy }: Props) {
+export function Select({ selectedKey, defaultSelectedKey, onSelectionChange, items, label, placeholder, className, isDisabled, isRequired, 'aria-label': ariaLabel, 'data-cy': dataCy }: Props) {
   return (
     <HeroUiSelect<SelectItem>
       selectedKey={selectedKey}
-      onSelectionChange={(key) => onSelectionChange(key as string)}
+      defaultSelectedKey={defaultSelectedKey}
+      onSelectionChange={(key) => onSelectionChange?.(key as string)}
       placeholder={placeholder}
       isDisabled={isDisabled}
       isRequired={isRequired}
@@ -42,7 +45,7 @@ export function Select({ selectedKey, onSelectionChange, items, label, placehold
       <SelectPopover>
         <ListBox>
           {items.map((item) => (
-            <ListBoxItem key={item.key} id={item.key} textValue={String(item.label)} data-cy={`select-item-${item.key}`}>
+            <ListBoxItem key={item.key} id={item.key} textValue={item.textValue ?? (typeof item.label === 'string' ? item.label : item.key)} data-cy={`select-item-${item.key}`}>
               {item.label}
             </ListBoxItem>
           ))}
