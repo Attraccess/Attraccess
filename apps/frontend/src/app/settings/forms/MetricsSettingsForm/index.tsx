@@ -24,7 +24,6 @@ import {
   Spinner,
   Tooltip,
   TooltipContent,
-  TooltipTrigger,
   useOverlayState,
 } from '@heroui/react';
 import { AlertTriangleIcon, ClipboardCopyIcon, KeyIcon, RefreshCwIcon, Trash2Icon } from 'lucide-react';
@@ -274,11 +273,9 @@ export function MetricsSettingsForm() {
       <InputGroup>
         <Input className="font-mono text-sm" />
         <Tooltip>
-          <TooltipTrigger>
-            <Button variant="ghost" isIconOnly onPress={handleCopyEndpoint} aria-label={t('copyButton')}>
-              <ClipboardCopyIcon size={16} />
-            </Button>
-          </TooltipTrigger>
+          <Button variant="ghost" isIconOnly onPress={handleCopyEndpoint} aria-label={t('copyButton')}>
+            <ClipboardCopyIcon size={16} />
+          </Button>
           <TooltipContent>{t('copyButton')}</TooltipContent>
         </Tooltip>
       </InputGroup>
@@ -312,11 +309,9 @@ export function MetricsSettingsForm() {
           <InputGroup>
             <Input className="font-mono text-sm" />
             <Tooltip>
-              <TooltipTrigger>
-                <Button variant="ghost" isIconOnly onPress={handleCopyKey} aria-label={t('copyButton')}>
-                  <ClipboardCopyIcon size={16} />
-                </Button>
-              </TooltipTrigger>
+              <Button variant="ghost" isIconOnly onPress={handleCopyKey} aria-label={t('copyButton')}>
+                <ClipboardCopyIcon size={16} />
+              </Button>
               <TooltipContent>{t('copyButton')}</TooltipContent>
             </Tooltip>
           </InputGroup>
