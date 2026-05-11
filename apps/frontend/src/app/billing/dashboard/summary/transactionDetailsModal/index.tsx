@@ -12,6 +12,7 @@ import {
   TableBody,
   TableCell,
   TableColumn,
+  TableContent,
   TableHeader,
   TableRow,
   useOverlayState,
@@ -190,7 +191,8 @@ export function TransactionDetailsModal(props: Props) {
 
                         <div>
                           <div className="mb-2 font-semibold">{t('items.title')}</div>
-                          <Table aria-label="Transaction items">
+                          <Table>
+                            <TableContent aria-label="Transaction items">
                             <TableHeader>
                               <TableColumn>{t('items.columns.name')}</TableColumn>
                               <TableColumn>{t('items.columns.description')}</TableColumn>
@@ -229,6 +231,7 @@ export function TransactionDetailsModal(props: Props) {
                                 </TableRow>
                               ))}
                             </TableBody>
+                            </TableContent>
                           </Table>
                           <div className="mt-2 flex justify-end text-small text-default-500">
                             <div>

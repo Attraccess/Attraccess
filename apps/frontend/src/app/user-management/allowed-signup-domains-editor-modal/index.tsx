@@ -23,6 +23,7 @@ import {
   TableBody,
   TableCell,
   TableColumn,
+  TableContent,
   TableHeader,
   TableRow,
   TextField,
@@ -152,7 +153,8 @@ export function AllowedSignupDomainsEditorModal(props: Props) {
                       </InputGroup>
                     </TextField>
 
-                    <Table aria-label={t('table.ariaLabel')}>
+                    <Table>
+                      <TableContent aria-label={t('table.ariaLabel')}>
                       <TableHeader>
                         <TableColumn>{t('table.columns.domain')}</TableColumn>
                         <TableColumn>{t('table.columns.actions')}</TableColumn>
@@ -173,6 +175,7 @@ export function AllowedSignupDomainsEditorModal(props: Props) {
                           </TableRow>
                         )}
                       </TableBody>
+                      </TableContent>
                     </Table>
                   </ModalBody>
 

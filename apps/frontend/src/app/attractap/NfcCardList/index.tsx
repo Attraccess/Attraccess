@@ -14,6 +14,7 @@ import {
   TableBody,
   TableCell,
   TableColumn,
+  TableContent,
   TableHeader,
   TableRow,
   cn,
@@ -326,7 +327,8 @@ export function NfcCardList() {
         cardId={cardToDeleteId}
       />
 
-      <Table aria-label={t('nfcCards')} data-cy="nfc-card-list-table">
+      <Table data-cy="nfc-card-list-table">
+        <TableContent aria-label={t('nfcCards')}>
         <TableHeader>
           {headers.map((header) => (
             <TableColumn key={header} id={header}>
@@ -349,6 +351,7 @@ export function NfcCardList() {
             </TableRow>
           )}
         </TableBody>
+        </TableContent>
       </Table>
     </>
   );

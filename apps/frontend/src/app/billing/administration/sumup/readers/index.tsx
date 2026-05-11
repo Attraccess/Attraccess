@@ -11,6 +11,7 @@ import {
   TableBody,
   TableCell,
   TableColumn,
+  TableContent,
   TableHeader,
   TableRow,
 } from '@heroui/react';
@@ -58,7 +59,8 @@ export function SumUpReadersCard(props: Omit<CardProps, 'children'>) {
       </CardHeader>
 
       <CardContent>
-        <Table aria-label={t('table.ariaLabel')}>
+        <Table>
+          <TableContent aria-label={t('table.ariaLabel')}>
           <TableHeader>
             <TableColumn>{t('table.columns.name')}</TableColumn>
             <TableColumn>{t('table.columns.device')}</TableColumn>
@@ -90,6 +92,7 @@ export function SumUpReadersCard(props: Omit<CardProps, 'children'>) {
               </TableRow>
             )}
           </TableBody>
+          </TableContent>
         </Table>
       </CardContent>
     </Card>

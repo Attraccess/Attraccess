@@ -9,6 +9,7 @@ import {
   TableBody,
   TableCell,
   TableColumn,
+  TableContent,
   TableHeader,
   TableRow,
 } from '@heroui/react';
@@ -300,7 +301,8 @@ export function CsvInvite({ onSuccess, onError }: Props) {
         </div>
       ))}
 
-      <Table aria-label="csv-invite-table" data-cy="csv-invite-table">
+      <Table data-cy="csv-invite-table">
+        <TableContent aria-label="csv-invite-table">
         <TableHeader>
           <TableColumn>{t('preview.columns.index')}</TableColumn>
           <TableColumn>{t('preview.columns.username')}</TableColumn>
@@ -321,6 +323,7 @@ export function CsvInvite({ onSuccess, onError }: Props) {
             </TableRow>
           )}
         </TableBody>
+        </TableContent>
       </Table>
 
       {rowErrors.length > 0 && (
@@ -334,7 +337,8 @@ export function CsvInvite({ onSuccess, onError }: Props) {
             </Button>
           </div>
 
-          <Table aria-label="csv-invite-errors">
+          <Table>
+            <TableContent aria-label="csv-invite-errors">
             <TableHeader>
               <TableColumn>{t('errors.columns.row')}</TableColumn>
               <TableColumn>{t('errors.columns.field')}</TableColumn>
@@ -351,6 +355,7 @@ export function CsvInvite({ onSuccess, onError }: Props) {
                 </TableRow>
               )}
             </TableBody>
+            </TableContent>
           </Table>
         </div>
       )}

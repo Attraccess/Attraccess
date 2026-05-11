@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, AlertContent, AlertDescription, Button, Card, CardContent, CardHeader, Chip, Dropdown, DropdownItem, DropdownMenu, DropdownPopover, DropdownTrigger, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from '@heroui/react';
+import { Alert, AlertContent, AlertDescription, Button, Card, CardContent, CardHeader, Chip, Dropdown, DropdownItem, DropdownMenu, DropdownPopover, DropdownTrigger, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow } from '@heroui/react';
 import { buttonVariants } from '@heroui/styles';
 import { ArrowRightIcon, CpuIcon, LogsIcon, MoreVertical, PencilIcon, Trash2Icon } from 'lucide-react';
 import { EmptyState } from '../../../components/emptyState';
@@ -169,10 +169,9 @@ export function AttractapList() {
             </CardHeader>
             <CardContent>
               <Table
-                aria-label={`${tableIndex === 0 ? 'active' : 'stale'} attractaps`}
                 data-cy={`attractap-list-table-${tableIndex === 0 ? 'active' : 'stale'}`}
-
               >
+                <TableContent aria-label={`${tableIndex === 0 ? 'active' : 'stale'} attractaps`}>
                 <TableHeader>
                   <TableColumn>{t('table.columns.name')}</TableColumn>
                   <TableColumn>{t('table.columns.type')}</TableColumn>
@@ -216,6 +215,7 @@ export function AttractapList() {
                     </TableRow>
                   )}
                 </TableBody>
+                </TableContent>
               </Table>
             </CardContent>
           </Card>
