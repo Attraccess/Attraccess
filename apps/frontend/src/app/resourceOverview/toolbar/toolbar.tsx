@@ -1,5 +1,5 @@
 import { Button, TextField, InputGroup } from '@heroui/react';
-import { SearchIcon, PlusIcon } from 'lucide-react';
+import { ListFilterIcon, PlusIcon, ScanQrCodeIcon, SearchIcon } from 'lucide-react';
 import { useAuth } from '../../../hooks/useAuth';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { ResourceEditModal } from '../../resources/editModal/resourceEditModal';
@@ -52,7 +52,11 @@ export function Toolbar({
                   hideEmptyResourceGroups={filterProps.hideEmptyResourceGroups}
                   onHideEmptyResourceGroupsChanged={filterProps.onHideEmptyResourceGroupsChanged}
                 >
-                  {({ onOpen }) => <Button variant="ghost" isIconOnly onPress={onOpen} />}
+                  {({ onOpen }) => (
+                    <Button variant="ghost" isIconOnly onPress={onOpen}>
+                      <ListFilterIcon size={18} className={cn(highlightFilter && 'animate-pulse')} />
+                    </Button>
+                  )}
                 </ResourceFilter>
                 <SearchIcon size={18} />
               </InputGroup.Prefix>
@@ -63,7 +67,9 @@ export function Toolbar({
 
         <ResourceScanner>
           {(onOpen: () => void) => (
-            <Button variant="ghost" onPress={onOpen} isIconOnly />
+            <Button variant="ghost" onPress={onOpen} isIconOnly>
+              <ScanQrCodeIcon />
+            </Button>
           )}
         </ResourceScanner>
       </div>
@@ -73,12 +79,8 @@ export function Toolbar({
           <div className="flex items-center gap-2 mr-1 hidden md:flex">
             <ResourceEditModal onUpdated={(resource) => navigate(`/resources/${resource.id}`)} closeOnSuccess>
               {(onOpen: () => void) => (
-                <Button variant="primary"
-
-                  onPress={onOpen}
-
-                  data-cy="toolbar-open-create-resource-modal-button"
-                ><PlusIcon size={18} />
+                <Button variant="primary" onPress={onOpen} data-cy="toolbar-open-create-resource-modal-button">
+                  <PlusIcon size={18} />
                   {t('addResource')}
                 </Button>
               )}

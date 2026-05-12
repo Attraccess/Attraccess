@@ -49,7 +49,7 @@ export function SumUpReadersCard(props: Omit<CardProps, 'children'>) {
           actions={
             <SumUpReadersPairing>
               {(onOpen) => (
-                <Button variant="primary" onPress={onOpen}>
+                <Button variant="primary" onPress={onOpen}><Trash2Icon className="w-4 h-4" />
                   {t('actions.pairReader')}
                 </Button>
               )}

@@ -1,6 +1,6 @@
 import { useEmailTemplatesServiceEmailTemplateControllerFindAll } from '@attraccess/react-query-client';
 import { Table, TableContent, TableHeader, TableColumn, TableBody, TableRow, TableCell, Button } from '@heroui/react';
-import { Mail } from 'lucide-react';
+import { Edit3, Mail } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PageHeader } from '../../components/pageHeader'; // Assuming PageHeader exists
 import { EmptyState } from '../../components/emptyState';
@@ -24,7 +24,7 @@ export function EmailTemplatesPage() {
 
           isIconOnly
           aria-label={t('editButton')}
-        />
+        ><Edit3 size={18} /></Button>
       ),
     }));
   }, [emailTemplates, t]);

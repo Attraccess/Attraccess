@@ -24,7 +24,7 @@ import {
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import de from './de.json';
 import en from './en.json';
-import { CalendarClockIcon, PlusIcon } from 'lucide-react';
+import { CalendarClockIcon, PencilIcon, PlusIcon, TrashIcon } from 'lucide-react';
 import { EmptyState } from '../../../../components/emptyState';
 import { useQueryClient } from '@tanstack/react-query';
 import { MaintenanceScheduleUpsertModal } from './upsert';
@@ -109,11 +109,8 @@ export function MaintenanceSchedules(props: Props & Omit<CardProps, 'children'>)
           actions={
             <MaintenanceScheduleUpsertModal resourceId={resourceId}>
               {(open: () => void) => (
-                <Button variant="primary"
-                  onPress={open}
-
-                 
-                ><PlusIcon className="w-4 h-4" />
+                <Button variant="primary" onPress={open}>
+                  <PlusIcon className="w-4 h-4" />
                   {t('actions.add')}
                 </Button>
               )}
@@ -152,20 +149,16 @@ export function MaintenanceSchedules(props: Props & Omit<CardProps, 'children'>)
                 <TableCell>
                   <MaintenanceScheduleUpsertModal resourceId={resourceId} scheduleId={schedule.id}>
                     {(open: () => void) => (
-                      <Button variant="ghost"
-                        onPress={open}
-                        isIconOnly
-                       
-                      />
+                      <Button variant="ghost" onPress={open} isIconOnly>
+                        <PencilIcon className="w-4 h-4" />
+                      </Button>
                     )}
                   </MaintenanceScheduleUpsertModal>
                   <ScheduleDeleteModal resourceId={resourceId} schedule={schedule}>
                     {(open: () => void) => (
-                      <Button variant="danger-soft"
-                        onPress={open}
-                        isIconOnly
-                       
-                      />
+                      <Button variant="danger-soft" onPress={open} isIconOnly>
+                        <TrashIcon className="w-4 h-4" />
+                      </Button>
                     )}
                   </ScheduleDeleteModal>
                 </TableCell>

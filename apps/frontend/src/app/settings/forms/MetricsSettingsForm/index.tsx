@@ -247,22 +247,22 @@ export function MetricsSettingsForm() {
           <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
           <NumberFieldInput />
           <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
-          <Button
-            variant="primary"
-            size="sm"
-            onPress={handleSaveThreshold}
-            isPending={isSavingThreshold}
-            isDisabled={
-              thresholdInput === undefined ||
-              Number.isNaN(thresholdInput) ||
-              thresholdInput < 0 ||
-              thresholdInput === metricsSettings.slowQueryThresholdSeconds
-            }
-          >
-            {t('slowQueryThreshold.saveButton')}
-          </Button>
         </NumberFieldGroup>
       </NumberField>
+      <Button
+        variant="primary"
+        size="sm"
+        onPress={handleSaveThreshold}
+        isPending={isSavingThreshold}
+        isDisabled={
+          thresholdInput === undefined ||
+          Number.isNaN(thresholdInput) ||
+          thresholdInput < 0 ||
+          thresholdInput === metricsSettings.slowQueryThresholdSeconds
+        }
+      >
+        {t('slowQueryThreshold.saveButton')}
+      </Button>
     </div>
   ) : null;
 

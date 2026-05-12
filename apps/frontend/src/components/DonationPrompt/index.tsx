@@ -96,7 +96,7 @@ export function DonationPrompt() {
       isOpen={isVisible}
       onOpenChange={(open) => setIsVisible(open)}
     >
-      <DrawerBackdrop isDismissable={false} />
+      <DrawerBackdrop variant="blur" isDismissable={false} />
       <DrawerContent placement="bottom" className="w-full max-w-[680px] mx-auto">
         <DrawerHeader className="flex flex-col gap-1">
           <div className="text-base font-semibold">{t('title')}</div>

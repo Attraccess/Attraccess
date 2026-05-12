@@ -20,16 +20,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@heroui/react';
-import {
-  Users,
-  ShieldOffIcon,
-  ShieldCheckIcon,
-  Settings2Icon,
-  UserPlusIcon,
-  WrenchIcon,
-  CreditCardIcon,
-  KeyIcon,
-} from 'lucide-react';
+import { CreditCardIcon, KeyIcon, Settings2Icon, ShieldCheckIcon, ShieldOffIcon, UserPlusIcon, Users, WrenchIcon } from 'lucide-react';
 import {
   SSOProvider,
   User,
@@ -104,7 +95,8 @@ export const UserManagementPage: React.FC = () => {
           <>
             <InviteUserModal>
               {(onOpen) => (
-                <Button variant="ghost" onPress={onOpen}><UserPlusIcon className="w-4 h-4" />
+                <Button variant="ghost" onPress={onOpen}>
+                  <UserPlusIcon className="w-4 h-4" />
                   {t('actions.inviteUser')}
                 </Button>
               )}
@@ -121,7 +113,8 @@ export const UserManagementPage: React.FC = () => {
             </TwoFactorPolicyModal>
             <AllowedSignupDomainsEditorModal>
               {(onOpen) => (
-                <Button variant="ghost" onPress={onOpen}><Settings2Icon className="w-4 h-4" />
+                <Button variant="ghost" onPress={onOpen}>
+                  <Settings2Icon className="w-4 h-4" />
                   {t('actions.editAllowedSignupDomains')}
                 </Button>
               )}

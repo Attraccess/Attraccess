@@ -146,7 +146,7 @@ const NfcCardTableCell = (props: NfcCardTableCellProps) => {
                 variant="tertiary"
                 onPress={onOpen}
                 data-cy={`nfc-card-table-cell-deactivate-button-${props.card.id}`}
-              >
+              ><CheckIcon />
                 <XIcon />
                 {t('nfcCardsTable.actions.deactivate')}
               </Button>
@@ -159,7 +159,7 @@ const NfcCardTableCell = (props: NfcCardTableCellProps) => {
                 variant="tertiary"
                 onPress={onOpen}
                 data-cy={`nfc-card-table-cell-activate-button-${props.card.id}`}
-              >
+              ><XIcon />
                 <CheckIcon />
                 {t('nfcCardsTable.actions.activate')}
               </Button>

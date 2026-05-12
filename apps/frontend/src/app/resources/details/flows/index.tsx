@@ -18,6 +18,14 @@ import { useTheme } from '@heroui/react';
 import { usePtrStore } from '../../../../stores/ptr.store';
 import Dagre from '@dagrejs/dagre';
 import { Button } from '@heroui/react';
+import {
+  DownloadIcon,
+  LayoutGridIcon,
+  LogsIcon,
+  PlusIcon,
+  SaveIcon,
+  UploadIcon,
+} from 'lucide-react';
 import { nanoid } from 'nanoid';
 import { NodePickerModal } from './nodePickerModal';
 import { FlowProvider, useFlowContext } from './flowContext';
@@ -371,31 +379,42 @@ function FlowsPageInner() {
           <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
 
           <Panel position="top-right" className="flex flex-row flex-wrap gap-2">
-            {/* TODO(heroui-v3): map dynamic color/variant to new variant prop */}
             <Button
               isIconOnly
               isPending={isSaving}
               onPress={save}
               isDisabled={!flowHasChanged}
               variant={saveFailed ? 'danger-soft' : flowHasChanged ? 'primary' : 'ghost'}
-            />
-            <Button isIconOnly onPress={handleImportClick} aria-label={t('actions.import')} />
-            <Button
-              isIconOnly
-              onPress={handleExport}
-              aria-label={t('actions.export')}
-            />
+            >
+              <SaveIcon />
+            </Button>
+            <Button isIconOnly onPress={handleImportClick} aria-label={t('actions.import')}>
+              <UploadIcon />
+            </Button>
+            <Button isIconOnly onPress={handleExport} aria-label={t('actions.export')}>
+              <DownloadIcon />
+            </Button>
             <LogViewer resourceId={Number(resourceId)}>
-              {(open) => <Button isIconOnly onPress={open} />}
+              {(open) => (
+                <Button isIconOnly onPress={open}>
+                  <LogsIcon />
+                </Button>
+              )}
             </LogViewer>
 
-            <Button isIconOnly onPress={layout} />
+            <Button isIconOnly onPress={layout}>
+              <LayoutGridIcon />
+            </Button>
             <NodePickerModal
               tNodeTranslations={tNodeTranslations}
               onSelect={addStartNode}
               resourceId={Number(resourceId)}
             >
-              {(open) => <Button variant="primary" isIconOnly onPress={open} />}
+              {(open) => (
+                <Button variant="primary" isIconOnly onPress={open}>
+                  <PlusIcon />
+                </Button>
+              )}
             </NodePickerModal>
           </Panel>
         </ReactFlow>

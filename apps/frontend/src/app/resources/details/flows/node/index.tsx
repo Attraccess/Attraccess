@@ -3,7 +3,7 @@ import { ResourceFlowLogType, ResourceFlowNodeSchemaDto } from '@attraccess/reac
 import { NodeProps } from '@xyflow/react';
 import { Button, Card, CardContent, CardHeader, cn, Tooltip, TooltipContent, TooltipTrigger, useOverlayState } from '@heroui/react';
 import { Handle, NodeToolbar, Position, useNodeId } from '@xyflow/react';
-import { TriangleAlertIcon } from 'lucide-react';
+import { Edit2Icon, Trash2Icon, TriangleAlertIcon } from 'lucide-react';
 import { useFlowContext } from '../flowContext';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { DeleteConfirmationModal } from '../../../../../components/deleteConfirmationModal';
@@ -167,14 +167,12 @@ export function AttraccessNode(props: Props) {
           <NodeToolbar isVisible={data?.forceToolbarVisible || undefined} position={data?.toolbarPosition}>
             <div className="flex flex-row gap-2">
               {isEditable && (
-                <Button isIconOnly onPress={openEditor} />
+                <Button isIconOnly onPress={openEditor} ><Edit2Icon size={12} /></Button>
               )}
               {!previewMode && (
-                <Button variant="danger"
-                  isIconOnly
-
-                  onPress={userWantsToDelete}
-                />
+                <Button variant="danger" isIconOnly onPress={userWantsToDelete}>
+                  <Trash2Icon size={12} />
+                </Button>
               )}
             </div>
           </NodeToolbar>

@@ -30,7 +30,7 @@ import {
 } from '@heroui/react';
 import { EmptyState } from '../../../components/emptyState';
 import { PageHeader } from '../../../components/pageHeader';
-import { Settings2Icon, Trash2Icon } from 'lucide-react';
+import { PlusIcon, Settings2Icon, Trash2Icon } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import en from './en.json';
 import de from './de.json';
@@ -149,7 +149,7 @@ export function AllowedSignupDomainsEditorModal(props: Props) {
                           }}
                         />
                         <InputGroup.Suffix>
-                          <Button variant="ghost" onPress={onAddDomain} isIconOnly />
+                          <Button variant="ghost" onPress={onAddDomain} isIconOnly ><PlusIcon /></Button>
                         </InputGroup.Suffix>
                       </InputGroup>
                     </TextField>

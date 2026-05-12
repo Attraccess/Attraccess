@@ -24,7 +24,7 @@ import de from './de.json';
 import en from './en.json';
 import { ResourceMaintenanceUpsertModal } from './upsert';
 import { MarkDoneModal } from './mark-done';
-import { CogIcon, ConstructionIcon, PlusIcon } from 'lucide-react';
+import { CheckCircleIcon, CogIcon, ConstructionIcon, PlusIcon } from 'lucide-react';
 import { useNow } from '../../../../hooks/useNow';
 import { EmptyState } from '../../../../components/emptyState';
 
@@ -150,7 +150,7 @@ export function MaintenanceManagement(props: Props & Omit<CardProps, 'children'>
                           isIconOnly
                          
                           onPress={openMarkDone}
-                        />
+                        ><CheckCircleIcon className="w-4 h-4" /></Button>
                       )}
                     </MarkDoneModal>
                   )}

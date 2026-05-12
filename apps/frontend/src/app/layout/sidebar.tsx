@@ -9,14 +9,13 @@ import {
   DropdownMenu,
   DropdownItem,
   DropdownPopover,
-  Link,
   Accordion,
   AccordionItem,
   AccordionHeading,
   AccordionTrigger,
+  AccordionIndicator,
   AccordionPanel,
   AccordionBody,
-  LinkProps,
   Separator,
 } from '@heroui/react';
 import { buttonVariants } from '@heroui/styles';
@@ -26,28 +25,43 @@ import de from './sidebar.de.json';
 import en from './sidebar.en.json';
 import { Logo } from '../../components/logo';
 import { SidebarItem, SidebarItemGroup, useSidebarItems, useSidebarEndItems } from './sidebarItems';
-import { useNavigate } from 'react-router-dom';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
 
-function NavLink(
-  props: Omit<LinkProps, 'children'> & {
-    label: string;
-    icon: React.ReactNode;
-    isExternal?: boolean;
-    'data-cy'?: string;
-  },
-) {
+interface NavLinkProps {
+  href: string;
+  label: string;
+  icon: React.ReactNode;
+  isExternal?: boolean;
+  target?: string;
+  'data-cy'?: string;
+}
+
+function NavLink({ href, label, icon, isExternal, target, ...rest }: NavLinkProps) {
+  const resolvedTarget = target ?? (isExternal ? '_blank' : undefined);
+  const className =
+    'flex items-center px-2 py-2 rounded-md text-sm text-default-foreground no-underline hover:bg-default hover:text-default-foreground';
+
+  if (isExternal) {
+    return (
+      <a
+        {...rest}
+        href={href}
+        target={resolvedTarget}
+        rel={resolvedTarget === '_blank' ? 'noreferrer' : undefined}
+        className={className}
+      >
+        <span className="mr-3">{icon}</span>
+        <span className="flex-1">{label}</span>
+        <ExternalLink className="ml-2 h-4 w-4" />
+      </a>
+    );
+  }
+
   return (
-    <Link
-      {...props}
-      target={(props.target ?? props.isExternal) ? '_blank' : undefined}
-      className="flex items-center px-2 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700"
-      
-     
-    >
-      <span className="mr-3">{props.icon}</span>
-      <span className="flex-1">{props.label}</span>
-      {props.isExternal && <ExternalLink className="ml-2" />}
-    </Link>
+    <RouterLink {...rest} to={href} target={resolvedTarget} className={className}>
+      <span className="mr-3">{icon}</span>
+      <span className="flex-1">{label}</span>
+    </RouterLink>
   );
 }
 
@@ -201,7 +215,13 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
                   key={group.translationKey} id={group.translationKey}
                 >
                   <AccordionHeading>
-                    <AccordionTrigger><group.icon size={16} />{t('groups.' + group.translationKey + '.label')}</AccordionTrigger>
+                    <AccordionTrigger>
+                      <span className="flex items-center gap-2">
+                        <group.icon size={16} />
+                        {t('groups.' + group.translationKey + '.label')}
+                      </span>
+                      <AccordionIndicator />
+                    </AccordionTrigger>
                   </AccordionHeading>
                   <AccordionPanel>
                     <AccordionBody>
@@ -232,7 +252,13 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
                   className="text-sm"
                 >
                   <AccordionHeading>
-                    <AccordionTrigger><group.icon size={16} />{t('endItems.groups.' + group.translationKey + '.label')}</AccordionTrigger>
+                    <AccordionTrigger>
+                      <span className="flex items-center gap-2">
+                        <group.icon size={16} />
+                        {t('endItems.groups.' + group.translationKey + '.label')}
+                      </span>
+                      <AccordionIndicator />
+                    </AccordionTrigger>
                   </AccordionHeading>
                   <AccordionPanel>
                     <AccordionBody>

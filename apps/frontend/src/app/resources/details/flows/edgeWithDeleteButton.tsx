@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo } from 'react';
 import { BaseEdge, EdgeLabelRenderer, getBezierPath, useReactFlow, type EdgeProps } from '@xyflow/react';
 import { Button } from '@heroui/react';
+import { Trash2Icon } from 'lucide-react';
 
 export function EdgeWithDeleteButton(props: EdgeProps) {
   const {
@@ -50,7 +51,7 @@ export function EdgeWithDeleteButton(props: EdgeProps) {
             }}
             onPress={removeEdge}
             isIconOnly
-          />
+          ><Trash2Icon /></Button>
         )}
       </EdgeLabelRenderer>
     </>
