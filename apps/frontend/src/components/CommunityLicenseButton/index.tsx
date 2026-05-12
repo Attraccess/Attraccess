@@ -2,6 +2,7 @@ import {
   Alert,
   AlertContent,
   AlertDescription,
+  AlertIndicator,
   Button,
   Modal,
   ModalBackdrop,
@@ -12,7 +13,7 @@ import {
   ModalHeader,
   useOverlayState,
 } from '@heroui/react';
-import { HeartHandshakeIcon } from 'lucide-react';
+import { AlertTriangleIcon, HeartHandshakeIcon } from 'lucide-react';
 import { I18nTransComponent, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
@@ -80,6 +81,9 @@ export function CommunityLicenseButton({ onAccept, isDisabled, ...rest }: Commun
                       />
                     </p>
                     <Alert status="warning">
+                      <AlertIndicator>
+                        <AlertTriangleIcon />
+                      </AlertIndicator>
                       <AlertContent>
                         <AlertDescription>{t('modal.commercialNotice')}</AlertDescription>
                       </AlertContent>

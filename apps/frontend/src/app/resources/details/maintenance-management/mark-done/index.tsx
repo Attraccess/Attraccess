@@ -3,6 +3,7 @@ import {
   Alert,
   AlertContent,
   AlertDescription,
+  AlertIndicator,
   Button,
   Form,
   Modal,
@@ -24,6 +25,7 @@ import {
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useRef, useState } from 'react';
+import { AlertCircleIcon } from 'lucide-react';
 
 interface Props {
   resourceId: number;
@@ -102,6 +104,9 @@ export function MarkDoneModal(props: Props) {
                       />
                       {error ? (
                         <Alert status="danger">
+                          <AlertIndicator>
+                            <AlertCircleIcon />
+                          </AlertIndicator>
                           <AlertContent>
                             <AlertDescription>{(error as Error).message}</AlertDescription>
                           </AlertContent>

@@ -1,4 +1,5 @@
 {
+  "workInProgressAlertTitle": "Work in progress",
   "workInProgressAlert": "This feature is still under development and will be available soon.",
   "title": "Installed Plugins",
   "uploadButton": "Upload Plugin",

@@ -1,5 +1,5 @@
-import { Alert, AlertContent, AlertDescription, Separator, Spinner } from '@heroui/react';
-import { Users } from 'lucide-react';
+import { Alert, AlertContent, AlertDescription, AlertIndicator, Separator, Spinner } from '@heroui/react';
+import { AlertTriangleIcon, Users } from 'lucide-react';
 import { useTranslations, AttraccessUser } from '@attraccess/plugins-frontend-ui';
 import { useAccessControlServiceResourceIntroducersGetMany } from '@attraccess/react-query-client';
 import en from './translations/en.json';
@@ -28,6 +28,9 @@ export function IntroductionRequiredDisplay({ resourceId }: Readonly<Introductio
   return (
     <div className="space-y-4">
       <Alert status="warning">
+        <AlertIndicator>
+          <AlertTriangleIcon />
+        </AlertIndicator>
         <AlertContent>
           <AlertDescription>{t('needsIntroduction')}</AlertDescription>
         </AlertContent>

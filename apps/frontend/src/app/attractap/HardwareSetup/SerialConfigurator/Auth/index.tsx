@@ -1,5 +1,6 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Alert, AlertContent, AlertDescription, Button, Input, Label, ProgressCircle, ProgressCircleFillCircle, ProgressCircleTrack, ProgressCircleTrackCircle, TextField } from '@heroui/react';
+import { Alert, AlertContent, AlertDescription, AlertIndicator, Button, Input, Label, ProgressCircle, ProgressCircleFillCircle, ProgressCircleTrack, ProgressCircleTrackCircle, TextField } from '@heroui/react';
+import { AlertCircleIcon } from 'lucide-react';
 import {
   createContext,
   useCallback,
@@ -254,6 +255,9 @@ export function AttractapSerialCommGate({ children }: PropsWithChildren) {
           <Input maxLength={4} inputMode="numeric" required />
         </TextField>
         {error && <Alert status="danger">
+          <AlertIndicator>
+            <AlertCircleIcon />
+          </AlertIndicator>
           <AlertContent>
             <AlertDescription>{error}</AlertDescription>
           </AlertContent>

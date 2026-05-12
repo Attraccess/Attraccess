@@ -3,6 +3,7 @@ import {
   Alert,
   AlertContent,
   AlertDescription,
+  AlertIndicator,
   Button,
   Modal,
   ModalBackdrop,
@@ -26,6 +27,7 @@ import {
   useMqttServiceMqttServersGetAllKey,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
+import { AlertCircleIcon, AlertTriangleIcon } from 'lucide-react';
 
 // Define ServerListItem component inline
 interface ServerListItemProps {
@@ -120,6 +122,9 @@ export function MqttServerList() {
   if (error) {
     return (
       <Alert status="danger" data-cy="mqtt-server-list-error-alert">
+        <AlertIndicator>
+          <AlertCircleIcon />
+        </AlertIndicator>
         <AlertContent>
           <AlertDescription>{t('errorLoading')}</AlertDescription>
         </AlertContent>
@@ -130,6 +135,9 @@ export function MqttServerList() {
   if (servers.length === 0) {
     return (
       <Alert status="warning" data-cy="mqtt-server-list-no-servers-alert">
+        <AlertIndicator>
+          <AlertTriangleIcon />
+        </AlertIndicator>
         <AlertContent>
           <AlertDescription>{t('noServersConfigured')}</AlertDescription>
         </AlertContent>
