@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, AlertContent, AlertDescription, Button, Card, CardContent, CardHeader, Chip, Dropdown, DropdownItem, DropdownMenu, DropdownPopover, DropdownTrigger, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow } from '@heroui/react';
+import { Alert, AlertContent, AlertDescription, AlertTitle, Button, Card, CardContent, CardHeader, Chip, Dropdown, DropdownItem, DropdownMenu, DropdownPopover, DropdownTrigger, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow } from '@heroui/react';
 import { buttonVariants } from '@heroui/styles';
 import { ArrowRightIcon, CpuIcon, LogsIcon, MoreVertical, PencilIcon, Trash2Icon } from 'lucide-react';
+import { AlertStatusIcon } from '../../../components/AlertStatusIcon';
 import { EmptyState } from '../../../components/emptyState';
 import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { AttractapEditor } from '../AttractapEditor/AttractapEditor';
@@ -145,7 +146,9 @@ export function AttractapList() {
       />
 
       <Alert status="danger" className="mb-4">
+        <AlertStatusIcon status="danger" />
         <AlertContent>
+          <AlertTitle>{t('workInProgressTitle')}</AlertTitle>
           <AlertDescription>{t('workInProgress')}</AlertDescription>
         </AlertContent>
       </Alert>

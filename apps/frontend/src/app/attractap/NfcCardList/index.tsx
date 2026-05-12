@@ -2,6 +2,7 @@ import {
   Alert,
   AlertContent,
   AlertDescription,
+  AlertTitle,
   Button,
   Modal,
   ModalBackdrop,
@@ -37,6 +38,7 @@ import en from './en.json';
 import { NfcCardDeactivateModal } from './deactivate';
 import { NfcCardActivateModal } from './activate';
 import { CheckIcon, PlusIcon, ServerIcon, Trash2Icon, XIcon } from 'lucide-react';
+import { AlertStatusIcon } from '../../../components/AlertStatusIcon';
 import { PageHeader } from '../../../components/pageHeader';
 import { useAuth } from '../../../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
@@ -316,7 +318,9 @@ export function NfcCardList() {
       />
 
       <Alert status="warning" className="mb-4">
+        <AlertStatusIcon status="warning" />
         <AlertContent>
+          <AlertTitle>{t('workInProgressTitle')}</AlertTitle>
           <AlertDescription>{t('workInProgress')}</AlertDescription>
         </AlertContent>
       </Alert>

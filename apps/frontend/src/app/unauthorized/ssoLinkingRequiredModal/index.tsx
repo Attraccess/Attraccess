@@ -1,4 +1,5 @@
 import { Alert, AlertContent, AlertDescription, Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader } from '@heroui/react';
+import { AlertStatusIcon } from '../../../components/AlertStatusIcon';
 import { PageHeader } from '../../../components/pageHeader';
 import { useTranslations, useUrlQuery } from '@attraccess/plugins-frontend-ui';
 import { PasswordInput } from '../../../components/PasswordInput';
@@ -108,6 +109,7 @@ export function SSOLinkingRequiredModal(props: Props) {
 
         <ModalBody>
           <Alert status="warning">
+            <AlertStatusIcon status="warning" />
             <AlertContent>
               <AlertDescription>{t('description', { email })}</AlertDescription>
             </AlertContent>

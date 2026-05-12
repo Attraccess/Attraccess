@@ -24,6 +24,7 @@ import {
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useRef, useState } from 'react';
+import { AlertStatusIcon } from '../../../../../components/AlertStatusIcon';
 
 interface Props {
   resourceId: number;
@@ -102,6 +103,7 @@ export function MarkDoneModal(props: Props) {
                       />
                       {error ? (
                         <Alert status="danger">
+                          <AlertStatusIcon status="danger" />
                           <AlertContent>
                             <AlertDescription>{(error as Error).message}</AlertDescription>
                           </AlertContent>

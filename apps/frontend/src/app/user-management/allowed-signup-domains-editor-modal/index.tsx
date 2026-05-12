@@ -31,6 +31,7 @@ import {
 import { EmptyState } from '../../../components/emptyState';
 import { PageHeader } from '../../../components/pageHeader';
 import { PlusIcon, Settings2Icon, Trash2Icon } from 'lucide-react';
+import { AlertStatusIcon } from '../../../components/AlertStatusIcon';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import en from './en.json';
 import de from './de.json';
@@ -133,6 +134,7 @@ export function AllowedSignupDomainsEditorModal(props: Props) {
 
                   <ModalBody>
                     <Alert status="warning" className="whitespace-pre-wrap">
+                      <AlertStatusIcon status="warning" />
                       <AlertContent>
                         <AlertDescription>{t('noteAboutNoneAndWildcard')}</AlertDescription>
                       </AlertContent>

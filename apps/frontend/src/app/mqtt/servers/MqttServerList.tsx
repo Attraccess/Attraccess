@@ -26,6 +26,7 @@ import {
   useMqttServiceMqttServersGetAllKey,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
+import { AlertStatusIcon } from '../../../components/AlertStatusIcon';
 
 // Define ServerListItem component inline
 interface ServerListItemProps {
@@ -120,6 +121,7 @@ export function MqttServerList() {
   if (error) {
     return (
       <Alert status="danger" data-cy="mqtt-server-list-error-alert">
+        <AlertStatusIcon status="danger" />
         <AlertContent>
           <AlertDescription>{t('errorLoading')}</AlertDescription>
         </AlertContent>
@@ -130,6 +132,7 @@ export function MqttServerList() {
   if (servers.length === 0) {
     return (
       <Alert status="warning" data-cy="mqtt-server-list-no-servers-alert">
+        <AlertStatusIcon status="warning" />
         <AlertContent>
           <AlertDescription>{t('noServersConfigured')}</AlertDescription>
         </AlertContent>
