@@ -4,7 +4,6 @@ import {
   CardContent,
   CardHeader,
   CardProps,
-  Switch,
   Table,
   TableBody,
   TableCell,
@@ -26,6 +25,7 @@ import de from './de.json';
 import en from './en.json';
 import { CalendarClockIcon, PencilIcon, PlusIcon, TrashIcon } from 'lucide-react';
 import { EmptyState } from '../../../../components/emptyState';
+import { LabeledSwitch } from '../../../../components/labeledSwitch';
 import { useQueryClient } from '@tanstack/react-query';
 import { MaintenanceScheduleUpsertModal } from './upsert';
 import { ScheduleDeleteModal } from './ScheduleDeleteModal';
@@ -139,7 +139,7 @@ export function MaintenanceSchedules(props: Props & Omit<CardProps, 'children'>)
                 <TableCell>{t(`triggerType.${schedule.triggerType}`)}</TableCell>
                 <TableCell>{configSummary(schedule, t)}</TableCell>
                 <TableCell>
-                  <Switch
+                  <LabeledSwitch
                     isSelected={schedule.enabled}
                     onChange={(enabled) => handleEnabledChange(schedule, enabled)}
                     isDisabled={isUpdating}

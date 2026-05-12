@@ -5,7 +5,6 @@ import {
   CardHeader,
   CardProps,
   cn,
-  Switch,
   Table,
   TableBody,
   TableCell,
@@ -16,6 +15,7 @@ import {
 } from '@heroui/react';
 import { PageHeader } from '../../../../components/pageHeader';
 import { MaintenanceReasonDisplay } from '../../../../components/MaintenanceReasonDisplay';
+import { LabeledSwitch } from '../../../../components/labeledSwitch';
 import { ResourceMaintenance, useResourceMaintenancesServiceFindMaintenances } from '@attraccess/react-query-client';
 import { useMemo, useState } from 'react';
 import { DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -79,9 +79,9 @@ export function MaintenanceManagement(props: Props & Omit<CardProps, 'children'>
           noMargin
           actions={
             <>
-              <Switch isSelected={includePast} onChange={setIncludePast}>
+              <LabeledSwitch isSelected={includePast} onChange={setIncludePast}>
                 {t('filters.includePast')}
-              </Switch>
+              </LabeledSwitch>
               <ResourceMaintenanceUpsertModal resourceId={resourceId}>
                 {(open) => (
                   <Button variant="primary"

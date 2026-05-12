@@ -1,5 +1,6 @@
-import { Button, TextField, Label, Input, Switch, TextArea } from "@heroui/react";
+import { Button, TextField, Label, Input, TextArea } from "@heroui/react";
 import { Select } from '../../../../../components/select';
+import { LabeledSwitch } from '../../../../../components/labeledSwitch';
 import { Trash2 } from 'lucide-react';
 import { FormFieldType } from '@attraccess/react-query-client';
 import { EditableFormField, createDefaultFieldOptions } from '../types';
@@ -53,9 +54,9 @@ export function FormFieldEditor(props: FormFieldEditorProps) {
       </div>
 
       <div className="flex items-center justify-between">
-        <Switch isSelected={field.isRequired} onChange={(value) => onChange({ ...field, isRequired: value })}>
+        <LabeledSwitch isSelected={field.isRequired} onChange={(value) => onChange({ ...field, isRequired: value })}>
           {t('fields.required')}
-        </Switch>
+        </LabeledSwitch>
         <Button variant="danger-soft"
 
           onPress={onRemove}

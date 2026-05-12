@@ -13,7 +13,6 @@ import {
   ModalDialog,
   ModalFooter,
   ModalHeader,
-  Switch,
   TextArea,
   useOverlayState,
 } from '@heroui/react';
@@ -21,6 +20,7 @@ import de from './de.json';
 import en from './en.json';
 import { PageHeader } from '../../../../../components/pageHeader';
 import { MaintenanceReasonDisplay } from '../../../../../components/MaintenanceReasonDisplay';
+import { LabeledSwitch } from '../../../../../components/labeledSwitch';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { parseAbsolute, type DateValue, type ZonedDateTime, toZoned } from '@internationalized/date';
 import { CalendarIcon } from 'lucide-react';
@@ -132,9 +132,9 @@ export function ResourceMaintenanceUpsertModal(props: Props) {
                     <Form onSubmit={onSubmit} ref={formRef}>
                       <DatePicker value={startTime} isRequired hideTimeZone onChange={setStartTime} />
 
-                      <Switch isSelected={hasEndDate} onChange={onHasEndDateChange}>
+                      <LabeledSwitch isSelected={hasEndDate} onChange={onHasEndDateChange}>
                         {t('inputs.hasEndDate.label')}
-                      </Switch>
+                      </LabeledSwitch>
                       {hasEndDate && <DatePicker value={endTime} isRequired hideTimeZone onChange={setEndTime} />}
 
                       <div>

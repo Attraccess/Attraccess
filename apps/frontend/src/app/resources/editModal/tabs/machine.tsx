@@ -1,4 +1,4 @@
-import { Switch } from '@heroui/react';
+import { LabeledSwitch } from '../../../../components/labeledSwitch';
 import { EditorTabProps } from './props';
 
 export function MachineTab(props: EditorTabProps) {
@@ -6,7 +6,7 @@ export function MachineTab(props: EditorTabProps) {
 
   return (
     <div className="flex flex-col gap-2">
-      <Switch
+      <LabeledSwitch
         isSelected={formData.allowTakeOver}
         onChange={(value) => setField('allowTakeOver', value)}
         data-cy="resource-edit-modal-allow-takeover-switch"
@@ -15,7 +15,7 @@ export function MachineTab(props: EditorTabProps) {
           <span className="text-small">{t('inputs.machine.allowTakeOver.label')}</span>
           <span className="text-tiny text-default-400">{t('inputs.machine.allowTakeOver.description')}</span>
         </div>
-      </Switch>
+      </LabeledSwitch>
     </div>
   );
 }

@@ -9,9 +9,10 @@ import {
   useSettingsServiceUpdateSystemSettings,
   useSettingsServiceGetSystemSettingsKey,
 } from '@attraccess/react-query-client';
-import { Button, Form, TextField, Label, Input, Description, Spinner, Switch } from '@heroui/react';
+import { Button, Form, TextField, Label, Input, Description, Spinner } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PasswordInput } from '../../../../components/PasswordInput';
+import { LabeledSwitch } from '../../../../components/labeledSwitch';
 import { Select } from '../../../../components/select';
 import { useToastMessage } from '../../../../components/toastProvider';
 import API_ERROR_TRANSLATIONS_DE from '../../../../global-translations/api-errors.de.json';
@@ -181,13 +182,13 @@ export function SmtpSettingsForm({ variant, endpoint, onNext }: SmtpSettingsForm
         <Input type="number" min={1} />
         <Description>{t('inputs.port.description')}</Description>
       </TextField>
-      <Switch
+      <LabeledSwitch
         isSelected={smtpSecure}
         onChange={setSmtpSecure}
         isDisabled={smtpService !== SmtpServiceType.SMTP}
       >
         {t('inputs.secure.label')}
-      </Switch>
+      </LabeledSwitch>
       <TextField value={smtpUser} onChange={setSmtpUser}>
         <Label>{t('inputs.user.label')}</Label>
         <Input />

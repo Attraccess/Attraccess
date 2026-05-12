@@ -1,6 +1,7 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Button, Card, CardHeader, TextField, Label, Input, Checkbox, Spinner, Switch } from "@heroui/react";
+import { Button, Card, CardHeader, TextField, Label, Input, Checkbox, Spinner } from "@heroui/react";
 import { Select } from '../../../components/select';
+import { LabeledSwitch } from '../../../components/labeledSwitch';
 import { ArrowLeft } from 'lucide-react';
 import { PasswordInput } from '../../../components/PasswordInput';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -191,7 +192,7 @@ export function EditMqttServerPage() {
               />
 
               <div className="flex items-center space-x-2">
-                <Switch
+                <LabeledSwitch
                   id="defaultPublishRetain"
                   name="defaultPublishRetain"
                   isSelected={!!formValues.defaultPublishRetain}
@@ -199,7 +200,7 @@ export function EditMqttServerPage() {
                   data-cy="edit-mqtt-server-form-default-publish-retain-checkbox"
                 >
                   {t('defaultPublishRetainLabel')}
-                </Switch>
+                </LabeledSwitch>
               </div>
 
               <Select

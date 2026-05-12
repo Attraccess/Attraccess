@@ -11,10 +11,10 @@ import {
   ModalDialog,
   ModalFooter,
   ModalHeader,
-  Switch,
   TextArea,
 } from '@heroui/react';
 import { Select } from '../../../../components/select';
+import { LabeledSwitch } from '../../../../components/labeledSwitch';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { FormFieldType, FormResponseDto, FormSubmissionRequestDto } from '@attraccess/react-query-client';
 import {
@@ -332,7 +332,7 @@ function renderBooleanInput(
     <div className="space-y-1">
       <div className="flex items-center gap-3">
         <span className="text-xs text-default-500">{t('modal.booleanNo')}</span>
-        <Switch
+        <LabeledSwitch
           isSelected={isChecked}
           onChange={(checked) => onChange(checked)}
           aria-label={t('modal.booleanLabel')}

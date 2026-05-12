@@ -1,5 +1,6 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { DrawerBody, Drawer, DrawerContent, DrawerHeader, Switch, useOverlayState } from '@heroui/react';
+import { DrawerBody, Drawer, DrawerContent, DrawerHeader, useOverlayState } from '@heroui/react';
+import { LabeledSwitch } from '../../../../components/labeledSwitch';
 
 import de from './de.json';
 import en from './en.json';
@@ -25,21 +26,21 @@ export function ResourceFilter(props: Props & Omit<FilterProps, 'onSearchChanged
         <DrawerContent>
           <DrawerHeader>{t('drawer.title')}</DrawerHeader>
           <DrawerBody>
-            <Switch isSelected={filterProps.onlyInUseByMe} onChange={filterProps.onOnlyInUseByMeChanged}>
+            <LabeledSwitch isSelected={filterProps.onlyInUseByMe} onChange={filterProps.onOnlyInUseByMeChanged}>
               {t('drawer.options.onlyInUseByMe')}
-            </Switch>
-            <Switch
+            </LabeledSwitch>
+            <LabeledSwitch
               isSelected={filterProps.onlyWithPermissions}
               onChange={filterProps.onOnlyWithPermissionsChanged}
             >
               {t('drawer.options.onlyWithPermissions')}
-            </Switch>
-            <Switch
+            </LabeledSwitch>
+            <LabeledSwitch
               isSelected={filterProps.hideEmptyResourceGroups}
               onChange={filterProps.onHideEmptyResourceGroupsChanged}
             >
               {t('drawer.options.hideEmptyResourceGroups')}
-            </Switch>
+            </LabeledSwitch>
           </DrawerBody>
         </DrawerContent>
       </Drawer>

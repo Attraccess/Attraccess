@@ -1,5 +1,6 @@
-import { Card, CardContent, CardHeader, Input, Switch, TextArea } from "@heroui/react";
+import { Card, CardContent, CardHeader, Input, TextArea } from "@heroui/react";
 import { Select } from '../../../../../components/select';
+import { LabeledSwitch } from '../../../../../components/labeledSwitch';
 import { FormFieldType } from '@attraccess/react-query-client';
 import { EditableFormField, TextFieldOptions, NumberFieldOptions, SelectFieldOptions } from '../types';
 
@@ -83,7 +84,7 @@ function renderPreviewBoolean(t: (key: string) => string) {
   return (
     <div className="flex items-center gap-3">
       <span className="text-xs text-default-500">{t('preview.booleanNo')}</span>
-      <Switch aria-label={t('preview.booleanLabel')} />
+      <LabeledSwitch aria-label={t('preview.booleanLabel')} />
       <span className="text-xs text-default-500">{t('preview.booleanYes')}</span>
     </div>
   );

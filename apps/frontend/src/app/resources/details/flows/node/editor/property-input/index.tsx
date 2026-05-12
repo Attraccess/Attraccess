@@ -17,11 +17,11 @@ import {
   NumberFieldGroup,
   NumberFieldIncrementButton,
   NumberFieldInput,
-  Switch,
   TextArea,
 } from '@heroui/react';
 import { Select } from '../../../../../../../components/select';
 import { MqttServerSelect } from '../../../../../../../components/mqttServerSelect';
+import { LabeledSwitch } from '../../../../../../../components/labeledSwitch';
 import { PlusIcon, XIcon } from 'lucide-react';
 import { TFunction } from '@attraccess/plugins-frontend-ui';
 import { useCallback, useMemo, useState } from 'react';
@@ -424,9 +424,9 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
 
     case 'boolean':
       return (
-        <Switch isSelected={value as boolean} onChange={(newValue) => onChange(newValue as TValue)}>
+        <LabeledSwitch isSelected={value as boolean} onChange={(newValue) => onChange(newValue as TValue)}>
           {!hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : null}
-        </Switch>
+        </LabeledSwitch>
       );
   }
 

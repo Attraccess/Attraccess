@@ -13,11 +13,11 @@ import {
   ModalDialog,
   ModalFooter,
   ModalHeader,
-  Switch,
   TextField,
   useOverlayState,
 } from '@heroui/react';
 import { Select } from '../../../../../components/select';
+import { LabeledSwitch } from '../../../../../components/labeledSwitch';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -317,9 +317,9 @@ export function MaintenanceScheduleUpsertModal(props: Props) {
                         </>
                       )}
 
-                      <Switch isSelected={enabled} onChange={setEnabled}>
+                      <LabeledSwitch isSelected={enabled} onChange={setEnabled}>
                         {t('inputs.enabled.label')}
-                      </Switch>
+                      </LabeledSwitch>
 
                       {error && (
                         <Alert status="danger">

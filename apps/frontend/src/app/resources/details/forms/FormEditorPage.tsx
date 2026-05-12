@@ -29,9 +29,9 @@ import {
   Input,
   Selection,
   Spinner,
-  Switch,
 } from '@heroui/react';
 import { useToastMessage } from '../../../../components/toastProvider';
+import { LabeledSwitch } from '../../../../components/labeledSwitch';
 import { useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '../../../../components/pageHeader';
 import { DeleteConfirmationModal } from '../../../../components/deleteConfirmationModal';
@@ -254,24 +254,24 @@ export function FormEditorPage() {
             </div>
 
             <div className="grid gap-2">
-              <Switch
+              <LabeledSwitch
                 isSelected={form.isRequiredOnResourceUsageStart}
                 onChange={(value) => setForm((prev) => ({ ...prev, isRequiredOnResourceUsageStart: value }))}
               >
                 {t('editor.resourceUsageStart')}
-              </Switch>
-              <Switch
+              </LabeledSwitch>
+              <LabeledSwitch
                 isSelected={form.isRequiredOnResourceUsageTakeOver}
                 onChange={(value) => setForm((prev) => ({ ...prev, isRequiredOnResourceUsageTakeOver: value }))}
               >
                 {t('editor.resourceUsageTakeover')}
-              </Switch>
-              <Switch
+              </LabeledSwitch>
+              <LabeledSwitch
                 isSelected={form.isRequiredOnResourceUsageEnd}
                 onChange={(value) => setForm((prev) => ({ ...prev, isRequiredOnResourceUsageEnd: value }))}
               >
                 {t('editor.resourceUsageEnd')}
-              </Switch>
+              </LabeledSwitch>
             </div>
 
             <Separator />

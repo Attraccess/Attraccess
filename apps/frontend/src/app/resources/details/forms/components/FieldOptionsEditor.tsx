@@ -1,4 +1,5 @@
-import { Button, TextField, Label, Input, Switch } from '@heroui/react';
+import { Button, TextField, Label, Input } from '@heroui/react';
+import { LabeledSwitch } from '../../../../../components/labeledSwitch';
 import { Plus, X } from 'lucide-react';
 import { FormFieldType } from '@attraccess/react-query-client';
 import { EditableFormField, TextFieldOptions, NumberFieldOptions, SelectFieldOptions } from '../types';
@@ -50,12 +51,12 @@ function renderOptionsByType(
             <Label>{t('fields.options.text.placeholder')}</Label>
             <Input />
           </TextField>
-          <Switch
+          <LabeledSwitch
             isSelected={Boolean(textOptions.multiline)}
             onChange={(value) => updateOptions({ multiline: value })}
           >
             {t('fields.options.text.multiline')}
-          </Switch>
+          </LabeledSwitch>
         </div>
       );
     }
