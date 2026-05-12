@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Button, Card, CardHeader, CardContent, CardFooter, Switch } from '@heroui/react';
+import { Button, Card, CardHeader, CardContent, CardFooter } from '@heroui/react';
+import { LabeledSwitch } from '../../../../../components/labeledSwitch';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../../../components/toastProvider';
 import {
@@ -130,16 +131,15 @@ export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({ user, ss
           </div>
         ) : null}
         {Object.keys(permissions).map((permission) => (
-          <Switch
+          <LabeledSwitch
             key={permission}
             isSelected={permissions[permission as keyof SystemPermissions]}
             onChange={handlePermissionChange(permission as keyof SystemPermissions)}
-           
             isDisabled={isPermissionSsoManaged(permission)}
             data-cy={`user-permission-form-${permission}-checkbox`}
           >
             {t(`permissions.${permission}`)}
-          </Switch>
+          </LabeledSwitch>
         ))}
       </CardContent>
 

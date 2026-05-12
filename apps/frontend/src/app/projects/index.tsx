@@ -15,7 +15,8 @@ import de from './de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../global-translations/api-errors.en.json';
 import API_ERROR_TRANSLATIONS_DE from '../../global-translations/api-errors.de.json';
 import { PageHeader } from '../../components/pageHeader';
-import { Button, Card, CardContent, CardHeader, Chip, Skeleton, Switch } from '@heroui/react';
+import { Button, Card, CardContent, CardHeader, Chip, Skeleton } from '@heroui/react';
+import { LabeledSwitch } from '../../components/labeledSwitch';
 import { FolderIcon, PlusIcon } from 'lucide-react';
 import { UpsertProjectModal } from './upsertModal';
 import { EmptyState } from '../../components/emptyState';
@@ -203,9 +204,9 @@ export function ProjectsListPage() {
         icon={<FolderIcon />}
         actions={
           <div className="flex flex-wrap items-center gap-3">
-            <Switch isSelected={includeArchived} onChange={setIncludeArchived}>
+            <LabeledSwitch isSelected={includeArchived} onChange={setIncludeArchived}>
               {t('filters.includeArchived')}
-            </Switch>
+            </LabeledSwitch>
             <UpsertProjectModal>
               {(onOpen) => (
                 <Button variant="ghost" onPress={onOpen}><PlusIcon size="24" />

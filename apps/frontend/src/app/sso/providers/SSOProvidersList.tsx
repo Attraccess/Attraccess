@@ -33,7 +33,6 @@ import {
   DropdownItem,
   DropdownPopover,
   TextArea,
-  Switch,
   Link,
   useOverlayState,
 } from '@heroui/react';
@@ -64,6 +63,7 @@ import { AuthentikDiscoveryDialog } from './discovery/authentik';
 import { OpenIDConfiguration } from './discovery/OpenIDC.data';
 import { KeycloakDiscoveryDialog } from './discovery/keycloak';
 import { Select } from '../../../components/select';
+import { LabeledSwitch } from '../../../components/labeledSwitch';
 import { getBaseUrl } from '../../../api';
 import { hasRequiredSamlSigningMaterial } from './signingMaterial';
 
@@ -1051,34 +1051,34 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                           </p>
 
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <Switch
+                            <LabeledSwitch
                               isSelected={formValues.samlConfiguration?.signRequest ?? false}
                               onChange={(value) => handleSamlToggleChange('signRequest', value)}
                               data-cy="sso-provider-form-saml-sign-request-switch"
                             >
                               {t('signRequest')}
-                            </Switch>
-                            <Switch
+                            </LabeledSwitch>
+                            <LabeledSwitch
                               isSelected={formValues.samlConfiguration?.wantAssertionsSigned ?? false}
                               onChange={(value) => handleSamlToggleChange('wantAssertionsSigned', value)}
                               data-cy="sso-provider-form-saml-assertions-signed-switch"
                             >
                               {t('wantAssertionsSigned')}
-                            </Switch>
-                            <Switch
+                            </LabeledSwitch>
+                            <LabeledSwitch
                               isSelected={formValues.samlConfiguration?.wantAuthnResponseSigned ?? true}
                               onChange={(value) => handleSamlToggleChange('wantAuthnResponseSigned', value)}
                               data-cy="sso-provider-form-saml-response-signed-switch"
                             >
                               {t('wantAuthnResponseSigned')}
-                            </Switch>
-                            <Switch
+                            </LabeledSwitch>
+                            <LabeledSwitch
                               isSelected={formValues.samlConfiguration?.forceAuthn ?? false}
                               onChange={(value) => handleSamlToggleChange('forceAuthn', value)}
                               data-cy="sso-provider-form-saml-force-authn-switch"
                             >
                               {t('forceAuthn')}
-                            </Switch>
+                            </LabeledSwitch>
                           </div>
                         </>
                       )}

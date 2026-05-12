@@ -8,7 +8,6 @@ import {
   NumberFieldIncrementButton,
   NumberFieldInput,
   Separator,
-  Switch,
   TextField,
   Label,
   InputGroup,
@@ -37,6 +36,7 @@ import {
   useSettingsServiceUpdateMetricsSettings,
 } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../../components/toastProvider';
+import { LabeledSwitch } from '../../../../components/labeledSwitch';
 import en from './en.json';
 import de from './de.json';
 
@@ -206,7 +206,7 @@ export function MetricsSettingsForm() {
       <SectionHeading title={t('toggles.title')} description={t('toggles.description')} />
       <div className="flex flex-col gap-2">
         {TOGGLE_ORDER.map((subsystem) => (
-          <Switch
+          <LabeledSwitch
             key={subsystem}
             data-testid={`metrics-toggle-${subsystem}`}
             isSelected={metricsSettings.toggles[subsystem]}
@@ -225,7 +225,7 @@ export function MetricsSettingsForm() {
               </div>
               <p className="text-xs text-default-500">{t(`toggles.${subsystem}.description`)}</p>
             </div>
-          </Switch>
+          </LabeledSwitch>
         ))}
       </div>
     </div>
