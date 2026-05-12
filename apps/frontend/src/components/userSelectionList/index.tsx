@@ -7,6 +7,7 @@ import {
   TableBody,
   TableCell,
   TableColumn,
+  TableContent,
   TableHeader,
   TableProps,
   TableRow,
@@ -115,10 +116,8 @@ export function UserSelectionList<TUser extends User = User>(props: Readonly<Pro
         }
       />
 
-      <Table
-        {...tableProps}
-        aria-label={t('table.ariaLabel')}
-      >
+      <Table {...tableProps}>
+        <TableContent aria-label={t('table.ariaLabel')}>
         <TableHeader>
           <TableColumn>{t('selectedUsers.columns.user')}</TableColumn>
           {
@@ -167,6 +166,7 @@ export function UserSelectionList<TUser extends User = User>(props: Readonly<Pro
             </TableRow>
           )}
         </TableBody>
+        </TableContent>
       </Table>
       {selectedUsers && totalPages > 1 && (
         <SimplePagination

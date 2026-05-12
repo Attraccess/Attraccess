@@ -4,6 +4,7 @@ import {
   CardContent,
   CardHeader,
   Table,
+  TableContent,
   TableHeader,
   TableColumn,
   TableBody,
@@ -62,13 +63,8 @@ export function ProjectUsageHistory({ projectId }: ProjectUsageHistoryProps) {
           />
         </CardHeader>
         <CardContent>
-          <Table
-            aria-label={t('history.title')}
-
-
-            data-cy="project-usage-history-table"
-
-          >
+          <Table data-cy="project-usage-history-table">
+            <TableContent aria-label={t('history.title')}>
             <TableHeader>
               <TableColumn>{t('history.columns.resource')}</TableColumn>
               <TableColumn>{t('history.columns.user')}</TableColumn>
@@ -104,6 +100,7 @@ export function ProjectUsageHistory({ projectId }: ProjectUsageHistoryProps) {
                 </TableRow>
               )}
             </TableBody>
+            </TableContent>
           </Table>
         </CardContent>
       </Card>
