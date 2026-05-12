@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button, Drawer, DrawerBackdrop, DrawerBody, DrawerContent, DrawerDialog, DrawerFooter, DrawerHeader } from '@heroui/react';
+import { Button, DrawerBody, DrawerFooter, DrawerHeader } from '@heroui/react';
+import { StandardDrawer } from '../standardDrawer';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { HeartHandshake, Share2 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
@@ -92,35 +93,33 @@ export function DonationPrompt() {
   }
 
   return (
-    <Drawer
+    <StandardDrawer
       isOpen={isVisible}
       onOpenChange={(open) => setIsVisible(open)}
+      backdropProps={{ variant: 'blur', isDismissable: false }}
+      contentProps={{ placement: 'bottom' }}
+      dialogProps={{ className: 'w-full max-w-[680px] mx-auto' }}
     >
-      <DrawerBackdrop variant="blur" isDismissable={false} />
-      <DrawerContent placement="bottom">
-        <DrawerDialog className="w-full max-w-[680px] mx-auto">
-          <DrawerHeader className="flex flex-col gap-1">
-            <div className="text-base font-semibold">{t('title')}</div>
-            <div className="text-sm text-default-500">{t('subtitle')}</div>
-          </DrawerHeader>
-          <DrawerBody>
-            <div className="text-sm text-default-600 dark:text-default-400">{t('body')}</div>
-          </DrawerBody>
-          <DrawerFooter className="flex flex-wrap gap-2 justify-end">
-            <Button variant="primary" onPress={onDonate}>
-              <HeartHandshake size={16} />
-              {t('actions.donate')}
-            </Button>
-            <Button variant="secondary" onPress={onShare}>
-              <Share2 size={16} />
-              {t('actions.share')}
-            </Button>
-            <Button variant="ghost" onPress={onHideForMonth}>
-              {t('actions.hideForMonth')}
-            </Button>
-          </DrawerFooter>
-        </DrawerDialog>
-      </DrawerContent>
-    </Drawer>
+      <DrawerHeader className="flex flex-col gap-1">
+        <div className="text-base font-semibold">{t('title')}</div>
+        <div className="text-sm text-default-500">{t('subtitle')}</div>
+      </DrawerHeader>
+      <DrawerBody>
+        <div className="text-sm text-default-600 dark:text-default-400">{t('body')}</div>
+      </DrawerBody>
+      <DrawerFooter className="flex flex-wrap gap-2 justify-end">
+        <Button variant="primary" onPress={onDonate}>
+          <HeartHandshake size={16} />
+          {t('actions.donate')}
+        </Button>
+        <Button variant="secondary" onPress={onShare}>
+          <Share2 size={16} />
+          {t('actions.share')}
+        </Button>
+        <Button variant="ghost" onPress={onHideForMonth}>
+          {t('actions.hideForMonth')}
+        </Button>
+      </DrawerFooter>
+    </StandardDrawer>
   );
 }
