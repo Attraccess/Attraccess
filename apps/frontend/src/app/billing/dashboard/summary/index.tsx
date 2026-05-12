@@ -13,6 +13,7 @@ import {
   TableBody,
   TableCell,
   TableColumn,
+  TableContent,
   TableHeader,
   TableRow,
 } from '@heroui/react';
@@ -174,12 +175,8 @@ export function SummaryCard(props: Omit<CardProps, 'children'> & Props) {
           )}
         </div>
 
-        <Table
-          aria-label={t('transactions.table.ariaLabel')}
-
-
-
-        >
+        <Table>
+          <TableContent aria-label={t('transactions.table.ariaLabel')}>
           <TableHeader>
             <TableColumn>{t('transactions.table.columns.id')}</TableColumn>
             <TableColumn>{t('transactions.table.columns.dateTime')}</TableColumn>
@@ -217,6 +214,7 @@ export function SummaryCard(props: Omit<CardProps, 'children'> & Props) {
               </TableRow>
             )}
           </TableBody>
+          </TableContent>
         </Table>
 
         {openedTransactionId && (

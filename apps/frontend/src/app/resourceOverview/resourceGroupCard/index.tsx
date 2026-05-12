@@ -15,6 +15,7 @@ import {
   TableBody,
   TableCell,
   TableColumn,
+  TableContent,
   TableHeader,
   TableRow,
 } from '@heroui/react';
@@ -145,11 +146,8 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
       </CardHeader>
 
       <CardContent>
-        <Table
-
-
-          aria-label={tableAriaLabel}
-        >
+        <Table>
+          <TableContent aria-label={tableAriaLabel}>
           <TableHeader>
             <TableColumn width="0">{t('columns.image')}</TableColumn>
             <TableColumn>{t('columns.name')}</TableColumn>
@@ -184,6 +182,7 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
               </TableRow>
             )}
           </TableBody>
+          </TableContent>
         </Table>
       </CardContent>
 

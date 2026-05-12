@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Table, TableHeader, TableBody, TableRow } from '@heroui/react';
+import { Table, TableContent, TableHeader, TableBody, TableRow } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { generateHeaderColumns } from './utils/tableHeaders';
 import { generateRowCells } from './utils/tableRows';
@@ -147,12 +147,8 @@ export const HistoryTable = ({
 
   return (
     <>
-    <Table
-      aria-label={t('table.ariaLabel')}
-
-      data-cy="resource-usage-history-table"
-
-    >
+    <Table data-cy="resource-usage-history-table">
+      <TableContent aria-label={t('table.ariaLabel')}>
       <TableHeader>{headerColumns}</TableHeader>
       <TableBody
         renderEmptyState={() => <EmptyState />}
@@ -179,6 +175,7 @@ export const HistoryTable = ({
           </TableRow>
         ))}
       </TableBody>
+      </TableContent>
     </Table>
     <SimplePagination total={totalPages} page={page} onChange={handlePageChange} />
     </>

@@ -20,6 +20,7 @@ import {
   TableBody,
   TableCell,
   TableColumn,
+  TableContent,
   TableHeader,
   TableRow,
 } from '@heroui/react';
@@ -146,12 +147,8 @@ export function ManageResourceGroups({
         />
       </CardHeader>
       <CardContent>
-        <Table
-          aria-label={t('table.ariaLabel')}
-
-
-
-        >
+        <Table>
+          <TableContent aria-label={t('table.ariaLabel')}>
           <TableHeader>
             <TableColumn>{t('columns.group')}</TableColumn>
             <TableColumn>{t('columns.actions')}</TableColumn>
@@ -181,6 +178,7 @@ export function ManageResourceGroups({
               </TableRow>
             )}
           </TableBody>
+          </TableContent>
         </Table>
       </CardContent>
     </Card>
