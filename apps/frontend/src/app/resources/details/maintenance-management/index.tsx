@@ -102,7 +102,7 @@ export function MaintenanceManagement(props: Props & Omit<CardProps, 'children'>
         <Table>
           <TableContent aria-label={t('table.ariaLabel')}>
           <TableHeader>
-            <TableColumn>{t('table.columns.start')}</TableColumn>
+            <TableColumn isRowHeader>{t('table.columns.start')}</TableColumn>
             <TableColumn>{t('table.columns.end')}</TableColumn>
             <TableColumn>{t('table.columns.reason')}</TableColumn>
             <TableColumn>{t('table.columns.createdBy')}</TableColumn>

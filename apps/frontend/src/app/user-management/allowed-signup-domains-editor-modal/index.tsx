@@ -159,7 +159,7 @@ export function AllowedSignupDomainsEditorModal(props: Props) {
                     <Table>
                       <TableContent aria-label={t('table.ariaLabel')}>
                       <TableHeader>
-                        <TableColumn>{t('table.columns.domain')}</TableColumn>
+                        <TableColumn isRowHeader>{t('table.columns.domain')}</TableColumn>
                         <TableColumn>{t('table.columns.actions')}</TableColumn>
                       </TableHeader>
                       <TableBody

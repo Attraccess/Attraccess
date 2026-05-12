@@ -119,7 +119,7 @@ export function UserSelectionList<TUser extends User = User>(props: Readonly<Pro
       <Table {...tableProps}>
         <TableContent aria-label={t('table.ariaLabel')}>
         <TableHeader>
-          <TableColumn>{t('selectedUsers.columns.user')}</TableColumn>
+          <TableColumn isRowHeader>{t('selectedUsers.columns.user')}</TableColumn>
           {
             (additionalColumns ?? []).map((col) => (
               <TableColumn className={col.headerClassName} key={col.key} id={col.key}>

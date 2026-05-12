@@ -66,7 +66,7 @@ export function ProjectUsageHistory({ projectId }: ProjectUsageHistoryProps) {
           <Table data-cy="project-usage-history-table">
             <TableContent aria-label={t('history.title')}>
             <TableHeader>
-              <TableColumn>{t('history.columns.resource')}</TableColumn>
+              <TableColumn isRowHeader>{t('history.columns.resource')}</TableColumn>
               <TableColumn>{t('history.columns.user')}</TableColumn>
               <TableColumn>{t('history.columns.start')}</TableColumn>
               <TableColumn>{t('history.columns.end')}</TableColumn>

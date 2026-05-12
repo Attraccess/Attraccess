@@ -176,7 +176,7 @@ export function AttractapList() {
               >
                 <TableContent aria-label={`${tableIndex === 0 ? 'active' : 'stale'} attractaps`}>
                 <TableHeader>
-                  <TableColumn>{t('table.columns.name')}</TableColumn>
+                  <TableColumn isRowHeader>{t('table.columns.name')}</TableColumn>
                   <TableColumn>{t('table.columns.type')}</TableColumn>
                   <TableColumn>{t('table.columns.lastConnection')}</TableColumn>
                   <TableColumn>{t('table.columns.actions')}</TableColumn>

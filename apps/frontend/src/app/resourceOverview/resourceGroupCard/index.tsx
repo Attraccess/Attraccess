@@ -150,7 +150,7 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
           <TableContent aria-label={tableAriaLabel}>
           <TableHeader>
             <TableColumn width="0">{t('columns.image')}</TableColumn>
-            <TableColumn>{t('columns.name')}</TableColumn>
+            <TableColumn isRowHeader>{t('columns.name')}</TableColumn>
             <TableColumn width="0" className="text-left">
               {t('columns.status')}
             </TableColumn>

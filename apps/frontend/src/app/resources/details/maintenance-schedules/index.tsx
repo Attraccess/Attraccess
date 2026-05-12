@@ -123,7 +123,7 @@ export function MaintenanceSchedules(props: Props & Omit<CardProps, 'children'>)
         <Table>
           <TableContent aria-label={t('table.ariaLabel')}>
           <TableHeader>
-            <TableColumn>{t('table.columns.name')}</TableColumn>
+            <TableColumn isRowHeader>{t('table.columns.name')}</TableColumn>
             <TableColumn>{t('table.columns.triggerType')}</TableColumn>
             <TableColumn>{t('table.columns.configSummary')}</TableColumn>
             <TableColumn>{t('table.columns.enabled')}</TableColumn>

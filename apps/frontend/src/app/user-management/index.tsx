@@ -142,7 +142,7 @@ export const UserManagementPage: React.FC = () => {
               {t('table.columns.isEmailVerified')}
             </TableColumn>
             <TableColumn width="0">{t('table.columns.id')}</TableColumn>
-            <TableColumn>{t('table.columns.username')}</TableColumn>
+            <TableColumn isRowHeader>{t('table.columns.username')}</TableColumn>
             <TableColumn className="hidden md:table-cell">{t('table.columns.externalIdentifier')}</TableColumn>
             <TableColumn width="0" className="text-center">
               {t('table.columns.ssoLinked')}
