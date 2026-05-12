@@ -9,7 +9,6 @@ import {
   AlertContent,
   AlertDescription,
   Button,
-  Input,
   InputGroup,
   Label,
   Modal,
@@ -141,7 +140,7 @@ export function AllowedSignupDomainsEditorModal(props: Props) {
                     <TextField value={domainToAdd} onChange={setDomainToAdd}>
                       <Label>{t('inputs.addDomain.label')}</Label>
                       <InputGroup>
-                        <Input
+                        <InputGroup.Input
                           ref={addDomainInputRef}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') {
@@ -149,7 +148,9 @@ export function AllowedSignupDomainsEditorModal(props: Props) {
                             }
                           }}
                         />
-                        <Button variant="ghost" onPress={onAddDomain} isIconOnly />
+                        <InputGroup.Suffix>
+                          <Button variant="ghost" onPress={onAddDomain} isIconOnly />
+                        </InputGroup.Suffix>
                       </InputGroup>
                     </TextField>
 

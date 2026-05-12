@@ -848,24 +848,26 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                           >
                             <Label>{t('clientSecret')}</Label>
                             <InputGroup>
-                              <Input
+                              <InputGroup.Input
                                 type={showClientSecret ? 'text' : 'password'}
                                 placeholder="••••••••••••••••"
                                 data-cy="sso-provider-form-oidc-client-secret-input"
                               />
-                              <Tooltip>
-                                <Button
-                                  variant="ghost"
-                                  isIconOnly
-                                  onPress={() => setShowClientSecret(!showClientSecret)}
-                                  data-cy="sso-provider-form-oidc-toggle-client-secret-button"
-                                >
-                                  {showClientSecret ? <EyeOff size={16} /> : <Eye size={16} />}
-                                </Button>
-                                <TooltipContent>
-                                  {showClientSecret ? t('hideClientSecret') : t('showClientSecret')}
-                                </TooltipContent>
-                              </Tooltip>
+                              <InputGroup.Suffix>
+                                <Tooltip>
+                                  <Button
+                                    variant="ghost"
+                                    isIconOnly
+                                    onPress={() => setShowClientSecret(!showClientSecret)}
+                                    data-cy="sso-provider-form-oidc-toggle-client-secret-button"
+                                  >
+                                    {showClientSecret ? <EyeOff size={16} /> : <Eye size={16} />}
+                                  </Button>
+                                  <TooltipContent>
+                                    {showClientSecret ? t('hideClientSecret') : t('showClientSecret')}
+                                  </TooltipContent>
+                                </Tooltip>
+                              </InputGroup.Suffix>
                             </InputGroup>
                           </TextField>
 

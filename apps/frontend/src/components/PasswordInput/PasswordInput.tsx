@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { TextFieldProps, TextField, Label, Input, InputGroup, Description, FieldError } from '@heroui/react';
+import { TextFieldProps, TextField, Label, InputGroup, Description, FieldError } from '@heroui/react';
 import { Button, Tooltip } from '@heroui/react';
 import { Eye, EyeOff } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -44,7 +44,7 @@ export const PasswordInput: React.FC<PasswordInputProps> = ({
     <TextField {...fieldProps} onChange={handleChange}>
       {label && <Label>{label}</Label>}
       <InputGroup>
-        <Input
+        <InputGroup.Input
           type={showPassword ? 'text' : 'password'}
           id={id}
           name={name}
@@ -52,21 +52,22 @@ export const PasswordInput: React.FC<PasswordInputProps> = ({
           placeholder={placeholder}
           data-cy={dataCy}
         />
-        <Tooltip>
-          <Tooltip.Trigger>
-            <Button
-              variant="ghost"
-              isIconOnly
-
-              onPress={() => setShowPassword((v) => !v)}
-              aria-label={showPassword ? t('hidePassword') : t('showPassword')}
-              data-cy="password-input-toggle-button"
-            >
-              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-            </Button>
-          </Tooltip.Trigger>
-          <Tooltip.Content>{showPassword ? t('hidePassword') : t('showPassword')}</Tooltip.Content>
-        </Tooltip>
+        <InputGroup.Suffix>
+          <Tooltip>
+            <Tooltip.Trigger>
+              <Button
+                variant="ghost"
+                isIconOnly
+                onPress={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? t('hidePassword') : t('showPassword')}
+                data-cy="password-input-toggle-button"
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </Button>
+            </Tooltip.Trigger>
+            <Tooltip.Content>{showPassword ? t('hidePassword') : t('showPassword')}</Tooltip.Content>
+          </Tooltip>
+        </InputGroup.Suffix>
       </InputGroup>
       {description && <Description>{description}</Description>}
       {errorMessage && <FieldError>{errorMessage}</FieldError>}
