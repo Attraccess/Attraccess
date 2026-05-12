@@ -1,6 +1,6 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Alert, AlertContent, AlertDescription, AlertIndicator, Button, Input, Label, TextField, cn } from '@heroui/react';
-import { AlertCircleIcon } from 'lucide-react';
+import { Alert, AlertContent, AlertDescription, Button, Input, Label, TextField, cn } from '@heroui/react';
+import { AlertStatusIcon } from '../../../../../components/AlertStatusIcon';
 import { useCallback, useState, type FormEvent } from 'react';
 import { PageHeader } from '../../../../../components/pageHeader';
 import { useAttractapSerialComm } from '../Auth';
@@ -106,9 +106,7 @@ export function AttractapSerialConfiguratorPin({ className, mode = 'change' }: A
           <Input maxLength={4} inputMode="numeric" required />
         </TextField>
         {error && <Alert status="danger">
-          <AlertIndicator>
-            <AlertCircleIcon />
-          </AlertIndicator>
+          <AlertStatusIcon status="danger" />
           <AlertContent>
             <AlertDescription>{error}</AlertDescription>
           </AlertContent>

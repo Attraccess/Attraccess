@@ -4,7 +4,6 @@ import {
   Alert,
   AlertContent,
   AlertDescription,
-  AlertIndicator,
   AlertTitle,
   Button,
   Card,
@@ -29,7 +28,8 @@ import {
   Tooltip,
   TooltipContent,
 } from '@heroui/react';
-import { AlertTriangleIcon, Trash2, Upload } from 'lucide-react';
+import { Trash2, Upload } from 'lucide-react';
+import { AlertStatusIcon } from '../../components/AlertStatusIcon';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { UploadPluginModal } from './UploadPluginModal';
 import { useToastMessage } from '../../components/toastProvider';
@@ -89,12 +89,10 @@ export function PluginsList() {
   return (
     <>
       <Alert status="danger" className="mb-4" data-cy="plugins-list-work-in-progress-alert">
-        <AlertIndicator>
-          <AlertTriangleIcon />
-        </AlertIndicator>
+        <AlertStatusIcon status="danger" />
         <AlertContent>
-          <AlertTitle>{t('workInProgressAlertTitle')}</AlertTitle>
-          <AlertDescription>{t('workInProgressAlert')}</AlertDescription>
+          <AlertTitle>{t('workInProgressTitle')}</AlertTitle>
+          <AlertDescription>{t('workInProgress')}</AlertDescription>
         </AlertContent>
       </Alert>
       <Card className="w-full" data-cy="plugins-list-card">
