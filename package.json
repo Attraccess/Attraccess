@@ -73,7 +73,7 @@
     "express-session": "^1.19.0",
     "fetch-event-stream": "^0.1.6",
     "framer-motion": "^12.38.0",
-    "glob": "^12.0.0",
+    "glob": "^13.0.6",
     "handlebars": "^4.7.9",
     "identity-obj-proxy": "^3.0.0",
     "intl-pluralrules": "^2.0.1",
