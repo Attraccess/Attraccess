@@ -19,7 +19,6 @@ import { UnauthorizedLayout } from './unauthorized/unauthorized-layout/layout';
 import { BootScreen } from '../components/bootScreen';
 import { usePtrStore } from '../stores/ptr.store';
 import { ReactFlowProvider } from '@xyflow/react';
-import { ServerNotAvailable } from './serverNotAvailable';
 import { AccessDenied } from './unauthorized/accessDenied';
 import { getBaseUrl } from '../api';
 import { AcceptInvitation } from './accept-invitation';
@@ -100,7 +99,6 @@ function AppLayout(props: PropsWithChildren) {
           <ToastProvider>
             <ReactFlowProvider>
               <Layout noLayout={!isAuthenticated}>
-                <ServerNotAvailable />
                 {props.children}
               </Layout>
             </ReactFlowProvider>

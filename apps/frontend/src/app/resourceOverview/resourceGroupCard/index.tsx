@@ -161,7 +161,7 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
             renderEmptyState={() => <EmptyState />}
           >
             {(resource) => (
-              <TableRow key={resource.id} id={resource.id} className="cursor-pointer hover:bg-primary-50 transition-bg duration-300">
+              <TableRow key={resource.id} id={resource.id} className="cursor-pointer hover:bg-primary-50 transition-bg duration-300" onAction={() => navigate(`/resources/${resource.id}`)}>
                 <TableCell>
                   <img
                     height={48}

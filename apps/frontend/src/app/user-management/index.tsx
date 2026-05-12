@@ -3,9 +3,6 @@ import { PageHeader } from '../../components/pageHeader';
 import { AttraccessUser, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   Button,
-  Card,
-  CardContent,
-  CardFooter,
   Chip,
   TextField,
   Input,
@@ -131,26 +128,27 @@ export const UserManagementPage: React.FC = () => {
         }
       />
 
-      <Card>
-        <CardContent>
-          <TextField value={search} onChange={setSearch} aria-label={t('table.inputs.search')} className="mb-4">
+      <div className="mt-6">
+        <div className="flex justify-end mb-2">
+          <TextField value={search} onChange={setSearch} aria-label={t('table.inputs.search')} className="w-full sm:w-72">
             <Input placeholder={t('table.inputs.search')} />
           </TextField>
+        </div>
 
-          <Table>
-            <TableContent aria-label={t('table.ariaLabel')}>
-            <TableHeader>
-              <TableColumn width="0" className="hidden md:table-cell">
-                {t('table.columns.isEmailVerified')}
-              </TableColumn>
-              <TableColumn width="0">{t('table.columns.id')}</TableColumn>
-              <TableColumn>{t('table.columns.username')}</TableColumn>
-              <TableColumn className="hidden md:table-cell">{t('table.columns.externalIdentifier')}</TableColumn>
-              <TableColumn width="0" className="text-center">
-                {t('table.columns.ssoLinked')}
-              </TableColumn>
-              <TableColumn className="text-center">{t('table.columns.permissions')}</TableColumn>
-            </TableHeader>
+        <Table>
+          <TableContent aria-label={t('table.ariaLabel')}>
+          <TableHeader>
+            <TableColumn width="0" className="hidden md:table-cell">
+              {t('table.columns.isEmailVerified')}
+            </TableColumn>
+            <TableColumn width="0">{t('table.columns.id')}</TableColumn>
+            <TableColumn>{t('table.columns.username')}</TableColumn>
+            <TableColumn className="hidden md:table-cell">{t('table.columns.externalIdentifier')}</TableColumn>
+            <TableColumn width="0" className="text-center">
+              {t('table.columns.ssoLinked')}
+            </TableColumn>
+            <TableColumn className="text-center">{t('table.columns.permissions')}</TableColumn>
+          </TableHeader>
 
             <TableBody
               items={searchResult?.data ?? []}
@@ -179,7 +177,7 @@ export const UserManagementPage: React.FC = () => {
                 const isSsoLinked = ssoDetails.length > 0;
 
                 return (
-                  <TableRow key={user.id} id={user.id} className="cursor-pointer hover:bg-primary-50 transition-bg duration-300">
+                  <TableRow key={user.id} id={user.id} className="cursor-pointer hover:bg-primary-50 transition-bg duration-300" onAction={() => navigate(`/users/${user.id}`)}>
                     <TableCell className="hidden md:table-cell">
                       {user.isEmailVerified ? <ShieldCheckIcon /> : <ShieldOffIcon />}
                     </TableCell>
@@ -258,16 +256,15 @@ export const UserManagementPage: React.FC = () => {
                 );
               }}
             </TableBody>
-            </TableContent>
-          </Table>
-        </CardContent>
+          </TableContent>
+        </Table>
 
-        <CardFooter className="flex w-full justify-end">
+        <div className="flex w-full justify-end mt-4">
           {isFetchedSearchResult && (
             <SimplePagination showControls page={page} total={totalPages} onChange={(page) => setPage(page)} />
           )}
-        </CardFooter>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 };

@@ -10,25 +10,27 @@ interface Props {
 export function SharedDataTab(props: EditorTabProps & Props) {
   const { t, formData, setField, onImageSelected, resource } = props;
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-3 w-full">
       <TextField
         isRequired
         isInvalid={!formData.name}
         value={formData.name}
         onChange={(v) => setField('name', v)}
         data-cy="resource-edit-modal-name-input"
+        className="w-full"
       >
         <Label>{t('inputs.name.label')}</Label>
-        <Input required />
+        <Input required className="w-full" />
         {!formData.name && <FieldError />}
       </TextField>
       <TextField
         value={formData.description}
         onChange={(v) => setField('description', v)}
         data-cy="resource-edit-modal-description-input"
+        className="w-full"
       >
         <Label>{t('inputs.description.label')}</Label>
-        <Input />
+        <Input className="w-full" />
       </TextField>
 
       <ImageUpload

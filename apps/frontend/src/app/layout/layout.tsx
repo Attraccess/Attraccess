@@ -4,6 +4,7 @@ import { Sidebar } from './sidebar';
 import { Header } from './header';
 import { DonationPrompt } from '../../components/DonationPrompt';
 import { UpdateNotificationBanner } from '../../components/UpdateNotificationBanner';
+import { ServerNotAvailable } from '../serverNotAvailable';
 import { useLiveTransactionUpdates } from '../billing/dashboard/summary/live-updates';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -67,11 +68,16 @@ export function Layout({ children, noLayout }: LayoutProps) {
   });
 
   if (noLayout) {
-    return <div className="bg-gray-100 dark:bg-gray-900">{children}</div>;
+    return (
+      <div className="bg-background min-h-screen flex flex-col">
+        <ServerNotAvailable />
+        {children}
+      </div>
+    );
   }
 
   return (
-    <div className="flex h-screen bg-white dark:bg-gray-800">
+    <div className="flex h-screen bg-background">
       {/* Sidebar */}
       <Sidebar isOpen={isOpen} toggleSidebar={toggleSidebar} />
 
@@ -83,8 +89,11 @@ export function Layout({ children, noLayout }: LayoutProps) {
         {/* Update notification banner (admins only) */}
         <UpdateNotificationBanner />
 
+        {/* Server unavailable inline notice */}
+        <ServerNotAvailable />
+
         {/* Page Content */}
-        <main className="flex-1 overflow-auto p-4">{children}</main>
+        <main className="flex-1 overflow-auto p-4 bg-background">{children}</main>
 
         {/* Global donation prompt for eligible users */}
         <DonationPrompt />

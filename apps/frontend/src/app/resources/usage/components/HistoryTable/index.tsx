@@ -157,7 +157,7 @@ export const HistoryTable = ({
           <TableRow
             key={session.id} id={session.id}
             className="cursor-pointer hover:bg-primary-50 transition-bg duration-300"
-            onClick={() => onSessionClick(session)}
+            onAction={() => onSessionClick(session)}
           >
             {resource
               ? generateRowCells(session, t, resource, showAllUsers, canManageResources, (sessionToRender) => (
