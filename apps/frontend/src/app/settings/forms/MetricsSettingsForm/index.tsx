@@ -11,7 +11,6 @@ import {
   Switch,
   TextField,
   Label,
-  Input,
   InputGroup,
   Modal,
   ModalBackdrop,
@@ -271,13 +270,15 @@ export function MetricsSettingsForm() {
     <TextField value={metricsEndpointUrl} isReadOnly>
       <Label>{t('endpointLabel')}</Label>
       <InputGroup>
-        <Input className="font-mono text-sm" />
-        <Tooltip>
-          <Button variant="ghost" isIconOnly onPress={handleCopyEndpoint} aria-label={t('copyButton')}>
-            <ClipboardCopyIcon size={16} />
-          </Button>
-          <TooltipContent>{t('copyButton')}</TooltipContent>
-        </Tooltip>
+        <InputGroup.Input className="font-mono text-sm" />
+        <InputGroup.Suffix>
+          <Tooltip>
+            <Button variant="ghost" isIconOnly onPress={handleCopyEndpoint} aria-label={t('copyButton')}>
+              <ClipboardCopyIcon size={16} />
+            </Button>
+            <TooltipContent>{t('copyButton')}</TooltipContent>
+          </Tooltip>
+        </InputGroup.Suffix>
       </InputGroup>
     </TextField>
   );
@@ -307,13 +308,15 @@ export function MetricsSettingsForm() {
         <TextField value={generatedKey} isReadOnly>
           <Label>{t('apiKeyLabel')}</Label>
           <InputGroup>
-            <Input className="font-mono text-sm" />
-            <Tooltip>
-              <Button variant="ghost" isIconOnly onPress={handleCopyKey} aria-label={t('copyButton')}>
-                <ClipboardCopyIcon size={16} />
-              </Button>
-              <TooltipContent>{t('copyButton')}</TooltipContent>
-            </Tooltip>
+            <InputGroup.Input className="font-mono text-sm" />
+            <InputGroup.Suffix>
+              <Tooltip>
+                <Button variant="ghost" isIconOnly onPress={handleCopyKey} aria-label={t('copyButton')}>
+                  <ClipboardCopyIcon size={16} />
+                </Button>
+                <TooltipContent>{t('copyButton')}</TooltipContent>
+              </Tooltip>
+            </InputGroup.Suffix>
           </InputGroup>
         </TextField>
 

@@ -1,4 +1,4 @@
-import { Button, TextField, InputGroup, Input } from '@heroui/react';
+import { Button, TextField, InputGroup } from '@heroui/react';
 import { SearchIcon, PlusIcon } from 'lucide-react';
 import { useAuth } from '../../../hooks/useAuth';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -43,25 +43,20 @@ export function Toolbar({
             aria-label={t('searchPlaceholder')}
           >
             <InputGroup>
-              <ResourceFilter
-                onlyInUseByMe={filterProps.onlyInUseByMe}
-                onOnlyInUseByMeChanged={filterProps.onOnlyInUseByMeChanged}
-                onlyWithPermissions={filterProps.onlyWithPermissions}
-                onOnlyWithPermissionsChanged={filterProps.onOnlyWithPermissionsChanged}
-                hideEmptyResourceGroups={filterProps.hideEmptyResourceGroups}
-                onHideEmptyResourceGroupsChanged={filterProps.onHideEmptyResourceGroupsChanged}
-              >
-                {({ onOpen }) => (
-                  <Button
-
-                    variant="ghost"
-                    isIconOnly
-                    onPress={onOpen}
-                  />
-                )}
-              </ResourceFilter>
-              <SearchIcon size={18} />
-              <Input placeholder={t('searchPlaceholder')} data-cy="resource-search-input" />
+              <InputGroup.Prefix>
+                <ResourceFilter
+                  onlyInUseByMe={filterProps.onlyInUseByMe}
+                  onOnlyInUseByMeChanged={filterProps.onOnlyInUseByMeChanged}
+                  onlyWithPermissions={filterProps.onlyWithPermissions}
+                  onOnlyWithPermissionsChanged={filterProps.onOnlyWithPermissionsChanged}
+                  hideEmptyResourceGroups={filterProps.hideEmptyResourceGroups}
+                  onHideEmptyResourceGroupsChanged={filterProps.onHideEmptyResourceGroupsChanged}
+                >
+                  {({ onOpen }) => <Button variant="ghost" isIconOnly onPress={onOpen} />}
+                </ResourceFilter>
+                <SearchIcon size={18} />
+              </InputGroup.Prefix>
+              <InputGroup.Input placeholder={t('searchPlaceholder')} data-cy="resource-search-input" />
             </InputGroup>
           </TextField>
         </div>
