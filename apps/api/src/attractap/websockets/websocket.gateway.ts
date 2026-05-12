@@ -10,7 +10,7 @@ import {
 import { Server } from 'ws';
 import { existsSync, statSync, openSync, readSync, closeSync } from 'fs';
 import { join } from 'path';
-import { Inject, Logger } from '@nestjs/common';
+import { Inject, Logger, UseInterceptors } from '@nestjs/common';
 import { WebsocketService } from './websocket.service';
 import { AuthenticatedWebSocket, AttractapEvent, AttractapMessage, AttractapEventType } from './websocket.types';
 import { AttractapService } from '../attractap.service';
@@ -39,8 +39,10 @@ import { MetricsService } from '../../metrics/metrics.service';
 import { MetricsToggleService } from '../../metrics/settings/metrics-toggle.service';
 import { WS_METRICS } from '../../metrics/definitions/tokens';
 import { ATTRACTAP_GATEWAY_LABEL, WsMetrics } from '../../metrics/definitions/ws.metrics';
+import { WsMetricsInterceptor } from '../../metrics/instrumentation/ws/ws.interceptor';
 
 @WebSocketGateway({ path: '/api/attractap/websocket' })
+@UseInterceptors(WsMetricsInterceptor)
 export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
