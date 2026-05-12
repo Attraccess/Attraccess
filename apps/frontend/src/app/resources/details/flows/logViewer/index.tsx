@@ -1,4 +1,4 @@
-import { Accordion, AccordionItem, AccordionHeading, AccordionTrigger, AccordionPanel, AccordionBody, Separator, Drawer, DrawerBody, DrawerContent, DrawerHeader, TextArea, useOverlayState } from '@heroui/react';
+import { Accordion, AccordionItem, AccordionHeading, AccordionTrigger, AccordionPanel, AccordionBody, Separator, Drawer, DrawerBackdrop, DrawerBody, DrawerContent, DrawerDialog, DrawerHeader, TextArea, useOverlayState } from '@heroui/react';
 import { PageHeader } from '../../../../../components/pageHeader';
 import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
@@ -87,40 +87,43 @@ export function LogViewer(props: Props) {
     <>
       {props.children(open)}
       <Drawer isOpen={isOpen} onOpenChange={setOpen}>
+        <DrawerBackdrop />
         <DrawerContent>
-          <DrawerHeader>
-            <PageHeader title={t('title')} noMargin />
-          </DrawerHeader>
+          <DrawerDialog>
+            <DrawerHeader>
+              <PageHeader title={t('title')} noMargin />
+            </DrawerHeader>
 
-          <DrawerBody>
-            <div className="flex flex-col gap-4">
-              {Object.entries(logsByRunId).map(([runId, logsOfRun], index, self) => (
-                <div key={`${runId}-logs`}>
-                  <div>
-                    <PageHeader
-                      title={t('nodes.' + (firstNodeOfRun(runId)?.node?.type ?? 'flow') + '.title')}
-                      subtitle={formatDateTime(firstNodeOfRun(runId)?.createdAt)}
-                      noMargin
-                    />
+            <DrawerBody>
+              <div className="flex flex-col gap-4">
+                {Object.entries(logsByRunId).map(([runId, logsOfRun], index, self) => (
+                  <div key={`${runId}-logs`}>
+                    <div>
+                      <PageHeader
+                        title={t('nodes.' + (firstNodeOfRun(runId)?.node?.type ?? 'flow') + '.title')}
+                        subtitle={formatDateTime(firstNodeOfRun(runId)?.createdAt)}
+                        noMargin
+                      />
 
-                    <Accordion className="mt-2">
-                      {logsOfRun.map((log) => (
-                        <AccordionItem key={`${runId}-${log.id}`}>
-                          <AccordionHeading><AccordionTrigger>{log.title}</AccordionTrigger></AccordionHeading>
-                          <AccordionPanel><AccordionBody>
-                            {log.payload && (
-                              <TextArea readOnly value={JSON.stringify(JSON.parse(log.payload), null, 2)} />
-                            )}
-                          </AccordionBody></AccordionPanel>
-                        </AccordionItem>
-                      ))}
-                    </Accordion>
+                      <Accordion className="mt-2">
+                        {logsOfRun.map((log) => (
+                          <AccordionItem key={`${runId}-${log.id}`}>
+                            <AccordionHeading><AccordionTrigger>{log.title}</AccordionTrigger></AccordionHeading>
+                            <AccordionPanel><AccordionBody>
+                              {log.payload && (
+                                <TextArea readOnly value={JSON.stringify(JSON.parse(log.payload), null, 2)} />
+                              )}
+                            </AccordionBody></AccordionPanel>
+                          </AccordionItem>
+                        ))}
+                      </Accordion>
+                    </div>
+                    {index < self.length - 1 && <Separator className="my-4" />}
                   </div>
-                  {index < self.length - 1 && <Separator className="my-4" />}
-                </div>
-              ))}
-            </div>
-          </DrawerBody>
+                ))}
+              </div>
+            </DrawerBody>
+          </DrawerDialog>
         </DrawerContent>
       </Drawer>
     </>

@@ -1,5 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { DrawerBody, Drawer, DrawerContent, DrawerHeader, useOverlayState } from '@heroui/react';
+import { DrawerBackdrop, DrawerBody, Drawer, DrawerContent, DrawerDialog, DrawerHeader, useOverlayState } from '@heroui/react';
 import { LabeledSwitch } from '../../../../components/labeledSwitch';
 
 import de from './de.json';
@@ -23,25 +23,28 @@ export function ResourceFilter(props: Props & Omit<FilterProps, 'onSearchChanged
     <>
       {children({ onOpen: open })}
       <Drawer isOpen={isOpen} onOpenChange={setOpen}>
+        <DrawerBackdrop />
         <DrawerContent>
-          <DrawerHeader>{t('drawer.title')}</DrawerHeader>
-          <DrawerBody>
-            <LabeledSwitch isSelected={filterProps.onlyInUseByMe} onChange={filterProps.onOnlyInUseByMeChanged}>
-              {t('drawer.options.onlyInUseByMe')}
-            </LabeledSwitch>
-            <LabeledSwitch
-              isSelected={filterProps.onlyWithPermissions}
-              onChange={filterProps.onOnlyWithPermissionsChanged}
-            >
-              {t('drawer.options.onlyWithPermissions')}
-            </LabeledSwitch>
-            <LabeledSwitch
-              isSelected={filterProps.hideEmptyResourceGroups}
-              onChange={filterProps.onHideEmptyResourceGroupsChanged}
-            >
-              {t('drawer.options.hideEmptyResourceGroups')}
-            </LabeledSwitch>
-          </DrawerBody>
+          <DrawerDialog>
+            <DrawerHeader>{t('drawer.title')}</DrawerHeader>
+            <DrawerBody>
+              <LabeledSwitch isSelected={filterProps.onlyInUseByMe} onChange={filterProps.onOnlyInUseByMeChanged}>
+                {t('drawer.options.onlyInUseByMe')}
+              </LabeledSwitch>
+              <LabeledSwitch
+                isSelected={filterProps.onlyWithPermissions}
+                onChange={filterProps.onOnlyWithPermissionsChanged}
+              >
+                {t('drawer.options.onlyWithPermissions')}
+              </LabeledSwitch>
+              <LabeledSwitch
+                isSelected={filterProps.hideEmptyResourceGroups}
+                onChange={filterProps.onHideEmptyResourceGroupsChanged}
+              >
+                {t('drawer.options.hideEmptyResourceGroups')}
+              </LabeledSwitch>
+            </DrawerBody>
+          </DrawerDialog>
         </DrawerContent>
       </Drawer>
     </>
