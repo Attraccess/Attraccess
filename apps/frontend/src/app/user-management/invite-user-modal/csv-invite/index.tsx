@@ -304,7 +304,7 @@ export function CsvInvite({ onSuccess, onError }: Props) {
       <Table data-cy="csv-invite-table">
         <TableContent aria-label="csv-invite-table">
         <TableHeader>
-          <TableColumn>{t('preview.columns.index')}</TableColumn>
+          <TableColumn isRowHeader>{t('preview.columns.index')}</TableColumn>
           <TableColumn>{t('preview.columns.username')}</TableColumn>
           <TableColumn>{t('preview.columns.email')}</TableColumn>
           <TableColumn>{t('preview.columns.permissions.label')}</TableColumn>
@@ -340,7 +340,7 @@ export function CsvInvite({ onSuccess, onError }: Props) {
           <Table>
             <TableContent aria-label="csv-invite-errors">
             <TableHeader>
-              <TableColumn>{t('errors.columns.row')}</TableColumn>
+              <TableColumn isRowHeader>{t('errors.columns.row')}</TableColumn>
               <TableColumn>{t('errors.columns.field')}</TableColumn>
               <TableColumn>{t('errors.columns.message')}</TableColumn>
               <TableColumn>{t('errors.columns.value')}</TableColumn>

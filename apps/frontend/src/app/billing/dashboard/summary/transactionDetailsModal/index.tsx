@@ -194,7 +194,7 @@ export function TransactionDetailsModal(props: Props) {
                           <Table>
                             <TableContent aria-label="Transaction items">
                             <TableHeader>
-                              <TableColumn>{t('items.columns.name')}</TableColumn>
+                              <TableColumn isRowHeader>{t('items.columns.name')}</TableColumn>
                               <TableColumn>{t('items.columns.description')}</TableColumn>
                               <TableColumn>{t('items.columns.quantity')}</TableColumn>
                               <TableColumn>{t('items.columns.unitPrice')}</TableColumn>

@@ -330,8 +330,8 @@ export function NfcCardList() {
       <Table data-cy="nfc-card-list-table">
         <TableContent aria-label={t('nfcCards')}>
         <TableHeader>
-          {headers.map((header) => (
-            <TableColumn key={header} id={header}>
+          {headers.map((header, idx) => (
+            <TableColumn key={header} id={header} isRowHeader={idx === 0}>
               {t('nfcCardsTable.headers.' + header)}
             </TableColumn>
           ))}

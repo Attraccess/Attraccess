@@ -107,7 +107,7 @@ export function PluginsList() {
           <Table data-cy="plugins-list-table">
             <TableContent aria-label="Plugins table">
             <TableHeader>
-              <TableColumn>{t('columns.name')}</TableColumn>
+              <TableColumn isRowHeader>{t('columns.name')}</TableColumn>
               <TableColumn>{t('columns.version')}</TableColumn>
               <TableColumn>{t('columns.directory')}</TableColumn>
               <TableColumn>{t('columns.actions')}</TableColumn>

@@ -269,7 +269,7 @@ export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
               <Table>
                 <TableContent aria-label={t('charts.topResources.table.ariaLabel')}>
                 <TableHeader>
-                  <TableColumn>{t('charts.topResources.columns.resource')}</TableColumn>
+                  <TableColumn isRowHeader>{t('charts.topResources.columns.resource')}</TableColumn>
                   <TableColumn>{t('charts.topResources.columns.sessions')}</TableColumn>
                   <TableColumn>{t('charts.topResources.columns.minutes')}</TableColumn>
                   <TableColumn>{t('charts.topResources.columns.spend')}</TableColumn>

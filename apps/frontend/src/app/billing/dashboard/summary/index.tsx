@@ -178,7 +178,7 @@ export function SummaryCard(props: Omit<CardProps, 'children'> & Props) {
         <Table>
           <TableContent aria-label={t('transactions.table.ariaLabel')}>
           <TableHeader>
-            <TableColumn>{t('transactions.table.columns.id')}</TableColumn>
+            <TableColumn isRowHeader>{t('transactions.table.columns.id')}</TableColumn>
             <TableColumn>{t('transactions.table.columns.dateTime')}</TableColumn>
             <TableColumn>{t('transactions.table.columns.status')}</TableColumn>
             <TableColumn className="w-full">

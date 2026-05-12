@@ -70,7 +70,7 @@ export function IntroductionHistoryModal(props: Readonly<Props>) {
                   <Table>
                     <TableContent aria-label={t('table.ariaLabel')}>
                     <TableHeader>
-                      <TableColumn>{t('table.columns.date')}</TableColumn>
+                      <TableColumn isRowHeader>{t('table.columns.date')}</TableColumn>
                       <TableColumn>{t('table.columns.action')}</TableColumn>
                       <TableColumn>{t('table.columns.comment')}</TableColumn>
                     </TableHeader>
