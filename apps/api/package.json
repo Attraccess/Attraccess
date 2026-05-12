@@ -26,7 +26,7 @@
     "decompress": "^4.2.1",
     "express": "4.22.1",
     "express-session": "^1.18.1",
-    "glob": "^12.0.0",
+    "glob": "^13.0.6",
     "handlebars": "^4.7.8",
     "identity-obj-proxy": "^3.0.0",
     "mjml": "^5.0.1",
