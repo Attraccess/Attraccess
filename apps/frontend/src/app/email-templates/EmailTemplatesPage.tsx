@@ -36,7 +36,7 @@ export function EmailTemplatesPage() {
       <Table>
         <TableContent aria-label="Email templates table">
           <TableHeader>
-          <TableColumn>{t('columns.type')}</TableColumn>
+          <TableColumn isRowHeader>{t('columns.type')}</TableColumn>
           <TableColumn>{t('columns.subject')}</TableColumn>
           <TableColumn>{t('columns.actions')}</TableColumn>
         </TableHeader>

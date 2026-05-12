@@ -163,7 +163,7 @@ export function BaseCsvExportModal<TData extends Row>(props: Props<TData>) {
           <TableContent aria-label={t('table.ariaLabel')}>
           <TableHeader columns={selectedColumns}>
             {(column) => (
-              <TableColumn key={column.key} id={column.key}>
+              <TableColumn key={column.key} id={column.key} isRowHeader={column.key === selectedColumns[0]?.key}>
                 {column.label}
               </TableColumn>
             )}

@@ -150,7 +150,7 @@ export function ManageResourceGroups({
         <Table>
           <TableContent aria-label={t('table.ariaLabel')}>
           <TableHeader>
-            <TableColumn>{t('columns.group')}</TableColumn>
+            <TableColumn isRowHeader>{t('columns.group')}</TableColumn>
             <TableColumn>{t('columns.actions')}</TableColumn>
           </TableHeader>
           <TableBody

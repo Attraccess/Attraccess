@@ -139,7 +139,7 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
         <Table>
           <TableContent aria-label={t('table.ariaLabel')}>
           <TableHeader>
-            <TableColumn> </TableColumn>
+            <TableColumn isRowHeader> </TableColumn>
             <TableColumn> </TableColumn>
           </TableHeader>
           <TableBody>
