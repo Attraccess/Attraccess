@@ -166,13 +166,13 @@ export function AttractapHardwareSetup(props: Props) {
 
       <Modal isOpen={isOpen} onOpenChange={setOpen}>
         <ModalBackdrop>
-          <ModalContainer size={state === 'configure' ? 'lg' : undefined}>
+          <ModalContainer size={state === 'configure' ? 'lg' : 'md'}>
             <ModalDialog>
               {() => (
                 <>
                   <ModalHeader>
                     <div className="flex w-full items-center gap-2">
-                      <Button variant="ghost" isIconOnly aria-label="Go back" onPress={onBack}>
+                      <Button variant="ghost" isIconOnly aria-label={t('actions.back')} onPress={onBack}>
                         <ArrowLeft className="w-5 h-5" />
                       </Button>
                       <div className="flex-1">

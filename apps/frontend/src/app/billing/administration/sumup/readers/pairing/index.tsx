@@ -117,6 +117,9 @@ export function SumUpReadersPairing(props: Props) {
                   </ModalBody>
 
                   <ModalFooter>
+                    <Button variant="secondary" onPress={close}>
+                      {t('actions.cancel')}
+                    </Button>
                     <Button variant="primary" onPress={onSubmit} isPending={isPairingReader}>
                       {t('actions.pair')}
                     </Button>
