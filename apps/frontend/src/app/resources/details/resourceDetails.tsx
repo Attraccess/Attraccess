@@ -2,7 +2,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Button, Spinner, useOverlayState } from '@heroui/react';
 import { useAuth } from '../../../hooks/useAuth';
 import { useToastMessage } from '../../../components/toastProvider';
-import { ArrowLeft, BookOpen, ListChecks, PenSquareIcon, ShapesIcon, Trash, WorkflowIcon } from 'lucide-react';
+import { ArrowLeft, BookOpen, ListChecks, PenSquareIcon, ShapesIcon, Trash, WorkflowIcon, WrenchIcon } from 'lucide-react';
 
 import { ResourceUsageSession } from '../usage/resourceUsageSession';
 import { ResourceUsageHistory } from '../usage/resourceUsageHistory';
@@ -29,7 +29,6 @@ import { ResourceQrCode } from './qrcode';
 import { useQrCodeAction } from './useQrCodeAction';
 import { filenameToUrl } from '../../../api';
 import { MaintenanceManagement } from './maintenance-management';
-import { MaintenanceSchedules } from './maintenance-schedules';
 import { ResourceBillingInfo } from './resourceBillingInfo';
 import { ResourceHealthWarning } from './health-state';
 
@@ -159,6 +158,15 @@ function ResourceDetailsComponent() {
                   {t('navItems.forms')}
                 </Button>
 
+                {maintenancePermissions?.canManage && (
+                  <Button variant="ghost"
+                    onPress={() => navigate(`/resources/${resourceId}/maintenance`)}
+                    data-cy="maintenance-button"
+                  ><WrenchIcon className="w-4 h-4" />
+                    {t('actions.maintenance')}
+                  </Button>
+                )}
+
                 <ResourceEditModal resourceId={resourceId} closeOnSuccess>
                   {(onOpen) => (
                     <Button variant="ghost"
@@ -203,10 +211,7 @@ function ResourceDetailsComponent() {
           <ResourceUsageHistory resourceId={resourceId} data-cy="resource-usage-history" className="flex-grow" />
 
           {maintenancePermissions?.canManage && (
-            <>
-              <MaintenanceManagement resourceId={resourceId} className="flex-grow" />
-              <MaintenanceSchedules resourceId={resourceId} className="flex-grow" />
-            </>
+            <MaintenanceManagement resourceId={resourceId} className="flex-grow" />
           )}
         </div>
       </div>
