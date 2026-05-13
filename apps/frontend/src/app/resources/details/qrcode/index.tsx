@@ -83,8 +83,8 @@ export function ResourceQrCode(props: Props & Omit<ButtonProps, 'children' | 'st
 
                   <ModalBody>
                     <Select
-                      selectedKey={action}
-                      onSelectionChange={(key) => setAction(key as QrCodeAction)}
+                      value={action}
+                      onChange={(key) => setAction(key as QrCodeAction)}
                       label={t('modal.action.label')}
                       items={Object.values(QrCodeAction).map((val) => ({
                         key: val,

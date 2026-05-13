@@ -150,8 +150,8 @@ export function SmtpSettingsForm({ variant, endpoint, onNext }: SmtpSettingsForm
     >
       <Select
         label={t('inputs.service.label')}
-        selectedKey={smtpService}
-        onSelectionChange={(key) => {
+        value={smtpService}
+        onChange={(key) => {
           const next = key as SmtpServiceType;
           setSmtpService(next);
           if (next === SmtpServiceType.OUTLOOK365) {

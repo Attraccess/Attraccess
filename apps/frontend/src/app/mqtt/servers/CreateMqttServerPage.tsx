@@ -130,8 +130,8 @@ export function CreateMqttServerForm(props?: Readonly<CreateMqttServerPageProps>
 
       <Select
         label={t('defaultPublishQosLabel')}
-        selectedKey={String(formValues.defaultPublishQos ?? 0)}
-        onSelectionChange={(key) => setFormValues((prev) => ({ ...prev, defaultPublishQos: Number(key) }))}
+        value={String(formValues.defaultPublishQos ?? 0)}
+        onChange={(key) => setFormValues((prev) => ({ ...prev, defaultPublishQos: Number(key) }))}
         data-cy="create-mqtt-server-form-default-publish-qos-input"
         items={qosOptions.map((option) => ({ key: String(option), label: t(`qosOption.${option}`) }))}
       />
@@ -148,8 +148,8 @@ export function CreateMqttServerForm(props?: Readonly<CreateMqttServerPageProps>
 
       <Select
         label={t('defaultSubscribeQosLabel')}
-        selectedKey={String(formValues.defaultSubscribeQos ?? 0)}
-        onSelectionChange={(key) => setFormValues((prev) => ({ ...prev, defaultSubscribeQos: Number(key) }))}
+        value={String(formValues.defaultSubscribeQos ?? 0)}
+        onChange={(key) => setFormValues((prev) => ({ ...prev, defaultSubscribeQos: Number(key) }))}
         data-cy="create-mqtt-server-form-default-subscribe-qos-input"
         items={qosOptions.map((option) => ({ key: String(option), label: t(`qosOption.${option}`) }))}
       />

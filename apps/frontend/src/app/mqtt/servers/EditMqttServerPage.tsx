@@ -183,8 +183,8 @@ export function EditMqttServerPage() {
 
               <Select
                 label={t('defaultPublishQosLabel')}
-                selectedKey={String(formValues.defaultPublishQos ?? 0)}
-                onSelectionChange={(key) => {
+                value={String(formValues.defaultPublishQos ?? 0)}
+                onChange={(key) => {
                   setFormValues((prev) => ({ ...prev, defaultPublishQos: Number(key) }));
                 }}
                 data-cy="edit-mqtt-server-form-default-publish-qos-input"
@@ -205,8 +205,8 @@ export function EditMqttServerPage() {
 
               <Select
                 label={t('defaultSubscribeQosLabel')}
-                selectedKey={String(formValues.defaultSubscribeQos ?? 0)}
-                onSelectionChange={(key) => {
+                value={String(formValues.defaultSubscribeQos ?? 0)}
+                onChange={(key) => {
                   setFormValues((prev) => ({ ...prev, defaultSubscribeQos: Number(key) }));
                 }}
                 data-cy="edit-mqtt-server-form-default-subscribe-qos-input"

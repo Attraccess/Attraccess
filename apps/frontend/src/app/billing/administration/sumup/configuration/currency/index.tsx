@@ -93,8 +93,8 @@ export function CurrencyCard(props: Omit<CardProps, 'children'>) {
               label: currency,
             }))}
             label={t('inputs.currency.label')}
-            selectedKey={currency}
-            onSelectionChange={(key) => setCurrency(key as Currency)}
+            value={currency}
+            onChange={(key) => setCurrency(key as Currency)}
           />
 
           <input type="submit" hidden />

@@ -258,8 +258,8 @@ export function CsvInvite({ onSuccess, onError }: Props) {
 
       <Select
         label={t('inputs.fieldMapping.email')}
-        selectedKey={emailKey ?? ''}
-        onSelectionChange={setEmailKey}
+        value={emailKey ?? ''}
+        onChange={setEmailKey}
         items={csvHeaders.map((header) => ({
           label: header,
           key: header,
@@ -269,8 +269,8 @@ export function CsvInvite({ onSuccess, onError }: Props) {
 
       <Select
         label={t('inputs.fieldMapping.username')}
-        selectedKey={usernameKey ?? ''}
-        onSelectionChange={setUsernameKey}
+        value={usernameKey ?? ''}
+        onChange={setUsernameKey}
         items={csvHeaders.map((header) => ({
           label: header,
           key: header,
@@ -283,8 +283,8 @@ export function CsvInvite({ onSuccess, onError }: Props) {
           <Select
             className="flex-1"
             label={t('inputs.fieldMapping.' + permission)}
-            selectedKey={mapping.keyMapping}
-            onSelectionChange={(key) => updatePermissionKeyMapping(permission as keyof SystemPermissions, key)}
+            value={mapping.keyMapping}
+            onChange={(key) => updatePermissionKeyMapping(permission as keyof SystemPermissions, key)}
             items={csvHeaders.map((header) => ({
               label: header,
               key: header,
