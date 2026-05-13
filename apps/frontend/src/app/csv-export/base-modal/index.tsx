@@ -132,7 +132,7 @@ export function BaseCsvExportModal<TData extends Row>(props: Props<TData>) {
             data-cy="resource-usage-export-columns-listbox"
           >
             {(column) => (
-              <ListBoxItem key={column.key} textValue={column.label}>
+              <ListBoxItem key={column.key} id={column.key} textValue={column.label}>
                 {column.label}
               </ListBoxItem>
             )}
