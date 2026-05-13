@@ -20,17 +20,23 @@ export function FirmwareSelector(props: Props) {
         </ProgressCircle>
       )}
       {firmwares?.map((firmware) => (
-        <Card onClick={() => props.onSelect(firmware)} key={`${firmware.name}-${firmware.variant}`}>
-          <Card.Header>
-            <PageHeader title={firmware.friendlyName} noMargin />
-          </Card.Header>
-          <Card.Content className="flex flex-wrap gap-2 flex-row">
-            {firmware.variantFriendlyName.split(',').map((variantFeature) => (
-              <Chip color="accent" key={`${firmware.name}-${firmware.variant}-${variantFeature}`}>
-                {variantFeature}
-              </Chip>
-            ))}
-          </Card.Content>
+        <Card key={`${firmware.name}-${firmware.variant}`}>
+          <button
+            type="button"
+            className="w-full cursor-pointer text-left transition-colors hover:bg-default-100 active:bg-default-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            onClick={() => props.onSelect(firmware)}
+          >
+            <Card.Header>
+              <PageHeader title={firmware.friendlyName} noMargin />
+            </Card.Header>
+            <Card.Content className="flex flex-wrap gap-2 flex-row">
+              {firmware.variantFriendlyName.split(',').map((variantFeature) => (
+                <Chip color="accent" key={`${firmware.name}-${firmware.variant}-${variantFeature}`}>
+                  {variantFeature}
+                </Chip>
+              ))}
+            </Card.Content>
+          </button>
         </Card>
       ))}
     </div>
