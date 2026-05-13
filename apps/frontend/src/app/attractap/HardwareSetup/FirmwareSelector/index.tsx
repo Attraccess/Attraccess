@@ -23,7 +23,7 @@ export function FirmwareSelector(props: Props) {
         <Card key={`${firmware.name}-${firmware.variant}`}>
           <button
             type="button"
-            className="w-full cursor-pointer text-left transition-colors hover:bg-default-100 active:bg-default-200"
+            className="w-full cursor-pointer text-left transition-colors hover:bg-default-100 active:bg-default-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             onClick={() => props.onSelect(firmware)}
           >
             <Card.Header>
