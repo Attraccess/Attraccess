@@ -143,7 +143,7 @@ export const UserManagementPage: React.FC = () => {
           }
         />
 
-        <Table className="rounded-t-none">
+        <Table>
           <TableContent aria-label={t('table.ariaLabel')}>
           <TableHeader>
             <TableColumn width="0" className="hidden md:table-cell">

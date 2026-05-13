@@ -1,4 +1,4 @@
-// Reusable toolbar strip rendered flush above a HeroUI v3 Table component
+// Reusable toolbar row rendered above a HeroUI v3 Table, matching row-card chrome
 // FEATURE: Standardize the table-search pattern across the frontend application
 
 import type { ReactNode } from 'react';
@@ -18,7 +18,7 @@ export function TableToolbar(props: Props) {
   return (
     <div
       className={cn(
-        'flex flex-wrap items-center gap-3 rounded-t-large border border-b-0 border-default-200 bg-content1 px-3 py-2 shadow-sm',
+        'mb-2 flex flex-wrap items-center gap-3 rounded-large bg-content1 px-3 py-2 shadow-small',
         className,
       )}
       data-cy="table-toolbar"
