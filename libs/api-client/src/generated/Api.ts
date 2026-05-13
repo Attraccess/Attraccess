@@ -1262,6 +1262,8 @@ export interface MetricsSettingsDto {
   apiKeyConfigured: boolean;
   /** Per-subsystem metrics timing toggles */
   toggles: MetricsTogglesDto;
+  /** Threshold above which a DB query is counted as slow (in seconds). */
+  slowQueryThresholdSeconds: number;
 }
 
 export interface UpdateMetricsTogglesDto {
@@ -1284,6 +1286,11 @@ export interface UpdateMetricsTogglesDto {
 export interface UpdateMetricsSettingsDto {
   /** Per-subsystem metrics toggles update */
   toggles?: UpdateMetricsTogglesDto;
+  /**
+   * Threshold above which a DB query is counted as slow (in seconds).
+   * @min 0
+   */
+  slowQueryThresholdSeconds?: number;
 }
 
 export interface GenerateMetricsApiKeyResponseDto {
