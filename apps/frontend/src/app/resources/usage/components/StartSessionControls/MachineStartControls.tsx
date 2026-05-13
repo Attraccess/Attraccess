@@ -30,7 +30,7 @@ export function MachineStartControls({
         label={t('machine.project.label')}
         placeholder={t('machine.project.placeholder')}
       />
-      <ButtonGroup fullWidth>
+      <ButtonGroup className="w-full">
         <Button isPending={isStarting} onPress={onStart}><PlayIcon className="w-4 h-4" />
           {t('machine.startSession')}
         </Button>

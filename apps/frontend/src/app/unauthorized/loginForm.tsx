@@ -164,7 +164,7 @@ function LoginFormContent(props: LoginFormProps & { t: TFunction; tExists: TExis
       </div>
       <Button variant="primary"
         type="submit"
-        fullWidth
+        className="w-full"
         isPending={isPending}
         isDisabled={isPending}
         data-cy="login-form-sign-in-button"

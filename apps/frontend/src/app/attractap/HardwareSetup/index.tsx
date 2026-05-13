@@ -72,7 +72,7 @@ function Content(props: ContentProps) {
           </AlertContent>
         </Alert>
 
-        <Button variant="primary" onPress={() => espTools.current.connectToDevice()} fullWidth>
+        <Button variant="primary" onPress={() => espTools.current.connectToDevice()} className="w-full">
           {t('connect.button.label')}
         </Button>
       </div>

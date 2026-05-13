@@ -163,7 +163,7 @@ export function EditMqttServerPage() {
                 placeholder={t('passwordPlaceholder')}
                 value={formValues.password}
                 onChange={(v: string) => setFormValues((p) => ({ ...p, password: v }))}
-                fullWidth
+                className="w-full"
                 data-cy="edit-mqtt-server-form-password-input"
                 autoComplete="off"
               />

@@ -61,7 +61,7 @@ export function ResetPassword() {
           </Card.Content>
           <Card.Footer>
             <Button variant="primary"
-              fullWidth
+              className="w-full"
               onPress={() => navigate('/')}
               data-cy="reset-password-success-go-to-login-button"
             >
@@ -110,7 +110,7 @@ export function ResetPassword() {
           />
         </Card.Content>
         <Card.Footer>
-          <Button variant="primary" fullWidth type="submit" data-cy="reset-password-submit-button">
+          <Button variant="primary" className="w-full" type="submit" data-cy="reset-password-submit-button">
             {t('submit')}
           </Button>
         </Card.Footer>

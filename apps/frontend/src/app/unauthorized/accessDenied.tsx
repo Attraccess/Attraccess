@@ -45,7 +45,7 @@ export const AccessDenied = memo(function AccessDeniedComponent() {
 
           <Button variant="primary"
             onPress={handleGoBack}
-            fullWidth
+            className="w-full"
             data-cy="access-denied-go-back-button"
           ><ArrowLeft className="w-4 h-4" />
             {t('goBack')}
@@ -53,7 +53,7 @@ export const AccessDenied = memo(function AccessDeniedComponent() {
 
           <Button variant="outline"
             onPress={handleGoHome}
-            fullWidth
+            className="w-full"
             data-cy="access-denied-go-home-button"
           ><Home className="w-4 h-4" />
             {t('goHome')}

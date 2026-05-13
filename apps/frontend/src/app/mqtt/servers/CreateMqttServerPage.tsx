@@ -113,7 +113,7 @@ export function CreateMqttServerForm(props?: Readonly<CreateMqttServerPageProps>
         placeholder={t('passwordPlaceholder')}
         value={formValues.password}
         onChange={(v: string) => setFormValues((p) => ({ ...p, password: v }))}
-        fullWidth
+        className="w-full"
         data-cy="create-mqtt-server-form-password-input"
         autoComplete="off"
       />
