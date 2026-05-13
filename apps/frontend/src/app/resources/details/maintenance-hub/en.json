@@ -1,0 +1,86 @@
+{
+  "title": "Maintenance",
+  "subtitle": "{resourceName}",
+  "actions": {
+    "newSchedule": "New schedule",
+    "manageMaintenance": "Manage maintenance",
+    "backToResource": "Back to resource"
+  },
+  "stats": {
+    "active": "Active",
+    "schedules": "Schedules",
+    "nextRun": "Next run",
+    "thisMonth": "This month",
+    "nextRunNone": "—",
+    "nextRunRelative": "in {value}"
+  },
+  "tabs": {
+    "schedules": "Schedules",
+    "activity": "Active & history"
+  },
+  "schedules": {
+    "empty": "No maintenance schedules yet.",
+    "addFirst": "Create your first schedule",
+    "status": { "on": "On", "paused": "Paused" },
+    "triggerType": {
+      "USAGE_HOURS": "Usage hours",
+      "USAGE_COUNT": "Usage count",
+      "TIME_INTERVAL": "Time interval"
+    },
+    "actions": {
+      "edit": "Edit",
+      "pause": "Pause",
+      "resume": "Resume",
+      "delete": "Delete"
+    },
+    "deleteConfirm": "Delete schedule \"{name}\"?"
+  },
+  "activity": {
+    "live": {
+      "label": "Live now",
+      "count": "{count} running",
+      "endsIn": "ends in {time}",
+      "startedAgo": "Started {time} ago",
+      "createdBy": "by {name}",
+      "markDone": "Mark done"
+    },
+    "upcoming": {
+      "label": "Upcoming",
+      "count": "{count} scheduled",
+      "empty": "No upcoming maintenance.",
+      "columns": { "when": "When", "duration": "Duration", "reason": "Reason" }
+    },
+    "history": {
+      "label": "History",
+      "subtitle": "Last 30 days",
+      "showAll": "Show all",
+      "empty": "No past maintenance.",
+      "columns": { "when": "When", "duration": "Duration", "reason": "Reason", "completedBy": "Completed by" }
+    }
+  },
+  "form": {
+    "titleCreate": "New maintenance schedule",
+    "titleEdit": "Edit: {name}",
+    "name": { "label": "Name", "placeholder": "e.g. Monthly check" },
+    "triggerType": { "label": "Trigger type" },
+    "duration": { "label": "Duration" },
+    "unit": { "label": "Unit", "MINUTES": "minutes", "HOURS": "hours", "DAYS": "days" },
+    "thresholdSessions": { "label": "Sessions threshold" },
+    "enabled": { "label": "Enabled" },
+    "timeIntervalNote": "Time-interval schedules are evaluated periodically by the server.",
+    "actions": { "save": "Save", "cancel": "Cancel" },
+    "alert": { "errorTitle": "Couldn't save schedule" }
+  },
+  "configSummary": {
+    "usageHoursMinutes": "{duration} min of use",
+    "usageHoursHours": "{duration} h of use",
+    "usageHoursDays": "{duration} d of use",
+    "usageCount": "Every {count} sessions",
+    "timeIntervalMinutes": "Every {duration} min",
+    "timeIntervalHours": "Every {duration} h",
+    "timeIntervalDays": "Every {duration} d"
+  },
+  "errors": {
+    "forbidden": "You don't have permission to manage maintenance for this resource."
+  }
+}
