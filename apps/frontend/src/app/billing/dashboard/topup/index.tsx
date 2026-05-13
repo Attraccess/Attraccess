@@ -176,8 +176,8 @@ export function BillingDashboardTopupCard(props: Props) {
             <Select
               items={readers?.map((reader) => ({ key: reader.id, label: reader.name })) ?? []}
               label={t('inputs.reader.label')}
-              selectedKey={readerId}
-              onSelectionChange={(key) => setReaderId(key as string)}
+              value={readerId}
+              onChange={(key) => setReaderId(key as string)}
             />
           )}
 

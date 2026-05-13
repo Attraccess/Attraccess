@@ -160,8 +160,8 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
           <Select
             label={!hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined}
             aria-label={t('nodes.' + nodeType + '.config.' + name + '.label')}
-            selectedKey={String(value ?? schema.default ?? '')}
-            onSelectionChange={(newValue) => onChange(newValue as TValue)}
+            value={String(value ?? schema.default ?? '')}
+            onChange={(newValue) => onChange(newValue as TValue)}
             items={schema.enum.map((enumValue) => ({
               key: String(enumValue),
               label: t('nodes.' + nodeType + '.config.' + name + '.enum.' + enumValue),
@@ -201,15 +201,15 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
       const enumValues = schema.enum ?? (isQosField ? [0, 1, 2] : undefined);
 
       if (enumValues) {
-        const selectedKey =
+        const selectedValue =
           value !== undefined ? String(value) : schema.default !== undefined ? String(schema.default) : undefined;
 
         return (
           <Select
             label={!hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined}
             aria-label={t('nodes.' + nodeType + '.config.' + name + '.label')}
-            selectedKey={selectedKey}
-            onSelectionChange={(newValue) => {
+            value={selectedValue}
+            onChange={(newValue) => {
               if (newValue == null) return;
               setValue(Number(newValue) as TValue);
             }}

@@ -42,8 +42,8 @@ export function AttractapSelect(props: Props) {
       label={props.label}
       aria-label={props.ariaLabel}
       placeholder={readers?.find((r) => r.id === props.selection)?.name ?? props.placeholder}
-      selectedKey={props.selection ? props.selection.toString() : ''}
-      onSelectionChange={(key) => props.onSelectionChange(Number(key))}
+      value={props.selection ? props.selection.toString() : ''}
+      onChange={(key) => props.onSelectionChange(Number(key))}
       data-cy="attractap-select"
     />
   );

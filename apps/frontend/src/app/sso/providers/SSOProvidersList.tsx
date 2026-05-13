@@ -729,8 +729,8 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                         <label className="text-sm font-medium">{t('type')}</label>
                         <Select
                           items={Object.values(SSOProviderType).map((type) => ({ key: type, label: type }))}
-                          selectedKey={formValues.type}
-                          onSelectionChange={(key) => {
+                          value={formValues.type}
+                          onChange={(key) => {
                             if (key) handleSelectChange(key as SSOProviderType);
                           }}
                           isRequired

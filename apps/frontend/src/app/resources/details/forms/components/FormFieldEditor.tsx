@@ -45,8 +45,8 @@ export function FormFieldEditor(props: FormFieldEditorProps) {
 
         <Select
           label={t('fields.type')}
-          selectedKey={field.type}
-          onSelectionChange={(key) => {
+          value={field.type}
+          onChange={(key) => {
             handleTypeChange((key as FormFieldType) ?? FormFieldType.TEXT);
           }}
           items={FIELD_TYPE_OPTIONS.map((option) => ({ key: option.value, label: t(option.labelKey) }))}

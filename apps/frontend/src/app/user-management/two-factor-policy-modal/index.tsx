@@ -133,8 +133,8 @@ export function TwoFactorPolicyModal(props: Props) {
                     <Select
                       label={t('inputs.policy.label')}
                       isDisabled={isLoading}
-                      selectedKey={selectedPolicy ?? undefined}
-                      onSelectionChange={(key) => {
+                      value={selectedPolicy ?? undefined}
+                      onChange={(key) => {
                         if (key) setSelectedPolicy(key as TwoFactorPolicy);
                       }}
                       items={policyOptions.map((option) => ({

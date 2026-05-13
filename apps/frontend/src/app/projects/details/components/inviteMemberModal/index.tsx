@@ -130,8 +130,8 @@ export function InviteProjectMemberModal(props: Readonly<InviteProjectMemberModa
                     />
                     <Select
                       label={t('inputs.role')}
-                      selectedKey={role}
-                      onSelectionChange={(key) => {
+                      value={role}
+                      onChange={(key) => {
                         if (key) setRole(key as ProjectMember['role']);
                       }}
                       items={roleOptions.map((value) => ({ key: value, label: t(`roles.${value}`) }))}

@@ -34,8 +34,8 @@ export function ProjectsSelect(props: Props) {
       {...selectProps}
       items={items}
       placeholder={projects?.data?.find((r) => r.id === resolvedValue)?.name ?? props.placeholder}
-      selectedKey={resolvedValue ? resolvedValue.toString() : ''}
-      onSelectionChange={(key) => {
+      value={resolvedValue ? resolvedValue.toString() : ''}
+      onChange={(key) => {
         if (key === UNASSIGNED_KEY || key === '') {
           handleChange(undefined);
           return;

@@ -360,8 +360,8 @@ function renderSelectInput(
       placeholder={options.length ? t('modal.selectPlaceholder') : t('modal.selectUnavailable')}
       isDisabled={!options.length}
       aria-label={fieldName}
-      selectedKey={selectedKey}
-      onSelectionChange={(key) => onChange(key ?? '')}
+      value={selectedKey}
+      onChange={(key) => onChange(key ?? '')}
       items={options.map((option) => ({ key: option, label: option }))}
     />
   );

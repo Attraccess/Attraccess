@@ -19,41 +19,56 @@ interface SelectItem {
 }
 
 export interface Props {
-  selectedKey?: string;
-  defaultSelectedKey?: string;
-  onSelectionChange?: (key: string) => unknown;
+  value?: string;
+  defaultValue?: string;
+  onChange?: (key: string) => unknown;
   items: SelectItem[];
   label?: ReactNode;
   placeholder?: string;
   className?: string;
   isDisabled?: boolean;
   isRequired?: boolean;
+  isInvalid?: boolean;
+  name?: string;
+  disabledKeys?: Iterable<string | number>;
+  variant?: 'primary' | 'secondary';
+  fullWidth?: boolean;
   'aria-label'?: string;
   'data-cy'?: string;
   isLoading?: boolean;
 }
 
 export function Select({
-  selectedKey,
-  defaultSelectedKey,
-  onSelectionChange,
+  value,
+  defaultValue,
+  onChange,
   items,
   label,
   placeholder,
   className,
   isDisabled,
   isRequired,
+  isInvalid,
+  name,
+  disabledKeys,
+  variant,
+  fullWidth,
   'aria-label': ariaLabel,
   'data-cy': dataCy,
 }: Props) {
   return (
     <HeroUiSelect<SelectItem>
-      selectedKey={selectedKey}
-      defaultSelectedKey={defaultSelectedKey}
-      onSelectionChange={(key) => onSelectionChange?.(key as string)}
+      value={value}
+      defaultValue={defaultValue}
+      onChange={(key) => onChange?.(key as string)}
       placeholder={placeholder}
       isDisabled={isDisabled}
       isRequired={isRequired}
+      isInvalid={isInvalid}
+      name={name}
+      disabledKeys={disabledKeys}
+      variant={variant}
+      fullWidth={fullWidth}
       className={className}
       aria-label={ariaLabel}
       data-cy={dataCy}

@@ -259,8 +259,8 @@ export function MaintenanceScheduleUpsertModal(props: Props) {
 
                       <Select
                         label={t('inputs.triggerType.label')}
-                        selectedKey={triggerType}
-                        onSelectionChange={(key) => {
+                        value={triggerType}
+                        onChange={(key) => {
                           if (key) setTriggerType(key as ResourceMaintenanceScheduleTriggerType);
                         }}
                         items={TRIGGER_OPTIONS.map((opt) => ({
@@ -277,8 +277,8 @@ export function MaintenanceScheduleUpsertModal(props: Props) {
                           </TextField>
                           <Select
                             label={t('inputs.unit.label')}
-                            selectedKey={usageHoursUnit}
-                            onSelectionChange={(key) => {
+                            value={usageHoursUnit}
+                            onChange={(key) => {
                               if (key) setUsageHoursUnit(key as UsageDurationUnit);
                             }}
                             items={Object.values(UsageDurationUnit).map((unit) => ({
@@ -304,8 +304,8 @@ export function MaintenanceScheduleUpsertModal(props: Props) {
                           </TextField>
                           <Select
                             label={t('inputs.unit.label')}
-                            selectedKey={timeIntervalUnit}
-                            onSelectionChange={(key) => {
+                            value={timeIntervalUnit}
+                            onChange={(key) => {
                               if (key) setTimeIntervalUnit(key as UsageDurationUnit);
                             }}
                             items={Object.values(UsageDurationUnit).map((unit) => ({
