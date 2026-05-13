@@ -45,7 +45,7 @@ export function ResourceScanner(props: Props) {
       {props.children(open)}
       <Modal isOpen={isOpen} onOpenChange={setOpen}>
         <ModalBackdrop>
-          <ModalContainer>
+          <ModalContainer size="md">
             <ModalDialog>{() => <Scanner onScan={onScan} components={{ tracker: boundingBox }} />}</ModalDialog>
           </ModalContainer>
         </ModalBackdrop>

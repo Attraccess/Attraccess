@@ -9,9 +9,10 @@ import {
   ModalDialog,
   ModalFooter,
   ModalHeader,
+  ModalHeading,
+  ModalIcon,
   useOverlayState,
 } from '@heroui/react';
-import { PageHeader } from '../../../../components/pageHeader';
 import { QrCodeIcon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { QRCode } from 'react-qrcode-logo';
@@ -68,17 +69,14 @@ export function ResourceQrCode(props: Props & Omit<ButtonProps, 'children' | 'st
 
       <Modal isOpen={isOpen} onOpenChange={setOpen}>
         <ModalBackdrop>
-          <ModalContainer>
+          <ModalContainer size="sm">
             <ModalDialog>
               {() => (
                 <>
                   <ModalHeader>
-                    <PageHeader
-                      title={t('modal.title')}
-                      subtitle={t('modal.subtitle')}
-                      icon={<QrCodeIcon />}
-                      noMargin
-                    />
+                    <ModalIcon><QrCodeIcon /></ModalIcon>
+                    <ModalHeading>{t('modal.title')}</ModalHeading>
+                    <p className="text-sm text-muted">{t('modal.subtitle')}</p>
                   </ModalHeader>
 
                   <ModalBody>

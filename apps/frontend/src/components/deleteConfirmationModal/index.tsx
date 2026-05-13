@@ -33,7 +33,7 @@ export function DeleteConfirmationModal({
       }}
     >
       <ModalBackdrop>
-        <ModalContainer>
+        <ModalContainer size="sm">
           <ModalDialog>
             {({ close }) => (
               <>

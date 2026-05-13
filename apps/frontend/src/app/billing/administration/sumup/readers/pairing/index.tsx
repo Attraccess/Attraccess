@@ -14,9 +14,9 @@ import {
   ModalDialog,
   ModalFooter,
   ModalHeader,
+  ModalHeading,
   useOverlayState,
 } from '@heroui/react';
-import { PageHeader } from '../../../../../../components/pageHeader';
 import { PasswordInput } from '../../../../../../components/PasswordInput';
 import { useCallback, useRef, useState } from 'react';
 import { useBillingServiceGetSumUpReadersKey, useBillingServicePairSumUpReader } from '@attraccess/react-query-client';
@@ -87,15 +87,16 @@ export function SumUpReadersPairing(props: Props) {
 
       <Modal isOpen={isOpen} onOpenChange={setOpen}>
         <ModalBackdrop>
-          <ModalContainer>
+          <ModalContainer size="md">
             <ModalDialog>
               {({ close }) => (
                 <>
                   <ModalHeader>
-                    <PageHeader title={t('title')} subtitle={t('subtitle')} noMargin onBack={close} />
+                    <ModalHeading>{t('title')}</ModalHeading>
+                    <p className="text-sm text-muted">{t('subtitle')}</p>
                   </ModalHeader>
                   <ModalBody>
-                    <Form onSubmit={onSubmit} ref={formRef}>
+                    <Form onSubmit={onSubmit} ref={formRef} className="flex flex-col gap-4">
                       <PasswordInput
                         label={t('inputs.pairingCode')}
                         value={pairingCode}

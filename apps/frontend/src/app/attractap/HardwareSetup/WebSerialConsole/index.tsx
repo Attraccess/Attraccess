@@ -9,11 +9,11 @@ import {
   ModalContainer,
   ModalDialog,
   ModalHeader,
+  ModalHeading,
   useOverlayState,
 } from '@heroui/react';
 import { useCallback, useRef, useState } from 'react';
 import { ESPTools, ESPToolsErrorType } from '../../../../utils/esp-tools';
-import { PageHeader } from '../../../../components/pageHeader';
 import { Terminal } from '../../../../components/Terminal';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 
@@ -72,12 +72,12 @@ export function WebSerialConsole({ children }: Props) {
 
       <Modal isOpen={isOpen} onOpenChange={setOpen}>
         <ModalBackdrop>
-          <ModalContainer>
+          <ModalContainer size="lg">
             <ModalDialog>
               {() => (
                 <>
                   <ModalHeader>
-                    <PageHeader title={t('title')} noMargin />
+                    <ModalHeading>{t('title')}</ModalHeading>
                   </ModalHeader>
 
                   <ModalBody>

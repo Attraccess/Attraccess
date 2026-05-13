@@ -227,7 +227,7 @@ export function ActiveUsageSessionsBanner({ onShowMySessions }: ActiveUsageSessi
         onOpenChange={(open) => { if (!open && !isEndingAll) setIsModalOpen(false); }}
       >
         <ModalBackdrop isDismissable={!isEndingAll} />
-        <ModalContainer>
+        <ModalContainer size="md">
           <ModalDialog>
             {({ close }) => (
               <>

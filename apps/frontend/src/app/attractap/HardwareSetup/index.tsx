@@ -10,9 +10,10 @@ import {
   ModalContainer,
   ModalDialog,
   ModalHeader,
+  ModalHeading,
   useOverlayState,
 } from '@heroui/react';
-import { PageHeader } from '../../../components/pageHeader';
+import { ArrowLeft } from 'lucide-react';
 import { FirmwareSelector } from './FirmwareSelector';
 import { FirmwareFlasher } from './FirmwareFlasher';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -170,12 +171,15 @@ export function AttractapHardwareSetup(props: Props) {
               {() => (
                 <>
                   <ModalHeader>
-                    <PageHeader
-                      title={t('title.' + state)}
-                      subtitle={t('subtitle.' + state)}
-                      noMargin
-                      onBack={onBack}
-                    />
+                    <div className="flex w-full items-center gap-2">
+                      <Button variant="ghost" isIconOnly aria-label="Go back" onPress={onBack}>
+                        <ArrowLeft className="w-5 h-5" />
+                      </Button>
+                      <div className="flex-1">
+                        <ModalHeading>{t('title.' + state)}</ModalHeading>
+                        <p className="text-sm text-muted">{t('subtitle.' + state)}</p>
+                      </div>
+                    </div>
                   </ModalHeader>
 
                   <ModalBody className="mb-4">

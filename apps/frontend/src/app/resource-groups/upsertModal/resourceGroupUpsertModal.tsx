@@ -184,7 +184,7 @@ export function ResourceGroupUpsertModal(props: Readonly<Props>) {
       {props.children(open)}
       <Modal isOpen={isOpen} onOpenChange={setOpen} data-cy="resource-group-upsert-modal">
         <ModalBackdrop>
-          <ModalContainer placement="top">
+          <ModalContainer placement="top" size="md">
             <ModalDialog>
               {({ close }) => (
                 <Form onSubmit={handleSubmit}>

@@ -91,7 +91,7 @@ export function UploadPluginModal({ isOpen, onClose }: UploadPluginModalProps) {
       data-cy="upload-plugin-modal"
     >
       <ModalBackdrop>
-        <ModalContainer>
+        <ModalContainer size="md">
           <ModalDialog>
             {({ close }) => (
               <>

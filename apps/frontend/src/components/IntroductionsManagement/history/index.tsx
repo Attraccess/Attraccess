@@ -61,7 +61,7 @@ export function IntroductionHistoryModal(props: Readonly<Props>) {
       }}
     >
       <ModalBackdrop>
-        <ModalContainer>
+        <ModalContainer size="lg">
           <ModalDialog>
             {({ close }) => (
               <>

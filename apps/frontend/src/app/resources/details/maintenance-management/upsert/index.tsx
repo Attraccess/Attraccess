@@ -13,12 +13,13 @@ import {
   ModalDialog,
   ModalFooter,
   ModalHeader,
+  ModalHeading,
+  ModalIcon,
   TextArea,
   useOverlayState,
 } from '@heroui/react';
 import de from './de.json';
 import en from './en.json';
-import { PageHeader } from '../../../../../components/pageHeader';
 import { MaintenanceReasonDisplay } from '../../../../../components/MaintenanceReasonDisplay';
 import { LabeledSwitch } from '../../../../../components/labeledSwitch';
 import { useCallback, useMemo, useRef, useState } from 'react';
@@ -120,16 +121,17 @@ export function ResourceMaintenanceUpsertModal(props: Props) {
       {activator(open)}
       <Modal isOpen={isOpen} onOpenChange={setOpen}>
         <ModalBackdrop>
-          <ModalContainer>
+          <ModalContainer size="md">
             <ModalDialog>
               {() => (
                 <>
                   <ModalHeader>
-                    <PageHeader icon={<CalendarIcon />} title={t('title')} noMargin />
+                    <ModalIcon><CalendarIcon /></ModalIcon>
+                    <ModalHeading>{t('title')}</ModalHeading>
                   </ModalHeader>
 
                   <ModalBody>
-                    <Form onSubmit={onSubmit} ref={formRef}>
+                    <Form onSubmit={onSubmit} ref={formRef} className="flex flex-col gap-4">
                       <DatePicker value={startTime} isRequired hideTimeZone onChange={setStartTime} />
 
                       <LabeledSwitch isSelected={hasEndDate} onChange={onHasEndDateChange}>

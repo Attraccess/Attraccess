@@ -14,6 +14,7 @@ import {
   ModalDialog,
   ModalFooter,
   ModalHeader,
+  ModalHeading,
   NumberField,
   NumberFieldDecrementButton,
   NumberFieldGroup,
@@ -21,7 +22,6 @@ import {
   NumberFieldInput,
   useOverlayState,
 } from '@heroui/react';
-import { PageHeader } from '../../../../../components/pageHeader';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
@@ -138,15 +138,15 @@ export function ResourceBillingInfoEditor(props: Props) {
       {props.children(open)}
       <Modal isOpen={isOpen} onOpenChange={setOpen}>
         <ModalBackdrop>
-          <ModalContainer>
+          <ModalContainer size="md">
             <ModalDialog>
               {() => (
                 <>
                   <ModalHeader>
-                    <PageHeader title={t('title')} noMargin />
+                    <ModalHeading>{t('title')}</ModalHeading>
                   </ModalHeader>
                   <ModalBody>
-                    <Form onSubmit={onSubmit}>
+                    <Form onSubmit={onSubmit} className="flex flex-col gap-4">
                       <NumberField
                         aria-label={t('inputs.creditsPerUsage.label', { currency: configuration.currency })}
                         value={creditsPerUsage}

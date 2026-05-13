@@ -138,7 +138,7 @@ export function ResourceFormsModal({ isOpen, action, forms, onSubmit, onCancel }
       }}
     >
       <ModalBackdrop>
-        <ModalContainer>
+        <ModalContainer size="lg">
           <ModalDialog>
             {({ close }) => (
               <>

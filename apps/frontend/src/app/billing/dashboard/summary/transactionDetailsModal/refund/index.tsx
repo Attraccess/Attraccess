@@ -9,6 +9,7 @@ import {
   ModalDialog,
   ModalFooter,
   ModalHeader,
+  ModalHeading,
   NumberField,
   NumberFieldDecrementButton,
   NumberFieldGroup,
@@ -16,7 +17,6 @@ import {
   NumberFieldInput,
   useOverlayState,
 } from '@heroui/react';
-import { PageHeader } from '../../../../../../components/pageHeader';
 import en from './en.json';
 import de from './de.json';
 import { useCallback, useEffect, useState } from 'react';
@@ -110,16 +110,16 @@ export function RefundModal(props: Props) {
       {children && children(open)}
       <Modal isOpen={isOpen} onOpenChange={setOpen}>
         <ModalBackdrop>
-          <ModalContainer>
+          <ModalContainer size="sm">
             <ModalDialog>
               {() => (
                 <>
                   <ModalHeader>
-                    <PageHeader title={t('title')} noMargin />
+                    <ModalHeading>{t('title')}</ModalHeading>
                   </ModalHeader>
 
                   <ModalBody>
-                    <Form onSubmit={onSubmit}>
+                    <Form onSubmit={onSubmit} className="flex flex-col gap-4">
                       <NumberField
                         aria-label={t('inputs.amount')}
                         value={dbCurrencyToUserCurrency(amount, configuration.minorUnit)}

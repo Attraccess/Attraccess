@@ -56,7 +56,7 @@ export function CommunityLicenseButton({ onAccept, isDisabled, ...rest }: Commun
         }}
       >
         <ModalBackdrop>
-          <ModalContainer>
+          <ModalContainer size="md">
             <ModalDialog>
               {({ close: modalClose }) => (
                 <>

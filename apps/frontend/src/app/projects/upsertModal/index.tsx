@@ -11,10 +11,10 @@ import {
   ModalDialog,
   ModalFooter,
   ModalHeader,
+  ModalHeading,
   TextArea,
   useOverlayState,
 } from '@heroui/react';
-import { PageHeader } from '../../../components/pageHeader';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
@@ -152,12 +152,12 @@ export function UpsertProjectModal(props: Props) {
       {children(open)}
       <Modal isOpen={isOpen} onOpenChange={setOpen}>
         <ModalBackdrop>
-          <ModalContainer>
+          <ModalContainer size="md">
             <ModalDialog>
               {() => (
                 <>
                   <ModalHeader>
-                    <PageHeader title={projectId ? t('title.update') : t('title.create')} noMargin />
+                    <ModalHeading>{projectId ? t('title.update') : t('title.create')}</ModalHeading>
                   </ModalHeader>
 
                   <ModalBody>
@@ -167,6 +167,7 @@ export function UpsertProjectModal(props: Props) {
                         e.preventDefault();
                         onSubmit();
                       }}
+                      className="flex flex-col gap-4"
                     >
                       <TextField value={name} onChange={setName}>
                         <Label>{t('inputs.name.label')}</Label>

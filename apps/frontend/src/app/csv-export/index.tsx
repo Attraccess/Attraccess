@@ -100,7 +100,7 @@ export function CsvExport() {
         data-cy="csv-export-modal"
       >
         <ModalBackdrop>
-          <ModalContainer>
+          <ModalContainer size="md">
             <ModalDialog>
               {() => (
                 <>

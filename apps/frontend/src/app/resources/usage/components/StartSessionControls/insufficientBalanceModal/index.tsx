@@ -24,7 +24,7 @@ export function InsufficientBalanceModal(props: Props) {
       }}
     >
       <ModalBackdrop>
-        <ModalContainer>
+        <ModalContainer size="md">
           <ModalDialog>
             {() => (
               <BillingDashboardTopupCard

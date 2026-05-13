@@ -103,7 +103,7 @@ export function NodePickerModal(props: Props) {
       {props.children(open)}
       <Modal isOpen={isOpen} onOpenChange={setOpen}>
         <ModalBackdrop>
-          <ModalContainer>
+          <ModalContainer size="lg">
             <ModalDialog>
               {() => (
                 <>

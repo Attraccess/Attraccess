@@ -107,7 +107,7 @@ export function UpdateNotificationBanner() {
 
       <Modal isOpen={isReleaseNotesOpen} onOpenChange={setIsReleaseNotesOpen}>
         <ModalBackdrop>
-          <ModalContainer>
+          <ModalContainer size="md">
             <ModalDialog>
               {({ close }) => (
                 <>

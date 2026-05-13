@@ -165,7 +165,7 @@ export function MqttServerList() {
         data-cy="mqtt-server-list-delete-confirmation-modal"
       >
         <ModalBackdrop>
-          <ModalContainer>
+          <ModalContainer size="sm">
             <ModalDialog>
               {({ close }) => (
                 <>

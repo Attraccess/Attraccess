@@ -18,12 +18,13 @@ import {
   ModalDialog,
   ModalFooter,
   ModalHeader,
+  ModalHeading,
+  ModalIcon,
   useOverlayState,
 } from '@heroui/react';
 import { Select } from '../../../components/select';
 import { Settings2Icon } from 'lucide-react';
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
-import { PageHeader } from '../../../components/pageHeader';
 import { useToastMessage } from '../../../components/toastProvider';
 import API_ERROR_TRANSLATIONS_DE from '../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../global-translations/api-errors.en.json';
@@ -116,14 +117,16 @@ export function TwoFactorPolicyModal(props: Props) {
       {props.children(open)}
       <Modal isOpen={isOpen} onOpenChange={setOpen}>
         <ModalBackdrop>
-          <ModalContainer>
+          <ModalContainer size="md">
             <ModalDialog>
               {() => (
                 <>
                   <ModalHeader>
-                    <PageHeader title={t('title')} subtitle={t('subtitle')} icon={<Settings2Icon />} noMargin={true} />
+                    <ModalIcon><Settings2Icon /></ModalIcon>
+                    <ModalHeading>{t('title')}</ModalHeading>
+                    <p className="text-sm text-muted">{t('subtitle')}</p>
                   </ModalHeader>
-                  <ModalBody>
+                  <ModalBody className="flex flex-col gap-4">
                     <Alert status="warning">
                       <AlertContent>
                         <AlertTitle>{t('warning.title')}</AlertTitle>

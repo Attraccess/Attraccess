@@ -111,14 +111,14 @@ export function InviteProjectMemberModal(props: Readonly<InviteProjectMemberModa
       {children(open)}
       <Modal isOpen={isOpen} onOpenChange={handleOpenChange}>
         <ModalBackdrop>
-          <ModalContainer>
+          <ModalContainer size="sm">
             <ModalDialog>
               {({ close }) => (
                 <>
                   <ModalHeader>
                     <ModalHeading>{t('title')}</ModalHeading>
                   </ModalHeader>
-                  <ModalBody className="gap-4">
+                  <ModalBody className="flex flex-col gap-4">
                     <p className="text-small text-default-500">{t('description')}</p>
                     <UserSearch
                       label={t('inputs.user')}

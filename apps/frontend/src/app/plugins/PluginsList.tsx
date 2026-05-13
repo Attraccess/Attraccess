@@ -125,7 +125,7 @@ export function PluginsList() {
           data-cy="plugins-list-delete-confirmation-modal"
         >
           <ModalBackdrop>
-            <ModalContainer>
+            <ModalContainer size="sm">
               <ModalDialog>
                 {({ close }) => (
                   <>

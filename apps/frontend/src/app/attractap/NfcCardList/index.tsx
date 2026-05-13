@@ -76,7 +76,7 @@ const NfcCardDeleteModal = (props: DeleteModalProps) => {
       data-cy="nfc-card-delete-modal"
     >
       <ModalBackdrop>
-        <ModalContainer>
+        <ModalContainer size="md">
           <ModalDialog>
             {({ close }) => (
               <>
@@ -228,7 +228,7 @@ const EnrollNfcCardButton = () => {
         data-cy="enroll-nfc-card-modal"
       >
         <ModalBackdrop>
-          <ModalContainer>
+          <ModalContainer size="md">
             <ModalDialog>
               {({ close }) => (
                 <>
