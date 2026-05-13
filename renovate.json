@@ -1,6 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended"],
+  "rangeStrategy": "bump",
   "docker-compose": {
     "fileMatch": ["(^|/)docker-compose\\.yml$", "(^|/)services\\.docker-compose\\.yml$"]
   },
@@ -15,6 +16,49 @@
       "matchDatasources": ["docker"],
       "matchUpdateTypes": ["patch", "digest"],
       "automerge": true
+    },
+    {
+      "description": "Group NX packages into a single PR",
+      "matchPackagePrefixes": ["@nx/", "nx"],
+      "matchPackageNames": ["nx"],
+      "groupName": "NX packages",
+      "groupSlug": "nx"
+    },
+    {
+      "description": "Group NestJS packages into a single PR",
+      "matchPackagePrefixes": ["@nestjs/"],
+      "groupName": "NestJS packages",
+      "groupSlug": "nestjs"
+    },
+    {
+      "description": "Group TailwindCSS-related packages",
+      "matchPackageNames": ["tailwindcss", "tailwind-merge", "@tailwindcss/vite", "@tailwindcss/typography"],
+      "groupName": "TailwindCSS packages",
+      "groupSlug": "tailwindcss"
+    },
+    {
+      "description": "Group Workbox packages",
+      "matchPackagePrefixes": ["workbox-"],
+      "groupName": "Workbox packages",
+      "groupSlug": "workbox"
+    },
+    {
+      "description": "Group Jest test runner packages",
+      "matchPackageNames": ["jest", "jest-environment-jsdom", "jest-environment-node", "jest-util", "babel-jest"],
+      "matchPackagePrefixes": ["@jest/", "jest-"],
+      "groupName": "Jest packages",
+      "groupSlug": "jest"
+    },
+    {
+      "description": "Group @types/* packages into a single PR",
+      "matchPackagePrefixes": ["@types/"],
+      "groupName": "@types packages",
+      "groupSlug": "types"
+    },
+    {
+      "description": "Never auto-merge major updates — require manual review",
+      "matchUpdateTypes": ["major"],
+      "automerge": false
     }
   ]
 }
