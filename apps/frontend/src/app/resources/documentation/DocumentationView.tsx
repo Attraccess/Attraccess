@@ -1,6 +1,6 @@
 import { memo, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Button, Card, CardContent, CardFooter, CardHeader, Spinner } from '@heroui/react';
+import { Button, Card, Spinner } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { ArrowLeft, Edit, RefreshCw } from 'lucide-react';
 import { PageHeader } from '../../../components/pageHeader';
@@ -49,13 +49,13 @@ function DocumentationViewComponent() {
   if (isResourceError) {
     return (
       <Card className="max-w-xl mx-auto my-8">
-        <CardHeader>
+        <Card.Header>
           <h2 className="text-xl">{t('error.title')}</h2>
-        </CardHeader>
-        <CardContent>
+        </Card.Header>
+        <Card.Content>
           <p className="text-danger">{resourceError instanceof Error ? resourceError.message : t('error.unknown')}</p>
-        </CardContent>
-        <CardFooter className="flex justify-center gap-4">
+        </Card.Content>
+        <Card.Footer className="flex justify-center gap-4">
           <Button variant="primary"
             onPress={() => refetchResource()}
             data-cy="documentation-view-error-retry-button"
@@ -68,7 +68,7 @@ function DocumentationViewComponent() {
           ><ArrowLeft size={16} />
             {t('actions.backToResources')}
           </Button>
-        </CardFooter>
+        </Card.Footer>
       </Card>
     );
   }
@@ -77,20 +77,20 @@ function DocumentationViewComponent() {
   if (!resource) {
     return (
       <Card className="max-w-xl mx-auto my-8">
-        <CardHeader>
+        <Card.Header>
           <h2 className="text-xl">{t('notFound.title')}</h2>
-        </CardHeader>
-        <CardContent>
+        </Card.Header>
+        <Card.Content>
           <p>{t('notFound.message')}</p>
-        </CardContent>
-        <CardFooter className="justify-center">
+        </Card.Content>
+        <Card.Footer className="justify-center">
           <Button variant="secondary"
             onPress={() => navigate('/resources')}
             data-cy="documentation-view-not-found-back-to-resources-button"
           ><ArrowLeft size={16} />
             {t('actions.backToResources')}
           </Button>
-        </CardFooter>
+        </Card.Footer>
       </Card>
     );
   }
@@ -124,10 +124,10 @@ function DocumentationViewComponent() {
       />
 
       <Card className="mt-6">
-        <CardHeader>
+        <Card.Header>
           <h2 className="text-xl font-semibold">{resource.name}</h2>
-        </CardHeader>
-        <CardContent className="relative">
+        </Card.Header>
+        <Card.Content className="relative">
           {isFetching && (
             <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-10">
               <Spinner data-cy="documentation-view-fetching-spinner" />
@@ -150,7 +150,7 @@ function DocumentationViewComponent() {
               sandbox="allow-scripts allow-same-origin allow-forms"
             />
           )}
-        </CardContent>
+        </Card.Content>
       </Card>
     </div>
   );

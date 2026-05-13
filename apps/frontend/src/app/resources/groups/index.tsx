@@ -8,22 +8,7 @@ import {
   useResourcesServiceResourceGroupsGetMany,
   useResourcesServiceResourceGroupsRemoveResource,
 } from '@attraccess/react-query-client';
-import {
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardProps,
-  Checkbox,
-  Link,
-  Table,
-  TableBody,
-  TableCell,
-  TableColumn,
-  TableContent,
-  TableHeader,
-  TableRow,
-} from '@heroui/react';
+import { Button, Card, CardProps, Checkbox, Link, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow } from '@heroui/react';
 import { EmptyState } from '../../../components/emptyState';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { GroupIcon, PlusIcon } from 'lucide-react';
@@ -124,7 +109,7 @@ export function ManageResourceGroups({
 
   return (
     <Card {...cardProps}>
-      <CardHeader>
+      <Card.Header>
         <PageHeader
           title={t('title')}
           subtitle={t('subtitle')}
@@ -145,8 +130,8 @@ export function ManageResourceGroups({
             </ResourceGroupUpsertModal>
           }
         />
-      </CardHeader>
-      <CardContent>
+      </Card.Header>
+      <Card.Content>
         <Table>
           <TableContent aria-label={t('table.ariaLabel')}>
           <TableHeader>
@@ -180,7 +165,7 @@ export function ManageResourceGroups({
           </TableBody>
           </TableContent>
         </Table>
-      </CardContent>
+      </Card.Content>
     </Card>
   );
 }

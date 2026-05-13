@@ -1,16 +1,4 @@
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  Skeleton,
-  Table,
-  TableBody,
-  TableCell,
-  TableColumn,
-  TableContent,
-  TableHeader,
-  TableRow,
-} from '@heroui/react';
+import { Card, Skeleton, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow } from '@heroui/react';
 import { useMemo, useCallback, useEffect, useState } from 'react';
 import { useTranslations, useNumberFormatter, useDateTimeFormatter } from '@attraccess/plugins-frontend-ui';
 import { useProjectsServiceGetProjectUsageStats } from '@attraccess/react-query-client';
@@ -155,13 +143,13 @@ export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
   return (
     <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
       <Card className="min-h-[360px]">
-        <CardHeader>
+        <Card.Header>
           <div>
             <p className="font-semibold">{t('charts.timeSeries.title')}</p>
             <p className="text-xs text-default-500">{t('charts.title')}</p>
           </div>
-        </CardHeader>
-        <CardContent className="h-[320px]">
+        </Card.Header>
+        <Card.Content className="h-[320px]">
           {isLoading ? (
             <Skeleton className="w-full h-full" />
           ) : chartData.length === 0 ? (
@@ -202,17 +190,17 @@ export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
               </LineChart>
             </ResponsiveContainer>
           )}
-        </CardContent>
+        </Card.Content>
       </Card>
 
       <Card className="min-h-[360px]">
-        <CardHeader>
+        <Card.Header>
           <div>
             <p className="font-semibold">{t('charts.topResources.title')}</p>
             <p className="text-xs text-default-500">{t('charts.title')}</p>
           </div>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
+        </Card.Header>
+        <Card.Content className="flex flex-col gap-4">
           {isLoading ? (
             <>
               <Skeleton className="h-6 w-full" />
@@ -294,7 +282,7 @@ export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
               </Table>
             </>
           )}
-        </CardContent>
+        </Card.Content>
       </Card>
     </div>
   );

@@ -15,7 +15,7 @@ import de from './de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../global-translations/api-errors.en.json';
 import API_ERROR_TRANSLATIONS_DE from '../../global-translations/api-errors.de.json';
 import { PageHeader } from '../../components/pageHeader';
-import { Button, Card, CardContent, CardHeader, Chip, Skeleton } from '@heroui/react';
+import { Button, Card, Chip, Skeleton } from '@heroui/react';
 import { LabeledSwitch } from '../../components/labeledSwitch';
 import { FolderIcon, PlusIcon } from 'lucide-react';
 import { UpsertProjectModal } from './upsertModal';
@@ -220,11 +220,11 @@ export function ProjectsListPage() {
 
       {(isLoadingInvitations || hasInvitations) && (
         <Card className="mb-6">
-          <CardHeader className="flex flex-col items-start gap-1">
+          <Card.Header className="flex flex-col items-start gap-1">
             <p className="text-large font-semibold">{t('invitations.title')}</p>
             <p className="text-small text-default-500">{t('invitations.description')}</p>
-          </CardHeader>
-          <CardContent className="space-y-3">{invitationContent}</CardContent>
+          </Card.Header>
+          <Card.Content className="space-y-3">{invitationContent}</Card.Content>
         </Card>
       )}
 

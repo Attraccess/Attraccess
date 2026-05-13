@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Button, Card, CardContent, CardHeader, Chip, Skeleton } from '@heroui/react';
+import { Button, Card, Chip, Skeleton } from '@heroui/react';
 import {
   ApiError,
   ProjectsServiceRemoveProjectMemberMutationResult,
@@ -107,10 +107,10 @@ export function TeamMembersCard(props: Readonly<TeamMembersCardProps>) {
 
   return (
     <Card>
-      <CardHeader>
+      <Card.Header>
         <p className="text-large font-semibold">{t('sections.members.title')}</p>
-      </CardHeader>
-      <CardContent className="space-y-4">
+      </Card.Header>
+      <Card.Content className="space-y-4">
         <div className="flex items-center justify-between gap-4 rounded-medium border border-default-200 p-3">
           {data?.owner ? <AttraccessUser user={data.owner} /> : <Skeleton className="h-10 w-full" />}
           <Chip color="accent" variant="soft">
@@ -118,7 +118,7 @@ export function TeamMembersCard(props: Readonly<TeamMembersCardProps>) {
           </Chip>
         </div>
         <div className="space-y-3">{memberRows}</div>
-      </CardContent>
+      </Card.Content>
     </Card>
   );
 }

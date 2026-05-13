@@ -1,24 +1,5 @@
 import { ResourceFlowNodeDto, useBillingServiceGetBillingConfiguration } from '@attraccess/react-query-client';
-import {
-  Button,
-  Card,
-  CardContent,
-  TextField,
-  Label,
-  Input,
-  Modal,
-  ModalBackdrop,
-  ModalBody,
-  ModalContainer,
-  ModalDialog,
-  ModalHeader,
-  NumberField,
-  NumberFieldDecrementButton,
-  NumberFieldGroup,
-  NumberFieldIncrementButton,
-  NumberFieldInput,
-  TextArea,
-} from '@heroui/react';
+import { Button, Card, Input, Label, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalHeader, NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput, TextArea, TextField } from '@heroui/react';
 import { Select } from '../../../../../../../components/select';
 import { MqttServerSelect } from '../../../../../../../components/mqttServerSelect';
 import { LabeledSwitch } from '../../../../../../../components/labeledSwitch';
@@ -250,9 +231,9 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
         if (Object.entries((value ?? {}) as Record<string, unknown>)?.length === 0) {
           content = (
             <Card>
-              <CardContent>
+              <Card.Content>
                 <p className="text-sm text-gray-500">{t('nodes.' + nodeType + '.config.' + name + '.empty')}</p>
-              </CardContent>
+              </Card.Content>
             </Card>
           );
         } else {
@@ -319,9 +300,9 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
       if (arrayValue.length === 0) {
         content = (
           <Card>
-            <CardContent>
+            <Card.Content>
               <p className="text-sm text-gray-500">{emptyText}</p>
-            </CardContent>
+            </Card.Content>
           </Card>
         );
       } else {
@@ -329,7 +310,7 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
           <div className="flex flex-col gap-2 w-full">
             {arrayValue.map((row, index) => (
               <Card key={index} className="p-2 w-full">
-                <CardContent className="p-0">
+                <Card.Content className="p-0">
                   <div className="grid grid-cols-[1fr_auto] gap-2 items-start">
                     <div className="flex flex-col gap-2 p-2 w-full">
                       {items && items.type === 'object' && items.properties ? (
@@ -385,7 +366,7 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
                       </Button>
                     </div>
                   </div>
-                </CardContent>
+                </Card.Content>
               </Card>
             ))}
           </div>

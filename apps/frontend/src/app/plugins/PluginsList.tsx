@@ -1,33 +1,6 @@
 import { usePluginsServiceDeletePlugin, usePluginsServiceGetPlugins } from '@attraccess/react-query-client';
 import { useState } from 'react';
-import {
-  Alert,
-  AlertContent,
-  AlertDescription,
-  AlertTitle,
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  Chip,
-  Modal,
-  ModalBackdrop,
-  ModalBody,
-  ModalContainer,
-  ModalDialog,
-  ModalFooter,
-  ModalHeader,
-  ModalHeading,
-  Table,
-  TableBody,
-  TableCell,
-  TableColumn,
-  TableContent,
-  TableHeader,
-  TableRow,
-  Tooltip,
-  TooltipContent,
-} from '@heroui/react';
+import { Alert, AlertContent, AlertDescription, AlertTitle, Button, Card, Chip, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow, Tooltip, TooltipContent } from '@heroui/react';
 import { Trash2, Upload } from 'lucide-react';
 import { AlertStatusIcon } from '../../components/AlertStatusIcon';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -96,7 +69,7 @@ export function PluginsList() {
         </AlertContent>
       </Alert>
       <Card className="w-full" data-cy="plugins-list-card">
-        <CardHeader className="flex justify-between items-center">
+        <Card.Header className="flex justify-between items-center">
           <h1 className="text-xl font-bold">{t('title')}</h1>
           <Button
             variant="primary"
@@ -106,8 +79,8 @@ export function PluginsList() {
             <Upload size={18} />
             {t('uploadButton')}
           </Button>
-        </CardHeader>
-        <CardContent>
+        </Card.Header>
+        <Card.Content>
           <Table data-cy="plugins-list-table">
             <TableContent aria-label="Plugins table">
             <TableHeader>
@@ -144,7 +117,7 @@ export function PluginsList() {
             </TableBody>
             </TableContent>
           </Table>
-        </CardContent>
+        </Card.Content>
 
         <Modal
           isOpen={deleteModalOpen}

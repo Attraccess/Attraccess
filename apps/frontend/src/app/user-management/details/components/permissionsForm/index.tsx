@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Button, Card, CardHeader, CardContent, CardFooter } from '@heroui/react';
+import { Button, Card } from '@heroui/react';
 import { LabeledSwitch } from '../../../../../components/labeledSwitch';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../../../components/toastProvider';
@@ -116,11 +116,11 @@ export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({ user, ss
 
   return (
     <Card data-cy="user-permission-form-card">
-      <CardHeader>
+      <Card.Header>
         <PageHeader title={t('title')} noMargin />
-      </CardHeader>
+      </Card.Header>
 
-      <CardContent className="flex flex-col gap-2">
+      <Card.Content className="flex flex-col gap-2">
         {isSsoManaged ? (
           <div
             className="rounded-md border border-warning-200 bg-warning-50 px-3 py-2 text-warning-700"
@@ -141,9 +141,9 @@ export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({ user, ss
             {t(`permissions.${permission}`)}
           </LabeledSwitch>
         ))}
-      </CardContent>
+      </Card.Content>
 
-      <CardFooter className="flex justify-end">
+      <Card.Footer className="flex justify-end">
         <Button variant="primary"
           onPress={handleSave}
           isPending={isSavingPermissions}
@@ -152,7 +152,7 @@ export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({ user, ss
         >
           {t('actions.save')}
         </Button>
-      </CardFooter>
+      </Card.Footer>
     </Card>
   );
 };

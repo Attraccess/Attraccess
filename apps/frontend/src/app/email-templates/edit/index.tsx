@@ -6,25 +6,7 @@ import {
   useEmailTemplatesServiceEmailTemplateControllerPreviewMjml,
   EmailTemplateType,
 } from '@attraccess/react-query-client';
-import {
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  TextField,
-  Label,
-  Input,
-  Form,
-  Modal,
-  ModalBackdrop,
-  ModalBody,
-  ModalContainer,
-  ModalDialog,
-  ModalFooter,
-  ModalHeader,
-  ModalHeading,
-  Link,
-} from '@heroui/react';
+import { Button, Card, Form, Input, Label, Link, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, TextField, useTheme } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PageHeader } from '../../../components/pageHeader';
 import Editor from '@monaco-editor/react';
@@ -32,7 +14,6 @@ import Editor from '@monaco-editor/react';
 import * as enTranslationsFile from './en.json';
 import * as deTranslationsFile from './de.json';
 import { useDebounce } from '../../../hooks/useDebounce';
-import { useTheme } from '@heroui/react';
 
 export function EditEmailTemplatePage() {
   const navigate = useNavigate();
@@ -147,11 +128,11 @@ export function EditEmailTemplatePage() {
       <Form onSubmit={onSubmit}>
         <div className="flex flex-col flex-wrap gap-4 w-full lg:flex-row">
           <Card className="flex-1">
-            <CardHeader className="flex flex-row justify-between">
+            <Card.Header className="flex flex-row justify-between">
               <span>{t('sections.template')}</span>
               <Button isIconOnly onPress={() => setEditorIsExpanded(true)} />
-            </CardHeader>
-            <CardContent className="flex flex-col gap-4">
+            </Card.Header>
+            <Card.Content className="flex flex-col gap-4">
               {editor}
 
               <Modal isOpen={editorIsExpanded} onOpenChange={setEditorIsExpanded}>
@@ -173,18 +154,18 @@ export function EditEmailTemplatePage() {
                   </ModalContainer>
                 </ModalBackdrop>
               </Modal>
-            </CardContent>
+            </Card.Content>
           </Card>
 
           <Card className="flex-1">
-            <CardHeader>{t('sections.preview')}</CardHeader>
-            <CardContent>
+            <Card.Header>{t('sections.preview')}</Card.Header>
+            <Card.Content>
               <iframe
                 srcDoc={previewHtml}
                 title={t('preview.iframeTitle')}
                 className="w-full h-full min-h-[435px] border-0"
               />
-            </CardContent>
+            </Card.Content>
           </Card>
         </div>
 

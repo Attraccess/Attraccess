@@ -1,5 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Button, Card, CardHeader, TextField, Label, Input, Checkbox, Spinner } from "@heroui/react";
+import { Button, Card, Checkbox, Input, Label, Spinner, TextField } from "@heroui/react";
 import { Select } from '../../../components/select';
 import { LabeledSwitch } from '../../../components/labeledSwitch';
 import { ArrowLeft } from 'lucide-react';
@@ -113,7 +113,7 @@ export function EditMqttServerPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
       <Card data-cy="edit-mqtt-server-page-card">
-        <CardHeader>
+        <Card.Header>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Button variant="ghost"
@@ -127,7 +127,7 @@ export function EditMqttServerPage() {
               <h2>{t('editMqttServer')}</h2>
             </div>
           </div>
-        </CardHeader>
+        </Card.Header>
         <div style={{ padding: '1rem' }}>
           <form onSubmit={handleSubmit} className="space-y-6" data-cy="edit-mqtt-server-form">
             <div className="space-y-4">

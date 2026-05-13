@@ -1,19 +1,5 @@
 import { PageHeader } from '../../components/pageHeader';
-import {
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  Modal,
-  ModalBackdrop,
-  ModalBody,
-  ModalContainer,
-  ModalDialog,
-  ModalFooter,
-  ModalHeader,
-  ModalHeading,
-  useOverlayState,
-} from '@heroui/react';
+import { Button, Card, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, useOverlayState } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
@@ -61,35 +47,35 @@ export default function AccountPage() {
 
       <div className="flex flex-row flex-wrap gap-4">
         <Card className="max-w-md">
-          <CardHeader>
+          <Card.Header>
             <PageHeader title={t('sections.profile')} noMargin />
-          </CardHeader>
-          <CardContent className="flex flex-col gap-6">
+          </Card.Header>
+          <Card.Content className="flex flex-col gap-6">
             <EmailForm />
             <UsernameForm />
-          </CardContent>
+          </Card.Content>
         </Card>
 
         <Card className="max-w-md">
-          <CardHeader>
+          <Card.Header>
             <PageHeader title={t('sections.security')} noMargin />
-          </CardHeader>
-          <CardContent className="flex flex-col gap-6">
+          </Card.Header>
+          <Card.Content className="flex flex-col gap-6">
             {me && <SetPasswordForm userId={me.id} />}
             {me && <TwoFactorCard />}
-          </CardContent>
+          </Card.Content>
         </Card>
 
         <Card className="max-w-md">
-          <CardHeader>
+          <Card.Header>
             <PageHeader title={t('sections.dangerZone')} noMargin />
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
+          </Card.Header>
+          <Card.Content className="flex flex-col gap-4">
             <p className="text-sm text-default-500">{t('deleteAccount.description')}</p>
             <Button variant="danger-soft" onPress={open} data-cy="delete-account-open-modal">
               {t('deleteAccount.actions.request')}
             </Button>
-          </CardContent>
+          </Card.Content>
         </Card>
       </div>
 

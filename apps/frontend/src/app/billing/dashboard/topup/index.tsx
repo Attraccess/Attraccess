@@ -1,7 +1,7 @@
 import { useNumberFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
-import { Alert, AlertContent, AlertTitle, Button, Card, CardContent, CardFooter, CardHeader, CardProps, Form, NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput, Spinner, cn } from '@heroui/react';
+import { Alert, AlertContent, AlertTitle, Button, Card, CardProps, cn, Form, NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput, Spinner } from '@heroui/react';
 import { PageHeader } from '../../../../components/pageHeader';
 import { SumUpIcon } from '../../../../components/icons/sumup.icon';
 import {
@@ -118,12 +118,12 @@ export function BillingDashboardTopupCard(props: Props) {
   if (isLoadingSumUpConfiguration) {
     return (
       <Card {...cardProps} className={cn('max-w-full', cardProps.className)}>
-        <CardHeader>
+        <Card.Header>
           <PageHeader title={title ?? t('title')} subtitle={subtitle ?? t('subtitle')} icon={<SumUpIcon />} noMargin />
-        </CardHeader>
-        <CardContent className="flex justify-center py-8">
+        </Card.Header>
+        <Card.Content className="flex justify-center py-8">
           <Spinner />
-        </CardContent>
+        </Card.Content>
       </Card>
     );
   }
@@ -131,10 +131,10 @@ export function BillingDashboardTopupCard(props: Props) {
   if (isSumUpConfigurationError || !sumUpConfiguration?.enabled) {
     return (
       <Card {...cardProps} className={cn('max-w-full', cardProps.className)}>
-        <CardHeader>
+        <Card.Header>
           <PageHeader title={title ?? t('title')} subtitle={subtitle ?? t('subtitle')} icon={<SumUpIcon />} noMargin />
-        </CardHeader>
-        <CardContent>
+        </Card.Header>
+        <Card.Content>
           <Alert status={isSumUpConfigurationError ? 'danger' : 'warning'}
           >
             <AlertContent>
@@ -142,7 +142,7 @@ export function BillingDashboardTopupCard(props: Props) {
             </AlertContent>
             <p className="text-sm">{t('unavailable.description')}</p>
           </Alert>
-        </CardContent>
+        </Card.Content>
       </Card>
     );
   }
@@ -161,11 +161,11 @@ export function BillingDashboardTopupCard(props: Props) {
 
   return (
     <Card {...cardProps} className={cn('max-w-full', props.className)}>
-      <CardHeader>
+      <Card.Header>
         <PageHeader title={title ?? t('title')} subtitle={subtitle ?? t('subtitle')} icon={<SumUpIcon />} noMargin />
-      </CardHeader>
+      </Card.Header>
 
-      <CardContent>
+      <Card.Content>
         <Form
           onSubmit={(e) => {
             e.preventDefault();
@@ -204,9 +204,9 @@ export function BillingDashboardTopupCard(props: Props) {
             <p className="max-w-[600px] text-sm whitespace-pre-wrap text-wrap">{t('topUpInstructions.description')}</p>
           </Alert>
         </div>
-      </CardContent>
+      </Card.Content>
 
-      <CardFooter>
+      <Card.Footer>
         <Button variant="primary"
           onPress={onSubmit}
           isPending={isPendingTopUpWithSumUpReader}
@@ -214,7 +214,7 @@ export function BillingDashboardTopupCard(props: Props) {
         >
           {t('actions.topUp', { amount: formatNumber(amount), currency: configuration?.currency })}
         </Button>
-      </CardFooter>
+      </Card.Footer>
     </Card>
   );
 }

@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { Card, CardContent, CardProps, useOverlayState } from '@heroui/react';
+import { Card, CardProps, useOverlayState } from '@heroui/react';
 import { AlertCircle } from 'lucide-react';
 import {
   UseAccessControlServiceResourceIntroductionsGetHistoryKeyFn,
@@ -115,7 +115,7 @@ export function ResourceIntroductionsManagement(
   if (error) {
     return (
       <Card {...rest}>
-        <CardContent>
+        <Card.Content>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <AlertCircle size={20} color="red" />
             <div>
@@ -123,7 +123,7 @@ export function ResourceIntroductionsManagement(
               <p style={{ fontSize: '14px', opacity: 0.7 }}>{t('loadErrorDescription')}</p>
             </div>
           </div>
-        </CardContent>
+        </Card.Content>
       </Card>
     );
   }

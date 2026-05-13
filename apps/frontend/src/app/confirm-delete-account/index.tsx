@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useUrlQuery, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useNavigate } from 'react-router-dom';
 import { Loading } from '../loading';
-import { Alert, AlertContent, AlertDescription, AlertTitle, Button, Card, CardContent, CardFooter, CardHeader } from '@heroui/react';
+import { Alert, AlertContent, AlertDescription, AlertTitle, Button, Card } from '@heroui/react';
 import en from './en.json';
 import de from './de.json';
 import {
@@ -99,17 +99,17 @@ export function ConfirmDeleteAccount() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Card className="max-w-md w-full" data-cy="confirm-delete-success-card">
-          <CardHeader className="text-center">
+          <Card.Header className="text-center">
             <h2 className="text-3xl font-bold">{t('success.title')}</h2>
-          </CardHeader>
-          <CardContent>
+          </Card.Header>
+          <Card.Content>
             <p className="text-sm text-gray-600 dark:text-gray-400 text-center">{t('success.message')}</p>
-          </CardContent>
-          <CardFooter>
+          </Card.Content>
+          <Card.Footer>
             <Button variant="primary" fullWidth onPress={() => navigate('/')} data-cy="confirm-delete-success-button">
               {t('success.backToLogin')}
             </Button>
-          </CardFooter>
+          </Card.Footer>
         </Card>
       </div>
     );
@@ -119,18 +119,18 @@ export function ConfirmDeleteAccount() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Card className="max-w-md w-full" data-cy="confirm-delete-error-card">
-          <CardHeader className="text-center">
+          <Card.Header className="text-center">
             <h2 className="text-3xl font-bold">{t('error.title')}</h2>
-          </CardHeader>
-          <CardContent>
+          </Card.Header>
+          <Card.Content>
             <Alert status="danger" data-cy="confirm-delete-error-alert" >
               <AlertContent>
                 <AlertTitle>{t('error.errorTitle')}</AlertTitle>
                 <AlertDescription>{error}</AlertDescription>
               </AlertContent>
             </Alert>
-          </CardContent>
-          <CardFooter className="flex flex-col gap-2">
+          </Card.Content>
+          <Card.Footer className="flex flex-col gap-2">
             {allowRetry && (
               <Button variant="primary"
                 fullWidth
@@ -148,7 +148,7 @@ export function ConfirmDeleteAccount() {
             >
               {t('error.backToLogin')}
             </Button>
-          </CardFooter>
+          </Card.Footer>
         </Card>
       </div>
     );

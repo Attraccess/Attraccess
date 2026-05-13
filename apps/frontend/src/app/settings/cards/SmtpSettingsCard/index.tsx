@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, Chip } from '@heroui/react';
+import { Card, Chip } from '@heroui/react';
 import { CheckIcon, MailIcon, XIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PageHeader } from '../../../../components/pageHeader';
@@ -33,7 +33,7 @@ export function SmtpSettingsCard({ variant, onNext }: SmtpSettingsCardProps) {
 
   return (
     <Card className="flex-1 min-w-[300px]">
-      <CardHeader>
+      <Card.Header>
         <PageHeader
           title={t('title')}
           subtitle={t('subtitle')}
@@ -41,10 +41,10 @@ export function SmtpSettingsCard({ variant, onNext }: SmtpSettingsCardProps) {
           noMargin
           actions={passwordChip}
         />
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
+      </Card.Header>
+      <Card.Content className="flex flex-col gap-4">
         <SmtpSettingsForm variant={variant} endpoint="settings" onNext={onNext} />
-      </CardContent>
+      </Card.Content>
     </Card>
   );
 }

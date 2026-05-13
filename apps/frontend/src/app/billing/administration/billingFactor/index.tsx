@@ -1,5 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Button, Card, CardContent, CardFooter, CardHeader, CardProps, NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput } from "@heroui/react";
+import { Button, Card, CardProps, NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput } from "@heroui/react";
 import { PageHeader } from '../../../../components/pageHeader';
 import { useToastMessage } from '../../../../components/toastProvider';
 import { HandCoinsIcon } from 'lucide-react';
@@ -73,11 +73,11 @@ export function ManageBillingFactorCard(props: Props & Omit<CardProps, 'children
 
   return (
     <Card {...cardProps}>
-      <CardHeader>
+      <Card.Header>
         <PageHeader title={t('title')} subtitle={t('subtitle')} icon={<HandCoinsIcon />} noMargin />
-      </CardHeader>
+      </Card.Header>
 
-      <CardContent className="flex flex-col gap-4">
+      <Card.Content className="flex flex-col gap-4">
         <NumberField
           aria-label={t('inputs.amount')}
           value={value}
@@ -90,13 +90,13 @@ export function ManageBillingFactorCard(props: Props & Omit<CardProps, 'children
             <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
           </NumberFieldGroup>
         </NumberField>
-      </CardContent>
+      </Card.Content>
 
-      <CardFooter>
+      <Card.Footer>
         <Button variant="primary" onPress={handleUpdate} isPending={isChangingBillingFactor}>
           {t('actions.update')}
         </Button>
-      </CardFooter>
+      </Card.Footer>
     </Card>
   );
 }

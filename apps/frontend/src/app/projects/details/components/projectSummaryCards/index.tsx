@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, Skeleton } from '@heroui/react';
+import { Card, Skeleton } from '@heroui/react';
 import { useTranslations, useNumberFormatter } from '@attraccess/plugins-frontend-ui';
 import { ActivityIcon, CircleDollarSignIcon, Clock3Icon } from 'lucide-react';
 import { useProjectsServiceGetProjectUsageStats } from '@attraccess/react-query-client';
@@ -50,14 +50,14 @@ export function ProjectSummaryCards({ projectId }: ProjectSummaryCardsProps) {
     <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
       {cards.map((card) => (
         <Card key={card.key}>
-          <CardHeader className="flex items-center gap-4">
+          <Card.Header className="flex items-center gap-4">
             <IconWrapper>{card.icon}</IconWrapper>
             <div>
               <p className="text-sm font-semibold">{card.title}</p>
               <p className="text-xs text-default-500">{card.description}</p>
             </div>
-          </CardHeader>
-          <CardContent>
+          </Card.Header>
+          <Card.Content>
             {isLoading ? (
               <Skeleton className="h-6 w-24" />
             ) : card.value ? (
@@ -65,7 +65,7 @@ export function ProjectSummaryCards({ projectId }: ProjectSummaryCardsProps) {
             ) : (
               <p className="text-default-400 text-sm">{t('summary.empty')}</p>
             )}
-          </CardContent>
+          </Card.Content>
         </Card>
       ))}
     </div>

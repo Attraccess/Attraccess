@@ -7,7 +7,7 @@ import {
   useBillingServiceGetBillingConfigurationKey,
   useBillingServiceSetBillingConfiguration,
 } from '@attraccess/react-query-client';
-import { Button, Card, CardContent, CardHeader, Form, CardProps, CardFooter } from '@heroui/react';
+import { Button, Card, CardProps, Form } from '@heroui/react';
 import { PageHeader } from '../../../../../../components/pageHeader';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useToastMessage } from '../../../../../../components/toastProvider';
@@ -75,10 +75,10 @@ export function CurrencyCard(props: Omit<CardProps, 'children'>) {
 
   return (
     <Card {...props}>
-      <CardHeader>
+      <Card.Header>
         <PageHeader icon={<EuroIcon size={20} />} title={t('title')} subtitle={t('subtitle')} noMargin />
-      </CardHeader>
-      <CardContent>
+      </Card.Header>
+      <Card.Content>
         <Form
           onSubmit={(e) => {
             e.preventDefault();
@@ -100,12 +100,12 @@ export function CurrencyCard(props: Omit<CardProps, 'children'>) {
           <input type="submit" hidden />
         </Form>
 
-        <CardFooter>
+        <Card.Footer>
           <Button variant="primary" onPress={onSubmitConfiguration} isPending={isPendingSetConfiguration}>
             {t('actions.save')}
           </Button>
-        </CardFooter>
-      </CardContent>
+        </Card.Footer>
+      </Card.Content>
     </Card>
   );
 }

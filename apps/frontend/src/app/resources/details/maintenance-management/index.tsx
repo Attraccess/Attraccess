@@ -1,18 +1,4 @@
-import {
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardProps,
-  cn,
-  Table,
-  TableBody,
-  TableCell,
-  TableColumn,
-  TableContent,
-  TableHeader,
-  TableRow,
-} from '@heroui/react';
+import { Button, Card, CardProps, cn, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow } from '@heroui/react';
 import { PageHeader } from '../../../../components/pageHeader';
 import { MaintenanceReasonDisplay } from '../../../../components/MaintenanceReasonDisplay';
 import { LabeledSwitch } from '../../../../components/labeledSwitch';
@@ -72,7 +58,7 @@ export function MaintenanceManagement(props: Props & Omit<CardProps, 'children'>
 
   return (
     <Card {...cardProps}>
-      <CardHeader>
+      <Card.Header>
         <PageHeader
           title={t('title')}
           icon={<ConstructionIcon />}
@@ -96,9 +82,9 @@ export function MaintenanceManagement(props: Props & Omit<CardProps, 'children'>
             </>
           }
         />
-      </CardHeader>
+      </Card.Header>
 
-      <CardContent>
+      <Card.Content>
         <Table>
           <TableContent aria-label={t('table.ariaLabel')}>
           <TableHeader>
@@ -160,7 +146,7 @@ export function MaintenanceManagement(props: Props & Omit<CardProps, 'children'>
           </TableBody>
           </TableContent>
         </Table>
-      </CardContent>
+      </Card.Content>
     </Card>
   );
 }

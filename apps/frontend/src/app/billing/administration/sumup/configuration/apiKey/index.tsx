@@ -7,7 +7,7 @@ import {
   useBillingServiceGetSumUpReadersKey,
   useBillingServiceSetSumUpApiKey,
 } from '@attraccess/react-query-client';
-import { Button, Card, CardContent, CardHeader, Form, Chip, Spinner, Link, CardFooter, CardProps } from '@heroui/react';
+import { Button, Card, CardProps, Chip, Form, Link, Spinner } from '@heroui/react';
 import { PageHeader } from '../../../../../../components/pageHeader';
 import { PasswordInput } from '../../../../../../components/PasswordInput';
 import { useCallback, useRef, useState } from 'react';
@@ -76,7 +76,7 @@ export function ApiKeyCard(props: Omit<CardProps, 'children'>) {
 
   return (
     <Card {...props}>
-      <CardHeader>
+      <Card.Header>
         <PageHeader
           icon={<WebhookIcon size={20} />}
           title={t('title')}
@@ -104,9 +104,9 @@ export function ApiKeyCard(props: Omit<CardProps, 'children'>) {
             </Chip>
           }
         />
-      </CardHeader>
+      </Card.Header>
 
-      <CardContent className="flex flex-col gap-2">
+      <Card.Content className="flex flex-col gap-2">
         <Form
           onSubmit={(e) => {
             e.preventDefault();
@@ -131,12 +131,12 @@ export function ApiKeyCard(props: Omit<CardProps, 'children'>) {
 
           <input type="submit" hidden />
         </Form>
-      </CardContent>
-      <CardFooter>
+      </Card.Content>
+      <Card.Footer>
         <Button variant="primary" onPress={onSubmitApiKey} isPending={isPendingSetSumUpApiKey}>
           {t('actions.save')}
         </Button>
-      </CardFooter>
+      </Card.Footer>
     </Card>
   );
 }

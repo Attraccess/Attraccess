@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { useUrlQuery } from '@attraccess/plugins-frontend-ui';
 import { useNavigate } from 'react-router-dom';
 import { Loading } from '../loading';
-import { Button, Card, CardContent, CardFooter, CardHeader, Form } from '@heroui/react';
+import { Button, Card, Form } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PasswordInput } from '../../components/PasswordInput';
 import en from './en.json';
@@ -55,11 +55,11 @@ export function ResetPassword() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Card className="max-w-md w-full" data-cy="reset-password-success-card">
-          <CardHeader className="text-center">{t('success.title')}</CardHeader>
-          <CardContent>
+          <Card.Header className="text-center">{t('success.title')}</Card.Header>
+          <Card.Content>
             <p className="text-sm text-gray-600 dark:text-gray-400 text-center">{t('success.message')}</p>
-          </CardContent>
-          <CardFooter>
+          </Card.Content>
+          <Card.Footer>
             <Button variant="primary"
               fullWidth
               onPress={() => navigate('/')}
@@ -67,7 +67,7 @@ export function ResetPassword() {
             >
               {t('success.goToLogin')}
             </Button>
-          </CardFooter>
+          </Card.Footer>
         </Card>
       </div>
     );
@@ -82,8 +82,8 @@ export function ResetPassword() {
         }}
         data-cy="reset-password-form"
       >
-        <CardHeader>{t('title')}</CardHeader>
-        <CardContent>
+        <Card.Header>{t('title')}</Card.Header>
+        <Card.Content>
           <PasswordInput
             label={t('inputs.password')}
             value={password}
@@ -108,12 +108,12 @@ export function ResetPassword() {
             data-cy="reset-password-confirm-password-input"
             autoComplete="new-password"
           />
-        </CardContent>
-        <CardFooter>
+        </Card.Content>
+        <Card.Footer>
           <Button variant="primary" fullWidth type="submit" data-cy="reset-password-submit-button">
             {t('submit')}
           </Button>
-        </CardFooter>
+        </Card.Footer>
       </Form>
     </Card>
   );

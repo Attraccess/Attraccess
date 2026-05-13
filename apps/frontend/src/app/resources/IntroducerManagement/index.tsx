@@ -1,4 +1,4 @@
-import { Card, CardContent, CardProps } from '@heroui/react';
+import { Card, CardProps } from '@heroui/react';
 import { AlertCircle } from 'lucide-react';
 import {
   useAccessControlServiceResourceIntroducersGetMany,
@@ -80,7 +80,7 @@ export function ResoureIntroducerManagement(
   if (error) {
     return (
       <Card {...rest}>
-        <CardContent>
+        <Card.Content>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <AlertCircle size={20} color="red" />
             <div>
@@ -88,7 +88,7 @@ export function ResoureIntroducerManagement(
               <p style={{ fontSize: '14px', opacity: 0.7 }}>{t('load.errorDescription')}</p>
             </div>
           </div>
-        </CardContent>
+        </Card.Content>
       </Card>
     );
   }

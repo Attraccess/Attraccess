@@ -1,41 +1,5 @@
 import React, { useState, forwardRef, useImperativeHandle, useCallback } from 'react';
-import {
-  Button,
-  Table,
-  TableHeader,
-  TableColumn,
-  TableBody,
-  TableRow,
-  TableCell,
-  TableContent,
-  Tooltip,
-  TooltipContent,
-  TextField,
-  Label,
-  Input,
-  InputGroup,
-  Description,
-  Modal,
-  ModalBackdrop,
-  ModalBody,
-  ModalContainer,
-  ModalDialog,
-  ModalFooter,
-  ModalHeader,
-  ModalHeading,
-  Separator,
-  Card,
-  CardContent,
-  CardHeader,
-  Dropdown,
-  DropdownTrigger,
-  DropdownMenu,
-  DropdownItem,
-  DropdownPopover,
-  TextArea,
-  Link,
-  useOverlayState,
-} from '@heroui/react';
+import { Button, Card, Description, Dropdown, DropdownItem, DropdownMenu, DropdownPopover, DropdownTrigger, Input, InputGroup, Label, Link, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Separator, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow, TextArea, TextField, Tooltip, TooltipContent, useOverlayState } from '@heroui/react';
 import { buttonVariants } from '@heroui/styles';
 import { Pencil, Trash, Key, FileCode, Eye, EyeOff, MoreVertical, Copy, Info } from 'lucide-react';
 import { useToastMessage } from '../../../components/toastProvider';
@@ -1085,11 +1049,11 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
 
                       <Separator className="my-4" />
                       <Card className="border border-default-200" data-cy="sso-provider-form-setup-card">
-                        <CardHeader className="flex items-center gap-2">
+                        <Card.Header className="flex items-center gap-2">
                           <Info size={16} />
                           <span className="font-semibold">{t('setupInstructions')}</span>
-                        </CardHeader>
-                        <CardContent className="flex flex-col gap-3">
+                        </Card.Header>
+                        <Card.Content className="flex flex-col gap-3">
                           <p className="text-xs text-default-500">{t('setupInstructionsHint')}</p>
                           <div className="flex flex-col gap-3">
                             {!isSamlProvider && (
@@ -1152,7 +1116,7 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                               <Link href={docsAuthentikPermissionsUrl}>{t('docsAuthentikPermissions')}</Link>
                             )}
                           </div>
-                        </CardContent>
+                        </Card.Content>
                       </Card>
                     </div>
                   </ModalBody>

@@ -1,4 +1,4 @@
-import { Button, Card, CardContent, CardFooter, CardHeader, Chip, Spinner } from '@heroui/react';
+import { Button, Card, Chip, Spinner } from '@heroui/react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PageHeader } from '../../../../components/pageHeader';
@@ -58,7 +58,7 @@ export function FormListPage() {
               onClick={() => navigate(`/resources/${resourceId}/forms/${form.id}`)}
               className="border border-default-200 dark:border-default-100"
             >
-              <CardHeader className="flex flex-col items-start gap-2">
+              <Card.Header className="flex flex-col items-start gap-2">
                 <p className="text-base font-semibold text-default-700">{form.name}</p>
                 <div className="flex flex-wrap gap-2">
                   {form.isRequiredOnResourceUsageStart && (
@@ -77,14 +77,14 @@ export function FormListPage() {
                     </Chip>
                   )}
                 </div>
-              </CardHeader>
-              <CardContent>
+              </Card.Header>
+              <Card.Content>
                 <p className="text-sm text-default-500">{t('list.fieldCount', { count: form.fields.length })}</p>
-              </CardContent>
-              <CardFooter className="flex justify-between text-xs text-default-400">
+              </Card.Content>
+              <Card.Footer className="flex justify-between text-xs text-default-400">
                 <span>{t('list.updated')}</span>
                 <DateTimeDisplay date={form.updatedAt} />
-              </CardFooter>
+              </Card.Footer>
             </Card>
           ))}
         </div>
