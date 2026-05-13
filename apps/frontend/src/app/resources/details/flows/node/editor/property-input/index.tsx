@@ -107,7 +107,7 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
 
         <Modal isOpen={isCreateServerOpen} onOpenChange={setIsCreateServerOpen}>
           <ModalBackdrop>
-            <ModalContainer>
+            <ModalContainer size="md">
               <ModalDialog>
                 {({ close }) => (
                   <>

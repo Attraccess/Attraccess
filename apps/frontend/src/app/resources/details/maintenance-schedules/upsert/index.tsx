@@ -13,6 +13,8 @@ import {
   ModalDialog,
   ModalFooter,
   ModalHeader,
+  ModalHeading,
+  ModalIcon,
   TextField,
   useOverlayState,
 } from '@heroui/react';
@@ -29,7 +31,6 @@ import {
   UsageDurationUnit,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
-import { PageHeader } from '../../../../../components/pageHeader';
 import { CalendarClockIcon } from 'lucide-react';
 import de from './de.json';
 import en from './en.json';
@@ -232,16 +233,13 @@ export function MaintenanceScheduleUpsertModal(props: Props) {
       {activator(open)}
       <Modal isOpen={isOpen} onOpenChange={setOpen}>
         <ModalBackdrop>
-          <ModalContainer>
+          <ModalContainer size="md">
             <ModalDialog>
               {() => (
                 <>
                   <ModalHeader>
-                    <PageHeader
-                      icon={<CalendarClockIcon />}
-                      title={scheduleId != null ? t('titleEdit') : t('titleCreate')}
-                      noMargin
-                    />
+                    <ModalIcon><CalendarClockIcon /></ModalIcon>
+                    <ModalHeading>{scheduleId != null ? t('titleEdit') : t('titleCreate')}</ModalHeading>
                   </ModalHeader>
 
                   <ModalBody>
@@ -251,6 +249,7 @@ export function MaintenanceScheduleUpsertModal(props: Props) {
                         e.preventDefault();
                         onSubmit();
                       }}
+                      className="flex flex-col gap-4"
                     >
                       <TextField value={name} onChange={setName}>
                         <Label>{t('inputs.name.label')}</Label>

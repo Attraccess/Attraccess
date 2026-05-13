@@ -233,7 +233,7 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
 
       <Modal isOpen={isOpen} onOpenChange={setOpen} data-cy="registration-form-success-modal">
         <ModalBackdrop>
-          <ModalContainer>
+          <ModalContainer size="sm">
             <ModalDialog>
               {({ close }) => (
                 <>

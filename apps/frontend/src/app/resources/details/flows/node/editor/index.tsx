@@ -9,10 +9,10 @@ import {
   ModalDialog,
   ModalFooter,
   ModalHeader,
+  ModalHeading,
   useOverlayState,
 } from '@heroui/react';
 import { useNodeId, useNodesData } from '@xyflow/react';
-import { PageHeader } from '../../../../../../components/pageHeader';
 import { useFlowContext } from '../../flowContext';
 import { Property, PropertyInput } from './property-input';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -60,20 +60,17 @@ export function NodeEditor(props: Props) {
       {props.children(open)}
       <Modal isOpen={isOpen} onOpenChange={setOpen}>
         <ModalBackdrop>
-          <ModalContainer>
+          <ModalContainer size="lg">
             <ModalDialog>
               {() => (
                 <>
                   <ModalHeader>
-                    <PageHeader
-                      title={t('nodes.' + schema.type + '.title')}
-                      subtitle={t('nodes.' + schema.type + '.description')}
-                      noMargin
-                    />
+                    <ModalHeading>{t('nodes.' + schema.type + '.title')}</ModalHeading>
+                    <p className="text-sm text-muted">{t('nodes.' + schema.type + '.description')}</p>
                   </ModalHeader>
 
                   <ModalBody className="flex flex-col gap-2">
-                    <Form onSubmit={onSave} ref={formRef}>
+                    <Form onSubmit={onSave} ref={formRef} className="flex flex-col gap-4">
                       {Object.entries(schema.configSchema.properties as Record<string, Property<unknown>>).map(
                         ([propertyName, property]) => (
                           <PropertyInput

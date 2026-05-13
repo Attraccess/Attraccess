@@ -263,7 +263,7 @@ export function UserManagementDetailsPage() {
 
       <Modal isOpen={isOpen} onOpenChange={setOpen}>
         <ModalBackdrop>
-          <ModalContainer>
+          <ModalContainer size="sm">
             <ModalDialog>
               {({ close: modalClose }) => (
                 <>

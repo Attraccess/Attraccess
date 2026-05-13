@@ -671,7 +671,7 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
       {/* Main Provider Form Modal */}
       <Modal isOpen={isOpen} onOpenChange={setOpen} data-cy="sso-provider-form-modal">
         <ModalBackdrop>
-          <ModalContainer>
+          <ModalContainer size="lg">
             <ModalDialog>
               {({ close }) => (
                 <>

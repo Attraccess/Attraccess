@@ -130,7 +130,7 @@ export function IntroductionsManagement(props: Readonly<IntroductionsManagementP
           }}
         >
           <ModalBackdrop>
-            <ModalContainer>
+            <ModalContainer size="md">
               <ModalDialog>
                 {() => (
                   <>

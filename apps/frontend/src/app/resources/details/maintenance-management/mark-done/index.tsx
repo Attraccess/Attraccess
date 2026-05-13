@@ -81,7 +81,7 @@ export function MarkDoneModal(props: Props) {
       {children(open)}
       <Modal isOpen={isOpen} onOpenChange={onOpenChangeHandler}>
         <ModalBackdrop>
-          <ModalContainer>
+          <ModalContainer size="md">
             <ModalDialog>
               {({ close }) => (
                 <>

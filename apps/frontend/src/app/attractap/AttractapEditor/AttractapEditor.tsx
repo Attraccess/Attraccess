@@ -100,10 +100,10 @@ export function AttractapEditor(props: Readonly<Props>) {
   );
 
   return (
-    <Form onSubmit={onSubmit} data-cy="attractap-editor-form">
+    <Form onSubmit={onSubmit} data-cy="attractap-editor-form" className="flex flex-col gap-4">
       <Modal isOpen={props.isOpen} onOpenChange={props.onCancel} data-cy="attractap-editor-modal">
         <ModalBackdrop>
-          <ModalContainer placement="top">
+          <ModalContainer placement="top" size="lg">
             <ModalDialog>
               {() => (
                 <>

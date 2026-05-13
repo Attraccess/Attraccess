@@ -365,7 +365,7 @@ export function MetricsSettingsForm() {
         }}
       >
         <ModalBackdrop>
-          <ModalContainer>
+          <ModalContainer size="sm">
             <ModalDialog>
               {({ close }) => (
                 <>
@@ -397,7 +397,7 @@ export function MetricsSettingsForm() {
         }}
       >
         <ModalBackdrop>
-          <ModalContainer>
+          <ModalContainer size="sm">
             <ModalDialog>
               {({ close }) => (
                 <>

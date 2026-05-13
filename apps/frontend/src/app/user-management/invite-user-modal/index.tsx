@@ -10,6 +10,7 @@ import {
   ModalContainer,
   ModalDialog,
   ModalHeader,
+  ModalHeading,
   Tab,
   TabList,
   TabPanel,
@@ -20,7 +21,6 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 import { ApiError, useUsersServiceFindManyKey, useUsersServiceInviteUser } from '@attraccess/react-query-client';
-import { PageHeader } from '../../../components/pageHeader';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useToastMessage } from '../../../components/toastProvider';
 import { useQueryClient } from '@tanstack/react-query';
@@ -138,7 +138,7 @@ export function InviteUserModal(props: Props) {
               {() => (
                 <>
                   <ModalHeader>
-                    <PageHeader title={t('title')} noMargin />
+                    <ModalHeading>{t('title')}</ModalHeading>
                   </ModalHeader>
 
                   <ModalBody>

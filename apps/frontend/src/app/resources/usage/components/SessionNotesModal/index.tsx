@@ -45,7 +45,7 @@ export const SessionNotesModal = ({ isOpen, onClose, onConfirm, mode, isSubmitti
       }}
     >
       <ModalBackdrop>
-        <ModalContainer className="sm:max-w-md">
+        <ModalContainer size="md">
           <ModalDialog>
             {({ close }) => (
               <>

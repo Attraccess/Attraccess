@@ -81,7 +81,7 @@ export default function AccountPage() {
 
       <Modal isOpen={isOpen} onOpenChange={setOpen}>
         <ModalBackdrop>
-          <ModalContainer>
+          <ModalContainer size="sm">
             <ModalDialog>
               {({ close }) => (
                 <>

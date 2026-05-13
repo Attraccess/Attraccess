@@ -137,7 +137,7 @@ export function EditEmailTemplatePage() {
 
               <Modal isOpen={editorIsExpanded} onOpenChange={setEditorIsExpanded}>
                 <ModalBackdrop>
-                  <ModalContainer>
+                  <ModalContainer size="cover">
                     <ModalDialog>
                       {({ close }) => (
                         <>

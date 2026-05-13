@@ -18,6 +18,8 @@ import {
   ModalDialog,
   ModalFooter,
   ModalHeader,
+  ModalHeading,
+  ModalIcon,
   Table,
   TableBody,
   TableCell,
@@ -29,7 +31,6 @@ import {
   useOverlayState,
 } from '@heroui/react';
 import { EmptyState } from '../../../components/emptyState';
-import { PageHeader } from '../../../components/pageHeader';
 import { PlusIcon, Settings2Icon, Trash2Icon } from 'lucide-react';
 import { AlertStatusIcon } from '../../../components/AlertStatusIcon';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -124,15 +125,17 @@ export function AllowedSignupDomainsEditorModal(props: Props) {
       {props.children(open)}
       <Modal isOpen={isOpen} onOpenChange={setOpen}>
         <ModalBackdrop>
-          <ModalContainer>
+          <ModalContainer size="lg">
             <ModalDialog>
               {() => (
                 <>
                   <ModalHeader>
-                    <PageHeader title={t('title')} subtitle={t('subtitle')} icon={<Settings2Icon />} noMargin={true} />
+                    <ModalIcon><Settings2Icon /></ModalIcon>
+                    <ModalHeading>{t('title')}</ModalHeading>
+                    <p className="text-sm text-muted">{t('subtitle')}</p>
                   </ModalHeader>
 
-                  <ModalBody>
+                  <ModalBody className="flex flex-col gap-4">
                     <Alert status="warning" className="whitespace-pre-wrap">
                       <AlertStatusIcon status="warning" />
                       <AlertContent>

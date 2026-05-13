@@ -7,12 +7,12 @@ import {
   ModalDialog,
   ModalFooter,
   ModalHeader,
+  ModalHeading,
   useOverlayState,
 } from '@heroui/react';
 import de from './de.json';
 import en from './en.json';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { PageHeader } from '../../../../components/pageHeader';
 import {
   UseAttractapServiceGetAllCardsKeyFn,
   useAttractapServiceToggleCardActive,
@@ -55,12 +55,12 @@ export function NfcCardActivateModal(props: Props) {
       })}
       <Modal isOpen={isOpen} onOpenChange={setOpen} data-cy="nfc-card-activate-modal">
         <ModalBackdrop>
-          <ModalContainer>
+          <ModalContainer size="sm">
             <ModalDialog>
               {({ close }) => (
                 <>
                   <ModalHeader>
-                    <PageHeader title={t('title')} noMargin />
+                    <ModalHeading>{t('title')}</ModalHeading>
                   </ModalHeader>
                   <ModalBody>{t('description')}</ModalBody>
                   <ModalFooter>

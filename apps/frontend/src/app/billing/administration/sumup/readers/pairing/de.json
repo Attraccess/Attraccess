@@ -6,7 +6,8 @@
     "name": "Name"
   },
   "actions": {
-    "pair": "Karten-Lesegerät einrichten"
+    "pair": "Karten-Lesegerät einrichten",
+    "cancel": "Abbrechen"
   },
   "success": {
     "toast": {

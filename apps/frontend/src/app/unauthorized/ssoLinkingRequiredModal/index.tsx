@@ -1,6 +1,5 @@
-import { Alert, AlertContent, AlertDescription, Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader } from '@heroui/react';
+import { Alert, AlertContent, AlertDescription, Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading } from '@heroui/react';
 import { AlertStatusIcon } from '../../../components/AlertStatusIcon';
-import { PageHeader } from '../../../components/pageHeader';
 import { useTranslations, useUrlQuery } from '@attraccess/plugins-frontend-ui';
 import { PasswordInput } from '../../../components/PasswordInput';
 import { useToastMessage } from '../../../components/toastProvider';
@@ -100,11 +99,12 @@ export function SSOLinkingRequiredModal(props: Props) {
   return (
     <Modal isOpen={show}>
       <ModalBackdrop isDismissable={false} />
-      <ModalContainer>
+      <ModalContainer size="md">
         <ModalDialog>
           {() => (<>
         <ModalHeader>
-          <PageHeader title={t('title')} subtitle={t('subtitle')} noMargin />
+          <ModalHeading>{t('title')}</ModalHeading>
+          <p className="text-sm text-muted">{t('subtitle')}</p>
         </ModalHeader>
 
         <ModalBody>

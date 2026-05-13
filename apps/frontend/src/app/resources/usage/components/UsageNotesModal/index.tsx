@@ -55,7 +55,7 @@ export const UsageNotesModal = memo(
         }}
       >
         <ModalBackdrop>
-          <ModalContainer>
+          <ModalContainer size="md">
             <ModalDialog>
               {({ close }) => (
                 <>

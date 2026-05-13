@@ -10,10 +10,10 @@ import {
   ModalDialog,
   ModalFooter,
   ModalHeader,
+  ModalHeading,
   useOverlayState,
 } from '@heroui/react';
 import { OpenIDConfiguration } from '../OpenIDC.data';
-import { PageHeader } from '../../../../../components/pageHeader';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useCallback, useState } from 'react';
 import { useToastMessage } from '../../../../../components/toastProvider';
@@ -97,14 +97,14 @@ export function KeycloakDiscoveryDialog(props: Props) {
         }}
       >
         <ModalBackdrop>
-          <ModalContainer>
+          <ModalContainer size="md">
             <ModalDialog>
               {({ close }) => (
                 <>
                   <ModalHeader>
-                    <PageHeader noMargin title={t('title')} />
+                    <ModalHeading>{t('title')}</ModalHeading>
                   </ModalHeader>
-                  <ModalBody>
+                  <ModalBody className="flex flex-col gap-4">
                     <TextField value={host} onChange={setHost}>
                       <Label>{t('host')}</Label>
                       <Input />

@@ -213,8 +213,8 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
       {props.children?.(open)}
       <Modal isOpen={isOpen} onOpenChange={setOpen} data-cy="resource-edit-modal">
         <ModalBackdrop>
-          <ModalContainer>
-            <ModalDialog className="w-screen sm:w-[90vw] sm:max-w-6xl">
+          <ModalContainer size="cover">
+            <ModalDialog>
               {({ close }) => (
                 <>
                   <ModalHeader>

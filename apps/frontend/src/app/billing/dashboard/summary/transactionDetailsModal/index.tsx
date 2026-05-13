@@ -8,6 +8,7 @@ import {
   ModalContainer,
   ModalDialog,
   ModalHeader,
+  ModalHeading,
   Table,
   TableBody,
   TableCell,
@@ -20,7 +21,6 @@ import {
 import de from './de.json';
 import en from './en.json';
 import { AttraccessUser, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { PageHeader } from '../../../../../components/pageHeader';
 import {
   BillingTransaction,
   BillingTransactionStatus,
@@ -91,24 +91,21 @@ export function TransactionDetailsModal(props: Props) {
       {children && children(open)}
       <Modal isOpen={isOpen} onOpenChange={setOpen}>
         <ModalBackdrop>
-          <ModalContainer>
+          <ModalContainer size="lg">
             <ModalDialog>
               {() => (
                 <>
                   <ModalHeader>
-                    <PageHeader
-                      title={t('title')}
-                      noMargin
-                      actions={
-                        <RefundModal transactionId={transactionId}>
-                          {(onOpen) => (
-                            <Button variant="danger-soft" onPress={onOpen}>
-                              {t('actions.refund')}
-                            </Button>
-                          )}
-                        </RefundModal>
-                      }
-                    />
+                    <div className="flex w-full items-center justify-between gap-2">
+                      <ModalHeading>{t('title')}</ModalHeading>
+                      <RefundModal transactionId={transactionId}>
+                        {(onOpen) => (
+                          <Button variant="danger-soft" onPress={onOpen}>
+                            {t('actions.refund')}
+                          </Button>
+                        )}
+                      </RefundModal>
+                    </div>
                   </ModalHeader>
                   <ModalBody>
                     {!transaction ? (
