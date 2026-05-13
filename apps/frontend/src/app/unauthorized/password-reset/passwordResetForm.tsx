@@ -60,7 +60,7 @@ export function PasswordResetForm({ onGoBack }: PasswordResetFormProps) {
 
       <Button variant="primary"
         onPress={() => requestPasswordReset({ requestBody: { email } })}
-        fullWidth
+        className="w-full"
         isPending={isPending}
         isDisabled={isPending}
         data-cy="password-reset-form-submit-button"

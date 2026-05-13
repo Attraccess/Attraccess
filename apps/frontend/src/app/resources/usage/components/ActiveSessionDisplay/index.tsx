@@ -128,7 +128,7 @@ export function ActiveSessionDisplay({ resourceId, startTime }: ActiveSessionDis
 
         <FlowButtons resourceId={resourceId} />
 
-        <ButtonGroup fullWidth>
+        <ButtonGroup className="w-full">
           <Button
             isPending={endSession.isPending}
             onPress={immediatelyEndSession}

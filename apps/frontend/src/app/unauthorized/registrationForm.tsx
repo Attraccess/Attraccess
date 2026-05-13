@@ -220,7 +220,7 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
 
         <Button
           variant="primary"
-          fullWidth
+          className="w-full"
           type="submit"
           isPending={isPending}
           isDisabled={!canSubmit}

@@ -23,7 +23,7 @@ function SSOLoginButton(props: Readonly<SSOLoginButtonProps>) {
 
   return (
     <a href={loginHref} target="_self" className="w-full block" data-cy={`sso-login-button-${provider.name}`}>
-      <Button fullWidth>
+      <Button className="w-full">
         {t('loginWith', { provider: provider.name })}
       </Button>
     </a>
