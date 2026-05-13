@@ -39,8 +39,8 @@ export function LiveSection(props: Props) {
             <div className="flex-1">
               <div className="font-medium mb-1"><MaintenanceReasonDisplay reason={m.reason} /></div>
               <div className="text-xs text-default-600">
-                <span>Start: <DateTimeDisplay date={m.startTime} /></span>
-                {m.endTime && (<> · <span>End: <DateTimeDisplay date={m.endTime} /></span></>)}
+                <span>{t('activity.live.start')}: <DateTimeDisplay date={m.startTime} /></span>
+                {m.endTime && (<> · <span>{t('activity.live.end')}: <DateTimeDisplay date={m.endTime} /></span></>)}
                 {(m.createdByUser as { username?: string } | undefined)?.username && (
                   <> · {t('activity.live.createdBy', { name: String((m.createdByUser as { username?: string }).username) })}</>
                 )}

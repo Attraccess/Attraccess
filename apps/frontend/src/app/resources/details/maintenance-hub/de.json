@@ -45,7 +45,9 @@
       "endsIn": "endet in {time}",
       "startedAgo": "Gestartet vor {time}",
       "createdBy": "von {name}",
-      "markDone": "Als erledigt markieren"
+      "markDone": "Als erledigt markieren",
+      "start": "Start",
+      "end": "Ende"
     },
     "upcoming": {
       "label": "Anstehend",
@@ -84,6 +86,8 @@
     "timeIntervalDays": "Alle {duration} Tage"
   },
   "errors": {
-    "forbidden": "Du hast keine Berechtigung zur Wartungs-Verwaltung dieser Ressource."
+    "forbidden": "Du hast keine Berechtigung zur Wartungs-Verwaltung dieser Ressource.",
+    "resourceNotFound": "Ressource nicht gefunden.",
+    "backToResources": "Zurück zur Übersicht"
   }
 }

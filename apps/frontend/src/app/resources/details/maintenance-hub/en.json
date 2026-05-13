@@ -45,7 +45,9 @@
       "endsIn": "ends in {time}",
       "startedAgo": "Started {time} ago",
       "createdBy": "by {name}",
-      "markDone": "Mark done"
+      "markDone": "Mark done",
+      "start": "Start",
+      "end": "End"
     },
     "upcoming": {
       "label": "Upcoming",
@@ -84,6 +86,8 @@
     "timeIntervalDays": "Every {duration} d"
   },
   "errors": {
-    "forbidden": "You don't have permission to manage maintenance for this resource."
+    "forbidden": "You don't have permission to manage maintenance for this resource.",
+    "resourceNotFound": "Resource not found.",
+    "backToResources": "Back to resources"
   }
 }

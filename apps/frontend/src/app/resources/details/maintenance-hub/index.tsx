@@ -51,10 +51,10 @@ export function MaintenanceHubPage() {
   if (resourceError || !resource) {
     return (
       <div className="max-w-2xl mx-auto py-16 text-center">
-        <p className="text-default-600 mb-4">Resource not found.</p>
+        <p className="text-default-600 mb-4">{t('errors.resourceNotFound')}</p>
         <Button variant="ghost" onPress={() => navigate('/resources')}>
           <ArrowLeft className="w-4 h-4" />
-          Back to resources
+          {t('errors.backToResources')}
         </Button>
       </div>
     );
