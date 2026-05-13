@@ -2,10 +2,7 @@ import { Button, Skeleton } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PlusIcon } from 'lucide-react';
 import { useMemo } from 'react';
-import {
-  ResourceMaintenance,
-  useResourceMaintenancesServiceFindMaintenances,
-} from '@attraccess/react-query-client';
+import { ResourceMaintenance } from '@attraccess/react-query-client';
 import { useNow } from '../../../../hooks/useNow';
 import { ResourceMaintenanceUpsertModal } from '../maintenance-management/upsert';
 import { LiveSection } from './live-section';
@@ -16,21 +13,17 @@ import en from './en.json';
 
 interface Props {
   resourceId: number;
+  maintenances: ResourceMaintenance[];
+  isLoading: boolean;
 }
 
 export function ActivityTab(props: Props) {
-  const { resourceId } = props;
+  const { resourceId, maintenances, isLoading } = props;
   const { t } = useTranslations({ de, en });
   const now = useNow();
 
-  const { data, isLoading } = useResourceMaintenancesServiceFindMaintenances(
-    { resourceId, includePast: true, includeActive: true, includeUpcoming: true },
-    undefined,
-    { refetchInterval: 10_000 },
-  );
-
   const partitioned = useMemo(() => {
-    const all = data?.data ?? [];
+    const all = maintenances;
     const live: ResourceMaintenance[] = [];
     const upcoming: ResourceMaintenance[] = [];
     const past: ResourceMaintenance[] = [];
@@ -44,7 +37,7 @@ export function ActivityTab(props: Props) {
     upcoming.sort((a, b) => +new Date(a.startTime) - +new Date(b.startTime));
     past.sort((a, b) => +new Date(b.startTime) - +new Date(a.startTime));
     return { live, upcoming, past };
-  }, [data?.data, now]);
+  }, [maintenances, now]);
 
   if (isLoading) {
     return (

@@ -32,17 +32,23 @@ export function MaintenanceHubPage() {
   const { data: permissions, isLoading: isLoadingPerms } =
     useResourceMaintenancesServiceCanManageMaintenance({ resourceId });
 
-  const { data: schedules } =
+  const { data: schedules, isLoading: isLoadingSchedules } =
     useResourceMaintenanceSchedulesServiceFindMaintenanceSchedules({ resourceId });
 
-  const { data: maintenancesEnvelope } = useResourceMaintenancesServiceFindMaintenances(
-    { resourceId, includePast: true, includeActive: true, includeUpcoming: true },
-    undefined,
-    { refetchInterval: 10_000 },
-  );
+  const { data: maintenancesEnvelope, isLoading: isLoadingMaintenances } =
+    useResourceMaintenancesServiceFindMaintenances(
+      { resourceId, includePast: true, includeActive: true, includeUpcoming: true },
+      undefined,
+      { refetchInterval: 10_000 },
+    );
 
   const [tab, setTab] = useState<'schedules' | 'activity'>('schedules');
-  const [createDrawerOpen, setCreateDrawerOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerScheduleId, setDrawerScheduleId] = useState<number | undefined>(undefined);
+
+  const openCreateDrawer = () => { setDrawerScheduleId(undefined); setDrawerOpen(true); };
+  const openEditDrawer = (id: number) => { setDrawerScheduleId(id); setDrawerOpen(true); };
+  const closeDrawer = () => setDrawerOpen(false);
 
   if (isLoadingResource || isLoadingPerms) {
     return <div className="flex justify-center py-16"><Spinner /></div>;
@@ -80,7 +86,7 @@ export function MaintenanceHubPage() {
         icon={<ConstructionIcon className="w-6 h-6" />}
         backTo={`/resources/${resourceId}`}
         actions={
-          <Button variant="primary" onPress={() => setCreateDrawerOpen(true)}>
+          <Button variant="primary" onPress={openCreateDrawer}>
             <PlusIcon className="w-4 h-4" />
             {t('actions.newSchedule')}
           </Button>
@@ -101,10 +107,24 @@ export function MaintenanceHubPage() {
               <Tab id="activity">{t('tabs.activity')}</Tab>
             </TabList>
             <TabPanel id="schedules">
-              <div className="p-4"><SchedulesTab resourceId={resourceId} /></div>
+              <div className="p-4">
+                <SchedulesTab
+                  resourceId={resourceId}
+                  schedules={schedules ?? []}
+                  isLoading={isLoadingSchedules}
+                  onCreate={openCreateDrawer}
+                  onEdit={openEditDrawer}
+                />
+              </div>
             </TabPanel>
             <TabPanel id="activity">
-              <div className="p-4"><ActivityTab resourceId={resourceId} /></div>
+              <div className="p-4">
+                <ActivityTab
+                  resourceId={resourceId}
+                  maintenances={maintenancesEnvelope?.data ?? []}
+                  isLoading={isLoadingMaintenances}
+                />
+              </div>
             </TabPanel>
           </Tabs>
         </Card>
@@ -112,8 +132,9 @@ export function MaintenanceHubPage() {
 
       <ScheduleFormDrawer
         resourceId={resourceId}
-        isOpen={createDrawerOpen}
-        onClose={() => setCreateDrawerOpen(false)}
+        scheduleId={drawerScheduleId}
+        isOpen={drawerOpen}
+        onClose={closeDrawer}
       />
     </div>
   );
