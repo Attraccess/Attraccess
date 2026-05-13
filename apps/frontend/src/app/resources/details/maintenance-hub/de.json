@@ -36,6 +36,9 @@
     "deleteConfirm": "Zeitplan \"{name}\" löschen?"
   },
   "activity": {
+    "actions": {
+      "create": "Neue Wartung"
+    },
     "live": {
       "label": "Läuft gerade",
       "count": "{count} laufend",

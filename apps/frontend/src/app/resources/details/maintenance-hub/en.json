@@ -36,6 +36,9 @@
     "deleteConfirm": "Delete schedule \"{name}\"?"
   },
   "activity": {
+    "actions": {
+      "create": "New maintenance"
+    },
     "live": {
       "label": "Live now",
       "count": "{count} running",
