@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, Chip } from '@heroui/react';
+import { Card, Chip } from '@heroui/react';
 import { CheckIcon, Settings2Icon, XIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PageHeader } from '../../../../components/pageHeader';
@@ -33,7 +33,7 @@ export function AppSettingsCard({ variant, onNext }: AppSettingsCardProps) {
 
   return (
     <Card className="flex-1 min-w-[300px]">
-      <CardHeader>
+      <Card.Header>
         <PageHeader
           title={t('title')}
           subtitle={t('subtitle')}
@@ -41,10 +41,10 @@ export function AppSettingsCard({ variant, onNext }: AppSettingsCardProps) {
           noMargin
           actions={licenseChip}
         />
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
+      </Card.Header>
+      <Card.Content className="flex flex-col gap-4">
         <AppSettingsForm variant={variant} endpoint="settings" onNext={onNext} />
-      </CardContent>
+      </Card.Content>
     </Card>
   );
 }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, AlertContent, AlertDescription, AlertTitle, Button, Card, CardContent, CardHeader, Chip, Dropdown, DropdownItem, DropdownMenu, DropdownPopover, DropdownTrigger, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow } from '@heroui/react';
+import { Alert, AlertContent, AlertDescription, AlertTitle, Button, Card, Chip, Dropdown, DropdownItem, DropdownMenu, DropdownPopover, DropdownTrigger, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow } from '@heroui/react';
 import { buttonVariants } from '@heroui/styles';
 import { ArrowRightIcon, CpuIcon, LogsIcon, MoreVertical, PencilIcon, Trash2Icon } from 'lucide-react';
 import { AlertStatusIcon } from '../../../components/AlertStatusIcon';
@@ -163,14 +163,14 @@ export function AttractapList() {
       <div className="flex flex-col gap-4">
         {[activeReaders, staleReaders].map((readers, tableIndex) => (
           <Card key={tableIndex}>
-            <CardHeader>
+            <Card.Header>
               <PageHeader
                 noMargin
                 title={t(`table.${tableIndex === 0 ? 'active' : 'stale'}.title`)}
                 subtitle={t(`table.${tableIndex === 0 ? 'active' : 'stale'}.description`)}
               />
-            </CardHeader>
-            <CardContent>
+            </Card.Header>
+            <Card.Content>
               <Table
                 data-cy={`attractap-list-table-${tableIndex === 0 ? 'active' : 'stale'}`}
               >
@@ -220,7 +220,7 @@ export function AttractapList() {
                 </TableBody>
                 </TableContent>
               </Table>
-            </CardContent>
+            </Card.Content>
           </Card>
         ))}
       </div>

@@ -19,22 +19,7 @@ import { ChangeEmailForm } from './components/changeEmail';
 
 import en from './en.json';
 import de from './de.json';
-import {
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  Chip,
-  Separator,
-  Modal,
-  ModalBackdrop,
-  ModalBody,
-  ModalContainer,
-  ModalDialog,
-  ModalFooter,
-  ModalHeader,
-  useOverlayState,
-} from '@heroui/react';
+import { Button, Card, Chip, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Separator, useOverlayState } from '@heroui/react';
 import { useToastMessage } from '../../../components/toastProvider';
 import API_ERROR_TRANSLATIONS_EN from '../../../global-translations/api-errors.en.json';
 import API_ERROR_TRANSLATIONS_DE from '../../../global-translations/api-errors.de.json';
@@ -180,34 +165,34 @@ export function UserManagementDetailsPage() {
               />
             </div>
             <Card className="w-full">
-              <CardHeader>
+              <Card.Header>
                 <PageHeader title={t('profile.usernameTitle')} noMargin />
-              </CardHeader>
-              <CardContent className="flex flex-col gap-8">
+              </Card.Header>
+              <Card.Content className="flex flex-col gap-8">
                 <ChangeUsernameForm userId={user.id} />
-              </CardContent>
+              </Card.Content>
             </Card>
 
             <Card className="w-full">
-              <CardHeader>
+              <Card.Header>
                 <PageHeader title={t('profile.emailTitle')} noMargin />
-              </CardHeader>
-              <CardContent className="flex flex-col gap-8">
+              </Card.Header>
+              <Card.Content className="flex flex-col gap-8">
                 <ChangeEmailForm userId={user.id} />
-              </CardContent>
+              </Card.Content>
             </Card>
 
             <Card className="w-full">
-              <CardHeader>
+              <Card.Header>
                 <PageHeader title={t('profile.passwordTitle')} noMargin />
-              </CardHeader>
-              <CardContent className="flex flex-col gap-8">
+              </Card.Header>
+              <Card.Content className="flex flex-col gap-8">
                 <SetPasswordForm userId={user.id} />
-              </CardContent>
+              </Card.Content>
             </Card>
 
             <Card className="w-full">
-              <CardHeader className="flex items-center justify-between">
+              <Card.Header className="flex items-center justify-between">
                 <PageHeader title={t('sso.title')} noMargin />
                 <Chip
                   color={ssoDetails.length > 0 ? 'accent' : 'default'}
@@ -215,8 +200,8 @@ export function UserManagementDetailsPage() {
                 >
                   {ssoDetails.length > 0 ? t('sso.linked', { count: ssoDetails.length }) : t('sso.notLinkedChip')}
                 </Chip>
-              </CardHeader>
-              <CardContent>
+              </Card.Header>
+              <Card.Content>
                 {ssoDetails.length === 0 ? (
                   <div className="flex items-center gap-2">
                     <Chip color="default" variant="soft">
@@ -257,20 +242,20 @@ export function UserManagementDetailsPage() {
                     })}
                   </div>
                 )}
-              </CardContent>
+              </Card.Content>
             </Card>
 
             <Card className="w-full">
-              <CardHeader>
+              <Card.Header>
                 <PageHeader title={t('delete.title')} noMargin />
-              </CardHeader>
-              <CardContent className="flex flex-col gap-4">
+              </Card.Header>
+              <Card.Content className="flex flex-col gap-4">
                 <p className="text-sm text-default-500">{t('delete.description')}</p>
                 <Button variant="danger-soft" onPress={open} isDisabled={isSelf} data-cy="admin-delete-user-open-modal">
                   {t('delete.actions.open')}
                 </Button>
                 {isSelf ? <p className="text-xs text-default-400">{t('delete.selfDisabled')}</p> : null}
-              </CardContent>
+              </Card.Content>
             </Card>
           </>
         )}

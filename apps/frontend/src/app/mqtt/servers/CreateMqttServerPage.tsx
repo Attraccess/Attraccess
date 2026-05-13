@@ -1,5 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Button, Card, CardHeader, TextField, Label, Input, Checkbox, Form } from "@heroui/react";
+import { Button, Card, Checkbox, Form, Input, Label, TextField } from "@heroui/react";
 import { Select } from '../../../components/select';
 import { ArrowLeft } from 'lucide-react';
 import { PasswordInput } from '../../../components/PasswordInput';
@@ -185,7 +185,7 @@ export function CreateMqttServerPage(props?: Readonly<CreateMqttServerPageProps>
 
   return (
     <Card data-cy="create-mqtt-server-page-card">
-      <CardHeader>
+      <Card.Header>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <Button variant="ghost"
@@ -199,7 +199,7 @@ export function CreateMqttServerPage(props?: Readonly<CreateMqttServerPageProps>
             <h2>{t('addNewMqttServer')}</h2>
           </div>
         </div>
-      </CardHeader>
+      </Card.Header>
       <div style={{ padding: '1rem' }}>
         <CreateMqttServerForm {...props} onCancel={handleCancel} />
       </div>

@@ -1,20 +1,7 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
-import {
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardProps,
-  Table,
-  TableBody,
-  TableCell,
-  TableColumn,
-  TableContent,
-  TableHeader,
-  TableRow,
-} from '@heroui/react';
+import { Button, Card, CardProps, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow } from '@heroui/react';
 import { PageHeader } from '../../../../../components/pageHeader';
 import { SmartphoneNfcIcon, Trash2Icon } from 'lucide-react';
 import {
@@ -40,7 +27,7 @@ export function SumUpReadersCard(props: Omit<CardProps, 'children'>) {
 
   return (
     <Card {...props}>
-      <CardHeader>
+      <Card.Header>
         <PageHeader
           icon={<SmartphoneNfcIcon />}
           title={t('title')}
@@ -56,9 +43,9 @@ export function SumUpReadersCard(props: Omit<CardProps, 'children'>) {
             </SumUpReadersPairing>
           }
         />
-      </CardHeader>
+      </Card.Header>
 
-      <CardContent>
+      <Card.Content>
         <Table>
           <TableContent aria-label={t('table.ariaLabel')}>
           <TableHeader>
@@ -94,7 +81,7 @@ export function SumUpReadersCard(props: Omit<CardProps, 'children'>) {
           </TableBody>
           </TableContent>
         </Table>
-      </CardContent>
+      </Card.Content>
     </Card>
   );
 }

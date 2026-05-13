@@ -1,24 +1,6 @@
 import { memo, useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import {
-  Button,
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  TextField,
-  Label,
-  Input,
-  FieldError,
-  Radio,
-  RadioGroup,
-  Spinner,
-  Tab,
-  TabList,
-  TabPanel,
-  Tabs,
-  TextArea,
-} from '@heroui/react';
+import { Button, Card, FieldError, Input, Label, Radio, RadioGroup, Spinner, Tab, TabList, TabPanel, Tabs, TextArea, TextField } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { ArrowLeft, Save } from 'lucide-react';
 import { useToastMessage } from '../../../components/toastProvider';
@@ -157,13 +139,13 @@ function DocumentationEditorComponent() {
   if (isResourceError) {
     return (
       <Card className="max-w-xl mx-auto my-8">
-        <CardHeader>
+        <Card.Header>
           <h2 className="text-xl">{t('error.title')}</h2>
-        </CardHeader>
-        <CardContent>
+        </Card.Header>
+        <Card.Content>
           <p className="text-danger">{resourceError instanceof Error ? resourceError.message : t('error.unknown')}</p>
-        </CardContent>
-        <CardFooter className="flex justify-center gap-4">
+        </Card.Content>
+        <Card.Footer className="flex justify-center gap-4">
           <Button variant="primary" onPress={() => refetchResource()} data-cy="documentation-editor-error-retry-button">
             {t('actions.retry')}
           </Button>
@@ -173,7 +155,7 @@ function DocumentationEditorComponent() {
           ><ArrowLeft size={16} />
             {t('actions.backToResources')}
           </Button>
-        </CardFooter>
+        </Card.Footer>
       </Card>
     );
   }
@@ -182,20 +164,20 @@ function DocumentationEditorComponent() {
   if (!resource) {
     return (
       <Card className="max-w-xl mx-auto my-8">
-        <CardHeader>
+        <Card.Header>
           <h2 className="text-xl">{t('notFound.title')}</h2>
-        </CardHeader>
-        <CardContent>
+        </Card.Header>
+        <Card.Content>
           <p>{t('notFound.message')}</p>
-        </CardContent>
-        <CardFooter className="justify-center">
+        </Card.Content>
+        <Card.Footer className="justify-center">
           <Button variant="secondary"
             onPress={() => navigate('/resources')}
             data-cy="documentation-editor-not-found-back-to-resources-button"
           ><ArrowLeft size={16} />
             {t('actions.backToResources')}
           </Button>
-        </CardFooter>
+        </Card.Footer>
       </Card>
     );
   }
@@ -218,7 +200,7 @@ function DocumentationEditorComponent() {
       />
 
       <Card className="mt-6">
-        <CardHeader>
+        <Card.Header>
           <RadioGroup
            
             orientation="horizontal"
@@ -234,8 +216,8 @@ function DocumentationEditorComponent() {
               {t('documentationType.url')}
             </Radio>
           </RadioGroup>
-        </CardHeader>
-        <CardContent>
+        </Card.Header>
+        <Card.Content>
           {documentationType === DocumentationType.MARKDOWN && (
             <Tabs
               selectedKey={selectedTab}
@@ -280,8 +262,8 @@ function DocumentationEditorComponent() {
               {validationErrors.url && <FieldError>{validationErrors.url}</FieldError>}
             </TextField>
           )}
-        </CardContent>
-        <CardFooter>
+        </Card.Content>
+        <Card.Footer>
           <div className="flex justify-end space-x-2">
             <Button variant="ghost"
               onPress={() => navigate(`/resources/${resourceId}`)}
@@ -298,7 +280,7 @@ function DocumentationEditorComponent() {
               {t('actions.save')}
             </Button>
           </div>
-        </CardFooter>
+        </Card.Footer>
       </Card>
     </div>
   );

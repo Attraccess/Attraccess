@@ -1,17 +1,4 @@
-import {
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardProps,
-  Table,
-  TableBody,
-  TableCell,
-  TableColumn,
-  TableContent,
-  TableHeader,
-  TableRow,
-} from '@heroui/react';
+import { Button, Card, CardProps, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow } from '@heroui/react';
 import { PageHeader } from '../../../../components/pageHeader';
 import {
   ResourceMaintenanceSchedule,
@@ -101,7 +88,7 @@ export function MaintenanceSchedules(props: Props & Omit<CardProps, 'children'>)
 
   return (
     <Card {...cardProps}>
-      <CardHeader>
+      <Card.Header>
         <PageHeader
           title={t('title')}
           icon={<CalendarClockIcon />}
@@ -117,9 +104,9 @@ export function MaintenanceSchedules(props: Props & Omit<CardProps, 'children'>)
             </MaintenanceScheduleUpsertModal>
           }
         />
-      </CardHeader>
+      </Card.Header>
 
-      <CardContent>
+      <Card.Content>
         <Table>
           <TableContent aria-label={t('table.ariaLabel')}>
           <TableHeader>
@@ -167,7 +154,7 @@ export function MaintenanceSchedules(props: Props & Omit<CardProps, 'children'>)
           </TableBody>
           </TableContent>
         </Table>
-      </CardContent>
+      </Card.Content>
     </Card>
   );
 }

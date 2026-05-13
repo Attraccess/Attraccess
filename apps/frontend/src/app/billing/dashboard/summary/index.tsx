@@ -1,22 +1,5 @@
 import { DateTimeDisplay, useNumberFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
-import {
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardProps,
-  Chip,
-  cn,
-  Skeleton,
-  Spinner,
-  Table,
-  TableBody,
-  TableCell,
-  TableColumn,
-  TableContent,
-  TableHeader,
-  TableRow,
-} from '@heroui/react';
+import { Button, Card, CardProps, Chip, cn, Skeleton, Spinner, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow } from '@heroui/react';
 import { PageHeader } from '../../../../components/pageHeader';
 import de from './de.json';
 import en from './en.json';
@@ -158,10 +141,10 @@ export function SummaryCard(props: Omit<CardProps, 'children'> & Props) {
 
   return (
     <Card {...cardProps}>
-      <CardHeader>
+      <Card.Header>
         <PageHeader title={t('title')} noMargin icon={<CreditCardIcon />} />
-      </CardHeader>
-      <CardContent>
+      </Card.Header>
+      <Card.Content>
         <div className="mb-4">
           {isLoadingBalance ? (
             <Spinner />
@@ -224,7 +207,7 @@ export function SummaryCard(props: Omit<CardProps, 'children'> & Props) {
             onClose={() => setIsOpenDetails(false)}
           />
         )}
-      </CardContent>
+      </Card.Content>
     </Card>
   );
 }

@@ -12,24 +12,7 @@ import {
   UseResourceFormsServiceResourceFormsGetOneKeyFn,
   UseResourceFormsServiceResourceFormsListKeyFn,
 } from '@attraccess/react-query-client';
-import {
-  Accordion,
-  AccordionItem,
-  AccordionHeading,
-  AccordionTrigger,
-  AccordionPanel,
-  AccordionBody,
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  Separator,
-  TextField,
-  Label,
-  Input,
-  Selection,
-  Spinner,
-} from '@heroui/react';
+import { Accordion, AccordionBody, AccordionHeading, AccordionItem, AccordionPanel, AccordionTrigger, Button, Card, Input, Label, Selection, Separator, Spinner, TextField } from '@heroui/react';
 import { useToastMessage } from '../../../../components/toastProvider';
 import { LabeledSwitch } from '../../../../components/labeledSwitch';
 import { useQueryClient } from '@tanstack/react-query';
@@ -241,7 +224,7 @@ export function FormEditorPage() {
 
       <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
         <Card>
-          <CardContent className="space-y-6">
+          <Card.Content className="space-y-6">
             <div className="grid gap-4 md:grid-cols-2">
               <TextField
                 isRequired
@@ -331,16 +314,16 @@ export function FormEditorPage() {
                 {t('editor.save')}
               </Button>
             </div>
-          </CardContent>
+          </Card.Content>
         </Card>
 
         <Card>
-          <CardHeader>
+          <Card.Header>
             <p className="font-semibold text-default-700">{t('editor.previewTitle')}</p>
-          </CardHeader>
-          <CardContent>
+          </Card.Header>
+          <Card.Content>
             <FormPreview fields={form.fields} t={t} />
-          </CardContent>
+          </Card.Content>
         </Card>
       </div>
 

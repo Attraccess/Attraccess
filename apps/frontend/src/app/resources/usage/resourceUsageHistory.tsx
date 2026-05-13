@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useAuth } from '../../../hooks/useAuth';
-import { Card, CardHeader, CardContent } from '@heroui/react';
+import { Card } from '@heroui/react';
 import {
   ResourceUsage,
   useResourcesServiceResourceUsageUpdateSessionProject,
@@ -135,16 +135,16 @@ export function ResourceUsageHistory({ resourceId, ...rest }: ResourceUsageHisto
 
   return (
     <Card {...rest}>
-      <CardHeader className="flex justify-between items-center">
+      <Card.Header className="flex justify-between items-center">
         <HistoryHeader
           title={t('usageHistory')}
           showAllUsers={showAllUsers}
           setShowAllUsers={setShowAllUsers}
           canManageResources={canManageResources}
         />
-      </CardHeader>
+      </Card.Header>
 
-      <CardContent>
+      <Card.Content>
         <HistoryTable
           resourceId={resourceId}
           showAllUsers={showAllUsers}
@@ -155,7 +155,7 @@ export function ResourceUsageHistory({ resourceId, ...rest }: ResourceUsageHisto
           updatingSessionIds={updatingSessionIds}
           onProjectChange={handleProjectChange}
         />
-      </CardContent>
+      </Card.Content>
 
       <UsageNotesModal
         isOpen={isModalOpen}

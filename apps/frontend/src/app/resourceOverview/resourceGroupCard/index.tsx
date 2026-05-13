@@ -3,22 +3,7 @@ import {
   useResourcesServiceGetAllResources,
   useResourcesServiceResourceGroupsGetOne,
 } from '@attraccess/react-query-client';
-import {
-  Button,
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardProps,
-  Skeleton,
-  Table,
-  TableBody,
-  TableCell,
-  TableColumn,
-  TableContent,
-  TableHeader,
-  TableRow,
-} from '@heroui/react';
+import { Button, Card, CardProps, Skeleton, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow } from '@heroui/react';
 import { EmptyState } from '../../../components/emptyState';
 import { PageHeader } from '../../../components/pageHeader';
 import { useMemo, useState } from 'react';
@@ -129,7 +114,7 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
 
   return (
     <Card aria-label={accessibleTitle} {...cardProps}>
-      <CardHeader className="flex flex-row justify-between">
+      <Card.Header className="flex flex-row justify-between">
         {groupIsFetched ? (
           <PageHeader title={title} subtitle={subtitle} noMargin />
         ) : (
@@ -143,9 +128,9 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
             aria-label={t('actions.openGroupSettings')}
           />
         )}
-      </CardHeader>
+      </Card.Header>
 
-      <CardContent>
+      <Card.Content>
         <Table>
           <TableContent aria-label={tableAriaLabel}>
           <TableHeader>
@@ -184,13 +169,13 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
           </TableBody>
           </TableContent>
         </Table>
-      </CardContent>
+      </Card.Content>
 
-      <CardFooter className="flex w-full justify-center">
+      <Card.Footer className="flex w-full justify-center">
         {isFetchedResources && (
           <SimplePagination showControls page={page} total={totalPages} onChange={(page) => setPage(page)} />
         )}
-      </CardFooter>
+      </Card.Footer>
     </Card>
   );
 }

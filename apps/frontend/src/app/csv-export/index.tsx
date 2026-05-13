@@ -1,20 +1,5 @@
 import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
-import {
-  Button,
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  DateValue,
-  Modal,
-  ModalBackdrop,
-  ModalBody,
-  ModalContainer,
-  ModalDialog,
-  ModalHeader,
-  RangeCalendar,
-  RangeValue,
-} from '@heroui/react';
+import { Button, Card, DateValue, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalHeader, RangeCalendar, RangeValue } from '@heroui/react';
 import de from './de.json';
 import en from './en.json';
 import { useCallback, useMemo, useRef, useState } from 'react';
@@ -71,8 +56,8 @@ export function CsvExport() {
   return (
     <>
       <Card>
-        <CardHeader>{t('title')}</CardHeader>
-        <CardContent>
+        <Card.Header>{t('title')}</Card.Header>
+        <Card.Content>
           <span className="font-bold">{t('rangeCalendar.selection.label')}</span>
           <div className="flex gap-4 flex-row flex-wrap">
             <RangeCalendar
@@ -90,8 +75,8 @@ export function CsvExport() {
               {t('rangeCalendar.selection.end', { date: dateRangeEndFormatted })}
             </p>
           </div>
-        </CardContent>
-        <CardFooter>
+        </Card.Content>
+        <Card.Footer>
           {exportTypes.map((exportType) => (
             <Button
               key={exportType.key}
@@ -104,7 +89,7 @@ export function CsvExport() {
               {t(`exports.${exportType.key}.button`)}
             </Button>
           ))}
-        </CardFooter>
+        </Card.Footer>
       </Card>
 
       <Modal

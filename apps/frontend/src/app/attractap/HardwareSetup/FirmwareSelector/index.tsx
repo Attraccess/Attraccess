@@ -1,5 +1,5 @@
 import { AttractapFirmware, useAttractapServiceGetFirmwares } from '@attraccess/react-query-client';
-import { Card, CardContent, CardHeader, Chip, ProgressCircle, ProgressCircleFillCircle, ProgressCircleTrack, ProgressCircleTrackCircle } from "@heroui/react";
+import { Card, Chip, ProgressCircle, ProgressCircleFillCircle, ProgressCircleTrack, ProgressCircleTrackCircle } from "@heroui/react";
 import { PageHeader } from '../../../../components/pageHeader';
 
 interface Props {
@@ -21,16 +21,16 @@ export function FirmwareSelector(props: Props) {
       )}
       {firmwares?.map((firmware) => (
         <Card onClick={() => props.onSelect(firmware)} key={`${firmware.name}-${firmware.variant}`}>
-          <CardHeader>
+          <Card.Header>
             <PageHeader title={firmware.friendlyName} noMargin />
-          </CardHeader>
-          <CardContent className="flex flex-wrap gap-2 flex-row">
+          </Card.Header>
+          <Card.Content className="flex flex-wrap gap-2 flex-row">
             {firmware.variantFriendlyName.split(',').map((variantFeature) => (
               <Chip color="accent" key={`${firmware.name}-${firmware.variant}-${variantFeature}`}>
                 {variantFeature}
               </Chip>
             ))}
-          </CardContent>
+          </Card.Content>
         </Card>
       ))}
     </div>

@@ -1,16 +1,5 @@
 import { useState, useCallback } from 'react';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  Table,
-  TableContent,
-  TableHeader,
-  TableColumn,
-  TableBody,
-  TableRow,
-  TableCell,
-} from '@heroui/react';
+import { Card, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow } from '@heroui/react';
 import { DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useProjectsServiceGetProjectUsageHistory, ResourceUsage } from '@attraccess/react-query-client';
 import en from './en.json';
@@ -54,15 +43,15 @@ export function ProjectUsageHistory({ projectId }: ProjectUsageHistoryProps) {
   return (
     <>
       <Card>
-        <CardHeader>
+        <Card.Header>
           <HistoryHeader
             title={t('history.title')}
             showAllUsers={false}
             setShowAllUsers={() => undefined}
             canManageResources={false}
           />
-        </CardHeader>
-        <CardContent>
+        </Card.Header>
+        <Card.Content>
           <Table data-cy="project-usage-history-table">
             <TableContent aria-label={t('history.title')}>
             <TableHeader>
@@ -102,7 +91,7 @@ export function ProjectUsageHistory({ projectId }: ProjectUsageHistoryProps) {
             </TableBody>
             </TableContent>
           </Table>
-        </CardContent>
+        </Card.Content>
       </Card>
 
       <UsageNotesModal isOpen={isModalOpen} onClose={closeModal} session={selectedSession} />

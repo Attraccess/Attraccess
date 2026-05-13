@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Card, CardContent, CardHeader, Spinner } from '@heroui/react';
+import { Card, Spinner } from '@heroui/react';
 import { Clock } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useAuth } from '../../../../../hooks/useAuth';
@@ -113,13 +113,13 @@ export function ResourceUsageSession({
 
   return (
     <Card {...rest}>
-      <CardHeader>
+      <Card.Header>
         <div className="flex items-center">
           <Clock className="w-5 h-5 mr-2" />
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{t('title.' + resource.type)}: </h3>
         </div>
-      </CardHeader>
-      <CardContent>{renderContent()}</CardContent>
+      </Card.Header>
+      <Card.Content>{renderContent()}</Card.Content>
     </Card>
   );
 }

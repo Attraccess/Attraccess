@@ -1,7 +1,7 @@
 import { ResourceFlowLogType, ResourceFlowNodeSchemaDto } from '@attraccess/react-query-client';
 
 import { NodeProps } from '@xyflow/react';
-import { Button, Card, CardContent, CardHeader, cn, Tooltip, TooltipContent, TooltipTrigger, useOverlayState } from '@heroui/react';
+import { Button, Card, cn, Tooltip, TooltipContent, TooltipTrigger, useOverlayState } from '@heroui/react';
 import { Handle, NodeToolbar, Position, useNodeId } from '@xyflow/react';
 import { Edit2Icon, Trash2Icon, TriangleAlertIcon } from 'lucide-react';
 import { useFlowContext } from '../flowContext';
@@ -177,7 +177,7 @@ export function AttraccessNode(props: Props) {
             </div>
           </NodeToolbar>
           <Card className={cardClasses} onDoubleClick={isEditable ? openEditor : undefined}>
-            <CardHeader className="flex flex-col gap-1">
+            <Card.Header className="flex flex-col gap-1">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center min-w-0">
                   <span className="font-bold text-sm truncate">{t('nodes.' + schema.type + '.title')}</span>
@@ -213,10 +213,10 @@ export function AttraccessNode(props: Props) {
               {previewMode && (
                 <span className="text-xs text-default-500 text-wrap">{t('nodes.' + schema.type + '.description')}</span>
               )}
-            </CardHeader>
+            </Card.Header>
 
             {!previewMode && previewRows.length > 0 && (
-              <CardContent className="pt-0">
+              <Card.Content className="pt-0">
                 <div className="flex flex-col gap-2">
                   {previewRows.map((row) => (
                     <div className="flex flex-col gap-2" key={row.label}>
@@ -230,7 +230,7 @@ export function AttraccessNode(props: Props) {
                     </div>
                   ))}
                 </div>
-              </CardContent>
+              </Card.Content>
             )}
           </Card>
 

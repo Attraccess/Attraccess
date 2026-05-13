@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, CardProps, Table, TableContent, TableHeader, TableBody, TableRow, TableCell, TableColumn, Button, cn, Skeleton, NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput } from "@heroui/react";
+import { Button, Card, CardProps, cn, NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput, Skeleton, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow } from "@heroui/react";
 import { CreditCard, Edit2Icon } from 'lucide-react';
 import {
   useBillingServiceGetBillingBalance,
@@ -120,7 +120,7 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
 
   return (
     <Card {...cardProps}>
-      <CardHeader className="flex items-center justify-between py-3">
+      <Card.Header className="flex items-center justify-between py-3">
         <PageHeader
           title={t('title')}
           icon={<CreditCard />}
@@ -133,9 +133,9 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
           }
           noMargin
         />
-      </CardHeader>
+      </Card.Header>
 
-      <CardContent>
+      <Card.Content>
         <Table>
           <TableContent aria-label={t('table.ariaLabel')}>
           <TableHeader>
@@ -221,7 +221,7 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
           </TableBody>
           </TableContent>
         </Table>
-      </CardContent>
+      </Card.Content>
     </Card>
   );
 }
