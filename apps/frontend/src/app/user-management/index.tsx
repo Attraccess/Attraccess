@@ -5,7 +5,7 @@ import {
   Button,
   Chip,
   TextField,
-  Input,
+  InputGroup,
   Table,
   TableBody,
   TableCell,
@@ -17,7 +17,8 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@heroui/react';
-import { CreditCardIcon, KeyIcon, Settings2Icon, ShieldCheckIcon, ShieldOffIcon, UserPlusIcon, Users, WrenchIcon } from 'lucide-react';
+import { CreditCardIcon, KeyIcon, SearchIcon, Settings2Icon, ShieldCheckIcon, ShieldOffIcon, UserPlusIcon, Users, WrenchIcon } from 'lucide-react';
+import { TableToolbar } from '../../components/TableToolbar';
 import {
   SSOProvider,
   User,
@@ -129,11 +130,18 @@ export const UserManagementPage: React.FC = () => {
       />
 
       <div className="mt-6">
-        <div className="flex justify-end mb-2">
-          <TextField value={search} onChange={setSearch} aria-label={t('table.inputs.search')} className="w-full sm:w-72">
-            <Input placeholder={t('table.inputs.search')} />
-          </TextField>
-        </div>
+        <TableToolbar
+          search={
+            <TextField value={search} onChange={setSearch} aria-label={t('table.inputs.search')}>
+              <InputGroup>
+                <InputGroup.Prefix>
+                  <SearchIcon size={16} />
+                </InputGroup.Prefix>
+                <InputGroup.Input placeholder={t('table.inputs.search')} data-cy="user-management-search-input" />
+              </InputGroup>
+            </TextField>
+          }
+        />
 
         <Table>
           <TableContent aria-label={t('table.ariaLabel')}>
