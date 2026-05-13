@@ -99,26 +99,14 @@ export async function bootstrap() {
 
   app.use(cookieParser());
 
-  const appSettingsService = app.get(SettingsService);
-  // Fetch the configured app URL early so we can derive the `secure` flag for cookies
-  // and validate CORS origins.
-  const appUrl = await appSettingsService.getUrl();
-  const allowedOrigin = appUrl ? new URL(appUrl).origin : null;
   app.enableCors({
     origin: (requestOrigin, callback) => {
       // Allow requests with no origin (e.g. server-to-server, curl, mobile apps)
       if (!requestOrigin) {
         return callback(null, true);
       }
-      // If no app URL is configured yet (initial setup), allow any origin
-      if (!allowedOrigin) {
-        return callback(null, requestOrigin);
-      }
-      // Allow requests from the configured app URL origin
-      if (requestOrigin === allowedOrigin) {
-        return callback(null, requestOrigin);
-      }
-      return callback(new Error('Not allowed by CORS'));
+
+      return callback(null, requestOrigin);
     },
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key'],
@@ -155,7 +143,7 @@ export async function bootstrap() {
       const allMigrations = dataSource.migrations;
       const executedMigrations = dataSource.migrations;
       bootstrapLogger.log(
-        `Pending migrations detected (${allMigrations.length} total known, ${executedMigrations.length} already executed). Running migrations...`
+        `Pending migrations detected (${allMigrations.length} total known, ${executedMigrations.length} already executed). Running migrations...`,
       );
       await dataSource.runMigrations();
       bootstrapLogger.log('Migrations completed successfully.');
@@ -173,6 +161,9 @@ export async function bootstrap() {
 
   app.useWebSocketAdapter(new WsAdapter(app));
 
+  const appSettingsService = app.get(SettingsService);
+  const appUrl = await appSettingsService.getUrl();
+
   // Session middleware is used for SAML SSO state persistence only (not for regular auth).
   // OIDC state is handled by OidcCookieStateStore (a signed oidc-state cookie) instead.
   // Cookie is explicitly SameSite=Lax so it survives IdP redirects (cross-site top-level navigations).
@@ -186,7 +177,7 @@ export async function bootstrap() {
         secure: appUrl?.startsWith('https://') ?? false,
         httpOnly: true,
       },
-    })
+    }),
   );
 
   bootstrapLogger.log(`🚀 Application is running with global prefix: ${globalPrefix}`);
@@ -199,7 +190,7 @@ export async function bootstrap() {
       transformOptions: {
         enableImplicitConversion: true,
       },
-    })
+    }),
   );
 
   app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get('Reflector')));
