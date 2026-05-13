@@ -5,6 +5,7 @@ import { LabeledSwitch } from '../../../../components/labeledSwitch';
 import { ResourceMaintenance, useResourceMaintenancesServiceFindMaintenances } from '@attraccess/react-query-client';
 import { useMemo, useState } from 'react';
 import { DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useNavigate } from 'react-router-dom';
 
 import de from './de.json';
 import en from './en.json';
@@ -25,6 +26,8 @@ export function MaintenanceManagement(props: Props & Omit<CardProps, 'children'>
     de,
     en,
   });
+
+  const navigate = useNavigate();
 
   const [includePast, setIncludePast] = useState(false);
 
@@ -65,6 +68,12 @@ export function MaintenanceManagement(props: Props & Omit<CardProps, 'children'>
           noMargin
           actions={
             <>
+              <Button variant="ghost"
+                onPress={() => navigate(`/resources/${resourceId}/maintenance`)}
+                data-cy="manage-maintenance-button"
+              >
+                {t('actions.manageHub.label')}
+              </Button>
               <LabeledSwitch isSelected={includePast} onChange={setIncludePast}>
                 {t('filters.includePast')}
               </LabeledSwitch>
