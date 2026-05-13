@@ -105,7 +105,7 @@ export function LogViewer(props: Props) {
 
                   <Accordion className="mt-2">
                     {logsOfRun.map((log) => (
-                      <AccordionItem key={`${runId}-${log.id}`}>
+                      <AccordionItem key={`${runId}-${log.id}`} id={`${runId}-${log.id}`}>
                         <AccordionHeading><AccordionTrigger>{log.title}</AccordionTrigger></AccordionHeading>
                         <AccordionPanel><AccordionBody>
                           {log.payload && (
