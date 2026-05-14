@@ -23,6 +23,13 @@
     "errorPrefix": "Error loading preview.",
     "emptyPlaceholder": "Start editing the MJML body to see a preview."
   },
+  "variables": {
+    "title": "Available variables",
+    "hint": "Click a variable to copy it. Insert anywhere as {{name}}.",
+    "empty": "No variables for this template.",
+    "copied": "Copied {name}",
+    "completionDetail": "Template variable"
+  },
   "actions": {
     "close": "Close",
     "cancel": "Cancel",

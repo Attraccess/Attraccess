@@ -23,6 +23,13 @@
     "errorPrefix": "Fehler beim Laden der Vorschau.",
     "emptyPlaceholder": "Beginnen Sie mit dem Bearbeiten des MJML-Inhalts, um eine Vorschau zu sehen."
   },
+  "variables": {
+    "title": "Verfügbare Variablen",
+    "hint": "Klicken Sie auf eine Variable, um sie zu kopieren. Fügen Sie sie als {{name}} ein.",
+    "empty": "Keine Variablen für diese Vorlage.",
+    "copied": "{name} kopiert",
+    "completionDetail": "Template-Variable"
+  },
   "actions": {
     "close": "Schließen",
     "cancel": "Abbrechen",
