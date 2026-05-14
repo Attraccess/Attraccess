@@ -32,7 +32,6 @@ export function ScheduleFormDrawer(props: Props) {
     <StandardDrawer
       isOpen={isOpen}
       onOpenChange={(open) => { if (!open) onClose(); }}
-      dialogProps={{ className: 'md:max-w-2xl md:mx-auto' }}
     >
       <DrawerHeader>
         <h2 className="text-lg font-semibold">{title}</h2>

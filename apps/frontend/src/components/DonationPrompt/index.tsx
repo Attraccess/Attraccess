@@ -98,7 +98,6 @@ export function DonationPrompt() {
       onOpenChange={(open) => setIsVisible(open)}
       backdropProps={{ variant: 'blur', isDismissable: false }}
       contentProps={{ placement: 'bottom' }}
-      dialogProps={{ className: 'w-full max-w-[680px] mx-auto' }}
     >
       <DrawerHeader className="flex flex-col gap-1">
         <div className="text-base font-semibold">{t('title')}</div>
