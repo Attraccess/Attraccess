@@ -133,6 +133,8 @@
   "devDependencies": {
     "@babel/core": "^7.29.0",
     "@babel/preset-react": "^7.28.5",
+    "@commitlint/cli": "^19.6.1",
+    "@commitlint/config-conventional": "^19.6.0",
     "@cyclonedx/cdxgen": "^12.3.3",
     "@nx/esbuild": "22.7.1",
     "@nx/eslint": "22.7.1",
