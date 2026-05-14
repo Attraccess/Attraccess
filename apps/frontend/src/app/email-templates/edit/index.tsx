@@ -11,6 +11,7 @@ import {
   Card,
   CardBody,
   CardHeader,
+  Chip,
   Input,
   Form,
   Modal,
@@ -21,6 +22,7 @@ import {
   Link,
 } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useToastMessage } from '../../../components/toastProvider';
 import { PageHeader } from '../../../components/pageHeader';
 import Editor from '@monaco-editor/react';
 
@@ -41,6 +43,20 @@ export function EditEmailTemplatePage() {
   const template = useFindOneEmailTemplate({ type: templateType as EmailTemplateType }, undefined, {
     enabled: !!templateType,
   });
+
+  const toast = useToastMessage();
+  const variables = useMemo(() => template.data?.variables ?? [], [template.data]);
+
+  const copyVariable = useCallback(
+    (name: string) => {
+      const token = `{{${name}}}`;
+      navigator.clipboard.writeText(token).then(
+        () => toast.success({ title: t('variables.copied', { name: token }) }),
+        () => toast.error({ title: t('variables.copied', { name: token }) }),
+      );
+    },
+    [t, toast],
+  );
 
   const [subject, setSubject] = useState<string>('');
   const [body, setBody] = useState<string>('');
@@ -101,8 +117,35 @@ export function EditEmailTemplatePage() {
   const [editorIsExpanded, setEditorIsExpanded] = useState(false);
 
   const editor = useMemo(() => {
+    const variableList = (
+      <div className="flex flex-col gap-2">
+        <span className="text-sm font-medium">{t('variables.title')}</span>
+        {variables.length === 0 ? (
+          <span className="text-sm text-default-500">{t('variables.empty')}</span>
+        ) : (
+          <>
+            <span className="text-xs text-default-500">{t('variables.hint')}</span>
+            <div className="flex flex-row flex-wrap gap-2">
+              {variables.map((name) => (
+                <Chip
+                  key={name}
+                  variant="flat"
+                  color="primary"
+                  className="cursor-pointer"
+                  onClick={() => copyVariable(name)}
+                >
+                  {name}
+                </Chip>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    );
+
     return (
       <>
+        {variableList}
         <Input label={t('form.subject')} value={subject} onChange={(e) => setSubject(e.target.value)} />
         <Editor
           theme={theme === 'dark' ? 'vs-dark' : 'vs-light'}
@@ -115,7 +158,7 @@ export function EditEmailTemplatePage() {
         </Link>
       </>
     );
-  }, [body, theme, subject, t]);
+  }, [body, theme, subject, t, variables, copyVariable]);
 
   const onSubmit = useCallback(
     (e: React.FormEvent<HTMLFormElement>) => {
