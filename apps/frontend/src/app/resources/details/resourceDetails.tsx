@@ -192,26 +192,24 @@ function ResourceDetailsComponent() {
 
       <div className="w-full space-y-6 mb-6">
         <ResourceHealthWarning resourceId={resourceId} />
-        <div className="flex flex-row flex-wrap w-full gap-6 items-stretch">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
           <ResourceUsageSession
             resourceId={resourceId}
             resource={resource}
             data-cy="resource-usage-session"
-            className="flex-grow"
             insufficientBalanceDesiredAmount={insufficientBalanceDesiredAmount}
           />
           <ResourceBillingInfo
             resourceId={resourceId}
-            className="flex-grow"
             onExampleAmountChange={(value) => setInsufficientBalanceDesiredAmount(Math.ceil(value))}
           />
         </div>
 
-        <div className="flex flex-row flex-wrap w-full gap-6 items-stretch">
-          <ResourceUsageHistory resourceId={resourceId} data-cy="resource-usage-history" className="flex-grow" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
+          <ResourceUsageHistory resourceId={resourceId} data-cy="resource-usage-history" />
 
           {maintenancePermissions?.canManage && (
-            <MaintenanceManagement resourceId={resourceId} className="flex-grow" />
+            <MaintenanceManagement resourceId={resourceId} />
           )}
         </div>
       </div>
