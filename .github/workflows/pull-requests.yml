@@ -34,6 +34,21 @@ jobs:
             exit 1
           fi
 
+  commitlint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+      - name: Validate PR title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: echo "$PR_TITLE" | pnpm exec commitlint
+      - name: Validate commits in PR
+        run: pnpm exec commitlint --from origin/${{ github.event.pull_request.base.ref }} --to HEAD
+
   lint-and-typecheck:
     runs-on: ubuntu-latest
     steps:
