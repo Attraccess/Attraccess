@@ -32,6 +32,10 @@ This repository enforces [Conventional Commits](https://www.conventionalcommits.
 
 Optional, free-form. Use whatever identifies the area of change clearly. Recent examples from this repo: `metrics`, `deps`, `api`, `security`, `ATT-261` (Linear issue ID).
 
+### Length
+
+The header (`<type>(scope): <description>` line) must be 120 characters or fewer. The body and footer have no length limit.
+
 ### Examples
 
 ```
