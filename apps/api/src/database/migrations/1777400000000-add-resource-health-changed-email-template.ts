@@ -74,7 +74,7 @@ const RESOURCE_HEALTH_CHANGED_VARIABLES = [
   'health.bodyAction',
 ].join(',');
 
-const TEMPLATE_TYPES_BEFORE = [
+const PREVIOUS_CHECK_TYPES = [
   'verify-email',
   'user-invitation',
   'reset-password',
@@ -85,19 +85,13 @@ const TEMPLATE_TYPES_BEFORE = [
   'delete-account-confirmation',
 ];
 
-const TEMPLATE_TYPES_AFTER = [...TEMPLATE_TYPES_BEFORE, 'resource-health-changed'];
-
-const checkList = (types: string[]) => types.map((t) => `'${t}'`).join(',');
-
 export class AddResourceHealthChangedEmailTemplate1777400000000 implements MigrationInterface {
   name = 'AddResourceHealthChangedEmailTemplate1777400000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`ALTER TABLE "email_templates" RENAME TO "temporary_email_templates"`);
     await queryRunner.query(
-      `CREATE TABLE "email_templates" ("type" varchar CHECK( "type" IN (${checkList(
-        TEMPLATE_TYPES_AFTER,
-      )}) ) PRIMARY KEY NOT NULL, "subject" varchar(255) NOT NULL, "body" text NOT NULL, "createdAt" datetime NOT NULL DEFAULT (datetime('now')), "updatedAt" datetime NOT NULL DEFAULT (datetime('now')), "variables" text NOT NULL)`,
+      `CREATE TABLE "email_templates" ("type" varchar(255) PRIMARY KEY NOT NULL, "subject" varchar(255) NOT NULL, "body" text NOT NULL, "createdAt" datetime NOT NULL DEFAULT (datetime('now')), "updatedAt" datetime NOT NULL DEFAULT (datetime('now')), "variables" text NOT NULL)`,
     );
     await queryRunner.query(
       `INSERT INTO "email_templates"("type", "subject", "body", "createdAt", "updatedAt", "variables") SELECT "type", "subject", "body", "createdAt", "updatedAt", "variables" FROM "temporary_email_templates"`,
@@ -119,14 +113,16 @@ export class AddResourceHealthChangedEmailTemplate1777400000000 implements Migra
     await queryRunner.query(`DELETE FROM "email_templates" WHERE "type" = 'resource-health-changed'`);
     await queryRunner.query(`ALTER TABLE "email_templates" RENAME TO "temporary_email_templates"`);
     await queryRunner.query(
-      `CREATE TABLE "email_templates" ("type" varchar CHECK( "type" IN (${checkList(
-        TEMPLATE_TYPES_BEFORE,
+      `CREATE TABLE "email_templates" ("type" varchar CHECK( "type" IN (${PREVIOUS_CHECK_TYPES.map(
+        (t) => `'${t}'`,
+      ).join(
+        ',',
       )}) ) PRIMARY KEY NOT NULL, "subject" varchar(255) NOT NULL, "body" text NOT NULL, "createdAt" datetime NOT NULL DEFAULT (datetime('now')), "updatedAt" datetime NOT NULL DEFAULT (datetime('now')), "variables" text NOT NULL)`,
     );
     await queryRunner.query(
-      `INSERT INTO "email_templates"("type", "subject", "body", "createdAt", "updatedAt", "variables") SELECT "type", "subject", "body", "createdAt", "updatedAt", "variables" FROM "temporary_email_templates" WHERE "type" IN (${checkList(
-        TEMPLATE_TYPES_BEFORE,
-      )})`,
+      `INSERT INTO "email_templates"("type", "subject", "body", "createdAt", "updatedAt", "variables") SELECT "type", "subject", "body", "createdAt", "updatedAt", "variables" FROM "temporary_email_templates" WHERE "type" IN (${PREVIOUS_CHECK_TYPES.map(
+        (t) => `'${t}'`,
+      ).join(',')})`,
     );
     await queryRunner.query(`DROP TABLE "temporary_email_templates"`);
   }

@@ -25,7 +25,6 @@ export class EmailTemplate {
   @PrimaryColumn({
     type: 'varchar',
     length: 255,
-    enum: EmailTemplateType,
   })
   type!: EmailTemplateType;
 
