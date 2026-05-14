@@ -1,6 +1,6 @@
 {
   "title": "Maintenance",
-  "subtitle": "{resourceName}",
+  "subtitle": "{{resourceName}}",
   "actions": {
     "newSchedule": "New schedule",
     "manageMaintenance": "Manage maintenance",
@@ -12,7 +12,7 @@
     "nextRun": "Next run",
     "thisMonth": "This month",
     "nextRunNone": "—",
-    "nextRunRelative": "in {value}"
+    "nextRunRelative": "in {{value}}"
   },
   "tabs": {
     "schedules": "Schedules",
@@ -33,7 +33,7 @@
       "resume": "Resume",
       "delete": "Delete"
     },
-    "deleteConfirm": "Delete schedule \"{name}\"?"
+    "deleteConfirm": "Delete schedule \"{{name}}\"?"
   },
   "activity": {
     "actions": {
@@ -41,17 +41,17 @@
     },
     "live": {
       "label": "Live now",
-      "count": "{count} running",
-      "endsIn": "ends in {time}",
-      "startedAgo": "Started {time} ago",
-      "createdBy": "by {name}",
+      "count": "{{count}} running",
+      "endsIn": "ends in {{time}}",
+      "startedAgo": "Started {{time}} ago",
+      "createdBy": "by {{name}}",
       "markDone": "Mark done",
       "start": "Start",
       "end": "End"
     },
     "upcoming": {
       "label": "Upcoming",
-      "count": "{count} scheduled",
+      "count": "{{count}} scheduled",
       "empty": "No upcoming maintenance.",
       "columns": { "when": "When", "duration": "Duration", "reason": "Reason" }
     },
@@ -65,7 +65,7 @@
   },
   "form": {
     "titleCreate": "New maintenance schedule",
-    "titleEdit": "Edit: {name}",
+    "titleEdit": "Edit: {{name}}",
     "name": { "label": "Name", "placeholder": "e.g. Monthly check" },
     "triggerType": { "label": "Trigger type" },
     "duration": { "label": "Duration" },
@@ -77,13 +77,13 @@
     "alert": { "errorTitle": "Couldn't save schedule" }
   },
   "configSummary": {
-    "usageHoursMinutes": "{duration} min of use",
-    "usageHoursHours": "{duration} h of use",
-    "usageHoursDays": "{duration} d of use",
-    "usageCount": "Every {count} sessions",
-    "timeIntervalMinutes": "Every {duration} min",
-    "timeIntervalHours": "Every {duration} h",
-    "timeIntervalDays": "Every {duration} d"
+    "usageHoursMinutes": "{{duration}} min of use",
+    "usageHoursHours": "{{duration}} h of use",
+    "usageHoursDays": "{{duration}} d of use",
+    "usageCount": "Every {{count}} sessions",
+    "timeIntervalMinutes": "Every {{duration}} min",
+    "timeIntervalHours": "Every {{duration}} h",
+    "timeIntervalDays": "Every {{duration}} d"
   },
   "errors": {
     "forbidden": "You don't have permission to manage maintenance for this resource.",

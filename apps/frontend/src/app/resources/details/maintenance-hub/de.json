@@ -1,6 +1,6 @@
 {
   "title": "Wartung",
-  "subtitle": "{resourceName}",
+  "subtitle": "{{resourceName}}",
   "actions": {
     "newSchedule": "Neuer Zeitplan",
     "manageMaintenance": "Wartung verwalten",
@@ -12,7 +12,7 @@
     "nextRun": "Nächste Ausführung",
     "thisMonth": "Diesen Monat",
     "nextRunNone": "—",
-    "nextRunRelative": "in {value}"
+    "nextRunRelative": "in {{value}}"
   },
   "tabs": {
     "schedules": "Zeitpläne",
@@ -33,7 +33,7 @@
       "resume": "Fortsetzen",
       "delete": "Löschen"
     },
-    "deleteConfirm": "Zeitplan \"{name}\" löschen?"
+    "deleteConfirm": "Zeitplan \"{{name}}\" löschen?"
   },
   "activity": {
     "actions": {
@@ -41,17 +41,17 @@
     },
     "live": {
       "label": "Läuft gerade",
-      "count": "{count} laufend",
-      "endsIn": "endet in {time}",
-      "startedAgo": "Gestartet vor {time}",
-      "createdBy": "von {name}",
+      "count": "{{count}} laufend",
+      "endsIn": "endet in {{time}}",
+      "startedAgo": "Gestartet vor {{time}}",
+      "createdBy": "von {{name}}",
       "markDone": "Als erledigt markieren",
       "start": "Start",
       "end": "Ende"
     },
     "upcoming": {
       "label": "Anstehend",
-      "count": "{count} geplant",
+      "count": "{{count}} geplant",
       "empty": "Keine anstehenden Wartungen.",
       "columns": { "when": "Wann", "duration": "Dauer", "reason": "Grund" }
     },
@@ -65,7 +65,7 @@
   },
   "form": {
     "titleCreate": "Neuer Wartungs-Zeitplan",
-    "titleEdit": "Bearbeiten: {name}",
+    "titleEdit": "Bearbeiten: {{name}}",
     "name": { "label": "Name", "placeholder": "z. B. monatlicher Check" },
     "triggerType": { "label": "Auslöser-Typ" },
     "duration": { "label": "Dauer" },
@@ -77,13 +77,13 @@
     "alert": { "errorTitle": "Zeitplan konnte nicht gespeichert werden" }
   },
   "configSummary": {
-    "usageHoursMinutes": "{duration} Min. Nutzung",
-    "usageHoursHours": "{duration} Std. Nutzung",
-    "usageHoursDays": "{duration} Tage Nutzung",
-    "usageCount": "Alle {count} Sitzungen",
-    "timeIntervalMinutes": "Alle {duration} Min.",
-    "timeIntervalHours": "Alle {duration} Std.",
-    "timeIntervalDays": "Alle {duration} Tage"
+    "usageHoursMinutes": "{{duration}} Min. Nutzung",
+    "usageHoursHours": "{{duration}} Std. Nutzung",
+    "usageHoursDays": "{{duration}} Tage Nutzung",
+    "usageCount": "Alle {{count}} Sitzungen",
+    "timeIntervalMinutes": "Alle {{duration}} Min.",
+    "timeIntervalHours": "Alle {{duration}} Std.",
+    "timeIntervalDays": "Alle {{duration}} Tage"
   },
   "errors": {
     "forbidden": "Du hast keine Berechtigung zur Wartungs-Verwaltung dieser Ressource.",
