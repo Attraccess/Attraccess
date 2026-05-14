@@ -134,8 +134,8 @@ export function ScheduleForm(props: Props) {
 
       <Select
         label={t('form.triggerType.label')}
-        selectedKey={triggerType}
-        onSelectionChange={(key) => { if (key) setTriggerType(key as ResourceMaintenanceScheduleTriggerType); }}
+        value={triggerType}
+        onChange={(key) => { if (key) setTriggerType(key as ResourceMaintenanceScheduleTriggerType); }}
         items={TRIGGER_OPTIONS.map((opt) => ({
           key: opt.value,
           label: t(`schedules.triggerType.${opt.labelKey}`),
@@ -150,8 +150,8 @@ export function ScheduleForm(props: Props) {
           </TextField>
           <Select
             label={t('form.unit.label')}
-            selectedKey={usageHoursUnit}
-            onSelectionChange={(key) => { if (key) setUsageHoursUnit(key as UsageDurationUnit); }}
+            value={usageHoursUnit}
+            onChange={(key) => { if (key) setUsageHoursUnit(key as UsageDurationUnit); }}
             items={Object.values(UsageDurationUnit).map((unit) => ({
               key: unit,
               label: t(`form.unit.${unit}`),
@@ -175,8 +175,8 @@ export function ScheduleForm(props: Props) {
           </TextField>
           <Select
             label={t('form.unit.label')}
-            selectedKey={timeIntervalUnit}
-            onSelectionChange={(key) => { if (key) setTimeIntervalUnit(key as UsageDurationUnit); }}
+            value={timeIntervalUnit}
+            onChange={(key) => { if (key) setTimeIntervalUnit(key as UsageDurationUnit); }}
             items={Object.values(UsageDurationUnit).map((unit) => ({
               key: unit,
               label: t(`form.unit.${unit}`),
