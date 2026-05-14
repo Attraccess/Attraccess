@@ -32,13 +32,18 @@ import { useDebounce } from '../../../hooks/useDebounce';
 import { ExpandIcon } from 'lucide-react';
 import { useTheme } from '@heroui/use-theme';
 
-let variableProviderRegistered = false;
+const VARIABLE_PROVIDER_FLAG = '__attraccessVariableProvider';
 
-function registerVariableProvider(monaco: Monaco, getVariables: () => string[], detailLabel: string) {
-  if (variableProviderRegistered) {
+function registerVariableProvider(
+  monaco: Monaco,
+  getVariables: () => string[],
+  getDetailLabel: () => string,
+) {
+  const monacoWithFlag = monaco as Monaco & { [VARIABLE_PROVIDER_FLAG]?: boolean };
+  if (monacoWithFlag[VARIABLE_PROVIDER_FLAG]) {
     return;
   }
-  variableProviderRegistered = true;
+  monacoWithFlag[VARIABLE_PROVIDER_FLAG] = true;
   monaco.languages.registerCompletionItemProvider('mjml', {
     triggerCharacters: ['{'],
     provideCompletionItems: (model, position) => {
@@ -49,12 +54,13 @@ function registerVariableProvider(monaco: Monaco, getVariables: () => string[], 
         startColumn: word.startColumn,
         endColumn: word.endColumn,
       };
+      const detail = getDetailLabel();
       return {
         suggestions: getVariables().map((name) => ({
           label: name,
           kind: monaco.languages.CompletionItemKind.Variable,
           insertText: `{{${name}}}`,
-          detail: detailLabel,
+          detail,
           range,
         })),
       };
@@ -82,12 +88,14 @@ export function EditEmailTemplatePage() {
     variablesRef.current = variables;
   }, [variables]);
 
-  const handleEditorMount = useCallback<OnMount>(
-    (_editor, monaco) => {
-      registerVariableProvider(monaco, () => variablesRef.current, t('variables.completionDetail'));
-    },
-    [t],
-  );
+  const detailLabelRef = useRef<string>('');
+  useEffect(() => {
+    detailLabelRef.current = t('variables.completionDetail');
+  }, [t]);
+
+  const handleEditorMount = useCallback<OnMount>((_editor, monaco) => {
+    registerVariableProvider(monaco, () => variablesRef.current, () => detailLabelRef.current);
+  }, []);
 
   const copyVariable = useCallback(
     (name: string) => {
