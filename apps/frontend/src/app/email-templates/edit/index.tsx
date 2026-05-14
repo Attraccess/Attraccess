@@ -44,6 +44,9 @@ function registerVariableProvider(
     return;
   }
   monacoWithFlag[VARIABLE_PROVIDER_FLAG] = true;
+  if (!monaco.languages.getLanguages().some((lang) => lang.id === 'mjml')) {
+    monaco.languages.register({ id: 'mjml', extensions: ['.mjml'], aliases: ['MJML', 'mjml'] });
+  }
   monaco.languages.registerCompletionItemProvider('mjml', {
     triggerCharacters: ['{'],
     provideCompletionItems: (model, position) => {
@@ -93,8 +96,12 @@ export function EditEmailTemplatePage() {
     detailLabelRef.current = t('variables.completionDetail');
   }, [t]);
 
-  const handleEditorMount = useCallback<OnMount>((_editor, monaco) => {
+  const handleEditorMount = useCallback<OnMount>((editor, monaco) => {
     registerVariableProvider(monaco, () => variablesRef.current, () => detailLabelRef.current);
+    const model = editor.getModel();
+    if (model && model.getLanguageId() !== 'mjml') {
+      monaco.editor.setModelLanguage(model, 'mjml');
+    }
   }, []);
 
   const copyVariable = useCallback(
