@@ -25,9 +25,9 @@
   },
   "variables": {
     "title": "Available variables",
-    "hint": "Click a variable to copy it. Insert anywhere as {{name}}.",
+    "hint": "Click a chip to copy the variable to your clipboard.",
     "empty": "No variables for this template.",
-    "copied": "Copied {name}",
+    "copied": "Copied {{name}}",
     "completionDetail": "Template variable"
   },
   "actions": {

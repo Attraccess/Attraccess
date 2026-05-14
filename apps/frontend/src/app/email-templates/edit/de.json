@@ -25,9 +25,9 @@
   },
   "variables": {
     "title": "Verfügbare Variablen",
-    "hint": "Klicken Sie auf eine Variable, um sie zu kopieren. Fügen Sie sie als {{name}} ein.",
+    "hint": "Klicken Sie auf einen Chip, um die Variable in die Zwischenablage zu kopieren.",
     "empty": "Keine Variablen für diese Vorlage.",
-    "copied": "{name} kopiert",
+    "copied": "{{name}} kopiert",
     "completionDetail": "Template-Variable"
   },
   "actions": {
