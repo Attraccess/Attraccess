@@ -28,6 +28,7 @@
     "hint": "Click a chip to copy the variable to your clipboard.",
     "empty": "No variables for this template.",
     "copied": "Copied {{name}}",
+    "copyFailed": "Could not copy {{name}}",
     "completionDetail": "Template variable"
   },
   "actions": {

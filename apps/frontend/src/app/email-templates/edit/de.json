@@ -28,6 +28,7 @@
     "hint": "Klicken Sie auf einen Chip, um die Variable in die Zwischenablage zu kopieren.",
     "empty": "Keine Variablen für diese Vorlage.",
     "copied": "{{name}} kopiert",
+    "copyFailed": "{{name}} konnte nicht kopiert werden",
     "completionDetail": "Template-Variable"
   },
   "actions": {

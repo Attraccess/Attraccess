@@ -51,10 +51,15 @@ function registerVariableProvider(
     triggerCharacters: ['{'],
     provideCompletionItems: (model, position) => {
       const word = model.getWordUntilPosition(position);
+      const lineContent = model.getLineContent(position.lineNumber);
+      let startColumn = word.startColumn;
+      while (startColumn > 1 && lineContent[startColumn - 2] === '{') {
+        startColumn -= 1;
+      }
       const range = {
         startLineNumber: position.lineNumber,
         endLineNumber: position.lineNumber,
-        startColumn: word.startColumn,
+        startColumn,
         endColumn: word.endColumn,
       };
       const detail = getDetailLabel();
@@ -109,7 +114,7 @@ export function EditEmailTemplatePage() {
       const token = `{{${name}}}`;
       navigator.clipboard.writeText(token).then(
         () => toast.success({ title: t('variables.copied', { name: token }) }),
-        () => toast.error({ title: t('variables.copied', { name: token }) }),
+        () => toast.error({ title: t('variables.copyFailed', { name: token }) }),
       );
     },
     [t, toast],
