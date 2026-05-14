@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   useEmailTemplatesServiceEmailTemplateControllerFindOne as useFindOneEmailTemplate,
@@ -24,13 +24,43 @@ import {
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../components/toastProvider';
 import { PageHeader } from '../../../components/pageHeader';
-import Editor from '@monaco-editor/react';
+import Editor, { type Monaco, type OnMount } from '@monaco-editor/react';
 
 import * as enTranslationsFile from './en.json';
 import * as deTranslationsFile from './de.json';
 import { useDebounce } from '../../../hooks/useDebounce';
 import { ExpandIcon } from 'lucide-react';
 import { useTheme } from '@heroui/use-theme';
+
+let variableProviderRegistered = false;
+
+function registerVariableProvider(monaco: Monaco, getVariables: () => string[], detailLabel: string) {
+  if (variableProviderRegistered) {
+    return;
+  }
+  variableProviderRegistered = true;
+  monaco.languages.registerCompletionItemProvider('mjml', {
+    triggerCharacters: ['{'],
+    provideCompletionItems: (model, position) => {
+      const word = model.getWordUntilPosition(position);
+      const range = {
+        startLineNumber: position.lineNumber,
+        endLineNumber: position.lineNumber,
+        startColumn: word.startColumn,
+        endColumn: word.endColumn,
+      };
+      return {
+        suggestions: getVariables().map((name) => ({
+          label: name,
+          kind: monaco.languages.CompletionItemKind.Variable,
+          insertText: `{{${name}}}`,
+          detail: detailLabel,
+          range,
+        })),
+      };
+    },
+  });
+}
 
 export function EditEmailTemplatePage() {
   const navigate = useNavigate();
@@ -46,6 +76,18 @@ export function EditEmailTemplatePage() {
 
   const toast = useToastMessage();
   const variables = useMemo(() => template.data?.variables ?? [], [template.data]);
+
+  const variablesRef = useRef<string[]>([]);
+  useEffect(() => {
+    variablesRef.current = variables;
+  }, [variables]);
+
+  const handleEditorMount = useCallback<OnMount>(
+    (_editor, monaco) => {
+      registerVariableProvider(monaco, () => variablesRef.current, t('variables.completionDetail'));
+    },
+    [t],
+  );
 
   const copyVariable = useCallback(
     (name: string) => {
@@ -152,13 +194,14 @@ export function EditEmailTemplatePage() {
           defaultLanguage="mjml"
           defaultValue={body}
           onChange={(value) => setBody(value ?? '')}
+          onMount={handleEditorMount}
         />
         <Link href="https://documentation.mjml.io/" isExternal showAnchorIcon>
           {t('form.mjmlDocumentation')}
         </Link>
       </>
     );
-  }, [body, theme, subject, t, variables, copyVariable]);
+  }, [body, theme, subject, t, variables, copyVariable, handleEditorMount]);
 
   const onSubmit = useCallback(
     (e: React.FormEvent<HTMLFormElement>) => {
