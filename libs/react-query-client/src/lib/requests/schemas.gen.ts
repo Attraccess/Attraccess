@@ -1358,7 +1358,7 @@ export const $PreviewMjmlResponseDto = {
 
 export const $EmailTemplateType = {
     type: 'string',
-    enum: ['verify-email', 'user-invitation', 'reset-password', 'username-changed', 'password-changed', 'resource-usage-billing-transaction-summary', 'project-invitation', 'delete-account-confirmation'],
+    enum: ['verify-email', 'user-invitation', 'reset-password', 'username-changed', 'password-changed', 'resource-usage-billing-transaction-summary', 'project-invitation', 'delete-account-confirmation', 'resource-health-changed'],
     description: 'Template type/key used by the system'
 } as const;
 
