@@ -1,0 +1,93 @@
+{
+  "title": "Wartung",
+  "subtitle": "{{resourceName}}",
+  "actions": {
+    "newSchedule": "Neuer Zeitplan",
+    "manageMaintenance": "Wartung verwalten",
+    "backToResource": "Zurück zur Ressource"
+  },
+  "stats": {
+    "active": "Aktiv",
+    "schedules": "Zeitpläne",
+    "nextRun": "Nächste Ausführung",
+    "thisMonth": "Diesen Monat",
+    "nextRunNone": "—",
+    "nextRunRelative": "in {{value}}"
+  },
+  "tabs": {
+    "schedules": "Zeitpläne",
+    "activity": "Aktiv & Verlauf"
+  },
+  "schedules": {
+    "empty": "Noch keine Wartungs-Zeitpläne.",
+    "addFirst": "Ersten Zeitplan anlegen",
+    "status": { "on": "An", "paused": "Pausiert" },
+    "triggerType": {
+      "USAGE_HOURS": "Nutzungsstunden",
+      "USAGE_COUNT": "Nutzungsanzahl",
+      "TIME_INTERVAL": "Zeitintervall"
+    },
+    "actions": {
+      "edit": "Bearbeiten",
+      "pause": "Pausieren",
+      "resume": "Fortsetzen",
+      "delete": "Löschen"
+    },
+    "deleteConfirm": "Zeitplan \"{{name}}\" löschen?"
+  },
+  "activity": {
+    "actions": {
+      "create": "Neue Wartung"
+    },
+    "live": {
+      "label": "Läuft gerade",
+      "count": "{{count}} laufend",
+      "endsIn": "endet in {{time}}",
+      "startedAgo": "Gestartet vor {{time}}",
+      "createdBy": "von {{name}}",
+      "markDone": "Als erledigt markieren",
+      "start": "Start",
+      "end": "Ende"
+    },
+    "upcoming": {
+      "label": "Anstehend",
+      "count": "{{count}} geplant",
+      "empty": "Keine anstehenden Wartungen.",
+      "columns": { "when": "Wann", "duration": "Dauer", "reason": "Grund" }
+    },
+    "history": {
+      "label": "Verlauf",
+      "subtitle": "Letzte 30 Tage",
+      "showAll": "Alle anzeigen",
+      "empty": "Keine vergangenen Wartungen.",
+      "columns": { "when": "Wann", "duration": "Dauer", "reason": "Grund", "completedBy": "Erledigt von" }
+    }
+  },
+  "form": {
+    "titleCreate": "Neuer Wartungs-Zeitplan",
+    "titleEdit": "Bearbeiten: {{name}}",
+    "name": { "label": "Name", "placeholder": "z. B. monatlicher Check" },
+    "triggerType": { "label": "Auslöser-Typ" },
+    "duration": { "label": "Dauer" },
+    "unit": { "label": "Einheit", "MINUTES": "Minuten", "HOURS": "Stunden", "DAYS": "Tage" },
+    "thresholdSessions": { "label": "Sitzungsschwelle" },
+    "enabled": { "label": "Aktiv" },
+    "timeIntervalNote": "Zeitintervall-Zeitpläne werden periodisch vom Server ausgewertet.",
+    "actions": { "save": "Speichern", "cancel": "Abbrechen" },
+    "alert": { "errorTitle": "Zeitplan konnte nicht gespeichert werden" }
+  },
+  "configSummary": {
+    "usageHoursMinutes": "{{duration}} Min. Nutzung",
+    "usageHoursHours": "{{duration}} Std. Nutzung",
+    "usageHoursDays": "{{duration}} Tage Nutzung",
+    "usageCount": "Alle {{count}} Sitzungen",
+    "timeIntervalMinutes": "Alle {{duration}} Min.",
+    "timeIntervalHours": "Alle {{duration}} Std.",
+    "timeIntervalDays": "Alle {{duration}} Tage"
+  },
+  "errors": {
+    "forbidden": "Du hast keine Berechtigung zur Wartungs-Verwaltung dieser Ressource.",
+    "resourceNotFound": "Ressource nicht gefunden.",
+    "backToResources": "Zurück zur Übersicht"
+  }
+}

@@ -469,6 +469,9 @@ importers:
       '@types/jest':
         specifier: 30.0.0
         version: 30.0.0
+      '@types/lodash':
+        specifier: ^4.17.24
+        version: 4.17.24
       '@types/lodash-es':
         specifier: ^4.17.12
         version: 4.17.12
@@ -586,6 +589,9 @@ importers:
       jsonc-eslint-parser:
         specifier: ^3.1.0
         version: 3.1.0
+      lodash:
+        specifier: ^4.18.1
+        version: 4.18.1
       nx:
         specifier: 22.7.1
         version: 22.7.1(@swc-node/register@1.11.1(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(@swc/core@1.15.33(@swc/helpers@0.5.21))(@swc/types@0.1.26)(typescript@6.0.3))(@swc/core@1.15.33(@swc/helpers@0.5.21))
@@ -5270,9 +5276,6 @@ packages:
 
   '@types/lodash-es@4.17.12':
     resolution: {integrity: sha512-0NgftHUcV4v34VhXm8QBSftKVXtbkBG3ViCjs6+eJ5a6y6Mi/jiFGPc1sC7QK+9BFhWrURE3EOggmWaSxL9OzQ==}
-
-  '@types/lodash@4.17.16':
-    resolution: {integrity: sha512-HX7Em5NYQAXKW+1T+FiuG27NGwzJfCX3s1GjOa7ujxZa52kjJLOr4FUxT+giF6Tgxv1e+/czV/iTtBw27WTU9g==}
 
   '@types/lodash@4.17.24':
     resolution: {integrity: sha512-gIW7lQLZbue7lRSWEFql49QJJWThrTFFeIMJdp3eH4tKoxm1OvEPg02rm4wCCSHS0cL3/Fizimb35b7k8atwsQ==}
@@ -21054,9 +21057,7 @@ snapshots:
 
   '@types/lodash-es@4.17.12':
     dependencies:
-      '@types/lodash': 4.17.16
-
-  '@types/lodash@4.17.16': {}
+      '@types/lodash': 4.17.24
 
   '@types/lodash@4.17.24': {}
 

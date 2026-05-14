@@ -19,6 +19,7 @@ import { ResourceOverview } from '../resourceOverview';
 import { Dependencies } from '../dependencies';
 import { UserManagementDetailsPage } from '../user-management/details';
 import FlowsPage from '../resources/details/flows';
+import { MaintenanceHubPage } from '../resources/details/maintenance-hub';
 import { FormEditorPage, FormListPage } from '../resources/details/forms';
 import AccountPage from '../account';
 import { ConfirmDeleteAccount } from '../confirm-delete-account';
@@ -98,6 +99,11 @@ const coreRoutes: RouteConfig[] = [
     path: '/resources/:id/documentation/edit',
     element: <DocumentationEditor />,
     authRequired: 'canManageResources',
+  },
+  {
+    path: '/resources/:id/maintenance',
+    element: <MaintenanceHubPage />,
+    authRequired: true,
   },
   {
     path: '/resource-groups/:groupId',
