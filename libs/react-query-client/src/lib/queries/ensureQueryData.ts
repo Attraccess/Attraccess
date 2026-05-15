@@ -239,6 +239,12 @@ export const ensureUseSettingsServiceGetFirstTimeSetupStatusData = (queryClient:
 */
 export const ensureUseSettingsServiceGetMetricsSettingsData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseSettingsServiceGetMetricsSettingsKeyFn(), queryFn: () => SettingsService.getMetricsSettings() });
 /**
+* Get auth rate-limit settings
+* @returns AuthRateLimitSettingsDto Current auth rate-limit settings.
+* @throws ApiError
+*/
+export const ensureUseSettingsServiceGetAuthRateLimitSettingsData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseSettingsServiceGetAuthRateLimitSettingsKeyFn(), queryFn: () => SettingsService.getAuthRateLimitSettings() });
+/**
 * Get license information
 * @returns LicenseDataDto The current license data.
 * @throws ApiError

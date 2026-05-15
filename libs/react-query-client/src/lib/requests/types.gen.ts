@@ -1174,6 +1174,52 @@ export type GenerateMetricsApiKeyResponseDto = {
     apiKey: string;
 };
 
+export type AuthRateLimitSettingsDto = {
+    /**
+     * Max failed attempts within the window before lockout
+     */
+    maxAttempts: number;
+    /**
+     * Sliding window length, in seconds, for counting attempts
+     */
+    windowSeconds: number;
+    /**
+     * Base lockout duration in seconds after the threshold is reached
+     */
+    lockoutDurationSeconds: number;
+    /**
+     * Whether to extend lockout exponentially on repeat lockouts
+     */
+    exponentialBackoff: boolean;
+    /**
+     * Multiplier applied to lockout duration when exponentialBackoff is on
+     */
+    backoffMultiplier: number;
+};
+
+export type UpdateAuthRateLimitSettingsDto = {
+    /**
+     * Max failed attempts within the window before lockout
+     */
+    maxAttempts?: number;
+    /**
+     * Sliding window length, in seconds
+     */
+    windowSeconds?: number;
+    /**
+     * Base lockout duration in seconds
+     */
+    lockoutDurationSeconds?: number;
+    /**
+     * Whether to extend lockout exponentially on repeat lockouts
+     */
+    exponentialBackoff?: boolean;
+    /**
+     * Multiplier applied to lockout duration
+     */
+    backoffMultiplier?: number;
+};
+
 export type LicenseDataDto = {
     /**
      * Whether the license is valid
@@ -4346,6 +4392,14 @@ export type GenerateMetricsApiKeyResponse = GenerateMetricsApiKeyResponseDto;
 
 export type DeleteMetricsApiKeyResponse = MetricsSettingsDto;
 
+export type GetAuthRateLimitSettingsResponse = AuthRateLimitSettingsDto;
+
+export type UpdateAuthRateLimitSettingsData = {
+    requestBody: UpdateAuthRateLimitSettingsDto;
+};
+
+export type UpdateAuthRateLimitSettingsResponse = AuthRateLimitSettingsDto;
+
 export type GetLicenseInformationResponse = LicenseDataDto;
 
 export type CreateOneResourceData = {
@@ -6460,6 +6514,33 @@ export type $OpenApiTs = {
                  * Metrics API key removed.
                  */
                 200: MetricsSettingsDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/settings/auth/rate-limit': {
+        get: {
+            res: {
+                /**
+                 * Current auth rate-limit settings.
+                 */
+                200: AuthRateLimitSettingsDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+        patch: {
+            req: UpdateAuthRateLimitSettingsData;
+            res: {
+                /**
+                 * Auth rate-limit settings updated.
+                 */
+                200: AuthRateLimitSettingsDto;
                 /**
                  * Unauthorized
                  */

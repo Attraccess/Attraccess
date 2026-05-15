@@ -349,6 +349,9 @@ describe('UsersService', () => {
           sentProjectInvitations: [],
           receivedProjectInvitations: [],
           formSubmissions: [],
+          lockedUntil: null,
+          failedLoginAttempts: 0,
+          firstFailedLoginAt: null,
         } as User,
         {
           id: 2,
@@ -391,6 +394,9 @@ describe('UsersService', () => {
           sentProjectInvitations: [],
           receivedProjectInvitations: [],
           formSubmissions: [],
+          lockedUntil: null,
+          failedLoginAttempts: 0,
+          firstFailedLoginAt: null,
         } as User,
       ];
 

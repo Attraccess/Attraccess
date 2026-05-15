@@ -49,6 +49,68 @@ Session security is controlled via environment variables:
 - Generate a strong `AUTH_SESSION_SECRET` during initial setup and store it securely.
 - Adjust `SESSION_COOKIE_MAX_AGE` based on your security requirements. Shorter durations are more secure but require users to log in more frequently.
 
+## Auth Rate Limiting and Account Lockout
+
+Failed authentication attempts on login, registration, and password reset endpoints are throttled per IP. Repeated login failures additionally lock the affected account. Settings are admin-tunable from **Settings -> Auth rate limiting**.
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `maxAttempts` | `5` | Failed attempts allowed inside the window before throttle / lockout kicks in. |
+| `windowSeconds` | `900` | Sliding window for counting failures. |
+| `lockoutDurationSeconds` | `900` | Base lockout duration. |
+| `exponentialBackoff` | `false` | When `true`, lockouts grow by `backoffMultiplier` on each repeat. |
+| `backoffMultiplier` | `2` | Multiplier applied to lockout duration on each repeat lockout. |
+
+Rate limit triggers:
+
+- **`429 Too Many Requests`** with a `Retry-After` header is returned when an IP exceeds the threshold.
+- **`423 Locked`** with a `Retry-After` header is returned for a locked account on subsequent login attempts.
+
+A successful login or admin unlock clears the lockout. Admin unlock is available via the user management UI.
+
+## Auth Audit Log Format
+
+Every auth attempt produces a single-line, space-separated log record under the `AuthAudit` logger context. Field names and order are stable so the log is fail2ban-friendly.
+
+```
+auth.failed type=login outcome=invalid_credentials ip=1.2.3.4 user_id=42 username=alice ts=2026-05-15T12:34:56.000Z reason=bad_password
+auth.success type=login outcome=success ip=1.2.3.4 user_id=42 username=alice ts=2026-05-15T12:35:01.000Z
+```
+
+| Field | Description |
+|-------|-------------|
+| `prefix` | `auth.success` for successes, `auth.failed` otherwise. |
+| `type` | One of `login`, `register`, `password_reset_request`, `password_reset_complete`. |
+| `outcome` | `success`, `invalid_credentials`, `account_locked`, `rate_limited`, `two_factor_required`, `two_factor_invalid`, `email_not_verified`, `invalid_token`, `invalid_input`, `unknown_user`. |
+| `ip` | Client IP. Falls back to `unknown` when not resolvable. |
+| `user_id` | Numeric user id when known, `-` otherwise. |
+| `username` | Username when known, `-` otherwise. Whitespace and quotes are replaced with `_`. |
+| `ts` | ISO 8601 UTC timestamp. |
+| `reason` | Optional short reason tag. Omitted when not set. |
+
+> Passwords, tokens, and other secrets are never logged.
+
+### Fail2ban regex
+
+A minimal `failregex` for `/etc/fail2ban/filter.d/attraccess-auth.conf`:
+
+```
+failregex = ^.*auth\.failed type=(?:login|register|password_reset_request|password_reset_complete) outcome=\S+ ip=<HOST> .*$
+ignoreregex =
+```
+
+Pair with a jail (e.g., `/etc/fail2ban/jail.d/attraccess.local`) that watches the API logs:
+
+```ini
+[attraccess-auth]
+enabled  = true
+filter   = attraccess-auth
+logpath  = /var/log/attraccess/api.log
+maxretry = 5
+findtime = 900
+bantime  = 900
+```
+
 ## See Also
 
 - [Environment Variables](installation/environment-variables.md) -- All configuration options

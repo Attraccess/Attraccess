@@ -50,3 +50,29 @@ export const SMTP_KEYS = {
 
 /** Cache TTL for settings reads. Writes update cache immediately; this only affects reads when DB is changed outside this process. */
 export const SETTINGS_CACHE_TTL_MS = 60 * 1000; // 1 minute
+
+export const AUTH_PARENT = 'auth';
+
+export const AUTH_KEYS = {
+  rateLimitMaxAttempts: 'rate_limit_max_attempts',
+  rateLimitWindowSeconds: 'rate_limit_window_seconds',
+  rateLimitLockoutDurationSeconds: 'rate_limit_lockout_duration_seconds',
+  rateLimitExponentialBackoff: 'rate_limit_exponential_backoff',
+  rateLimitBackoffMultiplier: 'rate_limit_backoff_multiplier',
+} as const;
+
+export interface RateLimitPolicy {
+  maxAttempts: number;
+  windowSeconds: number;
+  lockoutDurationSeconds: number;
+  exponentialBackoff: boolean;
+  backoffMultiplier: number;
+}
+
+export const RATE_LIMIT_DEFAULTS: RateLimitPolicy = {
+  maxAttempts: 5,
+  windowSeconds: 900,
+  lockoutDurationSeconds: 900,
+  exponentialBackoff: false,
+  backoffMultiplier: 2,
+};

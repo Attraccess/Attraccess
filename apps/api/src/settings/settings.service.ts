@@ -14,13 +14,19 @@ import { SmtpSettingsInternal, SmtpSettingsService } from './smtp-settings.servi
 import {
   APP_KEYS,
   APP_PARENT,
+  AUTH_KEYS,
+  AUTH_PARENT,
   METRICS_KEYS,
   METRICS_PARENT,
   METRICS_SLOW_QUERY_THRESHOLD_DEFAULT_SECONDS,
   METRICS_TOGGLE_DEFAULTS,
   METRICS_TOGGLE_KEYS,
   MetricsSubsystem,
+  RATE_LIMIT_DEFAULTS,
+  RateLimitPolicy,
 } from './constants';
+import { AuthRateLimitSettingsDto } from './dto/auth-rate-limit-settings.dto';
+import { UpdateAuthRateLimitSettingsDto } from './dto/update-auth-rate-limit-settings.dto';
 import { SettingsStoreService } from './settings-store.service';
 import {
   FirstTimeSetupStatusDto,
@@ -193,6 +199,79 @@ export class SettingsService {
     }
   }
 
+  async getAuthRateLimitSettings(): Promise<AuthRateLimitSettingsDto> {
+    return this.resolveRateLimitPolicy();
+  }
+
+  async getRateLimitPolicy(): Promise<RateLimitPolicy> {
+    return this.resolveRateLimitPolicy();
+  }
+
+  async updateAuthRateLimitSettings(update: UpdateAuthRateLimitSettingsDto): Promise<AuthRateLimitSettingsDto> {
+    const writes: Array<Promise<void>> = [];
+    if (update.maxAttempts !== undefined) {
+      writes.push(
+        this.settingsStore.setPlainSetting(AUTH_PARENT, AUTH_KEYS.rateLimitMaxAttempts, String(update.maxAttempts)),
+      );
+    }
+    if (update.windowSeconds !== undefined) {
+      writes.push(
+        this.settingsStore.setPlainSetting(AUTH_PARENT, AUTH_KEYS.rateLimitWindowSeconds, String(update.windowSeconds)),
+      );
+    }
+    if (update.lockoutDurationSeconds !== undefined) {
+      writes.push(
+        this.settingsStore.setPlainSetting(
+          AUTH_PARENT,
+          AUTH_KEYS.rateLimitLockoutDurationSeconds,
+          String(update.lockoutDurationSeconds),
+        ),
+      );
+    }
+    if (update.exponentialBackoff !== undefined) {
+      writes.push(
+        this.settingsStore.setPlainSetting(
+          AUTH_PARENT,
+          AUTH_KEYS.rateLimitExponentialBackoff,
+          update.exponentialBackoff ? 'true' : 'false',
+        ),
+      );
+    }
+    if (update.backoffMultiplier !== undefined) {
+      writes.push(
+        this.settingsStore.setPlainSetting(
+          AUTH_PARENT,
+          AUTH_KEYS.rateLimitBackoffMultiplier,
+          String(update.backoffMultiplier),
+        ),
+      );
+    }
+    await Promise.all(writes);
+    return this.resolveRateLimitPolicy();
+  }
+
+  private async resolveRateLimitPolicy(): Promise<RateLimitPolicy> {
+    const [maxAttempts, windowSeconds, lockoutDurationSeconds, exponentialBackoff, backoffMultiplier] =
+      await Promise.all([
+        this.settingsStore.getPlainSetting(AUTH_PARENT, AUTH_KEYS.rateLimitMaxAttempts),
+        this.settingsStore.getPlainSetting(AUTH_PARENT, AUTH_KEYS.rateLimitWindowSeconds),
+        this.settingsStore.getPlainSetting(AUTH_PARENT, AUTH_KEYS.rateLimitLockoutDurationSeconds),
+        this.settingsStore.getPlainSetting(AUTH_PARENT, AUTH_KEYS.rateLimitExponentialBackoff),
+        this.settingsStore.getPlainSetting(AUTH_PARENT, AUTH_KEYS.rateLimitBackoffMultiplier),
+      ]);
+
+    return {
+      maxAttempts: parsePositiveInt(maxAttempts, RATE_LIMIT_DEFAULTS.maxAttempts),
+      windowSeconds: parsePositiveInt(windowSeconds, RATE_LIMIT_DEFAULTS.windowSeconds),
+      lockoutDurationSeconds: parsePositiveInt(
+        lockoutDurationSeconds,
+        RATE_LIMIT_DEFAULTS.lockoutDurationSeconds,
+      ),
+      exponentialBackoff: exponentialBackoff === 'true',
+      backoffMultiplier: parsePositiveFloat(backoffMultiplier, RATE_LIMIT_DEFAULTS.backoffMultiplier),
+    };
+  }
+
   async updateMetricsToggles(update: UpdateMetricsTogglesDto): Promise<MetricsTogglesDto> {
     const subsystems = Object.keys(METRICS_TOGGLE_KEYS) as MetricsSubsystem[];
     const writes = subsystems
@@ -210,4 +289,26 @@ export class SettingsService {
     }
     return this.getMetricsToggles();
   }
+}
+
+function parsePositiveInt(raw: string | null, fallback: number): number {
+  if (raw === null || raw === undefined || raw === '') {
+    return fallback;
+  }
+  const parsed = parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    return fallback;
+  }
+  return parsed;
+}
+
+function parsePositiveFloat(raw: string | null, fallback: number): number {
+  if (raw === null || raw === undefined || raw === '') {
+    return fallback;
+  }
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    return fallback;
+  }
+  return parsed;
 }

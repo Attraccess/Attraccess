@@ -1,0 +1,35 @@
+{
+  "loading": "Loading rate-limit settings…",
+  "description": "Throttle failed authentication attempts per IP and lock accounts after repeated failures.",
+  "fields": {
+    "maxAttempts": {
+      "label": "Max attempts",
+      "description": "Failed attempts allowed within the window before triggering throttle or lockout."
+    },
+    "windowSeconds": {
+      "label": "Window (seconds)",
+      "description": "Time window during which failed attempts are counted."
+    },
+    "lockoutDurationSeconds": {
+      "label": "Lockout duration (seconds)",
+      "description": "Base lockout duration when the threshold is reached."
+    },
+    "exponentialBackoff": {
+      "label": "Exponential backoff",
+      "description": "Extend the lockout exponentially on consecutive lockouts."
+    },
+    "backoffMultiplier": {
+      "label": "Backoff multiplier",
+      "description": "Multiplier applied to lockout duration when exponential backoff is on."
+    }
+  },
+  "saveButton": "Save",
+  "saved": {
+    "title": "Rate-limit settings saved",
+    "description": "New thresholds take effect immediately."
+  },
+  "error": {
+    "title": "Could not save",
+    "description": "Check the values and try again."
+  }
+}

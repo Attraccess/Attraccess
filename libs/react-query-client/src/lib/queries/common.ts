@@ -143,6 +143,10 @@ export type SettingsServiceGetMetricsSettingsDefaultResponse = Awaited<ReturnTyp
 export type SettingsServiceGetMetricsSettingsQueryResult<TData = SettingsServiceGetMetricsSettingsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useSettingsServiceGetMetricsSettingsKey = "SettingsServiceGetMetricsSettings";
 export const UseSettingsServiceGetMetricsSettingsKeyFn = (queryKey?: Array<unknown>) => [useSettingsServiceGetMetricsSettingsKey, ...(queryKey ?? [])];
+export type SettingsServiceGetAuthRateLimitSettingsDefaultResponse = Awaited<ReturnType<typeof SettingsService.getAuthRateLimitSettings>>;
+export type SettingsServiceGetAuthRateLimitSettingsQueryResult<TData = SettingsServiceGetAuthRateLimitSettingsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useSettingsServiceGetAuthRateLimitSettingsKey = "SettingsServiceGetAuthRateLimitSettings";
+export const UseSettingsServiceGetAuthRateLimitSettingsKeyFn = (queryKey?: Array<unknown>) => [useSettingsServiceGetAuthRateLimitSettingsKey, ...(queryKey ?? [])];
 export type LicenseServiceGetLicenseInformationDefaultResponse = Awaited<ReturnType<typeof LicenseService.getLicenseInformation>>;
 export type LicenseServiceGetLicenseInformationQueryResult<TData = LicenseServiceGetLicenseInformationDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useLicenseServiceGetLicenseInformationKey = "LicenseServiceGetLicenseInformation";
@@ -600,6 +604,7 @@ export type UsersServiceChangeUserBillingFactorMutationResult = Awaited<ReturnTy
 export type EmailTemplatesServiceEmailTemplateControllerUpdateMutationResult = Awaited<ReturnType<typeof EmailTemplatesService.emailTemplateControllerUpdate>>;
 export type SettingsServiceUpdateSystemSettingsMutationResult = Awaited<ReturnType<typeof SettingsService.updateSystemSettings>>;
 export type SettingsServiceUpdateMetricsSettingsMutationResult = Awaited<ReturnType<typeof SettingsService.updateMetricsSettings>>;
+export type SettingsServiceUpdateAuthRateLimitSettingsMutationResult = Awaited<ReturnType<typeof SettingsService.updateAuthRateLimitSettings>>;
 export type AttractapServiceUpdateReaderMutationResult = Awaited<ReturnType<typeof AttractapService.updateReader>>;
 export type AttractapServiceToggleCardActiveMutationResult = Awaited<ReturnType<typeof AttractapService.toggleCardActive>>;
 export type UsersServiceDeleteUserMutationResult = Awaited<ReturnType<typeof UsersService.deleteUser>>;

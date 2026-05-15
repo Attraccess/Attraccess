@@ -1786,6 +1786,68 @@ export const $GenerateMetricsApiKeyResponseDto = {
     required: ['apiKeyConfigured', 'apiKey']
 } as const;
 
+export const $AuthRateLimitSettingsDto = {
+    type: 'object',
+    properties: {
+        maxAttempts: {
+            type: 'number',
+            description: 'Max failed attempts within the window before lockout',
+            example: 5
+        },
+        windowSeconds: {
+            type: 'number',
+            description: 'Sliding window length, in seconds, for counting attempts',
+            example: 900
+        },
+        lockoutDurationSeconds: {
+            type: 'number',
+            description: 'Base lockout duration in seconds after the threshold is reached',
+            example: 900
+        },
+        exponentialBackoff: {
+            type: 'boolean',
+            description: 'Whether to extend lockout exponentially on repeat lockouts',
+            example: false
+        },
+        backoffMultiplier: {
+            type: 'number',
+            description: 'Multiplier applied to lockout duration when exponentialBackoff is on',
+            example: 2
+        }
+    },
+    required: ['maxAttempts', 'windowSeconds', 'lockoutDurationSeconds', 'exponentialBackoff', 'backoffMultiplier']
+} as const;
+
+export const $UpdateAuthRateLimitSettingsDto = {
+    type: 'object',
+    properties: {
+        maxAttempts: {
+            type: 'number',
+            description: 'Max failed attempts within the window before lockout',
+            example: 5
+        },
+        windowSeconds: {
+            type: 'number',
+            description: 'Sliding window length, in seconds',
+            example: 900
+        },
+        lockoutDurationSeconds: {
+            type: 'number',
+            description: 'Base lockout duration in seconds',
+            example: 900
+        },
+        exponentialBackoff: {
+            type: 'boolean',
+            description: 'Whether to extend lockout exponentially on repeat lockouts'
+        },
+        backoffMultiplier: {
+            type: 'number',
+            description: 'Multiplier applied to lockout duration',
+            example: 2
+        }
+    }
+} as const;
+
 export const $LicenseDataDto = {
     type: 'object',
     properties: {
