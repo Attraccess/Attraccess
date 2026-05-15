@@ -195,7 +195,7 @@ export function MaintenanceManagement(props: Props & Omit<CardProps, 'children' 
                 )}
               >
                 <div className="flex-1 min-w-0">
-                  <div className="text-foreground-700 text-xs">
+                  <div className="text-foreground-700 text-xs whitespace-nowrap overflow-hidden text-ellipsis">
                     <DateTimeDisplay date={maintenance.startTime} />
                     {maintenance.endTime && (
                       <>

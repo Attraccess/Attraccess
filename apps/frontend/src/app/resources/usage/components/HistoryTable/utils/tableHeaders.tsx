@@ -24,7 +24,7 @@ export function generateHeaderColumns(
         {t('headers.machine.endTime')}
       </TableColumn>,
       <TableColumn key="duration" id="duration">{t('headers.machine.duration')}</TableColumn>,
-      <TableColumn key="project" id="project" className="hidden md:table-cell">
+      <TableColumn key="project" id="project" className="hidden 2xl:table-cell">
         {t('headers.machine.project')}
       </TableColumn>,
       <TableColumn key="icons" id="icons">{''}</TableColumn>,

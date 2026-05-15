@@ -32,13 +32,13 @@ export function generateRowCells(
 
   if (resource.type === 'machine') {
     cells.push(
-      <TableCell key={`start-${session.id}`}>
+      <TableCell key={`start-${session.id}`} className="whitespace-nowrap">
         <DateTimeDisplay date={session.startTime} />
       </TableCell>,
-      <TableCell key={`end-${session.id}`} className="hidden md:table-cell">
+      <TableCell key={`end-${session.id}`} className="hidden md:table-cell whitespace-nowrap">
         <DateTimeDisplay date={session.endTime} />
       </TableCell>,
-      <TableCell key={`duration-${session.id}`}>
+      <TableCell key={`duration-${session.id}`} className="whitespace-nowrap">
         <DurationDisplay
           minutes={session.usageInMinutes >= 0 ? session.usageInMinutes : null}
           alternativeText={
@@ -48,7 +48,7 @@ export function generateRowCells(
           }
         />
       </TableCell>,
-      <TableCell key={`project-${session.id}`} className="hidden md:table-cell">
+      <TableCell key={`project-${session.id}`} className="hidden 2xl:table-cell">
         {projectCellRenderer ? projectCellRenderer(session) : session.project?.name}
       </TableCell>,
       <TableCell key={`icons-${session.id}`} className="flex items-center gap-2">
