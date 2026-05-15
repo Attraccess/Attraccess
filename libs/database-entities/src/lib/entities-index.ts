@@ -68,6 +68,7 @@ import { Project } from './entities/project';
 import { ProjectMember, ProjectMemberRole } from './entities/project-member.entity';
 import { ProjectInvitation, ProjectInvitationStatus } from './entities/project-invitation.entity';
 import { Form, FormField, FormSubmission, FormFieldType, ResourceFormAction } from './entities/form';
+import { PasswordPolicy, PASSWORD_POLICY_SINGLETON_ID } from './entities/password-policy.entity';
 
 // Export all entities individually
 export {
@@ -142,6 +143,8 @@ export {
   ResourceHealthState,
   ResourceHealthStatus,
   ResourceHealthSource,
+  PasswordPolicy,
+  PASSWORD_POLICY_SINGLETON_ID,
 };
 
 // Export the entities object
@@ -181,4 +184,5 @@ export const entities = {
   FormField,
   FormSubmission,
   ResourceHealthState,
+  PasswordPolicy,
 };

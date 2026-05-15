@@ -151,6 +151,7 @@ export enum EmailTemplateType {
   ResourceUsageBillingTransactionSummary = "resource-usage-billing-transaction-summary",
   ProjectInvitation = "project-invitation",
   DeleteAccountConfirmation = "delete-account-confirmation",
+  ResourceHealthChanged = "resource-health-changed",
 }
 
 /** The type of the provider */
@@ -189,8 +190,8 @@ export interface CreateUserDto {
    */
   email: string;
   /**
-   * The password for the new user
-   * @example "password123"
+   * The password for the new user (validated server-side against the active password policy)
+   * @example "correct-horse-battery-staple-42"
    */
   password: string;
   /**
@@ -1262,6 +1263,8 @@ export interface MetricsSettingsDto {
   apiKeyConfigured: boolean;
   /** Per-subsystem metrics timing toggles */
   toggles: MetricsTogglesDto;
+  /** Threshold above which a DB query is counted as slow (in seconds). */
+  slowQueryThresholdSeconds: number;
 }
 
 export interface UpdateMetricsTogglesDto {
@@ -1284,6 +1287,11 @@ export interface UpdateMetricsTogglesDto {
 export interface UpdateMetricsSettingsDto {
   /** Per-subsystem metrics toggles update */
   toggles?: UpdateMetricsTogglesDto;
+  /**
+   * Threshold above which a DB query is counted as slow (in seconds).
+   * @min 0
+   */
+  slowQueryThresholdSeconds?: number;
 }
 
 export interface GenerateMetricsApiKeyResponseDto {
@@ -1307,6 +1315,28 @@ export interface LicenseDataDto {
   usageLimits: Record<string, any>;
   /** Are you using this software for free as a non-profit? */
   isNonProfit: boolean;
+}
+
+export interface PublicPasswordPolicyDto {
+  /** @example 12 */
+  minLength: number;
+  /** @example 128 */
+  maxLength: number;
+  /** @example true */
+  allowAllUnicode: boolean;
+  /** @example false */
+  requireUppercase: boolean;
+  /** @example false */
+  requireLowercase: boolean;
+  /** @example false */
+  requireDigit: boolean;
+  /** @example false */
+  requireSpecial: boolean;
+  /**
+   * Minimum required zxcvbn score (0-4)
+   * @example 3
+   */
+  minZxcvbnScore: number;
 }
 
 export interface CreateResourceDto {
@@ -4062,6 +4092,8 @@ export type DeleteMetricsApiKeyData = MetricsSettingsDto;
 
 export type GetLicenseInformationData = LicenseDataDto;
 
+export type GetPublicPasswordPolicyData = PublicPasswordPolicyDto;
+
 export type CreateOneResourceData = Resource;
 
 export interface GetAllResourcesParams {
@@ -6260,6 +6292,23 @@ export namespace License {
     export type RequestBody = never;
     export type RequestHeaders = {};
     export type ResponseBody = GetLicenseInformationData;
+  }
+}
+
+export namespace PasswordPolicy {
+  /**
+   * No description
+   * @tags Password Policy
+   * @name GetPublicPasswordPolicy
+   * @summary Get the public password policy
+   * @request GET:/api/password-policy/public
+   */
+  export namespace GetPublicPasswordPolicy {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetPublicPasswordPolicyData;
   }
 }
 
@@ -10385,6 +10434,23 @@ export class Api<
         path: `/api/license-data`,
         method: "GET",
         secure: true,
+        format: "json",
+        ...params,
+      }),
+  };
+  passwordPolicy = {
+    /**
+     * No description
+     *
+     * @tags Password Policy
+     * @name GetPublicPasswordPolicy
+     * @summary Get the public password policy
+     * @request GET:/api/password-policy/public
+     */
+    getPublicPasswordPolicy: (params: RequestParams = {}) =>
+      this.request<GetPublicPasswordPolicyData, any>({
+        path: `/api/password-policy/public`,
+        method: "GET",
         format: "json",
         ...params,
       }),

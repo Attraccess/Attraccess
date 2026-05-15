@@ -47,6 +47,7 @@ import { BruteForceProtectionService } from './rate-limiting/brute-force.service
 import { AuthAuditLogger } from './rate-limiting/auth-audit.logger';
 import { AuthRateLimitInterceptor } from './rate-limiting/auth-rate-limit.interceptor';
 import { LoginRateLimitGuard } from './rate-limiting/login.rate-limit.guard';
+import { PasswordPolicyModule } from './password-policy/password-policy.module';
 
 @Module({
   imports: [
@@ -65,6 +66,7 @@ import { LoginRateLimitGuard } from './rate-limiting/login.rate-limit.guard';
     EncryptionModule,
     LicenseModule,
     SettingsModule,
+    PasswordPolicyModule,
   ],
   providers: [
     UsersService,

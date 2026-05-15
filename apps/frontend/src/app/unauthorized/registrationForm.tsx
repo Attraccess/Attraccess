@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { ArrowRight, Mail } from 'lucide-react';
+import { ArrowRight, Mail, Wand2 } from 'lucide-react';
 import { Alert, Input } from '@heroui/react';
 import { Button } from '@heroui/react';
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, useDisclosure } from '@heroui/react';
@@ -11,6 +11,7 @@ import de from './registrationForm.de.json';
 import {
   useUsersServiceCreateOneUser,
   useUsersServiceFindManyKey,
+  usePasswordPolicyServiceGetPublicPasswordPolicy,
   ApiError,
   AuthenticationType,
 } from '@attraccess/react-query-client';
@@ -18,9 +19,33 @@ import { useQueryClient } from '@tanstack/react-query';
 import API_ERROR_TRANSLATIONS_DE from '../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../global-translations/api-errors.en.json';
 import { useToastMessage } from '../../components/toastProvider';
+import {
+  PasswordPolicyHints,
+  generateStrongPassword,
+} from '../../components/PasswordPolicyHints';
+import { PolicyError, PublicPasswordPolicy, validatePassword } from '@attraccess/shared';
 
 interface RegisterFormProps {
   onHasAccount: () => void;
+}
+
+const FALLBACK_POLICY: PublicPasswordPolicy = {
+  minLength: 12,
+  maxLength: 128,
+  allowAllUnicode: true,
+  requireUppercase: false,
+  requireLowercase: false,
+  requireDigit: false,
+  requireSpecial: false,
+  minZxcvbnScore: 3,
+};
+
+function extractPolicyErrors(error: unknown): PolicyError[] | null {
+  if (!(error instanceof ApiError) || error.status !== 400) {
+    return null;
+  }
+  const body = error.body as { policyErrors?: PolicyError[] } | undefined;
+  return Array.isArray(body?.policyErrors) ? body.policyErrors : null;
 }
 
 export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
@@ -42,24 +67,22 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
 
   const [username, setUsername] = useState<string>('');
   const [email, setEmail] = useState<string>('');
-  const [password, setPassword] = useState<string | null>(null);
-  const [passwordConfirmation, setPasswordConfirmation] = useState<string | null>(null);
+  const [password, setPassword] = useState<string>('');
+  const [passwordConfirmation, setPasswordConfirmation] = useState<string>('');
+  const [serverErrors, setServerErrors] = useState<PolicyError[]>([]);
+
+  const { data: policyData } = usePasswordPolicyServiceGetPublicPasswordPolicy();
+  const policy = useMemo<PublicPasswordPolicy>(
+    () => (policyData as PublicPasswordPolicy | undefined) ?? FALLBACK_POLICY,
+    [policyData],
+  );
 
   const passwordsDontMatch = useMemo(() => {
-    if (password === null || passwordConfirmation === null) {
+    if (!password || !passwordConfirmation) {
       return false;
     }
-
     return password !== passwordConfirmation;
   }, [password, passwordConfirmation]);
-
-  const passwordTooShort = useMemo(() => {
-    if (password === null) {
-      return false;
-    }
-
-    return password.length < 8;
-  }, [password]);
 
   const usernameValidationMessages = useMemo(
     () => ({
@@ -78,25 +101,46 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
   );
   const trimmedEmail = useMemo(() => email.trim(), [email]);
 
+  const localPolicyResult = useMemo(
+    () =>
+      validatePassword(
+        password,
+        {
+          ...policy,
+          checkHIBP: false,
+          checkCommonPasswords: false,
+          historySize: 0,
+          rotationDays: 0,
+        },
+        { username: trimmedUsername, email: trimmedEmail },
+      ),
+    [password, policy, trimmedUsername, trimmedEmail],
+  );
+
   const canSubmit = useMemo(
     () =>
       isUsernameValid &&
       !!trimmedEmail &&
-      password !== null &&
-      passwordConfirmation !== null &&
-      !passwordTooShort &&
-      !passwordsDontMatch,
-    [isUsernameValid, trimmedEmail, password, passwordConfirmation, passwordTooShort, passwordsDontMatch],
+      password.length > 0 &&
+      passwordConfirmation.length > 0 &&
+      !passwordsDontMatch &&
+      localPolicyResult.ok,
+    [isUsernameValid, trimmedEmail, password, passwordConfirmation, passwordsDontMatch, localPolicyResult.ok],
   );
 
   const { mutate: createUserMutate, isPending } = useUsersServiceCreateOneUser({
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: [useUsersServiceFindManyKey],
-      });
+      queryClient.invalidateQueries({ queryKey: [useUsersServiceFindManyKey] });
+      setServerErrors([]);
       onOpen();
     },
     onError: (error) => {
+      const policyErrors = extractPolicyErrors(error);
+      if (policyErrors) {
+        setServerErrors(policyErrors);
+        return;
+      }
+      setServerErrors([]);
       toast.apiError({
         error: error as ApiError,
         t,
@@ -109,11 +153,10 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
   const handleSubmit: React.FormEventHandler = useCallback(
     async (event) => {
       event.preventDefault();
-
-      if (!canSubmit || password === null) {
+      if (!canSubmit) {
         return;
       }
-
+      setServerErrors([]);
       setRegisteredEmail(trimmedEmail);
       createUserMutate({
         requestBody: {
@@ -126,6 +169,29 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
     },
     [canSubmit, createUserMutate, password, trimmedEmail, trimmedUsername],
   );
+
+  const handleGeneratePassword = useCallback(async () => {
+    const generated = generateStrongPassword({
+      length: Math.max(20, policy.minLength + 4),
+      requireUppercase: policy.requireUppercase,
+      requireLowercase: policy.requireLowercase,
+      requireDigit: policy.requireDigit,
+      requireSpecial: policy.requireSpecial,
+    });
+    setPassword(generated);
+    setPasswordConfirmation(generated);
+    setServerErrors([]);
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(generated);
+        toast.success({ title: t('passwordGeneratedCopied') });
+      } else {
+        toast.success({ title: t('passwordGenerated') });
+      }
+    } catch {
+      toast.success({ title: t('passwordGenerated') });
+    }
+  }, [policy, toast, t]);
 
   const markTwoFactorSetupIntent = useCallback(() => {
     if (typeof window === 'undefined') {
@@ -159,7 +225,6 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
           value={username}
           onValueChange={setUsername}
           required
-
           data-cy="registration-form-username-input"
           isRequired
         />
@@ -170,7 +235,6 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
           type="email"
           label={t('email')}
           required
-
           data-cy="registration-form-email-input"
           isRequired
           value={email}
@@ -185,14 +249,26 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
           data-cy="registration-form-password-input"
           autoComplete="new-password"
           isRequired
-          validate={() => {
-            if (passwordTooShort) {
-              return t('validationError.passwordTooShort');
-            }
-            return true;
-          }}
-          value={password ?? ''}
+          value={password}
           onValueChange={setPassword}
+        />
+
+        <Button
+          variant="flat"
+          color="secondary"
+          onPress={handleGeneratePassword}
+          startContent={<Wand2 className="h-4 w-4" />}
+          data-cy="registration-form-generate-password-button"
+        >
+          {t('generatePassword')}
+        </Button>
+
+        <PasswordPolicyHints
+          password={password}
+          username={trimmedUsername}
+          email={trimmedEmail}
+          policy={policy}
+          serverErrors={serverErrors}
         />
 
         <PasswordInput
@@ -209,7 +285,7 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
             }
             return true;
           }}
-          value={passwordConfirmation ?? ''}
+          value={passwordConfirmation}
           onValueChange={setPasswordConfirmation}
         />
 
