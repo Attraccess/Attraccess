@@ -11,7 +11,7 @@ import de from './de.json';
 import en from './en.json';
 import { ResourceMaintenanceUpsertModal } from './upsert';
 import { MarkDoneModal } from './mark-done';
-import { CheckCircleIcon, CogIcon, ConstructionIcon, PlusIcon } from 'lucide-react';
+import { CheckCircleIcon, CogIcon, ConstructionIcon, ExternalLinkIcon, PlusIcon } from 'lucide-react';
 import { useNow } from '../../../../hooks/useNow';
 import { EmptyState } from '../../../../components/emptyState';
 
@@ -76,6 +76,31 @@ export function MaintenanceManagement(props: Props & Omit<CardProps, 'children' 
           <Button variant="primary" onPress={open}>
             <PlusIcon className="w-4 h-4" />
             {t('actions.create.label')}
+          </Button>
+        )}
+      </ResourceMaintenanceUpsertModal>
+    </>
+  );
+
+  const flatActions = (
+    <>
+      <Button
+        variant="ghost"
+        size="sm"
+        isIconOnly
+        onPress={() => navigate(`/resources/${resourceId}/maintenance`)}
+        data-cy="manage-maintenance-button"
+        aria-label={t('actions.manageHub.label')}
+      >
+        <ExternalLinkIcon className="w-4 h-4" />
+      </Button>
+      <LabeledSwitch isSelected={includePast} onChange={setIncludePast}>
+        {t('filters.includePast')}
+      </LabeledSwitch>
+      <ResourceMaintenanceUpsertModal resourceId={resourceId}>
+        {(open) => (
+          <Button variant="primary" size="sm" isIconOnly onPress={open} aria-label={t('actions.create.label')}>
+            <PlusIcon className="w-4 h-4" />
           </Button>
         )}
       </ResourceMaintenanceUpsertModal>
@@ -154,7 +179,7 @@ export function MaintenanceManagement(props: Props & Omit<CardProps, 'children' 
             <ConstructionIcon className="w-4 h-4" />
             <h3 className="text-xs font-semibold uppercase tracking-wider">{t('title')}</h3>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">{actions}</div>
+          <div className="flex items-center gap-2 flex-wrap">{flatActions}</div>
         </header>
         {maintenanceWithStatus.length === 0 ? (
           <EmptyState />

@@ -190,18 +190,24 @@ function ResourceDetailsComponent() {
         }
       />
 
-      <div className="w-full space-y-6 mb-6">
+      <div className="mb-6">
         <ResourceHealthWarning resourceId={resourceId} />
+      </div>
 
-        <ResourceUsageSession
-          resourceId={resourceId}
-          resource={resource}
-          data-cy="resource-usage-session"
-          insufficientBalanceDesiredAmount={insufficientBalanceDesiredAmount}
-          className="border-l-4 border-l-primary shadow-medium"
-        />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6 lg:items-start">
+        <div className="lg:col-span-2 space-y-6">
+          <ResourceUsageSession
+            resourceId={resourceId}
+            resource={resource}
+            data-cy="resource-usage-session"
+            insufficientBalanceDesiredAmount={insufficientBalanceDesiredAmount}
+            className="border-l-4 border-l-primary shadow-medium"
+          />
 
-        <div className="space-y-8">
+          <ResourceUsageHistory resourceId={resourceId} data-cy="resource-usage-history" />
+        </div>
+
+        <aside className="lg:col-span-1 space-y-8">
           <ResourceBillingInfo
             variant="flat"
             resourceId={resourceId}
@@ -210,9 +216,7 @@ function ResourceDetailsComponent() {
           {maintenancePermissions?.canManage && (
             <MaintenanceManagement variant="flat" resourceId={resourceId} />
           )}
-        </div>
-
-        <ResourceUsageHistory resourceId={resourceId} data-cy="resource-usage-history" />
+        </aside>
       </div>
 
       <div className="flex flex-row flex-wrap w-full gap-6 items-stretch">

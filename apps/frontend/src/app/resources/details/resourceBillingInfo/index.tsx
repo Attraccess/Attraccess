@@ -129,7 +129,7 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children' | 
           <TableBody>
             <TableRow className="border-b-4 border-divider">
               <TableCell>{t('balance.label')}</TableCell>
-              <TableCell className={cn(adjustedBalance < 0 ? 'text-danger' : 'text-success')}>
+              <TableCell className={cn('whitespace-nowrap text-right', adjustedBalance < 0 ? 'text-danger' : 'text-success')}>
                 {t('billingValue', {
                   credits: formatNumber(adjustedBalance),
                   currency: configuration.currency,
@@ -138,13 +138,13 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children' | 
             </TableRow>
             <TableRow>
               <TableCell>{t('perUse.label')}</TableCell>
-              <TableCell className="text-warning">
+              <TableCell className="text-warning whitespace-nowrap text-right">
                 {t('billingValue', { credits: formatNumber(creditsPerUsage), currency: configuration.currency })}
               </TableCell>
             </TableRow>
             <TableRow>
               <TableCell>{t('perMinute.label')}</TableCell>
-              <TableCell className="text-warning">
+              <TableCell className="text-warning whitespace-nowrap text-right">
                 {t('billingValue', {
                   credits: formatNumber(creditsPerMinute),
                   currency: configuration.currency,
@@ -155,7 +155,7 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children' | 
               resourceBillingConfiguration.additionalItems.map((item) => (
                 <TableRow key={JSON.stringify(item)} id={JSON.stringify(item)}>
                   <TableCell>{item.name}</TableCell>
-                  <TableCell className="text-warning">
+                  <TableCell className="text-warning whitespace-nowrap text-right">
                     {t('billingValue', {
                       credits: formatNumber(
                         dbCurrencyToUserCurrency(item.unitPrice * item.quantity, configuration.minorUnit),
@@ -185,7 +185,7 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children' | 
                   </NumberFieldGroup>
                 </NumberField>
               </TableCell>
-              <TableCell>
+              <TableCell className="whitespace-nowrap text-right">
                 {t('billingValue', {
                   credits: formatNumber(exampleCost),
                   currency: configuration.currency,
@@ -195,7 +195,7 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children' | 
             </TableRow>
             <TableRow>
               <TableCell>{t('exampleResultingBalance.label')}</TableCell>
-              <TableCell className={cn(exampleResultingBalance < 0 ? 'text-danger' : 'text-success')}>
+              <TableCell className={cn('whitespace-nowrap text-right', exampleResultingBalance < 0 ? 'text-danger' : 'text-success')}>
                 {t('billingValue', {
                   credits: formatNumber(exampleResultingBalance),
                   currency: configuration.currency,
