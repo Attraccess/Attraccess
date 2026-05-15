@@ -16,24 +16,24 @@ export default defineConfig(({ command }) => {
   root: __dirname,
   cacheDir: '../../node_modules/.vite/apps/frontend',
   server: {
-    port: 4200,
+    port: Number(process.env.VITE_PORT) || 4200,
     host: '0.0.0.0',
     ...(isDev ? {
       proxy: {
         '/api': {
-          target: 'http://localhost:3000',
+          target: process.env.VITE_API_PROXY_TARGET || 'http://localhost:3000',
           changeOrigin: true,
           ws: true,
         },
         '/cdn': {
-          target: 'http://localhost:3000',
+          target: process.env.VITE_API_PROXY_TARGET || 'http://localhost:3000',
           changeOrigin: true,
         },
       },
     } : {}),
   },
   preview: {
-    port: 4300,
+    port: Number(process.env.VITE_PREVIEW_PORT) || 4300,
     host: '0.0.0.0',
   },
   plugins: [
