@@ -1,10 +1,10 @@
-import { Button, Card, CardProps, NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput } from "@heroui/react";
+import { Button, NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput } from "@heroui/react";
 import { PageHeader } from '../../../../components/pageHeader';
 import { HandCoinsIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
-import { useCallback, useState } from 'react';
+import { HTMLAttributes, useCallback, useState } from 'react';
 import {
   useBillingServiceCreateManualTransaction,
   UseBillingServiceGetBillingBalanceKeyFn,
@@ -21,8 +21,8 @@ interface Props {
   userId?: number;
 }
 
-export function ManualTransactionsCard(props: Props & Omit<CardProps, 'children'>) {
-  const { userId, ...cardProps } = props;
+export function ManualTransactionsCard(props: Props & Omit<HTMLAttributes<HTMLElement>, 'children'>) {
+  const { userId, className, ...sectionProps } = props;
   const { t, tExists } = useTranslations({
     en: {
       ...en,
@@ -80,26 +80,22 @@ export function ManualTransactionsCard(props: Props & Omit<CardProps, 'children'
   }, [userId, amount, createManualTransaction, configuration]);
 
   return (
-    <Card {...cardProps}>
-      <Card.Header>
-        <PageHeader title={t('title')} subtitle={t('subtitle')} icon={<HandCoinsIcon />} noMargin />
-      </Card.Header>
+    <section {...sectionProps} className={`w-full flex flex-col gap-4 ${className ?? ''}`}>
+      <PageHeader title={t('title')} subtitle={t('subtitle')} icon={<HandCoinsIcon />} noMargin />
 
-      <Card.Content className="flex flex-col gap-4">
-        <NumberField aria-label={t('inputs.amount')} value={amount} onChange={(value) => setAmount(value)}>
-          <NumberFieldGroup>
-            <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
-            <NumberFieldInput />
-            <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
-          </NumberFieldGroup>
-        </NumberField>
-      </Card.Content>
+      <NumberField aria-label={t('inputs.amount')} value={amount} onChange={(value) => setAmount(value)}>
+        <NumberFieldGroup>
+          <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
+          <NumberFieldInput />
+          <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
+        </NumberFieldGroup>
+      </NumberField>
 
-      <Card.Footer>
+      <div className="flex justify-end">
         <Button variant="primary" onPress={handleCreateTransaction} isPending={isCreatingManualTransaction}>
           {t('actions.createTransaction')}
         </Button>
-      </Card.Footer>
-    </Card>
+      </div>
+    </section>
   );
 }
