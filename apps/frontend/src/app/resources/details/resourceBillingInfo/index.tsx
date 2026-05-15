@@ -1,4 +1,4 @@
-import { Button, Card, CardProps, cn, NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput, Skeleton, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow } from "@heroui/react";
+import { Button, Card, cn, NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput, Skeleton, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow } from "@heroui/react";
 import { CreditCard, Edit2Icon } from 'lucide-react';
 import {
   useBillingServiceGetBillingBalance,
@@ -12,17 +12,19 @@ import de from './de.json';
 import en from './en.json';
 import { PageHeader } from '../../../../components/pageHeader';
 import { ResourceBillingInfoEditor } from './editor';
-import { useEffect, useMemo, useState } from 'react';
+import { HTMLAttributes, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../../../hooks/useAuth';
 import { dbCurrencyToUserCurrency } from '@attraccess/shared';
+import { FlatSection } from '../flatSection';
 
-interface Props {
+interface Props extends Omit<HTMLAttributes<HTMLElement>, 'children'> {
   resourceId: number;
   onExampleAmountChange?: (amount: number) => void;
+  variant?: 'card' | 'flat';
 }
 
-export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) {
-  const { resourceId, onExampleAmountChange, ...cardProps } = props;
+export function ResourceBillingInfo(props: Props) {
+  const { resourceId, onExampleAmountChange, variant = 'card', className, ...htmlProps } = props;
 
   const { t } = useTranslations({ en, de });
   const { data: configuration } = useBillingServiceGetBillingConfiguration();
@@ -118,26 +120,9 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
     return null;
   }
 
-  return (
-    <Card {...cardProps}>
-      <Card.Header className="flex items-center justify-between py-3">
-        <PageHeader
-          title={t('title')}
-          icon={<CreditCard />}
-          actions={
-            <ResourceBillingInfoEditor resourceId={resourceId}>
-              {(onOpen) => (
-                <Button variant="primary" isIconOnly onPress={onOpen} ><Edit2Icon size={12} /></Button>
-              )}
-            </ResourceBillingInfoEditor>
-          }
-          noMargin
-        />
-      </Card.Header>
-
-      <Card.Content>
-        <Table>
-          <TableContent aria-label={t('table.ariaLabel')}>
+  const tableContent = (
+    <Table>
+      <TableContent aria-label={t('table.ariaLabel')}>
           <TableHeader>
             <TableColumn isRowHeader> </TableColumn>
             <TableColumn> </TableColumn>
@@ -145,7 +130,7 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
           <TableBody>
             <TableRow className="border-b-4 border-divider">
               <TableCell>{t('balance.label')}</TableCell>
-              <TableCell className={cn(adjustedBalance < 0 ? 'text-danger' : 'text-success')}>
+              <TableCell className={cn('whitespace-nowrap text-right', adjustedBalance < 0 ? 'text-danger' : 'text-success')}>
                 {t('billingValue', {
                   credits: formatNumber(adjustedBalance),
                   currency: configuration.currency,
@@ -154,13 +139,13 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
             </TableRow>
             <TableRow>
               <TableCell>{t('perUse.label')}</TableCell>
-              <TableCell className="text-warning">
+              <TableCell className="text-warning whitespace-nowrap text-right">
                 {t('billingValue', { credits: formatNumber(creditsPerUsage), currency: configuration.currency })}
               </TableCell>
             </TableRow>
             <TableRow>
               <TableCell>{t('perMinute.label')}</TableCell>
-              <TableCell className="text-warning">
+              <TableCell className="text-warning whitespace-nowrap text-right">
                 {t('billingValue', {
                   credits: formatNumber(creditsPerMinute),
                   currency: configuration.currency,
@@ -171,7 +156,7 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
               resourceBillingConfiguration.additionalItems.map((item) => (
                 <TableRow key={JSON.stringify(item)} id={JSON.stringify(item)}>
                   <TableCell>{item.name}</TableCell>
-                  <TableCell className="text-warning">
+                  <TableCell className="text-warning whitespace-nowrap text-right">
                     {t('billingValue', {
                       credits: formatNumber(
                         dbCurrencyToUserCurrency(item.unitPrice * item.quantity, configuration.minorUnit),
@@ -201,7 +186,7 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
                   </NumberFieldGroup>
                 </NumberField>
               </TableCell>
-              <TableCell>
+              <TableCell className="whitespace-nowrap text-right">
                 {t('billingValue', {
                   credits: formatNumber(exampleCost),
                   currency: configuration.currency,
@@ -211,7 +196,7 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
             </TableRow>
             <TableRow>
               <TableCell>{t('exampleResultingBalance.label')}</TableCell>
-              <TableCell className={cn(exampleResultingBalance < 0 ? 'text-danger' : 'text-success')}>
+              <TableCell className={cn('whitespace-nowrap text-right', exampleResultingBalance < 0 ? 'text-danger' : 'text-success')}>
                 {t('billingValue', {
                   credits: formatNumber(exampleResultingBalance),
                   currency: configuration.currency,
@@ -221,7 +206,42 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
           </TableBody>
           </TableContent>
         </Table>
-      </Card.Content>
+  );
+
+  const editorAction = (
+    <ResourceBillingInfoEditor resourceId={resourceId}>
+      {(onOpen) => (
+        <Button variant="primary" isIconOnly onPress={onOpen}><Edit2Icon size={12} /></Button>
+      )}
+    </ResourceBillingInfoEditor>
+  );
+
+  if (variant === 'flat') {
+    return (
+      <FlatSection
+        icon={<CreditCard className="w-4 h-4" />}
+        title={t('title')}
+        actions={editorAction}
+        className={className}
+        {...htmlProps}
+      >
+        <div className="text-sm">{tableContent}</div>
+      </FlatSection>
+    );
+  }
+
+  return (
+    <Card className={className} {...htmlProps}>
+      <Card.Header className="flex items-center justify-between py-3">
+        <PageHeader
+          title={t('title')}
+          icon={<CreditCard />}
+          actions={editorAction}
+          noMargin
+        />
+      </Card.Header>
+
+      <Card.Content>{tableContent}</Card.Content>
     </Card>
   );
 }
