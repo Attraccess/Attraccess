@@ -57,14 +57,33 @@ This installs Node (via nvm if needed), pnpm, and project deps. You must install
 
 ## Development
 
-Start the api and frontend in development mode (HMR):
+Start the API and frontend in development mode (HMR), with automatic port resolution:
 
 ```bash
-pnpm nx run-many -t serve --projects=api,frontend
+pnpm serve
 ```
 
-The API will be available at `http://localhost:3000`
-and the Frontend at `http://localhost:4200`
+The launcher probes for free ports and prints them at startup. Defaults:
+
+- API: 3000 (searches 3000–3099)
+- Frontend: 4200 (searches 4200–4299)
+- Vite preview: 4300 (searches 4300–4399)
+
+Run only one service:
+
+```bash
+pnpm serve --only=api
+pnpm serve --only=frontend
+```
+
+Pin a specific port (fails loudly if busy):
+
+```bash
+PORT=3010 pnpm serve              # API on 3010
+VITE_PORT=4250 pnpm serve         # Frontend on 4250
+```
+
+The frontend dev proxy automatically targets whichever port the API resolved to (via `VITE_API_PROXY_TARGET`).
 
 ## API Documentation
 
