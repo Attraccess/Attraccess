@@ -1,4 +1,4 @@
-import { Button, Card, CardProps, cn, NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput, Skeleton, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow } from "@heroui/react";
+import { Button, Card, cn, NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput, Skeleton, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow } from "@heroui/react";
 import { CreditCard, Edit2Icon } from 'lucide-react';
 import {
   useBillingServiceGetBillingBalance,
@@ -12,18 +12,19 @@ import de from './de.json';
 import en from './en.json';
 import { PageHeader } from '../../../../components/pageHeader';
 import { ResourceBillingInfoEditor } from './editor';
-import { useEffect, useMemo, useState } from 'react';
+import { HTMLAttributes, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../../../hooks/useAuth';
 import { dbCurrencyToUserCurrency } from '@attraccess/shared';
+import { FlatSection } from '../flatSection';
 
-interface Props {
+interface Props extends Omit<HTMLAttributes<HTMLElement>, 'children'> {
   resourceId: number;
   onExampleAmountChange?: (amount: number) => void;
   variant?: 'card' | 'flat';
 }
 
-export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children' | 'variant'>) {
-  const { resourceId, onExampleAmountChange, variant = 'card', ...cardProps } = props;
+export function ResourceBillingInfo(props: Props) {
+  const { resourceId, onExampleAmountChange, variant = 'card', className, ...htmlProps } = props;
 
   const { t } = useTranslations({ en, de });
   const { data: configuration } = useBillingServiceGetBillingConfiguration();
@@ -217,21 +218,20 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children' | 
 
   if (variant === 'flat') {
     return (
-      <section className={cn('w-full', (cardProps as { className?: string }).className)}>
-        <header className="flex items-center justify-between border-b border-divider pb-2 mb-3">
-          <div className="flex items-center gap-2 text-foreground-700">
-            <CreditCard className="w-4 h-4" />
-            <h3 className="text-xs font-semibold uppercase tracking-wider">{t('title')}</h3>
-          </div>
-          {editorAction}
-        </header>
+      <FlatSection
+        icon={<CreditCard className="w-4 h-4" />}
+        title={t('title')}
+        actions={editorAction}
+        className={className}
+        {...htmlProps}
+      >
         <div className="text-sm">{tableContent}</div>
-      </section>
+      </FlatSection>
     );
   }
 
   return (
-    <Card {...cardProps}>
+    <Card className={className} {...htmlProps}>
       <Card.Header className="flex items-center justify-between py-3">
         <PageHeader
           title={t('title')}

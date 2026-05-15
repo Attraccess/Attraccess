@@ -1,9 +1,9 @@
-import { Button, Card, CardProps, cn, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow } from '@heroui/react';
+import { Button, Card, cn, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow } from '@heroui/react';
 import { PageHeader } from '../../../../components/pageHeader';
 import { MaintenanceReasonDisplay } from '../../../../components/MaintenanceReasonDisplay';
 import { LabeledSwitch } from '../../../../components/labeledSwitch';
 import { ResourceMaintenance, useResourceMaintenancesServiceFindMaintenances } from '@attraccess/react-query-client';
-import { useMemo, useState } from 'react';
+import { HTMLAttributes, useMemo, useState } from 'react';
 import { DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useNavigate } from 'react-router-dom';
 
@@ -14,14 +14,15 @@ import { MarkDoneModal } from './mark-done';
 import { CheckCircleIcon, CogIcon, ConstructionIcon, ExternalLinkIcon, PlusIcon } from 'lucide-react';
 import { useNow } from '../../../../hooks/useNow';
 import { EmptyState } from '../../../../components/emptyState';
+import { FlatSection } from '../flatSection';
 
-interface Props {
+interface Props extends Omit<HTMLAttributes<HTMLElement>, 'children'> {
   resourceId: number;
   variant?: 'card' | 'flat';
 }
 
-export function MaintenanceManagement(props: Props & Omit<CardProps, 'children' | 'variant'>) {
-  const { resourceId, variant = 'card', ...cardProps } = props;
+export function MaintenanceManagement(props: Props) {
+  const { resourceId, variant = 'card', className, ...htmlProps } = props;
 
   const { t } = useTranslations({
     de,
@@ -173,14 +174,13 @@ export function MaintenanceManagement(props: Props & Omit<CardProps, 'children' 
 
   if (variant === 'flat') {
     return (
-      <section className={cn('w-full', (cardProps as { className?: string }).className)}>
-        <header className="flex items-center justify-between gap-2 flex-wrap border-b border-divider pb-2 mb-3">
-          <div className="flex items-center gap-2 text-foreground-700">
-            <ConstructionIcon className="w-4 h-4" />
-            <h3 className="text-xs font-semibold uppercase tracking-wider">{t('title')}</h3>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">{flatActions}</div>
-        </header>
+      <FlatSection
+        icon={<ConstructionIcon className="w-4 h-4" />}
+        title={t('title')}
+        actions={flatActions}
+        className={className}
+        {...htmlProps}
+      >
         {maintenanceWithStatus.length === 0 ? (
           <EmptyState />
         ) : (
@@ -221,12 +221,12 @@ export function MaintenanceManagement(props: Props & Omit<CardProps, 'children' 
             ))}
           </ul>
         )}
-      </section>
+      </FlatSection>
     );
   }
 
   return (
-    <Card {...cardProps}>
+    <Card className={className} {...htmlProps}>
       <Card.Header>
         <PageHeader
           title={t('title')}
