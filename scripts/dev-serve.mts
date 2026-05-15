@@ -12,9 +12,20 @@ interface Resolved {
   previewPort?: number;
 }
 
-function parseArgs(argv: string[]): { only: Target } {
+function parseArgs(argv: string[]): { only: Target; passthroughArgs: string[] } {
   let only: Target = 'both';
-  for (const arg of argv.slice(2)) {
+  const passthroughArgs: string[] = [];
+  const args = argv.slice(2);
+  let sawDelimiter = false;
+  for (const arg of args) {
+    if (sawDelimiter) {
+      passthroughArgs.push(arg);
+      continue;
+    }
+    if (arg === '--') {
+      sawDelimiter = true;
+      continue;
+    }
     const m = arg.match(/^--only=(.+)$/);
     if (m) {
       if (m[1] === 'api' || m[1] === 'frontend' || m[1] === 'both') {
@@ -24,11 +35,11 @@ function parseArgs(argv: string[]): { only: Target } {
       }
     } else if (arg === '--only') {
       throw new Error('--only requires a value: api|frontend|both');
-    } else if (arg.startsWith('--')) {
-      throw new Error(`Unknown flag: ${arg}`);
+    } else {
+      passthroughArgs.push(arg);
     }
   }
-  return { only };
+  return { only, passthroughArgs };
 }
 
 async function resolvePort(envName: string, defaultStart: number, label: string): Promise<number> {
@@ -58,7 +69,7 @@ function banner(r: Resolved): string {
 }
 
 async function main() {
-  const { only } = parseArgs(process.argv);
+  const { only, passthroughArgs } = parseArgs(process.argv);
   const resolved: Resolved = {};
   const childEnv: NodeJS.ProcessEnv = { ...process.env };
 
@@ -81,7 +92,7 @@ async function main() {
   const projects = only === 'both' ? 'api,frontend' : only;
   const child = spawn(
     'pnpm',
-    ['nx', 'run-many', '-t', 'serve', `--projects=${projects}`, '--outputStyle=stream'],
+    ['nx', 'run-many', '-t', 'serve', `--projects=${projects}`, '--outputStyle=stream', ...passthroughArgs],
     { stdio: 'inherit', env: childEnv },
   );
 

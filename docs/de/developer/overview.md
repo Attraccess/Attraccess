@@ -40,7 +40,7 @@ pnpm install
 
 ### 3. Entwicklungsserver starten
 
-Den Port-auflösenden Launcher verwenden:
+Den port-auflösenden Launcher verwenden:
 
 ```bash
 pnpm serve
