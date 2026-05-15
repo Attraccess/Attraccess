@@ -38,23 +38,22 @@ cd Attraccess
 pnpm install
 ```
 
-### 3. Backend starten
+### 3. Entwicklungsserver starten
+
+Den port-auflösenden Launcher verwenden:
 
 ```bash
-pnpm nx serve api
+pnpm serve
 ```
 
-Der API-Server startet standardmäßig unter `http://localhost:3000`. Die Swagger-Dokumentation ist unter `http://localhost:3000/api` verfügbar.
+Der Launcher sucht freie Ports beginnend bei den Standardwerten (API 3000, Frontend 4200, Preview 4300) und gibt sie beim Start aus. Mehrere Instanzen können gleichzeitig laufen, ohne dass Ports manuell konfiguriert werden müssen.
 
-### 4. Frontend starten
+Flags:
 
-In einem separaten Terminal:
+- `--only=api` / `--only=frontend` / `--only=both` (Standard `both`)
+- `PORT=<n>` fixiert den API-Port; `VITE_PORT=<n>` fixiert das Frontend (strikt — bricht ab, falls belegt)
 
-```bash
-pnpm nx serve frontend
-```
-
-Der Frontend-Entwicklungsserver startet unter `http://localhost:4200`. API-Anfragen werden automatisch an das Backend weitergeleitet.
+Der Vite-Dev-Proxy wird automatisch auf den vom Launcher gewählten API-Port konfiguriert.
 
 ## Entwicklungsablauf
 
@@ -71,8 +70,9 @@ Das Repository ist als NX-Monorepo organisiert. Siehe [Architektur](developer/ar
 
 | Befehl | Beschreibung |
 |--------|-------------|
-| `pnpm nx serve api` | Backend im Entwicklungsmodus starten |
-| `pnpm nx serve frontend` | Frontend im Entwicklungsmodus starten |
+| `pnpm serve` | Backend und Frontend mit dem Port-auflösenden Launcher starten |
+| `pnpm serve --only=api` | Nur das Backend starten |
+| `pnpm serve --only=frontend` | Nur das Frontend starten |
 | `pnpm nx test api` | Backend-Tests ausführen |
 | `pnpm nx test frontend` | Frontend-Tests ausführen |
 | `pnpm nx build api` | Backend für Produktion erstellen |

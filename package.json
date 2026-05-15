@@ -3,7 +3,7 @@
   "version": "1.5.2",
   "license": "MIT",
   "scripts": {
-    "serve": "nx run-many -t serve --projects=api,frontend --outputStyle=stream",
+    "serve": "node --experimental-strip-types scripts/dev-serve.mts",
     "lint:strict": "nx affected -t lint -- --max-warnings=0",
     "prepare": "husky",
     "precommit": "pnpm nx affected --uncommitted --nxBail --target=lint,typecheck,build,test,e2e",
