@@ -1,8 +1,8 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Button, Card, Checkbox, Input, Label, Spinner, TextField } from "@heroui/react";
+import { Button, Checkbox, Form, Input, Label, Spinner, TextField } from '@heroui/react';
 import { Select } from '../../../components/select';
 import { LabeledSwitch } from '../../../components/labeledSwitch';
-import { ArrowLeft } from 'lucide-react';
+import { PageHeader } from '../../../components/pageHeader';
 import { PasswordInput } from '../../../components/PasswordInput';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useToastMessage } from '../../../components/toastProvider';
@@ -37,14 +37,12 @@ export function EditMqttServerPage() {
     defaultSubscribeQos: 0,
   });
 
-  // Fetch server details
   const {
     data: server,
     isLoading: isLoadingServer,
     isError,
   } = useMqttServiceMqttServersGetOneById({ id: Number(serverId) });
 
-  // Update form values when server data is loaded
   useEffect(() => {
     if (server) {
       setFormValues({
@@ -81,7 +79,6 @@ export function EditMqttServerPage() {
     },
   });
 
-
   const qosOptions = [0, 1, 2] as const;
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -107,131 +104,154 @@ export function EditMqttServerPage() {
   }
 
   if (isError || !server) {
-    return null; // Navigate happens in onError callback
+    return null;
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
-      <Card data-cy="edit-mqtt-server-page-card">
-        <Card.Header>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Button variant="ghost"
-                isIconOnly
-                onPress={handleCancel}
-                aria-label={t('back')}
-                data-cy="edit-mqtt-server-page-back-button"
-              >
-                <ArrowLeft size={20} />
-              </Button>
-              <h2>{t('editMqttServer')}</h2>
-            </div>
-          </div>
-        </Card.Header>
-        <div style={{ padding: '1rem' }}>
-          <form onSubmit={handleSubmit} className="space-y-6" data-cy="edit-mqtt-server-form">
-            <div className="space-y-4">
-              <TextField value={formValues.name} onChange={(v) => setFormValues((p) => ({ ...p, name: v }))}>
-                <Label>{t('nameLabel')}</Label>
-                <Input id="name" name="name" placeholder={t('namePlaceholder')} required data-cy="edit-mqtt-server-form-name-input" />
-              </TextField>
+    <div className="max-w-7xl mx-auto px-4 py-8" data-cy="edit-mqtt-server-page">
+      <PageHeader title={t('editMqttServer')} onBack={handleCancel} />
 
-              <TextField value={formValues.host} onChange={(v) => setFormValues((p) => ({ ...p, host: v }))}>
-                <Label>{t('hostLabel')}</Label>
-                <Input id="host" name="host" placeholder={t('hostPlaceholder')} required data-cy="edit-mqtt-server-form-host-input" />
-              </TextField>
+      <Form onSubmit={handleSubmit} className="gap-4" data-cy="edit-mqtt-server-form">
+        <TextField
+          value={formValues.name}
+          onChange={(v) => setFormValues((p) => ({ ...p, name: v }))}
+          className="w-full"
+        >
+          <Label>{t('nameLabel')}</Label>
+          <Input
+            id="name"
+            name="name"
+            placeholder={t('namePlaceholder')}
+            required
+            data-cy="edit-mqtt-server-form-name-input"
+          />
+        </TextField>
 
-              <TextField value={String(formValues.port || 1883)} onChange={(v) => setFormValues((p) => ({ ...p, port: parseInt(v, 10) }))}>
-                <Label>{t('portLabel')}</Label>
-                <Input id="port" name="port" type="number" placeholder={t('portPlaceholder')} required data-cy="edit-mqtt-server-form-port-input" />
-              </TextField>
+        <TextField
+          value={formValues.host}
+          onChange={(v) => setFormValues((p) => ({ ...p, host: v }))}
+          className="w-full"
+        >
+          <Label>{t('hostLabel')}</Label>
+          <Input
+            id="host"
+            name="host"
+            placeholder={t('hostPlaceholder')}
+            required
+            data-cy="edit-mqtt-server-form-host-input"
+          />
+        </TextField>
 
-              <TextField value={formValues.clientId} onChange={(v) => setFormValues((p) => ({ ...p, clientId: v }))}>
-                <Label>{t('clientIdLabel')}</Label>
-                <Input id="clientId" name="clientId" placeholder={t('clientIdPlaceholder')} data-cy="edit-mqtt-server-form-client-id-input" />
-              </TextField>
+        <TextField
+          value={String(formValues.port || 1883)}
+          onChange={(v) => setFormValues((p) => ({ ...p, port: parseInt(v, 10) }))}
+          className="w-full"
+        >
+          <Label>{t('portLabel')}</Label>
+          <Input
+            id="port"
+            name="port"
+            type="number"
+            placeholder={t('portPlaceholder')}
+            required
+            data-cy="edit-mqtt-server-form-port-input"
+          />
+        </TextField>
 
-              <TextField value={formValues.username} onChange={(v) => setFormValues((p) => ({ ...p, username: v }))}>
-                <Label>{t('usernameLabel')}</Label>
-                <Input id="username" name="username" placeholder={t('usernamePlaceholder')} data-cy="edit-mqtt-server-form-username-input" />
-              </TextField>
+        <TextField
+          value={formValues.clientId}
+          onChange={(v) => setFormValues((p) => ({ ...p, clientId: v }))}
+          className="w-full"
+        >
+          <Label>{t('clientIdLabel')}</Label>
+          <Input
+            id="clientId"
+            name="clientId"
+            placeholder={t('clientIdPlaceholder')}
+            data-cy="edit-mqtt-server-form-client-id-input"
+          />
+        </TextField>
 
-              <PasswordInput
-                label={t('passwordLabel')}
-                id="password"
-                name="password"
-                placeholder={t('passwordPlaceholder')}
-                value={formValues.password}
-                onChange={(v: string) => setFormValues((p) => ({ ...p, password: v }))}
-                className="w-full"
-                data-cy="edit-mqtt-server-form-password-input"
-                autoComplete="off"
-              />
+        <TextField
+          value={formValues.username}
+          onChange={(v) => setFormValues((p) => ({ ...p, username: v }))}
+          className="w-full"
+        >
+          <Label>{t('usernameLabel')}</Label>
+          <Input
+            id="username"
+            name="username"
+            placeholder={t('usernamePlaceholder')}
+            data-cy="edit-mqtt-server-form-username-input"
+          />
+        </TextField>
 
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="useTls"
-                  name="useTls"
-                  isSelected={formValues.useTls}
-                  onChange={(checked) => setFormValues((prev) => ({ ...prev, useTls: checked }))}
-                  data-cy="edit-mqtt-server-form-use-tls-checkbox"
-                />
-                <label htmlFor="useTls" className="text-sm">
-                  {t('useTls')}
-                </label>
-              </div>
+        <PasswordInput
+          label={t('passwordLabel')}
+          id="password"
+          name="password"
+          placeholder={t('passwordPlaceholder')}
+          value={formValues.password}
+          onChange={(v: string) => setFormValues((p) => ({ ...p, password: v }))}
+          className="w-full"
+          data-cy="edit-mqtt-server-form-password-input"
+          autoComplete="off"
+        />
 
-              <Select
-                label={t('defaultPublishQosLabel')}
-                value={String(formValues.defaultPublishQos ?? 0)}
-                onChange={(key) => {
-                  setFormValues((prev) => ({ ...prev, defaultPublishQos: Number(key) }));
-                }}
-                data-cy="edit-mqtt-server-form-default-publish-qos-input"
-                items={qosOptions.map((option) => ({ key: String(option), label: t(`qosOption.${option}`) }))}
-              />
+        <Checkbox
+          id="useTls"
+          name="useTls"
+          isSelected={formValues.useTls}
+          onChange={(checked) => setFormValues((prev) => ({ ...prev, useTls: checked }))}
+          data-cy="edit-mqtt-server-form-use-tls-checkbox"
+        >
+          {t('useTls')}
+        </Checkbox>
 
-              <div className="flex items-center space-x-2">
-                <LabeledSwitch
-                  id="defaultPublishRetain"
-                  name="defaultPublishRetain"
-                  isSelected={!!formValues.defaultPublishRetain}
-                  onChange={(checked) => setFormValues((prev) => ({ ...prev, defaultPublishRetain: checked }))}
-                  data-cy="edit-mqtt-server-form-default-publish-retain-checkbox"
-                >
-                  {t('defaultPublishRetainLabel')}
-                </LabeledSwitch>
-              </div>
+        <Select
+          label={t('defaultPublishQosLabel')}
+          value={String(formValues.defaultPublishQos ?? 0)}
+          onChange={(key) => {
+            setFormValues((prev) => ({ ...prev, defaultPublishQos: Number(key) }));
+          }}
+          data-cy="edit-mqtt-server-form-default-publish-qos-input"
+          items={qosOptions.map((option) => ({ key: String(option), label: t(`qosOption.${option}`) }))}
+        />
 
-              <Select
-                label={t('defaultSubscribeQosLabel')}
-                value={String(formValues.defaultSubscribeQos ?? 0)}
-                onChange={(key) => {
-                  setFormValues((prev) => ({ ...prev, defaultSubscribeQos: Number(key) }));
-                }}
-                data-cy="edit-mqtt-server-form-default-subscribe-qos-input"
-                items={qosOptions.map((option) => ({ key: String(option), label: t(`qosOption.${option}`) }))}
-              />
-            </div>
+        <LabeledSwitch
+          id="defaultPublishRetain"
+          name="defaultPublishRetain"
+          isSelected={!!formValues.defaultPublishRetain}
+          onChange={(checked) => setFormValues((prev) => ({ ...prev, defaultPublishRetain: checked }))}
+          data-cy="edit-mqtt-server-form-default-publish-retain-checkbox"
+        >
+          {t('defaultPublishRetainLabel')}
+        </LabeledSwitch>
 
-            <div className="flex justify-end space-x-3">
-              <Button variant="secondary"
-                onPress={handleCancel}
-                data-cy="edit-mqtt-server-form-cancel-button"
-              >
-                {t('cancel')}
-              </Button>
-              <Button variant="primary"
-                type="submit"
-                isPending={updateMqttServer.isPending}
-                data-cy="edit-mqtt-server-form-update-button"
-              >
-                {t('update')}
-              </Button>
-            </div>
-          </form>
+        <Select
+          label={t('defaultSubscribeQosLabel')}
+          value={String(formValues.defaultSubscribeQos ?? 0)}
+          onChange={(key) => {
+            setFormValues((prev) => ({ ...prev, defaultSubscribeQos: Number(key) }));
+          }}
+          data-cy="edit-mqtt-server-form-default-subscribe-qos-input"
+          items={qosOptions.map((option) => ({ key: String(option), label: t(`qosOption.${option}`) }))}
+        />
+
+        <div className="flex justify-end space-x-3 mt-4 w-full">
+          <Button variant="secondary" onPress={handleCancel} data-cy="edit-mqtt-server-form-cancel-button">
+            {t('cancel')}
+          </Button>
+          <Button
+            variant="primary"
+            type="submit"
+            isPending={updateMqttServer.isPending}
+            data-cy="edit-mqtt-server-form-update-button"
+          >
+            {t('update')}
+          </Button>
         </div>
-      </Card>
+      </Form>
     </div>
   );
 }
