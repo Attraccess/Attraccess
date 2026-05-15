@@ -49,16 +49,16 @@ Die Sitzungssicherheit wird ueber Umgebungsvariablen gesteuert:
 - Erzeugen Sie bei der Ersteinrichtung einen starken `AUTH_SESSION_SECRET` und bewahren Sie ihn sicher auf.
 - Passen Sie `SESSION_COOKIE_MAX_AGE` an Ihre Sicherheitsanforderungen an. Kuerzere Dauern sind sicherer, erfordern aber haeufigeres Anmelden.
 
-## Auth-Rate-Limiting und Konto-Sperre
+## Drosselung und Kontosperre
 
-Fehlgeschlagene Auth-Versuche bei Login, Registrierung und Passwort-Reset werden pro IP gedrosselt. Wiederholte Login-Fehlversuche sperren zusaetzlich das betroffene Konto. Werte sind unter **Einstellungen -> Auth-Rate-Limiting** einstellbar.
+Fehlgeschlagene Anmeldungen, Registrierungen und Passwort-Zuruecksetzungen werden pro IP gedrosselt. Wiederholte Login-Fehlversuche sperren zusaetzlich das betroffene Konto. Werte sind unter **Einstellungen -> Drosselung & Kontosperre** einstellbar.
 
 | Einstellung | Standard | Beschreibung |
 |-------------|----------|-------------|
 | `maxAttempts` | `5` | Erlaubte Fehlversuche pro Zeitfenster, bevor Drosselung oder Sperre greift. |
 | `windowSeconds` | `900` | Zeitfenster fuer das Zaehlen der Fehlversuche. |
 | `lockoutDurationSeconds` | `900` | Grundsperrdauer. |
-| `exponentialBackoff` | `false` | Wenn `true`, waechst die Sperre bei jeder Wiederholung um `backoffMultiplier`. |
+| `exponentialBackoff` | `false` | Wenn `true`, waechst die Sperrdauer bei jeder Wiederholung um den Faktor `backoffMultiplier`. |
 | `backoffMultiplier` | `2` | Multiplikator fuer die Sperrdauer bei wiederholten Sperren. |
 
 Antworten bei Auslosen:
@@ -68,9 +68,9 @@ Antworten bei Auslosen:
 
 Erfolgreicher Login oder Admin-Unlock entsperrt das Konto. Admin-Unlock erfolgt ueber die Benutzerverwaltung.
 
-## Auth-Audit-Log-Format
+## Format des Anmelde-Audit-Logs
 
-Jeder Auth-Versuch erzeugt eine einzeilige, leerzeichengetrennte Log-Zeile unter dem `AuthAudit`-Kontext. Feldnamen und Reihenfolge sind stabil und fail2ban-freundlich.
+Jeder Anmeldeversuch erzeugt eine einzeilige, leerzeichengetrennte Log-Zeile im `AuthAudit`-Kontext. Feldnamen und Reihenfolge sind stabil und fail2ban-tauglich.
 
 ```
 auth.failed type=login outcome=invalid_credentials ip=1.2.3.4 user_id=42 username=alice ts=2026-05-15T12:34:56.000Z reason=bad_password

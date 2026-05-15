@@ -1,5 +1,5 @@
 {
-  "loading": "Rate-Limit-Einstellungen werden geladen…",
+  "loading": "Einstellungen werden geladen…",
   "description": "Drossle fehlgeschlagene Anmeldeversuche pro IP und sperre Konten nach mehrfachen Fehlversuchen.",
   "fields": {
     "maxAttempts": {
@@ -15,17 +15,17 @@
       "description": "Grundsperrdauer beim Erreichen der Schwelle."
     },
     "exponentialBackoff": {
-      "label": "Exponentielles Backoff",
-      "description": "Sperre bei wiederholten Lockouts exponentiell verlängern."
+      "label": "Exponentielle Verlängerung",
+      "description": "Sperre bei wiederholten Sperren exponentiell verlängern."
     },
     "backoffMultiplier": {
-      "label": "Backoff-Multiplikator",
-      "description": "Multiplikator für die Sperrdauer, wenn exponentielles Backoff aktiv ist."
+      "label": "Verlängerungs-Multiplikator",
+      "description": "Multiplikator für die Sperrdauer, wenn die exponentielle Verlängerung aktiv ist."
     }
   },
   "saveButton": "Speichern",
   "saved": {
-    "title": "Rate-Limit-Einstellungen gespeichert",
+    "title": "Einstellungen gespeichert",
     "description": "Neue Schwellen gelten sofort."
   },
   "error": {
