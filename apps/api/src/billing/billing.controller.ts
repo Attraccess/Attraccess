@@ -41,6 +41,7 @@ import { SumUpConfigurationDto } from './dto/sumup/sumup-configuration.dto';
 import { ResourceBillingConfigurationDto } from './dto/resource-billing-configuration.dto';
 import { ResourceFlowsService } from '../resources/flows/resource-flows.service';
 import { RefundTransactionDto } from './dto/refund-transaction.dto';
+import { SseInstrumentation } from '../metrics/instrumentation/sse/sse.helper';
 
 @ApiTags('Billing')
 @Controller()
@@ -52,6 +53,7 @@ export class BillingController {
     private readonly sumUpService: SumUpService,
     private readonly liveNotificationsService: LiveNotificationsService,
     private readonly flowsService: ResourceFlowsService,
+    private readonly sse: SseInstrumentation,
   ) {}
 
   @Get('/users/:userId/billing/balance')
@@ -279,7 +281,7 @@ export class BillingController {
     const subject = this.liveNotificationsService.getTransactionSubject(request.user.id);
 
     // Create an observable from the subject
-    return subject.asObservable();
+    return this.sse.wrap('billing', subject.asObservable());
   }
 
   @Post('/billing/transactions/:transactionId/refund')

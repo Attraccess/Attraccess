@@ -47,5 +47,52 @@
     "grafanaTitle": "Grafana-Einrichtung",
     "grafanaDescription": "Füge in Grafana eine Prometheus-Datenquelle hinzu, die auf deinen Prometheus-Server zeigt (z. B. http://prometheus:9090). Die Metriken sind automatisch verfügbar, sobald Prometheus den obigen Endpunkt abfragt."
   },
+  "slowQueryThreshold": {
+    "title": "Schwellwert für langsame Queries",
+    "description": "DB-Queries über dieser Dauer werden als langsam gezählt.",
+    "label": "Schwellwert (Sekunden)",
+    "savedTitle": "Schwellwert gespeichert",
+    "savedDescription": "Schwellwert für langsame Queries aktualisiert. Änderungen werden innerhalb weniger Sekunden wirksam.",
+    "errorTitle": "Speichern fehlgeschlagen",
+    "errorDescription": "Schwellwert konnte nicht aktualisiert werden. Bitte versuche es erneut.",
+    "saveButton": "Speichern"
+  },
+  "toggles": {
+    "title": "Timing-Metriken pro Subsystem",
+    "description": "Aktiviere oder deaktiviere die Timing-Instrumentierung einzelner Subsysteme. Deaktivierte Subsysteme stellen das Schreiben ihrer Histogramm- und Counter-Serien ein.",
+    "highCostBadge": "Hohe Last",
+    "savedTitle": "Schalter gespeichert",
+    "savedDescription": "Metrik-Schalter aktualisiert. Änderungen werden innerhalb weniger Sekunden wirksam.",
+    "errorTitle": "Speichern fehlgeschlagen",
+    "errorDescription": "Der Metrik-Schalter konnte nicht aktualisiert werden. Bitte versuche es erneut.",
+    "http": {
+      "label": "HTTP-Anfrage-Timing",
+      "description": "Erfasst Latenz und Anfragenzähler je Route."
+    },
+    "ws": {
+      "label": "WebSocket-Nachrichten-Timing",
+      "description": "Erfasst die Handler-Dauer je Event sowie die Verbindungs-Lebensdauer."
+    },
+    "cron": {
+      "label": "Cron-Job-Timing",
+      "description": "Erfasst Laufzeit sowie Erfolg/Fehler geplanter Jobs."
+    },
+    "db": {
+      "label": "Datenbank-Query-Timing",
+      "description": "Hohe Kardinalität — standardmäßig deaktiviert. Nur auf Installationen aktivieren, deren Monitoring-Infrastruktur die zusätzlichen Zeitreihen verarbeiten kann."
+    },
+    "external": {
+      "label": "Externe-Aufruf-Timing",
+      "description": "Erfasst SumUp, SMTP, MQTT und weitere ausgehende Integrationen."
+    },
+    "sse": {
+      "label": "Server-Sent Events",
+      "description": "Erfasst aktive SSE-Verbindungen, Nachrichtenrate und Verbindungs-Lebensdauer."
+    },
+    "flow": {
+      "label": "Ressourcen-Flow-Ausführung",
+      "description": "Erfasst die Ausführungsdauer von Flows und Nodes."
+    }
+  },
   "doneButton": "Fertig"
 }

@@ -10,6 +10,22 @@
  * ---------------------------------------------------------------
  */
 
+export enum ResourceHealthSource {
+  Payload = "payload",
+  Heartbeat = "heartbeat",
+  Manual = "manual",
+}
+
+export enum ResourceHealthStatus {
+  Healthy = "healthy",
+  Unhealthy = "unhealthy",
+}
+
+export enum ResourceFlowVariableScope {
+  Resource = "resource",
+  Global = "global",
+}
+
 /** The type of the log entry */
 export enum ResourceFlowLogType {
   FlowStart = "flow.start",
@@ -30,6 +46,7 @@ export enum ResourceFlowNodeType {
   InputResourceDoorUnlatched = "input.resource.door.unlatched",
   InputMqttMessageReceived = "input.mqtt.message.received",
   InputResourceActivityNoActivity = "input.resource.activity.no-activity",
+  InputVariableChanged = "input.variable.changed",
   OutputHttpSendRequest = "output.http.sendRequest",
   OutputMqttSendMessage = "output.mqtt.sendMessage",
   OutputResourceBillingCalculationSetAdditionalItems = "output.resource.billing.calculation.set-additional-items",
@@ -40,6 +57,10 @@ export enum ResourceFlowNodeType {
   ProcessingSetPayload = "processing.set-payload",
   ProcessingMqttWaitForMessage = "processing.mqtt.waitForMessage",
   ProcessingError = "processing.error",
+  ProcessingVariablesSet = "processing.variables.set",
+  ProcessingVariablesGet = "processing.variables.get",
+  OutputResourceHealthHeartbeat = "output.resource.health.heartbeat",
+  OutputResourceHealthSet = "output.resource.health.set",
 }
 
 export enum SumUpReaderStatus {
@@ -138,6 +159,7 @@ export enum EmailTemplateType {
   ResourceUsageBillingTransactionSummary = "resource-usage-billing-transaction-summary",
   ProjectInvitation = "project-invitation",
   DeleteAccountConfirmation = "delete-account-confirmation",
+  ResourceHealthChanged = "resource-health-changed",
 }
 
 /** The type of the provider */
@@ -176,8 +198,8 @@ export interface CreateUserDto {
    */
   email: string;
   /**
-   * The password for the new user
-   * @example "password123"
+   * The password for the new user (validated server-side against the active password policy)
+   * @example "correct-horse-battery-staple-42"
    */
   password: string;
   /**
@@ -570,8 +592,8 @@ export interface SSOProviderOIDCConfiguration {
    */
   clientSecret: string;
   /**
-   * Optional list of OIDC scopes to request
-   * @example ["openid","email","profile"]
+   * Optional list of OIDC scopes to request. The `openid` scope is added automatically and does not need to be listed here.
+   * @example ["email","profile"]
    */
   scopes?: string[];
   /**
@@ -1227,9 +1249,57 @@ export interface FirstTimeSetupStatusDto {
   stepsCompleted: FirstTimeSetupStepsDto;
 }
 
+export interface MetricsTogglesDto {
+  /** Whether HTTP request timing metrics are enabled */
+  http: boolean;
+  /** Whether WebSocket message timing metrics are enabled */
+  ws: boolean;
+  /** Whether cron job timing metrics are enabled */
+  cron: boolean;
+  /** Whether database query timing metrics are enabled (high cardinality) */
+  db: boolean;
+  /** Whether external call timing metrics are enabled */
+  external: boolean;
+  /** Whether Server-Sent Events metrics are enabled */
+  sse: boolean;
+  /** Whether resource flow execution metrics are enabled */
+  flow: boolean;
+}
+
 export interface MetricsSettingsDto {
   /** Whether a metrics API key is configured */
   apiKeyConfigured: boolean;
+  /** Per-subsystem metrics timing toggles */
+  toggles: MetricsTogglesDto;
+  /** Threshold above which a DB query is counted as slow (in seconds). */
+  slowQueryThresholdSeconds: number;
+}
+
+export interface UpdateMetricsTogglesDto {
+  /** Whether HTTP request timing metrics are enabled */
+  http?: boolean;
+  /** Whether WebSocket message timing metrics are enabled */
+  ws?: boolean;
+  /** Whether cron job timing metrics are enabled */
+  cron?: boolean;
+  /** Whether database query timing metrics are enabled (high cardinality) */
+  db?: boolean;
+  /** Whether external call timing metrics are enabled */
+  external?: boolean;
+  /** Whether Server-Sent Events metrics are enabled */
+  sse?: boolean;
+  /** Whether resource flow execution metrics are enabled */
+  flow?: boolean;
+}
+
+export interface UpdateMetricsSettingsDto {
+  /** Per-subsystem metrics toggles update */
+  toggles?: UpdateMetricsTogglesDto;
+  /**
+   * Threshold above which a DB query is counted as slow (in seconds).
+   * @min 0
+   */
+  slowQueryThresholdSeconds?: number;
 }
 
 export interface GenerateMetricsApiKeyResponseDto {
@@ -1237,6 +1307,59 @@ export interface GenerateMetricsApiKeyResponseDto {
   apiKeyConfigured: boolean;
   /** The generated API key (shown only once) */
   apiKey: string;
+}
+
+export interface AuthRateLimitSettingsDto {
+  /**
+   * Max failed attempts within the window before lockout
+   * @example 5
+   */
+  maxAttempts: number;
+  /**
+   * Sliding window length, in seconds, for counting attempts
+   * @example 900
+   */
+  windowSeconds: number;
+  /**
+   * Base lockout duration in seconds after the threshold is reached
+   * @example 900
+   */
+  lockoutDurationSeconds: number;
+  /**
+   * Whether to extend lockout exponentially on repeat lockouts
+   * @example false
+   */
+  exponentialBackoff: boolean;
+  /**
+   * Multiplier applied to lockout duration when exponentialBackoff is on
+   * @example 2
+   */
+  backoffMultiplier: number;
+}
+
+export interface UpdateAuthRateLimitSettingsDto {
+  /**
+   * Max failed attempts within the window before lockout
+   * @example 5
+   */
+  maxAttempts?: number;
+  /**
+   * Sliding window length, in seconds
+   * @example 900
+   */
+  windowSeconds?: number;
+  /**
+   * Base lockout duration in seconds
+   * @example 900
+   */
+  lockoutDurationSeconds?: number;
+  /** Whether to extend lockout exponentially on repeat lockouts */
+  exponentialBackoff?: boolean;
+  /**
+   * Multiplier applied to lockout duration
+   * @example 2
+   */
+  backoffMultiplier?: number;
 }
 
 export interface LicenseDataDto {
@@ -1253,6 +1376,28 @@ export interface LicenseDataDto {
   usageLimits: Record<string, any>;
   /** Are you using this software for free as a non-profit? */
   isNonProfit: boolean;
+}
+
+export interface PublicPasswordPolicyDto {
+  /** @example 12 */
+  minLength: number;
+  /** @example 128 */
+  maxLength: number;
+  /** @example true */
+  allowAllUnicode: boolean;
+  /** @example false */
+  requireUppercase: boolean;
+  /** @example false */
+  requireLowercase: boolean;
+  /** @example false */
+  requireDigit: boolean;
+  /** @example false */
+  requireSpecial: boolean;
+  /**
+   * Minimum required zxcvbn score (0-4)
+   * @example 3
+   */
+  minZxcvbnScore: number;
 }
 
 export interface CreateResourceDto {
@@ -2904,6 +3049,69 @@ export interface ResourceFlowNode {
   resource?: Resource;
 }
 
+export interface FlowVariableDto {
+  id: number;
+  scope: ResourceFlowVariableScope;
+  resourceId: number | null;
+  key: string;
+  /** Parsed JSON value */
+  value: object;
+  valueType: object;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+}
+
+export interface FlowVariableUpsertDto {
+  /** Any JSON value */
+  value: object;
+}
+
+export interface ResourceHealthStateDto {
+  /**
+   * The health record id
+   * @example 1
+   */
+  id: number;
+  /**
+   * The resource ID this state belongs to
+   * @example 1
+   */
+  resourceId: number;
+  /**
+   * Identifier for the source reporting health (empty for the resource default).
+   * @example "Shelly"
+   */
+  identifier: string;
+  status: ResourceHealthStatus;
+  /** @example "not connected" */
+  reason?: string | null;
+  source: ResourceHealthSource;
+  /**
+   * When the state was last reported
+   * @format date-time
+   */
+  lastReportedAt: string;
+}
+
+export interface ResourceHealthSummaryDto {
+  /**
+   * The resource ID
+   * @example 1
+   */
+  resourceId: number;
+  /**
+   * Whether the resource is currently considered healthy
+   * @example true
+   */
+  isHealthy: boolean;
+  /** Individual health state entries (one per identifier). Empty if no entries exist yet. */
+  entries: ResourceHealthStateDto[];
+  /** Subset of entries that are unhealthy (convenience for clients showing warnings). */
+  unhealthyEntries: ResourceHealthStateDto[];
+}
+
 export interface ProjectAccessInfoDto {
   /** Whether the authenticated user owns the project */
   isOwner: boolean;
@@ -3956,11 +4164,19 @@ export type ApplyFirstTimeSetupSettingsData = SystemSettingsDto;
 
 export type GetMetricsSettingsData = MetricsSettingsDto;
 
+export type UpdateMetricsSettingsData = MetricsSettingsDto;
+
 export type GenerateMetricsApiKeyData = GenerateMetricsApiKeyResponseDto;
 
 export type DeleteMetricsApiKeyData = MetricsSettingsDto;
 
+export type GetAuthRateLimitSettingsData = AuthRateLimitSettingsDto;
+
+export type UpdateAuthRateLimitSettingsData = AuthRateLimitSettingsDto;
+
 export type GetLicenseInformationData = LicenseDataDto;
+
+export type GetPublicPasswordPolicyData = PublicPasswordPolicyDto;
 
 export type CreateOneResourceData = Resource;
 
@@ -4574,6 +4790,41 @@ export interface GetButtonsParams {
 }
 
 export type GetButtonsData = ResourceFlowNode[];
+
+export interface ListFlowVariablesParams {
+  resourceId: number;
+}
+
+export type ListFlowVariablesData = FlowVariableDto[];
+
+export interface UpsertFlowVariableParams {
+  resourceId: number;
+  key: string;
+  scope: ResourceFlowVariableScope;
+}
+
+export type UpsertFlowVariableData = any;
+
+export interface DeleteFlowVariableParams {
+  resourceId: number;
+  key: string;
+  scope: ResourceFlowVariableScope;
+}
+
+export type DeleteFlowVariableData = any;
+
+export interface GetResourceHealthParams {
+  resourceId: number;
+}
+
+export type GetResourceHealthData = ResourceHealthSummaryDto;
+
+export interface ClearResourceHealthEntryParams {
+  resourceId: number;
+  entryId: number;
+}
+
+export type ClearResourceHealthEntryData = any;
 
 export interface FindManyProjectsParams {
   /**
@@ -6086,6 +6337,22 @@ export namespace Settings {
   /**
    * No description
    * @tags Settings
+   * @name UpdateMetricsSettings
+   * @summary Update metrics settings
+   * @request PATCH:/api/settings/metrics
+   * @secure
+   */
+  export namespace UpdateMetricsSettings {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = UpdateMetricsSettingsDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = UpdateMetricsSettingsData;
+  }
+
+  /**
+   * No description
+   * @tags Settings
    * @name GenerateMetricsApiKey
    * @summary Generate a new metrics API key
    * @request POST:/api/settings/metrics/generate-api-key
@@ -6114,6 +6381,38 @@ export namespace Settings {
     export type RequestHeaders = {};
     export type ResponseBody = DeleteMetricsApiKeyData;
   }
+
+  /**
+   * No description
+   * @tags Settings
+   * @name GetAuthRateLimitSettings
+   * @summary Get auth rate-limit settings
+   * @request GET:/api/settings/auth/rate-limit
+   * @secure
+   */
+  export namespace GetAuthRateLimitSettings {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetAuthRateLimitSettingsData;
+  }
+
+  /**
+   * No description
+   * @tags Settings
+   * @name UpdateAuthRateLimitSettings
+   * @summary Update auth rate-limit settings
+   * @request PATCH:/api/settings/auth/rate-limit
+   * @secure
+   */
+  export namespace UpdateAuthRateLimitSettings {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = UpdateAuthRateLimitSettingsDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = UpdateAuthRateLimitSettingsData;
+  }
 }
 
 export namespace License {
@@ -6131,6 +6430,23 @@ export namespace License {
     export type RequestBody = never;
     export type RequestHeaders = {};
     export type ResponseBody = GetLicenseInformationData;
+  }
+}
+
+export namespace PasswordPolicy {
+  /**
+   * No description
+   * @tags Password Policy
+   * @name GetPublicPasswordPolicy
+   * @summary Get the public password policy
+   * @request GET:/api/password-policy/public
+   */
+  export namespace GetPublicPasswordPolicy {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetPublicPasswordPolicyData;
   }
 }
 
@@ -7681,6 +7997,105 @@ export namespace ResourceFlows {
     export type RequestBody = never;
     export type RequestHeaders = {};
     export type ResponseBody = GetButtonsData;
+  }
+}
+
+export namespace FlowVariables {
+  /**
+   * No description
+   * @tags Flow Variables
+   * @name ListFlowVariables
+   * @summary List flow variables for a resource
+   * @request GET:/api/resources/{resourceId}/flow-variables
+   * @secure
+   */
+  export namespace ListFlowVariables {
+    export type RequestParams = {
+      resourceId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = ListFlowVariablesData;
+  }
+
+  /**
+   * No description
+   * @tags Flow Variables
+   * @name UpsertFlowVariable
+   * @summary Upsert a flow variable
+   * @request PUT:/api/resources/{resourceId}/flow-variables/{scope}/{key}
+   * @secure
+   */
+  export namespace UpsertFlowVariable {
+    export type RequestParams = {
+      resourceId: number;
+      key: string;
+      scope: ResourceFlowVariableScope;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = FlowVariableUpsertDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = UpsertFlowVariableData;
+  }
+
+  /**
+   * No description
+   * @tags Flow Variables
+   * @name DeleteFlowVariable
+   * @summary Delete a flow variable
+   * @request DELETE:/api/resources/{resourceId}/flow-variables/{scope}/{key}
+   * @secure
+   */
+  export namespace DeleteFlowVariable {
+    export type RequestParams = {
+      resourceId: number;
+      key: string;
+      scope: ResourceFlowVariableScope;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = DeleteFlowVariableData;
+  }
+}
+
+export namespace ResourceHealth {
+  /**
+   * @description Returns the current health state for the resource, including any per-source entries (e.g. heartbeat, payload-derived). Resources without any health-related flow nodes are reported as healthy.
+   * @tags Resource Health
+   * @name GetResourceHealth
+   * @summary Get health summary for a resource
+   * @request GET:/api/resources/{resourceId}/health
+   * @secure
+   */
+  export namespace GetResourceHealth {
+    export type RequestParams = {
+      resourceId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetResourceHealthData;
+  }
+
+  /**
+   * @description Deletes a single health state entry. Use this to clear a stuck unhealthy state when the originating flow node was deleted or its identifier changed. Requires maintenance management permission.
+   * @tags Resource Health
+   * @name ClearResourceHealthEntry
+   * @summary Clear a health entry (manually mark healthy)
+   * @request DELETE:/api/resources/{resourceId}/health/entries/{entryId}
+   * @secure
+   */
+  export namespace ClearResourceHealthEntry {
+    export type RequestParams = {
+      resourceId: number;
+      entryId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = ClearResourceHealthEntryData;
   }
 }
 
@@ -10147,6 +10562,29 @@ export class Api<
      * No description
      *
      * @tags Settings
+     * @name UpdateMetricsSettings
+     * @summary Update metrics settings
+     * @request PATCH:/api/settings/metrics
+     * @secure
+     */
+    updateMetricsSettings: (
+      data: UpdateMetricsSettingsDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<UpdateMetricsSettingsData, void>({
+        path: `/api/settings/metrics`,
+        method: "PATCH",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Settings
      * @name GenerateMetricsApiKey
      * @summary Generate a new metrics API key
      * @request POST:/api/settings/metrics/generate-api-key
@@ -10178,6 +10616,47 @@ export class Api<
         format: "json",
         ...params,
       }),
+
+    /**
+     * No description
+     *
+     * @tags Settings
+     * @name GetAuthRateLimitSettings
+     * @summary Get auth rate-limit settings
+     * @request GET:/api/settings/auth/rate-limit
+     * @secure
+     */
+    getAuthRateLimitSettings: (params: RequestParams = {}) =>
+      this.request<GetAuthRateLimitSettingsData, void>({
+        path: `/api/settings/auth/rate-limit`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Settings
+     * @name UpdateAuthRateLimitSettings
+     * @summary Update auth rate-limit settings
+     * @request PATCH:/api/settings/auth/rate-limit
+     * @secure
+     */
+    updateAuthRateLimitSettings: (
+      data: UpdateAuthRateLimitSettingsDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<UpdateAuthRateLimitSettingsData, void>({
+        path: `/api/settings/auth/rate-limit`,
+        method: "PATCH",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
   };
   license = {
     /**
@@ -10194,6 +10673,23 @@ export class Api<
         path: `/api/license-data`,
         method: "GET",
         secure: true,
+        format: "json",
+        ...params,
+      }),
+  };
+  passwordPolicy = {
+    /**
+     * No description
+     *
+     * @tags Password Policy
+     * @name GetPublicPasswordPolicy
+     * @summary Get the public password policy
+     * @request GET:/api/password-policy/public
+     */
+    getPublicPasswordPolicy: (params: RequestParams = {}) =>
+      this.request<GetPublicPasswordPolicyData, any>({
+        path: `/api/password-policy/public`,
+        method: "GET",
         format: "json",
         ...params,
       }),
@@ -11843,6 +12339,113 @@ export class Api<
         method: "GET",
         secure: true,
         format: "json",
+        ...params,
+      }),
+  };
+  flowVariables = {
+    /**
+     * No description
+     *
+     * @tags Flow Variables
+     * @name ListFlowVariables
+     * @summary List flow variables for a resource
+     * @request GET:/api/resources/{resourceId}/flow-variables
+     * @secure
+     */
+    listFlowVariables: (
+      { resourceId }: ListFlowVariablesParams,
+      params: RequestParams = {},
+    ) =>
+      this.request<ListFlowVariablesData, void>({
+        path: `/api/resources/${resourceId}/flow-variables`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Flow Variables
+     * @name UpsertFlowVariable
+     * @summary Upsert a flow variable
+     * @request PUT:/api/resources/{resourceId}/flow-variables/{scope}/{key}
+     * @secure
+     */
+    upsertFlowVariable: (
+      { resourceId, key, scope }: UpsertFlowVariableParams,
+      data: FlowVariableUpsertDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<UpsertFlowVariableData, void>({
+        path: `/api/resources/${resourceId}/flow-variables/${scope}/${key}`,
+        method: "PUT",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Flow Variables
+     * @name DeleteFlowVariable
+     * @summary Delete a flow variable
+     * @request DELETE:/api/resources/{resourceId}/flow-variables/{scope}/{key}
+     * @secure
+     */
+    deleteFlowVariable: (
+      { resourceId, key, scope }: DeleteFlowVariableParams,
+      params: RequestParams = {},
+    ) =>
+      this.request<DeleteFlowVariableData, void>({
+        path: `/api/resources/${resourceId}/flow-variables/${scope}/${key}`,
+        method: "DELETE",
+        secure: true,
+        ...params,
+      }),
+  };
+  resourceHealth = {
+    /**
+     * @description Returns the current health state for the resource, including any per-source entries (e.g. heartbeat, payload-derived). Resources without any health-related flow nodes are reported as healthy.
+     *
+     * @tags Resource Health
+     * @name GetResourceHealth
+     * @summary Get health summary for a resource
+     * @request GET:/api/resources/{resourceId}/health
+     * @secure
+     */
+    getResourceHealth: (
+      { resourceId }: GetResourceHealthParams,
+      params: RequestParams = {},
+    ) =>
+      this.request<GetResourceHealthData, void>({
+        path: `/api/resources/${resourceId}/health`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description Deletes a single health state entry. Use this to clear a stuck unhealthy state when the originating flow node was deleted or its identifier changed. Requires maintenance management permission.
+     *
+     * @tags Resource Health
+     * @name ClearResourceHealthEntry
+     * @summary Clear a health entry (manually mark healthy)
+     * @request DELETE:/api/resources/{resourceId}/health/entries/{entryId}
+     * @secure
+     */
+    clearResourceHealthEntry: (
+      { resourceId, entryId }: ClearResourceHealthEntryParams,
+      params: RequestParams = {},
+    ) =>
+      this.request<ClearResourceHealthEntryData, void>({
+        path: `/api/resources/${resourceId}/health/entries/${entryId}`,
+        method: "DELETE",
+        secure: true,
         ...params,
       }),
   };

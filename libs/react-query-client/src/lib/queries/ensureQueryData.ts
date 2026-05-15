@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { type QueryClient } from "@tanstack/react-query";
-import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, FlowVariablesService, LicenseService, MqttService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceHealthService, ResourceMaintenanceSchedulesService, ResourceMaintenancesService, ResourcesService, SettingsService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
+import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, FlowVariablesService, LicenseService, MqttService, PasswordPolicyService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceHealthService, ResourceMaintenanceSchedulesService, ResourceMaintenancesService, ResourcesService, SettingsService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
 import { EmailTemplateType, PermissionFilter } from "../requests/types.gen";
 import * as Common from "./common";
 /**
@@ -239,11 +239,23 @@ export const ensureUseSettingsServiceGetFirstTimeSetupStatusData = (queryClient:
 */
 export const ensureUseSettingsServiceGetMetricsSettingsData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseSettingsServiceGetMetricsSettingsKeyFn(), queryFn: () => SettingsService.getMetricsSettings() });
 /**
+* Get auth rate-limit settings
+* @returns AuthRateLimitSettingsDto Current auth rate-limit settings.
+* @throws ApiError
+*/
+export const ensureUseSettingsServiceGetAuthRateLimitSettingsData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseSettingsServiceGetAuthRateLimitSettingsKeyFn(), queryFn: () => SettingsService.getAuthRateLimitSettings() });
+/**
 * Get license information
 * @returns LicenseDataDto The current license data.
 * @throws ApiError
 */
 export const ensureUseLicenseServiceGetLicenseInformationData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseLicenseServiceGetLicenseInformationKeyFn(), queryFn: () => LicenseService.getLicenseInformation() });
+/**
+* Get the public password policy
+* @returns PublicPasswordPolicyDto The currently active public password policy
+* @throws ApiError
+*/
+export const ensureUsePasswordPolicyServiceGetPublicPasswordPolicyData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UsePasswordPolicyServiceGetPublicPasswordPolicyKeyFn(), queryFn: () => PasswordPolicyService.getPublicPasswordPolicy() });
 /**
 * Get all resources
 * @param data The data for the request.

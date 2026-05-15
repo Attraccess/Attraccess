@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { UseQueryResult } from "@tanstack/react-query";
-import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, FlowVariablesService, LicenseService, MqttService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceHealthService, ResourceMaintenanceSchedulesService, ResourceMaintenancesService, ResourcesService, SettingsService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
+import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, FlowVariablesService, LicenseService, MqttService, PasswordPolicyService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceHealthService, ResourceMaintenanceSchedulesService, ResourceMaintenancesService, ResourcesService, SettingsService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
 import { EmailTemplateType, PermissionFilter } from "../requests/types.gen";
 export type SystemServiceInfoDefaultResponse = Awaited<ReturnType<typeof SystemService.info>>;
 export type SystemServiceInfoQueryResult<TData = SystemServiceInfoDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
@@ -143,10 +143,18 @@ export type SettingsServiceGetMetricsSettingsDefaultResponse = Awaited<ReturnTyp
 export type SettingsServiceGetMetricsSettingsQueryResult<TData = SettingsServiceGetMetricsSettingsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useSettingsServiceGetMetricsSettingsKey = "SettingsServiceGetMetricsSettings";
 export const UseSettingsServiceGetMetricsSettingsKeyFn = (queryKey?: Array<unknown>) => [useSettingsServiceGetMetricsSettingsKey, ...(queryKey ?? [])];
+export type SettingsServiceGetAuthRateLimitSettingsDefaultResponse = Awaited<ReturnType<typeof SettingsService.getAuthRateLimitSettings>>;
+export type SettingsServiceGetAuthRateLimitSettingsQueryResult<TData = SettingsServiceGetAuthRateLimitSettingsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useSettingsServiceGetAuthRateLimitSettingsKey = "SettingsServiceGetAuthRateLimitSettings";
+export const UseSettingsServiceGetAuthRateLimitSettingsKeyFn = (queryKey?: Array<unknown>) => [useSettingsServiceGetAuthRateLimitSettingsKey, ...(queryKey ?? [])];
 export type LicenseServiceGetLicenseInformationDefaultResponse = Awaited<ReturnType<typeof LicenseService.getLicenseInformation>>;
 export type LicenseServiceGetLicenseInformationQueryResult<TData = LicenseServiceGetLicenseInformationDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useLicenseServiceGetLicenseInformationKey = "LicenseServiceGetLicenseInformation";
 export const UseLicenseServiceGetLicenseInformationKeyFn = (queryKey?: Array<unknown>) => [useLicenseServiceGetLicenseInformationKey, ...(queryKey ?? [])];
+export type PasswordPolicyServiceGetPublicPasswordPolicyDefaultResponse = Awaited<ReturnType<typeof PasswordPolicyService.getPublicPasswordPolicy>>;
+export type PasswordPolicyServiceGetPublicPasswordPolicyQueryResult<TData = PasswordPolicyServiceGetPublicPasswordPolicyDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const usePasswordPolicyServiceGetPublicPasswordPolicyKey = "PasswordPolicyServiceGetPublicPasswordPolicy";
+export const UsePasswordPolicyServiceGetPublicPasswordPolicyKeyFn = (queryKey?: Array<unknown>) => [usePasswordPolicyServiceGetPublicPasswordPolicyKey, ...(queryKey ?? [])];
 export type ResourcesServiceGetAllResourcesDefaultResponse = Awaited<ReturnType<typeof ResourcesService.getAllResources>>;
 export type ResourcesServiceGetAllResourcesQueryResult<TData = ResourcesServiceGetAllResourcesDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useResourcesServiceGetAllResourcesKey = "ResourcesServiceGetAllResources";
@@ -606,6 +614,8 @@ export type UsersServiceChangeUserEmailMutationResult = Awaited<ReturnType<typeo
 export type UsersServiceChangeUserBillingFactorMutationResult = Awaited<ReturnType<typeof UsersService.changeUserBillingFactor>>;
 export type EmailTemplatesServiceEmailTemplateControllerUpdateMutationResult = Awaited<ReturnType<typeof EmailTemplatesService.emailTemplateControllerUpdate>>;
 export type SettingsServiceUpdateSystemSettingsMutationResult = Awaited<ReturnType<typeof SettingsService.updateSystemSettings>>;
+export type SettingsServiceUpdateMetricsSettingsMutationResult = Awaited<ReturnType<typeof SettingsService.updateMetricsSettings>>;
+export type SettingsServiceUpdateAuthRateLimitSettingsMutationResult = Awaited<ReturnType<typeof SettingsService.updateAuthRateLimitSettings>>;
 export type AttractapServiceUpdateReaderMutationResult = Awaited<ReturnType<typeof AttractapService.updateReader>>;
 export type AttractapServiceToggleCardActiveMutationResult = Awaited<ReturnType<typeof AttractapService.toggleCardActive>>;
 export type UsersServiceDeleteUserMutationResult = Awaited<ReturnType<typeof UsersService.deleteUser>>;

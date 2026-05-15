@@ -1,8 +1,8 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { useMutation, UseMutationOptions, useQuery, UseQueryOptions } from "@tanstack/react-query";
-import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, FlowVariablesService, LicenseService, MqttService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceHealthService, ResourceMaintenanceSchedulesService, ResourceMaintenancesService, ResourcesService, SettingsService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
-import { AcceptInvitationDto, AppKeyRequestDto, BulkUpdateUserPermissionsDto, ChangeBillingFactorDto, ChangeEmailDto, ChangePasswordDto, ChangeUsernameDto, CreateFormDto, CreateMaintenanceDto, CreateMaintenanceScheduleDto, CreateMqttServerDto, CreateProjectDto, CreateProjectInvitationDto, CreateResourceDto, CreateResourceGroupDto, CreateSSOProviderDto, CreateUserDto, CsvInviteUploadDto, DeleteAccountConfirmDto, EmailTemplateType, EndUsageSessionDto, EnrollNfcCardDto, FinishMaintenanceDto, FlowVariableUpsertDto, InviteUserDto, LinkUserToExternalAccountRequestDto, ModifyBalanceDto, NfcCardSetActiveStateDto, PairSumUpReaderDto, PermissionFilter, PreviewMjmlDto, RefundTransactionDto, ResetNfcCardDto, ResetPasswordDto, ResourceFlowSaveDto, ResourceFlowVariableScope, SetBillingConfigurationDto, SetSumUpApiKeyDto, SetUserPasswordDto, SSOProvisioningPermissionsDto, SSOProvisioningUserDto, StartUsageSessionDto, SumupTopUpDto, SumupTransactionCallbackDto, TwoFactorCodeDto, TwoFactorPolicyDto, UpdateEmailTemplateDto, UpdateFormDto, UpdateMaintenanceScheduleDto, UpdateMqttServerDto, UpdateProjectDto, UpdateReaderDto, UpdateResourceBillingConfigurationDto, UpdateResourceDto, UpdateResourceGroupDto, UpdateResourceGroupIntroductionDto, UpdateResourceIntroductionDto, UpdateSSOProviderDto, UpdateSystemSettingsDto, UpdateUsageSessionProjectDto, UpdateUserPermissionsDto, UploadPluginDto, VerifyEmailDto } from "../requests/types.gen";
+import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, FlowVariablesService, LicenseService, MqttService, PasswordPolicyService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceHealthService, ResourceMaintenanceSchedulesService, ResourceMaintenancesService, ResourcesService, SettingsService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
+import { AcceptInvitationDto, AppKeyRequestDto, BulkUpdateUserPermissionsDto, ChangeBillingFactorDto, ChangeEmailDto, ChangePasswordDto, ChangeUsernameDto, CreateFormDto, CreateMaintenanceDto, CreateMaintenanceScheduleDto, CreateMqttServerDto, CreateProjectDto, CreateProjectInvitationDto, CreateResourceDto, CreateResourceGroupDto, CreateSSOProviderDto, CreateUserDto, CsvInviteUploadDto, DeleteAccountConfirmDto, EmailTemplateType, EndUsageSessionDto, EnrollNfcCardDto, FinishMaintenanceDto, FlowVariableUpsertDto, InviteUserDto, LinkUserToExternalAccountRequestDto, ModifyBalanceDto, NfcCardSetActiveStateDto, PairSumUpReaderDto, PermissionFilter, PreviewMjmlDto, RefundTransactionDto, ResetNfcCardDto, ResetPasswordDto, ResourceFlowSaveDto, ResourceFlowVariableScope, SetBillingConfigurationDto, SetSumUpApiKeyDto, SetUserPasswordDto, SSOProvisioningPermissionsDto, SSOProvisioningUserDto, StartUsageSessionDto, SumupTopUpDto, SumupTransactionCallbackDto, TwoFactorCodeDto, TwoFactorPolicyDto, UpdateAuthRateLimitSettingsDto, UpdateEmailTemplateDto, UpdateFormDto, UpdateMaintenanceScheduleDto, UpdateMetricsSettingsDto, UpdateMqttServerDto, UpdateProjectDto, UpdateReaderDto, UpdateResourceBillingConfigurationDto, UpdateResourceDto, UpdateResourceGroupDto, UpdateResourceGroupIntroductionDto, UpdateResourceIntroductionDto, UpdateSSOProviderDto, UpdateSystemSettingsDto, UpdateUsageSessionProjectDto, UpdateUserPermissionsDto, UploadPluginDto, VerifyEmailDto } from "../requests/types.gen";
 import * as Common from "./common";
 /**
 * Return API information
@@ -239,11 +239,23 @@ export const useSettingsServiceGetFirstTimeSetupStatus = <TData = Common.Setting
 */
 export const useSettingsServiceGetMetricsSettings = <TData = Common.SettingsServiceGetMetricsSettingsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseSettingsServiceGetMetricsSettingsKeyFn(queryKey), queryFn: () => SettingsService.getMetricsSettings() as TData, ...options });
 /**
+* Get auth rate-limit settings
+* @returns AuthRateLimitSettingsDto Current auth rate-limit settings.
+* @throws ApiError
+*/
+export const useSettingsServiceGetAuthRateLimitSettings = <TData = Common.SettingsServiceGetAuthRateLimitSettingsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseSettingsServiceGetAuthRateLimitSettingsKeyFn(queryKey), queryFn: () => SettingsService.getAuthRateLimitSettings() as TData, ...options });
+/**
 * Get license information
 * @returns LicenseDataDto The current license data.
 * @throws ApiError
 */
 export const useLicenseServiceGetLicenseInformation = <TData = Common.LicenseServiceGetLicenseInformationDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseLicenseServiceGetLicenseInformationKeyFn(queryKey), queryFn: () => LicenseService.getLicenseInformation() as TData, ...options });
+/**
+* Get the public password policy
+* @returns PublicPasswordPolicyDto The currently active public password policy
+* @throws ApiError
+*/
+export const usePasswordPolicyServiceGetPublicPasswordPolicy = <TData = Common.PasswordPolicyServiceGetPublicPasswordPolicyDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UsePasswordPolicyServiceGetPublicPasswordPolicyKeyFn(queryKey), queryFn: () => PasswordPolicyService.getPublicPasswordPolicy() as TData, ...options });
 /**
 * Get all resources
 * @param data The data for the request.
@@ -2100,6 +2112,30 @@ export const useSettingsServiceUpdateSystemSettings = <TData = Common.SettingsSe
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {
   requestBody: UpdateSystemSettingsDto;
 }, TContext>({ mutationFn: ({ requestBody }) => SettingsService.updateSystemSettings({ requestBody }) as unknown as Promise<TData>, ...options });
+/**
+* Update metrics settings
+* @param data The data for the request.
+* @param data.requestBody
+* @returns MetricsSettingsDto Metrics settings updated.
+* @throws ApiError
+*/
+export const useSettingsServiceUpdateMetricsSettings = <TData = Common.SettingsServiceUpdateMetricsSettingsMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  requestBody: UpdateMetricsSettingsDto;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  requestBody: UpdateMetricsSettingsDto;
+}, TContext>({ mutationFn: ({ requestBody }) => SettingsService.updateMetricsSettings({ requestBody }) as unknown as Promise<TData>, ...options });
+/**
+* Update auth rate-limit settings
+* @param data The data for the request.
+* @param data.requestBody
+* @returns AuthRateLimitSettingsDto Auth rate-limit settings updated.
+* @throws ApiError
+*/
+export const useSettingsServiceUpdateAuthRateLimitSettings = <TData = Common.SettingsServiceUpdateAuthRateLimitSettingsMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  requestBody: UpdateAuthRateLimitSettingsDto;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  requestBody: UpdateAuthRateLimitSettingsDto;
+}, TContext>({ mutationFn: ({ requestBody }) => SettingsService.updateAuthRateLimitSettings({ requestBody }) as unknown as Promise<TData>, ...options });
 /**
 * Update reader name and connected resources
 * @param data The data for the request.

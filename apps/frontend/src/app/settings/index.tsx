@@ -6,6 +6,7 @@ import de from './de.json';
 import { AppSettingsCard } from './cards/AppSettingsCard';
 import { SmtpSettingsCard } from './cards/SmtpSettingsCard';
 import { MetricsSettingsCard } from './cards/MetricsSettingsCard';
+import { AuthRateLimitCard } from './cards/AuthRateLimitCard';
 
 export function SystemSettingsPage() {
   const { t } = useTranslations({ en, de });
@@ -17,6 +18,7 @@ export function SystemSettingsPage() {
         <AppSettingsCard variant="standalone" />
         <SmtpSettingsCard variant="standalone" />
         <MetricsSettingsCard />
+        <AuthRateLimitCard />
       </div>
     </div>
   );

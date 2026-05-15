@@ -6,6 +6,7 @@ import { Session, User } from '@attraccess/database-entities';
 import { randomBytes } from 'crypto';
 import { TokenHashService } from '../../encryption/token-hash.service';
 import { MetricsService } from '../../metrics/metrics.service';
+import { CronTimer } from '../../metrics/instrumentation/cron/cron.helper';
 
 export interface SessionMetadata {
   userAgent?: string;
@@ -24,6 +25,7 @@ export class SessionService {
     private readonly sessionRepository: Repository<Session>,
     private readonly tokenHashService: TokenHashService,
     private readonly metricsService: MetricsService,
+    private readonly cronTimer: CronTimer,
   ) { }
 
   /**
@@ -180,16 +182,18 @@ export class SessionService {
    */
   @Cron(CronExpression.EVERY_6_HOURS)
   async cleanupExpiredSessions(): Promise<void> {
-    const now = new Date();
-    const result = await this.sessionRepository.delete({
-      expiresAt: LessThan(now),
-    });
+    await this.cronTimer.time('session_cleanup', async () => {
+      const now = new Date();
+      const result = await this.sessionRepository.delete({
+        expiresAt: LessThan(now),
+      });
 
-    if (result.affected && result.affected > 0) {
-      this.logger.log(`Cleaned up ${result.affected} expired sessions`);
-      const activeCount = await this.sessionRepository.count({ where: { expiresAt: MoreThan(new Date()) } });
-      this.metricsService.authActiveSessions.set(activeCount);
-    }
+      if (result.affected && result.affected > 0) {
+        this.logger.log(`Cleaned up ${result.affected} expired sessions`);
+        const activeCount = await this.sessionRepository.count({ where: { expiresAt: MoreThan(new Date()) } });
+        this.metricsService.authActiveSessions.set(activeCount);
+      }
+    });
   }
 
   /**

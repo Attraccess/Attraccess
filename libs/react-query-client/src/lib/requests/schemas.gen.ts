@@ -21,8 +21,8 @@ export const $CreateUserDto = {
         },
         password: {
             type: 'string',
-            description: 'The password for the new user',
-            example: 'password123'
+            description: 'The password for the new user (validated server-side against the active password policy)',
+            example: 'correct-horse-battery-staple-42'
         },
         strategy: {
             description: 'The authentication strategy to use',
@@ -1358,7 +1358,7 @@ export const $PreviewMjmlResponseDto = {
 
 export const $EmailTemplateType = {
     type: 'string',
-    enum: ['verify-email', 'user-invitation', 'reset-password', 'username-changed', 'password-changed', 'resource-usage-billing-transaction-summary', 'project-invitation', 'delete-account-confirmation'],
+    enum: ['verify-email', 'user-invitation', 'reset-password', 'username-changed', 'password-changed', 'resource-usage-billing-transaction-summary', 'project-invitation', 'delete-account-confirmation', 'resource-health-changed'],
     description: 'Template type/key used by the system'
 } as const;
 
@@ -1660,15 +1660,115 @@ export const $FirstTimeSetupStatusDto = {
     required: ['available', 'stepsCompleted']
 } as const;
 
+export const $MetricsTogglesDto = {
+    type: 'object',
+    properties: {
+        http: {
+            type: 'boolean',
+            description: 'Whether HTTP request timing metrics are enabled'
+        },
+        ws: {
+            type: 'boolean',
+            description: 'Whether WebSocket message timing metrics are enabled'
+        },
+        cron: {
+            type: 'boolean',
+            description: 'Whether cron job timing metrics are enabled'
+        },
+        db: {
+            type: 'boolean',
+            description: 'Whether database query timing metrics are enabled (high cardinality)'
+        },
+        external: {
+            type: 'boolean',
+            description: 'Whether external call timing metrics are enabled'
+        },
+        sse: {
+            type: 'boolean',
+            description: 'Whether Server-Sent Events metrics are enabled'
+        },
+        flow: {
+            type: 'boolean',
+            description: 'Whether resource flow execution metrics are enabled'
+        }
+    },
+    required: ['http', 'ws', 'cron', 'db', 'external', 'sse', 'flow']
+} as const;
+
 export const $MetricsSettingsDto = {
     type: 'object',
     properties: {
         apiKeyConfigured: {
             type: 'boolean',
             description: 'Whether a metrics API key is configured'
+        },
+        toggles: {
+            description: 'Per-subsystem metrics timing toggles',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/MetricsTogglesDto'
+                }
+            ]
+        },
+        slowQueryThresholdSeconds: {
+            type: 'number',
+            description: 'Threshold above which a DB query is counted as slow (in seconds).'
         }
     },
-    required: ['apiKeyConfigured']
+    required: ['apiKeyConfigured', 'toggles', 'slowQueryThresholdSeconds']
+} as const;
+
+export const $UpdateMetricsTogglesDto = {
+    type: 'object',
+    properties: {
+        http: {
+            type: 'boolean',
+            description: 'Whether HTTP request timing metrics are enabled'
+        },
+        ws: {
+            type: 'boolean',
+            description: 'Whether WebSocket message timing metrics are enabled'
+        },
+        cron: {
+            type: 'boolean',
+            description: 'Whether cron job timing metrics are enabled'
+        },
+        db: {
+            type: 'boolean',
+            description: 'Whether database query timing metrics are enabled (high cardinality)'
+        },
+        external: {
+            type: 'boolean',
+            description: 'Whether external call timing metrics are enabled'
+        },
+        sse: {
+            type: 'boolean',
+            description: 'Whether Server-Sent Events metrics are enabled'
+        },
+        flow: {
+            type: 'boolean',
+            description: 'Whether resource flow execution metrics are enabled'
+        }
+    }
+} as const;
+
+export const $UpdateMetricsSettingsDto = {
+    type: 'object',
+    properties: {
+        toggles: {
+            description: 'Per-subsystem metrics toggles update',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/UpdateMetricsTogglesDto'
+                }
+            ]
+        },
+        slowQueryThresholdSeconds: {
+            type: 'number',
+            description: 'Threshold above which a DB query is counted as slow (in seconds).',
+            minimum: 0
+        }
+    }
 } as const;
 
 export const $GenerateMetricsApiKeyResponseDto = {
@@ -1684,6 +1784,68 @@ export const $GenerateMetricsApiKeyResponseDto = {
         }
     },
     required: ['apiKeyConfigured', 'apiKey']
+} as const;
+
+export const $AuthRateLimitSettingsDto = {
+    type: 'object',
+    properties: {
+        maxAttempts: {
+            type: 'number',
+            description: 'Max failed attempts within the window before lockout',
+            example: 5
+        },
+        windowSeconds: {
+            type: 'number',
+            description: 'Sliding window length, in seconds, for counting attempts',
+            example: 900
+        },
+        lockoutDurationSeconds: {
+            type: 'number',
+            description: 'Base lockout duration in seconds after the threshold is reached',
+            example: 900
+        },
+        exponentialBackoff: {
+            type: 'boolean',
+            description: 'Whether to extend lockout exponentially on repeat lockouts',
+            example: false
+        },
+        backoffMultiplier: {
+            type: 'number',
+            description: 'Multiplier applied to lockout duration when exponentialBackoff is on',
+            example: 2
+        }
+    },
+    required: ['maxAttempts', 'windowSeconds', 'lockoutDurationSeconds', 'exponentialBackoff', 'backoffMultiplier']
+} as const;
+
+export const $UpdateAuthRateLimitSettingsDto = {
+    type: 'object',
+    properties: {
+        maxAttempts: {
+            type: 'number',
+            description: 'Max failed attempts within the window before lockout',
+            example: 5
+        },
+        windowSeconds: {
+            type: 'number',
+            description: 'Sliding window length, in seconds',
+            example: 900
+        },
+        lockoutDurationSeconds: {
+            type: 'number',
+            description: 'Base lockout duration in seconds',
+            example: 900
+        },
+        exponentialBackoff: {
+            type: 'boolean',
+            description: 'Whether to extend lockout exponentially on repeat lockouts'
+        },
+        backoffMultiplier: {
+            type: 'number',
+            description: 'Multiplier applied to lockout duration',
+            example: 2
+        }
+    }
 } as const;
 
 export const $LicenseDataDto = {
@@ -1716,6 +1878,46 @@ export const $LicenseDataDto = {
         }
     },
     required: ['valid', 'modules', 'usageLimits', 'isNonProfit']
+} as const;
+
+export const $PublicPasswordPolicyDto = {
+    type: 'object',
+    properties: {
+        minLength: {
+            type: 'number',
+            example: 12
+        },
+        maxLength: {
+            type: 'number',
+            example: 128
+        },
+        allowAllUnicode: {
+            type: 'boolean',
+            example: true
+        },
+        requireUppercase: {
+            type: 'boolean',
+            example: false
+        },
+        requireLowercase: {
+            type: 'boolean',
+            example: false
+        },
+        requireDigit: {
+            type: 'boolean',
+            example: false
+        },
+        requireSpecial: {
+            type: 'boolean',
+            example: false
+        },
+        minZxcvbnScore: {
+            type: 'number',
+            example: 3,
+            description: 'Minimum required zxcvbn score (0-4)'
+        }
+    },
+    required: ['minLength', 'maxLength', 'allowAllUnicode', 'requireUppercase', 'requireLowercase', 'requireDigit', 'requireSpecial', 'minZxcvbnScore']
 } as const;
 
 export const $ResourceType = {

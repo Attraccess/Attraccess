@@ -77,6 +77,7 @@ import {
   ResourceFlowVariableScope,
   type ResourceFlowVariableValueType,
 } from './entities/resourceFlowVariable';
+import { PasswordPolicy, PASSWORD_POLICY_SINGLETON_ID } from './entities/password-policy.entity';
 
 // Export all entities individually
 export {
@@ -158,6 +159,8 @@ export {
   GetVariablesNodeDataSchema,
   VariableChangedNodeDataSchema,
   VariableScopeSchema,
+  PasswordPolicy,
+  PASSWORD_POLICY_SINGLETON_ID,
 };
 
 // Export the entities object
@@ -198,4 +201,5 @@ export const entities = {
   FormSubmission,
   ResourceHealthState,
   ResourceFlowVariable,
+  PasswordPolicy,
 };

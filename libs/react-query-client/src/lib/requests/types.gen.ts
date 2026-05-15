@@ -17,7 +17,7 @@ export type CreateUserDto = {
      */
     email: string;
     /**
-     * The password for the new user
+     * The password for the new user (validated server-side against the active password policy)
      */
     password: string;
     /**
@@ -881,7 +881,8 @@ export enum EmailTemplateType {
     PASSWORD_CHANGED = 'password-changed',
     RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY = 'resource-usage-billing-transaction-summary',
     PROJECT_INVITATION = 'project-invitation',
-    DELETE_ACCOUNT_CONFIRMATION = 'delete-account-confirmation'
+    DELETE_ACCOUNT_CONFIRMATION = 'delete-account-confirmation',
+    RESOURCE_HEALTH_CHANGED = 'resource-health-changed'
 }
 
 export type EmailTemplate = {
@@ -1074,11 +1075,92 @@ export type FirstTimeSetupStatusDto = {
     stepsCompleted: FirstTimeSetupStepsDto;
 };
 
+export type MetricsTogglesDto = {
+    /**
+     * Whether HTTP request timing metrics are enabled
+     */
+    http: boolean;
+    /**
+     * Whether WebSocket message timing metrics are enabled
+     */
+    ws: boolean;
+    /**
+     * Whether cron job timing metrics are enabled
+     */
+    cron: boolean;
+    /**
+     * Whether database query timing metrics are enabled (high cardinality)
+     */
+    db: boolean;
+    /**
+     * Whether external call timing metrics are enabled
+     */
+    external: boolean;
+    /**
+     * Whether Server-Sent Events metrics are enabled
+     */
+    sse: boolean;
+    /**
+     * Whether resource flow execution metrics are enabled
+     */
+    flow: boolean;
+};
+
 export type MetricsSettingsDto = {
     /**
      * Whether a metrics API key is configured
      */
     apiKeyConfigured: boolean;
+    /**
+     * Per-subsystem metrics timing toggles
+     */
+    toggles: MetricsTogglesDto;
+    /**
+     * Threshold above which a DB query is counted as slow (in seconds).
+     */
+    slowQueryThresholdSeconds: number;
+};
+
+export type UpdateMetricsTogglesDto = {
+    /**
+     * Whether HTTP request timing metrics are enabled
+     */
+    http?: boolean;
+    /**
+     * Whether WebSocket message timing metrics are enabled
+     */
+    ws?: boolean;
+    /**
+     * Whether cron job timing metrics are enabled
+     */
+    cron?: boolean;
+    /**
+     * Whether database query timing metrics are enabled (high cardinality)
+     */
+    db?: boolean;
+    /**
+     * Whether external call timing metrics are enabled
+     */
+    external?: boolean;
+    /**
+     * Whether Server-Sent Events metrics are enabled
+     */
+    sse?: boolean;
+    /**
+     * Whether resource flow execution metrics are enabled
+     */
+    flow?: boolean;
+};
+
+export type UpdateMetricsSettingsDto = {
+    /**
+     * Per-subsystem metrics toggles update
+     */
+    toggles?: UpdateMetricsTogglesDto;
+    /**
+     * Threshold above which a DB query is counted as slow (in seconds).
+     */
+    slowQueryThresholdSeconds?: number;
 };
 
 export type GenerateMetricsApiKeyResponseDto = {
@@ -1090,6 +1172,52 @@ export type GenerateMetricsApiKeyResponseDto = {
      * The generated API key (shown only once)
      */
     apiKey: string;
+};
+
+export type AuthRateLimitSettingsDto = {
+    /**
+     * Max failed attempts within the window before lockout
+     */
+    maxAttempts: number;
+    /**
+     * Sliding window length, in seconds, for counting attempts
+     */
+    windowSeconds: number;
+    /**
+     * Base lockout duration in seconds after the threshold is reached
+     */
+    lockoutDurationSeconds: number;
+    /**
+     * Whether to extend lockout exponentially on repeat lockouts
+     */
+    exponentialBackoff: boolean;
+    /**
+     * Multiplier applied to lockout duration when exponentialBackoff is on
+     */
+    backoffMultiplier: number;
+};
+
+export type UpdateAuthRateLimitSettingsDto = {
+    /**
+     * Max failed attempts within the window before lockout
+     */
+    maxAttempts?: number;
+    /**
+     * Sliding window length, in seconds
+     */
+    windowSeconds?: number;
+    /**
+     * Base lockout duration in seconds
+     */
+    lockoutDurationSeconds?: number;
+    /**
+     * Whether to extend lockout exponentially on repeat lockouts
+     */
+    exponentialBackoff?: boolean;
+    /**
+     * Multiplier applied to lockout duration
+     */
+    backoffMultiplier?: number;
 };
 
 export type LicenseDataDto = {
@@ -1115,6 +1243,20 @@ export type LicenseDataDto = {
      * Are you using this software for free as a non-profit?
      */
     isNonProfit: boolean;
+};
+
+export type PublicPasswordPolicyDto = {
+    minLength: number;
+    maxLength: number;
+    allowAllUnicode: boolean;
+    requireUppercase: boolean;
+    requireLowercase: boolean;
+    requireDigit: boolean;
+    requireSpecial: boolean;
+    /**
+     * Minimum required zxcvbn score (0-4)
+     */
+    minZxcvbnScore: number;
 };
 
 /**
@@ -4289,11 +4431,27 @@ export type ApplyFirstTimeSetupSettingsResponse = SystemSettingsDto;
 
 export type GetMetricsSettingsResponse = MetricsSettingsDto;
 
+export type UpdateMetricsSettingsData = {
+    requestBody: UpdateMetricsSettingsDto;
+};
+
+export type UpdateMetricsSettingsResponse = MetricsSettingsDto;
+
 export type GenerateMetricsApiKeyResponse = GenerateMetricsApiKeyResponseDto;
 
 export type DeleteMetricsApiKeyResponse = MetricsSettingsDto;
 
+export type GetAuthRateLimitSettingsResponse = AuthRateLimitSettingsDto;
+
+export type UpdateAuthRateLimitSettingsData = {
+    requestBody: UpdateAuthRateLimitSettingsDto;
+};
+
+export type UpdateAuthRateLimitSettingsResponse = AuthRateLimitSettingsDto;
+
 export type GetLicenseInformationResponse = LicenseDataDto;
+
+export type GetPublicPasswordPolicyResponse = PublicPasswordPolicyDto;
 
 export type CreateOneResourceData = {
     formData: CreateResourceDto;
@@ -6395,6 +6553,19 @@ export type $OpenApiTs = {
                 401: unknown;
             };
         };
+        patch: {
+            req: UpdateMetricsSettingsData;
+            res: {
+                /**
+                 * Metrics settings updated.
+                 */
+                200: MetricsSettingsDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
     };
     '/api/settings/metrics/generate-api-key': {
         post: {
@@ -6424,6 +6595,33 @@ export type $OpenApiTs = {
             };
         };
     };
+    '/api/settings/auth/rate-limit': {
+        get: {
+            res: {
+                /**
+                 * Current auth rate-limit settings.
+                 */
+                200: AuthRateLimitSettingsDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+        patch: {
+            req: UpdateAuthRateLimitSettingsData;
+            res: {
+                /**
+                 * Auth rate-limit settings updated.
+                 */
+                200: AuthRateLimitSettingsDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
     '/api/license-data': {
         get: {
             res: {
@@ -6437,6 +6635,16 @@ export type $OpenApiTs = {
                  * Unauthorized
                  */
                 401: unknown;
+            };
+        };
+    };
+    '/api/password-policy/public': {
+        get: {
+            res: {
+                /**
+                 * The currently active public password policy
+                 */
+                200: PublicPasswordPolicyDto;
             };
         };
     };

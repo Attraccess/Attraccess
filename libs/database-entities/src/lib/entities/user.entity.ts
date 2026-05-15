@@ -133,6 +133,18 @@ export class User {
   @Exclude()
   lastUsernameChangeAt!: Date | null;
 
+  @Column({ type: 'datetime', nullable: true })
+  @Exclude()
+  lockedUntil!: Date | null;
+
+  @Column({ type: 'integer', default: 0 })
+  @Exclude()
+  failedLoginAttempts!: number;
+
+  @Column({ type: 'datetime', nullable: true })
+  @Exclude()
+  firstFailedLoginAt!: Date | null;
+
   @Column({ type: 'text', nullable: true })
   @Exclude()
   deleteAccountToken!: string | null;

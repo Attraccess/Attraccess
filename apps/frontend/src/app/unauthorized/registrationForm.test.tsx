@@ -24,7 +24,7 @@ vi.mock('@attraccess/plugins-frontend-ui', () => ({
       passwordConfirmation: 'Confirm your password',
       createAccountButton: 'Create account and start making!',
       creatingAccount: 'Creating your account...',
-      'validationError.passwordTooShort': 'Password must be at least 8 characters long.',
+      generatePassword: 'Generate strong password',
       'validationError.passwordsDoNotMatch': 'The passwords do not match',
       'success.title': 'Account Created Successfully!',
       'success.message':
@@ -53,9 +53,27 @@ vi.mock('@attraccess/react-query-client', () => ({
     mutate: mutateMock,
     isPending: false,
   }),
+  usePasswordPolicyServiceGetPublicPasswordPolicy: () => ({
+    data: {
+      minLength: 12,
+      maxLength: 128,
+      allowAllUnicode: true,
+      requireUppercase: false,
+      requireLowercase: false,
+      requireDigit: false,
+      requireSpecial: false,
+      minZxcvbnScore: 3,
+    },
+  }),
+  useUsersServiceFindManyKey: 'useUsersServiceFindManyKey',
   UseUsersServiceFindManyKeyFn: () => ['useUsersServiceFindManyKey'],
   ApiError: class ApiError extends Error {},
   AuthenticationType: { LOCAL_PASSWORD: 'LOCAL_PASSWORD' },
+}));
+
+vi.mock('../../components/PasswordPolicyHints', () => ({
+  PasswordPolicyHints: () => <div data-testid="policy-hints" />,
+  generateStrongPassword: () => 'GeneratedStrong-12345!',
 }));
 
 function renderForm() {
@@ -82,8 +100,8 @@ describe('RegistrationForm', () => {
 
     await user.type(screen.getByLabelText('Pick a username'), 'john+qa');
     await user.type(screen.getByLabelText('Your email address'), 'admin@example.com');
-    await user.type(screen.getByLabelText('Create your password'), 'password123');
-    await user.type(screen.getByLabelText('Confirm your password'), 'password123');
+    await user.type(screen.getByLabelText('Create your password'), 'correct-horse-battery-staple-42');
+    await user.type(screen.getByLabelText('Confirm your password'), 'correct-horse-battery-staple-42');
 
     expect(screen.getByText('Only letters, numbers, underscores, hyphens, and dots are allowed.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Create account and start making!' })).toBeDisabled();
@@ -98,15 +116,15 @@ describe('RegistrationForm', () => {
 
     await user.type(screen.getByLabelText('Pick a username'), '  Jane_Doe  ');
     await user.type(screen.getByLabelText('Your email address'), ' test@example.com ');
-    await user.type(screen.getByLabelText('Create your password'), 'password123');
-    await user.type(screen.getByLabelText('Confirm your password'), 'password123');
+    await user.type(screen.getByLabelText('Create your password'), 'correct-horse-battery-staple-42');
+    await user.type(screen.getByLabelText('Confirm your password'), 'correct-horse-battery-staple-42');
 
     await user.click(screen.getByRole('button', { name: 'Create account and start making!' }));
 
     expect(mutateMock).toHaveBeenCalledWith({
       requestBody: {
         username: 'Jane_Doe',
-        password: 'password123',
+        password: 'correct-horse-battery-staple-42',
         email: 'test@example.com',
         strategy: 'LOCAL_PASSWORD',
       },

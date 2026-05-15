@@ -14,8 +14,10 @@
   "passwordConfirmation": "Confirm your password",
   "createAccountButton": "Create account and start making!",
   "creatingAccount": "Creating your account...",
+  "generatePassword": "Generate strong password",
+  "passwordGenerated": "Strong password filled in",
+  "passwordGeneratedCopied": "Strong password copied to clipboard and filled in",
   "validationError": {
-    "passwordTooShort": "Password must be at least 8 characters long.",
     "passwordsDoNotMatch": "The passwords do not match"
   },
   "success": {

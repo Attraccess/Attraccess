@@ -6,7 +6,10 @@ import { FirstTimeSetupStatusDto } from './dto/first-time-setup-status.dto';
 import { SystemSettingsDto } from './dto/system-settings.dto';
 import { UpdateSystemSettingsDto } from './dto/update-system-settings.dto';
 import { MetricsSettingsDto } from './dto/metrics-settings.dto';
+import { UpdateMetricsSettingsDto } from './dto/update-metrics-settings.dto';
 import { GenerateMetricsApiKeyResponseDto } from './dto/generate-metrics-api-key-response.dto';
+import { AuthRateLimitSettingsDto } from './dto/auth-rate-limit-settings.dto';
+import { UpdateAuthRateLimitSettingsDto } from './dto/update-auth-rate-limit-settings.dto';
 
 @ApiTags('Settings')
 @Controller('settings')
@@ -46,8 +49,21 @@ export class SettingsController {
   @ApiOperation({ summary: 'Get metrics settings', operationId: 'getMetricsSettings' })
   @ApiResponse({ status: 200, description: 'Current metrics settings.', type: MetricsSettingsDto })
   async getMetricsSettings(): Promise<MetricsSettingsDto> {
-    const { configured } = await this.settingsService.getMetricsApiKey();
-    return { apiKeyConfigured: configured };
+    return this.buildMetricsSettings();
+  }
+
+  @Patch('metrics')
+  @Auth('canManageSystemConfiguration')
+  @ApiOperation({ summary: 'Update metrics settings', operationId: 'updateMetricsSettings' })
+  @ApiResponse({ status: 200, description: 'Metrics settings updated.', type: MetricsSettingsDto })
+  async updateMetricsSettings(@Body() body: UpdateMetricsSettingsDto): Promise<MetricsSettingsDto> {
+    if (body.toggles) {
+      await this.settingsService.updateMetricsToggles(body.toggles);
+    }
+    if (body.slowQueryThresholdSeconds !== undefined) {
+      await this.settingsService.setMetricsSlowQueryThresholdSeconds(body.slowQueryThresholdSeconds);
+    }
+    return this.buildMetricsSettings();
   }
 
   @Post('metrics/generate-api-key')
@@ -65,7 +81,34 @@ export class SettingsController {
   @ApiResponse({ status: 200, description: 'Metrics API key removed.', type: MetricsSettingsDto })
   async deleteMetricsApiKey(): Promise<MetricsSettingsDto> {
     await this.settingsService.setMetricsApiKey(null);
-    return { apiKeyConfigured: false };
+    return this.buildMetricsSettings();
+  }
+
+  private async buildMetricsSettings(): Promise<MetricsSettingsDto> {
+    const [{ configured }, toggles, slowQueryThresholdSeconds] = await Promise.all([
+      this.settingsService.getMetricsApiKey(),
+      this.settingsService.getMetricsToggles(),
+      this.settingsService.getMetricsSlowQueryThresholdSeconds(),
+    ]);
+    return { apiKeyConfigured: configured, toggles, slowQueryThresholdSeconds };
+  }
+
+  @Get('auth/rate-limit')
+  @Auth('canManageSystemConfiguration')
+  @ApiOperation({ summary: 'Get auth rate-limit settings', operationId: 'getAuthRateLimitSettings' })
+  @ApiResponse({ status: 200, description: 'Current auth rate-limit settings.', type: AuthRateLimitSettingsDto })
+  async getAuthRateLimitSettings(): Promise<AuthRateLimitSettingsDto> {
+    return this.settingsService.getAuthRateLimitSettings();
+  }
+
+  @Patch('auth/rate-limit')
+  @Auth('canManageSystemConfiguration')
+  @ApiOperation({ summary: 'Update auth rate-limit settings', operationId: 'updateAuthRateLimitSettings' })
+  @ApiResponse({ status: 200, description: 'Auth rate-limit settings updated.', type: AuthRateLimitSettingsDto })
+  async updateAuthRateLimitSettings(
+    @Body() body: UpdateAuthRateLimitSettingsDto,
+  ): Promise<AuthRateLimitSettingsDto> {
+    return this.settingsService.updateAuthRateLimitSettings(body);
   }
 
   @Post('first-time-setup')

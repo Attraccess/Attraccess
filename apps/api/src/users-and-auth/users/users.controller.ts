@@ -18,6 +18,8 @@ import {
   ServiceUnavailableException,
   Delete,
 } from '@nestjs/common';
+import { AuthRateLimitInterceptor } from '../rate-limiting/auth-rate-limit.interceptor';
+import { AuthRateLimit } from '../rate-limiting/rate-limit.decorator';
 import { UsersService } from './users.service';
 import { AuthenticatedRequest, Auth } from '@attraccess/plugins-backend-sdk';
 import { AuthService } from '../auth/auth.service';
@@ -68,9 +70,12 @@ import { DeleteAccountConfirmDto } from './dtos/deleteAccountConfirm.dto';
 import { SSOService } from '../auth/sso/sso.service';
 import { getSsoManagedPermissionKeys } from '@attraccess/shared';
 import { TokenHashService } from '../../encryption/token-hash.service';
+import { PasswordPolicyService } from '../password-policy/password-policy.service';
+import { PasswordPolicyViolationException } from '../password-policy/password-policy.errors';
 
 @ApiTags('Users')
 @Controller('users')
+@UseInterceptors(AuthRateLimitInterceptor)
 export class UsersController {
   private readonly logger = new Logger(UsersController.name);
 
@@ -83,6 +88,7 @@ export class UsersController {
     @InjectRepository(Setting)
     private readonly settingRepository: Repository<Setting>,
     private readonly tokenHashService: TokenHashService,
+    private readonly passwordPolicyService: PasswordPolicyService,
   ) { }
 
   private mapEmailSendError(error: unknown): never {
@@ -368,6 +374,7 @@ export class UsersController {
   }
 
   @Post()
+  @AuthRateLimit('register')
   @ApiOperation({ summary: 'Create a new user', operationId: 'createOneUser' })
   @ApiResponse({
     status: 201,
@@ -397,6 +404,14 @@ export class UsersController {
       if (!signupDomainWhitelist.includes(emailDomain)) {
         throw new ForbiddenSignupDomainException(emailDomain);
       }
+    }
+
+    const policyResult = await this.passwordPolicyService.validate(body.password, {
+      username: body.username,
+      email: body.email,
+    });
+    if (!policyResult.ok) {
+      throw new PasswordPolicyViolationException(policyResult.errors);
     }
 
     const user = await this.usersService.createOne({
@@ -637,6 +652,7 @@ export class UsersController {
   }
 
   @Post('reset-password')
+  @AuthRateLimit('password_reset_request')
   @ApiOperation({ summary: 'Request a password reset', operationId: 'requestPasswordReset' })
   @ApiResponse({
     status: 200,
@@ -675,6 +691,7 @@ export class UsersController {
   }
 
   @Post('/:userId/change-password-by-token')
+  @AuthRateLimit('password_reset_complete')
   @ApiOperation({ summary: 'Change a user password after password reset', operationId: 'changePasswordViaResetToken' })
   @ApiResponse({
     status: 200,

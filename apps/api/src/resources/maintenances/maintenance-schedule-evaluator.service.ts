@@ -14,6 +14,7 @@ import {
 import { ResourceMaintenanceService } from './maintenance.service';
 import { ResourceMaintenanceChangedEvent } from './events/resource-maintenance-changed.event';
 import { ResourceUsageEvent } from '../usage/events/resource-usage.events';
+import { CronTimer } from '../../metrics/instrumentation/cron/cron.helper';
 
 /**
  * Evaluates maintenance schedules and creates ResourceMaintenance when a schedule's condition is met.
@@ -37,6 +38,7 @@ export class MaintenanceScheduleEvaluatorService {
     @InjectRepository(ResourceUsage)
     private readonly usageRepository: Repository<ResourceUsage>,
     private readonly maintenanceService: ResourceMaintenanceService,
+    private readonly cronTimer: CronTimer,
   ) { }
 
   /**
@@ -240,7 +242,9 @@ export class MaintenanceScheduleEvaluatorService {
    */
   @Cron(CronExpression.EVERY_5_MINUTES)
   async runScheduledEvaluation(): Promise<void> {
-    await this.evaluateAll();
+    await this.cronTimer.time('maintenance_evaluator', async () => {
+      await this.evaluateAll();
+    });
   }
 
   /**

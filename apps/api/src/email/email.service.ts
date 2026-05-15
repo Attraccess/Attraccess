@@ -9,6 +9,8 @@ import {
   ResourceUsage,
   Project,
   ProjectInvitation,
+  Resource,
+  ResourceHealthStatus,
 } from '@attraccess/database-entities';
 import { dbCurrencyToUserCurrency } from '@attraccess/shared';
 import * as Handlebars from 'handlebars';
@@ -16,6 +18,7 @@ import { MjmlService } from '../email-template/mjml.service';
 import { EntityManager } from 'typeorm';
 import { SettingsService } from '../settings/settings.service';
 import { MetricsService } from '../metrics/metrics.service';
+import { ExternalCallTimer } from '../metrics/instrumentation/external/external.helper';
 
 @Injectable()
 export class EmailService {
@@ -26,6 +29,7 @@ export class EmailService {
     private readonly emailTemplateService: EmailTemplateService,
     private readonly mjmlService: MjmlService,
     private readonly metricsService: MetricsService,
+    private readonly externalCallTimer: ExternalCallTimer,
   ) {
     this.logger.debug('Initializing EmailService');
     this.logger.debug('EmailService initialized');
@@ -60,12 +64,14 @@ export class EmailService {
       this.logger.debug(
         `Sending email to: ${user.email} using ${templateType} template with subject: ${dbTemplate.subject}`,
       );
-      await transporter.sendMail({
-        to: user.email,
-        from,
-        subject,
-        html: body,
-      });
+      await this.externalCallTimer.time('smtp', 'send', () =>
+        transporter.sendMail({
+          to: user.email,
+          from,
+          subject,
+          html: body,
+        }),
+      );
       if (typeof transporter.close === 'function') {
         transporter.close();
       }
@@ -243,6 +249,47 @@ export class EmailService {
     };
 
     await this.sendEmail(user, EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY, context);
+  }
+
+  async sendResourceHealthChangedEmail(
+    user: User,
+    resource: Pick<Resource, 'id' | 'name'>,
+    change: {
+      status: ResourceHealthStatus;
+      previousStatus: ResourceHealthStatus | null;
+      reason: string | null;
+      identifier: string;
+    },
+  ) {
+    if (!user?.email) {
+      return;
+    }
+
+    const base = await this.getBaseContext(user);
+    const becameUnhealthy = change.status === ResourceHealthStatus.UNHEALTHY;
+    const resourceUrl = `${base.host.frontend}/resources/${resource.id}`;
+
+    const context = {
+      ...base,
+      resource: {
+        id: resource.id,
+        name: resource.name,
+        url: resourceUrl,
+      },
+      health: {
+        status: change.status,
+        previousStatus: change.previousStatus ?? 'unknown',
+        reason: change.reason,
+        identifier: change.identifier,
+        headline: becameUnhealthy
+          ? `Resource degraded: ${resource.name}`
+          : `Resource recovered: ${resource.name}`,
+        headerColor: becameUnhealthy ? '#B91C1C' : '#047857',
+        bodyAction: becameUnhealthy ? 'has become degraded' : 'is healthy again',
+      },
+    };
+
+    await this.sendEmail(user, EmailTemplateType.RESOURCE_HEALTH_CHANGED, context);
   }
 
   private async createTransporter(): Promise<{ transporter: ReturnType<typeof createTransport>; from: string }> {
