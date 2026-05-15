@@ -1,13 +1,12 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
+import { AUTH_KEYS, AUTH_PARENT, RATE_LIMIT_DEFAULTS } from '../../settings/constants';
 
-const PARENT = 'auth';
-
-const RATE_LIMIT_DEFAULTS: ReadonlyArray<readonly [string, string]> = [
-  ['rate_limit_max_attempts', '5'],
-  ['rate_limit_window_seconds', '900'],
-  ['rate_limit_lockout_duration_seconds', '900'],
-  ['rate_limit_exponential_backoff', 'false'],
-  ['rate_limit_backoff_multiplier', '2'],
+const SEED_ENTRIES: ReadonlyArray<readonly [string, string]> = [
+  [AUTH_KEYS.rateLimitMaxAttempts, String(RATE_LIMIT_DEFAULTS.maxAttempts)],
+  [AUTH_KEYS.rateLimitWindowSeconds, String(RATE_LIMIT_DEFAULTS.windowSeconds)],
+  [AUTH_KEYS.rateLimitLockoutDurationSeconds, String(RATE_LIMIT_DEFAULTS.lockoutDurationSeconds)],
+  [AUTH_KEYS.rateLimitExponentialBackoff, RATE_LIMIT_DEFAULTS.exponentialBackoff ? 'true' : 'false'],
+  [AUTH_KEYS.rateLimitBackoffMultiplier, String(RATE_LIMIT_DEFAULTS.backoffMultiplier)],
 ];
 
 export class AuthRateLimiting1777500000000 implements MigrationInterface {
@@ -18,14 +17,14 @@ export class AuthRateLimiting1777500000000 implements MigrationInterface {
     await queryRunner.query(`ALTER TABLE "user" ADD COLUMN "failedLoginAttempts" integer NOT NULL DEFAULT 0`);
     await queryRunner.query(`ALTER TABLE "user" ADD COLUMN "firstFailedLoginAt" datetime`);
 
-    for (const [key, value] of RATE_LIMIT_DEFAULTS) {
+    for (const [key, value] of SEED_ENTRIES) {
       const existing = await queryRunner.query(
         `SELECT COUNT(*) as count FROM "setting" WHERE "parent" = ? AND "key" = ?`,
-        [PARENT, key],
+        [AUTH_PARENT, key],
       );
       if (Number(existing[0].count) === 0) {
         await queryRunner.query(`INSERT INTO "setting" ("parent", "key", "value") VALUES (?, ?, ?)`, [
-          PARENT,
+          AUTH_PARENT,
           key,
           value,
         ]);
@@ -34,8 +33,8 @@ export class AuthRateLimiting1777500000000 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    for (const [key] of RATE_LIMIT_DEFAULTS) {
-      await queryRunner.query(`DELETE FROM "setting" WHERE "parent" = ? AND "key" = ?`, [PARENT, key]);
+    for (const [key] of SEED_ENTRIES) {
+      await queryRunner.query(`DELETE FROM "setting" WHERE "parent" = ? AND "key" = ?`, [AUTH_PARENT, key]);
     }
     await queryRunner.query(`ALTER TABLE "user" DROP COLUMN "firstFailedLoginAt"`);
     await queryRunner.query(`ALTER TABLE "user" DROP COLUMN "failedLoginAttempts"`);

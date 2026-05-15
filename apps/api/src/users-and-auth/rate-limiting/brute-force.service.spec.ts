@@ -98,6 +98,29 @@ describe('BruteForceProtectionService', () => {
     });
   });
 
+  describe('eviction', () => {
+    it('drops stale entries on the next recordFailure call', async () => {
+      const originalNow = Date.now;
+      let clock = 0;
+      const setNow = (value: number) => {
+        clock = value;
+      };
+      jest.spyOn(Date, 'now').mockImplementation(() => clock);
+      try {
+        setNow(1000);
+        await service.recordFailure('login', '8.8.8.8', null);
+        setNow(1000 + 70 * 1000);
+        await service.recordFailure('login', '9.9.9.9', null);
+        const internalIp = (service as unknown as { ipCounters: Map<string, unknown> }).ipCounters;
+        expect(internalIp.has('login:8.8.8.8')).toBe(false);
+        expect(internalIp.has('login:9.9.9.9')).toBe(true);
+      } finally {
+        (Date.now as unknown as { mockRestore?: () => void }).mockRestore?.();
+        Date.now = originalNow;
+      }
+    });
+  });
+
   describe('exponential backoff', () => {
     it('multiplies lockout duration on repeat lockouts', async () => {
       settings.getRateLimitPolicy.mockResolvedValue({

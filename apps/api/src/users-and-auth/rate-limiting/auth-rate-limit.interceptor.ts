@@ -2,6 +2,7 @@ import {
   CallHandler,
   ExecutionContext,
   Injectable,
+  Logger,
   NestInterceptor,
   UnauthorizedException,
   ForbiddenException,
@@ -17,6 +18,8 @@ import { resolveIp, setRetryAfter } from './login.rate-limit.guard';
 
 @Injectable()
 export class AuthRateLimitInterceptor implements NestInterceptor {
+  private readonly logger = new Logger(AuthRateLimitInterceptor.name);
+
   constructor(
     private readonly bruteForce: BruteForceProtectionService,
     private readonly audit: AuthAuditLogger,
@@ -46,11 +49,15 @@ export class AuthRateLimitInterceptor implements NestInterceptor {
     return next.handle().pipe(
       tap({
         next: () => {
-          void this.bruteForce.recordSuccess(scope, ip, userId);
+          this.bruteForce
+            .recordSuccess(scope, ip, userId)
+            .catch((err) => this.logger.error(`recordSuccess failed for scope=${scope}`, err as Error));
           this.audit.log({ type: auditType, outcome: 'success', ip, userId });
         },
         error: (err: unknown) => {
-          void this.bruteForce.recordFailure(scope, ip, userId);
+          this.bruteForce
+            .recordFailure(scope, ip, userId)
+            .catch((recErr) => this.logger.error(`recordFailure failed for scope=${scope}`, recErr as Error));
           this.audit.log({
             type: auditType,
             outcome: classifyOutcome(err),

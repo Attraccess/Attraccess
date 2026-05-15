@@ -18,6 +18,8 @@ interface CounterEntry {
   lockoutCount: number;
 }
 
+const MAX_COUNTER_ENTRIES = 10_000;
+
 @Injectable()
 export class BruteForceProtectionService {
   private readonly ipCounters = new Map<string, CounterEntry>();
@@ -56,6 +58,8 @@ export class BruteForceProtectionService {
     const policy = await this.settingsService.getRateLimitPolicy();
     const windowMs = policy.windowSeconds * 1000;
     const now = this.nowFn();
+
+    this.evictStale(now, windowMs);
 
     const ipEntry = this.upsertCounter(this.ipCounters, ipKey(scope, ip), now, windowMs);
     if (ipEntry.count >= policy.maxAttempts) {
@@ -153,6 +157,37 @@ export class BruteForceProtectionService {
       return 0;
     }
     return Math.ceil((entry.lockoutUntil - now) / 1000);
+  }
+
+  private evictStale(now: number, windowMs: number): void {
+    for (const [key, entry] of this.ipCounters) {
+      if (isStale(entry, now, windowMs)) {
+        this.ipCounters.delete(key);
+      }
+    }
+    for (const [key, entry] of this.accountCounters) {
+      if (isStale(entry, now, windowMs)) {
+        this.accountCounters.delete(key);
+      }
+    }
+    if (this.ipCounters.size > MAX_COUNTER_ENTRIES) {
+      dropOldest(this.ipCounters, this.ipCounters.size - MAX_COUNTER_ENTRIES);
+    }
+    if (this.accountCounters.size > MAX_COUNTER_ENTRIES) {
+      dropOldest(this.accountCounters, this.accountCounters.size - MAX_COUNTER_ENTRIES);
+    }
+  }
+}
+
+function isStale(entry: CounterEntry, now: number, windowMs: number): boolean {
+  if (entry.lockoutUntil > now) return false;
+  return now - entry.firstAt > windowMs;
+}
+
+function dropOldest<K>(store: Map<K, CounterEntry>, count: number): void {
+  const sorted = [...store.entries()].sort(([, a], [, b]) => a.firstAt - b.firstAt);
+  for (let i = 0; i < count && i < sorted.length; i += 1) {
+    store.delete(sorted[i][0]);
   }
 }
 

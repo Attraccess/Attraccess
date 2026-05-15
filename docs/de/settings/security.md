@@ -61,7 +61,7 @@ Fehlgeschlagene Anmeldungen, Registrierungen und Passwort-Zuruecksetzungen werde
 | `exponentialBackoff` | `false` | Wenn `true`, waechst die Sperrdauer bei jeder Wiederholung um den Faktor `backoffMultiplier`. |
 | `backoffMultiplier` | `2` | Multiplikator fuer die Sperrdauer bei wiederholten Sperren. |
 
-Antworten bei Auslosen:
+Antworten bei Ausloesung:
 
 - **`429 Too Many Requests`** mit `Retry-After`-Header, wenn eine IP die Schwelle ueberschreitet.
 - **`423 Locked`** mit `Retry-After`-Header bei einem gesperrten Konto.
