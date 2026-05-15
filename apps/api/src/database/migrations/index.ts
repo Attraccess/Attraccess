@@ -107,3 +107,4 @@ export * from './1774980482357-add-saml-provider-type-and-invitation-index';
 export * from './1775000000000-add-metrics-subsystem-toggles';
 export * from './1777217977658-resource-health-state';
 export * from './1777300000000-add-metrics-slow-query-threshold';
+export * from './1777400000000-add-resource-health-changed-email-template';

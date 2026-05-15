@@ -881,7 +881,8 @@ export enum EmailTemplateType {
     PASSWORD_CHANGED = 'password-changed',
     RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY = 'resource-usage-billing-transaction-summary',
     PROJECT_INVITATION = 'project-invitation',
-    DELETE_ACCOUNT_CONFIRMATION = 'delete-account-confirmation'
+    DELETE_ACCOUNT_CONFIRMATION = 'delete-account-confirmation',
+    RESOURCE_HEALTH_CHANGED = 'resource-health-changed'
 }
 
 export type EmailTemplate = {

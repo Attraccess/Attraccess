@@ -11,6 +11,7 @@ export enum EmailTemplateType {
   RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY = 'resource-usage-billing-transaction-summary',
   PROJECT_INVITATION = 'project-invitation',
   DELETE_ACCOUNT_CONFIRMATION = 'delete-account-confirmation',
+  RESOURCE_HEALTH_CHANGED = 'resource-health-changed',
 }
 
 @Entity('email_templates')
@@ -24,7 +25,6 @@ export class EmailTemplate {
   @PrimaryColumn({
     type: 'varchar',
     length: 255,
-    enum: EmailTemplateType,
   })
   type!: EmailTemplateType;
 
