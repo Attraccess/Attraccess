@@ -4,7 +4,10 @@ import {
   PasswordValidationResult,
   PolicyError,
 } from './types';
-import { COMMON_PASSWORDS } from './common-passwords';
+
+export interface ValidatePasswordOptions {
+  commonPasswords?: ReadonlySet<string>;
+}
 
 const UPPER_RE = /\p{Lu}/u;
 const LOWER_RE = /\p{Ll}/u;
@@ -33,6 +36,7 @@ export const validatePassword = (
   password: string,
   policy: PasswordPolicyConfig,
   userCtx: PasswordUserContext = {},
+  options: ValidatePasswordOptions = {},
 ): PasswordValidationResult => {
   const errors: PolicyError[] = [];
   const pw = password ?? '';
@@ -83,7 +87,7 @@ export const validatePassword = (
     }
   }
 
-  if (policy.checkCommonPasswords && COMMON_PASSWORDS.has(normalizedPw)) {
+  if (policy.checkCommonPasswords && options.commonPasswords?.has(normalizedPw)) {
     errors.push({ code: 'COMMON_PASSWORD', params: {} });
   }
 

@@ -6,6 +6,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { PasswordPolicy, PASSWORD_POLICY_SINGLETON_ID } from '@attraccess/database-entities';
 import {
+  COMMON_PASSWORDS,
   DEFAULT_PASSWORD_POLICY,
   PasswordPolicyConfig,
   PasswordUserContext,
@@ -75,7 +76,7 @@ export class PasswordPolicyService implements OnModuleInit {
 
   public async validate(password: string, userCtx: PasswordUserContext = {}): Promise<ServerValidationResult> {
     const policy = await this.getPolicy();
-    const baseResult = validatePassword(password, policy, userCtx);
+    const baseResult = validatePassword(password, policy, userCtx, { commonPasswords: COMMON_PASSWORDS });
     const errors: PolicyError[] = [...baseResult.errors];
 
     const zxcvbnInputs = [userCtx.username, userCtx.email].filter((v): v is string => typeof v === 'string' && v.length > 0);

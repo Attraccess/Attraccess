@@ -1,3 +1,4 @@
+import { COMMON_PASSWORDS } from './common-passwords';
 import { DEFAULT_PASSWORD_POLICY, PasswordPolicyConfig } from './types';
 import { validatePassword } from './validate-password';
 
@@ -105,18 +106,38 @@ describe('validatePassword', () => {
   });
 
   describe('common passwords', () => {
-    it('rejects a top-10k common password when enabled', () => {
-      const result = validatePassword('password', policy({ minLength: 4, checkCommonPasswords: true }));
+    it('rejects a top-10k common password when enabled and list provided', () => {
+      const result = validatePassword(
+        'password',
+        policy({ minLength: 4, checkCommonPasswords: true }),
+        {},
+        { commonPasswords: COMMON_PASSWORDS },
+      );
       expect(result.errors).toContainEqual({ code: 'COMMON_PASSWORD', params: {} });
     });
 
     it('skips check when disabled', () => {
-      const result = validatePassword('password', policy({ minLength: 4, checkCommonPasswords: false }));
+      const result = validatePassword(
+        'password',
+        policy({ minLength: 4, checkCommonPasswords: false }),
+        {},
+        { commonPasswords: COMMON_PASSWORDS },
+      );
+      expect(result.errors.some((e) => e.code === 'COMMON_PASSWORD')).toBe(false);
+    });
+
+    it('skips check when no list provided', () => {
+      const result = validatePassword('password', policy({ minLength: 4, checkCommonPasswords: true }));
       expect(result.errors.some((e) => e.code === 'COMMON_PASSWORD')).toBe(false);
     });
 
     it('case-insensitive match', () => {
-      const result = validatePassword('PASSWORD', policy({ minLength: 4, checkCommonPasswords: true }));
+      const result = validatePassword(
+        'PASSWORD',
+        policy({ minLength: 4, checkCommonPasswords: true }),
+        {},
+        { commonPasswords: COMMON_PASSWORDS },
+      );
       expect(result.errors).toContainEqual({ code: 'COMMON_PASSWORD', params: {} });
     });
   });
