@@ -18,7 +18,16 @@ import { useTheme } from '@heroui/use-theme';
 import { usePtrStore } from '../../../../stores/ptr.store';
 import Dagre from '@dagrejs/dagre';
 import { Button } from '@heroui/react';
-import { CheckIcon, LayoutGridIcon, LogsIcon, PlusIcon, SaveIcon, Download as DownloadIcon, Upload as UploadIcon } from 'lucide-react';
+import {
+  CheckIcon,
+  LayoutGridIcon,
+  LogsIcon,
+  PlusIcon,
+  SaveIcon,
+  Download as DownloadIcon,
+  Upload as UploadIcon,
+  Braces as BracesIcon,
+} from 'lucide-react';
 import { nanoid } from 'nanoid';
 import { NodePickerModal } from './nodePickerModal';
 import { FlowProvider, useFlowContext } from './flowContext';
@@ -27,6 +36,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { EdgeWithDeleteButton } from './edgeWithDeleteButton';
 import JSConfetti from 'js-confetti';
 import { LogViewer } from './logViewer';
+import { VariablesModal } from './variablesModal';
 import de from './de.json';
 import en from './en.json';
 import nodesDeTranslations from './node/de.json';
@@ -391,6 +401,17 @@ function FlowsPageInner() {
             <LogViewer resourceId={Number(resourceId)}>
               {(open) => <Button isIconOnly startContent={<LogsIcon />} onPress={open} />}
             </LogViewer>
+
+            <VariablesModal resourceId={Number(resourceId)}>
+              {(open) => (
+                <Button
+                  isIconOnly
+                  startContent={<BracesIcon />}
+                  onPress={open}
+                  aria-label={t('actions.variables')}
+                />
+              )}
+            </VariablesModal>
 
             <Button isIconOnly startContent={<LayoutGridIcon />} onPress={layout} />
             <NodePickerModal
