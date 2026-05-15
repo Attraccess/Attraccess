@@ -17,7 +17,7 @@ export type CreateUserDto = {
      */
     email: string;
     /**
-     * The password for the new user
+     * The password for the new user (validated server-side against the active password policy)
      */
     password: string;
     /**
@@ -1243,6 +1243,20 @@ export type LicenseDataDto = {
      * Are you using this software for free as a non-profit?
      */
     isNonProfit: boolean;
+};
+
+export type PublicPasswordPolicyDto = {
+    minLength: number;
+    maxLength: number;
+    allowAllUnicode: boolean;
+    requireUppercase: boolean;
+    requireLowercase: boolean;
+    requireDigit: boolean;
+    requireSpecial: boolean;
+    /**
+     * Minimum required zxcvbn score (0-4)
+     */
+    minZxcvbnScore: number;
 };
 
 /**
@@ -4402,6 +4416,8 @@ export type UpdateAuthRateLimitSettingsResponse = AuthRateLimitSettingsDto;
 
 export type GetLicenseInformationResponse = LicenseDataDto;
 
+export type GetPublicPasswordPolicyResponse = PublicPasswordPolicyDto;
+
 export type CreateOneResourceData = {
     formData: CreateResourceDto;
 };
@@ -6561,6 +6577,16 @@ export type $OpenApiTs = {
                  * Unauthorized
                  */
                 401: unknown;
+            };
+        };
+    };
+    '/api/password-policy/public': {
+        get: {
+            res: {
+                /**
+                 * The currently active public password policy
+                 */
+                200: PublicPasswordPolicyDto;
             };
         };
     };

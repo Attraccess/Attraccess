@@ -21,8 +21,8 @@ export const $CreateUserDto = {
         },
         password: {
             type: 'string',
-            description: 'The password for the new user',
-            example: 'password123'
+            description: 'The password for the new user (validated server-side against the active password policy)',
+            example: 'correct-horse-battery-staple-42'
         },
         strategy: {
             description: 'The authentication strategy to use',
@@ -1878,6 +1878,46 @@ export const $LicenseDataDto = {
         }
     },
     required: ['valid', 'modules', 'usageLimits', 'isNonProfit']
+} as const;
+
+export const $PublicPasswordPolicyDto = {
+    type: 'object',
+    properties: {
+        minLength: {
+            type: 'number',
+            example: 12
+        },
+        maxLength: {
+            type: 'number',
+            example: 128
+        },
+        allowAllUnicode: {
+            type: 'boolean',
+            example: true
+        },
+        requireUppercase: {
+            type: 'boolean',
+            example: false
+        },
+        requireLowercase: {
+            type: 'boolean',
+            example: false
+        },
+        requireDigit: {
+            type: 'boolean',
+            example: false
+        },
+        requireSpecial: {
+            type: 'boolean',
+            example: false
+        },
+        minZxcvbnScore: {
+            type: 'number',
+            example: 3,
+            description: 'Minimum required zxcvbn score (0-4)'
+        }
+    },
+    required: ['minLength', 'maxLength', 'allowAllUnicode', 'requireUppercase', 'requireLowercase', 'requireDigit', 'requireSpecial', 'minZxcvbnScore']
 } as const;
 
 export const $ResourceType = {

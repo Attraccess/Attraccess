@@ -15,6 +15,7 @@ import { TokenHashService } from '../../encryption/token-hash.service';
 import { ForbiddenException } from '@nestjs/common';
 import { BruteForceProtectionService } from '../rate-limiting/brute-force.service';
 import { AuthAuditLogger } from '../rate-limiting/auth-audit.logger';
+import { PasswordPolicyService } from '../password-policy/password-policy.service';
 
 describe('UsersController', () => {
   let controller: UsersController;
@@ -93,6 +94,14 @@ describe('UsersController', () => {
         {
           provide: AuthAuditLogger,
           useValue: { log: jest.fn() },
+        },
+        {
+          provide: PasswordPolicyService,
+          useValue: {
+            validate: jest.fn(async () => ({ ok: true, errors: [], zxcvbn: { score: 4, required: 3 } })),
+            getPolicy: jest.fn(),
+            getPublicPolicy: jest.fn(),
+          },
         },
       ],
     }).compile();

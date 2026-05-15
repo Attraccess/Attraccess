@@ -1,4 +1,4 @@
-import { IsBoolean, IsEmail, IsIn, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsBoolean, IsEmail, IsIn, IsOptional, IsString } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { AuthenticationType } from '@attraccess/database-entities';
 
@@ -18,11 +18,10 @@ export class CreateUserDto {
   email: string;
 
   @ApiProperty({
-    description: 'The password for the new user',
-    example: 'password123',
+    description: 'The password for the new user (validated server-side against the active password policy)',
+    example: 'correct-horse-battery-staple-42',
   })
   @IsString()
-  @MinLength(8)
   password: string;
 
   @ApiProperty({
