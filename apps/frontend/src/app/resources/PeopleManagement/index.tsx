@@ -18,6 +18,7 @@ import {
   ModalFooter,
   ModalHeader,
   ModalHeading,
+  Spinner,
   Table,
   TableBody,
   TableCell,
@@ -105,13 +106,26 @@ export function PeopleManagement(props: Readonly<PeopleManagementProps & Omit<Ca
   const [historyUserId, setHistoryUserId] = useState<number | null>(null);
   const { isOpen: isHistoryOpen, open: openHistory, close: closeHistory } = useOverlayState();
 
-  const { data: introducers, error: introducersError } = useAccessControlServiceResourceIntroducersGetMany({
+  const [pendingIntroducerUserId, setPendingIntroducerUserId] = useState<number | null>(null);
+  const [pendingIntroductionUserId, setPendingIntroductionUserId] = useState<number | null>(null);
+
+  const {
+    data: introducers,
+    error: introducersError,
+    isLoading: isIntroducersLoading,
+  } = useAccessControlServiceResourceIntroducersGetMany({
     resourceId,
   });
 
-  const { data: introductions, error: introductionsError } = useAccessControlServiceResourceIntroductionsGetMany({
+  const {
+    data: introductions,
+    error: introductionsError,
+    isLoading: isIntroductionsLoading,
+  } = useAccessControlServiceResourceIntroductionsGetMany({
     resourceId,
   });
+
+  const isLoading = isIntroducersLoading || isIntroductionsLoading;
 
   const userHasValidIntroduction = useHasValidIntroduction({ introductions: introductions ?? [] });
 
@@ -225,11 +239,16 @@ export function PeopleManagement(props: Readonly<PeopleManagementProps & Omit<Ca
     (introductions ?? []).forEach((introduction) => {
       const user = introduction.receiverUser;
       if (!user) return;
-      const sortedHistory = [...(introduction.history ?? [])].sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-      );
-      const lastEvent = sortedHistory[0];
-      const lastEventAt = lastEvent?.createdAt ?? introduction.createdAt;
+      let latestHistoryAt: string | null = null;
+      let latestHistoryTime = -Infinity;
+      for (const event of introduction.history ?? []) {
+        const time = new Date(event.createdAt).getTime();
+        if (time > latestHistoryTime) {
+          latestHistoryTime = time;
+          latestHistoryAt = event.createdAt;
+        }
+      }
+      const lastEventAt = latestHistoryAt ?? introduction.createdAt;
       const isValid = userHasValidIntroduction(user);
       const existing = byUserId.get(user.id);
       if (existing) {
@@ -276,13 +295,23 @@ export function PeopleManagement(props: Readonly<PeopleManagementProps & Omit<Ca
   const handleAddSubmit = useCallback(async () => {
     if (!addUser || !addMode) return;
     if (addMode === 'introducer') {
-      await grantIntroducer({ resourceId, userId: addUser.id });
+      setPendingIntroducerUserId(addUser.id);
+      try {
+        await grantIntroducer({ resourceId, userId: addUser.id });
+      } finally {
+        setPendingIntroducerUserId(null);
+      }
     } else {
-      await grantIntroduction({
-        resourceId,
-        userId: addUser.id,
-        requestBody: { comment: addComment || undefined },
-      });
+      setPendingIntroductionUserId(addUser.id);
+      try {
+        await grantIntroduction({
+          resourceId,
+          userId: addUser.id,
+          requestBody: { comment: addComment || undefined },
+        });
+      } finally {
+        setPendingIntroductionUserId(null);
+      }
     }
     setAddUser(null);
     setAddComment('');
@@ -302,18 +331,23 @@ export function PeopleManagement(props: Readonly<PeopleManagementProps & Omit<Ca
   const handleRevokeSubmit = useCallback(async () => {
     if (!revokeContext) return;
     const { user, action } = revokeContext;
-    if (action === 'grant') {
-      await grantIntroduction({
-        resourceId,
-        userId: user.id,
-        requestBody: { comment: revokeComment || undefined },
-      });
-    } else {
-      await revokeIntroduction({
-        resourceId,
-        userId: user.id,
-        requestBody: { comment: revokeComment || undefined },
-      });
+    setPendingIntroductionUserId(user.id);
+    try {
+      if (action === 'grant') {
+        await grantIntroduction({
+          resourceId,
+          userId: user.id,
+          requestBody: { comment: revokeComment || undefined },
+        });
+      } else {
+        await revokeIntroduction({
+          resourceId,
+          userId: user.id,
+          requestBody: { comment: revokeComment || undefined },
+        });
+      }
+    } finally {
+      setPendingIntroductionUserId(null);
     }
     setRevokeContext(null);
     setRevokeComment('');
@@ -326,6 +360,18 @@ export function PeopleManagement(props: Readonly<PeopleManagementProps & Omit<Ca
       openHistory();
     },
     [openHistory],
+  );
+
+  const handleRevokeIntroducer = useCallback(
+    async (userId: number) => {
+      setPendingIntroducerUserId(userId);
+      try {
+        await revokeIntroducer({ resourceId, userId });
+      } finally {
+        setPendingIntroducerUserId(null);
+      }
+    },
+    [revokeIntroducer, resourceId],
   );
 
   if (introducersError || introductionsError) {
@@ -425,8 +471,16 @@ export function PeopleManagement(props: Readonly<PeopleManagementProps & Omit<Ca
               <TableColumn>{t('columns.actions')}</TableColumn>
             </TableHeader>
             <TableBody
-              items={filteredRows}
-              renderEmptyState={() => <EmptyState message={t('emptyState')} />}
+              items={isLoading ? [] : filteredRows}
+              renderEmptyState={() =>
+                isLoading ? (
+                  <div className="flex justify-center py-12">
+                    <Spinner data-cy="people-loading-spinner" />
+                  </div>
+                ) : (
+                  <EmptyState message={t('emptyState')} />
+                )
+              }
             >
               {(row) => (
                 <TableRow key={row.user.id} id={row.user.id}>
@@ -483,7 +537,7 @@ export function PeopleManagement(props: Readonly<PeopleManagementProps & Omit<Ca
                               <Button
                                 variant="ghost"
                                 isIconOnly
-                                isPending={isRevokingIntroduction}
+                                isPending={isRevokingIntroduction && pendingIntroductionUserId === row.user.id}
                                 onPress={() => handleIntroductionToggle(row.user, 'revoke')}
                                 aria-label={t('rowActions.revokeIntroduction')}
                                 data-cy={`people-row-revoke-introduction-${row.user.id}`}
@@ -499,7 +553,7 @@ export function PeopleManagement(props: Readonly<PeopleManagementProps & Omit<Ca
                               <Button
                                 variant="ghost"
                                 isIconOnly
-                                isPending={isGrantingIntroduction}
+                                isPending={isGrantingIntroduction && pendingIntroductionUserId === row.user.id}
                                 onPress={() => handleIntroductionToggle(row.user, 'grant')}
                                 aria-label={t('rowActions.grantIntroduction')}
                                 data-cy={`people-row-grant-introduction-${row.user.id}`}
@@ -517,8 +571,8 @@ export function PeopleManagement(props: Readonly<PeopleManagementProps & Omit<Ca
                             <Button
                               variant="ghost"
                               isIconOnly
-                              isPending={isRevokingIntroducer}
-                              onPress={() => revokeIntroducer({ resourceId, userId: row.user.id })}
+                              isPending={isRevokingIntroducer && pendingIntroducerUserId === row.user.id}
+                              onPress={() => handleRevokeIntroducer(row.user.id)}
                               aria-label={t('rowActions.revokeIntroducer')}
                               data-cy={`people-row-revoke-introducer-${row.user.id}`}
                             >
