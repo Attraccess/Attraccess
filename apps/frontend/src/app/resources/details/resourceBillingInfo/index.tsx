@@ -19,10 +19,11 @@ import { dbCurrencyToUserCurrency } from '@attraccess/shared';
 interface Props {
   resourceId: number;
   onExampleAmountChange?: (amount: number) => void;
+  variant?: 'card' | 'flat';
 }
 
-export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) {
-  const { resourceId, onExampleAmountChange, ...cardProps } = props;
+export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children' | 'variant'>) {
+  const { resourceId, onExampleAmountChange, variant = 'card', ...cardProps } = props;
 
   const { t } = useTranslations({ en, de });
   const { data: configuration } = useBillingServiceGetBillingConfiguration();
@@ -118,26 +119,9 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
     return null;
   }
 
-  return (
-    <Card {...cardProps}>
-      <Card.Header className="flex items-center justify-between py-3">
-        <PageHeader
-          title={t('title')}
-          icon={<CreditCard />}
-          actions={
-            <ResourceBillingInfoEditor resourceId={resourceId}>
-              {(onOpen) => (
-                <Button variant="primary" isIconOnly onPress={onOpen} ><Edit2Icon size={12} /></Button>
-              )}
-            </ResourceBillingInfoEditor>
-          }
-          noMargin
-        />
-      </Card.Header>
-
-      <Card.Content>
-        <Table>
-          <TableContent aria-label={t('table.ariaLabel')}>
+  const tableContent = (
+    <Table>
+      <TableContent aria-label={t('table.ariaLabel')}>
           <TableHeader>
             <TableColumn isRowHeader> </TableColumn>
             <TableColumn> </TableColumn>
@@ -221,7 +205,43 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
           </TableBody>
           </TableContent>
         </Table>
-      </Card.Content>
+  );
+
+  const editorAction = (
+    <ResourceBillingInfoEditor resourceId={resourceId}>
+      {(onOpen) => (
+        <Button variant="primary" isIconOnly onPress={onOpen}><Edit2Icon size={12} /></Button>
+      )}
+    </ResourceBillingInfoEditor>
+  );
+
+  if (variant === 'flat') {
+    return (
+      <section className={cn('w-full', (cardProps as { className?: string }).className)}>
+        <header className="flex items-center justify-between border-b border-divider pb-2 mb-3">
+          <div className="flex items-center gap-2 text-foreground-700">
+            <CreditCard className="w-4 h-4" />
+            <h3 className="text-xs font-semibold uppercase tracking-wider">{t('title')}</h3>
+          </div>
+          {editorAction}
+        </header>
+        <div className="text-sm">{tableContent}</div>
+      </section>
+    );
+  }
+
+  return (
+    <Card {...cardProps}>
+      <Card.Header className="flex items-center justify-between py-3">
+        <PageHeader
+          title={t('title')}
+          icon={<CreditCard />}
+          actions={editorAction}
+          noMargin
+        />
+      </Card.Header>
+
+      <Card.Content>{tableContent}</Card.Content>
     </Card>
   );
 }
