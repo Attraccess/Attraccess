@@ -193,29 +193,26 @@ function ResourceDetailsComponent() {
       <div className="w-full space-y-6 mb-6">
         <ResourceHealthWarning resourceId={resourceId} />
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-          <div className="lg:col-span-2 space-y-6">
-            <ResourceUsageSession
-              resourceId={resourceId}
-              resource={resource}
-              data-cy="resource-usage-session"
-              insufficientBalanceDesiredAmount={insufficientBalanceDesiredAmount}
-              className="border-l-4 border-l-primary shadow-medium"
-            />
-            <ResourceUsageHistory resourceId={resourceId} data-cy="resource-usage-history" />
-          </div>
+        <ResourceUsageSession
+          resourceId={resourceId}
+          resource={resource}
+          data-cy="resource-usage-session"
+          insufficientBalanceDesiredAmount={insufficientBalanceDesiredAmount}
+          className="border-l-4 border-l-primary shadow-medium"
+        />
 
-          <aside className="lg:col-span-1 space-y-8">
-            <ResourceBillingInfo
-              variant="flat"
-              resourceId={resourceId}
-              onExampleAmountChange={(value) => setInsufficientBalanceDesiredAmount(Math.ceil(value))}
-            />
-            {maintenancePermissions?.canManage && (
-              <MaintenanceManagement variant="flat" resourceId={resourceId} />
-            )}
-          </aside>
+        <div className="space-y-8">
+          <ResourceBillingInfo
+            variant="flat"
+            resourceId={resourceId}
+            onExampleAmountChange={(value) => setInsufficientBalanceDesiredAmount(Math.ceil(value))}
+          />
+          {maintenancePermissions?.canManage && (
+            <MaintenanceManagement variant="flat" resourceId={resourceId} />
+          )}
         </div>
+
+        <ResourceUsageHistory resourceId={resourceId} data-cy="resource-usage-history" />
       </div>
 
       <div className="flex flex-row flex-wrap w-full gap-6 items-stretch">
