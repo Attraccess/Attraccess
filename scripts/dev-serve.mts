@@ -15,10 +15,18 @@ interface Resolved {
 function parseArgs(argv: string[]): { only: Target } {
   let only: Target = 'both';
   for (const arg of argv.slice(2)) {
-    const m = arg.match(/^--only=(api|frontend|both)$/);
-    if (m) only = m[1] as Target;
-    else if (arg === '--only') throw new Error('--only requires a value: api|frontend|both');
-    else if (arg.startsWith('--')) throw new Error(`Unknown flag: ${arg}`);
+    const m = arg.match(/^--only=(.+)$/);
+    if (m) {
+      if (m[1] === 'api' || m[1] === 'frontend' || m[1] === 'both') {
+        only = m[1] as Target;
+      } else {
+        throw new Error(`Invalid value for --only: "${m[1]}". Must be api, frontend, or both.`);
+      }
+    } else if (arg === '--only') {
+      throw new Error('--only requires a value: api|frontend|both');
+    } else if (arg.startsWith('--')) {
+      throw new Error(`Unknown flag: ${arg}`);
+    }
   }
   return { only };
 }
@@ -42,9 +50,9 @@ function banner(r: Resolved): string {
   const lines: string[] = [];
   lines.push('┌─────────────────────────────────────────────┐');
   lines.push('│ Attraccess dev servers                      │');
-  if (r.apiPort !== undefined) lines.push(`│   API      → http://localhost:${String(r.apiPort).padEnd(13)}│`);
-  if (r.frontendPort !== undefined) lines.push(`│   Frontend → http://localhost:${String(r.frontendPort).padEnd(13)}│`);
-  if (r.previewPort !== undefined) lines.push(`│   Preview  → http://localhost:${String(r.previewPort).padEnd(13)}│`);
+  if (r.apiPort !== undefined) lines.push(`│   API      → http://localhost:${String(r.apiPort).padEnd(14)}│`);
+  if (r.frontendPort !== undefined) lines.push(`│   Frontend → http://localhost:${String(r.frontendPort).padEnd(14)}│`);
+  if (r.previewPort !== undefined) lines.push(`│   Preview  → http://localhost:${String(r.previewPort).padEnd(14)}│`);
   lines.push('└─────────────────────────────────────────────┘');
   return lines.join('\n');
 }
@@ -84,8 +92,13 @@ async function main() {
   process.on('SIGTERM', () => forward('SIGTERM'));
 
   child.on('exit', (code, signal) => {
-    if (signal) process.kill(process.pid, signal);
-    else process.exit(code ?? 0);
+    if (signal) {
+      process.removeAllListeners('SIGINT');
+      process.removeAllListeners('SIGTERM');
+      process.kill(process.pid, signal);
+    } else {
+      process.exit(code ?? 0);
+    }
   });
 }
 
