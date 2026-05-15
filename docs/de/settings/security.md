@@ -49,6 +49,55 @@ Die Sitzungssicherheit wird ueber Umgebungsvariablen gesteuert:
 - Erzeugen Sie bei der Ersteinrichtung einen starken `AUTH_SESSION_SECRET` und bewahren Sie ihn sicher auf.
 - Passen Sie `SESSION_COOKIE_MAX_AGE` an Ihre Sicherheitsanforderungen an. Kuerzere Dauern sind sicherer, erfordern aber haeufigeres Anmelden.
 
+## Auth-Rate-Limiting und Konto-Sperre
+
+Fehlgeschlagene Auth-Versuche bei Login, Registrierung und Passwort-Reset werden pro IP gedrosselt. Wiederholte Login-Fehlversuche sperren zusaetzlich das betroffene Konto. Werte sind unter **Einstellungen -> Auth-Rate-Limiting** einstellbar.
+
+| Einstellung | Standard | Beschreibung |
+|-------------|----------|-------------|
+| `maxAttempts` | `5` | Erlaubte Fehlversuche pro Zeitfenster, bevor Drosselung oder Sperre greift. |
+| `windowSeconds` | `900` | Zeitfenster fuer das Zaehlen der Fehlversuche. |
+| `lockoutDurationSeconds` | `900` | Grundsperrdauer. |
+| `exponentialBackoff` | `false` | Wenn `true`, waechst die Sperre bei jeder Wiederholung um `backoffMultiplier`. |
+| `backoffMultiplier` | `2` | Multiplikator fuer die Sperrdauer bei wiederholten Sperren. |
+
+Antworten bei Auslosen:
+
+- **`429 Too Many Requests`** mit `Retry-After`-Header, wenn eine IP die Schwelle ueberschreitet.
+- **`423 Locked`** mit `Retry-After`-Header bei einem gesperrten Konto.
+
+Erfolgreicher Login oder Admin-Unlock entsperrt das Konto. Admin-Unlock erfolgt ueber die Benutzerverwaltung.
+
+## Auth-Audit-Log-Format
+
+Jeder Auth-Versuch erzeugt eine einzeilige, leerzeichengetrennte Log-Zeile unter dem `AuthAudit`-Kontext. Feldnamen und Reihenfolge sind stabil und fail2ban-freundlich.
+
+```
+auth.failed type=login outcome=invalid_credentials ip=1.2.3.4 user_id=42 username=alice ts=2026-05-15T12:34:56.000Z reason=bad_password
+```
+
+| Feld | Beschreibung |
+|------|-------------|
+| `prefix` | `auth.success` bei Erfolg, sonst `auth.failed`. |
+| `type` | `login`, `register`, `password_reset_request`, `password_reset_complete`. |
+| `outcome` | `success`, `invalid_credentials`, `account_locked`, `rate_limited`, `two_factor_required`, `two_factor_invalid`, `email_not_verified`, `invalid_token`, `invalid_input`, `unknown_user`. |
+| `ip` | Client-IP, sonst `unknown`. |
+| `user_id` | Numerische User-ID, sonst `-`. |
+| `username` | Benutzername, sonst `-`. Whitespace und Quotes werden durch `_` ersetzt. |
+| `ts` | ISO-8601-UTC-Zeitstempel. |
+| `reason` | Optionaler Kurz-Grund. |
+
+Passwoerter, Tokens oder andere Secrets werden nie geloggt.
+
+### fail2ban-Regex
+
+Minimaler `failregex` fuer `/etc/fail2ban/filter.d/attraccess-auth.conf`:
+
+```
+failregex = ^.*auth\.failed type=(?:login|register|password_reset_request|password_reset_complete) outcome=\S+ ip=<HOST> .*$
+ignoreregex =
+```
+
 ## Siehe auch
 
 - [Umgebungsvariablen](installation/environment-variables.md) -- Alle Konfigurationsoptionen

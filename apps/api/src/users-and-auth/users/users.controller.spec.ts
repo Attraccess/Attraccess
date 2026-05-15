@@ -13,6 +13,8 @@ import { CsvInviteConfigDto } from './dtos/csvInvite.dto';
 import { FileUpload } from '../../common/types/file-upload.types';
 import { TokenHashService } from '../../encryption/token-hash.service';
 import { ForbiddenException } from '@nestjs/common';
+import { BruteForceProtectionService } from '../rate-limiting/brute-force.service';
+import { AuthAuditLogger } from '../rate-limiting/auth-audit.logger';
 
 describe('UsersController', () => {
   let controller: UsersController;
@@ -78,6 +80,19 @@ describe('UsersController', () => {
           useValue: {
             hashToken: jest.fn((token: string) => `hashed:${token}`),
           },
+        },
+        {
+          provide: BruteForceProtectionService,
+          useValue: {
+            assertIpAllowed: jest.fn().mockResolvedValue(undefined),
+            assertAccountAllowed: jest.fn().mockResolvedValue(undefined),
+            recordFailure: jest.fn().mockResolvedValue(undefined),
+            recordSuccess: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: AuthAuditLogger,
+          useValue: { log: jest.fn() },
         },
       ],
     }).compile();

@@ -43,6 +43,10 @@ import { AccountLinkingExceptionFilter } from './auth/sso/oidc/account-linking.e
 import { TwoFactorService } from './auth/two-factor.service';
 import { SettingsModule } from '../settings/settings.module';
 import { SettingsService } from '../settings/settings.service';
+import { BruteForceProtectionService } from './rate-limiting/brute-force.service';
+import { AuthAuditLogger } from './rate-limiting/auth-audit.logger';
+import { AuthRateLimitInterceptor } from './rate-limiting/auth-rate-limit.interceptor';
+import { LoginRateLimitGuard } from './rate-limiting/login.rate-limit.guard';
 
 @Module({
   imports: [
@@ -77,6 +81,10 @@ import { SettingsService } from '../settings/settings.service';
     SSOSamlStrategy,
     SSOLinkTokenService,
     AccountLinkingExceptionFilter,
+    BruteForceProtectionService,
+    AuthAuditLogger,
+    AuthRateLimitInterceptor,
+    LoginRateLimitGuard,
     {
       provide: SSOOIDCStrategy,
       useFactory: async (moduleRef: ModuleRef, settingsService: SettingsService, stateStore: OidcCookieStateStore) => {
@@ -101,6 +109,6 @@ import { SettingsService } from '../settings/settings.service';
     },
   ],
   controllers: [UsersController, AuthController, TwoFactorController, SSOController],
-  exports: [UsersService, AuthService, SessionService],
+  exports: [UsersService, AuthService, SessionService, BruteForceProtectionService, AuthAuditLogger],
 })
 export class UsersAndAuthModule {}

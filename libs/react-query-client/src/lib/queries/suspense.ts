@@ -239,6 +239,12 @@ export const useSettingsServiceGetFirstTimeSetupStatusSuspense = <TData = Common
 */
 export const useSettingsServiceGetMetricsSettingsSuspense = <TData = Common.SettingsServiceGetMetricsSettingsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseSettingsServiceGetMetricsSettingsKeyFn(queryKey), queryFn: () => SettingsService.getMetricsSettings() as TData, ...options });
 /**
+* Get auth rate-limit settings
+* @returns AuthRateLimitSettingsDto Current auth rate-limit settings.
+* @throws ApiError
+*/
+export const useSettingsServiceGetAuthRateLimitSettingsSuspense = <TData = Common.SettingsServiceGetAuthRateLimitSettingsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseSettingsServiceGetAuthRateLimitSettingsKeyFn(queryKey), queryFn: () => SettingsService.getAuthRateLimitSettings() as TData, ...options });
+/**
 * Get license information
 * @returns LicenseDataDto The current license data.
 * @throws ApiError

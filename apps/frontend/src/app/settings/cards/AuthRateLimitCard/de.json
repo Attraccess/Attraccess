@@ -1,0 +1,4 @@
+{
+  "title": "Auth-Rate-Limiting",
+  "subtitle": "Fehlgeschlagene Anmeldungen drosseln und Konten nach wiederholten Fehlversuchen sperren"
+}

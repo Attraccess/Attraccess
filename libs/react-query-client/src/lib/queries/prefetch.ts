@@ -239,6 +239,12 @@ export const prefetchUseSettingsServiceGetFirstTimeSetupStatus = (queryClient: Q
 */
 export const prefetchUseSettingsServiceGetMetricsSettings = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseSettingsServiceGetMetricsSettingsKeyFn(), queryFn: () => SettingsService.getMetricsSettings() });
 /**
+* Get auth rate-limit settings
+* @returns AuthRateLimitSettingsDto Current auth rate-limit settings.
+* @throws ApiError
+*/
+export const prefetchUseSettingsServiceGetAuthRateLimitSettings = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseSettingsServiceGetAuthRateLimitSettingsKeyFn(), queryFn: () => SettingsService.getAuthRateLimitSettings() });
+/**
 * Get license information
 * @returns LicenseDataDto The current license data.
 * @throws ApiError
