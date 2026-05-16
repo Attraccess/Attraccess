@@ -140,7 +140,7 @@ docker compose exec fail2ban fail2ban-client set attraccess-auth findtime 600
 docker compose exec fail2ban fail2ban-client set attraccess-auth bantime 3600
 ```
 
-Diese Live-Aenderungen gehen beim naechsten Neustart verloren — fuer den Dauerbetrieb ueber Umgebungsvariablen persistieren.
+Diese Live-Aenderungen gehen beim naechsten Neustart verloren — fuer den Dauerbetrieb sollten Sie sie ueber Umgebungsvariablen persistieren.
 
 ### Auth-Audit-Log inspizieren
 

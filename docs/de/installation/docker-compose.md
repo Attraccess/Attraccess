@@ -149,7 +149,7 @@ docker compose --profile fail2ban up -d
 | `F2B_ATTRACCESS_BANTIME` | `900` | Sperrdauer in Sekunden. `-1` = permanent. |
 | `F2B_IPTABLES_CHAIN` | `DOCKER-USER` | iptables-Chain, in die die Sperr-Regeln geschrieben werden. |
 | `F2B_LOG_LEVEL` | `INFO` | Log-Level des fail2ban-Servers. |
-| `F2B_DB_PURGE_AGE` | `1d` | Aufbewahrungszeit historischer Events in der fail2ban-sqlite-DB. |
+| `F2B_DB_PURGE_AGE` | `1d` | Aufbewahrungszeit historischer Events in der fail2ban-SQLite-DB. |
 
 Sperren werden im Volume `fail2ban-data` persistiert und ueberleben Container-Neustarts.
 

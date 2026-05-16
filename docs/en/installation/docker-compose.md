@@ -149,7 +149,7 @@ docker compose --profile fail2ban up -d
 | `F2B_ATTRACCESS_BANTIME` | `900` | Ban duration in seconds. `-1` = permanent. |
 | `F2B_IPTABLES_CHAIN` | `DOCKER-USER` | iptables chain the ban rules are written to. |
 | `F2B_LOG_LEVEL` | `INFO` | fail2ban server log level. |
-| `F2B_DB_PURGE_AGE` | `1d` | How long fail2ban keeps historical events in its sqlite DB. |
+| `F2B_DB_PURGE_AGE` | `1d` | How long fail2ban keeps historical events in its SQLite DB. |
 
 Bans are persisted to the `fail2ban-data` volume so they survive container restarts.
 
