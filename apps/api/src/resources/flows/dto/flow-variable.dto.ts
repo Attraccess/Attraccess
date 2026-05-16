@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { Allow } from 'class-validator';
 import { ResourceFlowVariableScope, ResourceFlowVariableValueType } from '@attraccess/database-entities';
 
 export class FlowVariableDto {
@@ -16,5 +17,6 @@ export class FlowVariableDto {
 
 export class FlowVariableUpsertDto {
   @ApiProperty({ description: 'Any JSON value', type: Object })
+  @Allow()
   value!: unknown;
 }

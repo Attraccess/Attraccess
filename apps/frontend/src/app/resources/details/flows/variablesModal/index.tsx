@@ -196,6 +196,7 @@ export function VariablesModal(props: Props) {
                   </Button>
                 </div>
 
+                <div className="overflow-x-auto">
                 <Table aria-label={t('title')} removeWrapper isStriped>
                   <TableHeader>
                     <TableColumn>{t('table.key')}</TableColumn>
@@ -267,6 +268,7 @@ export function VariablesModal(props: Props) {
                     )}
                   </TableBody>
                 </Table>
+                </div>
               </div>
             )}
           </ModalBody>
