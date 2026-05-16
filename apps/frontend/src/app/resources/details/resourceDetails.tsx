@@ -23,8 +23,7 @@ import { DocumentationModal } from '../documentation';
 import de from './resourceDetails.de.json';
 import en from './resourceDetails.en.json';
 import { ResourceEditModal } from '../editModal/resourceEditModal';
-import { ResoureIntroducerManagement } from '../IntroducerManagement';
-import { ResourceIntroductionsManagement } from '../IntroductionsManagement';
+import { PeopleManagement } from '../PeopleManagement';
 import { ResourceQrCode } from './qrcode';
 import { useQrCodeAction } from './useQrCodeAction';
 import { filenameToUrl } from '../../../api';
@@ -221,27 +220,21 @@ function ResourceDetailsComponent() {
 
       <div className="flex flex-row flex-wrap w-full gap-6 items-stretch">
         {(isIntroducer?.isIntroducer || canManageResources) && (
-          <ResourceIntroductionsManagement
+          <PeopleManagement
             resourceId={resourceId}
+            canManageIntroducers={canManageResources}
+            canManageIntroductions={isIntroducer?.isIntroducer || canManageResources}
             className="flex-1 min-w-80"
-            data-cy="manage-resource-introductions"
+            data-cy="manage-resource-people"
           />
         )}
 
         {canManageResources && (
-          <>
-            <ResoureIntroducerManagement
-              resourceId={resourceId}
-              className="flex-1 min-w-80"
-              data-cy="manage-resource-introducers"
-            />
-
-            <ManageResourceGroups
-              resourceId={resourceId}
-              data-cy="manage-resource-groups"
-              className="flex-1 min-w-80"
-            />
-          </>
+          <ManageResourceGroups
+            resourceId={resourceId}
+            data-cy="manage-resource-groups"
+            className="flex-1 min-w-80"
+          />
         )}
       </div>
 
