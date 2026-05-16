@@ -4,9 +4,11 @@
 # the slice-D audit format, then asserts that the offending IP is banned via
 # `fail2ban-client status attraccess-auth`.
 #
-# Designed to run on CI (GitHub Actions, ubuntu-latest) without requiring
-# iptables to be writable: the jail action is overridden to `dummy` so the ban
-# is registered in fail2ban's state without touching the host firewall.
+# Designed to run on CI (GitHub Actions, ubuntu-latest). The jail action is
+# overridden to `dummy` so the ban is registered in fail2ban's state without
+# touching the host firewall, but the upstream image's entrypoint still
+# initialises iptables before exec-ing fail2ban-server, so the container is
+# granted NET_ADMIN/NET_RAW just like in production compose.
 
 set -euo pipefail
 
@@ -16,7 +18,7 @@ CONTAINER="attraccess-fail2ban-smoke"
 TEST_IP="10.99.0.42"
 MAXRETRY=5
 FAILURES=6
-TIMEOUT_S=45
+TIMEOUT_S=60
 
 WORK="$(mktemp -d)"
 trap 'docker rm -f "$CONTAINER" >/dev/null 2>&1 || true; rm -rf "$WORK"' EXIT
@@ -25,8 +27,8 @@ mkdir -p "$WORK/jail.d" "$WORK/filter.d" "$WORK/logs"
 cp "$REPO_ROOT/fail2ban/jail.d/attraccess.conf" "$WORK/jail.d/attraccess.conf"
 cp "$REPO_ROOT/fail2ban/filter.d/attraccess-auth.conf" "$WORK/filter.d/attraccess-auth.conf"
 
-# Point jail at our synthetic log and swap the banaction for dummy so the ban
-# does not require NET_ADMIN / iptables on the runner.
+# Point jail at our synthetic log and swap the banaction for dummy so the
+# assertion does not depend on host iptables state surviving the run.
 sed -i.bak \
   -e "s|/var/lib/docker/containers/\*/\*-json.log|/srv/logs/api.log|" \
   -e "s|action   = %(action_)s|action   = dummy[name=attraccess-auth]|" \
@@ -43,6 +45,8 @@ done
 echo "smoke: prepared ${FAILURES} failed-login lines for ${TEST_IP}"
 
 docker run -d --name "$CONTAINER" \
+  --cap-add NET_ADMIN \
+  --cap-add NET_RAW \
   -e F2B_ATTRACCESS_MAXRETRY="$MAXRETRY" \
   -e F2B_ATTRACCESS_FINDTIME=900 \
   -e F2B_ATTRACCESS_BANTIME=900 \
@@ -68,6 +72,10 @@ while [[ $(date +%s) -lt $deadline ]]; do
 done
 
 echo "smoke: FAIL — ${TEST_IP} was not banned within ${TIMEOUT_S}s" >&2
+echo "--- container state ---" >&2
+docker ps -a --filter "name=$CONTAINER" >&2 || true
+docker inspect --format '{{.State.Status}} exit={{.State.ExitCode}} oom={{.State.OOMKilled}}' \
+  "$CONTAINER" >&2 || true
 echo "--- fail2ban-client status ---" >&2
 docker exec "$CONTAINER" fail2ban-client status attraccess-auth >&2 || true
 echo "--- container logs ---" >&2
