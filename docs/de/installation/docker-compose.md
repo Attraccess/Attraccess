@@ -127,6 +127,40 @@ Konfigurieren Sie im Nginx Proxy Manager (Port 81) einen Proxy-Host:
 
 Details zur SSL-Konfiguration finden Sie unter [SSL einrichten](installation/ssl-setup.md).
 
+## Brute-Force-IP-Sperre mit fail2ban
+
+Attraccess liefert einen optionalen `fail2ban`-Dienst, der das Auth-Audit-Log beobachtet und IPs sperrt, die den konfigurierten Fehler-Schwellenwert ueberschreiten. Er ist hinter dem Compose-Profil `fail2ban` versteckt und startet daher **nicht** standardmaessig.
+
+> [!IMPORTANT]
+> fail2ban setzt iptables-Regeln im **Host-Kernel**. Dies ist daher Linux-only. Auf Docker Desktop fuer macOS oder Windows startet der Container zwar, die Sperren sind aber wirkungslos — nutzen Sie statt dessen das eingebaute Rate Limiting (siehe [Sicherheitseinstellungen](settings/security.md)).
+
+### Im Produktivbetrieb aktivieren
+
+```bash
+docker compose --profile fail2ban up -d
+```
+
+### Per Umgebungsvariablen tunen
+
+| Variable | Standard | Beschreibung |
+|----------|----------|-------------|
+| `F2B_ATTRACCESS_MAXRETRY` | `5` | Fehlversuche pro IP innerhalb von `findtime`, bevor gesperrt wird. |
+| `F2B_ATTRACCESS_FINDTIME` | `900` | Zeitfenster in Sekunden fuer das Zaehlen der Fehlversuche. |
+| `F2B_ATTRACCESS_BANTIME` | `900` | Sperrdauer in Sekunden. `-1` = permanent. |
+| `F2B_IPTABLES_CHAIN` | `DOCKER-USER` | iptables-Chain, in die die Sperr-Regeln geschrieben werden. |
+| `F2B_LOG_LEVEL` | `INFO` | Log-Level des fail2ban-Servers. |
+| `F2B_DB_PURGE_AGE` | `1d` | Aufbewahrungszeit historischer Events in der fail2ban-sqlite-DB. |
+
+Sperren werden im Volume `fail2ban-data` persistiert und ueberleben Container-Neustarts.
+
+### Lokale Entwicklung
+
+Derselbe Dienst ist in der Entwicklungsumgebung verfuegbar, bleibt aber inaktiv, solange Sie nicht explizit `--profile fail2ban` setzen. Ohne Flag ignoriert `docker compose up` den Dienst vollstaendig — Ihre IP wird beim Testen nicht gesperrt.
+
+### Admin-Operationen
+
+Siehe [Sicherheitseinstellungen → fail2ban-Administration](settings/security.md#fail2ban-administration) fuer das Auflisten aktiver Sperren, manuelles Entsperren und Live-Tuning.
+
 ## Nächste Schritte
 
 - [Umgebungsvariablen](installation/environment-variables.md) – Alle Konfigurationsoptionen
