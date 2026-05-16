@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { AuthenticationType, PasswordPolicy, Setting } from '@attraccess/database-entities';
+import { AuthenticationDetail, AuthenticationType, PasswordHistory, PasswordPolicy, Setting } from '@attraccess/database-entities';
 import { UsersController } from '../users/users.controller';
 import { UsersService } from '../users/users.service';
 import { AuthService } from '../auth/auth.service';
@@ -67,6 +67,8 @@ describe('Register flow + password policy (integration)', () => {
           },
         },
         { provide: getRepositoryToken(PasswordPolicy), useValue: { findOne: jest.fn(async () => policyRow()), create: jest.fn((row) => row), save: jest.fn() } },
+        { provide: getRepositoryToken(PasswordHistory), useValue: { find: jest.fn(async () => []), save: jest.fn(), create: jest.fn((row) => row), createQueryBuilder: jest.fn(() => ({ delete: jest.fn().mockReturnThis(), where: jest.fn().mockReturnThis(), andWhere: jest.fn().mockReturnThis(), execute: jest.fn(async () => ({ affected: 0 })) })) } },
+        { provide: getRepositoryToken(AuthenticationDetail), useValue: { findOne: jest.fn(async () => null) } },
         {
           provide: UsersService,
           useValue: {
@@ -161,6 +163,8 @@ describe('Register flow + password policy (integration)', () => {
           },
         },
         { provide: getRepositoryToken(PasswordPolicy), useValue: { findOne: jest.fn(async () => policyRow()), create: jest.fn(), save: jest.fn() } },
+        { provide: getRepositoryToken(PasswordHistory), useValue: { find: jest.fn(async () => []), save: jest.fn(), create: jest.fn((row) => row), createQueryBuilder: jest.fn(() => ({ delete: jest.fn().mockReturnThis(), where: jest.fn().mockReturnThis(), andWhere: jest.fn().mockReturnThis(), execute: jest.fn(async () => ({ affected: 0 })) })) } },
+        { provide: getRepositoryToken(AuthenticationDetail), useValue: { findOne: jest.fn(async () => null) } },
         {
           provide: UsersService,
           useValue: {

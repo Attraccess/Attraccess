@@ -1,10 +1,9 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { ArrowRight, Mail, Wand2 } from 'lucide-react';
+import { ArrowRight, Mail } from 'lucide-react';
 import { Alert, Input } from '@heroui/react';
 import { Button } from '@heroui/react';
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, useDisclosure } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { PasswordInput } from '../../components/PasswordInput';
 import { UsernameInput, USERNAME_RULES, useUsernameValidation } from '../../components/UsernameInput';
 import en from './registrationForm.en.json';
 import de from './registrationForm.de.json';
@@ -19,10 +18,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import API_ERROR_TRANSLATIONS_DE from '../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../global-translations/api-errors.en.json';
 import { useToastMessage } from '../../components/toastProvider';
-import {
-  PasswordPolicyHints,
-  generateStrongPassword,
-} from '../../components/PasswordPolicyHints';
+import { PasswordField } from '../../components/PasswordField';
 import { PolicyError, PublicPasswordPolicy, validatePassword } from '@attraccess/shared';
 
 interface RegisterFormProps {
@@ -170,29 +166,6 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
     [canSubmit, createUserMutate, password, trimmedEmail, trimmedUsername],
   );
 
-  const handleGeneratePassword = useCallback(async () => {
-    const generated = generateStrongPassword({
-      length: Math.max(20, policy.minLength + 4),
-      requireUppercase: policy.requireUppercase,
-      requireLowercase: policy.requireLowercase,
-      requireDigit: policy.requireDigit,
-      requireSpecial: policy.requireSpecial,
-    });
-    setPassword(generated);
-    setPasswordConfirmation(generated);
-    setServerErrors([]);
-    try {
-      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(generated);
-        toast.success({ title: t('passwordGeneratedCopied') });
-      } else {
-        toast.success({ title: t('passwordGenerated') });
-      }
-    } catch {
-      toast.success({ title: t('passwordGenerated') });
-    }
-  }, [policy, toast, t]);
-
   const markTwoFactorSetupIntent = useCallback(() => {
     if (typeof window === 'undefined') {
       return;
@@ -241,52 +214,24 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
           onValueChange={setEmail}
         />
 
-        <PasswordInput
-          id="password"
-          name="password"
-          label={t('password')}
-          required
-          data-cy="registration-form-password-input"
-          autoComplete="new-password"
-          isRequired
+        <PasswordField
           value={password}
-          onValueChange={setPassword}
-        />
-
-        <Button
-          variant="flat"
-          color="secondary"
-          onPress={handleGeneratePassword}
-          startContent={<Wand2 className="h-4 w-4" />}
-          data-cy="registration-form-generate-password-button"
-        >
-          {t('generatePassword')}
-        </Button>
-
-        <PasswordPolicyHints
-          password={password}
+          onValueChange={(v) => {
+            setPassword(v);
+            setServerErrors([]);
+          }}
           username={trimmedUsername}
           email={trimmedEmail}
           policy={policy}
           serverErrors={serverErrors}
-        />
-
-        <PasswordInput
-          id="password_confirmation"
-          name="password_confirmation"
-          label={t('passwordConfirmation')}
-          required
-          data-cy="registration-form-password-confirmation-input"
-          autoComplete="new-password"
+          passwordLabel={t('password')}
+          confirmationLabel={t('passwordConfirmation')}
+          showConfirmation
+          confirmationValue={passwordConfirmation}
+          onConfirmationChange={setPasswordConfirmation}
           isRequired
-          validate={() => {
-            if (passwordsDontMatch) {
-              return t('validationError.passwordsDoNotMatch');
-            }
-            return true;
-          }}
-          value={passwordConfirmation}
-          onValueChange={setPasswordConfirmation}
+          autoComplete="new-password"
+          dataCyPrefix="registration-form"
         />
 
         <Button

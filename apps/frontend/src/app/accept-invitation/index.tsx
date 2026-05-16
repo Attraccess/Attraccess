@@ -7,9 +7,18 @@ import en from './en.json';
 import de from './de.json';
 import { ApiError, useUsersServiceAcceptInvitation } from '@attraccess/react-query-client';
 import { PageHeader } from '../../components/pageHeader';
-import { PasswordInput } from '../../components/PasswordInput';
+import { PasswordField } from '../../components/PasswordField';
 import { useLogin } from '../../hooks/useAuth';
 import { useToastMessage } from '../../components/toastProvider';
+import { PolicyError } from '@attraccess/shared';
+
+function extractPolicyErrors(error: unknown): PolicyError[] | null {
+  if (!(error instanceof ApiError) || error.status !== 400) {
+    return null;
+  }
+  const body = error.body as { policyErrors?: PolicyError[] } | undefined;
+  return Array.isArray(body?.policyErrors) ? body.policyErrors : null;
+}
 
 export function AcceptInvitation() {
   const query = useUrlQuery();
@@ -22,6 +31,7 @@ export function AcceptInvitation() {
 
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [serverErrors, setServerErrors] = useState<PolicyError[]>([]);
   const formRef = useRef<HTMLFormElement>(null);
 
   const { mutate: login } = useLogin();
@@ -40,6 +50,12 @@ export function AcceptInvitation() {
       navigate('/');
     },
     onError: (error) => {
+      const policyErrors = extractPolicyErrors(error);
+      if (policyErrors) {
+        setServerErrors(policyErrors);
+        return;
+      }
+      setServerErrors([]);
       toast.apiError({
         error: error as ApiError,
         t,
@@ -66,6 +82,7 @@ export function AcceptInvitation() {
       return;
     }
 
+    setServerErrors([]);
     acceptInvitation({ requestBody: { token, email, password } });
   }, [password, confirmPassword, token, email, acceptInvitation]);
 
@@ -91,28 +108,22 @@ export function AcceptInvitation() {
         }}
         className="flex flex-col gap-4"
       >
-        <PasswordInput
-          autoComplete="new-password"
-          label={t('inputs.password.label')}
+        <PasswordField
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          isRequired
-        />
-
-        <PasswordInput
-          autoComplete="new-password"
-          label={t('inputs.confirmPassword.label')}
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          required
-          isRequired
-          validate={() => {
-            if (password !== confirmPassword) {
-              return t('error.passwordsDoNotMatch.description');
-            }
-            return true;
+          onValueChange={(v) => {
+            setPassword(v);
+            setServerErrors([]);
           }}
+          email={email}
+          serverErrors={serverErrors}
+          passwordLabel={t('inputs.password.label')}
+          confirmationLabel={t('inputs.confirmPassword.label')}
+          showConfirmation
+          confirmationValue={confirmPassword}
+          onConfirmationChange={setConfirmPassword}
+          isRequired
+          autoComplete="new-password"
+          dataCyPrefix="accept-invitation"
         />
 
         <Button color="primary" isLoading={isPending} type="submit">

@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { PasswordPolicy } from '@attraccess/database-entities';
+import * as bcrypt from 'bcrypt';
+import { AuthenticationDetail, AuthenticationType, PasswordHistory, PasswordPolicy } from '@attraccess/database-entities';
 import { DEFAULT_PASSWORD_POLICY } from '@attraccess/shared';
 import { PasswordPolicyService } from './password-policy.service';
 import { HibpClient } from './hibp.client';
@@ -28,6 +29,13 @@ const buildRow = (overrides: Partial<PasswordPolicy> = {}): PasswordPolicy => ({
 describe('PasswordPolicyService', () => {
   let service: PasswordPolicyService;
   let repo: { findOne: jest.Mock; create: jest.Mock; save: jest.Mock };
+  let historyRepo: {
+    find: jest.Mock;
+    save: jest.Mock;
+    create: jest.Mock;
+    createQueryBuilder: jest.Mock;
+  };
+  let authDetailRepo: { findOne: jest.Mock };
   let hibp: { check: jest.Mock };
   let zxcvbn: { evaluate: jest.Mock };
 
@@ -37,6 +45,19 @@ describe('PasswordPolicyService', () => {
       create: jest.fn((row) => row),
       save: jest.fn(async (row) => row),
     };
+    const deleteBuilder = {
+      delete: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      execute: jest.fn(async () => ({ affected: 0 })),
+    };
+    historyRepo = {
+      find: jest.fn(async () => []),
+      save: jest.fn(async (row) => row),
+      create: jest.fn((row) => row),
+      createQueryBuilder: jest.fn(() => deleteBuilder),
+    };
+    authDetailRepo = { findOne: jest.fn(async () => null) };
     hibp = { check: jest.fn(async () => ({ pwned: false, count: 0, available: true })) };
     zxcvbn = { evaluate: jest.fn(() => ({ score: 4, guessesLog10: 12, crackTimesSeconds: {}, warning: '', suggestions: [] })) };
 
@@ -44,6 +65,8 @@ describe('PasswordPolicyService', () => {
       providers: [
         PasswordPolicyService,
         { provide: getRepositoryToken(PasswordPolicy), useValue: repo },
+        { provide: getRepositoryToken(PasswordHistory), useValue: historyRepo },
+        { provide: getRepositoryToken(AuthenticationDetail), useValue: authDetailRepo },
         { provide: HibpClient, useValue: hibp },
         { provide: ZxcvbnService, useValue: zxcvbn },
       ],
@@ -108,5 +131,65 @@ describe('PasswordPolicyService', () => {
       email: 'else@example.com',
     });
     expect(hibp.check).not.toHaveBeenCalled();
+  });
+
+  describe('password history', () => {
+    const currentPassword = 'Old-Tr0ub4dor-Hummingbird-9!plate';
+    const reusedPriorPassword = 'Older-Tr0ub4dor-Hummingbird-9!plate';
+
+    it('flags PASSWORD_REUSED when candidate matches current password hash', async () => {
+      const currentHash = await bcrypt.hash(currentPassword, 4);
+      repo.findOne = jest.fn(async () => buildRow({ historySize: 3 }));
+      authDetailRepo.findOne = jest.fn(async () => ({ password: currentHash, type: AuthenticationType.LOCAL_PASSWORD }));
+
+      const result = await service.validate(
+        currentPassword,
+        { username: 'else', email: 'else@example.com' },
+        { userIdForHistory: 7 },
+      );
+      expect(result.ok).toBe(false);
+      expect(result.errors).toContainEqual({ code: 'PASSWORD_REUSED', params: { historySize: 3 } });
+    });
+
+    it('flags PASSWORD_REUSED when candidate matches a prior history entry', async () => {
+      const currentHash = await bcrypt.hash(currentPassword, 4);
+      const priorHash = await bcrypt.hash(reusedPriorPassword, 4);
+      repo.findOne = jest.fn(async () => buildRow({ historySize: 3 }));
+      authDetailRepo.findOne = jest.fn(async () => ({ password: currentHash }));
+      historyRepo.find = jest.fn(async () => [
+        { id: 1, passwordHash: priorHash, userId: 7, createdAt: new Date() },
+      ]);
+
+      const result = await service.validate(
+        reusedPriorPassword,
+        { username: 'else', email: 'else@example.com' },
+        { userIdForHistory: 7 },
+      );
+      expect(result.ok).toBe(false);
+      expect(result.errors).toContainEqual({ code: 'PASSWORD_REUSED', params: { historySize: 3 } });
+    });
+
+    it('does not check history when historySize is 0', async () => {
+      repo.findOne = jest.fn(async () => buildRow({ historySize: 0 }));
+      await service.validate('Tr0ub4dor-Hummingbird-9!plate', {}, { userIdForHistory: 7 });
+      expect(authDetailRepo.findOne).not.toHaveBeenCalled();
+      expect(historyRepo.find).not.toHaveBeenCalled();
+    });
+
+    it('archiveCurrentPasswordToHistory saves the current hash and prunes', async () => {
+      const currentHash = await bcrypt.hash(currentPassword, 4);
+      repo.findOne = jest.fn(async () => buildRow({ historySize: 2 }));
+      authDetailRepo.findOne = jest.fn(async () => ({ password: currentHash }));
+
+      await service.archiveCurrentPasswordToHistory(11);
+      expect(historyRepo.save).toHaveBeenCalledWith(expect.objectContaining({ userId: 11, passwordHash: currentHash }));
+      expect(historyRepo.createQueryBuilder).toHaveBeenCalled();
+    });
+
+    it('archiveCurrentPasswordToHistory is a no-op when historySize is 0', async () => {
+      repo.findOne = jest.fn(async () => buildRow({ historySize: 0 }));
+      await service.archiveCurrentPasswordToHistory(11);
+      expect(historyRepo.save).not.toHaveBeenCalled();
+    });
   });
 });
