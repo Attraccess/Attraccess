@@ -4,7 +4,8 @@ import { HandCoinsIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
-import { HTMLAttributes, useCallback, useState } from 'react';
+import { ComponentPropsWithoutRef, useCallback, useState } from 'react';
+import { twMerge } from 'tailwind-merge';
 import {
   useBillingServiceCreateManualTransaction,
   UseBillingServiceGetBillingBalanceKeyFn,
@@ -21,7 +22,7 @@ interface Props {
   userId?: number;
 }
 
-export function ManualTransactionsCard(props: Props & Omit<HTMLAttributes<HTMLElement>, 'children'>) {
+export function ManualTransactionsCard(props: Props & Omit<ComponentPropsWithoutRef<'section'>, 'children'>) {
   const { userId, className, ...sectionProps } = props;
   const { t, tExists } = useTranslations({
     en: {
@@ -80,7 +81,7 @@ export function ManualTransactionsCard(props: Props & Omit<HTMLAttributes<HTMLEl
   }, [userId, amount, createManualTransaction, configuration]);
 
   return (
-    <section {...sectionProps} className={`w-full flex flex-col gap-4 ${className ?? ''}`}>
+    <section {...sectionProps} className={twMerge('w-full flex flex-col gap-4', className)}>
       <PageHeader title={t('title')} subtitle={t('subtitle')} icon={<HandCoinsIcon />} noMargin />
 
       <NumberField aria-label={t('inputs.amount')} value={amount} onChange={(value) => setAmount(value)}>
