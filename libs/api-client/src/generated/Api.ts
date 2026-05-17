@@ -1301,6 +1301,59 @@ export interface GenerateMetricsApiKeyResponseDto {
   apiKey: string;
 }
 
+export interface AuthRateLimitSettingsDto {
+  /**
+   * Max failed attempts within the window before lockout
+   * @example 5
+   */
+  maxAttempts: number;
+  /**
+   * Sliding window length, in seconds, for counting attempts
+   * @example 900
+   */
+  windowSeconds: number;
+  /**
+   * Base lockout duration in seconds after the threshold is reached
+   * @example 900
+   */
+  lockoutDurationSeconds: number;
+  /**
+   * Whether to extend lockout exponentially on repeat lockouts
+   * @example false
+   */
+  exponentialBackoff: boolean;
+  /**
+   * Multiplier applied to lockout duration when exponentialBackoff is on
+   * @example 2
+   */
+  backoffMultiplier: number;
+}
+
+export interface UpdateAuthRateLimitSettingsDto {
+  /**
+   * Max failed attempts within the window before lockout
+   * @example 5
+   */
+  maxAttempts?: number;
+  /**
+   * Sliding window length, in seconds
+   * @example 900
+   */
+  windowSeconds?: number;
+  /**
+   * Base lockout duration in seconds
+   * @example 900
+   */
+  lockoutDurationSeconds?: number;
+  /** Whether to extend lockout exponentially on repeat lockouts */
+  exponentialBackoff?: boolean;
+  /**
+   * Multiplier applied to lockout duration
+   * @example 2
+   */
+  backoffMultiplier?: number;
+}
+
 export interface LicenseDataDto {
   /** Whether the license is valid */
   valid: boolean;
@@ -4090,6 +4143,10 @@ export type GenerateMetricsApiKeyData = GenerateMetricsApiKeyResponseDto;
 
 export type DeleteMetricsApiKeyData = MetricsSettingsDto;
 
+export type GetAuthRateLimitSettingsData = AuthRateLimitSettingsDto;
+
+export type UpdateAuthRateLimitSettingsData = AuthRateLimitSettingsDto;
+
 export type GetLicenseInformationData = LicenseDataDto;
 
 export type GetPublicPasswordPolicyData = PublicPasswordPolicyDto;
@@ -6274,6 +6331,38 @@ export namespace Settings {
     export type RequestBody = never;
     export type RequestHeaders = {};
     export type ResponseBody = DeleteMetricsApiKeyData;
+  }
+
+  /**
+   * No description
+   * @tags Settings
+   * @name GetAuthRateLimitSettings
+   * @summary Get auth rate-limit settings
+   * @request GET:/api/settings/auth/rate-limit
+   * @secure
+   */
+  export namespace GetAuthRateLimitSettings {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetAuthRateLimitSettingsData;
+  }
+
+  /**
+   * No description
+   * @tags Settings
+   * @name UpdateAuthRateLimitSettings
+   * @summary Update auth rate-limit settings
+   * @request PATCH:/api/settings/auth/rate-limit
+   * @secure
+   */
+  export namespace UpdateAuthRateLimitSettings {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = UpdateAuthRateLimitSettingsDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = UpdateAuthRateLimitSettingsData;
   }
 }
 
@@ -10415,6 +10504,47 @@ export class Api<
         path: `/api/settings/metrics/api-key`,
         method: "DELETE",
         secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Settings
+     * @name GetAuthRateLimitSettings
+     * @summary Get auth rate-limit settings
+     * @request GET:/api/settings/auth/rate-limit
+     * @secure
+     */
+    getAuthRateLimitSettings: (params: RequestParams = {}) =>
+      this.request<GetAuthRateLimitSettingsData, void>({
+        path: `/api/settings/auth/rate-limit`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Settings
+     * @name UpdateAuthRateLimitSettings
+     * @summary Update auth rate-limit settings
+     * @request PATCH:/api/settings/auth/rate-limit
+     * @secure
+     */
+    updateAuthRateLimitSettings: (
+      data: UpdateAuthRateLimitSettingsDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<UpdateAuthRateLimitSettingsData, void>({
+        path: `/api/settings/auth/rate-limit`,
+        method: "PATCH",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
         format: "json",
         ...params,
       }),
