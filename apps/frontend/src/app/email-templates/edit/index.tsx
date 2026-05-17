@@ -6,10 +6,27 @@ import {
   useEmailTemplatesServiceEmailTemplateControllerPreviewMjml,
   EmailTemplateType,
 } from '@attraccess/react-query-client';
-import { Button, Card, Form, Input, Label, Link, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, TextField, useTheme } from '@heroui/react';
+import {
+  Button,
+  Form,
+  Input,
+  Label,
+  Link,
+  Modal,
+  ModalBackdrop,
+  ModalBody,
+  ModalContainer,
+  ModalDialog,
+  ModalFooter,
+  ModalHeader,
+  ModalHeading,
+  TextField,
+  useTheme,
+} from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PageHeader } from '../../../components/pageHeader';
 import Editor from '@monaco-editor/react';
+import { Maximize } from 'lucide-react';
 
 import * as enTranslationsFile from './en.json';
 import * as deTranslationsFile from './de.json';
@@ -123,57 +140,81 @@ export function EditEmailTemplatePage() {
   );
 
   return (
-    <div>
+    <div className="max-w-7xl mx-auto px-4 py-8" data-cy="edit-email-template-page">
       <PageHeader title={t('templateType.' + templateType)} subtitle={t('subtitle')} backTo="/email-templates" />
-      <Form onSubmit={onSubmit}>
-        <div className="flex flex-col flex-wrap gap-4 w-full lg:flex-row">
-          <Card className="flex-1">
-            <Card.Header className="flex flex-row justify-between">
-              <span>{t('sections.template')}</span>
-              <Button isIconOnly onPress={() => setEditorIsExpanded(true)} />
-            </Card.Header>
-            <Card.Content className="flex flex-col gap-4">
-              {editor}
+      <Form onSubmit={onSubmit} className="gap-8" data-cy="edit-email-template-form">
+        <div className="flex flex-col flex-wrap gap-8 w-full lg:flex-row lg:gap-6">
+          <section
+            className="flex-1 min-w-0 w-full flex flex-col gap-4"
+            data-cy="edit-email-template-section-template"
+          >
+            <div className="flex flex-row items-center justify-between">
+              <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
+                {t('sections.template')}
+              </h3>
+              <Button
+                isIconOnly
+                variant="ghost"
+                size="sm"
+                onPress={() => setEditorIsExpanded(true)}
+                aria-label={t('actions.expand')}
+                data-cy="edit-email-template-expand-button"
+              >
+                <Maximize size={16} />
+              </Button>
+            </div>
+            {editor}
 
-              <Modal isOpen={editorIsExpanded} onOpenChange={setEditorIsExpanded}>
-                <ModalBackdrop>
-                  <ModalContainer size="cover">
-                    <ModalDialog>
-                      {({ close }) => (
-                        <>
-                          <ModalHeader>
-                            <ModalHeading>{t('templateType.' + templateType)}</ModalHeading>
-                          </ModalHeader>
-                          <ModalBody>{editor}</ModalBody>
-                          <ModalFooter>
-                            <Button onPress={close}>{t('actions.close')}</Button>
-                          </ModalFooter>
-                        </>
-                      )}
-                    </ModalDialog>
-                  </ModalContainer>
-                </ModalBackdrop>
-              </Modal>
-            </Card.Content>
-          </Card>
+            <Modal isOpen={editorIsExpanded} onOpenChange={setEditorIsExpanded}>
+              <ModalBackdrop>
+                <ModalContainer size="cover">
+                  <ModalDialog>
+                    {({ close }) => (
+                      <>
+                        <ModalHeader>
+                          <ModalHeading>{t('templateType.' + templateType)}</ModalHeading>
+                        </ModalHeader>
+                        <ModalBody>{editor}</ModalBody>
+                        <ModalFooter>
+                          <Button onPress={close}>{t('actions.close')}</Button>
+                        </ModalFooter>
+                      </>
+                    )}
+                  </ModalDialog>
+                </ModalContainer>
+              </ModalBackdrop>
+            </Modal>
+          </section>
 
-          <Card className="flex-1">
-            <Card.Header>{t('sections.preview')}</Card.Header>
-            <Card.Content>
-              <iframe
-                srcDoc={previewHtml}
-                title={t('preview.iframeTitle')}
-                className="w-full h-full min-h-[435px] border-0"
-              />
-            </Card.Content>
-          </Card>
+          <section
+            className="flex-1 min-w-0 w-full flex flex-col gap-4"
+            data-cy="edit-email-template-section-preview"
+          >
+            <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
+              {t('sections.preview')}
+            </h3>
+            <iframe
+              srcDoc={previewHtml}
+              title={t('preview.iframeTitle')}
+              className="w-full h-full min-h-[435px] border-0 rounded-md bg-default-50"
+            />
+          </section>
         </div>
 
-        <div className="flex flex-row gap-4 w-full justify-end">
-          <Button variant="ghost" onPress={() => navigate('/email-templates')}>
+        <div className="flex flex-row gap-4 w-full justify-end mt-4">
+          <Button
+            variant="ghost"
+            onPress={() => navigate('/email-templates')}
+            data-cy="edit-email-template-cancel-button"
+          >
             {t('actions.cancel')}
           </Button>
-          <Button variant="primary" type="submit" isPending={updateTemplate.isPending}>
+          <Button
+            variant="primary"
+            type="submit"
+            isPending={updateTemplate.isPending}
+            data-cy="edit-email-template-save-button"
+          >
             {t('actions.save')}
           </Button>
         </div>
