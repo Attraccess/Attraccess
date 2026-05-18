@@ -11,9 +11,11 @@ import {
   AuthenticationType,
 } from '@attraccess/react-query-client';
 import { PageHeader } from '../../../../components/pageHeader';
-import { PasswordInput } from '../../../../components/PasswordInput';
+import { PasswordField } from '../../../../components/PasswordField';
 import { UsernameInput, USERNAME_RULES, useUsernameValidation } from '../../../../components/UsernameInput';
 import { useToastMessage } from '../../../../components/toastProvider';
+import { PolicyError } from '@attraccess/shared';
+import { extractPolicyErrors } from '../../../../utils/policyErrors';
 import API_ERROR_TRANSLATIONS_DE from '../../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../global-translations/api-errors.en.json';
 import en from './en.json';
@@ -35,19 +37,13 @@ export function CreateAdminStep({ onSuccess, isOverwrite }: CreateAdminStepProps
 
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState<string | null>(null);
-  const [passwordConfirmation, setPasswordConfirmation] = useState<string | null>(null);
+  const [password, setPassword] = useState('');
+  const [passwordConfirmation, setPasswordConfirmation] = useState('');
+  const [serverErrors, setServerErrors] = useState<PolicyError[]>([]);
 
   const passwordsDontMatch = useMemo(
-    () =>
-      password !== null &&
-      passwordConfirmation !== null &&
-      password !== passwordConfirmation,
+    () => password.length > 0 && passwordConfirmation.length > 0 && password !== passwordConfirmation,
     [password, passwordConfirmation],
-  );
-  const passwordTooShort = useMemo(
-    () => password !== null && password.length < 8,
-    [password],
   );
 
   const usernameValidationMessages = useMemo(
@@ -71,27 +67,26 @@ export function CreateAdminStep({ onSuccess, isOverwrite }: CreateAdminStepProps
     () =>
       isUsernameValid &&
       !!trimmedEmail &&
-      password !== null &&
-      passwordConfirmation !== null &&
-      !passwordTooShort &&
+      password.length > 0 &&
+      passwordConfirmation.length > 0 &&
       !passwordsDontMatch,
-    [
-      isUsernameValid,
-      trimmedEmail,
-      password,
-      passwordConfirmation,
-      passwordTooShort,
-      passwordsDontMatch,
-    ],
+    [isUsernameValid, trimmedEmail, password, passwordConfirmation, passwordsDontMatch],
   );
 
   const { mutate: createUser, isPending } = useUsersServiceCreateOneUser({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: UseUsersServiceFindManyKeyFn() });
       queryClient.invalidateQueries({ queryKey: UseSettingsServiceGetFirstTimeSetupStatusKeyFn() });
+      setServerErrors([]);
       onSuccess?.();
     },
     onError: (error) => {
+      const policyErrors = extractPolicyErrors(error);
+      if (policyErrors) {
+        setServerErrors(policyErrors);
+        return;
+      }
+      setServerErrors([]);
       toast.apiError({
         error: error as ApiError,
         t,
@@ -102,7 +97,8 @@ export function CreateAdminStep({ onSuccess, isOverwrite }: CreateAdminStepProps
   });
 
   const handleSubmit = useCallback(() => {
-    if (!formRef.current?.checkValidity() || !canSubmit || password === null) return;
+    if (!formRef.current?.checkValidity() || !canSubmit) return;
+    setServerErrors([]);
     createUser({
       requestBody: {
         username: trimmedUsername,
@@ -148,25 +144,23 @@ export function CreateAdminStep({ onSuccess, isOverwrite }: CreateAdminStepProps
           onValueChange={setEmail}
           isRequired
         />
-        <PasswordInput
-          label={t('password')}
-          value={password ?? ''}
-          onValueChange={(v) => setPassword(v || null)}
-          autoComplete="new-password"
+        <PasswordField
+          value={password}
+          onValueChange={(v) => {
+            setPassword(v);
+            setServerErrors([]);
+          }}
+          username={trimmedUsername}
+          email={trimmedEmail}
+          serverErrors={serverErrors}
+          passwordLabel={t('password')}
+          confirmationLabel={t('passwordConfirmation')}
+          showConfirmation
+          confirmationValue={passwordConfirmation}
+          onConfirmationChange={setPasswordConfirmation}
           isRequired
-          validate={() =>
-            passwordTooShort ? t('validationError.passwordTooShort') : true
-          }
-        />
-        <PasswordInput
-          label={t('passwordConfirmation')}
-          value={passwordConfirmation ?? ''}
-          onValueChange={(v) => setPasswordConfirmation(v || null)}
           autoComplete="new-password"
-          isRequired
-          validate={() =>
-            passwordsDontMatch ? t('validationError.passwordsDoNotMatch') : true
-          }
+          dataCyPrefix="create-admin"
         />
         <input type="submit" hidden />
       </Form>

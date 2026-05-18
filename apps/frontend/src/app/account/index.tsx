@@ -72,7 +72,7 @@ export default function AccountPage() {
             <PageHeader title={t('sections.security')} noMargin />
           </CardHeader>
           <CardBody className="flex flex-col gap-6">
-            {me && <SetPasswordForm userId={me.id} />}
+            {me && <SetPasswordForm userId={me.id} username={me.username} />}
             {me && <TwoFactorCard />}
           </CardBody>
         </Card>

@@ -641,6 +641,14 @@ export class UsersController {
 
     const user = await this.usersService.findOne({ email: body.email });
 
+    const policyResult = await this.passwordPolicyService.validate(body.password, {
+      username: user.username,
+      email: user.email,
+    });
+    if (!policyResult.ok) {
+      throw new PasswordPolicyViolationException(policyResult.errors);
+    }
+
     await this.authService.addAuthenticationDetails(user.id, {
       type: AuthenticationType.LOCAL_PASSWORD,
       details: {
@@ -721,6 +729,16 @@ export class UsersController {
       throw new ForbiddenException('Invalid token');
     }
 
+    const policyResult = await this.passwordPolicyService.validate(
+      body.password,
+      { username: user.username, email: user.email },
+      { userIdForHistory: user.id },
+    );
+    if (!policyResult.ok) {
+      throw new PasswordPolicyViolationException(policyResult.errors);
+    }
+
+    await this.passwordPolicyService.archiveCurrentPasswordToHistory(user.id);
     await this.authService.changePassword(user, body.password);
 
     await this.usersService.updateOne(userId, {
@@ -1144,6 +1162,16 @@ export class UsersController {
       throw new UserNotFoundException(id);
     }
 
+    const policyResult = await this.passwordPolicyService.validate(
+      body.password,
+      { username: user.username, email: user.email },
+      { userIdForHistory: user.id },
+    );
+    if (!policyResult.ok) {
+      throw new PasswordPolicyViolationException(policyResult.errors);
+    }
+
+    await this.passwordPolicyService.archiveCurrentPasswordToHistory(user.id);
     await this.authService.changePassword(user, body.password);
 
     this.logger.debug(`Password successfully updated for user ID: ${id}`);

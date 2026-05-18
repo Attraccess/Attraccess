@@ -195,7 +195,7 @@ export function UserManagementDetailsPage() {
                 <PageHeader title={t('profile.passwordTitle')} noMargin />
               </CardHeader>
               <CardBody className="flex flex-col gap-8">
-                <SetPasswordForm userId={user.id} />
+                <SetPasswordForm userId={user.id} username={user.username} />
               </CardBody>
             </Card>
 

@@ -52,7 +52,8 @@ export type PolicyErrorCode =
   | 'SIMILAR_TO_USERNAME'
   | 'COMMON_PASSWORD'
   | 'HIBP_PWNED'
-  | 'ZXCVBN_SCORE';
+  | 'ZXCVBN_SCORE'
+  | 'PASSWORD_REUSED';
 
 export interface MinLengthError {
   code: 'MIN_LENGTH';
@@ -114,6 +115,11 @@ export interface ZxcvbnScoreError {
   params: { score: number; required: number };
 }
 
+export interface PasswordReusedError {
+  code: 'PASSWORD_REUSED';
+  params: { historySize: number };
+}
+
 export type PolicyError =
   | MinLengthError
   | MaxLengthError
@@ -126,7 +132,8 @@ export type PolicyError =
   | SimilarToUsernameError
   | CommonPasswordError
   | HibpPwnedError
-  | ZxcvbnScoreError;
+  | ZxcvbnScoreError
+  | PasswordReusedError;
 
 export interface PasswordValidationResult {
   ok: boolean;

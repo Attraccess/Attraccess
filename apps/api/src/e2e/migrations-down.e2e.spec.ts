@@ -18,6 +18,7 @@ import {
   IntroductionHistoryAction,
   MqttServer,
   NFCCard,
+  PasswordHistory,
   Project,
   ProjectInvitation,
   ProjectInvitationStatus,
@@ -166,6 +167,7 @@ const seedDatabase = async (dataSource: DataSource) => {
   const formSubmissionRepo = dataSource.getRepository(FormSubmission);
   const nfcCardRepo = dataSource.getRepository(NFCCard);
   const emailTemplateRepo = dataSource.getRepository(EmailTemplate);
+  const passwordHistoryRepo = dataSource.getRepository(PasswordHistory);
 
   const resourceGroup = await ensureEntity(resourceGroupRepo, () => ({
     name: `Seed Group ${seedTag}`,
@@ -471,6 +473,11 @@ const seedDatabase = async (dataSource: DataSource) => {
     subject: 'Verify your email',
     body: 'Hello {{name}}',
     variables: ['{{name}}', '{{url}}'],
+  }));
+
+  await ensureEntity(passwordHistoryRepo, () => ({
+    userId: primaryUser.id,
+    passwordHash: `$2b$04$seed.${seedTag}.placeholder.bcrypt.hash.value.padding`,
   }));
 };
 

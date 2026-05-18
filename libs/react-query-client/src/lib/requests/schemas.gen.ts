@@ -334,8 +334,8 @@ export const $ChangePasswordDto = {
     properties: {
         password: {
             type: 'string',
-            description: 'The new password for the user',
-            example: 'password123'
+            description: 'The new password (validated server-side against the active password policy)',
+            example: 'correct-horse-battery-staple-42'
         },
         token: {
             type: 'string',
@@ -489,8 +489,8 @@ export const $SetUserPasswordDto = {
     properties: {
         password: {
             type: 'string',
-            description: 'The new password for the user',
-            example: 'newSecurePassword123'
+            description: 'The new password (validated server-side against the active password policy)',
+            example: 'correct-horse-battery-staple-42'
         }
     },
     required: ['password']

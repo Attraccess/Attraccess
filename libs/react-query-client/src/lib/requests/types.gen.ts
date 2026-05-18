@@ -203,7 +203,7 @@ export type ResetPasswordDto = {
 
 export type ChangePasswordDto = {
     /**
-     * The new password for the user
+     * The new password (validated server-side against the active password policy)
      */
     password: string;
     /**
@@ -293,7 +293,7 @@ export enum PermissionFilter {
 
 export type SetUserPasswordDto = {
     /**
-     * The new password for the user
+     * The new password (validated server-side against the active password policy)
      */
     password: string;
 };
