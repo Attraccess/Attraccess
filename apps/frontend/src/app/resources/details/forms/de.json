@@ -19,6 +19,12 @@
   "editor": {
     "createTitle": "Formular erstellen",
     "editTitle": "{{formName}}",
+    "sections": {
+      "identity": "Formularidentität",
+      "behavior": "Wann dieses Formular erforderlich ist",
+      "fields": "Felder",
+      "preview": "Live-Vorschau"
+    },
     "nameLabel": "Formularname",
     "namePlaceholder": "Maschinen-Sicherheitscheckliste",
     "resourceUsageStart": "Vor Start einer Sitzung erforderlich",
