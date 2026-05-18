@@ -1,5 +1,5 @@
-import { useCallback, useState } from 'react';
-import { Card, CardProps, useOverlayState } from '@heroui/react';
+import { HTMLAttributes, useCallback, useState } from 'react';
+import { useOverlayState } from '@heroui/react';
 import { AlertCircle } from 'lucide-react';
 import {
   UseAccessControlServiceResourceGroupIntroductionsGetHistoryKeyFn,
@@ -22,7 +22,7 @@ interface ResourceGroupIntroductionsManagementProps {
 }
 
 export function ResourceGroupIntroductionsManagement(
-  props: Readonly<ResourceGroupIntroductionsManagementProps & Omit<CardProps, 'children'>>,
+  props: Readonly<ResourceGroupIntroductionsManagementProps & Omit<HTMLAttributes<HTMLElement>, 'children'>>,
 ) {
   const { groupId, ...rest } = props;
   const { t } = useTranslations({ en, de });
@@ -114,17 +114,15 @@ export function ResourceGroupIntroductionsManagement(
 
   if (error) {
     return (
-      <Card {...rest}>
-        <Card.Content>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <AlertCircle size={20} color="red" />
-            <div>
-              <p style={{ color: 'red', fontWeight: '500' }}>{t('loadError')}</p>
-              <p style={{ fontSize: '14px', opacity: 0.7 }}>{t('loadErrorDescription')}</p>
-            </div>
+      <div {...rest}>
+        <div className="flex items-center gap-3">
+          <AlertCircle size={20} color="red" />
+          <div>
+            <p className="text-danger font-medium">{t('loadError')}</p>
+            <p className="text-sm opacity-70">{t('loadErrorDescription')}</p>
           </div>
-        </Card.Content>
-      </Card>
+        </div>
+      </div>
     );
   }
 

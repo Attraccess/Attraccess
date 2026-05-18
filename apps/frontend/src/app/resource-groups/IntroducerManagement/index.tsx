@@ -1,4 +1,4 @@
-import { Card, CardProps } from '@heroui/react';
+import { HTMLAttributes } from 'react';
 import { AlertCircle } from 'lucide-react';
 import {
   useAccessControlServiceResourceGroupIntroducersGetMany,
@@ -19,7 +19,7 @@ interface ResourceGroupIntroducerManagementProps {
 }
 
 export function ResoureGroupIntroducerManagement(
-  props: Readonly<ResourceGroupIntroducerManagementProps & Omit<CardProps, 'children'>>,
+  props: Readonly<ResourceGroupIntroducerManagementProps & Omit<HTMLAttributes<HTMLElement>, 'children'>>,
 ) {
   const { groupId, ...cardProps } = props;
 
@@ -85,17 +85,15 @@ export function ResoureGroupIntroducerManagement(
 
   if (error) {
     return (
-      <Card {...cardProps}>
-        <Card.Content>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <AlertCircle size={20} color="red" />
-            <div>
-              <p style={{ color: 'red', fontWeight: '500' }}>{t('load.error')}</p>
-              <p style={{ fontSize: '14px', opacity: 0.7 }}>{t('load.errorDescription')}</p>
-            </div>
+      <div {...cardProps}>
+        <div className="flex items-center gap-3">
+          <AlertCircle size={20} color="red" />
+          <div>
+            <p className="text-danger font-medium">{t('load.error')}</p>
+            <p className="text-sm opacity-70">{t('load.errorDescription')}</p>
           </div>
-        </Card.Content>
-      </Card>
+        </div>
+      </div>
     );
   }
 

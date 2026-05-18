@@ -1,11 +1,22 @@
-import { useCallback, useMemo, useState } from 'react';
-import { Button, Card, CardProps, Form, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, TextArea, useOverlayState } from '@heroui/react';
+import { HTMLAttributes, useCallback, useMemo, useState } from 'react';
+import {
+  Button,
+  Form,
+  Modal,
+  ModalBackdrop,
+  ModalBody,
+  ModalContainer,
+  ModalDialog,
+  ModalFooter,
+  ModalHeader,
+  TextArea,
+  useOverlayState,
+} from '@heroui/react';
 import { HistoryIcon, ShieldCheckIcon } from 'lucide-react';
 import { ResourceIntroduction, User } from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
-import { PageHeader } from '../pageHeader';
 import { Action, UserSelectionList } from '../userSelectionList';
 import { useHasValidIntroduction } from '../../hooks/useHasValidIntroduction';
 
@@ -23,7 +34,9 @@ interface IntroductionsManagementProps {
   onHistoryModalOpen: (props: { user: User; introduction: ResourceIntroduction }) => void;
 }
 
-export function IntroductionsManagement(props: Readonly<IntroductionsManagementProps & Omit<CardProps, 'children'>>) {
+export function IntroductionsManagement(
+  props: Readonly<IntroductionsManagementProps & Omit<HTMLAttributes<HTMLElement>, 'children'>>,
+) {
   const {
     introductions,
     onGrantIntroduction,
@@ -32,6 +45,7 @@ export function IntroductionsManagement(props: Readonly<IntroductionsManagementP
     isRevoking,
     isLoadingIntroductions,
     onHistoryModalOpen,
+    className,
     ...rest
   } = props;
 
@@ -106,59 +120,60 @@ export function IntroductionsManagement(props: Readonly<IntroductionsManagementP
   }, [selectedUser, action, comment, onGrantIntroduction, onRevokeIntroduction, closeCommentModal]);
 
   return (
-    <Card {...rest}>
-      <Card.Header>
-        <PageHeader title={t('title')} subtitle={t('subtitle')} icon={<ShieldCheckIcon />} noMargin={true} />
-      </Card.Header>
-      <Card.Content>
-        <UserSelectionList
-          selectedUsers={userWithIntroductionStatus}
-          onAddToSelection={(user) => onGrantIntroduction({ user })}
-          addToSelectionIsLoading={isGranting}
-          selectedUserIsLoading={isLoadingIntroductions}
-          rowClassName={(user) =>
-            user.hasValidIntroduction ? 'border-l-8 border-l-success' : 'border-l-8 border-l-danger'
-          }
-          tableProps={{}}
-          actions={Actions}
-        />
+    <section className={`w-full flex flex-col gap-4 ${className ?? ''}`} {...rest}>
+      <div className="flex items-center gap-2">
+        <ShieldCheckIcon className="w-4 h-4 text-default-700" />
+        <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">{t('title')}</h3>
+      </div>
+      <p className="text-sm text-default-500">{t('subtitle')}</p>
 
-        <Modal
-          isOpen={commentModalIsOpen}
-          onOpenChange={(o) => {
-            if (!o) closeCommentModal();
-          }}
-        >
-          <ModalBackdrop>
-            <ModalContainer size="md">
-              <ModalDialog>
-                {() => (
-                  <>
-                    <ModalHeader>{t('commentModal.title')}</ModalHeader>
+      <UserSelectionList
+        selectedUsers={userWithIntroductionStatus}
+        onAddToSelection={(user) => onGrantIntroduction({ user })}
+        addToSelectionIsLoading={isGranting}
+        selectedUserIsLoading={isLoadingIntroductions}
+        rowClassName={(user) =>
+          user.hasValidIntroduction ? 'border-l-8 border-l-success' : 'border-l-8 border-l-danger'
+        }
+        tableProps={{}}
+        actions={Actions}
+      />
 
-                    <ModalBody>
-                      <Form
-                        onSubmit={(e) => {
-                          e.preventDefault();
-                          onCommentModalSubmit();
-                        }}
-                      >
-                        <TextArea value={comment} onChange={(e) => setComment(e.target.value)} />
+      <Modal
+        isOpen={commentModalIsOpen}
+        onOpenChange={(o) => {
+          if (!o) closeCommentModal();
+        }}
+      >
+        <ModalBackdrop>
+          <ModalContainer size="md">
+            <ModalDialog>
+              {() => (
+                <>
+                  <ModalHeader>{t('commentModal.title')}</ModalHeader>
 
-                        <button type="submit" hidden />
-                      </Form>
-                    </ModalBody>
+                  <ModalBody>
+                    <Form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        onCommentModalSubmit();
+                      }}
+                    >
+                      <TextArea value={comment} onChange={(e) => setComment(e.target.value)} />
 
-                    <ModalFooter>
-                      <Button onPress={onCommentModalSubmit}>{t('commentModal.submit')}</Button>
-                    </ModalFooter>
-                  </>
-                )}
-              </ModalDialog>
-            </ModalContainer>
-          </ModalBackdrop>
-        </Modal>
-      </Card.Content>
-    </Card>
+                      <button type="submit" hidden />
+                    </Form>
+                  </ModalBody>
+
+                  <ModalFooter>
+                    <Button onPress={onCommentModalSubmit}>{t('commentModal.submit')}</Button>
+                  </ModalFooter>
+                </>
+              )}
+            </ModalDialog>
+          </ModalContainer>
+        </ModalBackdrop>
+      </Modal>
+    </section>
   );
 }
