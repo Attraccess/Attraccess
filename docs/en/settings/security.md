@@ -111,6 +111,56 @@ findtime = 900
 bantime  = 900
 ```
 
+The shipped Docker Compose stack already wires both files for you behind the `fail2ban` profile — see [Docker Compose installation](installation/docker-compose.md#brute-force-ip-banning-with-fail2ban).
+
+## fail2ban Administration
+
+Once the `fail2ban` Compose profile is running, these commands manage the jail.
+
+### List active bans
+
+```bash
+docker compose exec fail2ban fail2ban-client status attraccess-auth
+```
+
+Output includes `Currently banned`, `Total banned`, and the `Banned IP list`.
+
+### Unban an IP
+
+```bash
+docker compose exec fail2ban fail2ban-client set attraccess-auth unbanip 1.2.3.4
+```
+
+### Manually ban an IP
+
+```bash
+docker compose exec fail2ban fail2ban-client set attraccess-auth banip 1.2.3.4
+```
+
+### Re-tune thresholds
+
+The defaults are read from `F2B_ATTRACCESS_MAXRETRY`, `F2B_ATTRACCESS_FINDTIME`, and `F2B_ATTRACCESS_BANTIME` at container start. Edit `.env.docker-compose` (or your `.env`) and recreate the service:
+
+```bash
+docker compose up -d --force-recreate fail2ban
+```
+
+For ephemeral tuning without a restart:
+
+```bash
+docker compose exec fail2ban fail2ban-client set attraccess-auth maxretry 10
+docker compose exec fail2ban fail2ban-client set attraccess-auth findtime 600
+docker compose exec fail2ban fail2ban-client set attraccess-auth bantime 3600
+```
+
+These live changes are lost on next restart — persist them via env vars for production.
+
+### Inspect the audit log fail2ban is reading
+
+```bash
+docker compose logs attraccess | grep -E 'auth\.failed'
+```
+
 ## See Also
 
 - [Environment Variables](installation/environment-variables.md) -- All configuration options
