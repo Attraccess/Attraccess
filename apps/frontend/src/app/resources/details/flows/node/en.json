@@ -123,6 +123,43 @@
             }
           }
         }
+      },
+      "variable": {
+        "changed": {
+          "title": "Variable changed",
+          "description": "Triggered when a watched flow variable changes value.",
+          "outputs": {
+            "output": "Output"
+          },
+          "preview": {
+            "watches": "Watching",
+            "source": "Source"
+          },
+          "config": {
+            "watches": {
+              "label": "Watched variables",
+              "empty": "No variables watched.",
+              "add": "Add watch",
+              "items": {
+                "key": { "label": "Key" },
+                "scope": {
+                  "label": "Scope",
+                  "enum": {
+                    "resource": "Resource",
+                    "global": "Global"
+                  }
+                }
+              }
+            },
+            "source": {
+              "label": "Trigger source",
+              "enum": {
+                "any": "Any change (including this resource)",
+                "exclude-self": "Only changes from other resources"
+              }
+            }
+          }
+        }
       }
     },
     "processing": {
@@ -249,6 +286,86 @@
         "config": {
           "message": {
             "label": "Error message template"
+          }
+        }
+      },
+      "variables": {
+        "set": {
+          "title": "Set variables",
+          "description": "Stores one or more flow variables. Keys and values support Handlebars templates.",
+          "inputs": {
+            "input": "Input"
+          },
+          "outputs": {
+            "output": "Output"
+          },
+          "preview": {
+            "assignments": "Sets"
+          },
+          "config": {
+            "variables": {
+              "label": "Variables",
+              "empty": "No variables configured.",
+              "add": "Add variable",
+              "items": {
+                "key": {
+                  "label": "Key",
+                  "helpText": "Identifier for this variable. Letters, digits, dot, dash and underscore."
+                },
+                "value": {
+                  "label": "Value template",
+                  "helpText": "Handlebars template. Reference payload as \\{{path.to.field}} and existing variables as \\{{variables.KEY}}. Plain text without \\{{ }} is stored as-is.",
+                  "docsUrl": "https://handlebarsjs.com/guide/expressions.html",
+                  "docsLabel": "Handlebars syntax reference"
+                },
+                "scope": {
+                  "label": "Scope",
+                  "helpText": "Resource: only this resource sees the value. Global: shared across all resources.",
+                  "enum": {
+                    "resource": "Resource",
+                    "global": "Global"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "get": {
+          "title": "Get variables",
+          "description": "Reads flow variables and writes them onto the payload at the configured paths.",
+          "inputs": {
+            "input": "Input"
+          },
+          "outputs": {
+            "output": "Output"
+          },
+          "preview": {
+            "reads": "Reads"
+          },
+          "config": {
+            "variables": {
+              "label": "Variables",
+              "empty": "No variables configured.",
+              "add": "Add variable",
+              "items": {
+                "key": {
+                  "label": "Key",
+                  "helpText": "Variable to read."
+                },
+                "scope": {
+                  "label": "Scope",
+                  "helpText": "Resource: only variables stored on this resource. Global: shared across all resources.",
+                  "enum": {
+                    "resource": "Resource",
+                    "global": "Global"
+                  }
+                },
+                "payloadPath": {
+                  "label": "Payload path",
+                  "helpText": "Dot path on the payload where the value will be written, e.g. user.email."
+                }
+              }
+            }
           }
         }
       }

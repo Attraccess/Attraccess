@@ -4292,7 +4292,7 @@ export const $RefundTransactionDto = {
 
 export const $ResourceFlowNodeType = {
     type: 'string',
-    enum: ['input.button', 'input.resource.usage.started', 'input.resource.usage.stopped', 'input.resource.usage.takeover', 'input.resource.door.unlocked', 'input.resource.door.locked', 'input.resource.door.unlatched', 'input.mqtt.message.received', 'input.resource.activity.no-activity', 'output.http.sendRequest', 'output.mqtt.sendMessage', 'output.resource.billing.calculation.set-additional-items', 'output.resource.usage.end-session', 'output.resource.activity.track-activity', 'processing.wait', 'processing.if', 'processing.set-payload', 'processing.mqtt.waitForMessage', 'processing.error', 'output.resource.health.heartbeat', 'output.resource.health.set'],
+    enum: ['input.button', 'input.resource.usage.started', 'input.resource.usage.stopped', 'input.resource.usage.takeover', 'input.resource.door.unlocked', 'input.resource.door.locked', 'input.resource.door.unlatched', 'input.mqtt.message.received', 'input.resource.activity.no-activity', 'input.variable.changed', 'output.http.sendRequest', 'output.mqtt.sendMessage', 'output.resource.billing.calculation.set-additional-items', 'output.resource.usage.end-session', 'output.resource.activity.track-activity', 'processing.wait', 'processing.if', 'processing.set-payload', 'processing.mqtt.waitForMessage', 'processing.error', 'processing.variables.set', 'processing.variables.get', 'output.resource.health.heartbeat', 'output.resource.health.set'],
     description: 'The name of the node type'
 } as const;
 
@@ -4756,6 +4756,61 @@ export const $ResourceFlowNode = {
         }
     },
     required: ['id', 'type', 'position', 'data', 'resourceId']
+} as const;
+
+export const $ResourceFlowVariableScope = {
+    type: 'string',
+    enum: ['resource', 'global']
+} as const;
+
+export const $FlowVariableDto = {
+    type: 'object',
+    properties: {
+        id: {
+            type: 'number'
+        },
+        scope: {
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/ResourceFlowVariableScope'
+                }
+            ]
+        },
+        resourceId: {
+            type: 'number',
+            nullable: true
+        },
+        key: {
+            type: 'string'
+        },
+        value: {
+            type: 'object',
+            description: 'Parsed JSON value'
+        },
+        valueType: {
+            type: 'object'
+        },
+        createdAt: {
+            type: 'string',
+            format: 'date-time'
+        },
+        updatedAt: {
+            type: 'string',
+            format: 'date-time'
+        }
+    },
+    required: ['id', 'scope', 'resourceId', 'key', 'value', 'valueType', 'createdAt', 'updatedAt']
+} as const;
+
+export const $FlowVariableUpsertDto = {
+    type: 'object',
+    properties: {
+        value: {
+            type: 'object',
+            description: 'Any JSON value'
+        }
+    },
+    required: ['value']
 } as const;
 
 export const $ResourceHealthStatus = {

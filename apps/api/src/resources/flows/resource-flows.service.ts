@@ -25,6 +25,9 @@ import {
   ResourceActivityTrackActivityNodeDataSchema,
   ResourceHealthHeartbeatNodeDataSchema,
   ResourceHealthSetNodeDataSchema,
+  SetVariablesNodeDataSchema,
+  GetVariablesNodeDataSchema,
+  VariableChangedNodeDataSchema,
 } from '@attraccess/database-entities';
 import { ResourceNotFoundException } from '../../exceptions/resource.notFound.exception';
 import { ResourceFlowSaveDto, ResourceFlowResponseDto } from './dto';
@@ -440,6 +443,26 @@ export class ResourceFlowsService {
           schema.outputs = ['output'];
           schema.supportedByResource = true;
           schema.isOutput = true;
+          break;
+
+        case ResourceFlowNodeType.INPUT_VARIABLE_CHANGED:
+          schema.configSchema = z.toJSONSchema(VariableChangedNodeDataSchema, { io: 'input' });
+          schema.outputs = ['output'];
+          schema.supportedByResource = true;
+          break;
+
+        case ResourceFlowNodeType.PROCESSING_SET_VARIABLES:
+          schema.configSchema = z.toJSONSchema(SetVariablesNodeDataSchema, { io: 'input' });
+          schema.inputs = ['input'];
+          schema.outputs = ['output'];
+          schema.supportedByResource = true;
+          break;
+
+        case ResourceFlowNodeType.PROCESSING_GET_VARIABLES:
+          schema.configSchema = z.toJSONSchema(GetVariablesNodeDataSchema, { io: 'input' });
+          schema.inputs = ['input'];
+          schema.outputs = ['output'];
+          schema.supportedByResource = true;
           break;
 
         default: {

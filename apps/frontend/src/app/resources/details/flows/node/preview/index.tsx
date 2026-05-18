@@ -8,10 +8,25 @@ interface Props {
   schema: ResourceFlowNodeSchemaDto;
 }
 
-export type NodePreviewData = Array<{
+export type NodePreviewEntryField = {
   label: string;
   value: string;
-}>;
+};
+
+export type NodePreviewRow =
+  | {
+      label: string;
+      value: string;
+    }
+  | {
+      label: string;
+      entries: Array<{
+        title?: string;
+        fields: Array<NodePreviewEntryField>;
+      }>;
+    };
+
+export type NodePreviewData = Array<NodePreviewRow>;
 
 export function useNodePreviewRows(props: Props): NodePreviewData {
   const { tNodeTranslations: t, schema } = props;
@@ -164,6 +179,86 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
             value: (nodeData?.data.status as string) ?? '',
           },
         ];
+
+      case ResourceFlowNodeType.INPUT_VARIABLE_CHANGED: {
+        const watches = (nodeData?.data.watches as Array<{ key: string; scope: string }>) ?? [];
+        const keyLabel = t('nodes.input.variable.changed.config.watches.items.key.label');
+        const scopeLabel = t('nodes.input.variable.changed.config.watches.items.scope.label');
+        const rows: NodePreviewData = [
+          {
+            label: t('nodes.input.variable.changed.preview.watches'),
+            entries: watches.map((w) => ({
+              fields: [
+                { label: keyLabel, value: w?.key ?? '-' },
+                {
+                  label: scopeLabel,
+                  value: w?.scope
+                    ? t('nodes.input.variable.changed.config.watches.items.scope.enum.' + w.scope)
+                    : '-',
+                },
+              ],
+            })),
+          },
+        ];
+        const sourceValue = nodeData?.data.source as string | undefined;
+        if (sourceValue) {
+          rows.push({
+            label: t('nodes.input.variable.changed.preview.source'),
+            value: t('nodes.input.variable.changed.config.source.enum.' + sourceValue),
+          });
+        }
+        return rows;
+      }
+
+      case ResourceFlowNodeType.PROCESSING_VARIABLES_SET: {
+        const variables =
+          (nodeData?.data.variables as Array<{ key: string; value: string; scope: string }>) ?? [];
+        const keyLabel = t('nodes.processing.variables.set.config.variables.items.key.label');
+        const valueLabel = t('nodes.processing.variables.set.config.variables.items.value.label');
+        const scopeLabel = t('nodes.processing.variables.set.config.variables.items.scope.label');
+        return [
+          {
+            label: t('nodes.processing.variables.set.preview.assignments'),
+            entries: variables.map((v) => ({
+              fields: [
+                { label: keyLabel, value: v?.key ?? '-' },
+                { label: valueLabel, value: v?.value ?? '-' },
+                {
+                  label: scopeLabel,
+                  value: v?.scope
+                    ? t('nodes.processing.variables.set.config.variables.items.scope.enum.' + v.scope)
+                    : '-',
+                },
+              ],
+            })),
+          },
+        ];
+      }
+
+      case ResourceFlowNodeType.PROCESSING_VARIABLES_GET: {
+        const variables =
+          (nodeData?.data.variables as Array<{ key: string; scope: string; payloadPath: string }>) ?? [];
+        const keyLabel = t('nodes.processing.variables.get.config.variables.items.key.label');
+        const pathLabel = t('nodes.processing.variables.get.config.variables.items.payloadPath.label');
+        const scopeLabel = t('nodes.processing.variables.get.config.variables.items.scope.label');
+        return [
+          {
+            label: t('nodes.processing.variables.get.preview.reads'),
+            entries: variables.map((v) => ({
+              fields: [
+                { label: keyLabel, value: v?.key ?? '-' },
+                { label: pathLabel, value: v?.payloadPath ?? '-' },
+                {
+                  label: scopeLabel,
+                  value: v?.scope
+                    ? t('nodes.processing.variables.get.config.variables.items.scope.enum.' + v.scope)
+                    : '-',
+                },
+              ],
+            })),
+          },
+        ];
+      }
 
       default: {
         const exhaustiveCheck: never = schema.type;

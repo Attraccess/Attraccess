@@ -16,7 +16,7 @@ import {
 } from '@heroui/react';
 import { MqttServerSelect } from '../../../../../../../components/mqttServerSelect';
 import { PlusIcon, XIcon } from 'lucide-react';
-import { TFunction } from '@attraccess/plugins-frontend-ui';
+import { TExists, TFunction } from '@attraccess/plugins-frontend-ui';
 import { useCallback, useMemo, useState } from 'react';
 import { dbCurrencyToUserCurrency, userCurrencyToDbCurrency } from '@attraccess/shared';
 import { CreateMqttServerForm } from '../../../../../../mqtt/servers/CreateMqttServerPage';
@@ -46,6 +46,7 @@ interface Props<TValue> {
   name: string;
   schema: Property<TValue>;
   tNodeTranslations: TFunction;
+  tNodeExists?: TExists;
   value: TValue;
   onChange: (value: TValue) => void;
   isRequired: boolean;
@@ -53,11 +54,36 @@ interface Props<TValue> {
 }
 
 export function PropertyInput<TValue>(props: Props<TValue>) {
-  const { name, isRequired, schema, tNodeTranslations: t, nodeType, value, onChange, hideLabel } = props;
+  const { name, isRequired, schema, tNodeTranslations: t, tNodeExists, nodeType, value, onChange, hideLabel } = props;
 
-  let description = undefined;
+  const helpTextKey = `nodes.${nodeType}.config.${name}.helpText`;
+  const docsUrlKey = `nodes.${nodeType}.config.${name}.docsUrl`;
+  const docsLabelKey = `nodes.${nodeType}.config.${name}.docsLabel`;
+  const helpText = tNodeExists?.(helpTextKey) ? t(helpTextKey) : undefined;
+  const docsUrl = tNodeExists?.(docsUrlKey) ? t(docsUrlKey) : undefined;
+  const docsLabel = tNodeExists?.(docsLabelKey) ? t(docsLabelKey) : docsUrl;
+
+  let description: React.ReactNode = undefined;
   if (schema.overrideWithInput) {
     description = t('nodes.genericConfig.overridableByInput', { fieldName: schema.overrideWithInput });
+  }
+  if (helpText || docsUrl) {
+    description = (
+      <span className="flex flex-col gap-0.5">
+        {description ? <span>{description}</span> : null}
+        {helpText ? <span>{helpText}</span> : null}
+        {docsUrl ? (
+          <a
+            href={docsUrl}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="text-primary-500 hover:underline w-fit"
+          >
+            {docsLabel}
+          </a>
+        ) : null}
+      </span>
+    );
   }
 
   const { data: configuration } = useBillingServiceGetBillingConfiguration();
@@ -345,6 +371,7 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
                               key={propName}
                               nodeType={nodeType}
                               tNodeTranslations={t}
+                              tNodeExists={tNodeExists}
                               name={name + '.items.' + propName}
                               schema={propSchema as Property<unknown>}
                               value={(row as Record<string, unknown>)?.[propName]}
@@ -357,7 +384,6 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
                                 onChange(newArrayValue as TValue);
                               }}
                               isRequired={false}
-                              hideLabel
                             />
                           ))}
                         </>
@@ -365,6 +391,7 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
                         <PropertyInput
                           nodeType={nodeType}
                           tNodeTranslations={t}
+                          tNodeExists={tNodeExists}
                           name={name + '.items'}
                           schema={items as unknown as Property<unknown>}
                           value={row as unknown}

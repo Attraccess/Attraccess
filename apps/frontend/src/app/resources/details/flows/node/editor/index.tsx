@@ -5,16 +5,17 @@ import { PageHeader } from '../../../../../../components/pageHeader';
 import { useFlowContext } from '../../flowContext';
 import { Property, PropertyInput } from './property-input';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { TFunction } from '@attraccess/plugins-frontend-ui';
+import { TExists, TFunction } from '@attraccess/plugins-frontend-ui';
 
 interface Props {
   schema: ResourceFlowNodeSchemaDto;
   children: (onOpen: () => void) => React.ReactNode;
   tNodeTranslations: TFunction;
+  tNodeExists?: TExists;
 }
 
 export function NodeEditor(props: Props) {
-  const { tNodeTranslations: t, schema } = props;
+  const { tNodeTranslations: t, tNodeExists, schema } = props;
   const { isOpen, onOpen, onOpenChange, onClose } = useDisclosure();
 
   const nodeId = useNodeId();
@@ -66,6 +67,7 @@ export function NodeEditor(props: Props) {
                     isRequired={(schema.configSchema.required as string[])?.includes(propertyName)}
                     nodeType={schema.type}
                     tNodeTranslations={t}
+                    tNodeExists={tNodeExists}
                     name={propertyName}
                     schema={property}
                     value={data[propertyName]}

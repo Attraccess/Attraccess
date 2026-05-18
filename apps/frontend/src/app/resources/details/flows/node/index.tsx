@@ -9,10 +9,11 @@ import { DeleteConfirmationModal } from '../../../../../components/deleteConfirm
 import { ResourceFlowLog } from '@attraccess/react-query-client';
 import { useNodePreviewRows } from './preview';
 import { NodeEditor } from './editor';
-import { TFunction } from '@attraccess/plugins-frontend-ui';
+import { TExists, TFunction } from '@attraccess/plugins-frontend-ui';
 
 interface Props {
   tNodeTranslations: TFunction;
+  tNodeExists?: TExists;
   schema: ResourceFlowNodeSchemaDto;
   node?: NodeProps;
   previewMode?: boolean;
@@ -30,7 +31,7 @@ enum ProcessingState {
 }
 
 export function AttraccessNode(props: Props) {
-  const { schema, previewMode, tNodeTranslations: t, data } = props;
+  const { schema, previewMode, tNodeTranslations: t, tNodeExists, data } = props;
 
   const nodeId = useNodeId();
 
@@ -153,7 +154,7 @@ export function AttraccessNode(props: Props) {
   const previewRows = useNodePreviewRows({ schema, tNodeTranslations: t });
 
   return (
-    <NodeEditor schema={schema} tNodeTranslations={t}>
+    <NodeEditor schema={schema} tNodeTranslations={t} tNodeExists={tNodeExists}>
       {(openEditor) => (
         <div>
           <DeleteConfirmationModal
@@ -221,11 +222,41 @@ export function AttraccessNode(props: Props) {
               <CardBody className="pt-0">
                 <div className="flex flex-col gap-2">
                   {previewRows.map((row) => (
-                    <div className="flex flex-col gap-2" key={row.label}>
+                    <div className="flex flex-col gap-1" key={row.label}>
                       <small>{row.label}</small>
-                      <Code className="text-ellipsis overflow-hidden" title={row.value}>
-                        {row.value}
-                      </Code>
+                      {'entries' in row ? (
+                        row.entries.length === 0 ? (
+                          <Code className="text-ellipsis overflow-hidden">-</Code>
+                        ) : (
+                          <div className="flex flex-col gap-1">
+                            {row.entries.map((entry, idx) => (
+                              <div
+                                key={idx}
+                                className="flex flex-col gap-0.5 rounded-md border border-default-200 px-2 py-1"
+                              >
+                                {entry.fields.map((field) => (
+                                  <div
+                                    key={field.label}
+                                    className="grid grid-cols-[auto_1fr] gap-x-2 items-baseline min-w-0"
+                                  >
+                                    <small className="text-default-500 whitespace-nowrap">{field.label}</small>
+                                    <Code
+                                      className="text-ellipsis overflow-hidden whitespace-nowrap min-w-0"
+                                      title={field.value}
+                                    >
+                                      {field.value}
+                                    </Code>
+                                  </div>
+                                ))}
+                              </div>
+                            ))}
+                          </div>
+                        )
+                      ) : (
+                        <Code className="text-ellipsis overflow-hidden" title={row.value}>
+                          {row.value}
+                        </Code>
+                      )}
                     </div>
                   ))}
                 </div>
