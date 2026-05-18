@@ -53,7 +53,11 @@ cp "$FILTER_TEMPLATE" "$FILTER_DST"
 
 echo "fail2ban entrypoint: attraccess-auth jail configured (maxretry=$MAXRETRY findtime=$FINDTIME bantime=$BANTIME chain=$CHAIN)"
 
+if [ "$#" -eq 0 ]; then
+  set -- /usr/bin/fail2ban-server -f -x -v start
+fi
+
 if [ -x /entrypoint.sh ]; then
   exec /entrypoint.sh "$@"
 fi
-exec fail2ban-server -f -x -v start
+exec "$@"
