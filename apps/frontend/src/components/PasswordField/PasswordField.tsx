@@ -21,7 +21,7 @@ export const FALLBACK_PUBLIC_POLICY: PublicPasswordPolicy = {
   minZxcvbnScore: 3,
 };
 
-export interface PasswordFieldProps {
+interface BasePasswordFieldProps {
   value: string;
   onValueChange: (value: string) => void;
   username?: string;
@@ -29,10 +29,6 @@ export interface PasswordFieldProps {
   policy?: PublicPasswordPolicy;
   serverErrors?: PolicyError[];
   passwordLabel?: string;
-  confirmationLabel?: string;
-  showConfirmation?: boolean;
-  confirmationValue?: string;
-  onConfirmationChange?: (value: string) => void;
   showGenerator?: boolean;
   isRequired?: boolean;
   autoComplete?: 'new-password' | 'current-password';
@@ -40,24 +36,42 @@ export interface PasswordFieldProps {
   hintsHidden?: boolean;
 }
 
-export function PasswordField({
-  value,
-  onValueChange,
-  username = '',
-  email = '',
-  policy,
-  serverErrors,
-  passwordLabel,
-  confirmationLabel,
-  showConfirmation = false,
-  confirmationValue = '',
-  onConfirmationChange,
-  showGenerator = true,
-  isRequired = false,
-  autoComplete = 'new-password',
-  dataCyPrefix,
-  hintsHidden = false,
-}: PasswordFieldProps) {
+interface PasswordFieldWithoutConfirmation {
+  showConfirmation?: false;
+  confirmationValue?: never;
+  onConfirmationChange?: never;
+  confirmationLabel?: never;
+}
+
+interface PasswordFieldWithConfirmation {
+  showConfirmation: true;
+  confirmationValue: string;
+  onConfirmationChange: (value: string) => void;
+  confirmationLabel?: string;
+}
+
+export type PasswordFieldProps = BasePasswordFieldProps &
+  (PasswordFieldWithoutConfirmation | PasswordFieldWithConfirmation);
+
+export function PasswordField(props: PasswordFieldProps) {
+  const {
+    value,
+    onValueChange,
+    username = '',
+    email = '',
+    policy,
+    serverErrors,
+    passwordLabel,
+    showGenerator = true,
+    isRequired = false,
+    autoComplete = 'new-password',
+    dataCyPrefix,
+    hintsHidden = false,
+  } = props;
+  const showConfirmation = props.showConfirmation === true;
+  const confirmationValue = showConfirmation ? props.confirmationValue : '';
+  const onConfirmationChange = showConfirmation ? props.onConfirmationChange : undefined;
+  const confirmationLabel = showConfirmation ? props.confirmationLabel : undefined;
   const { t } = useTranslations({ en, de });
   const toast = useToastMessage();
 

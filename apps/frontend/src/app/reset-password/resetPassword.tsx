@@ -7,17 +7,10 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PasswordField } from '../../components/PasswordField';
 import en from './en.json';
 import de from './de.json';
-import { ApiError, useUsersServiceChangePasswordViaResetToken } from '@attraccess/react-query-client';
+import { useUsersServiceChangePasswordViaResetToken } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../components/toastProvider';
 import { PolicyError } from '@attraccess/shared';
-
-function extractPolicyErrors(error: unknown): PolicyError[] | null {
-  if (!(error instanceof ApiError) || error.status !== 400) {
-    return null;
-  }
-  const body = error.body as { policyErrors?: PolicyError[] } | undefined;
-  return Array.isArray(body?.policyErrors) ? body.policyErrors : null;
-}
+import { extractPolicyErrors } from '../../utils/policyErrors';
 
 export function ResetPassword() {
   const query = useUrlQuery();

@@ -11,14 +11,7 @@ import { PasswordField } from '../../components/PasswordField';
 import { useLogin } from '../../hooks/useAuth';
 import { useToastMessage } from '../../components/toastProvider';
 import { PolicyError } from '@attraccess/shared';
-
-function extractPolicyErrors(error: unknown): PolicyError[] | null {
-  if (!(error instanceof ApiError) || error.status !== 400) {
-    return null;
-  }
-  const body = error.body as { policyErrors?: PolicyError[] } | undefined;
-  return Array.isArray(body?.policyErrors) ? body.policyErrors : null;
-}
+import { extractPolicyErrors } from '../../utils/policyErrors';
 
 export function AcceptInvitation() {
   const query = useUrlQuery();

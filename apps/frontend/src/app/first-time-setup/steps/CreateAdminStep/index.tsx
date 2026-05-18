@@ -15,6 +15,7 @@ import { PasswordField } from '../../../../components/PasswordField';
 import { UsernameInput, USERNAME_RULES, useUsernameValidation } from '../../../../components/UsernameInput';
 import { useToastMessage } from '../../../../components/toastProvider';
 import { PolicyError } from '@attraccess/shared';
+import { extractPolicyErrors } from '../../../../utils/policyErrors';
 import API_ERROR_TRANSLATIONS_DE from '../../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../global-translations/api-errors.en.json';
 import en from './en.json';
@@ -24,14 +25,6 @@ export type CreateAdminStepProps = {
   onSuccess?: () => void;
   isOverwrite?: boolean;
 };
-
-function extractPolicyErrors(error: unknown): PolicyError[] | null {
-  if (!(error instanceof ApiError) || error.status !== 400) {
-    return null;
-  }
-  const body = error.body as { policyErrors?: PolicyError[] } | undefined;
-  return Array.isArray(body?.policyErrors) ? body.policyErrors : null;
-}
 
 export function CreateAdminStep({ onSuccess, isOverwrite }: CreateAdminStepProps) {
   const { t, tExists } = useTranslations({

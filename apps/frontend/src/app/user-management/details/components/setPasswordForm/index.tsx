@@ -2,9 +2,10 @@ import React, { HTMLAttributes, useCallback, useMemo, useState } from 'react';
 import { Button, cn } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../../../components/toastProvider';
-import { ApiError, useUsersServiceSetUserPassword } from '@attraccess/react-query-client';
+import { useUsersServiceSetUserPassword } from '@attraccess/react-query-client';
 import { PasswordField } from '../../../../../components/PasswordField';
 import { PolicyError } from '@attraccess/shared';
+import { extractPolicyErrors } from '../../../../../utils/policyErrors';
 
 import en from './en.json';
 import de from './de.json';
@@ -13,14 +14,6 @@ interface SetPasswordFormProps {
   userId: number;
   username?: string;
   email?: string;
-}
-
-function extractPolicyErrors(error: unknown): PolicyError[] | null {
-  if (!(error instanceof ApiError) || error.status !== 400) {
-    return null;
-  }
-  const body = error.body as { policyErrors?: PolicyError[] } | undefined;
-  return Array.isArray(body?.policyErrors) ? body.policyErrors : null;
 }
 
 export const SetPasswordForm: React.FC<SetPasswordFormProps & Omit<HTMLAttributes<HTMLDivElement>, 'children'>> = ({

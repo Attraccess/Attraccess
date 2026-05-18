@@ -20,6 +20,7 @@ import API_ERROR_TRANSLATIONS_EN from '../../global-translations/api-errors.en.j
 import { useToastMessage } from '../../components/toastProvider';
 import { PasswordField } from '../../components/PasswordField';
 import { PolicyError, PublicPasswordPolicy, validatePassword } from '@attraccess/shared';
+import { extractPolicyErrors } from '../../utils/policyErrors';
 
 interface RegisterFormProps {
   onHasAccount: () => void;
@@ -35,14 +36,6 @@ const FALLBACK_POLICY: PublicPasswordPolicy = {
   requireSpecial: false,
   minZxcvbnScore: 3,
 };
-
-function extractPolicyErrors(error: unknown): PolicyError[] | null {
-  if (!(error instanceof ApiError) || error.status !== 400) {
-    return null;
-  }
-  const body = error.body as { policyErrors?: PolicyError[] } | undefined;
-  return Array.isArray(body?.policyErrors) ? body.policyErrors : null;
-}
 
 export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
   const { t, tExists } = useTranslations({
