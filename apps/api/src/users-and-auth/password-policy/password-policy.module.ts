@@ -3,16 +3,24 @@
 
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { AuthenticationDetail, PasswordHistory, PasswordPolicy } from '@attraccess/database-entities';
+import {
+  AuthenticationDetail,
+  PasswordHistory,
+  PasswordPolicy,
+  PasswordPolicyOverride,
+} from '@attraccess/database-entities';
 import { PasswordPolicyService } from './password-policy.service';
 import { PasswordPolicyController } from './password-policy.controller';
+import { AdminPasswordPolicyController } from './admin-password-policy.controller';
 import { HibpClient } from './hibp.client';
 import { ZxcvbnService } from './zxcvbn.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([PasswordPolicy, PasswordHistory, AuthenticationDetail])],
+  imports: [
+    TypeOrmModule.forFeature([PasswordPolicy, PasswordPolicyOverride, PasswordHistory, AuthenticationDetail]),
+  ],
   providers: [PasswordPolicyService, HibpClient, ZxcvbnService],
-  controllers: [PasswordPolicyController],
+  controllers: [PasswordPolicyController, AdminPasswordPolicyController],
   exports: [PasswordPolicyService],
 })
 export class PasswordPolicyModule {}

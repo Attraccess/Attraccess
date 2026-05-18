@@ -31,6 +31,7 @@ import { ProjectsListPage } from '../projects';
 import { ProjectDetailsPage } from '../projects/details';
 import { ProjectTeamPage } from '../projects/details/team';
 import SystemSettingsPage from '../settings';
+import PasswordPolicySettingsPage from '../settings/password-policy';
 import FirstTimeSetupPage from '../first-time-setup';
 import { UnauthorizedLayout } from '../unauthorized/unauthorized-layout/layout';
 
@@ -182,6 +183,11 @@ const coreRoutes: RouteConfig[] = [
   {
     path: '/settings',
     element: <SystemSettingsPage />,
+    authRequired: 'canManageSystemConfiguration',
+  },
+  {
+    path: '/settings/security/password-policy',
+    element: <PasswordPolicySettingsPage />,
     authRequired: 'canManageSystemConfiguration',
   },
   {

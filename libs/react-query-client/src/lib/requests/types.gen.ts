@@ -1259,6 +1259,82 @@ export type PublicPasswordPolicyDto = {
     minZxcvbnScore: number;
 };
 
+export type PasswordPolicyDto = {
+    minLength: number;
+    maxLength: number;
+    allowAllUnicode: boolean;
+    requireUppercase: boolean;
+    requireLowercase: boolean;
+    requireDigit: boolean;
+    requireSpecial: boolean;
+    checkHIBP: boolean;
+    checkCommonPasswords: boolean;
+    /**
+     * Minimum required zxcvbn score (0-4)
+     */
+    minZxcvbnScore: number;
+    /**
+     * Number of recent passwords to remember (0 disables)
+     */
+    historySize: number;
+    /**
+     * Forced rotation interval in days (0 disables)
+     */
+    rotationDays: number;
+};
+
+export type UpdatePasswordPolicyDto = {
+    minLength?: number;
+    maxLength?: number;
+    allowAllUnicode?: boolean;
+    requireUppercase?: boolean;
+    requireLowercase?: boolean;
+    requireDigit?: boolean;
+    requireSpecial?: boolean;
+    checkHIBP?: boolean;
+    checkCommonPasswords?: boolean;
+    minZxcvbnScore?: number;
+    historySize?: number;
+    rotationDays?: number;
+};
+
+export enum PasswordPolicyRole {
+    ADMIN = 'admin',
+    MACHINE = 'machine',
+    API_TOKEN = 'api-token'
+}
+
+export type PasswordPolicyOverrideDto = {
+    role: PasswordPolicyRole;
+    minLength: number | null;
+    maxLength: number | null;
+    allowAllUnicode: boolean | null;
+    requireUppercase: boolean | null;
+    requireLowercase: boolean | null;
+    requireDigit: boolean | null;
+    requireSpecial: boolean | null;
+    checkHIBP: boolean | null;
+    checkCommonPasswords: boolean | null;
+    minZxcvbnScore: number | null;
+    historySize: number | null;
+    rotationDays: number | null;
+};
+
+export type UpsertPasswordPolicyOverrideDto = {
+    minLength?: number | null;
+    maxLength?: number | null;
+    allowAllUnicode?: boolean | null;
+    requireUppercase?: boolean | null;
+    requireLowercase?: boolean | null;
+    requireDigit?: boolean | null;
+    requireSpecial?: boolean | null;
+    checkHIBP?: boolean | null;
+    checkCommonPasswords?: boolean | null;
+    minZxcvbnScore?: number | null;
+    historySize?: number | null;
+    rotationDays?: number | null;
+};
+
 /**
  * The type of the resource
  */
@@ -4453,6 +4529,35 @@ export type GetLicenseInformationResponse = LicenseDataDto;
 
 export type GetPublicPasswordPolicyResponse = PublicPasswordPolicyDto;
 
+export type GetAdminPasswordPolicyResponse = PasswordPolicyDto;
+
+export type UpdateAdminPasswordPolicyData = {
+    requestBody: UpdatePasswordPolicyDto;
+};
+
+export type UpdateAdminPasswordPolicyResponse = PasswordPolicyDto;
+
+export type ListPasswordPolicyOverridesResponse = Array<PasswordPolicyOverrideDto>;
+
+export type GetPasswordPolicyOverrideData = {
+    role: PasswordPolicyRole;
+};
+
+export type GetPasswordPolicyOverrideResponse = PasswordPolicyOverrideDto | null;
+
+export type UpsertPasswordPolicyOverrideData = {
+    requestBody: UpsertPasswordPolicyOverrideDto;
+    role: PasswordPolicyRole;
+};
+
+export type UpsertPasswordPolicyOverrideResponse = PasswordPolicyOverrideDto;
+
+export type DeletePasswordPolicyOverrideData = {
+    role: PasswordPolicyRole;
+};
+
+export type DeletePasswordPolicyOverrideResponse = void;
+
 export type CreateOneResourceData = {
     formData: CreateResourceDto;
 };
@@ -6645,6 +6750,88 @@ export type $OpenApiTs = {
                  * The currently active public password policy
                  */
                 200: PublicPasswordPolicyDto;
+            };
+        };
+    };
+    '/api/admin/password-policy': {
+        get: {
+            res: {
+                /**
+                 * The global password policy.
+                 */
+                200: PasswordPolicyDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+        patch: {
+            req: UpdateAdminPasswordPolicyData;
+            res: {
+                /**
+                 * Password policy updated.
+                 */
+                200: PasswordPolicyDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/admin/password-policy/overrides': {
+        get: {
+            res: {
+                /**
+                 * All defined overrides.
+                 */
+                200: Array<PasswordPolicyOverrideDto>;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/admin/password-policy/overrides/{role}': {
+        get: {
+            req: GetPasswordPolicyOverrideData;
+            res: {
+                /**
+                 * The override row, or null if unset.
+                 */
+                200: PasswordPolicyOverrideDto | null;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+        put: {
+            req: UpsertPasswordPolicyOverrideData;
+            res: {
+                /**
+                 * The saved override row.
+                 */
+                200: PasswordPolicyOverrideDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+        delete: {
+            req: DeletePasswordPolicyOverrideData;
+            res: {
+                /**
+                 * Override removed.
+                 */
+                204: void;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
             };
         };
     };

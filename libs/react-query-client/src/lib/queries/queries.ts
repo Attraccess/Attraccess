@@ -1,8 +1,8 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { useMutation, UseMutationOptions, useQuery, UseQueryOptions } from "@tanstack/react-query";
-import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, FlowVariablesService, LicenseService, MqttService, PasswordPolicyService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceHealthService, ResourceMaintenanceSchedulesService, ResourceMaintenancesService, ResourcesService, SettingsService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
-import { AcceptInvitationDto, AppKeyRequestDto, BulkUpdateUserPermissionsDto, ChangeBillingFactorDto, ChangeEmailDto, ChangePasswordDto, ChangeUsernameDto, CreateFormDto, CreateMaintenanceDto, CreateMaintenanceScheduleDto, CreateMqttServerDto, CreateProjectDto, CreateProjectInvitationDto, CreateResourceDto, CreateResourceGroupDto, CreateSSOProviderDto, CreateUserDto, CsvInviteUploadDto, DeleteAccountConfirmDto, EmailTemplateType, EndUsageSessionDto, EnrollNfcCardDto, FinishMaintenanceDto, FlowVariableUpsertDto, InviteUserDto, LinkUserToExternalAccountRequestDto, ModifyBalanceDto, NfcCardSetActiveStateDto, PairSumUpReaderDto, PermissionFilter, PreviewMjmlDto, RefundTransactionDto, ResetNfcCardDto, ResetPasswordDto, ResourceFlowSaveDto, ResourceFlowVariableScope, SetBillingConfigurationDto, SetSumUpApiKeyDto, SetUserPasswordDto, SSOProvisioningPermissionsDto, SSOProvisioningUserDto, StartUsageSessionDto, SumupTopUpDto, SumupTransactionCallbackDto, TwoFactorCodeDto, TwoFactorPolicyDto, UpdateAuthRateLimitSettingsDto, UpdateEmailTemplateDto, UpdateFormDto, UpdateMaintenanceScheduleDto, UpdateMetricsSettingsDto, UpdateMqttServerDto, UpdateProjectDto, UpdateReaderDto, UpdateResourceBillingConfigurationDto, UpdateResourceDto, UpdateResourceGroupDto, UpdateResourceGroupIntroductionDto, UpdateResourceIntroductionDto, UpdateSSOProviderDto, UpdateSystemSettingsDto, UpdateUsageSessionProjectDto, UpdateUserPermissionsDto, UploadPluginDto, VerifyEmailDto } from "../requests/types.gen";
+import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, FlowVariablesService, LicenseService, MqttService, PasswordPolicyAdminService, PasswordPolicyService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceHealthService, ResourceMaintenanceSchedulesService, ResourceMaintenancesService, ResourcesService, SettingsService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
+import { AcceptInvitationDto, AppKeyRequestDto, BulkUpdateUserPermissionsDto, ChangeBillingFactorDto, ChangeEmailDto, ChangePasswordDto, ChangeUsernameDto, CreateFormDto, CreateMaintenanceDto, CreateMaintenanceScheduleDto, CreateMqttServerDto, CreateProjectDto, CreateProjectInvitationDto, CreateResourceDto, CreateResourceGroupDto, CreateSSOProviderDto, CreateUserDto, CsvInviteUploadDto, DeleteAccountConfirmDto, EmailTemplateType, EndUsageSessionDto, EnrollNfcCardDto, FinishMaintenanceDto, FlowVariableUpsertDto, InviteUserDto, LinkUserToExternalAccountRequestDto, ModifyBalanceDto, NfcCardSetActiveStateDto, PairSumUpReaderDto, PasswordPolicyRole, PermissionFilter, PreviewMjmlDto, RefundTransactionDto, ResetNfcCardDto, ResetPasswordDto, ResourceFlowSaveDto, ResourceFlowVariableScope, SetBillingConfigurationDto, SetSumUpApiKeyDto, SetUserPasswordDto, SSOProvisioningPermissionsDto, SSOProvisioningUserDto, StartUsageSessionDto, SumupTopUpDto, SumupTransactionCallbackDto, TwoFactorCodeDto, TwoFactorPolicyDto, UpdateAuthRateLimitSettingsDto, UpdateEmailTemplateDto, UpdateFormDto, UpdateMaintenanceScheduleDto, UpdateMetricsSettingsDto, UpdateMqttServerDto, UpdatePasswordPolicyDto, UpdateProjectDto, UpdateReaderDto, UpdateResourceBillingConfigurationDto, UpdateResourceDto, UpdateResourceGroupDto, UpdateResourceGroupIntroductionDto, UpdateResourceIntroductionDto, UpdateSSOProviderDto, UpdateSystemSettingsDto, UpdateUsageSessionProjectDto, UpdateUserPermissionsDto, UploadPluginDto, UpsertPasswordPolicyOverrideDto, VerifyEmailDto } from "../requests/types.gen";
 import * as Common from "./common";
 /**
 * Return API information
@@ -256,6 +256,28 @@ export const useLicenseServiceGetLicenseInformation = <TData = Common.LicenseSer
 * @throws ApiError
 */
 export const usePasswordPolicyServiceGetPublicPasswordPolicy = <TData = Common.PasswordPolicyServiceGetPublicPasswordPolicyDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UsePasswordPolicyServiceGetPublicPasswordPolicyKeyFn(queryKey), queryFn: () => PasswordPolicyService.getPublicPasswordPolicy() as TData, ...options });
+/**
+* Get the global password policy
+* @returns PasswordPolicyDto The global password policy.
+* @throws ApiError
+*/
+export const usePasswordPolicyAdminServiceGetAdminPasswordPolicy = <TData = Common.PasswordPolicyAdminServiceGetAdminPasswordPolicyDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UsePasswordPolicyAdminServiceGetAdminPasswordPolicyKeyFn(queryKey), queryFn: () => PasswordPolicyAdminService.getAdminPasswordPolicy() as TData, ...options });
+/**
+* List all per-role password policy overrides
+* @returns PasswordPolicyOverrideDto All defined overrides.
+* @throws ApiError
+*/
+export const usePasswordPolicyAdminServiceListPasswordPolicyOverrides = <TData = Common.PasswordPolicyAdminServiceListPasswordPolicyOverridesDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UsePasswordPolicyAdminServiceListPasswordPolicyOverridesKeyFn(queryKey), queryFn: () => PasswordPolicyAdminService.listPasswordPolicyOverrides() as TData, ...options });
+/**
+* Get the per-role override for a single role
+* @param data The data for the request.
+* @param data.role
+* @returns unknown The override row, or null if unset.
+* @throws ApiError
+*/
+export const usePasswordPolicyAdminServiceGetPasswordPolicyOverride = <TData = Common.PasswordPolicyAdminServiceGetPasswordPolicyOverrideDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ role }: {
+  role: PasswordPolicyRole;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UsePasswordPolicyAdminServiceGetPasswordPolicyOverrideKeyFn({ role }, queryKey), queryFn: () => PasswordPolicyAdminService.getPasswordPolicyOverride({ role }) as TData, ...options });
 /**
 * Get all resources
 * @param data The data for the request.
@@ -1835,6 +1857,21 @@ export const useAuthenticationServiceUpdateOneSsoProvider = <TData = Common.Auth
   requestBody: UpdateSSOProviderDto;
 }, TContext>({ mutationFn: ({ id, requestBody }) => AuthenticationService.updateOneSsoProvider({ id, requestBody }) as unknown as Promise<TData>, ...options });
 /**
+* Upsert a per-role password policy override
+* @param data The data for the request.
+* @param data.role
+* @param data.requestBody
+* @returns PasswordPolicyOverrideDto The saved override row.
+* @throws ApiError
+*/
+export const usePasswordPolicyAdminServiceUpsertPasswordPolicyOverride = <TData = Common.PasswordPolicyAdminServiceUpsertPasswordPolicyOverrideMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  requestBody: UpsertPasswordPolicyOverrideDto;
+  role: PasswordPolicyRole;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  requestBody: UpsertPasswordPolicyOverrideDto;
+  role: PasswordPolicyRole;
+}, TContext>({ mutationFn: ({ requestBody, role }) => PasswordPolicyAdminService.upsertPasswordPolicyOverride({ requestBody, role }) as unknown as Promise<TData>, ...options });
+/**
 * Update a resource
 * @param data The data for the request.
 * @param data.id
@@ -2137,6 +2174,18 @@ export const useSettingsServiceUpdateAuthRateLimitSettings = <TData = Common.Set
   requestBody: UpdateAuthRateLimitSettingsDto;
 }, TContext>({ mutationFn: ({ requestBody }) => SettingsService.updateAuthRateLimitSettings({ requestBody }) as unknown as Promise<TData>, ...options });
 /**
+* Update the global password policy
+* @param data The data for the request.
+* @param data.requestBody
+* @returns PasswordPolicyDto Password policy updated.
+* @throws ApiError
+*/
+export const usePasswordPolicyAdminServiceUpdateAdminPasswordPolicy = <TData = Common.PasswordPolicyAdminServiceUpdateAdminPasswordPolicyMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  requestBody: UpdatePasswordPolicyDto;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  requestBody: UpdatePasswordPolicyDto;
+}, TContext>({ mutationFn: ({ requestBody }) => PasswordPolicyAdminService.updateAdminPasswordPolicy({ requestBody }) as unknown as Promise<TData>, ...options });
+/**
 * Update reader name and connected resources
 * @param data The data for the request.
 * @param data.readerId The ID of the reader to update
@@ -2202,6 +2251,18 @@ export const useAuthenticationServiceDeleteOneSsoProvider = <TData = Common.Auth
 * @throws ApiError
 */
 export const useSettingsServiceDeleteMetricsApiKey = <TData = Common.SettingsServiceDeleteMetricsApiKeyMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, void, TContext>, "mutationFn">) => useMutation<TData, TError, void, TContext>({ mutationFn: () => SettingsService.deleteMetricsApiKey() as unknown as Promise<TData>, ...options });
+/**
+* Delete a per-role password policy override
+* @param data The data for the request.
+* @param data.role
+* @returns void Override removed.
+* @throws ApiError
+*/
+export const usePasswordPolicyAdminServiceDeletePasswordPolicyOverride = <TData = Common.PasswordPolicyAdminServiceDeletePasswordPolicyOverrideMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  role: PasswordPolicyRole;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  role: PasswordPolicyRole;
+}, TContext>({ mutationFn: ({ role }) => PasswordPolicyAdminService.deletePasswordPolicyOverride({ role }) as unknown as Promise<TData>, ...options });
 /**
 * Delete a resource
 * @param data The data for the request.

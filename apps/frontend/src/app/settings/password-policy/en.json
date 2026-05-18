@@ -1,0 +1,87 @@
+{
+  "title": "Password Policy",
+  "subtitle": "Set rules for what counts as an acceptable password. Changes take effect immediately on the next password validation.",
+  "loading": "Loading password policy…",
+  "saveButton": "Save changes",
+  "savedToast": { "title": "Password policy updated", "description": "New rules apply on the next password validation." },
+  "errorToast": { "title": "Could not save password policy", "description": "Please review the values and try again." },
+  "global": {
+    "title": "Global policy",
+    "subtitle": "Applies to every user unless a per-role override exists.",
+    "saveButton": "Save policy"
+  },
+  "fields": {
+    "minLength": { "label": "Minimum length", "description": "Reject passwords shorter than this. Range 1-1024." },
+    "maxLength": { "label": "Maximum length", "description": "Reject passwords longer than this. Range 1-1024." },
+    "allowAllUnicode": { "label": "Allow all Unicode characters", "description": "When off, only ASCII printable characters are accepted." },
+    "requireUppercase": { "label": "Require an uppercase letter", "description": "Reject passwords without at least one uppercase letter." },
+    "requireLowercase": { "label": "Require a lowercase letter", "description": "Reject passwords without at least one lowercase letter." },
+    "requireDigit": { "label": "Require a digit", "description": "Reject passwords without at least one digit." },
+    "requireSpecial": { "label": "Require a special character", "description": "Reject passwords without at least one non-alphanumeric character." },
+    "checkHIBP": { "label": "Check against HIBP breach database", "description": "Reject passwords that have appeared in known breaches." },
+    "checkCommonPasswords": { "label": "Reject common passwords", "description": "Block passwords from the bundled common-password list." },
+    "minZxcvbnScore": { "label": "Minimum zxcvbn score (0-4)", "description": "Strength estimator. 0 = very weak, 4 = very strong." },
+    "historySize": { "label": "Password history size", "description": "Block reuse of the last N passwords. 0 disables history." },
+    "rotationDays": { "label": "Forced rotation (days)", "description": "Force password change after this many days. 0 disables rotation." }
+  },
+  "preview": {
+    "title": "Live preview",
+    "subtitle": "Type a candidate password to see whether the current form values would accept it.",
+    "passwordLabel": "Candidate password",
+    "pass": "Would pass",
+    "fail": "Would fail",
+    "noErrors": "All checks pass.",
+    "samples": "Examples",
+    "errors": {
+      "MIN_LENGTH": "Too short (min {{min}}, got {{actual}}).",
+      "MAX_LENGTH": "Too long (max {{max}}, got {{actual}}).",
+      "MISSING_UPPER": "Missing uppercase letter.",
+      "MISSING_LOWER": "Missing lowercase letter.",
+      "MISSING_DIGIT": "Missing digit.",
+      "MISSING_SPECIAL": "Missing special character.",
+      "DISALLOWED_CHARACTER": "Contains disallowed character.",
+      "SIMILAR_TO_EMAIL": "Too similar to email.",
+      "SIMILAR_TO_USERNAME": "Too similar to username.",
+      "COMMON_PASSWORD": "Is a common password.",
+      "HIBP_PWNED": "Found in {{count}} known breaches.",
+      "ZXCVBN_SCORE": "Strength score {{score}} below required {{required}}.",
+      "PASSWORD_REUSED": "Matches one of the last {{historySize}} passwords."
+    }
+  },
+  "diff": {
+    "title": "Confirm changes",
+    "subtitle": "Review what you are about to save.",
+    "noChanges": "No changes.",
+    "field": "Field",
+    "before": "Before",
+    "after": "After",
+    "confirm": "Confirm save",
+    "cancel": "Cancel"
+  },
+  "overrides": {
+    "title": "Per-role overrides",
+    "subtitle": "Override individual fields for a specific role. Fields left as 'inherit' fall back to the global policy.",
+    "role": "Role",
+    "status": "Status",
+    "actions": "Actions",
+    "statusInherits": "Inherits global policy",
+    "statusCustom": "{{count}} field(s) overridden",
+    "edit": "Edit",
+    "remove": "Remove",
+    "save": "Save override",
+    "cancel": "Cancel",
+    "inherit": "Inherit",
+    "override": "Override",
+    "removed": { "title": "Override removed", "description": "Role {{role}} now falls back to the global policy." },
+    "saved": { "title": "Override saved", "description": "Role {{role}} now uses the customized policy." },
+    "modal": {
+      "title": "Override for role {{role}}",
+      "subtitle": "Toggle a field to override; leave off to inherit from the global policy."
+    },
+    "roles": {
+      "admin": "Admin",
+      "machine": "Machine account",
+      "api-token": "API token"
+    }
+  }
+}

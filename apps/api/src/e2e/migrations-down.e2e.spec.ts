@@ -19,6 +19,8 @@ import {
   MqttServer,
   NFCCard,
   PasswordHistory,
+  PasswordPolicyOverride,
+  PasswordPolicyRole,
   Project,
   ProjectInvitation,
   ProjectInvitationStatus,
@@ -168,6 +170,7 @@ const seedDatabase = async (dataSource: DataSource) => {
   const nfcCardRepo = dataSource.getRepository(NFCCard);
   const emailTemplateRepo = dataSource.getRepository(EmailTemplate);
   const passwordHistoryRepo = dataSource.getRepository(PasswordHistory);
+  const passwordPolicyOverrideRepo = dataSource.getRepository(PasswordPolicyOverride);
 
   const resourceGroup = await ensureEntity(resourceGroupRepo, () => ({
     name: `Seed Group ${seedTag}`,
@@ -478,6 +481,22 @@ const seedDatabase = async (dataSource: DataSource) => {
   await ensureEntity(passwordHistoryRepo, () => ({
     userId: primaryUser.id,
     passwordHash: `$2b$04$seed.${seedTag}.placeholder.bcrypt.hash.value.padding`,
+  }));
+
+  await ensureEntity(passwordPolicyOverrideRepo, () => ({
+    role: PasswordPolicyRole.ADMIN,
+    minLength: 16,
+    maxLength: null,
+    allowAllUnicode: null,
+    requireUppercase: null,
+    requireLowercase: null,
+    requireDigit: null,
+    requireSpecial: null,
+    checkHIBP: null,
+    checkCommonPasswords: null,
+    minZxcvbnScore: null,
+    historySize: null,
+    rotationDays: null,
   }));
 };
 

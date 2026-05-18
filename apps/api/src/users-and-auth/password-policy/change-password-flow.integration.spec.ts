@@ -6,6 +6,7 @@ import {
   AuthenticationType,
   PasswordHistory,
   PasswordPolicy,
+  PasswordPolicyOverride,
   Setting,
 } from '@attraccess/database-entities';
 import { UsersController } from '../users/users.controller';
@@ -114,6 +115,17 @@ async function buildController(opts: BuildOpts = {}) {
         },
       },
       { provide: getRepositoryToken(PasswordPolicy), useValue: policyRepo },
+      {
+        provide: getRepositoryToken(PasswordPolicyOverride),
+        useValue: {
+          find: jest.fn(async () => []),
+          findOne: jest.fn(async () => null),
+          save: jest.fn(async (row) => row),
+          create: jest.fn((row) => row),
+          merge: jest.fn((a, b) => Object.assign(a, b)),
+          delete: jest.fn(async () => ({ affected: 0 })),
+        },
+      },
       { provide: getRepositoryToken(PasswordHistory), useValue: historyRepo },
       { provide: getRepositoryToken(AuthenticationDetail), useValue: authDetailRepo },
       {
