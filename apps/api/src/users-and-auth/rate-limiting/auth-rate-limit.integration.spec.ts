@@ -7,6 +7,7 @@ import { AuthAuditLogger } from './auth-audit.logger';
 import { AuthRateLimitInterceptor } from './auth-rate-limit.interceptor';
 import { AuthRateLimit } from './rate-limit.decorator';
 import { SettingsService } from '../../settings/settings.service';
+import * as guard from './login.rate-limit.guard';
 
 @Controller()
 @UseInterceptors(AuthRateLimitInterceptor)
@@ -47,11 +48,14 @@ const policy = {
 })
 class FakeModule {}
 
+const FIXED_TEST_IP = '127.0.0.1';
+
 describe('AuthRateLimitInterceptor (HTTP integration)', () => {
   let app: INestApplication;
   let bruteForce: BruteForceProtectionService;
 
   beforeAll(async () => {
+    jest.spyOn(guard, 'resolveIp').mockReturnValue(FIXED_TEST_IP);
     const moduleRef = await Test.createTestingModule({ imports: [FakeModule] }).compile();
     app = moduleRef.createNestApplication();
     await app.init();
@@ -59,6 +63,7 @@ describe('AuthRateLimitInterceptor (HTTP integration)', () => {
   });
 
   afterAll(async () => {
+    jest.restoreAllMocks();
     await app.close();
   });
 
@@ -71,7 +76,7 @@ describe('AuthRateLimitInterceptor (HTTP integration)', () => {
     expect(blocked.status).toBe(429);
     expect(blocked.headers['retry-after']).toBeDefined();
     expect(Number(blocked.headers['retry-after'])).toBeGreaterThan(0);
-    await bruteForce.recordSuccess('register', '::ffff:127.0.0.1', null);
+    await bruteForce.recordSuccess('register', FIXED_TEST_IP, null);
     const after = await request(app.getHttpServer()).post('/register').send({});
     expect(after.status).toBe(201);
   });
