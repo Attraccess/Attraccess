@@ -73,6 +73,14 @@ jobs:
       - name: Test affected projects
         run: pnpm nx affected --target=test,e2e --parallel=5 --base=origin/${{ github.event.pull_request.base.ref }}
 
+  fail2ban-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+      - name: Run fail2ban smoke test
+        run: ./scripts/fail2ban-smoke.sh
+
   containerize:
     runs-on: ubuntu-latest
     steps:
