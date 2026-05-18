@@ -114,39 +114,36 @@ export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({ user, ss
   }
 
   return (
-    <div className="w-full flex flex-col gap-6" data-cy="user-permission-form-card">
-      <section
-        className="w-full flex flex-col gap-4"
-        data-cy="user-permission-form-section"
-      >
-        <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
-          {t('title')}
-        </h3>
-        {isSsoManaged ? (
-          <div
-            className="rounded-md border border-warning-200 bg-warning-50 px-3 py-2 text-warning-700"
-            data-cy="user-permission-form-sso-managed"
-          >
-            <p className="text-sm font-semibold">{t('ssoManaged.title')}</p>
-            <p className="text-sm">{t('ssoManaged.description', { providers: ssoProvidersLabel })}</p>
-          </div>
-        ) : null}
-        <div className="flex flex-col gap-2">
-          {Object.keys(permissions).map((permission) => (
-            <LabeledSwitch
-              key={permission}
-              isSelected={permissions[permission as keyof SystemPermissions]}
-              onChange={handlePermissionChange(permission as keyof SystemPermissions)}
-              isDisabled={isPermissionSsoManaged(permission)}
-              data-cy={`user-permission-form-${permission}-checkbox`}
-            >
-              {t(`permissions.${permission}`)}
-            </LabeledSwitch>
-          ))}
+    <section
+      className="w-full flex flex-col gap-4"
+      data-cy="user-permission-form-section"
+    >
+      <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
+        {t('title')}
+      </h3>
+      {isSsoManaged ? (
+        <div
+          className="rounded-md border border-warning-200 bg-warning-50 px-3 py-2 text-warning-700"
+          data-cy="user-permission-form-sso-managed"
+        >
+          <p className="text-sm font-semibold">{t('ssoManaged.title')}</p>
+          <p className="text-sm">{t('ssoManaged.description', { providers: ssoProvidersLabel })}</p>
         </div>
-      </section>
-
-      <div className="flex justify-end">
+      ) : null}
+      <div className="flex flex-col gap-2">
+        {Object.keys(permissions).map((permission) => (
+          <LabeledSwitch
+            key={permission}
+            isSelected={permissions[permission as keyof SystemPermissions]}
+            onChange={handlePermissionChange(permission as keyof SystemPermissions)}
+            isDisabled={isPermissionSsoManaged(permission)}
+            data-cy={`user-permission-form-${permission}-checkbox`}
+          >
+            {t(`permissions.${permission}`)}
+          </LabeledSwitch>
+        ))}
+      </div>
+      <div className="flex w-full justify-end">
         <Button
           variant="primary"
           onPress={handleSave}
@@ -157,6 +154,6 @@ export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({ user, ss
           {t('actions.save')}
         </Button>
       </div>
-    </div>
+    </section>
   );
 };
