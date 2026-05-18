@@ -61,7 +61,7 @@ export function FlowProvider({ children, resourceId }: FlowProviderProps) {
   const [edges, setEdges] = useState<Edge[]>([]);
   const { data: resource } = useResourcesServiceGetOneResourceById({ id: resourceId });
 
-  const { t: tNodeTranslations } = useTranslations({
+  const { t: tNodeTranslations, tExists: tNodeExists } = useTranslations({
     de: nodesDeTranslations,
     en: nodesEnTranslations,
   });
@@ -135,12 +135,17 @@ export function FlowProvider({ children, resourceId }: FlowProviderProps) {
     const types: NodeTypes = {};
     nodeSchemas.forEach((nodeSchema) => {
       types[nodeSchema.type] = (props: NodeProps) => (
-        <AttraccessNode tNodeTranslations={tNodeTranslations} schema={nodeSchema} node={props} />
+        <AttraccessNode
+          tNodeTranslations={tNodeTranslations}
+          tNodeExists={tNodeExists}
+          schema={nodeSchema}
+          node={props}
+        />
       );
     });
 
     return types;
-  }, [nodeSchemas, tNodeTranslations]);
+  }, [nodeSchemas, tNodeTranslations, tNodeExists]);
 
   const copySelectedNodes = useCallback(async () => {
     const clipboardData = buildClipboardData(nodes, edges);

@@ -14,6 +14,7 @@ export enum ResourceFlowNodeType {
   INPUT_RESOURCE_DOOR_UNLATCHED = 'input.resource.door.unlatched',
   INPUT_MQTT_MESSAGE_RECEIVED = 'input.mqtt.message.received',
   INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY = 'input.resource.activity.no-activity',
+  INPUT_VARIABLE_CHANGED = 'input.variable.changed',
   OUTPUT_HTTP_SEND_REQUEST = 'output.http.sendRequest',
   OUTPUT_MQTT_SEND_MESSAGE = 'output.mqtt.sendMessage',
   OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS = 'output.resource.billing.calculation.set-additional-items',
@@ -24,11 +25,17 @@ export enum ResourceFlowNodeType {
   PROCESSING_SET_PAYLOAD = 'processing.set-payload',
   PROCESSING_MQTT_WAIT_FOR_MESSAGE = 'processing.mqtt.waitForMessage',
   PROCESSING_ERROR = 'processing.error',
+  PROCESSING_SET_VARIABLES = 'processing.variables.set',
+  PROCESSING_GET_VARIABLES = 'processing.variables.get',
   OUTPUT_RESOURCE_HEALTH_HEARTBEAT = 'output.resource.health.heartbeat',
   OUTPUT_RESOURCE_HEALTH_SET = 'output.resource.health.set',
 }
 
 // Zod schemas for node data validation
+export const VariableScopeSchema = z.enum(['resource', 'global']);
+
+const VariableKeySchema = z.string().min(1, 'Key is required');
+
 export const NodeWithoutDataSchema = z.object({}).optional();
 
 export const ButtonNodeDataSchema = z.object({
@@ -117,6 +124,37 @@ export const SetPayloadNodeDataSchema = z.object({
       }),
     )
     .default([]),
+});
+
+export const SetVariablesNodeDataSchema = z.object({
+  variables: z
+    .array(
+      z.object({
+        key: VariableKeySchema,
+        value: z.string().optional().default('').meta({ stringVariant: 'multiline' }),
+        scope: VariableScopeSchema,
+      }),
+    )
+    .min(1, 'At least one variable is required'),
+});
+
+export const GetVariablesNodeDataSchema = z.object({
+  variables: z
+    .array(
+      z.object({
+        key: VariableKeySchema,
+        scope: VariableScopeSchema,
+        payloadPath: z.string().min(1, 'Payload path is required'),
+      }),
+    )
+    .min(1, 'At least one variable is required'),
+});
+
+export const VariableChangedNodeDataSchema = z.object({
+  watches: z
+    .array(z.object({ key: VariableKeySchema, scope: VariableScopeSchema }))
+    .min(1, 'At least one watch is required'),
+  source: z.enum(['any', 'exclude-self']).default('any'),
 });
 
 export const MqttWaitForMessageNodeDataSchema = z.object({
@@ -232,6 +270,15 @@ export function getNodeDataSchema(nodeType: ResourceFlowNodeType) {
 
     case ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_SET:
       return ResourceHealthSetNodeDataSchema;
+
+    case ResourceFlowNodeType.PROCESSING_SET_VARIABLES:
+      return SetVariablesNodeDataSchema;
+
+    case ResourceFlowNodeType.PROCESSING_GET_VARIABLES:
+      return GetVariablesNodeDataSchema;
+
+    case ResourceFlowNodeType.INPUT_VARIABLE_CHANGED:
+      return VariableChangedNodeDataSchema;
 
     default: {
       const exhaustiveCheck: never = nodeType;

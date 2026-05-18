@@ -21,6 +21,11 @@ export enum ResourceHealthStatus {
   Unhealthy = "unhealthy",
 }
 
+export enum ResourceFlowVariableScope {
+  Resource = "resource",
+  Global = "global",
+}
+
 /** The type of the log entry */
 export enum ResourceFlowLogType {
   FlowStart = "flow.start",
@@ -41,6 +46,7 @@ export enum ResourceFlowNodeType {
   InputResourceDoorUnlatched = "input.resource.door.unlatched",
   InputMqttMessageReceived = "input.mqtt.message.received",
   InputResourceActivityNoActivity = "input.resource.activity.no-activity",
+  InputVariableChanged = "input.variable.changed",
   OutputHttpSendRequest = "output.http.sendRequest",
   OutputMqttSendMessage = "output.mqtt.sendMessage",
   OutputResourceBillingCalculationSetAdditionalItems = "output.resource.billing.calculation.set-additional-items",
@@ -51,6 +57,8 @@ export enum ResourceFlowNodeType {
   ProcessingSetPayload = "processing.set-payload",
   ProcessingMqttWaitForMessage = "processing.mqtt.waitForMessage",
   ProcessingError = "processing.error",
+  ProcessingVariablesSet = "processing.variables.set",
+  ProcessingVariablesGet = "processing.variables.get",
   OutputResourceHealthHeartbeat = "output.resource.health.heartbeat",
   OutputResourceHealthSet = "output.resource.health.set",
 }
@@ -1299,6 +1307,59 @@ export interface GenerateMetricsApiKeyResponseDto {
   apiKeyConfigured: boolean;
   /** The generated API key (shown only once) */
   apiKey: string;
+}
+
+export interface AuthRateLimitSettingsDto {
+  /**
+   * Max failed attempts within the window before lockout
+   * @example 5
+   */
+  maxAttempts: number;
+  /**
+   * Sliding window length, in seconds, for counting attempts
+   * @example 900
+   */
+  windowSeconds: number;
+  /**
+   * Base lockout duration in seconds after the threshold is reached
+   * @example 900
+   */
+  lockoutDurationSeconds: number;
+  /**
+   * Whether to extend lockout exponentially on repeat lockouts
+   * @example false
+   */
+  exponentialBackoff: boolean;
+  /**
+   * Multiplier applied to lockout duration when exponentialBackoff is on
+   * @example 2
+   */
+  backoffMultiplier: number;
+}
+
+export interface UpdateAuthRateLimitSettingsDto {
+  /**
+   * Max failed attempts within the window before lockout
+   * @example 5
+   */
+  maxAttempts?: number;
+  /**
+   * Sliding window length, in seconds
+   * @example 900
+   */
+  windowSeconds?: number;
+  /**
+   * Base lockout duration in seconds
+   * @example 900
+   */
+  lockoutDurationSeconds?: number;
+  /** Whether to extend lockout exponentially on repeat lockouts */
+  exponentialBackoff?: boolean;
+  /**
+   * Multiplier applied to lockout duration
+   * @example 2
+   */
+  backoffMultiplier?: number;
 }
 
 export interface LicenseDataDto {
@@ -2988,6 +3049,25 @@ export interface ResourceFlowNode {
   resource?: Resource;
 }
 
+export interface FlowVariableDto {
+  id: number;
+  scope: ResourceFlowVariableScope;
+  resourceId: number | null;
+  key: string;
+  /** Parsed JSON value */
+  value: object;
+  valueType: object;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+}
+
+export interface FlowVariableUpsertDto {
+  /** Any JSON value */
+  value: object;
+}
+
 export interface ResourceHealthStateDto {
   /**
    * The health record id
@@ -4090,6 +4170,10 @@ export type GenerateMetricsApiKeyData = GenerateMetricsApiKeyResponseDto;
 
 export type DeleteMetricsApiKeyData = MetricsSettingsDto;
 
+export type GetAuthRateLimitSettingsData = AuthRateLimitSettingsDto;
+
+export type UpdateAuthRateLimitSettingsData = AuthRateLimitSettingsDto;
+
 export type GetLicenseInformationData = LicenseDataDto;
 
 export type GetPublicPasswordPolicyData = PublicPasswordPolicyDto;
@@ -4706,6 +4790,28 @@ export interface GetButtonsParams {
 }
 
 export type GetButtonsData = ResourceFlowNode[];
+
+export interface ListFlowVariablesParams {
+  resourceId: number;
+}
+
+export type ListFlowVariablesData = FlowVariableDto[];
+
+export interface UpsertFlowVariableParams {
+  resourceId: number;
+  key: string;
+  scope: ResourceFlowVariableScope;
+}
+
+export type UpsertFlowVariableData = any;
+
+export interface DeleteFlowVariableParams {
+  resourceId: number;
+  key: string;
+  scope: ResourceFlowVariableScope;
+}
+
+export type DeleteFlowVariableData = any;
 
 export interface GetResourceHealthParams {
   resourceId: number;
@@ -6274,6 +6380,38 @@ export namespace Settings {
     export type RequestBody = never;
     export type RequestHeaders = {};
     export type ResponseBody = DeleteMetricsApiKeyData;
+  }
+
+  /**
+   * No description
+   * @tags Settings
+   * @name GetAuthRateLimitSettings
+   * @summary Get auth rate-limit settings
+   * @request GET:/api/settings/auth/rate-limit
+   * @secure
+   */
+  export namespace GetAuthRateLimitSettings {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetAuthRateLimitSettingsData;
+  }
+
+  /**
+   * No description
+   * @tags Settings
+   * @name UpdateAuthRateLimitSettings
+   * @summary Update auth rate-limit settings
+   * @request PATCH:/api/settings/auth/rate-limit
+   * @secure
+   */
+  export namespace UpdateAuthRateLimitSettings {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = UpdateAuthRateLimitSettingsDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = UpdateAuthRateLimitSettingsData;
   }
 }
 
@@ -7859,6 +7997,66 @@ export namespace ResourceFlows {
     export type RequestBody = never;
     export type RequestHeaders = {};
     export type ResponseBody = GetButtonsData;
+  }
+}
+
+export namespace FlowVariables {
+  /**
+   * No description
+   * @tags Flow Variables
+   * @name ListFlowVariables
+   * @summary List flow variables for a resource
+   * @request GET:/api/resources/{resourceId}/flow-variables
+   * @secure
+   */
+  export namespace ListFlowVariables {
+    export type RequestParams = {
+      resourceId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = ListFlowVariablesData;
+  }
+
+  /**
+   * No description
+   * @tags Flow Variables
+   * @name UpsertFlowVariable
+   * @summary Upsert a flow variable
+   * @request PUT:/api/resources/{resourceId}/flow-variables/{scope}/{key}
+   * @secure
+   */
+  export namespace UpsertFlowVariable {
+    export type RequestParams = {
+      resourceId: number;
+      key: string;
+      scope: ResourceFlowVariableScope;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = FlowVariableUpsertDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = UpsertFlowVariableData;
+  }
+
+  /**
+   * No description
+   * @tags Flow Variables
+   * @name DeleteFlowVariable
+   * @summary Delete a flow variable
+   * @request DELETE:/api/resources/{resourceId}/flow-variables/{scope}/{key}
+   * @secure
+   */
+  export namespace DeleteFlowVariable {
+    export type RequestParams = {
+      resourceId: number;
+      key: string;
+      scope: ResourceFlowVariableScope;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = DeleteFlowVariableData;
   }
 }
 
@@ -10418,6 +10616,47 @@ export class Api<
         format: "json",
         ...params,
       }),
+
+    /**
+     * No description
+     *
+     * @tags Settings
+     * @name GetAuthRateLimitSettings
+     * @summary Get auth rate-limit settings
+     * @request GET:/api/settings/auth/rate-limit
+     * @secure
+     */
+    getAuthRateLimitSettings: (params: RequestParams = {}) =>
+      this.request<GetAuthRateLimitSettingsData, void>({
+        path: `/api/settings/auth/rate-limit`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Settings
+     * @name UpdateAuthRateLimitSettings
+     * @summary Update auth rate-limit settings
+     * @request PATCH:/api/settings/auth/rate-limit
+     * @secure
+     */
+    updateAuthRateLimitSettings: (
+      data: UpdateAuthRateLimitSettingsDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<UpdateAuthRateLimitSettingsData, void>({
+        path: `/api/settings/auth/rate-limit`,
+        method: "PATCH",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
   };
   license = {
     /**
@@ -12100,6 +12339,71 @@ export class Api<
         method: "GET",
         secure: true,
         format: "json",
+        ...params,
+      }),
+  };
+  flowVariables = {
+    /**
+     * No description
+     *
+     * @tags Flow Variables
+     * @name ListFlowVariables
+     * @summary List flow variables for a resource
+     * @request GET:/api/resources/{resourceId}/flow-variables
+     * @secure
+     */
+    listFlowVariables: (
+      { resourceId }: ListFlowVariablesParams,
+      params: RequestParams = {},
+    ) =>
+      this.request<ListFlowVariablesData, void>({
+        path: `/api/resources/${resourceId}/flow-variables`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Flow Variables
+     * @name UpsertFlowVariable
+     * @summary Upsert a flow variable
+     * @request PUT:/api/resources/{resourceId}/flow-variables/{scope}/{key}
+     * @secure
+     */
+    upsertFlowVariable: (
+      { resourceId, key, scope }: UpsertFlowVariableParams,
+      data: FlowVariableUpsertDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<UpsertFlowVariableData, void>({
+        path: `/api/resources/${resourceId}/flow-variables/${scope}/${key}`,
+        method: "PUT",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Flow Variables
+     * @name DeleteFlowVariable
+     * @summary Delete a flow variable
+     * @request DELETE:/api/resources/{resourceId}/flow-variables/{scope}/{key}
+     * @secure
+     */
+    deleteFlowVariable: (
+      { resourceId, key, scope }: DeleteFlowVariableParams,
+      params: RequestParams = {},
+    ) =>
+      this.request<DeleteFlowVariableData, void>({
+        path: `/api/resources/${resourceId}/flow-variables/${scope}/${key}`,
+        method: "DELETE",
+        secure: true,
         ...params,
       }),
   };

@@ -109,5 +109,6 @@ export * from './1777217977658-resource-health-state';
 export * from './1777300000000-add-metrics-slow-query-threshold';
 export * from './1777400000000-add-resource-health-changed-email-template';
 export * from './1777500000000-auth-rate-limiting';
+export * from './1778000000000-flow-variables';
 export * from './1779000000000-password-policy';
 export * from './1779100000000-password-history';
