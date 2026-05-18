@@ -3,8 +3,7 @@ import { useResourcesServiceResourceGroupsGetOne } from '@attraccess/react-query
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PageHeader } from '../../components/pageHeader';
 import { GroupDetailsForm } from './GroupDetailsForm';
-import { ResoureGroupIntroducerManagement } from './IntroducerManagement';
-import { ResourceGroupIntroductionsManagement } from './IntroductionsManagement';
+import { PeopleManagement } from '../resources/PeopleManagement';
 import { Spinner } from '@heroui/react';
 import en from './en.json';
 import de from './de.json';
@@ -40,9 +39,13 @@ export function ResourceGroupEditPage() {
 
       <div className="flex flex-row flex-wrap gap-4 items-stretch">
         <GroupDetailsForm groupId={numericGroupId} className="flex-1 min-w-80" />
-        <ResoureGroupIntroducerManagement groupId={numericGroupId} className="flex-1 min-w-80" />
-
-        <ResourceGroupIntroductionsManagement groupId={numericGroupId} className="flex-1 min-w-80" />
+        <PeopleManagement
+          target={{ type: 'group', id: numericGroupId }}
+          canManageIntroducers
+          canManageIntroductions
+          className="flex-1 min-w-80"
+          data-cy="manage-resource-group-people"
+        />
       </div>
     </div>
   );

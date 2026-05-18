@@ -16,7 +16,7 @@ import en from './en.json';
 import de from './de.json';
 
 export function PeopleManagement(props: Readonly<PeopleManagementProps & Omit<CardProps, 'children'>>) {
-  const { resourceId, canManageIntroducers, canManageIntroductions, ...rest } = props;
+  const { target, canManageIntroducers, canManageIntroductions, ...rest } = props;
   const { t } = useTranslations({ en, de });
 
   const [filter, setFilter] = useState<FilterMode>('all');
@@ -32,9 +32,9 @@ export function PeopleManagement(props: Readonly<PeopleManagementProps & Omit<Ca
   const [historyUserId, setHistoryUserId] = useState<number | null>(null);
   const { isOpen: isHistoryOpen, open: openHistory, close: closeHistory } = useOverlayState();
 
-  const { rows, isLoading, hasError } = usePeopleRows({ resourceId });
+  const { rows, isLoading, hasError } = usePeopleRows({ target });
 
-  const mutations = usePeopleMutations({ resourceId, t });
+  const mutations = usePeopleMutations({ target, t });
 
   const filteredRows = useMemo(() => {
     if (filter === 'introducers') return rows.filter((r) => r.isIntroducer);
@@ -189,7 +189,7 @@ export function PeopleManagement(props: Readonly<PeopleManagementProps & Omit<Ca
 
       {historyUserId !== null && (
         <HistoryModalLoader
-          resourceId={resourceId}
+          target={target}
           userId={historyUserId}
           isOpen={isHistoryOpen}
           onClose={() => {

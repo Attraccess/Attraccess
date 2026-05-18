@@ -221,7 +221,7 @@ function ResourceDetailsComponent() {
       <div className="flex flex-row flex-wrap w-full gap-6 items-stretch">
         {(isIntroducer?.isIntroducer || canManageResources) && (
           <PeopleManagement
-            resourceId={resourceId}
+            target={{ type: 'resource', id: resourceId }}
             canManageIntroducers={canManageResources}
             canManageIntroductions={isIntroducer?.isIntroducer || canManageResources}
             className="flex-1 min-w-80"
