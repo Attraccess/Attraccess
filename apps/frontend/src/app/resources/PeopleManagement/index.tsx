@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { HTMLAttributes, useCallback, useMemo, useState } from 'react';
 import { Card, CardProps, useOverlayState } from '@heroui/react';
 import { AlertCircle } from 'lucide-react';
 import { User } from '@attraccess/react-query-client';
@@ -110,7 +110,11 @@ export function PeopleManagement(props: Readonly<PeopleManagementProps & Omit<Ca
       </div>
     );
     if (flat) {
-      return <section className={className}>{errorContent}</section>;
+      return (
+        <section className={className} {...(rest as HTMLAttributes<HTMLElement>)}>
+          {errorContent}
+        </section>
+      );
     }
     return (
       <Card {...rest} className={className}>
@@ -209,7 +213,7 @@ export function PeopleManagement(props: Readonly<PeopleManagementProps & Omit<Ca
 
   if (flat) {
     return (
-      <section className={className}>
+      <section className={className} {...(rest as HTMLAttributes<HTMLElement>)}>
         {header}
         <div className="flex flex-col gap-4 mt-4">{body}</div>
         {modals}

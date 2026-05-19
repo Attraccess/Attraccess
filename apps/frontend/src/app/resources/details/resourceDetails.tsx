@@ -224,6 +224,7 @@ function ResourceDetailsComponent() {
             target={{ type: 'resource', id: resourceId }}
             canManageIntroducers={canManageResources}
             canManageIntroductions={isIntroducer?.isIntroducer || canManageResources}
+            flat
             className="flex-1 min-w-80"
             data-cy="manage-resource-people"
           />
