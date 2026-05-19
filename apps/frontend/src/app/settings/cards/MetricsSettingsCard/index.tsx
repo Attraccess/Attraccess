@@ -1,7 +1,6 @@
-import { Card, Chip } from '@heroui/react';
-import { ActivityIcon, CheckIcon, XIcon } from 'lucide-react';
+import { Chip } from '@heroui/react';
+import { CheckIcon, XIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { PageHeader } from '../../../../components/pageHeader';
 import { MetricsSettingsForm } from '../../forms/MetricsSettingsForm';
 import { useSettingsServiceGetMetricsSettings } from '@attraccess/react-query-client';
 import en from './en.json';
@@ -23,19 +22,17 @@ export function MetricsSettingsCard() {
   ) : null;
 
   return (
-    <Card className="flex-1 min-w-[300px]">
-      <Card.Header>
-        <PageHeader
-          title={t('title')}
-          subtitle={t('subtitle')}
-          icon={<ActivityIcon size={18} />}
-          noMargin
-          actions={statusChip}
-        />
-      </Card.Header>
-      <Card.Content className="flex flex-col gap-4">
-        <MetricsSettingsForm />
-      </Card.Content>
-    </Card>
+    <section
+      className="w-full flex flex-col gap-4 pt-6 border-t border-default-200 first:pt-0 first:border-t-0"
+      data-cy="metrics-settings-section"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
+          {t('title')}
+        </h3>
+        {statusChip}
+      </div>
+      <MetricsSettingsForm />
+    </section>
   );
 }

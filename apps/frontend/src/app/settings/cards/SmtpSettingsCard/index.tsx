@@ -1,7 +1,6 @@
-import { Card, Chip } from '@heroui/react';
-import { CheckIcon, MailIcon, XIcon } from 'lucide-react';
+import { Chip } from '@heroui/react';
+import { CheckIcon, XIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { PageHeader } from '../../../../components/pageHeader';
 import { SmtpSettingsForm } from '../../forms/SmtpSettingsForm';
 import en from './en.json';
 import de from './de.json';
@@ -32,19 +31,17 @@ export function SmtpSettingsCard({ variant, onNext }: SmtpSettingsCardProps) {
     ) : null;
 
   return (
-    <Card className="flex-1 min-w-[300px]">
-      <Card.Header>
-        <PageHeader
-          title={t('title')}
-          subtitle={t('subtitle')}
-          icon={<MailIcon size={18} />}
-          noMargin
-          actions={passwordChip}
-        />
-      </Card.Header>
-      <Card.Content className="flex flex-col gap-4">
-        <SmtpSettingsForm variant={variant} endpoint="settings" onNext={onNext} />
-      </Card.Content>
-    </Card>
+    <section
+      className="w-full flex flex-col gap-4 pt-6 border-t border-default-200 first:pt-0 first:border-t-0"
+      data-cy="smtp-settings-section"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
+          {t('title')}
+        </h3>
+        {passwordChip}
+      </div>
+      <SmtpSettingsForm variant={variant} endpoint="settings" onNext={onNext} />
+    </section>
   );
 }
