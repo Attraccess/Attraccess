@@ -65,12 +65,18 @@ export function FormFieldEditor(props: FormFieldEditorProps) {
         </Button>
       </div>
 
-      <TextArea
-       
-        placeholder={t('fields.placeholder.description')}
+      <TextField
+        fullWidth
         value={field.description ?? ''}
-        onChange={(event) => onChange({ ...field, description: event.target.value })}
-      />
+        onChange={(value) => onChange({ ...field, description: value })}
+      >
+        <Label>{t('fields.description')}</Label>
+        <TextArea
+          rows={3}
+          placeholder={t('fields.placeholder.description')}
+          className="min-h-24 resize-y"
+        />
+      </TextField>
 
       <FieldOptionsEditor field={field} onChange={onChange} t={t} />
     </div>
