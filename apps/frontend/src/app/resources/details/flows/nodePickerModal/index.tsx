@@ -5,14 +5,8 @@ import {
   AccordionTrigger,
   AccordionPanel,
   AccordionBody,
-  Modal,
-  ModalBackdrop,
-  ModalBody,
-  ModalContainer,
-  ModalDialog,
-  ModalFooter,
-  ModalHeader,
-  ModalHeading,
+  DrawerBody,
+  DrawerHeader,
   useOverlayState,
 } from '@heroui/react';
 import { useCallback, useMemo } from 'react';
@@ -21,6 +15,7 @@ import { ResourceFlowNodeSchemaDto, useResourceFlowsServiceGetNodeSchemas } from
 import de from './de.json';
 import en from './en.json';
 import { AttraccessNode } from '../node';
+import { StandardDrawer } from '../../../../../components/standardDrawer';
 
 interface Props {
   onSelect: (nodeType: string) => void;
@@ -55,7 +50,6 @@ export function NodePickerModal(props: Props) {
       return groups;
     }
 
-    // Group nodes by type
     nodeSchemas.forEach((schema) => {
       if (!schema.supportedByResource) {
         return;
@@ -101,52 +95,41 @@ export function NodePickerModal(props: Props) {
   return (
     <>
       {props.children(open)}
-      <Modal isOpen={isOpen} onOpenChange={setOpen}>
-        <ModalBackdrop>
-          <ModalContainer size="lg">
-            <ModalDialog>
-              {() => (
-                <>
-                  <ModalHeader>
-                    <ModalHeading>{t('title')}</ModalHeading>
-                  </ModalHeader>
-                  <ModalBody className="flex flex-col gap-4">
-                    <Accordion defaultExpandedKeys={nodeGroups.map((_, index) => index.toString())}>
-                      {nodeGroups.map((group, index) => (
-                        <AccordionItem key={index} id={index}>
-                          <AccordionHeading>
-                            <AccordionTrigger>{t('nodeType.' + group.category)}</AccordionTrigger>
-                          </AccordionHeading>
-                          <AccordionPanel>
-                            <AccordionBody>
-                              <div className="flex flex-row flex-wrap gap-4">
-                                {group.nodes.map((nodeSchema) => (
-                                  <div
-                                    key={nodeSchema.type}
-                                    onClick={() => onSelect(nodeSchema.type)}
-                                    className="cursor-pointer hover:bg-primary-50 transition-bg duration-300"
-                                  >
-                                    <AttraccessNode
-                                      tNodeTranslations={props.tNodeTranslations}
-                                      schema={nodeSchema}
-                                      previewMode={true}
-                                    />
-                                  </div>
-                                ))}
-                              </div>
-                            </AccordionBody>
-                          </AccordionPanel>
-                        </AccordionItem>
+      <StandardDrawer isOpen={isOpen} onOpenChange={setOpen}>
+        <DrawerHeader>
+          <h2 className="text-lg font-semibold">{t('title')}</h2>
+        </DrawerHeader>
+        <DrawerBody className="flex flex-col gap-4">
+          <Accordion defaultExpandedKeys={nodeGroups.map((_, index) => index.toString())}>
+            {nodeGroups.map((group, index) => (
+              <AccordionItem key={index} id={index}>
+                <AccordionHeading>
+                  <AccordionTrigger>{t('nodeType.' + group.category)}</AccordionTrigger>
+                </AccordionHeading>
+                <AccordionPanel>
+                  <AccordionBody>
+                    <div className="flex flex-row flex-wrap gap-4">
+                      {group.nodes.map((nodeSchema) => (
+                        <div
+                          key={nodeSchema.type}
+                          onClick={() => onSelect(nodeSchema.type)}
+                          className="cursor-pointer hover:bg-primary-50 transition-bg duration-300"
+                        >
+                          <AttraccessNode
+                            tNodeTranslations={props.tNodeTranslations}
+                            schema={nodeSchema}
+                            previewMode={true}
+                          />
+                        </div>
                       ))}
-                    </Accordion>
-                  </ModalBody>
-                  <ModalFooter></ModalFooter>
-                </>
-              )}
-            </ModalDialog>
-          </ModalContainer>
-        </ModalBackdrop>
-      </Modal>
+                    </div>
+                  </AccordionBody>
+                </AccordionPanel>
+              </AccordionItem>
+            ))}
+          </Accordion>
+        </DrawerBody>
+      </StandardDrawer>
     </>
   );
 }

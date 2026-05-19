@@ -1,15 +1,10 @@
 import { ResourceFlowNodeSchemaDto } from '@attraccess/react-query-client';
 import {
   Button,
+  DrawerBody,
+  DrawerFooter,
+  DrawerHeader,
   Form,
-  Modal,
-  ModalBackdrop,
-  ModalBody,
-  ModalContainer,
-  ModalDialog,
-  ModalFooter,
-  ModalHeader,
-  ModalHeading,
   useOverlayState,
 } from '@heroui/react';
 import { useNodeId, useNodesData } from '@xyflow/react';
@@ -17,6 +12,7 @@ import { useFlowContext } from '../../flowContext';
 import { Property, PropertyInput } from './property-input';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { TFunction } from '@attraccess/plugins-frontend-ui';
+import { StandardDrawer } from '../../../../../../components/standardDrawer';
 
 interface Props {
   schema: ResourceFlowNodeSchemaDto;
@@ -58,48 +54,38 @@ export function NodeEditor(props: Props) {
   return (
     <>
       {props.children(open)}
-      <Modal isOpen={isOpen} onOpenChange={setOpen}>
-        <ModalBackdrop>
-          <ModalContainer size="lg">
-            <ModalDialog>
-              {() => (
-                <>
-                  <ModalHeader>
-                    <ModalHeading>{t('nodes.' + schema.type + '.title')}</ModalHeading>
-                    <p className="text-sm text-muted">{t('nodes.' + schema.type + '.description')}</p>
-                  </ModalHeader>
+      <StandardDrawer isOpen={isOpen} onOpenChange={setOpen}>
+        <DrawerHeader>
+          <h2 className="text-lg font-semibold">{t('nodes.' + schema.type + '.title')}</h2>
+          <p className="text-sm text-muted">{t('nodes.' + schema.type + '.description')}</p>
+        </DrawerHeader>
 
-                  <ModalBody className="flex flex-col gap-2">
-                    <Form onSubmit={onSave} ref={formRef} className="flex flex-col gap-4">
-                      {Object.entries(schema.configSchema.properties as Record<string, Property<unknown>>).map(
-                        ([propertyName, property]) => (
-                          <PropertyInput
-                            key={propertyName}
-                            isRequired={(schema.configSchema.required as string[])?.includes(propertyName)}
-                            nodeType={schema.type}
-                            tNodeTranslations={t}
-                            name={propertyName}
-                            schema={property}
-                            value={data[propertyName]}
-                            onChange={(value) => onInputChange(propertyName, value)}
-                          />
-                        ),
-                      )}
-                      <input hidden type="submit" />
-                    </Form>
-                  </ModalBody>
+        <DrawerBody className="flex flex-col gap-2">
+          <Form onSubmit={onSave} ref={formRef} className="flex flex-col gap-4">
+            {Object.entries(schema.configSchema.properties as Record<string, Property<unknown>>).map(
+              ([propertyName, property]) => (
+                <PropertyInput
+                  key={propertyName}
+                  isRequired={(schema.configSchema.required as string[])?.includes(propertyName)}
+                  nodeType={schema.type}
+                  tNodeTranslations={t}
+                  name={propertyName}
+                  schema={property}
+                  value={data[propertyName]}
+                  onChange={(value) => onInputChange(propertyName, value)}
+                />
+              ),
+            )}
+            <input hidden type="submit" />
+          </Form>
+        </DrawerBody>
 
-                  <ModalFooter>
-                    <Button variant="primary" onPress={onSave}>
-                      {t('editor.buttons.save')}
-                    </Button>
-                  </ModalFooter>
-                </>
-              )}
-            </ModalDialog>
-          </ModalContainer>
-        </ModalBackdrop>
-      </Modal>
+        <DrawerFooter>
+          <Button variant="primary" onPress={onSave}>
+            {t('editor.buttons.save')}
+          </Button>
+        </DrawerFooter>
+      </StandardDrawer>
     </>
   );
 }
