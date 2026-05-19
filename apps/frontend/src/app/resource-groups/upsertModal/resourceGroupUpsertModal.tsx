@@ -6,16 +6,12 @@ import {
   Label,
   Input,
   FieldError,
-  Modal,
-  ModalBackdrop,
-  ModalBody,
-  ModalContainer,
-  ModalDialog,
-  ModalFooter,
-  ModalHeader,
-  ModalHeading,
+  DrawerBody,
+  DrawerFooter,
+  DrawerHeader,
   useOverlayState,
 } from '@heroui/react';
+import { StandardDrawer } from '../../../components/standardDrawer';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './resourceGroupUpsertModal.en.json';
 import de from './resourceGroupUpsertModal.de.json';
@@ -182,65 +178,61 @@ export function ResourceGroupUpsertModal(props: Readonly<Props>) {
   return (
     <>
       {props.children(open)}
-      <Modal isOpen={isOpen} onOpenChange={setOpen} data-cy="resource-group-upsert-modal">
-        <ModalBackdrop>
-          <ModalContainer placement="top" size="md">
-            <ModalDialog>
-              {({ close }) => (
-                <Form onSubmit={handleSubmit}>
-                  <ModalHeader>
-                    <ModalHeading>{isEditMode ? t('modalTitleUpdate') : t('modalTitleCreate')}</ModalHeading>
-                  </ModalHeader>
+      <StandardDrawer isOpen={isOpen} onOpenChange={setOpen}>
+        <Form onSubmit={handleSubmit} data-cy="resource-group-upsert-modal" className="contents">
+          <DrawerHeader>
+            <h2 className="text-lg font-semibold">{isEditMode ? t('modalTitleUpdate') : t('modalTitleCreate')}</h2>
+          </DrawerHeader>
 
-                  <ModalBody className="w-full space-y-4">
-                    <TextField
-                      isRequired
-                      isInvalid={!!getFieldError('name')}
-                      value={formData.name}
-                      onChange={(v) => {
-                        setFormData({ ...formData, name: v });
-                        setApiErrors((prev) => ({ ...prev, name: undefined }));
-                      }}
-                      data-cy="resource-group-name-input"
-                    >
-                      <Label>{t('nameLabel')}</Label>
-                      <Input ref={nameInputRef} />
-                      {getFieldError('name') && <FieldError>{getFieldError('name')}</FieldError>}
-                    </TextField>
-                    <TextField
-                      isInvalid={!!getFieldError('description')}
-                      value={formData.description}
-                      onChange={(v) => {
-                        setFormData({ ...formData, description: v });
-                        setApiErrors((prev) => ({ ...prev, description: undefined }));
-                      }}
-                      data-cy="resource-group-description-input"
-                    >
-                      <Label>{t('descriptionLabel')}</Label>
-                      <Input />
-                      {getFieldError('description') && <FieldError>{getFieldError('description')}</FieldError>}
-                    </TextField>
-                  </ModalBody>
+          <DrawerBody className="w-full space-y-4">
+            <TextField
+              isRequired
+              isInvalid={!!getFieldError('name')}
+              value={formData.name}
+              onChange={(v) => {
+                setFormData({ ...formData, name: v });
+                setApiErrors((prev) => ({ ...prev, name: undefined }));
+              }}
+              data-cy="resource-group-name-input"
+            >
+              <Label>{t('nameLabel')}</Label>
+              <Input ref={nameInputRef} />
+              {getFieldError('name') && <FieldError>{getFieldError('name')}</FieldError>}
+            </TextField>
+            <TextField
+              isInvalid={!!getFieldError('description')}
+              value={formData.description}
+              onChange={(v) => {
+                setFormData({ ...formData, description: v });
+                setApiErrors((prev) => ({ ...prev, description: undefined }));
+              }}
+              data-cy="resource-group-description-input"
+            >
+              <Label>{t('descriptionLabel')}</Label>
+              <Input />
+              {getFieldError('description') && <FieldError>{getFieldError('description')}</FieldError>}
+            </TextField>
+          </DrawerBody>
 
-                  <ModalFooter>
-                    <Button variant="secondary" onPress={close} data-cy="resource-group-upsert-modal-cancel-button">
-                      {t('cancelButton')}
-                    </Button>
-                    <Button
-                      variant="primary"
-                      type="submit"
-                      isPending={mutation.isPending}
-                      data-cy="resource-group-upsert-modal-submit-button"
-                    >
-                      {isEditMode ? t('updateButton') : t('createButton')}
-                    </Button>
-                  </ModalFooter>
-                </Form>
-              )}
-            </ModalDialog>
-          </ModalContainer>
-        </ModalBackdrop>
-      </Modal>
+          <DrawerFooter>
+            <Button
+              variant="secondary"
+              onPress={closeDisclosure}
+              data-cy="resource-group-upsert-modal-cancel-button"
+            >
+              {t('cancelButton')}
+            </Button>
+            <Button
+              variant="primary"
+              type="submit"
+              isPending={mutation.isPending}
+              data-cy="resource-group-upsert-modal-submit-button"
+            >
+              {isEditMode ? t('updateButton') : t('createButton')}
+            </Button>
+          </DrawerFooter>
+        </Form>
+      </StandardDrawer>
     </>
   );
 }
