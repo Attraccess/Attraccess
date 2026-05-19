@@ -1,5 +1,6 @@
 import React, { useState, forwardRef, useImperativeHandle, useCallback } from 'react';
-import { Button, Description, Dropdown, DropdownItem, DropdownMenu, DropdownPopover, DropdownTrigger, Input, InputGroup, Label, Link, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow, TextArea, TextField, Tooltip, TooltipContent, useOverlayState } from '@heroui/react';
+import { Button, Description, Dropdown, DropdownItem, DropdownMenu, DropdownPopover, DropdownTrigger, DrawerBody, DrawerFooter, DrawerHeader, Input, InputGroup, Label, Link, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow, TextArea, TextField, Tooltip, TooltipContent, useOverlayState } from '@heroui/react';
+import { StandardDrawer } from '../../../components/standardDrawer';
 import { buttonVariants } from '@heroui/styles';
 import { Pencil, Trash, Key, Eye, EyeOff, MoreVertical, Copy } from 'lucide-react';
 import { useToastMessage } from '../../../components/toastProvider';
@@ -668,17 +669,13 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
         </div>
       )}
 
-      {/* Main Provider Form Modal */}
-      <Modal isOpen={isOpen} onOpenChange={setOpen} data-cy="sso-provider-form-modal">
-        <ModalBackdrop>
-          <ModalContainer size="lg">
-            <ModalDialog>
-              {({ close }) => (
-                <>
-                  <ModalHeader>
-                    <ModalHeading>{editingProvider ? t('editProvider') : t('createNewProvider')}</ModalHeading>
-                  </ModalHeader>
-                  <ModalBody>
+      {/* Main Provider Form Drawer */}
+      <StandardDrawer isOpen={isOpen} onOpenChange={setOpen}>
+        <div data-cy="sso-provider-form-modal" className="contents">
+        <DrawerHeader>
+          <h2 className="text-lg font-semibold">{editingProvider ? t('editProvider') : t('createNewProvider')}</h2>
+        </DrawerHeader>
+        <DrawerBody>
                     <div className="flex flex-col gap-8" data-cy="sso-provider-form">
                       <section className="w-full flex flex-col gap-4 pt-6 border-t border-default-200 first:pt-0 first:border-t-0">
                         <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
@@ -1171,27 +1168,23 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                         </div>
                       </section>
                     </div>
-                  </ModalBody>
-                  <ModalFooter>
-                    <Button variant="secondary" onPress={close} data-cy="sso-provider-form-cancel-button">
-                      {t('cancel')}
-                    </Button>
-                    <Button
-                      variant="primary"
-                      onPress={handleSubmit}
-                      isDisabled={isSaveDisabled}
-                      isPending={isMutationPending}
-                      data-cy="sso-provider-form-save-button"
-                    >
-                      {t('save')}
-                    </Button>
-                  </ModalFooter>
-                </>
-              )}
-            </ModalDialog>
-          </ModalContainer>
-        </ModalBackdrop>
-      </Modal>
+        </DrawerBody>
+        <DrawerFooter>
+          <Button variant="secondary" onPress={() => setOpen(false)} data-cy="sso-provider-form-cancel-button">
+            {t('cancel')}
+          </Button>
+          <Button
+            variant="primary"
+            onPress={handleSubmit}
+            isDisabled={isSaveDisabled}
+            isPending={isMutationPending}
+            data-cy="sso-provider-form-save-button"
+          >
+            {t('save')}
+          </Button>
+        </DrawerFooter>
+        </div>
+      </StandardDrawer>
     </>
   );
 });
