@@ -16,7 +16,7 @@ import en from './en.json';
 import de from './de.json';
 
 export function PeopleManagement(props: Readonly<PeopleManagementProps & Omit<CardProps, 'children'>>) {
-  const { target, canManageIntroducers, canManageIntroductions, ...rest } = props;
+  const { target, canManageIntroducers, canManageIntroductions, flat, className, ...rest } = props;
   const { t } = useTranslations({ en, de });
 
   const [filter, setFilter] = useState<FilterMode>('all');
@@ -100,63 +100,69 @@ export function PeopleManagement(props: Readonly<PeopleManagementProps & Omit<Ca
   );
 
   if (hasError) {
+    const errorContent = (
+      <div className="flex items-center gap-3 p-2">
+        <AlertCircle size={20} className="text-danger" />
+        <div>
+          <p className="font-medium text-danger">{t('loadError')}</p>
+          <p className="text-sm text-foreground-500">{t('loadErrorDescription')}</p>
+        </div>
+      </div>
+    );
+    if (flat) {
+      return <section className={className}>{errorContent}</section>;
+    }
     return (
-      <Card {...rest}>
-        <Card.Content>
-          <div className="flex items-center gap-3 p-2">
-            <AlertCircle size={20} className="text-danger" />
-            <div>
-              <p className="font-medium text-danger">{t('loadError')}</p>
-              <p className="text-sm text-foreground-500">{t('loadErrorDescription')}</p>
-            </div>
-          </div>
-        </Card.Content>
+      <Card {...rest} className={className}>
+        <Card.Content>{errorContent}</Card.Content>
       </Card>
     );
   }
 
-  return (
-    <Card {...rest}>
-      <Card.Header>
-        <PeopleHeader
-          t={t}
-          canManageIntroducers={canManageIntroducers}
-          canManageIntroductions={canManageIntroductions}
-          onAdd={handleAddOpen}
-        />
-      </Card.Header>
+  const header = (
+    <PeopleHeader
+      t={t}
+      canManageIntroducers={canManageIntroducers}
+      canManageIntroductions={canManageIntroductions}
+      onAdd={handleAddOpen}
+    />
+  );
 
-      <Card.Content className="flex flex-col gap-4">
-        <Select
-          aria-label={t('filters.all')}
-          value={filter}
-          onChange={(key) => setFilter(key as FilterMode)}
-          items={[
-            { key: 'all', label: t('filters.all') },
-            { key: 'introducers', label: t('filters.introducers') },
-            { key: 'introduced', label: t('filters.introduced') },
-          ]}
-          data-cy="people-filter"
-          className="max-w-xs"
-        />
+  const body = (
+    <>
+      <Select
+        aria-label={t('filters.all')}
+        value={filter}
+        onChange={(key) => setFilter(key as FilterMode)}
+        items={[
+          { key: 'all', label: t('filters.all') },
+          { key: 'introducers', label: t('filters.introducers') },
+          { key: 'introduced', label: t('filters.introduced') },
+        ]}
+        data-cy="people-filter"
+        className="max-w-xs"
+      />
 
-        <PeopleTable
-          t={t}
-          rows={filteredRows}
-          isLoading={isLoading}
-          canManageIntroducers={canManageIntroducers}
-          canManageIntroductions={canManageIntroductions}
-          pendingIntroducerUserId={mutations.pendingIntroducerUserId}
-          pendingIntroductionUserId={mutations.pendingIntroductionUserId}
-          isRevokingIntroducer={mutations.isRevokingIntroducer}
-          isGrantingIntroduction={mutations.isGrantingIntroduction}
-          isRevokingIntroduction={mutations.isRevokingIntroduction}
-          onOpenHistory={handleHistoryOpen}
-          onToggleIntroduction={handleIntroductionToggle}
-          onRevokeIntroducer={mutations.revokeIntroducer}
-        />
-      </Card.Content>
+      <PeopleTable
+        t={t}
+        rows={filteredRows}
+        isLoading={isLoading}
+        canManageIntroducers={canManageIntroducers}
+        canManageIntroductions={canManageIntroductions}
+        pendingIntroducerUserId={mutations.pendingIntroducerUserId}
+        pendingIntroductionUserId={mutations.pendingIntroductionUserId}
+        isRevokingIntroducer={mutations.isRevokingIntroducer}
+        isGrantingIntroduction={mutations.isGrantingIntroduction}
+        isRevokingIntroduction={mutations.isRevokingIntroduction}
+        onOpenHistory={handleHistoryOpen}
+        onToggleIntroduction={handleIntroductionToggle}
+        onRevokeIntroducer={mutations.revokeIntroducer}
+      />
+    </>
+  );
 
+  const modals = (
+    <>
       <AddPersonModal
         t={t}
         isOpen={isAddOpen}
@@ -198,6 +204,24 @@ export function PeopleManagement(props: Readonly<PeopleManagementProps & Omit<Ca
           }}
         />
       )}
+    </>
+  );
+
+  if (flat) {
+    return (
+      <section className={className}>
+        {header}
+        <div className="flex flex-col gap-4 mt-4">{body}</div>
+        {modals}
+      </section>
+    );
+  }
+
+  return (
+    <Card {...rest} className={className}>
+      <Card.Header>{header}</Card.Header>
+      <Card.Content className="flex flex-col gap-4">{body}</Card.Content>
+      {modals}
     </Card>
   );
 }
