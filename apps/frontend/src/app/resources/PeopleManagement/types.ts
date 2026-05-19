@@ -3,6 +3,8 @@ import { ResourceIntroducer, ResourceIntroduction, User } from '@attraccess/reac
 export type AddMode = 'introducer' | 'introduction';
 export type FilterMode = 'all' | 'introducers' | 'introduced';
 
+export type PeopleTarget = { type: 'resource'; id: number } | { type: 'group'; id: number };
+
 export interface PersonRow {
   user: User;
   isIntroducer: boolean;
@@ -14,7 +16,8 @@ export interface PersonRow {
 }
 
 export interface PeopleManagementProps {
-  resourceId: number;
+  target: PeopleTarget;
   canManageIntroducers: boolean;
   canManageIntroductions: boolean;
+  flat?: boolean;
 }
