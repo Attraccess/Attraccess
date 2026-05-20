@@ -73,11 +73,11 @@ export default defineConfig(({ command }) => {
       strategies: 'injectManifest',
       injectManifest: {
         minify: process.env.NODE_ENV === 'production',
-        enableWorkboxModulesLogs: true,
+        enableWorkboxModulesLogs: false,
         maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
       },
       devOptions: {
-        enabled: true,
+        enabled: false,
         type: 'module',
       },
     }),
