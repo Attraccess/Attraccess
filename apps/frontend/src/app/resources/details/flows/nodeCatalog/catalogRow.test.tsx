@@ -4,15 +4,17 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { CatalogRow } from './catalogRow';
 import type { CatalogNode } from './useNodeCatalog';
+import type { TFunction } from '@attraccess/plugins-frontend-ui';
+import { ResourceFlowNodeType } from '@attraccess/react-query-client';
 
-const tStub = ((key: string) => {
+const tStub: TFunction = ((key: string) => {
   if (key === 'nodes.input.button.title') return 'Button';
   if (key === 'nodes.input.button.description') return 'User-triggered start';
   return key;
-}) as never;
+}) as unknown as TFunction;
 
 const node: CatalogNode = {
-  schema: { type: 'input.button' as never, inputs: [], outputs: ['out'], isOutput: false, supportedByResource: true, configSchema: {} },
+  schema: { type: ResourceFlowNodeType.INPUT_BUTTON, inputs: [], outputs: ['out'], isOutput: false, supportedByResource: true, configSchema: {} },
   direction: 'down',
 };
 
