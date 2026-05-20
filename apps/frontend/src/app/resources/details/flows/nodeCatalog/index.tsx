@@ -34,7 +34,7 @@ export function NodeCatalogPanel({ resourceId, onSelect, tNodeTranslations }: Pr
       <aside
         role="region"
         aria-label={t('title')}
-        className={`hidden md:flex flex-col border-r border-default-200 dark:border-default-100 bg-background transition-[width] duration-200 ${
+        className={`hidden md:flex flex-col h-full min-h-0 border-r border-default-200 dark:border-default-100 bg-background transition-[width] duration-200 ${
           collapsed ? 'w-12' : 'w-72'
         }`}
       >
@@ -51,7 +51,7 @@ export function NodeCatalogPanel({ resourceId, onSelect, tNodeTranslations }: Pr
           </Button>
         </div>
         {!collapsed && (
-          <div className="overflow-y-auto p-2">
+          <div className="flex-1 min-h-0 overflow-y-auto p-2">
             <CatalogContent
               groups={groups}
               isDomainExpanded={isDomainExpanded}
