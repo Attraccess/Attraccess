@@ -1,0 +1,61 @@
+// Single node row inside the catalog: icon, name, description, direction glyph
+// FEATURE: Node catalog redesign — row presentation
+import type { DragEvent, MouseEvent } from 'react';
+import { TFunction } from '@attraccess/plugins-frontend-ui';
+import { ArrowDownIcon, ArrowUpIcon, ArrowUpDownIcon } from 'lucide-react';
+import { CatalogNode, Direction } from './useNodeCatalog';
+import { DOMAINS, schemaToDomain } from './domains';
+
+interface Props {
+  node: CatalogNode;
+  tNodeTranslations: TFunction;
+  onSelect: (nodeType: string) => void;
+}
+
+const DIRECTION_ICON: Record<Direction, { icon: typeof ArrowDownIcon; label: string }> = {
+  down: { icon: ArrowDownIcon, label: 'trigger' },
+  up: { icon: ArrowUpIcon, label: 'action' },
+  both: { icon: ArrowUpDownIcon, label: 'both' },
+};
+
+export function CatalogRow({ node, tNodeTranslations, onSelect }: Props) {
+  const domain = schemaToDomain(node.schema.type);
+  const def = DOMAINS[domain];
+  const Icon = def.icon;
+  const Dir = DIRECTION_ICON[node.direction];
+  const DirIcon = Dir.icon;
+
+  const handleClick = (_e: MouseEvent<HTMLButtonElement>) => {
+    onSelect(node.schema.type);
+  };
+
+  const handleDragStart = (e: DragEvent<HTMLButtonElement>) => {
+    e.dataTransfer.setData('application/reactflow', node.schema.type);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  return (
+    <button
+      type="button"
+      draggable
+      onClick={handleClick}
+      onDragStart={handleDragStart}
+      className="w-full flex items-center gap-3 px-2 py-2 rounded-md hover:bg-default-100 active:bg-default-200 transition-colors text-left cursor-pointer"
+    >
+      <span className={`flex-none w-8 h-8 rounded-md flex items-center justify-center ${def.iconBg} ${def.iconFg}`}>
+        <Icon className="w-4 h-4" />
+      </span>
+      <span className="flex-1 min-w-0">
+        <span className="block text-sm font-medium truncate">
+          {tNodeTranslations('nodes.' + node.schema.type + '.title')}
+        </span>
+        <span className="block text-xs text-default-500 truncate">
+          {tNodeTranslations('nodes.' + node.schema.type + '.description')}
+        </span>
+      </span>
+      <span aria-label={Dir.label} className="flex-none text-default-400">
+        <DirIcon className="w-4 h-4" />
+      </span>
+    </button>
+  );
+}
