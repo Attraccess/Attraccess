@@ -4,6 +4,7 @@ import '@testing-library/jest-dom/vitest';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { TFunction } from '@attraccess/plugins-frontend-ui';
 import { NodeCatalogPanel } from './index';
 import { TestWrapper } from '../../../../../test-utils/wrappers';
 
@@ -46,7 +47,7 @@ const tNodeTranslations = ((key: string) => {
     'nodes.input.resource.door.locked.description': 'Fires on lock',
   };
   return dict[key] ?? key;
-}) as never;
+}) as unknown as TFunction;
 
 describe('NodeCatalogPanel', () => {
   beforeEach(() => {
