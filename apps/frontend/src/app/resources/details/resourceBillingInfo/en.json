@@ -17,6 +17,9 @@
   "example": {
     "label": "Example cost ({{minutes}} min)"
   },
+  "simulator": {
+    "minutesLabel": "Simulate minutes"
+  },
   "exampleResultingBalance": {
     "label": "Resulting balance"
   }

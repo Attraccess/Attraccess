@@ -171,21 +171,7 @@ export function ResourceBillingInfo(props: Props) {
               )) as any
             }
             <TableRow className="border-t border-b-4 border-divider">
-              <TableCell>
-                <NumberField
-                  aria-label={t('example.label', { minutes: exampleMinutes })}
-                  value={exampleMinutes}
-                  onChange={(value) => setExampleMinutes(value)}
-                  minValue={0}
-                  defaultValue={10}
-                >
-                  <NumberFieldGroup>
-                    <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
-                    <NumberFieldInput />
-                    <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
-                  </NumberFieldGroup>
-                </NumberField>
-              </TableCell>
+              <TableCell>{t('example.label', { minutes: exampleMinutes })}</TableCell>
               <TableCell className="whitespace-nowrap text-right">
                 {t('billingValue', {
                   credits: formatNumber(exampleCost),
@@ -216,6 +202,28 @@ export function ResourceBillingInfo(props: Props) {
     </ResourceBillingInfoEditor>
   );
 
+  const minutesSimulator = (
+    <div className="flex items-center justify-between gap-3 mt-3 px-1">
+      <label className="text-xs text-foreground-600 uppercase tracking-wider">
+        {t('simulator.minutesLabel')}
+      </label>
+      <NumberField
+        aria-label={t('simulator.minutesLabel')}
+        value={exampleMinutes}
+        onChange={(value) => setExampleMinutes(value)}
+        minValue={0}
+        defaultValue={10}
+        className="w-36"
+      >
+        <NumberFieldGroup>
+          <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
+          <NumberFieldInput />
+          <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
+        </NumberFieldGroup>
+      </NumberField>
+    </div>
+  );
+
   if (variant === 'flat') {
     return (
       <FlatSection
@@ -226,22 +234,26 @@ export function ResourceBillingInfo(props: Props) {
         {...htmlProps}
       >
         <div className="text-sm">{tableContent}</div>
+        {minutesSimulator}
       </FlatSection>
     );
   }
 
   return (
-    <Card className={className} {...htmlProps}>
-      <Card.Header className="flex items-center justify-between py-3">
-        <PageHeader
-          title={t('title')}
-          icon={<CreditCard />}
-          actions={editorAction}
-          noMargin
-        />
-      </Card.Header>
+    <div className={className} {...htmlProps}>
+      <Card>
+        <Card.Header className="flex items-center justify-between py-3">
+          <PageHeader
+            title={t('title')}
+            icon={<CreditCard />}
+            actions={editorAction}
+            noMargin
+          />
+        </Card.Header>
 
-      <Card.Content>{tableContent}</Card.Content>
-    </Card>
+        <Card.Content>{tableContent}</Card.Content>
+      </Card>
+      {minutesSimulator}
+    </div>
   );
 }
