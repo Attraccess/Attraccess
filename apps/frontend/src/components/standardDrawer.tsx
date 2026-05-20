@@ -18,7 +18,7 @@ interface Props {
   dialogProps?: Omit<DrawerDialogProps, 'children'>;
 }
 
-const DEFAULT_DIALOG_CLASSNAME = 'md:max-w-2xl md:mx-auto bg-background';
+const DEFAULT_DIALOG_CLASSNAME = 'md:max-w-2xl md:mx-auto bg-content1';
 
 export function StandardDrawer(props: Props) {
   const { isOpen, onOpenChange, children, backdropProps, contentProps, dialogProps } = props;
