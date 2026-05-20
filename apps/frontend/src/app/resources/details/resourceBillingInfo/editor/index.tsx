@@ -6,15 +6,10 @@ import {
 } from '@attraccess/react-query-client';
 import {
   Button,
+  DrawerBody,
+  DrawerFooter,
+  DrawerHeader,
   Form,
-  Modal,
-  ModalBackdrop,
-  ModalBody,
-  ModalContainer,
-  ModalDialog,
-  ModalFooter,
-  ModalHeader,
-  ModalHeading,
   NumberField,
   NumberFieldDecrementButton,
   NumberFieldGroup,
@@ -22,6 +17,7 @@ import {
   NumberFieldInput,
   useOverlayState,
 } from '@heroui/react';
+import { StandardDrawer } from '../../../../../components/standardDrawer';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
@@ -136,57 +132,47 @@ export function ResourceBillingInfoEditor(props: Props) {
   return (
     <>
       {props.children(open)}
-      <Modal isOpen={isOpen} onOpenChange={setOpen}>
-        <ModalBackdrop>
-          <ModalContainer size="md">
-            <ModalDialog>
-              {() => (
-                <>
-                  <ModalHeader>
-                    <ModalHeading>{t('title')}</ModalHeading>
-                  </ModalHeader>
-                  <ModalBody>
-                    <Form onSubmit={onSubmit} className="flex flex-col gap-4">
-                      <NumberField
-                        aria-label={t('inputs.creditsPerUsage.label', { currency: configuration.currency })}
-                        value={creditsPerUsage}
-                        minValue={0}
-                        onChange={(value) => setCreditsPerUsage(value)}
-                        defaultValue={0}
-                      >
-                        <NumberFieldGroup>
-                          <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
-                          <NumberFieldInput />
-                          <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
-                        </NumberFieldGroup>
-                      </NumberField>
-                      <NumberField
-                        aria-label={t('inputs.creditsPerMinute.label', { currency: configuration.currency })}
-                        value={creditsPerMinute}
-                        minValue={0}
-                        onChange={(value) => setCreditsPerMinute(value)}
-                        defaultValue={0}
-                      >
-                        <NumberFieldGroup>
-                          <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
-                          <NumberFieldInput />
-                          <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
-                        </NumberFieldGroup>
-                      </NumberField>
-                      <input hidden type="submit" />
-                    </Form>
-                  </ModalBody>
-                  <ModalFooter>
-                    <Button variant="primary" onPress={onSubmit} isPending={isSaving}>
-                      {t('actions.save')}
-                    </Button>
-                  </ModalFooter>
-                </>
-              )}
-            </ModalDialog>
-          </ModalContainer>
-        </ModalBackdrop>
-      </Modal>
+      <StandardDrawer isOpen={isOpen} onOpenChange={setOpen}>
+        <DrawerHeader>
+          <h2 className="text-lg font-semibold">{t('title')}</h2>
+        </DrawerHeader>
+        <DrawerBody>
+          <Form onSubmit={onSubmit} className="flex flex-col gap-4">
+            <NumberField
+              aria-label={t('inputs.creditsPerUsage.label', { currency: configuration.currency })}
+              value={creditsPerUsage}
+              minValue={0}
+              onChange={(value) => setCreditsPerUsage(value)}
+              defaultValue={0}
+            >
+              <NumberFieldGroup>
+                <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
+                <NumberFieldInput />
+                <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
+              </NumberFieldGroup>
+            </NumberField>
+            <NumberField
+              aria-label={t('inputs.creditsPerMinute.label', { currency: configuration.currency })}
+              value={creditsPerMinute}
+              minValue={0}
+              onChange={(value) => setCreditsPerMinute(value)}
+              defaultValue={0}
+            >
+              <NumberFieldGroup>
+                <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
+                <NumberFieldInput />
+                <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
+              </NumberFieldGroup>
+            </NumberField>
+            <input hidden type="submit" />
+          </Form>
+        </DrawerBody>
+        <DrawerFooter>
+          <Button variant="primary" onPress={onSubmit} isPending={isSaving}>
+            {t('actions.save')}
+          </Button>
+        </DrawerFooter>
+      </StandardDrawer>
     </>
   );
 }
