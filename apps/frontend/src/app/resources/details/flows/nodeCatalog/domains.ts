@@ -33,7 +33,7 @@ export const DOMAINS: Record<Domain, DomainDef> = {
   health:   { color: 'rose',   iconBg: 'bg-rose-100 dark:bg-rose-900/30',     iconFg: 'text-rose-700 dark:text-rose-300',     icon: HeartPulseIcon },
 };
 
-export function schemaToDomain(nodeType: ResourceFlowNodeType): Domain {
+export function schemaToDomain(nodeType: string): Domain {
   if (nodeType === ResourceFlowNodeType.INPUT_BUTTON) return 'manual';
   if (nodeType.includes('.resource.door.')) return 'door';
   if (nodeType.includes('.mqtt.')) return 'mqtt';
