@@ -4,15 +4,12 @@ import {
   TextField,
   FieldError,
   Input,
-  Modal,
-  ModalBackdrop,
-  ModalBody,
-  ModalContainer,
-  ModalDialog,
-  ModalFooter,
-  ModalHeader,
+  DrawerBody,
+  DrawerFooter,
+  DrawerHeader,
   TextArea,
 } from '@heroui/react';
+import { StandardDrawer } from '../../../../components/standardDrawer';
 import { Select } from '../../../../components/select';
 import { LabeledSwitch } from '../../../../components/labeledSwitch';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -131,69 +128,59 @@ export function ResourceFormsModal({ isOpen, action, forms, onSubmit, onCancel }
   };
 
   return (
-    <Modal
+    <StandardDrawer
       isOpen={isOpen}
       onOpenChange={(open) => {
         if (!open) onCancel();
       }}
     >
-      <ModalBackdrop>
-        <ModalContainer size="lg">
-          <ModalDialog>
-            {({ close }) => (
-              <>
-                <ModalHeader className="flex flex-col gap-1">
-                  <span>{modalTitle}</span>
-                  <span className="text-sm text-default-500">{t('modal.description')}</span>
-                </ModalHeader>
-                <ModalBody>
-                  {forms.map((form) => (
-                    <div key={form.id} className="space-y-4 rounded-lg border border-default-200 p-4">
-                      <p className="font-semibold text-default-600">{t('modal.formHeading', { name: form.name })}</p>
-                      {form.fields.map((field) => {
-                        const rawOptions = field.options as Record<string, unknown> | null | undefined;
-                        const parsedOptions = parseFieldOptions(field.type, rawOptions ?? null);
-                        const selectOptions =
-                          field.type === FormFieldType.SELECT ? extractSelectOptions(field.options) : null;
+      <DrawerHeader className="flex flex-col gap-1">
+        <span>{modalTitle}</span>
+        <span className="text-sm text-default-500">{t('modal.description')}</span>
+      </DrawerHeader>
+      <DrawerBody>
+        {forms.map((form) => (
+          <div key={form.id} className="space-y-4 rounded-lg border border-default-200 p-4">
+            <p className="font-semibold text-default-600">{t('modal.formHeading', { name: form.name })}</p>
+            {form.fields.map((field) => {
+              const rawOptions = field.options as Record<string, unknown> | null | undefined;
+              const parsedOptions = parseFieldOptions(field.type, rawOptions ?? null);
+              const selectOptions =
+                field.type === FormFieldType.SELECT ? extractSelectOptions(field.options) : null;
 
-                        return (
-                          <div key={field.id} className="space-y-2">
-                            <div>
-                              <p className="text-sm font-medium text-default-600">
-                                {field.name}
-                                {field.isRequired && <span className="text-danger-500 ml-1">*</span>}
-                              </p>
-                              {field.description && <p className="text-xs text-default-400">{field.description}</p>}
-                            </div>
-                            {renderFieldInput(
-                              field,
-                              parsedOptions,
-                              selectOptions ?? undefined,
-                              values[field.id],
-                              (value) => handleValueChange(field.id, value),
-                              errors[field.id],
-                              t,
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ))}
-                </ModalBody>
-                <ModalFooter>
-                  <Button variant="ghost" onPress={onCancel}>
-                    {t('modal.cancel')}
-                  </Button>
-                  <Button variant="primary" onPress={handleSubmit}>
-                    {t('modal.submit')}
-                  </Button>
-                </ModalFooter>
-              </>
-            )}
-          </ModalDialog>
-        </ModalContainer>
-      </ModalBackdrop>
-    </Modal>
+              return (
+                <div key={field.id} className="space-y-2">
+                  <div>
+                    <p className="text-sm font-medium text-default-600">
+                      {field.name}
+                      {field.isRequired && <span className="text-danger-500 ml-1">*</span>}
+                    </p>
+                    {field.description && <p className="text-xs text-default-400">{field.description}</p>}
+                  </div>
+                  {renderFieldInput(
+                    field,
+                    parsedOptions,
+                    selectOptions ?? undefined,
+                    values[field.id],
+                    (value) => handleValueChange(field.id, value),
+                    errors[field.id],
+                    t,
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </DrawerBody>
+      <DrawerFooter>
+        <Button variant="ghost" onPress={onCancel}>
+          {t('modal.cancel')}
+        </Button>
+        <Button variant="primary" onPress={handleSubmit}>
+          {t('modal.submit')}
+        </Button>
+      </DrawerFooter>
+    </StandardDrawer>
   );
 }
 
