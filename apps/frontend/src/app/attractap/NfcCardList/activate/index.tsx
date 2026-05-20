@@ -1,15 +1,5 @@
-import {
-  Button,
-  Modal,
-  ModalBackdrop,
-  ModalBody,
-  ModalContainer,
-  ModalDialog,
-  ModalFooter,
-  ModalHeader,
-  ModalHeading,
-  useOverlayState,
-} from '@heroui/react';
+import { Button, DrawerBody, DrawerFooter, DrawerHeader, useOverlayState } from '@heroui/react';
+import { StandardDrawer } from '../../../../components/standardDrawer';
 import de from './de.json';
 import en from './en.json';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -53,28 +43,22 @@ export function NfcCardActivateModal(props: Props) {
       {activator(() => {
         open();
       })}
-      <Modal isOpen={isOpen} onOpenChange={setOpen} data-cy="nfc-card-activate-modal">
-        <ModalBackdrop>
-          <ModalContainer size="sm">
-            <ModalDialog>
-              {({ close }) => (
-                <>
-                  <ModalHeader>
-                    <ModalHeading>{t('title')}</ModalHeading>
-                  </ModalHeader>
-                  <ModalBody>{t('description')}</ModalBody>
-                  <ModalFooter>
-                    <Button onPress={close}>{t('cancel')}</Button>
-                    <Button onPress={onActivate} isPending={isPending}>
-                      {t('activate')}
-                    </Button>
-                  </ModalFooter>
-                </>
-              )}
-            </ModalDialog>
-          </ModalContainer>
-        </ModalBackdrop>
-      </Modal>
+      <StandardDrawer isOpen={isOpen} onOpenChange={setOpen}>
+        <div data-cy="nfc-card-activate-modal" className="contents">
+          <DrawerHeader>
+            <h2 className="text-lg font-semibold">{t('title')}</h2>
+          </DrawerHeader>
+          <DrawerBody>{t('description')}</DrawerBody>
+          <DrawerFooter>
+            <Button variant="secondary" onPress={close}>
+              {t('cancel')}
+            </Button>
+            <Button variant="primary" onPress={onActivate} isPending={isPending}>
+              {t('activate')}
+            </Button>
+          </DrawerFooter>
+        </div>
+      </StandardDrawer>
     </>
   );
 }
