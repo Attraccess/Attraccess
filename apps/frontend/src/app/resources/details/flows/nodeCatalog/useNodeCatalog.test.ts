@@ -64,4 +64,18 @@ describe('useNodeCatalog', () => {
     expect(result.current.collapsed).toBe(true);
     expect(window.localStorage.getItem('nodeCatalog.collapsed')).toBe('true');
   });
+
+  it('updates isDomainExpanded result after setDomainExpanded across renders', () => {
+    const { result, rerender } = renderHook(() => useNodeCatalog({ resourceId: 1 }));
+    expect(result.current.isDomainExpanded('manual')).toBe(true);
+    act(() => result.current.setDomainExpanded('manual', false));
+    rerender();
+    expect(result.current.isDomainExpanded('manual')).toBe(false);
+  });
+
+  it('returns at least one group when supported schemas exist', () => {
+    const { result } = renderHook(() => useNodeCatalog({ resourceId: 1 }));
+    expect(Array.isArray(result.current.groups)).toBe(true);
+    expect(result.current.groups.length).toBeGreaterThan(0);
+  });
 });

@@ -66,6 +66,21 @@ function useStoredBool(key: string, fallback: boolean): [boolean, (next: boolean
   return [value === 'true', setter];
 }
 
+function useExpandedSnapshot(): string {
+  return useSyncExternalStore(
+    subscribeToStorage,
+    () => {
+      if (typeof window === 'undefined') return '';
+      const parts: string[] = [];
+      for (const key of DOMAIN_ORDER) {
+        parts.push(key + '=' + (readBool(STORAGE_KEY_EXPANDED_PREFIX + key, true) ? '1' : '0'));
+      }
+      return parts.join('|');
+    },
+    () => '',
+  );
+}
+
 export function useNodeCatalog({ resourceId }: UseNodeCatalogArgs): UseNodeCatalogResult {
   const { data: schemas } = useResourceFlowsServiceGetNodeSchemas({ resourceId });
 
@@ -83,9 +98,12 @@ export function useNodeCatalog({ resourceId }: UseNodeCatalogArgs): UseNodeCatal
 
   const [collapsed, setCollapsed] = useStoredBool(STORAGE_KEY_COLLAPSED, false);
 
-  const isDomainExpanded = useCallback((domain: Domain) => {
-    return readBool(STORAGE_KEY_EXPANDED_PREFIX + domain, true);
-  }, []);
+  const expandedSnapshot = useExpandedSnapshot();
+
+  const isDomainExpanded = useCallback(
+    (domain: Domain) => readBool(STORAGE_KEY_EXPANDED_PREFIX + domain, true),
+    [expandedSnapshot],
+  );
 
   const setDomainExpanded = useCallback((domain: Domain, next: boolean) => {
     writeBool(STORAGE_KEY_EXPANDED_PREFIX + domain, next);
