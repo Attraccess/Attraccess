@@ -1,6 +1,12 @@
 {
   "addNewMqttServer": "Add New MQTT Server",
   "back": "Back",
+  "sections": {
+    "connection": "Connection",
+    "authentication": "Authentication",
+    "publishDefaults": "Publish defaults",
+    "subscribeDefaults": "Subscribe defaults"
+  },
   "nameLabel": "Name",
   "namePlaceholder": "My MQTT Server",
   "hostLabel": "Host",

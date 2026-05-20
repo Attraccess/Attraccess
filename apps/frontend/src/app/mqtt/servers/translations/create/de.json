@@ -1,6 +1,12 @@
 {
   "addNewMqttServer": "Neuen MQTT-Server hinzufügen",
   "back": "Zurück",
+  "sections": {
+    "connection": "Verbindung",
+    "authentication": "Authentifizierung",
+    "publishDefaults": "Standards für Veröffentlichungen",
+    "subscribeDefaults": "Standards für Abonnements"
+  },
   "nameLabel": "Name",
   "namePlaceholder": "Mein MQTT-Server",
   "hostLabel": "Host",
