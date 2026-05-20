@@ -15,14 +15,28 @@
   },
   "preview": "Preview",
   "edit": "Edit",
+  "sections": {
+    "type": "Documentation Type",
+    "content": "Content"
+  },
   "actions": {
     "save": "Save",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "retry": "Retry",
+    "backToResources": "Back to Resources"
   },
   "validation": {
     "urlRequired": "URL is required when URL type is selected",
     "markdownRequired": "Markdown content is required when Markdown type is selected",
     "invalidUrl": "Please enter a valid URL"
+  },
+  "error": {
+    "title": "Error Loading Documentation",
+    "unknown": "An unknown error occurred while loading the resource."
+  },
+  "notFound": {
+    "title": "Resource Not Found",
+    "message": "The requested resource could not be found."
   },
   "notifications": {
     "saveSuccess": {
