@@ -1,5 +1,6 @@
 import { PageHeader } from '../../components/pageHeader';
-import { Button, Card, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, useOverlayState } from '@heroui/react';
+import { Button, Card, DrawerBody, DrawerFooter, DrawerHeader, useOverlayState } from '@heroui/react';
+import { StandardDrawer } from '../../components/standardDrawer';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
@@ -79,37 +80,27 @@ export default function AccountPage() {
         </Card>
       </div>
 
-      <Modal isOpen={isOpen} onOpenChange={setOpen}>
-        <ModalBackdrop>
-          <ModalContainer size="sm">
-            <ModalDialog>
-              {({ close }) => (
-                <>
-                  <ModalHeader>
-                    <ModalHeading>{t('deleteAccount.modal.title')}</ModalHeading>
-                  </ModalHeader>
-                  <ModalBody>
-                    <p className="text-sm text-default-500">{t('deleteAccount.modal.description')}</p>
-                  </ModalBody>
-                  <ModalFooter>
-                    <Button variant="ghost" onPress={close} isDisabled={isRequestingDelete}>
-                      {t('deleteAccount.actions.cancel')}
-                    </Button>
-                    <Button
-                      variant="danger"
-                      onPress={() => requestDelete()}
-                      isPending={isRequestingDelete}
-                      data-cy="delete-account-confirm-button"
-                    >
-                      {t('deleteAccount.actions.confirm')}
-                    </Button>
-                  </ModalFooter>
-                </>
-              )}
-            </ModalDialog>
-          </ModalContainer>
-        </ModalBackdrop>
-      </Modal>
+      <StandardDrawer isOpen={isOpen} onOpenChange={setOpen}>
+        <DrawerHeader>
+          <h2 className="text-lg font-semibold">{t('deleteAccount.modal.title')}</h2>
+        </DrawerHeader>
+        <DrawerBody>
+          <p className="text-sm text-default-500">{t('deleteAccount.modal.description')}</p>
+        </DrawerBody>
+        <DrawerFooter>
+          <Button variant="ghost" onPress={close} isDisabled={isRequestingDelete}>
+            {t('deleteAccount.actions.cancel')}
+          </Button>
+          <Button
+            variant="danger"
+            onPress={() => requestDelete()}
+            isPending={isRequestingDelete}
+            data-cy="delete-account-confirm-button"
+          >
+            {t('deleteAccount.actions.confirm')}
+          </Button>
+        </DrawerFooter>
+      </StandardDrawer>
     </div>
   );
 }
