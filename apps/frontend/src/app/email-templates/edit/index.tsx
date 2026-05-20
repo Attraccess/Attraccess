@@ -8,23 +8,19 @@ import {
 } from '@attraccess/react-query-client';
 import {
   Button,
+  DrawerBody,
+  DrawerFooter,
+  DrawerHeader,
   Form,
   Input,
   Label,
   Link,
-  Modal,
-  ModalBackdrop,
-  ModalBody,
-  ModalContainer,
-  ModalDialog,
-  ModalFooter,
-  ModalHeader,
-  ModalHeading,
   TextField,
   useTheme,
 } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PageHeader } from '../../../components/pageHeader';
+import { StandardDrawer } from '../../../components/standardDrawer';
 import Editor from '@monaco-editor/react';
 import { Maximize } from 'lucide-react';
 
@@ -109,12 +105,14 @@ export function EditEmailTemplatePage() {
           <Label>{t('form.subject')}</Label>
           <Input />
         </TextField>
-        <Editor
-          theme={theme === 'dark' ? 'vs-dark' : 'vs-light'}
-          defaultLanguage="mjml"
-          defaultValue={body}
-          onChange={(value) => setBody(value ?? '')}
-        />
+        <div className="h-[300px] md:h-[60vh]">
+          <Editor
+            theme={theme === 'dark' ? 'vs-dark' : 'vs-light'}
+            defaultLanguage="mjml"
+            defaultValue={body}
+            onChange={(value) => setBody(value ?? '')}
+          />
+        </div>
         <Link href="https://documentation.mjml.io/">{t('form.mjmlDocumentation')}</Link>
       </>
     );
@@ -165,25 +163,21 @@ export function EditEmailTemplatePage() {
             </div>
             {editor}
 
-            <Modal isOpen={editorIsExpanded} onOpenChange={setEditorIsExpanded}>
-              <ModalBackdrop>
-                <ModalContainer size="cover">
-                  <ModalDialog>
-                    {({ close }) => (
-                      <>
-                        <ModalHeader>
-                          <ModalHeading>{t('templateType.' + templateType)}</ModalHeading>
-                        </ModalHeader>
-                        <ModalBody>{editor}</ModalBody>
-                        <ModalFooter>
-                          <Button onPress={close}>{t('actions.close')}</Button>
-                        </ModalFooter>
-                      </>
-                    )}
-                  </ModalDialog>
-                </ModalContainer>
-              </ModalBackdrop>
-            </Modal>
+            <StandardDrawer
+              isOpen={editorIsExpanded}
+              onOpenChange={setEditorIsExpanded}
+              dialogProps={{ className: 'md:max-w-5xl' }}
+            >
+              <DrawerHeader>
+                <h2 className="text-lg font-semibold">{t('templateType.' + templateType)}</h2>
+              </DrawerHeader>
+              <DrawerBody>
+                <div className="flex flex-col gap-4 h-full min-h-[60vh]">{editor}</div>
+              </DrawerBody>
+              <DrawerFooter>
+                <Button onPress={() => setEditorIsExpanded(false)}>{t('actions.close')}</Button>
+              </DrawerFooter>
+            </StandardDrawer>
           </section>
 
           <section
