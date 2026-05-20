@@ -125,12 +125,18 @@ export function AttractapEditor(props: Readonly<Props>) {
               </Slider>
             )}
             <Separator className="my-6" />
-            <ResourceSelector
-              selection={connectedResourceIds}
-              onSelectionChange={setConnectedResourceIds}
-              data-cy="attractap-editor-resource-selector"
-              multiple={reader?.firmware.capabilities.resourceSelection ?? true}
-            />
+            <div className="flex flex-col gap-3 w-full">
+              <div className="flex flex-col gap-1">
+                <h3 className="text-base font-semibold">{t('connectedResources')}</h3>
+                <p className="text-sm text-default-500">{t('connectedResourcesDescription')}</p>
+              </div>
+              <ResourceSelector
+                selection={connectedResourceIds}
+                onSelectionChange={setConnectedResourceIds}
+                data-cy="attractap-editor-resource-selector"
+                multiple={reader?.firmware.capabilities.resourceSelection ?? true}
+              />
+            </div>
           </Form>
         </DrawerBody>
         <DrawerFooter>
