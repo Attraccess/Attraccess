@@ -9,17 +9,11 @@ import {
   AlertContent,
   AlertDescription,
   Button,
+  DrawerBody,
+  DrawerFooter,
+  DrawerHeader,
   InputGroup,
   Label,
-  Modal,
-  ModalBackdrop,
-  ModalBody,
-  ModalContainer,
-  ModalDialog,
-  ModalFooter,
-  ModalHeader,
-  ModalHeading,
-  ModalIcon,
   Table,
   TableBody,
   TableCell,
@@ -30,6 +24,7 @@ import {
   TextField,
   useOverlayState,
 } from '@heroui/react';
+import { StandardDrawer } from '../../../components/standardDrawer';
 import { EmptyState } from '../../../components/emptyState';
 import { PlusIcon, Settings2Icon, Trash2Icon } from 'lucide-react';
 import { AlertStatusIcon } from '../../../components/AlertStatusIcon';
@@ -123,79 +118,73 @@ export function AllowedSignupDomainsEditorModal(props: Props) {
   return (
     <>
       {props.children(open)}
-      <Modal isOpen={isOpen} onOpenChange={setOpen}>
-        <ModalBackdrop>
-          <ModalContainer size="lg">
-            <ModalDialog>
-              {() => (
-                <>
-                  <ModalHeader>
-                    <ModalIcon><Settings2Icon /></ModalIcon>
-                    <ModalHeading>{t('title')}</ModalHeading>
-                    <p className="text-sm text-muted">{t('subtitle')}</p>
-                  </ModalHeader>
+      <StandardDrawer isOpen={isOpen} onOpenChange={setOpen}>
+        <DrawerHeader className="flex flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <Settings2Icon className="w-5 h-5" />
+            <h2 className="text-lg font-semibold">{t('title')}</h2>
+          </div>
+          <p className="text-sm text-default-500">{t('subtitle')}</p>
+        </DrawerHeader>
 
-                  <ModalBody className="flex flex-col gap-4">
-                    <Alert status="warning" className="whitespace-pre-wrap">
-                      <AlertStatusIcon status="warning" />
-                      <AlertContent>
-                        <AlertDescription>{t('noteAboutNoneAndWildcard')}</AlertDescription>
-                      </AlertContent>
-                    </Alert>
-                    <TextField value={domainToAdd} onChange={setDomainToAdd}>
-                      <Label>{t('inputs.addDomain.label')}</Label>
-                      <InputGroup>
-                        <InputGroup.Input
-                          ref={addDomainInputRef}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              onAddDomain();
-                            }
-                          }}
-                        />
-                        <InputGroup.Suffix>
-                          <Button variant="ghost" onPress={onAddDomain} isIconOnly ><PlusIcon /></Button>
-                        </InputGroup.Suffix>
-                      </InputGroup>
-                    </TextField>
+        <DrawerBody className="flex flex-col gap-4">
+          <Alert status="warning" className="whitespace-pre-wrap">
+            <AlertStatusIcon status="warning" />
+            <AlertContent>
+              <AlertDescription>{t('noteAboutNoneAndWildcard')}</AlertDescription>
+            </AlertContent>
+          </Alert>
+          <TextField value={domainToAdd} onChange={setDomainToAdd}>
+            <Label>{t('inputs.addDomain.label')}</Label>
+            <InputGroup>
+              <InputGroup.Input
+                ref={addDomainInputRef}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    onAddDomain();
+                  }
+                }}
+              />
+              <InputGroup.Suffix>
+                <Button variant="ghost" onPress={onAddDomain} isIconOnly>
+                  <PlusIcon />
+                </Button>
+              </InputGroup.Suffix>
+            </InputGroup>
+          </TextField>
 
-                    <Table>
-                      <TableContent aria-label={t('table.ariaLabel')}>
-                      <TableHeader>
-                        <TableColumn isRowHeader>{t('table.columns.domain')}</TableColumn>
-                        <TableColumn>{t('table.columns.actions')}</TableColumn>
-                      </TableHeader>
-                      <TableBody
-                        items={(editedDomains ?? []).map((domain) => ({ value: domain }))}
-                        renderEmptyState={() => <EmptyState />}
-                      >
-                        {(domain) => (
-                          <TableRow key={domain.value} id={domain.value}>
-                            <TableCell className="w-full">{domain.value}</TableCell>
-                            <TableCell className="flex-row flex">
-                              <Button variant="danger-soft" onPress={() => onRemoveDomain(domain.value)}>
-                                <Trash2Icon className="w-4 h-4" />
-                                {t('table.actions.removeDomain')}
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        )}
-                      </TableBody>
-                      </TableContent>
-                    </Table>
-                  </ModalBody>
+          <Table>
+            <TableContent aria-label={t('table.ariaLabel')}>
+              <TableHeader>
+                <TableColumn isRowHeader>{t('table.columns.domain')}</TableColumn>
+                <TableColumn>{t('table.columns.actions')}</TableColumn>
+              </TableHeader>
+              <TableBody
+                items={(editedDomains ?? []).map((domain) => ({ value: domain }))}
+                renderEmptyState={() => <EmptyState />}
+              >
+                {(domain) => (
+                  <TableRow key={domain.value} id={domain.value}>
+                    <TableCell className="w-full">{domain.value}</TableCell>
+                    <TableCell className="flex-row flex">
+                      <Button variant="danger-soft" onPress={() => onRemoveDomain(domain.value)}>
+                        <Trash2Icon className="w-4 h-4" />
+                        {t('table.actions.removeDomain')}
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </TableContent>
+          </Table>
+        </DrawerBody>
 
-                  <ModalFooter>
-                    <Button variant="primary" onPress={onSave} isPending={isSaving}>
-                      {t('actions.save.label')}
-                    </Button>
-                  </ModalFooter>
-                </>
-              )}
-            </ModalDialog>
-          </ModalContainer>
-        </ModalBackdrop>
-      </Modal>
+        <DrawerFooter>
+          <Button variant="primary" onPress={onSave} isPending={isSaving}>
+            {t('actions.save.label')}
+          </Button>
+        </DrawerFooter>
+      </StandardDrawer>
     </>
   );
 }
