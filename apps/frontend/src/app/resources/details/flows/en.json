@@ -3,7 +3,8 @@
   "subtitle": "With flows you can automate workflows for your resources and for example control smart plugs or lamps.",
   "actions": {
     "export": "Export",
-    "import": "Import"
+    "import": "Import",
+    "addNode": "Add node"
   },
   "export": {
     "success": {

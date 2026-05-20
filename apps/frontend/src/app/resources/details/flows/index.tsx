@@ -22,11 +22,12 @@ import {
   DownloadIcon,
   LayoutGridIcon,
   LogsIcon,
+  PlusIcon,
   SaveIcon,
   UploadIcon,
 } from 'lucide-react';
 import { nanoid } from 'nanoid';
-import { NodeCatalogPanel } from './nodeCatalog';
+import { NodeCatalogHandle, NodeCatalogPanel } from './nodeCatalog';
 import { FlowProvider, useFlowContext } from './flowContext';
 import { useFlowImportExport } from './flowImportExport';
 import { useQueryClient } from '@tanstack/react-query';
@@ -147,6 +148,7 @@ function FlowsPageInner() {
 
   const { fitView, screenToFlowPosition } = useReactFlow();
   const mousePosRef = useRef<{ x: number; y: number } | null>(null);
+  const nodeCatalogRef = useRef<NodeCatalogHandle>(null);
   const {
     nodes,
     edges,
@@ -367,8 +369,9 @@ function FlowsPageInner() {
         backTo={`/resources/${resourceId}`}
       />
 
-      <div className="flex flex-row w-full h-full rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800 relative">
+      <div className="flex flex-row w-full h-full rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800">
         <NodeCatalogPanel
+          ref={nodeCatalogRef}
           resourceId={Number(resourceId)}
           onSelect={addStartNode}
           tNodeTranslations={tNodeTranslations}
@@ -427,6 +430,15 @@ function FlowsPageInner() {
 
               <Button isIconOnly onPress={layout}>
                 <LayoutGridIcon />
+              </Button>
+              <Button
+                isIconOnly
+                variant="primary"
+                onPress={() => nodeCatalogRef.current?.open()}
+                aria-label={t('actions.addNode')}
+                className="md:hidden"
+              >
+                <PlusIcon />
               </Button>
             </Panel>
           </ReactFlow>

@@ -1,8 +1,8 @@
 // NodeCatalogPanel: responsive container hosting CatalogContent in sidebar and mobile overlay
 // FEATURE: Node catalog redesign — top-level panel
-import { useCallback } from 'react';
+import { forwardRef, useCallback, useImperativeHandle } from 'react';
 import { DrawerBody, DrawerHeader, useOverlayState, Button } from '@heroui/react';
-import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from 'lucide-react';
+import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
 import { TFunction, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { StandardDrawer } from '../../../../../components/standardDrawer';
 import { CatalogContent } from './catalogContent';
@@ -11,16 +11,25 @@ import { DOMAINS } from './domains';
 import de from './de.json';
 import en from './en.json';
 
+export interface NodeCatalogHandle {
+  open: () => void;
+}
+
 interface Props {
   resourceId: number;
   onSelect: (nodeType: string) => void;
   tNodeTranslations: TFunction;
 }
 
-export function NodeCatalogPanel({ resourceId, onSelect, tNodeTranslations }: Props) {
+export const NodeCatalogPanel = forwardRef<NodeCatalogHandle, Props>(function NodeCatalogPanel(
+  { resourceId, onSelect, tNodeTranslations },
+  ref,
+) {
   const { t } = useTranslations({ de, en });
   const { groups, collapsed, setCollapsed, isDomainExpanded, setDomainExpanded } = useNodeCatalog({ resourceId });
   const { isOpen, setOpen, open, close } = useOverlayState();
+
+  useImperativeHandle(ref, () => ({ open }), [open]);
 
   const handleSelectMobile = useCallback(
     (nodeType: string) => {
@@ -91,16 +100,6 @@ export function NodeCatalogPanel({ resourceId, onSelect, tNodeTranslations }: Pr
         </div>
       </aside>
 
-      <Button
-        isIconOnly
-        variant="primary"
-        onPress={open}
-        aria-label={t('toggleOpen')}
-        className="md:hidden absolute top-2 left-2 z-10"
-      >
-        <PlusIcon className="w-4 h-4" />
-      </Button>
-
       <StandardDrawer isOpen={isOpen} onOpenChange={setOpen}>
         <DrawerHeader>
           <h2 className="text-lg font-semibold">{t('title')}</h2>
@@ -118,4 +117,4 @@ export function NodeCatalogPanel({ resourceId, onSelect, tNodeTranslations }: Pr
       </StandardDrawer>
     </>
   );
-}
+});

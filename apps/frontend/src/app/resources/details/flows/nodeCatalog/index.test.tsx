@@ -2,10 +2,11 @@
 // FEATURE: Node catalog redesign — top-level panel tests
 import '@testing-library/jest-dom/vitest';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { createRef } from 'react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { TFunction } from '@attraccess/plugins-frontend-ui';
-import { NodeCatalogPanel } from './index';
+import { NodeCatalogHandle, NodeCatalogPanel } from './index';
 import { TestWrapper } from '../../../../../test-utils/wrappers';
 
 vi.mock('@attraccess/plugins-frontend-ui', () => ({
@@ -82,14 +83,15 @@ describe('NodeCatalogPanel', () => {
     expect(window.localStorage.getItem('nodeCatalog.collapsed')).toBe('false');
   });
 
-  it('opens mobile overlay when toggle pressed and selects a node', async () => {
+  it('opens mobile overlay via imperative ref and selects a node', async () => {
     const onSelect = vi.fn();
     const user = userEvent.setup();
+    const ref = createRef<NodeCatalogHandle>();
     render(
-      <NodeCatalogPanel resourceId={1} onSelect={onSelect} tNodeTranslations={tNodeTranslations} />,
+      <NodeCatalogPanel ref={ref} resourceId={1} onSelect={onSelect} tNodeTranslations={tNodeTranslations} />,
       { wrapper: TestWrapper },
     );
-    await user.click(screen.getByRole('button', { name: 'Open catalog' }));
+    act(() => { ref.current?.open(); });
     const buttons = screen.getAllByRole('button', { name: /Button/ });
     await user.click(buttons[buttons.length - 1]);
     expect(onSelect).toHaveBeenCalledWith('input.button');
