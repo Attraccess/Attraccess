@@ -1,5 +1,5 @@
 import { DateTimeDisplay, useNumberFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Button, Card, CardProps, Chip, cn, Skeleton, Spinner, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow } from '@heroui/react';
+import { Button, Chip, cn, Skeleton, Spinner, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow } from '@heroui/react';
 import { PageHeader } from '../../../../components/pageHeader';
 import de from './de.json';
 import en from './en.json';
@@ -17,13 +17,14 @@ import { dbCurrencyToUserCurrency } from '@attraccess/shared';
 import { TransactionDetailsModal } from './transactionDetailsModal';
 
 interface Props {
+  className?: string;
   transactionsPerPage?: number;
   userId?: number;
   isDisabled?: boolean;
 }
 
-export function SummaryCard(props: Omit<CardProps, 'children'> & Props) {
-  const { transactionsPerPage = 5, userId: userIdFromProps, isDisabled, ...cardProps } = props;
+export function SummaryCard(props: Props) {
+  const { className, transactionsPerPage = 5, userId: userIdFromProps, isDisabled } = props;
   const { t } = useTranslations({ en, de });
 
   const { user: currentUser } = useAuth();
@@ -140,33 +141,27 @@ export function SummaryCard(props: Omit<CardProps, 'children'> & Props) {
   }
 
   return (
-    <Card {...cardProps}>
-      <Card.Header>
-        <PageHeader title={t('title')} noMargin icon={<CreditCardIcon />} />
-      </Card.Header>
-      <Card.Content>
-        <div className="mb-4">
-          {isLoadingBalance ? (
-            <Spinner />
-          ) : (
-            <p className="text-2xl font-bold">
-              {t('balance', {
-                balance: formatNumber(dbCurrencyToUserCurrency(balance?.value ?? 0, configuration.minorUnit)),
-                currency: configuration.currency,
-              })}
-            </p>
-          )}
-        </div>
+    <div className={cn('w-full flex flex-col gap-6', className)}>
+      <PageHeader title={t('title')} noMargin icon={<CreditCardIcon />} />
 
-        <Table>
-          <TableContent aria-label={t('transactions.table.ariaLabel')}>
+      {isLoadingBalance ? (
+        <Spinner />
+      ) : (
+        <p className="text-2xl font-bold">
+          {t('balance', {
+            balance: formatNumber(dbCurrencyToUserCurrency(balance?.value ?? 0, configuration.minorUnit)),
+            currency: configuration.currency,
+          })}
+        </p>
+      )}
+
+      <Table>
+        <TableContent aria-label={t('transactions.table.ariaLabel')}>
           <TableHeader>
             <TableColumn isRowHeader>{t('transactions.table.columns.id')}</TableColumn>
             <TableColumn>{t('transactions.table.columns.dateTime')}</TableColumn>
             <TableColumn>{t('transactions.table.columns.status')}</TableColumn>
-            <TableColumn className="w-full">
-              {t('transactions.table.columns.details')}
-            </TableColumn>
+            <TableColumn className="w-full">{t('transactions.table.columns.details')}</TableColumn>
             <TableColumn>{t('transactions.table.columns.amount')}</TableColumn>
             <TableColumn>{t('transactions.table.columns.actions')}</TableColumn>
           </TableHeader>
@@ -190,24 +185,30 @@ export function SummaryCard(props: Omit<CardProps, 'children'> & Props) {
                   {formatNumber(dbCurrencyToUserCurrency(transaction.amount, configuration.minorUnit))}
                 </TableCell>
                 <TableCell>
-                  <Button isIconOnly variant="ghost" onPress={() => { setOpenedTransactionId(transaction.id); setIsOpenDetails(true); }}>
+                  <Button
+                    isIconOnly
+                    variant="ghost"
+                    onPress={() => {
+                      setOpenedTransactionId(transaction.id);
+                      setIsOpenDetails(true);
+                    }}
+                  >
                     <ReceiptTextIcon />
                   </Button>
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
-          </TableContent>
-        </Table>
+        </TableContent>
+      </Table>
 
-        {openedTransactionId && (
-          <TransactionDetailsModal
-            transactionId={openedTransactionId}
-            isOpen={isOpenDetails}
-            onClose={() => setIsOpenDetails(false)}
-          />
-        )}
-      </Card.Content>
-    </Card>
+      {openedTransactionId && (
+        <TransactionDetailsModal
+          transactionId={openedTransactionId}
+          isOpen={isOpenDetails}
+          onClose={() => setIsOpenDetails(false)}
+        />
+      )}
+    </div>
   );
 }
