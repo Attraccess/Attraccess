@@ -4,20 +4,16 @@ import {
   TextField,
   Label,
   Input,
-  Modal,
-  ModalBackdrop,
-  ModalBody,
-  ModalContainer,
-  ModalDialog,
-  ModalFooter,
-  ModalHeader,
-  ModalHeading,
+  DrawerBody,
+  DrawerFooter,
+  DrawerHeader,
   TextArea,
   useOverlayState,
 } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
+import { StandardDrawer } from '../../../components/standardDrawer';
 import { ImageUpload } from '../../../components/imageUpload';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -150,56 +146,46 @@ export function UpsertProjectModal(props: Props) {
   return (
     <>
       {children(open)}
-      <Modal isOpen={isOpen} onOpenChange={setOpen}>
-        <ModalBackdrop>
-          <ModalContainer size="md">
-            <ModalDialog>
-              {() => (
-                <>
-                  <ModalHeader>
-                    <ModalHeading>{projectId ? t('title.update') : t('title.create')}</ModalHeading>
-                  </ModalHeader>
+      <StandardDrawer isOpen={isOpen} onOpenChange={setOpen}>
+        <DrawerHeader>
+          <h2 className="text-lg font-semibold">{projectId ? t('title.update') : t('title.create')}</h2>
+        </DrawerHeader>
 
-                  <ModalBody>
-                    <Form
-                      ref={formRef}
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        onSubmit();
-                      }}
-                      className="flex flex-col gap-4"
-                    >
-                      <TextField value={name} onChange={setName}>
-                        <Label>{t('inputs.name.label')}</Label>
-                        <Input name="name" />
-                      </TextField>
-                      <TextArea
-                        name="description"
-                        value={description}
-                        onChange={(e) => setDescription(e.target.value)}
-                      />
-                      <ImageUpload
-                        id="project-logo-image-upload"
-                        label={t('inputs.logo.label')}
-                        onChange={setLogo}
-                        autoScale={{ maxWidth: 600, maxHeight: 600 }}
-                        currentImageUrl={existingProject?.logo ? filenameToUrl(existingProject.logo) : undefined}
-                      />
-                      <input type="submit" hidden />
-                    </Form>
-                  </ModalBody>
+        <DrawerBody>
+          <Form
+            ref={formRef}
+            onSubmit={(e) => {
+              e.preventDefault();
+              onSubmit();
+            }}
+            className="flex flex-col gap-4"
+          >
+            <TextField value={name} onChange={setName}>
+              <Label>{t('inputs.name.label')}</Label>
+              <Input name="name" />
+            </TextField>
+            <TextArea
+              name="description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+            <ImageUpload
+              id="project-logo-image-upload"
+              label={t('inputs.logo.label')}
+              onChange={setLogo}
+              autoScale={{ maxWidth: 600, maxHeight: 600 }}
+              currentImageUrl={existingProject?.logo ? filenameToUrl(existingProject.logo) : undefined}
+            />
+            <input type="submit" hidden />
+          </Form>
+        </DrawerBody>
 
-                  <ModalFooter>
-                    <Button variant="primary" onPress={onSubmit} isPending={isSaving}>
-                      {projectId ? t('actions.update.label') : t('actions.create.label')}
-                    </Button>
-                  </ModalFooter>
-                </>
-              )}
-            </ModalDialog>
-          </ModalContainer>
-        </ModalBackdrop>
-      </Modal>
+        <DrawerFooter>
+          <Button variant="primary" onPress={onSubmit} isPending={isSaving}>
+            {projectId ? t('actions.update.label') : t('actions.create.label')}
+          </Button>
+        </DrawerFooter>
+      </StandardDrawer>
     </>
   );
 }
