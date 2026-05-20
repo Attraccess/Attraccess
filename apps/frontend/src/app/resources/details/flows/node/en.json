@@ -1,7 +1,8 @@
 {
   "editor": {
     "buttons": {
-      "save": "Save"
+      "save": "Save",
+      "cancel": "Cancel"
     }
   },
   "nodes": {
