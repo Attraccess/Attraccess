@@ -1,7 +1,7 @@
 // Tests for domain mapping: schemaToDomain, DOMAINS, and DOMAIN_ORDER
 // FEATURE: Node catalog redesign — domain grouping
 import { describe, it, expect } from 'vitest';
-import { ResourceFlowNodeType } from '@attraccess/database-entities';
+import { ResourceFlowNodeType } from '@attraccess/react-query-client';
 import { schemaToDomain, DOMAINS, DOMAIN_ORDER } from './domains';
 
 describe('schemaToDomain', () => {
@@ -12,7 +12,7 @@ describe('schemaToDomain', () => {
     [ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER, 'resource'],
     [ResourceFlowNodeType.INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY, 'resource'],
     [ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION, 'resource'],
-    [ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS, 'resource'],
+    [ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_CALCULATION_SET_ADDITIONAL_ITEMS, 'resource'],
     [ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_TRACK_ACTIVITY, 'resource'],
     [ResourceFlowNodeType.INPUT_RESOURCE_DOOR_LOCKED, 'door'],
     [ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLOCKED, 'door'],

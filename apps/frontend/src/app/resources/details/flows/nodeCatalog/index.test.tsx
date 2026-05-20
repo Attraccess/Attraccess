@@ -30,14 +30,18 @@ vi.mock('@attraccess/plugins-frontend-ui', () => ({
   },
 }));
 
-vi.mock('@attraccess/react-query-client', () => ({
-  useResourceFlowsServiceGetNodeSchemas: () => ({
-    data: [
-      { type: 'input.button', inputs: [], outputs: ['out'], isOutput: false, supportedByResource: true, configSchema: {} },
-      { type: 'input.resource.door.locked', inputs: [], outputs: ['out'], isOutput: false, supportedByResource: true, configSchema: {} },
-    ],
-  }),
-}));
+vi.mock('@attraccess/react-query-client', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@attraccess/react-query-client')>();
+  return {
+    ...actual,
+    useResourceFlowsServiceGetNodeSchemas: () => ({
+      data: [
+        { type: 'input.button', inputs: [], outputs: ['out'], isOutput: false, supportedByResource: true, configSchema: {} },
+        { type: 'input.resource.door.locked', inputs: [], outputs: ['out'], isOutput: false, supportedByResource: true, configSchema: {} },
+      ],
+    }),
+  };
+});
 
 const tNodeTranslations = ((key: string) => {
   const dict: Record<string, string> = {

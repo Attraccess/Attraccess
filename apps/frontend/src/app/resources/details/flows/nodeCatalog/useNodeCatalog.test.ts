@@ -5,17 +5,21 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useNodeCatalog } from './useNodeCatalog';
 
-vi.mock('@attraccess/react-query-client', () => ({
-  useResourceFlowsServiceGetNodeSchemas: () => ({
-    data: [
-      { type: 'input.button', inputs: [], outputs: ['output'], isOutput: false, supportedByResource: true, configSchema: {} },
-      { type: 'input.resource.door.locked', inputs: [], outputs: ['output'], isOutput: false, supportedByResource: true, configSchema: {} },
-      { type: 'output.http.sendRequest', inputs: ['input'], outputs: [], isOutput: true, supportedByResource: true, configSchema: {} },
-      { type: 'processing.wait', inputs: ['input'], outputs: ['output'], isOutput: false, supportedByResource: true, configSchema: {} },
-      { type: 'input.mqtt.message.received', inputs: [], outputs: ['output'], isOutput: false, supportedByResource: false, configSchema: {} },
-    ],
-  }),
-}));
+vi.mock('@attraccess/react-query-client', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@attraccess/react-query-client')>();
+  return {
+    ...actual,
+    useResourceFlowsServiceGetNodeSchemas: () => ({
+      data: [
+        { type: 'input.button', inputs: [], outputs: ['output'], isOutput: false, supportedByResource: true, configSchema: {} },
+        { type: 'input.resource.door.locked', inputs: [], outputs: ['output'], isOutput: false, supportedByResource: true, configSchema: {} },
+        { type: 'output.http.sendRequest', inputs: ['input'], outputs: [], isOutput: true, supportedByResource: true, configSchema: {} },
+        { type: 'processing.wait', inputs: ['input'], outputs: ['output'], isOutput: false, supportedByResource: true, configSchema: {} },
+        { type: 'input.mqtt.message.received', inputs: [], outputs: ['output'], isOutput: false, supportedByResource: false, configSchema: {} },
+      ],
+    }),
+  };
+});
 
 describe('useNodeCatalog', () => {
   beforeEach(() => {

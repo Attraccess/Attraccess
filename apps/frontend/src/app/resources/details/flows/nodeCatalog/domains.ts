@@ -1,7 +1,7 @@
 // Domain mapping for the Flow node catalog: pure data + classification
 // FEATURE: Node catalog redesign — domain grouping
 import type { ComponentType, SVGProps } from 'react';
-import { ResourceFlowNodeType } from '@attraccess/database-entities';
+import { ResourceFlowNodeType } from '@attraccess/react-query-client';
 import {
   CircleDotIcon,
   CogIcon,
