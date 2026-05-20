@@ -1,16 +1,12 @@
 import { ReactNode, useCallback, useMemo, useState } from 'react';
 import {
   Button,
-  Modal,
-  ModalBackdrop,
-  ModalBody,
-  ModalContainer,
-  ModalDialog,
-  ModalFooter,
-  ModalHeader,
-  ModalHeading,
+  DrawerBody,
+  DrawerFooter,
+  DrawerHeader,
   useOverlayState,
 } from '@heroui/react';
+import { StandardDrawer } from '../../../../../components/standardDrawer';
 import { Select } from '../../../../../components/select';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -109,48 +105,38 @@ export function InviteProjectMemberModal(props: Readonly<InviteProjectMemberModa
   return (
     <>
       {children(open)}
-      <Modal isOpen={isOpen} onOpenChange={handleOpenChange}>
-        <ModalBackdrop>
-          <ModalContainer size="sm">
-            <ModalDialog>
-              {({ close }) => (
-                <>
-                  <ModalHeader>
-                    <ModalHeading>{t('title')}</ModalHeading>
-                  </ModalHeader>
-                  <ModalBody className="flex flex-col gap-4">
-                    <p className="text-small text-default-500">{t('description')}</p>
-                    <UserSearch
-                      label={t('inputs.user')}
-                      afterSelection={
-                        selectedUser ? (
-                          <span className="text-tiny text-default-500">{selectedUser.username}</span>
-                        ) : null
-                      }
-                    />
-                    <Select
-                      label={t('inputs.role')}
-                      value={role}
-                      onChange={(key) => {
-                        if (key) setRole(key as ProjectMember['role']);
-                      }}
-                      items={roleOptions.map((value) => ({ key: value, label: t(`roles.${value}`) }))}
-                    />
-                  </ModalBody>
-                  <ModalFooter>
-                    <Button variant="ghost" onPress={close} isDisabled={isPending}>
-                      {t('actions.cancel')}
-                    </Button>
-                    <Button variant="primary" onPress={onInvite} isDisabled={!selectedUser} isPending={isPending}>
-                      {t('actions.invite')}
-                    </Button>
-                  </ModalFooter>
-                </>
-              )}
-            </ModalDialog>
-          </ModalContainer>
-        </ModalBackdrop>
-      </Modal>
+      <StandardDrawer isOpen={isOpen} onOpenChange={handleOpenChange}>
+        <DrawerHeader>
+          <h2 className="text-lg font-semibold">{t('title')}</h2>
+        </DrawerHeader>
+        <DrawerBody className="flex flex-col gap-4">
+          <p className="text-small text-default-500">{t('description')}</p>
+          <UserSearch
+            label={t('inputs.user')}
+            afterSelection={
+              selectedUser ? (
+                <span className="text-tiny text-default-500">{selectedUser.username}</span>
+              ) : null
+            }
+          />
+          <Select
+            label={t('inputs.role')}
+            value={role}
+            onChange={(key) => {
+              if (key) setRole(key as ProjectMember['role']);
+            }}
+            items={roleOptions.map((value) => ({ key: value, label: t(`roles.${value}`) }))}
+          />
+        </DrawerBody>
+        <DrawerFooter>
+          <Button variant="ghost" onPress={() => handleOpenChange(false)} isDisabled={isPending}>
+            {t('actions.cancel')}
+          </Button>
+          <Button variant="primary" onPress={onInvite} isDisabled={!selectedUser} isPending={isPending}>
+            {t('actions.invite')}
+          </Button>
+        </DrawerFooter>
+      </StandardDrawer>
     </>
   );
 }
