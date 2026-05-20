@@ -165,7 +165,7 @@ export function SummaryCard(props: Props) {
             <TableColumn>{t('transactions.table.columns.amount')}</TableColumn>
             <TableColumn>{t('transactions.table.columns.actions')}</TableColumn>
           </TableHeader>
-          <TableBody items={transactions?.data ?? []}>
+          <TableBody items={transactions?.data ?? []} renderEmptyState={() => t('transactions.table.empty')}>
             {(transaction) => (
               <TableRow key={transaction.id} id={transaction.id} className="wrap-none cursor-pointer">
                 <TableCell>{transaction.id}</TableCell>
