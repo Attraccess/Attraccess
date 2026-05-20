@@ -1,8 +1,8 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Button, Card, Checkbox, Form, Input, Label, TextField } from "@heroui/react";
+import { Button, Checkbox, Form, Input, Label, TextField } from "@heroui/react";
 import { Select } from '../../../components/select';
 import { LabeledSwitch } from '../../../components/labeledSwitch';
-import { ArrowLeft } from 'lucide-react';
+import { PageHeader } from '../../../components/pageHeader';
 import { PasswordInput } from '../../../components/PasswordInput';
 import { useNavigate } from 'react-router-dom';
 import { useToastMessage } from '../../../components/toastProvider';
@@ -255,25 +255,9 @@ export function CreateMqttServerPage(props?: Readonly<CreateMqttServerPageProps>
   }, [props, navigate]);
 
   return (
-    <Card data-cy="create-mqtt-server-page-card">
-      <Card.Header>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Button variant="ghost"
-              isIconOnly
-              onPress={handleCancel}
-              aria-label={t('back')}
-              data-cy="create-mqtt-server-page-back-button"
-            >
-              <ArrowLeft size={20} />
-            </Button>
-            <h2>{t('addNewMqttServer')}</h2>
-          </div>
-        </div>
-      </Card.Header>
-      <div style={{ padding: '1rem' }}>
-        <CreateMqttServerForm {...props} onCancel={handleCancel} />
-      </div>
-    </Card>
+    <div className="max-w-7xl mx-auto px-4 py-8" data-cy="create-mqtt-server-page">
+      <PageHeader title={t('addNewMqttServer')} onBack={handleCancel} />
+      <CreateMqttServerForm {...props} onCancel={handleCancel} />
+    </div>
   );
 }

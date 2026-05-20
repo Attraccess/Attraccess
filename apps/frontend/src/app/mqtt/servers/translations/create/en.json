@@ -1,6 +1,5 @@
 {
   "addNewMqttServer": "Add New MQTT Server",
-  "back": "Back",
   "sections": {
     "connection": "Connection",
     "authentication": "Authentication",
