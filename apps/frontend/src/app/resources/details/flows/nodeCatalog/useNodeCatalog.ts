@@ -101,7 +101,11 @@ export function useNodeCatalog({ resourceId }: UseNodeCatalogArgs): UseNodeCatal
   const expandedSnapshot = useExpandedSnapshot();
 
   const isDomainExpanded = useCallback(
-    (domain: Domain) => readBool(STORAGE_KEY_EXPANDED_PREFIX + domain, true),
+    (domain: Domain) => {
+      const entry = expandedSnapshot.split('|').find((p) => p.startsWith(domain + '='));
+      if (!entry) return true;
+      return entry.endsWith('=1');
+    },
     [expandedSnapshot],
   );
 
