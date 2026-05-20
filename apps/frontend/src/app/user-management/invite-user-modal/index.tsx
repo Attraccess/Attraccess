@@ -1,22 +1,19 @@
 import {
   Button,
+  DrawerBody,
+  DrawerFooter,
+  DrawerHeader,
   Form,
   TextField,
   Label,
   Input,
-  Modal,
-  ModalBackdrop,
-  ModalBody,
-  ModalContainer,
-  ModalDialog,
-  ModalHeader,
-  ModalHeading,
   Tab,
   TabList,
   TabPanel,
   Tabs,
   useOverlayState,
 } from '@heroui/react';
+import { StandardDrawer } from '../../../components/standardDrawer';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
@@ -126,81 +123,79 @@ export function InviteUserModal(props: Props) {
   return (
     <>
       {children(open)}
-      <Modal
+      <StandardDrawer
         isOpen={isOpen}
         onOpenChange={(o) => {
           if (!o) close();
         }}
       >
-        <ModalBackdrop>
-          <ModalContainer size={tab === 'single' ? 'sm' : 'lg'}>
-            <ModalDialog>
-              {() => (
-                <>
-                  <ModalHeader>
-                    <ModalHeading>{t('title')}</ModalHeading>
-                  </ModalHeader>
-
-                  <ModalBody>
-                    <Tabs selectedKey={tab}>
-                      <TabList>
-                        <Tab id="single">{t('tabs.single')}</Tab>
-                        <Tab id="csv">{t('tabs.csv')}</Tab>
-                      </TabList>
-                      <TabPanel id="single">
-                        <Form
-                          ref={formRef}
-                          onSubmit={(e) => {
-                            e.preventDefault();
-                            onSubmit();
-                          }}
-                          className="flex flex-col gap-4"
-                        >
-                          <UsernameInput
-                            label={t('inputs.username.label')}
-                            name="username"
-                            isRequired
-                            value={username}
-                            onChange={setUsername}
-                            validationMessages={usernameValidationMessages}
-                            description={t('inputs.username.description', {
-                              min: USERNAME_RULES.minLength,
-                              max: USERNAME_RULES.maxLength,
-                            })}
-                          />
-                          <TextField isRequired value={email} onChange={setEmail}>
-                            <Label>{t('inputs.email.label')}</Label>
-                            <Input name="email" type="email" required />
-                          </TextField>
-
-                          <div className="flex justify-end w-full">
-                            <Button variant="primary" type="submit" isPending={isPending} isDisabled={!canSubmit}>
-                              {t('actions.invite')}
-                            </Button>
-                          </div>
-                        </Form>
-                      </TabPanel>
-                      <TabPanel id="csv">
-                        <CsvInvite
-                          onSuccess={close}
-                          onError={(error) =>
-                            toast.apiError({
-                              error: error as ApiError,
-                              t,
-                              tExists,
-                              baseTranslationKey: 'api',
-                            })
-                          }
-                        />
-                      </TabPanel>
-                    </Tabs>
-                  </ModalBody>
-                </>
-              )}
-            </ModalDialog>
-          </ModalContainer>
-        </ModalBackdrop>
-      </Modal>
+        <DrawerHeader>
+          <h2 className="text-lg font-semibold">{t('title')}</h2>
+        </DrawerHeader>
+        <DrawerBody>
+          <Tabs selectedKey={tab}>
+            <TabList>
+              <Tab id="single">{t('tabs.single')}</Tab>
+              <Tab id="csv">{t('tabs.csv')}</Tab>
+            </TabList>
+            <TabPanel id="single">
+              <Form
+                ref={formRef}
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  onSubmit();
+                }}
+                className="flex flex-col gap-4"
+              >
+                <UsernameInput
+                  label={t('inputs.username.label')}
+                  name="username"
+                  isRequired
+                  value={username}
+                  onChange={setUsername}
+                  validationMessages={usernameValidationMessages}
+                  description={t('inputs.username.description', {
+                    min: USERNAME_RULES.minLength,
+                    max: USERNAME_RULES.maxLength,
+                  })}
+                />
+                <TextField isRequired value={email} onChange={setEmail}>
+                  <Label>{t('inputs.email.label')}</Label>
+                  <Input name="email" type="email" required />
+                </TextField>
+              </Form>
+            </TabPanel>
+            <TabPanel id="csv">
+              <CsvInvite
+                onSuccess={close}
+                onError={(error) =>
+                  toast.apiError({
+                    error: error as ApiError,
+                    t,
+                    tExists,
+                    baseTranslationKey: 'api',
+                  })
+                }
+              />
+            </TabPanel>
+          </Tabs>
+        </DrawerBody>
+        {tab === 'single' && (
+          <DrawerFooter>
+            <Button variant="secondary" onPress={close}>
+              {t('actions.cancel')}
+            </Button>
+            <Button
+              variant="primary"
+              onPress={onSubmit}
+              isPending={isPending}
+              isDisabled={!canSubmit}
+            >
+              {t('actions.invite')}
+            </Button>
+          </DrawerFooter>
+        )}
+      </StandardDrawer>
     </>
   );
 }
