@@ -43,8 +43,14 @@ describe('DOMAINS', () => {
     for (const key of DOMAIN_ORDER) {
       expect(DOMAINS[key]).toMatchObject({
         color: expect.any(String),
+        iconBg: expect.any(String),
+        iconFg: expect.any(String),
         icon: expect.anything(),
       });
     }
+  });
+
+  it('has the same domain keys as DOMAIN_ORDER', () => {
+    expect(Object.keys(DOMAINS).sort()).toEqual([...DOMAIN_ORDER].sort());
   });
 });
