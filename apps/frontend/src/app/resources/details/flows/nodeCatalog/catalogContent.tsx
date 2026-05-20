@@ -32,7 +32,7 @@ export function CatalogContent({
       {groups.map((group) => {
         const expanded = isDomainExpanded(group.domain);
         return (
-          <section key={group.domain}>
+          <section key={group.domain} id={'node-catalog-domain-' + group.domain}>
             <CatalogDomainHeader
               domain={group.domain}
               count={group.nodes.length}

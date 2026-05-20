@@ -7,6 +7,7 @@ import { TFunction, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { StandardDrawer } from '../../../../../components/standardDrawer';
 import { CatalogContent } from './catalogContent';
 import { useNodeCatalog } from './useNodeCatalog';
+import { DOMAINS } from './domains';
 import de from './de.json';
 import en from './en.json';
 
@@ -50,8 +51,34 @@ export function NodeCatalogPanel({ resourceId, onSelect, tNodeTranslations }: Pr
             {collapsed ? <ChevronRightIcon className="w-4 h-4" /> : <ChevronLeftIcon className="w-4 h-4" />}
           </Button>
         </div>
-        {!collapsed && (
-          <div className="flex-1 min-h-0 overflow-y-auto p-2">
+        <div className="flex-1 min-h-0 overflow-y-auto p-2">
+          {collapsed ? (
+            <ul className="flex flex-col items-center gap-1">
+              {groups.map((group) => {
+                const def = DOMAINS[group.domain];
+                const Icon = def.icon;
+                return (
+                  <li key={group.domain}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCollapsed(false);
+                        requestAnimationFrame(() => {
+                          document
+                            .getElementById('node-catalog-domain-' + group.domain)
+                            ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        });
+                      }}
+                      aria-label={t('domains.' + group.domain)}
+                      className={`flex items-center justify-center w-8 h-8 rounded-md ${def.iconBg} ${def.iconFg} hover:ring-2 hover:ring-primary-300 focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none`}
+                    >
+                      <Icon className="w-4 h-4" />
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
             <CatalogContent
               groups={groups}
               isDomainExpanded={isDomainExpanded}
@@ -60,8 +87,8 @@ export function NodeCatalogPanel({ resourceId, onSelect, tNodeTranslations }: Pr
               tCatalog={t}
               tNodeTranslations={tNodeTranslations}
             />
-          </div>
-        )}
+          )}
+        </div>
       </aside>
 
       <Button

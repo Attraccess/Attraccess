@@ -67,6 +67,21 @@ describe('NodeCatalogPanel', () => {
     expect(screen.getAllByText('Door').length).toBeGreaterThan(0);
   });
 
+  it('renders icon rail when collapsed and expands + scrolls on icon click', async () => {
+    window.localStorage.setItem('nodeCatalog.collapsed', 'true');
+    const user = userEvent.setup();
+    render(
+      <NodeCatalogPanel resourceId={1} onSelect={vi.fn()} tNodeTranslations={tNodeTranslations} />,
+      { wrapper: TestWrapper },
+    );
+    const manualButton = screen.getAllByRole('button', { name: 'Manual' })[0];
+    expect(manualButton).toBeInTheDocument();
+    expect(window.localStorage.getItem('nodeCatalog.collapsed')).toBe('true');
+
+    await user.click(manualButton);
+    expect(window.localStorage.getItem('nodeCatalog.collapsed')).toBe('false');
+  });
+
   it('opens mobile overlay when toggle pressed and selects a node', async () => {
     const onSelect = vi.fn();
     const user = userEvent.setup();
