@@ -1,6 +1,7 @@
 import { DateTimeDisplay, useNumberFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { Button, Chip, cn, Skeleton, Spinner, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow } from '@heroui/react';
 import { PageHeader } from '../../../../components/pageHeader';
+import { EmptyState } from '../../../../components/emptyState';
 import de from './de.json';
 import en from './en.json';
 import { useAuth } from '../../../../hooks/useAuth';
@@ -165,7 +166,7 @@ export function SummaryCard(props: Props) {
             <TableColumn>{t('transactions.table.columns.amount')}</TableColumn>
             <TableColumn>{t('transactions.table.columns.actions')}</TableColumn>
           </TableHeader>
-          <TableBody items={transactions?.data ?? []} renderEmptyState={() => t('transactions.table.empty')}>
+          <TableBody items={transactions?.data ?? []} renderEmptyState={() => <EmptyState message={t('transactions.table.empty') as string} />}>
             {(transaction) => (
               <TableRow key={transaction.id} id={transaction.id} className="wrap-none cursor-pointer">
                 <TableCell>{transaction.id}</TableCell>
