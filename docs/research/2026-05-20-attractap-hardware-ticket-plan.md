@@ -14,7 +14,7 @@
 
 | # | Title (short) | Parent | Phase | blockedBy | Spec section |
 |---|---------------|--------|-------|-----------|--------------|
-| T1 | Firmware folder move (`apps/attractap-firmware` → `apps/attractap/firmware`) | ATT-343 | prep | — | §4.2 ATT-343 child |
+| T1 | Firmware folder move (`apps/attractap/firmware` → `apps/attractap/firmware`) | ATT-343 | prep | — | §4.2 ATT-343 child |
 | T2 | Attractap V2 Hardware Implementation (PARENT) | (project root) | — | — | §4.1 |
 | T3 | P1 Bootstrap nx hardware workspace + tscircuit + CI | T2 | 1 | T1 | §4.2 P1-Bootstrap |
 | T4 | P1 Shared lib: connector spec freeze + JLC parts + mech envelope | T2 | 1 | T3 | §4.2 P1-SharedLib |
@@ -90,7 +90,7 @@ These IDs feed every subsequent `save_issue` call.
 ```markdown
 ## Goal
 
-Move `apps/attractap-firmware/` to `apps/attractap/firmware/` so the new hardware nx apps under `apps/attractap/hardware/` can sit alongside the existing firmware under a common `apps/attractap/` umbrella.
+Move `apps/attractap/firmware/` to `apps/attractap/firmware/` so the new hardware nx apps under `apps/attractap/hardware/` can sit alongside the existing firmware under a common `apps/attractap/` umbrella.
 
 ## Why this is a prep ticket under ATT-343
 
@@ -98,11 +98,11 @@ ATT-343 is research/prep only. This rename is a low-risk, isolated refactor that
 
 ## Scope
 
-- `git mv apps/attractap-firmware apps/attractap/firmware`
+- `git mv apps/attractap/firmware apps/attractap/firmware`
 - Update `apps/attractap/firmware/project.json` (path-sensitive fields).
 - Update `platformio.ini` `extra_scripts` paths (e.g. `pre:tools/build_adaptive_certs_wrapper.py`).
 - Update `apps/attractap/firmware/build_firmwares.py` if it uses repo-relative paths.
-- Update any CI workflow that references `apps/attractap-firmware/**` paths (search `.github/workflows/*.yml`).
+- Update any CI workflow that references `apps/attractap/firmware/**` paths (search `.github/workflows/*.yml`).
 - Update doc links: `docs/en/attractap/*.md`, root `README.md`, `apps/attractap/firmware/README.md`.
 - Update `nx.json` release projects list if `attractap-firmware` is referenced (it currently is not, per inspection).
 - Rename nx project name from `attractap-firmware` to `attractap-firmware` (keep the project key the same to avoid release-config churn) OR to `attractap/firmware` (must update `nx.json release.projects` if so). **Pick whichever causes fewer downstream changes. Document the choice in the PR.**
@@ -111,8 +111,8 @@ ATT-343 is research/prep only. This rename is a low-risk, isolated refactor that
 
 - PR opens green CI.
 - `pnpm nx run <project>:build` succeeds for all existing PlatformIO envs (`attractap-touch`, `attractap-touch-v2`, `attractap-touch-ethernet`, `attractap-lite-ethernet`).
-- No broken links in `docs/en/attractap/*.md` (search for `apps/attractap-firmware` and `attractap-firmware` references).
-- `git grep "apps/attractap-firmware"` returns no matches after the move.
+- No broken links in `docs/en/attractap/*.md` (search for `apps/attractap/firmware` and `attractap-firmware` references).
+- `git grep "apps/attractap/firmware"` returns no matches after the move.
 
 ## Out of scope
 

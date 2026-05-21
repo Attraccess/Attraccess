@@ -6,7 +6,7 @@ const { execSync } = require('child_process');
 
 const assetsDir = path.resolve(__dirname, 'src/assets/attractap-firmwares');
 const origins = [
-  { name: 'attractap', path: path.resolve(__dirname, '../attractap-firmware/firmware_output') },
+  { name: 'attractap', path: path.resolve(__dirname, '../attractap/firmware/firmware_output') },
   { name: 'attractap-touch', path: path.resolve(__dirname, '../attractap-touch-firmware/firmware_output') },
 ];
 
