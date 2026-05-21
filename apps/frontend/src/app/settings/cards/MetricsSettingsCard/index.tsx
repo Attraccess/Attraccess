@@ -1,4 +1,4 @@
-import { Chip } from '@heroui/react';
+import { Chip, cn } from '@heroui/react';
 import { CheckIcon, XIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { MetricsSettingsForm } from '../../forms/MetricsSettingsForm';
@@ -6,7 +6,11 @@ import { useSettingsServiceGetMetricsSettings } from '@attraccess/react-query-cl
 import en from './en.json';
 import de from './de.json';
 
-export function MetricsSettingsCard() {
+export type MetricsSettingsCardProps = {
+  className?: string;
+};
+
+export function MetricsSettingsCard({ className }: MetricsSettingsCardProps = {}) {
   const { t } = useTranslations({ en, de });
   const { data: metricsSettings } = useSettingsServiceGetMetricsSettings();
 
@@ -23,7 +27,10 @@ export function MetricsSettingsCard() {
 
   return (
     <section
-      className="w-full flex flex-col gap-4 pt-6 border-t border-default-200 first:pt-0 first:border-t-0"
+      className={cn(
+        'w-full flex flex-col gap-4 rounded-large border border-default-200 bg-default-50 p-6',
+        className,
+      )}
       data-cy="metrics-settings-section"
     >
       <div className="flex items-center justify-between gap-2">

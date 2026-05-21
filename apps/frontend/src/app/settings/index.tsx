@@ -13,10 +13,10 @@ export function SystemSettingsPage() {
   return (
     <div>
       <PageHeader title={t('title')} subtitle={t('subtitle')} icon={<Settings2Icon size={20} />} />
-      <div className="flex flex-col gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         <AppSettingsCard variant="standalone" />
         <SmtpSettingsCard variant="standalone" />
-        <MetricsSettingsCard />
+        <MetricsSettingsCard className="lg:col-span-2" />
       </div>
     </div>
   );

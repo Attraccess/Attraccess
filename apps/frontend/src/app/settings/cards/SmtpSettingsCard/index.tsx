@@ -1,4 +1,4 @@
-import { Chip } from '@heroui/react';
+import { Chip, cn } from '@heroui/react';
 import { CheckIcon, XIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { SmtpSettingsForm } from '../../forms/SmtpSettingsForm';
@@ -11,9 +11,10 @@ export type SmtpSettingsCardVariant = 'standalone' | 'wizard';
 export type SmtpSettingsCardProps = {
   variant: SmtpSettingsCardVariant;
   onNext?: () => void;
+  className?: string;
 };
 
-export function SmtpSettingsCard({ variant, onNext }: SmtpSettingsCardProps) {
+export function SmtpSettingsCard({ variant, onNext, className }: SmtpSettingsCardProps) {
   const { t } = useTranslations({ en, de });
 
   const { data: settings } = useSettingsServiceGetSystemSettings();
@@ -32,7 +33,10 @@ export function SmtpSettingsCard({ variant, onNext }: SmtpSettingsCardProps) {
 
   return (
     <section
-      className="w-full flex flex-col gap-4 pt-6 border-t border-default-200 first:pt-0 first:border-t-0"
+      className={cn(
+        'w-full flex flex-col gap-4 rounded-large border border-default-200 bg-default-50 p-6',
+        className,
+      )}
       data-cy="smtp-settings-section"
     >
       <div className="flex items-center justify-between gap-2">
