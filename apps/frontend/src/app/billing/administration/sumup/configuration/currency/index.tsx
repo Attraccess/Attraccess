@@ -79,7 +79,7 @@ export function CurrencyCard(props: Omit<ComponentPropsWithoutRef<'section'>, 'c
     <section
       {...sectionProps}
       className={twMerge(
-        'w-full flex flex-col gap-4 pt-6 border-t border-default-200 first:pt-0 first:border-t-0',
+        'w-full flex flex-col gap-4 pt-6 border-t border-default-200 first:pt-0 first:border-t-0 @xl:pt-0 @xl:border-t-0 @xl:pl-6 @xl:border-l @xl:first:pl-0 @xl:first:border-l-0',
         className
       )}
     >
