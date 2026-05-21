@@ -3,15 +3,18 @@
 
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsBoolean, IsInt, IsOptional, Max, Min, ValidateIf } from 'class-validator';
+import { IsBoolean, IsInt, IsOptional, IsString, Max, MaxLength, Min, MinLength, ValidateIf } from 'class-validator';
 import { PasswordPolicyRole } from '@attraccess/database-entities';
 
-const MIN_LENGTH_MIN = 1;
+const MIN_LENGTH_FLOOR = 8;
 const MIN_LENGTH_MAX = 1024;
 const SCORE_MIN = 0;
 const SCORE_MAX = 4;
 const HISTORY_MAX = 50;
 const ROTATION_MAX = 3650;
+const PREVIEW_PASSWORD_MAX = 4096;
+
+export const PASSWORD_POLICY_MIN_LENGTH_FLOOR = MIN_LENGTH_FLOOR;
 
 export class PasswordPolicyDto {
   @ApiProperty({ example: 12 })
@@ -52,19 +55,19 @@ export class PasswordPolicyDto {
 }
 
 export class UpdatePasswordPolicyDto {
-  @ApiPropertyOptional({ example: 12, minimum: MIN_LENGTH_MIN, maximum: MIN_LENGTH_MAX })
+  @ApiPropertyOptional({ example: 12, minimum: MIN_LENGTH_FLOOR, maximum: MIN_LENGTH_MAX })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
-  @Min(MIN_LENGTH_MIN)
+  @Min(MIN_LENGTH_FLOOR)
   @Max(MIN_LENGTH_MAX)
   minLength?: number;
 
-  @ApiPropertyOptional({ example: 128, minimum: MIN_LENGTH_MIN, maximum: MIN_LENGTH_MAX })
+  @ApiPropertyOptional({ example: 128, minimum: MIN_LENGTH_FLOOR, maximum: MIN_LENGTH_MAX })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
-  @Min(MIN_LENGTH_MIN)
+  @Min(MIN_LENGTH_FLOOR)
   @Max(MIN_LENGTH_MAX)
   maxLength?: number;
 
@@ -170,21 +173,21 @@ export class PasswordPolicyOverrideDto {
 }
 
 export class UpsertPasswordPolicyOverrideDto {
-  @ApiPropertyOptional({ nullable: true, type: Number, minimum: MIN_LENGTH_MIN, maximum: MIN_LENGTH_MAX })
+  @ApiPropertyOptional({ nullable: true, type: Number, minimum: MIN_LENGTH_FLOOR, maximum: MIN_LENGTH_MAX })
   @IsOptional()
   @ValidateIf((_, v) => v !== null)
   @Type(() => Number)
   @IsInt()
-  @Min(MIN_LENGTH_MIN)
+  @Min(MIN_LENGTH_FLOOR)
   @Max(MIN_LENGTH_MAX)
   minLength?: number | null;
 
-  @ApiPropertyOptional({ nullable: true, type: Number, minimum: MIN_LENGTH_MIN, maximum: MIN_LENGTH_MAX })
+  @ApiPropertyOptional({ nullable: true, type: Number, minimum: MIN_LENGTH_FLOOR, maximum: MIN_LENGTH_MAX })
   @IsOptional()
   @ValidateIf((_, v) => v !== null)
   @Type(() => Number)
   @IsInt()
-  @Min(MIN_LENGTH_MIN)
+  @Min(MIN_LENGTH_FLOOR)
   @Max(MIN_LENGTH_MAX)
   maxLength?: number | null;
 
@@ -256,4 +259,31 @@ export class UpsertPasswordPolicyOverrideDto {
   @Min(0)
   @Max(ROTATION_MAX)
   rotationDays?: number | null;
+}
+
+export class PreviewPasswordDto {
+  @ApiProperty({ description: 'Password candidate to evaluate against the policy', minLength: 1, maxLength: PREVIEW_PASSWORD_MAX })
+  @IsString()
+  @MinLength(1)
+  @MaxLength(PREVIEW_PASSWORD_MAX)
+  password!: string;
+
+  @ApiPropertyOptional({ enum: PasswordPolicyRole, enumName: 'PasswordPolicyRole', description: 'Evaluate against the effective policy for this role (uses global if omitted).' })
+  @IsOptional()
+  role?: PasswordPolicyRole;
+
+  @ApiPropertyOptional({ description: 'Draft policy overrides to merge over the persisted policy for this evaluation only.', type: () => UpdatePasswordPolicyDto })
+  @IsOptional()
+  draftPolicy?: UpdatePasswordPolicyDto;
+}
+
+export class PreviewPasswordResultDto {
+  @ApiProperty({ description: 'Whether the candidate satisfies every rule of the (draft-merged) policy', example: false })
+  ok!: boolean;
+
+  @ApiProperty({ description: 'Structured policy errors with codes and per-rule parameters', type: 'array', items: { type: 'object' } })
+  errors!: Array<{ code: string; params: Record<string, unknown> }>;
+
+  @ApiProperty({ description: 'zxcvbn evaluation summary', type: 'object', additionalProperties: false, properties: { score: { type: 'number' }, required: { type: 'number' } } })
+  zxcvbn!: { score: number; required: number };
 }

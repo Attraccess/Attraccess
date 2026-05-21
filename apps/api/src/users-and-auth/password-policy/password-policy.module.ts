@@ -7,6 +7,7 @@ import {
   AuthenticationDetail,
   PasswordHistory,
   PasswordPolicy,
+  PasswordPolicyAudit,
   PasswordPolicyOverride,
 } from '@attraccess/database-entities';
 import { PasswordPolicyService } from './password-policy.service';
@@ -17,7 +18,13 @@ import { ZxcvbnService } from './zxcvbn.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([PasswordPolicy, PasswordPolicyOverride, PasswordHistory, AuthenticationDetail]),
+    TypeOrmModule.forFeature([
+      PasswordPolicy,
+      PasswordPolicyOverride,
+      PasswordPolicyAudit,
+      PasswordHistory,
+      AuthenticationDetail,
+    ]),
   ],
   providers: [PasswordPolicyService, HibpClient, ZxcvbnService],
   controllers: [PasswordPolicyController, AdminPasswordPolicyController],

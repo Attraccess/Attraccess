@@ -84,6 +84,10 @@ import {
   PasswordPolicyRole,
   PASSWORD_POLICY_ROLES,
 } from './entities/password-policy-override.entity';
+import {
+  PasswordPolicyAudit,
+  PasswordPolicyAuditEvent,
+} from './entities/password-policy-audit.entity';
 
 // Export all entities individually
 export {
@@ -171,6 +175,8 @@ export {
   PasswordPolicyOverride,
   PasswordPolicyRole,
   PASSWORD_POLICY_ROLES,
+  PasswordPolicyAudit,
+  PasswordPolicyAuditEvent,
 };
 
 // Export the entities object
@@ -214,4 +220,5 @@ export const entities = {
   PasswordPolicy,
   PasswordHistory,
   PasswordPolicyOverride,
+  PasswordPolicyAudit,
 };

@@ -11,7 +11,7 @@
     "saveButton": "Save policy"
   },
   "fields": {
-    "minLength": { "label": "Minimum length", "description": "Reject passwords shorter than this. Range 1-1024." },
+    "minLength": { "label": "Minimum length", "description": "Reject passwords shorter than this. Range 8-1024 (NIST 800-63B floor)." },
     "maxLength": { "label": "Maximum length", "description": "Reject passwords longer than this. Range 1-1024." },
     "allowAllUnicode": { "label": "Allow all Unicode characters", "description": "When off, only ASCII printable characters are accepted." },
     "requireUppercase": { "label": "Require an uppercase letter", "description": "Reject passwords without at least one uppercase letter." },
@@ -26,12 +26,15 @@
   },
   "preview": {
     "title": "Live preview",
-    "subtitle": "Type a candidate password to see whether the current form values would accept it.",
+    "subtitle": "Type a candidate password and the server evaluates it against the (unsaved) form values — including HIBP, zxcvbn, and common-password checks.",
     "passwordLabel": "Candidate password",
     "pass": "Would pass",
     "fail": "Would fail",
     "noErrors": "All checks pass.",
-    "samples": "Examples",
+    "loading": "Evaluating with full server checks…",
+    "reveal": "Show password",
+    "hide": "Hide password",
+    "disclosure": "Evaluated server-side against the draft policy. Password is sent over TLS and never stored.",
     "errors": {
       "MIN_LENGTH": "Too short (min {{min}}, got {{actual}}).",
       "MAX_LENGTH": "Too long (max {{max}}, got {{actual}}).",
@@ -79,9 +82,7 @@
       "subtitle": "Toggle a field to override; leave off to inherit from the global policy."
     },
     "roles": {
-      "admin": "Admin",
-      "machine": "Machine account",
-      "api-token": "API token"
+      "admin": "Admin"
     }
   }
 }

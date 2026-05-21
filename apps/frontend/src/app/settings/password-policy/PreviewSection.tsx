@@ -1,34 +1,83 @@
-import { useCallback, useMemo, useState } from 'react';
-import { Card, CardBody, CardHeader, Chip, Input } from '@heroui/react';
-import { CheckIcon, XIcon } from 'lucide-react';
-import { COMMON_PASSWORDS, PolicyError, validatePassword } from '@attraccess/shared';
-import { PasswordPolicyDto } from '@attraccess/react-query-client';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Button, Card, CardBody, CardHeader, Chip, Input, Spinner } from '@heroui/react';
+import { CheckIcon, EyeIcon, EyeOffIcon, XIcon } from 'lucide-react';
+import type { PolicyError } from '@attraccess/shared';
+import {
+  PasswordPolicyAdminService,
+  PasswordPolicyDto,
+  PreviewPasswordResultDto,
+  UpdatePasswordPolicyDto,
+} from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 
-const SAMPLES = ['password', 'Tr0ub4dor-9!plate', 'correcthorsebatterystaple', 'X9$qz!Tm-2k_Q!fL'];
-
-function renderError(err: PolicyError, t: (key: string, vars?: Record<string, string | number>) => string): string {
-  const key = `preview.errors.${err.code}`;
-  return t(key, err.params as Record<string, string | number>);
-}
+const DEBOUNCE_MS = 400;
 
 interface Props {
   policy: PasswordPolicyDto;
 }
 
+function toDraftPolicy(p: PasswordPolicyDto): UpdatePasswordPolicyDto {
+  return {
+    minLength: p.minLength,
+    maxLength: p.maxLength,
+    allowAllUnicode: p.allowAllUnicode,
+    requireUppercase: p.requireUppercase,
+    requireLowercase: p.requireLowercase,
+    requireDigit: p.requireDigit,
+    requireSpecial: p.requireSpecial,
+    checkHIBP: p.checkHIBP,
+    checkCommonPasswords: p.checkCommonPasswords,
+    minZxcvbnScore: p.minZxcvbnScore,
+    historySize: p.historySize,
+    rotationDays: p.rotationDays,
+  };
+}
+
 export function PreviewSection({ policy }: Props) {
   const { t } = useTranslations({ en, de });
   const [candidate, setCandidate] = useState('');
+  const [reveal, setReveal] = useState(false);
+  const [result, setResult] = useState<PreviewPasswordResultDto | null>(null);
+  const [loading, setLoading] = useState(false);
+  const generation = useRef(0);
+  const inflight = useRef<{ cancel: () => void } | null>(null);
 
-  const evaluate = useCallback(
-    (pw: string) => validatePassword(pw, policy, {}, { commonPasswords: COMMON_PASSWORDS }),
-    [policy],
-  );
+  const draft = useMemo(() => toDraftPolicy(policy), [policy]);
 
-  const candidateResult = useMemo(() => evaluate(candidate), [candidate, evaluate]);
-  const sampleResults = useMemo(() => SAMPLES.map((s) => ({ sample: s, result: evaluate(s) })), [evaluate]);
+  useEffect(() => {
+    if (candidate.length === 0) {
+      setResult(null);
+      setLoading(false);
+      inflight.current?.cancel();
+      return;
+    }
+    const id = ++generation.current;
+    setLoading(true);
+    const timer = window.setTimeout(() => {
+      inflight.current?.cancel();
+      const promise = PasswordPolicyAdminService.previewAdminPasswordPolicy({
+        requestBody: { password: candidate, draftPolicy: draft },
+      });
+      inflight.current = { cancel: () => promise.cancel() };
+      promise
+        .then((next) => {
+          if (id !== generation.current) return;
+          setResult(next as PreviewPasswordResultDto);
+          setLoading(false);
+        })
+        .catch(() => {
+          if (id !== generation.current) return;
+          setLoading(false);
+        });
+    }, DEBOUNCE_MS);
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [candidate, draft]);
+
+  useEffect(() => () => inflight.current?.cancel(), []);
 
   return (
     <Card>
@@ -42,48 +91,56 @@ export function PreviewSection({ policy }: Props) {
           value={candidate}
           onValueChange={setCandidate}
           variant="bordered"
-          type="text"
+          type={reveal ? 'text' : 'password'}
+          autoComplete="new-password"
           data-testid="policy-preview-input"
+          endContent={
+            <Button
+              isIconOnly
+              size="sm"
+              variant="light"
+              aria-label={reveal ? t('preview.hide') : t('preview.reveal')}
+              onPress={() => setReveal((v) => !v)}
+              data-testid="policy-preview-reveal"
+            >
+              {reveal ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}
+            </Button>
+          }
         />
         {candidate.length > 0 && (
           <div className="flex flex-col gap-2" data-testid="policy-preview-result">
-            <Chip
-              color={candidateResult.ok ? 'success' : 'danger'}
-              startContent={candidateResult.ok ? <CheckIcon size={14} /> : <XIcon size={14} />}
-              variant="flat"
-            >
-              {candidateResult.ok ? t('preview.pass') : t('preview.fail')}
-            </Chip>
-            {candidateResult.errors.length === 0 ? (
-              <span className="text-xs text-default-500">{t('preview.noErrors')}</span>
-            ) : (
-              <ul className="list-disc pl-5 text-xs text-default-600">
-                {candidateResult.errors.map((err, idx) => (
-                  <li key={idx}>{renderError(err, t)}</li>
-                ))}
-              </ul>
-            )}
-          </div>
-        )}
-        <div className="flex flex-col gap-2">
-          <span className="text-sm font-medium">{t('preview.samples')}</span>
-          <ul className="flex flex-col gap-1">
-            {sampleResults.map(({ sample, result }) => (
-              <li key={sample} className="flex items-center justify-between gap-2 text-xs">
-                <code className="rounded bg-default-100 px-2 py-0.5">{sample}</code>
+            {loading && !result ? (
+              <div className="flex items-center gap-2 text-xs text-default-500">
+                <Spinner size="sm" /> {t('preview.loading')}
+              </div>
+            ) : result ? (
+              <>
                 <Chip
-                  size="sm"
                   color={result.ok ? 'success' : 'danger'}
+                  startContent={result.ok ? <CheckIcon size={14} /> : <XIcon size={14} />}
                   variant="flat"
-                  startContent={result.ok ? <CheckIcon size={12} /> : <XIcon size={12} />}
                 >
                   {result.ok ? t('preview.pass') : t('preview.fail')}
                 </Chip>
-              </li>
-            ))}
-          </ul>
-        </div>
+                {result.errors.length === 0 ? (
+                  <span className="text-xs text-default-500">{t('preview.noErrors')}</span>
+                ) : (
+                  <ul className="list-disc pl-5 text-xs text-default-600">
+                    {result.errors.map((err, idx) => (
+                      <li key={idx}>{renderError(err as unknown as PolicyError, t)}</li>
+                    ))}
+                  </ul>
+                )}
+                <span className="text-[10px] uppercase tracking-wide text-default-400">{t('preview.disclosure')}</span>
+              </>
+            ) : null}
+          </div>
+        )}
       </CardBody>
     </Card>
   );
+}
+
+function renderError(err: PolicyError, t: (key: string, vars?: Record<string, string | number>) => string): string {
+  return t(`preview.errors.${err.code}`, err.params as Record<string, string | number>);
 }

@@ -1,20 +1,14 @@
 // Per-role password policy override; nullable columns inherit from global singleton policy
-// FEATURE: Password policy per-role overrides for admin/machine/api-token classes
+// FEATURE: Password policy per-role overrides (admin only; machine/api-token are future slices)
 
-import { Column, CreateDateColumn, Entity, PrimaryColumn, UpdateDateColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, PrimaryColumn, UpdateDateColumn, VersionColumn } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 
 export enum PasswordPolicyRole {
   ADMIN = 'admin',
-  MACHINE = 'machine',
-  API_TOKEN = 'api-token',
 }
 
-export const PASSWORD_POLICY_ROLES: PasswordPolicyRole[] = [
-  PasswordPolicyRole.ADMIN,
-  PasswordPolicyRole.MACHINE,
-  PasswordPolicyRole.API_TOKEN,
-];
+export const PASSWORD_POLICY_ROLES: PasswordPolicyRole[] = [PasswordPolicyRole.ADMIN];
 
 @Entity()
 export class PasswordPolicyOverride {
@@ -77,4 +71,8 @@ export class PasswordPolicyOverride {
   @UpdateDateColumn()
   @ApiProperty({ description: 'When the override row was last updated' })
   updatedAt!: Date;
+
+  @VersionColumn()
+  @ApiProperty({ description: 'Row version for optimistic concurrency control', example: 1 })
+  version!: number;
 }

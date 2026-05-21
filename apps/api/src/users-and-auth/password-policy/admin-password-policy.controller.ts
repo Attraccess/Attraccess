@@ -1,16 +1,18 @@
 // Admin password policy endpoints: full read, partial update, per-role override CRUD with audit logs
-// FEATURE: Password policy admin surface (admin-only, hot-reload, audit logged)
+// FEATURE: Password policy admin surface (admin-only, hot-reload, audit logged, server-side preview)
 
 import {
-  BadRequestException,
   Body,
   Controller,
   Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Logger,
   Param,
   ParseEnumPipe,
   Patch,
+  Post,
   Put,
   Req,
 } from '@nestjs/common';
@@ -18,10 +20,12 @@ import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { PasswordPolicyOverride, PasswordPolicyRole } from '@attraccess/database-entities';
 import { PasswordPolicyConfig } from '@attraccess/shared';
-import { PasswordPolicyService } from './password-policy.service';
+import { AuditContext, PasswordPolicyService, POLICY_FIELDS } from './password-policy.service';
 import {
   PasswordPolicyDto,
   PasswordPolicyOverrideDto,
+  PreviewPasswordDto,
+  PreviewPasswordResultDto,
   UpdatePasswordPolicyDto,
   UpsertPasswordPolicyOverrideDto,
 } from './admin-password-policy.dto';
@@ -49,15 +53,32 @@ export class AdminPasswordPolicyController {
     @Body() body: UpdatePasswordPolicyDto,
     @Req() request: AuthenticatedRequest,
   ): Promise<PasswordPolicyDto> {
-    const before = await this.service.getPolicy();
-    this.assertRangeConsistency(body, before);
-    const after = await this.service.updatePolicy(body);
-    this.audit('global_policy_updated', request, {
-      before,
-      after,
-      changed: Object.keys(body),
-    });
+    const audit = this.buildAudit(request);
+    const after = await this.service.updatePolicy(body, audit);
+    this.mirrorAuditToLogger('global_policy_updated', audit, { changed: Object.keys(body) });
     return after;
+  }
+
+  @Post('preview')
+  @HttpCode(HttpStatus.OK)
+  @Auth('canManageSystemConfiguration')
+  @ApiOperation({
+    summary: 'Server-side preview: evaluate a candidate password against the current (or draft) policy',
+    operationId: 'previewAdminPasswordPolicy',
+  })
+  @ApiResponse({ status: 200, description: 'Full preview result including zxcvbn + HIBP + history checks.', type: PreviewPasswordResultDto })
+  async preview(@Body() body: PreviewPasswordDto): Promise<PreviewPasswordResultDto> {
+    let policyOverride: PasswordPolicyConfig | undefined;
+    if (body.draftPolicy) {
+      const effective = await this.service.getEffectivePolicy(body.role);
+      policyOverride = this.mergeDraft(effective, body.draftPolicy);
+    }
+    const result = await this.service.validate(body.password, {}, { role: body.role, policyOverride });
+    return {
+      ok: result.ok,
+      errors: result.errors.map((e) => ({ code: e.code, params: e.params })),
+      zxcvbn: result.zxcvbn,
+    };
   }
 
   @Get('overrides')
@@ -91,15 +112,14 @@ export class AdminPasswordPolicyController {
     @Body() body: UpsertPasswordPolicyOverrideDto,
     @Req() request: AuthenticatedRequest,
   ): Promise<PasswordPolicyOverrideDto> {
-    const beforeRow = await this.service.getOverride(role);
-    const before = beforeRow ? this.toOverrideDto(beforeRow) : null;
-    const saved = await this.service.upsertOverride(role, body);
-    const after = this.toOverrideDto(saved);
-    this.audit('override_upserted', request, { role, before, after, changed: Object.keys(body) });
-    return after;
+    const audit = this.buildAudit(request);
+    const saved = await this.service.upsertOverride(role, body, audit);
+    this.mirrorAuditToLogger('override_upserted', audit, { role, changed: Object.keys(body) });
+    return this.toOverrideDto(saved);
   }
 
   @Delete('overrides/:role')
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Auth('canManageSystemConfiguration')
   @ApiParam({ name: 'role', enum: PasswordPolicyRole, enumName: 'PasswordPolicyRole' })
   @ApiOperation({ summary: 'Delete a per-role password policy override', operationId: 'deletePasswordPolicyOverride' })
@@ -108,18 +128,20 @@ export class AdminPasswordPolicyController {
     @Param('role', new ParseEnumPipe(PasswordPolicyRole)) role: PasswordPolicyRole,
     @Req() request: AuthenticatedRequest,
   ): Promise<void> {
-    const beforeRow = await this.service.getOverride(role);
-    const before = beforeRow ? this.toOverrideDto(beforeRow) : null;
-    await this.service.deleteOverride(role);
-    this.audit('override_deleted', request, { role, before });
+    const audit = this.buildAudit(request);
+    await this.service.deleteOverride(role, audit);
+    this.mirrorAuditToLogger('override_deleted', audit, { role });
   }
 
-  private assertRangeConsistency(body: UpdatePasswordPolicyDto, current: PasswordPolicyConfig): void {
-    const effectiveMin = body.minLength ?? current.minLength;
-    const effectiveMax = body.maxLength ?? current.maxLength;
-    if (effectiveMin > effectiveMax) {
-      throw new BadRequestException(`minLength (${effectiveMin}) must be <= maxLength (${effectiveMax})`);
+  private mergeDraft(base: PasswordPolicyConfig, draft: UpdatePasswordPolicyDto): PasswordPolicyConfig {
+    const merged: PasswordPolicyConfig = { ...base };
+    for (const key of POLICY_FIELDS) {
+      const value = (draft as unknown as Record<string, unknown>)[key];
+      if (value !== undefined && value !== null) {
+        (merged as unknown as Record<string, unknown>)[key] = value;
+      }
     }
+    return merged;
   }
 
   private toOverrideDto(row: PasswordPolicyOverride): PasswordPolicyOverrideDto {
@@ -140,14 +162,31 @@ export class AdminPasswordPolicyController {
     };
   }
 
-  private audit(event: string, request: AuthenticatedRequest, payload: Record<string, unknown>): void {
+  private buildAudit(request: AuthenticatedRequest): AuditContext {
+    const headers = (request.headers ?? {}) as Record<string, string | string[] | undefined>;
+    const requestIdHeader = headers['x-request-id'];
+    const requestId = Array.isArray(requestIdHeader) ? requestIdHeader[0] : requestIdHeader;
+    const userAgentHeader = headers['user-agent'];
+    const userAgent = Array.isArray(userAgentHeader) ? userAgentHeader[0] : userAgentHeader;
+    return {
+      actorId: request.user?.id ?? null,
+      actorUsername: request.user?.username ?? null,
+      ip: request.ip ?? null,
+      userAgent: userAgent ?? null,
+      requestId: requestId ?? null,
+    };
+  }
+
+  private mirrorAuditToLogger(event: string, audit: AuditContext, extra: Record<string, unknown>): void {
     this.logger.log(
       JSON.stringify({
         event,
-        actorId: request.user?.id,
-        actorUsername: request.user?.username,
+        actorId: audit.actorId,
+        actorUsername: audit.actorUsername,
+        ip: audit.ip,
+        requestId: audit.requestId,
         at: new Date().toISOString(),
-        ...payload,
+        ...extra,
       }),
     );
   }

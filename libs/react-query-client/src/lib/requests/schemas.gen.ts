@@ -1984,13 +1984,13 @@ export const $UpdatePasswordPolicyDto = {
         minLength: {
             type: 'number',
             example: 12,
-            minimum: 1,
+            minimum: 8,
             maximum: 1024
         },
         maxLength: {
             type: 'number',
             example: 128,
-            minimum: 1,
+            minimum: 8,
             maximum: 1024
         },
         allowAllUnicode: {
@@ -2044,7 +2044,69 @@ export const $UpdatePasswordPolicyDto = {
 
 export const $PasswordPolicyRole = {
     type: 'string',
-    enum: ['admin', 'machine', 'api-token']
+    enum: ['admin'],
+    description: 'Evaluate against the effective policy for this role (uses global if omitted).'
+} as const;
+
+export const $PreviewPasswordDto = {
+    type: 'object',
+    properties: {
+        password: {
+            type: 'string',
+            description: 'Password candidate to evaluate against the policy',
+            minLength: 1,
+            maxLength: 4096
+        },
+        role: {
+            description: 'Evaluate against the effective policy for this role (uses global if omitted).',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/PasswordPolicyRole'
+                }
+            ]
+        },
+        draftPolicy: {
+            description: 'Draft policy overrides to merge over the persisted policy for this evaluation only.',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/UpdatePasswordPolicyDto'
+                }
+            ]
+        }
+    },
+    required: ['password']
+} as const;
+
+export const $PreviewPasswordResultDto = {
+    type: 'object',
+    properties: {
+        ok: {
+            type: 'boolean',
+            description: 'Whether the candidate satisfies every rule of the (draft-merged) policy',
+            example: false
+        },
+        errors: {
+            type: 'array',
+            description: 'Structured policy errors with codes and per-rule parameters',
+            items: {
+                type: 'object'
+            }
+        },
+        zxcvbn: {
+            type: 'object',
+            description: 'zxcvbn evaluation summary',
+            additionalProperties: false,
+            properties: {
+                score: {
+                    type: 'number'
+                },
+                required: {
+                    type: 'number'
+                }
+            }
+        }
+    },
+    required: ['ok', 'errors', 'zxcvbn']
 } as const;
 
 export const $PasswordPolicyOverrideDto = {
@@ -2115,13 +2177,13 @@ export const $UpsertPasswordPolicyOverrideDto = {
         minLength: {
             type: 'number',
             nullable: true,
-            minimum: 1,
+            minimum: 8,
             maximum: 1024
         },
         maxLength: {
             type: 'number',
             nullable: true,
-            minimum: 1,
+            minimum: 8,
             maximum: 1024
         },
         allowAllUnicode: {

@@ -1298,11 +1298,47 @@ export type UpdatePasswordPolicyDto = {
     rotationDays?: number;
 };
 
+/**
+ * Evaluate against the effective policy for this role (uses global if omitted).
+ */
 export enum PasswordPolicyRole {
-    ADMIN = 'admin',
-    MACHINE = 'machine',
-    API_TOKEN = 'api-token'
+    ADMIN = 'admin'
 }
+
+export type PreviewPasswordDto = {
+    /**
+     * Password candidate to evaluate against the policy
+     */
+    password: string;
+    /**
+     * Evaluate against the effective policy for this role (uses global if omitted).
+     */
+    role?: PasswordPolicyRole;
+    /**
+     * Draft policy overrides to merge over the persisted policy for this evaluation only.
+     */
+    draftPolicy?: UpdatePasswordPolicyDto;
+};
+
+export type PreviewPasswordResultDto = {
+    /**
+     * Whether the candidate satisfies every rule of the (draft-merged) policy
+     */
+    ok: boolean;
+    /**
+     * Structured policy errors with codes and per-rule parameters
+     */
+    errors: Array<{
+        [key: string]: unknown;
+    }>;
+    /**
+     * zxcvbn evaluation summary
+     */
+    zxcvbn: {
+        score?: number;
+        required?: number;
+    };
+};
 
 export type PasswordPolicyOverrideDto = {
     role: PasswordPolicyRole;
@@ -4537,6 +4573,12 @@ export type UpdateAdminPasswordPolicyData = {
 
 export type UpdateAdminPasswordPolicyResponse = PasswordPolicyDto;
 
+export type PreviewAdminPasswordPolicyData = {
+    requestBody: PreviewPasswordDto;
+};
+
+export type PreviewAdminPasswordPolicyResponse = PreviewPasswordResultDto;
+
 export type ListPasswordPolicyOverridesResponse = Array<PasswordPolicyOverrideDto>;
 
 export type GetPasswordPolicyOverrideData = {
@@ -6773,6 +6815,21 @@ export type $OpenApiTs = {
                  * Password policy updated.
                  */
                 200: PasswordPolicyDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/admin/password-policy/preview': {
+        post: {
+            req: PreviewAdminPasswordPolicyData;
+            res: {
+                /**
+                 * Full preview result including zxcvbn + HIBP + history checks.
+                 */
+                200: PreviewPasswordResultDto;
                 /**
                  * Unauthorized
                  */

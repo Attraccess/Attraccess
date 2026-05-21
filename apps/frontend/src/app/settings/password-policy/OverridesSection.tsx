@@ -33,56 +33,34 @@ import {
 } from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../components/toastProvider';
+import {
+  POLICY_BOOL_FIELDS,
+  POLICY_FIELD_KEYS,
+  POLICY_NUMBER_FIELDS,
+} from './policy-fields';
 import en from './en.json';
 import de from './de.json';
 
-const ROLES: PasswordPolicyRole[] = [
-  PasswordPolicyRole.ADMIN,
-  PasswordPolicyRole.MACHINE,
-  PasswordPolicyRole.API_TOKEN,
-];
+const ROLES: PasswordPolicyRole[] = [PasswordPolicyRole.ADMIN];
 
-const NUMBER_FIELDS: Array<{ key: keyof UpsertPasswordPolicyOverrideDto; min: number; max: number }> = [
-  { key: 'minLength', min: 1, max: 1024 },
-  { key: 'maxLength', min: 1, max: 1024 },
-  { key: 'minZxcvbnScore', min: 0, max: 4 },
-  { key: 'historySize', min: 0, max: 50 },
-  { key: 'rotationDays', min: 0, max: 3650 },
-];
-
-const BOOL_FIELDS: Array<keyof UpsertPasswordPolicyOverrideDto> = [
-  'allowAllUnicode',
-  'requireUppercase',
-  'requireLowercase',
-  'requireDigit',
-  'requireSpecial',
-  'checkHIBP',
-  'checkCommonPasswords',
-];
-
-const ALL_KEYS = [...NUMBER_FIELDS.map((f) => f.key), ...BOOL_FIELDS];
-
-function emptyOverride(): Required<PasswordPolicyOverrideDto> {
-  return {
-    role: PasswordPolicyRole.ADMIN,
-    minLength: null,
-    maxLength: null,
-    allowAllUnicode: null,
-    requireUppercase: null,
-    requireLowercase: null,
-    requireDigit: null,
-    requireSpecial: null,
-    checkHIBP: null,
-    checkCommonPasswords: null,
-    minZxcvbnScore: null,
-    historySize: null,
-    rotationDays: null,
-  };
+function emptyOverride(role: PasswordPolicyRole = PasswordPolicyRole.ADMIN): Required<PasswordPolicyOverrideDto> {
+  const out = { role } as Required<PasswordPolicyOverrideDto>;
+  for (const k of POLICY_FIELD_KEYS) {
+    (out as unknown as Record<string, unknown>)[k as string] = null;
+  }
+  return out;
 }
 
 function countOverridden(row: PasswordPolicyOverrideDto | undefined): number {
   if (!row) return 0;
-  return ALL_KEYS.reduce((acc, k) => acc + (row[k as keyof PasswordPolicyOverrideDto] !== null ? 1 : 0), 0);
+  return POLICY_FIELD_KEYS.reduce(
+    (acc, k) => acc + (row[k as keyof PasswordPolicyOverrideDto] !== null ? 1 : 0),
+    0,
+  );
+}
+
+function isAllInherit(draft: PasswordPolicyOverrideDto): boolean {
+  return POLICY_FIELD_KEYS.every((k) => draft[k as keyof PasswordPolicyOverrideDto] === null);
 }
 
 interface Props {
@@ -105,7 +83,7 @@ export function OverridesSection({ globalPolicy }: Props) {
 
   useEffect(() => {
     if (editingRole) {
-      const existing = overridesByRole.get(editingRole) ?? { ...emptyOverride(), role: editingRole };
+      const existing = overridesByRole.get(editingRole) ?? emptyOverride(editingRole);
       setDraft({ ...existing });
     }
   }, [editingRole, overridesByRole]);
@@ -113,7 +91,7 @@ export function OverridesSection({ globalPolicy }: Props) {
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: UsePasswordPolicyAdminServiceListPasswordPolicyOverridesKeyFn() });
 
-  const { mutate: upsert, isPending: isSaving } = usePasswordPolicyAdminServiceUpsertPasswordPolicyOverride({
+  const { mutate: upsert, isPending: isUpserting } = usePasswordPolicyAdminServiceUpsertPasswordPolicyOverride({
     onSuccess: (_data, vars) => {
       invalidate();
       toast.success({
@@ -125,21 +103,35 @@ export function OverridesSection({ globalPolicy }: Props) {
     onError: () => toast.error({ title: t('errorToast.title'), description: t('errorToast.description') }),
   });
 
-  const { mutate: remove } = usePasswordPolicyAdminServiceDeletePasswordPolicyOverride({
+  const { mutate: remove, isPending: isRemoving } = usePasswordPolicyAdminServiceDeletePasswordPolicyOverride({
     onSuccess: (_data, vars) => {
       invalidate();
       toast.success({
         title: t('overrides.removed.title'),
         description: t('overrides.removed.description', { role: t(`overrides.roles.${vars.role}`) }),
       });
+      if (editingRole === vars.role) {
+        setEditingRole(null);
+      }
     },
     onError: () => toast.error({ title: t('errorToast.title'), description: t('errorToast.description') }),
   });
 
+  const isSaving = isUpserting || isRemoving;
+
   const handleSave = () => {
     if (!editingRole) return;
+    if (isAllInherit(draft)) {
+      const existing = overridesByRole.get(editingRole);
+      if (existing) {
+        remove({ role: editingRole });
+      } else {
+        setEditingRole(null);
+      }
+      return;
+    }
     const requestBody: UpsertPasswordPolicyOverrideDto = {};
-    ALL_KEYS.forEach((k) => {
+    POLICY_FIELD_KEYS.forEach((k) => {
       const v = draft[k as keyof PasswordPolicyOverrideDto];
       (requestBody as Record<string, unknown>)[k as string] = v;
     });
@@ -216,7 +208,7 @@ export function OverridesSection({ globalPolicy }: Props) {
             <span className="text-sm font-normal text-default-500">{t('overrides.modal.subtitle')}</span>
           </ModalHeader>
           <ModalBody className="flex flex-col gap-4">
-            {NUMBER_FIELDS.map(({ key, min, max }) => {
+            {POLICY_NUMBER_FIELDS.map(({ key, min, max }) => {
               const v = draft[key as keyof PasswordPolicyOverrideDto] as number | null;
               const overrideOn = v !== null;
               const fallback = globalPolicy[key as keyof PasswordPolicyDto] as number;
@@ -248,7 +240,7 @@ export function OverridesSection({ globalPolicy }: Props) {
                 </div>
               );
             })}
-            {BOOL_FIELDS.map((key) => {
+            {POLICY_BOOL_FIELDS.map((key) => {
               const v = draft[key as keyof PasswordPolicyOverrideDto] as boolean | null;
               const overrideOn = v !== null;
               const fallback = globalPolicy[key as keyof PasswordPolicyDto] as boolean;

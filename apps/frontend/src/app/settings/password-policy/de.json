@@ -11,7 +11,7 @@
     "saveButton": "Richtlinie speichern"
   },
   "fields": {
-    "minLength": { "label": "Mindestlänge", "description": "Passwörter unter diesem Wert werden abgelehnt. Bereich 1–1024." },
+    "minLength": { "label": "Mindestlänge", "description": "Passwörter unter diesem Wert werden abgelehnt. Bereich 8–1024 (NIST-800-63B-Untergrenze)." },
     "maxLength": { "label": "Maximale Länge", "description": "Passwörter über diesem Wert werden abgelehnt. Bereich 1–1024." },
     "allowAllUnicode": { "label": "Alle Unicode-Zeichen zulassen", "description": "Wenn deaktiviert, sind nur ASCII-Druckzeichen erlaubt." },
     "requireUppercase": { "label": "Großbuchstaben verlangen", "description": "Passwörter ohne Großbuchstaben werden abgelehnt." },
@@ -26,12 +26,15 @@
   },
   "preview": {
     "title": "Live-Vorschau",
-    "subtitle": "Gib ein Kandidatenpasswort ein, um zu sehen, ob es mit den aktuellen Formularwerten akzeptiert würde.",
+    "subtitle": "Gib ein Kandidatenpasswort ein — der Server prüft es vollständig (HIBP, zxcvbn, häufige Passwörter) gegen die (noch nicht gespeicherten) Formularwerte.",
     "passwordLabel": "Kandidaten-Passwort",
     "pass": "Würde akzeptiert",
     "fail": "Würde abgelehnt",
     "noErrors": "Alle Prüfungen bestanden.",
-    "samples": "Beispiele",
+    "loading": "Volle Serverprüfung läuft …",
+    "reveal": "Passwort anzeigen",
+    "hide": "Passwort verbergen",
+    "disclosure": "Serverseitig gegen den Entwurf geprüft. Passwort wird per TLS gesendet und nicht gespeichert.",
     "errors": {
       "MIN_LENGTH": "Zu kurz (min. {{min}}, war {{actual}}).",
       "MAX_LENGTH": "Zu lang (max. {{max}}, war {{actual}}).",
@@ -79,9 +82,7 @@
       "subtitle": "Feld aktivieren um zu überschreiben; deaktiviert lassen um die globale Richtlinie zu erben."
     },
     "roles": {
-      "admin": "Administrator",
-      "machine": "Maschinenkonto",
-      "api-token": "API-Token"
+      "admin": "Administrator"
     }
   }
 }

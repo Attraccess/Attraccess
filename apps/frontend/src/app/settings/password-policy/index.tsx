@@ -16,26 +16,12 @@ import { PolicyFields } from './PolicyFields';
 import { PreviewSection } from './PreviewSection';
 import { OverridesSection } from './OverridesSection';
 import { ConfirmDiffModal } from './ConfirmDiffModal';
+import { POLICY_FIELD_KEYS } from './policy-fields';
 import en from './en.json';
 import de from './de.json';
 
-const FIELD_KEYS: (keyof PasswordPolicyDto)[] = [
-  'minLength',
-  'maxLength',
-  'allowAllUnicode',
-  'requireUppercase',
-  'requireLowercase',
-  'requireDigit',
-  'requireSpecial',
-  'checkHIBP',
-  'checkCommonPasswords',
-  'minZxcvbnScore',
-  'historySize',
-  'rotationDays',
-];
-
 function diff(before: PasswordPolicyDto, after: PasswordPolicyDto) {
-  return FIELD_KEYS.filter((k) => before[k] !== after[k]).map((k) => ({
+  return POLICY_FIELD_KEYS.filter((k) => before[k] !== after[k]).map((k) => ({
     field: String(k),
     before: String(before[k]),
     after: String(after[k]),
@@ -44,7 +30,7 @@ function diff(before: PasswordPolicyDto, after: PasswordPolicyDto) {
 
 function changedPayload(before: PasswordPolicyDto, after: PasswordPolicyDto): UpdatePasswordPolicyDto {
   const out: UpdatePasswordPolicyDto = {};
-  FIELD_KEYS.forEach((k) => {
+  POLICY_FIELD_KEYS.forEach((k) => {
     if (before[k] !== after[k]) {
       (out as Record<string, unknown>)[k as string] = after[k];
     }

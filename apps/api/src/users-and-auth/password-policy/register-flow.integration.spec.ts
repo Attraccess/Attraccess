@@ -5,9 +5,11 @@ import {
   AuthenticationType,
   PasswordHistory,
   PasswordPolicy,
+  PasswordPolicyAudit,
   PasswordPolicyOverride,
   Setting,
 } from '@attraccess/database-entities';
+import { DataSource } from 'typeorm';
 import { UsersController } from '../users/users.controller';
 import { UsersService } from '../users/users.service';
 import { AuthService } from '../auth/auth.service';
@@ -37,6 +39,7 @@ const policyRow = (overrides: Partial<PasswordPolicy> = {}): PasswordPolicy => (
   rotationDays: 0,
   createdAt: new Date(),
   updatedAt: new Date(),
+  version: 1,
   ...overrides,
 });
 
@@ -75,7 +78,9 @@ describe('Register flow + password policy (integration)', () => {
         },
         { provide: getRepositoryToken(PasswordPolicy), useValue: { findOne: jest.fn(async () => policyRow()), create: jest.fn((row) => row), save: jest.fn() } },
         { provide: getRepositoryToken(PasswordHistory), useValue: { find: jest.fn(async () => []), save: jest.fn(), create: jest.fn((row) => row), createQueryBuilder: jest.fn(() => ({ delete: jest.fn().mockReturnThis(), where: jest.fn().mockReturnThis(), andWhere: jest.fn().mockReturnThis(), execute: jest.fn(async () => ({ affected: 0 })) })) } },
-        { provide: getRepositoryToken(PasswordPolicyOverride), useValue: { find: jest.fn(async () => []), findOne: jest.fn(async () => null), save: jest.fn(), create: jest.fn((row) => row), merge: jest.fn((a, b) => Object.assign(a, b)), delete: jest.fn() } },
+        { provide: getRepositoryToken(PasswordPolicyOverride), useValue: { find: jest.fn(async () => []), findOne: jest.fn(async () => null), save: jest.fn(), create: jest.fn((row) => row), merge: jest.fn((a, b) => Object.assign(a, b)), delete: jest.fn(), remove: jest.fn() } },
+        { provide: getRepositoryToken(PasswordPolicyAudit), useValue: { create: jest.fn((row) => row), save: jest.fn(async (row) => row) } },
+        { provide: DataSource, useValue: { transaction: jest.fn(async (cb: never) => (cb as unknown as (m: { getRepository: () => unknown }) => Promise<unknown>)({ getRepository: () => ({ findOne: jest.fn(), find: jest.fn(async () => []), save: jest.fn(), create: jest.fn(), remove: jest.fn() }) })) } },
         { provide: getRepositoryToken(AuthenticationDetail), useValue: { findOne: jest.fn(async () => null) } },
         {
           provide: UsersService,
@@ -172,7 +177,9 @@ describe('Register flow + password policy (integration)', () => {
         },
         { provide: getRepositoryToken(PasswordPolicy), useValue: { findOne: jest.fn(async () => policyRow()), create: jest.fn(), save: jest.fn() } },
         { provide: getRepositoryToken(PasswordHistory), useValue: { find: jest.fn(async () => []), save: jest.fn(), create: jest.fn((row) => row), createQueryBuilder: jest.fn(() => ({ delete: jest.fn().mockReturnThis(), where: jest.fn().mockReturnThis(), andWhere: jest.fn().mockReturnThis(), execute: jest.fn(async () => ({ affected: 0 })) })) } },
-        { provide: getRepositoryToken(PasswordPolicyOverride), useValue: { find: jest.fn(async () => []), findOne: jest.fn(async () => null), save: jest.fn(), create: jest.fn((row) => row), merge: jest.fn((a, b) => Object.assign(a, b)), delete: jest.fn() } },
+        { provide: getRepositoryToken(PasswordPolicyOverride), useValue: { find: jest.fn(async () => []), findOne: jest.fn(async () => null), save: jest.fn(), create: jest.fn((row) => row), merge: jest.fn((a, b) => Object.assign(a, b)), delete: jest.fn(), remove: jest.fn() } },
+        { provide: getRepositoryToken(PasswordPolicyAudit), useValue: { create: jest.fn((row) => row), save: jest.fn(async (row) => row) } },
+        { provide: DataSource, useValue: { transaction: jest.fn(async (cb: never) => (cb as unknown as (m: { getRepository: () => unknown }) => Promise<unknown>)({ getRepository: () => ({ findOne: jest.fn(), find: jest.fn(async () => []), save: jest.fn(), create: jest.fn(), remove: jest.fn() }) })) } },
         { provide: getRepositoryToken(AuthenticationDetail), useValue: { findOne: jest.fn(async () => null) } },
         {
           provide: UsersService,

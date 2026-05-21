@@ -2,7 +2,7 @@
 
 import { useMutation, UseMutationOptions, useQuery, UseQueryOptions } from "@tanstack/react-query";
 import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, FlowVariablesService, LicenseService, MqttService, PasswordPolicyAdminService, PasswordPolicyService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceHealthService, ResourceMaintenanceSchedulesService, ResourceMaintenancesService, ResourcesService, SettingsService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
-import { AcceptInvitationDto, AppKeyRequestDto, BulkUpdateUserPermissionsDto, ChangeBillingFactorDto, ChangeEmailDto, ChangePasswordDto, ChangeUsernameDto, CreateFormDto, CreateMaintenanceDto, CreateMaintenanceScheduleDto, CreateMqttServerDto, CreateProjectDto, CreateProjectInvitationDto, CreateResourceDto, CreateResourceGroupDto, CreateSSOProviderDto, CreateUserDto, CsvInviteUploadDto, DeleteAccountConfirmDto, EmailTemplateType, EndUsageSessionDto, EnrollNfcCardDto, FinishMaintenanceDto, FlowVariableUpsertDto, InviteUserDto, LinkUserToExternalAccountRequestDto, ModifyBalanceDto, NfcCardSetActiveStateDto, PairSumUpReaderDto, PasswordPolicyRole, PermissionFilter, PreviewMjmlDto, RefundTransactionDto, ResetNfcCardDto, ResetPasswordDto, ResourceFlowSaveDto, ResourceFlowVariableScope, SetBillingConfigurationDto, SetSumUpApiKeyDto, SetUserPasswordDto, SSOProvisioningPermissionsDto, SSOProvisioningUserDto, StartUsageSessionDto, SumupTopUpDto, SumupTransactionCallbackDto, TwoFactorCodeDto, TwoFactorPolicyDto, UpdateAuthRateLimitSettingsDto, UpdateEmailTemplateDto, UpdateFormDto, UpdateMaintenanceScheduleDto, UpdateMetricsSettingsDto, UpdateMqttServerDto, UpdatePasswordPolicyDto, UpdateProjectDto, UpdateReaderDto, UpdateResourceBillingConfigurationDto, UpdateResourceDto, UpdateResourceGroupDto, UpdateResourceGroupIntroductionDto, UpdateResourceIntroductionDto, UpdateSSOProviderDto, UpdateSystemSettingsDto, UpdateUsageSessionProjectDto, UpdateUserPermissionsDto, UploadPluginDto, UpsertPasswordPolicyOverrideDto, VerifyEmailDto } from "../requests/types.gen";
+import { AcceptInvitationDto, AppKeyRequestDto, BulkUpdateUserPermissionsDto, ChangeBillingFactorDto, ChangeEmailDto, ChangePasswordDto, ChangeUsernameDto, CreateFormDto, CreateMaintenanceDto, CreateMaintenanceScheduleDto, CreateMqttServerDto, CreateProjectDto, CreateProjectInvitationDto, CreateResourceDto, CreateResourceGroupDto, CreateSSOProviderDto, CreateUserDto, CsvInviteUploadDto, DeleteAccountConfirmDto, EmailTemplateType, EndUsageSessionDto, EnrollNfcCardDto, FinishMaintenanceDto, FlowVariableUpsertDto, InviteUserDto, LinkUserToExternalAccountRequestDto, ModifyBalanceDto, NfcCardSetActiveStateDto, PairSumUpReaderDto, PasswordPolicyRole, PermissionFilter, PreviewMjmlDto, PreviewPasswordDto, RefundTransactionDto, ResetNfcCardDto, ResetPasswordDto, ResourceFlowSaveDto, ResourceFlowVariableScope, SetBillingConfigurationDto, SetSumUpApiKeyDto, SetUserPasswordDto, SSOProvisioningPermissionsDto, SSOProvisioningUserDto, StartUsageSessionDto, SumupTopUpDto, SumupTransactionCallbackDto, TwoFactorCodeDto, TwoFactorPolicyDto, UpdateAuthRateLimitSettingsDto, UpdateEmailTemplateDto, UpdateFormDto, UpdateMaintenanceScheduleDto, UpdateMetricsSettingsDto, UpdateMqttServerDto, UpdatePasswordPolicyDto, UpdateProjectDto, UpdateReaderDto, UpdateResourceBillingConfigurationDto, UpdateResourceDto, UpdateResourceGroupDto, UpdateResourceGroupIntroductionDto, UpdateResourceIntroductionDto, UpdateSSOProviderDto, UpdateSystemSettingsDto, UpdateUsageSessionProjectDto, UpdateUserPermissionsDto, UploadPluginDto, UpsertPasswordPolicyOverrideDto, VerifyEmailDto } from "../requests/types.gen";
 import * as Common from "./common";
 /**
 * Return API information
@@ -1316,6 +1316,18 @@ export const useSettingsServiceApplyFirstTimeSetupSettings = <TData = Common.Set
 * @throws ApiError
 */
 export const useSettingsServiceGenerateMetricsApiKey = <TData = Common.SettingsServiceGenerateMetricsApiKeyMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, void, TContext>, "mutationFn">) => useMutation<TData, TError, void, TContext>({ mutationFn: () => SettingsService.generateMetricsApiKey() as unknown as Promise<TData>, ...options });
+/**
+* Server-side preview: evaluate a candidate password against the current (or draft) policy
+* @param data The data for the request.
+* @param data.requestBody
+* @returns PreviewPasswordResultDto Full preview result including zxcvbn + HIBP + history checks.
+* @throws ApiError
+*/
+export const usePasswordPolicyAdminServicePreviewAdminPasswordPolicy = <TData = Common.PasswordPolicyAdminServicePreviewAdminPasswordPolicyMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  requestBody: PreviewPasswordDto;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  requestBody: PreviewPasswordDto;
+}, TContext>({ mutationFn: ({ requestBody }) => PasswordPolicyAdminService.previewAdminPasswordPolicy({ requestBody }) as unknown as Promise<TData>, ...options });
 /**
 * Create a new resource
 * @param data The data for the request.

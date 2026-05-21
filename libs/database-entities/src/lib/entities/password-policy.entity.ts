@@ -1,4 +1,4 @@
-import { Column, CreateDateColumn, Entity, PrimaryColumn, UpdateDateColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, PrimaryColumn, UpdateDateColumn, VersionColumn } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 
 export const PASSWORD_POLICY_SINGLETON_ID = 1;
@@ -64,4 +64,8 @@ export class PasswordPolicy {
   @UpdateDateColumn()
   @ApiProperty({ description: 'When the policy record was last updated' })
   updatedAt!: Date;
+
+  @VersionColumn()
+  @ApiProperty({ description: 'Row version for optimistic concurrency control', example: 1 })
+  version!: number;
 }

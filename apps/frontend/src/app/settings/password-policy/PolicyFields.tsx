@@ -22,7 +22,7 @@ export function PolicyFields({ value, onChange, testIdPrefix = 'policy' }: Props
         description={t('fields.minLength.description')}
         value={value.minLength}
         onValueChange={(v) => update('minLength', v)}
-        minValue={1}
+        minValue={8}
         maxValue={1024}
         variant="bordered"
         data-testid={`${testIdPrefix}-minLength`}

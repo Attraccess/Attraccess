@@ -571,6 +571,7 @@ export type TwoFactorAuthenticationServiceSetTwoFactorPolicyMutationResult = Awa
 export type EmailTemplatesServiceEmailTemplateControllerPreviewMjmlMutationResult = Awaited<ReturnType<typeof EmailTemplatesService.emailTemplateControllerPreviewMjml>>;
 export type SettingsServiceApplyFirstTimeSetupSettingsMutationResult = Awaited<ReturnType<typeof SettingsService.applyFirstTimeSetupSettings>>;
 export type SettingsServiceGenerateMetricsApiKeyMutationResult = Awaited<ReturnType<typeof SettingsService.generateMetricsApiKey>>;
+export type PasswordPolicyAdminServicePreviewAdminPasswordPolicyMutationResult = Awaited<ReturnType<typeof PasswordPolicyAdminService.previewAdminPasswordPolicy>>;
 export type ResourcesServiceCreateOneResourceMutationResult = Awaited<ReturnType<typeof ResourcesService.createOneResource>>;
 export type ResourcesServiceResourceGroupsCreateOneMutationResult = Awaited<ReturnType<typeof ResourcesService.resourceGroupsCreateOne>>;
 export type ResourcesServiceResourceGroupsAddResourceMutationResult = Awaited<ReturnType<typeof ResourcesService.resourceGroupsAddResource>>;
