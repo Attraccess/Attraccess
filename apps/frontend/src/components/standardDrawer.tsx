@@ -29,12 +29,13 @@ export function StandardDrawer(props: Props) {
 
   return (
     <Drawer isOpen={isOpen} onOpenChange={onOpenChange}>
-      <DrawerBackdrop {...backdropProps} />
-      <DrawerContent {...contentProps}>
-        <DrawerDialog {...dialogProps} className={mergedDialogClassName}>
-          {children}
-        </DrawerDialog>
-      </DrawerContent>
+      <DrawerBackdrop {...backdropProps}>
+        <DrawerContent {...contentProps}>
+          <DrawerDialog {...dialogProps} className={mergedDialogClassName}>
+            {children}
+          </DrawerDialog>
+        </DrawerContent>
+      </DrawerBackdrop>
     </Drawer>
   );
 }
