@@ -140,7 +140,12 @@ export function ResourceMaintenanceUpsertModal(props: Props) {
                   {t('inputs.reason.displayedToUsers')}: <MaintenanceReasonDisplay reason={reason} />
                 </p>
               ) : null}
-              <TextArea value={reason} onChange={(e) => setReason(e.target.value)} />
+              <TextArea
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                rows={5}
+                className="w-full min-h-32 resize-y"
+              />
             </div>
 
             {error ? (

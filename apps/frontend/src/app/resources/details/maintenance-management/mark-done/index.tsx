@@ -86,11 +86,14 @@ export function MarkDoneModal(props: Props) {
               e.preventDefault();
               onSubmit();
             }}
+            className="flex flex-col gap-4"
           >
             <TextArea
               placeholder={t('actions.markDone.modal.notesPlaceholder')}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
+              rows={5}
+              className="w-full min-h-32 resize-y"
             />
             {error ? (
               <Alert status="danger">
