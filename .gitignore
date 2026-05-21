@@ -30,6 +30,10 @@ apps/attractap-touch-firmware/.pio/
 apps/api/src/assets/attractap-firmwares/
 secrets/
 
+apps/attractap/hardware/**/dist/
+apps/attractap/hardware/**/.tscircuit/
+apps/attractap/hardware/**/index.circuit.json
+
 bom.json
 .autopilot.json
 .mcp_data/

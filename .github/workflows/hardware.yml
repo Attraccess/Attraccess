@@ -1,0 +1,149 @@
+name: Hardware
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    paths:
+      - 'apps/attractap/hardware/**'
+      - 'libs/attractap-hw-shared/**'
+      - '.github/workflows/hardware.yml'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  build-and-render:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+
+      - name: Lint hardware (DRC/ERC)
+        run: pnpm nx affected --target=lint --parallel=3 --base=origin/${{ github.event.pull_request.base.ref }} --projects=tag:scope:hardware
+      - name: Build hardware (circuit JSON)
+        run: pnpm nx affected --target=build --parallel=3 --base=origin/${{ github.event.pull_request.base.ref }} --projects=tag:scope:hardware
+      - name: Export fab files (gerbers, BOM, CPL)
+        run: pnpm nx affected --target=export --parallel=3 --base=origin/${{ github.event.pull_request.base.ref }} --projects=tag:scope:hardware
+      - name: Render previews (PCB + schematic + assembly)
+        run: pnpm nx affected --target=render --parallel=3 --base=origin/${{ github.event.pull_request.base.ref }} --projects=tag:scope:hardware
+
+      - name: Upload gerber ZIPs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hardware-gerbers-${{ github.event.pull_request.number }}-${{ github.run_attempt }}
+          path: apps/attractap/hardware/**/dist/export/*.zip
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload render PNGs
+        id: upload-renders
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hardware-renders-${{ github.event.pull_request.number }}-${{ github.run_attempt }}
+          path: apps/attractap/hardware/**/dist/render/*.png
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Collect render PNG list
+        id: collect-renders
+        if: always()
+        run: |
+          set -euo pipefail
+          shopt -s nullglob globstar
+          list_file="$(mktemp)"
+          for png in apps/attractap/hardware/**/dist/render/*.png; do
+            board="$(basename "$(dirname "$(dirname "$(dirname "$png")")")")"
+            echo "${board}|$(basename "$png")|${png}" >> "$list_file"
+          done
+          if [ -s "$list_file" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "list_file=$list_file" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload renders to imgur (if IMGUR_CLIENT_ID secret set)
+        id: imgur
+        if: steps.collect-renders.outputs.found == 'true' && env.IMGUR_CLIENT_ID != ''
+        env:
+          IMGUR_CLIENT_ID: ${{ secrets.IMGUR_CLIENT_ID }}
+          LIST_FILE: ${{ steps.collect-renders.outputs.list_file }}
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const fs = require('fs');
+            const list = fs.readFileSync(process.env.LIST_FILE, 'utf8').trim().split('\n');
+            const sections = new Map();
+            for (const row of list) {
+              const [board, name, file] = row.split('|');
+              const buf = fs.readFileSync(file);
+              const upload = await fetch('https://api.imgur.com/3/upload', {
+                method: 'POST',
+                headers: { Authorization: `Client-ID ${process.env.IMGUR_CLIENT_ID}` },
+                body: buf,
+              });
+              const json = await upload.json();
+              if (!json.success) {
+                core.warning(`imgur upload failed for ${file}: ${JSON.stringify(json)}`);
+                continue;
+              }
+              const title = name.replace(/\.png$/, '');
+              const md = `![${title}](${json.data.link})`;
+              if (!sections.has(board)) sections.set(board, []);
+              sections.get(board).push({ title, md });
+            }
+            const out = [];
+            for (const [board, items] of sections) {
+              out.push(`### \`${board}\``);
+              for (const { title, md } of items) {
+                out.push(`**${title}**\n\n${md}`);
+              }
+            }
+            core.setOutput('markdown', out.join('\n\n'));
+
+      - name: Build PR comment body
+        id: comment-body
+        if: always()
+        env:
+          RENDERS_FOUND: ${{ steps.collect-renders.outputs.found }}
+          IMGUR_MD: ${{ steps.imgur.outputs.markdown }}
+          LIST_FILE: ${{ steps.collect-renders.outputs.list_file }}
+        run: |
+          set -euo pipefail
+          out="$(mktemp)"
+          {
+            echo "## Hardware render previews"
+            echo ""
+            echo "Commit \`${{ github.event.pull_request.head.sha }}\` · workflow run [\`${{ github.run_id }}\`](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+            echo ""
+            if [ "$RENDERS_FOUND" != "true" ]; then
+              echo "_No render PNGs were produced for this PR._"
+            elif [ -n "${IMGUR_MD:-}" ]; then
+              printf '%s\n' "$IMGUR_MD"
+            else
+              echo "Inline image hosting is not configured (set the \`IMGUR_CLIENT_ID\` repo secret to enable previews)."
+              echo ""
+              echo "Rendered files:"
+              awk -F'|' '{ printf "- `%s` / `%s`\n", $1, $2 }' "$LIST_FILE"
+            fi
+            echo ""
+            echo "Download the full-resolution PNGs + gerber ZIPs from the [workflow artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})."
+          } > "$out"
+          {
+            echo 'body<<EOF_BODY'
+            cat "$out"
+            echo 'EOF_BODY'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Post sticky PR comment with renders
+        if: always()
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: hardware-renders
+          message: ${{ steps.comment-body.outputs.body }}
