@@ -11,7 +11,7 @@ description: Provides general information and guidelines for working with the At
 - **Main Purpose/Goal:** To provide a centralized and automated system for managing access to shared resources in collaborative workspaces, improving operational efficiency, ensuring fair usage, and enabling data-driven insights for administration and future planning (e.g., billing, maintenance).
 - **Key Features:**
   - Web application (React frontend, NestJS backend)
-  - Hardware component (Attractap NFC card reader/writer/terminal located in `apps/attractap-firmware`)
+  - Hardware component (Attractap NFC card reader/writer/terminal located in `apps/attractap/firmware`)
   - Monorepo structure managed by NX
   - Plugin architecture (see `libs/plugins-*`)
 
@@ -82,9 +82,9 @@ For Attractap firmware commands (PlatformIO), see section 8. These are not run v
 
 ## 7. Attractap Hardware Component
 
-- **Location:** `apps/attractap-firmware`
-- **Build System:** PlatformIO (config: `apps/attractap-firmware/platformio.ini`)
-- **Key tasks** (run from `/workspace/Attraccess/apps/attractap-firmware/`):
+- **Location:** `apps/attractap/firmware`
+- **Build System:** PlatformIO (config: `apps/attractap/firmware/platformio.ini`)
+- **Key tasks** (run from `/workspace/Attraccess/apps/attractap/firmware/`):
   - Building firmware: `platformio run`
   - Uploading firmware: `platformio run --target upload`
   - Monitoring serial output: `platformio device monitor`

@@ -83,7 +83,7 @@ The shared lib carries a `mech-envelope.md` document listing each board's outlin
 
 ```
 apps/attractap/
-  firmware/                      # moved from apps/attractap-firmware via separate prep PR
+  firmware/                      # moved from apps/attractap/firmware via separate prep PR
   hardware/
     core/                        # nx app, tscircuit project — motherboard
     nfc/                         # PN532 + WS2812 LED ring
@@ -135,7 +135,7 @@ JLCPCB for fab + JLC SMT assembly. tscircuit's JLC Parts integration provides au
 
 ```
 ATT-343 (research/prep, existing — this design lives here)
-  ├── ATT-XXX  Firmware folder move (prep) — apps/attractap-firmware → apps/attractap/firmware
+  ├── ATT-XXX  Firmware folder move (prep) — apps/attractap/firmware → apps/attractap/firmware
   │             (blocks the new parent's Phase 1 Bootstrap)
   └── (lazy, spawned per board when work picks up) ATT-XXX  Deep-ticket-drafting research for <board>
 ATT-XXY  NEW PARENT — "Attractap V2 Hardware Implementation"
@@ -162,7 +162,7 @@ ATT-XXY  NEW PARENT — "Attractap V2 Hardware Implementation"
 These tickets receive the most detailed body content. They lock in tool-chain decisions and inter-board contracts. The firmware-folder-move sits under ATT-343 as a prep ticket and blocks P1-Bootstrap.
 
 **ATT-343 child: FirmwareMove (prep, blocks P1-Bootstrap):**
-- `git mv apps/attractap-firmware apps/attractap/firmware` (single atomic PR).
+- `git mv apps/attractap/firmware apps/attractap/firmware` (single atomic PR).
 - Update `project.json` paths, PlatformIO `extra_scripts`, any CI workflow paths, docs links in `docs/en/attractap/*.md`, README references.
 - Verify `pnpm nx run attractap-firmware:build` still works (or rename project to `attractap/firmware`).
 - Acceptance: PR shows green CI, no broken doc links, firmware still builds via existing PlatformIO env list.

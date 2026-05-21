@@ -5,7 +5,7 @@
 - Node version: `22.17.1` (from `.nvmrc`).
 - Run commands from the repo root.
 - Prefer `pnpm nx` targets; avoid long-running dev servers unless asked.
-- Firmware is in `apps/attractap-firmware` and uses PlatformIO (not Nx).
+- Firmware is in `apps/attractap/firmware` and uses PlatformIO (not Nx).
 
 ## Setup
 1. Install dependencies:
@@ -39,12 +39,12 @@ If you need to start the API locally, set `LICENSE_KEY` as described in `README.
   - Frontend: `http://localhost:4200`
 
 ## Repo Notes
-- Firmware lives in `apps/attractap-firmware` and uses PlatformIO.
+- Firmware lives in `apps/attractap/firmware` and uses PlatformIO.
 - React Query client regeneration:
   - `pnpm nx build react-query-client --skipNxCache`
 
 ## Firmware Toolchain (Attractap)
-Location: `apps/attractap-firmware` (ESP32-C3 firmware).
+Location: `apps/attractap/firmware` (ESP32-C3 firmware).
 
 ### Requirements
 - Python 3 and `pip`
@@ -60,7 +60,7 @@ Location: `apps/attractap-firmware` (ESP32-C3 firmware).
 - `esptool.py --help`
 
 ### Build
-- `cd apps/attractap-firmware`
+- `cd apps/attractap/firmware`
 - `pio run -e attractap`
 
 ### Upload (device connected)

@@ -1,14 +1,14 @@
 {
   "name": "attractap-firmware",
-  "$schema": "../../node_modules/nx/schemas/project-schema.json",
-  "sourceRoot": "apps/attractap-firmware",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/attractap/firmware",
   "projectType": "application",
   "tags": [],
   "targets": {
     "build": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "cd apps/attractap-firmware && python3 build_firmwares.py",
+        "command": "cd apps/attractap/firmware && python3 build_firmwares.py",
         "cwd": "."
       },
       "outputs": ["{projectRoot}/firmware_output"],
