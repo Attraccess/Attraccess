@@ -6,6 +6,7 @@
   "dependencies": {
     "@tscircuit/cli": "0.1.1399",
     "tscircuit": "0.0.1774",
-    "tsx": "^4.20.3"
+    "tsx": "^4.20.3",
+    "zod": "3.24.4"
   }
 }
