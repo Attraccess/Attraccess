@@ -79,6 +79,15 @@ import {
 } from './entities/resourceFlowVariable';
 import { PasswordPolicy, PASSWORD_POLICY_SINGLETON_ID } from './entities/password-policy.entity';
 import { PasswordHistory } from './entities/password-history.entity';
+import {
+  PasswordPolicyOverride,
+  PasswordPolicyRole,
+  PASSWORD_POLICY_ROLES,
+} from './entities/password-policy-override.entity';
+import {
+  PasswordPolicyAudit,
+  PasswordPolicyAuditEvent,
+} from './entities/password-policy-audit.entity';
 
 // Export all entities individually
 export {
@@ -163,6 +172,11 @@ export {
   PasswordPolicy,
   PASSWORD_POLICY_SINGLETON_ID,
   PasswordHistory,
+  PasswordPolicyOverride,
+  PasswordPolicyRole,
+  PASSWORD_POLICY_ROLES,
+  PasswordPolicyAudit,
+  PasswordPolicyAuditEvent,
 };
 
 // Export the entities object
@@ -205,4 +219,6 @@ export const entities = {
   ResourceFlowVariable,
   PasswordPolicy,
   PasswordHistory,
+  PasswordPolicyOverride,
+  PasswordPolicyAudit,
 };

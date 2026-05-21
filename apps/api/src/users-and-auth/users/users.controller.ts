@@ -641,10 +641,11 @@ export class UsersController {
 
     const user = await this.usersService.findOne({ email: body.email });
 
-    const policyResult = await this.passwordPolicyService.validate(body.password, {
-      username: user.username,
-      email: user.email,
-    });
+    const policyResult = await this.passwordPolicyService.validate(
+      body.password,
+      { username: user.username, email: user.email },
+      { role: this.passwordPolicyService.resolveRole(user) },
+    );
     if (!policyResult.ok) {
       throw new PasswordPolicyViolationException(policyResult.errors);
     }
@@ -732,7 +733,7 @@ export class UsersController {
     const policyResult = await this.passwordPolicyService.validate(
       body.password,
       { username: user.username, email: user.email },
-      { userIdForHistory: user.id },
+      { userIdForHistory: user.id, role: this.passwordPolicyService.resolveRole(user) },
     );
     if (!policyResult.ok) {
       throw new PasswordPolicyViolationException(policyResult.errors);
@@ -1165,7 +1166,7 @@ export class UsersController {
     const policyResult = await this.passwordPolicyService.validate(
       body.password,
       { username: user.username, email: user.email },
-      { userIdForHistory: user.id },
+      { userIdForHistory: user.id, role: this.passwordPolicyService.resolveRole(user) },
     );
     if (!policyResult.ok) {
       throw new PasswordPolicyViolationException(policyResult.errors);

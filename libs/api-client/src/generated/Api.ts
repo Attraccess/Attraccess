@@ -143,6 +143,12 @@ export enum ResourceType {
   Door = "door",
 }
 
+export enum PasswordPolicyRole {
+  Admin = "admin",
+  Machine = "machine",
+  ApiToken = "api-token",
+}
+
 /** Selected SMTP provider type. */
 export enum SmtpServiceType {
   SMTP = "SMTP",
@@ -1398,6 +1404,140 @@ export interface PublicPasswordPolicyDto {
    * @example 3
    */
   minZxcvbnScore: number;
+}
+
+export interface PasswordPolicyDto {
+  /** @example 12 */
+  minLength: number;
+  /** @example 128 */
+  maxLength: number;
+  /** @example true */
+  allowAllUnicode: boolean;
+  /** @example false */
+  requireUppercase: boolean;
+  /** @example false */
+  requireLowercase: boolean;
+  /** @example false */
+  requireDigit: boolean;
+  /** @example false */
+  requireSpecial: boolean;
+  /** @example true */
+  checkHIBP: boolean;
+  /** @example true */
+  checkCommonPasswords: boolean;
+  /**
+   * Minimum required zxcvbn score (0-4)
+   * @example 3
+   */
+  minZxcvbnScore: number;
+  /**
+   * Number of recent passwords to remember (0 disables)
+   * @example 0
+   */
+  historySize: number;
+  /**
+   * Forced rotation interval in days (0 disables)
+   * @example 0
+   */
+  rotationDays: number;
+}
+
+export interface UpdatePasswordPolicyDto {
+  /**
+   * @min 1
+   * @max 1024
+   * @example 12
+   */
+  minLength?: number;
+  /**
+   * @min 1
+   * @max 1024
+   * @example 128
+   */
+  maxLength?: number;
+  /** @example true */
+  allowAllUnicode?: boolean;
+  /** @example false */
+  requireUppercase?: boolean;
+  /** @example false */
+  requireLowercase?: boolean;
+  /** @example false */
+  requireDigit?: boolean;
+  /** @example false */
+  requireSpecial?: boolean;
+  /** @example true */
+  checkHIBP?: boolean;
+  /** @example true */
+  checkCommonPasswords?: boolean;
+  /**
+   * @min 0
+   * @max 4
+   * @example 3
+   */
+  minZxcvbnScore?: number;
+  /**
+   * @min 0
+   * @max 50
+   * @example 0
+   */
+  historySize?: number;
+  /**
+   * @min 0
+   * @max 3650
+   * @example 0
+   */
+  rotationDays?: number;
+}
+
+export interface PasswordPolicyOverrideDto {
+  role: PasswordPolicyRole;
+  minLength: number | null;
+  maxLength: number | null;
+  allowAllUnicode: boolean | null;
+  requireUppercase: boolean | null;
+  requireLowercase: boolean | null;
+  requireDigit: boolean | null;
+  requireSpecial: boolean | null;
+  checkHIBP: boolean | null;
+  checkCommonPasswords: boolean | null;
+  minZxcvbnScore: number | null;
+  historySize: number | null;
+  rotationDays: number | null;
+}
+
+export interface UpsertPasswordPolicyOverrideDto {
+  /**
+   * @min 1
+   * @max 1024
+   */
+  minLength?: number | null;
+  /**
+   * @min 1
+   * @max 1024
+   */
+  maxLength?: number | null;
+  allowAllUnicode?: boolean | null;
+  requireUppercase?: boolean | null;
+  requireLowercase?: boolean | null;
+  requireDigit?: boolean | null;
+  requireSpecial?: boolean | null;
+  checkHIBP?: boolean | null;
+  checkCommonPasswords?: boolean | null;
+  /**
+   * @min 0
+   * @max 4
+   */
+  minZxcvbnScore?: number | null;
+  /**
+   * @min 0
+   * @max 50
+   */
+  historySize?: number | null;
+  /**
+   * @min 0
+   * @max 3650
+   */
+  rotationDays?: number | null;
 }
 
 export interface CreateResourceDto {
@@ -4178,6 +4318,30 @@ export type GetLicenseInformationData = LicenseDataDto;
 
 export type GetPublicPasswordPolicyData = PublicPasswordPolicyDto;
 
+export type GetAdminPasswordPolicyData = PasswordPolicyDto;
+
+export type UpdateAdminPasswordPolicyData = PasswordPolicyDto;
+
+export type ListPasswordPolicyOverridesData = PasswordPolicyOverrideDto[];
+
+export interface GetPasswordPolicyOverrideParams {
+  role: PasswordPolicyRole;
+}
+
+export type GetPasswordPolicyOverrideData = PasswordPolicyOverrideDto | null;
+
+export interface UpsertPasswordPolicyOverrideParams {
+  role: PasswordPolicyRole;
+}
+
+export type UpsertPasswordPolicyOverrideData = PasswordPolicyOverrideDto;
+
+export interface DeletePasswordPolicyOverrideParams {
+  role: PasswordPolicyRole;
+}
+
+export type DeletePasswordPolicyOverrideData = any;
+
 export type CreateOneResourceData = Resource;
 
 export interface GetAllResourcesParams {
@@ -6447,6 +6611,110 @@ export namespace PasswordPolicy {
     export type RequestBody = never;
     export type RequestHeaders = {};
     export type ResponseBody = GetPublicPasswordPolicyData;
+  }
+}
+
+export namespace PasswordPolicyAdmin {
+  /**
+   * No description
+   * @tags Password Policy Admin
+   * @name GetAdminPasswordPolicy
+   * @summary Get the global password policy
+   * @request GET:/api/admin/password-policy
+   * @secure
+   */
+  export namespace GetAdminPasswordPolicy {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetAdminPasswordPolicyData;
+  }
+
+  /**
+   * No description
+   * @tags Password Policy Admin
+   * @name UpdateAdminPasswordPolicy
+   * @summary Update the global password policy
+   * @request PATCH:/api/admin/password-policy
+   * @secure
+   */
+  export namespace UpdateAdminPasswordPolicy {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = UpdatePasswordPolicyDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = UpdateAdminPasswordPolicyData;
+  }
+
+  /**
+   * No description
+   * @tags Password Policy Admin
+   * @name ListPasswordPolicyOverrides
+   * @summary List all per-role password policy overrides
+   * @request GET:/api/admin/password-policy/overrides
+   * @secure
+   */
+  export namespace ListPasswordPolicyOverrides {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = ListPasswordPolicyOverridesData;
+  }
+
+  /**
+   * No description
+   * @tags Password Policy Admin
+   * @name GetPasswordPolicyOverride
+   * @summary Get the per-role override for a single role
+   * @request GET:/api/admin/password-policy/overrides/{role}
+   * @secure
+   */
+  export namespace GetPasswordPolicyOverride {
+    export type RequestParams = {
+      role: PasswordPolicyRole;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetPasswordPolicyOverrideData;
+  }
+
+  /**
+   * No description
+   * @tags Password Policy Admin
+   * @name UpsertPasswordPolicyOverride
+   * @summary Upsert a per-role password policy override
+   * @request PUT:/api/admin/password-policy/overrides/{role}
+   * @secure
+   */
+  export namespace UpsertPasswordPolicyOverride {
+    export type RequestParams = {
+      role: PasswordPolicyRole;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = UpsertPasswordPolicyOverrideDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = UpsertPasswordPolicyOverrideData;
+  }
+
+  /**
+   * No description
+   * @tags Password Policy Admin
+   * @name DeletePasswordPolicyOverride
+   * @summary Delete a per-role password policy override
+   * @request DELETE:/api/admin/password-policy/overrides/{role}
+   * @secure
+   */
+  export namespace DeletePasswordPolicyOverride {
+    export type RequestParams = {
+      role: PasswordPolicyRole;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = DeletePasswordPolicyOverrideData;
   }
 }
 
@@ -10691,6 +10959,131 @@ export class Api<
         path: `/api/password-policy/public`,
         method: "GET",
         format: "json",
+        ...params,
+      }),
+  };
+  passwordPolicyAdmin = {
+    /**
+     * No description
+     *
+     * @tags Password Policy Admin
+     * @name GetAdminPasswordPolicy
+     * @summary Get the global password policy
+     * @request GET:/api/admin/password-policy
+     * @secure
+     */
+    getAdminPasswordPolicy: (params: RequestParams = {}) =>
+      this.request<GetAdminPasswordPolicyData, void>({
+        path: `/api/admin/password-policy`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Password Policy Admin
+     * @name UpdateAdminPasswordPolicy
+     * @summary Update the global password policy
+     * @request PATCH:/api/admin/password-policy
+     * @secure
+     */
+    updateAdminPasswordPolicy: (
+      data: UpdatePasswordPolicyDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<UpdateAdminPasswordPolicyData, void>({
+        path: `/api/admin/password-policy`,
+        method: "PATCH",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Password Policy Admin
+     * @name ListPasswordPolicyOverrides
+     * @summary List all per-role password policy overrides
+     * @request GET:/api/admin/password-policy/overrides
+     * @secure
+     */
+    listPasswordPolicyOverrides: (params: RequestParams = {}) =>
+      this.request<ListPasswordPolicyOverridesData, void>({
+        path: `/api/admin/password-policy/overrides`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Password Policy Admin
+     * @name GetPasswordPolicyOverride
+     * @summary Get the per-role override for a single role
+     * @request GET:/api/admin/password-policy/overrides/{role}
+     * @secure
+     */
+    getPasswordPolicyOverride: (
+      { role }: GetPasswordPolicyOverrideParams,
+      params: RequestParams = {},
+    ) =>
+      this.request<GetPasswordPolicyOverrideData, void>({
+        path: `/api/admin/password-policy/overrides/${role}`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Password Policy Admin
+     * @name UpsertPasswordPolicyOverride
+     * @summary Upsert a per-role password policy override
+     * @request PUT:/api/admin/password-policy/overrides/{role}
+     * @secure
+     */
+    upsertPasswordPolicyOverride: (
+      { role }: UpsertPasswordPolicyOverrideParams,
+      data: UpsertPasswordPolicyOverrideDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<UpsertPasswordPolicyOverrideData, void>({
+        path: `/api/admin/password-policy/overrides/${role}`,
+        method: "PUT",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Password Policy Admin
+     * @name DeletePasswordPolicyOverride
+     * @summary Delete a per-role password policy override
+     * @request DELETE:/api/admin/password-policy/overrides/{role}
+     * @secure
+     */
+    deletePasswordPolicyOverride: (
+      { role }: DeletePasswordPolicyOverrideParams,
+      params: RequestParams = {},
+    ) =>
+      this.request<DeletePasswordPolicyOverrideData, void>({
+        path: `/api/admin/password-policy/overrides/${role}`,
+        method: "DELETE",
+        secure: true,
         ...params,
       }),
   };

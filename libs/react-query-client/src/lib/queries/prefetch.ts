@@ -1,8 +1,8 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { type QueryClient } from "@tanstack/react-query";
-import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, FlowVariablesService, LicenseService, MqttService, PasswordPolicyService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceHealthService, ResourceMaintenanceSchedulesService, ResourceMaintenancesService, ResourcesService, SettingsService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
-import { EmailTemplateType, PermissionFilter } from "../requests/types.gen";
+import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, FlowVariablesService, LicenseService, MqttService, PasswordPolicyAdminService, PasswordPolicyService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceHealthService, ResourceMaintenanceSchedulesService, ResourceMaintenancesService, ResourcesService, SettingsService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
+import { EmailTemplateType, PasswordPolicyRole, PermissionFilter } from "../requests/types.gen";
 import * as Common from "./common";
 /**
 * Return API information
@@ -256,6 +256,28 @@ export const prefetchUseLicenseServiceGetLicenseInformation = (queryClient: Quer
 * @throws ApiError
 */
 export const prefetchUsePasswordPolicyServiceGetPublicPasswordPolicy = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UsePasswordPolicyServiceGetPublicPasswordPolicyKeyFn(), queryFn: () => PasswordPolicyService.getPublicPasswordPolicy() });
+/**
+* Get the global password policy
+* @returns PasswordPolicyDto The global password policy.
+* @throws ApiError
+*/
+export const prefetchUsePasswordPolicyAdminServiceGetAdminPasswordPolicy = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UsePasswordPolicyAdminServiceGetAdminPasswordPolicyKeyFn(), queryFn: () => PasswordPolicyAdminService.getAdminPasswordPolicy() });
+/**
+* List all per-role password policy overrides
+* @returns PasswordPolicyOverrideDto All defined overrides.
+* @throws ApiError
+*/
+export const prefetchUsePasswordPolicyAdminServiceListPasswordPolicyOverrides = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UsePasswordPolicyAdminServiceListPasswordPolicyOverridesKeyFn(), queryFn: () => PasswordPolicyAdminService.listPasswordPolicyOverrides() });
+/**
+* Get the per-role override for a single role
+* @param data The data for the request.
+* @param data.role
+* @returns unknown The override row, or null if unset.
+* @throws ApiError
+*/
+export const prefetchUsePasswordPolicyAdminServiceGetPasswordPolicyOverride = (queryClient: QueryClient, { role }: {
+  role: PasswordPolicyRole;
+}) => queryClient.prefetchQuery({ queryKey: Common.UsePasswordPolicyAdminServiceGetPasswordPolicyOverrideKeyFn({ role }), queryFn: () => PasswordPolicyAdminService.getPasswordPolicyOverride({ role }) });
 /**
 * Get all resources
 * @param data The data for the request.

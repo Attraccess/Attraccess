@@ -1,8 +1,8 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { UseQueryOptions, useSuspenseQuery } from "@tanstack/react-query";
-import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, FlowVariablesService, LicenseService, MqttService, PasswordPolicyService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceHealthService, ResourceMaintenanceSchedulesService, ResourceMaintenancesService, ResourcesService, SettingsService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
-import { EmailTemplateType, PermissionFilter } from "../requests/types.gen";
+import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, FlowVariablesService, LicenseService, MqttService, PasswordPolicyAdminService, PasswordPolicyService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceHealthService, ResourceMaintenanceSchedulesService, ResourceMaintenancesService, ResourcesService, SettingsService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
+import { EmailTemplateType, PasswordPolicyRole, PermissionFilter } from "../requests/types.gen";
 import * as Common from "./common";
 /**
 * Return API information
@@ -256,6 +256,28 @@ export const useLicenseServiceGetLicenseInformationSuspense = <TData = Common.Li
 * @throws ApiError
 */
 export const usePasswordPolicyServiceGetPublicPasswordPolicySuspense = <TData = Common.PasswordPolicyServiceGetPublicPasswordPolicyDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UsePasswordPolicyServiceGetPublicPasswordPolicyKeyFn(queryKey), queryFn: () => PasswordPolicyService.getPublicPasswordPolicy() as TData, ...options });
+/**
+* Get the global password policy
+* @returns PasswordPolicyDto The global password policy.
+* @throws ApiError
+*/
+export const usePasswordPolicyAdminServiceGetAdminPasswordPolicySuspense = <TData = Common.PasswordPolicyAdminServiceGetAdminPasswordPolicyDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UsePasswordPolicyAdminServiceGetAdminPasswordPolicyKeyFn(queryKey), queryFn: () => PasswordPolicyAdminService.getAdminPasswordPolicy() as TData, ...options });
+/**
+* List all per-role password policy overrides
+* @returns PasswordPolicyOverrideDto All defined overrides.
+* @throws ApiError
+*/
+export const usePasswordPolicyAdminServiceListPasswordPolicyOverridesSuspense = <TData = Common.PasswordPolicyAdminServiceListPasswordPolicyOverridesDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UsePasswordPolicyAdminServiceListPasswordPolicyOverridesKeyFn(queryKey), queryFn: () => PasswordPolicyAdminService.listPasswordPolicyOverrides() as TData, ...options });
+/**
+* Get the per-role override for a single role
+* @param data The data for the request.
+* @param data.role
+* @returns unknown The override row, or null if unset.
+* @throws ApiError
+*/
+export const usePasswordPolicyAdminServiceGetPasswordPolicyOverrideSuspense = <TData = Common.PasswordPolicyAdminServiceGetPasswordPolicyOverrideDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ role }: {
+  role: PasswordPolicyRole;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UsePasswordPolicyAdminServiceGetPasswordPolicyOverrideKeyFn({ role }, queryKey), queryFn: () => PasswordPolicyAdminService.getPasswordPolicyOverride({ role }) as TData, ...options });
 /**
 * Get all resources
 * @param data The data for the request.

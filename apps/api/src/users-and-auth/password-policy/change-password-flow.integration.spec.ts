@@ -6,8 +6,11 @@ import {
   AuthenticationType,
   PasswordHistory,
   PasswordPolicy,
+  PasswordPolicyAudit,
+  PasswordPolicyOverride,
   Setting,
 } from '@attraccess/database-entities';
+import { DataSource } from 'typeorm';
 import { UsersController } from '../users/users.controller';
 import { UsersService } from '../users/users.service';
 import { AuthService } from '../auth/auth.service';
@@ -41,6 +44,7 @@ const buildPolicyRow = (overrides: Partial<PasswordPolicy> = {}): PasswordPolicy
   rotationDays: 0,
   createdAt: new Date(),
   updatedAt: new Date(),
+  version: 1,
   ...overrides,
 });
 
@@ -114,6 +118,32 @@ async function buildController(opts: BuildOpts = {}) {
         },
       },
       { provide: getRepositoryToken(PasswordPolicy), useValue: policyRepo },
+      {
+        provide: getRepositoryToken(PasswordPolicyOverride),
+        useValue: {
+          find: jest.fn(async () => []),
+          findOne: jest.fn(async () => null),
+          save: jest.fn(async (row) => row),
+          create: jest.fn((row) => row),
+          merge: jest.fn((a, b) => Object.assign(a, b)),
+          delete: jest.fn(async () => ({ affected: 0 })),
+          remove: jest.fn(async (row) => row),
+        },
+      },
+      {
+        provide: getRepositoryToken(PasswordPolicyAudit),
+        useValue: { create: jest.fn((row) => row), save: jest.fn(async (row) => row) },
+      },
+      {
+        provide: DataSource,
+        useValue: {
+          transaction: jest.fn(async (cb: never) =>
+            (cb as unknown as (m: { getRepository: () => unknown }) => Promise<unknown>)({
+              getRepository: () => ({ findOne: jest.fn(), find: jest.fn(async () => []), save: jest.fn(), create: jest.fn(), remove: jest.fn() }),
+            }),
+          ),
+        },
+      },
       { provide: getRepositoryToken(PasswordHistory), useValue: historyRepo },
       { provide: getRepositoryToken(AuthenticationDetail), useValue: authDetailRepo },
       {

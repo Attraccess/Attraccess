@@ -1920,6 +1920,321 @@ export const $PublicPasswordPolicyDto = {
     required: ['minLength', 'maxLength', 'allowAllUnicode', 'requireUppercase', 'requireLowercase', 'requireDigit', 'requireSpecial', 'minZxcvbnScore']
 } as const;
 
+export const $PasswordPolicyDto = {
+    type: 'object',
+    properties: {
+        minLength: {
+            type: 'number',
+            example: 12
+        },
+        maxLength: {
+            type: 'number',
+            example: 128
+        },
+        allowAllUnicode: {
+            type: 'boolean',
+            example: true
+        },
+        requireUppercase: {
+            type: 'boolean',
+            example: false
+        },
+        requireLowercase: {
+            type: 'boolean',
+            example: false
+        },
+        requireDigit: {
+            type: 'boolean',
+            example: false
+        },
+        requireSpecial: {
+            type: 'boolean',
+            example: false
+        },
+        checkHIBP: {
+            type: 'boolean',
+            example: true
+        },
+        checkCommonPasswords: {
+            type: 'boolean',
+            example: true
+        },
+        minZxcvbnScore: {
+            type: 'number',
+            example: 3,
+            description: 'Minimum required zxcvbn score (0-4)'
+        },
+        historySize: {
+            type: 'number',
+            example: 0,
+            description: 'Number of recent passwords to remember (0 disables)'
+        },
+        rotationDays: {
+            type: 'number',
+            example: 0,
+            description: 'Forced rotation interval in days (0 disables)'
+        }
+    },
+    required: ['minLength', 'maxLength', 'allowAllUnicode', 'requireUppercase', 'requireLowercase', 'requireDigit', 'requireSpecial', 'checkHIBP', 'checkCommonPasswords', 'minZxcvbnScore', 'historySize', 'rotationDays']
+} as const;
+
+export const $UpdatePasswordPolicyDto = {
+    type: 'object',
+    properties: {
+        minLength: {
+            type: 'number',
+            example: 12,
+            minimum: 8,
+            maximum: 1024
+        },
+        maxLength: {
+            type: 'number',
+            example: 128,
+            minimum: 8,
+            maximum: 1024
+        },
+        allowAllUnicode: {
+            type: 'boolean',
+            example: true
+        },
+        requireUppercase: {
+            type: 'boolean',
+            example: false
+        },
+        requireLowercase: {
+            type: 'boolean',
+            example: false
+        },
+        requireDigit: {
+            type: 'boolean',
+            example: false
+        },
+        requireSpecial: {
+            type: 'boolean',
+            example: false
+        },
+        checkHIBP: {
+            type: 'boolean',
+            example: true
+        },
+        checkCommonPasswords: {
+            type: 'boolean',
+            example: true
+        },
+        minZxcvbnScore: {
+            type: 'number',
+            example: 3,
+            minimum: 0,
+            maximum: 4
+        },
+        historySize: {
+            type: 'number',
+            example: 0,
+            minimum: 0,
+            maximum: 50
+        },
+        rotationDays: {
+            type: 'number',
+            example: 0,
+            minimum: 0,
+            maximum: 3650
+        }
+    }
+} as const;
+
+export const $PasswordPolicyRole = {
+    type: 'string',
+    enum: ['admin'],
+    description: 'Evaluate against the effective policy for this role (uses global if omitted).'
+} as const;
+
+export const $PreviewPasswordDto = {
+    type: 'object',
+    properties: {
+        password: {
+            type: 'string',
+            description: 'Password candidate to evaluate against the policy',
+            minLength: 1,
+            maxLength: 4096
+        },
+        role: {
+            description: 'Evaluate against the effective policy for this role (uses global if omitted).',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/PasswordPolicyRole'
+                }
+            ]
+        },
+        draftPolicy: {
+            description: 'Draft policy overrides to merge over the persisted policy for this evaluation only.',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/UpdatePasswordPolicyDto'
+                }
+            ]
+        }
+    },
+    required: ['password']
+} as const;
+
+export const $PreviewPasswordResultDto = {
+    type: 'object',
+    properties: {
+        ok: {
+            type: 'boolean',
+            description: 'Whether the candidate satisfies every rule of the (draft-merged) policy',
+            example: false
+        },
+        errors: {
+            type: 'array',
+            description: 'Structured policy errors with codes and per-rule parameters',
+            items: {
+                type: 'object'
+            }
+        },
+        zxcvbn: {
+            type: 'object',
+            description: 'zxcvbn evaluation summary',
+            additionalProperties: false,
+            properties: {
+                score: {
+                    type: 'number'
+                },
+                required: {
+                    type: 'number'
+                }
+            }
+        }
+    },
+    required: ['ok', 'errors', 'zxcvbn']
+} as const;
+
+export const $PasswordPolicyOverrideDto = {
+    type: 'object',
+    properties: {
+        role: {
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/PasswordPolicyRole'
+                }
+            ]
+        },
+        minLength: {
+            type: 'number',
+            nullable: true
+        },
+        maxLength: {
+            type: 'number',
+            nullable: true
+        },
+        allowAllUnicode: {
+            type: 'boolean',
+            nullable: true
+        },
+        requireUppercase: {
+            type: 'boolean',
+            nullable: true
+        },
+        requireLowercase: {
+            type: 'boolean',
+            nullable: true
+        },
+        requireDigit: {
+            type: 'boolean',
+            nullable: true
+        },
+        requireSpecial: {
+            type: 'boolean',
+            nullable: true
+        },
+        checkHIBP: {
+            type: 'boolean',
+            nullable: true
+        },
+        checkCommonPasswords: {
+            type: 'boolean',
+            nullable: true
+        },
+        minZxcvbnScore: {
+            type: 'number',
+            nullable: true
+        },
+        historySize: {
+            type: 'number',
+            nullable: true
+        },
+        rotationDays: {
+            type: 'number',
+            nullable: true
+        }
+    },
+    required: ['role', 'minLength', 'maxLength', 'allowAllUnicode', 'requireUppercase', 'requireLowercase', 'requireDigit', 'requireSpecial', 'checkHIBP', 'checkCommonPasswords', 'minZxcvbnScore', 'historySize', 'rotationDays']
+} as const;
+
+export const $UpsertPasswordPolicyOverrideDto = {
+    type: 'object',
+    properties: {
+        minLength: {
+            type: 'number',
+            nullable: true,
+            minimum: 8,
+            maximum: 1024
+        },
+        maxLength: {
+            type: 'number',
+            nullable: true,
+            minimum: 8,
+            maximum: 1024
+        },
+        allowAllUnicode: {
+            type: 'boolean',
+            nullable: true
+        },
+        requireUppercase: {
+            type: 'boolean',
+            nullable: true
+        },
+        requireLowercase: {
+            type: 'boolean',
+            nullable: true
+        },
+        requireDigit: {
+            type: 'boolean',
+            nullable: true
+        },
+        requireSpecial: {
+            type: 'boolean',
+            nullable: true
+        },
+        checkHIBP: {
+            type: 'boolean',
+            nullable: true
+        },
+        checkCommonPasswords: {
+            type: 'boolean',
+            nullable: true
+        },
+        minZxcvbnScore: {
+            type: 'number',
+            nullable: true,
+            minimum: 0,
+            maximum: 4
+        },
+        historySize: {
+            type: 'number',
+            nullable: true,
+            minimum: 0,
+            maximum: 50
+        },
+        rotationDays: {
+            type: 'number',
+            nullable: true,
+            minimum: 0,
+            maximum: 3650
+        }
+    }
+} as const;
+
 export const $ResourceType = {
     type: 'string',
     enum: ['machine', 'door'],

@@ -19,6 +19,10 @@ import {
   MqttServer,
   NFCCard,
   PasswordHistory,
+  PasswordPolicyAudit,
+  PasswordPolicyAuditEvent,
+  PasswordPolicyOverride,
+  PasswordPolicyRole,
   Project,
   ProjectInvitation,
   ProjectInvitationStatus,
@@ -168,6 +172,8 @@ const seedDatabase = async (dataSource: DataSource) => {
   const nfcCardRepo = dataSource.getRepository(NFCCard);
   const emailTemplateRepo = dataSource.getRepository(EmailTemplate);
   const passwordHistoryRepo = dataSource.getRepository(PasswordHistory);
+  const passwordPolicyOverrideRepo = dataSource.getRepository(PasswordPolicyOverride);
+  const passwordPolicyAuditRepo = dataSource.getRepository(PasswordPolicyAudit);
 
   const resourceGroup = await ensureEntity(resourceGroupRepo, () => ({
     name: `Seed Group ${seedTag}`,
@@ -478,6 +484,35 @@ const seedDatabase = async (dataSource: DataSource) => {
   await ensureEntity(passwordHistoryRepo, () => ({
     userId: primaryUser.id,
     passwordHash: `$2b$04$seed.${seedTag}.placeholder.bcrypt.hash.value.padding`,
+  }));
+
+  await ensureEntity(passwordPolicyOverrideRepo, () => ({
+    role: PasswordPolicyRole.ADMIN,
+    minLength: 16,
+    maxLength: null,
+    allowAllUnicode: null,
+    requireUppercase: null,
+    requireLowercase: null,
+    requireDigit: null,
+    requireSpecial: null,
+    checkHIBP: null,
+    checkCommonPasswords: null,
+    minZxcvbnScore: null,
+    historySize: null,
+    rotationDays: null,
+  }));
+
+  await ensureEntity(passwordPolicyAuditRepo, () => ({
+    event: PasswordPolicyAuditEvent.GLOBAL_POLICY_UPDATED,
+    actorId: primaryUser.id,
+    actorUsername: primaryUser.username,
+    ip: '127.0.0.1',
+    userAgent: 'seed-agent',
+    requestId: `seed-req-${seedTag}`,
+    role: null,
+    before: JSON.stringify({ minLength: 12 }),
+    after: JSON.stringify({ minLength: 16 }),
+    changedFields: JSON.stringify(['minLength']),
   }));
 };
 
