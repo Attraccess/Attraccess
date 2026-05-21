@@ -9,8 +9,11 @@ on:
       - '.github/workflows/hardware.yml'
 
 permissions:
-  contents: read
+  contents: write
   pull-requests: write
+
+env:
+  RENDERS_BRANCH: hardware-renders
 
 jobs:
   build-and-render:
@@ -20,16 +23,27 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
-      - uses: ./.github/actions/setup
+
+      - name: Setup PNPM
+        uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061
+
+      - name: Setup Node.js (hardware toolchain)
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22.17.1'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Lint hardware (DRC/ERC)
-        run: pnpm nx affected --target=lint --parallel=3 --base=origin/${{ github.event.pull_request.base.ref }} --projects=tag:scope:hardware
+        run: pnpm nx run-many --target=lint --parallel=3 --projects=tag:scope:hardware
       - name: Build hardware (circuit JSON)
-        run: pnpm nx affected --target=build --parallel=3 --base=origin/${{ github.event.pull_request.base.ref }} --projects=tag:scope:hardware
+        run: pnpm nx run-many --target=build --parallel=3 --projects=tag:scope:hardware
       - name: Export fab files (gerbers, BOM, CPL)
-        run: pnpm nx affected --target=export --parallel=3 --base=origin/${{ github.event.pull_request.base.ref }} --projects=tag:scope:hardware
+        run: pnpm nx run-many --target=export --parallel=3 --projects=tag:scope:hardware
       - name: Render previews (PCB + schematic + assembly)
-        run: pnpm nx affected --target=render --parallel=3 --base=origin/${{ github.event.pull_request.base.ref }} --projects=tag:scope:hardware
+        run: pnpm nx run-many --target=render --parallel=3 --projects=tag:scope:hardware
 
       - name: Upload gerber ZIPs
         uses: actions/upload-artifact@v4
@@ -41,7 +55,6 @@ jobs:
           retention-days: 30
 
       - name: Upload render PNGs
-        id: upload-renders
         uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -68,51 +81,64 @@ jobs:
             echo "found=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Upload renders to imgur (if IMGUR_CLIENT_ID secret set)
-        id: imgur
-        if: steps.collect-renders.outputs.found == 'true' && env.IMGUR_CLIENT_ID != ''
+      - name: Publish renders to orphan branch
+        id: publish-renders
+        if: always() && steps.collect-renders.outputs.found == 'true'
         env:
-          IMGUR_CLIENT_ID: ${{ secrets.IMGUR_CLIENT_ID }}
           LIST_FILE: ${{ steps.collect-renders.outputs.list_file }}
-        uses: actions/github-script@v9
-        with:
-          script: |
-            const fs = require('fs');
-            const list = fs.readFileSync(process.env.LIST_FILE, 'utf8').trim().split('\n');
-            const sections = new Map();
-            for (const row of list) {
-              const [board, name, file] = row.split('|');
-              const buf = fs.readFileSync(file);
-              const upload = await fetch('https://api.imgur.com/3/upload', {
-                method: 'POST',
-                headers: { Authorization: `Client-ID ${process.env.IMGUR_CLIENT_ID}` },
-                body: buf,
-              });
-              const json = await upload.json();
-              if (!json.success) {
-                core.warning(`imgur upload failed for ${file}: ${JSON.stringify(json)}`);
-                continue;
-              }
-              const title = name.replace(/\.png$/, '');
-              const md = `![${title}](${json.data.link})`;
-              if (!sections.has(board)) sections.set(board, []);
-              sections.get(board).push({ title, md });
-            }
-            const out = [];
-            for (const [board, items] of sections) {
-              out.push(`### \`${board}\``);
-              for (const { title, md } of items) {
-                out.push(`**${title}**\n\n${md}`);
-              }
-            }
-            core.setOutput('markdown', out.join('\n\n'));
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          RENDERS_BRANCH: ${{ env.RENDERS_BRANCH }}
+        run: |
+          set -euo pipefail
+          worktree="$(mktemp -d)/renders"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          if git ls-remote --exit-code --heads origin "$RENDERS_BRANCH" >/dev/null 2>&1; then
+            git fetch origin "$RENDERS_BRANCH"
+            git worktree add -B "$RENDERS_BRANCH" "$worktree" "origin/$RENDERS_BRANCH"
+          else
+            git worktree add --detach "$worktree"
+            (cd "$worktree" && git checkout --orphan "$RENDERS_BRANCH" && git rm -rf --quiet . 2>/dev/null || true)
+          fi
+          dest_dir="$worktree/pr-${PR_NUMBER}/${HEAD_SHA}"
+          mkdir -p "$dest_dir"
+          while IFS='|' read -r board name file; do
+            cp "$file" "$dest_dir/${board}-${name}"
+          done < "$LIST_FILE"
+          (
+            cd "$worktree"
+            git add "pr-${PR_NUMBER}/${HEAD_SHA}"
+            if git diff --cached --quiet; then
+              echo "no new renders to publish"
+            else
+              git commit -m "renders: pr #${PR_NUMBER} sha ${HEAD_SHA}"
+              git push origin "HEAD:${RENDERS_BRANCH}"
+            fi
+          )
+          raw_base="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${RENDERS_BRANCH}/pr-${PR_NUMBER}/${HEAD_SHA}"
+          md_file="$(mktemp)"
+          declare -A seen=()
+          while IFS='|' read -r board name file; do
+            if [ -z "${seen[$board]+x}" ]; then
+              echo "### \`${board}\`" >> "$md_file"
+              seen[$board]=1
+            fi
+            title="${name%.png}"
+            echo "" >> "$md_file"
+            echo "**${title}**" >> "$md_file"
+            echo "" >> "$md_file"
+            echo "![${title}](${raw_base}/${board}-${name})" >> "$md_file"
+            echo "" >> "$md_file"
+          done < "$LIST_FILE"
+          echo "md_file=$md_file" >> "$GITHUB_OUTPUT"
 
       - name: Build PR comment body
         id: comment-body
         if: always()
         env:
           RENDERS_FOUND: ${{ steps.collect-renders.outputs.found }}
-          IMGUR_MD: ${{ steps.imgur.outputs.markdown }}
+          MD_FILE: ${{ steps.publish-renders.outputs.md_file }}
           LIST_FILE: ${{ steps.collect-renders.outputs.list_file }}
         run: |
           set -euo pipefail
@@ -124,13 +150,8 @@ jobs:
             echo ""
             if [ "$RENDERS_FOUND" != "true" ]; then
               echo "_No render PNGs were produced for this PR._"
-            elif [ -n "${IMGUR_MD:-}" ]; then
-              printf '%s\n' "$IMGUR_MD"
             else
-              echo "Inline image hosting is not configured (set the \`IMGUR_CLIENT_ID\` repo secret to enable previews)."
-              echo ""
-              echo "Rendered files:"
-              awk -F'|' '{ printf "- `%s` / `%s`\n", $1, $2 }' "$LIST_FILE"
+              cat "$MD_FILE"
             fi
             echo ""
             echo "Download the full-resolution PNGs + gerber ZIPs from the [workflow artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})."
