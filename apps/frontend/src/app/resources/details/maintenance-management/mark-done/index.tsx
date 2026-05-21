@@ -4,15 +4,10 @@ import {
   AlertContent,
   AlertDescription,
   Button,
+  DrawerBody,
+  DrawerFooter,
+  DrawerHeader,
   Form,
-  Modal,
-  ModalBackdrop,
-  ModalBody,
-  ModalContainer,
-  ModalDialog,
-  ModalFooter,
-  ModalHeader,
-  ModalHeading,
   TextArea,
   useOverlayState,
 } from '@heroui/react';
@@ -25,6 +20,7 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useRef, useState } from 'react';
 import { AlertStatusIcon } from '../../../../../components/AlertStatusIcon';
+import { StandardDrawer } from '../../../../../components/standardDrawer';
 
 interface Props {
   resourceId: number;
@@ -79,53 +75,46 @@ export function MarkDoneModal(props: Props) {
   return (
     <>
       {children(open)}
-      <Modal isOpen={isOpen} onOpenChange={onOpenChangeHandler}>
-        <ModalBackdrop>
-          <ModalContainer size="md">
-            <ModalDialog>
-              {({ close }) => (
-                <>
-                  <ModalHeader>
-                    <ModalHeading>{t('actions.markDone.modal.title')}</ModalHeading>
-                  </ModalHeader>
-                  <ModalBody>
-                    <Form
-                      ref={formRef}
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        onSubmit();
-                      }}
-                    >
-                      <TextArea
-                        placeholder={t('actions.markDone.modal.notesPlaceholder')}
-                        value={notes}
-                        onChange={(e) => setNotes(e.target.value)}
-                      />
-                      {error ? (
-                        <Alert status="danger">
-                          <AlertStatusIcon status="danger" />
-                          <AlertContent>
-                            <AlertDescription>{(error as Error).message}</AlertDescription>
-                          </AlertContent>
-                        </Alert>
-                      ) : null}
-                      <button type="submit" hidden />
-                    </Form>
-                  </ModalBody>
-                  <ModalFooter>
-                    <Button variant="ghost" onPress={close}>
-                      {t('actions.markDone.modal.cancel')}
-                    </Button>
-                    <Button variant="primary" onPress={onSubmit} isPending={isPending}>
-                      {t('actions.markDone.modal.confirm')}
-                    </Button>
-                  </ModalFooter>
-                </>
-              )}
-            </ModalDialog>
-          </ModalContainer>
-        </ModalBackdrop>
-      </Modal>
+      <StandardDrawer isOpen={isOpen} onOpenChange={onOpenChangeHandler}>
+        <DrawerHeader>
+          <h2 className="text-lg font-semibold">{t('actions.markDone.modal.title')}</h2>
+        </DrawerHeader>
+        <DrawerBody>
+          <Form
+            ref={formRef}
+            onSubmit={(e) => {
+              e.preventDefault();
+              onSubmit();
+            }}
+            className="flex flex-col gap-4"
+          >
+            <TextArea
+              placeholder={t('actions.markDone.modal.notesPlaceholder')}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={5}
+              className="w-full min-h-32 resize-y"
+            />
+            {error ? (
+              <Alert status="danger">
+                <AlertStatusIcon status="danger" />
+                <AlertContent>
+                  <AlertDescription>{(error as Error).message}</AlertDescription>
+                </AlertContent>
+              </Alert>
+            ) : null}
+            <button type="submit" hidden />
+          </Form>
+        </DrawerBody>
+        <DrawerFooter>
+          <Button variant="ghost" onPress={() => setOpen(false)}>
+            {t('actions.markDone.modal.cancel')}
+          </Button>
+          <Button variant="primary" onPress={onSubmit} isPending={isPending}>
+            {t('actions.markDone.modal.confirm')}
+          </Button>
+        </DrawerFooter>
+      </StandardDrawer>
     </>
   );
 }
