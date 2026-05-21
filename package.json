@@ -242,6 +242,12 @@
     },
     "overrides": {
       "@internationalized/date": "3.12.1"
-    }
+    },
+    "onlyBuiltDependencies": [
+      "@nestjs/core",
+      "@swc/core",
+      "nx",
+      "sqlite3"
+    ]
   }
 }
