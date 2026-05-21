@@ -3,6 +3,7 @@
   "readerName": "Reader-Name",
   "enterReaderName": "Reader-Namen eingeben",
   "connectedResources": "Verbundene Ressourcen",
+  "connectedResourcesDescription": "Wähle aus, welche Ressourcen dieser Reader steuert. Benutzer halten ihre Karte an den Reader, um die gewählten Ressourcen freizuschalten.",
   "enterResourceIds": "Ressourcen-IDs eingeben (durch Kommas getrennt)",
   "resourcesDescription": "Geben Sie Ressourcen-IDs durch Kommas getrennt ein (z.B. 1, 2, 3)",
   "cancel": "Abbrechen",
