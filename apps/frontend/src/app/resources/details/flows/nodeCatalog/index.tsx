@@ -27,16 +27,19 @@ export const NodeCatalogPanel = forwardRef<NodeCatalogHandle, Props>(function No
 ) {
   const { t } = useTranslations({ de, en });
   const { groups, collapsed, setCollapsed, isDomainExpanded, setDomainExpanded } = useNodeCatalog({ resourceId });
-  const { isOpen, setOpen, open, close } = useOverlayState();
+  const { isOpen, setOpen } = useOverlayState();
 
-  useImperativeHandle(ref, () => ({ open }), [open]);
+  const openCatalog = useCallback(() => setOpen(true), [setOpen]);
+  const closeCatalog = useCallback(() => setOpen(false), [setOpen]);
+
+  useImperativeHandle(ref, () => ({ open: openCatalog }), [openCatalog]);
 
   const handleSelectMobile = useCallback(
     (nodeType: string) => {
       onSelect(nodeType);
-      close();
+      closeCatalog();
     },
-    [onSelect, close],
+    [onSelect, closeCatalog],
   );
 
   return (
