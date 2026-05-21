@@ -390,8 +390,8 @@ export type ResetPasswordDto = object;
 
 export interface ChangePasswordDto {
   /**
-   * The new password for the user
-   * @example "password123"
+   * The new password (validated server-side against the active password policy)
+   * @example "correct-horse-battery-staple-42"
    */
   password: string;
   /**
@@ -482,8 +482,8 @@ export interface BulkUpdateUserPermissionsDto {
 
 export interface SetUserPasswordDto {
   /**
-   * The new password for the user
-   * @example "newSecurePassword123"
+   * The new password (validated server-side against the active password policy)
+   * @example "correct-horse-battery-staple-42"
    */
   password: string;
 }
