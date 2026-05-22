@@ -2,16 +2,25 @@ import { useEmailTemplatesServiceEmailTemplateControllerFindAll } from '@attracc
 import { Table, TableContent, TableHeader, TableColumn, TableBody, TableRow, TableCell, Button } from '@heroui/react';
 import { Edit3, Mail } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../../components/pageHeader'; // Assuming PageHeader exists
 import { EmptyState } from '../../components/emptyState';
 
 import en from './en.json';
 import de from './de.json';
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 
 export function EmailTemplatesPage() {
   const { t } = useTranslations({ en, de });
+  const navigate = useNavigate();
   const { data: emailTemplates } = useEmailTemplatesServiceEmailTemplateControllerFindAll();
+
+  const openEditor = useCallback(
+    (type: string) => {
+      navigate(`/email-templates/${type}`);
+    },
+    [navigate],
+  );
 
   const tableItems = useMemo(() => {
     return (emailTemplates ?? []).map((item) => ({
@@ -19,15 +28,17 @@ export function EmailTemplatesPage() {
       type: t(`templateTypes.${item.type}`),
       subject: item.subject,
       actions: (
-        <Button variant="ghost"
-
-
+        <Button
+          variant="ghost"
           isIconOnly
           aria-label={t('editButton')}
-        ><Edit3 size={18} /></Button>
+          onPress={() => openEditor(item.type)}
+        >
+          <Edit3 size={18} />
+        </Button>
       ),
     }));
-  }, [emailTemplates, t]);
+  }, [emailTemplates, t, openEditor]);
 
   return (
     <>
@@ -45,7 +56,12 @@ export function EmailTemplatesPage() {
           renderEmptyState={() => <EmptyState />}
         >
           {(item) => (
-            <TableRow key={item.key} id={item.key}>
+            <TableRow
+              key={item.key}
+              id={item.key}
+              className="cursor-pointer hover:bg-primary-50 transition-bg duration-300"
+              onAction={() => openEditor(item.key)}
+            >
               <TableCell>{item.type}</TableCell>
               <TableCell>{item.subject}</TableCell>
               <TableCell>{item.actions}</TableCell>
