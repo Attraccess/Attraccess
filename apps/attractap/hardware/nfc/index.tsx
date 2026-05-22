@@ -151,9 +151,9 @@ export default () => (
     <hole diameter="3.2mm" {...at(3, 47)} />
     <hole diameter="3.2mm" {...at(47, 47)} />
 
-    <BoardLabel name="ATT-350 NFC" rev="v0" {...at(25, 3.5)} />
-    <AttraccessLogo {...at(7, 3)} scale={1.1} />
-    <AttraccessLogo {...at(43, 3)} scale={1.1} />
+    <BoardLabel name="ATT-350 NFC" rev="v0" {...at(25, 3)} />
+    <AttraccessLogo {...at(7, 4.5)} scale={1.1} />
+    <AttraccessLogo {...at(43, 4.5)} scale={1.1} />
     <Pin1Marker {...at(32.2, 47)} />
 
     <trace from=".J1 > .pin1" to=".C_VBUS > .pin1" />

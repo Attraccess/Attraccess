@@ -23,16 +23,6 @@ export interface Pin1MarkerProps {
   readonly layer?: 'top' | 'bottom';
 }
 
-const arc = (cx: number, cy: number, r: number, fromDeg: number, toDeg: number, steps: number) => {
-  const pts: { x: number; y: number }[] = [];
-  for (let i = 0; i <= steps; i += 1) {
-    const t = fromDeg + ((toDeg - fromDeg) * i) / steps;
-    const rad = (t * Math.PI) / 180;
-    pts.push({ x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) });
-  }
-  return pts;
-};
-
 export const AttraccessLogo = ({
   pcbX,
   pcbY,
@@ -40,23 +30,22 @@ export const AttraccessLogo = ({
   layer = 'top',
   strokeWidth = '0.2mm',
 }: AttraccessLogoProps) => {
-  const r = 1.4 * scale;
-  const shoulderY = 1.0 * scale;
-  const shoulderX = 0.55 * scale;
-  const baseY = 3.4 * scale;
-  const baseX = 1.15 * scale;
-  const headArc = arc(pcbX, pcbY, r, 30, 150, 12);
+  const headR = 1.3 * scale;
+  const neckY = -1.3 * scale;
+  const neckX = 0.45 * scale;
+  const baseY = -3.6 * scale;
+  const baseX = 0.85 * scale;
   return (
     <>
+      <silkscreencircle pcbX={pcbX} pcbY={pcbY} radius={headR} strokeWidth={strokeWidth} layer={layer} />
       <silkscreenpath
         layer={layer}
         route={[
-          ...headArc,
-          { x: pcbX - shoulderX, y: pcbY + shoulderY },
+          { x: pcbX - neckX, y: pcbY + neckY },
           { x: pcbX - baseX, y: pcbY + baseY },
           { x: pcbX + baseX, y: pcbY + baseY },
-          { x: pcbX + shoulderX, y: pcbY + shoulderY },
-          headArc[0],
+          { x: pcbX + neckX, y: pcbY + neckY },
+          { x: pcbX - neckX, y: pcbY + neckY },
         ]}
         strokeWidth={strokeWidth}
       />
