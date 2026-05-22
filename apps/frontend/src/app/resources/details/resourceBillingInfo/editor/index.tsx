@@ -10,6 +10,7 @@ import {
   DrawerFooter,
   DrawerHeader,
   Form,
+  Label,
   NumberField,
   NumberFieldDecrementButton,
   NumberFieldGroup,
@@ -139,12 +140,12 @@ export function ResourceBillingInfoEditor(props: Props) {
         <DrawerBody>
           <Form onSubmit={onSubmit} className="flex flex-col gap-4">
             <NumberField
-              aria-label={t('inputs.creditsPerUsage.label', { currency: configuration.currency })}
               value={creditsPerUsage}
               minValue={0}
               onChange={(value) => setCreditsPerUsage(value)}
               defaultValue={0}
             >
+              <Label>{t('inputs.creditsPerUsage.label', { currency: configuration.currency })}</Label>
               <NumberFieldGroup>
                 <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
                 <NumberFieldInput />
@@ -152,12 +153,12 @@ export function ResourceBillingInfoEditor(props: Props) {
               </NumberFieldGroup>
             </NumberField>
             <NumberField
-              aria-label={t('inputs.creditsPerMinute.label', { currency: configuration.currency })}
               value={creditsPerMinute}
               minValue={0}
               onChange={(value) => setCreditsPerMinute(value)}
               defaultValue={0}
             >
+              <Label>{t('inputs.creditsPerMinute.label', { currency: configuration.currency })}</Label>
               <NumberFieldGroup>
                 <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
                 <NumberFieldInput />
