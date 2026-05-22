@@ -48,7 +48,9 @@ export function generateRowCells(
               </Chip>
             }
           />
-          {hasNotes && <MessageSquareText className="w-4 h-4" />}
+          {hasNotes && (
+            <MessageSquareText className="w-4 h-4" role="img" aria-label={t('rows.machine.hasNotes')} />
+          )}
         </div>
       </TableCell>,
       <TableCell key={`project-${session.id}`} className="hidden 2xl:table-cell">
