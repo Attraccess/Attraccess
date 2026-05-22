@@ -12,7 +12,7 @@ semver bump on this library.
 
 | Board | Outline (L × W) | Max component height (top) | Max component height (bottom) | Notes |
 |-------|-----------------|----------------------------|-------------------------------|-------|
-| Core (MCU)   | 50.0 × 35.0 | 3.0 | 1.5 | Carries ESP32-P4-MINI-1 module (highest part) |
+| Core (MCU)   | 50.0 × 35.0 | 1.0 | 1.5 | Carries ESP32-P4NRW32 QFN-104 bare chip (≈ 0.9 mm height) — outline stays 50 × 35 until the coarse placement gate in ATT-349 confirms fit |
 | NFC          | 50.0 × 50.0 | 6.0 | 1.0 | Antenna keep-out applies — see §4 |
 | Beeper       | 15.0 × 15.0 | 9.0 | — (1L bottom-free) | Magnetic buzzer dominates height |
 | PoE          | 60.0 × 35.0 | 8.0 | 1.5 | RJ45 magjack drives the height budget |
@@ -61,7 +61,8 @@ Enclosure interior height (TBD ≤ 25 mm)
 | B2B 1.27 mm 2×N (J_POE, J_NFC) | 4.0 (3.5–4.5 vendor range) |
 | B2B 0.5 mm 2×10 (J_DISP)       | 1.5 (FFC alternate: 0.6 mm cable run-out) |
 | JST PH 1.25 mm 3P / 4P         | 5.0 (PH-S vertical) |
-| ESP32-P4-MINI-1 module         | 3.0 |
+| ESP32-P4-MINI-1 module (legacy, not stocked at JLC) | 3.0 |
+| ESP32-P4NRW32 bare QFN-104                          | 0.9 |
 | ESP32-C6-MINI-1 module         | 3.0 |
 | PN532 module (bare chip on flex) | 0.8 |
 | GT911 (QFN)                     | 0.85 |
@@ -78,7 +79,7 @@ Per-board total budget (rough, until case CAD lands):
 
 | Board       | Stack-up worst case (board + tallest top + mated B2B) |
 |-------------|------------------------------------------------------|
-| Core        | 1.6 + 3.0 (P4-MINI) + 4.0 (B2B mated) = **8.6 mm** |
+| Core        | 1.6 + 3.0 (C6-MINI on top, the tallest part) + 4.0 (B2B mated) = **8.6 mm** |
 | NFC         | 1.6 + 0.85 (PN532) + 4.0 (B2B) = **6.45 mm** |
 | Beeper      | 1.6 + 9.0 (buzzer) + 5.0 (JST PH mated) = **15.6 mm** |
 | PoE         | 1.6 + 13.5 (RJ45) + 4.0 (B2B) = **19.1 mm** |

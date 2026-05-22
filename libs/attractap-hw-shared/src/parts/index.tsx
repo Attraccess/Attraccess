@@ -9,3 +9,7 @@ export * from './discrete';
 export * from './buzzer';
 export * from './leds';
 export * from './silk';
+export * from './crystal';
+export * from './memory';
+export * from './switches';
+export * from './usb';

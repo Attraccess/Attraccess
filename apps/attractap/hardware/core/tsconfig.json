@@ -1,0 +1,11 @@
+{
+  "extends": "../../../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "noEmit": true,
+    "types": ["@tscircuit/props"]
+  },
+  "include": ["index.tsx", "power.tsx", "mcu-p4.tsx", "mcu-c6.tsx", "usb.tsx", "jtag.tsx", "connectors.tsx"]
+}

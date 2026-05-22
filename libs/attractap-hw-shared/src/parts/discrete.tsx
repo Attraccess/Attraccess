@@ -26,3 +26,22 @@ export const Diode1N4148Ws = ({ name, pn, ...rest }: Diode1N4148WsProps) => (
     {...rest}
   />
 );
+
+export type Usblc6Props = BasePartProps;
+
+export const Usblc6_2Sc6 = ({ name, pn, ...rest }: Usblc6Props) => (
+  <chip
+    name={name}
+    footprint="sot23-6"
+    supplierPartNumbers={jlcSupplier(pn)}
+    pinLabels={{
+      pin1: ['IO1_A'],
+      pin2: ['GND'],
+      pin3: ['IO2_A'],
+      pin4: ['IO2_B'],
+      pin5: ['VBUS'],
+      pin6: ['IO1_B'],
+    }}
+    {...rest}
+  />
+);

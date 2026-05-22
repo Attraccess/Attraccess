@@ -42,6 +42,46 @@ export const Pico125_4P = ({ name, pn, ...rest }: Pico125_4P_Props) => (
   />
 );
 
+export interface B2B_05_2xN_Props extends BasePartProps {
+  readonly pinsPerRow: number;
+}
+
+export const B2B_05_2xN = ({ name, pn, pinsPerRow, ...rest }: B2B_05_2xN_Props) => {
+  const total = pinsPerRow * 2;
+  const pad_dx = 0.25;
+  const pad_pitch = 0.5;
+  const row_dy = 0.85;
+  return (
+    <chip
+      name={name}
+      supplierPartNumbers={jlcSupplier(pn)}
+      pinLabels={Object.fromEntries(
+        Array.from({ length: total }, (_, i) => [`pin${i + 1}`, [`P${i + 1}`]]),
+      ) as Record<string, string[]>}
+      {...rest}
+    >
+      <footprint>
+        {Array.from({ length: total }).map((_, idx) => {
+          const isBottom = idx >= pinsPerRow;
+          const col = isBottom ? total - 1 - idx : idx;
+          const x = (col - (pinsPerRow - 1) / 2) * pad_pitch;
+          const y = isBottom ? -row_dy : row_dy;
+          return (
+            <smtpad
+              shape="rect"
+              portHints={[`pin${idx + 1}`]}
+              pcbX={x}
+              pcbY={y}
+              width={`${pad_pitch * 0.5}mm`}
+              height="0.6mm"
+            />
+          );
+        })}
+      </footprint>
+    </chip>
+  );
+};
+
 export type Ffc05_30P_Props = BasePartProps;
 
 const FFC30_PIN_LABELS = Object.fromEntries(

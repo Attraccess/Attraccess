@@ -1,0 +1,129 @@
+{
+  "name": "attractap-hw-core",
+  "$schema": "../../../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "apps/attractap/hardware/core",
+  "tags": ["scope:hardware", "type:board"],
+  "targets": {
+    "lint": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "{projectRoot}/index.tsx",
+        "{projectRoot}/power.tsx",
+        "{projectRoot}/mcu-p4.tsx",
+        "{projectRoot}/mcu-c6.tsx",
+        "{projectRoot}/usb.tsx",
+        "{projectRoot}/jtag.tsx",
+        "{projectRoot}/connectors.tsx",
+        "{projectRoot}/tscircuit.config.json"
+      ],
+      "outputs": [],
+      "options": {
+        "cwd": "apps/attractap/hardware/core",
+        "command": "pnpm exec tscircuit-cli build index.tsx --ignore-warnings"
+      }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "{projectRoot}/index.tsx",
+        "{projectRoot}/power.tsx",
+        "{projectRoot}/mcu-p4.tsx",
+        "{projectRoot}/mcu-c6.tsx",
+        "{projectRoot}/usb.tsx",
+        "{projectRoot}/jtag.tsx",
+        "{projectRoot}/connectors.tsx",
+        "{projectRoot}/tscircuit.config.json"
+      ],
+      "outputs": ["{projectRoot}/dist/build"],
+      "options": {
+        "cwd": "apps/attractap/hardware/core",
+        "commands": [
+          "rm -rf dist/build && mkdir -p dist/build",
+          "pnpm exec tscircuit-cli export index.tsx -f circuit-json -o dist/build/core.circuit.json"
+        ],
+        "parallel": false
+      }
+    },
+    "export": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "dependsOn": ["build"],
+      "inputs": [
+        "{projectRoot}/index.tsx",
+        "{projectRoot}/power.tsx",
+        "{projectRoot}/mcu-p4.tsx",
+        "{projectRoot}/mcu-c6.tsx",
+        "{projectRoot}/usb.tsx",
+        "{projectRoot}/jtag.tsx",
+        "{projectRoot}/connectors.tsx",
+        "{projectRoot}/tscircuit.config.json"
+      ],
+      "outputs": ["{projectRoot}/dist/export"],
+      "options": {
+        "cwd": "apps/attractap/hardware/core",
+        "commands": [
+          "rm -rf dist/export && mkdir -p dist/export",
+          "pnpm exec tscircuit-cli export index.tsx -f gerbers -o dist/export/core-gerbers.zip",
+          "node ../scripts/validate-bom.mjs dist/export/core-gerbers.zip"
+        ],
+        "parallel": false
+      }
+    },
+    "render": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "dependsOn": ["build"],
+      "inputs": [
+        "{projectRoot}/index.tsx",
+        "{projectRoot}/power.tsx",
+        "{projectRoot}/mcu-p4.tsx",
+        "{projectRoot}/mcu-c6.tsx",
+        "{projectRoot}/usb.tsx",
+        "{projectRoot}/jtag.tsx",
+        "{projectRoot}/connectors.tsx",
+        "{projectRoot}/tscircuit.config.json"
+      ],
+      "outputs": ["{projectRoot}/dist/render"],
+      "options": {
+        "cwd": "apps/attractap/hardware/core",
+        "commands": [
+          "rm -rf dist/render && mkdir -p dist/render",
+          "pnpm exec tscircuit-cli export index.tsx -f pcb-svg -o dist/render/core-pcb.svg",
+          "pnpm exec tscircuit-cli export index.tsx -f schematic-svg -o dist/render/core-schematic.svg",
+          "pnpm exec tscircuit-cli export index.tsx -f assembly-svg -o dist/render/core-assembly.svg",
+          "node ../scripts/render-png.mjs --out-dir dist/render dist/render/core-pcb.svg dist/render/core-schematic.svg dist/render/core-assembly.svg"
+        ],
+        "parallel": false
+      }
+    },
+    "render-3d": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "dependsOn": ["build"],
+      "inputs": [
+        "{projectRoot}/index.tsx",
+        "{projectRoot}/power.tsx",
+        "{projectRoot}/mcu-p4.tsx",
+        "{projectRoot}/mcu-c6.tsx",
+        "{projectRoot}/usb.tsx",
+        "{projectRoot}/jtag.tsx",
+        "{projectRoot}/connectors.tsx",
+        "{projectRoot}/tscircuit.config.json"
+      ],
+      "outputs": ["{projectRoot}/dist/render-3d"],
+      "options": {
+        "cwd": "apps/attractap/hardware/core",
+        "commands": [
+          "rm -rf dist/render-3d && mkdir -p dist/render-3d",
+          "pnpm exec tscircuit-cli export index.tsx -f glb -o dist/render-3d/core.glb",
+          "pnpm exec tscircuit-cli export index.tsx -f step -o dist/render-3d/core.step",
+          "node ../scripts/render-glb-png.mjs --out-dir dist/render-3d dist/render-3d/core.glb"
+        ],
+        "parallel": false
+      }
+    }
+  }
+}
