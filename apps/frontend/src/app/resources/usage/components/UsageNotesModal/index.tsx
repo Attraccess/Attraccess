@@ -1,7 +1,6 @@
 import { memo } from 'react';
 import {
   DrawerBody,
-  DrawerFooter,
   DrawerHeader,
   Button,
   Spinner,
@@ -12,6 +11,7 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './translations/en';
 import de from './translations/de';
 import { DateTimeDisplay } from '@attraccess/plugins-frontend-ui';
+import { X } from 'lucide-react';
 import { ProjectsSelect } from '../../../../../components/projectsSelect';
 import { StandardDrawer } from '../../../../../components/standardDrawer';
 import { useAuth } from '../../../../../hooks/useAuth';
@@ -43,6 +43,13 @@ export const UsageNotesModal = memo(
 
     if (!isOpen) return null;
 
+    const showProjectSection =
+      session?.usageAction === ResourceUsageAction.USAGE && Boolean(projectLabel) && Boolean(projectPlaceholder);
+    const canEditProject = Boolean(
+      session?.endTime && session?.userId === user?.id && resolveProjectId && onProjectChange,
+    );
+    const showForms = session ? hasRenderableFormSubmissions(session) : false;
+
     return (
       <StandardDrawer
         isOpen={isOpen}
@@ -51,15 +58,33 @@ export const UsageNotesModal = memo(
         }}
       >
         <DrawerHeader>
-          <h2 className="text-lg font-semibold">{t('sessionNotes')}</h2>
+          <div className="flex w-full items-start justify-between gap-3">
+            <div className="flex flex-col gap-1">
+              <h2 className="text-lg font-semibold">{t('sessionNotes')}</h2>
+              {session && (
+                <div className="text-xs text-default-500 space-y-0.5">
+                  <p>
+                    {t('sessionStarted')}: <DateTimeDisplay date={session.startTime} />
+                  </p>
+                  {session.endTime && (
+                    <p>
+                      {t('sessionEnded')}: <DateTimeDisplay date={session.endTime} />
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+            <Button isIconOnly variant="ghost" aria-label={t('close')} onPress={onClose}>
+              <X size={16} />
+            </Button>
+          </div>
         </DrawerHeader>
         <DrawerBody>
           {session ? (
-            <div className="space-y-4">
-              {session.usageAction === ResourceUsageAction.USAGE && projectLabel && projectPlaceholder && (
-                <div className="space-y-2">
-                  <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">{projectLabel}</p>
-                  {session.endTime && session.userId === user?.id && resolveProjectId && onProjectChange ? (
+            <div className="space-y-6">
+              {showProjectSection && (
+                <section className="space-y-2">
+                  {canEditProject && resolveProjectId && onProjectChange ? (
                     <ProjectsSelect
                       label={t('projectSelectLabel')}
                       value={resolveProjectId(session)}
@@ -70,29 +95,29 @@ export const UsageNotesModal = memo(
                       isDisabled={Boolean(updatingSessionIds?.[session.id])}
                     />
                   ) : (
-                    <p className="text-sm text-default-500">{session.project?.name ?? projectPlaceholder}</p>
+                    <>
+                      <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+                        {t('projectSelectLabel')}
+                      </p>
+                      <p className="text-sm text-default-500">{session.project?.name ?? projectPlaceholder}</p>
+                    </>
                   )}
-                </div>
+                </section>
               )}
 
-              <TextArea value={session.startNotes || t('noNotesProvided')} readOnly />
-
-              {session.endTime && <TextArea value={session.endNotes || t('noNotesProvided')} readOnly />}
-
-              <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                <p>
-                  {t('sessionStarted')}: <DateTimeDisplay date={session.startTime} />
-                </p>
+              <section className="space-y-3 border-t border-divider pt-4">
+                <NotesField label={t('startNotes')} value={session.startNotes} emptyText={t('noNotesProvided')} />
                 {session.endTime && (
-                  <p>
-                    {t('sessionEnded')}: <DateTimeDisplay date={session.endTime} />
-                  </p>
+                  <NotesField label={t('endNotes')} value={session.endNotes} emptyText={t('noNotesProvided')} />
                 )}
-              </div>
-              <div className="space-y-2">
-                <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">{t('formsTitle')}</p>
-                {renderFormSubmissions(session, t)}
-              </div>
+              </section>
+
+              {showForms && (
+                <section className="space-y-2 border-t border-divider pt-4">
+                  <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">{t('formsTitle')}</p>
+                  {renderFormSubmissions(session, t)}
+                </section>
+              )}
             </div>
           ) : (
             <div className="flex justify-center py-4">
@@ -100,11 +125,6 @@ export const UsageNotesModal = memo(
             </div>
           )}
         </DrawerBody>
-        <DrawerFooter>
-          <Button variant="ghost" onPress={onClose}>
-            {t('close')}
-          </Button>
-        </DrawerFooter>
       </StandardDrawer>
     );
   },
@@ -112,12 +132,38 @@ export const UsageNotesModal = memo(
 
 UsageNotesModal.displayName = 'UsageNotesModal';
 
-function renderFormSubmissions(session: ResourceUsage, t: (key: string) => string) {
-  if (!session.formSubmissions || session.formSubmissions.length === 0) {
-    return <p className="text-xs text-default-400">{t('noForms')}</p>;
-  }
+interface NotesFieldProps {
+  label: string;
+  value: string | null | undefined;
+  emptyText: string;
+}
 
-  return session.formSubmissions.map((submission) => {
+function NotesField({ label, value, emptyText }: NotesFieldProps) {
+  return (
+    <div className="space-y-1">
+      <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">{label}</p>
+      {value ? (
+        <TextArea value={value} readOnly />
+      ) : (
+        <p className="text-sm italic text-default-400">{emptyText}</p>
+      )}
+    </div>
+  );
+}
+
+function hasRenderableFormSubmissions(session: ResourceUsage): boolean {
+  if (!session.formSubmissions || session.formSubmissions.length === 0) return false;
+  return session.formSubmissions.some((submission) => {
+    const entries = Object.values(
+      (submission.data as Record<string, { value: string; fieldDefinition: { name: string; type: FormFieldType } }>) ??
+        {},
+    );
+    return entries.length > 0;
+  });
+}
+
+function renderFormSubmissions(session: ResourceUsage, t: (key: string) => string) {
+  return session.formSubmissions?.map((submission) => {
     const entries = Object.values(
       (submission.data as Record<string, { value: string; fieldDefinition: { name: string; type: FormFieldType } }>) ??
         {},
