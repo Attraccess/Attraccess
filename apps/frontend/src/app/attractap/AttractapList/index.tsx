@@ -114,7 +114,7 @@ export function AttractapList() {
               <WebSerialConsole>
                 {(onOpenSerialConsole) => (
                   <Dropdown>
-                    <DropdownTrigger className={buttonVariants({ variant: 'ghost' })}>
+                    <DropdownTrigger className={`${buttonVariants({ variant: 'ghost' })} whitespace-nowrap`}>
                       <MoreVertical className="w-4 h-4" />
                       {t('page.actions.menu')}
                     </DropdownTrigger>
