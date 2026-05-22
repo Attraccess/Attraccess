@@ -1,6 +1,7 @@
 // Date range section for CSV export — preset chips, calendar, summary pill
 // FEATURE: CSV export — step 1 of new export flow
 import { Card, DateValue, RangeCalendar, RangeValue } from '@heroui/react';
+import { CalendarDate } from '@internationalized/date';
 import { CalendarRangeIcon } from 'lucide-react';
 import { PresetChips } from './preset-chips';
 import { SelectedRangePill } from './selected-range-pill';
@@ -13,6 +14,9 @@ interface Props {
   onRangeChange: (range: RangeValue<DateValue>) => void;
   t: (key: string, vars?: Record<string, string | number>) => string;
 }
+
+const renderWeekdayHeader = (day: string) => <RangeCalendar.HeaderCell>{day}</RangeCalendar.HeaderCell>;
+const renderDayCell = (date: CalendarDate) => <RangeCalendar.Cell date={date} />;
 
 export function DateRangeSection(props: Props) {
   const { preset, range, onPresetChange, onRangeChange, t } = props;
@@ -62,10 +66,8 @@ export function DateRangeSection(props: Props) {
                 <RangeCalendar.NavButton slot="next" />
               </RangeCalendar.Header>
               <RangeCalendar.Grid>
-                <RangeCalendar.GridHeader>
-                  {(day) => <RangeCalendar.HeaderCell>{day}</RangeCalendar.HeaderCell>}
-                </RangeCalendar.GridHeader>
-                <RangeCalendar.GridBody>{(date) => <RangeCalendar.Cell date={date} />}</RangeCalendar.GridBody>
+                <RangeCalendar.GridHeader>{renderWeekdayHeader}</RangeCalendar.GridHeader>
+                <RangeCalendar.GridBody>{renderDayCell}</RangeCalendar.GridBody>
               </RangeCalendar.Grid>
             </RangeCalendar>
           </div>
