@@ -59,7 +59,7 @@ export function EmailTemplatesPage() {
             <TableRow
               key={item.key}
               id={item.key}
-              className="cursor-pointer hover:bg-primary-50 transition-bg duration-300"
+              className="cursor-pointer hover:bg-primary-50 transition-colors duration-300"
               onAction={() => openEditor(item.key)}
             >
               <TableCell>{item.type}</TableCell>
