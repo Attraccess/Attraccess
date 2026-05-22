@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 const REF_CLASS = [
   { prefix: 'LS', pattern: /buzzer|speaker|audio/i, label: 'buzzer' },
   { prefix: 'LED', pattern: /\bleds?\b|light.?emitting/i, label: 'LED' },
+  { prefix: 'ANT', pattern: /.*/, label: 'antenna', allowMissingPn: true },
   { prefix: 'SW', pattern: /switch|tactile|key/i, label: 'switch' },
   { prefix: 'Y', pattern: /crystal|oscillator|resonator/i, label: 'crystal/oscillator' },
   { prefix: 'Q', pattern: /mosfet|bjt|transistor|jfet|igbt|thyristor/i, label: 'transistor' },
@@ -56,7 +57,11 @@ function main() {
     process.exit(2);
   }
   const rows = parseCsv(readBomFromZip(zipPath));
-  const missing = rows.filter((r) => !r['JLCPCB Part #']);
+  const missing = rows.filter((r) => {
+    if (r['JLCPCB Part #']) return false;
+    const klass = classifyRef(r.Designator ?? '');
+    return !klass?.allowMissingPn;
+  });
   if (missing.length > 0) {
     process.stderr.write(
       `BOM validator: ${missing.length} row(s) missing JLCPCB Part #: ${missing.map((r) => r.Designator).join(', ')}\n`,
@@ -71,6 +76,7 @@ function main() {
     const designator = row.Designator ?? '';
     const expected = classifyRef(designator);
     if (!expected) continue;
+    if (!pn && expected.allowMissingPn) continue;
     const entry = classes[pn];
     if (!entry) {
       unknown.push(`${designator} (${pn}) — not in lcsc-classes.json; run \`pnpm pcbparts:jlc_get_part ${pn}\` and add it`);

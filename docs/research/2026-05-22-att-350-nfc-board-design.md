@@ -27,7 +27,8 @@ Acceptance gates (verbatim from ATT-350):
 6. Functional: reads MIFARE Classic + NTAG via I2C.
 
 v0 (this PR) drives gates **1–3**; gate **5** is a bench step post-fab;
-gate **6** depends on antenna tuning and is deferred to the deep-research
+gate **6** depends on the case-CAD enclosure-window aperture (drives the
+chosen ANT1 PN) and matching-network tuning, deferred to the deep-research
 sub-issue under ATT-343 (see §6).
 
 ## 2. Mechanical envelope
@@ -117,20 +118,31 @@ TX2 side. Receive path: antenna node → `Csa/Rsa` → PN532 `RX/LA/LB`. The
 exact parametrics depend on enclosure dielectric — these are the
 defaults the deep-research sub-issue (§6) will refine.
 
-### 4.5 PCB antenna loop
+### 4.5 Discrete coil antenna (v0)
 
-v0 footprint: **rectangular 4-turn loop, 28 × 28 mm outline**, 0.5 mm
-trace, 0.5 mm gap, on the **top copper layer only**. Loop sits centred
-at the board centre (25, 25). No copper, no via, no trace inside the
-loop on either layer (NXP AN1445 §3 "antenna interior keep-out" rule).
-Bottom-layer is left bare in the antenna area; hatched GND alternative
-is documented in `mech-envelope.md` and tuned during bring-up.
+v0 uses a **discrete pre-wound 13.56 MHz NFC coil antenna**, hand-populated
+through a 2-pad SMT footprint. Default footprint: 22 × 22 mm body,
+18 mm pad pitch, 1.8 × 2.5 mm pads — matches the common Abracon
+ANFCA-2521 / Wurth WE-MCA / Pulse PA0742 form factor for 22-mm-class
+NFC coils. Exact PN is locked by ATT-376 once the case-CAD enclosure
+window aperture is known.
 
-tscircuit cannot draw spiral antenna geometry directly. v0 leaves the
-loop as a **fabrication note + silkscreen rectangle outline** in the
-exported gerbers; the actual copper antenna is added by the deep-research
-sub-issue's KiCad pass before fab. This is acknowledged in the schematic
-fab-note text.
+The antenna sits **top-side, centred at (25, 25)**, with the 24 WS2812
+LEDs in a ring around it on the same layer. The PN532 IC, matching
+network, decoupling caps, and I2C pull-ups all live on the **bottom
+layer**, directly under the antenna and ring; bottom mech-envelope
+height budget (1.0 mm) accommodates the QFN-40 (0.85 mm) plus 0402 /
+0603 passives.
+
+Going discrete-component rather than PCB-trace antenna trades the
+RF-trace tuning work (Q-factor sweep, multi-turn spiral routing) for
+a vendor-spec'd antenna with known inductance and Q — the matching
+network values from NXP AN1445 (§4.4) are now a single tuning pass
+against the chosen coil's L/R/Q datasheet numbers, not a re-layout.
+
+BOM emits `ANT1` with an empty JLC PN column; the validator allows
+this for `ANT` designators since JLC SMT doesn't stock NFC antennas.
+Antenna is hand-soldered after JLC SMT assembly.
 
 ## 5. WS2812 ring
 
@@ -200,31 +212,30 @@ sub-issue may upgrade.
 
 ## 8. BOM (v0)
 
-| Ref           | Qty | Part                       | JLC PN     | Footprint   |
-|---------------|-----|----------------------------|------------|-------------|
-| U1            | 1   | PN5321A3HN                 | C28925     | QFN-40-EP   |
-| D1…D24        | 24  | WS2812B-MINI-X2            | C4154873   | SMD3535-4P  |
-| J1            | 1   | B2B 1.27 mm 2×5 male       | (existing) | pinrow10_p1.27 |
-| R_SDA, R_SCL  | 2   | 4.7 kΩ 0402                | C25092     | 0402        |
-| R_IRQ         | 1   | 10 kΩ 0402                 | C25744     | 0402        |
-| R_LED         | 1   | 33 Ω 0402                  | C25092 (TBD) | 0402      |
-| Rq1, Rq2      | 2   | 4.7 Ω 0603                 | TBD        | 0603        |
-| Rs1, Rs2      | 2   | 750 Ω 0402                 | TBD        | 0402        |
-| L_TVDD        | 1   | 47 µH ferrite bead         | TBD        | 0603        |
-| L_LED         | 1   | 10 µH ferrite bead         | TBD        | 0603        |
-| L0_TX1, L0_TX2| 2   | 560 nH ±5%                 | TBD        | 0603        |
-| C0_TX1, C0_TX2| 2   | 180 pF NP0                 | TBD        | 0402        |
-| C1_TX1, C1_TX2| 2   | 47 pF NP0                  | TBD        | 0402        |
-| C2_TX1, C2_TX2| 2   | 47 pF NP0                  | TBD        | 0402        |
-| Cs1, Cs2      | 2   | 1 nF                       | TBD        | 0402        |
-| C_PN_BULK     | 1   | 10 µF 0603                 | C19702     | 0603        |
-| C_PN_DEC×4    | 4   | 100 nF 0402                | C1525      | 0402        |
-| C_LED_BULK    | 1   | 10 µF 0603                 | C19702     | 0603        |
-| C_LED_DEC×24  | 24  | 100 nF 0402                | C1525      | 0402        |
+| Ref            | Qty | Part                                  | JLC PN     | Footprint     |
+|----------------|-----|---------------------------------------|------------|---------------|
+| U1             | 1   | PN5321A3HN                            | C28925     | QFN-40-EP     |
+| ANT1           | 1   | NFC coil antenna 22 × 22 mm (hand-pop)| —          | 2-pad 18 mm pitch SMT |
+| LED1…LED24     | 24  | WS2812B-MINI-X2                       | C4154873   | SMD3535-4P    |
+| J1             | 1   | B2B 1.27 mm 2×5 male SMD              | C2935458   | pinrow10_p1.27 |
+| R_SDA, R_SCL   | 2   | 4.7 kΩ 0402 1%                        | C25900     | 0402          |
+| R_IRQ          | 1   | 10 kΩ 0402 1%                         | C25744     | 0402          |
+| R_LED          | 1   | 33 Ω 0402 1%                          | C25105     | 0402          |
+| Rq1, Rq2       | 2   | 4.7 Ω 0603 1%                         | C23164     | 0603          |
+| Rs1, Rs2       | 2   | 750 Ω 0402 1%                         | C25132     | 0402          |
+| L_TVDD, L_LED  | 2   | 120 Ω @ 100 MHz ferrite bead 2 A      | C14709     | 0603          |
+| L0_TX1, L0_TX2 | 2   | 560 nH ±5%                            | C502009    | 0603          |
+| C0_TX1, C0_TX2 | 2   | 180 pF 50 V C0G                       | C20069329  | 0402          |
+| C1_TX1, C1_TX2 | 2   | 47 pF 50 V C0G                        | C1567      | 0402          |
+| C2_TX1, C2_TX2 | 2   | 47 pF 50 V C0G                        | C1567      | 0402          |
+| Cs1, Cs2       | 2   | 1 nF 50 V C0G                         | C76947     | 0402          |
+| C_PA, C_LED_BULK, C_LED_G1…6 | 8 | 10 µF 25 V X5R                  | C96446     | 0603          |
+| C_VBUS, C_PVDD, C_SVDD, C_AVDD, C_VMID, C_TVDD | 6 | 100 nF 50 V X7R     | C307331    | 0402          |
 
-**~75 part placements total**. JLC SMT-assembled in one pass. Any `TBD`
-PN is resolved during the implementation PR using `pcbparts:jlc_search`
-and committed to `lcsc-classes.json`.
+**~60 part placements**. PN532 + matching network + decoupling on
+bottom layer (under antenna); WS2812 ring + bulk decoupling + LED
+filter + connector on top layer. JLC SMT assembly populates everything
+except ANT1, which is hand-soldered post-SMT.
 
 ## 9. Acceptance + deferral
 

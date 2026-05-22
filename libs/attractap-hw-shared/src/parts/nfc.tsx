@@ -1,5 +1,5 @@
-// PN532 NFC front-end IC wrapper QFN-40-EP for JLC SMT assembly
-// FEATURE: shared lib parts — NFC board on-board RFID front-end
+// PN532 NFC front-end IC plus discrete 13.56 MHz coil antenna wrappers
+// FEATURE: shared lib parts — NFC board on-board RFID front-end + antenna
 
 import type { BasePartProps } from './types';
 import { jlcSupplier } from './types';
@@ -43,5 +43,65 @@ export const Pn532Ic = ({ name, pn, ...rest }: Pn532IcProps) => (
     {...rest}
   >
     <fabricationnotetext text="PN5321A3HN — antenna keep-out per mech-envelope.md NFC §4" />
+  </chip>
+);
+
+export interface NfcCoilAntennaProps extends Omit<BasePartProps, 'pn'> {
+  readonly pn?: string;
+  readonly padPitchMm?: number;
+  readonly bodyWidthMm?: number;
+  readonly bodyHeightMm?: number;
+  readonly padWidthMm?: number;
+  readonly padHeightMm?: number;
+  readonly note?: string;
+}
+
+export const NfcCoilAntenna = ({
+  name,
+  pn,
+  padPitchMm = 25,
+  bodyWidthMm = 32,
+  bodyHeightMm = 22,
+  padWidthMm = 1.8,
+  padHeightMm = 2.5,
+  note = 'NFC coil antenna 13.56MHz — hand-populated, PN selected per case-CAD aperture',
+  ...rest
+}: NfcCoilAntennaProps) => (
+  <chip
+    name={name}
+    pinLabels={{ pin1: ['P1'], pin2: ['P2'] }}
+    {...(pn ? { supplierPartNumbers: jlcSupplier(pn) } : {})}
+    {...rest}
+  >
+    <footprint>
+      <smtpad
+        shape="rect"
+        portHints={['pin1']}
+        pcbX={-padPitchMm / 2}
+        pcbY={0}
+        width={`${padWidthMm}mm`}
+        height={`${padHeightMm}mm`}
+      />
+      <smtpad
+        shape="rect"
+        portHints={['pin2']}
+        pcbX={padPitchMm / 2}
+        pcbY={0}
+        width={`${padWidthMm}mm`}
+        height={`${padHeightMm}mm`}
+      />
+      <silkscreenpath
+        route={[
+          { x: -bodyWidthMm / 2, y: -bodyHeightMm / 2 },
+          { x: bodyWidthMm / 2, y: -bodyHeightMm / 2 },
+          { x: bodyWidthMm / 2, y: bodyHeightMm / 2 },
+          { x: -bodyWidthMm / 2, y: bodyHeightMm / 2 },
+          { x: -bodyWidthMm / 2, y: -bodyHeightMm / 2 },
+        ]}
+        strokeWidth="0.15mm"
+      />
+      <silkscreencircle pcbX={-padPitchMm / 2 - 1} pcbY={padHeightMm / 2 + 0.5} radius={0.3} strokeWidth="0.1mm" />
+    </footprint>
+    <fabricationnotetext text={note} />
   </chip>
 );
