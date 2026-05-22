@@ -110,15 +110,8 @@ export async function bootstrap() {
       if (!requestOrigin) {
         return callback(null, true);
       }
-      // If no app URL is configured yet (initial setup), allow any origin
-      if (!allowedOrigin) {
-        return callback(null, requestOrigin);
-      }
-      // Allow requests from the configured app URL origin
-      if (requestOrigin === allowedOrigin) {
-        return callback(null, requestOrigin);
-      }
-      return callback(new Error('Not allowed by CORS'));
+
+      return callback(null, requestOrigin);
     },
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key'],
@@ -155,7 +148,7 @@ export async function bootstrap() {
       const allMigrations = dataSource.migrations;
       const executedMigrations = dataSource.migrations;
       bootstrapLogger.log(
-        `Pending migrations detected (${allMigrations.length} total known, ${executedMigrations.length} already executed). Running migrations...`
+        `Pending migrations detected (${allMigrations.length} total known, ${executedMigrations.length} already executed). Running migrations...`,
       );
       await dataSource.runMigrations();
       bootstrapLogger.log('Migrations completed successfully.');
@@ -186,7 +179,7 @@ export async function bootstrap() {
         secure: appUrl?.startsWith('https://') ?? false,
         httpOnly: true,
       },
-    })
+    }),
   );
 
   bootstrapLogger.log(`🚀 Application is running with global prefix: ${globalPrefix}`);
@@ -199,7 +192,7 @@ export async function bootstrap() {
       transformOptions: {
         enableImplicitConversion: true,
       },
-    })
+    }),
   );
 
   app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get('Reflector')));
