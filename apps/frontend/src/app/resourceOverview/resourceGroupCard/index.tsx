@@ -10,7 +10,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { filenameToUrl } from '../../../api';
 import { StatusChip } from './statusChip';
-import { ChevronRightIcon } from 'lucide-react';
+import { ChevronRightIcon, ShapesIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useAuth } from '../../../hooks/useAuth';
 import { useDebounce } from '../../../hooks/useDebounce';
@@ -148,14 +148,25 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
             {(resource) => (
               <TableRow key={resource.id} id={resource.id} className="cursor-pointer hover:bg-primary-50 transition-bg duration-300" onAction={() => navigate(`/resources/${resource.id}`)}>
                 <TableCell>
-                  <img
-                    height={48}
-                    width={48}
-                    src={filenameToUrl(resource.imageFilename)}
-                    alt={resource.name}
-                    className="object-contain"
-                    style={{ height: 48, width: 48 }}
-                  />
+                  {resource.imageFilename ? (
+                    <img
+                      height={48}
+                      width={48}
+                      src={filenameToUrl(resource.imageFilename)}
+                      alt=""
+                      aria-hidden="true"
+                      className="object-contain"
+                      style={{ height: 48, width: 48 }}
+                    />
+                  ) : (
+                    <div
+                      className="flex items-center justify-center text-default-400"
+                      style={{ height: 48, width: 48 }}
+                      aria-hidden="true"
+                    >
+                      <ShapesIcon className="w-6 h-6" />
+                    </div>
+                  )}
                 </TableCell>
                 <TableCell>{resource.name}</TableCell>
                 <TableCell className="text-right">
