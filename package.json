@@ -241,7 +241,10 @@
       "typeorm@0.3.29": "patches/typeorm@0.3.29.patch"
     },
     "overrides": {
-      "@internationalized/date": "3.12.1"
+      "@internationalized/date": "3.12.1",
+      "zod@>=3.25.0 <4.0.0": "3.24.4",
+      "eslint-plugin-react-hooks>zod": "^4.4.3",
+      "eslint-plugin-react-hooks>zod-validation-error": "^4.0.2"
     },
     "onlyBuiltDependencies": [
       "@nestjs/core",
