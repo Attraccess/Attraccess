@@ -36,6 +36,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Typecheck hardware libs
+        run: pnpm nx run-many --target=typecheck --parallel=3 --projects=tag:scope:hardware
+      - name: Test hardware libs
+        run: pnpm nx run-many --target=test --parallel=3 --projects=tag:scope:hardware
+      - name: Check generated docs in sync
+        run: pnpm nx run-many --target=doc-check --parallel=3 --projects=tag:scope:hardware
+
       - name: Lint hardware (DRC/ERC)
         run: pnpm nx run-many --target=lint --parallel=3 --projects=tag:scope:hardware
       - name: Build hardware (circuit JSON)

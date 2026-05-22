@@ -683,6 +683,19 @@ importers:
         specifier: ^4.20.3
         version: 4.22.3
 
+  libs/attractap-hw-shared:
+    dependencies:
+      tscircuit:
+        specifier: 0.0.1774
+        version: 0.0.1774(@gltf-transform/core@4.3.0)(@gltf-transform/extensions@4.3.0)(@gltf-transform/functions@4.3.0)(@tscircuit/schematic-corpus@0.0.114(typescript@6.0.3))(bun-match-svg@0.0.15(typescript@6.0.3))(esbuild-wasm@0.27.7)(looks-same@9.0.1)(three@0.179.1)(typescript@6.0.3)
+    devDependencies:
+      tsx:
+        specifier: ^4.20.3
+        version: 4.22.3
+      vitest:
+        specifier: ^4.1.5
+        version: 4.1.5(@opentelemetry/api@1.9.1)(@types/node@25.9.0)(@vitest/coverage-v8@4.1.5)(@vitest/ui@4.1.5)(happy-dom@20.9.0)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.13(@types/node@25.9.0)(esbuild@0.28.0)(jiti@2.7.0)(less@4.1.3)(sass-embedded@1.89.0)(sass@1.89.0)(stylus@0.64.0)(terser@5.47.1)(tsx@4.22.3)(yaml@2.9.0))
+
 packages:
 
   '@7nohe/openapi-react-query-codegen@1.6.2':

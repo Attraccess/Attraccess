@@ -1,0 +1,48 @@
+{
+  "name": "attractap-hw-shared",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "library",
+  "sourceRoot": "libs/attractap-hw-shared/src",
+  "tags": ["scope:hardware", "type:hw-lib"],
+  "targets": {
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["{projectRoot}/src/**/*", "{projectRoot}/tsconfig.json"],
+      "outputs": [],
+      "options": {
+        "cwd": "libs/attractap-hw-shared",
+        "command": "pnpm exec tsc -p tsconfig.json --noEmit"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["{projectRoot}/src/**/*", "{projectRoot}/vitest.config.ts", "{projectRoot}/tsconfig.json"],
+      "outputs": [],
+      "options": {
+        "cwd": "libs/attractap-hw-shared",
+        "command": "pnpm exec vitest run"
+      }
+    },
+    "doc-gen": {
+      "executor": "nx:run-commands",
+      "inputs": ["{projectRoot}/src/connectors/**/*", "{projectRoot}/src/doc-gen/**/*"],
+      "outputs": ["{projectRoot}/CONNECTORS.md"],
+      "options": {
+        "cwd": "libs/attractap-hw-shared",
+        "command": "pnpm exec tsx src/doc-gen/generate.ts"
+      }
+    },
+    "doc-check": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["{projectRoot}/src/connectors/**/*", "{projectRoot}/src/doc-gen/**/*", "{projectRoot}/CONNECTORS.md"],
+      "outputs": [],
+      "options": {
+        "cwd": "libs/attractap-hw-shared",
+        "command": "pnpm exec tsx src/doc-gen/generate.ts --check"
+      }
+    }
+  }
+}
