@@ -342,7 +342,7 @@ export function MetricsSettingsForm() {
 
       <div className="flex gap-2 flex-wrap">
         <Button variant="primary" onPress={handleGenerate} isPending={isGenerating}>
-          metricsSettings?.apiKeyConfigured ? <RefreshCwIcon size={16} /> : <KeyIcon size={16} />
+          {metricsSettings?.apiKeyConfigured ? <RefreshCwIcon size={16} /> : <KeyIcon size={16} />}
           {metricsSettings?.apiKeyConfigured ? t('rerollButton') : t('generateButton')}
         </Button>
 
