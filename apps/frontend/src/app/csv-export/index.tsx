@@ -61,11 +61,26 @@ export function CsvExport() {
           <span className="font-bold">{t('rangeCalendar.selection.label')}</span>
           <div className="flex gap-4 flex-row flex-wrap">
             <RangeCalendar
+              value={dateRange ?? null}
               onChange={(value) => setDateRange(value)}
               id="date-range"
               aria-label={t('rangeCalendar.label')}
               data-cy="csv-export-range-calendar"
-            />
+            >
+              <RangeCalendar.Header>
+                <RangeCalendar.Heading />
+                <RangeCalendar.NavButton slot="previous" />
+                <RangeCalendar.NavButton slot="next" />
+              </RangeCalendar.Header>
+              <RangeCalendar.Grid>
+                <RangeCalendar.GridHeader>
+                  {(day) => <RangeCalendar.HeaderCell>{day}</RangeCalendar.HeaderCell>}
+                </RangeCalendar.GridHeader>
+                <RangeCalendar.GridBody>
+                  {(date) => <RangeCalendar.Cell date={date} />}
+                </RangeCalendar.GridBody>
+              </RangeCalendar.Grid>
+            </RangeCalendar>
             <p>
               <br />
               {t('rangeCalendar.selection.start', {
