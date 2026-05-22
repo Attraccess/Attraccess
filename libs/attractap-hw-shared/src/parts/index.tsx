@@ -7,3 +7,4 @@ export * from './nfc';
 export * from './touch';
 export * from './discrete';
 export * from './buzzer';
+export * from './leds';

@@ -8,12 +8,12 @@ import { fileURLToPath } from 'node:url';
 
 const REF_CLASS = [
   { prefix: 'LS', pattern: /buzzer|speaker|audio/i, label: 'buzzer' },
-  { prefix: 'LED', pattern: /\bled\b|light.?emitting/i, label: 'LED' },
+  { prefix: 'LED', pattern: /\bleds?\b|light.?emitting/i, label: 'LED' },
   { prefix: 'SW', pattern: /switch|tactile|key/i, label: 'switch' },
   { prefix: 'Y', pattern: /crystal|oscillator|resonator/i, label: 'crystal/oscillator' },
   { prefix: 'Q', pattern: /mosfet|bjt|transistor|jfet|igbt|thyristor/i, label: 'transistor' },
   { prefix: 'D', pattern: /diode|rectifier|tvs|zener|schottky/i, label: 'diode' },
-  { prefix: 'U', pattern: /\bic\b|integrated|microcontroller|regulator|op.?amp|driver|converter|sensor|memory|logic/i, label: 'IC' },
+  { prefix: 'U', pattern: /\bics?\b|integrated|microcontroller|regulator|op.?amp|driver|converter|sensor|memory|logic|rfid|wireless/i, label: 'IC' },
   { prefix: 'J', pattern: /connector|terminal|header|jack|socket|receptacle|wire.?to.?board/i, label: 'connector' },
   { prefix: 'R', pattern: /resistor/i, label: 'resistor' },
   { prefix: 'C', pattern: /capacitor/i, label: 'capacitor' },
