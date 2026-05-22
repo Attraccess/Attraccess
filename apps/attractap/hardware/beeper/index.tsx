@@ -21,7 +21,7 @@ export default () => (
     autorouter="sequential-trace"
     defaultTraceWidth="0.15mm"
   >
-    <Buzzer5VTh name="LS1" pn="C2687681" pitchMm={6.5} bodyDiameterMm={12} buzzerType="magnetic" {...at(9, 8)} />
+    <Buzzer5VTh name="LS1" pn="C2687681" pitchMm={6.5} bodyDiameterMm={12} {...at(9, 8)} />
     <Ao3400 name="Q1" pn="C20917" {...at(3, 17)} />
     <R0603 name="R1" resistance="100" pn="C22775" {...at(7, 17)} />
     <R0603 name="R2" resistance="10k" pn="C25804" {...at(11, 17)} />

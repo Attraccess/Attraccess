@@ -689,6 +689,24 @@ importers:
         specifier: ^4.20.3
         version: 4.22.3
 
+  apps/attractap/hardware/nfc:
+    dependencies:
+      '@attraccess/attractap-hw-shared':
+        specifier: workspace:*
+        version: link:../../../../libs/attractap-hw-shared
+      '@tscircuit/cli':
+        specifier: 0.1.1399
+        version: 0.1.1399(tscircuit@0.0.1774(@gltf-transform/core@4.3.0)(@gltf-transform/extensions@4.3.0)(@gltf-transform/functions@4.3.0)(@tscircuit/schematic-corpus@0.0.114(typescript@6.0.3))(bun-match-svg@0.0.15(typescript@6.0.3))(esbuild-wasm@0.27.7)(looks-same@9.0.1)(three@0.179.1)(typescript@6.0.3))
+      playwright:
+        specifier: 1.56.1
+        version: 1.56.1
+      tscircuit:
+        specifier: 0.0.1774
+        version: 0.0.1774(@gltf-transform/core@4.3.0)(@gltf-transform/extensions@4.3.0)(@gltf-transform/functions@4.3.0)(@tscircuit/schematic-corpus@0.0.114(typescript@6.0.3))(bun-match-svg@0.0.15(typescript@6.0.3))(esbuild-wasm@0.27.7)(looks-same@9.0.1)(three@0.179.1)(typescript@6.0.3)
+      tsx:
+        specifier: ^4.20.3
+        version: 4.22.3
+
   libs/attractap-hw-shared:
     dependencies:
       tscircuit:

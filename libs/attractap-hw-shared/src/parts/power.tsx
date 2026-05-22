@@ -1,20 +1,16 @@
 import type { BasePartProps } from './types';
 import { jlcSupplier } from './types';
 
-export interface Ams1117Props extends BasePartProps {
-  readonly outputVoltage?: '3.3V' | '5V' | '1.8V' | '1.2V';
-}
+export type Ams1117Props = BasePartProps;
 
-export const Ams1117_3v3 = ({ name, pn, outputVoltage = '3.3V', ...rest }: Ams1117Props) => (
+export const Ams1117_3v3 = ({ name, pn, ...rest }: Ams1117Props) => (
   <chip
     name={name}
     footprint="sot223"
     supplierPartNumbers={jlcSupplier(pn)}
     pinLabels={{ pin1: ['ADJ_GND'], pin2: ['VOUT'], pin3: ['VIN'], pin4: ['TAB'] }}
     {...rest}
-  >
-    <fabricationnotetext text={`AMS1117 LDO ${outputVoltage}`} />
-  </chip>
+  />
 );
 
 export type Lm74700Props = BasePartProps;
@@ -33,9 +29,7 @@ export const Lm74700 = ({ name, pn, ...rest }: Lm74700Props) => (
       pin6: ['CATHODE'],
     }}
     {...rest}
-  >
-    <fabricationnotetext text="LM74700 ideal-diode controller" />
-  </chip>
+  />
 );
 
 export type Mp2315Props = BasePartProps;
@@ -56,7 +50,5 @@ export const Mp2315 = ({ name, pn, ...rest }: Mp2315Props) => (
       pin8: ['SS'],
     }}
     {...rest}
-  >
-    <fabricationnotetext text="MP2315 3A sync buck" />
-  </chip>
+  />
 );

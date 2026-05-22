@@ -55,7 +55,5 @@ export const Ffc05_30P = ({ name, pn, ...rest }: Ffc05_30P_Props) => (
     pinLabels={FFC30_PIN_LABELS}
     supplierPartNumbers={jlcSupplier(pn)}
     {...rest}
-  >
-    <fabricationnotetext text="FFC 0.5mm 30-pin connector" />
-  </chip>
+  />
 );

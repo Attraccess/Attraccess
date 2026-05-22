@@ -5,5 +5,20 @@
   "C25804": { "category": "Resistors", "subcategory": "Chip Resistor - Surface Mount", "model": "0603WAF1002T5E" },
   "C81598": { "category": "Diodes", "subcategory": "Switching Diodes", "model": "1N4148W" },
   "C2687681": { "category": "Audio Products / Vibration Motors", "subcategory": "Buzzers", "model": "SEA-1295Y-0520-42Ω-38P6.5" },
-  "C122442": { "category": "Connectors", "subcategory": "Wire To Board Connector", "model": "530470310" }
+  "C122442": { "category": "Connectors", "subcategory": "Wire To Board Connector", "model": "530470310" },
+  "C28925": { "category": "RF and Wireless", "subcategory": "RFID ICs", "model": "PN5321A3HN/C106,55" },
+  "C4154873": { "category": "Optoelectronics", "subcategory": "RGB LEDs(Built-in IC)", "model": "WS2812B-MINI-X2" },
+  "C25900": { "category": "Resistors", "subcategory": "Chip Resistor - Surface Mount", "model": "0402WGF4701TCE" },
+  "C25744": { "category": "Resistors", "subcategory": "Chip Resistor - Surface Mount", "model": "0402WGF1002TCE" },
+  "C25105": { "category": "Resistors", "subcategory": "Chip Resistor - Surface Mount", "model": "0402WGF330JTCE" },
+  "C23164": { "category": "Resistors", "subcategory": "Chip Resistor - Surface Mount", "model": "0603WAF470KT5E" },
+  "C25132": { "category": "Resistors", "subcategory": "Chip Resistor - Surface Mount", "model": "0402WGF7500TCE" },
+  "C307331": { "category": "Capacitors", "subcategory": "Multilayer Ceramic Capacitors MLCC - SMD/SMT", "model": "CL05B104KB54PNC" },
+  "C96446": { "category": "Capacitors", "subcategory": "Multilayer Ceramic Capacitors MLCC - SMD/SMT", "model": "CL10A106MA8NRNC" },
+  "C76947": { "category": "Capacitors", "subcategory": "Multilayer Ceramic Capacitors MLCC - SMD/SMT", "model": "GRM1555C1H102JA01D" },
+  "C1567": { "category": "Capacitors", "subcategory": "Multilayer Ceramic Capacitors MLCC - SMD/SMT", "model": "0402CG470J500NT" },
+  "C20069329": { "category": "Capacitors", "subcategory": "Multilayer Ceramic Capacitors MLCC - SMD/SMT", "model": "CGA0402C0G181J500GT" },
+  "C502009": { "category": "Inductors, Coils, Chokes", "subcategory": "Inductors (SMD)", "model": "MLJ1608WR56JT000" },
+  "C14709": { "category": "Filters", "subcategory": "Ferrite Beads", "model": "BLM18PG121SN1D" },
+  "C2935458": { "category": "Connectors", "subcategory": "Pin Headers", "model": "PZ127VS-12-10-H10-A38" }
 }

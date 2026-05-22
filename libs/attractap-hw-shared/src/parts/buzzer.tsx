@@ -7,7 +7,6 @@ import { jlcSupplier } from './types';
 export interface BuzzerThProps extends BasePartProps {
   readonly pitchMm?: number;
   readonly bodyDiameterMm?: number;
-  readonly buzzerType?: 'magnetic' | 'piezo';
 }
 
 export const Buzzer5VTh = ({
@@ -15,7 +14,6 @@ export const Buzzer5VTh = ({
   pn,
   pitchMm = 5.08,
   bodyDiameterMm = 12,
-  buzzerType = 'magnetic',
   ...rest
 }: BuzzerThProps) => (
   <chip
@@ -30,8 +28,5 @@ export const Buzzer5VTh = ({
       <silkscreencircle pcbX={0} pcbY={0} radius={bodyDiameterMm / 2} strokeWidth="0.15mm" />
       <courtyardcircle pcbX={0} pcbY={0} radius={bodyDiameterMm / 2} />
     </footprint>
-    <fabricationnotetext
-      text={`Buzzer 5V THT ${buzzerType} Ø${bodyDiameterMm}mm${buzzerType === 'magnetic' ? ' — flyback diode mandatory' : ' — no flyback needed'}`}
-    />
   </chip>
 );
