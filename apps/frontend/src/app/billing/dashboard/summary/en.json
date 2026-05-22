@@ -13,6 +13,9 @@
         "amount": "Amount",
         "actions": "Actions"
       },
+      "actions": {
+        "refund": "Refund transaction"
+      },
       "cells": {
         "details": {
           "unknown": "Unknown transaction type",

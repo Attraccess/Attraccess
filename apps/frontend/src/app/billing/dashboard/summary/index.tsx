@@ -12,10 +12,11 @@ import {
   useBillingServiceGetBillingConfiguration,
   useBillingServiceGetBillingTransactions,
 } from '@attraccess/react-query-client';
-import { CreditCardIcon, ReceiptTextIcon } from 'lucide-react';
+import { CreditCardIcon, RotateCcwIcon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { dbCurrencyToUserCurrency } from '@attraccess/shared';
 import { TransactionDetailsModal } from './transactionDetailsModal';
+import { RefundModal } from './transactionDetailsModal/refund';
 
 interface Props {
   className?: string;
@@ -137,6 +138,11 @@ export function SummaryCard(props: Props) {
   const [openedTransactionId, setOpenedTransactionId] = useState<number | undefined>(undefined);
   const [isOpenDetails, setIsOpenDetails] = useState(false);
 
+  const openDetails = useCallback((transactionId: number) => {
+    setOpenedTransactionId(transactionId);
+    setIsOpenDetails(true);
+  }, []);
+
   if (!configuration) {
     return <Skeleton className="h-10 w-full" />;
   }
@@ -157,7 +163,7 @@ export function SummaryCard(props: Props) {
       )}
 
       <Table>
-        <TableContent aria-label={t('transactions.table.ariaLabel')}>
+        <TableContent aria-label={t('transactions.table.ariaLabel')} onRowAction={(key) => openDetails(Number(key))}>
           <TableHeader>
             <TableColumn isRowHeader>{t('transactions.table.columns.id')}</TableColumn>
             <TableColumn>{t('transactions.table.columns.dateTime')}</TableColumn>
@@ -186,16 +192,18 @@ export function SummaryCard(props: Props) {
                   {formatNumber(dbCurrencyToUserCurrency(transaction.amount, configuration.minorUnit))}
                 </TableCell>
                 <TableCell>
-                  <Button
-                    isIconOnly
-                    variant="ghost"
-                    onPress={() => {
-                      setOpenedTransactionId(transaction.id);
-                      setIsOpenDetails(true);
-                    }}
-                  >
-                    <ReceiptTextIcon />
-                  </Button>
+                  <RefundModal transactionId={transaction.id}>
+                    {(onOpen) => (
+                      <Button
+                        isIconOnly
+                        variant="danger-soft"
+                        aria-label={t('transactions.table.actions.refund') as string}
+                        onPress={onOpen}
+                      >
+                        <RotateCcwIcon />
+                      </Button>
+                    )}
+                  </RefundModal>
                 </TableCell>
               </TableRow>
             )}
