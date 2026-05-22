@@ -10,4 +10,5 @@ export default {
   noForms: 'Keine Formulare vorhanden',
   booleanYes: 'Ja',
   booleanNo: 'Nein',
+  projectSelectLabel: 'Projekt',
 };
