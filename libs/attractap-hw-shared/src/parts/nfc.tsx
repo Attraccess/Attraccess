@@ -41,9 +41,7 @@ export const Pn532Ic = ({ name, pn, ...rest }: Pn532IcProps) => (
     supplierPartNumbers={jlcSupplier(pn)}
     pinLabels={PN532_PIN_LABELS}
     {...rest}
-  >
-    <fabricationnotetext text="PN5321A3HN — antenna keep-out per mech-envelope.md NFC §4" />
-  </chip>
+  />
 );
 
 export interface NfcCoilAntennaProps extends Omit<BasePartProps, 'pn'> {
@@ -53,7 +51,6 @@ export interface NfcCoilAntennaProps extends Omit<BasePartProps, 'pn'> {
   readonly bodyHeightMm?: number;
   readonly padWidthMm?: number;
   readonly padHeightMm?: number;
-  readonly note?: string;
 }
 
 export const NfcCoilAntenna = ({
@@ -64,7 +61,6 @@ export const NfcCoilAntenna = ({
   bodyHeightMm = 22,
   padWidthMm = 1.8,
   padHeightMm = 2.5,
-  note = 'NFC coil antenna 13.56MHz — hand-populated, PN selected per case-CAD aperture',
   ...rest
 }: NfcCoilAntennaProps) => (
   <chip
@@ -102,6 +98,5 @@ export const NfcCoilAntenna = ({
       />
       <silkscreencircle pcbX={-padPitchMm / 2 - 1} pcbY={padHeightMm / 2 + 0.5} radius={0.3} strokeWidth="0.1mm" />
     </footprint>
-    <fabricationnotetext text={note} />
   </chip>
 );

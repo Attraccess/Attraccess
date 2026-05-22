@@ -13,9 +13,7 @@ export const Ao3400 = ({ name, pn, ...rest }: Ao3400Props) => (
     pinLabels={{ pin1: ['gate'], pin2: ['source'], pin3: ['drain'] }}
     supplierPartNumbers={jlcSupplier(pn)}
     {...rest}
-  >
-    <fabricationnotetext text="AO3400A N-MOSFET logic-level Vgs(th)≈1.3V SOT-23 G/S/D" />
-  </chip>
+  />
 );
 
 export type Diode1N4148WsProps = BasePartProps;

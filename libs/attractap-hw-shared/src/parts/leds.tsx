@@ -11,6 +11,7 @@ export const Ws2812Mini = ({ name, pn, ...rest }: Ws2812MiniProps) => (
     name={name}
     pinLabels={{ pin1: ['VDD'], pin2: ['DOUT'], pin3: ['GND'], pin4: ['DIN'] }}
     supplierPartNumbers={jlcSupplier(pn)}
+    pcbStyle={{ silkscreenTextVisibility: 'hidden' }}
     {...rest}
   >
     <footprint>
@@ -27,6 +28,5 @@ export const Ws2812Mini = ({ name, pn, ...rest }: Ws2812MiniProps) => (
       ]} strokeWidth="0.1mm" />
       <silkscreencircle pcbX={-1.4} pcbY={1.4} radius={0.2} strokeWidth="0.1mm" />
     </footprint>
-    <fabricationnotetext text="WS2812B-MINI SMD3535 RGB LED — pin1=VDD, daisy-chain DOUT→DIN" />
   </chip>
 );
