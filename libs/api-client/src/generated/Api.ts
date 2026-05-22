@@ -143,10 +143,9 @@ export enum ResourceType {
   Door = "door",
 }
 
+/** Evaluate against the effective policy for this role (uses global if omitted). */
 export enum PasswordPolicyRole {
   Admin = "admin",
-  Machine = "machine",
-  ApiToken = "api-token",
 }
 
 /** Selected SMTP provider type. */
@@ -1444,13 +1443,13 @@ export interface PasswordPolicyDto {
 
 export interface UpdatePasswordPolicyDto {
   /**
-   * @min 1
+   * @min 8
    * @max 1024
    * @example 12
    */
   minLength?: number;
   /**
-   * @min 1
+   * @min 8
    * @max 1024
    * @example 128
    */
@@ -1489,6 +1488,34 @@ export interface UpdatePasswordPolicyDto {
   rotationDays?: number;
 }
 
+export interface PreviewPasswordDto {
+  /**
+   * Password candidate to evaluate against the policy
+   * @minLength 1
+   * @maxLength 4096
+   */
+  password: string;
+  /** Evaluate against the effective policy for this role (uses global if omitted). */
+  role?: PasswordPolicyRole;
+  /** Draft policy overrides to merge over the persisted policy for this evaluation only. */
+  draftPolicy?: UpdatePasswordPolicyDto;
+}
+
+export interface PreviewPasswordResultDto {
+  /**
+   * Whether the candidate satisfies every rule of the (draft-merged) policy
+   * @example false
+   */
+  ok: boolean;
+  /** Structured policy errors with codes and per-rule parameters */
+  errors: object[];
+  /** zxcvbn evaluation summary */
+  zxcvbn: {
+    score?: number;
+    required?: number;
+  };
+}
+
 export interface PasswordPolicyOverrideDto {
   role: PasswordPolicyRole;
   minLength: number | null;
@@ -1507,12 +1534,12 @@ export interface PasswordPolicyOverrideDto {
 
 export interface UpsertPasswordPolicyOverrideDto {
   /**
-   * @min 1
+   * @min 8
    * @max 1024
    */
   minLength?: number | null;
   /**
-   * @min 1
+   * @min 8
    * @max 1024
    */
   maxLength?: number | null;
@@ -4322,21 +4349,26 @@ export type GetAdminPasswordPolicyData = PasswordPolicyDto;
 
 export type UpdateAdminPasswordPolicyData = PasswordPolicyDto;
 
+export type PreviewAdminPasswordPolicyData = PreviewPasswordResultDto;
+
 export type ListPasswordPolicyOverridesData = PasswordPolicyOverrideDto[];
 
 export interface GetPasswordPolicyOverrideParams {
+  /** Evaluate against the effective policy for this role (uses global if omitted). */
   role: PasswordPolicyRole;
 }
 
 export type GetPasswordPolicyOverrideData = PasswordPolicyOverrideDto | null;
 
 export interface UpsertPasswordPolicyOverrideParams {
+  /** Evaluate against the effective policy for this role (uses global if omitted). */
   role: PasswordPolicyRole;
 }
 
 export type UpsertPasswordPolicyOverrideData = PasswordPolicyOverrideDto;
 
 export interface DeletePasswordPolicyOverrideParams {
+  /** Evaluate against the effective policy for this role (uses global if omitted). */
   role: PasswordPolicyRole;
 }
 
@@ -6650,6 +6682,22 @@ export namespace PasswordPolicyAdmin {
   /**
    * No description
    * @tags Password Policy Admin
+   * @name PreviewAdminPasswordPolicy
+   * @summary Server-side preview: evaluate a candidate password against the current (or draft) policy
+   * @request POST:/api/admin/password-policy/preview
+   * @secure
+   */
+  export namespace PreviewAdminPasswordPolicy {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = PreviewPasswordDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = PreviewAdminPasswordPolicyData;
+  }
+
+  /**
+   * No description
+   * @tags Password Policy Admin
    * @name ListPasswordPolicyOverrides
    * @summary List all per-role password policy overrides
    * @request GET:/api/admin/password-policy/overrides
@@ -6673,6 +6721,7 @@ export namespace PasswordPolicyAdmin {
    */
   export namespace GetPasswordPolicyOverride {
     export type RequestParams = {
+      /** Evaluate against the effective policy for this role (uses global if omitted). */
       role: PasswordPolicyRole;
     };
     export type RequestQuery = {};
@@ -6691,6 +6740,7 @@ export namespace PasswordPolicyAdmin {
    */
   export namespace UpsertPasswordPolicyOverride {
     export type RequestParams = {
+      /** Evaluate against the effective policy for this role (uses global if omitted). */
       role: PasswordPolicyRole;
     };
     export type RequestQuery = {};
@@ -6709,6 +6759,7 @@ export namespace PasswordPolicyAdmin {
    */
   export namespace DeletePasswordPolicyOverride {
     export type RequestParams = {
+      /** Evaluate against the effective policy for this role (uses global if omitted). */
       role: PasswordPolicyRole;
     };
     export type RequestQuery = {};
@@ -10997,6 +11048,29 @@ export class Api<
       this.request<UpdateAdminPasswordPolicyData, void>({
         path: `/api/admin/password-policy`,
         method: "PATCH",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Password Policy Admin
+     * @name PreviewAdminPasswordPolicy
+     * @summary Server-side preview: evaluate a candidate password against the current (or draft) policy
+     * @request POST:/api/admin/password-policy/preview
+     * @secure
+     */
+    previewAdminPasswordPolicy: (
+      data: PreviewPasswordDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<PreviewAdminPasswordPolicyData, void>({
+        path: `/api/admin/password-policy/preview`,
+        method: "POST",
         body: data,
         secure: true,
         type: ContentType.Json,
