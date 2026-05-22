@@ -38,7 +38,7 @@ COPY . .
 
 # Build the application
 RUN pnpm nx run-many -t build --projects=api,frontend
-RUN pnpm --filter ./dist/apps/api deploy --prod /app/deploy/api
+RUN pnpm --ignore-workspace --filter ./dist/apps/api deploy --prod /app/deploy/api
 RUN cd /app/deploy/api && pnpm rebuild bcrypt sqlite3
 
 

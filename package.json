@@ -241,7 +241,26 @@
       "typeorm@0.3.29": "patches/typeorm@0.3.29.patch"
     },
     "overrides": {
-      "@internationalized/date": "3.12.1"
+      "@internationalized/date": "3.12.1",
+      "tscircuit>zod": "3.25.76",
+      "@tscircuit/cli>zod": "3.25.76",
+      "@tscircuit/core>zod": "3.25.76",
+      "@tscircuit/eval>zod": "3.25.76",
+      "@tscircuit/props>zod": "3.25.76",
+      "@tscircuit/runframe>zod": "3.25.76",
+      "@tscircuit/circuit-json-util>zod": "3.25.76",
+      "@tscircuit/soup-util>zod": "3.25.76",
+      "@tscircuit/ngspice-spice-engine>zod": "3.25.76",
+      "calculate-packing>zod": "3.25.76",
+      "circuit-json-to-gltf>zod": "3.25.76",
+      "circuit-json-to-spice>zod": "3.25.76"
+    },
+    "packageExtensions": {
+      "circuit-json@0.0.425": {
+        "dependencies": {
+          "zod": "3.25.76"
+        }
+      }
     },
     "onlyBuiltDependencies": [
       "@nestjs/core",

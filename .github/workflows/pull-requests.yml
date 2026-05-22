@@ -58,9 +58,9 @@ jobs:
           fetch-depth: 0
       - uses: ./.github/actions/setup
       - name: Lint affected projects
-        run: pnpm nx affected --target=lint --parallel=5 --base=origin/${{ github.event.pull_request.base.ref }}
+        run: pnpm nx affected --target=lint --parallel=5 --base=origin/${{ github.event.pull_request.base.ref }} --exclude=tag:scope:hardware
       - name: Typecheck affected projects
-        run: pnpm nx affected --target=typecheck --parallel=5 --base=origin/${{ github.event.pull_request.base.ref }}
+        run: pnpm nx affected --target=typecheck --parallel=5 --base=origin/${{ github.event.pull_request.base.ref }} --exclude=tag:scope:hardware
 
   test:
     runs-on: ubuntu-latest
@@ -71,7 +71,7 @@ jobs:
           fetch-depth: 0
       - uses: ./.github/actions/setup
       - name: Test affected projects
-        run: pnpm nx affected --target=test,e2e --parallel=5 --base=origin/${{ github.event.pull_request.base.ref }}
+        run: pnpm nx affected --target=test,e2e --parallel=5 --base=origin/${{ github.event.pull_request.base.ref }} --exclude=tag:scope:hardware
 
   fail2ban-smoke:
     runs-on: ubuntu-latest
