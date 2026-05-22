@@ -4,7 +4,7 @@ export type JBeepSignal = '+5V' | 'GND' | 'PWM';
 
 export const J_BEEP = {
   name: 'J_BEEP',
-  footprint: 'JST PH 1.25mm 3P',
+  footprint: 'Molex PicoBlade 1.25mm 3P',
   pitch: '1.25mm',
   pinCount: 3,
   expectedPowerPins: 1,

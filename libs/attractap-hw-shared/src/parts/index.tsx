@@ -5,3 +5,5 @@ export * from './connectors';
 export * from './mcu';
 export * from './nfc';
 export * from './touch';
+export * from './discrete';
+export * from './buzzer';

@@ -4,7 +4,7 @@ export type JPwrDcSignal = '+5V' | 'GND';
 
 export const J_PWR_DC = {
   name: 'J_PWR_DC',
-  footprint: 'JST PH 1.25mm 4P',
+  footprint: 'Molex PicoBlade 1.25mm 4P',
   pitch: '1.25mm',
   pinCount: 4,
   expectedPowerPins: 2,

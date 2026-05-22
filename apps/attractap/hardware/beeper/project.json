@@ -39,7 +39,8 @@
         "cwd": "apps/attractap/hardware/beeper",
         "commands": [
           "rm -rf dist/export && mkdir -p dist/export",
-          "pnpm exec tscircuit-cli export index.tsx -f gerbers -o dist/export/beeper-gerbers.zip"
+          "pnpm exec tscircuit-cli export index.tsx -f gerbers -o dist/export/beeper-gerbers.zip",
+          "node ../scripts/validate-bom.mjs dist/export/beeper-gerbers.zip"
         ],
         "parallel": false
       }
@@ -58,6 +59,22 @@
           "pnpm exec tscircuit-cli export index.tsx -f schematic-svg -o dist/render/beeper-schematic.svg",
           "pnpm exec tscircuit-cli export index.tsx -f assembly-svg -o dist/render/beeper-assembly.svg",
           "node ../scripts/render-png.mjs --out-dir dist/render dist/render/beeper-pcb.svg dist/render/beeper-schematic.svg dist/render/beeper-assembly.svg"
+        ],
+        "parallel": false
+      }
+    },
+    "render-3d": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "dependsOn": ["build"],
+      "inputs": ["{projectRoot}/index.tsx", "{projectRoot}/tscircuit.config.json"],
+      "outputs": ["{projectRoot}/dist/render-3d"],
+      "options": {
+        "cwd": "apps/attractap/hardware/beeper",
+        "commands": [
+          "rm -rf dist/render-3d && mkdir -p dist/render-3d",
+          "pnpm exec tscircuit-cli export index.tsx -f glb -o dist/render-3d/beeper.glb",
+          "pnpm exec tscircuit-cli export index.tsx -f step -o dist/render-3d/beeper.step"
         ],
         "parallel": false
       }

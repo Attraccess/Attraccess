@@ -51,6 +51,17 @@ jobs:
         run: pnpm nx run-many --target=export --parallel=3 --projects=tag:scope:hardware
       - name: Render previews (PCB + schematic + assembly)
         run: pnpm nx run-many --target=render --parallel=3 --projects=tag:scope:hardware
+      - name: Render 3D (GLB + STEP)
+        run: pnpm nx run-many --target=render-3d --parallel=3 --projects=tag:scope:hardware
+
+      - name: Upload 3D renders
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hardware-3d-${{ github.event.pull_request.number }}-${{ github.run_attempt }}
+          path: apps/attractap/hardware/**/dist/render-3d/*.{glb,step}
+          if-no-files-found: warn
+          retention-days: 30
 
       - name: Upload gerber ZIPs
         uses: actions/upload-artifact@v4
