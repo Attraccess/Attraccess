@@ -10,4 +10,5 @@ export default {
   noForms: 'No form submissions recorded',
   booleanYes: 'Yes',
   booleanNo: 'No',
+  projectSelectLabel: 'Project',
 };
