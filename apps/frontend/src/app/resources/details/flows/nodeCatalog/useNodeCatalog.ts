@@ -2,7 +2,7 @@
 // FEATURE: Node catalog redesign — state management
 import { useCallback, useMemo, useSyncExternalStore } from 'react';
 import { ResourceFlowNodeSchemaDto, useResourceFlowsServiceGetNodeSchemas } from '@attraccess/react-query-client';
-import { Domain, DOMAIN_ORDER, schemaToDomain } from './domains';
+import { Domain, DOMAIN_ORDER, nodeTypeDomain } from './domains';
 
 export type Direction = 'down' | 'up' | 'both';
 
@@ -88,7 +88,7 @@ export function useNodeCatalog({ resourceId }: UseNodeCatalogArgs): UseNodeCatal
     const byDomain = new Map<Domain, CatalogNode[]>();
     for (const schema of schemas ?? []) {
       if (!schema.supportedByResource) continue;
-      const domain = schemaToDomain(schema.type);
+      const domain = nodeTypeDomain(schema.type);
       const list = byDomain.get(domain) ?? [];
       list.push({ schema, direction: getDirection(schema) });
       byDomain.set(domain, list);

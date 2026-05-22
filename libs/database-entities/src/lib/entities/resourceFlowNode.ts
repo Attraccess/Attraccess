@@ -5,27 +5,27 @@ import { Resource } from './resource.entity';
 import { EventNodeDataSchema } from '../entities-index';
 
 export enum ResourceFlowNodeType {
-  INPUT_BUTTON = 'input.button',
-  INPUT_RESOURCE_USAGE_STARTED = 'input.resource.usage.started',
-  INPUT_RESOURCE_USAGE_STOPPED = 'input.resource.usage.stopped',
-  INPUT_RESOURCE_USAGE_TAKEOVER = 'input.resource.usage.takeover',
-  INPUT_RESOURCE_DOOR_UNLOCKED = 'input.resource.door.unlocked',
-  INPUT_RESOURCE_DOOR_LOCKED = 'input.resource.door.locked',
-  INPUT_RESOURCE_DOOR_UNLATCHED = 'input.resource.door.unlatched',
-  INPUT_MQTT_MESSAGE_RECEIVED = 'input.mqtt.message.received',
-  INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY = 'input.resource.activity.no-activity',
-  OUTPUT_HTTP_SEND_REQUEST = 'output.http.sendRequest',
-  OUTPUT_MQTT_SEND_MESSAGE = 'output.mqtt.sendMessage',
-  OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS = 'output.resource.billing.calculation.set-additional-items',
-  OUTPUT_RESOURCE_USAGE_END_SESSION = 'output.resource.usage.end-session',
-  OUTPUT_RESOURCE_ACTIVITY_TRACK_ACTIVITY = 'output.resource.activity.track-activity',
-  PROCESSING_WAIT = 'processing.wait',
-  PROCESSING_IF = 'processing.if',
-  PROCESSING_SET_PAYLOAD = 'processing.set-payload',
-  PROCESSING_MQTT_WAIT_FOR_MESSAGE = 'processing.mqtt.waitForMessage',
-  PROCESSING_ERROR = 'processing.error',
-  OUTPUT_RESOURCE_HEALTH_HEARTBEAT = 'output.resource.health.heartbeat',
-  OUTPUT_RESOURCE_HEALTH_SET = 'output.resource.health.set',
+  MANUAL_BUTTON = 'manual.button',
+  RESOURCE_USAGE_STARTED = 'resource.usage.started',
+  RESOURCE_USAGE_STOPPED = 'resource.usage.stopped',
+  RESOURCE_USAGE_TAKEOVER = 'resource.usage.takeover',
+  RESOURCE_USAGE_END_SESSION = 'resource.usage.end-session',
+  RESOURCE_ACTIVITY_NO_ACTIVITY = 'resource.activity.no-activity',
+  RESOURCE_ACTIVITY_TRACK_ACTIVITY = 'resource.activity.track-activity',
+  RESOURCE_BILLING_SET_ADDITIONAL_ITEMS = 'resource.billing.set-additional-items',
+  DOOR_UNLOCKED = 'door.unlocked',
+  DOOR_LOCKED = 'door.locked',
+  DOOR_UNLATCHED = 'door.unlatched',
+  MQTT_MESSAGE_RECEIVED = 'mqtt.message.received',
+  MQTT_SEND_MESSAGE = 'mqtt.send-message',
+  MQTT_WAIT_FOR_MESSAGE = 'mqtt.wait-for-message',
+  HTTP_SEND_REQUEST = 'http.send-request',
+  LOGIC_WAIT = 'logic.wait',
+  LOGIC_IF = 'logic.if',
+  LOGIC_SET_PAYLOAD = 'logic.set-payload',
+  LOGIC_ERROR = 'logic.error',
+  HEALTH_HEARTBEAT = 'health.heartbeat',
+  HEALTH_SET = 'health.set',
 }
 
 // Zod schemas for node data validation
@@ -180,57 +180,57 @@ export const ResourceHealthSetNodeDataSchema = z.object({
 // Helper function to get the appropriate schema for a node type
 export function getNodeDataSchema(nodeType: ResourceFlowNodeType) {
   switch (nodeType) {
-    case ResourceFlowNodeType.INPUT_BUTTON:
+    case ResourceFlowNodeType.MANUAL_BUTTON:
       return ButtonNodeDataSchema;
 
-    case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED:
-    case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED:
-    case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER:
-    case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLOCKED:
-    case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_LOCKED:
-    case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLATCHED:
+    case ResourceFlowNodeType.RESOURCE_USAGE_STARTED:
+    case ResourceFlowNodeType.RESOURCE_USAGE_STOPPED:
+    case ResourceFlowNodeType.RESOURCE_USAGE_TAKEOVER:
+    case ResourceFlowNodeType.DOOR_UNLOCKED:
+    case ResourceFlowNodeType.DOOR_LOCKED:
+    case ResourceFlowNodeType.DOOR_UNLATCHED:
       return EventNodeDataSchema;
 
-    case ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED:
+    case ResourceFlowNodeType.MQTT_MESSAGE_RECEIVED:
       return MqttMessageReceivedNodeDataSchema;
 
-    case ResourceFlowNodeType.INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY:
+    case ResourceFlowNodeType.RESOURCE_ACTIVITY_NO_ACTIVITY:
       return InputResourceActivityNoActivityNodeDataSchema;
 
-    case ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS:
+    case ResourceFlowNodeType.RESOURCE_BILLING_SET_ADDITIONAL_ITEMS:
       return BillingTransactionItemCreateSchema;
 
-    case ResourceFlowNodeType.OUTPUT_HTTP_SEND_REQUEST:
+    case ResourceFlowNodeType.HTTP_SEND_REQUEST:
       return HttpRequestNodeDataSchema;
 
-    case ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE:
+    case ResourceFlowNodeType.MQTT_SEND_MESSAGE:
       return MqttSendMessageNodeDataSchema;
 
-    case ResourceFlowNodeType.PROCESSING_WAIT:
+    case ResourceFlowNodeType.LOGIC_WAIT:
       return WaitNodeDataSchema;
 
-    case ResourceFlowNodeType.PROCESSING_IF:
+    case ResourceFlowNodeType.LOGIC_IF:
       return IfNodeDataSchema;
 
-    case ResourceFlowNodeType.PROCESSING_SET_PAYLOAD:
+    case ResourceFlowNodeType.LOGIC_SET_PAYLOAD:
       return SetPayloadNodeDataSchema;
 
-    case ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE:
+    case ResourceFlowNodeType.MQTT_WAIT_FOR_MESSAGE:
       return MqttWaitForMessageNodeDataSchema;
 
-    case ResourceFlowNodeType.PROCESSING_ERROR:
+    case ResourceFlowNodeType.LOGIC_ERROR:
       return ErrorNodeDataSchema;
 
-    case ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION:
+    case ResourceFlowNodeType.RESOURCE_USAGE_END_SESSION:
       return ResourceUsageEndSessionNodeDataSchema;
 
-    case ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_TRACK_ACTIVITY:
+    case ResourceFlowNodeType.RESOURCE_ACTIVITY_TRACK_ACTIVITY:
       return ResourceActivityTrackActivityNodeDataSchema;
 
-    case ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT:
+    case ResourceFlowNodeType.HEALTH_HEARTBEAT:
       return ResourceHealthHeartbeatNodeDataSchema;
 
-    case ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_SET:
+    case ResourceFlowNodeType.HEALTH_SET:
       return ResourceHealthSetNodeDataSchema;
 
     default: {
@@ -270,7 +270,7 @@ export class ResourceFlowNode {
   })
   @ApiProperty({
     description: 'The type of the node',
-    example: ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED,
+    example: ResourceFlowNodeType.RESOURCE_USAGE_STARTED,
     enum: ResourceFlowNodeType,
     enumName: 'ResourceFlowNodeType',
   })

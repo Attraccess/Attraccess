@@ -11,11 +11,11 @@ vi.mock('@attraccess/react-query-client', async (importOriginal) => {
     ...actual,
     useResourceFlowsServiceGetNodeSchemas: () => ({
       data: [
-        { type: 'input.button', inputs: [], outputs: ['output'], isOutput: false, supportedByResource: true, configSchema: {} },
-        { type: 'input.resource.door.locked', inputs: [], outputs: ['output'], isOutput: false, supportedByResource: true, configSchema: {} },
-        { type: 'output.http.sendRequest', inputs: ['input'], outputs: [], isOutput: true, supportedByResource: true, configSchema: {} },
-        { type: 'processing.wait', inputs: ['input'], outputs: ['output'], isOutput: false, supportedByResource: true, configSchema: {} },
-        { type: 'input.mqtt.message.received', inputs: [], outputs: ['output'], isOutput: false, supportedByResource: false, configSchema: {} },
+        { type: 'manual.button', inputs: [], outputs: ['output'], isOutput: false, supportedByResource: true, configSchema: {} },
+        { type: 'door.locked', inputs: [], outputs: ['output'], isOutput: false, supportedByResource: true, configSchema: {} },
+        { type: 'http.send-request', inputs: ['input'], outputs: [], isOutput: true, supportedByResource: true, configSchema: {} },
+        { type: 'logic.wait', inputs: ['input'], outputs: ['output'], isOutput: false, supportedByResource: true, configSchema: {} },
+        { type: 'mqtt.message.received', inputs: [], outputs: ['output'], isOutput: false, supportedByResource: false, configSchema: {} },
       ],
     }),
   };
@@ -42,9 +42,9 @@ describe('useNodeCatalog', () => {
   it('annotates each row with a direction (down/up/both)', () => {
     const { result } = renderHook(() => useNodeCatalog({ resourceId: 1 }));
     const rows = result.current.groups.flatMap((g) => g.nodes);
-    expect(rows.find((n) => n.schema.type === 'input.button')?.direction).toBe('down');
-    expect(rows.find((n) => n.schema.type === 'output.http.sendRequest')?.direction).toBe('up');
-    expect(rows.find((n) => n.schema.type === 'processing.wait')?.direction).toBe('both');
+    expect(rows.find((n) => n.schema.type === 'manual.button')?.direction).toBe('down');
+    expect(rows.find((n) => n.schema.type === 'http.send-request')?.direction).toBe('up');
+    expect(rows.find((n) => n.schema.type === 'logic.wait')?.direction).toBe('both');
   });
 
   it('expands all domains by default and toggles via setDomainExpanded', () => {

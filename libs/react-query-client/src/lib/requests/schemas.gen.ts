@@ -4190,7 +4190,7 @@ export const $RefundTransactionDto = {
 
 export const $ResourceFlowNodeType = {
     type: 'string',
-    enum: ['input.button', 'input.resource.usage.started', 'input.resource.usage.stopped', 'input.resource.usage.takeover', 'input.resource.door.unlocked', 'input.resource.door.locked', 'input.resource.door.unlatched', 'input.mqtt.message.received', 'input.resource.activity.no-activity', 'output.http.sendRequest', 'output.mqtt.sendMessage', 'output.resource.billing.calculation.set-additional-items', 'output.resource.usage.end-session', 'output.resource.activity.track-activity', 'processing.wait', 'processing.if', 'processing.set-payload', 'processing.mqtt.waitForMessage', 'processing.error', 'output.resource.health.heartbeat', 'output.resource.health.set'],
+    enum: ['manual.button', 'resource.usage.started', 'resource.usage.stopped', 'resource.usage.takeover', 'resource.usage.end-session', 'resource.activity.no-activity', 'resource.activity.track-activity', 'resource.billing.set-additional-items', 'door.unlocked', 'door.locked', 'door.unlatched', 'mqtt.message.received', 'mqtt.send-message', 'mqtt.wait-for-message', 'http.send-request', 'logic.wait', 'logic.if', 'logic.set-payload', 'logic.error', 'health.heartbeat', 'health.set'],
     description: 'The name of the node type'
 } as const;
 
@@ -4263,7 +4263,7 @@ export const $ResourceFlowNodeDto = {
         },
         type: {
             description: 'The type of the node',
-            example: 'input.resource.usage.started',
+            example: 'resource.usage.started',
             allOf: [
                 {
                     '$ref': '#/components/schemas/ResourceFlowNodeType'
@@ -4373,7 +4373,7 @@ export const $ResourceFlowResponseDto = {
             example: [
                 {
                     id: 'TGVgqDzCKXKVr-XGUD5V3',
-                    type: 'input.resource.usage.started',
+                    type: 'resource.usage.started',
                     position: {
                         x: 100,
                         y: 200
@@ -4382,7 +4382,7 @@ export const $ResourceFlowResponseDto = {
                 },
                 {
                     id: 'TGVgqDzCKXKVr-XGUD5V4',
-                    type: 'output.http.sendRequest',
+                    type: 'http.send-request',
                     position: {
                         x: 300,
                         y: 200
@@ -4444,7 +4444,7 @@ export const $ResourceFlowSaveDto = {
             example: [
                 {
                     id: 'TGVgqDzCKXKVr-XGUD5V3',
-                    type: 'input.resource.usage.started',
+                    type: 'resource.usage.started',
                     position: {
                         x: 100,
                         y: 200
@@ -4453,7 +4453,7 @@ export const $ResourceFlowSaveDto = {
                 },
                 {
                     id: 'TGVgqDzCKXKVr-XGUD5V4',
-                    type: 'output.http.sendRequest',
+                    type: 'http.send-request',
                     position: {
                         x: 300,
                         y: 200
@@ -4602,7 +4602,7 @@ export const $ResourceFlowNode = {
         },
         type: {
             description: 'The type of the node',
-            example: 'input.resource.usage.started',
+            example: 'resource.usage.started',
             allOf: [
                 {
                     '$ref': '#/components/schemas/ResourceFlowNodeType'

@@ -1,7 +1,6 @@
 // Domain mapping for the Flow node catalog: pure data + classification
 // FEATURE: Node catalog redesign — domain grouping
 import type { ComponentType, SVGProps } from 'react';
-import { ResourceFlowNodeType } from '@attraccess/react-query-client';
 import {
   CircleDotIcon,
   CogIcon,
@@ -33,12 +32,6 @@ export const DOMAINS: Record<Domain, DomainDef> = {
   health:   { color: 'rose',   iconBg: 'bg-rose-100 dark:bg-rose-900/30',     iconFg: 'text-rose-700 dark:text-rose-300',     icon: HeartPulseIcon },
 };
 
-export function schemaToDomain(nodeType: string): Domain {
-  if (nodeType === ResourceFlowNodeType.INPUT_BUTTON) return 'manual';
-  if (nodeType.includes('.resource.door.')) return 'door';
-  if (nodeType.includes('.mqtt.')) return 'mqtt';
-  if (nodeType.includes('.http.')) return 'http';
-  if (nodeType.includes('.resource.health.')) return 'health';
-  if (nodeType.includes('.resource.')) return 'resource';
-  return 'logic';
+export function nodeTypeDomain(nodeType: string): Domain {
+  return nodeType.split('.', 1)[0] as Domain;
 }

@@ -64,7 +64,7 @@ describe('ResourceFlowsExecutorService – handleResourceUsageEvent', () => {
     await service.handleResourceUsageEvent(event);
     expect(triggerResourceUsageNodeSpy).toHaveBeenCalledWith(
       1,
-      'input.resource.door.locked',
+      'door.locked',
       expect.objectContaining({ resource: expect.objectContaining({ id: 1 }) }),
     );
   });
@@ -74,7 +74,7 @@ describe('ResourceFlowsExecutorService – handleResourceUsageEvent', () => {
     await service.handleResourceUsageEvent(event);
     expect(triggerResourceUsageNodeSpy).toHaveBeenCalledWith(
       1,
-      'input.resource.door.unlocked',
+      'door.unlocked',
       expect.objectContaining({ resource: expect.objectContaining({ id: 1 }) }),
     );
   });
@@ -84,7 +84,7 @@ describe('ResourceFlowsExecutorService – handleResourceUsageEvent', () => {
     await service.handleResourceUsageEvent(event);
     expect(triggerResourceUsageNodeSpy).toHaveBeenCalledWith(
       1,
-      'input.resource.door.unlatched',
+      'door.unlatched',
       expect.objectContaining({ resource: expect.objectContaining({ id: 1 }) }),
     );
   });

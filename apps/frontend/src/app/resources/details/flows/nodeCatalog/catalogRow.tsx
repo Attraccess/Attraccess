@@ -4,7 +4,7 @@ import type { DragEvent } from 'react';
 import { TFunction } from '@attraccess/plugins-frontend-ui';
 import { ArrowDownIcon, ArrowUpIcon, ArrowUpDownIcon } from 'lucide-react';
 import { CatalogNode, Direction } from './useNodeCatalog';
-import { DOMAINS, schemaToDomain } from './domains';
+import { DOMAINS, nodeTypeDomain } from './domains';
 
 interface Props {
   node: CatalogNode;
@@ -19,7 +19,7 @@ const DIRECTION_ICON: Record<Direction, { icon: typeof ArrowDownIcon; label: str
 };
 
 export function CatalogRow({ node, tNodeTranslations, onSelect }: Props) {
-  const domain = schemaToDomain(node.schema.type);
+  const domain = nodeTypeDomain(node.schema.type);
   const def = DOMAINS[domain];
   const Icon = def.icon;
   const { icon: DirIcon, label: dirLabel } = DIRECTION_ICON[node.direction];

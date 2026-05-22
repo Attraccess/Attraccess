@@ -622,7 +622,7 @@ describe('ResourceUsageService', () => {
       expect(flowExecutorService.runFlow).toHaveBeenCalledTimes(1);
       const [resId, nodeType, payload] = flowExecutorService.runFlow.mock.calls[0];
       expect(resId).toBe(mockActiveSession.resourceId ?? 1);
-      expect(nodeType).toBe(ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER);
+      expect(nodeType).toBe(ResourceFlowNodeType.RESOURCE_USAGE_TAKEOVER);
       expect(payload).toMatchObject({ newUser: { id: mockUser.id }, oldUser: { id: mockActiveSession.user.id } });
 
       // Billing start should still be called exactly once for the new session
@@ -981,7 +981,7 @@ describe('ResourceUsageService', () => {
       expect(eventEmitter.emitAsync).toHaveBeenCalledWith(ResourceUsageEvent.EVENT_NAME, expect.any(Object));
       expect(flowExecutorService.runFlow).toHaveBeenCalledWith(
         mockActiveSession.resourceId,
-        ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
+        ResourceFlowNodeType.RESOURCE_USAGE_STOPPED,
         expect.objectContaining({ endNotes: prefixedNotes }),
         expect.anything(),
       );
@@ -1026,7 +1026,7 @@ describe('ResourceUsageService', () => {
       );
       expect(flowExecutorService.runFlow).toHaveBeenCalledWith(
         mockActiveSession.resourceId,
-        ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
+        ResourceFlowNodeType.RESOURCE_USAGE_STOPPED,
         expect.objectContaining({ endNotes: prefixedNotes }),
         expect.anything(),
       );
@@ -1074,7 +1074,7 @@ describe('ResourceUsageService', () => {
       await expect(resourceIntroducersService.isIntroducer.mock.results.at(-1)?.value).resolves.toBe(true);
       expect(flowExecutorService.runFlow).toHaveBeenCalledWith(
         mockActiveSession.resourceId,
-        ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
+        ResourceFlowNodeType.RESOURCE_USAGE_STOPPED,
         expect.objectContaining({ endNotes: prefixedNotes }),
         expect.anything(),
       );

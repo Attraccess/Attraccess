@@ -32,27 +32,27 @@ export enum ResourceFlowLogType {
 
 /** The name of the node type */
 export enum ResourceFlowNodeType {
-  InputButton = "input.button",
-  InputResourceUsageStarted = "input.resource.usage.started",
-  InputResourceUsageStopped = "input.resource.usage.stopped",
-  InputResourceUsageTakeover = "input.resource.usage.takeover",
-  InputResourceDoorUnlocked = "input.resource.door.unlocked",
-  InputResourceDoorLocked = "input.resource.door.locked",
-  InputResourceDoorUnlatched = "input.resource.door.unlatched",
-  InputMqttMessageReceived = "input.mqtt.message.received",
-  InputResourceActivityNoActivity = "input.resource.activity.no-activity",
-  OutputHttpSendRequest = "output.http.sendRequest",
-  OutputMqttSendMessage = "output.mqtt.sendMessage",
-  OutputResourceBillingCalculationSetAdditionalItems = "output.resource.billing.calculation.set-additional-items",
-  OutputResourceUsageEndSession = "output.resource.usage.end-session",
-  OutputResourceActivityTrackActivity = "output.resource.activity.track-activity",
-  ProcessingWait = "processing.wait",
-  ProcessingIf = "processing.if",
-  ProcessingSetPayload = "processing.set-payload",
-  ProcessingMqttWaitForMessage = "processing.mqtt.waitForMessage",
-  ProcessingError = "processing.error",
-  OutputResourceHealthHeartbeat = "output.resource.health.heartbeat",
-  OutputResourceHealthSet = "output.resource.health.set",
+  ManualButton = "manual.button",
+  ResourceUsageStarted = "resource.usage.started",
+  ResourceUsageStopped = "resource.usage.stopped",
+  ResourceUsageTakeover = "resource.usage.takeover",
+  ResourceUsageEndSession = "resource.usage.end-session",
+  ResourceActivityNoActivity = "resource.activity.no-activity",
+  ResourceActivityTrackActivity = "resource.activity.track-activity",
+  ResourceBillingSetAdditionalItems = "resource.billing.set-additional-items",
+  DoorUnlocked = "door.unlocked",
+  DoorLocked = "door.locked",
+  DoorUnlatched = "door.unlatched",
+  MqttMessageReceived = "mqtt.message.received",
+  MqttSendMessage = "mqtt.send-message",
+  MqttWaitForMessage = "mqtt.wait-for-message",
+  HttpSendRequest = "http.send-request",
+  LogicWait = "logic.wait",
+  LogicIf = "logic.if",
+  LogicSetPayload = "logic.set-payload",
+  LogicError = "logic.error",
+  HealthHeartbeat = "health.heartbeat",
+  HealthSet = "health.set",
 }
 
 export enum SumUpReaderStatus {
@@ -2762,7 +2762,7 @@ export interface ResourceFlowNodeDto {
   id: string;
   /**
    * The type of the node
-   * @example "input.resource.usage.started"
+   * @example "resource.usage.started"
    */
   type: ResourceFlowNodeType;
   /**
@@ -2836,7 +2836,7 @@ export interface ValidationErrorDto {
 export interface ResourceFlowResponseDto {
   /**
    * Array of flow nodes defining the workflow steps
-   * @example [{"id":"TGVgqDzCKXKVr-XGUD5V3","type":"input.resource.usage.started","position":{"x":100,"y":200},"data":{}},{"id":"TGVgqDzCKXKVr-XGUD5V4","type":"output.http.sendRequest","position":{"x":300,"y":200},"data":{"url":"https://example.com/webhook","method":"POST","headers":{"Content-Type":"application/json"},"body":"{\"message\": \"Resource usage started\"}"}}]
+   * @example [{"id":"TGVgqDzCKXKVr-XGUD5V3","type":"resource.usage.started","position":{"x":100,"y":200},"data":{}},{"id":"TGVgqDzCKXKVr-XGUD5V4","type":"http.send-request","position":{"x":300,"y":200},"data":{"url":"https://example.com/webhook","method":"POST","headers":{"Content-Type":"application/json"},"body":"{\"message\": \"Resource usage started\"}"}}]
    */
   nodes: ResourceFlowNodeDto[];
   /**
@@ -2854,7 +2854,7 @@ export interface ResourceFlowResponseDto {
 export interface ResourceFlowSaveDto {
   /**
    * Array of flow nodes defining the workflow steps
-   * @example [{"id":"TGVgqDzCKXKVr-XGUD5V3","type":"input.resource.usage.started","position":{"x":100,"y":200},"data":{}},{"id":"TGVgqDzCKXKVr-XGUD5V4","type":"output.http.sendRequest","position":{"x":300,"y":200},"data":{"url":"https://example.com/webhook","method":"POST","headers":{"Content-Type":"application/json"},"body":"{\"message\": \"Resource usage started\"}"}}]
+   * @example [{"id":"TGVgqDzCKXKVr-XGUD5V3","type":"resource.usage.started","position":{"x":100,"y":200},"data":{}},{"id":"TGVgqDzCKXKVr-XGUD5V4","type":"http.send-request","position":{"x":300,"y":200},"data":{"url":"https://example.com/webhook","method":"POST","headers":{"Content-Type":"application/json"},"body":"{\"message\": \"Resource usage started\"}"}}]
    */
   nodes: ResourceFlowNodeDto[];
   /**
@@ -2933,7 +2933,7 @@ export interface ResourceFlowNode {
   id: string;
   /**
    * The type of the node
-   * @example "input.resource.usage.started"
+   * @example "resource.usage.started"
    */
   type: ResourceFlowNodeType;
   /**

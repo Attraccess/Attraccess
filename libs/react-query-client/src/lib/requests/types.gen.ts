@@ -2787,27 +2787,27 @@ export type RefundTransactionDto = {
  * The name of the node type
  */
 export enum ResourceFlowNodeType {
-    INPUT_BUTTON = 'input.button',
-    INPUT_RESOURCE_USAGE_STARTED = 'input.resource.usage.started',
-    INPUT_RESOURCE_USAGE_STOPPED = 'input.resource.usage.stopped',
-    INPUT_RESOURCE_USAGE_TAKEOVER = 'input.resource.usage.takeover',
-    INPUT_RESOURCE_DOOR_UNLOCKED = 'input.resource.door.unlocked',
-    INPUT_RESOURCE_DOOR_LOCKED = 'input.resource.door.locked',
-    INPUT_RESOURCE_DOOR_UNLATCHED = 'input.resource.door.unlatched',
-    INPUT_MQTT_MESSAGE_RECEIVED = 'input.mqtt.message.received',
-    INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY = 'input.resource.activity.no-activity',
-    OUTPUT_HTTP_SEND_REQUEST = 'output.http.sendRequest',
-    OUTPUT_MQTT_SEND_MESSAGE = 'output.mqtt.sendMessage',
-    OUTPUT_RESOURCE_BILLING_CALCULATION_SET_ADDITIONAL_ITEMS = 'output.resource.billing.calculation.set-additional-items',
-    OUTPUT_RESOURCE_USAGE_END_SESSION = 'output.resource.usage.end-session',
-    OUTPUT_RESOURCE_ACTIVITY_TRACK_ACTIVITY = 'output.resource.activity.track-activity',
-    PROCESSING_WAIT = 'processing.wait',
-    PROCESSING_IF = 'processing.if',
-    PROCESSING_SET_PAYLOAD = 'processing.set-payload',
-    PROCESSING_MQTT_WAIT_FOR_MESSAGE = 'processing.mqtt.waitForMessage',
-    PROCESSING_ERROR = 'processing.error',
-    OUTPUT_RESOURCE_HEALTH_HEARTBEAT = 'output.resource.health.heartbeat',
-    OUTPUT_RESOURCE_HEALTH_SET = 'output.resource.health.set'
+    MANUAL_BUTTON = 'manual.button',
+    RESOURCE_USAGE_STARTED = 'resource.usage.started',
+    RESOURCE_USAGE_STOPPED = 'resource.usage.stopped',
+    RESOURCE_USAGE_TAKEOVER = 'resource.usage.takeover',
+    RESOURCE_USAGE_END_SESSION = 'resource.usage.end-session',
+    RESOURCE_ACTIVITY_NO_ACTIVITY = 'resource.activity.no-activity',
+    RESOURCE_ACTIVITY_TRACK_ACTIVITY = 'resource.activity.track-activity',
+    RESOURCE_BILLING_SET_ADDITIONAL_ITEMS = 'resource.billing.set-additional-items',
+    DOOR_UNLOCKED = 'door.unlocked',
+    DOOR_LOCKED = 'door.locked',
+    DOOR_UNLATCHED = 'door.unlatched',
+    MQTT_MESSAGE_RECEIVED = 'mqtt.message.received',
+    MQTT_SEND_MESSAGE = 'mqtt.send-message',
+    MQTT_WAIT_FOR_MESSAGE = 'mqtt.wait-for-message',
+    HTTP_SEND_REQUEST = 'http.send-request',
+    LOGIC_WAIT = 'logic.wait',
+    LOGIC_IF = 'logic.if',
+    LOGIC_SET_PAYLOAD = 'logic.set-payload',
+    LOGIC_ERROR = 'logic.error',
+    HEALTH_HEARTBEAT = 'health.heartbeat',
+    HEALTH_SET = 'health.set'
 }
 
 export type ResourceFlowNodeSchemaDto = {

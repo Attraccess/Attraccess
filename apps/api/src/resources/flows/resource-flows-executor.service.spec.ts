@@ -28,7 +28,7 @@ type Edge = { source: string; target: string; sourceHandle?: string | null };
 function createNode(partial: Partial<ResourceFlowNode>): ResourceFlowNode {
   return {
     id: 'node-' + Math.random().toString(36).slice(2, 8),
-    type: ResourceFlowNodeType.INPUT_BUTTON,
+    type: ResourceFlowNodeType.MANUAL_BUTTON,
     position: { x: 0, y: 0 },
     data: {},
     createdAt: new Date(),
@@ -162,7 +162,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
   });
 
   it('returns empty array when no trigger nodes are found', async () => {
-    const result = await service.runFlow(1, ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED, {
+    const result = await service.runFlow(1, ResourceFlowNodeType.RESOURCE_USAGE_STARTED, {
       any: 'data',
     });
     expect(result).toEqual([]);
@@ -172,7 +172,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
   it('returns initial data when a single input node has no outgoing edges (terminal)', async () => {
     const inputNode = createNode({
       id: 'in-1',
-      type: ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED,
+      type: ResourceFlowNodeType.RESOURCE_USAGE_STARTED,
       resourceId: 1,
     });
     nodesById[inputNode.id] = inputNode;
@@ -181,7 +181,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     edgesBySourceAndHandle[`${inputNode.id}|`] = [];
 
     const initialData = { a: 1 };
-    const result = await service.runFlow(1, ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED, initialData);
+    const result = await service.runFlow(1, ResourceFlowNodeType.RESOURCE_USAGE_STARTED, initialData);
     expect(result).toEqual([
       {
         ...initialData,
@@ -191,10 +191,10 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
   });
 
   it('handles a simple linear path and returns the last node payload', async () => {
-    const inputNode = createNode({ id: 'in-1', type: ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED });
+    const inputNode = createNode({ id: 'in-1', type: ResourceFlowNodeType.RESOURCE_USAGE_STARTED });
     const billingNode = createNode({
       id: 'out-billing-1',
-      type: ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS,
+      type: ResourceFlowNodeType.RESOURCE_BILLING_SET_ADDITIONAL_ITEMS,
       data: {
         name: 'kWh',
         description: 'Energy',
@@ -214,7 +214,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
 
     const initialData = {};
 
-    const result = await service.runFlow(1, ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED, initialData);
+    const result = await service.runFlow(1, ResourceFlowNodeType.RESOURCE_USAGE_STARTED, initialData);
     expect(result).toEqual([
       {
         name: 'kWh',
@@ -228,10 +228,10 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
   });
 
   it('uses resource metadata in templated MQTT topics', async () => {
-    const inputNode = createNode({ id: 'in-1', type: ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED });
+    const inputNode = createNode({ id: 'in-1', type: ResourceFlowNodeType.RESOURCE_USAGE_STARTED });
     const mqttNode = createNode({
       id: 'mqtt-1',
-      type: ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE,
+      type: ResourceFlowNodeType.MQTT_SEND_MESSAGE,
       data: {
         serverId: 5,
         topic: 'devices/{{resource.metadata.deviceId}}/state',
@@ -253,7 +253,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       metadata: { deviceId: 'abc123' },
     });
 
-    await service.runFlow(1, ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED, {});
+    await service.runFlow(1, ResourceFlowNodeType.RESOURCE_USAGE_STARTED, {});
 
     expect(mqttClientService.publish).toHaveBeenCalledWith(5, 'devices/abc123/state', 'ping', {
       qos: undefined,
@@ -262,10 +262,10 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
   });
 
   it('evaluates IF nodes using resource metadata in payload', async () => {
-    const inputNode = createNode({ id: 'in-1', type: ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED });
+    const inputNode = createNode({ id: 'in-1', type: ResourceFlowNodeType.RESOURCE_USAGE_STARTED });
     const ifNode = createNode({
       id: 'if-1',
-      type: ResourceFlowNodeType.PROCESSING_IF,
+      type: ResourceFlowNodeType.LOGIC_IF,
       data: {
         path: 'resource.metadata.zone',
         comparisonOperator: '=',
@@ -275,7 +275,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     });
     const billingNode = createNode({
       id: 'out-billing-1',
-      type: ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS,
+      type: ResourceFlowNodeType.RESOURCE_BILLING_SET_ADDITIONAL_ITEMS,
       data: {
         name: 'zone-fee',
         description: 'Zone specific',
@@ -301,7 +301,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       metadata: { zone: 'B' },
     });
 
-    const result = await service.runFlow(1, ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED, {});
+    const result = await service.runFlow(1, ResourceFlowNodeType.RESOURCE_USAGE_STARTED, {});
 
     expect(result).toEqual([
       {
@@ -316,10 +316,10 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
   });
 
   it('fan-outs when a node has multiple outgoing edges with the same handle and returns all leaf results', async () => {
-    const inputNode = createNode({ id: 'in-1', type: ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED });
+    const inputNode = createNode({ id: 'in-1', type: ResourceFlowNodeType.RESOURCE_USAGE_STARTED });
     const ifNode = createNode({
       id: 'if-1',
-      type: ResourceFlowNodeType.PROCESSING_IF,
+      type: ResourceFlowNodeType.LOGIC_IF,
       data: {
         path: 'flag',
         comparisonOperator: '=',
@@ -329,7 +329,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     });
     const billingNodeA = createNode({
       id: 'out-a',
-      type: ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS,
+      type: ResourceFlowNodeType.RESOURCE_BILLING_SET_ADDITIONAL_ITEMS,
       data: {
         name: 'session-fee',
         description: 'Flat',
@@ -340,7 +340,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     });
     const billingNodeB = createNode({
       id: 'out-b',
-      type: ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS,
+      type: ResourceFlowNodeType.RESOURCE_BILLING_SET_ADDITIONAL_ITEMS,
       data: {
         name: 'session-fee',
         description: 'Flat',
@@ -368,7 +368,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       flag: 'yes',
     };
 
-    const result = await service.runFlow(1, ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED, initialData);
+    const result = await service.runFlow(1, ResourceFlowNodeType.RESOURCE_USAGE_STARTED, initialData);
     // Both leaves return the same additional item in this setup
     expect(result).toHaveLength(2);
     expect(result[0]).toEqual({
@@ -391,10 +391,10 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
 
   it('ends the active usage session with templated notes and passes payload through', async () => {
     // Arrange nodes: INPUT -> END_SESSION (terminal)
-    const inputNode = createNode({ id: 'in-1', type: ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED });
+    const inputNode = createNode({ id: 'in-1', type: ResourceFlowNodeType.RESOURCE_USAGE_STARTED });
     const endNode = createNode({
       id: 'end-1',
-      type: ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION,
+      type: ResourceFlowNodeType.RESOURCE_USAGE_END_SESSION,
       data: { notes: 'Ended by {{user.username}}' },
     });
     nodesById[inputNode.id] = inputNode;
@@ -415,7 +415,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     const initialData = { user: { username: 'bob' } };
 
     // Act
-    const result = await service.runFlow(1, ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED, initialData);
+    const result = await service.runFlow(1, ResourceFlowNodeType.RESOURCE_USAGE_STARTED, initialData);
 
     // Assert leaf payload passthrough
     expect(result).toEqual([
@@ -438,8 +438,8 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
   });
 
   it('throws NoUsageSessionError when no active session exists', async () => {
-    const inputNode = createNode({ id: 'in-1', type: ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED });
-    const endNode = createNode({ id: 'end-1', type: ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION, data: {} });
+    const inputNode = createNode({ id: 'in-1', type: ResourceFlowNodeType.RESOURCE_USAGE_STARTED });
+    const endNode = createNode({ id: 'end-1', type: ResourceFlowNodeType.RESOURCE_USAGE_END_SESSION, data: {} });
     nodesById[inputNode.id] = inputNode;
     nodesById[endNode.id] = endNode;
     initialNodes = [inputNode];
@@ -448,17 +448,17 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
 
     (resourceUsageService.getActiveSession as jest.Mock).mockResolvedValue(null);
 
-    await expect(service.runFlow(1, ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED, {})).rejects.toBeInstanceOf(
+    await expect(service.runFlow(1, ResourceFlowNodeType.RESOURCE_USAGE_STARTED, {})).rejects.toBeInstanceOf(
       NoUsageSessionError,
     );
   });
 
   it('updates resource activity when track-activity node executes and passes payload through', async () => {
     const resourceId = 5;
-    const inputNode = createNode({ id: 'in-activity', type: ResourceFlowNodeType.INPUT_BUTTON, resourceId });
+    const inputNode = createNode({ id: 'in-activity', type: ResourceFlowNodeType.MANUAL_BUTTON, resourceId });
     const trackNode = createNode({
       id: 'track-activity',
-      type: ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_TRACK_ACTIVITY,
+      type: ResourceFlowNodeType.RESOURCE_ACTIVITY_TRACK_ACTIVITY,
       resourceId,
     });
     nodesById[inputNode.id] = inputNode;
@@ -473,7 +473,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
 
     expect(resourceActivity.get(resourceId)).toBeUndefined();
 
-    const result = await service.runFlow(resourceId, ResourceFlowNodeType.INPUT_BUTTON, payload);
+    const result = await service.runFlow(resourceId, ResourceFlowNodeType.MANUAL_BUTTON, payload);
 
     expect(result).toEqual([
       {
@@ -489,7 +489,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     const resourceId = 9;
     const inactivityNode = createNode({
       id: 'inactive-1',
-      type: ResourceFlowNodeType.INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY,
+      type: ResourceFlowNodeType.RESOURCE_ACTIVITY_NO_ACTIVITY,
       resourceId,
       data: { minInactivityMinutes: 5 },
     });
@@ -521,10 +521,10 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
   describe('health nodes', () => {
     it('reports healthy when heartbeat output node fires and stores last seen timestamp', async () => {
       const resourceId = 11;
-      const inputNode = createNode({ id: 'in-hb', type: ResourceFlowNodeType.INPUT_BUTTON, resourceId });
+      const inputNode = createNode({ id: 'in-hb', type: ResourceFlowNodeType.MANUAL_BUTTON, resourceId });
       const heartbeatNode = createNode({
         id: 'heartbeat-1',
-        type: ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT,
+        type: ResourceFlowNodeType.HEALTH_HEARTBEAT,
         resourceId,
         data: { identifier: 'Shelly', timeoutSeconds: 60, unhealthyReason: 'no signal' },
       });
@@ -534,7 +534,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       edgesBySourceAndHandle[`${inputNode.id}|`] = [{ source: inputNode.id, target: heartbeatNode.id }];
       edgesBySourceAndHandle[`${heartbeatNode.id}|`] = [];
 
-      await service.runFlow(resourceId, ResourceFlowNodeType.INPUT_BUTTON, {});
+      await service.runFlow(resourceId, ResourceFlowNodeType.MANUAL_BUTTON, {});
 
       expect(resourceHealthService.reportHealth).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -551,10 +551,10 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
 
     it('SET node sets unhealthy from static config with templated reason', async () => {
       const resourceId = 12;
-      const inputNode = createNode({ id: 'in-set-1', type: ResourceFlowNodeType.INPUT_BUTTON, resourceId });
+      const inputNode = createNode({ id: 'in-set-1', type: ResourceFlowNodeType.MANUAL_BUTTON, resourceId });
       const setNode = createNode({
         id: 'set-1',
-        type: ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_SET,
+        type: ResourceFlowNodeType.HEALTH_SET,
         resourceId,
         data: { identifier: 'Internal', status: 'unhealthy', reason: 'temp={{temp}}' },
       });
@@ -564,7 +564,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       edgesBySourceAndHandle[`${inputNode.id}|`] = [{ source: inputNode.id, target: setNode.id }];
       edgesBySourceAndHandle[`${setNode.id}|`] = [];
 
-      await service.runFlow(resourceId, ResourceFlowNodeType.INPUT_BUTTON, { temp: 91 });
+      await service.runFlow(resourceId, ResourceFlowNodeType.MANUAL_BUTTON, { temp: 91 });
 
       expect(resourceHealthService.reportHealth).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -579,10 +579,10 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
 
     it('SET node sets healthy from static config and clears reason', async () => {
       const resourceId = 13;
-      const inputNode = createNode({ id: 'in-set-h', type: ResourceFlowNodeType.INPUT_BUTTON, resourceId });
+      const inputNode = createNode({ id: 'in-set-h', type: ResourceFlowNodeType.MANUAL_BUTTON, resourceId });
       const setNode = createNode({
         id: 'set-h',
-        type: ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_SET,
+        type: ResourceFlowNodeType.HEALTH_SET,
         resourceId,
         data: { identifier: '', status: 'healthy', reason: '' },
       });
@@ -592,7 +592,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       edgesBySourceAndHandle[`${inputNode.id}|`] = [{ source: inputNode.id, target: setNode.id }];
       edgesBySourceAndHandle[`${setNode.id}|`] = [];
 
-      await service.runFlow(resourceId, ResourceFlowNodeType.INPUT_BUTTON, {});
+      await service.runFlow(resourceId, ResourceFlowNodeType.MANUAL_BUTTON, {});
 
       expect(resourceHealthService.reportHealth).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -607,10 +607,10 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
 
     it('SET node payload health.status overrides static status and switches source to payload', async () => {
       const resourceId = 14;
-      const inputNode = createNode({ id: 'in-set-ovs', type: ResourceFlowNodeType.INPUT_BUTTON, resourceId });
+      const inputNode = createNode({ id: 'in-set-ovs', type: ResourceFlowNodeType.MANUAL_BUTTON, resourceId });
       const setNode = createNode({
         id: 'set-ovs',
-        type: ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_SET,
+        type: ResourceFlowNodeType.HEALTH_SET,
         resourceId,
         data: { identifier: 'Shelly', status: 'healthy', reason: 'fallback' },
       });
@@ -620,7 +620,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       edgesBySourceAndHandle[`${inputNode.id}|`] = [{ source: inputNode.id, target: setNode.id }];
       edgesBySourceAndHandle[`${setNode.id}|`] = [];
 
-      await service.runFlow(resourceId, ResourceFlowNodeType.INPUT_BUTTON, {
+      await service.runFlow(resourceId, ResourceFlowNodeType.MANUAL_BUTTON, {
         health: { status: 'unhealthy', reason: 'lost wifi' },
       });
 
@@ -637,10 +637,10 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
 
     it('SET node payload health.identifier overrides static identifier', async () => {
       const resourceId = 15;
-      const inputNode = createNode({ id: 'in-set-id', type: ResourceFlowNodeType.INPUT_BUTTON, resourceId });
+      const inputNode = createNode({ id: 'in-set-id', type: ResourceFlowNodeType.MANUAL_BUTTON, resourceId });
       const setNode = createNode({
         id: 'set-id',
-        type: ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_SET,
+        type: ResourceFlowNodeType.HEALTH_SET,
         resourceId,
         data: { identifier: 'StaticId', status: 'unhealthy', reason: 'static reason' },
       });
@@ -650,7 +650,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       edgesBySourceAndHandle[`${inputNode.id}|`] = [{ source: inputNode.id, target: setNode.id }];
       edgesBySourceAndHandle[`${setNode.id}|`] = [];
 
-      await service.runFlow(resourceId, ResourceFlowNodeType.INPUT_BUTTON, {
+      await service.runFlow(resourceId, ResourceFlowNodeType.MANUAL_BUTTON, {
         health: { identifier: 'PayloadId' },
       });
 
@@ -664,10 +664,10 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
 
     it('SET node uses static reason when payload reason absent', async () => {
       const resourceId = 16;
-      const inputNode = createNode({ id: 'in-set-sr', type: ResourceFlowNodeType.INPUT_BUTTON, resourceId });
+      const inputNode = createNode({ id: 'in-set-sr', type: ResourceFlowNodeType.MANUAL_BUTTON, resourceId });
       const setNode = createNode({
         id: 'set-sr',
-        type: ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_SET,
+        type: ResourceFlowNodeType.HEALTH_SET,
         resourceId,
         data: { identifier: '', status: 'unhealthy', reason: 'static fallback' },
       });
@@ -677,7 +677,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       edgesBySourceAndHandle[`${inputNode.id}|`] = [{ source: inputNode.id, target: setNode.id }];
       edgesBySourceAndHandle[`${setNode.id}|`] = [];
 
-      await service.runFlow(resourceId, ResourceFlowNodeType.INPUT_BUTTON, {});
+      await service.runFlow(resourceId, ResourceFlowNodeType.MANUAL_BUTTON, {});
 
       expect(resourceHealthService.reportHealth).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -690,10 +690,10 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
 
     it('SET node throws on invalid payload status', async () => {
       const resourceId = 17;
-      const inputNode = createNode({ id: 'in-set-bad', type: ResourceFlowNodeType.INPUT_BUTTON, resourceId });
+      const inputNode = createNode({ id: 'in-set-bad', type: ResourceFlowNodeType.MANUAL_BUTTON, resourceId });
       const setNode = createNode({
         id: 'set-bad',
-        type: ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_SET,
+        type: ResourceFlowNodeType.HEALTH_SET,
         resourceId,
         data: { identifier: '', status: 'healthy', reason: '' },
       });
@@ -704,7 +704,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       edgesBySourceAndHandle[`${setNode.id}|`] = [];
 
       await expect(
-        service.runFlow(resourceId, ResourceFlowNodeType.INPUT_BUTTON, {
+        service.runFlow(resourceId, ResourceFlowNodeType.MANUAL_BUTTON, {
           health: { status: 'maybe' },
         }),
       ).rejects.toThrow(/expected "healthy" or "unhealthy"/);
@@ -714,7 +714,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       const resourceId = 18;
       const heartbeatNode = createNode({
         id: 'hb-timeout',
-        type: ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT,
+        type: ResourceFlowNodeType.HEALTH_HEARTBEAT,
         resourceId,
         data: { identifier: 'Shelly', timeoutSeconds: 60, unhealthyReason: 'no signal' },
       });
@@ -741,7 +741,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       const resourceId = 19;
       const heartbeatNode = createNode({
         id: 'hb-fresh',
-        type: ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT,
+        type: ResourceFlowNodeType.HEALTH_HEARTBEAT,
         resourceId,
         data: { identifier: '', timeoutSeconds: 60, unhealthyReason: '' },
       });
@@ -760,7 +760,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       const resourceId = 20;
       const heartbeatNode = createNode({
         id: 'hb-firsttick',
-        type: ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT,
+        type: ResourceFlowNodeType.HEALTH_HEARTBEAT,
         resourceId,
         data: { identifier: '', timeoutSeconds: 60, unhealthyReason: '' },
       });
@@ -777,7 +777,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       const resourceId = 21;
       const heartbeatNode = createNode({
         id: 'hb-default-reason',
-        type: ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT,
+        type: ResourceFlowNodeType.HEALTH_HEARTBEAT,
         resourceId,
         data: { identifier: '', timeoutSeconds: 30, unhealthyReason: '' },
       });
@@ -827,8 +827,8 @@ describe('ResourceFlowsExecutorService MQTT', () => {
     flowNodeRepository = {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       find: jest.fn(async ({ where }: any) => {
-        if (where?.type === ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED) {
-          return initialNodes.filter((n) => n.type === ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED);
+        if (where?.type === ResourceFlowNodeType.MQTT_MESSAGE_RECEIVED) {
+          return initialNodes.filter((n) => n.type === ResourceFlowNodeType.MQTT_MESSAGE_RECEIVED);
         }
         const { resourceId, type } = where || {};
         return initialNodes.filter((n) => (resourceId ? n.resourceId === resourceId : true) && n.type === type);
@@ -914,7 +914,7 @@ describe('ResourceFlowsExecutorService MQTT', () => {
   it('matches INPUT_MQTT_MESSAGE_RECEIVED nodes using wildcards', async () => {
     const nodeA = {
       id: 'mqtt-a',
-      type: ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED,
+      type: ResourceFlowNodeType.MQTT_MESSAGE_RECEIVED,
       resourceId: 1,
       position: { x: 0, y: 0 },
       data: { serverId: 5, topic: 'sensors/+/temp' },
@@ -923,7 +923,7 @@ describe('ResourceFlowsExecutorService MQTT', () => {
     } as unknown as ResourceFlowNode;
     const nodeB = {
       id: 'mqtt-b',
-      type: ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED,
+      type: ResourceFlowNodeType.MQTT_MESSAGE_RECEIVED,
       resourceId: 2,
       position: { x: 0, y: 0 },
       data: { serverId: 5, topic: 'sensors/#' },
@@ -944,11 +944,11 @@ describe('ResourceFlowsExecutorService MQTT', () => {
     expect(new Set(nodeIds)).toEqual(new Set(['mqtt-a', 'mqtt-b']));
   });
 
-  it('processing.mqtt.waitForMessage resolves with {topic, payload} before timeout', async () => {
+  it('mqtt.wait-for-message resolves with {topic, payload} before timeout', async () => {
     // Build flow: INPUT -> WAIT -> (terminal)
     const inputNode = {
       id: 'in-1',
-      type: ResourceFlowNodeType.INPUT_BUTTON,
+      type: ResourceFlowNodeType.MANUAL_BUTTON,
       resourceId: 1,
       position: { x: 0, y: 0 },
       data: {},
@@ -958,7 +958,7 @@ describe('ResourceFlowsExecutorService MQTT', () => {
 
     const waitNode = {
       id: 'wait-1',
-      type: ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE,
+      type: ResourceFlowNodeType.MQTT_WAIT_FOR_MESSAGE,
       resourceId: 1,
       position: { x: 0, y: 0 },
       data: { serverId: 7, topic: 'devices/+/state', timeoutSeconds: 2 },
@@ -979,7 +979,7 @@ describe('ResourceFlowsExecutorService MQTT', () => {
       );
     }, 50);
 
-    const results = await service.runFlow(1, ResourceFlowNodeType.INPUT_BUTTON, {});
+    const results = await service.runFlow(1, ResourceFlowNodeType.MANUAL_BUTTON, {});
     expect(results).toEqual([
       {
         topic: 'devices/abc/state',
@@ -990,10 +990,10 @@ describe('ResourceFlowsExecutorService MQTT', () => {
     expect(mqttClientService.subscribe).toHaveBeenCalledWith(7, 'devices/+/state', undefined);
   });
 
-  it('processing.mqtt.waitForMessage times out and throws error', async () => {
+  it('mqtt.wait-for-message times out and throws error', async () => {
     const inputNode = {
       id: 'in-1',
-      type: ResourceFlowNodeType.INPUT_BUTTON,
+      type: ResourceFlowNodeType.MANUAL_BUTTON,
       resourceId: 1,
       position: { x: 0, y: 0 },
       data: {},
@@ -1003,7 +1003,7 @@ describe('ResourceFlowsExecutorService MQTT', () => {
 
     const waitNode = {
       id: 'wait-1',
-      type: ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE,
+      type: ResourceFlowNodeType.MQTT_WAIT_FOR_MESSAGE,
       resourceId: 1,
       position: { x: 0, y: 0 },
       data: { serverId: 8, topic: 'foo/#', timeoutSeconds: 1 },
@@ -1016,7 +1016,7 @@ describe('ResourceFlowsExecutorService MQTT', () => {
     edgesBySourceAndHandle[`${inputNode.id}|`] = [{ source: inputNode.id, target: waitNode.id }];
     edgesBySourceAndHandle[`${waitNode.id}|`] = [];
 
-    await expect(service.runFlow(1, ResourceFlowNodeType.INPUT_BUTTON, {})).rejects.toThrow(
+    await expect(service.runFlow(1, ResourceFlowNodeType.MANUAL_BUTTON, {})).rejects.toThrow(
       /Timeout waiting for MQTT message/,
     );
   });

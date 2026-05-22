@@ -164,10 +164,10 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
   private async subscribeToMqttTopics() {
     const [mqttMessageReceivedNodes, mqttWaitForMessageNodes] = await Promise.all([
       this.flowNodeRepository.find({
-        where: { type: ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED },
+        where: { type: ResourceFlowNodeType.MQTT_MESSAGE_RECEIVED },
       }),
       this.flowNodeRepository.find({
-        where: { type: ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE },
+        where: { type: ResourceFlowNodeType.MQTT_WAIT_FOR_MESSAGE },
       }),
     ]);
 
@@ -341,15 +341,15 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
           break;
         case ResourceUsageAction.DoorLock:
           // TODO: directly trigger the flow instead of relying on the event emitter
-          await this.handleResourceUsage(usage, ResourceFlowNodeType.INPUT_RESOURCE_DOOR_LOCKED);
+          await this.handleResourceUsage(usage, ResourceFlowNodeType.DOOR_LOCKED);
           break;
         case ResourceUsageAction.DoorUnlock:
           // TODO: directly trigger the flow instead of relying on the event emitter
-          await this.handleResourceUsage(usage, ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLOCKED);
+          await this.handleResourceUsage(usage, ResourceFlowNodeType.DOOR_UNLOCKED);
           break;
         case ResourceUsageAction.DoorUnlatch:
           // TODO: directly trigger the flow instead of relying on the event emitter
-          await this.handleResourceUsage(usage, ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLATCHED);
+          await this.handleResourceUsage(usage, ResourceFlowNodeType.DOOR_UNLATCHED);
           break;
 
         default: {
@@ -369,7 +369,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
 
     const messageReceivedNodes = await this.flowNodeRepository.find({
       where: {
-        type: ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED,
+        type: ResourceFlowNodeType.MQTT_MESSAGE_RECEIVED,
       },
     });
 
@@ -528,51 +528,51 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     transactionManager?: EntityManager,
   ): Promise<NodeProcessingResult> {
     switch (node.type) {
-      case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED:
-      case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED:
-      case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER:
-      case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLOCKED:
-      case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_LOCKED:
-      case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLATCHED:
-      case ResourceFlowNodeType.INPUT_BUTTON:
-      case ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED:
-      case ResourceFlowNodeType.INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY:
+      case ResourceFlowNodeType.RESOURCE_USAGE_STARTED:
+      case ResourceFlowNodeType.RESOURCE_USAGE_STOPPED:
+      case ResourceFlowNodeType.RESOURCE_USAGE_TAKEOVER:
+      case ResourceFlowNodeType.DOOR_UNLOCKED:
+      case ResourceFlowNodeType.DOOR_LOCKED:
+      case ResourceFlowNodeType.DOOR_UNLATCHED:
+      case ResourceFlowNodeType.MANUAL_BUTTON:
+      case ResourceFlowNodeType.MQTT_MESSAGE_RECEIVED:
+      case ResourceFlowNodeType.RESOURCE_ACTIVITY_NO_ACTIVITY:
         return { payload: input };
 
-      case ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT:
+      case ResourceFlowNodeType.HEALTH_HEARTBEAT:
         return this.processHeartbeatNode(node, input);
 
-      case ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_SET:
+      case ResourceFlowNodeType.HEALTH_SET:
         return this.processHealthSetNode(node, input);
 
-      case ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS:
+      case ResourceFlowNodeType.RESOURCE_BILLING_SET_ADDITIONAL_ITEMS:
         return this.processBillingSetAdditionalItemsNode(node, input, transactionManager);
 
-      case ResourceFlowNodeType.PROCESSING_WAIT:
+      case ResourceFlowNodeType.LOGIC_WAIT:
         return this.processWaitNode(node, input, transactionManager);
 
-      case ResourceFlowNodeType.OUTPUT_HTTP_SEND_REQUEST:
+      case ResourceFlowNodeType.HTTP_SEND_REQUEST:
         return this.processHttpSendRequestNode(node, input, transactionManager);
 
-      case ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE:
+      case ResourceFlowNodeType.MQTT_SEND_MESSAGE:
         return this.processMqttSendMessageNode(node, input, transactionManager);
 
-      case ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION:
+      case ResourceFlowNodeType.RESOURCE_USAGE_END_SESSION:
         return this.processEndUsageSessionNode(node, input, transactionManager);
 
-      case ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_TRACK_ACTIVITY:
+      case ResourceFlowNodeType.RESOURCE_ACTIVITY_TRACK_ACTIVITY:
         return this.processActivityTrackActivityNode(node, input);
 
-      case ResourceFlowNodeType.PROCESSING_IF:
+      case ResourceFlowNodeType.LOGIC_IF:
         return this.processIfNode(node, input, transactionManager);
 
-      case ResourceFlowNodeType.PROCESSING_SET_PAYLOAD:
+      case ResourceFlowNodeType.LOGIC_SET_PAYLOAD:
         return this.processSetPayloadNode(node, input, transactionManager);
 
-      case ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE:
+      case ResourceFlowNodeType.MQTT_WAIT_FOR_MESSAGE:
         return this.processMqttWaitForMessageNode(node, input, transactionManager);
 
-      case ResourceFlowNodeType.PROCESSING_ERROR:
+      case ResourceFlowNodeType.LOGIC_ERROR:
         return this.processErrorNode(node, input, transactionManager);
 
       default: {
@@ -1023,7 +1023,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
   @Cron(CronExpression.EVERY_MINUTE)
   public async checkHealthHeartbeats() {
     const heartbeatNodes = await this.flowNodeRepository.find({
-      where: { type: ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT },
+      where: { type: ResourceFlowNodeType.HEALTH_HEARTBEAT },
     });
 
     const validKeys = new Set<string>();
@@ -1105,7 +1105,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
           'usage.resourceId = node.resourceId AND usage.endTime IS NULL AND usage.isFinalized = TRUE AND usage.usageAction = :usageAction',
           { usageAction: ResourceUsageAction.Usage },
         )
-        .where('node.type = :type', { type: ResourceFlowNodeType.INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY })
+        .where('node.type = :type', { type: ResourceFlowNodeType.RESOURCE_ACTIVITY_NO_ACTIVITY })
         .distinct(true)
         .getMany();
 
@@ -1165,7 +1165,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     const button = await this.flowNodeRepository.findOne({
       where: {
         resourceId,
-        type: ResourceFlowNodeType.INPUT_BUTTON,
+        type: ResourceFlowNodeType.MANUAL_BUTTON,
         id: buttonId.toString(),
       },
     });

@@ -15,7 +15,7 @@ export class ResourceFlowNodeDto {
 
   @ApiProperty({
     description: 'The type of the node',
-    example: ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED,
+    example: ResourceFlowNodeType.RESOURCE_USAGE_STARTED,
     enum: ResourceFlowNodeType,
     enumName: 'ResourceFlowNodeType',
   })

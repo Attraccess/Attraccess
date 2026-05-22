@@ -20,7 +20,7 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
 
   return useMemo(() => {
     switch (schema.type) {
-      case ResourceFlowNodeType.INPUT_BUTTON:
+      case ResourceFlowNodeType.MANUAL_BUTTON:
         return [
           {
             label: t('nodes.input.button.preview.label'),
@@ -28,15 +28,15 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
           },
         ];
 
-      case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED:
-      case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED:
-      case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER:
-      case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLOCKED:
-      case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_LOCKED:
-      case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLATCHED:
+      case ResourceFlowNodeType.RESOURCE_USAGE_STARTED:
+      case ResourceFlowNodeType.RESOURCE_USAGE_STOPPED:
+      case ResourceFlowNodeType.RESOURCE_USAGE_TAKEOVER:
+      case ResourceFlowNodeType.DOOR_UNLOCKED:
+      case ResourceFlowNodeType.DOOR_LOCKED:
+      case ResourceFlowNodeType.DOOR_UNLATCHED:
         return [];
 
-      case ResourceFlowNodeType.INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY:
+      case ResourceFlowNodeType.RESOURCE_ACTIVITY_NO_ACTIVITY:
         return [
           {
             label: t('nodes.input.resource.activity.no-activity.preview.minInactivityMinutes'),
@@ -44,7 +44,7 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
           },
         ];
 
-      case ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED:
+      case ResourceFlowNodeType.MQTT_MESSAGE_RECEIVED:
         return [
           {
             label: t('nodes.input.mqtt.message.received.preview.topic'),
@@ -52,7 +52,7 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
           },
         ];
 
-      case ResourceFlowNodeType.PROCESSING_WAIT:
+      case ResourceFlowNodeType.LOGIC_WAIT:
         return [
           {
             label: t('nodes.processing.wait.preview.duration'),
@@ -60,7 +60,7 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
           },
         ];
 
-      case ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE:
+      case ResourceFlowNodeType.MQTT_WAIT_FOR_MESSAGE:
         return [
           {
             label: t('nodes.processing.mqtt.waitForMessage.preview.topic'),
@@ -72,7 +72,7 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
           },
         ];
 
-      case ResourceFlowNodeType.PROCESSING_ERROR:
+      case ResourceFlowNodeType.LOGIC_ERROR:
         return [
           {
             label: t('nodes.processing.error.preview.message'),
@@ -80,7 +80,7 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
           },
         ];
 
-      case ResourceFlowNodeType.PROCESSING_IF:
+      case ResourceFlowNodeType.LOGIC_IF:
         return [
           {
             label: t('nodes.processing.if.preview.summary'),
@@ -88,7 +88,7 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
           },
         ];
 
-      case ResourceFlowNodeType.PROCESSING_SET_PAYLOAD: {
+      case ResourceFlowNodeType.LOGIC_SET_PAYLOAD: {
         const entries = (nodeData?.data.entries as Array<{ key: string; value: string }>) ?? [];
         const preview = entries
           .slice(0, 3)
@@ -102,7 +102,7 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
         ];
       }
 
-      case ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_CALCULATION_SET_ADDITIONAL_ITEMS:
+      case ResourceFlowNodeType.RESOURCE_BILLING_SET_ADDITIONAL_ITEMS:
         return [
           {
             label: t('nodes.output.resource.billing.calculation.set-additional-items.preview.position'),
@@ -110,7 +110,7 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
           },
         ];
 
-      case ResourceFlowNodeType.OUTPUT_HTTP_SEND_REQUEST:
+      case ResourceFlowNodeType.HTTP_SEND_REQUEST:
         return [
           {
             label: t('nodes.output.http.sendRequest.preview.method'),
@@ -122,7 +122,7 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
           },
         ];
 
-      case ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE:
+      case ResourceFlowNodeType.MQTT_SEND_MESSAGE:
         return [
           {
             label: t('nodes.output.mqtt.sendMessage.preview.topic'),
@@ -130,7 +130,7 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
           },
         ];
 
-      case ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION:
+      case ResourceFlowNodeType.RESOURCE_USAGE_END_SESSION:
         return [
           {
             label: t('nodes.output.resource.usage.end-session.preview.notes'),
@@ -138,10 +138,10 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
           },
         ];
 
-      case ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_TRACK_ACTIVITY:
+      case ResourceFlowNodeType.RESOURCE_ACTIVITY_TRACK_ACTIVITY:
         return [];
 
-      case ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT:
+      case ResourceFlowNodeType.HEALTH_HEARTBEAT:
         return [
           {
             label: t('nodes.output.resource.health.heartbeat.preview.identifier'),
@@ -153,7 +153,7 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
           },
         ];
 
-      case ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_SET:
+      case ResourceFlowNodeType.HEALTH_SET:
         return [
           {
             label: t('nodes.output.resource.health.set.preview.identifier'),

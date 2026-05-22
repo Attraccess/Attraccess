@@ -20,15 +20,15 @@ describe('FlowTimer', () => {
     it('records success duration histogram and execution counter', async () => {
       const { registry, timer } = setup();
 
-      const result = await timer.timeFlow('input.button', async () => 'ok');
+      const result = await timer.timeFlow('manual.button', async () => 'ok');
 
       expect(result).toBe('ok');
       const text = await registry.metrics();
       expect(text).toContain(
-        'attraccess_flow_executions_total{trigger_type="input.button",status="success"} 1',
+        'attraccess_flow_executions_total{trigger_type="manual.button",status="success"} 1',
       );
       expect(text).toContain(
-        'attraccess_flow_execution_duration_seconds_count{trigger_type="input.button",status="success"} 1',
+        'attraccess_flow_execution_duration_seconds_count{trigger_type="manual.button",status="success"} 1',
       );
     });
 
@@ -36,17 +36,17 @@ describe('FlowTimer', () => {
       const { registry, timer } = setup();
 
       await expect(
-        timer.timeFlow('input.mqtt.message.received', async () => {
+        timer.timeFlow('mqtt.message.received', async () => {
           throw new Error('boom');
         }),
       ).rejects.toThrow('boom');
 
       const text = await registry.metrics();
       expect(text).toContain(
-        'attraccess_flow_executions_total{trigger_type="input.mqtt.message.received",status="failure"} 1',
+        'attraccess_flow_executions_total{trigger_type="mqtt.message.received",status="failure"} 1',
       );
       expect(text).toContain(
-        'attraccess_flow_execution_duration_seconds_count{trigger_type="input.mqtt.message.received",status="failure"} 1',
+        'attraccess_flow_execution_duration_seconds_count{trigger_type="mqtt.message.received",status="failure"} 1',
       );
     });
   });
@@ -55,12 +55,12 @@ describe('FlowTimer', () => {
     it('records success duration histogram on nodeDuration without a counter', async () => {
       const { registry, timer } = setup();
 
-      const result = await timer.timeNode('processing.if', async () => 42);
+      const result = await timer.timeNode('logic.if', async () => 42);
 
       expect(result).toBe(42);
       const text = await registry.metrics();
       expect(text).toContain(
-        'attraccess_flow_node_duration_seconds_count{node_type="processing.if",status="success"} 1',
+        'attraccess_flow_node_duration_seconds_count{node_type="logic.if",status="success"} 1',
       );
       expect(text).not.toContain('attraccess_flow_node_total');
     });
@@ -69,30 +69,30 @@ describe('FlowTimer', () => {
       const { registry, timer } = setup();
 
       await expect(
-        timer.timeNode('output.http.sendRequest', async () => {
+        timer.timeNode('http.send-request', async () => {
           throw new Error('http-fail');
         }),
       ).rejects.toThrow('http-fail');
 
       const text = await registry.metrics();
       expect(text).toContain(
-        'attraccess_flow_node_duration_seconds_count{node_type="output.http.sendRequest",status="failure"} 1',
+        'attraccess_flow_node_duration_seconds_count{node_type="http.send-request",status="failure"} 1',
       );
     });
 
     it('records multiple node types independently', async () => {
       const { registry, timer } = setup();
 
-      await timer.timeNode('processing.if', async () => undefined);
-      await timer.timeNode('output.mqtt.sendMessage', async () => undefined);
-      await timer.timeNode('processing.if', async () => undefined);
+      await timer.timeNode('logic.if', async () => undefined);
+      await timer.timeNode('mqtt.send-message', async () => undefined);
+      await timer.timeNode('logic.if', async () => undefined);
 
       const text = await registry.metrics();
       expect(text).toContain(
-        'attraccess_flow_node_duration_seconds_count{node_type="processing.if",status="success"} 2',
+        'attraccess_flow_node_duration_seconds_count{node_type="logic.if",status="success"} 2',
       );
       expect(text).toContain(
-        'attraccess_flow_node_duration_seconds_count{node_type="output.mqtt.sendMessage",status="success"} 1',
+        'attraccess_flow_node_duration_seconds_count{node_type="mqtt.send-message",status="success"} 1',
       );
     });
   });
@@ -102,7 +102,7 @@ describe('FlowTimer', () => {
       const { registry, timer } = setup(false);
       let called = false;
 
-      const result = await timer.timeFlow('input.button', async () => {
+      const result = await timer.timeFlow('manual.button', async () => {
         called = true;
         return 'value';
       });
@@ -118,7 +118,7 @@ describe('FlowTimer', () => {
       const { registry, timer } = setup(false);
       let called = false;
 
-      await timer.timeNode('processing.if', async () => {
+      await timer.timeNode('logic.if', async () => {
         called = true;
       });
 
@@ -130,8 +130,8 @@ describe('FlowTimer', () => {
     it('reads toggle synchronously via isEnabledCached', async () => {
       const { timer, toggle } = setup();
 
-      await timer.timeFlow('input.button', async () => undefined);
-      await timer.timeNode('processing.if', async () => undefined);
+      await timer.timeFlow('manual.button', async () => undefined);
+      await timer.timeNode('logic.if', async () => undefined);
 
       expect(toggle.isEnabledCached).toHaveBeenCalledWith('flow');
       expect(toggle.isEnabledCached).toHaveBeenCalledTimes(2);
