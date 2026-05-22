@@ -13,6 +13,9 @@
         "amount": "Betrag",
         "actions": "Aktionen"
       },
+      "actions": {
+        "refund": "Transaktion erstatten"
+      },
       "cells": {
         "details": {
           "unknown": "Transaktionsart unbekannt",
