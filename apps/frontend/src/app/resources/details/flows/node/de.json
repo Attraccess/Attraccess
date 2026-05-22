@@ -13,7 +13,7 @@
       "overridableByInput": "Überschreibbar durch Eingabe: {{fieldName}}",
       "createMqttServer": "MQTT-Server erstellen"
     },
-    "input": {
+    "manual": {
       "button": {
         "title": "Taste",
         "description": "Erzeugt eine Ausgabe, wenn die Taste dieses Knotens auf der Resourcen Seite gedrückt wird.",
@@ -28,104 +28,221 @@
             "label": "Beschriftung"
           }
         }
-      },
-      "resource": {
-        "usage": {
-          "started": {
-            "title": "Resource wurde gestartet",
-            "description": "Dieser Knoten wird ausgelöst, wenn eine Ressource gestartet wird.",
-            "outputs": {
-              "output": "Ausgabe"
-            }
-          },
-          "stopped": {
-            "title": "Resource wurde gestoppt",
-            "description": "Dieser Knoten wird ausgelöst, wenn eine Ressource gestoppt wird.",
-            "outputs": {
-              "output": "Ausgabe"
-            }
-          },
-          "takeover": {
-            "title": "Ressource wurde übernommen",
-            "description": "Dieser Knoten wird ausgelöst, wenn eine Ressource übernommen wird.",
-            "outputs": {
-              "output": "Ausgabe"
-            }
+      }
+    },
+    "resource": {
+      "usage": {
+        "started": {
+          "title": "Resource wurde gestartet",
+          "description": "Dieser Knoten wird ausgelöst, wenn eine Ressource gestartet wird.",
+          "outputs": {
+            "output": "Ausgabe"
           }
         },
-        "activity": {
-          "no-activity": {
-            "title": "Ressource ist inaktiv",
-            "description": "Dieser Knoten wird ausgelöst, wenn eine Ressource inaktiv ist für eine bestimmte Zeit.",
-            "outputs": {
-              "output": "Ausgabe"
-            },
-            "preview": {
-              "minInactivityMinutes": "Mindestinaktivität (Minuten)"
-            },
-            "config": {
-              "minInactivityMinutes": {
-                "label": "Mindestinaktivität (Minuten)"
-              }
-            }
+        "stopped": {
+          "title": "Resource wurde gestoppt",
+          "description": "Dieser Knoten wird ausgelöst, wenn eine Ressource gestoppt wird.",
+          "outputs": {
+            "output": "Ausgabe"
           }
         },
-        "door": {
-          "locked": {
-            "title": "Tür verriegelt",
-            "description": "Dieser Knoten wird ausgelöst, wenn die Tür verriegelt wird.",
-            "outputs": {
-              "output": "Ausgabe"
-            }
-          },
-          "unlocked": {
-            "title": "Tür entriegelt",
-            "description": "Dieser Knoten wird ausgelöst, wenn die Tür entriegelt wird.",
-            "outputs": {
-              "output": "Ausgabe"
-            }
-          },
-          "unlatched": {
-            "title": "Tür-Falle geöffnet",
-            "description": "Dieser Knoten wird ausgelöst, wenn die Tür-Falle geöffnet wird.",
-            "outputs": {
-              "output": "Ausgabe"
-            }
+        "takeover": {
+          "title": "Ressource wurde übernommen",
+          "description": "Dieser Knoten wird ausgelöst, wenn eine Ressource übernommen wird.",
+          "outputs": {
+            "output": "Ausgabe"
           }
         },
-        "billing": {
-          "calculation": {
-            "started": {
-              "title": "Abrechnungsberechnung gestartet",
-              "description": "Dieser Knoten wird ausgelöst, wenn die berechnung der Kosten für die Nutzung dieser Resource gestartet wird. Es ist zwingend erforderlich, dass im Anschluss (als letzter Knoten) der Knoten 'Abrechnung positionen hinzufügen' ausgelöst wird."
+        "end-session": {
+          "title": "Nutzung beenden",
+          "description": "Beendet die aktive Nutzungssitzung. Optional mit Notizen (Template oder statisch).",
+          "inputs": {
+            "input": "Eingabe"
+          },
+          "outputs": {
+            "output": "Ausgabe"
+          },
+          "config": {
+            "notes": {
+              "label": "Notizen (Templates erlaubt)"
             }
+          },
+          "preview": {
+            "notes": "Notizen"
           }
         }
       },
-      "mqtt": {
-        "message": {
-          "received": {
-            "title": "MQTT-Nachricht empfangen",
-            "description": "Dieser Knoten wird ausgelöst, wenn eine MQTT-Nachricht empfangen wird.",
-            "outputs": {
-              "output": "Ausgabe"
+      "activity": {
+        "no-activity": {
+          "title": "Ressource ist inaktiv",
+          "description": "Dieser Knoten wird ausgelöst, wenn eine Ressource inaktiv ist für eine bestimmte Zeit.",
+          "outputs": {
+            "output": "Ausgabe"
+          },
+          "preview": {
+            "minInactivityMinutes": "Mindestinaktivität (Minuten)"
+          },
+          "config": {
+            "minInactivityMinutes": {
+              "label": "Mindestinaktivität (Minuten)"
+            }
+          }
+        },
+        "track-activity": {
+          "title": "Ressource war aktiv",
+          "description": "Nutze um Attraccess anzuzeigen, dass die Ressource aktiv war.",
+          "inputs": {
+            "input": "Eingabe"
+          },
+          "outputs": {
+            "output": "Ausgabe"
+          }
+        }
+      },
+      "billing": {
+        "set-additional-items": {
+          "title": "Abrechnungs Position hinzufügen",
+          "description": "Mit diesem Knoten können Sie eine zusätzliche Position für die Abrechnung hinzufügen.",
+          "inputs": {
+            "input": "Eingabe"
+          },
+          "preview": {
+            "position": "Position"
+          },
+          "config": {
+            "name": {
+              "label": "Name"
             },
-            "preview": {
-              "topic": "Thema"
+            "unitPrice": {
+              "label": "Einheitspreis"
             },
-            "config": {
-              "topic": {
-                "label": "Thema"
-              },
-              "serverId": {
-                "label": "Server"
-              }
+            "quantity": {
+              "label": "Menge"
+            },
+            "description": {
+              "label": "Beschreibung"
+            },
+            "externalReference": {
+              "label": "Externe Referenz"
             }
           }
         }
       }
     },
-    "processing": {
+    "door": {
+      "locked": {
+        "title": "Tür verriegelt",
+        "description": "Dieser Knoten wird ausgelöst, wenn die Tür verriegelt wird.",
+        "outputs": {
+          "output": "Ausgabe"
+        }
+      },
+      "unlocked": {
+        "title": "Tür entriegelt",
+        "description": "Dieser Knoten wird ausgelöst, wenn die Tür entriegelt wird.",
+        "outputs": {
+          "output": "Ausgabe"
+        }
+      },
+      "unlatched": {
+        "title": "Tür-Falle geöffnet",
+        "description": "Dieser Knoten wird ausgelöst, wenn die Tür-Falle geöffnet wird.",
+        "outputs": {
+          "output": "Ausgabe"
+        }
+      }
+    },
+    "mqtt": {
+      "message": {
+        "received": {
+          "title": "MQTT-Nachricht empfangen",
+          "description": "Dieser Knoten wird ausgelöst, wenn eine MQTT-Nachricht empfangen wird.",
+          "outputs": {
+            "output": "Ausgabe"
+          },
+          "preview": {
+            "topic": "Thema"
+          },
+          "config": {
+            "topic": {
+              "label": "Thema"
+            },
+            "serverId": {
+              "label": "Server"
+            }
+          }
+        }
+      },
+      "wait-for-message": {
+        "title": "Auf MQTT-Nachricht warten",
+        "description": "Wartet auf die nächste MQTT-Nachricht, die dem Themen-Filter entspricht; übergibt {topic, payload}.",
+        "inputs": {
+          "input": "Eingabe"
+        },
+        "outputs": {
+          "output": "Ausgabe"
+        },
+        "preview": {
+          "topic": "Thema",
+          "timeoutSeconds": "Timeout (s)"
+        },
+        "config": {
+          "serverId": {
+            "label": "Server"
+          },
+          "topic": {
+            "label": "Thema (unterstützt + und #)"
+          },
+          "timeoutSeconds": {
+            "label": "Timeout (Sekunden)"
+          },
+          "subscribeQos": {
+            "label": "QoS (effektiv ist min(publish, subscribe))",
+            "enum": {
+              "0": "0 - Höchstens einmal (Fire-and-Forget)",
+              "1": "1 - Mindestens einmal (Bestätigung)",
+              "2": "2 - Genau einmal (Zwei-Phasen-Austausch)"
+            }
+          }
+        }
+      },
+      "send-message": {
+        "title": "MQTT-Nachricht senden",
+        "description": "Sendet eine MQTT-Nachricht.",
+        "inputs": {
+          "input": "Eingabe"
+        },
+        "outputs": {
+          "output": "Ausgabe"
+        },
+        "preview": {
+          "topic": "Thema"
+        },
+        "config": {
+          "topic": {
+            "label": "Thema"
+          },
+          "serverId": {
+            "label": "Server"
+          },
+          "payload": {
+            "label": "Nutzlast"
+          },
+          "qos": {
+            "label": "QoS",
+            "enum": {
+              "0": "0 - Höchstens einmal (Fire-and-Forget)",
+              "1": "1 - Mindestens einmal (Bestätigung)",
+              "2": "2 - Genau einmal (Zwei-Phasen-Austausch)"
+            }
+          },
+          "retain": {
+            "label": "Nachricht behalten (retain)"
+          }
+        }
+      }
+    },
+    "logic": {
       "wait": {
         "title": "Warten",
         "description": "Wartet eine bestimmte Zeit.",
@@ -148,31 +265,6 @@
               "seconds": "Sekunden",
               "minutes": "Minuten",
               "hours": "Stunden"
-            }
-          }
-        }
-      },
-      "mqtt": {
-        "waitForMessage": {
-          "title": "Auf MQTT-Nachricht warten",
-          "description": "Wartet auf die nächste MQTT-Nachricht, die dem Themen-Filter entspricht; übergibt {topic, payload}.",
-          "inputs": { "input": "Eingabe" },
-          "outputs": { "output": "Ausgabe" },
-          "preview": {
-            "topic": "Thema",
-            "timeoutSeconds": "Timeout (s)"
-          },
-          "config": {
-            "serverId": { "label": "Server" },
-            "topic": { "label": "Thema (unterstützt + und #)" },
-            "timeoutSeconds": { "label": "Timeout (Sekunden)" },
-            "subscribeQos": {
-              "label": "QoS (effektiv ist min(publish, subscribe))",
-              "enum": {
-                "0": "0 - Höchstens einmal (Fire-and-Forget)",
-                "1": "1 - Mindestens einmal (Bestätigung)",
-                "2": "2 - Genau einmal (Zwei-Phasen-Austausch)"
-              }
             }
           }
         }
@@ -231,8 +323,12 @@
             "empty": "Keine Einträge konfiguriert.",
             "add": "Eintrag hinzufügen",
             "items": {
-              "key": { "label": "Schlüssel (Pfad)" },
-              "value": { "label": "Wert-Template" }
+              "key": {
+                "label": "Schlüssel (Pfad)"
+              },
+              "value": {
+                "label": "Wert-Template"
+              }
             }
           }
         }
@@ -253,177 +349,99 @@
         }
       }
     },
-    "output": {
-      "http": {
-        "sendRequest": {
-          "title": "HTTP-Anfrage senden",
-          "description": "Sendet eine HTTP-Anfrage.",
-          "inputs": {
-            "input": "Eingabe"
+    "http": {
+      "send-request": {
+        "title": "HTTP-Anfrage senden",
+        "description": "Sendet eine HTTP-Anfrage.",
+        "inputs": {
+          "input": "Eingabe"
+        },
+        "outputs": {
+          "output": "Ausgabe"
+        },
+        "preview": {
+          "method": "Methode",
+          "url": "URL"
+        },
+        "config": {
+          "url": {
+            "label": "URL"
           },
-          "outputs": {
-            "output": "Ausgabe"
-          },
-          "preview": {
-            "method": "Methode",
-            "url": "URL"
-          },
-          "config": {
-            "url": {
-              "label": "URL"
-            },
-            "method": {
-              "label": "Methode",
-              "enum": {
-                "GET": "GET",
-                "POST": "POST",
-                "PUT": "PUT",
-                "PATCH": "PATCH",
-                "DELETE": "DELETE",
-                "HEAD": "HEAD",
-                "OPTIONS": "OPTIONS"
-              }
-            },
-            "headers": {
-              "label": "Headers",
-              "add": "Header hinzufügen",
-              "empty": "Keine Header"
-            },
-            "body": {
-              "label": "Body"
+          "method": {
+            "label": "Methode",
+            "enum": {
+              "GET": "GET",
+              "POST": "POST",
+              "PUT": "PUT",
+              "PATCH": "PATCH",
+              "DELETE": "DELETE",
+              "HEAD": "HEAD",
+              "OPTIONS": "OPTIONS"
             }
+          },
+          "headers": {
+            "label": "Headers",
+            "add": "Header hinzufügen",
+            "empty": "Keine Header"
+          },
+          "body": {
+            "label": "Body"
+          }
+        }
+      }
+    },
+    "health": {
+      "heartbeat": {
+        "title": "Lebenszeichen",
+        "description": "Markiert die Ressource als gesund, wenn dieser Knoten ausgelöst wird. Erfolgt innerhalb des Timeouts kein neues Lebenszeichen, wird die Ressource automatisch als ungesund markiert.",
+        "inputs": {
+          "input": "Eingabe"
+        },
+        "outputs": {
+          "output": "Ausgabe"
+        },
+        "preview": {
+          "identifier": "Bezeichner",
+          "timeoutSeconds": "Timeout (s)"
+        },
+        "config": {
+          "identifier": {
+            "label": "Bezeichner (optional)"
+          },
+          "timeoutSeconds": {
+            "label": "Timeout (Sekunden)"
+          },
+          "unhealthyReason": {
+            "label": "Begründung bei Timeout (optional)"
           }
         }
       },
-      "mqtt": {
-        "sendMessage": {
-          "title": "MQTT-Nachricht senden",
-          "description": "Sendet eine MQTT-Nachricht.",
-          "inputs": {
-            "input": "Eingabe"
-          },
-          "outputs": {
-            "output": "Ausgabe"
-          },
-          "preview": {
-            "topic": "Thema"
-          },
-          "config": {
-            "topic": {
-              "label": "Thema"
-            },
-            "serverId": {
-              "label": "Server"
-            },
-            "payload": {
-              "label": "Nutzlast"
-            },
-            "qos": {
-              "label": "QoS",
-              "enum": {
-                "0": "0 - Höchstens einmal (Fire-and-Forget)",
-                "1": "1 - Mindestens einmal (Bestätigung)",
-                "2": "2 - Genau einmal (Zwei-Phasen-Austausch)"
-              }
-            },
-            "retain": { "label": "Nachricht behalten (retain)" }
-          }
-        }
-      },
-      "resource": {
-        "usage": {
-          "end-session": {
-            "title": "Nutzung beenden",
-            "description": "Beendet die aktive Nutzungssitzung. Optional mit Notizen (Template oder statisch).",
-            "inputs": { "input": "Eingabe" },
-            "outputs": { "output": "Ausgabe" },
-            "config": {
-              "notes": { "label": "Notizen (Templates erlaubt)" }
-            },
-            "preview": {
-              "notes": "Notizen"
-            }
-          }
+      "set": {
+        "title": "Gesundheitszustand setzen",
+        "description": "Setzt den Gesundheitszustand der Ressource. Statische Werte können per Payload-Feldern überschrieben werden (health.identifier, health.status, health.reason).",
+        "inputs": {
+          "input": "Eingabe"
         },
-        "billing": {
-          "calculation": {
-            "set-additional-items": {
-              "title": "Abrechnungs Position hinzufügen",
-              "description": "Mit diesem Knoten können Sie eine zusätzliche Position für die Abrechnung hinzufügen.",
-              "inputs": {
-                "input": "Eingabe"
-              },
-              "preview": {
-                "position": "Position"
-              },
-              "config": {
-                "name": {
-                  "label": "Name"
-                },
-                "unitPrice": {
-                  "label": "Einheitspreis"
-                },
-                "quantity": {
-                  "label": "Menge"
-                },
-                "description": {
-                  "label": "Beschreibung"
-                },
-                "externalReference": {
-                  "label": "Externe Referenz"
-                }
-              }
-            }
-          }
+        "outputs": {
+          "output": "Ausgabe"
         },
-        "activity": {
-          "track-activity": {
-            "title": "Ressource war aktiv",
-            "description": "Nutze um Attraccess anzuzeigen, dass die Ressource aktiv war.",
-            "inputs": {
-              "input": "Eingabe"
-            },
-            "outputs": {
-              "output": "Ausgabe"
-            }
-          }
+        "preview": {
+          "identifier": "Bezeichner",
+          "status": "Status"
         },
-        "health": {
-          "heartbeat": {
-            "title": "Lebenszeichen",
-            "description": "Markiert die Ressource als gesund, wenn dieser Knoten ausgelöst wird. Erfolgt innerhalb des Timeouts kein neues Lebenszeichen, wird die Ressource automatisch als ungesund markiert.",
-            "inputs": { "input": "Eingabe" },
-            "outputs": { "output": "Ausgabe" },
-            "preview": {
-              "identifier": "Bezeichner",
-              "timeoutSeconds": "Timeout (s)"
-            },
-            "config": {
-              "identifier": { "label": "Bezeichner (optional)" },
-              "timeoutSeconds": { "label": "Timeout (Sekunden)" },
-              "unhealthyReason": { "label": "Begründung bei Timeout (optional)" }
+        "config": {
+          "identifier": {
+            "label": "Bezeichner (optional)"
+          },
+          "status": {
+            "label": "Status",
+            "enum": {
+              "healthy": "Gesund",
+              "unhealthy": "Ungesund"
             }
           },
-          "set": {
-            "title": "Gesundheitszustand setzen",
-            "description": "Setzt den Gesundheitszustand der Ressource. Statische Werte können per Payload-Feldern überschrieben werden (health.identifier, health.status, health.reason).",
-            "inputs": { "input": "Eingabe" },
-            "outputs": { "output": "Ausgabe" },
-            "preview": {
-              "identifier": "Bezeichner",
-              "status": "Status"
-            },
-            "config": {
-              "identifier": { "label": "Bezeichner (optional)" },
-              "status": {
-                "label": "Status",
-                "enum": {
-                  "healthy": "Gesund",
-                  "unhealthy": "Ungesund"
-                }
-              },
-              "reason": { "label": "Begründung (optional, Templates erlaubt)" }
-            }
+          "reason": {
+            "label": "Begründung (optional, Templates erlaubt)"
           }
         }
       }

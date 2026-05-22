@@ -23,7 +23,7 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
       case ResourceFlowNodeType.MANUAL_BUTTON:
         return [
           {
-            label: t('nodes.input.button.preview.label'),
+            label: t('nodes.manual.button.preview.label'),
             value: nodeData?.data.label as string,
           },
         ];
@@ -39,7 +39,7 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
       case ResourceFlowNodeType.RESOURCE_ACTIVITY_NO_ACTIVITY:
         return [
           {
-            label: t('nodes.input.resource.activity.no-activity.preview.minInactivityMinutes'),
+            label: t('nodes.resource.activity.no-activity.preview.minInactivityMinutes'),
             value: nodeData?.data.minInactivityMinutes as string,
           },
         ];
@@ -47,7 +47,7 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
       case ResourceFlowNodeType.MQTT_MESSAGE_RECEIVED:
         return [
           {
-            label: t('nodes.input.mqtt.message.received.preview.topic'),
+            label: t('nodes.mqtt.message.received.preview.topic'),
             value: nodeData?.data.topic as string,
           },
         ];
@@ -55,19 +55,19 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
       case ResourceFlowNodeType.LOGIC_WAIT:
         return [
           {
-            label: t('nodes.processing.wait.preview.duration'),
-            value: `${nodeData?.data.duration ?? 0} ${t('nodes.processing.wait.config.unit.enum.' + (nodeData?.data.unit ?? 'seconds'))}`,
+            label: t('nodes.logic.wait.preview.duration'),
+            value: `${nodeData?.data.duration ?? 0} ${t('nodes.logic.wait.config.unit.enum.' + (nodeData?.data.unit ?? 'seconds'))}`,
           },
         ];
 
       case ResourceFlowNodeType.MQTT_WAIT_FOR_MESSAGE:
         return [
           {
-            label: t('nodes.processing.mqtt.waitForMessage.preview.topic'),
+            label: t('nodes.mqtt.wait-for-message.preview.topic'),
             value: nodeData?.data.topic as string,
           },
           {
-            label: t('nodes.processing.mqtt.waitForMessage.preview.timeoutSeconds'),
+            label: t('nodes.mqtt.wait-for-message.preview.timeoutSeconds'),
             value: String(nodeData?.data.timeoutSeconds ?? ''),
           },
         ];
@@ -75,7 +75,7 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
       case ResourceFlowNodeType.LOGIC_ERROR:
         return [
           {
-            label: t('nodes.processing.error.preview.message'),
+            label: t('nodes.logic.error.preview.message'),
             value: nodeData?.data.message as string,
           },
         ];
@@ -83,7 +83,7 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
       case ResourceFlowNodeType.LOGIC_IF:
         return [
           {
-            label: t('nodes.processing.if.preview.summary'),
+            label: t('nodes.logic.if.preview.summary'),
             value: `${nodeData?.data.path ?? '-'} ${nodeData?.data.comparisonOperator} ${nodeData?.data.comparisonValue ?? '-'}`,
           },
         ];
@@ -96,7 +96,7 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
           .join(', ');
         return [
           {
-            label: t('nodes.processing.set-payload.preview.mappings'),
+            label: t('nodes.logic.set-payload.preview.mappings'),
             value: preview,
           },
         ];
@@ -105,7 +105,7 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
       case ResourceFlowNodeType.RESOURCE_BILLING_SET_ADDITIONAL_ITEMS:
         return [
           {
-            label: t('nodes.output.resource.billing.calculation.set-additional-items.preview.position'),
+            label: t('nodes.resource.billing.set-additional-items.preview.position'),
             value: nodeData?.data.name as string,
           },
         ];
@@ -113,11 +113,11 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
       case ResourceFlowNodeType.HTTP_SEND_REQUEST:
         return [
           {
-            label: t('nodes.output.http.sendRequest.preview.method'),
+            label: t('nodes.http.send-request.preview.method'),
             value: nodeData?.data.method as string,
           },
           {
-            label: t('nodes.output.http.sendRequest.preview.url'),
+            label: t('nodes.http.send-request.preview.url'),
             value: nodeData?.data.url as string,
           },
         ];
@@ -125,7 +125,7 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
       case ResourceFlowNodeType.MQTT_SEND_MESSAGE:
         return [
           {
-            label: t('nodes.output.mqtt.sendMessage.preview.topic'),
+            label: t('nodes.mqtt.send-message.preview.topic'),
             value: nodeData?.data.topic as string,
           },
         ];
@@ -133,7 +133,7 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
       case ResourceFlowNodeType.RESOURCE_USAGE_END_SESSION:
         return [
           {
-            label: t('nodes.output.resource.usage.end-session.preview.notes'),
+            label: t('nodes.resource.usage.end-session.preview.notes'),
             value: nodeData?.data.notes as string,
           },
         ];
@@ -144,11 +144,11 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
       case ResourceFlowNodeType.HEALTH_HEARTBEAT:
         return [
           {
-            label: t('nodes.output.resource.health.heartbeat.preview.identifier'),
+            label: t('nodes.health.heartbeat.preview.identifier'),
             value: (nodeData?.data.identifier as string) || '-',
           },
           {
-            label: t('nodes.output.resource.health.heartbeat.preview.timeoutSeconds'),
+            label: t('nodes.health.heartbeat.preview.timeoutSeconds'),
             value: String(nodeData?.data.timeoutSeconds ?? ''),
           },
         ];
@@ -156,11 +156,11 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
       case ResourceFlowNodeType.HEALTH_SET:
         return [
           {
-            label: t('nodes.output.resource.health.set.preview.identifier'),
+            label: t('nodes.health.set.preview.identifier'),
             value: (nodeData?.data.identifier as string) || '-',
           },
           {
-            label: t('nodes.output.resource.health.set.preview.status'),
+            label: t('nodes.health.set.preview.status'),
             value: (nodeData?.data.status as string) ?? '',
           },
         ];
