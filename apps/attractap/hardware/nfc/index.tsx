@@ -119,6 +119,7 @@ export default () => (
     <R0402 name="R_SDA" pn={R_4K7_PN} resistance="4.7k" {...atBottom(22.41, 34.66)} />
     <R0402 name="R_SCL" pn={R_4K7_PN} resistance="4.7k" {...atBottom(25, 35)} />
     <R0402 name="R_IRQ" pn={R_10K_PN} resistance="10k" {...atBottom(27.59, 34.66)} />
+    <R0402 name="R_NSS" pn={R_10K_PN} resistance="10k" {...atBottom(30, 33.5)} />
 
     <R0603 name="Rq1" pn={R_4R7_PN} resistance="4.7" {...atBottom(32.07, 17.93)} />
     <L0603 name="L0_TX1" pn={L_560NH_PN} inductance="560nH" {...atBottom(33.66, 20)} />
@@ -185,13 +186,14 @@ export default () => (
     <trace from=".U1 > .AVSS" to=".U1 > .AGND1" />
     <trace from=".U1 > .AGND1" to=".U1 > .AGND2" />
     <trace from=".U1 > .AGND2" to=".U1 > .EP" />
-    <trace from=".U1 > .EP" to=".U1 > .I1" />
-    <trace from=".U1 > .I1" to=".U1 > .NSS" />
-    <trace from=".U1 > .NSS" to=".U1 > .SIGIN" />
-    <trace from=".U1 > .SIGIN" to=".U1 > .VMID" />
-    <trace from=".U1 > .VMID" to=".C_VMID > .pin2" />
-    <trace from=".C_VMID > .pin1" to=".U1 > .SVDD" />
     <trace from=".J1 > .pin9" to=".U1 > .EP" />
+
+    <trace from=".U1 > .I1" to=".U1 > .EP" />
+    <trace from=".U1 > .SIGIN" to=".U1 > .EP" />
+    <trace from=".R_NSS > .pin1" to=".U1 > .SVDD" />
+    <trace from=".R_NSS > .pin2" to=".U1 > .NSS" />
+    <trace from=".U1 > .VMID" to=".C_VMID > .pin1" />
+    <trace from=".C_VMID > .pin2" to=".U1 > .EP" />
 
     <trace from=".U1 > .TX1" to=".Rq1 > .pin1" />
     <trace from=".Rq1 > .pin2" to=".L0_TX1 > .pin1" />
