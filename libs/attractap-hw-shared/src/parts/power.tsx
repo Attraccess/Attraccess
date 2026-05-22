@@ -1,11 +1,9 @@
 import type { BasePartProps } from './types';
 import { jlcSupplier } from './types';
 
-export interface Ams1117Props extends BasePartProps {
-  readonly outputVoltage?: '3.3V' | '5V' | '1.8V' | '1.2V';
-}
+export type Ams1117Props = BasePartProps;
 
-export const Ams1117_3v3 = ({ name, pn, outputVoltage: _outputVoltage = '3.3V', ...rest }: Ams1117Props) => (
+export const Ams1117_3v3 = ({ name, pn, ...rest }: Ams1117Props) => (
   <chip
     name={name}
     footprint="sot223"

@@ -7,7 +7,6 @@ import { jlcSupplier } from './types';
 export interface BuzzerThProps extends BasePartProps {
   readonly pitchMm?: number;
   readonly bodyDiameterMm?: number;
-  readonly buzzerType?: 'magnetic' | 'piezo';
 }
 
 export const Buzzer5VTh = ({
@@ -15,7 +14,6 @@ export const Buzzer5VTh = ({
   pn,
   pitchMm = 5.08,
   bodyDiameterMm = 12,
-  buzzerType: _buzzerType = 'magnetic',
   ...rest
 }: BuzzerThProps) => (
   <chip
