@@ -21,6 +21,11 @@ export enum ResourceHealthStatus {
   Unhealthy = "unhealthy",
 }
 
+export enum ResourceFlowVariableScope {
+  Resource = "resource",
+  Global = "global",
+}
+
 /** The type of the log entry */
 export enum ResourceFlowLogType {
   FlowStart = "flow.start",
@@ -41,6 +46,7 @@ export enum ResourceFlowNodeType {
   InputResourceDoorUnlatched = "input.resource.door.unlatched",
   InputMqttMessageReceived = "input.mqtt.message.received",
   InputResourceActivityNoActivity = "input.resource.activity.no-activity",
+  InputVariableChanged = "input.variable.changed",
   OutputHttpSendRequest = "output.http.sendRequest",
   OutputMqttSendMessage = "output.mqtt.sendMessage",
   OutputResourceBillingCalculationSetAdditionalItems = "output.resource.billing.calculation.set-additional-items",
@@ -51,6 +57,8 @@ export enum ResourceFlowNodeType {
   ProcessingSetPayload = "processing.set-payload",
   ProcessingMqttWaitForMessage = "processing.mqtt.waitForMessage",
   ProcessingError = "processing.error",
+  ProcessingVariablesSet = "processing.variables.set",
+  ProcessingVariablesGet = "processing.variables.get",
   OutputResourceHealthHeartbeat = "output.resource.health.heartbeat",
   OutputResourceHealthSet = "output.resource.health.set",
 }
@@ -135,6 +143,11 @@ export enum ResourceType {
   Door = "door",
 }
 
+/** Evaluate against the effective policy for this role (uses global if omitted). */
+export enum PasswordPolicyRole {
+  Admin = "admin",
+}
+
 /** Selected SMTP provider type. */
 export enum SmtpServiceType {
   SMTP = "SMTP",
@@ -151,6 +164,7 @@ export enum EmailTemplateType {
   ResourceUsageBillingTransactionSummary = "resource-usage-billing-transaction-summary",
   ProjectInvitation = "project-invitation",
   DeleteAccountConfirmation = "delete-account-confirmation",
+  ResourceHealthChanged = "resource-health-changed",
 }
 
 /** The type of the provider */
@@ -189,8 +203,8 @@ export interface CreateUserDto {
    */
   email: string;
   /**
-   * The password for the new user
-   * @example "password123"
+   * The password for the new user (validated server-side against the active password policy)
+   * @example "correct-horse-battery-staple-42"
    */
   password: string;
   /**
@@ -381,8 +395,8 @@ export type ResetPasswordDto = object;
 
 export interface ChangePasswordDto {
   /**
-   * The new password for the user
-   * @example "password123"
+   * The new password (validated server-side against the active password policy)
+   * @example "correct-horse-battery-staple-42"
    */
   password: string;
   /**
@@ -473,8 +487,8 @@ export interface BulkUpdateUserPermissionsDto {
 
 export interface SetUserPasswordDto {
   /**
-   * The new password for the user
-   * @example "newSecurePassword123"
+   * The new password (validated server-side against the active password policy)
+   * @example "correct-horse-battery-staple-42"
    */
   password: string;
 }
@@ -1300,6 +1314,59 @@ export interface GenerateMetricsApiKeyResponseDto {
   apiKey: string;
 }
 
+export interface AuthRateLimitSettingsDto {
+  /**
+   * Max failed attempts within the window before lockout
+   * @example 5
+   */
+  maxAttempts: number;
+  /**
+   * Sliding window length, in seconds, for counting attempts
+   * @example 900
+   */
+  windowSeconds: number;
+  /**
+   * Base lockout duration in seconds after the threshold is reached
+   * @example 900
+   */
+  lockoutDurationSeconds: number;
+  /**
+   * Whether to extend lockout exponentially on repeat lockouts
+   * @example false
+   */
+  exponentialBackoff: boolean;
+  /**
+   * Multiplier applied to lockout duration when exponentialBackoff is on
+   * @example 2
+   */
+  backoffMultiplier: number;
+}
+
+export interface UpdateAuthRateLimitSettingsDto {
+  /**
+   * Max failed attempts within the window before lockout
+   * @example 5
+   */
+  maxAttempts?: number;
+  /**
+   * Sliding window length, in seconds
+   * @example 900
+   */
+  windowSeconds?: number;
+  /**
+   * Base lockout duration in seconds
+   * @example 900
+   */
+  lockoutDurationSeconds?: number;
+  /** Whether to extend lockout exponentially on repeat lockouts */
+  exponentialBackoff?: boolean;
+  /**
+   * Multiplier applied to lockout duration
+   * @example 2
+   */
+  backoffMultiplier?: number;
+}
+
 export interface LicenseDataDto {
   /** Whether the license is valid */
   valid: boolean;
@@ -1314,6 +1381,190 @@ export interface LicenseDataDto {
   usageLimits: Record<string, any>;
   /** Are you using this software for free as a non-profit? */
   isNonProfit: boolean;
+}
+
+export interface PublicPasswordPolicyDto {
+  /** @example 12 */
+  minLength: number;
+  /** @example 128 */
+  maxLength: number;
+  /** @example true */
+  allowAllUnicode: boolean;
+  /** @example false */
+  requireUppercase: boolean;
+  /** @example false */
+  requireLowercase: boolean;
+  /** @example false */
+  requireDigit: boolean;
+  /** @example false */
+  requireSpecial: boolean;
+  /**
+   * Minimum required zxcvbn score (0-4)
+   * @example 3
+   */
+  minZxcvbnScore: number;
+}
+
+export interface PasswordPolicyDto {
+  /** @example 12 */
+  minLength: number;
+  /** @example 128 */
+  maxLength: number;
+  /** @example true */
+  allowAllUnicode: boolean;
+  /** @example false */
+  requireUppercase: boolean;
+  /** @example false */
+  requireLowercase: boolean;
+  /** @example false */
+  requireDigit: boolean;
+  /** @example false */
+  requireSpecial: boolean;
+  /** @example true */
+  checkHIBP: boolean;
+  /** @example true */
+  checkCommonPasswords: boolean;
+  /**
+   * Minimum required zxcvbn score (0-4)
+   * @example 3
+   */
+  minZxcvbnScore: number;
+  /**
+   * Number of recent passwords to remember (0 disables)
+   * @example 0
+   */
+  historySize: number;
+  /**
+   * Forced rotation interval in days (0 disables)
+   * @example 0
+   */
+  rotationDays: number;
+}
+
+export interface UpdatePasswordPolicyDto {
+  /**
+   * @min 8
+   * @max 1024
+   * @example 12
+   */
+  minLength?: number;
+  /**
+   * @min 8
+   * @max 1024
+   * @example 128
+   */
+  maxLength?: number;
+  /** @example true */
+  allowAllUnicode?: boolean;
+  /** @example false */
+  requireUppercase?: boolean;
+  /** @example false */
+  requireLowercase?: boolean;
+  /** @example false */
+  requireDigit?: boolean;
+  /** @example false */
+  requireSpecial?: boolean;
+  /** @example true */
+  checkHIBP?: boolean;
+  /** @example true */
+  checkCommonPasswords?: boolean;
+  /**
+   * @min 0
+   * @max 4
+   * @example 3
+   */
+  minZxcvbnScore?: number;
+  /**
+   * @min 0
+   * @max 50
+   * @example 0
+   */
+  historySize?: number;
+  /**
+   * @min 0
+   * @max 3650
+   * @example 0
+   */
+  rotationDays?: number;
+}
+
+export interface PreviewPasswordDto {
+  /**
+   * Password candidate to evaluate against the policy
+   * @minLength 1
+   * @maxLength 4096
+   */
+  password: string;
+  /** Evaluate against the effective policy for this role (uses global if omitted). */
+  role?: PasswordPolicyRole;
+  /** Draft policy overrides to merge over the persisted policy for this evaluation only. */
+  draftPolicy?: UpdatePasswordPolicyDto;
+}
+
+export interface PreviewPasswordResultDto {
+  /**
+   * Whether the candidate satisfies every rule of the (draft-merged) policy
+   * @example false
+   */
+  ok: boolean;
+  /** Structured policy errors with codes and per-rule parameters */
+  errors: object[];
+  /** zxcvbn evaluation summary */
+  zxcvbn: {
+    score?: number;
+    required?: number;
+  };
+}
+
+export interface PasswordPolicyOverrideDto {
+  role: PasswordPolicyRole;
+  minLength: number | null;
+  maxLength: number | null;
+  allowAllUnicode: boolean | null;
+  requireUppercase: boolean | null;
+  requireLowercase: boolean | null;
+  requireDigit: boolean | null;
+  requireSpecial: boolean | null;
+  checkHIBP: boolean | null;
+  checkCommonPasswords: boolean | null;
+  minZxcvbnScore: number | null;
+  historySize: number | null;
+  rotationDays: number | null;
+}
+
+export interface UpsertPasswordPolicyOverrideDto {
+  /**
+   * @min 8
+   * @max 1024
+   */
+  minLength?: number | null;
+  /**
+   * @min 8
+   * @max 1024
+   */
+  maxLength?: number | null;
+  allowAllUnicode?: boolean | null;
+  requireUppercase?: boolean | null;
+  requireLowercase?: boolean | null;
+  requireDigit?: boolean | null;
+  requireSpecial?: boolean | null;
+  checkHIBP?: boolean | null;
+  checkCommonPasswords?: boolean | null;
+  /**
+   * @min 0
+   * @max 4
+   */
+  minZxcvbnScore?: number | null;
+  /**
+   * @min 0
+   * @max 50
+   */
+  historySize?: number | null;
+  /**
+   * @min 0
+   * @max 3650
+   */
+  rotationDays?: number | null;
 }
 
 export interface CreateResourceDto {
@@ -2965,6 +3216,25 @@ export interface ResourceFlowNode {
   resource?: Resource;
 }
 
+export interface FlowVariableDto {
+  id: number;
+  scope: ResourceFlowVariableScope;
+  resourceId: number | null;
+  key: string;
+  /** Parsed JSON value */
+  value: object;
+  valueType: object;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+}
+
+export interface FlowVariableUpsertDto {
+  /** Any JSON value */
+  value: object;
+}
+
 export interface ResourceHealthStateDto {
   /**
    * The health record id
@@ -4067,7 +4337,42 @@ export type GenerateMetricsApiKeyData = GenerateMetricsApiKeyResponseDto;
 
 export type DeleteMetricsApiKeyData = MetricsSettingsDto;
 
+export type GetAuthRateLimitSettingsData = AuthRateLimitSettingsDto;
+
+export type UpdateAuthRateLimitSettingsData = AuthRateLimitSettingsDto;
+
 export type GetLicenseInformationData = LicenseDataDto;
+
+export type GetPublicPasswordPolicyData = PublicPasswordPolicyDto;
+
+export type GetAdminPasswordPolicyData = PasswordPolicyDto;
+
+export type UpdateAdminPasswordPolicyData = PasswordPolicyDto;
+
+export type PreviewAdminPasswordPolicyData = PreviewPasswordResultDto;
+
+export type ListPasswordPolicyOverridesData = PasswordPolicyOverrideDto[];
+
+export interface GetPasswordPolicyOverrideParams {
+  /** Evaluate against the effective policy for this role (uses global if omitted). */
+  role: PasswordPolicyRole;
+}
+
+export type GetPasswordPolicyOverrideData = PasswordPolicyOverrideDto | null;
+
+export interface UpsertPasswordPolicyOverrideParams {
+  /** Evaluate against the effective policy for this role (uses global if omitted). */
+  role: PasswordPolicyRole;
+}
+
+export type UpsertPasswordPolicyOverrideData = PasswordPolicyOverrideDto;
+
+export interface DeletePasswordPolicyOverrideParams {
+  /** Evaluate against the effective policy for this role (uses global if omitted). */
+  role: PasswordPolicyRole;
+}
+
+export type DeletePasswordPolicyOverrideData = any;
 
 export type CreateOneResourceData = Resource;
 
@@ -4681,6 +4986,28 @@ export interface GetButtonsParams {
 }
 
 export type GetButtonsData = ResourceFlowNode[];
+
+export interface ListFlowVariablesParams {
+  resourceId: number;
+}
+
+export type ListFlowVariablesData = FlowVariableDto[];
+
+export interface UpsertFlowVariableParams {
+  resourceId: number;
+  key: string;
+  scope: ResourceFlowVariableScope;
+}
+
+export type UpsertFlowVariableData = any;
+
+export interface DeleteFlowVariableParams {
+  resourceId: number;
+  key: string;
+  scope: ResourceFlowVariableScope;
+}
+
+export type DeleteFlowVariableData = any;
 
 export interface GetResourceHealthParams {
   resourceId: number;
@@ -6250,6 +6577,38 @@ export namespace Settings {
     export type RequestHeaders = {};
     export type ResponseBody = DeleteMetricsApiKeyData;
   }
+
+  /**
+   * No description
+   * @tags Settings
+   * @name GetAuthRateLimitSettings
+   * @summary Get auth rate-limit settings
+   * @request GET:/api/settings/auth/rate-limit
+   * @secure
+   */
+  export namespace GetAuthRateLimitSettings {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetAuthRateLimitSettingsData;
+  }
+
+  /**
+   * No description
+   * @tags Settings
+   * @name UpdateAuthRateLimitSettings
+   * @summary Update auth rate-limit settings
+   * @request PATCH:/api/settings/auth/rate-limit
+   * @secure
+   */
+  export namespace UpdateAuthRateLimitSettings {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = UpdateAuthRateLimitSettingsDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = UpdateAuthRateLimitSettingsData;
+  }
 }
 
 export namespace License {
@@ -6267,6 +6626,146 @@ export namespace License {
     export type RequestBody = never;
     export type RequestHeaders = {};
     export type ResponseBody = GetLicenseInformationData;
+  }
+}
+
+export namespace PasswordPolicy {
+  /**
+   * No description
+   * @tags Password Policy
+   * @name GetPublicPasswordPolicy
+   * @summary Get the public password policy
+   * @request GET:/api/password-policy/public
+   */
+  export namespace GetPublicPasswordPolicy {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetPublicPasswordPolicyData;
+  }
+}
+
+export namespace PasswordPolicyAdmin {
+  /**
+   * No description
+   * @tags Password Policy Admin
+   * @name GetAdminPasswordPolicy
+   * @summary Get the global password policy
+   * @request GET:/api/admin/password-policy
+   * @secure
+   */
+  export namespace GetAdminPasswordPolicy {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetAdminPasswordPolicyData;
+  }
+
+  /**
+   * No description
+   * @tags Password Policy Admin
+   * @name UpdateAdminPasswordPolicy
+   * @summary Update the global password policy
+   * @request PATCH:/api/admin/password-policy
+   * @secure
+   */
+  export namespace UpdateAdminPasswordPolicy {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = UpdatePasswordPolicyDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = UpdateAdminPasswordPolicyData;
+  }
+
+  /**
+   * No description
+   * @tags Password Policy Admin
+   * @name PreviewAdminPasswordPolicy
+   * @summary Server-side preview: evaluate a candidate password against the current (or draft) policy
+   * @request POST:/api/admin/password-policy/preview
+   * @secure
+   */
+  export namespace PreviewAdminPasswordPolicy {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = PreviewPasswordDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = PreviewAdminPasswordPolicyData;
+  }
+
+  /**
+   * No description
+   * @tags Password Policy Admin
+   * @name ListPasswordPolicyOverrides
+   * @summary List all per-role password policy overrides
+   * @request GET:/api/admin/password-policy/overrides
+   * @secure
+   */
+  export namespace ListPasswordPolicyOverrides {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = ListPasswordPolicyOverridesData;
+  }
+
+  /**
+   * No description
+   * @tags Password Policy Admin
+   * @name GetPasswordPolicyOverride
+   * @summary Get the per-role override for a single role
+   * @request GET:/api/admin/password-policy/overrides/{role}
+   * @secure
+   */
+  export namespace GetPasswordPolicyOverride {
+    export type RequestParams = {
+      /** Evaluate against the effective policy for this role (uses global if omitted). */
+      role: PasswordPolicyRole;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetPasswordPolicyOverrideData;
+  }
+
+  /**
+   * No description
+   * @tags Password Policy Admin
+   * @name UpsertPasswordPolicyOverride
+   * @summary Upsert a per-role password policy override
+   * @request PUT:/api/admin/password-policy/overrides/{role}
+   * @secure
+   */
+  export namespace UpsertPasswordPolicyOverride {
+    export type RequestParams = {
+      /** Evaluate against the effective policy for this role (uses global if omitted). */
+      role: PasswordPolicyRole;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = UpsertPasswordPolicyOverrideDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = UpsertPasswordPolicyOverrideData;
+  }
+
+  /**
+   * No description
+   * @tags Password Policy Admin
+   * @name DeletePasswordPolicyOverride
+   * @summary Delete a per-role password policy override
+   * @request DELETE:/api/admin/password-policy/overrides/{role}
+   * @secure
+   */
+  export namespace DeletePasswordPolicyOverride {
+    export type RequestParams = {
+      /** Evaluate against the effective policy for this role (uses global if omitted). */
+      role: PasswordPolicyRole;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = DeletePasswordPolicyOverrideData;
   }
 }
 
@@ -7817,6 +8316,66 @@ export namespace ResourceFlows {
     export type RequestBody = never;
     export type RequestHeaders = {};
     export type ResponseBody = GetButtonsData;
+  }
+}
+
+export namespace FlowVariables {
+  /**
+   * No description
+   * @tags Flow Variables
+   * @name ListFlowVariables
+   * @summary List flow variables for a resource
+   * @request GET:/api/resources/{resourceId}/flow-variables
+   * @secure
+   */
+  export namespace ListFlowVariables {
+    export type RequestParams = {
+      resourceId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = ListFlowVariablesData;
+  }
+
+  /**
+   * No description
+   * @tags Flow Variables
+   * @name UpsertFlowVariable
+   * @summary Upsert a flow variable
+   * @request PUT:/api/resources/{resourceId}/flow-variables/{scope}/{key}
+   * @secure
+   */
+  export namespace UpsertFlowVariable {
+    export type RequestParams = {
+      resourceId: number;
+      key: string;
+      scope: ResourceFlowVariableScope;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = FlowVariableUpsertDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = UpsertFlowVariableData;
+  }
+
+  /**
+   * No description
+   * @tags Flow Variables
+   * @name DeleteFlowVariable
+   * @summary Delete a flow variable
+   * @request DELETE:/api/resources/{resourceId}/flow-variables/{scope}/{key}
+   * @secure
+   */
+  export namespace DeleteFlowVariable {
+    export type RequestParams = {
+      resourceId: number;
+      key: string;
+      scope: ResourceFlowVariableScope;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = DeleteFlowVariableData;
   }
 }
 
@@ -10376,6 +10935,47 @@ export class Api<
         format: "json",
         ...params,
       }),
+
+    /**
+     * No description
+     *
+     * @tags Settings
+     * @name GetAuthRateLimitSettings
+     * @summary Get auth rate-limit settings
+     * @request GET:/api/settings/auth/rate-limit
+     * @secure
+     */
+    getAuthRateLimitSettings: (params: RequestParams = {}) =>
+      this.request<GetAuthRateLimitSettingsData, void>({
+        path: `/api/settings/auth/rate-limit`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Settings
+     * @name UpdateAuthRateLimitSettings
+     * @summary Update auth rate-limit settings
+     * @request PATCH:/api/settings/auth/rate-limit
+     * @secure
+     */
+    updateAuthRateLimitSettings: (
+      data: UpdateAuthRateLimitSettingsDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<UpdateAuthRateLimitSettingsData, void>({
+        path: `/api/settings/auth/rate-limit`,
+        method: "PATCH",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
   };
   license = {
     /**
@@ -10393,6 +10993,171 @@ export class Api<
         method: "GET",
         secure: true,
         format: "json",
+        ...params,
+      }),
+  };
+  passwordPolicy = {
+    /**
+     * No description
+     *
+     * @tags Password Policy
+     * @name GetPublicPasswordPolicy
+     * @summary Get the public password policy
+     * @request GET:/api/password-policy/public
+     */
+    getPublicPasswordPolicy: (params: RequestParams = {}) =>
+      this.request<GetPublicPasswordPolicyData, any>({
+        path: `/api/password-policy/public`,
+        method: "GET",
+        format: "json",
+        ...params,
+      }),
+  };
+  passwordPolicyAdmin = {
+    /**
+     * No description
+     *
+     * @tags Password Policy Admin
+     * @name GetAdminPasswordPolicy
+     * @summary Get the global password policy
+     * @request GET:/api/admin/password-policy
+     * @secure
+     */
+    getAdminPasswordPolicy: (params: RequestParams = {}) =>
+      this.request<GetAdminPasswordPolicyData, void>({
+        path: `/api/admin/password-policy`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Password Policy Admin
+     * @name UpdateAdminPasswordPolicy
+     * @summary Update the global password policy
+     * @request PATCH:/api/admin/password-policy
+     * @secure
+     */
+    updateAdminPasswordPolicy: (
+      data: UpdatePasswordPolicyDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<UpdateAdminPasswordPolicyData, void>({
+        path: `/api/admin/password-policy`,
+        method: "PATCH",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Password Policy Admin
+     * @name PreviewAdminPasswordPolicy
+     * @summary Server-side preview: evaluate a candidate password against the current (or draft) policy
+     * @request POST:/api/admin/password-policy/preview
+     * @secure
+     */
+    previewAdminPasswordPolicy: (
+      data: PreviewPasswordDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<PreviewAdminPasswordPolicyData, void>({
+        path: `/api/admin/password-policy/preview`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Password Policy Admin
+     * @name ListPasswordPolicyOverrides
+     * @summary List all per-role password policy overrides
+     * @request GET:/api/admin/password-policy/overrides
+     * @secure
+     */
+    listPasswordPolicyOverrides: (params: RequestParams = {}) =>
+      this.request<ListPasswordPolicyOverridesData, void>({
+        path: `/api/admin/password-policy/overrides`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Password Policy Admin
+     * @name GetPasswordPolicyOverride
+     * @summary Get the per-role override for a single role
+     * @request GET:/api/admin/password-policy/overrides/{role}
+     * @secure
+     */
+    getPasswordPolicyOverride: (
+      { role }: GetPasswordPolicyOverrideParams,
+      params: RequestParams = {},
+    ) =>
+      this.request<GetPasswordPolicyOverrideData, void>({
+        path: `/api/admin/password-policy/overrides/${role}`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Password Policy Admin
+     * @name UpsertPasswordPolicyOverride
+     * @summary Upsert a per-role password policy override
+     * @request PUT:/api/admin/password-policy/overrides/{role}
+     * @secure
+     */
+    upsertPasswordPolicyOverride: (
+      { role }: UpsertPasswordPolicyOverrideParams,
+      data: UpsertPasswordPolicyOverrideDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<UpsertPasswordPolicyOverrideData, void>({
+        path: `/api/admin/password-policy/overrides/${role}`,
+        method: "PUT",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Password Policy Admin
+     * @name DeletePasswordPolicyOverride
+     * @summary Delete a per-role password policy override
+     * @request DELETE:/api/admin/password-policy/overrides/{role}
+     * @secure
+     */
+    deletePasswordPolicyOverride: (
+      { role }: DeletePasswordPolicyOverrideParams,
+      params: RequestParams = {},
+    ) =>
+      this.request<DeletePasswordPolicyOverrideData, void>({
+        path: `/api/admin/password-policy/overrides/${role}`,
+        method: "DELETE",
+        secure: true,
         ...params,
       }),
   };
@@ -12041,6 +12806,71 @@ export class Api<
         method: "GET",
         secure: true,
         format: "json",
+        ...params,
+      }),
+  };
+  flowVariables = {
+    /**
+     * No description
+     *
+     * @tags Flow Variables
+     * @name ListFlowVariables
+     * @summary List flow variables for a resource
+     * @request GET:/api/resources/{resourceId}/flow-variables
+     * @secure
+     */
+    listFlowVariables: (
+      { resourceId }: ListFlowVariablesParams,
+      params: RequestParams = {},
+    ) =>
+      this.request<ListFlowVariablesData, void>({
+        path: `/api/resources/${resourceId}/flow-variables`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Flow Variables
+     * @name UpsertFlowVariable
+     * @summary Upsert a flow variable
+     * @request PUT:/api/resources/{resourceId}/flow-variables/{scope}/{key}
+     * @secure
+     */
+    upsertFlowVariable: (
+      { resourceId, key, scope }: UpsertFlowVariableParams,
+      data: FlowVariableUpsertDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<UpsertFlowVariableData, void>({
+        path: `/api/resources/${resourceId}/flow-variables/${scope}/${key}`,
+        method: "PUT",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Flow Variables
+     * @name DeleteFlowVariable
+     * @summary Delete a flow variable
+     * @request DELETE:/api/resources/{resourceId}/flow-variables/{scope}/{key}
+     * @secure
+     */
+    deleteFlowVariable: (
+      { resourceId, key, scope }: DeleteFlowVariableParams,
+      params: RequestParams = {},
+    ) =>
+      this.request<DeleteFlowVariableData, void>({
+        path: `/api/resources/${resourceId}/flow-variables/${scope}/${key}`,
+        method: "DELETE",
+        secure: true,
         ...params,
       }),
   };

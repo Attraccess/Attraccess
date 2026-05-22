@@ -40,6 +40,10 @@ import {
   ResourceHealthHeartbeatNodeDataSchema,
   ResourceHealthSetNodeDataSchema,
   HealthStateOptionEnum,
+  SetVariablesNodeDataSchema,
+  GetVariablesNodeDataSchema,
+  VariableChangedNodeDataSchema,
+  VariableScopeSchema,
 } from './entities/resourceFlowNode';
 import {
   ResourceHealthState,
@@ -68,6 +72,22 @@ import { Project } from './entities/project';
 import { ProjectMember, ProjectMemberRole } from './entities/project-member.entity';
 import { ProjectInvitation, ProjectInvitationStatus } from './entities/project-invitation.entity';
 import { Form, FormField, FormSubmission, FormFieldType, ResourceFormAction } from './entities/form';
+import {
+  ResourceFlowVariable,
+  ResourceFlowVariableScope,
+  type ResourceFlowVariableValueType,
+} from './entities/resourceFlowVariable';
+import { PasswordPolicy, PASSWORD_POLICY_SINGLETON_ID } from './entities/password-policy.entity';
+import { PasswordHistory } from './entities/password-history.entity';
+import {
+  PasswordPolicyOverride,
+  PasswordPolicyRole,
+  PASSWORD_POLICY_ROLES,
+} from './entities/password-policy-override.entity';
+import {
+  PasswordPolicyAudit,
+  PasswordPolicyAuditEvent,
+} from './entities/password-policy-audit.entity';
 
 // Export all entities individually
 export {
@@ -142,6 +162,21 @@ export {
   ResourceHealthState,
   ResourceHealthStatus,
   ResourceHealthSource,
+  ResourceFlowVariable,
+  ResourceFlowVariableScope,
+  type ResourceFlowVariableValueType,
+  SetVariablesNodeDataSchema,
+  GetVariablesNodeDataSchema,
+  VariableChangedNodeDataSchema,
+  VariableScopeSchema,
+  PasswordPolicy,
+  PASSWORD_POLICY_SINGLETON_ID,
+  PasswordHistory,
+  PasswordPolicyOverride,
+  PasswordPolicyRole,
+  PASSWORD_POLICY_ROLES,
+  PasswordPolicyAudit,
+  PasswordPolicyAuditEvent,
 };
 
 // Export the entities object
@@ -181,4 +216,9 @@ export const entities = {
   FormField,
   FormSubmission,
   ResourceHealthState,
+  ResourceFlowVariable,
+  PasswordPolicy,
+  PasswordHistory,
+  PasswordPolicyOverride,
+  PasswordPolicyAudit,
 };

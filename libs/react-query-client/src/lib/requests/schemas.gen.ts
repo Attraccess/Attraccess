@@ -21,8 +21,8 @@ export const $CreateUserDto = {
         },
         password: {
             type: 'string',
-            description: 'The password for the new user',
-            example: 'password123'
+            description: 'The password for the new user (validated server-side against the active password policy)',
+            example: 'correct-horse-battery-staple-42'
         },
         strategy: {
             description: 'The authentication strategy to use',
@@ -334,8 +334,8 @@ export const $ChangePasswordDto = {
     properties: {
         password: {
             type: 'string',
-            description: 'The new password for the user',
-            example: 'password123'
+            description: 'The new password (validated server-side against the active password policy)',
+            example: 'correct-horse-battery-staple-42'
         },
         token: {
             type: 'string',
@@ -489,8 +489,8 @@ export const $SetUserPasswordDto = {
     properties: {
         password: {
             type: 'string',
-            description: 'The new password for the user',
-            example: 'newSecurePassword123'
+            description: 'The new password (validated server-side against the active password policy)',
+            example: 'correct-horse-battery-staple-42'
         }
     },
     required: ['password']
@@ -1358,7 +1358,7 @@ export const $PreviewMjmlResponseDto = {
 
 export const $EmailTemplateType = {
     type: 'string',
-    enum: ['verify-email', 'user-invitation', 'reset-password', 'username-changed', 'password-changed', 'resource-usage-billing-transaction-summary', 'project-invitation', 'delete-account-confirmation'],
+    enum: ['verify-email', 'user-invitation', 'reset-password', 'username-changed', 'password-changed', 'resource-usage-billing-transaction-summary', 'project-invitation', 'delete-account-confirmation', 'resource-health-changed'],
     description: 'Template type/key used by the system'
 } as const;
 
@@ -1786,6 +1786,68 @@ export const $GenerateMetricsApiKeyResponseDto = {
     required: ['apiKeyConfigured', 'apiKey']
 } as const;
 
+export const $AuthRateLimitSettingsDto = {
+    type: 'object',
+    properties: {
+        maxAttempts: {
+            type: 'number',
+            description: 'Max failed attempts within the window before lockout',
+            example: 5
+        },
+        windowSeconds: {
+            type: 'number',
+            description: 'Sliding window length, in seconds, for counting attempts',
+            example: 900
+        },
+        lockoutDurationSeconds: {
+            type: 'number',
+            description: 'Base lockout duration in seconds after the threshold is reached',
+            example: 900
+        },
+        exponentialBackoff: {
+            type: 'boolean',
+            description: 'Whether to extend lockout exponentially on repeat lockouts',
+            example: false
+        },
+        backoffMultiplier: {
+            type: 'number',
+            description: 'Multiplier applied to lockout duration when exponentialBackoff is on',
+            example: 2
+        }
+    },
+    required: ['maxAttempts', 'windowSeconds', 'lockoutDurationSeconds', 'exponentialBackoff', 'backoffMultiplier']
+} as const;
+
+export const $UpdateAuthRateLimitSettingsDto = {
+    type: 'object',
+    properties: {
+        maxAttempts: {
+            type: 'number',
+            description: 'Max failed attempts within the window before lockout',
+            example: 5
+        },
+        windowSeconds: {
+            type: 'number',
+            description: 'Sliding window length, in seconds',
+            example: 900
+        },
+        lockoutDurationSeconds: {
+            type: 'number',
+            description: 'Base lockout duration in seconds',
+            example: 900
+        },
+        exponentialBackoff: {
+            type: 'boolean',
+            description: 'Whether to extend lockout exponentially on repeat lockouts'
+        },
+        backoffMultiplier: {
+            type: 'number',
+            description: 'Multiplier applied to lockout duration',
+            example: 2
+        }
+    }
+} as const;
+
 export const $LicenseDataDto = {
     type: 'object',
     properties: {
@@ -1816,6 +1878,361 @@ export const $LicenseDataDto = {
         }
     },
     required: ['valid', 'modules', 'usageLimits', 'isNonProfit']
+} as const;
+
+export const $PublicPasswordPolicyDto = {
+    type: 'object',
+    properties: {
+        minLength: {
+            type: 'number',
+            example: 12
+        },
+        maxLength: {
+            type: 'number',
+            example: 128
+        },
+        allowAllUnicode: {
+            type: 'boolean',
+            example: true
+        },
+        requireUppercase: {
+            type: 'boolean',
+            example: false
+        },
+        requireLowercase: {
+            type: 'boolean',
+            example: false
+        },
+        requireDigit: {
+            type: 'boolean',
+            example: false
+        },
+        requireSpecial: {
+            type: 'boolean',
+            example: false
+        },
+        minZxcvbnScore: {
+            type: 'number',
+            example: 3,
+            description: 'Minimum required zxcvbn score (0-4)'
+        }
+    },
+    required: ['minLength', 'maxLength', 'allowAllUnicode', 'requireUppercase', 'requireLowercase', 'requireDigit', 'requireSpecial', 'minZxcvbnScore']
+} as const;
+
+export const $PasswordPolicyDto = {
+    type: 'object',
+    properties: {
+        minLength: {
+            type: 'number',
+            example: 12
+        },
+        maxLength: {
+            type: 'number',
+            example: 128
+        },
+        allowAllUnicode: {
+            type: 'boolean',
+            example: true
+        },
+        requireUppercase: {
+            type: 'boolean',
+            example: false
+        },
+        requireLowercase: {
+            type: 'boolean',
+            example: false
+        },
+        requireDigit: {
+            type: 'boolean',
+            example: false
+        },
+        requireSpecial: {
+            type: 'boolean',
+            example: false
+        },
+        checkHIBP: {
+            type: 'boolean',
+            example: true
+        },
+        checkCommonPasswords: {
+            type: 'boolean',
+            example: true
+        },
+        minZxcvbnScore: {
+            type: 'number',
+            example: 3,
+            description: 'Minimum required zxcvbn score (0-4)'
+        },
+        historySize: {
+            type: 'number',
+            example: 0,
+            description: 'Number of recent passwords to remember (0 disables)'
+        },
+        rotationDays: {
+            type: 'number',
+            example: 0,
+            description: 'Forced rotation interval in days (0 disables)'
+        }
+    },
+    required: ['minLength', 'maxLength', 'allowAllUnicode', 'requireUppercase', 'requireLowercase', 'requireDigit', 'requireSpecial', 'checkHIBP', 'checkCommonPasswords', 'minZxcvbnScore', 'historySize', 'rotationDays']
+} as const;
+
+export const $UpdatePasswordPolicyDto = {
+    type: 'object',
+    properties: {
+        minLength: {
+            type: 'number',
+            example: 12,
+            minimum: 8,
+            maximum: 1024
+        },
+        maxLength: {
+            type: 'number',
+            example: 128,
+            minimum: 8,
+            maximum: 1024
+        },
+        allowAllUnicode: {
+            type: 'boolean',
+            example: true
+        },
+        requireUppercase: {
+            type: 'boolean',
+            example: false
+        },
+        requireLowercase: {
+            type: 'boolean',
+            example: false
+        },
+        requireDigit: {
+            type: 'boolean',
+            example: false
+        },
+        requireSpecial: {
+            type: 'boolean',
+            example: false
+        },
+        checkHIBP: {
+            type: 'boolean',
+            example: true
+        },
+        checkCommonPasswords: {
+            type: 'boolean',
+            example: true
+        },
+        minZxcvbnScore: {
+            type: 'number',
+            example: 3,
+            minimum: 0,
+            maximum: 4
+        },
+        historySize: {
+            type: 'number',
+            example: 0,
+            minimum: 0,
+            maximum: 50
+        },
+        rotationDays: {
+            type: 'number',
+            example: 0,
+            minimum: 0,
+            maximum: 3650
+        }
+    }
+} as const;
+
+export const $PasswordPolicyRole = {
+    type: 'string',
+    enum: ['admin'],
+    description: 'Evaluate against the effective policy for this role (uses global if omitted).'
+} as const;
+
+export const $PreviewPasswordDto = {
+    type: 'object',
+    properties: {
+        password: {
+            type: 'string',
+            description: 'Password candidate to evaluate against the policy',
+            minLength: 1,
+            maxLength: 4096
+        },
+        role: {
+            description: 'Evaluate against the effective policy for this role (uses global if omitted).',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/PasswordPolicyRole'
+                }
+            ]
+        },
+        draftPolicy: {
+            description: 'Draft policy overrides to merge over the persisted policy for this evaluation only.',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/UpdatePasswordPolicyDto'
+                }
+            ]
+        }
+    },
+    required: ['password']
+} as const;
+
+export const $PreviewPasswordResultDto = {
+    type: 'object',
+    properties: {
+        ok: {
+            type: 'boolean',
+            description: 'Whether the candidate satisfies every rule of the (draft-merged) policy',
+            example: false
+        },
+        errors: {
+            type: 'array',
+            description: 'Structured policy errors with codes and per-rule parameters',
+            items: {
+                type: 'object'
+            }
+        },
+        zxcvbn: {
+            type: 'object',
+            description: 'zxcvbn evaluation summary',
+            additionalProperties: false,
+            properties: {
+                score: {
+                    type: 'number'
+                },
+                required: {
+                    type: 'number'
+                }
+            }
+        }
+    },
+    required: ['ok', 'errors', 'zxcvbn']
+} as const;
+
+export const $PasswordPolicyOverrideDto = {
+    type: 'object',
+    properties: {
+        role: {
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/PasswordPolicyRole'
+                }
+            ]
+        },
+        minLength: {
+            type: 'number',
+            nullable: true
+        },
+        maxLength: {
+            type: 'number',
+            nullable: true
+        },
+        allowAllUnicode: {
+            type: 'boolean',
+            nullable: true
+        },
+        requireUppercase: {
+            type: 'boolean',
+            nullable: true
+        },
+        requireLowercase: {
+            type: 'boolean',
+            nullable: true
+        },
+        requireDigit: {
+            type: 'boolean',
+            nullable: true
+        },
+        requireSpecial: {
+            type: 'boolean',
+            nullable: true
+        },
+        checkHIBP: {
+            type: 'boolean',
+            nullable: true
+        },
+        checkCommonPasswords: {
+            type: 'boolean',
+            nullable: true
+        },
+        minZxcvbnScore: {
+            type: 'number',
+            nullable: true
+        },
+        historySize: {
+            type: 'number',
+            nullable: true
+        },
+        rotationDays: {
+            type: 'number',
+            nullable: true
+        }
+    },
+    required: ['role', 'minLength', 'maxLength', 'allowAllUnicode', 'requireUppercase', 'requireLowercase', 'requireDigit', 'requireSpecial', 'checkHIBP', 'checkCommonPasswords', 'minZxcvbnScore', 'historySize', 'rotationDays']
+} as const;
+
+export const $UpsertPasswordPolicyOverrideDto = {
+    type: 'object',
+    properties: {
+        minLength: {
+            type: 'number',
+            nullable: true,
+            minimum: 8,
+            maximum: 1024
+        },
+        maxLength: {
+            type: 'number',
+            nullable: true,
+            minimum: 8,
+            maximum: 1024
+        },
+        allowAllUnicode: {
+            type: 'boolean',
+            nullable: true
+        },
+        requireUppercase: {
+            type: 'boolean',
+            nullable: true
+        },
+        requireLowercase: {
+            type: 'boolean',
+            nullable: true
+        },
+        requireDigit: {
+            type: 'boolean',
+            nullable: true
+        },
+        requireSpecial: {
+            type: 'boolean',
+            nullable: true
+        },
+        checkHIBP: {
+            type: 'boolean',
+            nullable: true
+        },
+        checkCommonPasswords: {
+            type: 'boolean',
+            nullable: true
+        },
+        minZxcvbnScore: {
+            type: 'number',
+            nullable: true,
+            minimum: 0,
+            maximum: 4
+        },
+        historySize: {
+            type: 'number',
+            nullable: true,
+            minimum: 0,
+            maximum: 50
+        },
+        rotationDays: {
+            type: 'number',
+            nullable: true,
+            minimum: 0,
+            maximum: 3650
+        }
+    }
 } as const;
 
 export const $ResourceType = {
@@ -4190,7 +4607,7 @@ export const $RefundTransactionDto = {
 
 export const $ResourceFlowNodeType = {
     type: 'string',
-    enum: ['input.button', 'input.resource.usage.started', 'input.resource.usage.stopped', 'input.resource.usage.takeover', 'input.resource.door.unlocked', 'input.resource.door.locked', 'input.resource.door.unlatched', 'input.mqtt.message.received', 'input.resource.activity.no-activity', 'output.http.sendRequest', 'output.mqtt.sendMessage', 'output.resource.billing.calculation.set-additional-items', 'output.resource.usage.end-session', 'output.resource.activity.track-activity', 'processing.wait', 'processing.if', 'processing.set-payload', 'processing.mqtt.waitForMessage', 'processing.error', 'output.resource.health.heartbeat', 'output.resource.health.set'],
+    enum: ['input.button', 'input.resource.usage.started', 'input.resource.usage.stopped', 'input.resource.usage.takeover', 'input.resource.door.unlocked', 'input.resource.door.locked', 'input.resource.door.unlatched', 'input.mqtt.message.received', 'input.resource.activity.no-activity', 'input.variable.changed', 'output.http.sendRequest', 'output.mqtt.sendMessage', 'output.resource.billing.calculation.set-additional-items', 'output.resource.usage.end-session', 'output.resource.activity.track-activity', 'processing.wait', 'processing.if', 'processing.set-payload', 'processing.mqtt.waitForMessage', 'processing.error', 'processing.variables.set', 'processing.variables.get', 'output.resource.health.heartbeat', 'output.resource.health.set'],
     description: 'The name of the node type'
 } as const;
 
@@ -4654,6 +5071,61 @@ export const $ResourceFlowNode = {
         }
     },
     required: ['id', 'type', 'position', 'data', 'resourceId']
+} as const;
+
+export const $ResourceFlowVariableScope = {
+    type: 'string',
+    enum: ['resource', 'global']
+} as const;
+
+export const $FlowVariableDto = {
+    type: 'object',
+    properties: {
+        id: {
+            type: 'number'
+        },
+        scope: {
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/ResourceFlowVariableScope'
+                }
+            ]
+        },
+        resourceId: {
+            type: 'number',
+            nullable: true
+        },
+        key: {
+            type: 'string'
+        },
+        value: {
+            type: 'object',
+            description: 'Parsed JSON value'
+        },
+        valueType: {
+            type: 'object'
+        },
+        createdAt: {
+            type: 'string',
+            format: 'date-time'
+        },
+        updatedAt: {
+            type: 'string',
+            format: 'date-time'
+        }
+    },
+    required: ['id', 'scope', 'resourceId', 'key', 'value', 'valueType', 'createdAt', 'updatedAt']
+} as const;
+
+export const $FlowVariableUpsertDto = {
+    type: 'object',
+    properties: {
+        value: {
+            type: 'object',
+            description: 'Any JSON value'
+        }
+    },
+    required: ['value']
 } as const;
 
 export const $ResourceHealthStatus = {

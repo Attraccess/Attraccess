@@ -14,8 +14,10 @@
   "passwordConfirmation": "Bestätige dein Passwort",
   "createAccountButton": "Konto erstellen und loslegen!",
   "creatingAccount": "Dein Konto wird erstellt...",
+  "generatePassword": "Starkes Passwort generieren",
+  "passwordGenerated": "Starkes Passwort eingefügt",
+  "passwordGeneratedCopied": "Starkes Passwort in Zwischenablage kopiert und eingefügt",
   "validationError": {
-    "passwordTooShort": "Das Passwort muss mindestens 8 Zeichen lang sein.",
     "passwordsDoNotMatch": "Die Passwörter stimmen nicht überein"
   },
   "success": {

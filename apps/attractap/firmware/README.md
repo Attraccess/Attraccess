@@ -42,7 +42,7 @@ Replace `/dev/ttyUSB0` with the correct port for your device:
 
 1. Install [PlatformIO](https://platformio.org/)
 2. Clone this repository
-3. Open the `apps/attractap-firmware` directory in PlatformIO
+3. Open the `apps/attractap/firmware` directory in PlatformIO
 4. Build and upload the firmware
 
 ## Development
@@ -74,7 +74,7 @@ pio run -e attractap -t upload
 
 This project uses GitHub Actions for continuous integration:
 
-1. When changes are pushed to the `main` branch that affect files in the `apps/attractap-firmware` directory, a build is triggered
+1. When changes are pushed to the `main` branch that affect files in the `apps/attractap/firmware` directory, a build is triggered
 2. The firmware is built using PlatformIO, creating a merged binary for ESP Web Tools
 3. The files are automatically deployed to GitHub Pages with a web installer interface
 4. The firmware can be installed using any browser that supports Web Serial API
@@ -93,7 +93,7 @@ The manifest.json file contains the necessary information for ESP Web Tools to i
 
 ## Attractap Lite LED Animations
 
-The Attractap Lite variant uses a WS2812 LED ring for status feedback. For a user-facing guide to LED states and triggers, see the [Attractap Lite LED Guide](../../docs/user/resources/iots/attractap-lite-led-guide.md) in the docs.
+The Attractap Lite variant uses a WS2812 LED ring for status feedback. For a user-facing guide to LED states and triggers, see the [Attractap Lite LED Guide](../../../docs/user/resources/iots/attractap-lite-led-guide.md) in the docs.
 
 ### LED States (for developers)
 

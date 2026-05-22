@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   useEmailTemplatesServiceEmailTemplateControllerFindOne as useFindOneEmailTemplate,
@@ -8,6 +8,7 @@ import {
 } from '@attraccess/react-query-client';
 import {
   Button,
+  Chip,
   DrawerBody,
   DrawerFooter,
   DrawerHeader,
@@ -19,14 +20,59 @@ import {
   useTheme,
 } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useToastMessage } from '../../../components/toastProvider';
 import { PageHeader } from '../../../components/pageHeader';
 import { StandardDrawer } from '../../../components/standardDrawer';
-import Editor from '@monaco-editor/react';
+import Editor, { type Monaco, type OnMount } from '@monaco-editor/react';
 import { Maximize } from 'lucide-react';
 
 import * as enTranslationsFile from './en.json';
 import * as deTranslationsFile from './de.json';
 import { useDebounce } from '../../../hooks/useDebounce';
+
+const VARIABLE_PROVIDER_FLAG = '__attraccessVariableProvider';
+
+function registerVariableProvider(
+  monaco: Monaco,
+  getVariables: () => string[],
+  getDetailLabel: () => string,
+) {
+  const monacoWithFlag = monaco as Monaco & { [VARIABLE_PROVIDER_FLAG]?: boolean };
+  if (monacoWithFlag[VARIABLE_PROVIDER_FLAG]) {
+    return;
+  }
+  monacoWithFlag[VARIABLE_PROVIDER_FLAG] = true;
+  if (!monaco.languages.getLanguages().some((lang) => lang.id === 'mjml')) {
+    monaco.languages.register({ id: 'mjml', extensions: ['.mjml'], aliases: ['MJML', 'mjml'] });
+  }
+  monaco.languages.registerCompletionItemProvider('mjml', {
+    triggerCharacters: ['{'],
+    provideCompletionItems: (model, position) => {
+      const word = model.getWordUntilPosition(position);
+      const lineContent = model.getLineContent(position.lineNumber);
+      let startColumn = word.startColumn;
+      while (startColumn > 1 && lineContent[startColumn - 2] === '{') {
+        startColumn -= 1;
+      }
+      const range = {
+        startLineNumber: position.lineNumber,
+        endLineNumber: position.lineNumber,
+        startColumn,
+        endColumn: word.endColumn,
+      };
+      const detail = getDetailLabel();
+      return {
+        suggestions: getVariables().map((name) => ({
+          label: name,
+          kind: monaco.languages.CompletionItemKind.Variable,
+          insertText: `{{${name}}}`,
+          detail,
+          range,
+        })),
+      };
+    },
+  });
+}
 
 export function EditEmailTemplatePage() {
   const navigate = useNavigate();
@@ -39,6 +85,38 @@ export function EditEmailTemplatePage() {
   const template = useFindOneEmailTemplate({ type: templateType as EmailTemplateType }, undefined, {
     enabled: !!templateType,
   });
+
+  const toast = useToastMessage();
+  const variables = useMemo(() => template.data?.variables ?? [], [template.data]);
+
+  const variablesRef = useRef<string[]>([]);
+  useEffect(() => {
+    variablesRef.current = variables;
+  }, [variables]);
+
+  const detailLabelRef = useRef<string>('');
+  useEffect(() => {
+    detailLabelRef.current = t('variables.completionDetail');
+  }, [t]);
+
+  const handleEditorMount = useCallback<OnMount>((editor, monaco) => {
+    registerVariableProvider(monaco, () => variablesRef.current, () => detailLabelRef.current);
+    const model = editor.getModel();
+    if (model && model.getLanguageId() !== 'mjml') {
+      monaco.editor.setModelLanguage(model, 'mjml');
+    }
+  }, []);
+
+  const copyVariable = useCallback(
+    (name: string) => {
+      const token = `{{${name}}}`;
+      navigator.clipboard.writeText(token).then(
+        () => toast.success({ title: t('variables.copied', { name: token }) }),
+        () => toast.error({ title: t('variables.copyFailed', { name: token }) }),
+      );
+    },
+    [t, toast],
+  );
 
   const [subject, setSubject] = useState<string>('');
   const [body, setBody] = useState<string>('');
@@ -99,8 +177,35 @@ export function EditEmailTemplatePage() {
   const [editorIsExpanded, setEditorIsExpanded] = useState(false);
 
   const editor = useMemo(() => {
+    const variableList = (
+      <div className="flex flex-col gap-2">
+        <span className="text-sm font-medium">{t('variables.title')}</span>
+        {variables.length === 0 ? (
+          <span className="text-sm text-default-500">{t('variables.empty')}</span>
+        ) : (
+          <>
+            <span className="text-xs text-default-500">{t('variables.hint')}</span>
+            <div className="flex flex-row flex-wrap gap-2">
+              {variables.map((name) => (
+                <Chip
+                  key={name}
+                  variant="soft"
+                  color="accent"
+                  className="cursor-pointer"
+                  onClick={() => copyVariable(name)}
+                >
+                  {name}
+                </Chip>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    );
+
     return (
       <>
+        {variableList}
         <TextField value={subject} onChange={setSubject}>
           <Label>{t('form.subject')}</Label>
           <Input />
@@ -111,12 +216,13 @@ export function EditEmailTemplatePage() {
             defaultLanguage="mjml"
             defaultValue={body}
             onChange={(value) => setBody(value ?? '')}
+            onMount={handleEditorMount}
           />
         </div>
         <Link href="https://documentation.mjml.io/">{t('form.mjmlDocumentation')}</Link>
       </>
     );
-  }, [body, theme, subject, t]);
+  }, [body, theme, subject, t, variables, copyVariable, handleEditorMount]);
 
   const onSubmit = useCallback(
     (e: React.FormEvent<HTMLFormElement>) => {

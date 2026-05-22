@@ -17,7 +17,7 @@
     "node_version": "22.17.1 (from .nvmrc)",
     "run_commands_from": "repo root",
     "prefer": "pnpm nx targets; avoid long-running dev servers unless asked",
-    "firmware_note": "apps/attractap-firmware uses PlatformIO, not Nx"
+    "firmware_note": "apps/attractap/firmware uses PlatformIO, not Nx"
   },
   "common_commands": {
     "show_targets": "pnpm nx show project <project> --json",

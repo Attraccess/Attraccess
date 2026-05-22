@@ -1,0 +1,64 @@
+{
+  "title": "Flow-Variablen",
+  "subtitle": "Sieh dir Variablen an, die deine Flow-Nodes lesen und schreiben, oder bearbeite sie.",
+  "tabs": {
+    "resource": "Ressource",
+    "global": "Global"
+  },
+  "table": {
+    "key": "Schlüssel",
+    "type": "Typ",
+    "value": "Wert",
+    "updated": "Aktualisiert",
+    "actions": "Aktionen",
+    "empty": "Noch keine Variablen."
+  },
+  "actions": {
+    "add": "Variable hinzufügen",
+    "edit": "Bearbeiten",
+    "delete": "Löschen",
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "close": "Schließen",
+    "confirmDelete": "Variable wirklich löschen?",
+    "confirmDeleteYes": "Löschen",
+    "confirmDeleteNo": "Abbrechen"
+  },
+  "editor": {
+    "createTitle": "Variable hinzufügen",
+    "editTitle": "Variable bearbeiten: {{key}}",
+    "scope": "Geltungsbereich",
+    "scopeResource": "Ressource",
+    "scopeGlobal": "Global",
+    "key": "Schlüssel",
+    "keyPlaceholder": "z. B. door_unlocked",
+    "type": "Typ",
+    "types": {
+      "string": "Text",
+      "number": "Zahl",
+      "boolean": "Boolean",
+      "object": "Objekt",
+      "array": "Array",
+      "null": "Null"
+    },
+    "value": "Wert",
+    "valuePlaceholderString": "Ein Text…",
+    "valuePlaceholderNumber": "42",
+    "valuePlaceholderJson": "{\n  \"key\": \"value\"\n}",
+    "errors": {
+      "keyRequired": "Schlüssel ist erforderlich.",
+      "numberInvalid": "Wert muss eine Zahl sein.",
+      "jsonInvalid": "Wert muss gültiges JSON sein.",
+      "typeMismatchObject": "Wert muss ein JSON-Objekt sein.",
+      "typeMismatchArray": "Wert muss ein JSON-Array sein."
+    }
+  },
+  "toast": {
+    "saved": {
+      "title": "Variable gespeichert"
+    },
+    "deleted": {
+      "title": "Variable gelöscht"
+    }
+  }
+}

@@ -18,7 +18,8 @@
     "sharedGlobals": [
       "{workspaceRoot}/.github/workflows/pull-requests.yml",
       "{workspaceRoot}/.github/workflows/release.yml",
-      "{workspaceRoot}/.github/workflows/docker-nightly-latest.yml"
+      "{workspaceRoot}/.github/workflows/docker-nightly-latest.yml",
+      "{workspaceRoot}/.github/workflows/hardware.yml"
     ],
     "testing": ["default", "{workspaceRoot}/jest.preset.js"],
     "swagger": ["default", "{projectRoot}/webpack.config.swagger.js"],
@@ -91,9 +92,6 @@
     },
     "lint": {
       "cache": true,
-      "options": {
-        "max-warnings": 0
-      },
       "inputs": [
         "default",
         "^default",
@@ -105,6 +103,11 @@
         }
       ],
       "outputs": ["{options.outputFile}"]
+    },
+    "@nx/eslint:lint": {
+      "options": {
+        "max-warnings": 0
+      }
     },
     "@nx/esbuild:esbuild": {
       "cache": true,

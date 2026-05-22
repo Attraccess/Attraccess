@@ -189,7 +189,7 @@ export function UserManagementDetailsPage() {
             <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
               {t('profile.passwordTitle')}
             </h3>
-            <SetPasswordForm userId={user.id} />
+            <SetPasswordForm userId={user.id} username={user.username} />
           </section>
 
           <section

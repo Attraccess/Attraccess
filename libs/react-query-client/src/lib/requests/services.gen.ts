@@ -3,7 +3,7 @@
 import type { CancelablePromise } from './core/CancelablePromise';
 import { OpenAPI } from './core/OpenAPI';
 import { request as __request } from './core/request';
-import type { InfoResponse, RebootHostResponse, ShutdownHostResponse, GetCurrentVersionResponse, GetUpdateStatusData, GetUpdateStatusResponse, GetLocalSignupDomainWhitelistResponse, SetLocalSignupDomainWhitelistData, SetLocalSignupDomainWhitelistResponse, CreateOneUserData, CreateOneUserResponse, FindManyData, FindManyResponse, InviteUserData, InviteUserResponse, InviteUsersFromCsvData, InviteUsersFromCsvResponse, IsLocalSignupEnabledResponse, VerifyEmailData, VerifyEmailResponse, AcceptInvitationData, AcceptInvitationResponse, RequestPasswordResetData, RequestPasswordResetResponse, ChangePasswordViaResetTokenData, ChangePasswordViaResetTokenResponse, GetCurrentResponse, RequestDeleteAccountResponse, ConfirmDeleteAccountData, ConfirmDeleteAccountResponse, ChangeMyUsernameData, ChangeMyUsernameResponse, ChangeMyEmailData, ChangeMyEmailResponse, GetOneUserByIdData, GetOneUserByIdResponse, DeleteUserData, DeleteUserResponse, UpdatePermissionsData, UpdatePermissionsResponse, GetPermissionsData, GetPermissionsResponse, BulkUpdatePermissionsData, BulkUpdatePermissionsResponse, GetAllWithPermissionData, GetAllWithPermissionResponse, SetUserPasswordData, SetUserPasswordResponse, ChangeUserUsernameData, ChangeUserUsernameResponse, ChangeUserEmailData, ChangeUserEmailResponse, ChangeUserBillingFactorData, ChangeUserBillingFactorResponse, CreateSessionData, CreateSessionResponse2, RefreshSessionData, RefreshSessionResponse, EndSessionResponse, GetAllSsoProvidersResponse, CreateOneSsoProviderData, CreateOneSsoProviderResponse, LinkUserToExternalAccountData, LinkUserToExternalAccountResponse, GetOneSsoProviderByIdData, GetOneSsoProviderByIdResponse, UpdateOneSsoProviderData, UpdateOneSsoProviderResponse, DeleteOneSsoProviderData, DeleteOneSsoProviderResponse, DiscoverAuthentikOidcData, DiscoverAuthentikOidcResponse, DiscoverKeycloakOidcData, DiscoverKeycloakOidcResponse, SsoOidcLogoutData, SsoOidcLogoutResponse, SsoSamlLogoutData, SsoSamlLogoutResponse, SsoOidcDeleteUserData, SsoOidcDeleteUserResponse, SsoSamlDeleteUserData, SsoSamlDeleteUserResponse, SsoOidcUpdatePermissionsData, SsoOidcUpdatePermissionsResponse, SsoSamlUpdatePermissionsData, SsoSamlUpdatePermissionsResponse, LoginWithOidcData, LoginWithOidcResponse, OidcLoginCallbackData, OidcLoginCallbackResponse, LoginWithSamlData, LoginWithSamlResponse, SamlLoginCallbackData, SamlLoginCallbackResponse, GetTwoFactorStatusResponse, SetupTwoFactorResponse, VerifyTwoFactorData, VerifyTwoFactorResponse, DisableTwoFactorData, DisableTwoFactorResponse, GetTwoFactorPolicyResponse, SetTwoFactorPolicyData, SetTwoFactorPolicyResponse, EmailTemplateControllerPreviewMjmlData, EmailTemplateControllerPreviewMjmlResponse, EmailTemplateControllerFindAllResponse, EmailTemplateControllerFindOneData, EmailTemplateControllerFindOneResponse, EmailTemplateControllerUpdateData, EmailTemplateControllerUpdateResponse, GetSystemSettingsResponse, UpdateSystemSettingsData, UpdateSystemSettingsResponse, GetFirstTimeSetupStatusResponse, ApplyFirstTimeSetupSettingsData, ApplyFirstTimeSetupSettingsResponse, GetMetricsSettingsResponse, UpdateMetricsSettingsData, UpdateMetricsSettingsResponse, GenerateMetricsApiKeyResponse, DeleteMetricsApiKeyResponse, GetLicenseInformationResponse, CreateOneResourceData, CreateOneResourceResponse, GetAllResourcesData, GetAllResourcesResponse, GetAllResourcesInUseResponse, GetOneResourceByIdData, GetOneResourceByIdResponse, UpdateOneResourceData, UpdateOneResourceResponse, DeleteOneResourceData, DeleteOneResourceResponse, SseControllerStreamEventsData, SseControllerStreamEventsResponse, ResourceGroupsCreateOneData, ResourceGroupsCreateOneResponse, ResourceGroupsGetManyResponse, ResourceGroupsGetOneData, ResourceGroupsGetOneResponse, ResourceGroupsUpdateOneData, ResourceGroupsUpdateOneResponse, ResourceGroupsAddResourceData, ResourceGroupsAddResourceResponse, ResourceGroupsRemoveResourceData, ResourceGroupsRemoveResourceResponse, ResourceGroupsDeleteOneData, ResourceGroupsDeleteOneResponse, ResourceUsageStartSessionData, ResourceUsageStartSessionResponse, ResourceUsageEndSessionData, ResourceUsageEndSessionResponse, ResourceUsageUpdateSessionProjectData, ResourceUsageUpdateSessionProjectResponse, LockDoorData, LockDoorResponse, UnlockDoorData, UnlockDoorResponse, UnlatchDoorData, UnlatchDoorResponse, ResourceUsageGetHistoryData, ResourceUsageGetHistoryResponse, ResourceUsageGetActiveSessionData, ResourceUsageGetActiveSessionResponse, ResourceUsageCanControlData, ResourceUsageCanControlResponse, MqttServersGetAllResponse, MqttServersCreateOneData, MqttServersCreateOneResponse, MqttServersGetOneByIdData, MqttServersGetOneByIdResponse, MqttServersUpdateOneData, MqttServersUpdateOneResponse, MqttServersDeleteOneData, MqttServersDeleteOneResponse, ResourceGroupIntroductionsGetManyData, ResourceGroupIntroductionsGetManyResponse, ResourceGroupIntroductionsGetHistoryData, ResourceGroupIntroductionsGetHistoryResponse, ResourceGroupIntroductionsGrantData, ResourceGroupIntroductionsGrantResponse, ResourceGroupIntroductionsRevokeData, ResourceGroupIntroductionsRevokeResponse, ResourceGroupIntroducersGetManyData, ResourceGroupIntroducersGetManyResponse, ResourceGroupIntroducersIsIntroducerData, ResourceGroupIntroducersIsIntroducerResponse, ResourceGroupIntroducersGrantData, ResourceGroupIntroducersGrantResponse, ResourceGroupIntroducersRevokeData, ResourceGroupIntroducersRevokeResponse, ResourceIntroducersIsIntroducerData, ResourceIntroducersIsIntroducerResponse, ResourceIntroducersGetManyData, ResourceIntroducersGetManyResponse, ResourceIntroducersGrantData, ResourceIntroducersGrantResponse, ResourceIntroducersRevokeData, ResourceIntroducersRevokeResponse, ResourceIntroductionsGetManyData, ResourceIntroductionsGetManyResponse, ResourceIntroductionsGrantData, ResourceIntroductionsGrantResponse, ResourceIntroductionsRevokeData, ResourceIntroductionsRevokeResponse, ResourceIntroductionsGetHistoryData, ResourceIntroductionsGetHistoryResponse, CanManageMaintenanceData, CanManageMaintenanceResponse, CreateMaintenanceData, CreateMaintenanceResponse, FindMaintenancesData, FindMaintenancesResponse, GetMaintenanceData, GetMaintenanceResponse, FinishMaintenanceData, FinishMaintenanceResponse, FindMaintenanceSchedulesData, FindMaintenanceSchedulesResponse, CreateMaintenanceScheduleData, CreateMaintenanceScheduleResponse, GetMaintenanceScheduleData, GetMaintenanceScheduleResponse, UpdateMaintenanceScheduleData, UpdateMaintenanceScheduleResponse, DeleteMaintenanceScheduleData, DeleteMaintenanceScheduleResponse, GetBillingBalanceData, GetBillingBalanceResponse, GetBillingTransactionsData, GetBillingTransactionsResponse, CreateManualTransactionData, CreateManualTransactionResponse, GetBillingTransactionData, GetBillingTransactionResponse, GetResourceBillingConfigurationData, GetResourceBillingConfigurationResponse, UpdateResourceBillingConfigurationData, UpdateResourceBillingConfigurationResponse, SetSumUpApiKeyData, SetSumUpApiKeyResponse, SetBillingConfigurationData, SetBillingConfigurationResponse, GetBillingConfigurationResponse, GetSumUpConfigurationResponse, GetSumUpReadersResponse, PairSumUpReaderData, PairSumUpReaderResponse, RemoveSumUpReaderData, TopUpWithSumUpReaderData, TopUpWithSumUpReaderResponse, SumUpTopUpCallbackData, SumUpTopUpCallbackResponse, RefundTransactionData, RefundTransactionResponse, GetNodeSchemasData, GetNodeSchemasResponse, GetResourceFlowData, GetResourceFlowResponse, SaveResourceFlowData, SaveResourceFlowResponse, GetResourceFlowLogsData, GetResourceFlowLogsResponse, ResourceFlowsControllerStreamEventsData, ResourceFlowsControllerStreamEventsResponse, PressButtonData, PressButtonResponse, GetButtonsData, GetButtonsResponse, GetResourceHealthData, GetResourceHealthResponse, ClearResourceHealthEntryData, ClearResourceHealthEntryResponse, FindManyProjectsData, FindManyProjectsResponse, CreateProjectData, CreateProjectResponse, FindOneProjectData, FindOneProjectResponse, DeleteOneProjectData, DeleteOneProjectResponse, UpdateProjectData, UpdateProjectResponse, ArchiveProjectData, ArchiveProjectResponse, UnarchiveProjectData, UnarchiveProjectResponse, GetProjectUsageHistoryData, GetProjectUsageHistoryResponse, GetProjectUsageStatsData, GetProjectUsageStatsResponse, ListProjectMembersData, ListProjectMembersResponse, RemoveProjectMemberData, RemoveProjectMemberResponse, ListProjectInvitationsData, ListProjectInvitationsResponse, CreateProjectInvitationData, CreateProjectInvitationResponse, ResendProjectInvitationData, ResendProjectInvitationResponse, CancelProjectInvitationData, CancelProjectInvitationResponse, ListMyProjectInvitationsResponse, AcceptProjectInvitationData, AcceptProjectInvitationResponse, DeclineProjectInvitationData, DeclineProjectInvitationResponse, ResourceFormsListData, ResourceFormsListResponse, ResourceFormsCreateData, ResourceFormsCreateResponse, ResourceFormsGetRequirementsData, ResourceFormsGetRequirementsResponse, ResourceFormsGetOneData, ResourceFormsGetOneResponse, ResourceFormsUpdateData, ResourceFormsUpdateResponse, ResourceFormsDeleteData, ResourceFormsDeleteResponse, GetPluginsResponse, UploadPluginData, GetFrontendPluginFileData, GetFrontendPluginFileResponse, DeletePluginData, DeletePluginResponse, EnrollNfcCardData, EnrollNfcCardResponse, ResetNfcCardData, ResetNfcCardResponse, UpdateReaderData, UpdateReaderResponse, GetReaderByIdData, GetReaderByIdResponse, DeleteReaderData, DeleteReaderResponse, GetReadersResponse, GetAppKeyByUidData, GetAppKeyByUidResponse, GetAllCardsResponse, ToggleCardActiveData, ToggleCardActiveResponse, GetFirmwaresResponse, DownloadFirmwareBinaryData, DownloadFirmwareBinaryResponse, GetFirmwareBinaryData, GetFirmwareBinaryResponse, GetResourceUsageHoursInDateRangeData, GetResourceUsageHoursInDateRangeResponse, GetBillingTransactionsInDateRangeData, GetBillingTransactionsInDateRangeResponse } from './types.gen';
+import type { InfoResponse, RebootHostResponse, ShutdownHostResponse, GetCurrentVersionResponse, GetUpdateStatusData, GetUpdateStatusResponse, GetLocalSignupDomainWhitelistResponse, SetLocalSignupDomainWhitelistData, SetLocalSignupDomainWhitelistResponse, CreateOneUserData, CreateOneUserResponse, FindManyData, FindManyResponse, InviteUserData, InviteUserResponse, InviteUsersFromCsvData, InviteUsersFromCsvResponse, IsLocalSignupEnabledResponse, VerifyEmailData, VerifyEmailResponse, AcceptInvitationData, AcceptInvitationResponse, RequestPasswordResetData, RequestPasswordResetResponse, ChangePasswordViaResetTokenData, ChangePasswordViaResetTokenResponse, GetCurrentResponse, RequestDeleteAccountResponse, ConfirmDeleteAccountData, ConfirmDeleteAccountResponse, ChangeMyUsernameData, ChangeMyUsernameResponse, ChangeMyEmailData, ChangeMyEmailResponse, GetOneUserByIdData, GetOneUserByIdResponse, DeleteUserData, DeleteUserResponse, UpdatePermissionsData, UpdatePermissionsResponse, GetPermissionsData, GetPermissionsResponse, BulkUpdatePermissionsData, BulkUpdatePermissionsResponse, GetAllWithPermissionData, GetAllWithPermissionResponse, SetUserPasswordData, SetUserPasswordResponse, ChangeUserUsernameData, ChangeUserUsernameResponse, ChangeUserEmailData, ChangeUserEmailResponse, ChangeUserBillingFactorData, ChangeUserBillingFactorResponse, CreateSessionData, CreateSessionResponse2, RefreshSessionData, RefreshSessionResponse, EndSessionResponse, GetAllSsoProvidersResponse, CreateOneSsoProviderData, CreateOneSsoProviderResponse, LinkUserToExternalAccountData, LinkUserToExternalAccountResponse, GetOneSsoProviderByIdData, GetOneSsoProviderByIdResponse, UpdateOneSsoProviderData, UpdateOneSsoProviderResponse, DeleteOneSsoProviderData, DeleteOneSsoProviderResponse, DiscoverAuthentikOidcData, DiscoverAuthentikOidcResponse, DiscoverKeycloakOidcData, DiscoverKeycloakOidcResponse, SsoOidcLogoutData, SsoOidcLogoutResponse, SsoSamlLogoutData, SsoSamlLogoutResponse, SsoOidcDeleteUserData, SsoOidcDeleteUserResponse, SsoSamlDeleteUserData, SsoSamlDeleteUserResponse, SsoOidcUpdatePermissionsData, SsoOidcUpdatePermissionsResponse, SsoSamlUpdatePermissionsData, SsoSamlUpdatePermissionsResponse, LoginWithOidcData, LoginWithOidcResponse, OidcLoginCallbackData, OidcLoginCallbackResponse, LoginWithSamlData, LoginWithSamlResponse, SamlLoginCallbackData, SamlLoginCallbackResponse, GetTwoFactorStatusResponse, SetupTwoFactorResponse, VerifyTwoFactorData, VerifyTwoFactorResponse, DisableTwoFactorData, DisableTwoFactorResponse, GetTwoFactorPolicyResponse, SetTwoFactorPolicyData, SetTwoFactorPolicyResponse, EmailTemplateControllerPreviewMjmlData, EmailTemplateControllerPreviewMjmlResponse, EmailTemplateControllerFindAllResponse, EmailTemplateControllerFindOneData, EmailTemplateControllerFindOneResponse, EmailTemplateControllerUpdateData, EmailTemplateControllerUpdateResponse, GetSystemSettingsResponse, UpdateSystemSettingsData, UpdateSystemSettingsResponse, GetFirstTimeSetupStatusResponse, ApplyFirstTimeSetupSettingsData, ApplyFirstTimeSetupSettingsResponse, GetMetricsSettingsResponse, UpdateMetricsSettingsData, UpdateMetricsSettingsResponse, GenerateMetricsApiKeyResponse, DeleteMetricsApiKeyResponse, GetAuthRateLimitSettingsResponse, UpdateAuthRateLimitSettingsData, UpdateAuthRateLimitSettingsResponse, GetLicenseInformationResponse, GetPublicPasswordPolicyResponse, GetAdminPasswordPolicyResponse, UpdateAdminPasswordPolicyData, UpdateAdminPasswordPolicyResponse, PreviewAdminPasswordPolicyData, PreviewAdminPasswordPolicyResponse, ListPasswordPolicyOverridesResponse, GetPasswordPolicyOverrideData, GetPasswordPolicyOverrideResponse, UpsertPasswordPolicyOverrideData, UpsertPasswordPolicyOverrideResponse, DeletePasswordPolicyOverrideData, DeletePasswordPolicyOverrideResponse, CreateOneResourceData, CreateOneResourceResponse, GetAllResourcesData, GetAllResourcesResponse, GetAllResourcesInUseResponse, GetOneResourceByIdData, GetOneResourceByIdResponse, UpdateOneResourceData, UpdateOneResourceResponse, DeleteOneResourceData, DeleteOneResourceResponse, SseControllerStreamEventsData, SseControllerStreamEventsResponse, ResourceGroupsCreateOneData, ResourceGroupsCreateOneResponse, ResourceGroupsGetManyResponse, ResourceGroupsGetOneData, ResourceGroupsGetOneResponse, ResourceGroupsUpdateOneData, ResourceGroupsUpdateOneResponse, ResourceGroupsAddResourceData, ResourceGroupsAddResourceResponse, ResourceGroupsRemoveResourceData, ResourceGroupsRemoveResourceResponse, ResourceGroupsDeleteOneData, ResourceGroupsDeleteOneResponse, ResourceUsageStartSessionData, ResourceUsageStartSessionResponse, ResourceUsageEndSessionData, ResourceUsageEndSessionResponse, ResourceUsageUpdateSessionProjectData, ResourceUsageUpdateSessionProjectResponse, LockDoorData, LockDoorResponse, UnlockDoorData, UnlockDoorResponse, UnlatchDoorData, UnlatchDoorResponse, ResourceUsageGetHistoryData, ResourceUsageGetHistoryResponse, ResourceUsageGetActiveSessionData, ResourceUsageGetActiveSessionResponse, ResourceUsageCanControlData, ResourceUsageCanControlResponse, MqttServersGetAllResponse, MqttServersCreateOneData, MqttServersCreateOneResponse, MqttServersGetOneByIdData, MqttServersGetOneByIdResponse, MqttServersUpdateOneData, MqttServersUpdateOneResponse, MqttServersDeleteOneData, MqttServersDeleteOneResponse, ResourceGroupIntroductionsGetManyData, ResourceGroupIntroductionsGetManyResponse, ResourceGroupIntroductionsGetHistoryData, ResourceGroupIntroductionsGetHistoryResponse, ResourceGroupIntroductionsGrantData, ResourceGroupIntroductionsGrantResponse, ResourceGroupIntroductionsRevokeData, ResourceGroupIntroductionsRevokeResponse, ResourceGroupIntroducersGetManyData, ResourceGroupIntroducersGetManyResponse, ResourceGroupIntroducersIsIntroducerData, ResourceGroupIntroducersIsIntroducerResponse, ResourceGroupIntroducersGrantData, ResourceGroupIntroducersGrantResponse, ResourceGroupIntroducersRevokeData, ResourceGroupIntroducersRevokeResponse, ResourceIntroducersIsIntroducerData, ResourceIntroducersIsIntroducerResponse, ResourceIntroducersGetManyData, ResourceIntroducersGetManyResponse, ResourceIntroducersGrantData, ResourceIntroducersGrantResponse, ResourceIntroducersRevokeData, ResourceIntroducersRevokeResponse, ResourceIntroductionsGetManyData, ResourceIntroductionsGetManyResponse, ResourceIntroductionsGrantData, ResourceIntroductionsGrantResponse, ResourceIntroductionsRevokeData, ResourceIntroductionsRevokeResponse, ResourceIntroductionsGetHistoryData, ResourceIntroductionsGetHistoryResponse, CanManageMaintenanceData, CanManageMaintenanceResponse, CreateMaintenanceData, CreateMaintenanceResponse, FindMaintenancesData, FindMaintenancesResponse, GetMaintenanceData, GetMaintenanceResponse, FinishMaintenanceData, FinishMaintenanceResponse, FindMaintenanceSchedulesData, FindMaintenanceSchedulesResponse, CreateMaintenanceScheduleData, CreateMaintenanceScheduleResponse, GetMaintenanceScheduleData, GetMaintenanceScheduleResponse, UpdateMaintenanceScheduleData, UpdateMaintenanceScheduleResponse, DeleteMaintenanceScheduleData, DeleteMaintenanceScheduleResponse, GetBillingBalanceData, GetBillingBalanceResponse, GetBillingTransactionsData, GetBillingTransactionsResponse, CreateManualTransactionData, CreateManualTransactionResponse, GetBillingTransactionData, GetBillingTransactionResponse, GetResourceBillingConfigurationData, GetResourceBillingConfigurationResponse, UpdateResourceBillingConfigurationData, UpdateResourceBillingConfigurationResponse, SetSumUpApiKeyData, SetSumUpApiKeyResponse, SetBillingConfigurationData, SetBillingConfigurationResponse, GetBillingConfigurationResponse, GetSumUpConfigurationResponse, GetSumUpReadersResponse, PairSumUpReaderData, PairSumUpReaderResponse, RemoveSumUpReaderData, TopUpWithSumUpReaderData, TopUpWithSumUpReaderResponse, SumUpTopUpCallbackData, SumUpTopUpCallbackResponse, RefundTransactionData, RefundTransactionResponse, GetNodeSchemasData, GetNodeSchemasResponse, GetResourceFlowData, GetResourceFlowResponse, SaveResourceFlowData, SaveResourceFlowResponse, GetResourceFlowLogsData, GetResourceFlowLogsResponse, ResourceFlowsControllerStreamEventsData, ResourceFlowsControllerStreamEventsResponse, PressButtonData, PressButtonResponse, GetButtonsData, GetButtonsResponse, ListFlowVariablesData, ListFlowVariablesResponse, UpsertFlowVariableData, UpsertFlowVariableResponse, DeleteFlowVariableData, DeleteFlowVariableResponse, GetResourceHealthData, GetResourceHealthResponse, ClearResourceHealthEntryData, ClearResourceHealthEntryResponse, FindManyProjectsData, FindManyProjectsResponse, CreateProjectData, CreateProjectResponse, FindOneProjectData, FindOneProjectResponse, DeleteOneProjectData, DeleteOneProjectResponse, UpdateProjectData, UpdateProjectResponse, ArchiveProjectData, ArchiveProjectResponse, UnarchiveProjectData, UnarchiveProjectResponse, GetProjectUsageHistoryData, GetProjectUsageHistoryResponse, GetProjectUsageStatsData, GetProjectUsageStatsResponse, ListProjectMembersData, ListProjectMembersResponse, RemoveProjectMemberData, RemoveProjectMemberResponse, ListProjectInvitationsData, ListProjectInvitationsResponse, CreateProjectInvitationData, CreateProjectInvitationResponse, ResendProjectInvitationData, ResendProjectInvitationResponse, CancelProjectInvitationData, CancelProjectInvitationResponse, ListMyProjectInvitationsResponse, AcceptProjectInvitationData, AcceptProjectInvitationResponse, DeclineProjectInvitationData, DeclineProjectInvitationResponse, ResourceFormsListData, ResourceFormsListResponse, ResourceFormsCreateData, ResourceFormsCreateResponse, ResourceFormsGetRequirementsData, ResourceFormsGetRequirementsResponse, ResourceFormsGetOneData, ResourceFormsGetOneResponse, ResourceFormsUpdateData, ResourceFormsUpdateResponse, ResourceFormsDeleteData, ResourceFormsDeleteResponse, GetPluginsResponse, UploadPluginData, GetFrontendPluginFileData, GetFrontendPluginFileResponse, DeletePluginData, DeletePluginResponse, EnrollNfcCardData, EnrollNfcCardResponse, ResetNfcCardData, ResetNfcCardResponse, UpdateReaderData, UpdateReaderResponse, GetReaderByIdData, GetReaderByIdResponse, DeleteReaderData, DeleteReaderResponse, GetReadersResponse, GetAppKeyByUidData, GetAppKeyByUidResponse, GetAllCardsResponse, ToggleCardActiveData, ToggleCardActiveResponse, GetFirmwaresResponse, DownloadFirmwareBinaryData, DownloadFirmwareBinaryResponse, GetFirmwareBinaryData, GetFirmwareBinaryResponse, GetResourceUsageHoursInDateRangeData, GetResourceUsageHoursInDateRangeResponse, GetBillingTransactionsInDateRangeData, GetBillingTransactionsInDateRangeResponse } from './types.gen';
 
 export class SystemService {
     /**
@@ -1423,6 +1423,40 @@ export class SettingsService {
         });
     }
     
+    /**
+     * Get auth rate-limit settings
+     * @returns AuthRateLimitSettingsDto Current auth rate-limit settings.
+     * @throws ApiError
+     */
+    public static getAuthRateLimitSettings(): CancelablePromise<GetAuthRateLimitSettingsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/settings/auth/rate-limit',
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Update auth rate-limit settings
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns AuthRateLimitSettingsDto Auth rate-limit settings updated.
+     * @throws ApiError
+     */
+    public static updateAuthRateLimitSettings(data: UpdateAuthRateLimitSettingsData): CancelablePromise<UpdateAuthRateLimitSettingsResponse> {
+        return __request(OpenAPI, {
+            method: 'PATCH',
+            url: '/api/settings/auth/rate-limit',
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
 }
 
 export class LicenseService {
@@ -1439,6 +1473,155 @@ export class LicenseService {
                 401: `Unauthorized - User is not authenticated
 
 Unauthorized`
+            }
+        });
+    }
+    
+}
+
+export class PasswordPolicyService {
+    /**
+     * Get the public password policy
+     * @returns PublicPasswordPolicyDto The currently active public password policy
+     * @throws ApiError
+     */
+    public static getPublicPasswordPolicy(): CancelablePromise<GetPublicPasswordPolicyResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/password-policy/public'
+        });
+    }
+    
+}
+
+export class PasswordPolicyAdminService {
+    /**
+     * Get the global password policy
+     * @returns PasswordPolicyDto The global password policy.
+     * @throws ApiError
+     */
+    public static getAdminPasswordPolicy(): CancelablePromise<GetAdminPasswordPolicyResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/admin/password-policy',
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Update the global password policy
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns PasswordPolicyDto Password policy updated.
+     * @throws ApiError
+     */
+    public static updateAdminPasswordPolicy(data: UpdateAdminPasswordPolicyData): CancelablePromise<UpdateAdminPasswordPolicyResponse> {
+        return __request(OpenAPI, {
+            method: 'PATCH',
+            url: '/api/admin/password-policy',
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Server-side preview: evaluate a candidate password against the current (or draft) policy
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns PreviewPasswordResultDto Full preview result including zxcvbn + HIBP + history checks.
+     * @throws ApiError
+     */
+    public static previewAdminPasswordPolicy(data: PreviewAdminPasswordPolicyData): CancelablePromise<PreviewAdminPasswordPolicyResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/admin/password-policy/preview',
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * List all per-role password policy overrides
+     * @returns PasswordPolicyOverrideDto All defined overrides.
+     * @throws ApiError
+     */
+    public static listPasswordPolicyOverrides(): CancelablePromise<ListPasswordPolicyOverridesResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/admin/password-policy/overrides',
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Get the per-role override for a single role
+     * @param data The data for the request.
+     * @param data.role
+     * @returns unknown The override row, or null if unset.
+     * @throws ApiError
+     */
+    public static getPasswordPolicyOverride(data: GetPasswordPolicyOverrideData): CancelablePromise<GetPasswordPolicyOverrideResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/admin/password-policy/overrides/{role}',
+            path: {
+                role: data.role
+            },
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Upsert a per-role password policy override
+     * @param data The data for the request.
+     * @param data.role
+     * @param data.requestBody
+     * @returns PasswordPolicyOverrideDto The saved override row.
+     * @throws ApiError
+     */
+    public static upsertPasswordPolicyOverride(data: UpsertPasswordPolicyOverrideData): CancelablePromise<UpsertPasswordPolicyOverrideResponse> {
+        return __request(OpenAPI, {
+            method: 'PUT',
+            url: '/api/admin/password-policy/overrides/{role}',
+            path: {
+                role: data.role
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Delete a per-role password policy override
+     * @param data The data for the request.
+     * @param data.role
+     * @returns void Override removed.
+     * @throws ApiError
+     */
+    public static deletePasswordPolicyOverride(data: DeletePasswordPolicyOverrideData): CancelablePromise<DeletePasswordPolicyOverrideResponse> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/api/admin/password-policy/overrides/{role}',
+            path: {
+                role: data.role
+            },
+            errors: {
+                401: 'Unauthorized'
             }
         });
     }
@@ -3186,6 +3369,80 @@ export class ResourceFlowsService {
                 401: 'Unauthorized',
                 403: 'Insufficient permissions to manage resources',
                 404: 'Resource not found'
+            }
+        });
+    }
+    
+}
+
+export class FlowVariablesService {
+    /**
+     * List flow variables for a resource
+     * @param data The data for the request.
+     * @param data.resourceId
+     * @returns FlowVariableDto
+     * @throws ApiError
+     */
+    public static listFlowVariables(data: ListFlowVariablesData): CancelablePromise<ListFlowVariablesResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/resources/{resourceId}/flow-variables',
+            path: {
+                resourceId: data.resourceId
+            },
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Upsert a flow variable
+     * @param data The data for the request.
+     * @param data.resourceId
+     * @param data.key
+     * @param data.scope
+     * @param data.requestBody
+     * @returns void
+     * @throws ApiError
+     */
+    public static upsertFlowVariable(data: UpsertFlowVariableData): CancelablePromise<UpsertFlowVariableResponse> {
+        return __request(OpenAPI, {
+            method: 'PUT',
+            url: '/api/resources/{resourceId}/flow-variables/{scope}/{key}',
+            path: {
+                resourceId: data.resourceId,
+                key: data.key,
+                scope: data.scope
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Delete a flow variable
+     * @param data The data for the request.
+     * @param data.resourceId
+     * @param data.key
+     * @param data.scope
+     * @returns void
+     * @throws ApiError
+     */
+    public static deleteFlowVariable(data: DeleteFlowVariableData): CancelablePromise<DeleteFlowVariableResponse> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/api/resources/{resourceId}/flow-variables/{scope}/{key}',
+            path: {
+                resourceId: data.resourceId,
+                key: data.key,
+                scope: data.scope
+            },
+            errors: {
+                401: 'Unauthorized'
             }
         });
     }

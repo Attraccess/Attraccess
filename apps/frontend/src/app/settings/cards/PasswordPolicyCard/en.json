@@ -1,0 +1,5 @@
+{
+  "title": "Password Policy",
+  "subtitle": "Rules for what counts as an acceptable password, with optional per-role overrides.",
+  "openButton": "Open password policy"
+}

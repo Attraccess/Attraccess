@@ -6,6 +6,10 @@ import { SessionService } from './session.service';
 import { User } from '@attraccess/database-entities';
 import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { CookieConfigService } from '../../common/services/cookie-config.service';
+import { LoginRateLimitGuard } from '../rate-limiting/login.rate-limit.guard';
+import { BruteForceProtectionService } from '../rate-limiting/brute-force.service';
+import { AuthAuditLogger } from '../rate-limiting/auth-audit.logger';
+import { UsersService } from '../users/users.service';
 
 describe('AuthController', () => {
   let authController: AuthController;
@@ -36,6 +40,18 @@ describe('AuthController', () => {
             clearAuthCookie: jest.fn(),
           },
         },
+        {
+          provide: BruteForceProtectionService,
+          useValue: {
+            assertIpAllowed: jest.fn().mockResolvedValue(undefined),
+            assertAccountAllowed: jest.fn().mockResolvedValue(undefined),
+            recordFailure: jest.fn().mockResolvedValue(undefined),
+            recordSuccess: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        { provide: AuthAuditLogger, useValue: { log: jest.fn() } },
+        { provide: UsersService, useValue: { findOne: jest.fn() } },
+        { provide: LoginRateLimitGuard, useValue: { canActivate: jest.fn().mockResolvedValue(true) } },
       ],
     }).compile();
 

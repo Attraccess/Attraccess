@@ -124,6 +124,43 @@
             }
           }
         }
+      },
+      "variable": {
+        "changed": {
+          "title": "Variable geändert",
+          "description": "Wird ausgelöst, wenn sich der Wert einer überwachten Flow-Variable ändert.",
+          "outputs": {
+            "output": "Ausgabe"
+          },
+          "preview": {
+            "watches": "Überwacht",
+            "source": "Quelle"
+          },
+          "config": {
+            "watches": {
+              "label": "Überwachte Variablen",
+              "empty": "Keine Variablen überwacht.",
+              "add": "Überwachung hinzufügen",
+              "items": {
+                "key": { "label": "Schlüssel" },
+                "scope": {
+                  "label": "Geltungsbereich",
+                  "enum": {
+                    "resource": "Ressource",
+                    "global": "Global"
+                  }
+                }
+              }
+            },
+            "source": {
+              "label": "Auslöse-Quelle",
+              "enum": {
+                "any": "Jede Änderung (auch diese Ressource)",
+                "exclude-self": "Nur Änderungen aus anderen Ressourcen"
+              }
+            }
+          }
+        }
       }
     },
     "processing": {
@@ -250,6 +287,86 @@
         "config": {
           "message": {
             "label": "Fehlermeldungs-Vorlage"
+          }
+        }
+      },
+      "variables": {
+        "set": {
+          "title": "Variablen setzen",
+          "description": "Speichert eine oder mehrere Flow-Variablen. Schlüssel und Werte unterstützen Handlebars-Vorlagen.",
+          "inputs": {
+            "input": "Eingabe"
+          },
+          "outputs": {
+            "output": "Ausgabe"
+          },
+          "preview": {
+            "assignments": "Setzt"
+          },
+          "config": {
+            "variables": {
+              "label": "Variablen",
+              "empty": "Keine Variablen konfiguriert.",
+              "add": "Variable hinzufügen",
+              "items": {
+                "key": {
+                  "label": "Schlüssel",
+                  "helpText": "Bezeichner dieser Variable. Buchstaben, Ziffern, Punkt, Bindestrich und Unterstrich erlaubt."
+                },
+                "value": {
+                  "label": "Wert-Vorlage",
+                  "helpText": "Handlebars-Vorlage. Nutzlast referenzieren mit \\{{path.to.field}}, vorhandene Variablen mit \\{{variables.KEY}}. Reiner Text ohne \\{{ }} wird unverändert übernommen.",
+                  "docsUrl": "https://handlebarsjs.com/guide/expressions.html",
+                  "docsLabel": "Handlebars-Syntax-Referenz"
+                },
+                "scope": {
+                  "label": "Geltungsbereich",
+                  "helpText": "Ressource: nur diese Ressource sieht den Wert. Global: über alle Ressourcen geteilt.",
+                  "enum": {
+                    "resource": "Ressource",
+                    "global": "Global"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "get": {
+          "title": "Variablen lesen",
+          "description": "Liest Flow-Variablen und schreibt sie an den konfigurierten Pfaden in das Payload.",
+          "inputs": {
+            "input": "Eingabe"
+          },
+          "outputs": {
+            "output": "Ausgabe"
+          },
+          "preview": {
+            "reads": "Liest"
+          },
+          "config": {
+            "variables": {
+              "label": "Variablen",
+              "empty": "Keine Variablen konfiguriert.",
+              "add": "Variable hinzufügen",
+              "items": {
+                "key": {
+                  "label": "Schlüssel",
+                  "helpText": "Zu lesende Variable."
+                },
+                "scope": {
+                  "label": "Geltungsbereich",
+                  "helpText": "Ressource: nur Variablen dieser Ressource. Global: über alle Ressourcen geteilt.",
+                  "enum": {
+                    "resource": "Ressource",
+                    "global": "Global"
+                  }
+                },
+                "payloadPath": {
+                  "label": "Nutzlast-Pfad",
+                  "helpText": "Punktpfad in der Nutzlast, an den der Wert geschrieben wird, z. B. user.email."
+                }
+              }
+            }
           }
         }
       }

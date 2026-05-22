@@ -3,7 +3,8 @@
   "subtitle": "Mit Flows kannst du Arbeitsabläufe für deine Ressourcen automatisieren und beispielsweise Smarte Steckdosen oder Lampen ansteuern.",
   "actions": {
     "export": "Exportieren",
-    "import": "Importieren"
+    "import": "Importieren",
+    "variables": "Variablen"
   },
   "export": {
     "success": {
