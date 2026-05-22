@@ -26,6 +26,7 @@
   "actions": {
     "close": "Close",
     "cancel": "Cancel",
-    "save": "Save Changes"
+    "save": "Save Changes",
+    "expand": "Expand editor"
   }
 }

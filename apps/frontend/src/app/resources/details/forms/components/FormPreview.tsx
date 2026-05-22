@@ -1,4 +1,4 @@
-import { Card, Input, TextArea } from "@heroui/react";
+import { Input, TextArea } from "@heroui/react";
 import { Select } from '../../../../../components/select';
 import { LabeledSwitch } from '../../../../../components/labeledSwitch';
 import { FormFieldType } from '@attraccess/react-query-client';
@@ -12,27 +12,29 @@ interface FormPreviewProps {
 export function FormPreview({ fields, t }: FormPreviewProps) {
   if (!fields.length) {
     return (
-      <Card className="h-full">
-        <Card.Header>
-          <p className="text-sm font-medium text-default-500">{t('preview.empty')}</p>
-        </Card.Header>
-      </Card>
+      <div className="rounded-lg border border-dashed border-default-200 p-6 text-center">
+        <p className="text-sm font-medium text-default-500">{t('preview.empty')}</p>
+      </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      {fields.map((field) => (
-        <Card key={field.id ?? field.name}>
-          <Card.Header className="flex flex-col items-start gap-1 pb-0">
+    <div className="flex flex-col gap-6">
+      {fields.map((field, index) => (
+        <div
+          key={field.id ?? field.name}
+          className="flex flex-col gap-2 pt-6 border-t border-default-200 first:pt-0 first:border-t-0"
+          data-cy={`form-preview-field-${index}`}
+        >
+          <div className="flex flex-col items-start gap-1">
             <p className="text-base font-semibold text-default-700">
               {field.name}
               {field.isRequired && <span className="text-danger-500 ml-1">*</span>}
             </p>
             {field.description && <p className="text-sm text-default-500">{field.description}</p>}
-          </Card.Header>
-          <Card.Content className="pt-2">{renderPreviewField(field, t)}</Card.Content>
-        </Card>
+          </div>
+          {renderPreviewField(field, t)}
+        </div>
       ))}
     </div>
   );

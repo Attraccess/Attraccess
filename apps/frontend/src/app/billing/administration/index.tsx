@@ -5,7 +5,7 @@ import de from './de.json';
 import { ManualTransactionsCard } from './manualTransactions';
 import { useState } from 'react';
 import { User } from '@attraccess/react-query-client';
-import { Button, Card } from '@heroui/react';
+import { Button } from '@heroui/react';
 import { useNavigate } from 'react-router-dom';
 import { SummaryCard } from '../dashboard/summary';
 import { SumUpIcon } from '../../../components/icons/sumup.icon';
@@ -32,14 +32,10 @@ export function BillingAdministrationPage() {
       />
 
       <div className="flex flex-row flex-wrap gap-4">
-        <Card className="flex-grow">
-          <Card.Header>
-            <PageHeader title={t('inputs.user')} noMargin />
-          </Card.Header>
-          <Card.Content>
-            <UserSearch onSelectionChange={setUser} />
-          </Card.Content>
-        </Card>
+        <section className="flex-grow w-full flex flex-col gap-4">
+          <PageHeader title={t('inputs.user')} noMargin />
+          <UserSearch onSelectionChange={setUser} />
+        </section>
 
         {user && (
           <>

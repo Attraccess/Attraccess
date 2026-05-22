@@ -1,4 +1,7 @@
 {
+  "sections": {
+    "details": "Details"
+  },
   "form": {
     "title": "Details",
     "subtitle": "Edit the group name and description",

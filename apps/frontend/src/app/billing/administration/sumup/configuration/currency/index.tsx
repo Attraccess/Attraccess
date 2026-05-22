@@ -7,9 +7,10 @@ import {
   useBillingServiceGetBillingConfigurationKey,
   useBillingServiceSetBillingConfiguration,
 } from '@attraccess/react-query-client';
-import { Button, Card, CardProps, Form } from '@heroui/react';
+import { Button, Form } from '@heroui/react';
 import { PageHeader } from '../../../../../../components/pageHeader';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { ComponentPropsWithoutRef, useCallback, useEffect, useRef, useState } from 'react';
+import { twMerge } from 'tailwind-merge';
 import { useToastMessage } from '../../../../../../components/toastProvider';
 import { useQueryClient } from '@tanstack/react-query';
 import { EuroIcon } from 'lucide-react';
@@ -17,7 +18,8 @@ import { Select } from '../../../../../../components/select';
 import API_ERROR_TRANSLATIONS_DE from '../../../../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../../../global-translations/api-errors.en.json';
 
-export function CurrencyCard(props: Omit<CardProps, 'children'>) {
+export function CurrencyCard(props: Omit<ComponentPropsWithoutRef<'section'>, 'children'>) {
+  const { className, ...sectionProps } = props;
   const { t, tExists } = useTranslations({
     en: {
       ...en,
@@ -74,38 +76,41 @@ export function CurrencyCard(props: Omit<CardProps, 'children'>) {
   }, [setConfiguration, currency]);
 
   return (
-    <Card {...props}>
-      <Card.Header>
-        <PageHeader icon={<EuroIcon size={20} />} title={t('title')} subtitle={t('subtitle')} noMargin />
-      </Card.Header>
-      <Card.Content>
-        <Form
-          onSubmit={(e) => {
-            e.preventDefault();
-            onSubmitConfiguration();
-          }}
-          ref={configFormRef}
-          className="flex flex-col gap-4"
-        >
-          <Select
-            items={Object.values(Currency).map((currency) => ({
-              key: currency,
-              label: currency,
-            }))}
-            label={t('inputs.currency.label')}
-            value={currency}
-            onChange={(key) => setCurrency(key as Currency)}
-          />
+    <section
+      {...sectionProps}
+      className={twMerge(
+        'w-full flex flex-col gap-4 pt-6 border-t border-default-200 first:pt-0 first:border-t-0 @xl:pt-0 @xl:border-t-0 @xl:pl-6 @xl:border-l @xl:first:pl-0 @xl:first:border-l-0',
+        className
+      )}
+    >
+      <PageHeader icon={<EuroIcon size={20} />} title={t('title')} subtitle={t('subtitle')} noMargin />
 
-          <input type="submit" hidden />
-        </Form>
+      <Form
+        onSubmit={(e) => {
+          e.preventDefault();
+          onSubmitConfiguration();
+        }}
+        ref={configFormRef}
+        className="flex flex-col gap-4 w-full"
+      >
+        <Select
+          items={Object.values(Currency).map((currency) => ({
+            key: currency,
+            label: currency,
+          }))}
+          label={t('inputs.currency.label')}
+          value={currency}
+          onChange={(key) => setCurrency(key as Currency)}
+        />
 
-        <Card.Footer>
-          <Button variant="primary" onPress={onSubmitConfiguration} isPending={isPendingSetConfiguration}>
-            {t('actions.save')}
-          </Button>
-        </Card.Footer>
-      </Card.Content>
-    </Card>
+        <input type="submit" hidden />
+      </Form>
+
+      <div className="flex justify-end">
+        <Button variant="primary" onPress={onSubmitConfiguration} isPending={isPendingSetConfiguration}>
+          {t('actions.save')}
+        </Button>
+      </div>
+    </section>
   );
 }

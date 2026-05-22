@@ -1,13 +1,15 @@
 import { useMemo } from 'react';
 import {
+  useAccessControlServiceResourceGroupIntroducersGetMany,
+  useAccessControlServiceResourceGroupIntroductionsGetMany,
   useAccessControlServiceResourceIntroducersGetMany,
   useAccessControlServiceResourceIntroductionsGetMany,
 } from '@attraccess/react-query-client';
 import { useHasValidIntroduction } from '../../../hooks/useHasValidIntroduction';
-import { PersonRow } from './types';
+import { PeopleTarget, PersonRow } from './types';
 
 interface Params {
-  resourceId: number;
+  target: PeopleTarget;
 }
 
 interface UsePeopleRowsResult {
@@ -16,18 +18,48 @@ interface UsePeopleRowsResult {
   hasError: boolean;
 }
 
-export function usePeopleRows({ resourceId }: Params): UsePeopleRowsResult {
-  const {
-    data: introducers,
-    error: introducersError,
-    isLoading: isIntroducersLoading,
-  } = useAccessControlServiceResourceIntroducersGetMany({ resourceId });
+export function usePeopleRows({ target }: Params): UsePeopleRowsResult {
+  const isResource = target.type === 'resource';
+  const isGroup = target.type === 'group';
 
   const {
-    data: introductions,
-    error: introductionsError,
-    isLoading: isIntroductionsLoading,
-  } = useAccessControlServiceResourceIntroductionsGetMany({ resourceId });
+    data: resourceIntroducers,
+    error: resourceIntroducersError,
+    isLoading: isResourceIntroducersLoading,
+  } = useAccessControlServiceResourceIntroducersGetMany({ resourceId: target.id }, undefined, { enabled: isResource });
+
+  const {
+    data: resourceIntroductions,
+    error: resourceIntroductionsError,
+    isLoading: isResourceIntroductionsLoading,
+  } = useAccessControlServiceResourceIntroductionsGetMany(
+    { resourceId: target.id },
+    undefined,
+    { enabled: isResource },
+  );
+
+  const {
+    data: groupIntroducers,
+    error: groupIntroducersError,
+    isLoading: isGroupIntroducersLoading,
+  } = useAccessControlServiceResourceGroupIntroducersGetMany({ groupId: target.id }, undefined, { enabled: isGroup });
+
+  const {
+    data: groupIntroductions,
+    error: groupIntroductionsError,
+    isLoading: isGroupIntroductionsLoading,
+  } = useAccessControlServiceResourceGroupIntroductionsGetMany(
+    { groupId: target.id },
+    undefined,
+    { enabled: isGroup },
+  );
+
+  const introducers = isResource ? resourceIntroducers : groupIntroducers;
+  const introductions = isResource ? resourceIntroductions : groupIntroductions;
+  const introducersError = isResource ? resourceIntroducersError : groupIntroducersError;
+  const introductionsError = isResource ? resourceIntroductionsError : groupIntroductionsError;
+  const isIntroducersLoading = isResource ? isResourceIntroducersLoading : isGroupIntroducersLoading;
+  const isIntroductionsLoading = isResource ? isResourceIntroductionsLoading : isGroupIntroductionsLoading;
 
   const userHasValidIntroduction = useHasValidIntroduction({ introductions: introductions ?? [] });
 

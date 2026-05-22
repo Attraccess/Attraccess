@@ -74,47 +74,43 @@ export function ResetPassword() {
   }
 
   return (
-    <Card data-cy="reset-password-form-card">
+    <div className="min-h-screen flex items-center justify-center px-4 py-8">
       <Form
         onSubmit={(e) => {
           e.preventDefault();
           onMainButtonPress();
         }}
+        className="max-w-md w-full gap-4"
         data-cy="reset-password-form"
       >
-        <Card.Header>{t('title')}</Card.Header>
-        <Card.Content>
-          <PasswordInput
-            label={t('inputs.password')}
-            value={password}
-            onChange={(setPassword)}
-            className="mb-4"
-            minLength={8}
-            required
-            data-cy="reset-password-password-input"
-            autoComplete="new-password"
-          />
-          <PasswordInput
-            label={t('inputs.confirmPassword')}
-            value={confirmPassword}
-            onChange={(setConfirmPassword)}
-            required
-            validate={() => {
-              if (password !== confirmPassword) {
-                return t('error.passwordsDoNotMatch.description');
-              }
-              return true;
-            }}
-            data-cy="reset-password-confirm-password-input"
-            autoComplete="new-password"
-          />
-        </Card.Content>
-        <Card.Footer>
-          <Button variant="primary" className="w-full" type="submit" data-cy="reset-password-submit-button">
-            {t('submit')}
-          </Button>
-        </Card.Footer>
+        <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">{t('title')}</h3>
+        <PasswordInput
+          label={t('inputs.password')}
+          value={password}
+          onChange={setPassword}
+          minLength={8}
+          required
+          data-cy="reset-password-password-input"
+          autoComplete="new-password"
+        />
+        <PasswordInput
+          label={t('inputs.confirmPassword')}
+          value={confirmPassword}
+          onChange={setConfirmPassword}
+          required
+          validate={() => {
+            if (password !== confirmPassword) {
+              return t('error.passwordsDoNotMatch.description');
+            }
+            return true;
+          }}
+          data-cy="reset-password-confirm-password-input"
+          autoComplete="new-password"
+        />
+        <Button variant="primary" className="w-full mt-2" type="submit" data-cy="reset-password-submit-button">
+          {t('submit')}
+        </Button>
       </Form>
-    </Card>
+    </div>
   );
 }

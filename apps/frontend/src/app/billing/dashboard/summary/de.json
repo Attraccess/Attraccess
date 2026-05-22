@@ -4,6 +4,7 @@
   "transactions": {
     "table": {
       "ariaLabel": "Transaktionen",
+      "empty": "Noch keine Transaktionen.",
       "columns": {
         "id": "ID",
         "dateTime": "Datum",

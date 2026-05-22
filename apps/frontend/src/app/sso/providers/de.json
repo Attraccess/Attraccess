@@ -22,6 +22,16 @@
   "failedToDelete": "Fehler beim Löschen des SSO-Anbieters.",
   "oidcConfiguration": "OIDC-Konfiguration",
   "samlConfiguration": "SAML-Konfiguration",
+  "sections": {
+    "provider": "Anbieter",
+    "oidcEndpoints": "OIDC-Endpunkte",
+    "oidcCredentials": "Client-Zugangsdaten",
+    "oidcClaims": "Claim-Zuordnung",
+    "samlIdentityProvider": "Identity Provider",
+    "samlAttributes": "Attribut-Zuordnung",
+    "samlProvisioning": "Provisioning",
+    "samlSigning": "Service-Provider-Signierung"
+  },
   "issuer": "Aussteller",
   "entryPoint": "Entry Point",
   "authorizationURL": "Autorisierungs-URL",

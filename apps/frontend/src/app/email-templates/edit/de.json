@@ -26,6 +26,7 @@
   "actions": {
     "close": "Schließen",
     "cancel": "Abbrechen",
-    "save": "Änderungen speichern"
+    "save": "Änderungen speichern",
+    "expand": "Editor vergrößern"
   }
 }
