@@ -4,11 +4,20 @@
   },
   "inputs": {
     "columns": {
-      "label": "Spalten"
+      "label": "Spalten",
+      "search": "Spalten suchen",
+      "selectAll": "Alle",
+      "selectNone": "Keine",
+      "selectedCount": "{{selected}} / {{total}} ausgewählt"
     }
+  },
+  "preview": {
+    "title": "Vorschau (erste {{n}})",
+    "rowCount": "{{count}} Datensätze gesamt"
   },
   "actions": {
     "refetch": "Aktualisieren",
-    "downloadCsv": "CSV herunterladen"
+    "downloadCsv": "CSV herunterladen",
+    "cancel": "Abbrechen"
   }
 }

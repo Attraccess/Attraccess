@@ -1,5 +1,30 @@
 {
   "title": "CSV Export",
+  "subtitle": "Export usage and billing data as CSV.",
+  "steps": {
+    "range": {
+      "title": "Pick a date range",
+      "description": "Select a preset or define a custom range."
+    },
+    "type": {
+      "title": "Choose export",
+      "description": "Pick the export type you want to generate."
+    }
+  },
+  "presets": {
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "last7d": "Last 7 days",
+    "last30d": "Last 30 days",
+    "thisMonth": "This month",
+    "lastMonth": "Last month",
+    "thisYear": "This year",
+    "custom": "Custom"
+  },
+  "range": {
+    "summary": "{{start}} – {{end}} · {{days}} days",
+    "empty": "No range selected"
+  },
   "rangeCalendar": {
     "label": "Date Range",
     "selection": {
@@ -12,13 +37,21 @@
     "modal": {
       "subtitle": "from {{start}} to {{end}}"
     },
+    "card": {
+      "estimatedRows": "~{{count}} rows",
+      "estimatedRowsLoading": "Loading…",
+      "requireRange": "Pick a date range first",
+      "cta": "Configure & Export"
+    },
     "resourceUsageHours": {
       "button": "Export Resource Usage",
-      "title": "Resource Usage"
+      "title": "Resource Usage",
+      "description": "Bookings and usage hours per resource."
     },
     "billingTransactions": {
       "button": "Export Billing Transactions",
-      "title": "Billing Transactions"
+      "title": "Billing Transactions",
+      "description": "Payments, refunds and status per user."
     }
   }
 }
