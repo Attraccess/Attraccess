@@ -1,13 +1,8 @@
 import { memo } from 'react';
 import {
-  Modal,
-  ModalBackdrop,
-  ModalBody,
-  ModalContainer,
-  ModalDialog,
-  ModalFooter,
-  ModalHeader,
-  ModalHeading,
+  DrawerBody,
+  DrawerFooter,
+  DrawerHeader,
   Button,
   Spinner,
   TextArea,
@@ -18,6 +13,7 @@ import en from './translations/en';
 import de from './translations/de';
 import { DateTimeDisplay } from '@attraccess/plugins-frontend-ui';
 import { ProjectsSelect } from '../../../../../components/projectsSelect';
+import { StandardDrawer } from '../../../../../components/standardDrawer';
 import { useAuth } from '../../../../../hooks/useAuth';
 
 interface UsageNotesModalProps {
@@ -48,78 +44,68 @@ export const UsageNotesModal = memo(
     if (!isOpen) return null;
 
     return (
-      <Modal
+      <StandardDrawer
         isOpen={isOpen}
         onOpenChange={(open) => {
           if (!open) onClose();
         }}
       >
-        <ModalBackdrop>
-          <ModalContainer size="md">
-            <ModalDialog>
-              {({ close }) => (
-                <>
-                  <ModalHeader className="flex flex-col gap-1">
-                    <ModalHeading>{t('sessionNotes')}</ModalHeading>
-                  </ModalHeader>
-                  <ModalBody>
-                    {session ? (
-                      <div className="space-y-4">
-                        {session.usageAction === ResourceUsageAction.USAGE && projectLabel && projectPlaceholder && (
-                          <div className="space-y-2">
-                            <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">{projectLabel}</p>
-                            {session.endTime && session.userId === user?.id && resolveProjectId && onProjectChange ? (
-                              <ProjectsSelect
-                                label={t('projectSelectLabel')}
-                                value={resolveProjectId(session)}
-                                onChange={(projectId) => onProjectChange(session, projectId)}
-                                placeholder={projectPlaceholder}
-                                includeUnassignedOption
-                                unassignedLabel={projectPlaceholder}
-                                isDisabled={Boolean(updatingSessionIds?.[session.id])}
-                              />
-                            ) : (
-                              <p className="text-sm text-default-500">{session.project?.name ?? projectPlaceholder}</p>
-                            )}
-                          </div>
-                        )}
-
-                        <TextArea value={session.startNotes || t('noNotesProvided')} readOnly />
-
-                        {session.endTime && <TextArea value={session.endNotes || t('noNotesProvided')} readOnly />}
-
-                        <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                          <p>
-                            {t('sessionStarted')}: <DateTimeDisplay date={session.startTime} />
-                          </p>
-                          {session.endTime && (
-                            <p>
-                              {t('sessionEnded')}: <DateTimeDisplay date={session.endTime} />
-                            </p>
-                          )}
-                        </div>
-                        <div className="space-y-2">
-                          <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">{t('formsTitle')}</p>
-                          {renderFormSubmissions(session, t)}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex justify-center py-4">
-                        <Spinner color="accent" />
-                      </div>
-                    )}
-                  </ModalBody>
-                  <ModalFooter>
-                    <Button variant="ghost" onPress={onClose}>
-                      {t('close')}
-                    </Button>
-                  </ModalFooter>
-                </>
+        <DrawerHeader>
+          <h2 className="text-lg font-semibold">{t('sessionNotes')}</h2>
+        </DrawerHeader>
+        <DrawerBody>
+          {session ? (
+            <div className="space-y-4">
+              {session.usageAction === ResourceUsageAction.USAGE && projectLabel && projectPlaceholder && (
+                <div className="space-y-2">
+                  <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">{projectLabel}</p>
+                  {session.endTime && session.userId === user?.id && resolveProjectId && onProjectChange ? (
+                    <ProjectsSelect
+                      label={t('projectSelectLabel')}
+                      value={resolveProjectId(session)}
+                      onChange={(projectId) => onProjectChange(session, projectId)}
+                      placeholder={projectPlaceholder}
+                      includeUnassignedOption
+                      unassignedLabel={projectPlaceholder}
+                      isDisabled={Boolean(updatingSessionIds?.[session.id])}
+                    />
+                  ) : (
+                    <p className="text-sm text-default-500">{session.project?.name ?? projectPlaceholder}</p>
+                  )}
+                </div>
               )}
-            </ModalDialog>
-          </ModalContainer>
-        </ModalBackdrop>
-      </Modal>
+
+              <TextArea value={session.startNotes || t('noNotesProvided')} readOnly />
+
+              {session.endTime && <TextArea value={session.endNotes || t('noNotesProvided')} readOnly />}
+
+              <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                <p>
+                  {t('sessionStarted')}: <DateTimeDisplay date={session.startTime} />
+                </p>
+                {session.endTime && (
+                  <p>
+                    {t('sessionEnded')}: <DateTimeDisplay date={session.endTime} />
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">{t('formsTitle')}</p>
+                {renderFormSubmissions(session, t)}
+              </div>
+            </div>
+          ) : (
+            <div className="flex justify-center py-4">
+              <Spinner color="accent" />
+            </div>
+          )}
+        </DrawerBody>
+        <DrawerFooter>
+          <Button variant="ghost" onPress={onClose}>
+            {t('close')}
+          </Button>
+        </DrawerFooter>
+      </StandardDrawer>
     );
   },
 );
