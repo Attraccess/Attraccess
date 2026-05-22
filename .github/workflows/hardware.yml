@@ -36,6 +36,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Typecheck attractap-hw-shared
+        run: pnpm nx run attractap-hw-shared:typecheck
+      - name: Test attractap-hw-shared
+        run: pnpm nx run attractap-hw-shared:test
+      - name: Check CONNECTORS.md is in sync
+        run: pnpm nx run attractap-hw-shared:doc-check
+
       - name: Lint hardware (DRC/ERC)
         run: pnpm nx run-many --target=lint --parallel=3 --projects=tag:scope:hardware
       - name: Build hardware (circuit JSON)
