@@ -228,7 +228,7 @@ histogram_quantile(0.95, sum by (target, operation, le) (rate(attraccess_externa
 
 **Duration buckets:** 10ms, 50ms, 100ms, 250ms, 500ms, 1s, 2.5s, 5s, 10s, 30s, 1min
 
-`trigger_type` and `node_type` are values from the `ResourceFlowNodeType` enum (e.g. `input.button`, `output.http.sendRequest`).
+`trigger_type` and `node_type` are values from the `ResourceFlowNodeType` enum (e.g. `manual.button`, `http.send-request`).
 
 ### Example PromQL Queries
 
