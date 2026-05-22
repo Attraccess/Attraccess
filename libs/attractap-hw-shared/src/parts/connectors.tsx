@@ -21,7 +21,7 @@ export type JstPh125_3P_Props = BasePartProps;
 export const JstPh125_3P = ({ name, pn, ...rest }: JstPh125_3P_Props) => (
   <pinheader
     name={name}
-    footprint="pinrow3_p1.25_id0.7_od1.3"
+    footprint="pinrow3_p1.25_id0.6_od1.0"
     pinCount={3}
     gender="male"
     supplierPartNumbers={jlcSupplier(pn)}
@@ -34,7 +34,7 @@ export type JstPh125_4P_Props = BasePartProps;
 export const JstPh125_4P = ({ name, pn, ...rest }: JstPh125_4P_Props) => (
   <pinheader
     name={name}
-    footprint="pinrow4_p1.25_id0.7_od1.3"
+    footprint="pinrow4_p1.25_id0.6_od1.0"
     pinCount={4}
     gender="male"
     supplierPartNumbers={jlcSupplier(pn)}

@@ -29,12 +29,12 @@ apps/attractap/hardware/
   README.md                    # this file
   scripts/
     render-png.mjs             # shared SVG → PNG converter
-  _placeholder/                # one-LED smoke-test board (remove once Beeper lands)
+  beeper/                      # Phase 1.5 pipeline-proof board (PWM buzzer)
     index.tsx                  # tscircuit JSX entry
     project.json               # nx targets
     package.json               # project marker
     tsconfig.json
-  <board>/                     # one directory per real board (Phase 1.5+)
+  <board>/                     # one directory per real board (Phase 2+)
 ```
 
 The connector pinouts and JLC-parts wrappers shared by every board live in
@@ -68,12 +68,12 @@ pnpm nx affected -t lint,build,export,render
 ## Adding a new board
 
 1. Create `apps/attractap/hardware/<board>/`.
-2. Copy `_placeholder/{project.json,package.json,tsconfig.json,index.tsx}` and
+2. Copy `beeper/{project.json,package.json,tsconfig.json,index.tsx}` and
    rename:
    - `package.json` `name` → `@attraccess/attractap-hw-<board>`.
    - `project.json` `name` → `attractap-hw-<board>`, `sourceRoot` →
      `apps/attractap/hardware/<board>`, each `cwd` → same path.
-   - swap every `_placeholder` filename token for `<board>`.
+   - swap every `beeper` filename token for `<board>`.
 3. Tag the project with `scope:hardware` and `type:board`. Add `type:hw-lib`
    instead if you're authoring a library, not a fabricated board.
 4. Run `pnpm install` once so pnpm picks up the new workspace member.

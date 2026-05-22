@@ -1,9 +1,9 @@
 {
-  "name": "attractap-hw-placeholder",
+  "name": "attractap-hw-beeper",
   "$schema": "../../../../node_modules/nx/schemas/project-schema.json",
   "projectType": "application",
-  "sourceRoot": "apps/attractap/hardware/_placeholder",
-  "tags": ["scope:hardware", "type:board", "placeholder"],
+  "sourceRoot": "apps/attractap/hardware/beeper",
+  "tags": ["scope:hardware", "type:board"],
   "targets": {
     "lint": {
       "executor": "nx:run-commands",
@@ -11,7 +11,7 @@
       "inputs": ["{projectRoot}/index.tsx", "{projectRoot}/tscircuit.config.json"],
       "outputs": [],
       "options": {
-        "cwd": "apps/attractap/hardware/_placeholder",
+        "cwd": "apps/attractap/hardware/beeper",
         "command": "pnpm exec tscircuit-cli build index.tsx --ignore-warnings"
       }
     },
@@ -21,10 +21,10 @@
       "inputs": ["{projectRoot}/index.tsx", "{projectRoot}/tscircuit.config.json"],
       "outputs": ["{projectRoot}/dist/build"],
       "options": {
-        "cwd": "apps/attractap/hardware/_placeholder",
+        "cwd": "apps/attractap/hardware/beeper",
         "commands": [
           "rm -rf dist/build && mkdir -p dist/build",
-          "pnpm exec tscircuit-cli export index.tsx -f circuit-json -o dist/build/_placeholder.circuit.json"
+          "pnpm exec tscircuit-cli export index.tsx -f circuit-json -o dist/build/beeper.circuit.json"
         ],
         "parallel": false
       }
@@ -36,10 +36,10 @@
       "inputs": ["{projectRoot}/index.tsx", "{projectRoot}/tscircuit.config.json"],
       "outputs": ["{projectRoot}/dist/export"],
       "options": {
-        "cwd": "apps/attractap/hardware/_placeholder",
+        "cwd": "apps/attractap/hardware/beeper",
         "commands": [
           "rm -rf dist/export && mkdir -p dist/export",
-          "pnpm exec tscircuit-cli export index.tsx -f gerbers -o dist/export/_placeholder-gerbers.zip"
+          "pnpm exec tscircuit-cli export index.tsx -f gerbers -o dist/export/beeper-gerbers.zip"
         ],
         "parallel": false
       }
@@ -51,13 +51,13 @@
       "inputs": ["{projectRoot}/index.tsx", "{projectRoot}/tscircuit.config.json"],
       "outputs": ["{projectRoot}/dist/render"],
       "options": {
-        "cwd": "apps/attractap/hardware/_placeholder",
+        "cwd": "apps/attractap/hardware/beeper",
         "commands": [
           "rm -rf dist/render && mkdir -p dist/render",
-          "pnpm exec tscircuit-cli export index.tsx -f pcb-svg -o dist/render/_placeholder-pcb.svg",
-          "pnpm exec tscircuit-cli export index.tsx -f schematic-svg -o dist/render/_placeholder-schematic.svg",
-          "pnpm exec tscircuit-cli export index.tsx -f assembly-svg -o dist/render/_placeholder-assembly.svg",
-          "node ../scripts/render-png.mjs --out-dir dist/render dist/render/_placeholder-pcb.svg dist/render/_placeholder-schematic.svg dist/render/_placeholder-assembly.svg"
+          "pnpm exec tscircuit-cli export index.tsx -f pcb-svg -o dist/render/beeper-pcb.svg",
+          "pnpm exec tscircuit-cli export index.tsx -f schematic-svg -o dist/render/beeper-schematic.svg",
+          "pnpm exec tscircuit-cli export index.tsx -f assembly-svg -o dist/render/beeper-assembly.svg",
+          "node ../scripts/render-png.mjs --out-dir dist/render dist/render/beeper-pcb.svg dist/render/beeper-schematic.svg dist/render/beeper-assembly.svg"
         ],
         "parallel": false
       }
