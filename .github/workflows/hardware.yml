@@ -36,6 +36,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Install Playwright Chromium (for 3D PNG render)
+        run: pnpm --filter @attraccess/attractap-hw-beeper exec playwright install --with-deps chromium
+
       - name: Typecheck hardware libs
         run: pnpm nx run-many --target=typecheck --parallel=3 --projects=tag:scope:hardware
       - name: Test hardware libs
@@ -59,7 +62,7 @@ jobs:
         if: always()
         with:
           name: hardware-3d-${{ github.event.pull_request.number }}-${{ github.run_attempt }}
-          path: apps/attractap/hardware/**/dist/render-3d/*.{glb,step}
+          path: apps/attractap/hardware/**/dist/render-3d/*.{glb,step,png}
           if-no-files-found: warn
           retention-days: 30
 
@@ -88,7 +91,7 @@ jobs:
           set -euo pipefail
           shopt -s nullglob globstar
           list_file="$(mktemp)"
-          for png in apps/attractap/hardware/**/dist/render/*.png; do
+          for png in apps/attractap/hardware/**/dist/render/*.png apps/attractap/hardware/**/dist/render-3d/*.png; do
             board="$(basename "$(dirname "$(dirname "$(dirname "$png")")")")"
             echo "${board}|$(basename "$png")|${png}" >> "$list_file"
           done

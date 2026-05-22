@@ -51,7 +51,7 @@ Every board exposes the same four targets. Run any of them with
 | `build` | `tscircuit-cli export -f circuit-json` | `<board>/dist/build/<board>.circuit.json` |
 | `export` | `tscircuit-cli export -f gerbers` + `validate-bom.mjs` | `<board>/dist/export/<board>-gerbers.zip` (gerbers, drill, `bom.csv`, `pick_and_place.csv` — drop-in JLCPCB SMT order); fails the build if any BOM row is missing a JLCPCB Part # |
 | `render` | `tscircuit-cli export -f pcb-svg/schematic-svg/assembly-svg` + `sharp` | `<board>/dist/render/<board>-{pcb,schematic,assembly}.{svg,png}` |
-| `render-3d` | `tscircuit-cli export -f glb` + `-f step` | `<board>/dist/render-3d/<board>.{glb,step}` — drop the `.glb` into any glTF viewer (e.g. `https://gltf-viewer.donmccurdy.com/`) for a 3D preview |
+| `render-3d` | `tscircuit-cli export -f glb` + `-f step` + Playwright/model-viewer | `<board>/dist/render-3d/<board>.{glb,step,png}` — `.glb` for interactive viewers, `.step` for mech-CAD, `.png` for inline PR previews |
 | `lint` | `tscircuit-cli build --ignore-warnings` | DRC + ERC; non-zero exit on violation |
 
 Run all boards at once:
