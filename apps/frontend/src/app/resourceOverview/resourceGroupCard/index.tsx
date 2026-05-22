@@ -153,7 +153,8 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
                       height={48}
                       width={48}
                       src={filenameToUrl(resource.imageFilename)}
-                      alt={resource.name}
+                      alt=""
+                      aria-hidden="true"
                       className="object-contain"
                       style={{ height: 48, width: 48 }}
                     />
@@ -161,7 +162,7 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
                     <div
                       className="flex items-center justify-center text-default-400"
                       style={{ height: 48, width: 48 }}
-                      aria-label={resource.name}
+                      aria-hidden="true"
                     >
                       <ShapesIcon className="w-6 h-6" />
                     </div>
