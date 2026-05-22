@@ -39,20 +39,20 @@ export function generateRowCells(
         <DateTimeDisplay date={session.endTime} />
       </TableCell>,
       <TableCell key={`duration-${session.id}`} className="whitespace-nowrap">
-        <DurationDisplay
-          minutes={session.usageInMinutes >= 0 ? session.usageInMinutes : null}
-          alternativeText={
-            <Chip color="accent" variant="soft">
-              {t('rows.machine.inProgress')}
-            </Chip>
-          }
-        />
+        <div className="flex items-center gap-2">
+          <DurationDisplay
+            minutes={session.usageInMinutes >= 0 ? session.usageInMinutes : null}
+            alternativeText={
+              <Chip color="accent" variant="soft">
+                {t('rows.machine.inProgress')}
+              </Chip>
+            }
+          />
+          {hasNotes && <MessageSquareText className="w-4 h-4" />}
+        </div>
       </TableCell>,
       <TableCell key={`project-${session.id}`} className="hidden 2xl:table-cell">
         {projectCellRenderer ? projectCellRenderer(session) : session.project?.name}
-      </TableCell>,
-      <TableCell key={`icons-${session.id}`} className="flex items-center gap-2">
-        {hasNotes && <MessageSquareText />}
       </TableCell>,
     );
   } else if (resource.type === 'door') {
