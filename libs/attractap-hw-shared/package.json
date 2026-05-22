@@ -9,6 +9,7 @@
     ".": "./src/index.ts",
     "./connectors": "./src/connectors/index.ts",
     "./parts": "./src/parts/index.tsx",
+    "./util": "./src/util/index.ts",
     "./package.json": "./package.json"
   },
   "dependencies": {

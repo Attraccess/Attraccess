@@ -1,0 +1,9 @@
+{
+  "_meta": "JLC component classifications captured via pcbparts MCP jlc_get_part. Refresh when adding a new PN to any board BOM.",
+  "C20917": { "category": "Transistors/Thyristors", "subcategory": "MOSFETs", "model": "AO3400A" },
+  "C22775": { "category": "Resistors", "subcategory": "Chip Resistor - Surface Mount", "model": "0603WAF1000T5E" },
+  "C25804": { "category": "Resistors", "subcategory": "Chip Resistor - Surface Mount", "model": "0603WAF1002T5E" },
+  "C81598": { "category": "Diodes", "subcategory": "Switching Diodes", "model": "1N4148W" },
+  "C2687681": { "category": "Audio Products / Vibration Motors", "subcategory": "Buzzers", "model": "SEA-1295Y-0520-42Ω-38P6.5" },
+  "C122442": { "category": "Connectors", "subcategory": "Wire To Board Connector", "model": "530470310" }
+}

@@ -38,7 +38,7 @@ PR description.
 
 ## J_PWR_DC
 
-- Footprint: `JST PH 1.25mm 4P`
+- Footprint: `Molex PicoBlade 1.25mm 4P`
 - Pitch: 1.25mm
 - Pin count: 4
 - Power pins (expected): 2
@@ -78,7 +78,7 @@ PR description.
 
 ## J_BEEP
 
-- Footprint: `JST PH 1.25mm 3P`
+- Footprint: `Molex PicoBlade 1.25mm 3P`
 - Pitch: 1.25mm
 - Pin count: 3
 - Power pins (expected): 1
