@@ -69,7 +69,7 @@ export function Layout({ children, noLayout }: LayoutProps) {
 
   if (noLayout) {
     return (
-      <div className="bg-background min-h-screen flex flex-col">
+      <div className="bg-background h-screen flex flex-col overflow-y-auto">
         <ServerNotAvailable />
         {children}
       </div>
