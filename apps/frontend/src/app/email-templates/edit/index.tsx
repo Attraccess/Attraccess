@@ -214,7 +214,7 @@ export function EditEmailTemplatePage() {
           <Editor
             theme={theme === 'dark' ? 'vs-dark' : 'vs-light'}
             defaultLanguage="mjml"
-            defaultValue={body}
+            value={body}
             onChange={(value) => setBody(value ?? '')}
             onMount={handleEditorMount}
           />
