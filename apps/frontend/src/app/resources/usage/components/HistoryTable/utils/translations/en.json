@@ -28,6 +28,7 @@
     },
     "machine": {
       "inProgress": "In Use",
+      "hasNotes": "This session has notes",
       "project": {
         "unassigned": "Unassigned",
         "updateSuccess": "Project updated",
