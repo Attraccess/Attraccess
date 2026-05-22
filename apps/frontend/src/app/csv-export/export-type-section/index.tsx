@@ -29,7 +29,7 @@ export function ExportTypeSection(props: Props) {
         <Card.Description>{t('steps.type.description')}</Card.Description>
       </Card.Header>
       <Card.Content>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <ResourceUsageCard range={range} onPress={() => onOpen('resourceUsageHours')} t={t} />
           <BillingTransactionsCard range={range} onPress={() => onOpen('billingTransactions')} t={t} />
         </div>
