@@ -39,8 +39,10 @@ libs/attractap-hw-shared/
       power.tsx          # AMS1117-3.3, LM74700, MP2315
       connectors.tsx     # B2B 1.27mm, JST PH 1.25mm, FFC 0.5mm
       mcu.tsx            # ESP32-P4-MINI-1, ESP32-C6-MINI-1
-      nfc.tsx            # PN532 module
+      nfc.tsx            # PN532 bare-IC QFN-40 wrapper
       touch.tsx          # GT911
+      leds.tsx           # WS2812 LED wrappers
+      silk.tsx           # AttraccessLogo, BoardLabel, Pin1Marker
     doc-gen/
       generate.ts        # emits CONNECTORS.md from the TS source
 ```
@@ -60,7 +62,7 @@ without regenerating `CONNECTORS.md` fails the check.
 ## Using from a board
 
 ```tsx
-import { J_NFC, assertWiresAllSignals, Pn532Module } from '@attraccess/attractap-hw-shared';
+import { J_NFC, assertWiresAllSignals, Pn532Ic } from '@attraccess/attractap-hw-shared';
 
 const wires = assertWiresAllSignals(J_NFC, {
   '+3V3': 'net.v3v3',
@@ -88,3 +90,27 @@ Omit a required signal and the project fails to compile.
    - notes/voltage/footprint string edits → **patch**
 5. Call out the bump rationale in the PR description so downstream board
    tickets know whether they need to respin.
+
+## Silkscreen policy
+
+Every Attractap board must follow these silk rules so the rendered PCB
+looks identifiable and uncluttered:
+
+1. **No descriptive blurbs.** Do not use `<fabricationnotetext>` to
+   restate what a part is or how it is wired. tscircuit overlays that
+   text onto the board view, and 24 copies of the same blurb destroy
+   readability.
+2. **One board label, top-edge or bottom-edge.** Use `<BoardLabel>` with
+   the project name (e.g. `ATT-350 NFC`) and revision (e.g. `v0`).
+3. **Attraccess logo on every board.** Use one or two `<AttraccessLogo>`
+   glyphs in free silk areas. Default scale 1.0 gives roughly a 4 mm
+   tall keyhole, scale to fit the available zone.
+4. **Pin-1 markers on every multi-pin connector.** Use `<Pin1Marker>`
+   placed at the pin-1 pad coordinate. Refdes alone is not enough — a
+   tech rotating the connector in a hurry needs a polarity dot.
+5. **Hide refdes on high-density part arrays.** WS2812 ring, breakout
+   pad arrays, etc. set `silkscreenTextVisibility="hidden"`. Refdes
+   stays on assembly drawing where it belongs.
+6. **Per-part silk outlines belong on the part wrapper**, not the
+   board. WS2812 outlines, antenna body box, buzzer circle all live in
+   the shared lib so every board gets the same silk for the same part.

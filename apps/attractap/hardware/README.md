@@ -29,12 +29,12 @@ apps/attractap/hardware/
   README.md                    # this file
   scripts/
     render-png.mjs             # shared SVG → PNG converter
-  _placeholder/                # one-LED smoke-test board (remove once Beeper lands)
+  beeper/                      # Phase 1.5 pipeline-proof board (PWM buzzer)
     index.tsx                  # tscircuit JSX entry
     project.json               # nx targets
     package.json               # project marker
     tsconfig.json
-  <board>/                     # one directory per real board (Phase 1.5+)
+  <board>/                     # one directory per real board (Phase 2+)
 ```
 
 The connector pinouts and JLC-parts wrappers shared by every board live in
@@ -49,31 +49,51 @@ Every board exposes the same four targets. Run any of them with
 | Target | Command | Output |
 |--------|---------|--------|
 | `build` | `tscircuit-cli export -f circuit-json` | `<board>/dist/build/<board>.circuit.json` |
-| `export` | `tscircuit-cli export -f gerbers` | `<board>/dist/export/<board>-gerbers.zip` (gerbers, drill, `bom.csv`, `pick_and_place.csv` — drop-in JLCPCB SMT order) |
+| `export` | `tscircuit-cli export -f gerbers` + `validate-bom.mjs` | `<board>/dist/export/<board>-gerbers.zip` (gerbers, drill, `bom.csv`, `pick_and_place.csv` — drop-in JLCPCB SMT order); fails the build if any BOM row is missing a JLCPCB Part # |
 | `render` | `tscircuit-cli export -f pcb-svg/schematic-svg/assembly-svg` + `sharp` | `<board>/dist/render/<board>-{pcb,schematic,assembly}.{svg,png}` |
+| `render-3d` | `tscircuit-cli export -f glb` + `-f step` + Playwright/model-viewer | `<board>/dist/render-3d/<board>.{glb,step,png}` — `.glb` for interactive viewers, `.step` for mech-CAD, `.png` for inline PR previews |
 | `lint` | `tscircuit-cli build --ignore-warnings` | DRC + ERC; non-zero exit on violation |
 
 Run all boards at once:
 
 ```bash
-pnpm nx run-many -t lint,build,export,render --projects=tag:scope:hardware
+pnpm nx run-many -t lint,build,export,render,render-3d --projects=tag:scope:hardware
 ```
 
 Affected only (mirrors CI):
 
 ```bash
-pnpm nx affected -t lint,build,export,render
+pnpm nx affected -t lint,build,export,render,render-3d
+```
+
+## Coordinate system gotcha
+
+`mech-envelope.md` documents per-board outlines and mounting-hole positions
+**in a bottom-left-origin frame** (so the Beeper holes are at `(3, 3)` and
+`(12, 12)` on the 15 × 15 mm outline). tscircuit's `<board>` element however
+places `pcbX/pcbY={0, 0}` at the geometric **centre** of the outline.
+
+Don't paste mech-envelope coords directly into `pcbX`/`pcbY` — they will sit
+outside the board. Use the `boardCoord` helper from
+`@attraccess/attractap-hw-shared`:
+
+```tsx
+import { boardCoord } from '@attraccess/attractap-hw-shared';
+
+const at = (x: number, y: number) => boardCoord({ x, y, boardW: 15, boardH: 15 });
+
+<R0603 name="R1" resistance="100" pn="C22775" {...at(3, 3)} />
 ```
 
 ## Adding a new board
 
 1. Create `apps/attractap/hardware/<board>/`.
-2. Copy `_placeholder/{project.json,package.json,tsconfig.json,index.tsx}` and
+2. Copy `beeper/{project.json,package.json,tsconfig.json,index.tsx}` and
    rename:
    - `package.json` `name` → `@attraccess/attractap-hw-<board>`.
    - `project.json` `name` → `attractap-hw-<board>`, `sourceRoot` →
      `apps/attractap/hardware/<board>`, each `cwd` → same path.
-   - swap every `_placeholder` filename token for `<board>`.
+   - swap every `beeper` filename token for `<board>`.
 3. Tag the project with `scope:hardware` and `type:board`. Add `type:hw-lib`
    instead if you're authoring a library, not a fabricated board.
 4. Run `pnpm install` once so pnpm picks up the new workspace member.

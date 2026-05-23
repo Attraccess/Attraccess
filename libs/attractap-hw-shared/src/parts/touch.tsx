@@ -18,7 +18,5 @@ export const Gt911 = ({ name, pn, ...rest }: Gt911Props) => (
       pin7: ['RESET'],
     }}
     {...rest}
-  >
-    <fabricationnotetext text="GT911 capacitive touch controller" />
-  </chip>
+  />
 );
