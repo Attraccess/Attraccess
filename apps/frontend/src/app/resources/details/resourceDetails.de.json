@@ -6,15 +6,22 @@
       "backToResources": "Zurück zu Ressourcen"
     }
   },
-  "navItems": {
+  "tabs": {
+    "overview": "Übersicht",
+    "history": "Verlauf",
+    "people": "Personen",
+    "groups": "Gruppen",
+    "maintenance": "Wartung",
     "flows": "Flows",
-    "forms": "Formulare"
+    "forms": "Formulare",
+    "mobilePickerLabel": "Bereich"
   },
   "actions": {
     "edit": "Bearbeiten",
     "delete": "Löschen",
     "documentation": "Dokumentation",
     "maintenance": "Wartung",
-    "qrCode": "QR-Code"
+    "qrCode": "QR-Code",
+    "moreLabel": "Weitere Aktionen"
   }
 }
