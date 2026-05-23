@@ -1,5 +1,6 @@
 import { PageHeader } from '../../components/pageHeader';
 import { Button, DrawerBody, DrawerFooter, DrawerHeader, useOverlayState } from '@heroui/react';
+import { AlertTriangleIcon, ShieldIcon, UserIcon } from 'lucide-react';
 import { StandardDrawer } from '../../components/standardDrawer';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
@@ -11,6 +12,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { TwoFactorCard } from './two-factor';
 import { useUsersServiceRequestDeleteAccount, ApiError } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../components/toastProvider';
+import { FlatSection } from '../resources/details/flatSection';
 import API_ERROR_TRANSLATIONS_EN from '../../global-translations/api-errors.en.json';
 import API_ERROR_TRANSLATIONS_DE from '../../global-translations/api-errors.de.json';
 
@@ -46,40 +48,31 @@ export default function AccountPage() {
     <div>
       <PageHeader title={t('title')} backTo="/" />
 
-      <div className="flex flex-col gap-8">
-        <section className="w-full max-w-md flex flex-col gap-6">
-          <header className="border-b border-divider pb-2">
-            <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
-              {t('sections.profile')}
-            </h3>
-          </header>
-          <EmailForm />
-          <UsernameForm />
-        </section>
-
-        <section className="w-full max-w-md flex flex-col gap-6">
-          <header className="border-b border-divider pb-2">
-            <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
-              {t('sections.security')}
-            </h3>
-          </header>
-          {me && <SetPasswordForm userId={me.id} username={me.username} />}
-          {me && <TwoFactorCard />}
-        </section>
-
-        <section className="w-full max-w-md flex flex-col gap-4">
-          <header className="border-b border-divider pb-2">
-            <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
-              {t('sections.dangerZone')}
-            </h3>
-          </header>
-          <p className="text-sm text-default-500">{t('deleteAccount.description')}</p>
-          <div>
-            <Button variant="danger-soft" onPress={open} data-cy="delete-account-open-modal">
-              {t('deleteAccount.actions.request')}
-            </Button>
+      <div className="w-full max-w-2xl flex flex-col gap-8">
+        <FlatSection icon={<UserIcon size={16} />} title={t('sections.profile')}>
+          <div className="flex flex-col gap-6">
+            <EmailForm />
+            <UsernameForm />
           </div>
-        </section>
+        </FlatSection>
+
+        <FlatSection icon={<ShieldIcon size={16} />} title={t('sections.security')}>
+          <div className="flex flex-col gap-6">
+            {me && <SetPasswordForm userId={me.id} username={me.username} />}
+            {me && <TwoFactorCard />}
+          </div>
+        </FlatSection>
+
+        <FlatSection icon={<AlertTriangleIcon size={16} className="text-danger" />} title={t('sections.dangerZone')}>
+          <div className="flex flex-col gap-4">
+            <p className="text-sm text-default-500">{t('deleteAccount.description')}</p>
+            <div>
+              <Button variant="danger" onPress={open} data-cy="delete-account-open-modal">
+                {t('deleteAccount.actions.request')}
+              </Button>
+            </div>
+          </div>
+        </FlatSection>
       </div>
 
       <StandardDrawer isOpen={isOpen} onOpenChange={setOpen}>
