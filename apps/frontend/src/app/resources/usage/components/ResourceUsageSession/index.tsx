@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { Card, Spinner } from '@heroui/react';
+import { HTMLAttributes, useMemo } from 'react';
+import { Spinner } from '@heroui/react';
 import { Clock } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useAuth } from '../../../../../hooks/useAuth';
@@ -17,13 +17,12 @@ import {
 import en from './translations/en.json';
 import de from './translations/de.json';
 import { MaintenanceInProgressDisplay } from './maintenance';
+import { FlatSection } from '../../../details/flatSection';
 
-type ResourceUsageSessionProps = {
+type ResourceUsageSessionProps = Omit<HTMLAttributes<HTMLElement>, 'children' | 'resource'> & {
   resourceId: number;
   resource: Resource;
   insufficientBalanceDesiredAmount?: number;
-  className?: string;
-  [key: string]: unknown;
 };
 
 export function ResourceUsageSession({
@@ -36,7 +35,6 @@ export function ResourceUsageSession({
   const { hasPermission, user } = useAuth();
   const canManageResources = hasPermission('canManageResources');
 
-  // Check if user has completed the introduction
   const { data: access, isLoading: isLoadingIntroStatus } = useResourcesServiceResourceUsageCanControl(
     { resourceId },
     undefined,
@@ -45,12 +43,10 @@ export function ResourceUsageSession({
     },
   );
 
-  // Get list of users who can give introductions
   const { data: introducers, isLoading: isLoadingIntroducers } = useAccessControlServiceResourceIntroducersGetMany({
     resourceId,
   });
 
-  // Get active session
   const { data: activeSessionResponse, isLoading: isLoadingSession } = useResourcesServiceResourceUsageGetActiveSession(
     { resourceId },
     undefined,
@@ -67,7 +63,6 @@ export function ResourceUsageSession({
     return introducers?.some((introducer) => introducer.userId === user?.id);
   }, [introducers, user]);
 
-  // Users with canManageResources permission can always start a session
   const canStartSession = canManageResources || access?.canControl || isIntroducer;
 
   const { data: activeMaintenances } = useResourceMaintenancesServiceFindMaintenances({
@@ -85,12 +80,9 @@ export function ResourceUsageSession({
     }
 
     if (activeSession) {
-      // Check if the active session belongs to the current user
       if (activeSession.userId === user?.id) {
-        // Current user's active session: Show timer and End button
         return <ActiveSessionDisplay resourceId={resourceId} startTime={activeSession.startTime} />;
       } else {
-        // Active session belongs to another user: Show info message
         return <OtherUserSessionDisplay resourceId={resourceId} />;
       }
     }
@@ -112,14 +104,8 @@ export function ResourceUsageSession({
   };
 
   return (
-    <Card {...rest}>
-      <Card.Header>
-        <div className="flex items-center">
-          <Clock className="w-5 h-5 mr-2" />
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{t('title.' + resource.type)}: </h3>
-        </div>
-      </Card.Header>
-      <Card.Content>{renderContent()}</Card.Content>
-    </Card>
+    <FlatSection icon={<Clock className="w-4 h-4" />} title={t('title.' + resource.type)} {...rest}>
+      {renderContent()}
+    </FlatSection>
   );
 }

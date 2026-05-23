@@ -1,5 +1,5 @@
 import { PageHeader } from '../../components/pageHeader';
-import { Button, Card, DrawerBody, DrawerFooter, DrawerHeader, useOverlayState } from '@heroui/react';
+import { Button, DrawerBody, DrawerFooter, DrawerHeader, useOverlayState } from '@heroui/react';
 import { StandardDrawer } from '../../components/standardDrawer';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
@@ -46,38 +46,40 @@ export default function AccountPage() {
     <div>
       <PageHeader title={t('title')} backTo="/" />
 
-      <div className="flex flex-row flex-wrap gap-4">
-        <Card className="max-w-md">
-          <Card.Header>
-            <PageHeader title={t('sections.profile')} noMargin />
-          </Card.Header>
-          <Card.Content className="flex flex-col gap-6">
-            <EmailForm />
-            <UsernameForm />
-          </Card.Content>
-        </Card>
+      <div className="flex flex-col gap-8">
+        <section className="w-full max-w-md flex flex-col gap-6">
+          <header className="border-b border-divider pb-2">
+            <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
+              {t('sections.profile')}
+            </h3>
+          </header>
+          <EmailForm />
+          <UsernameForm />
+        </section>
 
-        <Card className="max-w-md">
-          <Card.Header>
-            <PageHeader title={t('sections.security')} noMargin />
-          </Card.Header>
-          <Card.Content className="flex flex-col gap-6">
-            {me && <SetPasswordForm userId={me.id} username={me.username} />}
-            {me && <TwoFactorCard />}
-          </Card.Content>
-        </Card>
+        <section className="w-full max-w-md flex flex-col gap-6">
+          <header className="border-b border-divider pb-2">
+            <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
+              {t('sections.security')}
+            </h3>
+          </header>
+          {me && <SetPasswordForm userId={me.id} username={me.username} />}
+          {me && <TwoFactorCard />}
+        </section>
 
-        <Card className="max-w-md">
-          <Card.Header>
-            <PageHeader title={t('sections.dangerZone')} noMargin />
-          </Card.Header>
-          <Card.Content className="flex flex-col gap-4">
-            <p className="text-sm text-default-500">{t('deleteAccount.description')}</p>
+        <section className="w-full max-w-md flex flex-col gap-4">
+          <header className="border-b border-divider pb-2">
+            <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
+              {t('sections.dangerZone')}
+            </h3>
+          </header>
+          <p className="text-sm text-default-500">{t('deleteAccount.description')}</p>
+          <div>
             <Button variant="danger-soft" onPress={open} data-cy="delete-account-open-modal">
               {t('deleteAccount.actions.request')}
             </Button>
-          </Card.Content>
-        </Card>
+          </div>
+        </section>
       </div>
 
       <StandardDrawer isOpen={isOpen} onOpenChange={setOpen}>

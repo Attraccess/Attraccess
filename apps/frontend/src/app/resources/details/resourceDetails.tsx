@@ -200,7 +200,6 @@ function ResourceDetailsComponent() {
             resource={resource}
             data-cy="resource-usage-session"
             insufficientBalanceDesiredAmount={insufficientBalanceDesiredAmount}
-            className="border-l-4 border-l-primary shadow-medium"
           />
 
           <ResourceUsageHistory resourceId={resourceId} data-cy="resource-usage-history" />
