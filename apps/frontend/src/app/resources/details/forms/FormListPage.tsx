@@ -33,7 +33,7 @@ export function FormListPage() {
         subtitle={t('list.subtitle')}
         backTo={`/resources/${resourceId}`}
         actions={
-          <Button variant="primary">
+          <Button variant="primary" onPress={() => navigate(`/resources/${resourceId}/forms/new`)}>
             {t('list.create')}
           </Button>
         }
