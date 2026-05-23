@@ -14,7 +14,7 @@ const LAN8720A_PINS = {
   pin7: ['XTAL2'],
   pin8: ['XTAL1', 'CLKIN'],
   pin9: ['VSS'],
-  pin10: ['VDDIO_NC1'],
+  pin10: ['VDDIO_2'],
   pin11: ['nRST'],
   pin12: ['MDIO'],
   pin13: ['MDC'],
@@ -26,7 +26,7 @@ const LAN8720A_PINS = {
   pin19: ['TXEN'],
   pin20: ['TXD0'],
   pin21: ['TXD1'],
-  pin22: ['VDDIO_NC2'],
+  pin22: ['VDDIO_3'],
   pin23: ['TXP'],
   pin24: ['TXN'],
 } as const;
@@ -41,7 +41,7 @@ export const Lan8720a = ({ name, pn, ...rest }: Lan8720aProps) => (
     supplierPartNumbers={jlcSupplier(pn)}
     {...rest}
   >
-    <fabricationnotetext text="LAN8720A 10/100 Ethernet PHY (RMII)" />
+    <fabricationnotetext text="LAN8720A 10/100 Ethernet PHY (RMII). Parser fp 'qfn24' is stub — JLC EasyEDA footprint sourced via LCSC PN at fab." />
   </chip>
 );
 
@@ -78,7 +78,7 @@ export const Hy931147c = ({ name, pn, ...rest }: Hy931147cProps) => (
     supplierPartNumbers={jlcSupplier(pn)}
     {...rest}
   >
-    <fabricationnotetext text="HY931147C — PoE-rated RJ45 magjack 10/100, 1500Vrms iso (placeholder fp; JLC fetches real magjack)" />
+    <fabricationnotetext text="HY931147C — PoE-rated RJ45 magjack 10/100, 1500Vrms iso. Parser fp 'dip20' is stub — JLC EasyEDA footprint sourced via LCSC PN at fab." />
   </chip>
 );
 
@@ -97,6 +97,6 @@ export const Crystal25M_5032 = ({ name, pn, ...rest }: Crystal25M_5032_Props) =>
     supplierPartNumbers={jlcSupplier(pn)}
     {...rest}
   >
-    <fabricationnotetext text="25 MHz SMD5032 crystal, 20 pF load" />
+    <fabricationnotetext text="25 MHz SMD5032 crystal, 20 pF load. Parser fp 'dip2' is stub — JLC EasyEDA footprint sourced via LCSC PN at fab." />
   </chip>
 );

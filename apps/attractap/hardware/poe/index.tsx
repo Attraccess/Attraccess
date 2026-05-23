@@ -79,6 +79,7 @@ export default () => (
     <R0402 name="R_ILIM" pn="C25744" resistance="22k" tolerance="1%" pcbX={5} pcbY={6} />
     <C0402 name="C_SS" pn="C307331" capacitance="100nF" pcbX={9} pcbY={6} />
     <C0402 name="C_VSS_BIAS" pn="C307331" capacitance="100nF" pcbX={13} pcbY={6} />
+    <C0402 name="C_BLNK" pn="C76947" capacitance="1nF" pcbX={9} pcbY={3} />
 
     <net name="V_OUT_PD" />
 
@@ -96,6 +97,10 @@ export default () => (
     <trace from=".U_PD > .VSS_BIAS" to=".C_VSS_BIAS > .pin1" />
     <trace from=".C_VSS_BIAS > .pin2" to="net.PD_GND" />
     <trace from=".U_PD > .VOUT_PD" to="net.V_OUT_PD" />
+    {/* BLNK — 1nF blanking cap to RTN (TPS2375-family typical) */}
+    <trace from=".U_PD > .BLNK" to=".C_BLNK > .pin1" />
+    <trace from=".C_BLNK > .pin2" to="net.PD_GND" />
+    {/* Unused per WS3203 ref design (802.3af Class 0): T2P, PG, GATE, OCS — left NC */}
 
     {/* ─── MP9486A 100V -> 5V async buck ─────────────────────────────────── */}
     <Mp9486a name="U_BUCK" pn="C404013" pcbX={18} pcbY={0} />
@@ -107,7 +112,7 @@ export default () => (
     <R0402 name="R_FB_TOP" pn="C25789" resistance="51.1k" tolerance="1%" pcbX={26} pcbY={4} />
     <R0402 name="R_FB_BOT" pn="C25744" resistance="10k" tolerance="1%" pcbX={26} pcbY={7} />
     <R0402 name="R_EN" pn="C25776" resistance="100k" tolerance="1%" pcbX={14} pcbY={6} />
-    <C0402 name="C_OUT_HF" pn="C307331" capacitance="22uF" pcbX={29} pcbY={3} />
+    <C0402 name="C_OUT_HF" pn="C307331" capacitance="100nF" pcbX={29} pcbY={3} />
     <ElecCap_22uF_100V name="C_OUT_BULK" pn="C46550391" pcbX={29} pcbY={-3} />
 
     <net name="SW_NODE" />
@@ -198,8 +203,10 @@ export default () => (
     <net name="MDI_RXN" />
     <net name="MDI_TERM_VDDA" />
 
-    {/* PHY supply wiring */}
+    {/* PHY supply wiring — LAN8720A has 3 VDDIO pins (4, 10, 22), all tied to 3V3 */}
     <trace from=".U_PHY > .VDDIO" to="net.V3V3" />
+    <trace from=".U_PHY > .VDDIO_2" to="net.V3V3" />
+    <trace from=".U_PHY > .VDDIO_3" to="net.V3V3" />
     <trace from=".C_VDDIO_HF > .pin1" to="net.V3V3" />
     <trace from=".C_VDDIO_HF > .pin2" to="net.PD_GND" />
     <trace from=".C_VDDIO_LF > .pin1" to="net.V3V3" />

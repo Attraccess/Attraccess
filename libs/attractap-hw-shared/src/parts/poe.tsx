@@ -31,7 +31,7 @@ export const Ws3203 = ({ name, pn, ...rest }: Ws3203Props) => (
     supplierPartNumbers={jlcSupplier(pn)}
     {...rest}
   >
-    <fabricationnotetext text="WS3203 — 802.3af PD interface (NJGW)" />
+    <fabricationnotetext text="WS3203 — 802.3af PD interface (NJGW). Unused pins (T2P/PG/GATE/OCS) NC per ref design." />
   </chip>
 );
 
@@ -77,7 +77,7 @@ export const Mb10s = ({ name, pn, ...rest }: Mb10sProps) => (
     supplierPartNumbers={jlcSupplier(pn)}
     {...rest}
   >
-    <fabricationnotetext text="MB10S — 1kV/1A bridge rectifier (placeholder fp; JLC fetches real MBS)" />
+    <fabricationnotetext text="MB10S — 1kV/1A bridge rectifier. Parser fp 'dip4' is stub — JLC EasyEDA footprint (MBS) sourced via LCSC PN at fab." />
   </chip>
 );
 
