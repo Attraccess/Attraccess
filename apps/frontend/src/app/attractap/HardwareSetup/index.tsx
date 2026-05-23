@@ -1,6 +1,19 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Alert, Button, Modal, ModalBody, ModalContent, ModalHeader, useDisclosure } from '@heroui/react';
-import { PageHeader } from '../../../components/pageHeader';
+import {
+  Alert,
+  AlertContent,
+  AlertDescription,
+  Button,
+  Modal,
+  ModalBackdrop,
+  ModalBody,
+  ModalContainer,
+  ModalDialog,
+  ModalHeader,
+  ModalHeading,
+  useOverlayState,
+} from '@heroui/react';
+import { ArrowLeft } from 'lucide-react';
 import { FirmwareSelector } from './FirmwareSelector';
 import { FirmwareFlasher } from './FirmwareFlasher';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -54,9 +67,13 @@ function Content(props: ContentProps) {
   if (!isConnected) {
     return (
       <div className="flex flex-col gap-4">
-        <Alert color="primary">{t('connect.description')}</Alert>
+        <Alert status="default">
+          <AlertContent>
+            <AlertDescription>{t('connect.description')}</AlertDescription>
+          </AlertContent>
+        </Alert>
 
-        <Button color="primary" onPress={() => espTools.current.connectToDevice()} fullWidth>
+        <Button variant="primary" onPress={() => espTools.current.connectToDevice()} className="w-full">
           {t('connect.button.label')}
         </Button>
       </div>
@@ -66,7 +83,11 @@ function Content(props: ContentProps) {
   if (state === 'init') {
     return (
       <>
-        <Alert color="primary">{t('init.description')}</Alert>
+        <Alert status="default">
+          <AlertContent>
+            <AlertDescription>{t('init.description')}</AlertDescription>
+          </AlertContent>
+        </Alert>
 
         <Button onPress={() => setState('select')}>{t('init.actions.selectFirmware')}</Button>
 
@@ -112,13 +133,13 @@ export function AttractapHardwareSetup(props: Props) {
     en,
   });
 
-  const { isOpen, onOpen, onOpenChange, onClose } = useDisclosure();
+  const { isOpen, open, setOpen, close, toggle } = useOverlayState();
   const [state, setState] = useState<State>('init');
 
   const onBack = useCallback(() => {
     switch (state) {
       case 'init':
-        onOpenChange();
+        toggle();
         break;
 
       case 'select':
@@ -137,35 +158,46 @@ export function AttractapHardwareSetup(props: Props) {
         throw new Error(`Unknown state: ${exhaustiveCheck}`);
       }
     }
-  }, [state, onOpenChange]);
+  }, [state, toggle]);
 
   return (
     <>
-      {children(onOpen)}
+      {children(open)}
 
-      <Modal
-        isOpen={isOpen}
-        onOpenChange={onOpenChange}
-        size={state === 'configure' ? '5xl' : undefined}
-        scrollBehavior="inside"
-      >
-        <ModalContent>
-          <ModalHeader>
-            <PageHeader title={t('title.' + state)} subtitle={t('subtitle.' + state)} noMargin onBack={onBack} />
-          </ModalHeader>
+      <Modal isOpen={isOpen} onOpenChange={setOpen}>
+        <ModalBackdrop>
+          <ModalContainer size={state === 'configure' ? 'lg' : 'md'}>
+            <ModalDialog>
+              {() => (
+                <>
+                  <ModalHeader>
+                    <div className="flex w-full items-center gap-2">
+                      <Button variant="ghost" isIconOnly aria-label={t('actions.back')} onPress={onBack}>
+                        <ArrowLeft className="w-5 h-5" />
+                      </Button>
+                      <div className="flex-1">
+                        <ModalHeading>{t('title.' + state)}</ModalHeading>
+                        <p className="text-sm text-muted">{t('subtitle.' + state)}</p>
+                      </div>
+                    </div>
+                  </ModalHeader>
 
-          <ModalBody className="mb-4">
-            <Content
-              state={state}
-              setState={setState}
-              onClose={onOpenChange}
-              openDeviceSettings={(deviceId) => {
-                onClose();
-                openDeviceSettings(deviceId);
-              }}
-            />
-          </ModalBody>
-        </ModalContent>
+                  <ModalBody className="mb-4">
+                    <Content
+                      state={state}
+                      setState={setState}
+                      onClose={close}
+                      openDeviceSettings={(deviceId) => {
+                        close();
+                        openDeviceSettings(deviceId);
+                      }}
+                    />
+                  </ModalBody>
+                </>
+              )}
+            </ModalDialog>
+          </ModalContainer>
+        </ModalBackdrop>
       </Modal>
     </>
   );

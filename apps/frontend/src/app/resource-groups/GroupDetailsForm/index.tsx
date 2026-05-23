@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Card, CardHeader, CardBody, Input, Textarea, Button, Spinner, CardProps } from '@heroui/react';
+import { useState, useEffect, useCallback, HTMLAttributes } from 'react';
+import { Button, Form, Input, Label, Spinner, TextArea, TextField } from '@heroui/react';
 import { Save, Edit3, Trash2Icon } from 'lucide-react';
 import {
   useResourcesServiceResourceGroupsGetOne,
@@ -13,7 +13,6 @@ import { useToastMessage } from '../../../components/toastProvider';
 import { useQueryClient } from '@tanstack/react-query';
 import en from './translations/en.json';
 import de from './translations/de.json';
-import { PageHeader } from '../../../components/pageHeader';
 import { DeleteConfirmationModal } from '../../../components/deleteConfirmationModal';
 import { useNavigate } from 'react-router-dom';
 
@@ -21,8 +20,8 @@ interface GroupDetailsFormProps {
   groupId: number;
 }
 
-export function GroupDetailsForm(props: Readonly<GroupDetailsFormProps & Omit<CardProps, 'children'>>) {
-  const { groupId, ...rest } = props;
+export function GroupDetailsForm(props: Readonly<GroupDetailsFormProps & Omit<HTMLAttributes<HTMLDivElement>, 'children'>>) {
+  const { groupId, className, ...rest } = props;
 
   const { t } = useTranslations({ en, de });
   const { success, error: showError } = useToastMessage();
@@ -97,85 +96,83 @@ export function GroupDetailsForm(props: Readonly<GroupDetailsFormProps & Omit<Ca
 
   if (isLoading) {
     return (
-      <Card {...rest}>
-        <CardBody>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px 0' }}>
-            <Spinner size="sm" />
-            <span style={{ marginLeft: '8px', opacity: 0.7 }}>{t('states.loading')}</span>
-          </div>
-        </CardBody>
-      </Card>
+      <div className={className} {...rest} data-cy="group-details-form-loading">
+        <div className="flex items-center justify-center py-8">
+          <Spinner />
+          <span className="ml-2 opacity-70">{t('states.loading')}</span>
+        </div>
+      </div>
     );
   }
 
   if (error || !group) {
     return (
-      <Card {...rest}>
-        <CardBody>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <Edit3 size={20} color="red" />
-            <div>
-              <p style={{ color: 'red', fontWeight: '500' }}>{t('errors.load.title')}</p>
-              <p style={{ fontSize: '14px', opacity: 0.7 }}>{t('errors.load.description')}</p>
-            </div>
+      <div className={className} {...rest} data-cy="group-details-form-error">
+        <div className="flex items-center gap-3">
+          <Edit3 size={20} color="red" />
+          <div>
+            <p className="text-danger font-medium">{t('errors.load.title')}</p>
+            <p className="text-sm opacity-70">{t('errors.load.description')}</p>
           </div>
-        </CardBody>
-      </Card>
+        </div>
+      </div>
     );
   }
 
   return (
-    <Card {...rest}>
-      <CardHeader>
-        <PageHeader title={t('form.title')} subtitle={t('form.subtitle')} icon={<Edit3 size={20} />} noMargin={true} />
-      </CardHeader>
-      <CardBody>
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <Input
-            label={t('form.fields.name.label')}
-            placeholder={t('form.fields.name.placeholder')}
-            value={name}
-            onValueChange={setName}
-            isRequired
-          />
+    <div className={className} {...rest} data-cy="group-details-form">
+      <Form onSubmit={handleSubmit} className="gap-6 w-full" data-cy="group-details-form-form">
+        <section className="w-full flex flex-col gap-4">
+          <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">{t('sections.details')}</h3>
 
-          <Textarea
-            label={t('form.fields.description.label')}
+          <TextField value={name} onChange={setName} isRequired className="w-full">
+            <Label>{t('form.fields.name.label')}</Label>
+            <Input
+              placeholder={t('form.fields.name.placeholder')}
+              data-cy="group-details-form-name-input"
+            />
+          </TextField>
+
+          <TextArea
             placeholder={t('form.fields.description.placeholder')}
             value={description}
-            onValueChange={setDescription}
-            minRows={3}
+            onChange={(e) => setDescription(e.target.value)}
+            data-cy="group-details-form-description-input"
           />
+        </section>
 
+        <div className="flex flex-col gap-2 w-full">
           <Button
+            variant="primary"
             type="submit"
-            color="primary"
-            startContent={<Save size={16} />}
-            isLoading={isUpdating}
+            isPending={isUpdating}
             isDisabled={!name.trim() || isUpdating}
             className="w-full"
+            data-cy="group-details-form-save-button"
           >
+            <Save size={16} />
             {t('form.buttons.save')}
           </Button>
 
           <Button
+            variant="danger"
             className="w-full"
-            color="danger"
-            startContent={<Trash2Icon className="w-4 h-4" />}
             onPress={() => setShowDeleteConfirmation(true)}
+            data-cy="group-details-form-delete-button"
           >
+            <Trash2Icon className="w-4 h-4" />
             {t('form.buttons.delete')}
           </Button>
+        </div>
 
-          <DeleteConfirmationModal
-            isOpen={showDeleteConfirmation}
-            onClose={() => setShowDeleteConfirmation(false)}
-            onConfirm={() => handleDelete()}
-            itemName={group.name}
-            isDeleting={isDeleting}
-          />
-        </form>
-      </CardBody>
-    </Card>
+        <DeleteConfirmationModal
+          isOpen={showDeleteConfirmation}
+          onClose={() => setShowDeleteConfirmation(false)}
+          onConfirm={() => handleDelete()}
+          itemName={group.name}
+          isDeleting={isDeleting}
+        />
+      </Form>
+    </div>
   );
 }

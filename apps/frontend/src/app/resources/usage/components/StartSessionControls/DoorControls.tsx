@@ -25,32 +25,26 @@ export function DoorControls({
 }: DoorControlsProps) {
   return (
     <div className="flex flex-row flex-wrap gap-2 w-full justify-between">
-      <Button
+      <Button variant="danger"
         className="flex-1"
-        isLoading={lockIsPending}
-        startContent={<LockIcon className="w-4 h-4" />}
+        isPending={lockIsPending}
         onPress={onLock}
-        color="danger"
-      >
+      ><LockIcon className="w-4 h-4" />
         {t('door.lock')}
       </Button>
-      <Button
+      <Button variant="primary"
         className="flex-1"
-        isLoading={unlockIsPending}
-        startContent={<LockIcon className="w-4 h-4" />}
+        isPending={unlockIsPending}
         onPress={onUnlock}
-        color="primary"
-      >
+      ><LockIcon className="w-4 h-4" />
         {t('door.unlock')}
       </Button>
       {separateUnlockAndUnlatch && onUnlatch && (
-        <Button
+        <Button variant="secondary"
           className="flex-1"
-          isLoading={unlatchIsPending}
-          startContent={<LockIcon className="w-4 h-4" />}
+          isPending={unlatchIsPending}
           onPress={onUnlatch}
-          color="secondary"
-        >
+        ><LockIcon className="w-4 h-4" />
           {t('door.unlatch')}
         </Button>
       )}

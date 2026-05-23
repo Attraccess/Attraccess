@@ -1,6 +1,6 @@
 import { PageHeader } from '../../components/pageHeader';
 import { ComputerIcon, PowerIcon, RefreshCcwIcon } from 'lucide-react';
-import { Card, CardHeader, CardBody, Button } from '@heroui/react';
+import { Button, Card } from '@heroui/react';
 import { BalenaIcon } from './balena-icon';
 import { useSystemServiceRebootHost, useSystemServiceShutdownHost } from '@attraccess/react-query-client';
 import { useCallback, useEffect, useState } from 'react';
@@ -60,27 +60,27 @@ export function BalenaPage() {
 
       <div className="flex flex-row flex-wrap gap-4">
         <Card className="w-full">
-          <CardHeader>
+          <Card.Header>
             <PageHeader title="Host Machine" icon={<ComputerIcon />} />
-          </CardHeader>
-          <CardBody className="flex flex-col gap-4">
+          </Card.Header>
+          <Card.Content className="flex flex-col gap-4">
+            {/* TODO(heroui-v3): map dynamic color/variant to new variant prop */}
             <Button
-              startContent={<RefreshCcwIcon />}
-              color="primary"
+             
               onPress={onClickReboot}
-              variant={rebootIsConfirmed ? 'solid' : 'bordered'}
-            >
+              variant={rebootIsConfirmed ? 'primary' : 'outline'}
+            ><RefreshCcwIcon />
               {rebootIsConfirmed ? 'Confirm Reboot' : 'Reboot'}
             </Button>
+            {/* TODO(heroui-v3): map dynamic color/variant to new variant prop */}
             <Button
-              startContent={<PowerIcon />}
-              color="danger"
+             
               onPress={onClickShutdown}
-              variant={shutdownIsConfirmed ? 'solid' : 'bordered'}
-            >
+              variant={shutdownIsConfirmed ? 'primary' : 'outline'}
+            ><PowerIcon />
               {shutdownIsConfirmed ? 'Confirm Shutdown' : 'Shutdown'}
             </Button>
-          </CardBody>
+          </Card.Content>
         </Card>
       </div>
     </>

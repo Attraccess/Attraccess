@@ -8,7 +8,7 @@ import {
   UseSettingsServiceGetSystemSettingsKeyFn,
   useSettingsServiceUpdateSystemSettings,
 } from '@attraccess/react-query-client';
-import { Button, Form, Input, Spinner } from '@heroui/react';
+import { Button, Form, TextField, Label, Input, Description, Spinner } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PasswordInput } from '../../../../components/PasswordInput';
 import { CommunityLicenseButton } from '../../../../components/CommunityLicenseButton';
@@ -103,7 +103,7 @@ export function AppSettingsForm({ variant, endpoint, onNext }: AppSettingsFormPr
   if (showLoading) {
     return (
       <div className="flex items-center gap-2 text-sm text-default-500">
-        <Spinner size="sm" />
+        <Spinner />
         {t('loading')}
       </div>
     );
@@ -118,37 +118,31 @@ export function AppSettingsForm({ variant, endpoint, onNext }: AppSettingsFormPr
       }}
       className="flex flex-col gap-4"
     >
-      <Input
-        label={t('inputs.url.label')}
-        description={t('inputs.url.description')}
-        type="url"
-        isRequired
-        value={url}
-        onValueChange={setUrl}
-      />
-      <Input
-        label={t('inputs.publicInternetUrl.label')}
-        description={t('inputs.publicInternetUrl.description')}
-        type="url"
-        value={publicInternetUrl}
-        onValueChange={setPublicInternetUrl}
-      />
+      <TextField isRequired value={url} onChange={setUrl}>
+        <Label>{t('inputs.url.label')}</Label>
+        <Input type="url" />
+        <Description>{t('inputs.url.description')}</Description>
+      </TextField>
+      <TextField value={publicInternetUrl} onChange={setPublicInternetUrl}>
+        <Label>{t('inputs.publicInternetUrl.label')}</Label>
+        <Input type="url" />
+        <Description>{t('inputs.publicInternetUrl.description')}</Description>
+      </TextField>
       {variant === 'standalone' && (
         <>
           <PasswordInput
             label={t('inputs.licenseKey.label')}
             description={t('inputs.licenseKey.description')}
             value={licenseKey}
-            onValueChange={setLicenseKey}
+            onChange={setLicenseKey}
             autoComplete="off"
           />
           <CommunityLicenseButton onAccept={setLicenseKey} isDisabled={isSaving} />
         </>
       )}
-      <Button
-        color="primary"
+      <Button variant="primary"
         onPress={handleSubmit}
-        isLoading={isSaving}
+        isPending={isSaving}
         isDisabled={showLoading}
       >
         {variant === 'wizard' ? t('actions.next') : t('actions.save')}

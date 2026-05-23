@@ -1,19 +1,19 @@
 import {
   Button,
   Form,
+  TextField,
+  Label,
   Input,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  Textarea,
-  useDisclosure,
+  DrawerBody,
+  DrawerFooter,
+  DrawerHeader,
+  TextArea,
+  useOverlayState,
 } from '@heroui/react';
-import { PageHeader } from '../../../components/pageHeader';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
+import { StandardDrawer } from '../../../components/standardDrawer';
 import { ImageUpload } from '../../../components/imageUpload';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -39,7 +39,7 @@ interface Props {
 export function UpsertProjectModal(props: Props) {
   const { children, projectId } = props;
 
-  const { isOpen, onOpen, onOpenChange, onClose } = useDisclosure();
+  const { isOpen, open, setOpen, close } = useOverlayState();
   const { t, tExists } = useTranslations({
     en: {
       ...en,
@@ -71,9 +71,9 @@ export function UpsertProjectModal(props: Props) {
       queryClient.invalidateQueries({
         queryKey: UseProjectsServiceFindOneProjectKeyFn({ id: project.id }),
       });
-      onClose();
+      close();
     },
-    [t, queryClient, onClose, toast],
+    [t, queryClient, close, toast],
   );
 
   const onSaveError = useCallback(
@@ -145,46 +145,47 @@ export function UpsertProjectModal(props: Props) {
 
   return (
     <>
-      {children(onOpen)}
-      <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
-        <ModalContent>
-          <ModalHeader>
-            <PageHeader title={projectId ? t('title.update') : t('title.create')} noMargin />
-          </ModalHeader>
+      {children(open)}
+      <StandardDrawer isOpen={isOpen} onOpenChange={setOpen}>
+        <DrawerHeader>
+          <h2 className="text-lg font-semibold">{projectId ? t('title.update') : t('title.create')}</h2>
+        </DrawerHeader>
 
-          <ModalBody>
-            <Form
-              ref={formRef}
-              onSubmit={(e) => {
-                e.preventDefault();
-                onSubmit();
-              }}
-            >
-              <Input label={t('inputs.name.label')} name="name" value={name} onValueChange={setName} />
-              <Textarea
-                label={t('inputs.description.label')}
-                name="description"
-                value={description}
-                onValueChange={setDescription}
-              />
-              <ImageUpload
-                id="project-logo-image-upload"
-                label={t('inputs.logo.label')}
-                onChange={setLogo}
-                autoScale={{ maxWidth: 600, maxHeight: 600 }}
-                currentImageUrl={existingProject?.logo ? filenameToUrl(existingProject.logo) : undefined}
-              />
-              <input type="submit" hidden />
-            </Form>
-          </ModalBody>
+        <DrawerBody>
+          <Form
+            ref={formRef}
+            onSubmit={(e) => {
+              e.preventDefault();
+              onSubmit();
+            }}
+            className="flex flex-col gap-4"
+          >
+            <TextField value={name} onChange={setName}>
+              <Label>{t('inputs.name.label')}</Label>
+              <Input name="name" />
+            </TextField>
+            <TextArea
+              name="description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+            <ImageUpload
+              id="project-logo-image-upload"
+              label={t('inputs.logo.label')}
+              onChange={setLogo}
+              autoScale={{ maxWidth: 600, maxHeight: 600 }}
+              currentImageUrl={existingProject?.logo ? filenameToUrl(existingProject.logo) : undefined}
+            />
+            <input type="submit" hidden />
+          </Form>
+        </DrawerBody>
 
-          <ModalFooter>
-            <Button color="primary" onPress={onSubmit} isLoading={isSaving}>
-              {projectId ? t('actions.update.label') : t('actions.create.label')}
-            </Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
+        <DrawerFooter>
+          <Button variant="primary" onPress={onSubmit} isPending={isSaving}>
+            {projectId ? t('actions.update.label') : t('actions.create.label')}
+          </Button>
+        </DrawerFooter>
+      </StandardDrawer>
     </>
   );
 }

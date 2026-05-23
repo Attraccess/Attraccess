@@ -5,7 +5,7 @@ import de from './de.json';
 import { ManualTransactionsCard } from './manualTransactions';
 import { useState } from 'react';
 import { User } from '@attraccess/react-query-client';
-import { Button, Card, CardBody, CardHeader, Link } from '@heroui/react';
+import { useNavigate } from 'react-router-dom';
 import { SummaryCard } from '../dashboard/summary';
 import { SumUpIcon } from '../../../components/icons/sumup.icon';
 import { BanknoteIcon } from 'lucide-react';
@@ -13,6 +13,7 @@ import { ManageBillingFactorCard } from './billingFactor';
 
 export function BillingAdministrationPage() {
   const { t } = useTranslations({ en, de });
+  const navigate = useNavigate();
 
   const [user, setUser] = useState<User | null>(null);
 
@@ -21,23 +22,22 @@ export function BillingAdministrationPage() {
       <PageHeader
         title={t('title')}
         icon={<BanknoteIcon />}
-        actions={
-          <Button as={Link} href="/billing/administration/sumup" startContent={<SumUpIcon />} variant="light">
-            {t('actions.sumupSettings')}
-          </Button>
-        }
+        actions={[
+          {
+            key: 'sumup-settings',
+            label: t('actions.sumupSettings'),
+            icon: <SumUpIcon />,
+            onPress: () => navigate('/billing/administration/sumup'),
+          },
+        ]}
         backTo="/billing"
       />
 
       <div className="flex flex-row flex-wrap gap-4">
-        <Card className="flex-grow">
-          <CardHeader>
-            <PageHeader title={t('inputs.user')} noMargin />
-          </CardHeader>
-          <CardBody>
-            <UserSearch onSelectionChange={setUser} label={t('inputs.user')} />
-          </CardBody>
-        </Card>
+        <section className="flex-grow w-full flex flex-col gap-4">
+          <PageHeader title={t('inputs.user')} noMargin />
+          <UserSearch onSelectionChange={setUser} />
+        </section>
 
         {user && (
           <>

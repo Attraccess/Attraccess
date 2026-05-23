@@ -2,11 +2,14 @@ import {
   Badge,
   Button,
   Chip,
+  TextField,
+  Label,
   Input,
   Table,
   TableBody,
   TableCell,
   TableColumn,
+  TableContent,
   TableHeader,
   TableRow,
 } from '@heroui/react';
@@ -249,14 +252,14 @@ export function CsvInvite({ onSuccess, onError }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
-      <Button onPress={selectFile} variant="flat" color="primary">
+      <Button variant="secondary" onPress={selectFile}>
         {selectedFile ? selectedFile.name : t('inputs.file')}
       </Button>
 
       <Select
         label={t('inputs.fieldMapping.email')}
-        selectedKey={emailKey ?? ''}
-        onSelectionChange={setEmailKey}
+        value={emailKey ?? ''}
+        onChange={setEmailKey}
         items={csvHeaders.map((header) => ({
           label: header,
           key: header,
@@ -266,8 +269,8 @@ export function CsvInvite({ onSuccess, onError }: Props) {
 
       <Select
         label={t('inputs.fieldMapping.username')}
-        selectedKey={usernameKey ?? ''}
-        onSelectionChange={setUsernameKey}
+        value={usernameKey ?? ''}
+        onChange={setUsernameKey}
         items={csvHeaders.map((header) => ({
           label: header,
           key: header,
@@ -280,32 +283,35 @@ export function CsvInvite({ onSuccess, onError }: Props) {
           <Select
             className="flex-1"
             label={t('inputs.fieldMapping.' + permission)}
-            selectedKey={mapping.keyMapping}
-            onSelectionChange={(key) => updatePermissionKeyMapping(permission as keyof SystemPermissions, key)}
+            value={mapping.keyMapping}
+            onChange={(key) => updatePermissionKeyMapping(permission as keyof SystemPermissions, key)}
             items={csvHeaders.map((header) => ({
               label: header,
               key: header,
             }))}
           />
-          <Input
+          <TextField
             className="flex-1"
-            label={t('inputs.yesValue')}
             value={mapping.yesValue}
-            onValueChange={(value) => updatePermissionYesValue(permission as keyof SystemPermissions, value)}
-          />
+            onChange={(value) => updatePermissionYesValue(permission as keyof SystemPermissions, value)}
+          >
+            <Label>{t('inputs.yesValue')}</Label>
+            <Input />
+          </TextField>
         </div>
       ))}
 
-      <Table aria-label="csv-invite-table" data-cy="csv-invite-table" removeWrapper>
+      <Table data-cy="csv-invite-table">
+        <TableContent aria-label="csv-invite-table">
         <TableHeader>
-          <TableColumn>{t('preview.columns.index')}</TableColumn>
+          <TableColumn isRowHeader>{t('preview.columns.index')}</TableColumn>
           <TableColumn>{t('preview.columns.username')}</TableColumn>
           <TableColumn>{t('preview.columns.email')}</TableColumn>
           <TableColumn>{t('preview.columns.permissions.label')}</TableColumn>
         </TableHeader>
-        <TableBody items={previewUsers} emptyContent={<EmptyState />}>
+        <TableBody items={previewUsers} renderEmptyState={() => <EmptyState />}>
           {(user) => (
-            <TableRow key={user.index}>
+            <TableRow key={user.index} id={user.index}>
               <TableCell>#{user.index}</TableCell>
               <TableCell className="w-full">{user.username}</TableCell>
               <TableCell>{user.email}</TableCell>
@@ -317,22 +323,24 @@ export function CsvInvite({ onSuccess, onError }: Props) {
             </TableRow>
           )}
         </TableBody>
+        </TableContent>
       </Table>
 
       {rowErrors.length > 0 && (
         <div className="flex flex-col gap-2 border border-default-200 rounded-medium p-3">
           <div className="flex items-center justify-between">
-            <Badge color="danger" variant="flat">
+            <Badge color="danger" variant="soft">
               {t('errors.title')} ({rowErrors.length})
             </Badge>
-            <Button size="sm" variant="light" onPress={() => submit({ ignoreFailed: true })}>
+            <Button variant="ghost" onPress={() => submit({ ignoreFailed: true })}>
               {t('actions.inviteIgnore')}
             </Button>
           </div>
 
-          <Table removeWrapper aria-label="csv-invite-errors">
+          <Table>
+            <TableContent aria-label="csv-invite-errors">
             <TableHeader>
-              <TableColumn>{t('errors.columns.row')}</TableColumn>
+              <TableColumn isRowHeader>{t('errors.columns.row')}</TableColumn>
               <TableColumn>{t('errors.columns.field')}</TableColumn>
               <TableColumn>{t('errors.columns.message')}</TableColumn>
               <TableColumn>{t('errors.columns.value')}</TableColumn>
@@ -347,17 +355,18 @@ export function CsvInvite({ onSuccess, onError }: Props) {
                 </TableRow>
               )}
             </TableBody>
+            </TableContent>
           </Table>
         </div>
       )}
 
       <div className="flex justify-end w-full gap-2">
         {rowErrors.length > 0 && (
-          <Button variant="flat" onPress={() => submit({ ignoreFailed: true })} isLoading={isPending}>
+          <Button variant="secondary" onPress={() => submit({ ignoreFailed: true })} isPending={isPending}>
             {t('actions.inviteIgnore')}
           </Button>
         )}
-        <Button color="primary" onPress={() => submit()} isLoading={isPending}>
+        <Button variant="primary" onPress={() => submit()} isPending={isPending}>
           {t('actions.invite')}
         </Button>
       </div>

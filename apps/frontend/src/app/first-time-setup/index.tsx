@@ -1,7 +1,7 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Accordion, AccordionItem, Selection, Spinner } from '@heroui/react';
+import { Accordion, AccordionItem, AccordionHeading, AccordionTrigger, AccordionPanel, AccordionBody, Spinner } from '@heroui/react';
 import { CheckCircle2Icon, Settings2Icon } from 'lucide-react';
 import { PageHeader } from '../../components/pageHeader';
 import { AppSettingsForm } from '../settings/forms/AppSettingsForm';
@@ -16,9 +16,6 @@ import { useSettingsServiceGetFirstTimeSetupStatus } from '@attraccess/react-que
 const WIZARD_STEPS = ['step-1', 'step-2', 'step-3', 'step-4', 'step-5'] as const;
 type WizardStepKey = (typeof WIZARD_STEPS)[number];
 
-function isWizardStepKey(key: string): key is WizardStepKey {
-  return WIZARD_STEPS.includes(key as WizardStepKey);
-}
 
 export function FirstTimeSetupPage() {
   const { t } = useTranslations({ en, de });
@@ -81,29 +78,10 @@ export function FirstTimeSetupPage() {
   const adminEmailVerified = !!setupStatus?.stepsCompleted?.adminEmailVerified;
   const isAdminStepOverwrite = stepCompleted[3] && !adminEmailVerified;
 
-  const currentStepIndex = WIZARD_STEPS.indexOf(currentStep);
-
-  const handleAccordionSelectionChange = useCallback(
-    (keys: Selection) => {
-      const keySet = typeof keys === 'string' ? new Set<string>() : keys;
-      const newKey = Array.from(keySet)[0];
-      if (newKey == null || typeof newKey !== 'string' || !isWizardStepKey(newKey)) return;
-      const newIndex = WIZARD_STEPS.indexOf(newKey);
-      const goingBack = newIndex < currentStepIndex;
-      const goingToNext = newIndex === currentStepIndex + 1;
-      const currentDone = stepCompleted[currentStepIndex];
-      const allowed = goingBack || (goingToNext && currentDone) || newIndex === currentStepIndex;
-      if (allowed) {
-        setCurrentStep(newKey);
-      }
-    },
-    [currentStepIndex, stepCompleted]
-  );
-
   if (isCheckingSetup) {
     return (
       <div className="flex items-center gap-2 text-sm text-default-500">
-        <Spinner size="sm" />
+        <Spinner />
         {t('loading')}
       </div>
     );
@@ -118,81 +96,78 @@ export function FirstTimeSetupPage() {
       />
 
       <Accordion
-        variant="splitted"
-        selectionMode="single"
-        selectedKeys={new Set([currentStep])}
-        onSelectionChange={handleAccordionSelectionChange}
+        variant="default"
+        expandedKeys={[currentStep]}
+        onExpandedChange={(keys) => {
+          const arr = [...keys];
+          if (arr.length > 0) setCurrentStep(arr[arr.length - 1] as WizardStepKey);
+        }}
         className="w-full"
       >
-        <AccordionItem
-          key="step-1"
-          aria-label={t('steps.app')}
-          title={
-            <span className="flex items-center gap-2">
-              {stepCompleted[0] && (
-                <CheckCircle2Icon className="size-5 shrink-0 text-success" aria-hidden />
-              )}
-              {t('steps.app')}
-            </span>
-          }
-        >
-          <AppSettingsForm variant="wizard" endpoint="first-time-setup" onNext={goToStep2} />
+        <AccordionItem key="step-1" id="step-1" aria-label={t('steps.app')}>
+          <AccordionHeading>
+            <AccordionTrigger>
+              <span className="flex items-center gap-2">
+                {stepCompleted[0] && <CheckCircle2Icon className="size-5 shrink-0 text-success" aria-hidden />}
+                {t('steps.app')}
+              </span>
+            </AccordionTrigger>
+          </AccordionHeading>
+          <AccordionPanel><AccordionBody>
+            <AppSettingsForm variant="wizard" endpoint="first-time-setup" onNext={goToStep2} />
+          </AccordionBody></AccordionPanel>
         </AccordionItem>
-        <AccordionItem
-          key="step-2"
-          aria-label={t('steps.smtp')}
-          title={
-            <span className="flex items-center gap-2">
-              {stepCompleted[1] && (
-                <CheckCircle2Icon className="size-5 shrink-0 text-success" aria-hidden />
-              )}
-              {t('steps.smtp')}
-            </span>
-          }
-        >
-          <SmtpSettingsForm variant="wizard" endpoint="first-time-setup" onNext={goToStep3} />
+        <AccordionItem key="step-2" id="step-2" aria-label={t('steps.smtp')}>
+          <AccordionHeading>
+            <AccordionTrigger>
+              <span className="flex items-center gap-2">
+                {stepCompleted[1] && <CheckCircle2Icon className="size-5 shrink-0 text-success" aria-hidden />}
+                {t('steps.smtp')}
+              </span>
+            </AccordionTrigger>
+          </AccordionHeading>
+          <AccordionPanel><AccordionBody>
+            <SmtpSettingsForm variant="wizard" endpoint="first-time-setup" onNext={goToStep3} />
+          </AccordionBody></AccordionPanel>
         </AccordionItem>
-        <AccordionItem
-          key="step-3"
-          aria-label={t('steps.license')}
-          title={
-            <span className="flex items-center gap-2">
-              {stepCompleted[2] && (
-                <CheckCircle2Icon className="size-5 shrink-0 text-success" aria-hidden />
-              )}
-              {t('steps.license')}
-            </span>
-          }
-        >
-          <LicenseStep onSuccess={goToStep4} />
+        <AccordionItem key="step-3" id="step-3" aria-label={t('steps.license')}>
+          <AccordionHeading>
+            <AccordionTrigger>
+              <span className="flex items-center gap-2">
+                {stepCompleted[2] && <CheckCircle2Icon className="size-5 shrink-0 text-success" aria-hidden />}
+                {t('steps.license')}
+              </span>
+            </AccordionTrigger>
+          </AccordionHeading>
+          <AccordionPanel><AccordionBody>
+            <LicenseStep onSuccess={goToStep4} />
+          </AccordionBody></AccordionPanel>
         </AccordionItem>
-        <AccordionItem
-          key="step-4"
-          aria-label={t('steps.admin')}
-          title={
-            <span className="flex items-center gap-2">
-              {stepCompleted[3] && (
-                <CheckCircle2Icon className="size-5 shrink-0 text-success" aria-hidden />
-              )}
-              {t('steps.admin')}
-            </span>
-          }
-        >
-          <CreateAdminStep onSuccess={goToStep5} isOverwrite={isAdminStepOverwrite} />
+        <AccordionItem key="step-4" id="step-4" aria-label={t('steps.admin')}>
+          <AccordionHeading>
+            <AccordionTrigger>
+              <span className="flex items-center gap-2">
+                {stepCompleted[3] && <CheckCircle2Icon className="size-5 shrink-0 text-success" aria-hidden />}
+                {t('steps.admin')}
+              </span>
+            </AccordionTrigger>
+          </AccordionHeading>
+          <AccordionPanel><AccordionBody>
+            <CreateAdminStep onSuccess={goToStep5} isOverwrite={isAdminStepOverwrite} />
+          </AccordionBody></AccordionPanel>
         </AccordionItem>
-        <AccordionItem
-          key="step-5"
-          aria-label={t('steps.verify')}
-          title={
-            <span className="flex items-center gap-2">
-              {stepCompleted[4] && (
-                <CheckCircle2Icon className="size-5 shrink-0 text-success" aria-hidden />
-              )}
-              {t('steps.verify')}
-            </span>
-          }
-        >
-          <VerifyEmailStep onCorrectAdminDetails={goToStep4} />
+        <AccordionItem key="step-5" id="step-5" aria-label={t('steps.verify')}>
+          <AccordionHeading>
+            <AccordionTrigger>
+              <span className="flex items-center gap-2">
+                {stepCompleted[4] && <CheckCircle2Icon className="size-5 shrink-0 text-success" aria-hidden />}
+                {t('steps.verify')}
+              </span>
+            </AccordionTrigger>
+          </AccordionHeading>
+          <AccordionPanel><AccordionBody>
+            <VerifyEmailStep onCorrectAdminDetails={goToStep4} />
+          </AccordionBody></AccordionPanel>
         </AccordionItem>
       </Accordion>
     </div>

@@ -1,5 +1,5 @@
-import { Alert, Button } from '@heroui/react';
-import { AlertTriangleIcon, CheckCircleIcon } from 'lucide-react';
+import { Alert, AlertContent, AlertDescription, AlertTitle, Button } from '@heroui/react';
+import { CheckCircleIcon } from 'lucide-react';
 import {
   ResourceHealthStateDto,
   useResourceHealthServiceClearResourceHealthEntry,
@@ -63,13 +63,13 @@ export function ResourceHealthWarning({ resourceId }: Props) {
             : t('alert.identifier.default');
 
         return (
-          <Alert
+          <Alert status="danger"
             key={entry.id}
-            color="danger"
-            title={t('alert.title')}
-            icon={<AlertTriangleIcon />}
-            description={t('alert.description')}
           >
+            <AlertContent>
+              <AlertTitle>{t('alert.title')}</AlertTitle>
+              <AlertDescription>{t('alert.description')}</AlertDescription>
+            </AlertContent>
             <div className="flex flex-col gap-1 mt-2 text-sm">
               <div>
                 <span className="text-gray-500 mr-1">{t('alert.identifier.label')}:</span>
@@ -87,14 +87,11 @@ export function ResourceHealthWarning({ resourceId }: Props) {
               </div>
               {canManage && (
                 <div className="mt-2">
-                  <Button
-                    size="sm"
-                    color="danger"
-                    variant="flat"
-                    startContent={<CheckCircleIcon size={16} />}
+                  <Button variant="danger-soft"
+
                     onPress={() => handleClear(entry.id)}
-                    isLoading={clearEntry.isPending}
-                  >
+                    isPending={clearEntry.isPending}
+                  ><CheckCircleIcon size={16} />
                     {t('actions.markHealthy')}
                   </Button>
                 </div>

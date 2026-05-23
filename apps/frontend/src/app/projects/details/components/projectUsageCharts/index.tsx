@@ -1,15 +1,4 @@
-import {
-  Card,
-  CardBody,
-  CardHeader,
-  Skeleton,
-  Table,
-  TableBody,
-  TableCell,
-  TableColumn,
-  TableHeader,
-  TableRow,
-} from '@heroui/react';
+import { Card, Skeleton, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow } from '@heroui/react';
 import { useMemo, useCallback, useEffect, useState } from 'react';
 import { useTranslations, useNumberFormatter, useDateTimeFormatter } from '@attraccess/plugins-frontend-ui';
 import { useProjectsServiceGetProjectUsageStats } from '@attraccess/react-query-client';
@@ -154,13 +143,13 @@ export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
   return (
     <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
       <Card className="min-h-[360px]">
-        <CardHeader>
+        <Card.Header>
           <div>
             <p className="font-semibold">{t('charts.timeSeries.title')}</p>
             <p className="text-xs text-default-500">{t('charts.title')}</p>
           </div>
-        </CardHeader>
-        <CardBody className="h-[320px]">
+        </Card.Header>
+        <Card.Content className="h-[320px]">
           {isLoading ? (
             <Skeleton className="w-full h-full" />
           ) : chartData.length === 0 ? (
@@ -201,17 +190,17 @@ export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
               </LineChart>
             </ResponsiveContainer>
           )}
-        </CardBody>
+        </Card.Content>
       </Card>
 
       <Card className="min-h-[360px]">
-        <CardHeader>
+        <Card.Header>
           <div>
             <p className="font-semibold">{t('charts.topResources.title')}</p>
             <p className="text-xs text-default-500">{t('charts.title')}</p>
           </div>
-        </CardHeader>
-        <CardBody className="flex flex-col gap-4">
+        </Card.Header>
+        <Card.Content className="flex flex-col gap-4">
           {isLoading ? (
             <>
               <Skeleton className="h-6 w-full" />
@@ -235,13 +224,13 @@ export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
                         dataKey="sessions"
                         fill={BAR_COLORS.sessions.base}
                         name={t('tooltip.sessions')}
-                        radius={6}
+
                         activeBar={
                           <Rectangle
                             fill={BAR_COLORS.sessions.active}
                             stroke={BAR_COLORS.sessions.base}
                             strokeWidth={2}
-                            radius={8}
+
                           />
                         }
                       />
@@ -249,13 +238,13 @@ export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
                         dataKey="minutes"
                         fill={BAR_COLORS.minutes.base}
                         name={t('tooltip.minutes')}
-                        radius={6}
+
                         activeBar={
                           <Rectangle
                             fill={BAR_COLORS.minutes.active}
                             stroke={BAR_COLORS.minutes.base}
                             strokeWidth={2}
-                            radius={8}
+
                           />
                         }
                       />
@@ -265,16 +254,17 @@ export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
                   <Skeleton className="h-full w-full" />
                 )}
               </div>
-              <Table removeWrapper aria-label={t('charts.topResources.table.ariaLabel')}>
+              <Table>
+                <TableContent aria-label={t('charts.topResources.table.ariaLabel')}>
                 <TableHeader>
-                  <TableColumn>{t('charts.topResources.columns.resource')}</TableColumn>
+                  <TableColumn isRowHeader>{t('charts.topResources.columns.resource')}</TableColumn>
                   <TableColumn>{t('charts.topResources.columns.sessions')}</TableColumn>
                   <TableColumn>{t('charts.topResources.columns.minutes')}</TableColumn>
                   <TableColumn>{t('charts.topResources.columns.spend')}</TableColumn>
                 </TableHeader>
                 <TableBody>
                   {topResources.map((resource) => (
-                    <TableRow key={resource.resourceId}>
+                    <TableRow key={resource.resourceId} id={resource.resourceId}>
                       <TableCell>{resource.resourceName}</TableCell>
                       <TableCell>{formatNumber(resource.sessions)}</TableCell>
                       <TableCell>{formatNumber(resource.minutes)}</TableCell>
@@ -288,10 +278,11 @@ export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
                     </TableRow>
                   ))}
                 </TableBody>
+                </TableContent>
               </Table>
             </>
           )}
-        </CardBody>
+        </Card.Content>
       </Card>
     </div>
   );

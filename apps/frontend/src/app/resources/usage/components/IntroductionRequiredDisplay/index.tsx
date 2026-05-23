@@ -1,5 +1,6 @@
-import { Alert, Divider, Spinner } from '@heroui/react';
+import { Alert, AlertContent, AlertDescription, Separator, Spinner } from '@heroui/react';
 import { Users } from 'lucide-react';
+import { AlertStatusIcon } from '../../../../../components/AlertStatusIcon';
 import { useTranslations, AttraccessUser } from '@attraccess/plugins-frontend-ui';
 import { useAccessControlServiceResourceIntroducersGetMany } from '@attraccess/react-query-client';
 import en from './translations/en.json';
@@ -20,14 +21,19 @@ export function IntroductionRequiredDisplay({ resourceId }: Readonly<Introductio
   if (isLoadingIntroducers) {
     return (
       <div className="flex justify-center py-4">
-        <Spinner size="md" color="primary" />
+        <Spinner color="accent" />
       </div>
     );
   }
 
   return (
     <div className="space-y-4">
-      <Alert color="warning">{t('needsIntroduction')}</Alert>
+      <Alert status="warning">
+        <AlertStatusIcon status="warning" />
+        <AlertContent>
+          <AlertDescription>{t('needsIntroduction')}</AlertDescription>
+        </AlertContent>
+      </Alert>
 
       {introducers && introducers.length > 0 ? (
         <div>
@@ -35,7 +41,7 @@ export function IntroductionRequiredDisplay({ resourceId }: Readonly<Introductio
             <Users className="w-4 h-4 mr-1" />
             {t('availableIntroducers')}:
           </p>
-          <Divider className="my-2" />
+          <Separator className="my-2" />
           <div className="space-y-2 mt-2">
             {introducers?.map((introducer) => (
               <AttraccessUser key={introducer.id} user={introducer.user} />

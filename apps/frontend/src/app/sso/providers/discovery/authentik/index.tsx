@@ -1,6 +1,19 @@
-import { Button, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, useDisclosure } from '@heroui/react';
+import {
+  Button,
+  TextField,
+  Label,
+  Input,
+  Modal,
+  ModalBackdrop,
+  ModalBody,
+  ModalContainer,
+  ModalDialog,
+  ModalFooter,
+  ModalHeader,
+  ModalHeading,
+  useOverlayState,
+} from '@heroui/react';
 import { OpenIDConfiguration } from '../OpenIDC.data';
-import { PageHeader } from '../../../../../components/pageHeader';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useCallback, useState } from 'react';
 import { useToastMessage } from '../../../../../components/toastProvider';
@@ -18,7 +31,7 @@ interface Props {
 
 export function AuthentikDiscoveryDialog(props: Props) {
   const { onDiscovery, children: activator } = props;
-  const { isOpen, onOpen, onClose } = useDisclosure();
+  const { isOpen, open, close } = useOverlayState();
   const [host, setHost] = useState('');
   const [applicationName, setApplicationName] = useState('');
   const [isDiscovering, setIsDiscovering] = useState(false);
@@ -60,7 +73,7 @@ export function AuthentikDiscoveryDialog(props: Props) {
 
       const config: OpenIDConfiguration = await response.json();
       onDiscovery(config);
-      onClose();
+      close();
       toast.success({ title: t('success.title'), description: t('success.description') });
     } catch (error) {
       toast.apiError({
@@ -72,30 +85,45 @@ export function AuthentikDiscoveryDialog(props: Props) {
     } finally {
       setIsDiscovering(false);
     }
-  }, [host, applicationName, toast, t, tExists, onDiscovery, onClose]);
+  }, [host, applicationName, toast, t, tExists, onDiscovery, close]);
 
   return (
     <>
-      {activator(onOpen)}
-      <Modal isOpen={isOpen} onClose={onClose}>
-        <ModalContent>
-          <ModalHeader>
-            <PageHeader noMargin title={t('title')} />
-          </ModalHeader>
-          <ModalBody>
-            <Input label={t('host')} value={host} onChange={(e) => setHost(e.target.value)} />
-            <Input
-              label={t('applicationName')}
-              value={applicationName}
-              onChange={(e) => setApplicationName(e.target.value)}
-            />
-          </ModalBody>
-          <ModalFooter>
-            <Button color="primary" onPress={discover} isLoading={isDiscovering}>
-              {t('discover')}
-            </Button>
-          </ModalFooter>
-        </ModalContent>
+      {activator(open)}
+      <Modal
+        isOpen={isOpen}
+        onOpenChange={(o) => {
+          if (!o) close();
+        }}
+      >
+        <ModalBackdrop>
+          <ModalContainer size="md">
+            <ModalDialog>
+              {({ close }) => (
+                <>
+                  <ModalHeader>
+                    <ModalHeading>{t('title')}</ModalHeading>
+                  </ModalHeader>
+                  <ModalBody className="flex flex-col gap-4">
+                    <TextField value={host} onChange={setHost}>
+                      <Label>{t('host')}</Label>
+                      <Input />
+                    </TextField>
+                    <TextField value={applicationName} onChange={setApplicationName}>
+                      <Label>{t('applicationName')}</Label>
+                      <Input />
+                    </TextField>
+                  </ModalBody>
+                  <ModalFooter>
+                    <Button variant="primary" onPress={discover} isPending={isDiscovering}>
+                      {t('discover')}
+                    </Button>
+                  </ModalFooter>
+                </>
+              )}
+            </ModalDialog>
+          </ModalContainer>
+        </ModalBackdrop>
       </Modal>
     </>
   );

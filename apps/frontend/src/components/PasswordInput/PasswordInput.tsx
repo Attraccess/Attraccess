@@ -1,59 +1,76 @@
 import React, { useState } from 'react';
-import { Input, InputProps } from '@heroui/react';
-import { Button } from '@heroui/react';
-import { Tooltip } from '@heroui/react';
+import { TextFieldProps, TextField, Label, InputGroup, Description, FieldError } from '@heroui/react';
+import { Button, Tooltip } from '@heroui/react';
 import { Eye, EyeOff } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './PasswordInput.en.json';
 import de from './PasswordInput.de.json';
 
-// Omit 'type' from InputProps since we always want it to be 'password' or 'text'
-export interface PasswordInputProps extends Omit<InputProps, 'type' | 'endContent'> {
-  /**
-   * Custom end content to append after the visibility toggle button.
-   * If provided, it will be rendered after the eye icon.
-   */
-  additionalEndContent?: React.ReactNode;
+export interface PasswordInputProps extends Omit<TextFieldProps, 'type' | 'children'> {
+  label?: React.ReactNode;
+  description?: React.ReactNode;
+  errorMessage?: React.ReactNode;
+  autoComplete: string;
+  onValueChange?: (value: string) => void;
+  id?: string;
+  name?: string;
+  required?: boolean;
+  placeholder?: string;
+  'data-cy'?: string;
 }
 
-/**
- * A password input component with built-in visibility toggle functionality.
- * This is a drop-in replacement for HeroUI Input components when type="password" is needed.
- *
- * Features:
- * - Eye/EyeOff icon toggle for password visibility
- * - Internationalized tooltips
- * - Consistent styling with HeroUI components
- * - All standard Input props supported
- */
-export const PasswordInput: React.FC<PasswordInputProps & Required<Pick<InputProps, 'autoComplete'>>> = ({
-  additionalEndContent,
-  ...inputProps
+export const PasswordInput: React.FC<PasswordInputProps> = ({
+  label,
+  description,
+  errorMessage,
+  onValueChange,
+  onChange,
+  id,
+  name,
+  required,
+  placeholder,
+  'data-cy': dataCy,
+  ...fieldProps
 }) => {
   const [showPassword, setShowPassword] = useState(false);
   const { t } = useTranslations({ en, de });
 
-  const togglePasswordVisibility = () => {
-    setShowPassword(!showPassword);
+  const handleChange = (v: string) => {
+    onChange?.(v);
+    onValueChange?.(v);
   };
 
-  const endContent = (
-    <div className="flex items-center gap-1">
-      <Tooltip content={showPassword ? t('hidePassword') : t('showPassword')}>
-        <Button
-          isIconOnly
-          size="sm"
-          variant="light"
-          onPress={togglePasswordVisibility}
-          aria-label={showPassword ? t('hidePassword') : t('showPassword')}
-          data-cy="password-input-toggle-button"
-        >
-          {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-        </Button>
-      </Tooltip>
-      {additionalEndContent}
-    </div>
+  return (
+    <TextField {...fieldProps} onChange={handleChange}>
+      {label && <Label>{label}</Label>}
+      <InputGroup>
+        <InputGroup.Input
+          type={showPassword ? 'text' : 'password'}
+          id={id}
+          name={name}
+          required={required}
+          placeholder={placeholder}
+          data-cy={dataCy}
+        />
+        <InputGroup.Suffix>
+          <Tooltip>
+            <Tooltip.Trigger>
+              <Button
+                variant="ghost"
+                isIconOnly
+                onPress={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? t('hidePassword') : t('showPassword')}
+                data-cy="password-input-toggle-button"
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </Button>
+            </Tooltip.Trigger>
+            <Tooltip.Content>{showPassword ? t('hidePassword') : t('showPassword')}</Tooltip.Content>
+          </Tooltip>
+        </InputGroup.Suffix>
+      </InputGroup>
+      {description && <Description>{description}</Description>}
+      {errorMessage && <FieldError>{errorMessage}</FieldError>}
+    </TextField>
   );
-
-  return <Input {...inputProps} type={showPassword ? 'text' : 'password'} endContent={endContent} />;
 };

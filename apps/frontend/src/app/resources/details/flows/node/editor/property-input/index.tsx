@@ -1,20 +1,8 @@
 import { ResourceFlowNodeDto, useBillingServiceGetBillingConfiguration } from '@attraccess/react-query-client';
-import {
-  Autocomplete,
-  AutocompleteItem,
-  Button,
-  Card,
-  CardBody,
-  Input,
-  NumberInput,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalHeader,
-  Switch,
-  Textarea,
-} from '@heroui/react';
+import { Button, Input, Label, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalHeader, NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput, TextArea, TextField } from '@heroui/react';
+import { Select } from '../../../../../../../components/select';
 import { MqttServerSelect } from '../../../../../../../components/mqttServerSelect';
+import { LabeledSwitch } from '../../../../../../../components/labeledSwitch';
 import { PlusIcon, XIcon } from 'lucide-react';
 import { TExists, TFunction } from '@attraccess/plugins-frontend-ui';
 import { useCallback, useMemo, useState } from 'react';
@@ -114,15 +102,12 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
   const [isCreateServerOpen, setIsCreateServerOpen] = useState(false);
 
   if (!configuration && schema.isCurrency) {
+    const currencyLabel = t('nodes.' + nodeType + '.config.' + name + '.label');
     return (
-      <Input
-        type="text"
-        isDisabled
-        label={!hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined}
-        placeholder={hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined}
-        description={description}
-        isRequired={isRequired}
-      />
+      <TextField isDisabled isRequired={isRequired}>
+        {!hideLabel && <Label>{currencyLabel}</Label>}
+        <Input type="text" placeholder={hideLabel ? currencyLabel : undefined} />
+      </TextField>
     );
   }
 
@@ -133,17 +118,15 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
           <div className="flex-grow min-w-0">
             <MqttServerSelect
               selectedId={value as number}
-              onSelectionChange={(newValue) => onChange(newValue as TValue)}
+              onSelectionChange={(id) => onChange(id as TValue)}
               label={!hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined}
               ariaLabel={t('nodes.' + nodeType + '.config.' + name + '.label')}
               isRequired={isRequired}
-              description={description}
               className="w-full"
             />
           </div>
           <Button
-            variant="flat"
-            color="primary"
+            variant="secondary"
             onPress={() => setIsCreateServerOpen(true)}
             data-cy="mqtt-server-select-create-button"
             isIconOnly
@@ -153,26 +136,30 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
           </Button>
         </div>
 
-        <Modal isOpen={isCreateServerOpen} onOpenChange={setIsCreateServerOpen} scrollBehavior="inside">
-          <ModalContent>
-            {(onClose) => (
-              <>
-                <ModalHeader>{t('nodes.genericConfig.createMqttServer')}</ModalHeader>
-                <ModalBody>
-                  <CreateMqttServerForm
-                    onSuccess={(server) => {
-                      onChange(server.id as TValue);
-                      setIsCreateServerOpen(false);
-                    }}
-                    onCancel={() => {
-                      setIsCreateServerOpen(false);
-                      onClose();
-                    }}
-                  />
-                </ModalBody>
-              </>
-            )}
-          </ModalContent>
+        <Modal isOpen={isCreateServerOpen} onOpenChange={setIsCreateServerOpen}>
+          <ModalBackdrop>
+            <ModalContainer size="md">
+              <ModalDialog>
+                {({ close }) => (
+                  <>
+                    <ModalHeader>{t('nodes.genericConfig.createMqttServer')}</ModalHeader>
+                    <ModalBody>
+                      <CreateMqttServerForm
+                        onSuccess={(server) => {
+                          onChange(server.id as TValue);
+                          setIsCreateServerOpen(false);
+                        }}
+                        onCancel={() => {
+                          setIsCreateServerOpen(false);
+                          close();
+                        }}
+                      />
+                    </ModalBody>
+                  </>
+                )}
+              </ModalDialog>
+            </ModalContainer>
+          </ModalBackdrop>
         </Modal>
       </>
     );
@@ -182,91 +169,90 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
     case 'string':
       if (schema.enum) {
         return (
-          <Autocomplete
-            isRequired={isRequired}
-            defaultSelectedKey={String(value ?? schema.default ?? '')}
-            onSelectionChange={(newValue) => onChange(newValue as TValue)}
+          <Select
             label={!hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined}
-            description={description}
-          >
-            {schema.enum.map((enumValue) => (
-              <AutocompleteItem key={enumValue}>
-                {t('nodes.' + nodeType + '.config.' + name + '.enum.' + enumValue)}
-              </AutocompleteItem>
-            ))}
-          </Autocomplete>
+            aria-label={t('nodes.' + nodeType + '.config.' + name + '.label')}
+            value={String(value ?? schema.default ?? '')}
+            onChange={(newValue) => onChange(newValue as TValue)}
+            items={schema.enum.map((enumValue) => ({
+              key: String(enumValue),
+              label: t('nodes.' + nodeType + '.config.' + name + '.enum.' + enumValue),
+            }))}
+          />
         );
       }
 
       if (schema.stringVariant === 'multiline') {
         return (
-          <Textarea
-            isRequired={isRequired}
-            label={!hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined}
+          <TextArea
+            required={isRequired}
             placeholder={hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined}
             value={value ? String(value) : undefined}
             defaultValue={schema.default ? String(schema.default) : undefined}
-            onValueChange={(newValue) => onChange(newValue as TValue)}
-            description={description}
+            onChange={(e) => onChange(e.target.value as TValue)}
           />
         );
       }
 
       return (
-        <Input
-          type="text"
+        <TextField
           isRequired={isRequired}
-          label={!hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined}
-          placeholder={hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined}
-          value={value ? String(value) : undefined}
-          defaultValue={schema.default ? String(schema.default) : undefined}
-          onValueChange={(newValue) => onChange(newValue as TValue)}
-          description={description}
-        />
+          value={value ? String(value) : ''}
+          onChange={(newValue) => onChange(newValue as TValue)}
+        >
+          {!hideLabel && <Label>{t('nodes.' + nodeType + '.config.' + name + '.label')}</Label>}
+          <Input
+            type="text"
+            placeholder={hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined}
+            defaultValue={schema.default ? String(schema.default) : undefined}
+          />
+        </TextField>
       );
     case 'integer':
     case 'number': {
       const enumValues = schema.enum ?? (isQosField ? [0, 1, 2] : undefined);
 
       if (enumValues) {
-        const selectedKey =
+        const selectedValue =
           value !== undefined ? String(value) : schema.default !== undefined ? String(schema.default) : undefined;
 
         return (
-          <Autocomplete
-            isRequired={isRequired}
-            defaultSelectedKey={selectedKey}
-            onSelectionChange={(newValue) => {
-              if (newValue === null) {
-                return;
-              }
-
-              const parsedValue = typeof newValue === 'number' ? newValue : Number(newValue);
-              setValue(parsedValue as TValue);
-            }}
+          <Select
             label={!hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined}
-            description={description}
-          >
-            {enumValues.map((enumValue) => (
-              <AutocompleteItem key={String(enumValue)}>
-                {t('nodes.' + nodeType + '.config.' + name + '.enum.' + enumValue)}
-              </AutocompleteItem>
-            ))}
-          </Autocomplete>
+            aria-label={t('nodes.' + nodeType + '.config.' + name + '.label')}
+            value={selectedValue}
+            onChange={(newValue) => {
+              if (newValue == null) return;
+              setValue(Number(newValue) as TValue);
+            }}
+            items={enumValues.map((enumValue) => ({
+              key: String(enumValue),
+              label: t('nodes.' + nodeType + '.config.' + name + '.enum.' + enumValue),
+            }))}
+          />
         );
       }
 
       return (
-        <NumberInput
+        <NumberField
           isRequired={isRequired}
-          label={!hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined}
+          aria-label={
+            !hideLabel
+              ? t('nodes.' + nodeType + '.config.' + name + '.label')
+              : t('nodes.' + nodeType + '.config.' + name + '.label')
+          }
           value={Number(parsedValue)}
           defaultValue={schema.default ? Number(schema.default) : undefined}
-          onValueChange={(newValue) => setValue(newValue as TValue)}
+          onChange={(newValue) => setValue(newValue as TValue)}
           minValue={schema.exclusiveMinimum !== undefined ? schema.exclusiveMinimum + 1 : undefined}
           maxValue={schema.maximum}
-          description={description}
-        />
+        >
+          <NumberFieldGroup>
+            <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
+            <NumberFieldInput />
+            <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
+          </NumberFieldGroup>
+        </NumberField>
       );
     }
 
@@ -275,38 +261,32 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
         let content = null;
         if (Object.entries((value ?? {}) as Record<string, unknown>)?.length === 0) {
           content = (
-            <Card>
-              <CardBody>
-                <p className="text-sm text-gray-500">{t('nodes.' + nodeType + '.config.' + name + '.empty')}</p>
-              </CardBody>
-            </Card>
+            <p className="text-sm text-default-500">{t('nodes.' + nodeType + '.config.' + name + '.empty')}</p>
           );
         } else {
           content = (
             <div className="flex flex-col gap-2">
               {Object.entries(value as Record<string, unknown>).map(([key, currentValueOfKey], index) => (
                 <div key={index} className="flex gap-2 items-center">
-                  <Input
-                    size="sm"
-                    placeholder="Header name"
+                  <TextField
                     value={key}
-                    onValueChange={(newKey) => onChange({ ...value, [key]: undefined, [newKey]: currentValueOfKey })}
+                    onChange={(newKey) => onChange({ ...value, [key]: undefined, [newKey]: currentValueOfKey })}
+                    isRequired
                     className="flex-1"
-                    isRequired={true}
-                  />
-                  <Input
-                    size="sm"
-                    placeholder="Header value"
+                  >
+                    <Input placeholder="Header name" />
+                  </TextField>
+                  <TextField
                     value={currentValueOfKey as string}
-                    onValueChange={(newValueOfKey) => onChange({ ...value, [key]: newValueOfKey })}
+                    onChange={(newValueOfKey) => onChange({ ...value, [key]: newValueOfKey })}
+                    isRequired
                     className="flex-1"
-                    isRequired={true}
-                  />
+                  >
+                    <Input placeholder="Header value" />
+                  </TextField>
                   <Button
-                    size="sm"
+                    variant="danger-soft"
                     isIconOnly
-                    variant="flat"
-                    color="danger"
                     onPress={() =>
                       onChange(
                         Object.fromEntries(
@@ -327,12 +307,8 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
           <div className="flex flex-col gap-2">
             {!hideLabel && <small>{t('nodes.' + nodeType + '.config.' + name + '.label')}</small>}
             {content}
-            <Button
-              size="sm"
-              variant="flat"
-              startContent={<PlusIcon size={16} />}
-              onPress={() => onChange({ ...value, '': '' })}
-            >
+            <Button variant="secondary" onPress={() => onChange({ ...value, '': '' })}>
+              <PlusIcon size={16} />
               {t('nodes.' + nodeType + '.config.' + name + '.add')}
             </Button>
           </div>
@@ -349,79 +325,68 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
 
       let content = null;
       if (arrayValue.length === 0) {
-        content = (
-          <Card>
-            <CardBody>
-              <p className="text-sm text-gray-500">{emptyText}</p>
-            </CardBody>
-          </Card>
-        );
+        content = <p className="text-sm text-default-500">{emptyText}</p>;
       } else {
         content = (
-          <div className="flex flex-col gap-2 w-full">
+          <div className="flex flex-col w-full divide-y divide-default-200">
             {arrayValue.map((row, index) => (
-              <Card key={index} className="p-2 w-full">
-                <CardBody className="p-0">
-                  <div className="grid grid-cols-[1fr_auto] gap-2 items-start">
-                    <div className="flex flex-col gap-2 p-2 w-full">
-                      {items && items.type === 'object' && items.properties ? (
-                        <>
-                          {Object.entries(items.properties).map(([propName, propSchema]) => (
-                            <PropertyInput
-                              key={propName}
-                              nodeType={nodeType}
-                              tNodeTranslations={t}
-                              tNodeExists={tNodeExists}
-                              name={name + '.items.' + propName}
-                              schema={propSchema as Property<unknown>}
-                              value={(row as Record<string, unknown>)?.[propName]}
-                              onChange={(newItemPropValue) => {
-                                const newArrayValue = [...arrayValue] as Array<Record<string, unknown>>;
-                                newArrayValue[index] = {
-                                  ...(newArrayValue[index] ?? {}),
-                                  [propName]: newItemPropValue,
-                                };
-                                onChange(newArrayValue as TValue);
-                              }}
-                              isRequired={false}
-                            />
-                          ))}
-                        </>
-                      ) : items ? (
+              <div key={index} className="grid grid-cols-[1fr_auto] gap-2 items-start py-2 first:pt-0 last:pb-0">
+                <div className="flex flex-col gap-2 w-full">
+                  {items && items.type === 'object' && items.properties ? (
+                    <>
+                      {Object.entries(items.properties).map(([propName, propSchema]) => (
                         <PropertyInput
+                          key={propName}
                           nodeType={nodeType}
                           tNodeTranslations={t}
                           tNodeExists={tNodeExists}
-                          name={name + '.items'}
-                          schema={items as unknown as Property<unknown>}
-                          value={row as unknown}
-                          onChange={(newItemValue) => {
-                            const newArrayValue = [...arrayValue];
-                            newArrayValue[index] = newItemValue as unknown;
+                          name={name + '.items.' + propName}
+                          schema={propSchema as Property<unknown>}
+                          value={(row as Record<string, unknown>)?.[propName]}
+                          onChange={(newItemPropValue) => {
+                            const newArrayValue = [...arrayValue] as Array<Record<string, unknown>>;
+                            newArrayValue[index] = {
+                              ...(newArrayValue[index] ?? {}),
+                              [propName]: newItemPropValue,
+                            };
                             onChange(newArrayValue as TValue);
                           }}
                           isRequired={false}
                           hideLabel
                         />
-                      ) : null}
-                    </div>
-                    <div className="row-span-2 flex items-start p-2">
-                      <Button
-                        size="sm"
-                        isIconOnly
-                        variant="flat"
-                        color="danger"
-                        onPress={() => {
-                          const copy = (arrayValue as Array<unknown>).filter((_, i) => i !== index);
-                          onChange(copy as TValue);
-                        }}
-                      >
-                        <XIcon size={16} />
-                      </Button>
-                    </div>
-                  </div>
-                </CardBody>
-              </Card>
+                      ))}
+                    </>
+                  ) : items ? (
+                    <PropertyInput
+                      nodeType={nodeType}
+                      tNodeTranslations={t}
+                      tNodeExists={tNodeExists}
+                      name={name + '.items'}
+                      schema={items as unknown as Property<unknown>}
+                      value={row as unknown}
+                      onChange={(newItemValue) => {
+                        const newArrayValue = [...arrayValue];
+                        newArrayValue[index] = newItemValue as unknown;
+                        onChange(newArrayValue as TValue);
+                      }}
+                      isRequired={false}
+                      hideLabel
+                    />
+                  ) : null}
+                </div>
+                <div className="flex items-start">
+                  <Button
+                    variant="danger-soft"
+                    isIconOnly
+                    onPress={() => {
+                      const copy = (arrayValue as Array<unknown>).filter((_, i) => i !== index);
+                      onChange(copy as TValue);
+                    }}
+                  >
+                    <XIcon size={16} />
+                  </Button>
+                </div>
+              </div>
             ))}
           </div>
         );
@@ -449,7 +414,8 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
         <div className="flex flex-col gap-2 w-full">
           {!hideLabel && <small>{t('nodes.' + nodeType + '.config.' + name + '.label')}</small>}
           {content}
-          <Button size="sm" variant="flat" startContent={<PlusIcon size={16} />} onPress={handleAdd}>
+          <Button variant="secondary" onPress={handleAdd}>
+            <PlusIcon size={16} />
             {addText}
           </Button>
         </div>
@@ -458,9 +424,9 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
 
     case 'boolean':
       return (
-        <Switch isSelected={value as boolean} onValueChange={(newValue) => onChange(newValue as TValue)}>
+        <LabeledSwitch isSelected={value as boolean} onChange={(newValue) => onChange(newValue as TValue)}>
           {!hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : null}
-        </Switch>
+        </LabeledSwitch>
       );
   }
 

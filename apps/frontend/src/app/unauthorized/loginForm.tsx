@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo } from 'react';
 import { ArrowRight, LogInIcon } from 'lucide-react';
-import { Accordion, AccordionItem, Input, Skeleton } from '@heroui/react';
+import { Accordion, AccordionItem, AccordionHeading, AccordionTrigger, AccordionPanel, AccordionBody, AlertContent, AlertDescription, AlertTitle, Description, Input, Label, Skeleton, TextField } from '@heroui/react';
 import { Button } from '@heroui/react';
 import { Alert } from '@heroui/react';
 import { TExists, TFunction, useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -48,9 +48,14 @@ export function LoginForm(props: LoginFormProps) {
   return (
     <>
       <LoginFormHeader {...props} isLocalSignupEnabled={isLocalSignupEnabled?.value ?? false} t={t} />
-      <Accordion variant="splitted" className="w-full">
-        <AccordionItem title={t('accordion.title')} indicator={<LogInIcon />} className="bg-default-100">
-          <LoginFormContent {...props} t={t} tExists={tExists} />
+      <Accordion variant="default" className="w-full">
+        <AccordionItem className="bg-default-100">
+          <AccordionHeading>
+            <AccordionTrigger><LogInIcon className="mr-2" />{t('accordion.title')}</AccordionTrigger>
+          </AccordionHeading>
+          <AccordionPanel><AccordionBody>
+            <LoginFormContent {...props} t={t} tExists={tExists} />
+          </AccordionBody></AccordionPanel>
         </AccordionItem>
       </Accordion>
     </>
@@ -66,7 +71,7 @@ function LoginFormHeader(props: LoginFormProps & { isLocalSignupEnabled: boolean
       {isLocalSignupEnabled && (
         <p className="mt-2 text-gray-600 dark:text-gray-300">
           {t('noAccount')}{' '}
-          <Button onPress={onNeedsAccount} variant="light" color="secondary" data-cy="login-form-sign-up-button">
+          <Button variant="secondary" onPress={onNeedsAccount} data-cy="login-form-sign-up-button">
             {t('signUpButton')}
           </Button>
         </p>
@@ -126,24 +131,14 @@ function LoginFormContent(props: LoginFormProps & { t: TFunction; tExists: TExis
     [login],
   );
 
-  const memoizedArrowRight = useMemo(
-    () => <ArrowRight className="group-hover:translate-x-1 transition-transform" />,
-    [],
-  );
+  const arrowRight = <ArrowRight className="group-hover:translate-x-1 transition-transform" />;
 
   return (
     <form className="space-y-6" onSubmit={handleSubmit} data-cy="login-form">
-      <Input
-        id="username"
-        name="username"
-        type="text"
-        label={t('username')}
-
-        required
-        isDisabled={isPending}
-        data-cy="login-form-username-input"
-        autoComplete="username"
-      />
+      <TextField isDisabled={isPending}>
+        <Label>{t('username')}</Label>
+        <Input id="username" name="username" type="text" required autoComplete="username" data-cy="login-form-username-input" />
+      </TextField>
       <PasswordInput
         id="password"
         name="password"
@@ -153,44 +148,37 @@ function LoginFormContent(props: LoginFormProps & { t: TFunction; tExists: TExis
         data-cy="login-form-password-input"
         autoComplete="current-password"
       />
-      <Input
-        id="twoFactorCode"
-        name="twoFactorCode"
-        type="text"
-        label={t('twoFactorCode')}
-        description={t('twoFactorHelper')}
-        variant="underlined"
-        isDisabled={isPending}
-        inputMode="numeric"
-        autoComplete="one-time-code"
-        maxLength={6}
-        data-cy="login-form-two-factor-input"
-      />
+      <TextField isDisabled={isPending}>
+        <Label>{t('twoFactorCode')}</Label>
+        <Input id="twoFactorCode" name="twoFactorCode" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} data-cy="login-form-two-factor-input" />
+        <Description>{t('twoFactorHelper')}</Description>
+      </TextField>
       <div className="flex items-center justify-between">
-        <Button
+        <Button variant="secondary"
           onPress={onForgotPassword}
-          variant="light"
-          color="secondary"
           isDisabled={isPending}
           data-cy="login-form-forgot-password-button"
         >
           {t('forgotPassword')}
         </Button>
       </div>
-      <Button
+      <Button variant="primary"
         type="submit"
-        fullWidth
-        color="primary"
-        endContent={memoizedArrowRight}
-        isLoading={isPending}
+        className="w-full"
+        isPending={isPending}
         isDisabled={isPending}
         data-cy="login-form-sign-in-button"
       >
         {isPending ? t('signingIn') : t('signInButton')}
-      </Button>
+        {arrowRight}</Button>
 
       {errorTitle && (
-        <Alert color="danger" title={errorTitle} description={errorDescription} data-cy="login-form-error-alert" />
+        <Alert status="danger" data-cy="login-form-error-alert" >
+          <AlertContent>
+            <AlertTitle>{errorTitle}</AlertTitle>
+            <AlertDescription>{errorDescription}</AlertDescription>
+          </AlertContent>
+        </Alert>
       )}
     </form>
   );

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Button, Card, CardHeader, CardBody, CardFooter, Switch } from '@heroui/react';
+import { Button } from '@heroui/react';
+import { LabeledSwitch } from '../../../../../components/labeledSwitch';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../../../components/toastProvider';
 import {
@@ -11,7 +12,6 @@ import {
   useUsersServiceFindManyKey,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
-import { PageHeader } from '../../../../../components/pageHeader';
 
 import en from './en.json';
 import de from './de.json';
@@ -114,46 +114,46 @@ export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({ user, ss
   }
 
   return (
-    <Card data-cy="user-permission-form-card">
-      <CardHeader>
-        <PageHeader title={t('title')} noMargin />
-      </CardHeader>
-
-      <CardBody className="flex flex-col gap-2">
-        {isSsoManaged ? (
-          <div
-            className="rounded-md border border-warning-200 bg-warning-50 px-3 py-2 text-warning-700"
-            data-cy="user-permission-form-sso-managed"
-          >
-            <p className="text-sm font-semibold">{t('ssoManaged.title')}</p>
-            <p className="text-sm">{t('ssoManaged.description', { providers: ssoProvidersLabel })}</p>
-          </div>
-        ) : null}
+    <section
+      className="w-full flex flex-col gap-4"
+      data-cy="user-permission-form-section"
+    >
+      <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
+        {t('title')}
+      </h3>
+      {isSsoManaged ? (
+        <div
+          className="rounded-md border border-warning-200 bg-warning-50 px-3 py-2 text-warning-700"
+          data-cy="user-permission-form-sso-managed"
+        >
+          <p className="text-sm font-semibold">{t('ssoManaged.title')}</p>
+          <p className="text-sm">{t('ssoManaged.description', { providers: ssoProvidersLabel })}</p>
+        </div>
+      ) : null}
+      <div className="flex flex-col gap-2">
         {Object.keys(permissions).map((permission) => (
-          <Switch
+          <LabeledSwitch
             key={permission}
             isSelected={permissions[permission as keyof SystemPermissions]}
-            onValueChange={handlePermissionChange(permission as keyof SystemPermissions)}
-            color="primary"
+            onChange={handlePermissionChange(permission as keyof SystemPermissions)}
             isDisabled={isPermissionSsoManaged(permission)}
             data-cy={`user-permission-form-${permission}-checkbox`}
           >
             {t(`permissions.${permission}`)}
-          </Switch>
+          </LabeledSwitch>
         ))}
-      </CardBody>
-
-      <CardFooter className="flex justify-end">
+      </div>
+      <div className="flex w-full justify-end">
         <Button
-          color="primary"
+          variant="primary"
           onPress={handleSave}
-          isLoading={isSavingPermissions}
+          isPending={isSavingPermissions}
           isDisabled={allPermissionsSsoManaged}
           data-cy="user-permission-form-save-button"
         >
           {t('actions.save')}
         </Button>
-      </CardFooter>
-    </Card>
+      </div>
+    </section>
   );
 };

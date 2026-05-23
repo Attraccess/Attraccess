@@ -1,16 +1,13 @@
 import { ReactNode, useCallback, useMemo, useState } from 'react';
 import {
   Button,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  Select,
-  SelectItem,
-  Selection,
-  useDisclosure,
+  DrawerBody,
+  DrawerFooter,
+  DrawerHeader,
+  useOverlayState,
 } from '@heroui/react';
+import { StandardDrawer } from '../../../../../components/standardDrawer';
+import { Select } from '../../../../../components/select';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   UseProjectsServiceListProjectInvitationsKeyFn,
@@ -35,7 +32,7 @@ type InviteProjectMemberModalProps = {
 
 export function InviteProjectMemberModal(props: Readonly<InviteProjectMemberModalProps>) {
   const { projectId, children } = props;
-  const { isOpen, onOpen, onClose } = useDisclosure();
+  const { isOpen, open, close } = useOverlayState();
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [role, setRole] = useState<ProjectMember['role']>(ProjectMemberRole.VIEWER);
   const queryClient = useQueryClient();
@@ -68,7 +65,7 @@ export function InviteProjectMemberModal(props: Readonly<InviteProjectMemberModa
         description: t('success.description', { username: invitation.invitedUser?.username ?? '' }),
       });
       invalidateCollaboratorQueries();
-      onClose();
+      close();
       resetState();
     },
     onError: (error) => {
@@ -83,16 +80,6 @@ export function InviteProjectMemberModal(props: Readonly<InviteProjectMemberModa
 
   const roleOptions = useMemo(() => Object.values(ProjectMemberRole), []);
 
-  const onSelectionChange = useCallback(
-    (keys: Selection) => {
-      const value = Array.from(keys)[0] as ProjectMember['role'] | undefined;
-      if (value) {
-        setRole(value);
-      }
-    },
-    [setRole],
-  );
-
   const onInvite = useCallback(async () => {
     if (!selectedUser) {
       return;
@@ -104,57 +91,52 @@ export function InviteProjectMemberModal(props: Readonly<InviteProjectMemberModa
   }, [createInvitation, projectId, role, selectedUser]);
 
   const handleOpenChange = useCallback(
-    (open: boolean) => {
-      if (!open) {
+    (isOpen: boolean) => {
+      if (!isOpen) {
         resetState();
-        onClose();
+        close();
         return;
       }
-      onOpen();
+      open();
     },
-    [onOpen, onClose, resetState],
+    [open, close, resetState],
   );
 
   return (
     <>
-      {children(onOpen)}
-      <Modal isOpen={isOpen} onOpenChange={handleOpenChange}>
-        <ModalContent>
-          {() => (
-            <>
-              <ModalHeader>{t('title')}</ModalHeader>
-              <ModalBody className="gap-4">
-                <p className="text-small text-default-500">{t('description')}</p>
-                <UserSearch
-                  label={t('inputs.user')}
-                  onSelectionChange={setSelectedUser}
-                  afterSelection={
-                    selectedUser ? <span className="text-tiny text-default-500">{selectedUser.username}</span> : null
-                  }
-                />
-                <Select
-                  label={t('inputs.role')}
-                  selectedKeys={[role]}
-                  onSelectionChange={onSelectionChange}
-                  disallowEmptySelection
-                >
-                  {roleOptions.map((value) => (
-                    <SelectItem key={value}>{t(`roles.${value}`)}</SelectItem>
-                  ))}
-                </Select>
-              </ModalBody>
-              <ModalFooter>
-                <Button variant="light" onPress={() => onClose()} isDisabled={isPending}>
-                  {t('actions.cancel')}
-                </Button>
-                <Button color="primary" onPress={onInvite} isDisabled={!selectedUser} isLoading={isPending}>
-                  {t('actions.invite')}
-                </Button>
-              </ModalFooter>
-            </>
-          )}
-        </ModalContent>
-      </Modal>
+      {children(open)}
+      <StandardDrawer isOpen={isOpen} onOpenChange={handleOpenChange}>
+        <DrawerHeader>
+          <h2 className="text-lg font-semibold">{t('title')}</h2>
+        </DrawerHeader>
+        <DrawerBody className="flex flex-col gap-4">
+          <p className="text-small text-default-500">{t('description')}</p>
+          <UserSearch
+            label={t('inputs.user')}
+            afterSelection={
+              selectedUser ? (
+                <span className="text-tiny text-default-500">{selectedUser.username}</span>
+              ) : null
+            }
+          />
+          <Select
+            label={t('inputs.role')}
+            value={role}
+            onChange={(key) => {
+              if (key) setRole(key as ProjectMember['role']);
+            }}
+            items={roleOptions.map((value) => ({ key: value, label: t(`roles.${value}`) }))}
+          />
+        </DrawerBody>
+        <DrawerFooter>
+          <Button variant="ghost" onPress={() => handleOpenChange(false)} isDisabled={isPending}>
+            {t('actions.cancel')}
+          </Button>
+          <Button variant="primary" onPress={onInvite} isDisabled={!selectedUser} isPending={isPending}>
+            {t('actions.invite')}
+          </Button>
+        </DrawerFooter>
+      </StandardDrawer>
     </>
   );
 }

@@ -1,11 +1,18 @@
 import { ResourceFlowNodeSchemaDto } from '@attraccess/react-query-client';
-import { Button, Form, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, useDisclosure } from '@heroui/react';
+import {
+  Button,
+  DrawerBody,
+  DrawerFooter,
+  DrawerHeader,
+  Form,
+  useOverlayState,
+} from '@heroui/react';
 import { useNodeId, useNodesData } from '@xyflow/react';
-import { PageHeader } from '../../../../../../components/pageHeader';
 import { useFlowContext } from '../../flowContext';
 import { Property, PropertyInput } from './property-input';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { TExists, TFunction } from '@attraccess/plugins-frontend-ui';
+import { StandardDrawer } from '../../../../../../components/standardDrawer';
 
 interface Props {
   schema: ResourceFlowNodeSchemaDto;
@@ -16,7 +23,7 @@ interface Props {
 
 export function NodeEditor(props: Props) {
   const { tNodeTranslations: t, tNodeExists, schema } = props;
-  const { isOpen, onOpen, onOpenChange, onClose } = useDisclosure();
+  const { isOpen, open, setOpen, close } = useOverlayState();
 
   const nodeId = useNodeId();
   const currentData = useNodesData(nodeId as string);
@@ -38,8 +45,8 @@ export function NodeEditor(props: Props) {
     }
 
     updateNodeData(nodeId as string, data);
-    onClose();
-  }, [nodeId, data, updateNodeData, onClose]);
+    close();
+  }, [nodeId, data, updateNodeData, close]);
 
   const onInputChange = useCallback((propertyName: string, value: unknown) => {
     setData((prev) => ({ ...prev, [propertyName]: value }));
@@ -47,45 +54,43 @@ export function NodeEditor(props: Props) {
 
   return (
     <>
-      {props.children(onOpen)}
-      <Modal isOpen={isOpen} onOpenChange={onOpenChange} scrollBehavior="inside">
-        <ModalContent>
-          <ModalHeader>
-            <PageHeader
-              title={t('nodes.' + schema.type + '.title')}
-              subtitle={t('nodes.' + schema.type + '.description')}
-              noMargin
-            />
-          </ModalHeader>
+      {props.children(open)}
+      <StandardDrawer isOpen={isOpen} onOpenChange={setOpen}>
+        <DrawerHeader className="flex flex-col gap-1">
+          <h2 className="text-lg font-semibold">{t('nodes.' + schema.type + '.title')}</h2>
+          <p className="text-sm text-default-500">{t('nodes.' + schema.type + '.description')}</p>
+        </DrawerHeader>
 
-          <ModalBody className="flex flex-col gap-2">
-            <Form onSubmit={onSave} ref={formRef}>
-              {Object.entries(schema.configSchema.properties as Record<string, Property<unknown>>).map(
-                ([propertyName, property]) => (
-                  <PropertyInput
-                    key={propertyName}
-                    isRequired={(schema.configSchema.required as string[])?.includes(propertyName)}
-                    nodeType={schema.type}
-                    tNodeTranslations={t}
-                    tNodeExists={tNodeExists}
-                    name={propertyName}
-                    schema={property}
-                    value={data[propertyName]}
-                    onChange={(value) => onInputChange(propertyName, value)}
-                  />
-                ),
-              )}
-              <input hidden type="submit" />
-            </Form>
-          </ModalBody>
+        <DrawerBody className="flex flex-col gap-2">
+          <Form onSubmit={onSave} ref={formRef} className="flex flex-col gap-4">
+            {Object.entries(schema.configSchema.properties as Record<string, Property<unknown>>).map(
+              ([propertyName, property]) => (
+                <PropertyInput
+                  key={propertyName}
+                  isRequired={(schema.configSchema.required as string[])?.includes(propertyName)}
+                  nodeType={schema.type}
+                  tNodeTranslations={t}
+                  tNodeExists={tNodeExists}
+                  name={propertyName}
+                  schema={property}
+                  value={data[propertyName]}
+                  onChange={(value) => onInputChange(propertyName, value)}
+                />
+              ),
+            )}
+            <input hidden type="submit" />
+          </Form>
+        </DrawerBody>
 
-          <ModalFooter>
-            <Button color="primary" onPress={onSave}>
-              {t('editor.buttons.save')}
-            </Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
+        <DrawerFooter className="flex flex-wrap gap-2 justify-end">
+          <Button variant="ghost" onPress={close}>
+            {t('editor.buttons.cancel')}
+          </Button>
+          <Button variant="primary" onPress={onSave}>
+            {t('editor.buttons.save')}
+          </Button>
+        </DrawerFooter>
+      </StandardDrawer>
     </>
   );
 }

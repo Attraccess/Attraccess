@@ -1,22 +1,22 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
-  Modal,
-  Textarea,
-  ModalBody,
-  ModalContent,
-  ModalHeader,
-  useDisclosure,
-  Button,
-  ModalFooter,
   Alert,
-  Form,
+  AlertContent,
+  AlertTitle,
+  Button,
   DatePicker,
-  Switch,
+  DrawerBody,
+  DrawerFooter,
+  DrawerHeader,
+  Form,
+  TextArea,
+  useOverlayState,
 } from '@heroui/react';
 import de from './de.json';
 import en from './en.json';
-import { PageHeader } from '../../../../../components/pageHeader';
 import { MaintenanceReasonDisplay } from '../../../../../components/MaintenanceReasonDisplay';
+import { LabeledSwitch } from '../../../../../components/labeledSwitch';
+import { StandardDrawer } from '../../../../../components/standardDrawer';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { parseAbsolute, type DateValue, type ZonedDateTime, toZoned } from '@internationalized/date';
 import { CalendarIcon } from 'lucide-react';
@@ -40,7 +40,7 @@ export function ResourceMaintenanceUpsertModal(props: Props) {
     en,
   });
 
-  const { isOpen, onOpen, onOpenChange, onClose } = useDisclosure();
+  const { isOpen, open, setOpen, close } = useOverlayState();
 
   const queryClient = useQueryClient();
   const formRef = useRef<HTMLFormElement>(null);
@@ -82,8 +82,8 @@ export function ResourceMaintenanceUpsertModal(props: Props) {
     queryClient.invalidateQueries({
       queryKey: [useResourceMaintenancesServiceFindMaintenancesKey],
     });
-    onClose();
-  }, [queryClient, onClose]);
+    close();
+  }, [queryClient, close]);
 
   const {
     mutate: createMaintenanceMutation,
@@ -109,75 +109,64 @@ export function ResourceMaintenanceUpsertModal(props: Props) {
         reason,
       },
     });
-  }, [
-    createMaintenanceMutation,
-    startTime,
-    endTime,
-    reason,
-    resourceId,
-    hasEndDate,
-    dateValueToAbsoluteString,
-  ]);
+  }, [createMaintenanceMutation, startTime, endTime, reason, resourceId, hasEndDate, dateValueToAbsoluteString]);
 
   return (
     <>
-      {activator(onOpen)}
-      <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
-        <ModalContent>
-          <ModalHeader>
-            <PageHeader icon={<CalendarIcon />} title={t('title')} noMargin />
-          </ModalHeader>
+      {activator(open)}
+      <StandardDrawer isOpen={isOpen} onOpenChange={setOpen}>
+        <DrawerHeader>
+          <div className="flex items-center gap-2">
+            <CalendarIcon className="w-5 h-5" />
+            <h2 className="text-lg font-semibold">{t('title')}</h2>
+          </div>
+        </DrawerHeader>
 
-          <ModalBody>
-            <Form onSubmit={onSubmit} ref={formRef}>
-              <DatePicker
-                label={t('inputs.startTime.label')}
-                value={startTime}
-                isRequired
-                hideTimeZone
-                onChange={setStartTime}
-              />
+        <DrawerBody>
+          <Form onSubmit={onSubmit} ref={formRef} className="flex flex-col gap-4">
+            <DatePicker value={startTime} isRequired hideTimeZone onChange={setStartTime} />
 
-              <Switch isSelected={hasEndDate} onValueChange={onHasEndDateChange}>
-                {t('inputs.hasEndDate.label')}
-              </Switch>
-              {hasEndDate && (
-                <DatePicker
-                  label={t('inputs.endTime.label')}
-                  value={endTime}
-                  isRequired
-                  hideTimeZone
-                  onChange={setEndTime}
-                />
-              )}
+            <LabeledSwitch isSelected={hasEndDate} onChange={onHasEndDateChange}>
+              {t('inputs.hasEndDate.label')}
+            </LabeledSwitch>
+            {hasEndDate && <DatePicker value={endTime} isRequired hideTimeZone onChange={setEndTime} />}
 
-              <div>
-                <label className="text-sm font-medium text-foreground mb-1 block">{t('inputs.reason.label')}</label>
-                {reason ? (
-                  <p className="text-sm text-default-500 mb-2">
-                    {t('inputs.reason.displayedToUsers')}: <MaintenanceReasonDisplay reason={reason} />
-                  </p>
-                ) : null}
-                <Textarea value={reason} onChange={(e) => setReason(e.target.value)} />
-              </div>
-
-              {error ? (
-                <Alert color="danger" title={t('alert.error.title')} variant="flat">
-                  {(error as Error).message}
-                </Alert>
+            <div>
+              <label className="text-sm font-medium text-foreground mb-1 block">
+                {t('inputs.reason.label')}
+              </label>
+              {reason ? (
+                <p className="text-sm text-default-500 mb-2">
+                  {t('inputs.reason.displayedToUsers')}: <MaintenanceReasonDisplay reason={reason} />
+                </p>
               ) : null}
+              <TextArea
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                rows={5}
+                className="w-full min-h-32 resize-y"
+              />
+            </div>
 
-              <button type="submit" hidden />
-            </Form>
-          </ModalBody>
+            {error ? (
+              <Alert status="danger">
+                <AlertContent>
+                  <AlertTitle>{t('alert.error.title')}</AlertTitle>
+                </AlertContent>
+                {(error as Error).message}
+              </Alert>
+            ) : null}
 
-          <ModalFooter>
-            <Button onPress={onSubmit} color="primary" type="submit" isLoading={isCreating}>
-              {t('actions.save')}
-            </Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
+            <button type="submit" hidden />
+          </Form>
+        </DrawerBody>
+
+        <DrawerFooter>
+          <Button variant="primary" onPress={onSubmit} type="submit" isPending={isCreating}>
+            {t('actions.save')}
+          </Button>
+        </DrawerFooter>
+      </StandardDrawer>
     </>
   );
 }

@@ -1,6 +1,6 @@
 import { memo, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Button, Card, CardBody, CardFooter, CardHeader, Spinner } from '@heroui/react';
+import { Button, Card, Spinner } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { ArrowLeft, Edit, RefreshCw } from 'lucide-react';
 import { PageHeader } from '../../../components/pageHeader';
@@ -40,7 +40,7 @@ function DocumentationViewComponent() {
   if (isLoadingResource) {
     return (
       <div className="flex justify-center items-center h-[50vh]">
-        <Spinner size="lg" label={t('loading')} data-cy="documentation-view-loading-spinner" />
+        <Spinner data-cy="documentation-view-loading-spinner" />
       </div>
     );
   }
@@ -49,30 +49,26 @@ function DocumentationViewComponent() {
   if (isResourceError) {
     return (
       <Card className="max-w-xl mx-auto my-8">
-        <CardHeader>
+        <Card.Header>
           <h2 className="text-xl">{t('error.title')}</h2>
-        </CardHeader>
-        <CardBody>
+        </Card.Header>
+        <Card.Content>
           <p className="text-danger">{resourceError instanceof Error ? resourceError.message : t('error.unknown')}</p>
-        </CardBody>
-        <CardFooter className="flex justify-center gap-4">
-          <Button
+        </Card.Content>
+        <Card.Footer className="flex justify-center gap-4">
+          <Button variant="primary"
             onPress={() => refetchResource()}
-            color="primary"
-            startContent={<RefreshCw size={16} />}
             data-cy="documentation-view-error-retry-button"
-          >
+          ><RefreshCw size={16} />
             {t('actions.retry')}
           </Button>
-          <Button
+          <Button variant="secondary"
             onPress={() => navigate('/resources')}
-            variant="flat"
-            startContent={<ArrowLeft size={16} />}
             data-cy="documentation-view-error-back-to-resources-button"
-          >
+          ><ArrowLeft size={16} />
             {t('actions.backToResources')}
           </Button>
-        </CardFooter>
+        </Card.Footer>
       </Card>
     );
   }
@@ -81,22 +77,20 @@ function DocumentationViewComponent() {
   if (!resource) {
     return (
       <Card className="max-w-xl mx-auto my-8">
-        <CardHeader>
+        <Card.Header>
           <h2 className="text-xl">{t('notFound.title')}</h2>
-        </CardHeader>
-        <CardBody>
+        </Card.Header>
+        <Card.Content>
           <p>{t('notFound.message')}</p>
-        </CardBody>
-        <CardFooter className="justify-center">
-          <Button
+        </Card.Content>
+        <Card.Footer className="justify-center">
+          <Button variant="secondary"
             onPress={() => navigate('/resources')}
-            variant="flat"
-            startContent={<ArrowLeft size={16} />}
             data-cy="documentation-view-not-found-back-to-resources-button"
-          >
+          ><ArrowLeft size={16} />
             {t('actions.backToResources')}
           </Button>
-        </CardFooter>
+        </Card.Footer>
       </Card>
     );
   }
@@ -107,41 +101,34 @@ function DocumentationViewComponent() {
         title={t('title')}
         subtitle={resource.name}
         backTo={`/resources/${resourceId}`}
-        actions={
-          <div className="flex gap-2">
-            {canManageResources && (
-              <Button
-                color="primary"
-                variant="flat"
-                onPress={handleEditDocumentation}
-                startContent={<Edit size={16} />}
-                data-cy="documentation-view-header-edit-button"
-              >
-                {t('actions.edit')}
-              </Button>
-            )}
-            <Button
-              variant="flat"
-              onPress={() => refetchResource()}
-              isLoading={isFetching}
-              startContent={<RefreshCw size={16} />}
-              aria-label={t('actions.refresh')}
-              data-cy="documentation-view-header-refresh-button"
-            >
-              {t('actions.refresh')}
-            </Button>
-          </div>
-        }
+        actions={[
+          {
+            key: 'edit',
+            label: t('actions.edit'),
+            icon: <Edit size={16} />,
+            isHidden: !canManageResources,
+            onPress: handleEditDocumentation,
+            dataCy: 'documentation-view-header-edit-button',
+          },
+          {
+            key: 'refresh',
+            label: t('actions.refresh'),
+            icon: <RefreshCw size={16} />,
+            isPending: isFetching,
+            onPress: () => refetchResource(),
+            dataCy: 'documentation-view-header-refresh-button',
+          },
+        ]}
       />
 
       <Card className="mt-6">
-        <CardHeader>
+        <Card.Header>
           <h2 className="text-xl font-semibold">{resource.name}</h2>
-        </CardHeader>
-        <CardBody className="relative">
+        </Card.Header>
+        <Card.Content className="relative">
           {isFetching && (
             <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-10">
-              <Spinner size="lg" data-cy="documentation-view-fetching-spinner" />
+              <Spinner data-cy="documentation-view-fetching-spinner" />
             </div>
           )}
 
@@ -161,7 +148,7 @@ function DocumentationViewComponent() {
               sandbox="allow-scripts allow-same-origin allow-forms"
             />
           )}
-        </CardBody>
+        </Card.Content>
       </Card>
     </div>
   );

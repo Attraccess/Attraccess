@@ -11,6 +11,7 @@ vitest.config.*.timestamp*
 *.sqlite
 .DS_Store
 .parcel-cache/
+.superpowers/
 
 storage/
 storage-docker/

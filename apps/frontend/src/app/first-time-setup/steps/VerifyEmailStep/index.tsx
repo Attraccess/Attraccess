@@ -1,7 +1,7 @@
 import { MailIcon, PencilIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Alert, Button, Link } from '@heroui/react';
+import { Alert, AlertContent, AlertDescription, Button, Link } from '@heroui/react';
 import en from './en.json';
 import de from './de.json';
 
@@ -25,15 +25,19 @@ export function VerifyEmailStep({ onCorrectAdminDetails }: VerifyEmailStepProps)
         </div>
       </div>
 
-      <Alert color="primary" variant="flat" description={t('message')} />
+      <Alert status="default" >
+        <AlertContent>
+          <AlertDescription>{t('message')}</AlertDescription>
+        </AlertContent>
+      </Alert>
 
-      <Button color="primary" onPress={() => navigate('/', { replace: true })}>
+      <Button variant="primary" onPress={() => navigate('/', { replace: true })}>
         {t('actions.goToLogin')}
       </Button>
 
       {onCorrectAdminDetails && (
         <Link
-          as="button"
+
           className="text-sm cursor-pointer self-center"
           onPress={onCorrectAdminDetails}
           data-testid="wrong-admin-details-link"

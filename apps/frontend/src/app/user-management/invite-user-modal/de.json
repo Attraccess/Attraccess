@@ -18,7 +18,8 @@
     }
   },
   "actions": {
-    "invite": "Einladen"
+    "invite": "Einladen",
+    "cancel": "Abbrechen"
   },
   "success": {
     "title": "Erfolg",

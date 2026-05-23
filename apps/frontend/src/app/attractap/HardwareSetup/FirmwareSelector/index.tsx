@@ -1,5 +1,5 @@
 import { AttractapFirmware, useAttractapServiceGetFirmwares } from '@attraccess/react-query-client';
-import { Card, CardBody, CardHeader, Chip, CircularProgress } from '@heroui/react';
+import { Card, Chip, ProgressCircle, ProgressCircleFillCircle, ProgressCircleTrack, ProgressCircleTrackCircle } from "@heroui/react";
 import { PageHeader } from '../../../../components/pageHeader';
 
 interface Props {
@@ -11,19 +11,32 @@ export function FirmwareSelector(props: Props) {
 
   return (
     <div className="flex flex-col gap-4">
-      {isLoading && <CircularProgress isIndeterminate />}
+      {isLoading && (
+        <ProgressCircle isIndeterminate>
+          <ProgressCircleTrack>
+            <ProgressCircleTrackCircle />
+            <ProgressCircleFillCircle />
+          </ProgressCircleTrack>
+        </ProgressCircle>
+      )}
       {firmwares?.map((firmware) => (
-        <Card onPress={() => props.onSelect(firmware)} isPressable key={`${firmware.name}-${firmware.variant}`}>
-          <CardHeader>
-            <PageHeader title={firmware.friendlyName} noMargin />
-          </CardHeader>
-          <CardBody className="flex flex-wrap gap-2 flex-row">
-            {firmware.variantFriendlyName.split(',').map((variantFeature) => (
-              <Chip color="primary" key={`${firmware.name}-${firmware.variant}-${variantFeature}`}>
-                {variantFeature}
-              </Chip>
-            ))}
-          </CardBody>
+        <Card key={`${firmware.name}-${firmware.variant}`}>
+          <button
+            type="button"
+            className="w-full cursor-pointer text-left transition-colors hover:bg-default-100 active:bg-default-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            onClick={() => props.onSelect(firmware)}
+          >
+            <Card.Header>
+              <PageHeader title={firmware.friendlyName} noMargin />
+            </Card.Header>
+            <Card.Content className="flex flex-wrap gap-2 flex-row">
+              {firmware.variantFriendlyName.split(',').map((variantFeature) => (
+                <Chip color="accent" key={`${firmware.name}-${firmware.variant}-${variantFeature}`}>
+                  {variantFeature}
+                </Chip>
+              ))}
+            </Card.Content>
+          </button>
         </Card>
       ))}
     </div>

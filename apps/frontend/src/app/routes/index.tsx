@@ -2,7 +2,7 @@ import { Navigate } from 'react-router-dom';
 import { ResourceDetails } from '../resources/details/resourceDetails';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { Spinner } from '@heroui/react';
-import { MqttServersPage, CreateMqttServerPage, EditMqttServerPage } from '../mqtt';
+import { MqttServersPage, EditMqttServerPage } from '../mqtt';
 import { SSOProvidersPage } from '../sso/SSOProvidersPage';
 import { UserManagementPage } from '../user-management';
 import { usePluginStore } from 'react-pluggable';
@@ -20,6 +20,7 @@ import { ResourceOverview } from '../resourceOverview';
 import { Dependencies } from '../dependencies';
 import { UserManagementDetailsPage } from '../user-management/details';
 import FlowsPage from '../resources/details/flows';
+import { MaintenanceHubPage } from '../resources/details/maintenance-hub';
 import { FormEditorPage, FormListPage } from '../resources/details/forms';
 import AccountPage from '../account';
 import { ConfirmDeleteAccount } from '../confirm-delete-account';
@@ -103,6 +104,11 @@ const coreRoutes: RouteConfig[] = [
     authRequired: 'canManageResources',
   },
   {
+    path: '/resources/:id/maintenance',
+    element: <MaintenanceHubPage />,
+    authRequired: true,
+  },
+  {
     path: '/resource-groups/:groupId',
     element: <ResourceGroupEditPage />,
     authRequired: true,
@@ -110,11 +116,6 @@ const coreRoutes: RouteConfig[] = [
   {
     path: '/mqtt/servers',
     element: <MqttServersPage />,
-    authRequired: 'canManageResources',
-  },
-  {
-    path: '/mqtt/servers/create',
-    element: <CreateMqttServerPage />,
     authRequired: 'canManageResources',
   },
   {

@@ -1,4 +1,4 @@
-import { Button, Input } from '@heroui/react';
+import { Button, TextField, Input } from '@heroui/react';
 import { Plus, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { TFunction } from '@attraccess/plugins-frontend-ui';
@@ -142,13 +142,11 @@ export function ResourceMetadataEditor({ t, value, onChange }: ResourceMetadataE
           <p className="text-sm font-semibold text-default-600">{t('inputs.metadata.label')}</p>
           <p className="text-xs text-default-500">{t('inputs.metadata.description')}</p>
         </div>
-        <Button
-          size="sm"
-          variant="flat"
-          startContent={<Plus className="w-4 h-4" />}
+        <Button variant="secondary"
+
           className="w-full sm:w-auto whitespace-nowrap"
           onPress={handleAddEntry}
-        >
+        ><Plus className="w-4 h-4" />
           {t('inputs.metadata.actions.add')}
         </Button>
       </div>
@@ -159,29 +157,30 @@ export function ResourceMetadataEditor({ t, value, onChange }: ResourceMetadataE
         <div className="space-y-2">
           {entries.map((entry, index) => (
             <div key={entry.id} className="flex flex-col sm:flex-row gap-2 sm:items-center">
-              <Input
+              <TextField
                 value={entry.key}
-                placeholder={t('inputs.metadata.key.placeholder')}
+                onChange={(v) => handleKeyChange(entry.id, v)}
                 aria-label={t('inputs.metadata.key.label')}
-                onChange={(event) => handleKeyChange(entry.id, event.target.value)}
                 className="flex-1"
-                ref={index === entries.length - 1 ? lastKeyInputRef : undefined}
-              />
-              <Input
+              >
+                <Input
+                  placeholder={t('inputs.metadata.key.placeholder')}
+                  ref={index === entries.length - 1 ? lastKeyInputRef : undefined}
+                />
+              </TextField>
+              <TextField
                 value={entry.value}
-                placeholder={t('inputs.metadata.value.placeholder')}
+                onChange={(v) => handleValueChange(entry.id, v)}
                 aria-label={t('inputs.metadata.value.label')}
-                onChange={(event) => handleValueChange(entry.id, event.target.value)}
                 className="flex-1"
-              />
-              <Button
-                size="sm"
-                variant="light"
-                color="danger"
-                startContent={<Trash2 className="w-4 h-4" />}
+              >
+                <Input placeholder={t('inputs.metadata.value.placeholder')} />
+              </TextField>
+              <Button variant="danger-soft"
+
                 className="w-full sm:w-auto"
                 onPress={() => handleRemoveEntry(entry.id)}
-              >
+              ><Trash2 className="w-4 h-4" />
                 {t('inputs.metadata.actions.remove')}
               </Button>
             </div>

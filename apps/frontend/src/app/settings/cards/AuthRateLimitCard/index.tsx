@@ -1,21 +1,32 @@
-import { Card, CardBody, CardHeader } from '@heroui/react';
+import { cn } from '@heroui/react';
 import { ShieldAlertIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { PageHeader } from '../../../../components/pageHeader';
 import { AuthRateLimitForm } from '../../forms/AuthRateLimitForm';
 import en from './en.json';
 import de from './de.json';
 
-export function AuthRateLimitCard() {
+export type AuthRateLimitCardProps = {
+  className?: string;
+};
+
+export function AuthRateLimitCard({ className }: AuthRateLimitCardProps = {}) {
   const { t } = useTranslations({ en, de });
   return (
-    <Card className="flex-1 min-w-[300px]">
-      <CardHeader>
-        <PageHeader title={t('title')} subtitle={t('subtitle')} icon={<ShieldAlertIcon size={18} />} noMargin />
-      </CardHeader>
-      <CardBody className="flex flex-col gap-4">
-        <AuthRateLimitForm />
-      </CardBody>
-    </Card>
+    <section
+      className={cn(
+        'w-full flex flex-col gap-4 rounded-large border border-default-200 bg-default-50 p-6',
+        className,
+      )}
+      data-cy="auth-rate-limit-settings-section"
+    >
+      <div className="flex items-center gap-2">
+        <ShieldAlertIcon size={18} className="text-default-700" />
+        <div className="flex flex-col">
+          <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">{t('title')}</h3>
+          <p className="text-xs text-default-500">{t('subtitle')}</p>
+        </div>
+      </div>
+      <AuthRateLimitForm />
+    </section>
   );
 }

@@ -1,50 +1,39 @@
-import {
-  Button,
-  Card,
-  CardBody,
-  CardHeader,
-  CardProps,
-  cn,
-  Switch,
-  Table,
-  TableBody,
-  TableCell,
-  TableColumn,
-  TableHeader,
-  TableRow,
-} from '@heroui/react';
-import { PageHeader } from '../../../../components/pageHeader';
-import { MaintenanceReasonDisplay, useFormattedMaintenanceReason } from '../../../../components/MaintenanceReasonDisplay';
+import { Button, Card, cn, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow } from '@heroui/react';
+import { PageAction, PageHeader } from '../../../../components/pageHeader';
+import { MaintenanceReasonDisplay } from '../../../../components/MaintenanceReasonDisplay';
+import { LabeledSwitch } from '../../../../components/labeledSwitch';
 import { ResourceMaintenance, useResourceMaintenancesServiceFindMaintenances } from '@attraccess/react-query-client';
-import { useMemo, useState } from 'react';
+import { HTMLAttributes, useMemo, useState } from 'react';
 import { DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useNavigate } from 'react-router-dom';
 
 import de from './de.json';
 import en from './en.json';
 import { ResourceMaintenanceUpsertModal } from './upsert';
 import { MarkDoneModal } from './mark-done';
-import { CheckCircleIcon, CogIcon, ConstructionIcon, PlusIcon } from 'lucide-react';
+import { CheckCircleIcon, CogIcon, ConstructionIcon, ExternalLinkIcon, PlusIcon } from 'lucide-react';
 import { useNow } from '../../../../hooks/useNow';
 import { EmptyState } from '../../../../components/emptyState';
-import { useReactQueryStatusToHeroUiTableLoadingState } from '../../../../hooks/useReactQueryStatusToHeroUiTableLoadingState';
+import { FlatSection } from '../../../../components/flatSection';
 
-interface Props {
+interface Props extends Omit<HTMLAttributes<HTMLElement>, 'children'> {
   resourceId: number;
+  variant?: 'card' | 'flat';
 }
 
-export function MaintenanceManagement(props: Props & Omit<CardProps, 'children'>) {
-  const { resourceId, ...cardProps } = props;
+export function MaintenanceManagement(props: Props) {
+  const { resourceId, variant = 'card', className, ...htmlProps } = props;
 
   const { t } = useTranslations({
     de,
     en,
   });
 
-  const formatReason = useFormattedMaintenanceReason({});
+  const navigate = useNavigate();
 
   const [includePast, setIncludePast] = useState(false);
 
-  const { data: maintenances, status: fetchStatus } = useResourceMaintenancesServiceFindMaintenances({
+  const { data: maintenances } = useResourceMaintenancesServiceFindMaintenances({
     resourceId,
     includePast,
     includeActive: true,
@@ -72,42 +61,70 @@ export function MaintenanceManagement(props: Props & Omit<CardProps, 'children'>
     [maintenances?.data, now],
   );
 
-  const tableLoadingState = useReactQueryStatusToHeroUiTableLoadingState(fetchStatus);
+  const cardActions: PageAction[] = [
+    {
+      key: 'manage-hub',
+      label: t('actions.manageHub.label'),
+      onPress: () => navigate(`/resources/${resourceId}/maintenance`),
+      dataCy: 'manage-maintenance-button',
+    },
+    {
+      key: 'create',
+      label: t('actions.create.label'),
+      icon: <PlusIcon className="w-4 h-4" />,
+      variant: 'primary',
+      renderTrigger: (triggerProps) => (
+        <ResourceMaintenanceUpsertModal resourceId={resourceId}>
+          {(open) => <Button {...triggerProps} onPress={open} />}
+        </ResourceMaintenanceUpsertModal>
+      ),
+    },
+  ];
 
-  return (
-    <Card {...cardProps}>
-      <CardHeader>
-        <PageHeader
-          title={t('title')}
-          icon={<ConstructionIcon />}
-          noMargin
-          actions={
-            <>
-              <Switch isSelected={includePast} onValueChange={setIncludePast}>
-                {t('filters.includePast')}
-              </Switch>
-              <ResourceMaintenanceUpsertModal resourceId={resourceId}>
-                {(open) => (
-                  <Button
-                    onPress={open}
-                    color="primary"
-                    size="sm"
-                    title={t('actions.create.title')}
-                    startContent={<PlusIcon className="w-4 h-4" />}
-                  >
-                    {t('actions.create.label')}
-                  </Button>
-                )}
-              </ResourceMaintenanceUpsertModal>
-            </>
-          }
-        />
-      </CardHeader>
+  const flatActions = (
+    <>
+      <Button
+        variant="ghost"
+        size="sm"
+        isIconOnly
+        onPress={() => navigate(`/resources/${resourceId}/maintenance`)}
+        data-cy="manage-maintenance-button"
+        aria-label={t('actions.manageHub.label')}
+      >
+        <ExternalLinkIcon className="w-4 h-4" />
+      </Button>
+      <LabeledSwitch isSelected={includePast} onChange={setIncludePast}>
+        {t('filters.includePast')}
+      </LabeledSwitch>
+      <ResourceMaintenanceUpsertModal resourceId={resourceId}>
+        {(open) => (
+          <Button
+            variant="primary"
+            size="sm"
+            isIconOnly
+            onPress={open}
+            aria-label={t('actions.create.label')}
+          >
+            <PlusIcon className="w-4 h-4" />
+          </Button>
+        )}
+      </ResourceMaintenanceUpsertModal>
+    </>
+  );
 
-      <CardBody>
-        <Table removeWrapper aria-label={t('table.ariaLabel')}>
+  const includePastSwitch = (
+    <div className="flex justify-end px-4 py-2 border-b border-divider">
+      <LabeledSwitch isSelected={includePast} onChange={setIncludePast}>
+        {t('filters.includePast')}
+      </LabeledSwitch>
+    </div>
+  );
+
+  const tableContent = (
+    <Table>
+          <TableContent aria-label={t('table.ariaLabel')}>
           <TableHeader>
-            <TableColumn>{t('table.columns.start')}</TableColumn>
+            <TableColumn isRowHeader>{t('table.columns.start')}</TableColumn>
             <TableColumn>{t('table.columns.end')}</TableColumn>
             <TableColumn>{t('table.columns.reason')}</TableColumn>
             <TableColumn>{t('table.columns.createdBy')}</TableColumn>
@@ -117,7 +134,7 @@ export function MaintenanceManagement(props: Props & Omit<CardProps, 'children'>
               <CogIcon />
             </TableColumn>
           </TableHeader>
-          <TableBody items={maintenanceWithStatus} loadingState={tableLoadingState} emptyContent={<EmptyState />}>
+          <TableBody items={maintenanceWithStatus} renderEmptyState={() => <EmptyState />}>
             {(maintenance) => (
               <TableRow
                 className={cn(
@@ -131,13 +148,13 @@ export function MaintenanceManagement(props: Props & Omit<CardProps, 'children'>
                 <TableCell>
                   <DateTimeDisplay date={maintenance.endTime} />
                 </TableCell>
-                <TableCell className="overflow-hidden text-ellipsis" title={formatReason(maintenance.reason)}>
+                <TableCell className="overflow-hidden text-ellipsis">
                   <MaintenanceReasonDisplay reason={maintenance.reason} />
                 </TableCell>
-                <TableCell title={(maintenance.createdByUser as { username?: string } | undefined)?.username ?? ''}>
+                <TableCell>
                   {(maintenance.createdByUser as { username?: string } | undefined)?.username ?? '—'}
                 </TableCell>
-                <TableCell title={(maintenance.completedByUser as { username?: string } | undefined)?.username ?? ''}>
+                <TableCell>
                   {(maintenance.completedByUser as { username?: string } | undefined)?.username ?? '—'}
                 </TableCell>
                 <TableCell>
@@ -147,18 +164,15 @@ export function MaintenanceManagement(props: Props & Omit<CardProps, 'children'>
                     '—'
                   )}
                 </TableCell>
-                <TableCell align="right">
+                <TableCell>
                   {maintenance.isActive && (
                     <MarkDoneModal resourceId={resourceId} maintenanceId={maintenance.id}>
                       {(openMarkDone: () => void) => (
-                        <Button
+                        <Button variant="tertiary"
                           isIconOnly
-                          startContent={<CheckCircleIcon className="w-4 h-4" />}
-                          title={t('actions.markDone.title')}
+                         
                           onPress={openMarkDone}
-                          color="success"
-                          variant="light"
-                        />
+                        ><CheckCircleIcon className="w-4 h-4" /></Button>
                       )}
                     </MarkDoneModal>
                   )}
@@ -166,8 +180,78 @@ export function MaintenanceManagement(props: Props & Omit<CardProps, 'children'>
               </TableRow>
             )}
           </TableBody>
+          </TableContent>
         </Table>
-      </CardBody>
+  );
+
+  if (variant === 'flat') {
+    return (
+      <FlatSection
+        icon={<ConstructionIcon className="w-4 h-4" />}
+        title={t('title')}
+        actions={flatActions}
+        className={className}
+        {...htmlProps}
+      >
+        {maintenanceWithStatus.length === 0 ? (
+          <EmptyState />
+        ) : (
+          <ul className="text-sm divide-y divide-divider">
+            {maintenanceWithStatus.map((maintenance) => (
+              <li
+                key={maintenance.id}
+                className={cn(
+                  'flex items-start justify-between gap-3 py-2',
+                  maintenance.isActive && 'border-l-4 border-l-warning pl-2',
+                  maintenance.isPast && 'line-through opacity-60',
+                )}
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="text-foreground-700 text-xs whitespace-nowrap overflow-hidden text-ellipsis">
+                    <DateTimeDisplay date={maintenance.startTime} />
+                    {maintenance.endTime && (
+                      <>
+                        {' – '}
+                        <DateTimeDisplay date={maintenance.endTime} />
+                      </>
+                    )}
+                  </div>
+                  <div className="text-foreground truncate">
+                    <MaintenanceReasonDisplay reason={maintenance.reason} />
+                  </div>
+                </div>
+                {maintenance.isActive && (
+                  <MarkDoneModal resourceId={resourceId} maintenanceId={maintenance.id}>
+                    {(openMarkDone: () => void) => (
+                      <Button variant="tertiary" isIconOnly onPress={openMarkDone}>
+                        <CheckCircleIcon className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </MarkDoneModal>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </FlatSection>
+    );
+  }
+
+  return (
+    <Card className={className} {...htmlProps}>
+      <Card.Header>
+        <PageHeader
+          title={t('title')}
+          icon={<ConstructionIcon />}
+          noMargin
+          actions={cardActions}
+        />
+      </Card.Header>
+
+      <Card.Content>
+        {includePastSwitch}
+        {tableContent}
+      </Card.Content>
     </Card>
   );
 }

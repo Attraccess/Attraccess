@@ -1,5 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Alert, Autocomplete, AutocompleteItem, Button, CircularProgress, cn, Progress } from '@heroui/react';
+import { Alert, AlertContent, AlertTitle, Button, Label, ProgressBar, ProgressBarFill, ProgressBarTrack, TextField, Input, cn } from '@heroui/react';
 import { useMemo, useState } from 'react';
 import { PasswordInput } from '../../../../../components/PasswordInput';
 import { PageHeader } from '../../../../../components/pageHeader';
@@ -53,61 +53,79 @@ export function AttractapSerialConfiguratorNetwork({ className }: { className?: 
       <PageHeader
         title={t('title')}
         noMargin
-        actions={
-          <div className="flex items-center gap-2">
-            <Button size="sm" onPress={handleRefresh} isLoading={isFetchingConfiguration}>
-              {t('actions.refreshStatus')}
-            </Button>
-            <Button size="sm" onPress={handleRefresh} isLoading={isFetchingConfiguration}>
-              {t('actions.refreshWifi')}
-            </Button>
-            {isFetchingConfiguration && <CircularProgress size="sm" isIndeterminate />}
-          </div>
-        }
+        actions={[
+          {
+            key: 'refresh-status',
+            label: t('actions.refreshStatus'),
+            isPending: isFetchingConfiguration,
+            onPress: handleRefresh,
+          },
+          {
+            key: 'refresh-wifi',
+            label: t('actions.refreshWifi'),
+            isPending: isFetchingConfiguration,
+            onPress: handleRefresh,
+          },
+        ]}
       />
 
       {status?.wifi_connected && (
-        <Alert color="success" title={t('wifi.connected.title')}>
+        <Alert status="success">
+          <AlertContent>
+            <AlertTitle>{t('wifi.connected.title')}</AlertTitle>
+          </AlertContent>
           {t('wifi.connected.description', { ssid: status.wifi_ssid, ip: status.wifi_ip })}
         </Alert>
       )}
-      {isWifiConnecting && <Progress isIndeterminate label={t('wifi.connecting.label', { ssid: selectedWifiSSID })} />}
+      {isWifiConnecting && (
+        <ProgressBar isIndeterminate aria-label={t('wifi.connecting.label', { ssid: selectedWifiSSID })}>
+          <ProgressBarTrack>
+            <ProgressBarFill />
+          </ProgressBarTrack>
+        </ProgressBar>
+      )}
       {status && !status.wifi_connected && !isWifiConnecting && (
-        <Alert color="danger" title={t('wifi.disconnected.title')}>
+        <Alert status="danger">
+          <AlertContent>
+            <AlertTitle>{t('wifi.disconnected.title')}</AlertTitle>
+          </AlertContent>
           {t('wifi.disconnected.description', { ssid: status.wifi_ssid ?? '' })}
         </Alert>
       )}
 
       {status?.ethernet_connected ? (
-        <Alert color="success" title={t('ethernet.connected.title')}>
+        <Alert status="success">
+          <AlertContent>
+            <AlertTitle>{t('ethernet.connected.title')}</AlertTitle>
+          </AlertContent>
           {t('ethernet.connected.description', { ip: status.ethernet_ip })}
         </Alert>
       ) : (
-        <Alert color="warning" title={t('ethernet.disconnected.title')} />
+        <Alert status="warning" >
+          <AlertContent>
+            <AlertTitle>{t('ethernet.disconnected.title')}</AlertTitle>
+          </AlertContent>
+        </Alert>
       )}
 
-      <Autocomplete
-        allowsCustomValue
-        defaultItems={networkSelectItems}
-        label={t('ssidSelect.label')}
-        defaultSelectedKey={selectedWifiSSID ?? undefined}
-        onSelectionChange={(ssid) => setSelectedWifiSSID((ssid as string) ?? null)}
-        onInputChange={(value) => setSelectedWifiSSID(value)}
-        isLoading={isFetchingConfiguration}
-        inputValue={selectedWifiSSID ?? ''}
-      >
-        {(item) => <AutocompleteItem key={item.key}>{item.label}</AutocompleteItem>}
-      </Autocomplete>
+      <TextField value={selectedWifiSSID ?? ''} onChange={setSelectedWifiSSID}>
+        <Label>{t('ssidSelect.label')}</Label>
+        <Input list="wifi-ssid-list" />
+        <datalist id="wifi-ssid-list">
+          {networkSelectItems.map((item) => (
+            <option key={item.key} value={item.key}>{item.label}</option>
+          ))}
+        </datalist>
+      </TextField>
       <PasswordInput
         label={t('password.label')}
         value={wifiPassword ?? ''}
-        onChange={(e) => setWifiPassword(e.target.value)}
+        onChange={(setWifiPassword)}
         autoComplete="off"
       />
-      <Button
+      <Button variant="primary"
         onPress={handleSetWifiCredentials}
-        color="primary"
-        isLoading={isWifiConnecting}
+        isPending={isWifiConnecting}
         isDisabled={!selectedWifiSSID}
       >
         {t('setCredentials.label')}

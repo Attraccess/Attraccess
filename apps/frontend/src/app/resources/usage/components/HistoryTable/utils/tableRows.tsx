@@ -32,27 +32,29 @@ export function generateRowCells(
 
   if (resource.type === 'machine') {
     cells.push(
-      <TableCell key={`start-${session.id}`}>
+      <TableCell key={`start-${session.id}`} className="whitespace-nowrap">
         <DateTimeDisplay date={session.startTime} />
       </TableCell>,
-      <TableCell key={`end-${session.id}`} className="hidden md:table-cell">
+      <TableCell key={`end-${session.id}`} className="hidden md:table-cell whitespace-nowrap">
         <DateTimeDisplay date={session.endTime} />
       </TableCell>,
-      <TableCell key={`duration-${session.id}`}>
-        <DurationDisplay
-          minutes={session.usageInMinutes >= 0 ? session.usageInMinutes : null}
-          alternativeText={
-            <Chip color="primary" variant="flat">
-              {t('rows.machine.inProgress')}
-            </Chip>
-          }
-        />
+      <TableCell key={`duration-${session.id}`} className="whitespace-nowrap">
+        <div className="flex items-center gap-2">
+          <DurationDisplay
+            minutes={session.usageInMinutes >= 0 ? session.usageInMinutes : null}
+            alternativeText={
+              <Chip color="accent" variant="soft">
+                {t('rows.machine.inProgress')}
+              </Chip>
+            }
+          />
+          {hasNotes && (
+            <MessageSquareText className="w-4 h-4" role="img" aria-label={t('rows.machine.hasNotes')} />
+          )}
+        </div>
       </TableCell>,
-      <TableCell key={`project-${session.id}`} className="hidden md:table-cell">
+      <TableCell key={`project-${session.id}`} className="hidden 2xl:table-cell">
         {projectCellRenderer ? projectCellRenderer(session) : session.project?.name}
-      </TableCell>,
-      <TableCell key={`icons-${session.id}`} className="flex items-center gap-2">
-        {hasNotes && <MessageSquareText />}
       </TableCell>,
     );
   } else if (resource.type === 'door') {

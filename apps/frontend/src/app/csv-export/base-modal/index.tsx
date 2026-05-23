@@ -1,26 +1,15 @@
-import { ListboxWrapper, useTranslations } from '@attraccess/plugins-frontend-ui';
-import {
-  Button,
-  Checkbox,
-  Listbox,
-  ListboxItem,
-  ModalBody,
-  ModalFooter,
-  TableBody,
-  TableHeader,
-  TableRow,
-  Table,
-  TableColumn,
-  TableCell,
-} from '@heroui/react';
+// Modernized CSV export modal — two pane layout with column picker and preview
+// FEATURE: CSV export — modal body and footer used by every export type
+import { Button, ModalBody, ModalFooter } from '@heroui/react';
 import { QueryStatus } from '@tanstack/react-query';
-import { EmptyState } from '../../../components/emptyState';
-import { TableDataLoadingIndicator } from '../../../components/tableComponents';
-import { useReactQueryStatusToHeroUiTableLoadingState } from '../../../hooks/useReactQueryStatusToHeroUiTableLoadingState';
-import { RotateCwIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { ColumnPicker } from './column-picker';
+import { PreviewTable } from './preview-table';
 import de from './de.json';
 import en from './en.json';
+
+const PREVIEW_LIMIT = 5;
 
 export interface ColumnDefinition<TData extends Row> {
   label: string;
@@ -52,19 +41,13 @@ interface Props<TData extends Row> {
 
 interface ItemRow {
   key: string;
-  columns: Array<{
-    key: string;
-    value: string;
-  }>;
+  columns: Array<{ key: string; value: string }>;
 }
 
 export function BaseCsvExportModal<TData extends Row>(props: Props<TData>) {
   const { columns, items, refetch, options, setOption, filename, queryStatus } = props;
 
-  const { t } = useTranslations({
-    de,
-    en,
-  });
+  const { t } = useTranslations({ de, en });
 
   const [selectedColumnKeys, setSelectedColumnKeys] = useState<Array<string>>(
     columns.filter((col) => col.selectedByDefault).map((col) => col.key),
@@ -74,136 +57,72 @@ export function BaseCsvExportModal<TData extends Row>(props: Props<TData>) {
     setSelectedColumnKeys(columns.filter((col) => col.selectedByDefault).map((col) => col.key));
   }, [columns]);
 
-  const selectedColumns = useMemo(() => {
-    return columns.filter((col) => selectedColumnKeys.includes(col.key));
-  }, [columns, selectedColumnKeys]);
+  const selectedColumns = useMemo(
+    () => columns.filter((col) => selectedColumnKeys.includes(col.key)),
+    [columns, selectedColumnKeys],
+  );
 
-  const itemRows = useMemo(() => {
-    const rows: ItemRow[] = [];
-
-    items.forEach((item) => {
-      const row: ItemRow = {
-        key: String(item.id),
-        columns: [],
-      };
-      selectedColumns.forEach((columnDefinition) => {
-        const value = columnDefinition.getter(item);
-        const column: ItemRow['columns'][0] = {
-          key: columnDefinition.key,
-          value: String(value ?? ''),
-        };
-        row.columns.push(column);
-      });
-
-      rows.push(row);
-    });
-
-    return rows;
+  const itemRows: ItemRow[] = useMemo(() => {
+    return items.map((item) => ({
+      key: String(item.id),
+      columns: selectedColumns.map((col) => ({
+        key: col.key,
+        value: String(col.getter(item) ?? ''),
+      })),
+    }));
   }, [items, selectedColumns]);
 
   const downloadCsv = useCallback(() => {
     const headerRow = selectedColumns.map((column) => column.label);
-
-    const csv = [headerRow.join(';'), ...itemRows.map((row) => row.columns.map((col) => col.value).join(';'))].join(
-      '\n',
-    );
-
+    const csv = [
+      headerRow.join(';'),
+      ...itemRows.map((row) => row.columns.map((col) => col.value).join(';')),
+    ].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = filename;
-    if (!filename.endsWith('.csv')) {
-      a.download += '.csv';
-    }
+    a.download = filename.endsWith('.csv') ? filename : `${filename}.csv`;
     a.click();
   }, [selectedColumns, itemRows, filename]);
 
-  const loadingState = useReactQueryStatusToHeroUiTableLoadingState(queryStatus);
+  const columnsLite = useMemo(() => columns.map((c) => ({ key: c.key, label: c.label })), [columns]);
 
   return (
     <>
-      <ModalBody>
-        <label className="text-sm font-medium">{t('inputs.columns.label')}</label>
-        <ListboxWrapper>
-          <Listbox
-            classNames={{
-              list: 'max-h-[200px] overflow-scroll',
-            }}
-            selectedKeys={selectedColumnKeys}
-            items={columns}
-            label={t('inputs.columns.label')}
-            selectionMode="multiple"
-            variant="flat"
-            onSelectionChange={(keys) => {
-              setSelectedColumnKeys(Array.from(keys as Set<string>));
-            }}
-            data-cy="resource-usage-export-columns-listbox"
-          >
-            {(column) => (
-              <ListboxItem key={column.key} textValue={column.label}>
-                {column.label}
-              </ListboxItem>
-            )}
-          </Listbox>
-        </ListboxWrapper>
+      <ModalBody className="grid grid-cols-1 md:grid-cols-[minmax(0,18rem)_minmax(0,1fr)] gap-6">
+        <ColumnPicker
+          columns={columnsLite}
+          selectedKeys={selectedColumnKeys}
+          onSelectionChange={setSelectedColumnKeys}
+          options={options}
+          onOptionChange={setOption}
+          searchLabel={t('inputs.columns.label')}
+          searchPlaceholder={t('inputs.columns.search')}
+          selectAllLabel={t('inputs.columns.selectAll')}
+          selectNoneLabel={t('inputs.columns.selectNone')}
+          selectedCountLabel={(vars) => t('inputs.columns.selectedCount', vars)}
+        />
 
-        <div className="flex gap-4">
-          {refetch && (
-            <Button
-              variant="light"
-              color="secondary"
-              endContent={<RotateCwIcon className={'w-4 h-4 ' + (queryStatus === 'pending' ? 'animate-spin' : '')} />}
-              onPress={() => refetch()}
-              data-cy="resource-usage-export-refresh-button"
-            >
-              {t('actions.refetch')}
-            </Button>
-          )}
-
-          {(options ?? []).map((option) => (
-            <Checkbox
-              key={option.key}
-              isSelected={option.value}
-              onValueChange={(nextValue) => setOption?.(option.key, nextValue)}
-              data-cy="resource-usage-export-grouping-checkbox"
-            >
-              {option.label}
-            </Checkbox>
-          ))}
-        </div>
-
-        <Table
-          isCompact
-          isVirtualized
-          maxTableHeight={500}
-          rowHeight={40}
-          data-cy="resource-usage-export-table"
-          aria-label={t('table.ariaLabel')}
-        >
-          <TableHeader columns={selectedColumns}>
-            {(column) => <TableColumn key={column.key}>{column.label}</TableColumn>}
-          </TableHeader>
-          <TableBody
-            items={itemRows}
-            loadingState={loadingState}
-            loadingContent={<TableDataLoadingIndicator />}
-            emptyContent={<EmptyState />}
-          >
-            {(row) => (
-              <TableRow key={row.key}>
-                {row.columns.map((column) => (
-                  <TableCell style={{ whiteSpace: 'nowrap' }} key={column.key}>
-                    {column.value}
-                  </TableCell>
-                ))}
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+        <PreviewTable
+          columns={selectedColumns.map((c) => ({ key: c.key, label: c.label }))}
+          rows={itemRows}
+          totalCount={items.length}
+          previewLimit={PREVIEW_LIMIT}
+          ariaLabel={t('table.ariaLabel')}
+          titleLabel={(vars) => t('preview.title', vars)}
+          rowCountLabel={(vars) => t('preview.rowCount', vars)}
+          refetch={refetch}
+          queryStatus={queryStatus}
+        />
       </ModalBody>
-      <ModalFooter>
-        <Button onPress={() => downloadCsv()} data-cy="resource-usage-export-download-csv-button">
+      <ModalFooter className="justify-end">
+        <Button
+          variant="primary"
+          onPress={() => downloadCsv()}
+          isDisabled={selectedColumns.length === 0 || items.length === 0}
+          data-cy="resource-usage-export-download-csv-button"
+        >
           {t('actions.downloadCsv')}
         </Button>
       </ModalFooter>

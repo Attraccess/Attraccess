@@ -22,6 +22,16 @@
   "failedToDelete": "Failed to delete SSO provider.",
   "oidcConfiguration": "OIDC Configuration",
   "samlConfiguration": "SAML Configuration",
+  "sections": {
+    "provider": "Provider",
+    "oidcEndpoints": "OIDC endpoints",
+    "oidcCredentials": "Client credentials",
+    "oidcClaims": "Claim mapping",
+    "samlIdentityProvider": "Identity provider",
+    "samlAttributes": "Attribute mapping",
+    "samlProvisioning": "Provisioning",
+    "samlSigning": "Service provider signing"
+  },
   "issuer": "Issuer",
   "entryPoint": "Entry Point",
   "authorizationURL": "Authorization URL",

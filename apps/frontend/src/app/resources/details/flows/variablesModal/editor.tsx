@@ -1,4 +1,6 @@
-import { Button, Input, Select, SelectItem, Switch, Textarea } from '@heroui/react';
+import { Button, Input, Label, TextArea, TextField } from '@heroui/react';
+import { Select } from '../../../../../components/select';
+import { LabeledSwitch } from '../../../../../components/labeledSwitch';
 import { ResourceFlowVariableScope } from '@attraccess/react-query-client';
 import { TFunction } from '@attraccess/plugins-frontend-ui';
 import { useCallback, useMemo, useState } from 'react';
@@ -123,73 +125,62 @@ export function VariableEditor(props: Props) {
 
       <Select
         label={t('editor.scope')}
-        selectedKeys={[scope]}
-        onChange={(e) => setScope(e.target.value as ResourceFlowVariableScope)}
+        value={scope}
+        onChange={(v) => setScope(v as ResourceFlowVariableScope)}
         isDisabled={isEdit}
-      >
-        <SelectItem key={ResourceFlowVariableScope.RESOURCE}>{t('editor.scopeResource')}</SelectItem>
-        <SelectItem key={ResourceFlowVariableScope.GLOBAL}>{t('editor.scopeGlobal')}</SelectItem>
-      </Select>
-
-      <Input
-        label={t('editor.key')}
-        placeholder={t('editor.keyPlaceholder')}
-        value={key}
-        onValueChange={setKey}
-        isDisabled={isEdit}
+        items={[
+          { key: ResourceFlowVariableScope.RESOURCE, label: t('editor.scopeResource') },
+          { key: ResourceFlowVariableScope.GLOBAL, label: t('editor.scopeGlobal') },
+        ]}
       />
+
+      <TextField value={key} onChange={setKey} isDisabled={isEdit}>
+        <Label>{t('editor.key')}</Label>
+        <Input placeholder={t('editor.keyPlaceholder')} />
+      </TextField>
 
       <Select
         label={t('editor.type')}
-        selectedKeys={[valueType]}
-        onChange={(e) => onChangeType(e.target.value as ValueType)}
-      >
-        {ALL_TYPES.map((typeOption) => (
-          <SelectItem key={typeOption}>{t(`editor.types.${typeOption}`)}</SelectItem>
-        ))}
-      </Select>
+        value={valueType}
+        onChange={(v) => onChangeType(v as ValueType)}
+        items={ALL_TYPES.map((typeOption) => ({
+          key: typeOption,
+          label: t(`editor.types.${typeOption}`),
+        }))}
+      />
 
       {valueType === 'string' && (
-        <Input
-          label={t('editor.value')}
-          placeholder={t('editor.valuePlaceholderString')}
-          value={stringValue}
-          onValueChange={setStringValue}
-        />
+        <TextField value={stringValue} onChange={setStringValue}>
+          <Label>{t('editor.value')}</Label>
+          <Input placeholder={t('editor.valuePlaceholderString')} />
+        </TextField>
       )}
       {valueType === 'number' && (
-        <Input
-          label={t('editor.value')}
-          type="number"
-          placeholder={t('editor.valuePlaceholderNumber')}
-          value={numberValue}
-          onValueChange={setNumberValue}
-        />
+        <TextField value={numberValue} onChange={setNumberValue}>
+          <Label>{t('editor.value')}</Label>
+          <Input type="number" placeholder={t('editor.valuePlaceholderNumber')} />
+        </TextField>
       )}
       {valueType === 'boolean' && (
         <div className="flex items-center gap-3">
           <span className="text-sm">{t('editor.value')}</span>
-          <Switch isSelected={boolValue} onValueChange={setBoolValue} />
+          <LabeledSwitch isSelected={boolValue} onChange={setBoolValue} />
         </div>
       )}
       {(valueType === 'object' || valueType === 'array') && (
-        <Textarea
-          label={t('editor.value')}
-          minRows={6}
-          placeholder={t('editor.valuePlaceholderJson')}
-          value={jsonValue}
-          onValueChange={setJsonValue}
-          classNames={{ input: 'font-mono text-sm' }}
-        />
+        <TextField value={jsonValue} onChange={setJsonValue}>
+          <Label>{t('editor.value')}</Label>
+          <TextArea rows={6} placeholder={t('editor.valuePlaceholderJson')} className="font-mono text-sm" />
+        </TextField>
       )}
 
       {error && <p className="text-danger text-sm">{error}</p>}
 
       <div className="flex flex-row justify-end gap-2">
-        <Button variant="flat" onPress={onCancel} isDisabled={isSaving}>
+        <Button variant="ghost" onPress={onCancel} isDisabled={isSaving}>
           {t('actions.cancel')}
         </Button>
-        <Button color="primary" onPress={handleSubmit} isLoading={isSaving}>
+        <Button variant="primary" onPress={handleSubmit} isPending={isSaving}>
           {t('actions.save')}
         </Button>
       </div>

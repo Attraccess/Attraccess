@@ -1,20 +1,23 @@
 import {
   Button,
+  DrawerBody,
+  DrawerFooter,
+  DrawerHeader,
   Form,
+  TextField,
+  Label,
   Input,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalHeader,
   Tab,
+  TabList,
+  TabPanel,
   Tabs,
-  useDisclosure,
+  useOverlayState,
 } from '@heroui/react';
+import { StandardDrawer } from '../../../components/standardDrawer';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 import { ApiError, useUsersServiceFindManyKey, useUsersServiceInviteUser } from '@attraccess/react-query-client';
-import { PageHeader } from '../../../components/pageHeader';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useToastMessage } from '../../../components/toastProvider';
 import { useQueryClient } from '@tanstack/react-query';
@@ -29,7 +32,7 @@ interface Props {
 
 export function InviteUserModal(props: Props) {
   const { children } = props;
-  const { isOpen, onOpen, onClose } = useDisclosure();
+  const { isOpen, open, close } = useOverlayState();
   const { t, tExists } = useTranslations({
     en: {
       ...en,
@@ -82,7 +85,7 @@ export function InviteUserModal(props: Props) {
         queryKey: [useUsersServiceFindManyKey],
       });
       resetSingleInviteForm();
-      onClose();
+      close();
     },
     onError: (error) => {
       toast.apiError({
@@ -119,72 +122,80 @@ export function InviteUserModal(props: Props) {
 
   return (
     <>
-      {children(onOpen)}
-      <Modal isOpen={isOpen} onClose={onClose} size={tab === 'single' ? 'sm' : '3xl'} scrollBehavior="inside">
-        <ModalContent>
-          <ModalHeader>
-            <PageHeader title={t('title')} noMargin />
-          </ModalHeader>
-
-          <ModalBody>
-            <Tabs onSelectionChange={(key) => setTab(key as 'single' | 'csv')} selectedKey={tab}>
-              <Tab key="single" title={t('tabs.single')}>
-                <Form
-                  ref={formRef}
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    onSubmit();
-                  }}
-                  className="flex flex-col gap-4"
-                >
-                  <UsernameInput
-                    label={t('inputs.username.label')}
-                    name="username"
-                    isRequired
-                    required
-                    value={username}
-                    onValueChange={setUsername}
-                    validationMessages={usernameValidationMessages}
-                    description={t('inputs.username.description', {
-                      min: USERNAME_RULES.minLength,
-                      max: USERNAME_RULES.maxLength,
-                    })}
-                  />
-                  <Input
-                    label={t('inputs.email.label')}
-                    name="email"
-                    type="email"
-                    isRequired
-                    required
-                    value={email}
-                    onValueChange={setEmail}
-                  />
-
-                  <div className="flex justify-end w-full">
-                    <Button color="primary" type="submit" isLoading={isPending} isDisabled={!canSubmit}>
-                      {t('actions.invite')}
-                    </Button>
-                  </div>
-                </Form>
-              </Tab>
-
-              <Tab key="csv" title={t('tabs.csv')}>
-                <CsvInvite
-                  onSuccess={onClose}
-                  onError={(error) =>
-                    toast.apiError({
-                      error: error as ApiError,
-                      t,
-                      tExists,
-                      baseTranslationKey: 'api',
-                    })
-                  }
+      {children(open)}
+      <StandardDrawer
+        isOpen={isOpen}
+        onOpenChange={(o) => {
+          if (!o) close();
+        }}
+      >
+        <DrawerHeader>
+          <h2 className="text-lg font-semibold">{t('title')}</h2>
+        </DrawerHeader>
+        <DrawerBody>
+          <Tabs selectedKey={tab} onSelectionChange={(k) => setTab(k as 'single' | 'csv')}>
+            <TabList>
+              <Tab id="single">{t('tabs.single')}</Tab>
+              <Tab id="csv">{t('tabs.csv')}</Tab>
+            </TabList>
+            <TabPanel id="single">
+              <Form
+                ref={formRef}
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  onSubmit();
+                }}
+                className="flex flex-col gap-4"
+              >
+                <UsernameInput
+                  label={t('inputs.username.label')}
+                  name="username"
+                  isRequired
+                  value={username}
+                  onChange={setUsername}
+                  validationMessages={usernameValidationMessages}
+                  description={t('inputs.username.description', {
+                    min: USERNAME_RULES.minLength,
+                    max: USERNAME_RULES.maxLength,
+                  })}
                 />
-              </Tab>
-            </Tabs>
-          </ModalBody>
-        </ModalContent>
-      </Modal>
+                <TextField isRequired value={email} onChange={setEmail}>
+                  <Label>{t('inputs.email.label')}</Label>
+                  <Input name="email" type="email" required />
+                </TextField>
+              </Form>
+            </TabPanel>
+            <TabPanel id="csv">
+              <CsvInvite
+                onSuccess={close}
+                onError={(error) =>
+                  toast.apiError({
+                    error: error as ApiError,
+                    t,
+                    tExists,
+                    baseTranslationKey: 'api',
+                  })
+                }
+              />
+            </TabPanel>
+          </Tabs>
+        </DrawerBody>
+        {tab === 'single' && (
+          <DrawerFooter>
+            <Button variant="secondary" onPress={close}>
+              {t('actions.cancel')}
+            </Button>
+            <Button
+              variant="primary"
+              onPress={onSubmit}
+              isPending={isPending}
+              isDisabled={!canSubmit}
+            >
+              {t('actions.invite')}
+            </Button>
+          </DrawerFooter>
+        )}
+      </StandardDrawer>
     </>
   );
 }

@@ -1,5 +1,5 @@
 import { Project } from '@attraccess/react-query-client';
-import { Card, CardBody, CardFooter, Chip, Image, Link } from '@heroui/react';
+import { Card, Chip, Link } from '@heroui/react';
 import { filenameToUrl } from '../../../api';
 
 interface Props {
@@ -11,22 +11,19 @@ export function ProjectCard(props: Props) {
   const { project, archivedLabel } = props;
 
   return (
-    <Card isPressable shadow="sm" as={Link} href={`/projects/${project.id}`}>
-      <CardBody className="overflow-visible p-0">
-        <Image
+    <Link href={`/projects/${project.id}`} className="block"><Card>
+      <Card.Content className="overflow-visible p-0">
+        <img
           alt={project.name}
-          className="w-full object-cover h-[240px] hover:object-contain transition-all duration-300"
-          radius="lg"
-          shadow="sm"
+          className="w-full object-cover h-[240px] hover:object-contain transition-all duration-300 rounded-lg shadow-sm"
           src={filenameToUrl(project.logo) || '/project-no-thumbnail.svg'}
-          width="100%"
         />
-      </CardBody>
-      <CardFooter className="flex-col items-start justify-start gap-2">
+      </Card.Content>
+      <Card.Footer className="flex-col items-start justify-start gap-2">
         <div className="flex w-full items-center justify-between gap-2">
           <b className="text-ellipsis overflow-hidden line-clamp-1">{project.name}</b>
           {project.archivedAt && (
-            <Chip size="sm" variant="flat" color="warning">
+            <Chip variant="soft" color="warning">
               {archivedLabel ?? 'Archived'}
             </Chip>
           )}
@@ -34,7 +31,7 @@ export function ProjectCard(props: Props) {
         <p className="text-small leading-5 text-default-500 text-ellipsis overflow-hidden line-clamp-2 min-h-[2.5rem]">
           {project.description}
         </p>
-      </CardFooter>
-    </Card>
+      </Card.Footer>
+    </Card></Link>
   );
 }

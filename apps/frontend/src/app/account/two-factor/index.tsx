@@ -1,4 +1,4 @@
-import { Alert, Button, Input, Skeleton } from '@heroui/react';
+import { Alert, AlertContent, AlertDescription, AlertTitle, Button, Input, Label, Skeleton, TextField } from '@heroui/react';
 import { QRCode } from 'react-qrcode-logo';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -97,11 +97,16 @@ export function TwoFactorCard() {
         <div className="text-sm text-default-500">{status?.enabled ? t('status.enabled') : t('status.disabled')}</div>
       </div>
 
-      {policyWarning && <Alert color="warning" title={t('policy.title')} description={policyWarning} />}
+      {policyWarning && <Alert status="warning" >
+        <AlertContent>
+          <AlertTitle>{t('policy.title')}</AlertTitle>
+          <AlertDescription>{policyWarning}</AlertDescription>
+        </AlertContent>
+      </Alert>}
 
       {showSetup && (
         <div className="flex flex-col gap-4">
-          <Button onPress={handleStartSetup} isLoading={isSettingUp} isDisabled={isBusy}>
+          <Button onPress={handleStartSetup} isPending={isSettingUp} isDisabled={isBusy}>
             {setupData ? t('setup.regenerateButton') : t('setup.startButton')}
           </Button>
 
@@ -112,26 +117,17 @@ export function TwoFactorCard() {
                 <div className="text-xs text-default-500">{t('setup.scanHint')}</div>
               </div>
 
-              <Input
-                label={t('setup.secretLabel')}
-                value={setupData.secret}
-                readOnly
-                variant="bordered"
-                description={t('setup.secretHint')}
-              />
+              <TextField value={setupData.secret} isReadOnly>
+                <Label>{t('setup.secretLabel')}</Label>
+                <Input />
+              </TextField>
 
-              <Input
-                label={t('setup.codeLabel')}
-                value={setupCode}
-                onValueChange={setSetupCode}
-                variant="bordered"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                maxLength={6}
-                isDisabled={isBusy}
-              />
+              <TextField value={setupCode} onChange={setSetupCode} isDisabled={isBusy}>
+                <Label>{t('setup.codeLabel')}</Label>
+                <Input inputMode="numeric" autoComplete="one-time-code" maxLength={6} />
+              </TextField>
 
-              <Button onPress={handleVerify} isLoading={isVerifying} isDisabled={isBusy || !setupCode.trim()}>
+              <Button onPress={handleVerify} isPending={isVerifying} isDisabled={isBusy || !setupCode.trim()}>
                 {t('setup.verifyButton')}
               </Button>
             </div>
@@ -141,17 +137,11 @@ export function TwoFactorCard() {
 
       {!showSetup && (
         <div className="flex flex-col gap-4">
-          <Input
-            label={t('disable.codeLabel')}
-            value={disableCode}
-            onValueChange={setDisableCode}
-            variant="bordered"
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            maxLength={6}
-            isDisabled={isBusy}
-          />
-          <Button color="danger" onPress={handleDisable} isLoading={isDisabling} isDisabled={isBusy || !disableCode.trim()}>
+          <TextField value={disableCode} onChange={setDisableCode} isDisabled={isBusy}>
+            <Label>{t('disable.codeLabel')}</Label>
+            <Input inputMode="numeric" autoComplete="one-time-code" maxLength={6} />
+          </TextField>
+          <Button variant="danger" onPress={handleDisable} isPending={isDisabling} isDisabled={isBusy || !disableCode.trim()}>
             {t('disable.button')}
           </Button>
         </div>

@@ -17,6 +17,12 @@
   "editor": {
     "createTitle": "Create form",
     "editTitle": "{{formName}}",
+    "sections": {
+      "identity": "Form identity",
+      "behavior": "When this form is required",
+      "fields": "Fields",
+      "preview": "Live preview"
+    },
     "nameLabel": "Form name",
     "namePlaceholder": "Machine safety checklist",
     "resourceUsageStart": "Require before starting a session",

@@ -2,8 +2,10 @@ import { useCallback, useMemo, useState } from 'react';
 import {
   Button,
   Modal,
+  ModalBackdrop,
   ModalBody,
-  ModalContent,
+  ModalContainer,
+  ModalDialog,
   ModalFooter,
   ModalHeader,
 } from '@heroui/react';
@@ -60,7 +62,6 @@ export function UpdateNotificationBanner() {
   }, [updateStatus]);
 
   const onOpenReleaseNotes = useCallback(() => setIsReleaseNotesOpen(true), []);
-  const onCloseReleaseNotes = useCallback(() => setIsReleaseNotesOpen(false), []);
 
   if (!shouldRender || !updateStatus?.latestRelease || !updateStatus.latestVersion) {
     return null;
@@ -88,61 +89,54 @@ export function UpdateNotificationBanner() {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant="flat" color="primary" onPress={onOpenReleaseNotes}>
+            <Button variant="secondary" onPress={onOpenReleaseNotes}>
               {t('viewReleaseNotes')}
             </Button>
-            <Button
-              size="sm"
-              color="primary"
-              endContent={<ExternalLink size={14} />}
-              as="a"
-              href={updateDocsPath}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              {t('howToUpdate')}
-            </Button>
-            <Button
-              size="sm"
-              variant="light"
-              isIconOnly
-              aria-label={t('dismissThisVersion')}
-              onPress={onDismiss}
-            >
+            <a href={updateDocsPath} target="_blank" rel="noopener noreferrer">
+              <Button variant="primary">
+                {t('howToUpdate')}
+                <ExternalLink size={14} />
+              </Button>
+            </a>
+            <Button variant="ghost" isIconOnly aria-label={t('dismissThisVersion')} onPress={onDismiss}>
               <X size={16} />
             </Button>
           </div>
         </div>
       </div>
 
-      <Modal isOpen={isReleaseNotesOpen} onOpenChange={setIsReleaseNotesOpen} size="2xl" scrollBehavior="inside">
-        <ModalContent>
-          <ModalHeader>{t('releaseNotesModalTitle', { version: release.version })}</ModalHeader>
-          <ModalBody>
-            {release.body?.trim() ? (
-              <div className="prose prose-sm dark:prose-invert max-w-none">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{release.body}</ReactMarkdown>
-              </div>
-            ) : (
-              <div className="text-default-500">{t('releaseNotesFallback')}</div>
-            )}
-          </ModalBody>
-          <ModalFooter className="flex-wrap gap-2 justify-between">
-            <Button
-              as="a"
-              href={release.htmlUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              variant="flat"
-              endContent={<ExternalLink size={14} />}
-            >
-              {release.tagName}
-            </Button>
-            <Button color="primary" onPress={onCloseReleaseNotes}>
-              {t('close')}
-            </Button>
-          </ModalFooter>
-        </ModalContent>
+      <Modal isOpen={isReleaseNotesOpen} onOpenChange={setIsReleaseNotesOpen}>
+        <ModalBackdrop>
+          <ModalContainer size="md">
+            <ModalDialog>
+              {({ close }) => (
+                <>
+                  <ModalHeader>{t('releaseNotesModalTitle', { version: release.version })}</ModalHeader>
+                  <ModalBody>
+                    {release.body?.trim() ? (
+                      <div className="prose prose-sm dark:prose-invert max-w-none">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{release.body}</ReactMarkdown>
+                      </div>
+                    ) : (
+                      <div className="text-default-500">{t('releaseNotesFallback')}</div>
+                    )}
+                  </ModalBody>
+                  <ModalFooter className="flex-wrap gap-2 justify-between">
+                    <a href={release.htmlUrl} target="_blank" rel="noopener noreferrer">
+                      <Button variant="secondary">
+                        {release.tagName}
+                        <ExternalLink size={14} />
+                      </Button>
+                    </a>
+                    <Button variant="primary" onPress={close}>
+                      {t('close')}
+                    </Button>
+                  </ModalFooter>
+                </>
+              )}
+            </ModalDialog>
+          </ModalContainer>
+        </ModalBackdrop>
       </Modal>
     </>
   );

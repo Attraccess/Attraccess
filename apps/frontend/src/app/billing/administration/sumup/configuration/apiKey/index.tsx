@@ -7,17 +7,19 @@ import {
   useBillingServiceGetSumUpReadersKey,
   useBillingServiceSetSumUpApiKey,
 } from '@attraccess/react-query-client';
-import { Button, Card, CardBody, CardHeader, Form, Chip, Spinner, Link, CardFooter, CardProps } from '@heroui/react';
+import { Button, Chip, Form, Link, Spinner } from '@heroui/react';
 import { PageHeader } from '../../../../../../components/pageHeader';
 import { PasswordInput } from '../../../../../../components/PasswordInput';
-import { useCallback, useRef, useState } from 'react';
+import { ComponentPropsWithoutRef, useCallback, useRef, useState } from 'react';
+import { twMerge } from 'tailwind-merge';
 import { useToastMessage } from '../../../../../../components/toastProvider';
 import { useQueryClient } from '@tanstack/react-query';
 import { CheckIcon, WebhookIcon, XIcon } from 'lucide-react';
 import API_ERROR_TRANSLATIONS_DE from '../../../../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../../../global-translations/api-errors.en.json';
 
-export function ApiKeyCard(props: Omit<CardProps, 'children'>) {
+export function ApiKeyCard(props: Omit<ComponentPropsWithoutRef<'section'>, 'children'>) {
+  const { className, ...sectionProps } = props;
   const { t, tExists } = useTranslations({
     en: {
       ...en,
@@ -75,21 +77,25 @@ export function ApiKeyCard(props: Omit<CardProps, 'children'>) {
   }, [setSumUpApiKey, apiKey]);
 
   return (
-    <Card {...props}>
-      <CardHeader>
-        <PageHeader
-          icon={<WebhookIcon size={20} />}
-          title={t('title')}
-          subtitle={t('subtitle')}
-          noMargin
-          actions={
+    <section
+      {...sectionProps}
+      className={twMerge(
+        'w-full flex flex-col gap-4 pt-6 border-t border-default-200 first:pt-0 first:border-t-0 @xl:pt-0 @xl:border-t-0 @xl:pl-6 @xl:border-l @xl:first:pl-0 @xl:first:border-l-0',
+        className
+      )}
+    >
+      <PageHeader
+        icon={<WebhookIcon size={20} />}
+        title={
+          <span className="flex items-center gap-2 flex-wrap">
+            {t('title')}
             <Chip
               color={isLoadingConfiguration ? 'default' : configuration?.enabled ? 'success' : 'warning'}
-              variant="flat"
+              variant="soft"
             >
               <div className="flex items-center gap-2">
                 {isLoadingConfiguration ? (
-                  <Spinner size="sm" />
+                  <Spinner />
                 ) : configuration?.enabled ? (
                   <CheckIcon size={16} />
                 ) : (
@@ -102,41 +108,43 @@ export function ApiKeyCard(props: Omit<CardProps, 'children'>) {
                     : t('status.disabled.title')}
               </div>
             </Chip>
-          }
+          </span>
+        }
+        subtitle={t('subtitle')}
+        noMargin
+      />
+
+      <Form
+        onSubmit={(e) => {
+          e.preventDefault();
+          onSubmitApiKey();
+        }}
+        ref={apiKeyFormRef}
+        className="flex flex-col gap-2 w-full"
+      >
+        <PasswordInput
+          label={t('inputs.apiKey.label')}
+          description={t('inputs.apiKey.description')}
+          value={apiKey}
+          onChange={setApiKey}
+          autoComplete="off"
+          isRequired
         />
-      </CardHeader>
 
-      <CardBody className="flex flex-col gap-2">
-        <Form
-          onSubmit={(e) => {
-            e.preventDefault();
-            onSubmitApiKey();
-          }}
-          ref={apiKeyFormRef}
-        >
-          <PasswordInput
-            label={t('inputs.apiKey.label')}
-            description={t('inputs.apiKey.description')}
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-            autoComplete="off"
-            isRequired
-          />
+        <small>
+          <Link href={sumUpApiKeyUrl} target="_blank" rel="noopener noreferrer">
+            {sumUpApiKeyUrl}
+          </Link>
+        </small>
 
-          <small>
-            <Link isExternal href={sumUpApiKeyUrl} target="_blank" rel="noopener noreferrer">
-              {sumUpApiKeyUrl}
-            </Link>
-          </small>
+        <input type="submit" hidden />
+      </Form>
 
-          <input type="submit" hidden />
-        </Form>
-      </CardBody>
-      <CardFooter>
-        <Button color="primary" onPress={onSubmitApiKey} isLoading={isPendingSetSumUpApiKey}>
+      <div className="flex justify-end">
+        <Button variant="primary" onPress={onSubmitApiKey} isPending={isPendingSetSumUpApiKey}>
           {t('actions.save')}
         </Button>
-      </CardFooter>
-    </Card>
+      </div>
+    </section>
   );
 }

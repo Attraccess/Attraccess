@@ -1,4 +1,4 @@
-import { Alert, Button, CircularProgress } from '@heroui/react';
+import { Alert, AlertContent, AlertTitle, Button, ProgressCircle, ProgressCircleFillCircle, ProgressCircleTrack, ProgressCircleTrackCircle } from '@heroui/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { ESPTools, ESPToolsResult } from '../../../../utils/esp-tools';
@@ -46,7 +46,10 @@ function SerialConfiguratorContent({ openDeviceSettings }: Props) {
   return (
     <div className="w-full flex flex-row flex-wrap flex-stretch gap-4">
       {isLoadingInitialData && (
-        <Alert color="primary" title={t('connecting.progress.label')}>
+        <Alert status="default">
+          <AlertContent>
+            <AlertTitle>{t('connecting.progress.label')}</AlertTitle>
+          </AlertContent>
           {t('connecting.progress.label')}
         </Alert>
       )}
@@ -98,14 +101,22 @@ export function AttractapSerialConfigurator(props: Props) {
   if (state === 'connecting') {
     return (
       <div className="flex flex-col items-center justify-center gap-4">
-        <CircularProgress isIndeterminate label={t('connecting.progress.label')} />
+        <ProgressCircle isIndeterminate aria-label={t('connecting.progress.label')}>
+        <ProgressCircleTrack>
+          <ProgressCircleTrackCircle />
+          <ProgressCircleFillCircle />
+        </ProgressCircleTrack>
+      </ProgressCircle>
       </div>
     );
   }
 
   if (state === 'error') {
     return (
-      <Alert color="danger" title={error?.type}>
+      <Alert status="danger">
+        <AlertContent>
+          <AlertTitle>{error?.type}</AlertTitle>
+        </AlertContent>
         <div>{error?.details as string}</div>
         <Button onPress={connect}>{t('actions.retryConnect')}</Button>
       </Alert>

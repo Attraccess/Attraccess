@@ -1,5 +1,16 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Button, Divider, NumberInput, Spinner, Switch } from '@heroui/react';
+import {
+  Button,
+  NumberField,
+  NumberFieldDecrementButton,
+  NumberFieldGroup,
+  NumberFieldIncrementButton,
+  NumberFieldInput,
+  Separator,
+  Spinner,
+} from '@heroui/react';
+import { HelpCircleIcon } from 'lucide-react';
+import { LabeledSwitch } from '../../../../components/labeledSwitch';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
@@ -28,6 +39,46 @@ function toFormState(value: AuthRateLimitSettingsDto): FormState {
     exponentialBackoff: value.exponentialBackoff,
     backoffMultiplier: value.backoffMultiplier,
   };
+}
+
+function NumberRow({
+  label,
+  description,
+  value,
+  onChange,
+  minValue = 1,
+  step = 1,
+  isDisabled,
+  dataTestid,
+}: {
+  label: string;
+  description?: string;
+  value: number;
+  onChange: (value: number) => void;
+  minValue?: number;
+  step?: number;
+  isDisabled?: boolean;
+  dataTestid?: string;
+}) {
+  return (
+    <div className="flex flex-col gap-1" data-testid={dataTestid}>
+      <div className="flex items-center gap-1.5">
+        <span className="text-sm font-medium">{label}</span>
+        {description && (
+          <span title={description} aria-label={description}>
+            <HelpCircleIcon size={14} className="text-default-400 cursor-help" />
+          </span>
+        )}
+      </div>
+      <NumberField value={value} onChange={onChange} minValue={minValue} step={step} isDisabled={isDisabled}>
+        <NumberFieldGroup>
+          <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
+          <NumberFieldInput />
+          <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
+        </NumberFieldGroup>
+      </NumberField>
+    </div>
+  );
 }
 
 export function AuthRateLimitForm() {
@@ -77,60 +128,51 @@ export function AuthRateLimitForm() {
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-default-500">{t('description')}</p>
-      <NumberInput
-        label={t('fields.maxAttempts.label')}
-        description={t('fields.maxAttempts.description')}
-        value={form.maxAttempts}
-        onValueChange={(value) => setForm({ ...form, maxAttempts: value })}
-        minValue={1}
-        step={1}
-        variant="bordered"
-        data-testid="rate-limit-max-attempts"
-      />
-      <NumberInput
-        label={t('fields.windowSeconds.label')}
-        description={t('fields.windowSeconds.description')}
-        value={form.windowSeconds}
-        onValueChange={(value) => setForm({ ...form, windowSeconds: value })}
-        minValue={1}
-        step={1}
-        variant="bordered"
-        data-testid="rate-limit-window-seconds"
-      />
-      <NumberInput
-        label={t('fields.lockoutDurationSeconds.label')}
-        description={t('fields.lockoutDurationSeconds.description')}
-        value={form.lockoutDurationSeconds}
-        onValueChange={(value) => setForm({ ...form, lockoutDurationSeconds: value })}
-        minValue={1}
-        step={1}
-        variant="bordered"
-        data-testid="rate-limit-lockout-duration"
-      />
-      <Divider />
-      <Switch
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <NumberRow
+          label={t('fields.maxAttempts.label')}
+          description={t('fields.maxAttempts.description')}
+          value={form.maxAttempts}
+          onChange={(value) => setForm({ ...form, maxAttempts: value })}
+          dataTestid="rate-limit-max-attempts"
+        />
+        <NumberRow
+          label={t('fields.windowSeconds.label')}
+          description={t('fields.windowSeconds.description')}
+          value={form.windowSeconds}
+          onChange={(value) => setForm({ ...form, windowSeconds: value })}
+          dataTestid="rate-limit-window-seconds"
+        />
+        <NumberRow
+          label={t('fields.lockoutDurationSeconds.label')}
+          description={t('fields.lockoutDurationSeconds.description')}
+          value={form.lockoutDurationSeconds}
+          onChange={(value) => setForm({ ...form, lockoutDurationSeconds: value })}
+          dataTestid="rate-limit-lockout-duration"
+        />
+      </div>
+      <Separator />
+      <LabeledSwitch
         isSelected={form.exponentialBackoff}
-        onValueChange={(value) => setForm({ ...form, exponentialBackoff: value })}
+        onChange={(value) => setForm({ ...form, exponentialBackoff: value })}
         data-testid="rate-limit-exponential-backoff"
       >
         <div className="flex flex-col gap-1">
           <span className="text-sm font-medium">{t('fields.exponentialBackoff.label')}</span>
           <span className="text-xs text-default-500">{t('fields.exponentialBackoff.description')}</span>
         </div>
-      </Switch>
-      <NumberInput
+      </LabeledSwitch>
+      <NumberRow
         label={t('fields.backoffMultiplier.label')}
         description={t('fields.backoffMultiplier.description')}
         value={form.backoffMultiplier}
-        onValueChange={(value) => setForm({ ...form, backoffMultiplier: value })}
-        minValue={1}
+        onChange={(value) => setForm({ ...form, backoffMultiplier: value })}
         step={0.1}
-        variant="bordered"
         isDisabled={!form.exponentialBackoff}
-        data-testid="rate-limit-backoff-multiplier"
+        dataTestid="rate-limit-backoff-multiplier"
       />
       <div>
-        <Button color="primary" onPress={handleSave} isLoading={isPending} isDisabled={!isDirty}>
+        <Button variant="primary" onPress={handleSave} isPending={isPending} isDisabled={!isDirty}>
           {t('saveButton')}
         </Button>
       </div>

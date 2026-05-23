@@ -13,6 +13,8 @@
   "actions": {
     "edit": "Edit",
     "delete": "Delete",
-    "documentation": "Documentation"
+    "documentation": "Documentation",
+    "maintenance": "Maintenance",
+    "qrCode": "QR Code"
   }
 }

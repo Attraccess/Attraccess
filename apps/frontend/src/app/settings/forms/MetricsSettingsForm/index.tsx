@@ -1,19 +1,28 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   Button,
   Chip,
-  Divider,
-  Input,
+  NumberField,
+  NumberFieldDecrementButton,
+  NumberFieldGroup,
+  NumberFieldIncrementButton,
+  NumberFieldInput,
+  Separator,
+  TextField,
+  Label,
+  InputGroup,
   Modal,
+  ModalBackdrop,
   ModalBody,
-  ModalContent,
+  ModalContainer,
+  ModalDialog,
   ModalFooter,
   ModalHeader,
-  NumberInput,
+  ModalHeading,
   Spinner,
-  Switch,
   Tooltip,
-  useDisclosure,
+  TooltipContent,
+  useOverlayState,
 } from '@heroui/react';
 import { AlertTriangleIcon, ClipboardCopyIcon, KeyIcon, RefreshCwIcon, Trash2Icon } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -27,6 +36,7 @@ import {
   useSettingsServiceUpdateMetricsSettings,
 } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../../components/toastProvider';
+import { LabeledSwitch } from '../../../../components/labeledSwitch';
 import en from './en.json';
 import de from './de.json';
 
@@ -62,14 +72,8 @@ export function MetricsSettingsForm() {
 
   const { data: metricsSettings, isLoading } = useSettingsServiceGetMetricsSettings();
 
-  useEffect(() => {
-    if (metricsSettings?.slowQueryThresholdSeconds !== undefined) {
-      setThresholdInput(metricsSettings.slowQueryThresholdSeconds);
-    }
-  }, [metricsSettings?.slowQueryThresholdSeconds]);
-
-  const rerollModal = useDisclosure();
-  const removeModal = useDisclosure();
+  const rerollModal = useOverlayState();
+  const removeModal = useOverlayState();
 
   const metricsEndpointUrl = useMemo(() => `${window.location.origin}/api/metrics`, []);
 
@@ -81,7 +85,7 @@ export function MetricsSettingsForm() {
         title: t('keyGenerated.title'),
         description: t('keyGenerated.description'),
       });
-      rerollModal.onClose();
+      rerollModal.close();
     },
   });
 
@@ -93,7 +97,7 @@ export function MetricsSettingsForm() {
         title: t('keyRemoved.title'),
         description: t('keyRemoved.description'),
       });
-      removeModal.onClose();
+      removeModal.close();
     },
   });
 
@@ -131,18 +135,21 @@ export function MetricsSettingsForm() {
     },
   });
 
-  const handleCopyText = useCallback(async (text: string, successTitle: string, successDescription: string) => {
-    if (!navigator?.clipboard?.writeText) {
-      toast.error({ title: t('copyFailed.title'), description: t('copyFailed.description') });
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(text);
-      toast.success({ title: successTitle, description: successDescription });
-    } catch {
-      toast.error({ title: t('copyFailed.title'), description: t('copyFailed.description') });
-    }
-  }, [toast, t]);
+  const handleCopyText = useCallback(
+    async (text: string, successTitle: string, successDescription: string) => {
+      if (!navigator?.clipboard?.writeText) {
+        toast.error({ title: t('copyFailed.title'), description: t('copyFailed.description') });
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(text);
+        toast.success({ title: successTitle, description: successDescription });
+      } catch {
+        toast.error({ title: t('copyFailed.title'), description: t('copyFailed.description') });
+      }
+    },
+    [toast, t],
+  );
 
   const handleCopyKey = useCallback(async () => {
     if (!generatedKey) return;
@@ -155,7 +162,7 @@ export function MetricsSettingsForm() {
 
   const handleGenerate = useCallback(() => {
     if (metricsSettings?.apiKeyConfigured) {
-      rerollModal.onOpen();
+      rerollModal.open();
     } else {
       generateApiKey();
     }
@@ -187,7 +194,7 @@ export function MetricsSettingsForm() {
   if (isLoading) {
     return (
       <div className="flex items-center gap-2 text-sm text-default-500">
-        <Spinner size="sm" />
+        <Spinner />
         {t('loading')}
       </div>
     );
@@ -195,30 +202,30 @@ export function MetricsSettingsForm() {
 
   const togglesSection = metricsSettings?.toggles ? (
     <div className="flex flex-col gap-3">
-      <Divider />
+      <Separator />
       <SectionHeading title={t('toggles.title')} description={t('toggles.description')} />
       <div className="flex flex-col gap-2">
         {TOGGLE_ORDER.map((subsystem) => (
-          <Switch
+          <LabeledSwitch
             key={subsystem}
             data-testid={`metrics-toggle-${subsystem}`}
             isSelected={metricsSettings.toggles[subsystem]}
-            onValueChange={(value) => handleToggleChange(subsystem, value)}
+            onChange={(value) => handleToggleChange(subsystem, value)}
             isDisabled={isUpdatingToggles && pendingToggle !== null}
-            classNames={{ base: 'inline-flex flex-row-reverse items-start justify-between max-w-full w-full' }}
+            className="inline-flex flex-row-reverse items-start justify-between max-w-full w-full"
           >
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-2 text-sm font-medium">
                 {t(`toggles.${subsystem}.label`)}
                 {subsystem === 'db' && (
-                  <Chip size="sm" color="warning" variant="flat">
+                  <Chip size="sm" color="warning">
                     {t('toggles.highCostBadge')}
                   </Chip>
                 )}
               </div>
               <p className="text-xs text-default-500">{t(`toggles.${subsystem}.description`)}</p>
             </div>
-          </Switch>
+          </LabeledSwitch>
         ))}
       </div>
     </div>
@@ -226,68 +233,65 @@ export function MetricsSettingsForm() {
 
   const thresholdSection = metricsSettings ? (
     <div className="flex flex-col gap-3">
-      <Divider />
+      <Separator />
       <SectionHeading title={t('slowQueryThreshold.title')} description={t('slowQueryThreshold.description')} />
-      <NumberInput
-        label={t('slowQueryThreshold.label')}
+      <NumberField
         value={thresholdInput}
-        onValueChange={setThresholdInput}
+        onChange={setThresholdInput}
         minValue={0}
         step={0.1}
-        variant="bordered"
-        endContent={
-          <Button
-            size="sm"
-            color="primary"
-            variant="flat"
-            onPress={handleSaveThreshold}
-            isLoading={isSavingThreshold}
-            isDisabled={
-              thresholdInput === undefined ||
-              Number.isNaN(thresholdInput) ||
-              thresholdInput < 0 ||
-              thresholdInput === metricsSettings.slowQueryThresholdSeconds
-            }
-          >
-            {t('slowQueryThreshold.saveButton')}
-          </Button>
+        aria-label={t('slowQueryThreshold.label')}
+      >
+        <Label>{t('slowQueryThreshold.label')}</Label>
+        <NumberFieldGroup>
+          <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
+          <NumberFieldInput />
+          <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
+        </NumberFieldGroup>
+      </NumberField>
+      <Button
+        variant="primary"
+        size="sm"
+        onPress={handleSaveThreshold}
+        isPending={isSavingThreshold}
+        isDisabled={
+          thresholdInput === undefined ||
+          Number.isNaN(thresholdInput) ||
+          thresholdInput < 0 ||
+          thresholdInput === metricsSettings.slowQueryThresholdSeconds
         }
-      />
+      >
+        {t('slowQueryThreshold.saveButton')}
+      </Button>
     </div>
   ) : null;
 
   const endpointSection = (
-    <Input
-      label={t('endpointLabel')}
-      value={metricsEndpointUrl}
-      isReadOnly
-      variant="bordered"
-      classNames={{ input: 'font-mono text-sm' }}
-      endContent={
-        <Tooltip content={t('copyButton')}>
-          <Button
-            isIconOnly
-            size="sm"
-            variant="light"
-            onPress={handleCopyEndpoint}
-            aria-label={t('copyButton')}
-          >
-            <ClipboardCopyIcon size={16} />
-          </Button>
-        </Tooltip>
-      }
-    />
+    <TextField value={metricsEndpointUrl} isReadOnly>
+      <Label>{t('endpointLabel')}</Label>
+      <InputGroup>
+        <InputGroup.Input className="font-mono text-sm" />
+        <InputGroup.Suffix>
+          <Tooltip>
+            <Button variant="ghost" isIconOnly onPress={handleCopyEndpoint} aria-label={t('copyButton')}>
+              <ClipboardCopyIcon size={16} />
+            </Button>
+            <TooltipContent>{t('copyButton')}</TooltipContent>
+          </Tooltip>
+        </InputGroup.Suffix>
+      </InputGroup>
+    </TextField>
   );
 
   const setupGuideSection = (
     <div className="flex flex-col gap-3">
-      <Divider />
+      <Separator />
       <h4 className="text-sm font-semibold">{t('setupGuide.title')}</h4>
       <p className="text-sm text-default-500">{t('setupGuide.description')}</p>
       <CodeBlock>{prometheusSnippet}</CodeBlock>
       <p className="text-xs text-default-400">{t('setupGuide.bearerNote')}</p>
 
-      <Divider />
+      <Separator />
       <h4 className="text-sm font-semibold">{t('setupGuide.grafanaTitle')}</h4>
       <p className="text-sm text-default-500">{t('setupGuide.grafanaDescription')}</p>
     </div>
@@ -301,26 +305,20 @@ export function MetricsSettingsForm() {
           {t('warning')}
         </div>
 
-        <Input
-          label={t('apiKeyLabel')}
-          value={generatedKey}
-          isReadOnly
-          variant="bordered"
-          classNames={{ input: 'font-mono text-sm' }}
-          endContent={
-            <Tooltip content={t('copyButton')}>
-              <Button
-                isIconOnly
-                size="sm"
-                variant="light"
-                onPress={handleCopyKey}
-                aria-label={t('copyButton')}
-              >
-                <ClipboardCopyIcon size={16} />
-              </Button>
-            </Tooltip>
-          }
-        />
+        <TextField value={generatedKey} isReadOnly>
+          <Label>{t('apiKeyLabel')}</Label>
+          <InputGroup>
+            <InputGroup.Input className="font-mono text-sm" />
+            <InputGroup.Suffix>
+              <Tooltip>
+                <Button variant="ghost" isIconOnly onPress={handleCopyKey} aria-label={t('copyButton')}>
+                  <ClipboardCopyIcon size={16} />
+                </Button>
+                <TooltipContent>{t('copyButton')}</TooltipContent>
+              </Tooltip>
+            </InputGroup.Suffix>
+          </InputGroup>
+        </TextField>
 
         {endpointSection}
         {setupGuideSection}
@@ -328,11 +326,7 @@ export function MetricsSettingsForm() {
         {thresholdSection}
 
         <div className="flex gap-2">
-          <Button
-            color="primary"
-            variant="flat"
-            onPress={() => setGeneratedKey(null)}
-          >
+          <Button variant="secondary" onPress={() => setGeneratedKey(null)}>
             {t('doneButton')}
           </Button>
         </div>
@@ -347,22 +341,14 @@ export function MetricsSettingsForm() {
       {endpointSection}
 
       <div className="flex gap-2 flex-wrap">
-        <Button
-          color="primary"
-          startContent={metricsSettings?.apiKeyConfigured ? <RefreshCwIcon size={16} /> : <KeyIcon size={16} />}
-          onPress={handleGenerate}
-          isLoading={isGenerating}
-        >
+        <Button variant="primary" onPress={handleGenerate} isPending={isGenerating}>
+          {metricsSettings?.apiKeyConfigured ? <RefreshCwIcon size={16} /> : <KeyIcon size={16} />}
           {metricsSettings?.apiKeyConfigured ? t('rerollButton') : t('generateButton')}
         </Button>
 
         {metricsSettings?.apiKeyConfigured && (
-          <Button
-            color="danger"
-            variant="flat"
-            startContent={<Trash2Icon size={16} />}
-            onPress={removeModal.onOpen}
-          >
+          <Button variant="danger-soft" onPress={removeModal.open}>
+            <Trash2Icon size={16} />
             {t('removeButton')}
           </Button>
         )}
@@ -372,38 +358,68 @@ export function MetricsSettingsForm() {
       {togglesSection}
       {thresholdSection}
 
-      <Modal isOpen={rerollModal.isOpen} onClose={rerollModal.onClose}>
-        <ModalContent>
-          <ModalHeader>{t('confirmReroll.title')}</ModalHeader>
-          <ModalBody>
-            <p>{t('confirmReroll.description')}</p>
-          </ModalBody>
-          <ModalFooter>
-            <Button variant="light" onPress={rerollModal.onClose}>
-              {t('confirmReroll.cancel')}
-            </Button>
-            <Button color="warning" onPress={() => generateApiKey()} isLoading={isGenerating}>
-              {t('confirmReroll.confirm')}
-            </Button>
-          </ModalFooter>
-        </ModalContent>
+      <Modal
+        isOpen={rerollModal.isOpen}
+        onOpenChange={(o) => {
+          if (!o) rerollModal.close();
+        }}
+      >
+        <ModalBackdrop>
+          <ModalContainer size="sm">
+            <ModalDialog>
+              {({ close }) => (
+                <>
+                  <ModalHeader>
+                    <ModalHeading>{t('confirmReroll.title')}</ModalHeading>
+                  </ModalHeader>
+                  <ModalBody>
+                    <p>{t('confirmReroll.description')}</p>
+                  </ModalBody>
+                  <ModalFooter>
+                    <Button variant="ghost" onPress={close}>
+                      {t('confirmReroll.cancel')}
+                    </Button>
+                    <Button variant="tertiary" onPress={() => generateApiKey()} isPending={isGenerating}>
+                      {t('confirmReroll.confirm')}
+                    </Button>
+                  </ModalFooter>
+                </>
+              )}
+            </ModalDialog>
+          </ModalContainer>
+        </ModalBackdrop>
       </Modal>
 
-      <Modal isOpen={removeModal.isOpen} onClose={removeModal.onClose}>
-        <ModalContent>
-          <ModalHeader>{t('confirmRemove.title')}</ModalHeader>
-          <ModalBody>
-            <p>{t('confirmRemove.description')}</p>
-          </ModalBody>
-          <ModalFooter>
-            <Button variant="light" onPress={removeModal.onClose}>
-              {t('confirmRemove.cancel')}
-            </Button>
-            <Button color="danger" onPress={() => deleteApiKey()} isLoading={isDeleting}>
-              {t('confirmRemove.confirm')}
-            </Button>
-          </ModalFooter>
-        </ModalContent>
+      <Modal
+        isOpen={removeModal.isOpen}
+        onOpenChange={(o) => {
+          if (!o) removeModal.close();
+        }}
+      >
+        <ModalBackdrop>
+          <ModalContainer size="sm">
+            <ModalDialog>
+              {({ close }) => (
+                <>
+                  <ModalHeader>
+                    <ModalHeading>{t('confirmRemove.title')}</ModalHeading>
+                  </ModalHeader>
+                  <ModalBody>
+                    <p>{t('confirmRemove.description')}</p>
+                  </ModalBody>
+                  <ModalFooter>
+                    <Button variant="ghost" onPress={close}>
+                      {t('confirmRemove.cancel')}
+                    </Button>
+                    <Button variant="danger" onPress={() => deleteApiKey()} isPending={isDeleting}>
+                      {t('confirmRemove.confirm')}
+                    </Button>
+                  </ModalFooter>
+                </>
+              )}
+            </ModalDialog>
+          </ModalContainer>
+        </ModalBackdrop>
       </Modal>
     </div>
   );

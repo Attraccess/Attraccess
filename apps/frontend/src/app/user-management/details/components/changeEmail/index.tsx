@@ -4,7 +4,7 @@ import {
   useUsersServiceFindManyKey,
   useUsersServiceGetAllWithPermissionKey,
 } from '@attraccess/react-query-client';
-import { Button, cn, Input } from '@heroui/react';
+import { Button, cn, TextField, Label, Input } from '@heroui/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { HTMLAttributes, useCallback, useState } from 'react';
 
@@ -69,9 +69,12 @@ export function ChangeEmailForm({ userId, ...divProps }: Props & Omit<HTMLAttrib
 
   return (
     <div {...divProps} className={cn(divProps.className, 'flex flex-col gap-4')}>
-      <Input type="email" label={t('email.label')} value={email} onValueChange={setEmail} />
+      <TextField value={email} onChange={setEmail}>
+        <Label>{t('email.label')}</Label>
+        <Input type="email" />
+      </TextField>
       <div className="flex w-full justify-end">
-        <Button isLoading={isPending} onPress={onSubmit} color="primary" isDisabled={!isEmailValid || isPending}>
+        <Button variant="primary" isPending={isPending} onPress={onSubmit} isDisabled={!isEmailValid || isPending}>
           {t('actions.save')}
         </Button>
       </div>

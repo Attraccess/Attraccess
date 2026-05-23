@@ -1,6 +1,13 @@
-import { NumberInput, Switch } from '@heroui/react';
+import {
+  NumberField,
+  NumberFieldDecrementButton,
+  NumberFieldGroup,
+  NumberFieldIncrementButton,
+  NumberFieldInput,
+} from '@heroui/react';
 import { PasswordPolicyDto } from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { LabeledSwitch } from '../../../components/labeledSwitch';
 import en from './en.json';
 import de from './de.json';
 
@@ -10,6 +17,38 @@ interface Props {
   testIdPrefix?: string;
 }
 
+function NumberRow({
+  label,
+  description,
+  value,
+  onChange,
+  minValue,
+  maxValue,
+  dataTestid,
+}: {
+  label: string;
+  description?: string;
+  value: number;
+  onChange: (v: number) => void;
+  minValue?: number;
+  maxValue?: number;
+  dataTestid?: string;
+}) {
+  return (
+    <div className="flex flex-col gap-1" data-testid={dataTestid}>
+      <span className="text-sm font-medium">{label}</span>
+      <NumberField value={value} onChange={onChange} minValue={minValue} maxValue={maxValue}>
+        <NumberFieldGroup>
+          <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
+          <NumberFieldInput />
+          <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
+        </NumberFieldGroup>
+      </NumberField>
+      {description && <span className="text-xs text-default-500">{description}</span>}
+    </div>
+  );
+}
+
 export function PolicyFields({ value, onChange, testIdPrefix = 'policy' }: Props) {
   const { t } = useTranslations({ en, de });
   const update = <K extends keyof PasswordPolicyDto>(key: K, v: PasswordPolicyDto[K]) =>
@@ -17,55 +56,50 @@ export function PolicyFields({ value, onChange, testIdPrefix = 'policy' }: Props
 
   return (
     <div className="flex flex-col gap-4">
-      <NumberInput
+      <NumberRow
         label={t('fields.minLength.label')}
         description={t('fields.minLength.description')}
         value={value.minLength}
-        onValueChange={(v) => update('minLength', v)}
+        onChange={(v) => update('minLength', v)}
         minValue={8}
         maxValue={1024}
-        variant="bordered"
-        data-testid={`${testIdPrefix}-minLength`}
+        dataTestid={`${testIdPrefix}-minLength`}
       />
-      <NumberInput
+      <NumberRow
         label={t('fields.maxLength.label')}
         description={t('fields.maxLength.description')}
         value={value.maxLength}
-        onValueChange={(v) => update('maxLength', v)}
+        onChange={(v) => update('maxLength', v)}
         minValue={1}
         maxValue={1024}
-        variant="bordered"
-        data-testid={`${testIdPrefix}-maxLength`}
+        dataTestid={`${testIdPrefix}-maxLength`}
       />
-      <NumberInput
+      <NumberRow
         label={t('fields.minZxcvbnScore.label')}
         description={t('fields.minZxcvbnScore.description')}
         value={value.minZxcvbnScore}
-        onValueChange={(v) => update('minZxcvbnScore', v)}
+        onChange={(v) => update('minZxcvbnScore', v)}
         minValue={0}
         maxValue={4}
-        variant="bordered"
-        data-testid={`${testIdPrefix}-minZxcvbnScore`}
+        dataTestid={`${testIdPrefix}-minZxcvbnScore`}
       />
-      <NumberInput
+      <NumberRow
         label={t('fields.historySize.label')}
         description={t('fields.historySize.description')}
         value={value.historySize}
-        onValueChange={(v) => update('historySize', v)}
+        onChange={(v) => update('historySize', v)}
         minValue={0}
         maxValue={50}
-        variant="bordered"
-        data-testid={`${testIdPrefix}-historySize`}
+        dataTestid={`${testIdPrefix}-historySize`}
       />
-      <NumberInput
+      <NumberRow
         label={t('fields.rotationDays.label')}
         description={t('fields.rotationDays.description')}
         value={value.rotationDays}
-        onValueChange={(v) => update('rotationDays', v)}
+        onChange={(v) => update('rotationDays', v)}
         minValue={0}
         maxValue={3650}
-        variant="bordered"
-        data-testid={`${testIdPrefix}-rotationDays`}
+        dataTestid={`${testIdPrefix}-rotationDays`}
       />
       {(
         [
@@ -78,17 +112,17 @@ export function PolicyFields({ value, onChange, testIdPrefix = 'policy' }: Props
           'checkCommonPasswords',
         ] as const
       ).map((key) => (
-        <Switch
+        <LabeledSwitch
           key={key}
           isSelected={value[key]}
-          onValueChange={(v) => update(key, v)}
+          onChange={(v) => update(key, v)}
           data-testid={`${testIdPrefix}-${key}`}
         >
           <div className="flex flex-col gap-1">
             <span className="text-sm font-medium">{t(`fields.${key}.label`)}</span>
             <span className="text-xs text-default-500">{t(`fields.${key}.description`)}</span>
           </div>
-        </Switch>
+        </LabeledSwitch>
       ))}
     </div>
   );

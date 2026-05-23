@@ -1,14 +1,19 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
-  Button,
-  Spinner,
   Alert,
+  AlertContent,
+  AlertDescription,
+  Button,
   Modal,
-  ModalContent,
-  ModalHeader,
+  ModalBackdrop,
   ModalBody,
+  ModalContainer,
+  ModalDialog,
   ModalFooter,
-  useDisclosure,
+  ModalHeader,
+  ModalHeading,
+  Spinner,
+  useOverlayState,
 } from '@heroui/react';
 import { useNavigate } from 'react-router-dom';
 import { useToastMessage } from '../../../components/toastProvider';
@@ -21,6 +26,7 @@ import {
   useMqttServiceMqttServersGetAllKey,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
+import { AlertStatusIcon } from '../../../components/AlertStatusIcon';
 
 // Define ServerListItem component inline
 interface ServerListItemProps {
@@ -43,19 +49,11 @@ function ServerListItem({ id, name, host, port, onEdit, onDelete, t }: ServerLis
         </p>
       </div>
       <div className="space-x-2">
-        <Button
-          color="secondary"
-          variant="flat"
-          size="sm"
-          onPress={() => onEdit(id)}
-          data-cy={`mqtt-server-list-item-edit-button-${id}`}
-        >
+        <Button variant="secondary" onPress={() => onEdit(id)} data-cy={`mqtt-server-list-item-edit-button-${id}`}>
           {t('editServer')}
         </Button>
         <Button
-          color="danger"
-          variant="flat"
-          size="sm"
+          variant="danger-soft"
           onPress={() => onDelete(id)}
           data-cy={`mqtt-server-list-item-delete-button-${id}`}
         >
@@ -71,7 +69,7 @@ export function MqttServerList() {
   const navigate = useNavigate();
   const { success, error: showError } = useToastMessage();
   const queryClient = useQueryClient();
-  const { isOpen, onOpen, onClose } = useDisclosure();
+  const { isOpen, open, close: closeDeleteModal } = useOverlayState();
   const [serverToDelete, setServerToDelete] = useState<number | null>(null);
 
   // Fetch MQTT servers
@@ -87,7 +85,7 @@ export function MqttServerList() {
       queryClient.invalidateQueries({
         queryKey: [useMqttServiceMqttServersGetAllKey],
       });
-      onClose();
+      closeDeleteModal();
     },
     onError: (err) => {
       showError({
@@ -103,7 +101,7 @@ export function MqttServerList() {
 
   const handleDeleteServer = (serverId: number) => {
     setServerToDelete(serverId);
-    onOpen();
+    open();
   };
 
   const confirmDelete = async () => {
@@ -115,23 +113,29 @@ export function MqttServerList() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-4">
-        <Spinner size="lg" color="primary" data-cy="mqtt-server-list-loading-spinner" />
+        <Spinner color="accent" data-cy="mqtt-server-list-loading-spinner" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <Alert color="danger" data-cy="mqtt-server-list-error-alert">
-        {t('errorLoading')}
+      <Alert status="danger" data-cy="mqtt-server-list-error-alert">
+        <AlertStatusIcon status="danger" />
+        <AlertContent>
+          <AlertDescription>{t('errorLoading')}</AlertDescription>
+        </AlertContent>
       </Alert>
     );
   }
 
   if (servers.length === 0) {
     return (
-      <Alert color="warning" data-cy="mqtt-server-list-no-servers-alert">
-        {t('noServersConfigured')}
+      <Alert status="warning" data-cy="mqtt-server-list-no-servers-alert">
+        <AlertStatusIcon status="warning" />
+        <AlertContent>
+          <AlertDescription>{t('noServersConfigured')}</AlertDescription>
+        </AlertContent>
       </Alert>
     );
   }
@@ -153,31 +157,46 @@ export function MqttServerList() {
         ))}
       </div>
 
-      <Modal isOpen={isOpen} onClose={onClose} data-cy="mqtt-server-list-delete-confirmation-modal">
-        <ModalContent>
-          <ModalHeader>{t('deleteServer')}</ModalHeader>
-          <ModalBody>
-            <p>{t('deleteConfirmation')}</p>
-          </ModalBody>
-          <ModalFooter>
-            <Button
-              color="default"
-              variant="flat"
-              onPress={onClose}
-              data-cy="mqtt-server-list-delete-confirmation-cancel-button"
-            >
-              {t('cancel')}
-            </Button>
-            <Button
-              color="danger"
-              onPress={confirmDelete}
-              isLoading={deleteServer.isPending}
-              data-cy="mqtt-server-list-delete-confirmation-delete-button"
-            >
-              {t('deleteServer')}
-            </Button>
-          </ModalFooter>
-        </ModalContent>
+      <Modal
+        isOpen={isOpen}
+        onOpenChange={(o) => {
+          if (!o) closeDeleteModal();
+        }}
+        data-cy="mqtt-server-list-delete-confirmation-modal"
+      >
+        <ModalBackdrop>
+          <ModalContainer size="sm">
+            <ModalDialog>
+              {({ close }) => (
+                <>
+                  <ModalHeader>
+                    <ModalHeading>{t('deleteServer')}</ModalHeading>
+                  </ModalHeader>
+                  <ModalBody>
+                    <p>{t('deleteConfirmation')}</p>
+                  </ModalBody>
+                  <ModalFooter>
+                    <Button
+                      variant="secondary"
+                      onPress={close}
+                      data-cy="mqtt-server-list-delete-confirmation-cancel-button"
+                    >
+                      {t('cancel')}
+                    </Button>
+                    <Button
+                      variant="danger"
+                      onPress={confirmDelete}
+                      isPending={deleteServer.isPending}
+                      data-cy="mqtt-server-list-delete-confirmation-delete-button"
+                    >
+                      {t('deleteServer')}
+                    </Button>
+                  </ModalFooter>
+                </>
+              )}
+            </ModalDialog>
+          </ModalContainer>
+        </ModalBackdrop>
       </Modal>
     </>
   );

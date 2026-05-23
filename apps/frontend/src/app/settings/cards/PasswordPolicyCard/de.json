@@ -1,5 +1,17 @@
 {
   "title": "Passwortrichtlinie",
   "subtitle": "Regeln für zulässige Passwörter, mit optionalen rollenspezifischen Übersteuerungen.",
-  "openButton": "Passwortrichtlinie öffnen"
+  "openButton": "Passwortrichtlinie öffnen",
+  "loading": "Aktuelle Richtlinie wird geladen…",
+  "summary": {
+    "minLength": "Mind. {{count}} Zeichen",
+    "requireUppercase": "Großbuchstaben",
+    "requireLowercase": "Kleinbuchstaben",
+    "requireDigit": "Ziffer",
+    "requireSpecial": "Sonderzeichen",
+    "zxcvbn": "Stärke ≥ {{score}}",
+    "hibp": "Leak-Prüfung",
+    "history": "Letzte {{count}} nicht wiederverwendbar",
+    "rotation": "Wechsel alle {{days}}d"
+  }
 }

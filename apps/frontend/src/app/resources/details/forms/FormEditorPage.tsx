@@ -12,20 +12,9 @@ import {
   UseResourceFormsServiceResourceFormsGetOneKeyFn,
   UseResourceFormsServiceResourceFormsListKeyFn,
 } from '@attraccess/react-query-client';
-import {
-  Accordion,
-  AccordionItem,
-  Button,
-  Card,
-  CardBody,
-  CardHeader,
-  Divider,
-  Input,
-  Selection,
-  Spinner,
-  Switch,
-} from '@heroui/react';
+import { Accordion, AccordionBody, AccordionHeading, AccordionIndicator, AccordionItem, AccordionPanel, AccordionTrigger, Button, Input, Label, Selection, Spinner, TextField } from '@heroui/react';
 import { useToastMessage } from '../../../../components/toastProvider';
+import { LabeledSwitch } from '../../../../components/labeledSwitch';
 import { useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '../../../../components/pageHeader';
 import { DeleteConfirmationModal } from '../../../../components/deleteConfirmationModal';
@@ -67,7 +56,7 @@ export function FormEditorPage() {
 
   const [form, setForm] = useState<EditableForm>({ ...EMPTY_FORM, fields: [] });
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  const [expandedFieldKey, setExpandedFieldKey] = useState<Selection | undefined>(undefined);
+  const [expandedFieldKeys, setExpandedFieldKeys] = useState<Selection>(new Set<string>());
 
   useEffect(() => {
     if (formResponse) {
@@ -142,7 +131,7 @@ export function FormEditorPage() {
         },
       ],
     }));
-    setExpandedFieldKey(new Set([`field-${temporaryId}`]));
+    setExpandedFieldKeys(new Set([`field-${temporaryId}`]));
     setFieldAdded(true);
   };
 
@@ -213,7 +202,7 @@ export function FormEditorPage() {
   if (!isCreateMode && isLoadingForm) {
     return (
       <div className="flex justify-center py-10">
-        <Spinner size="lg" />
+        <Spinner />
       </div>
     );
   }
@@ -224,127 +213,149 @@ export function FormEditorPage() {
         title={isCreateMode ? t('editor.createTitle') : t('editor.editTitle', { formName: formResponse?.name ?? '' })}
         subtitle={resource?.name}
         backTo={`/resources/${resourceId}/forms`}
-        actions={
-          !isCreateMode && (
-            <Button color="danger" variant="light" onPress={() => setDeleteModalOpen(true)}>
-              {t('editor.delete')}
-            </Button>
-          )
-        }
+        actions={[
+          {
+            key: 'delete',
+            label: t('editor.delete'),
+            variant: 'destructive',
+            isHidden: isCreateMode,
+            onPress: () => setDeleteModalOpen(true),
+          },
+        ]}
       />
 
-      <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
-        <Card>
-          <CardBody className="space-y-6">
+      <div className="grid gap-8 lg:grid-cols-[2fr_1fr]" data-cy="form-editor-page">
+        <div className="flex flex-col gap-8">
+          <section className="w-full flex flex-col gap-4 pt-6 border-t border-default-200 first:pt-0 first:border-t-0">
+            <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
+              {t('editor.sections.identity')}
+            </h3>
             <div className="grid gap-4 md:grid-cols-2">
-              <Input
-                label={t('editor.nameLabel')}
-                placeholder={t('editor.namePlaceholder')}
-                value={form.name}
-                onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
+              <TextField
                 isRequired
-              />
+                value={form.name}
+                onChange={(v) => setForm((prev) => ({ ...prev, name: v }))}
+              >
+                <Label>{t('editor.nameLabel')}</Label>
+                <Input placeholder={t('editor.namePlaceholder')} data-cy="form-editor-name-input" />
+              </TextField>
             </div>
+          </section>
 
-            <div className="grid gap-2">
-              <Switch
-                isSelected={form.isRequiredOnResourceUsageStart}
-                onValueChange={(value) => setForm((prev) => ({ ...prev, isRequiredOnResourceUsageStart: value }))}
-              >
-                {t('editor.resourceUsageStart')}
-              </Switch>
-              <Switch
-                isSelected={form.isRequiredOnResourceUsageTakeOver}
-                onValueChange={(value) => setForm((prev) => ({ ...prev, isRequiredOnResourceUsageTakeOver: value }))}
-              >
-                {t('editor.resourceUsageTakeover')}
-              </Switch>
-              <Switch
-                isSelected={form.isRequiredOnResourceUsageEnd}
-                onValueChange={(value) => setForm((prev) => ({ ...prev, isRequiredOnResourceUsageEnd: value }))}
-              >
-                {t('editor.resourceUsageEnd')}
-              </Switch>
-            </div>
-
-            <Divider />
-
-            {form.fields.length === 0 && (
-              <div className="rounded-lg border border-dashed border-default-200 p-6 text-center">
-                <p className="font-medium text-default-600">{t('editor.emptyFieldsTitle')}</p>
-                <p className="text-sm text-default-400">{t('editor.emptyFieldsDescription')}</p>
+          <section className="w-full flex flex-col gap-4 pt-6 border-t border-default-200 first:pt-0 first:border-t-0">
+            <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
+              {t('editor.sections.behavior')}
+            </h3>
+            <div className="divide-y divide-default-200/60 rounded-lg border border-default-200">
+              <div className="px-4 py-3">
+                <LabeledSwitch
+                  isSelected={form.isRequiredOnResourceUsageStart}
+                  onChange={(value) => setForm((prev) => ({ ...prev, isRequiredOnResourceUsageStart: value }))}
+                >
+                  {t('editor.resourceUsageStart')}
+                </LabeledSwitch>
               </div>
-            )}
+              <div className="px-4 py-3">
+                <LabeledSwitch
+                  isSelected={form.isRequiredOnResourceUsageTakeOver}
+                  onChange={(value) => setForm((prev) => ({ ...prev, isRequiredOnResourceUsageTakeOver: value }))}
+                >
+                  {t('editor.resourceUsageTakeover')}
+                </LabeledSwitch>
+              </div>
+              <div className="px-4 py-3">
+                <LabeledSwitch
+                  isSelected={form.isRequiredOnResourceUsageEnd}
+                  onChange={(value) => setForm((prev) => ({ ...prev, isRequiredOnResourceUsageEnd: value }))}
+                >
+                  {t('editor.resourceUsageEnd')}
+                </LabeledSwitch>
+              </div>
+            </div>
+          </section>
 
-            <Accordion
-              selectionMode="single"
-              variant="bordered"
-              onSelectionChange={setExpandedFieldKey}
-              selectedKeys={expandedFieldKey}
-            >
-              {form.fields.map((field, index) => {
-                const key = `field-${field.id ?? field._id}`;
-                const typeLabel = t(`fields.types.${field.type}`);
-
-                return (
-                  <AccordionItem
-                    key={key}
-                    aria-label={`${t('fields.label')} #${index + 1}`}
-                    title={
-                      <div className="flex flex-col text-start">
-                        <span className="text-sm font-semibold text-default-700">
-                          <i className="font-thin">#{index + 1}</i> {field.name || t('fields.placeholder.label')}
-                        </span>
-                        <span className="text-xs text-default-400">{typeLabel}</span>
-                      </div>
-                    }
-                  >
-                    <FormFieldEditor
-                      field={field}
-                      onChange={(value) => updateField(index, value)}
-                      onRemove={() => removeField(index)}
-                      t={t}
-                      labelInputRef={index === form.fields.length - 1 ? lastLabelInputRef : undefined}
-                    />
-                  </AccordionItem>
-                );
-              })}
-            </Accordion>
-
+          <section className="w-full flex flex-col gap-4 pt-6 border-t border-default-200 first:pt-0 first:border-t-0">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-default-700">{t('editor.fieldsTitle')}</h2>
-              <Button size="sm" variant="flat" onPress={addField}>
+              <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
+                {t('editor.sections.fields')}
+              </h3>
+              <Button variant="secondary" onPress={addField} data-cy="form-editor-add-field-button">
                 {t('editor.addField')}
               </Button>
             </div>
 
-            <div className="flex items-center justify-between pt-2">
-              {hasUnsavedChanges && <span className="text-sm text-warning-500">{t('editor.unsaved')}</span>}
-              <Button
-                color="primary"
-                onPress={handleSave}
-                isLoading={createForm.isPending || updateForm.isPending}
-                isDisabled={!form.name || form.fields.length === 0}
+            {form.fields.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-default-200 p-6 text-center">
+                <p className="font-medium text-default-600">{t('editor.emptyFieldsTitle')}</p>
+                <p className="text-sm text-default-400">{t('editor.emptyFieldsDescription')}</p>
+              </div>
+            ) : (
+              <Accordion
+                variant="surface"
+                expandedKeys={expandedFieldKeys}
+                onExpandedChange={setExpandedFieldKeys}
               >
-                {t('editor.save')}
-              </Button>
-            </div>
-          </CardBody>
-        </Card>
+                {form.fields.map((field, index) => {
+                  const key = `field-${field.id ?? field._id}`;
+                  const typeLabel = t(`fields.types.${field.type}`);
 
-        <Card>
-          <CardHeader>
-            <p className="font-semibold text-default-700">{t('editor.previewTitle')}</p>
-          </CardHeader>
-          <CardBody>
-            <FormPreview fields={form.fields} t={t} />
-          </CardBody>
-        </Card>
+                  return (
+                    <AccordionItem key={key} id={key} aria-label={`${t('fields.label')} #${index + 1}`}>
+                      <AccordionHeading>
+                        <AccordionTrigger>
+                          <div className="flex flex-col text-start flex-1">
+                            <span className="text-sm font-semibold text-default-700">
+                              <i className="font-thin">#{index + 1}</i> {field.name || t('fields.placeholder.label')}
+                            </span>
+                            <span className="text-xs text-default-400">{typeLabel}</span>
+                          </div>
+                          <AccordionIndicator />
+                        </AccordionTrigger>
+                      </AccordionHeading>
+                      <AccordionPanel><AccordionBody>
+                        <FormFieldEditor
+                          field={field}
+                          onChange={(value) => updateField(index, value)}
+                          onRemove={() => removeField(index)}
+                          t={t}
+                          labelInputRef={index === form.fields.length - 1 ? lastLabelInputRef : undefined}
+                        />
+                      </AccordionBody></AccordionPanel>
+                    </AccordionItem>
+                  );
+                })}
+              </Accordion>
+            )}
+          </section>
+
+          <div className="flex items-center justify-between pt-6 border-t border-default-200">
+            {hasUnsavedChanges ? (
+              <span className="text-sm text-warning-500">{t('editor.unsaved')}</span>
+            ) : (
+              <span />
+            )}
+            <Button
+              variant="primary"
+              onPress={handleSave}
+              isPending={createForm.isPending || updateForm.isPending}
+              isDisabled={!form.name || form.fields.length === 0}
+              data-cy="form-editor-save-button"
+            >
+              {t('editor.save')}
+            </Button>
+          </div>
+        </div>
+
+        <aside className="w-full flex flex-col gap-4 pt-6 border-t border-default-200 lg:pt-0 lg:border-t-0 lg:border-l lg:border-default-200 lg:pl-6">
+          <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
+            {t('editor.sections.preview')}
+          </h3>
+          <FormPreview fields={form.fields} t={t} />
+        </aside>
       </div>
 
       <DeleteConfirmationModal
         isOpen={deleteModalOpen}
-        onOpenChange={setDeleteModalOpen}
         onClose={() => setDeleteModalOpen(false)}
         onConfirm={handleDelete}
         itemName={formResponse?.name ?? ''}

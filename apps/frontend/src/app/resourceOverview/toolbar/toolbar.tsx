@@ -1,6 +1,5 @@
-import { Button } from '@heroui/react';
-import { Input } from '@heroui/react';
-import { SearchIcon, PlusIcon, ScanQrCodeIcon, ListFilterIcon } from 'lucide-react';
+import { Button, TextField, InputGroup } from '@heroui/react';
+import { ListFilterIcon, PlusIcon, ScanQrCodeIcon, SearchIcon } from 'lucide-react';
 import { useAuth } from '../../../hooks/useAuth';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { ResourceEditModal } from '../../resources/editModal/resourceEditModal';
@@ -37,15 +36,14 @@ export function Toolbar({
     <div>
       <div className="mb-6 flex flex-row w-full items-center justify-between gap-4 rounded-full p-2 shadow-medium bg-content1">
         <div className="relative flex-grow">
-          <Input
-            radius="full"
+          <TextField
             value={filterProps.search}
-            onChange={(e) => filterProps.onSearchChanged(e.target.value)}
-            placeholder={t('searchPlaceholder')}
+            onChange={filterProps.onSearchChanged}
             className={cn((searchIsLoading || highlightSearch) && 'animate-pulse')}
-            color={highlightSearch ? 'danger' : undefined}
-            startContent={
-              <>
+            aria-label={t('searchPlaceholder')}
+          >
+            <InputGroup>
+              <InputGroup.Prefix>
                 <ResourceFilter
                   onlyInUseByMe={filterProps.onlyInUseByMe}
                   onOnlyInUseByMeChanged={filterProps.onOnlyInUseByMeChanged}
@@ -55,30 +53,23 @@ export function Toolbar({
                   onHideEmptyResourceGroupsChanged={filterProps.onHideEmptyResourceGroupsChanged}
                 >
                   {({ onOpen }) => (
-                    <Button
-                      size="sm"
-                      variant="light"
-                      startContent={<ListFilterIcon size={18} className={cn(highlightFilter && 'animate-pulse')} />}
-                      isIconOnly
-                      color={highlightFilter ? 'danger' : undefined}
-                      onPress={onOpen}
-                    />
+                    <Button variant="ghost" isIconOnly onPress={onOpen}>
+                      <ListFilterIcon size={18} className={cn(highlightFilter && 'animate-pulse')} />
+                    </Button>
                   )}
                 </ResourceFilter>
                 <SearchIcon size={18} />
-              </>
-            }
-            classNames={{
-              inputWrapper: 'bg-transparent border-none shadow-none focus-within:ring-0 pl-2',
-              input: 'text-sm',
-            }}
-            data-cy="resource-search-input"
-          />
+              </InputGroup.Prefix>
+              <InputGroup.Input placeholder={t('searchPlaceholder')} data-cy="resource-search-input" />
+            </InputGroup>
+          </TextField>
         </div>
 
         <ResourceScanner>
           {(onOpen: () => void) => (
-            <Button variant="light" radius="full" onPress={onOpen} startContent={<ScanQrCodeIcon />} isIconOnly />
+            <Button variant="ghost" onPress={onOpen} isIconOnly>
+              <ScanQrCodeIcon />
+            </Button>
           )}
         </ResourceScanner>
       </div>
@@ -88,14 +79,8 @@ export function Toolbar({
           <div className="flex items-center gap-2 mr-1 hidden md:flex">
             <ResourceEditModal onUpdated={(resource) => navigate(`/resources/${resource.id}`)} closeOnSuccess>
               {(onOpen: () => void) => (
-                <Button
-                  radius="full"
-                  onPress={onOpen}
-                  startContent={<PlusIcon size={18} />}
-                  color="primary"
-                  size="sm"
-                  data-cy="toolbar-open-create-resource-modal-button"
-                >
+                <Button variant="primary" onPress={onOpen} data-cy="toolbar-open-create-resource-modal-button">
+                  <PlusIcon size={18} />
                   {t('addResource')}
                 </Button>
               )}

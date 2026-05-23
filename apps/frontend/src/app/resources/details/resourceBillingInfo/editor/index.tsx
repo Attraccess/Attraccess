@@ -6,16 +6,19 @@ import {
 } from '@attraccess/react-query-client';
 import {
   Button,
+  DrawerBody,
+  DrawerFooter,
+  DrawerHeader,
   Form,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  NumberInput,
-  useDisclosure,
+  Label,
+  NumberField,
+  NumberFieldDecrementButton,
+  NumberFieldGroup,
+  NumberFieldIncrementButton,
+  NumberFieldInput,
+  useOverlayState,
 } from '@heroui/react';
-import { PageHeader } from '../../../../../components/pageHeader';
+import { StandardDrawer } from '../../../../../components/standardDrawer';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
@@ -35,7 +38,7 @@ interface Props {
 export function ResourceBillingInfoEditor(props: Props) {
   const { resourceId } = props;
 
-  const { isOpen, onOpen, onOpenChange, onClose } = useDisclosure();
+  const { isOpen, open, setOpen, close } = useOverlayState();
   const { t, tExists } = useTranslations({
     en: {
       ...en,
@@ -60,7 +63,7 @@ export function ResourceBillingInfoEditor(props: Props) {
       queryClient.invalidateQueries({
         queryKey: UseBillingServiceGetResourceBillingConfigurationKeyFn({ resourceId }),
       });
-      onClose();
+      close();
     },
     onError: (error: Error) => {
       toast.apiError({
@@ -129,42 +132,48 @@ export function ResourceBillingInfoEditor(props: Props) {
 
   return (
     <>
-      {props.children(onOpen)}
-      <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
-        <ModalContent>
-          <ModalHeader>
-            <PageHeader title={t('title')} noMargin />
-          </ModalHeader>
-          <ModalBody>
-            <Form onSubmit={onSubmit}>
-              <NumberInput
-                label={t('inputs.creditsPerUsage.label', { currency: configuration.currency })}
-                description={t('inputs.creditsPerUsage.description')}
-                value={creditsPerUsage}
-                minValue={0}
-                onValueChange={(value) => setCreditsPerUsage(value)}
-                isClearable
-                defaultValue={0}
-              />
-              <NumberInput
-                label={t('inputs.creditsPerMinute.label', { currency: configuration.currency })}
-                description={t('inputs.creditsPerMinute.description')}
-                value={creditsPerMinute}
-                minValue={0}
-                onValueChange={(value) => setCreditsPerMinute(value)}
-                isClearable
-                defaultValue={0}
-              />
-              <input hidden type="submit" />
-            </Form>
-          </ModalBody>
-          <ModalFooter>
-            <Button onPress={onSubmit} color="primary" isLoading={isSaving}>
-              {t('actions.save')}
-            </Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
+      {props.children(open)}
+      <StandardDrawer isOpen={isOpen} onOpenChange={setOpen}>
+        <DrawerHeader>
+          <h2 className="text-lg font-semibold">{t('title')}</h2>
+        </DrawerHeader>
+        <DrawerBody>
+          <Form onSubmit={onSubmit} className="flex flex-col gap-4">
+            <NumberField
+              value={creditsPerUsage}
+              minValue={0}
+              onChange={(value) => setCreditsPerUsage(value)}
+              defaultValue={0}
+            >
+              <Label>{t('inputs.creditsPerUsage.label', { currency: configuration.currency })}</Label>
+              <NumberFieldGroup>
+                <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
+                <NumberFieldInput />
+                <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
+              </NumberFieldGroup>
+            </NumberField>
+            <NumberField
+              value={creditsPerMinute}
+              minValue={0}
+              onChange={(value) => setCreditsPerMinute(value)}
+              defaultValue={0}
+            >
+              <Label>{t('inputs.creditsPerMinute.label', { currency: configuration.currency })}</Label>
+              <NumberFieldGroup>
+                <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
+                <NumberFieldInput />
+                <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
+              </NumberFieldGroup>
+            </NumberField>
+            <input hidden type="submit" />
+          </Form>
+        </DrawerBody>
+        <DrawerFooter>
+          <Button variant="primary" onPress={onSubmit} isPending={isSaving}>
+            {t('actions.save')}
+          </Button>
+        </DrawerFooter>
+      </StandardDrawer>
     </>
   );
 }

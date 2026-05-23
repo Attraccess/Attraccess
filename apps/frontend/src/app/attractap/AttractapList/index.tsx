@@ -1,24 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  Alert,
-  Button,
-  Dropdown,
-  DropdownTrigger,
-  DropdownMenu,
-  DropdownItem,
-  Table,
-  TableBody,
-  TableCell,
-  TableColumn,
-  TableHeader,
-  TableRow,
-  Card,
-  CardHeader,
-  CardBody,
-  Chip,
-} from '@heroui/react';
-import { ArrowRightIcon, CpuIcon, LogsIcon, MoreVertical, PencilIcon, Trash2Icon } from 'lucide-react';
-import { TableDataLoadingIndicator } from '../../../components/tableComponents';
+import { Alert, AlertContent, AlertDescription, AlertTitle, Button, Card, Chip, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow } from '@heroui/react';
+import { ArrowRightIcon, CpuIcon, LogsIcon, PencilIcon, Trash2Icon } from 'lucide-react';
+import { AlertStatusIcon } from '../../../components/AlertStatusIcon';
 import { EmptyState } from '../../../components/emptyState';
 import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { AttractapEditor } from '../AttractapEditor/AttractapEditor';
@@ -28,9 +11,8 @@ import {
   useAttractapServiceGetReaders,
 } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../components/toastProvider';
-import { PageHeader } from '../../../components/pageHeader';
+import { PageAction, PageHeader } from '../../../components/pageHeader';
 import { AttractapHardwareSetup } from '../HardwareSetup';
-import { useReactQueryStatusToHeroUiTableLoadingState } from '../../../hooks/useReactQueryStatusToHeroUiTableLoadingState';
 import { WebSerialConsole } from '../HardwareSetup/WebSerialConsole';
 import { useNow } from '../../../hooks/useNow';
 
@@ -49,12 +31,9 @@ export function AttractapList() {
   const {
     data: allReaders,
     error: readersError,
-    status: fetchStatus,
   } = useAttractapServiceGetReaders(undefined, {
     refetchInterval: 5000,
   });
-
-  const loadingState = useReactQueryStatusToHeroUiTableLoadingState(fetchStatus);
 
   const toast = useToastMessage();
 
@@ -121,53 +100,45 @@ export function AttractapList() {
 
   return (
     <>
-      <PageHeader
-        title={t('page.title')}
-        backTo="/attractap"
-        actions={
-          <AttractapHardwareSetup
-            openDeviceSettings={(deviceId) => {
-              setOpenedReaderEditor(Number(deviceId));
-            }}
-          >
-            {(onOpenHardwareSetup) => (
-              <WebSerialConsole>
-                {(onOpenSerialConsole) => (
-                  <Dropdown>
-                    <DropdownTrigger>
-                      <Button variant="light" startContent={<MoreVertical className="w-4 h-4" />}>
-                        {t('page.actions.menu')}
-                      </Button>
-                    </DropdownTrigger>
-                    <DropdownMenu aria-label="Attractap actions">
-                      <DropdownItem
-                        key="serial-console"
-                        startContent={<LogsIcon className="w-4 h-4" />}
-                        onPress={onOpenSerialConsole}
-                        data-cy="attractap-list-open-console-button"
-                      >
-                        {t('page.actions.openSerialConsole')}
-                      </DropdownItem>
-
-                      <DropdownItem
-                        key="hardware-setup"
-                        startContent={<CpuIcon className="w-4 h-4" />}
-                        onPress={onOpenHardwareSetup}
-                        data-cy="attractap-list-open-flasher-button"
-                      >
-                        {t('page.actions.openHardwareSetup')}
-                      </DropdownItem>
-                    </DropdownMenu>
-                  </Dropdown>
-                )}
-              </WebSerialConsole>
+      <AttractapHardwareSetup
+        openDeviceSettings={(deviceId) => {
+          setOpenedReaderEditor(Number(deviceId));
+        }}
+      >
+        {(onOpenHardwareSetup) => (
+          <WebSerialConsole>
+            {(onOpenSerialConsole) => (
+              <PageHeader
+                title={t('page.title')}
+                backTo="/attractap"
+                actions={[
+                  {
+                    key: 'serial-console',
+                    label: t('page.actions.openSerialConsole'),
+                    icon: <LogsIcon className="w-4 h-4" />,
+                    onPress: onOpenSerialConsole,
+                    dataCy: 'attractap-list-open-console-button',
+                  },
+                  {
+                    key: 'hardware-setup',
+                    label: t('page.actions.openHardwareSetup'),
+                    icon: <CpuIcon className="w-4 h-4" />,
+                    onPress: onOpenHardwareSetup,
+                    dataCy: 'attractap-list-open-flasher-button',
+                  },
+                ] satisfies PageAction[]}
+              />
             )}
-          </AttractapHardwareSetup>
-        }
-      />
+          </WebSerialConsole>
+        )}
+      </AttractapHardwareSetup>
 
-      <Alert color="danger" className="mb-4">
-        {t('workInProgress')}
+      <Alert status="danger" className="mb-4">
+        <AlertStatusIcon status="danger" />
+        <AlertContent>
+          <AlertTitle>{t('workInProgressTitle')}</AlertTitle>
+          <AlertDescription>{t('workInProgress')}</AlertDescription>
+        </AlertContent>
       </Alert>
 
       <AttractapEditor
@@ -180,33 +151,30 @@ export function AttractapList() {
       <div className="flex flex-col gap-4">
         {[activeReaders, staleReaders].map((readers, tableIndex) => (
           <Card key={tableIndex}>
-            <CardHeader>
+            <Card.Header>
               <PageHeader
                 noMargin
                 title={t(`table.${tableIndex === 0 ? 'active' : 'stale'}.title`)}
                 subtitle={t(`table.${tableIndex === 0 ? 'active' : 'stale'}.description`)}
               />
-            </CardHeader>
-            <CardBody>
+            </Card.Header>
+            <Card.Content>
               <Table
-                aria-label={`${tableIndex === 0 ? 'active' : 'stale'} attractaps`}
                 data-cy={`attractap-list-table-${tableIndex === 0 ? 'active' : 'stale'}`}
-                removeWrapper
               >
+                <TableContent aria-label={`${tableIndex === 0 ? 'active' : 'stale'} attractaps`}>
                 <TableHeader>
-                  <TableColumn>{t('table.columns.name')}</TableColumn>
+                  <TableColumn isRowHeader>{t('table.columns.name')}</TableColumn>
                   <TableColumn>{t('table.columns.type')}</TableColumn>
                   <TableColumn>{t('table.columns.lastConnection')}</TableColumn>
                   <TableColumn>{t('table.columns.actions')}</TableColumn>
                 </TableHeader>
                 <TableBody
                   items={readers ?? []}
-                  loadingState={loadingState}
-                  loadingContent={<TableDataLoadingIndicator />}
-                  emptyContent={<EmptyState />}
+                  renderEmptyState={() => <EmptyState />}
                 >
                   {(reader) => (
-                    <TableRow key={reader.id} className={tableIndex === 1 ? 'border-l-8 border-l-warning' : ''}>
+                    <TableRow key={reader.id} id={reader.id} className={tableIndex === 1 ? 'border-l-8 border-l-warning' : ''}>
                       <TableCell>{reader.name}</TableCell>
                       <TableCell className="whitespace-nowrap">
                         {reader.firmware.name} ({reader.firmware.variant})
@@ -215,26 +183,21 @@ export function AttractapList() {
                       </TableCell>
                       <TableCell className="whitespace-nowrap">{formatDateTime(reader.lastConnection)}</TableCell>
                       <TableCell className="flex-row flex">
-                        <Button
-                          size="sm"
-                          startContent={<PencilIcon className="w-4 h-4" />}
-                          variant="light"
+                        <Button variant="ghost"
+
                           onPress={() => setOpenedReaderEditor(reader.id)}
                           data-cy={`attractap-list-edit-reader-button-${reader.id}`}
-                        >
+                        ><PencilIcon className="w-4 h-4" />
                           {t('table.actions.editReader')}
                         </Button>
 
                         <AttractapDeleteModal readerId={reader.id}>
                           {(onOpen) => (
-                            <Button
-                              startContent={<Trash2Icon className="w-4 h-4" />}
-                              size="sm"
-                              color="danger"
-                              variant="light"
+                            <Button variant="danger-soft"
+
                               onPress={onOpen}
                               data-cy={`attractap-list-delete-reader-button-${reader.id}`}
-                            >
+                            ><Trash2Icon className="w-4 h-4" />
                               {t('table.actions.deleteReader')}
                             </Button>
                           )}
@@ -243,8 +206,9 @@ export function AttractapList() {
                     </TableRow>
                   )}
                 </TableBody>
+                </TableContent>
               </Table>
-            </CardBody>
+            </Card.Content>
           </Card>
         ))}
       </div>

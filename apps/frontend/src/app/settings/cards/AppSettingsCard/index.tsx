@@ -1,7 +1,6 @@
-import { Card, CardBody, CardHeader, Chip } from '@heroui/react';
-import { CheckIcon, Settings2Icon, XIcon } from 'lucide-react';
+import { Chip, cn } from '@heroui/react';
+import { CheckIcon, GlobeIcon, XIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { PageHeader } from '../../../../components/pageHeader';
 import { AppSettingsForm } from '../../forms/AppSettingsForm';
 import en from './en.json';
 import de from './de.json';
@@ -12,16 +11,17 @@ export type AppSettingsCardVariant = 'standalone' | 'wizard';
 export type AppSettingsCardProps = {
   variant: AppSettingsCardVariant;
   onNext?: () => void;
+  className?: string;
 };
 
-export function AppSettingsCard({ variant, onNext }: AppSettingsCardProps) {
+export function AppSettingsCard({ variant, onNext, className }: AppSettingsCardProps) {
   const { t } = useTranslations({ en, de });
 
   const { data: settings } = useSettingsServiceGetSystemSettings();
 
   const licenseChip =
     variant === 'standalone' && settings ? (
-      <Chip color={settings.app.licenseKeyConfigured ? 'success' : 'warning'} variant="flat">
+      <Chip color={settings.app.licenseKeyConfigured ? 'success' : 'warning'} variant="soft">
         <div className="flex items-center gap-2">
           {settings.app.licenseKeyConfigured ? <CheckIcon size={16} /> : <XIcon size={16} />}
           {settings.app.licenseKeyConfigured
@@ -32,19 +32,21 @@ export function AppSettingsCard({ variant, onNext }: AppSettingsCardProps) {
     ) : null;
 
   return (
-    <Card className="flex-1 min-w-[300px]">
-      <CardHeader>
-        <PageHeader
-          title={t('title')}
-          subtitle={t('subtitle')}
-          icon={<Settings2Icon size={18} />}
-          noMargin
-          actions={licenseChip}
-        />
-      </CardHeader>
-      <CardBody className="flex flex-col gap-4">
-        <AppSettingsForm variant={variant} endpoint="settings" onNext={onNext} />
-      </CardBody>
-    </Card>
+    <section
+      className={cn(
+        'w-full flex flex-col gap-4 rounded-large border border-default-200 bg-default-50 p-6',
+        className,
+      )}
+      data-cy="app-settings-section"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 text-default-700">
+          <GlobeIcon size={18} />
+          <h3 className="text-sm uppercase tracking-wide font-semibold">{t('title')}</h3>
+        </div>
+        {licenseChip}
+      </div>
+      <AppSettingsForm variant={variant} endpoint="settings" onNext={onNext} />
+    </section>
   );
 }

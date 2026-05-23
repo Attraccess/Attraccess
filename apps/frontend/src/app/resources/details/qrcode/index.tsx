@@ -3,13 +3,16 @@ import {
   ButtonProps,
   Link,
   Modal,
+  ModalBackdrop,
   ModalBody,
-  ModalContent,
+  ModalContainer,
+  ModalDialog,
   ModalFooter,
   ModalHeader,
-  useDisclosure,
+  ModalHeading,
+  ModalIcon,
+  useOverlayState,
 } from '@heroui/react';
-import { PageHeader } from '../../../../components/pageHeader';
 import { QrCodeIcon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { QRCode } from 'react-qrcode-logo';
@@ -44,7 +47,7 @@ export function ResourceQrCode(props: Props & Omit<ButtonProps, 'children' | 'st
   }, [id, resourceId]);
 
   const [action, setAction] = useState<QrCodeAction>(QrCodeAction.View);
-  const { isOpen, onOpen, onOpenChange } = useDisclosure();
+  const { isOpen, open, setOpen } = useOverlayState();
 
   const qrCodeUrl = useMemo(() => {
     const url = new URL(window.location.origin);
@@ -59,46 +62,57 @@ export function ResourceQrCode(props: Props & Omit<ButtonProps, 'children' | 'st
 
   return (
     <>
-      <Button {...buttonProps} onPress={onOpen} startContent={<QrCodeIcon size={buttonIconSize} />}>
+      <Button {...buttonProps} onPress={open}>
+        <QrCodeIcon size={buttonIconSize} />
         {t('button.label')}
       </Button>
 
-      <Modal isOpen={isOpen} onOpenChange={onOpenChange} scrollBehavior="inside">
-        <ModalContent>
-          <ModalHeader>
-            <PageHeader title={t('modal.title')} subtitle={t('modal.subtitle')} icon={<QrCodeIcon />} noMargin />
-          </ModalHeader>
+      <Modal isOpen={isOpen} onOpenChange={setOpen}>
+        <ModalBackdrop>
+          <ModalContainer size="sm">
+            <ModalDialog>
+              {() => (
+                <>
+                  <ModalHeader>
+                    <ModalIcon><QrCodeIcon /></ModalIcon>
+                    <ModalHeading>{t('modal.title')}</ModalHeading>
+                    <p className="text-sm text-muted">{t('modal.subtitle')}</p>
+                  </ModalHeader>
 
-          <ModalBody>
-            <Select
-              selectedKey={action}
-              onSelectionChange={(key) => setAction(key as QrCodeAction)}
-              items={Object.values(QrCodeAction).map((val) => ({
-                key: val,
-                label: t(`modal.action.${val}`),
-              }))}
-              label={t('modal.action.label')}
-            />
-            <QRCode
-              value={qrCodeUrl}
-              size={300}
-              logoHeight={100}
-              logoWidth={50}
-              logoPadding={10}
-              logoPaddingStyle="square"
-              logoImage="/logo.png"
-              qrStyle="fluid"
-              id={id}
-            />
-            <Link target="_blank" href={qrCodeUrl}>
-              {qrCodeUrl}
-            </Link>
-          </ModalBody>
+                  <ModalBody>
+                    <Select
+                      value={action}
+                      onChange={(key) => setAction(key as QrCodeAction)}
+                      label={t('modal.action.label')}
+                      items={Object.values(QrCodeAction).map((val) => ({
+                        key: val,
+                        label: t(`modal.action.${val}`),
+                      }))}
+                    />
+                    <QRCode
+                      value={qrCodeUrl}
+                      size={300}
+                      logoHeight={100}
+                      logoWidth={50}
+                      logoPadding={10}
+                      logoPaddingStyle="square"
+                      logoImage="/logo.png"
+                      qrStyle="fluid"
+                      id={id}
+                    />
+                    <Link target="_blank" href={qrCodeUrl}>
+                      {qrCodeUrl}
+                    </Link>
+                  </ModalBody>
 
-          <ModalFooter>
-            <Button onPress={download}>{t('modal.download')}</Button>
-          </ModalFooter>
-        </ModalContent>
+                  <ModalFooter>
+                    <Button onPress={download}>{t('modal.download')}</Button>
+                  </ModalFooter>
+                </>
+              )}
+            </ModalDialog>
+          </ModalContainer>
+        </ModalBackdrop>
       </Modal>
     </>
   );

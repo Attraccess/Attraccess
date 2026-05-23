@@ -7,9 +7,9 @@ import {
   useProjectsServiceFindOneProjectKey,
   useProjectsServiceUnarchiveProject,
 } from '@attraccess/react-query-client';
-import { Skeleton, Image, Button, Link, Chip } from '@heroui/react';
+import { Skeleton, Button, Chip } from '@heroui/react';
 import { filenameToUrl } from '../../../api';
-import { PageHeader } from '../../../components/pageHeader';
+import { PageHeader, PageAction } from '../../../components/pageHeader';
 import { ArchiveIcon, ArchiveRestoreIcon, Edit2Icon, FoldersIcon, Trash2Icon, UsersIcon } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { DeleteConfirmationModal } from '../../../components/deleteConfirmationModal';
@@ -128,7 +128,7 @@ export function ProjectDetailsPage() {
             <span className="flex items-center gap-2">
               {project.name}
               {project.archivedAt && (
-                <Chip size="sm" variant="flat" color="warning" startContent={<ArchiveIcon className="size-3" />}>
+                <Chip variant="soft" color="warning"><ArchiveIcon className="size-3" />
                   {t('archivedBadge')}
                 </Chip>
               )}
@@ -140,61 +140,55 @@ export function ProjectDetailsPage() {
         subtitle={project?.description ?? <Skeleton className="w-full h-4" />}
         icon={
           project?.logo ? (
-            <Image className="max-w-12 max-h-12" src={filenameToUrl(project.logo)} alt={project?.name} />
+            <img className="max-w-12 max-h-12" src={filenameToUrl(project.logo)} alt={project?.name} />
           ) : (
             <FoldersIcon />
           )
         }
         backTo="/projects"
         actions={
-          project?.access.isOwner && (
-            <>
-              <Button
-                variant="light"
-                as={Link}
-                href={`/projects/${projectId}/team`}
-                startContent={<UsersIcon className="size-4" />}
-              >
-                {t('actions.members.label')}
-              </Button>
-              <UpsertProjectModal projectId={projectId}>
-                {(onOpen) => (
-                  <Button onPress={onOpen} startContent={<Edit2Icon className="size-4" />} variant="light">
-                    {t('actions.update.label')}
-                  </Button>
-                )}
-              </UpsertProjectModal>
-              {project.archivedAt ? (
-                <Button
-                  onPress={() => unarchiveProject({ id: projectId })}
-                  startContent={<ArchiveRestoreIcon className="size-4" />}
-                  variant="light"
-                  color="warning"
-                  isLoading={isUnarchiving}
-                >
-                  {t('actions.unarchive.label')}
-                </Button>
-              ) : (
-                <Button
-                  onPress={() => archiveProject({ id: projectId })}
-                  startContent={<ArchiveIcon className="size-4" />}
-                  variant="light"
-                  color="warning"
-                  isLoading={isArchiving}
-                >
-                  {t('actions.archive.label')}
-                </Button>
-              )}
-              <Button
-                onPress={() => setShowDeleteConfirmationModal(true)}
-                startContent={<Trash2Icon className="size-4" />}
-                color="danger"
-                variant="light"
-              >
-                {t('actions.delete.label')}
-              </Button>
-            </>
-          )
+          project?.access.isOwner
+            ? ([
+                {
+                  key: 'members',
+                  label: t('actions.members.label'),
+                  icon: <UsersIcon className="size-4" />,
+                  onPress: () => navigate(`/projects/${projectId}/team`),
+                },
+                {
+                  key: 'update',
+                  label: t('actions.update.label'),
+                  icon: <Edit2Icon className="size-4" />,
+                  renderTrigger: (triggerProps) => (
+                    <UpsertProjectModal projectId={projectId}>
+                      {(onOpen) => <Button {...triggerProps} onPress={onOpen} />}
+                    </UpsertProjectModal>
+                  ),
+                },
+                project.archivedAt
+                  ? {
+                      key: 'unarchive',
+                      label: t('actions.unarchive.label'),
+                      icon: <ArchiveRestoreIcon className="size-4" />,
+                      isPending: isUnarchiving,
+                      onPress: () => unarchiveProject({ id: projectId }),
+                    }
+                  : {
+                      key: 'archive',
+                      label: t('actions.archive.label'),
+                      icon: <ArchiveIcon className="size-4" />,
+                      isPending: isArchiving,
+                      onPress: () => archiveProject({ id: projectId }),
+                    },
+                {
+                  key: 'delete',
+                  label: t('actions.delete.label'),
+                  icon: <Trash2Icon className="size-4" />,
+                  variant: 'destructive',
+                  onPress: () => setShowDeleteConfirmationModal(true),
+                },
+              ] satisfies PageAction[])
+            : undefined
         }
       />
 
