@@ -36,7 +36,12 @@ assertWiresAllSignals(J_POE, {
 });
 
 export default () => (
-  <board width="60mm" height="35mm" routingDisabled>
+  <board
+    width="60mm"
+    height="35mm"
+    autorouter="sequential-trace"
+    defaultTraceWidth="0.2mm"
+  >
     {/* ─── Cable-side: PoE-rated magjack + 2x bridges (Mode A + Mode B) + TVS ── */}
     <Hy931147c name="J1" pn="C91754" pcbX={-22} pcbY={0} pcbRotation={0} />
     <Mb10s name="BR1" pn="C2488" pcbX={-10} pcbY={8} pcbRotation={0} />
@@ -105,19 +110,17 @@ export default () => (
     <C0402 name="C_OUT_HF" pn="C307331" capacitance="22uF" pcbX={29} pcbY={3} />
     <ElecCap_22uF_100V name="C_OUT_BULK" pn="C46550391" pcbX={29} pcbY={-3} />
 
-    <net name="VIN_BUCK" />
     <net name="SW_NODE" />
     <net name="V5V" />
 
-    <trace from="net.V_OUT_PD" to="net.VIN_BUCK" />
-    <trace from=".U_BUCK > .VIN" to="net.VIN_BUCK" />
-    <trace from=".C_VIN_BULK > .pin1" to="net.VIN_BUCK" />
+    <trace from=".U_BUCK > .VIN" to="net.V_OUT_PD" />
+    <trace from=".C_VIN_BULK > .pin1" to="net.V_OUT_PD" />
     <trace from=".C_VIN_BULK > .pin2" to="net.PD_GND" />
-    <trace from=".C_VIN_LF > .pin1" to="net.VIN_BUCK" />
+    <trace from=".C_VIN_LF > .pin1" to="net.V_OUT_PD" />
     <trace from=".C_VIN_LF > .pin2" to="net.PD_GND" />
 
     {/* EN tied high via 100k */}
-    <trace from=".R_EN > .pin1" to="net.VIN_BUCK" />
+    <trace from=".R_EN > .pin1" to="net.V_OUT_PD" />
     <trace from=".R_EN > .pin2" to=".U_BUCK > .EN" />
 
     {/* Bootstrap cap */}
