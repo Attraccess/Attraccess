@@ -1,5 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Alert, AlertContent, AlertTitle, Button, Label, ProgressBar, ProgressBarFill, ProgressBarTrack, ProgressCircle, ProgressCircleFillCircle, ProgressCircleTrack, ProgressCircleTrackCircle, TextField, Input, cn } from '@heroui/react';
+import { Alert, AlertContent, AlertTitle, Button, Label, ProgressBar, ProgressBarFill, ProgressBarTrack, TextField, Input, cn } from '@heroui/react';
 import { useMemo, useState } from 'react';
 import { PasswordInput } from '../../../../../components/PasswordInput';
 import { PageHeader } from '../../../../../components/pageHeader';
@@ -53,24 +53,20 @@ export function AttractapSerialConfiguratorNetwork({ className }: { className?: 
       <PageHeader
         title={t('title')}
         noMargin
-        actions={
-          <div className="flex items-center gap-2">
-            <Button onPress={handleRefresh} isPending={isFetchingConfiguration}>
-              {t('actions.refreshStatus')}
-            </Button>
-            <Button onPress={handleRefresh} isPending={isFetchingConfiguration}>
-              {t('actions.refreshWifi')}
-            </Button>
-            {isFetchingConfiguration && (
-              <ProgressCircle isIndeterminate>
-                <ProgressCircleTrack>
-                  <ProgressCircleTrackCircle />
-                  <ProgressCircleFillCircle />
-                </ProgressCircleTrack>
-              </ProgressCircle>
-            )}
-          </div>
-        }
+        actions={[
+          {
+            key: 'refresh-status',
+            label: t('actions.refreshStatus'),
+            isPending: isFetchingConfiguration,
+            onPress: handleRefresh,
+          },
+          {
+            key: 'refresh-wifi',
+            label: t('actions.refreshWifi'),
+            isPending: isFetchingConfiguration,
+            onPress: handleRefresh,
+          },
+        ]}
       />
 
       {status?.wifi_connected && (

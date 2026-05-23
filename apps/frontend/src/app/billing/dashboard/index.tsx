@@ -6,7 +6,6 @@ import { ChartNoAxesCombinedIcon, Settings2Icon } from 'lucide-react';
 import { SummaryCard } from './summary';
 import { BillingDashboardTopupCard } from './topup';
 import { useAuth } from '../../../hooks/useAuth';
-import { Button } from '@heroui/react';
 import { useNavigate } from 'react-router-dom';
 
 export function BillingDashboardPage() {
@@ -20,13 +19,15 @@ export function BillingDashboardPage() {
       <PageHeader
         title={t('title')}
         icon={<ChartNoAxesCombinedIcon />}
-        actions={
-          hasPermission('canManageBilling') && (
-            <Button variant="ghost" onPress={() => navigate('/billing/administration')}><Settings2Icon />
-              {t('actions.administration')}
-            </Button>
-          )
-        }
+        actions={[
+          {
+            key: 'administration',
+            label: t('actions.administration'),
+            icon: <Settings2Icon />,
+            isHidden: !hasPermission('canManageBilling'),
+            onPress: () => navigate('/billing/administration'),
+          },
+        ]}
       />
 
       <div className="flex flex-row flex-wrap gap-4">

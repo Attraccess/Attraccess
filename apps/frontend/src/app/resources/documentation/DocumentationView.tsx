@@ -101,26 +101,24 @@ function DocumentationViewComponent() {
         title={t('title')}
         subtitle={resource.name}
         backTo={`/resources/${resourceId}`}
-        actions={
-          <div className="flex gap-2">
-            {canManageResources && (
-              <Button variant="secondary"
-                onPress={handleEditDocumentation}
-                data-cy="documentation-view-header-edit-button"
-              ><Edit size={16} />
-                {t('actions.edit')}
-              </Button>
-            )}
-            <Button variant="secondary"
-              onPress={() => refetchResource()}
-              isPending={isFetching}
-              aria-label={t('actions.refresh')}
-              data-cy="documentation-view-header-refresh-button"
-            ><RefreshCw size={16} />
-              {t('actions.refresh')}
-            </Button>
-          </div>
-        }
+        actions={[
+          {
+            key: 'edit',
+            label: t('actions.edit'),
+            icon: <Edit size={16} />,
+            isHidden: !canManageResources,
+            onPress: handleEditDocumentation,
+            dataCy: 'documentation-view-header-edit-button',
+          },
+          {
+            key: 'refresh',
+            label: t('actions.refresh'),
+            icon: <RefreshCw size={16} />,
+            isPending: isFetching,
+            onPress: () => refetchResource(),
+            dataCy: 'documentation-view-header-refresh-button',
+          },
+        ]}
       />
 
       <Card className="mt-6">

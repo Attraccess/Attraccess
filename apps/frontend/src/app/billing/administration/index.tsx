@@ -5,7 +5,6 @@ import de from './de.json';
 import { ManualTransactionsCard } from './manualTransactions';
 import { useState } from 'react';
 import { User } from '@attraccess/react-query-client';
-import { Button } from '@heroui/react';
 import { useNavigate } from 'react-router-dom';
 import { SummaryCard } from '../dashboard/summary';
 import { SumUpIcon } from '../../../components/icons/sumup.icon';
@@ -23,11 +22,14 @@ export function BillingAdministrationPage() {
       <PageHeader
         title={t('title')}
         icon={<BanknoteIcon />}
-        actions={
-          <Button variant="ghost" onPress={() => navigate('/billing/administration/sumup')}><SumUpIcon />
-            {t('actions.sumupSettings')}
-          </Button>
-        }
+        actions={[
+          {
+            key: 'sumup-settings',
+            label: t('actions.sumupSettings'),
+            icon: <SumUpIcon />,
+            onPress: () => navigate('/billing/administration/sumup'),
+          },
+        ]}
         backTo="/billing"
       />
 

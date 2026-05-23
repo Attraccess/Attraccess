@@ -1,14 +1,20 @@
-import React, { ReactNode } from 'react';
+import { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { Button, cn } from '@heroui/react';
+import { PageAction, PageHeaderActions } from './actions';
+
+export type { PageAction, PageActionPress, PageActionRender, PageActionTriggerProps, PageActionVariant } from './actions';
+export { PageHeaderActions } from './actions';
 
 interface PageHeaderProps {
   title: string | ReactNode;
   subtitle?: string | ReactNode;
   backTo?: string;
   onBack?: () => void;
-  actions?: ReactNode;
+  actions?: PageAction[];
+  maxVisibleActions?: number;
+  moreActionsLabel?: string;
   icon?: ReactNode;
   noMargin?: boolean;
   thumbnailSrc?: string;
@@ -21,6 +27,8 @@ export function PageHeader({
   backTo,
   onBack,
   actions,
+  maxVisibleActions,
+  moreActionsLabel,
   icon,
   noMargin,
   thumbnailSrc,
@@ -28,11 +36,14 @@ export function PageHeader({
 }: Readonly<PageHeaderProps>) {
   const navigate = useNavigate();
 
+  const hasActions = !!actions && actions.some((a) => !a.isHidden);
+
   return (
     <div className={cn('flex items-center w-full justify-between mb-8 flex-wrap gap-y-8', noMargin && 'mb-0')}>
       <div className="flex items-center">
         {(backTo || onBack) && (
-          <Button variant="ghost"
+          <Button
+            variant="ghost"
             onPress={() => (backTo ? navigate(backTo) : onBack?.())}
             isIconOnly
             aria-label="Go back"
@@ -73,7 +84,15 @@ export function PageHeader({
         </div>
       </div>
 
-      {actions && <div className="flex items-center gap-2 flex-wrap">{actions}</div>}
+      {hasActions && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <PageHeaderActions
+            actions={actions as PageAction[]}
+            maxVisible={maxVisibleActions}
+            moreLabel={moreActionsLabel}
+          />
+        </div>
+      )}
     </div>
   );
 }

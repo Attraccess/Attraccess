@@ -29,16 +29,16 @@ export function MqttServersPage() {
     <div>
       <PageHeader
         title={t('title')}
-        actions={
-          <Button
-            variant="ghost"
-            onPress={() => setIsCreateOpen(true)}
-            data-cy="mqtt-servers-page-add-new-server-button"
-          >
-            <Plus size={16} />
-            {t('addNewServer')}
-          </Button>
-        }
+        actions={[
+          {
+            key: 'add-server',
+            label: t('addNewServer'),
+            icon: <Plus size={16} />,
+            variant: 'primary',
+            onPress: () => setIsCreateOpen(true),
+            dataCy: 'mqtt-servers-page-add-new-server-button',
+          },
+        ]}
       />
       <MqttServerList />
       <StandardDrawer

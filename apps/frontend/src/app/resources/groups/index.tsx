@@ -115,20 +115,20 @@ export function ManageResourceGroups({
           subtitle={t('subtitle')}
           icon={<GroupIcon />}
           noMargin
-          actions={
-            <ResourceGroupUpsertModal onUpserted={onGroupCreated}>
-              {(onOpen: () => void) => (
-                <Button variant="secondary"
-
-                  onPress={onOpen}
-
-                  data-cy="toolbar-open-create-resource-group-modal-button"
-                ><PlusIcon size={18} />
-                  {t('addGroup')}
-                </Button>
-              )}
-            </ResourceGroupUpsertModal>
-          }
+          actions={[
+            {
+              key: 'add-group',
+              label: t('addGroup'),
+              icon: <PlusIcon size={18} />,
+              variant: 'primary',
+              dataCy: 'toolbar-open-create-resource-group-modal-button',
+              renderTrigger: (triggerProps) => (
+                <ResourceGroupUpsertModal onUpserted={onGroupCreated}>
+                  {(onOpen: () => void) => <Button {...triggerProps} onPress={onOpen} />}
+                </ResourceGroupUpsertModal>
+              ),
+            },
+          ]}
         />
       </Card.Header>
       <Card.Content>

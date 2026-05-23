@@ -1,5 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Alert, AlertContent, AlertTitle, Button, ProgressCircle, ProgressCircleFillCircle, ProgressCircleTrack, ProgressCircleTrackCircle, cn } from '@heroui/react';
+import { Alert, AlertContent, AlertTitle, Button, cn } from '@heroui/react';
 import { useCallback, useMemo, useState } from 'react';
 import { getBaseUrl } from '../../../../../api';
 import { PageHeader } from '../../../../../components/pageHeader';
@@ -136,20 +136,14 @@ export function AttractapSerialConfiguratorApi({
       <PageHeader
         noMargin
         title={<span onDoubleClick={manualUpdateApiData}>{t('title')}</span>}
-        actions={
-          isFetchingConfiguration || isUpdatingApi ? (
-            <ProgressCircle isIndeterminate>
-              <ProgressCircleTrack>
-                <ProgressCircleTrackCircle />
-                <ProgressCircleFillCircle />
-              </ProgressCircleTrack>
-            </ProgressCircle>
-          ) : (
-            <Button onPress={handleRefresh}>
-              {t('actions.refreshStatus')}
-            </Button>
-          )
-        }
+        actions={[
+          {
+            key: 'refresh-status',
+            label: t('actions.refreshStatus'),
+            isPending: isFetchingConfiguration || isUpdatingApi,
+            onPress: handleRefresh,
+          },
+        ]}
       />
 
       <Alert status={alertColor}>

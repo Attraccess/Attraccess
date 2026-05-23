@@ -6,7 +6,7 @@ import { ArrowLeft, BookOpen, ListChecks, PenSquareIcon, ShapesIcon, Trash, Work
 
 import { ResourceUsageSession } from '../usage/resourceUsageSession';
 import { ResourceUsageHistory } from '../usage/resourceUsageHistory';
-import { PageHeader } from '../../../components/pageHeader';
+import { PageHeader, PageAction } from '../../../components/pageHeader';
 import { DeleteConfirmationModal } from '../../../components/deleteConfirmationModal';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { memo, useState } from 'react';
@@ -126,67 +126,77 @@ function ResourceDetailsComponent() {
         thumbnailAlt={resource.name}
         subtitle={resource.description ?? undefined}
         backTo="/resources"
-        actions={
-          <>
-            <DocumentationModal resourceId={resourceId}>
-              {(onOpenDocumentation) => (
-                <Button variant="ghost"
-                  onPress={onOpenDocumentation}
-                  data-cy="documentation-button"
-                ><BookOpen className="w-4 h-4" />
-                  {t('actions.documentation')}
-                </Button>
-              )}
-            </DocumentationModal>
-
-            {canManageResources && (
-              <>
-                <ResourceQrCode resourceId={resourceId} variant="ghost" buttonIconSize={16} />
-
-                <Button variant="ghost"
-                  onPress={() => navigate(`/resources/${resourceId}/flows`)}
-                  data-cy="flows-button"
-                ><WorkflowIcon className="w-4 h-4" />
-                  {t('navItems.flows')}
-                </Button>
-
-                <Button variant="ghost"
-                  onPress={() => navigate(`/resources/${resourceId}/forms`)}
-                  data-cy="forms-button"
-                ><ListChecks className="w-4 h-4" />
-                  {t('navItems.forms')}
-                </Button>
-
-                {maintenancePermissions?.canManage && (
-                  <Button variant="ghost"
-                    onPress={() => navigate(`/resources/${resourceId}/maintenance`)}
-                    data-cy="maintenance-button"
-                  ><WrenchIcon className="w-4 h-4" />
-                    {t('actions.maintenance')}
-                  </Button>
-                )}
-
-                <ResourceEditModal resourceId={resourceId} closeOnSuccess>
-                  {(onOpen) => (
-                    <Button variant="ghost"
-                      onPress={onOpen}
-                      data-cy="edit-resource-button"
-                    ><PenSquareIcon className="w-4 h-4" />
-                      {t('actions.edit')}
-                    </Button>
-                  )}
-                </ResourceEditModal>
-
-                <Button variant="danger-soft"
-                  onPress={open}
-                  data-cy="delete-resource-button"
-                ><Trash className="w-4 h-4" />
-                  {t('actions.delete')}
-                </Button>
-              </>
-            )}
-          </>
-        }
+        actions={[
+          {
+            key: 'documentation',
+            label: t('actions.documentation'),
+            icon: <BookOpen className="w-4 h-4" />,
+            dataCy: 'documentation-button',
+            renderTrigger: (triggerProps) => (
+              <DocumentationModal resourceId={resourceId}>
+                {(onOpenDocumentation) => <Button {...triggerProps} onPress={onOpenDocumentation} />}
+              </DocumentationModal>
+            ),
+          },
+          {
+            key: 'qr',
+            label: t('actions.qrCode'),
+            isHidden: !canManageResources,
+            renderTrigger: (triggerProps) => (
+              <ResourceQrCode
+                resourceId={resourceId}
+                variant={triggerProps.variant}
+                size={triggerProps.size}
+                buttonIconSize={16}
+              />
+            ),
+          },
+          {
+            key: 'flows',
+            label: t('navItems.flows'),
+            icon: <WorkflowIcon className="w-4 h-4" />,
+            isHidden: !canManageResources,
+            onPress: () => navigate(`/resources/${resourceId}/flows`),
+            dataCy: 'flows-button',
+          },
+          {
+            key: 'forms',
+            label: t('navItems.forms'),
+            icon: <ListChecks className="w-4 h-4" />,
+            isHidden: !canManageResources,
+            onPress: () => navigate(`/resources/${resourceId}/forms`),
+            dataCy: 'forms-button',
+          },
+          {
+            key: 'maintenance',
+            label: t('actions.maintenance'),
+            icon: <WrenchIcon className="w-4 h-4" />,
+            isHidden: !canManageResources || !maintenancePermissions?.canManage,
+            onPress: () => navigate(`/resources/${resourceId}/maintenance`),
+            dataCy: 'maintenance-button',
+          },
+          {
+            key: 'edit',
+            label: t('actions.edit'),
+            icon: <PenSquareIcon className="w-4 h-4" />,
+            isHidden: !canManageResources,
+            dataCy: 'edit-resource-button',
+            renderTrigger: (triggerProps) => (
+              <ResourceEditModal resourceId={resourceId} closeOnSuccess>
+                {(onOpen) => <Button {...triggerProps} onPress={onOpen} />}
+              </ResourceEditModal>
+            ),
+          },
+          {
+            key: 'delete',
+            label: t('actions.delete'),
+            icon: <Trash className="w-4 h-4" />,
+            variant: 'destructive',
+            isHidden: !canManageResources,
+            onPress: open,
+            dataCy: 'delete-resource-button',
+          },
+        ] satisfies PageAction[]}
       />
 
       <div className="mb-6">

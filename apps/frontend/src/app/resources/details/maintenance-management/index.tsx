@@ -1,5 +1,5 @@
 import { Button, Card, cn, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow } from '@heroui/react';
-import { PageHeader } from '../../../../components/pageHeader';
+import { PageAction, PageHeader } from '../../../../components/pageHeader';
 import { MaintenanceReasonDisplay } from '../../../../components/MaintenanceReasonDisplay';
 import { LabeledSwitch } from '../../../../components/labeledSwitch';
 import { ResourceMaintenance, useResourceMaintenancesServiceFindMaintenances } from '@attraccess/react-query-client';
@@ -61,27 +61,25 @@ export function MaintenanceManagement(props: Props) {
     [maintenances?.data, now],
   );
 
-  const actions = (
-    <>
-      <Button variant="ghost"
-        onPress={() => navigate(`/resources/${resourceId}/maintenance`)}
-        data-cy="manage-maintenance-button"
-      >
-        {t('actions.manageHub.label')}
-      </Button>
-      <LabeledSwitch isSelected={includePast} onChange={setIncludePast}>
-        {t('filters.includePast')}
-      </LabeledSwitch>
-      <ResourceMaintenanceUpsertModal resourceId={resourceId}>
-        {(open) => (
-          <Button variant="primary" onPress={open}>
-            <PlusIcon className="w-4 h-4" />
-            {t('actions.create.label')}
-          </Button>
-        )}
-      </ResourceMaintenanceUpsertModal>
-    </>
-  );
+  const cardActions: PageAction[] = [
+    {
+      key: 'manage-hub',
+      label: t('actions.manageHub.label'),
+      onPress: () => navigate(`/resources/${resourceId}/maintenance`),
+      dataCy: 'manage-maintenance-button',
+    },
+    {
+      key: 'create',
+      label: t('actions.create.label'),
+      icon: <PlusIcon className="w-4 h-4" />,
+      variant: 'primary',
+      renderTrigger: (triggerProps) => (
+        <ResourceMaintenanceUpsertModal resourceId={resourceId}>
+          {(open) => <Button {...triggerProps} onPress={open} />}
+        </ResourceMaintenanceUpsertModal>
+      ),
+    },
+  ];
 
   const flatActions = (
     <>
@@ -106,6 +104,14 @@ export function MaintenanceManagement(props: Props) {
         )}
       </ResourceMaintenanceUpsertModal>
     </>
+  );
+
+  const includePastSwitch = (
+    <div className="flex justify-end px-4 py-2 border-b border-divider">
+      <LabeledSwitch isSelected={includePast} onChange={setIncludePast}>
+        {t('filters.includePast')}
+      </LabeledSwitch>
+    </div>
   );
 
   const tableContent = (
@@ -232,11 +238,14 @@ export function MaintenanceManagement(props: Props) {
           title={t('title')}
           icon={<ConstructionIcon />}
           noMargin
-          actions={actions}
+          actions={cardActions}
         />
       </Card.Header>
 
-      <Card.Content>{tableContent}</Card.Content>
+      <Card.Content>
+        {includePastSwitch}
+        {tableContent}
+      </Card.Content>
     </Card>
   );
 }

@@ -86,30 +86,32 @@ export function ApiKeyCard(props: Omit<ComponentPropsWithoutRef<'section'>, 'chi
     >
       <PageHeader
         icon={<WebhookIcon size={20} />}
-        title={t('title')}
+        title={
+          <span className="flex items-center gap-2 flex-wrap">
+            {t('title')}
+            <Chip
+              color={isLoadingConfiguration ? 'default' : configuration?.enabled ? 'success' : 'warning'}
+              variant="soft"
+            >
+              <div className="flex items-center gap-2">
+                {isLoadingConfiguration ? (
+                  <Spinner />
+                ) : configuration?.enabled ? (
+                  <CheckIcon size={16} />
+                ) : (
+                  <XIcon size={16} />
+                )}
+                {isLoadingConfiguration
+                  ? t('status.loading.title')
+                  : configuration?.enabled
+                    ? t('status.enabled.title')
+                    : t('status.disabled.title')}
+              </div>
+            </Chip>
+          </span>
+        }
         subtitle={t('subtitle')}
         noMargin
-        actions={
-          <Chip
-            color={isLoadingConfiguration ? 'default' : configuration?.enabled ? 'success' : 'warning'}
-            variant="soft"
-          >
-            <div className="flex items-center gap-2">
-              {isLoadingConfiguration ? (
-                <Spinner />
-              ) : configuration?.enabled ? (
-                <CheckIcon size={16} />
-              ) : (
-                <XIcon size={16} />
-              )}
-              {isLoadingConfiguration
-                ? t('status.loading.title')
-                : configuration?.enabled
-                  ? t('status.enabled.title')
-                  : t('status.disabled.title')}
-            </div>
-          </Chip>
-        }
       />
 
       <Form

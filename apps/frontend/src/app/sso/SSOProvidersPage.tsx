@@ -3,7 +3,6 @@ import { PageHeader } from '../../components/pageHeader';
 import { SSOProvidersList, SSOProvidersListRef } from './providers/SSOProvidersList';
 import { useAuth } from '../../hooks/useAuth';
 import { Navigate } from 'react-router-dom';
-import { Button } from '@heroui/react';
 import { Plus } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
@@ -34,14 +33,16 @@ export const SSOProvidersPage: React.FC = () => {
         title={t('title')}
         subtitle={t('subtitle')}
         backTo="/users"
-        actions={
-          <Button variant="primary"
-            onPress={handleAddNewProvider}
-            data-cy="sso-providers-page-header-add-new-provider-button"
-          ><Plus size={16} />
-            {t('actions.addNew')}
-          </Button>
-        }
+        actions={[
+          {
+            key: 'add-new',
+            label: t('actions.addNew'),
+            icon: <Plus size={16} />,
+            variant: 'primary',
+            onPress: handleAddNewProvider,
+            dataCy: 'sso-providers-page-header-add-new-provider-button',
+          },
+        ]}
       />
 
       <div className="mt-6">

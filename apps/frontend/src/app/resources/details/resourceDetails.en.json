@@ -14,6 +14,7 @@
     "edit": "Edit",
     "delete": "Delete",
     "documentation": "Documentation",
-    "maintenance": "Maintenance"
+    "maintenance": "Maintenance",
+    "qrCode": "QR Code"
   }
 }

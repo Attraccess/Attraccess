@@ -201,17 +201,17 @@ function DocumentationEditorComponent() {
         title={t('title')}
         subtitle={resource.name}
         backTo={`/resources/${resourceId}`}
-        actions={
-          <Button
-            variant="primary"
-            onPress={handleSave}
-            isPending={updateResource.isPending}
-            data-cy="documentation-editor-header-save-button"
-          >
-            <Save className="w-4 h-4" />
-            {t('actions.save')}
-          </Button>
-        }
+        actions={[
+          {
+            key: 'save',
+            label: t('actions.save'),
+            icon: <Save className="w-4 h-4" />,
+            variant: 'primary',
+            isPending: updateResource.isPending,
+            onPress: handleSave,
+            dataCy: 'documentation-editor-header-save-button',
+          },
+        ]}
       />
 
       <Form onSubmit={handleSubmit} className="gap-8" data-cy="documentation-editor-form">

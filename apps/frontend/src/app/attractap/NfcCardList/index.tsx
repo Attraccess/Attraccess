@@ -43,7 +43,7 @@ import { NfcCardDeactivateModal } from './deactivate';
 import { NfcCardActivateModal } from './activate';
 import { CheckIcon, PlusIcon, ServerIcon, Trash2Icon, XIcon } from 'lucide-react';
 import { AlertStatusIcon } from '../../../components/AlertStatusIcon';
-import { PageHeader } from '../../../components/pageHeader';
+import { PageAction, PageHeader } from '../../../components/pageHeader';
 import { useAuth } from '../../../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 
@@ -199,7 +199,11 @@ const NfcCardTableCell = (props: NfcCardTableCellProps) => {
   return props.card[props.header as keyof NFCCard] as React.ReactNode;
 };
 
-const EnrollNfcCardButton = () => {
+interface EnrollNfcCardProps {
+  children: (onOpen: () => void) => React.ReactNode;
+}
+
+const EnrollNfcCard = ({ children }: EnrollNfcCardProps) => {
   const { t } = useTranslations({
     de,
     en,
@@ -223,10 +227,7 @@ const EnrollNfcCardButton = () => {
 
   return (
     <>
-      <Button variant="ghost" onPress={() => setShow(true)} data-cy="enroll-nfc-card-button-trigger">
-        <PlusIcon />
-        {t('enroll')}
-      </Button>
+      {children(() => setShow(true))}
       <StandardDrawer
         isOpen={show}
         onOpenChange={(open) => {
@@ -306,17 +307,27 @@ export function NfcCardList() {
     <>
       <PageHeader
         title={t('nfcCards')}
-        actions={
-          <>
-            <EnrollNfcCardButton />
-            {hasPermission('canManageResources') && (
-              <Button variant="ghost" onPress={() => navigate('/attractap/readers')}>
-                <ServerIcon />
-                {t('readers')}
-              </Button>
-            )}
-          </>
-        }
+        actions={[
+          {
+            key: 'enroll',
+            label: t('enroll'),
+            icon: <PlusIcon />,
+            variant: 'primary',
+            dataCy: 'enroll-nfc-card-button-trigger',
+            renderTrigger: (triggerProps) => (
+              <EnrollNfcCard>
+                {(onOpen) => <Button {...triggerProps} onPress={onOpen} />}
+              </EnrollNfcCard>
+            ),
+          },
+          {
+            key: 'readers',
+            label: t('readers'),
+            icon: <ServerIcon />,
+            isHidden: !hasPermission('canManageResources'),
+            onPress: () => navigate('/attractap/readers'),
+          },
+        ] satisfies PageAction[]}
       />
 
       <Alert status="warning" className="mb-4">
