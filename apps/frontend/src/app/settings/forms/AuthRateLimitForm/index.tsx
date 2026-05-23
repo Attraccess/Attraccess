@@ -9,6 +9,7 @@ import {
   Separator,
   Spinner,
 } from '@heroui/react';
+import { HelpCircleIcon } from 'lucide-react';
 import { LabeledSwitch } from '../../../../components/labeledSwitch';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -61,7 +62,14 @@ function NumberRow({
 }) {
   return (
     <div className="flex flex-col gap-1" data-testid={dataTestid}>
-      <span className="text-sm font-medium">{label}</span>
+      <div className="flex items-center gap-1.5">
+        <span className="text-sm font-medium">{label}</span>
+        {description && (
+          <span title={description} aria-label={description}>
+            <HelpCircleIcon size={14} className="text-default-400 cursor-help" />
+          </span>
+        )}
+      </div>
       <NumberField value={value} onChange={onChange} minValue={minValue} step={step} isDisabled={isDisabled}>
         <NumberFieldGroup>
           <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
@@ -69,7 +77,6 @@ function NumberRow({
           <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
         </NumberFieldGroup>
       </NumberField>
-      {description && <span className="text-xs text-default-500">{description}</span>}
     </div>
   );
 }
@@ -121,27 +128,29 @@ export function AuthRateLimitForm() {
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-default-500">{t('description')}</p>
-      <NumberRow
-        label={t('fields.maxAttempts.label')}
-        description={t('fields.maxAttempts.description')}
-        value={form.maxAttempts}
-        onChange={(value) => setForm({ ...form, maxAttempts: value })}
-        dataTestid="rate-limit-max-attempts"
-      />
-      <NumberRow
-        label={t('fields.windowSeconds.label')}
-        description={t('fields.windowSeconds.description')}
-        value={form.windowSeconds}
-        onChange={(value) => setForm({ ...form, windowSeconds: value })}
-        dataTestid="rate-limit-window-seconds"
-      />
-      <NumberRow
-        label={t('fields.lockoutDurationSeconds.label')}
-        description={t('fields.lockoutDurationSeconds.description')}
-        value={form.lockoutDurationSeconds}
-        onChange={(value) => setForm({ ...form, lockoutDurationSeconds: value })}
-        dataTestid="rate-limit-lockout-duration"
-      />
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <NumberRow
+          label={t('fields.maxAttempts.label')}
+          description={t('fields.maxAttempts.description')}
+          value={form.maxAttempts}
+          onChange={(value) => setForm({ ...form, maxAttempts: value })}
+          dataTestid="rate-limit-max-attempts"
+        />
+        <NumberRow
+          label={t('fields.windowSeconds.label')}
+          description={t('fields.windowSeconds.description')}
+          value={form.windowSeconds}
+          onChange={(value) => setForm({ ...form, windowSeconds: value })}
+          dataTestid="rate-limit-window-seconds"
+        />
+        <NumberRow
+          label={t('fields.lockoutDurationSeconds.label')}
+          description={t('fields.lockoutDurationSeconds.description')}
+          value={form.lockoutDurationSeconds}
+          onChange={(value) => setForm({ ...form, lockoutDurationSeconds: value })}
+          dataTestid="rate-limit-lockout-duration"
+        />
+      </div>
       <Separator />
       <LabeledSwitch
         isSelected={form.exponentialBackoff}
