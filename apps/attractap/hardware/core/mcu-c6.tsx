@@ -50,6 +50,24 @@ export const McuC6 = ({ boardW, boardH }: McuC6Props) => {
       <trace from=".U_C6 > .GND1" to=".U_C6 > .GND2" />
       <trace from=".U_C6 > .GND2" to=".U_C6 > .GND11" />
       <trace from=".U_C6 > .GND11" to=".U_C6 > .GND14" />
+      <trace from=".U_C6 > .GND14" to=".U_C6 > .GND36" />
+      <trace from=".U_C6 > .GND36" to=".U_C6 > .GND37" />
+      <trace from=".U_C6 > .GND37" to=".U_C6 > .GND38" />
+      <trace from=".U_C6 > .GND38" to=".U_C6 > .GND39" />
+      <trace from=".U_C6 > .GND39" to=".U_C6 > .GND40" />
+      <trace from=".U_C6 > .GND40" to=".U_C6 > .GND41" />
+      <trace from=".U_C6 > .GND41" to=".U_C6 > .GND42" />
+      <trace from=".U_C6 > .GND42" to=".U_C6 > .GND43" />
+      <trace from=".U_C6 > .GND43" to=".U_C6 > .GND44" />
+      <trace from=".U_C6 > .GND44" to=".U_C6 > .GND45" />
+      <trace from=".U_C6 > .GND45" to=".U_C6 > .GND46" />
+      <trace from=".U_C6 > .GND46" to=".U_C6 > .GND47" />
+      <trace from=".U_C6 > .GND47" to=".U_C6 > .GND48" />
+      <trace from=".U_C6 > .GND48" to=".U_C6 > .GND49" />
+      <trace from=".U_C6 > .GND49" to=".U_C6 > .GND50" />
+      <trace from=".U_C6 > .GND50" to=".U_C6 > .GND51" />
+      <trace from=".U_C6 > .GND51" to=".U_C6 > .GND52" />
+      <trace from=".U_C6 > .GND52" to=".U_C6 > .GND53" />
 
       <trace from=".R_C6_EN > .pin1" to=".U_C6 > .EN" />
       <trace from=".R_C6_EN > .pin2" to=".U_C6 > .VDD3V3" />

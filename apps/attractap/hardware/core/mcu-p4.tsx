@@ -18,6 +18,7 @@ const C_10UF_PN = 'C96446';
 const C_1UF_PN = 'C15849';
 const C_10PF_PN = 'C32949';
 const R_10K_PN = 'C25744';
+const R_4K7_PN = 'C25900';
 const R_33R_PN = 'C25105';
 const FB_PN = 'C14709';
 const P4_PN = 'C22387510';
@@ -84,8 +85,8 @@ export const McuP4 = ({ boardW, boardH }: McuP4Props) => {
       <TactileTs1088 name="SW_BOOT" pn={TS1088_PN} {...at(36, 22)} />
       <R0402 name="R_BOOT_PU" pn={R_10K_PN} resistance="10k" {...at(33, 22)} />
 
-      <R0402 name="R_MDIO_PU" pn={R_10K_PN} resistance="10k" {...at(17, 14)} />
-      <R0402 name="R_MDC_PU" pn={R_10K_PN} resistance="10k" {...at(17, 15)} />
+      <R0402 name="R_MDIO_PU" pn={R_4K7_PN} resistance="4.7k" {...at(17, 14)} />
+      <R0402 name="R_MDC_PU" pn={R_4K7_PN} resistance="4.7k" {...at(17, 15)} />
       <R0402 name="R_REFCLK" pn={R_33R_PN} resistance="33" {...at(17, 16)} />
 
       <trace from=".Y1 > .XIN" to=".U_P4 > .XTAL_P" />

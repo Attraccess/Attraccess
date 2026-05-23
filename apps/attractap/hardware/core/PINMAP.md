@@ -33,7 +33,7 @@ IDF ethernet + esp_hosted examples to minimise sdkconfig surgery.
 | `CSI_REXT` | 48 | Precision 200 Ω to GND (CSI unused but tie to spec) |
 | `GND` (EP) | 105 | Stitched thermal vias to GND plane |
 
-## 2. Boot strap pins (fixed)
+## 2. Bootstrap pins (fixed)
 
 | Strap | P4 pin | Default | Reason |
 |-------|--------|---------|--------|
@@ -117,7 +117,7 @@ firmware on the C6). 4-bit bus + clock + cmd at +3V3.
 | `SDIO_D2`     | 97 (GPIO53)   | C6 pin 28 (IO22)  | 10 kΩ to +3V3 |
 | `SDIO_D3`     | 98 (GPIO54)   | C6 pin 29 (IO23)  | 10 kΩ to +3V3 |
 | `C6_EN`       | 80→GPIO39 (TBV) | C6 pin 8 (EN)   | 10 kΩ to +3V3 + 1 µF to GND |
-| `C6_BOOT`     | 81→GPIO40 (TBV) | C6 pin 23 (IO9) | 10 kΩ to +3V3 (boot strap on C6) |
+| `C6_BOOT`     | 81→GPIO40 (TBV) | C6 pin 23 (IO9) | 10 kΩ to +3V3 (bootstrap on C6) |
 
 > **Note**: GPIO39–48 already carry RMII. The TBV rows on `C6_EN`/`C6_BOOT`
 > are the conflict. Resolve at PINMAP-lock review — easy fix is to route

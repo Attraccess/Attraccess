@@ -104,7 +104,6 @@ export default () => (
     <trace from=".R_USB_DM > .pin2" to=".U_P4 > .DM" />
     <trace from=".R_USB_DP > .pin2" to=".U_P4 > .DP" />
 
-    <trace from=".U_P4 > .GPIO39" to=".J_POE > .pin11" />
     <trace from=".R_REFCLK > .pin2" to=".J_POE > .pin11" />
     <trace from=".U_P4 > .GPIO40" to=".J_POE > .pin5" />
     <trace from=".U_P4 > .GPIO41" to=".J_POE > .pin6" />
