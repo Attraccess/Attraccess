@@ -9,3 +9,5 @@ export * from './discrete';
 export * from './buzzer';
 export * from './leds';
 export * from './silk';
+export * from './ethernet';
+export * from './poe';
