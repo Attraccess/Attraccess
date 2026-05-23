@@ -149,13 +149,20 @@ matching-network retune.
 
 The `NfcCoilAntenna` wrapper in `libs/attractap-hw-shared/src/parts/nfc.tsx`
 accepts the manufacturer PN via an `mpn` prop, distinct from the JLC
-`pn` prop — the latter remains unset because **ANT1 ships from JLC with
-an empty Part # column** (JLC SMT does not stock 13.56 MHz NFC antenna
-coils), so ANT1 is hand-soldered post-SMT regardless of which vendor PN
-is picked. The BOM validator
-(`apps/attractap/hardware/scripts/validate-bom.mjs`) explicitly
-whitelists `ANT`-prefixed designators for missing JLC PN (see
-`allowMissingPn` on the `ANT` REF_CLASS row).
+`pn` prop — the latter remains unset because **JLC SMT does not stock
+13.56 MHz NFC antenna coils** and so ANT1 is hand-soldered post-SMT
+regardless of which vendor PN is picked.
+
+To keep the JLC PCBA matcher from flagging ANT1 as "No Part Selected",
+the export step strips ANT-prefixed rows from `bom.csv` *and*
+`pick_and_place.csv` inside the gerber zip before validation. That is
+done by `apps/attractap/hardware/scripts/strip-dnp.mjs`, which sources
+its prefix list from the `allowMissingPn` rows in
+`validate-bom.mjs::REF_CLASS` — so adding a new hand-populated reference
+prefix in the validator automatically extends the DNP strip. The
+matching-network designators and J1 / U1 / LEDs are untouched; ANT1
+disappears from the JLC-bound BOM and CPL entirely and is soldered on
+afterwards.
 
 The antenna sits **top-side, centred at (25, 25)**, with the 24 WS2812
 LEDs in a ring around it on the same layer. The PN532 IC, matching
