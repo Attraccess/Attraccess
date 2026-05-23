@@ -118,7 +118,7 @@ export function InviteUserModal(props: Props) {
     });
   }, [inviteUser, trimmedEmail, trimmedUsername, usernameError]);
 
-  const [tab] = useState<'single' | 'csv'>('single');
+  const [tab, setTab] = useState<'single' | 'csv'>('single');
 
   return (
     <>
@@ -133,7 +133,7 @@ export function InviteUserModal(props: Props) {
           <h2 className="text-lg font-semibold">{t('title')}</h2>
         </DrawerHeader>
         <DrawerBody>
-          <Tabs selectedKey={tab}>
+          <Tabs selectedKey={tab} onSelectionChange={(k) => setTab(k as 'single' | 'csv')}>
             <TabList>
               <Tab id="single">{t('tabs.single')}</Tab>
               <Tab id="csv">{t('tabs.csv')}</Tab>

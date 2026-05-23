@@ -234,7 +234,7 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
               </div>
 
               <div className="flex flex-col gap-2 w-full">
-                <Tabs selectedKey={formData.type}>
+                <Tabs selectedKey={formData.type} onSelectionChange={(k) => setField('type', k as ResourceType)}>
                   <TabList>
                     <Tab id="machine">{t('inputs.type.options.machine')}</Tab>
                     <Tab id="door">{t('inputs.type.options.door')}</Tab>
