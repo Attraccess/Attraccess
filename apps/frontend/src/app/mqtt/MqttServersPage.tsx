@@ -1,43 +1,64 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Button } from '@heroui/react';
-import { Navigate, useNavigate } from 'react-router-dom';
-import { Plus } from 'lucide-react';
+import { Button, DrawerBody, DrawerHeader } from '@heroui/react';
+import { Navigate } from 'react-router-dom';
+import { Plus, X } from 'lucide-react';
+import { useCallback, useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import en from './translations/en.json';
 import de from './translations/de.json';
 import { MqttServerList } from './servers/MqttServerList';
+import { CreateMqttServerForm } from './servers/CreateMqttServerPage';
 import { PageHeader } from '../../components/pageHeader';
+import { StandardDrawer } from '../../components/standardDrawer';
 
 export function MqttServersPage() {
   const { hasPermission } = useAuth();
-  const navigate = useNavigate();
   const { t } = useTranslations({ en, de });
+
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
 
   const canManageMqtt = hasPermission('canManageResources');
 
-  // Redirect if user doesn't have permission
+  const close = useCallback(() => setIsCreateOpen(false), []);
+
   if (!canManageMqtt) {
     return <Navigate to="/" />;
   }
-
-  const handleAddNewServer = () => {
-    navigate('/mqtt/servers/create');
-  };
 
   return (
     <div>
       <PageHeader
         title={t('title')}
         actions={
-          <Button variant="ghost"
-            onPress={handleAddNewServer}
+          <Button
+            variant="ghost"
+            onPress={() => setIsCreateOpen(true)}
             data-cy="mqtt-servers-page-add-new-server-button"
-          ><Plus size={16} />
+          >
+            <Plus size={16} />
             {t('addNewServer')}
           </Button>
         }
       />
       <MqttServerList />
+      <StandardDrawer
+        isOpen={isCreateOpen}
+        onOpenChange={(open) => {
+          if (!open) close();
+        }}
+      >
+        <DrawerHeader>
+          <div className="flex w-full items-start justify-between gap-3">
+            <h2 className="text-lg font-semibold">{t('addNewMqttServer')}</h2>
+            <Button isIconOnly variant="ghost" aria-label={t('close')} onPress={close}>
+              <X size={16} />
+            </Button>
+          </div>
+        </DrawerHeader>
+        <DrawerBody>
+          <CreateMqttServerForm onSuccess={close} onCancel={close} />
+        </DrawerBody>
+      </StandardDrawer>
     </div>
   );
 }

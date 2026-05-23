@@ -4,6 +4,9 @@ import {
   AlertDescription,
   AlertTitle,
   Button,
+  DrawerBody,
+  DrawerFooter,
+  DrawerHeader,
   Modal,
   ModalBackdrop,
   ModalBody,
@@ -20,6 +23,7 @@ import {
   TableRow,
   cn,
 } from '@heroui/react';
+import { StandardDrawer } from '../../../components/standardDrawer';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AttraccessUser, DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
@@ -206,13 +210,16 @@ const EnrollNfcCardButton = () => {
 
   const { mutate: enrollNfcCardMutation } = useAttractapServiceEnrollNfcCard();
 
+  const close = useCallback(() => setShow(false), []);
+
   const enrollNfcCard = useCallback(() => {
     if (!readerId) {
       return;
     }
 
     enrollNfcCardMutation({ requestBody: { readerId } });
-  }, [readerId, enrollNfcCardMutation]);
+    close();
+  }, [readerId, enrollNfcCardMutation, close]);
 
   return (
     <>
@@ -220,50 +227,45 @@ const EnrollNfcCardButton = () => {
         <PlusIcon />
         {t('enroll')}
       </Button>
-      <Modal
+      <StandardDrawer
         isOpen={show}
         onOpenChange={(open) => {
-          if (!open) setShow(false);
+          if (!open) close();
         }}
-        data-cy="enroll-nfc-card-modal"
       >
-        <ModalBackdrop>
-          <ModalContainer size="md">
-            <ModalDialog>
-              {({ close }) => (
-                <>
-                  <ModalHeader>
-                    <h1>{t('enrollModal.title')}</h1>
-                  </ModalHeader>
-                  <ModalBody>
-                    <p>{t('enrollModal.description')}</p>
-                    <AttractapSelect
-                      label={t('enrollModal.readerLabel')}
-                      placeholder={t('enrollModal.readerPlaceholder')}
-                      selection={readerId}
-                      onSelectionChange={(readerId) => setReaderId(readerId ?? null)}
-                      data-cy="enroll-nfc-card-modal-reader-select"
-                      requiredCapabilities={{ cardEnrollment: true }}
-                    />
-                  </ModalBody>
-                  <ModalFooter>
-                    <Button onPress={close} data-cy="enroll-nfc-card-modal-cancel-button">
-                      {t('enrollModal.cancel')}
-                    </Button>
-                    <Button
-                      isDisabled={!readerId}
-                      onPress={enrollNfcCard}
-                      data-cy="enroll-nfc-card-modal-enroll-button"
-                    >
-                      {t('enrollModal.enroll')}
-                    </Button>
-                  </ModalFooter>
-                </>
-              )}
-            </ModalDialog>
-          </ModalContainer>
-        </ModalBackdrop>
-      </Modal>
+        <DrawerHeader>
+          <div className="flex w-full items-start justify-between gap-3">
+            <h2 className="text-lg font-semibold">{t('enrollModal.title')}</h2>
+            <Button isIconOnly variant="ghost" aria-label={t('enrollModal.cancel')} onPress={close}>
+              <XIcon size={16} />
+            </Button>
+          </div>
+        </DrawerHeader>
+        <DrawerBody>
+          <p>{t('enrollModal.description')}</p>
+          <AttractapSelect
+            label={t('enrollModal.readerLabel')}
+            placeholder={t('enrollModal.readerPlaceholder')}
+            selection={readerId}
+            onSelectionChange={(readerId) => setReaderId(readerId ?? null)}
+            data-cy="enroll-nfc-card-modal-reader-select"
+            requiredCapabilities={{ cardEnrollment: true }}
+          />
+        </DrawerBody>
+        <DrawerFooter>
+          <Button variant="secondary" onPress={close} data-cy="enroll-nfc-card-modal-cancel-button">
+            {t('enrollModal.cancel')}
+          </Button>
+          <Button
+            variant="primary"
+            isDisabled={!readerId}
+            onPress={enrollNfcCard}
+            data-cy="enroll-nfc-card-modal-enroll-button"
+          >
+            {t('enrollModal.enroll')}
+          </Button>
+        </DrawerFooter>
+      </StandardDrawer>
     </>
   );
 };
