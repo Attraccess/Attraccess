@@ -72,3 +72,13 @@ export const L0603 = ({ name, pn, inductance, ...rest }: InductorWrapperProps) =
     {...rest}
   />
 );
+
+export const ElecCap_22uF_100V = ({ name, pn, ...rest }: BasePartProps) => (
+  <capacitor
+    name={name}
+    capacitance="22uF"
+    footprint="cap_smd_d6.3_h7.7_p2.5"
+    supplierPartNumbers={jlcSupplier(pn)}
+    {...rest}
+  />
+);
