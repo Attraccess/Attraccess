@@ -2,7 +2,7 @@ import { Navigate } from 'react-router-dom';
 import { ResourceDetails } from '../resources/details/resourceDetails';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { Spinner } from '@heroui/react';
-import { MqttServersPage, CreateMqttServerPage, EditMqttServerPage } from '../mqtt';
+import { MqttServersPage, EditMqttServerPage } from '../mqtt';
 import { SSOProvidersPage } from '../sso/SSOProvidersPage';
 import { UserManagementPage } from '../user-management';
 import { usePluginStore } from 'react-pluggable';
@@ -116,11 +116,6 @@ const coreRoutes: RouteConfig[] = [
   {
     path: '/mqtt/servers',
     element: <MqttServersPage />,
-    authRequired: 'canManageResources',
-  },
-  {
-    path: '/mqtt/servers/create',
-    element: <CreateMqttServerPage />,
     authRequired: 'canManageResources',
   },
   {

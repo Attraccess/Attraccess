@@ -1,5 +1,7 @@
 {
   "title": "MQTT Servers",
   "addNewServer": "Add New Server",
+  "addNewMqttServer": "Add New MQTT Server",
+  "close": "Close",
   "back": "Back"
-} 
+}

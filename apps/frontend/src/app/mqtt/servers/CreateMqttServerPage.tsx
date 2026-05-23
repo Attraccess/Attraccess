@@ -2,13 +2,11 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { Button, Checkbox, Form, Input, Label, TextField } from "@heroui/react";
 import { Select } from '../../../components/select';
 import { LabeledSwitch } from '../../../components/labeledSwitch';
-import { PageHeader } from '../../../components/pageHeader';
 import { PasswordInput } from '../../../components/PasswordInput';
-import { useNavigate } from 'react-router-dom';
 import { useToastMessage } from '../../../components/toastProvider';
 import en from './translations/create/en.json';
 import de from './translations/create/de.json';
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import {
   useMqttServiceMqttServersCreateOne,
   CreateMqttServerDto,
@@ -17,15 +15,14 @@ import {
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 
-interface CreateMqttServerPageProps {
+interface CreateMqttServerFormProps {
   onSuccess?: (createdServer: MqttServer) => void;
   onCancel?: () => void;
 }
 
-export function CreateMqttServerForm(props?: Readonly<CreateMqttServerPageProps>) {
-  const { onSuccess } = props || {};
+export function CreateMqttServerForm(props?: Readonly<CreateMqttServerFormProps>) {
+  const { onSuccess, onCancel } = props || {};
   const { t } = useTranslations({ en, de });
-  const navigate = useNavigate();
   const toast = useToastMessage();
   const queryClient = useQueryClient();
 
@@ -51,11 +48,7 @@ export function CreateMqttServerForm(props?: Readonly<CreateMqttServerPageProps>
       queryClient.invalidateQueries({
         queryKey: [useMqttServiceMqttServersGetAllKey],
       });
-      if (onSuccess) {
-        onSuccess(server);
-      } else {
-        navigate('/mqtt/servers');
-      }
+      onSuccess?.(server);
     },
     onError: (err: Error) => {
       toast.error({
@@ -64,14 +57,6 @@ export function CreateMqttServerForm(props?: Readonly<CreateMqttServerPageProps>
       });
     },
   });
-
-  const handleCancel = useCallback(() => {
-    if (props?.onCancel) {
-      props.onCancel();
-    } else {
-      navigate('/mqtt/servers');
-    }
-  }, [props, navigate]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -226,7 +211,7 @@ export function CreateMqttServerForm(props?: Readonly<CreateMqttServerPageProps>
       </section>
 
       <div className="flex justify-end space-x-3 mt-4 w-full">
-        <Button variant="secondary" onPress={handleCancel} data-cy="create-mqtt-server-form-cancel-button">
+        <Button variant="secondary" onPress={onCancel} data-cy="create-mqtt-server-form-cancel-button">
           {t('cancel')}
         </Button>
         <Button variant="primary"
@@ -238,26 +223,5 @@ export function CreateMqttServerForm(props?: Readonly<CreateMqttServerPageProps>
         </Button>
       </div>
     </Form>
-  );
-}
-
-export function CreateMqttServerPage(props?: Readonly<CreateMqttServerPageProps>) {
-  const navigate = useNavigate();
-
-  const { t } = useTranslations({ en, de });
-
-  const handleCancel = useCallback(() => {
-    if (props?.onCancel) {
-      props.onCancel();
-    } else {
-      navigate('/mqtt/servers');
-    }
-  }, [props, navigate]);
-
-  return (
-    <div className="max-w-7xl mx-auto px-4 py-8" data-cy="create-mqtt-server-page">
-      <PageHeader title={t('addNewMqttServer')} onBack={handleCancel} />
-      <CreateMqttServerForm {...props} onCancel={handleCancel} />
-    </div>
   );
 }

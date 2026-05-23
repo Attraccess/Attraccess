@@ -1,5 +1,7 @@
 {
   "title": "MQTT Server",
   "addNewServer": "Neuen Server hinzufügen",
+  "addNewMqttServer": "Neuen MQTT Server hinzufügen",
+  "close": "Schließen",
   "back": "Zurück"
-} 
+}
