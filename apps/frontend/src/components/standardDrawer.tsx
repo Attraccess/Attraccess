@@ -1,6 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react';
 import {
-  Drawer,
   DrawerBackdrop,
   DrawerContent,
   DrawerDialog,
@@ -13,7 +12,7 @@ interface Props {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   children: ReactNode;
-  backdropProps?: Omit<DrawerBackdropProps, 'children'>;
+  backdropProps?: Omit<DrawerBackdropProps, 'children' | 'isOpen' | 'onOpenChange'>;
   contentProps?: Omit<DrawerContentProps, 'children'>;
   dialogProps?: Omit<DrawerDialogProps, 'children'>;
 }
@@ -35,13 +34,12 @@ export function StandardDrawer(props: Props) {
   const mergedStyle = { ...FIELD_CONTRAST_STYLE, ...dialogProps?.style };
 
   return (
-    <Drawer isOpen={isOpen} onOpenChange={onOpenChange}>
-      <DrawerBackdrop {...backdropProps} />
+    <DrawerBackdrop {...backdropProps} isOpen={isOpen} onOpenChange={onOpenChange}>
       <DrawerContent {...contentProps}>
         <DrawerDialog {...dialogProps} className={mergedDialogClassName} style={mergedStyle}>
           {children}
         </DrawerDialog>
       </DrawerContent>
-    </Drawer>
+    </DrawerBackdrop>
   );
 }
