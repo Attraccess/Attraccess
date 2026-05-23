@@ -72,12 +72,12 @@ export type Mb10sProps = BasePartProps;
 export const Mb10s = ({ name, pn, ...rest }: Mb10sProps) => (
   <chip
     name={name}
-    footprint="mbs_4lead"
+    footprint="dip4"
     pinLabels={MB10S_PINS}
     supplierPartNumbers={jlcSupplier(pn)}
     {...rest}
   >
-    <fabricationnotetext text="MB10S — 1kV/1A bridge rectifier" />
+    <fabricationnotetext text="MB10S — 1kV/1A bridge rectifier (placeholder fp; JLC fetches real MBS)" />
   </chip>
 );
 

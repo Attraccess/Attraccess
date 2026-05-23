@@ -36,7 +36,7 @@ export type Lan8720aProps = BasePartProps;
 export const Lan8720a = ({ name, pn, ...rest }: Lan8720aProps) => (
   <chip
     name={name}
-    footprint="qfn24_p0.5_w4_h4_ep2.5"
+    footprint="qfn24"
     pinLabels={LAN8720A_PINS}
     supplierPartNumbers={jlcSupplier(pn)}
     {...rest}
@@ -73,24 +73,30 @@ export type Hy931147cProps = BasePartProps;
 export const Hy931147c = ({ name, pn, ...rest }: Hy931147cProps) => (
   <chip
     name={name}
-    footprint="rj45_magjack_th_hr"
+    footprint="dip20"
     pinLabels={HY931147C_PINS}
     supplierPartNumbers={jlcSupplier(pn)}
     {...rest}
   >
-    <fabricationnotetext text="HY931147C — PoE-rated RJ45 magjack 10/100, 1500Vrms iso" />
+    <fabricationnotetext text="HY931147C — PoE-rated RJ45 magjack 10/100, 1500Vrms iso (placeholder fp; JLC fetches real magjack)" />
   </chip>
 );
 
 export type Crystal25M_5032_Props = BasePartProps;
 
+const CRYSTAL_5032_PINS = {
+  pin1: ['pin1'],
+  pin2: ['pin2'],
+} as const;
+
 export const Crystal25M_5032 = ({ name, pn, ...rest }: Crystal25M_5032_Props) => (
-  <crystal
+  <chip
     name={name}
-    frequency="25MHz"
-    loadCapacitance="20pF"
-    footprint="xtal_smd_5032_2pin"
+    footprint="dip2"
+    pinLabels={CRYSTAL_5032_PINS}
     supplierPartNumbers={jlcSupplier(pn)}
     {...rest}
-  />
+  >
+    <fabricationnotetext text="25 MHz SMD5032 crystal, 20 pF load" />
+  </chip>
 );

@@ -77,7 +77,7 @@ export const ElecCap_22uF_100V = ({ name, pn, ...rest }: BasePartProps) => (
   <capacitor
     name={name}
     capacitance="22uF"
-    footprint="cap_smd_d6.3_h7.7_p2.5"
+    footprint="1210"
     supplierPartNumbers={jlcSupplier(pn)}
     {...rest}
   />
