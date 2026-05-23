@@ -47,6 +47,7 @@ const L_560NH_PN = 'C502009';
 const WS2812_PN = 'C4154873';
 const PN532_PN = 'C28925';
 const HEADER_PN = 'C2935458';
+const ANT1_MPN = 'ANFCA-2522-D00-T';
 
 const leds = Array.from({ length: RING_LEDS }, (_, i) => {
   const angle = (i * 360) / RING_LEDS;
@@ -83,7 +84,7 @@ export default () => (
     autorouter="sequential-trace"
     defaultTraceWidth="0.2mm"
   >
-    <NfcCoilAntenna name="ANT1" padPitchMm={18} bodyWidthMm={22} bodyHeightMm={22} {...at(25, 25)} />
+    <NfcCoilAntenna name="ANT1" mpn={ANT1_MPN} padPitchMm={18} bodyWidthMm={22} bodyHeightMm={22} {...at(25, 25)} />
 
     {leds.map((l) => (
       <Ws2812Mini

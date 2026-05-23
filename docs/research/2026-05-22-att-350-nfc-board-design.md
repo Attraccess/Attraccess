@@ -140,13 +140,22 @@ against the case-CAD enclosure window aperture):
 |                  | Würth WE-MCA 760308141 series — 24.4 × 23 mm, ~2.4 µH; needs the relaxed (~4 mm) keep-out variant of the layout |
 |                  | Pulse PA0742.000NLT — 24.7 × 23.5 mm, ~3.0 µH; same relaxed-keep-out caveat as the Würth |
 
-ATT-376 locks the final PN once the enclosure-window dielectric load is
-characterised. **ANT1 ships from JLC with an empty Part # column** —
-JLC SMT does not stock 13.56 MHz NFC antenna coils — so ANT1 is
-hand-soldered post-SMT regardless of which vendor PN is picked.
-The BOM validator (`apps/attractap/hardware/scripts/validate-bom.mjs`)
-explicitly whitelists `ANT`-prefixed designators for missing JLC PN
-(see `allowMissingPn` on the `ANT` REF_CLASS row).
+v0 ships with **`ANT1.mpn = 'ANFCA-2522-D00-T'`** (Abracon) wired in the
+schematic source — the drop-in 22 × 22 mm candidate. ATT-376 may swap
+this to the Würth or Pulse alternative once the enclosure-window
+dielectric load is characterised; that swap is a single-line edit in
+`apps/attractap/hardware/nfc/index.tsx` (`ANT1_MPN` constant) plus the
+matching-network retune.
+
+The `NfcCoilAntenna` wrapper in `libs/attractap-hw-shared/src/parts/nfc.tsx`
+accepts the manufacturer PN via an `mpn` prop, distinct from the JLC
+`pn` prop — the latter remains unset because **ANT1 ships from JLC with
+an empty Part # column** (JLC SMT does not stock 13.56 MHz NFC antenna
+coils), so ANT1 is hand-soldered post-SMT regardless of which vendor PN
+is picked. The BOM validator
+(`apps/attractap/hardware/scripts/validate-bom.mjs`) explicitly
+whitelists `ANT`-prefixed designators for missing JLC PN (see
+`allowMissingPn` on the `ANT` REF_CLASS row).
 
 The antenna sits **top-side, centred at (25, 25)**, with the 24 WS2812
 LEDs in a ring around it on the same layer. The PN532 IC, matching
@@ -236,7 +245,7 @@ sub-issue may upgrade.
 | Ref            | Qty | Part                                  | JLC PN     | Footprint     |
 |----------------|-----|---------------------------------------|------------|---------------|
 | U1             | 1   | PN5321A3HN                            | C28925     | QFN-40-EP     |
-| ANT1           | 1   | NFC coil antenna 22 × 22 mm (hand-pop)| —          | 2-pad 18 mm pitch SMT |
+| ANT1           | 1   | Abracon ANFCA-2522-D00-T 22 × 22 mm (hand-pop) | — (`mpn` only) | 2-pad 18 mm pitch SMT |
 | LED1…LED24     | 24  | WS2812B-MINI-X2                       | C4154873   | SMD3535-4P    |
 | J1             | 1   | B2B 1.27 mm 2×5 male SMD              | C2935458   | pinrow10_p1.27 |
 | R_SDA, R_SCL   | 2   | 4.7 kΩ 0402 1%                        | C25900     | 0402          |

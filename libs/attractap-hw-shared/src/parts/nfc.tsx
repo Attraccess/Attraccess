@@ -46,6 +46,7 @@ export const Pn532Ic = ({ name, pn, ...rest }: Pn532IcProps) => (
 
 export interface NfcCoilAntennaProps extends Omit<BasePartProps, 'pn'> {
   readonly pn?: string;
+  readonly mpn?: string;
   readonly padPitchMm?: number;
   readonly bodyWidthMm?: number;
   readonly bodyHeightMm?: number;
@@ -56,6 +57,7 @@ export interface NfcCoilAntennaProps extends Omit<BasePartProps, 'pn'> {
 export const NfcCoilAntenna = ({
   name,
   pn,
+  mpn,
   padPitchMm = 25,
   bodyWidthMm = 32,
   bodyHeightMm = 22,
@@ -67,6 +69,7 @@ export const NfcCoilAntenna = ({
     name={name}
     pinLabels={{ pin1: ['P1'], pin2: ['P2'] }}
     {...(pn ? { supplierPartNumbers: jlcSupplier(pn) } : {})}
+    {...(mpn ? { manufacturerPartNumber: mpn } : {})}
     {...rest}
   >
     <footprint>
