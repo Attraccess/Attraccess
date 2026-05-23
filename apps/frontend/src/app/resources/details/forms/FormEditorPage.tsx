@@ -12,7 +12,7 @@ import {
   UseResourceFormsServiceResourceFormsGetOneKeyFn,
   UseResourceFormsServiceResourceFormsListKeyFn,
 } from '@attraccess/react-query-client';
-import { Accordion, AccordionBody, AccordionHeading, AccordionItem, AccordionPanel, AccordionTrigger, Button, Input, Label, Selection, Spinner, TextField } from '@heroui/react';
+import { Accordion, AccordionBody, AccordionHeading, AccordionIndicator, AccordionItem, AccordionPanel, AccordionTrigger, Button, Input, Label, Selection, Spinner, TextField } from '@heroui/react';
 import { useToastMessage } from '../../../../components/toastProvider';
 import { LabeledSwitch } from '../../../../components/labeledSwitch';
 import { useQueryClient } from '@tanstack/react-query';
@@ -56,7 +56,7 @@ export function FormEditorPage() {
 
   const [form, setForm] = useState<EditableForm>({ ...EMPTY_FORM, fields: [] });
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  const [, setExpandedFieldKey] = useState<Selection | undefined>(undefined);
+  const [expandedFieldKeys, setExpandedFieldKeys] = useState<Selection>(new Set<string>());
 
   useEffect(() => {
     if (formResponse) {
@@ -131,7 +131,7 @@ export function FormEditorPage() {
         },
       ],
     }));
-    setExpandedFieldKey(new Set([`field-${temporaryId}`]));
+    setExpandedFieldKeys(new Set([`field-${temporaryId}`]));
     setFieldAdded(true);
   };
 
@@ -288,7 +288,11 @@ export function FormEditorPage() {
                 <p className="text-sm text-default-400">{t('editor.emptyFieldsDescription')}</p>
               </div>
             ) : (
-              <Accordion>
+              <Accordion
+                variant="surface"
+                expandedKeys={expandedFieldKeys}
+                onExpandedChange={setExpandedFieldKeys}
+              >
                 {form.fields.map((field, index) => {
                   const key = `field-${field.id ?? field._id}`;
                   const typeLabel = t(`fields.types.${field.type}`);
@@ -297,12 +301,13 @@ export function FormEditorPage() {
                     <AccordionItem key={key} id={key} aria-label={`${t('fields.label')} #${index + 1}`}>
                       <AccordionHeading>
                         <AccordionTrigger>
-                          <div className="flex flex-col text-start">
+                          <div className="flex flex-col text-start flex-1">
                             <span className="text-sm font-semibold text-default-700">
                               <i className="font-thin">#{index + 1}</i> {field.name || t('fields.placeholder.label')}
                             </span>
                             <span className="text-xs text-default-400">{typeLabel}</span>
                           </div>
+                          <AccordionIndicator />
                         </AccordionTrigger>
                       </AccordionHeading>
                       <AccordionPanel><AccordionBody>
