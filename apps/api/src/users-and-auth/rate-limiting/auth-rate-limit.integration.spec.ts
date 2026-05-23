@@ -71,7 +71,7 @@ describe('AuthRateLimitInterceptor (HTTP integration)', () => {
     expect(blocked.status).toBe(429);
     expect(blocked.headers['retry-after']).toBeDefined();
     expect(Number(blocked.headers['retry-after'])).toBeGreaterThan(0);
-    await bruteForce.recordSuccess('register', '::ffff:127.0.0.1', null);
+    await bruteForce.recordSuccess('register', '127.0.0.1', null);
     const after = await request(app.getHttpServer()).post('/register').send({});
     expect(after.status).toBe(201);
   });
