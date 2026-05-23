@@ -2,7 +2,16 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Button, Spinner, useOverlayState } from '@heroui/react';
 import { useAuth } from '../../../hooks/useAuth';
 import { useToastMessage } from '../../../components/toastProvider';
-import { ArrowLeft, BookOpen, ListChecks, PenSquareIcon, ShapesIcon, Trash, WorkflowIcon, WrenchIcon } from 'lucide-react';
+import {
+  ArrowLeft,
+  BookOpen,
+  ListChecks,
+  PenSquareIcon,
+  ShapesIcon,
+  Trash,
+  WorkflowIcon,
+  WrenchIcon,
+} from 'lucide-react';
 
 import { ResourceUsageSession } from '../usage/resourceUsageSession';
 import { ResourceUsageHistory } from '../usage/resourceUsageHistory';
@@ -210,7 +219,6 @@ function ResourceDetailsComponent() {
             resource={resource}
             data-cy="resource-usage-session"
             insufficientBalanceDesiredAmount={insufficientBalanceDesiredAmount}
-            className="border-l-4 border-l-primary shadow-medium"
           />
 
           <ResourceUsageHistory resourceId={resourceId} data-cy="resource-usage-history" />

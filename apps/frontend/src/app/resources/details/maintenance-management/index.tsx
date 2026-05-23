@@ -14,7 +14,7 @@ import { MarkDoneModal } from './mark-done';
 import { CheckCircleIcon, CogIcon, ConstructionIcon, ExternalLinkIcon, PlusIcon } from 'lucide-react';
 import { useNow } from '../../../../hooks/useNow';
 import { EmptyState } from '../../../../components/emptyState';
-import { FlatSection } from '../flatSection';
+import { FlatSection } from '../../../../components/flatSection';
 
 interface Props extends Omit<HTMLAttributes<HTMLElement>, 'children'> {
   resourceId: number;
@@ -98,7 +98,13 @@ export function MaintenanceManagement(props: Props) {
       </LabeledSwitch>
       <ResourceMaintenanceUpsertModal resourceId={resourceId}>
         {(open) => (
-          <Button variant="primary" size="sm" isIconOnly onPress={open} aria-label={t('actions.create.label')}>
+          <Button
+            variant="primary"
+            size="sm"
+            isIconOnly
+            onPress={open}
+            aria-label={t('actions.create.label')}
+          >
             <PlusIcon className="w-4 h-4" />
           </Button>
         )}

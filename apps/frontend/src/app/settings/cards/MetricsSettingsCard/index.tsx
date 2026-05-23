@@ -1,5 +1,5 @@
 import { Chip, cn } from '@heroui/react';
-import { CheckIcon, XIcon } from 'lucide-react';
+import { ActivityIcon, CheckIcon, XIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { MetricsSettingsForm } from '../../forms/MetricsSettingsForm';
 import { useSettingsServiceGetMetricsSettings } from '@attraccess/react-query-client';
@@ -34,9 +34,10 @@ export function MetricsSettingsCard({ className }: MetricsSettingsCardProps = {}
       data-cy="metrics-settings-section"
     >
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
-          {t('title')}
-        </h3>
+        <div className="flex items-center gap-2 text-default-700">
+          <ActivityIcon size={18} />
+          <h3 className="text-sm uppercase tracking-wide font-semibold">{t('title')}</h3>
+        </div>
         {statusChip}
       </div>
       <MetricsSettingsForm />

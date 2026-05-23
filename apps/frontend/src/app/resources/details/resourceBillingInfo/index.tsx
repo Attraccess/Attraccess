@@ -15,7 +15,7 @@ import { ResourceBillingInfoEditor } from './editor';
 import { Fragment, HTMLAttributes, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../../../hooks/useAuth';
 import { dbCurrencyToUserCurrency } from '@attraccess/shared';
-import { FlatSection } from '../flatSection';
+import { FlatSection } from '../../../../components/flatSection';
 
 interface Props extends Omit<HTMLAttributes<HTMLElement>, 'children'> {
   resourceId: number;
@@ -187,8 +187,14 @@ export function ResourceBillingInfo(props: Props) {
             minutes: exampleMinutes,
           })}
         </dd>
-        <dt>{t('exampleResultingBalance.label')}</dt>
-        <dd className={cn(valueClass, exampleResultingBalance < 0 ? 'text-danger' : 'text-success')}>
+        <dt className="font-medium">{t('exampleResultingBalance.label')}</dt>
+        <dd
+          className={cn(
+            valueClass,
+            'font-semibold text-base',
+            exampleResultingBalance < 0 ? 'text-danger' : 'text-success',
+          )}
+        >
           {t('billingValue', {
             credits: formatNumber(exampleResultingBalance),
             currency: configuration.currency,
@@ -202,6 +208,7 @@ export function ResourceBillingInfo(props: Props) {
     <ResourceBillingInfoEditor resourceId={resourceId}>
       {(onOpen) => (
         <Button variant="primary" isIconOnly onPress={onOpen} aria-label={t('actions.edit')}>
+
           <Edit2Icon size={12} />
         </Button>
       )}
