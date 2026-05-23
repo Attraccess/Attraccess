@@ -33,13 +33,14 @@ interface NavLinkProps {
   icon: React.ReactNode;
   isExternal?: boolean;
   target?: string;
+  indent?: boolean;
   'data-cy'?: string;
 }
 
-function NavLink({ href, label, icon, isExternal, target, ...rest }: NavLinkProps) {
+function NavLink({ href, label, icon, isExternal, target, indent, ...rest }: NavLinkProps) {
   const resolvedTarget = target ?? (isExternal ? '_blank' : undefined);
-  const className =
-    'flex items-center px-2 py-2 rounded-md text-sm text-default-foreground no-underline hover:bg-default hover:text-default-foreground';
+  const paddingClass = indent ? 'pl-6 pr-2' : 'px-2';
+  const className = `flex items-center ${paddingClass} py-2 rounded-md text-sm text-default-foreground no-underline hover:bg-default hover:text-default-foreground`;
 
   if (isExternal) {
     return (
@@ -234,6 +235,7 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
                           icon={<item.icon size={16} />}
                           label={t('groups.' + group.translationKey + '.items.' + item.translationKey)}
                           data-cy={`sidebar-nav-${item.path?.replace('/', '')}`}
+                          indent
                         />
                       ))}
                     </AccordionBody>
@@ -273,6 +275,7 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
                           icon={<item.icon size={16} />}
                           label={t('endItems.groups.' + group.translationKey + '.items.' + item.translationKey)}
                           isExternal={item.isExternal}
+                          indent
                         />
                       ))}
                     </AccordionBody>
