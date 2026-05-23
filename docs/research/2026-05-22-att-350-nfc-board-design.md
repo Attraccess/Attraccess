@@ -118,51 +118,69 @@ TX2 side. Receive path: antenna node → `Csa/Rsa` → PN532 `RX/LA/LB`. The
 exact parametrics depend on enclosure dielectric — these are the
 defaults the deep-research sub-issue (§6) will refine.
 
-### 4.5 Discrete coil antenna (v0)
+### 4.5 PCB-trace coil antenna (v0)
 
-v0 uses a **discrete pre-wound 13.56 MHz NFC coil antenna**, hand-populated
-through a 2-pad SMT footprint. Default footprint: 22 × 22 mm body,
-18 mm pad pitch, 1.8 × 2.5 mm pads — matches the common Abracon
-ANFCA-2521 / Wurth WE-MCA / Pulse PA0742 form factor for 22-mm-class
-NFC coils.
+v0 uses a **PCB-trace 13.56 MHz NFC antenna** etched directly into the
+top-layer copper — no discrete part, no hand-soldering, no JLC custom-part
+pre-order. JLC ships the board with the antenna already on it.
 
-ANT1 target spec (for prototype builds before ATT-376 locks the final PN
-against the case-CAD enclosure window aperture):
+Trade-off vs the discrete pre-wound coil that an earlier revision of
+this doc proposed: PCB-trace Q is lower (~30–50 vs ~60+ for wirewound),
+so read range is shorter, but the design is fully fabricated by JLC at
+no extra cost. Reference range target: ~5 cm for MIFARE / NTAG cards
+against the PN532's full TX power.
 
-| Field            | Value / target                                                |
-|------------------|---------------------------------------------------------------|
-| Frequency        | 13.56 MHz                                                     |
-| Inductance       | ~1.4–3.0 µH (matches L0 560 nH × 2 + C1/C2 47 pF tuning net, retuneable inside this range without a layout rev) |
-| Q (unloaded)     | ≥ 60 @ 13.56 MHz                                              |
-| Body footprint   | ≤ 22 × 22 mm fits the v0 layout drop-in; up to 25 × 24 mm fits inside the LED-ring inner edge (R ≈ 16.25 mm) but tightens the antenna-to-LED keep-out to ~4 mm (vs the 6 mm baseline in §2). 2-pad SMT, 18 mm pad pitch. |
-| Termination      | Surface-mount pads (no through-hole / no wire leads)          |
-| Reference family | Abracon ANFCA-2522-D00-T — 22 × 22 mm, ~2.85 µH, drop-in for v0 |
-|                  | Würth WE-MCA 760308141 series — 24.4 × 23 mm, ~2.4 µH; needs the relaxed (~4 mm) keep-out variant of the layout |
-|                  | Pulse PA0742.000NLT — 24.7 × 23.5 mm, ~3.0 µH; same relaxed-keep-out caveat as the Würth |
+Geometry (parametric in `libs/attractap-hw-shared/src/parts/nfc.tsx::NfcPcbAntenna`):
 
-v0 ships with **`ANT1.mpn = 'ANFCA-2522-D00-T'`** (Abracon) wired in the
-schematic source — the drop-in 22 × 22 mm candidate. ATT-376 may swap
-this to the Würth or Pulse alternative once the enclosure-window
-dielectric load is characterised; that swap is a single-line edit in
-`apps/attractap/hardware/nfc/index.tsx` (`ANT1_MPN` constant) plus the
-matching-network retune.
+| Field         | Value (v0)            |
+|---------------|-----------------------|
+| Shape         | Square spiral         |
+| Outer side    | 22 mm (constrained: outer / √2 ≤ LED-ring inner edge 16.25 mm — sets the upper bound on `outerMm` for the 24-LED ring layout) |
+| Turns         | 8                     |
+| Trace width   | 0.5 mm (~19.7 mil — comfortable for JLC 6/6 mil baseline) |
+| Gap           | 0.3 mm (~11.8 mil)    |
+| Inner side    | 22 − 2 × 8 × 0.8 = 9.2 mm |
+| Estimated L   | ~1.4 µH (Wheeler approximation for square spiral, d_avg ≈ 15.6 mm, fill ratio ρ ≈ 0.41) |
+| Estimated Q   | ~40 @ 13.56 MHz on 1 oz Cu |
+| Resonance net | L_ant ≈ 1.4 µH with C2 = 100 pF → f₀ ≈ 13.45 MHz (within tuning trim range) |
 
-The `NfcCoilAntenna` wrapper in `libs/attractap-hw-shared/src/parts/nfc.tsx`
-accepts the manufacturer PN via an `mpn` prop, distinct from the JLC
-`pn` prop — the latter remains unset because **JLC SMT does not stock
-13.56 MHz NFC antenna coils** and so ANT1 is hand-soldered post-SMT
-regardless of which vendor PN is picked.
+Matching-network retune from the discrete-coil ~2.85 µH target:
 
-To keep the JLC PCBA matcher from flagging ANT1 as "No Part Selected",
-the export step strips ANT-prefixed rows from `bom.csv` *and*
-`pick_and_place.csv` inside the gerber zip before validation. That is
-done by `apps/attractap/hardware/scripts/strip-dnp.mjs`, which sources
-its prefix list from the `allowMissingPn` rows in
-`validate-bom.mjs::REF_CLASS` — so adding a new hand-populated reference
-prefix in the validator automatically extends the DNP strip. The
-matching-network designators and J1 / U1 / LEDs are untouched; ANT1
-disappears from the JLC-bound BOM and CPL entirely and is soldered on
-afterwards.
+- `C2_TX1`, `C2_TX2`: **47 pF → 100 pF** (JLC C1546, 0402 C0G, **basic + preferred** — no fee). Brings the resonance from ~19.6 MHz (with 47 pF and 1.4 µH) down to ~13.45 MHz at the antenna node.
+- `C1_TX1`, `C1_TX2`: stay at 47 pF (series tuning, sets impedance match).
+- `L0_TX1`, `L0_TX2`, `C0_TX1`, `C0_TX2`: unchanged (EMC pre-filter).
+- `Rs1`/`Rs2`/`Cs1`/`Cs2`: unchanged (RX divider).
+
+Expected first-board behaviour and tuning loop:
+
+1. Initial read range likely **2–4 cm** because L_ant comes out of the
+   etch tolerance ±15 % and C2 100 pF is a single-step E12 jump, not a
+   measured trim.
+2. Bench step (gate 5): NanoVNA on TP_ANT (the two antenna pad anchors)
+   → measure actual L_ant and series-resonant frequency.
+3. Swap C1 (47 pF → 33 pF or 56 pF) and / or C2 (100 pF → 82 pF or 120 pF)
+   to centre the antenna network on 13.56 MHz with the case-loaded
+   dielectric.
+4. v1 board rev (if needed) bakes the trimmed values.
+
+`NfcPcbAntenna` in the shared lib emits a chip with two named pads
+(P1 = outer-corner anchor on the right side, P2 = inner-end anchor) and
+a footprint built from `8 turns × 4 segments = 32` rotated rect SMT
+pads on the top layer, all bound to `pin1` so they form one continuous
+copper net. The matching-network `<trace>` declarations connect to
+`pin1` (outer perimeter) and `pin2` (inner end); the autorouter routes
+these from the bottom-layer matching caps through vias up to the
+antenna anchors.
+
+Because the antenna is etched copper (not a placed component), JLC SMT
+populates everything else and ships the board with the antenna already
+on it — no `Pre-order Service`, no hand-soldering. The BOM/CPL still
+runs through `apps/attractap/hardware/scripts/strip-dnp.mjs` which
+removes any `ANT`-prefixed rows from the gerber-zip CSVs before fab
+upload (defensive in case a future design adds a hand-populated antenna
+variant alongside this one). For the current board the strip is a
+no-op because `NfcPcbAntenna` doesn't emit an ANT row into the
+JLC-bound BOM at all (it lives in PCB copper, not the BOM).
 
 The antenna sits **top-side, centred at (25, 25)**, with the 24 WS2812
 LEDs in a ring around it on the same layer. The PN532 IC, matching
@@ -171,15 +189,10 @@ layer**, directly under the antenna and ring; bottom mech-envelope
 height budget (1.0 mm) accommodates the QFN-40 (0.85 mm) plus 0402 /
 0603 passives.
 
-Going discrete-component rather than PCB-trace antenna trades the
-RF-trace tuning work (Q-factor sweep, multi-turn spiral routing) for
-a vendor-spec'd antenna with known inductance and Q — the matching
-network values from NXP AN1445 (§4.4) are now a single tuning pass
-against the chosen coil's L/R/Q datasheet numbers, not a re-layout.
-
-BOM emits `ANT1` with an empty JLC PN column; the validator allows
-this for `ANT` designators since JLC SMT doesn't stock NFC antennas.
-Antenna is hand-soldered after JLC SMT assembly.
+The legacy `NfcCoilAntenna` wrapper stays in the shared lib (for future
+designs that need a discrete vendor coil — e.g. once ATT-376 picks
+between Abracon ANFCA-2522-D00-T / Würth WE-MCA / Pulse PA0742 for a
+closer-range higher-Q variant) but is no longer used by this board.
 
 ## 5. WS2812 ring
 
@@ -252,7 +265,7 @@ sub-issue may upgrade.
 | Ref            | Qty | Part                                  | JLC PN     | Footprint     |
 |----------------|-----|---------------------------------------|------------|---------------|
 | U1             | 1   | PN5321A3HN                            | C28925     | QFN-40-EP     |
-| ANT1           | 1   | Abracon ANFCA-2522-D00-T 22 × 22 mm (hand-pop) | — (`mpn` only) | 2-pad 18 mm pitch SMT |
+| ANT1           | 1   | PCB-trace 13.56 MHz spiral, 22 × 22 mm, 8 turns, 0.5 / 0.3 mm trace / gap | (etched copper, no part placed) | top-layer copper |
 | LED1…LED24     | 24  | WS2812B-MINI-X2                       | C4154873   | SMD3535-4P    |
 | J1             | 1   | B2B 1.27 mm 2×5 male SMD              | C2935458   | pinrow10_p1.27 |
 | R_SDA, R_SCL   | 2   | 4.7 kΩ 0402 1%                        | C25900     | 0402          |
@@ -264,7 +277,7 @@ sub-issue may upgrade.
 | L0_TX1, L0_TX2 | 2   | 560 nH ±5%                            | C502009    | 0603          |
 | C0_TX1, C0_TX2 | 2   | 180 pF 50 V C0G                       | C20069329  | 0402          |
 | C1_TX1, C1_TX2 | 2   | 47 pF 50 V C0G                        | C1567      | 0402          |
-| C2_TX1, C2_TX2 | 2   | 47 pF 50 V C0G                        | C1567      | 0402          |
+| C2_TX1, C2_TX2 | 2   | 100 pF 50 V C0G                       | C1546      | 0402          |
 | Cs1, Cs2       | 2   | 1 nF 50 V C0G                         | C76947     | 0402          |
 | C_PA, C_LED_BULK, C_LED_G1…6 | 8 | 10 µF 25 V X5R                  | C96446     | 0603          |
 | C_VBUS, C_PVDD, C_SVDD, C_AVDD, C_VMID, C_TVDD | 6 | 100 nF 50 V X7R     | C307331    | 0402          |

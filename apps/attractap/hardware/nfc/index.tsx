@@ -9,7 +9,7 @@ import {
   C0402,
   C0603,
   L0603,
-  NfcCoilAntenna,
+  NfcPcbAntenna,
   Pin1Marker,
   Pn532Ic,
   R0402,
@@ -37,6 +37,7 @@ const C_100NF_PN = 'C307331';
 const C_10UF_PN = 'C96446';
 const C_1NF_PN = 'C76947';
 const C_47PF_PN = 'C1567';
+const C_100PF_PN = 'C1546';
 const C_180PF_PN = 'C20069329';
 const R_4K7_PN = 'C25900';
 const R_10K_PN = 'C25744';
@@ -47,7 +48,6 @@ const L_560NH_PN = 'C502009';
 const WS2812_PN = 'C4154873';
 const PN532_PN = 'C28925';
 const HEADER_PN = 'C2935458';
-const ANT1_MPN = 'ANFCA-2522-D00-T';
 
 const leds = Array.from({ length: RING_LEDS }, (_, i) => {
   const angle = (i * 360) / RING_LEDS;
@@ -84,7 +84,7 @@ export default () => (
     autorouter="sequential-trace"
     defaultTraceWidth="0.2mm"
   >
-    <NfcCoilAntenna name="ANT1" mpn={ANT1_MPN} padPitchMm={18} bodyWidthMm={22} bodyHeightMm={22} {...at(25, 25)} />
+    <NfcPcbAntenna name="ANT1" outerMm={22} turns={8} traceWidthMm={0.5} gapMm={0.3} {...at(25, 25)} />
 
     {leds.map((l) => (
       <Ws2812Mini
@@ -129,7 +129,7 @@ export default () => (
     <L0603 name="L0_TX1" pn={L_560NH_PN} inductance="560nH" {...atBottom(33.66, 20)} />
     <C0402 name="C0_TX1" pn={C_180PF_PN} capacitance="180pF" {...atBottom(34.66, 22.41)} />
     <C0402 name="C1_TX1" pn={C_47PF_PN} capacitance="47pF" {...atBottom(35, 25)} />
-    <C0402 name="C2_TX1" pn={C_47PF_PN} capacitance="47pF" {...atBottom(34.66, 27.59)} />
+    <C0402 name="C2_TX1" pn={C_100PF_PN} capacitance="100pF" {...atBottom(34.66, 27.59)} />
     <R0402 name="Rs1" pn={R_750R_PN} resistance="750" {...atBottom(33.66, 30)} />
     <C0402 name="Cs1" pn={C_1NF_PN} capacitance="1nF" {...atBottom(32.07, 32.07)} />
 
@@ -137,7 +137,7 @@ export default () => (
     <L0603 name="L0_TX2" pn={L_560NH_PN} inductance="560nH" {...atBottom(16.34, 30)} />
     <C0402 name="C0_TX2" pn={C_180PF_PN} capacitance="180pF" {...atBottom(15.34, 27.59)} />
     <C0402 name="C1_TX2" pn={C_47PF_PN} capacitance="47pF" {...atBottom(15, 25)} />
-    <C0402 name="C2_TX2" pn={C_47PF_PN} capacitance="47pF" {...atBottom(15.34, 22.41)} />
+    <C0402 name="C2_TX2" pn={C_100PF_PN} capacitance="100pF" {...atBottom(15.34, 22.41)} />
     <R0402 name="Rs2" pn={R_750R_PN} resistance="750" {...atBottom(16.34, 20)} />
     <C0402 name="Cs2" pn={C_1NF_PN} capacitance="1nF" {...atBottom(17.93, 17.93)} />
 
