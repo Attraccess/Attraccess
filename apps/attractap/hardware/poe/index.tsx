@@ -74,8 +74,8 @@ export default () => (
 
     {/* ─── WS3203 PD interface — detect, classify, hot-swap pass FET ─────── */}
     <Ws3203 name="U_PD" pn="C5143001" pcbX={5} pcbY={0} />
-    <R0402 name="R_DEN" pn="C25741" resistance="24.9k" tolerance="1%" pcbX={5} pcbY={-6} />
-    <R0402 name="R_CLS" pn="C25742" resistance="768" tolerance="1%" pcbX={9} pcbY={-6} />
+    <R0402 name="R_DEN" pn="C138027" resistance="24.9k" tolerance="1%" pcbX={5} pcbY={-6} />
+    <R0402 name="R_CLS" pn="C49656920" resistance="768" tolerance="1%" pcbX={9} pcbY={-6} />
     <R0402 name="R_ILIM" pn="C25768" resistance="22k" tolerance="1%" pcbX={5} pcbY={6} />
     <C0402 name="C_SS" pn="C307331" capacitance="100nF" pcbX={9} pcbY={6} />
     <C0402 name="C_VSS_BIAS" pn="C307331" capacitance="100nF" pcbX={13} pcbY={6} />
@@ -109,9 +109,9 @@ export default () => (
     <C0402 name="C_BST" pn="C307331" capacitance="100nF" pcbX={18} pcbY={-6} />
     <Ss34 name="D_CATCH" pn="C8678" pcbX={22} pcbY={-3} />
     <L0603 name="L_BUCK" pn="C168137" inductance="47uH" pcbX={25} pcbY={0} />
-    <R0402 name="R_FB_TOP" pn="C25789" resistance="51.1k" tolerance="1%" pcbX={26} pcbY={4} />
+    <R0402 name="R_FB_TOP" pn="C25904" resistance="51.1k" tolerance="1%" pcbX={26} pcbY={4} />
     <R0402 name="R_FB_BOT" pn="C25744" resistance="10k" tolerance="1%" pcbX={26} pcbY={7} />
-    <R0402 name="R_EN" pn="C25776" resistance="100k" tolerance="1%" pcbX={14} pcbY={6} />
+    <R0402 name="R_EN" pn="C25741" resistance="100k" tolerance="1%" pcbX={14} pcbY={6} />
     <C0402 name="C_OUT_HF" pn="C307331" capacitance="100nF" pcbX={29} pcbY={3} />
     <ElecCap_22uF_100V name="C_OUT_BULK" pn="C46550391" pcbX={29} pcbY={-3} />
 
@@ -182,19 +182,19 @@ export default () => (
     <C0402 name="C_VDDCR_HF" pn="C1537" capacitance="470pF" pcbX={-10} pcbY={-6} />
     <C0402 name="C_VDDCR_LF" pn="C52923" capacitance="1uF" pcbX={-12} pcbY={-6} />
 
-    <R0402 name="R_RBIAS" pn="C25754" resistance="12.1k" tolerance="1%" pcbX={-12} pcbY={-10} />
-    <R0402 name="R_MDIO_PU" pn="C25771" resistance="1.5k" tolerance="1%" pcbX={0} pcbY={-12} />
+    <R0402 name="R_RBIAS" pn="C25852" resistance="12.1k" tolerance="1%" pcbX={-12} pcbY={-10} />
+    <R0402 name="R_MDIO_PU" pn="C25867" resistance="1.5k" tolerance="1%" pcbX={0} pcbY={-12} />
 
     {/* RMII series-term resistors on PHY-driven RX outputs */}
-    <R0402 name="R_S_RXD0" pn="C17414" resistance="10" tolerance="1%" pcbX={-12} pcbY={-14} />
-    <R0402 name="R_S_RXD1" pn="C17414" resistance="10" tolerance="1%" pcbX={-10} pcbY={-14} />
-    <R0402 name="R_S_CRSDV" pn="C17414" resistance="10" tolerance="1%" pcbX={-8} pcbY={-14} />
+    <R0402 name="R_S_RXD0" pn="C25077" resistance="10" tolerance="1%" pcbX={-12} pcbY={-14} />
+    <R0402 name="R_S_RXD1" pn="C25077" resistance="10" tolerance="1%" pcbX={-10} pcbY={-14} />
+    <R0402 name="R_S_CRSDV" pn="C25077" resistance="10" tolerance="1%" pcbX={-8} pcbY={-14} />
 
     {/* MDI termination: 49.9R pull-ups on TX/RX to VDDA */}
-    <R0402 name="R_TXP_TERM" pn="C25104" resistance="49.9" tolerance="1%" pcbX={-16} pcbY={-8} />
-    <R0402 name="R_TXN_TERM" pn="C25104" resistance="49.9" tolerance="1%" pcbX={-16} pcbY={-6} />
-    <R0402 name="R_RXP_TERM" pn="C25104" resistance="49.9" tolerance="1%" pcbX={-18} pcbY={-8} />
-    <R0402 name="R_RXN_TERM" pn="C25104" resistance="49.9" tolerance="1%" pcbX={-18} pcbY={-6} />
+    <R0402 name="R_TXP_TERM" pn="C25120" resistance="49.9" tolerance="1%" pcbX={-16} pcbY={-8} />
+    <R0402 name="R_TXN_TERM" pn="C25120" resistance="49.9" tolerance="1%" pcbX={-16} pcbY={-6} />
+    <R0402 name="R_RXP_TERM" pn="C25120" resistance="49.9" tolerance="1%" pcbX={-18} pcbY={-8} />
+    <R0402 name="R_RXN_TERM" pn="C25120" resistance="49.9" tolerance="1%" pcbX={-18} pcbY={-6} />
     <C0402 name="C_TERM_BYP" pn="C307331" capacitance="100nF" pcbX={-17} pcbY={-3} />
 
     <net name="MDI_TXP" />
@@ -318,7 +318,7 @@ export default () => (
 
     {/* ─── RJ45 shield bond: 1nF/2kV Y2 || 1M to PD_GND ──────────────────── */}
     <capacitor name="C_SHIELD_Y2" capacitance="1nF" footprint="1206" supplierPartNumbers={{ jlcpcb: ['C9196'] }} pcbX={-22} pcbY={6} />
-    <R0402 name="R_SHIELD_BLEED" pn="C61216" resistance="1M" tolerance="5%" pcbX={-22} pcbY={4} />
+    <R0402 name="R_SHIELD_BLEED" pn="C26083" resistance="1M" tolerance="1%" pcbX={-22} pcbY={4} />
 
     <net name="CHASSIS" />
     <trace from=".J1 > .SHIELD_1" to="net.CHASSIS" />
@@ -329,8 +329,8 @@ export default () => (
     <trace from=".R_SHIELD_BLEED > .pin2" to="net.PD_GND" />
 
     {/* ─── RJ45 integrated LEDs (driven by PHY LED1/LED2 pins) ─────────── */}
-    <R0402 name="R_LED_LINK" pn="C25819" resistance="330" tolerance="5%" pcbX={-22} pcbY={10} />
-    <R0402 name="R_LED_ACT" pn="C25819" resistance="330" tolerance="5%" pcbX={-22} pcbY={12} />
+    <R0402 name="R_LED_LINK" pn="C25104" resistance="330" tolerance="1%" pcbX={-22} pcbY={10} />
+    <R0402 name="R_LED_ACT" pn="C25104" resistance="330" tolerance="1%" pcbX={-22} pcbY={12} />
 
     <trace from=".J1 > .LED_LINK_A" to="net.V3V3" />
     <trace from=".J1 > .LED_LINK_K" to=".R_LED_LINK > .pin1" />
