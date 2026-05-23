@@ -22,5 +22,8 @@
   },
   "exampleResultingBalance": {
     "label": "Resulting balance"
+  },
+  "actions": {
+    "edit": "Edit billing"
   }
 }

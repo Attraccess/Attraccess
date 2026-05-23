@@ -111,7 +111,7 @@ export function ManageResourceGroups({
     <ResourceGroupUpsertModal onUpserted={onGroupCreated}>
       {(onOpen: () => void) => (
         <Button
-          variant="secondary"
+          variant="primary"
           size="sm"
           onPress={onOpen}
           data-cy="toolbar-open-create-resource-group-modal-button"
@@ -125,35 +125,39 @@ export function ManageResourceGroups({
 
   return (
     <FlatSection icon={<GroupIcon className="w-4 h-4" />} title={t('title')} actions={actions} {...rest}>
-      <Table>
-        <TableContent aria-label={t('table.ariaLabel')}>
-          <TableHeader>
-            <TableColumn isRowHeader>{t('columns.group')}</TableColumn>
-            <TableColumn>{t('columns.actions')}</TableColumn>
-          </TableHeader>
-          <TableBody items={currentPage} renderEmptyState={() => <EmptyState />}>
-            {(group) => (
-              <TableRow
-                key={group.id}
-                id={group.id}
-                className={isAdded(group) ? 'border-l-8 border-l-success' : 'border-l-8 border-l-danger'}
-              >
-                <TableCell className="w-full">{group.name}</TableCell>
-                <TableCell className="text-right flex items-center gap-2">
-                  <Checkbox
-                    onChange={() => {
-                      handleGroupClick(group);
-                    }}
-                    aria-label={group.name}
-                    isSelected={isAdded(group)}
-                  />
-                  <Link href={`/resource-groups/${group.id}`}>{t('actions.openGroup')}</Link>
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </TableContent>
-      </Table>
+      {currentPage.length === 0 ? (
+        <EmptyState />
+      ) : (
+        <Table>
+          <TableContent aria-label={t('table.ariaLabel')}>
+            <TableHeader>
+              <TableColumn isRowHeader>{t('columns.group')}</TableColumn>
+              <TableColumn>{t('columns.actions')}</TableColumn>
+            </TableHeader>
+            <TableBody items={currentPage}>
+              {(group) => (
+                <TableRow
+                  key={group.id}
+                  id={group.id}
+                  className={isAdded(group) ? 'border-l-8 border-l-success' : 'border-l-8 border-l-danger'}
+                >
+                  <TableCell className="w-full">{group.name}</TableCell>
+                  <TableCell className="text-right flex items-center gap-2">
+                    <Checkbox
+                      onChange={() => {
+                        handleGroupClick(group);
+                      }}
+                      aria-label={group.name}
+                      isSelected={isAdded(group)}
+                    />
+                    <Link href={`/resource-groups/${group.id}`}>{t('actions.openGroup')}</Link>
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </TableContent>
+        </Table>
+      )}
     </FlatSection>
   );
 }

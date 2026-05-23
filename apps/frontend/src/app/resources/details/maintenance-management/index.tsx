@@ -100,7 +100,13 @@ export function MaintenanceManagement(props: Props) {
       </LabeledSwitch>
       <ResourceMaintenanceUpsertModal resourceId={resourceId}>
         {(open) => (
-          <Button variant="primary" size="sm" isIconOnly onPress={open} aria-label={t('actions.create.label')}>
+          <Button
+            variant="primary"
+            size="sm"
+            isIconOnly
+            onPress={open}
+            aria-label={t('actions.create.label')}
+          >
             <PlusIcon className="w-4 h-4" />
           </Button>
         )}

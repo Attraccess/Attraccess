@@ -22,5 +22,8 @@
   },
   "exampleResultingBalance": {
     "label": "Resultierendes Guthaben"
+  },
+  "actions": {
+    "edit": "Abrechnung bearbeiten"
   }
 }
