@@ -1,8 +1,27 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { Button, Spinner, useOverlayState } from '@heroui/react';
+import {
+  Button,
+  Dropdown,
+  DropdownItem,
+  DropdownMenu,
+  DropdownPopover,
+  DropdownTrigger,
+  Spinner,
+  useOverlayState,
+} from '@heroui/react';
 import { useAuth } from '../../../hooks/useAuth';
 import { useToastMessage } from '../../../components/toastProvider';
-import { ArrowLeft, BookOpen, ListChecks, PenSquareIcon, ShapesIcon, Trash, WorkflowIcon, WrenchIcon } from 'lucide-react';
+import {
+  ArrowLeft,
+  BookOpen,
+  ListChecks,
+  MoreVerticalIcon,
+  PenSquareIcon,
+  ShapesIcon,
+  Trash,
+  WorkflowIcon,
+  WrenchIcon,
+} from 'lucide-react';
 
 import { ResourceUsageSession } from '../usage/resourceUsageSession';
 import { ResourceUsageHistory } from '../usage/resourceUsageHistory';
@@ -130,10 +149,8 @@ function ResourceDetailsComponent() {
           <>
             <DocumentationModal resourceId={resourceId}>
               {(onOpenDocumentation) => (
-                <Button variant="ghost"
-                  onPress={onOpenDocumentation}
-                  data-cy="documentation-button"
-                ><BookOpen className="w-4 h-4" />
+                <Button variant="outline" size="sm" onPress={onOpenDocumentation} data-cy="documentation-button">
+                  <BookOpen className="w-4 h-4" />
                   {t('actions.documentation')}
                 </Button>
               )}
@@ -141,48 +158,70 @@ function ResourceDetailsComponent() {
 
             {canManageResources && (
               <>
-                <ResourceQrCode resourceId={resourceId} variant="ghost" buttonIconSize={16} />
+                <ResourceQrCode resourceId={resourceId} variant="outline" buttonIconSize={16} />
 
-                <Button variant="ghost"
+                <Button
+                  variant="outline"
+                  size="sm"
                   onPress={() => navigate(`/resources/${resourceId}/flows`)}
                   data-cy="flows-button"
-                ><WorkflowIcon className="w-4 h-4" />
+                >
+                  <WorkflowIcon className="w-4 h-4" />
                   {t('navItems.flows')}
                 </Button>
 
-                <Button variant="ghost"
+                <Button
+                  variant="outline"
+                  size="sm"
                   onPress={() => navigate(`/resources/${resourceId}/forms`)}
                   data-cy="forms-button"
-                ><ListChecks className="w-4 h-4" />
+                >
+                  <ListChecks className="w-4 h-4" />
                   {t('navItems.forms')}
                 </Button>
 
                 {maintenancePermissions?.canManage && (
-                  <Button variant="ghost"
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onPress={() => navigate(`/resources/${resourceId}/maintenance`)}
                     data-cy="maintenance-button"
-                  ><WrenchIcon className="w-4 h-4" />
+                  >
+                    <WrenchIcon className="w-4 h-4" />
                     {t('actions.maintenance')}
                   </Button>
                 )}
 
                 <ResourceEditModal resourceId={resourceId} closeOnSuccess>
                   {(onOpen) => (
-                    <Button variant="ghost"
-                      onPress={onOpen}
-                      data-cy="edit-resource-button"
-                    ><PenSquareIcon className="w-4 h-4" />
+                    <Button variant="outline" size="sm" onPress={onOpen} data-cy="edit-resource-button">
+                      <PenSquareIcon className="w-4 h-4" />
                       {t('actions.edit')}
                     </Button>
                   )}
                 </ResourceEditModal>
 
-                <Button variant="danger-soft"
-                  onPress={open}
-                  data-cy="delete-resource-button"
-                ><Trash className="w-4 h-4" />
-                  {t('actions.delete')}
-                </Button>
+                <Dropdown>
+                  <DropdownTrigger aria-label={t('actions.more')}>
+                    <Button variant="outline" size="sm" isIconOnly aria-label={t('actions.more')}>
+                      <MoreVerticalIcon className="w-4 h-4" />
+                    </Button>
+                  </DropdownTrigger>
+                  <DropdownPopover>
+                    <DropdownMenu aria-label={t('actions.more')}>
+                      <DropdownItem
+                        key="delete"
+                        id="delete"
+                        onPress={open}
+                        data-cy="delete-resource-button"
+                        className="text-danger"
+                      >
+                        <Trash className="w-4 h-4 inline mr-2" />
+                        {t('actions.delete')}
+                      </DropdownItem>
+                    </DropdownMenu>
+                  </DropdownPopover>
+                </Dropdown>
               </>
             )}
           </>
@@ -200,7 +239,6 @@ function ResourceDetailsComponent() {
             resource={resource}
             data-cy="resource-usage-session"
             insufficientBalanceDesiredAmount={insufficientBalanceDesiredAmount}
-            className="border-l-4 border-l-primary shadow-medium"
           />
 
           <ResourceUsageHistory resourceId={resourceId} data-cy="resource-usage-history" />

@@ -1,5 +1,5 @@
 import { Chip, cn } from '@heroui/react';
-import { CheckIcon, XIcon } from 'lucide-react';
+import { CheckIcon, MailIcon, XIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { SmtpSettingsForm } from '../../forms/SmtpSettingsForm';
 import en from './en.json';
@@ -40,9 +40,10 @@ export function SmtpSettingsCard({ variant, onNext, className }: SmtpSettingsCar
       data-cy="smtp-settings-section"
     >
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
-          {t('title')}
-        </h3>
+        <div className="flex items-center gap-2 text-default-700">
+          <MailIcon size={18} />
+          <h3 className="text-sm uppercase tracking-wide font-semibold">{t('title')}</h3>
+        </div>
         {passwordChip}
       </div>
       <SmtpSettingsForm variant={variant} endpoint="settings" onNext={onNext} />

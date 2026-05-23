@@ -1,5 +1,5 @@
 import { Chip, cn } from '@heroui/react';
-import { CheckIcon, XIcon } from 'lucide-react';
+import { CheckIcon, GlobeIcon, XIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { AppSettingsForm } from '../../forms/AppSettingsForm';
 import en from './en.json';
@@ -40,9 +40,10 @@ export function AppSettingsCard({ variant, onNext, className }: AppSettingsCardP
       data-cy="app-settings-section"
     >
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
-          {t('title')}
-        </h3>
+        <div className="flex items-center gap-2 text-default-700">
+          <GlobeIcon size={18} />
+          <h3 className="text-sm uppercase tracking-wide font-semibold">{t('title')}</h3>
+        </div>
         {licenseChip}
       </div>
       <AppSettingsForm variant={variant} endpoint="settings" onNext={onNext} />

@@ -131,10 +131,11 @@ export function PasswordField(props: PasswordFieldProps) {
 
       {showGenerator && (
         <Button
-          variant="secondary"
+          variant="outline"
           onPress={handleGenerate}
           data-cy={cy('generate-password-button')}
           type="button"
+          fullWidth
         >
           <Wand2 className="h-4 w-4" />
           {t('generate')}
