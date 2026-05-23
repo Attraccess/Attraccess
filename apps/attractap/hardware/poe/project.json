@@ -61,6 +61,23 @@
         ],
         "parallel": false
       }
+    },
+    "render-3d": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "dependsOn": ["build"],
+      "inputs": ["{projectRoot}/index.tsx", "{projectRoot}/tscircuit.config.json"],
+      "outputs": ["{projectRoot}/dist/render-3d"],
+      "options": {
+        "cwd": "apps/attractap/hardware/poe",
+        "commands": [
+          "rm -rf dist/render-3d && mkdir -p dist/render-3d",
+          "pnpm exec tscircuit-cli export index.tsx -f glb -o dist/render-3d/poe.glb",
+          "pnpm exec tscircuit-cli export index.tsx -f step -o dist/render-3d/poe.step",
+          "node ../scripts/render-glb-png.mjs --out-dir dist/render-3d dist/render-3d/poe.glb"
+        ],
+        "parallel": false
+      }
     }
   }
 }
