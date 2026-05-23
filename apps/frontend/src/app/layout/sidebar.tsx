@@ -53,7 +53,7 @@ function NavLink({ href, label, icon, isExternal, target, indent, ...rest }: Nav
       >
         <span className="mr-3">{icon}</span>
         <span className="flex-1">{label}</span>
-        <ExternalLink className="ml-2 h-4 w-4" />
+        <ExternalLink className="ml-2 mr-2 h-4 w-4" />
       </a>
     );
   }
@@ -312,7 +312,7 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
                 <DropdownTrigger
                   aria-label="Settings"
                   data-cy="sidebar-settings-button"
-                  className={buttonVariants({ variant: 'ghost', isIconOnly: true })}
+                  className={`${buttonVariants({ variant: 'ghost', isIconOnly: true })} !inline-flex items-center justify-center`}
                 >
                   <Settings className="h-5 w-5" />
                 </DropdownTrigger>
