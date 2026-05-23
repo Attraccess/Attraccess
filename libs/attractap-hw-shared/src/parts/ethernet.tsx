@@ -36,36 +36,30 @@ export type Lan8720aProps = BasePartProps;
 export const Lan8720a = ({ name, pn, ...rest }: Lan8720aProps) => (
   <chip
     name={name}
-    footprint="qfn24"
+    footprint="qfn24_w4_h4_p0.5mm"
     pinLabels={LAN8720A_PINS}
     supplierPartNumbers={jlcSupplier(pn)}
     {...rest}
   >
-    <fabricationnotetext text="LAN8720A 10/100 Ethernet PHY (RMII). Parser fp 'qfn24' is stub — JLC EasyEDA footprint sourced via LCSC PN at fab." />
+    <fabricationnotetext text="LAN8720A 10/100 Ethernet PHY (RMII), QFN-24-EP 4x4mm 0.5mm pitch." />
   </chip>
 );
 
 const HY931147C_PINS = {
-  pin1: ['TX_P'],
-  pin2: ['TX_N'],
-  pin3: ['RX_P'],
-  pin4: ['CT_TX'],
-  pin5: ['CT_RX'],
-  pin6: ['RX_N'],
-  pin7: ['CABLE_3'],
-  pin8: ['CABLE_6'],
-  pin9: ['CABLE_1'],
-  pin10: ['CABLE_2'],
-  pin11: ['CABLE_4_5_A'],
-  pin12: ['CABLE_4_5_B'],
-  pin13: ['CABLE_7_8_A'],
-  pin14: ['CABLE_7_8_B'],
-  pin15: ['LED_LINK_A'],
-  pin16: ['LED_LINK_K'],
-  pin17: ['LED_ACT_A'],
-  pin18: ['LED_ACT_K'],
-  pin19: ['SHIELD_1'],
-  pin20: ['SHIELD_2'],
+  pin1: ['TX_P', 'J1'],
+  pin2: ['TX_N', 'J2'],
+  pin3: ['RX_P', 'J3'],
+  pin4: ['CABLE_4', 'J4'],
+  pin5: ['CABLE_5', 'J5'],
+  pin6: ['RX_N', 'J6'],
+  pin7: ['CABLE_7', 'J7'],
+  pin8: ['CABLE_8', 'J8'],
+  pin9: ['SHIELD_1'],
+  pin10: ['SHIELD_2'],
+  pin11: ['LED_LINK_A'],
+  pin12: ['LED_LINK_K'],
+  pin13: ['LED_ACT_A'],
+  pin14: ['LED_ACT_K'],
 } as const;
 
 export type Hy931147cProps = BasePartProps;
@@ -73,30 +67,56 @@ export type Hy931147cProps = BasePartProps;
 export const Hy931147c = ({ name, pn, ...rest }: Hy931147cProps) => (
   <chip
     name={name}
-    footprint="dip20"
     pinLabels={HY931147C_PINS}
     supplierPartNumbers={jlcSupplier(pn)}
+    footprint={
+      <footprint>
+        <platedhole shape="circle" portHints={['pin1']} pcbX={8.890} pcbY={-5.715} holeDiameter="0.9mm" outerDiameter="1.6mm" />
+        <platedhole shape="circle" portHints={['pin2']} pcbX={6.350} pcbY={-4.445} holeDiameter="0.9mm" outerDiameter="1.6mm" />
+        <platedhole shape="circle" portHints={['pin3']} pcbX={8.890} pcbY={-3.175} holeDiameter="0.9mm" outerDiameter="1.6mm" />
+        <platedhole shape="circle" portHints={['pin4']} pcbX={6.350} pcbY={-1.905} holeDiameter="0.9mm" outerDiameter="1.6mm" />
+        <platedhole shape="circle" portHints={['pin5']} pcbX={8.890} pcbY={-0.635} holeDiameter="0.9mm" outerDiameter="1.6mm" />
+        <platedhole shape="circle" portHints={['pin6']} pcbX={6.350} pcbY={0.635} holeDiameter="0.9mm" outerDiameter="1.6mm" />
+        <platedhole shape="circle" portHints={['pin7']} pcbX={8.890} pcbY={1.905} holeDiameter="0.9mm" outerDiameter="1.6mm" />
+        <platedhole shape="circle" portHints={['pin8']} pcbX={6.350} pcbY={3.175} holeDiameter="0.9mm" outerDiameter="1.6mm" />
+        <platedhole shape="circle" portHints={['pin9']} pcbX={8.890} pcbY={4.445} holeDiameter="0.9mm" outerDiameter="1.6mm" />
+        <platedhole shape="circle" portHints={['pin10']} pcbX={6.350} pcbY={5.715} holeDiameter="0.9mm" outerDiameter="1.6mm" />
+        <platedhole shape="circle" portHints={['pin11']} pcbX={-4.089} pcbY={-6.629} holeDiameter="1.1mm" outerDiameter="1.8mm" />
+        <platedhole shape="circle" portHints={['pin12']} pcbX={-4.089} pcbY={-4.089} holeDiameter="1.1mm" outerDiameter="1.8mm" />
+        <platedhole shape="circle" portHints={['pin13']} pcbX={-4.089} pcbY={4.089} holeDiameter="1.1mm" outerDiameter="1.8mm" />
+        <platedhole shape="circle" portHints={['pin14']} pcbX={-4.089} pcbY={6.629} holeDiameter="1.1mm" outerDiameter="1.8mm" />
+      </footprint>
+    }
     {...rest}
   >
-    <fabricationnotetext text="HY931147C — PoE-rated RJ45 magjack 10/100, 1500Vrms iso. Parser fp 'dip20' is stub — JLC EasyEDA footprint sourced via LCSC PN at fab." />
+    <fabricationnotetext text="HY931147C PoE RJ45 magjack. Pins 4,5,7,8 = spare-pair direct cable contacts for Mode A PoE." />
   </chip>
 );
 
 export type Crystal25M_5032_Props = BasePartProps;
 
 const CRYSTAL_5032_PINS = {
-  pin1: ['pin1'],
-  pin2: ['pin2'],
+  pin1: ['XOUT'],
+  pin2: ['GND_1'],
+  pin3: ['XIN'],
+  pin4: ['GND_2'],
 } as const;
 
 export const Crystal25M_5032 = ({ name, pn, ...rest }: Crystal25M_5032_Props) => (
   <chip
     name={name}
-    footprint="dip2"
     pinLabels={CRYSTAL_5032_PINS}
     supplierPartNumbers={jlcSupplier(pn)}
+    footprint={
+      <footprint>
+        <smtpad portHints={['pin1']} shape="rect" pcbX={-2.0} pcbY={1.20} width="1.6mm" height="1.2mm" layer="top" />
+        <smtpad portHints={['pin2']} shape="rect" pcbX={2.0} pcbY={1.20} width="1.6mm" height="1.2mm" layer="top" />
+        <smtpad portHints={['pin3']} shape="rect" pcbX={2.0} pcbY={-1.20} width="1.6mm" height="1.2mm" layer="top" />
+        <smtpad portHints={['pin4']} shape="rect" pcbX={-2.0} pcbY={-1.20} width="1.6mm" height="1.2mm" layer="top" />
+      </footprint>
+    }
     {...rest}
   >
-    <fabricationnotetext text="25 MHz SMD5032 crystal, 20 pF load. Parser fp 'dip2' is stub — JLC EasyEDA footprint sourced via LCSC PN at fab." />
+    <fabricationnotetext text="25 MHz SMD5032-4P crystal, 20 pF load. Pins 1+3 = crystal, pins 2+4 = GND." />
   </chip>
 );

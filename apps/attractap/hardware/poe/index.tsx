@@ -1,4 +1,4 @@
-// PoE PD board — 802.3af, integrated magjack, WS3203 PD + MP9486A buck, LAN8720A PHY
+// PoE PD board — 802.3af Mode A, integrated magjack, WS3203 PD + MP9486A buck, LAN8720A PHY
 // FEATURE: hardware/poe — see docs/research/2026-05-23-att-351-poe-deep-research.md
 
 import {
@@ -37,33 +37,32 @@ assertWiresAllSignals(J_POE, {
 
 export default () => (
   <board
-    width="60mm"
-    height="35mm"
+    width="75mm"
+    height="40mm"
     autorouter="sequential-trace"
     defaultTraceWidth="0.2mm"
   >
-    {/* ─── Cable-side: PoE-rated magjack + 2x bridges (Mode A + Mode B) + TVS ── */}
-    <Hy931147c name="J1" pn="C91754" pcbX={-22} pcbY={0} pcbRotation={0} />
-    <Mb10s name="BR1" pn="C2488" pcbX={-10} pcbY={8} pcbRotation={0} />
-    <Mb10s name="BR2" pn="C2488" pcbX={-10} pcbY={-8} pcbRotation={0} />
-    <Smaj58a name="D_TVS" pn="C2980408" pcbX={0} pcbY={8} pcbRotation={0} />
-    <C0402 name="C_DEN" pn="C307331" capacitance="100nF" pcbX={0} pcbY={5} />
+    {/* ─── Magjack: HY931147C (Mode A spare-pair PoE only — no CT exposed) ── */}
+    <Hy931147c name="J1" pn="C91754" pcbX={-23} pcbY={0} pcbRotation={0} />
+
+    {/* ─── Mode A spare-pair bridge: pins 4+5 ↔ pins 7+8 ─────────────────── */}
+    <Mb10s name="BR2" pn="C2488" pcbX={-9} pcbY={-7} pcbRotation={0} />
+    <Smaj58a name="D_TVS" pn="C2980408" pcbX={-9} pcbY={2} pcbRotation={0} />
+    <C0402 name="C_DEN" pn="C307331" capacitance="100nF" pcbX={-9} pcbY={5} />
 
     <net name="V_PoE_BUS" />
     <net name="PD_GND" />
+    <net name="MODE_A_POS" />
+    <net name="MODE_A_NEG" />
 
-    {/* Mode B (data-pair) center taps -> BR1 */}
-    <trace from=".J1 > .CT_TX" to=".BR1 > .AC1" />
-    <trace from=".J1 > .CT_RX" to=".BR1 > .AC2" />
-
-    {/* Mode A (spare-pair) -> BR2 */}
-    <trace from=".J1 > .CABLE_4_5_A" to=".BR2 > .AC1" />
-    <trace from=".J1 > .CABLE_7_8_A" to=".BR2 > .AC2" />
-
-    {/* Both bridges OR into the V_PoE_BUS net */}
-    <trace from=".BR1 > .POS" to="net.V_PoE_BUS" />
+    {/* Tie cable pins of same pair together */}
+    <trace from=".J1 > .CABLE_4" to="net.MODE_A_POS" />
+    <trace from=".J1 > .CABLE_5" to="net.MODE_A_POS" />
+    <trace from=".J1 > .CABLE_7" to="net.MODE_A_NEG" />
+    <trace from=".J1 > .CABLE_8" to="net.MODE_A_NEG" />
+    <trace from=".BR2 > .AC1" to="net.MODE_A_POS" />
+    <trace from=".BR2 > .AC2" to="net.MODE_A_NEG" />
     <trace from=".BR2 > .POS" to="net.V_PoE_BUS" />
-    <trace from=".BR1 > .NEG" to="net.PD_GND" />
     <trace from=".BR2 > .NEG" to="net.PD_GND" />
 
     {/* TVS clamp + detection cap across V_PoE_BUS-to-PD_GND */}
@@ -73,13 +72,13 @@ export default () => (
     <trace from=".C_DEN > .pin2" to="net.PD_GND" />
 
     {/* ─── WS3203 PD interface — detect, classify, hot-swap pass FET ─────── */}
-    <Ws3203 name="U_PD" pn="C5143001" pcbX={5} pcbY={0} />
-    <R0402 name="R_DEN" pn="C138027" resistance="24.9k" tolerance="1%" pcbX={5} pcbY={-6} />
-    <R0402 name="R_CLS" pn="C185397" resistance="768" tolerance="1%" pcbX={9} pcbY={-6} />
-    <R0402 name="R_ILIM" pn="C25768" resistance="22k" tolerance="1%" pcbX={5} pcbY={6} />
-    <C0402 name="C_SS" pn="C307331" capacitance="100nF" pcbX={9} pcbY={6} />
-    <C0402 name="C_VSS_BIAS" pn="C307331" capacitance="100nF" pcbX={13} pcbY={6} />
-    <C0402 name="C_BLNK" pn="C76947" capacitance="1nF" pcbX={9} pcbY={3} />
+    <Ws3203 name="U_PD" pn="C5143001" pcbX={1} pcbY={-5} />
+    <R0402 name="R_DEN" pn="C138027" resistance="24.9k" tolerance="1%" pcbX={1} pcbY={-10} />
+    <R0402 name="R_CLS" pn="C185397" resistance="768" tolerance="1%" pcbX={5} pcbY={-10} />
+    <R0402 name="R_ILIM" pn="C25768" resistance="22k" tolerance="1%" pcbX={-3} pcbY={-10} />
+    <C0402 name="C_SS" pn="C307331" capacitance="100nF" pcbX={-3} pcbY={-1} />
+    <C0402 name="C_VSS_BIAS" pn="C307331" capacitance="100nF" pcbX={5} pcbY={-1} />
+    <C0402 name="C_BLNK" pn="C76947" capacitance="1nF" pcbX={1} pcbY={-1} />
 
     <net name="V_OUT_PD" />
 
@@ -97,23 +96,21 @@ export default () => (
     <trace from=".U_PD > .VSS_BIAS" to=".C_VSS_BIAS > .pin1" />
     <trace from=".C_VSS_BIAS > .pin2" to="net.PD_GND" />
     <trace from=".U_PD > .VOUT_PD" to="net.V_OUT_PD" />
-    {/* BLNK — 1nF blanking cap to RTN (TPS2375-family typical) */}
     <trace from=".U_PD > .BLNK" to=".C_BLNK > .pin1" />
     <trace from=".C_BLNK > .pin2" to="net.PD_GND" />
-    {/* Unused per WS3203 ref design (802.3af Class 0): T2P, PG, GATE, OCS — left NC */}
 
     {/* ─── MP9486A 100V -> 5V async buck ─────────────────────────────────── */}
-    <Mp9486a name="U_BUCK" pn="C404013" pcbX={18} pcbY={0} />
-    <ElecCap_22uF_100V name="C_VIN_BULK" pn="C46550391" pcbX={14} pcbY={-3} />
-    <C0402 name="C_VIN_LF" pn="C307331" capacitance="100nF" pcbX={14} pcbY={3} />
-    <C0402 name="C_BST" pn="C307331" capacitance="100nF" pcbX={18} pcbY={-6} />
-    <Ss34 name="D_CATCH" pn="C8678" pcbX={22} pcbY={-3} />
-    <L0603 name="L_BUCK" pn="C168137" inductance="47uH" pcbX={25} pcbY={0} />
-    <R0402 name="R_FB_TOP" pn="C25904" resistance="51.1k" tolerance="1%" pcbX={26} pcbY={4} />
-    <R0402 name="R_FB_BOT" pn="C25744" resistance="10k" tolerance="1%" pcbX={26} pcbY={7} />
-    <R0402 name="R_EN" pn="C25741" resistance="100k" tolerance="1%" pcbX={14} pcbY={6} />
-    <C0402 name="C_OUT_HF" pn="C307331" capacitance="100nF" pcbX={29} pcbY={3} />
-    <ElecCap_22uF_100V name="C_OUT_BULK" pn="C46550391" pcbX={29} pcbY={-3} />
+    <Mp9486a name="U_BUCK" pn="C404013" pcbX={13} pcbY={-5} />
+    <ElecCap_22uF_100V name="C_VIN_BULK" pn="C46550391" pcbX={9} pcbY={-13} />
+    <C0402 name="C_VIN_LF" pn="C307331" capacitance="100nF" pcbX={10.5} pcbY={-10} />
+    <C0402 name="C_BST" pn="C307331" capacitance="100nF" pcbX={13} pcbY={1} />
+    <Ss34 name="D_CATCH" pn="C8678" pcbX={18} pcbY={-10} />
+    <L0603 name="L_BUCK" pn="C168137" inductance="47uH" pcbX={17} pcbY={-1} />
+    <R0402 name="R_FB_TOP" pn="C25904" resistance="51.1k" tolerance="1%" pcbX={21} pcbY={-8} />
+    <R0402 name="R_FB_BOT" pn="C25744" resistance="10k" tolerance="1%" pcbX={21} pcbY={-6} />
+    <R0402 name="R_EN" pn="C25741" resistance="100k" tolerance="1%" pcbX={9} pcbY={-1} />
+    <C0402 name="C_OUT_HF" pn="C307331" capacitance="100nF" pcbX={21} pcbY={-2} />
+    <ElecCap_22uF_100V name="C_OUT_BULK" pn="C46550391" pcbX={22} pcbY={-13} />
 
     <net name="SW_NODE" />
     <net name="V5V" />
@@ -145,7 +142,7 @@ export default () => (
     <trace from=".C_OUT_BULK > .pin1" to="net.V5V" />
     <trace from=".C_OUT_BULK > .pin2" to="net.PD_GND" />
 
-    {/* Feedback divider: V5V -> 51.1k -> FB -> 10k -> GND, FB = 0.81V */}
+    {/* Feedback divider: V5V -> 51.1k -> FB -> 10k -> GND */}
     <trace from="net.V5V" to=".R_FB_TOP > .pin1" />
     <trace from=".R_FB_TOP > .pin2" to=".U_BUCK > .FB" />
     <trace from=".U_BUCK > .FB" to=".R_FB_BOT > .pin1" />
@@ -153,9 +150,9 @@ export default () => (
     <trace from=".U_BUCK > .GND" to="net.PD_GND" />
 
     {/* ─── AMS1117-3.3 — V5V -> +3V3 for LAN8720A VDDIO/VDDA ──────────────── */}
-    <Ams1117_3v3 name="U_LDO33" pn="C6186" pcbX={-5} pcbY={10} />
-    <C0402 name="C_LDO_IN" pn="C52923" capacitance="1uF" pcbX={-9} pcbY={10} />
-    <C0402 name="C_LDO_OUT" pn="C15525" capacitance="10uF" pcbX={-1} pcbY={10} />
+    <Ams1117_3v3 name="U_LDO33" pn="C6186" pcbX={5} pcbY={7} />
+    <C0402 name="C_LDO_IN" pn="C52923" capacitance="1uF" pcbX={-2} pcbY={7} />
+    <C0402 name="C_LDO_OUT" pn="C15525" capacitance="10uF" pcbX={11} pcbY={7} />
 
     <net name="V3V3" />
 
@@ -169,33 +166,33 @@ export default () => (
     <trace from=".C_LDO_OUT > .pin2" to="net.PD_GND" />
 
     {/* ─── LAN8720A PHY + 25 MHz crystal + decoupling + strap resistors ──── */}
-    <Lan8720a name="U_PHY" pn="C17146" pcbX={-10} pcbY={-10} />
-    <Crystal25M_5032 name="Y1" pn="C20617602" pcbX={-20} pcbY={-14} />
-    <C0402 name="C_XTAL1" pn="C1549" capacitance="18pF" pcbX={-22} pcbY={-15} />
-    <C0402 name="C_XTAL2" pn="C1549" capacitance="18pF" pcbX={-18} pcbY={-15} />
+    <Lan8720a name="U_PHY" pn="C17146" pcbX={20} pcbY={6} />
+    <Crystal25M_5032 name="Y1" pn="C20617602" pcbX={12} pcbY={13} />
+    <C0402 name="C_XTAL1" pn="C1549" capacitance="18pF" pcbX={9} pcbY={16} />
+    <C0402 name="C_XTAL2" pn="C1549" capacitance="18pF" pcbX={15} pcbY={16} />
 
-    <C0402 name="C_VDDIO_HF" pn="C307331" capacitance="100nF" pcbX={-7} pcbY={-6} />
-    <C0402 name="C_VDDIO_LF" pn="C23733" capacitance="4.7uF" pcbX={-5} pcbY={-6} />
-    <L0603 name="L_VDDA_FB" pn="C85833" inductance="600R" pcbX={-13} pcbY={-14} />
-    <C0402 name="C_VDDA_HF" pn="C307331" capacitance="100nF" pcbX={-15} pcbY={-7} />
-    <C0402 name="C_VDDA_LF" pn="C23733" capacitance="4.7uF" pcbX={-14} pcbY={-5} />
-    <C0402 name="C_VDDCR_HF" pn="C1537" capacitance="470pF" pcbX={-10} pcbY={-6} />
-    <C0402 name="C_VDDCR_LF" pn="C52923" capacitance="1uF" pcbX={-12} pcbY={-6} />
+    <C0402 name="C_VDDIO_HF" pn="C307331" capacitance="100nF" pcbX={17.5} pcbY={11} />
+    <C0402 name="C_VDDIO_LF" pn="C23733" capacitance="4.7uF" pcbX={17.5} pcbY={9.5} />
+    <L0603 name="L_VDDA_FB" pn="C85833" inductance="600R" pcbX={20.5} pcbY={11.5} />
+    <C0402 name="C_VDDA_HF" pn="C307331" capacitance="100nF" pcbX={23} pcbY={11} />
+    <C0402 name="C_VDDA_LF" pn="C23733" capacitance="4.7uF" pcbX={23} pcbY={9} />
+    <C0402 name="C_VDDCR_HF" pn="C1537" capacitance="470pF" pcbX={23} pcbY={6} />
+    <C0402 name="C_VDDCR_LF" pn="C52923" capacitance="1uF" pcbX={23} pcbY={4} />
 
-    <R0402 name="R_RBIAS" pn="C25852" resistance="12.1k" tolerance="1%" pcbX={-12} pcbY={-10} />
-    <R0402 name="R_MDIO_PU" pn="C25867" resistance="1.5k" tolerance="1%" pcbX={0} pcbY={-12} />
+    <R0402 name="R_RBIAS" pn="C25852" resistance="12.1k" tolerance="1%" pcbX={17} pcbY={2} />
+    <R0402 name="R_MDIO_PU" pn="C25867" resistance="1.5k" tolerance="1%" pcbX={26} pcbY={3} />
 
     {/* RMII series-term resistors on PHY-driven RX outputs */}
-    <R0402 name="R_S_RXD0" pn="C25077" resistance="10" tolerance="1%" pcbX={-12} pcbY={-14} />
-    <R0402 name="R_S_RXD1" pn="C25077" resistance="10" tolerance="1%" pcbX={-10} pcbY={-14} />
-    <R0402 name="R_S_CRSDV" pn="C25077" resistance="10" tolerance="1%" pcbX={-8} pcbY={-14} />
+    <R0402 name="R_S_RXD0" pn="C25077" resistance="10" tolerance="1%" pcbX={26} pcbY={6} />
+    <R0402 name="R_S_RXD1" pn="C25077" resistance="10" tolerance="1%" pcbX={26} pcbY={8} />
+    <R0402 name="R_S_CRSDV" pn="C25077" resistance="10" tolerance="1%" pcbX={26} pcbY={10} />
 
     {/* MDI termination: 49.9R pull-ups on TX/RX to VDDA */}
-    <R0402 name="R_TXP_TERM" pn="C25120" resistance="49.9" tolerance="1%" pcbX={-16} pcbY={-8} />
-    <R0402 name="R_TXN_TERM" pn="C25120" resistance="49.9" tolerance="1%" pcbX={-16} pcbY={-6} />
-    <R0402 name="R_RXP_TERM" pn="C25120" resistance="49.9" tolerance="1%" pcbX={-18} pcbY={-8} />
-    <R0402 name="R_RXN_TERM" pn="C25120" resistance="49.9" tolerance="1%" pcbX={-18} pcbY={-6} />
-    <C0402 name="C_TERM_BYP" pn="C307331" capacitance="100nF" pcbX={-17} pcbY={-3} />
+    <R0402 name="R_TXP_TERM" pn="C25120" resistance="49.9" tolerance="1%" pcbX={17} pcbY={4} />
+    <R0402 name="R_TXN_TERM" pn="C25120" resistance="49.9" tolerance="1%" pcbX={15} pcbY={4} />
+    <R0402 name="R_RXP_TERM" pn="C25120" resistance="49.9" tolerance="1%" pcbX={22} pcbY={2} />
+    <R0402 name="R_RXN_TERM" pn="C25120" resistance="49.9" tolerance="1%" pcbX={24} pcbY={2} />
+    <C0402 name="C_TERM_BYP" pn="C307331" capacitance="100nF" pcbX={15} pcbY={2} />
 
     <net name="MDI_TXP" />
     <net name="MDI_TXN" />
@@ -203,7 +200,7 @@ export default () => (
     <net name="MDI_RXN" />
     <net name="MDI_TERM_VDDA" />
 
-    {/* PHY supply wiring — LAN8720A has 3 VDDIO pins (4, 10, 22), all tied to 3V3 */}
+    {/* PHY supply wiring */}
     <trace from=".U_PHY > .VDDIO" to="net.V3V3" />
     <trace from=".U_PHY > .VDDIO_2" to="net.V3V3" />
     <trace from=".U_PHY > .VDDIO_3" to="net.V3V3" />
@@ -223,27 +220,28 @@ export default () => (
     <trace from=".C_VDDCR_LF > .pin2" to="net.PD_GND" />
     <trace from=".U_PHY > .VSS" to="net.PD_GND" />
 
-    {/* RBIAS */}
     <trace from=".U_PHY > .RBIAS" to=".R_RBIAS > .pin1" />
     <trace from=".R_RBIAS > .pin2" to="net.PD_GND" />
 
-    {/* Strap resistors — REGOFF pull-up (enable internal reg) + nINTSEL pull-down (REFCLK OUT) */}
-    <R0402 name="R_STRAP_REGOFF" pn="C25744" resistance="10k" tolerance="1%" pcbX={-8} pcbY={-10} />
-    <R0402 name="R_STRAP_INTSEL" pn="C25744" resistance="10k" tolerance="1%" pcbX={-8} pcbY={-12} />
+    {/* Strap resistors */}
+    <R0402 name="R_STRAP_REGOFF" pn="C25744" resistance="10k" tolerance="1%" pcbX={28} pcbY={5} />
+    <R0402 name="R_STRAP_INTSEL" pn="C25744" resistance="10k" tolerance="1%" pcbX={28} pcbY={7} />
     <trace from=".U_PHY > .LED1" to=".R_STRAP_REGOFF > .pin1" />
     <trace from=".R_STRAP_REGOFF > .pin2" to="net.V3V3" />
     <trace from=".U_PHY > .LED2" to=".R_STRAP_INTSEL > .pin1" />
     <trace from=".R_STRAP_INTSEL > .pin2" to="net.PD_GND" />
 
-    {/* Crystal */}
-    <trace from=".U_PHY > .XTAL1" to=".Y1 > .pin1" />
-    <trace from=".U_PHY > .XTAL2" to=".Y1 > .pin2" />
-    <trace from=".Y1 > .pin1" to=".C_XTAL1 > .pin1" />
+    {/* Crystal — XOUT/XIN are signal, GND_1/GND_2 = ground */}
+    <trace from=".U_PHY > .XTAL1" to=".Y1 > .XOUT" />
+    <trace from=".U_PHY > .XTAL2" to=".Y1 > .XIN" />
+    <trace from=".Y1 > .GND_1" to="net.PD_GND" />
+    <trace from=".Y1 > .GND_2" to="net.PD_GND" />
+    <trace from=".Y1 > .XOUT" to=".C_XTAL1 > .pin1" />
     <trace from=".C_XTAL1 > .pin2" to="net.PD_GND" />
-    <trace from=".Y1 > .pin2" to=".C_XTAL2 > .pin1" />
+    <trace from=".Y1 > .XIN" to=".C_XTAL2 > .pin1" />
     <trace from=".C_XTAL2 > .pin2" to="net.PD_GND" />
 
-    {/* MDI termination — TX/RX 49.9R pulls to MDI_TERM_VDDA bypass-cap node */}
+    {/* MDI termination */}
     <trace from=".U_PHY > .TXP" to="net.MDI_TXP" />
     <trace from=".U_PHY > .TXN" to="net.MDI_TXN" />
     <trace from=".R_TXP_TERM > .pin1" to="net.MDI_TXP" />
@@ -258,7 +256,7 @@ export default () => (
     <trace from=".C_TERM_BYP > .pin2" to="net.PD_GND" />
     <trace from="net.MDI_TERM_VDDA" to=".U_PHY > .VDD2A" />
 
-    {/* Magjack MDI side to PHY MDI pairs */}
+    {/* Magjack signal-side TX/RX to PHY MDI pairs */}
     <trace from=".J1 > .TX_P" to="net.MDI_TXP" />
     <trace from=".J1 > .TX_N" to="net.MDI_TXN" />
     <trace from=".J1 > .RX_P" to="net.MDI_RXP" />
@@ -280,7 +278,7 @@ export default () => (
     <trace from=".R_S_CRSDV > .pin2" to="net.RMII_CRS_DV_OUT" />
 
     {/* ─── J_POE — 2x8 1.27mm B2B to Core ──────────────────────────────── */}
-    <B2B_127_2xN name="J_POE" pn="C7470092" pinsPerRow={8} pcbX={26} pcbY={10} pcbRotation={0} />
+    <B2B_127_2xN name="J_POE" pn="C7470092" pinsPerRow={8} pcbX={32} pcbY={-12} pcbRotation={0} />
 
     <net name="RMII_TXD0" />
     <net name="RMII_TXD1" />
@@ -317,8 +315,8 @@ export default () => (
     <trace from="net.PHY_nRST" to=".U_PHY > .nRST" />
 
     {/* ─── RJ45 shield bond: 1nF/2kV Y2 || 1M to PD_GND ──────────────────── */}
-    <capacitor name="C_SHIELD_Y2" capacitance="1nF" footprint="1206" supplierPartNumbers={{ jlcpcb: ['C9196'] }} pcbX={-22} pcbY={6} />
-    <R0402 name="R_SHIELD_BLEED" pn="C26083" resistance="1M" tolerance="1%" pcbX={-22} pcbY={4} />
+    <capacitor name="C_SHIELD_Y2" capacitance="1nF" footprint="1206" supplierPartNumbers={{ jlcpcb: ['C9196'] }} pcbX={-30} pcbY={11} />
+    <R0402 name="R_SHIELD_BLEED" pn="C26083" resistance="1M" tolerance="1%" pcbX={-30} pcbY={9} />
 
     <net name="CHASSIS" />
     <trace from=".J1 > .SHIELD_1" to="net.CHASSIS" />
@@ -329,8 +327,8 @@ export default () => (
     <trace from=".R_SHIELD_BLEED > .pin2" to="net.PD_GND" />
 
     {/* ─── RJ45 integrated LEDs (driven by PHY LED1/LED2 pins) ─────────── */}
-    <R0402 name="R_LED_LINK" pn="C25104" resistance="330" tolerance="1%" pcbX={-22} pcbY={10} />
-    <R0402 name="R_LED_ACT" pn="C25104" resistance="330" tolerance="1%" pcbX={-22} pcbY={12} />
+    <R0402 name="R_LED_LINK" pn="C25104" resistance="330" tolerance="1%" pcbX={-30} pcbY={14} />
+    <R0402 name="R_LED_ACT" pn="C25104" resistance="330" tolerance="1%" pcbX={-30} pcbY={16} />
 
     <trace from=".J1 > .LED_LINK_A" to="net.V3V3" />
     <trace from=".J1 > .LED_LINK_K" to=".R_LED_LINK > .pin1" />

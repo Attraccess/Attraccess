@@ -26,12 +26,12 @@ export type Ws3203Props = BasePartProps;
 export const Ws3203 = ({ name, pn, ...rest }: Ws3203Props) => (
   <chip
     name={name}
-    footprint="tssop14"
+    footprint="tssop14_p0.65mm"
     pinLabels={WS3203_PINS}
     supplierPartNumbers={jlcSupplier(pn)}
     {...rest}
   >
-    <fabricationnotetext text="WS3203 — 802.3af PD interface (NJGW). Unused pins (T2P/PG/GATE/OCS) NC per ref design." />
+    <fabricationnotetext text="WS3203 — 802.3af PD interface (NJGW), TSSOP-14 0.65mm pitch. Unused pins (T2P/PG/GATE/OCS) NC per ref design." />
   </chip>
 );
 
@@ -72,12 +72,19 @@ export type Mb10sProps = BasePartProps;
 export const Mb10s = ({ name, pn, ...rest }: Mb10sProps) => (
   <chip
     name={name}
-    footprint="dip4"
     pinLabels={MB10S_PINS}
     supplierPartNumbers={jlcSupplier(pn)}
+    footprint={
+      <footprint>
+        <smtpad portHints={['pin1']} shape="rect" pcbX={-3.10} pcbY={-1.20} width="2.0mm" height="1.1mm" layer="top" />
+        <smtpad portHints={['pin2']} shape="rect" pcbX={-3.10} pcbY={1.20} width="2.0mm" height="1.1mm" layer="top" />
+        <smtpad portHints={['pin3']} shape="rect" pcbX={3.10} pcbY={1.20} width="2.0mm" height="1.1mm" layer="top" />
+        <smtpad portHints={['pin4']} shape="rect" pcbX={3.10} pcbY={-1.20} width="2.0mm" height="1.1mm" layer="top" />
+      </footprint>
+    }
     {...rest}
   >
-    <fabricationnotetext text="MB10S — 1kV/1A bridge rectifier. Parser fp 'dip4' is stub — JLC EasyEDA footprint (MBS) sourced via LCSC PN at fab." />
+    <fabricationnotetext text="MB10S — 1kV/1A bridge rectifier, MBS SMD package." />
   </chip>
 );
 
