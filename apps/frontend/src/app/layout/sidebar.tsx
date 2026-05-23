@@ -33,13 +33,14 @@ interface NavLinkProps {
   icon: React.ReactNode;
   isExternal?: boolean;
   target?: string;
+  indent?: boolean;
   'data-cy'?: string;
 }
 
-function NavLink({ href, label, icon, isExternal, target, ...rest }: NavLinkProps) {
+function NavLink({ href, label, icon, isExternal, target, indent, ...rest }: NavLinkProps) {
   const resolvedTarget = target ?? (isExternal ? '_blank' : undefined);
-  const className =
-    'flex items-center px-2 py-2 rounded-md text-sm text-default-foreground no-underline hover:bg-default hover:text-default-foreground';
+  const paddingClass = indent ? 'pl-6 pr-2' : 'px-2';
+  const className = `flex items-center ${paddingClass} py-2 rounded-md text-sm text-default-foreground no-underline hover:bg-default hover:text-default-foreground`;
 
   if (isExternal) {
     return (
@@ -215,16 +216,18 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
                   key={group.translationKey} id={group.translationKey}
                 >
                   <AccordionHeading>
-                    <AccordionTrigger>
-                      <span className="flex items-center gap-2">
-                        <group.icon size={16} />
+                    <AccordionTrigger className="px-2 py-2 text-sm font-normal rounded-md">
+                      <span className="flex items-center">
+                        <span className="mr-3 flex items-center">
+                          <group.icon size={16} />
+                        </span>
                         {t('groups.' + group.translationKey + '.label')}
                       </span>
                       <AccordionIndicator />
                     </AccordionTrigger>
                   </AccordionHeading>
                   <AccordionPanel>
-                    <AccordionBody>
+                    <AccordionBody className="px-0 pt-0 pb-0">
                       {group.items.map((item) => (
                         <NavLink
                           key={item.path}
@@ -232,6 +235,7 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
                           icon={<item.icon size={16} />}
                           label={t('groups.' + group.translationKey + '.items.' + item.translationKey)}
                           data-cy={`sidebar-nav-${item.path?.replace('/', '')}`}
+                          indent
                         />
                       ))}
                     </AccordionBody>
@@ -252,16 +256,18 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
                   className="text-sm"
                 >
                   <AccordionHeading>
-                    <AccordionTrigger>
-                      <span className="flex items-center gap-2">
-                        <group.icon size={16} />
+                    <AccordionTrigger className="px-2 py-2 text-sm font-normal rounded-md">
+                      <span className="flex items-center">
+                        <span className="mr-3 flex items-center">
+                          <group.icon size={16} />
+                        </span>
                         {t('endItems.groups.' + group.translationKey + '.label')}
                       </span>
                       <AccordionIndicator />
                     </AccordionTrigger>
                   </AccordionHeading>
                   <AccordionPanel>
-                    <AccordionBody>
+                    <AccordionBody className="px-0 pt-0 pb-0">
                       {group.items.map((item) => (
                         <NavLink
                           key={item.path}
@@ -269,6 +275,7 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
                           icon={<item.icon size={16} />}
                           label={t('endItems.groups.' + group.translationKey + '.items.' + item.translationKey)}
                           isExternal={item.isExternal}
+                          indent
                         />
                       ))}
                     </AccordionBody>
