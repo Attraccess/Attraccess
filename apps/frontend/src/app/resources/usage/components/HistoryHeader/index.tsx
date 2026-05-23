@@ -24,7 +24,7 @@ export const HistoryHeader = memo(
         </div>
         {canManageResources && (
           <div className="flex items-center">
-            <Checkbox isSelected={showAllUsers} onValueChange={setShowAllUsers} size="sm" />
+            <Checkbox isSelected={showAllUsers} onChange={setShowAllUsers} />
             <span className="ml-2 text-sm flex items-center">
               <Users className="w-4 h-4 mr-1" /> {t('showAllUsers')}
             </span>

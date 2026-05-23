@@ -1,5 +1,5 @@
-import { Alert, Button, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from '@heroui/react';
-import { PageHeader } from '../../../components/pageHeader';
+import { Alert, AlertContent, AlertDescription, Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading } from '@heroui/react';
+import { AlertStatusIcon } from '../../../components/AlertStatusIcon';
 import { useTranslations, useUrlQuery } from '@attraccess/plugins-frontend-ui';
 import { PasswordInput } from '../../../components/PasswordInput';
 import { useToastMessage } from '../../../components/toastProvider';
@@ -97,29 +97,40 @@ export function SSOLinkingRequiredModal(props: Props) {
   }, [linkToken, linkMutation, password]);
 
   return (
-    <Modal isOpen={show} isDismissable={false}>
-      <ModalContent>
+    <Modal isOpen={show}>
+      <ModalBackdrop isDismissable={false} />
+      <ModalContainer size="md">
+        <ModalDialog>
+          {() => (<>
         <ModalHeader>
-          <PageHeader title={t('title')} subtitle={t('subtitle')} noMargin />
+          <ModalHeading>{t('title')}</ModalHeading>
+          <p className="text-sm text-muted">{t('subtitle')}</p>
         </ModalHeader>
 
         <ModalBody>
-          <Alert color="warning">{t('description', { email })}</Alert>
+          <Alert status="warning">
+            <AlertStatusIcon status="warning" />
+            <AlertContent>
+              <AlertDescription>{t('description', { email })}</AlertDescription>
+            </AlertContent>
+          </Alert>
 
           <PasswordInput
             label={t('inputs.password.label')}
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(setPassword)}
             autoComplete="current-password"
           />
         </ModalBody>
 
         <ModalFooter>
-          <Button color="primary" onPress={linkUser} isLoading={linkingIsLoading}>
+          <Button variant="primary" onPress={linkUser} isPending={linkingIsLoading}>
             {t('actions.link')}
           </Button>
         </ModalFooter>
-      </ModalContent>
+          </>)}
+        </ModalDialog>
+      </ModalContainer>
     </Modal>
   );
 }

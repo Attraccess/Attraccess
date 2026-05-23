@@ -8,40 +8,60 @@ import {
   DropdownTrigger,
   DropdownMenu,
   DropdownItem,
-  Link,
+  DropdownPopover,
   Accordion,
   AccordionItem,
-  LinkProps,
-  Divider,
+  AccordionHeading,
+  AccordionTrigger,
+  AccordionIndicator,
+  AccordionPanel,
+  AccordionBody,
+  Separator,
 } from '@heroui/react';
+import { buttonVariants } from '@heroui/styles';
 import { useAllRoutes } from '../routes';
 import { SystemPermissions } from '@attraccess/react-query-client';
 import de from './sidebar.de.json';
 import en from './sidebar.en.json';
 import { Logo } from '../../components/logo';
 import { SidebarItem, SidebarItemGroup, useSidebarItems, useSidebarEndItems } from './sidebarItems';
-import { useNavigate } from 'react-router-dom';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
 
-function NavLink(
-  props: Omit<LinkProps, 'children'> & {
-    label: string;
-    icon: React.ReactNode;
-    isExternal?: boolean;
-    'data-cy'?: string;
-  },
-) {
+interface NavLinkProps {
+  href: string;
+  label: string;
+  icon: React.ReactNode;
+  isExternal?: boolean;
+  target?: string;
+  'data-cy'?: string;
+}
+
+function NavLink({ href, label, icon, isExternal, target, ...rest }: NavLinkProps) {
+  const resolvedTarget = target ?? (isExternal ? '_blank' : undefined);
+  const className =
+    'flex items-center px-2 py-2 rounded-md text-sm text-default-foreground no-underline hover:bg-default hover:text-default-foreground';
+
+  if (isExternal) {
+    return (
+      <a
+        {...rest}
+        href={href}
+        target={resolvedTarget}
+        rel={resolvedTarget === '_blank' ? 'noreferrer' : undefined}
+        className={className}
+      >
+        <span className="mr-3">{icon}</span>
+        <span className="flex-1">{label}</span>
+        <ExternalLink className="ml-2 h-4 w-4" />
+      </a>
+    );
+  }
+
   return (
-    <Link
-      {...props}
-      target={(props.target ?? props.isExternal) ? '_blank' : undefined}
-      className="flex items-center px-2 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700"
-      color="foreground"
-      underline="none"
-    >
-      <span className="mr-3">{props.icon}</span>
-      <span className="flex-1">{props.label}</span>
-      {props.isExternal && <ExternalLink className="ml-2" />}
-    </Link>
+    <RouterLink {...rest} to={href} target={resolvedTarget} className={className}>
+      <span className="mr-3">{icon}</span>
+      <span className="flex-1">{label}</span>
+    </RouterLink>
   );
 }
 
@@ -156,7 +176,7 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-gray-100 dark:bg-gray-900 transform ${
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-surface border-r border-separator/40 transform ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         } transition-transform duration-300 ease-in-out md:relative md:translate-x-0 flex flex-col`}
       >
@@ -164,8 +184,7 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
         <div className="flex items-center justify-between h-16 px-4">
           <Logo data-cy="sidebar-home-link" />
 
-          <Button
-            variant="light"
+          <Button variant="ghost"
             aria-label="Close sidebar"
             isIconOnly
             className="md:hidden"
@@ -176,7 +195,7 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
           </Button>
         </div>
 
-        <Divider />
+        <Separator />
 
         {/* Sidebar Navigation */}
         <div className="flex-grow overflow-y-auto py-4">
@@ -190,22 +209,33 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
                 data-cy={`sidebar-nav-${item.path?.replace('/', '')}`}
               />
             ))}
-            <Accordion defaultSelectedKeys={['##default##']}>
+            <Accordion>
               {otherGroups.map((group) => (
                 <AccordionItem
-                  key={group.translationKey}
-                  title={t('groups.' + group.translationKey + '.label')}
-                  startContent={<group.icon size={16} />}
+                  key={group.translationKey} id={group.translationKey}
                 >
-                  {group.items.map((item) => (
-                    <NavLink
-                      key={item.path}
-                      href={item.path}
-                      icon={<item.icon size={16} />}
-                      label={t('groups.' + group.translationKey + '.items.' + item.translationKey)}
-                      data-cy={`sidebar-nav-${item.path?.replace('/', '')}`}
-                    />
-                  ))}
+                  <AccordionHeading>
+                    <AccordionTrigger>
+                      <span className="flex items-center gap-2">
+                        <group.icon size={16} />
+                        {t('groups.' + group.translationKey + '.label')}
+                      </span>
+                      <AccordionIndicator />
+                    </AccordionTrigger>
+                  </AccordionHeading>
+                  <AccordionPanel>
+                    <AccordionBody>
+                      {group.items.map((item) => (
+                        <NavLink
+                          key={item.path}
+                          href={item.path}
+                          icon={<item.icon size={16} />}
+                          label={t('groups.' + group.translationKey + '.items.' + item.translationKey)}
+                          data-cy={`sidebar-nav-${item.path?.replace('/', '')}`}
+                        />
+                      ))}
+                    </AccordionBody>
+                  </AccordionPanel>
                 </AccordionItem>
               ))}
             </Accordion>
@@ -215,25 +245,34 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
         {/* Helpful Links */}
         <div className="py-4">
           <nav className="px-2 space-y-1">
-            <Accordion isCompact>
+            <Accordion>
               {sidebarEndGroups.map((group) => (
                 <AccordionItem
-                  key={group.translationKey}
-                  title={t('endItems.groups.' + group.translationKey + '.label')}
-                  startContent={<group.icon size={16} />}
-                  isCompact
+                  key={group.translationKey} id={group.translationKey}
                   className="text-sm"
                 >
-                  {group.items.map((item) => (
-                    <NavLink
-                      key={item.path}
-                      href={item.path}
-                      icon={<item.icon size={16} />}
-                      label={t('endItems.groups.' + group.translationKey + '.items.' + item.translationKey)}
-                      isExternal={item.isExternal}
-                      size="sm"
-                    />
-                  ))}
+                  <AccordionHeading>
+                    <AccordionTrigger>
+                      <span className="flex items-center gap-2">
+                        <group.icon size={16} />
+                        {t('endItems.groups.' + group.translationKey + '.label')}
+                      </span>
+                      <AccordionIndicator />
+                    </AccordionTrigger>
+                  </AccordionHeading>
+                  <AccordionPanel>
+                    <AccordionBody>
+                      {group.items.map((item) => (
+                        <NavLink
+                          key={item.path}
+                          href={item.path}
+                          icon={<item.icon size={16} />}
+                          label={t('endItems.groups.' + group.translationKey + '.items.' + item.translationKey)}
+                          isExternal={item.isExternal}
+                        />
+                      ))}
+                    </AccordionBody>
+                  </AccordionPanel>
                 </AccordionItem>
               ))}
             </Accordion>
@@ -244,15 +283,15 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
                 icon={<item.icon size={16} />}
                 label={t('endItems.' + item.translationKey)}
                 data-cy={`sidebar-nav-${item.path?.replace('/', '')}`}
-                size="sm"
+
                 isExternal={item.isExternal}
-                showAnchorIcon={false}
+
               />
             ))}
           </nav>
         </div>
 
-        <Divider />
+        <Separator />
 
         {/* User section at bottom */}
         <div className="p-4">
@@ -262,49 +301,58 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
                 <User className="h-4 w-4 mr-2" />
                 <span>{user.username}</span>
               </div>
-              <Dropdown data-cy="sidebar-settings-dropdown" placement="top-end">
-                <DropdownTrigger>
-                  <Button variant="light" aria-label="Settings" isIconOnly data-cy="sidebar-settings-button">
-                    <Settings className="h-5 w-5" />
-                  </Button>
+              <Dropdown data-cy="sidebar-settings-dropdown">
+                <DropdownTrigger
+                  aria-label="Settings"
+                  data-cy="sidebar-settings-button"
+                  className={buttonVariants({ variant: 'ghost', isIconOnly: true })}
+                >
+                  <Settings className="h-5 w-5" />
                 </DropdownTrigger>
-                <DropdownMenu data-cy="sidebar-settings-dropdown-menu">
-                  <DropdownItem key="language-label" isDisabled startContent={<Languages className="h-4 w-4" />}>
-                    {t('language')}
-                  </DropdownItem>
-                  <DropdownItem
-                    key="language-en"
-                    onPress={() => setLanguage('en')}
-                    endContent={language === 'en' ? <Check className="h-4 w-4" /> : null}
-                    data-cy="sidebar-language-en"
-                  >
-                    {t('languages.en')}
-                  </DropdownItem>
-                  <DropdownItem
-                    key="language-de"
-                    onPress={() => setLanguage('de')}
-                    endContent={language === 'de' ? <Check className="h-4 w-4" /> : null}
-                    data-cy="sidebar-language-de"
-                  >
-                    {t('languages.de')}
-                  </DropdownItem>
-                  <DropdownItem
-                    key="account"
-                    onPress={() => navigate('/account')}
-                    startContent={<User className="h-4 w-4" />}
-                    data-cy="sidebar-account-button"
-                  >
-                    {t('account')}
-                  </DropdownItem>
-                  <DropdownItem
-                    key="logout"
-                    onPress={() => logout()}
-                    startContent={<LogOut />}
-                    data-cy="sidebar-logout-button"
-                  >
-                    {t('logout')}
-                  </DropdownItem>
-                </DropdownMenu>
+                <DropdownPopover>
+                  <DropdownMenu data-cy="sidebar-settings-dropdown-menu">
+                    <DropdownItem key="language-label" id="language-label" isDisabled>
+                      <Languages className="h-4 w-4" />
+                      {t('language')}
+                    </DropdownItem>
+                    <DropdownItem
+                      key="language-en"
+                      id="language-en"
+                      onPress={() => setLanguage('en')}
+                      data-cy="sidebar-language-en"
+                    >
+                      {t('languages.en')}
+                      {language === 'en' ? <Check className="h-4 w-4" /> : null}
+                    </DropdownItem>
+                    <DropdownItem
+                      key="language-de"
+                      id="language-de"
+                      onPress={() => setLanguage('de')}
+                      data-cy="sidebar-language-de"
+                    >
+                      {t('languages.de')}
+                      {language === 'de' ? <Check className="h-4 w-4" /> : null}
+                    </DropdownItem>
+                    <DropdownItem
+                      key="account"
+                      id="account"
+                      onPress={() => navigate('/account')}
+                      data-cy="sidebar-account-button"
+                    >
+                      <User className="h-4 w-4" />
+                      {t('account')}
+                    </DropdownItem>
+                    <DropdownItem
+                      key="logout"
+                      id="logout"
+                      onPress={() => logout()}
+                      data-cy="sidebar-logout-button"
+                    >
+                      <LogOut />
+                      {t('logout')}
+                    </DropdownItem>
+                  </DropdownMenu>
+                </DropdownPopover>
               </Dropdown>
             </div>
           )}

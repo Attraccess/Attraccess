@@ -2,10 +2,11 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 
 import de from './de.json';
 import en from './en.json';
-import { Alert, Button } from '@heroui/react';
+import { Button } from '@heroui/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useState } from 'react';
 import { useReliableServerAvailability } from '../../hooks/useReliableServerAvailability';
+import { CloudOffIcon, RotateCwIcon } from 'lucide-react';
 
 export function ServerNotAvailable() {
   const { t } = useTranslations({
@@ -37,18 +38,25 @@ export function ServerNotAvailable() {
     setIsLoading(false);
   }, [queryClient]);
 
+  if (!isServerLikelyDown) {
+    return null;
+  }
+
   return (
-    <Alert
-      className="sticky top-6 z-50 m-6 mt-0 w-auto"
-      color="danger"
-      title={t('title')}
-      variant="faded"
-      isVisible={isServerLikelyDown}
+    <div
+      role="status"
+      aria-live="polite"
+      className="w-full bg-danger/10 border-b border-danger/30 px-4 py-2.5 flex flex-wrap items-center gap-3 animate-in slide-in-from-top duration-300"
     >
-      <p>{t('description')}</p>
-      <Button onPress={reload} isLoading={isLoading}>
+      <CloudOffIcon className="text-danger shrink-0" size={18} />
+      <div className="flex-1 min-w-[200px]">
+        <div className="text-sm font-semibold text-foreground">{t('title')}</div>
+        <div className="text-xs text-muted">{t('description')}</div>
+      </div>
+      <Button size="sm" variant="danger-soft" onPress={reload} isPending={isLoading}>
+        <RotateCwIcon className="w-3.5 h-3.5" />
         {t('actions.reload')}
       </Button>
-    </Alert>
+    </div>
   );
 }

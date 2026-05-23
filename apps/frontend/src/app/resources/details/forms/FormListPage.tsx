@@ -1,5 +1,5 @@
-import { Button, Card, CardBody, CardFooter, CardHeader, Chip, Spinner } from '@heroui/react';
-import { useNavigate, useParams, Link as RouterLink } from 'react-router-dom';
+import { Card, Chip, Spinner } from '@heroui/react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PageHeader } from '../../../../components/pageHeader';
 import { EmptyState } from '../../../../components/emptyState';
@@ -32,16 +32,19 @@ export function FormListPage() {
         title={t('list.title', { resourceName: resource?.name ?? '' })}
         subtitle={t('list.subtitle')}
         backTo={`/resources/${resourceId}`}
-        actions={
-          <Button as={RouterLink} to={`/resources/${resourceId}/forms/new`} color="primary">
-            {t('list.create')}
-          </Button>
-        }
+        actions={[
+          {
+            key: 'create',
+            label: t('list.create'),
+            variant: 'primary',
+            onPress: () => navigate(`/resources/${resourceId}/forms/new`),
+          },
+        ]}
       />
 
       {isLoading && (
         <div className="flex justify-center py-10">
-          <Spinner size="lg" />
+          <Spinner />
         </div>
       )}
 
@@ -54,37 +57,37 @@ export function FormListPage() {
           {forms.map((form) => (
             <Card
               key={form.id}
-              isPressable
-              onPress={() => navigate(`/resources/${resourceId}/forms/${form.id}`)}
+
+              onClick={() => navigate(`/resources/${resourceId}/forms/${form.id}`)}
               className="border border-default-200 dark:border-default-100"
             >
-              <CardHeader className="flex flex-col items-start gap-2">
+              <Card.Header className="flex flex-col items-start gap-2">
                 <p className="text-base font-semibold text-default-700">{form.name}</p>
                 <div className="flex flex-wrap gap-2">
                   {form.isRequiredOnResourceUsageStart && (
-                    <Chip size="sm" color="primary" variant="flat">
+                    <Chip color="accent" variant="soft">
                       {t('list.badges.start')}
                     </Chip>
                   )}
                   {form.isRequiredOnResourceUsageTakeOver && (
-                    <Chip size="sm" color="warning" variant="flat">
+                    <Chip color="warning" variant="soft">
                       {t('list.badges.takeover')}
                     </Chip>
                   )}
                   {form.isRequiredOnResourceUsageEnd && (
-                    <Chip size="sm" color="secondary" variant="flat">
+                    <Chip color="default" variant="soft">
                       {t('list.badges.end')}
                     </Chip>
                   )}
                 </div>
-              </CardHeader>
-              <CardBody>
+              </Card.Header>
+              <Card.Content>
                 <p className="text-sm text-default-500">{t('list.fieldCount', { count: form.fields.length })}</p>
-              </CardBody>
-              <CardFooter className="flex justify-between text-xs text-default-400">
+              </Card.Content>
+              <Card.Footer className="flex justify-between text-xs text-default-400">
                 <span>{t('list.updated')}</span>
                 <DateTimeDisplay date={form.updatedAt} />
-              </CardFooter>
+              </Card.Footer>
             </Card>
           ))}
         </div>

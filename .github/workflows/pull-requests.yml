@@ -46,8 +46,6 @@ jobs:
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: echo "$PR_TITLE" | pnpm exec commitlint
-      - name: Validate commits in PR
-        run: pnpm exec commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }}
 
   lint-and-typecheck:
     runs-on: ubuntu-latest

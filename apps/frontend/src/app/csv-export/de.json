@@ -1,5 +1,30 @@
 {
   "title": "CSV-Export",
+  "subtitle": "Exportiere Nutzungs- und Zahlungsdaten als CSV-Datei.",
+  "steps": {
+    "range": {
+      "title": "Zeitraum wählen",
+      "description": "Wähle einen vordefinierten Zeitraum oder ein benutzerdefiniertes Datum."
+    },
+    "type": {
+      "title": "Export wählen",
+      "description": "Wähle den gewünschten Export aus."
+    }
+  },
+  "presets": {
+    "today": "Heute",
+    "yesterday": "Gestern",
+    "last7d": "Letzte 7 Tage",
+    "last30d": "Letzte 30 Tage",
+    "thisMonth": "Dieser Monat",
+    "lastMonth": "Letzter Monat",
+    "thisYear": "Dieses Jahr",
+    "custom": "Benutzerdefiniert"
+  },
+  "range": {
+    "summary": "{{start}} – {{end}} · {{days}} Tage",
+    "empty": "Kein Zeitraum gewählt"
+  },
   "rangeCalendar": {
     "label": "Zeitraum",
     "selection": {
@@ -12,13 +37,21 @@
     "modal": {
       "subtitle": "vom {{start}} bis zum {{end}}"
     },
+    "card": {
+      "estimatedRows": "Voraussichtlich {{count}} Zeilen",
+      "estimatedRowsLoading": "Lade …",
+      "requireRange": "Wähle zuerst Zeitraum",
+      "cta": "Konfigurieren & Exportieren"
+    },
     "resourceUsageHours": {
       "button": "Ressourcennutzung exportieren",
-      "title": "Ressourcennutzung"
+      "title": "Ressourcennutzung",
+      "description": "Buchungen und Nutzungsstunden je Ressource."
     },
     "billingTransactions": {
       "button": "Zahlungen exportieren",
-      "title": "Zahlungen"
+      "title": "Zahlungen",
+      "description": "Zahlungen, Gutschriften und Status je Nutzer."
     }
   }
 }

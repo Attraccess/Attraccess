@@ -2,23 +2,24 @@ import {
   Button,
   Chip,
   Modal,
+  ModalBackdrop,
   ModalBody,
-  ModalContent,
+  ModalContainer,
+  ModalDialog,
   ModalFooter,
   ModalHeader,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
+  ModalHeading,
   Table,
   TableBody,
   TableCell,
   TableColumn,
+  TableContent,
   TableHeader,
   TableRow,
-  Tab,
-  Tabs,
   Tooltip,
-  useDisclosure,
+  TooltipContent,
+  TooltipTrigger,
+  useOverlayState,
 } from '@heroui/react';
 import { useCallback, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -66,7 +67,7 @@ function fullValue(value: unknown): string {
 
 export function VariablesModal(props: Props) {
   const { resourceId } = props;
-  const { isOpen, onOpenChange, onOpen, onClose } = useDisclosure();
+  const { isOpen, open, setOpen, close } = useOverlayState();
   const { t, tExists } = useTranslations({
     en: { ...en, api: API_ERROR_TRANSLATIONS_EN },
     de: { ...de, api: API_ERROR_TRANSLATIONS_DE },
@@ -76,6 +77,7 @@ export function VariablesModal(props: Props) {
   const queryClient = useQueryClient();
 
   const [activeScope, setActiveScope] = useState<ResourceFlowVariableScope>(ResourceFlowVariableScope.RESOURCE);
+  const [pendingDeleteKey, setPendingDeleteKey] = useState<string | null>(null);
   const [editor, setEditor] = useState<
     { open: false } | { open: true; mode: EditorMode; initial?: VariableFormValues }
   >({ open: false });
@@ -105,6 +107,7 @@ export function VariablesModal(props: Props) {
     onSuccess: () => {
       invalidate();
       toast.success({ title: t('toast.deleted.title') });
+      setPendingDeleteKey(null);
     },
     onError: (error) => {
       toast.apiError({ error: error as ApiError, t, tExists, baseTranslationKey: 'api' });
@@ -161,123 +164,149 @@ export function VariablesModal(props: Props) {
     [remove, resourceId],
   );
 
+  const rowKey = (row: FlowVariableDto) => `${row.scope}:${row.key}`;
+
   return (
     <>
-      {props.children(onOpen)}
-      <Modal isOpen={isOpen} onOpenChange={onOpenChange} size="3xl" scrollBehavior="inside">
-        <ModalContent>
-          <ModalHeader className="flex flex-col gap-1">
-            <span>{t('title')}</span>
-            <span className="text-sm font-normal text-default-500">{t('subtitle')}</span>
-          </ModalHeader>
-          <ModalBody>
-            {editor.open ? (
-              <VariableEditor
-                mode={editor.mode}
-                initial={editor.initial}
-                isSaving={upsert.isPending}
-                onCancel={() => setEditor({ open: false })}
-                onSubmit={handleSubmit}
-                t={t}
-              />
-            ) : (
-              <div className="flex flex-col gap-3">
-                <div className="flex flex-row items-center justify-between gap-3 flex-wrap">
-                  <Tabs
-                    selectedKey={activeScope}
-                    onSelectionChange={(key) => setActiveScope(key as ResourceFlowVariableScope)}
-                    aria-label={t('title')}
-                  >
-                    <Tab key={ResourceFlowVariableScope.RESOURCE} title={t('tabs.resource')} />
-                    <Tab key={ResourceFlowVariableScope.GLOBAL} title={t('tabs.global')} />
-                  </Tabs>
-                  <Button color="primary" startContent={<Plus className="h-4 w-4" />} onPress={handleAdd}>
-                    {t('actions.add')}
-                  </Button>
-                </div>
+      {props.children(open)}
+      <Modal isOpen={isOpen} onOpenChange={setOpen}>
+        <ModalBackdrop>
+          <ModalContainer size="lg">
+            <ModalDialog>
+              <ModalHeader className="flex flex-col gap-1">
+                <ModalHeading>{t('title')}</ModalHeading>
+                <span className="text-sm font-normal text-default-500">{t('subtitle')}</span>
+              </ModalHeader>
+              <ModalBody>
+                {editor.open ? (
+                  <VariableEditor
+                    mode={editor.mode}
+                    initial={editor.initial}
+                    isSaving={upsert.isPending}
+                    onCancel={() => setEditor({ open: false })}
+                    onSubmit={handleSubmit}
+                    t={t}
+                  />
+                ) : (
+                  <div className="flex flex-col gap-3">
+                    <div className="flex flex-row items-center justify-between gap-3 flex-wrap">
+                      <div className="flex flex-row gap-2">
+                        <Button
+                          variant={activeScope === ResourceFlowVariableScope.RESOURCE ? 'primary' : 'ghost'}
+                          onPress={() => setActiveScope(ResourceFlowVariableScope.RESOURCE)}
+                        >
+                          {t('tabs.resource')}
+                        </Button>
+                        <Button
+                          variant={activeScope === ResourceFlowVariableScope.GLOBAL ? 'primary' : 'ghost'}
+                          onPress={() => setActiveScope(ResourceFlowVariableScope.GLOBAL)}
+                        >
+                          {t('tabs.global')}
+                        </Button>
+                      </div>
+                      <Button variant="primary" onPress={handleAdd}>
+                        <Plus className="h-4 w-4" />
+                        {t('actions.add')}
+                      </Button>
+                    </div>
 
-                <div className="overflow-x-auto">
-                <Table aria-label={t('title')} removeWrapper isStriped>
-                  <TableHeader>
-                    <TableColumn>{t('table.key')}</TableColumn>
-                    <TableColumn>{t('table.type')}</TableColumn>
-                    <TableColumn>{t('table.value')}</TableColumn>
-                    <TableColumn>{t('table.updated')}</TableColumn>
-                    <TableColumn align="end">{t('table.actions')}</TableColumn>
-                  </TableHeader>
-                  <TableBody emptyContent={t('table.empty')} items={rows}>
-                    {(row) => (
-                      <TableRow key={`${row.scope}:${row.key}`}>
-                        <TableCell className="font-mono">{row.key}</TableCell>
-                        <TableCell>
-                          <Chip size="sm" variant="flat">
-                            {String(row.valueType)}
-                          </Chip>
-                        </TableCell>
-                        <TableCell>
-                          <Tooltip
-                            content={
-                              <pre className="max-w-md whitespace-pre-wrap">{fullValue(row.value as unknown)}</pre>
-                            }
-                          >
-                            <span className="font-mono text-sm">{previewValue(row.value as unknown)}</span>
-                          </Tooltip>
-                        </TableCell>
-                        <TableCell className="text-sm text-default-500">{formatDateTime(row.updatedAt)}</TableCell>
-                        <TableCell>
-                          <div className="flex flex-row justify-end gap-1">
-                            <Button
-                              isIconOnly
-                              size="sm"
-                              variant="light"
-                              aria-label={t('actions.edit')}
-                              onPress={() => handleEdit(row)}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Popover placement="left">
-                              <PopoverTrigger>
-                                <Button
-                                  isIconOnly
-                                  size="sm"
-                                  variant="light"
-                                  color="danger"
-                                  aria-label={t('actions.delete')}
-                                  isLoading={remove.isPending}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent>
-                                <div className="flex flex-col gap-2 p-2">
-                                  <p className="text-sm">{t('actions.confirmDelete')}</p>
-                                  <div className="flex flex-row justify-end gap-2">
-                                    <Button size="sm" variant="flat">
-                                      {t('actions.confirmDeleteNo')}
-                                    </Button>
-                                    <Button size="sm" color="danger" onPress={() => handleDelete(row)}>
-                                      {t('actions.confirmDeleteYes')}
-                                    </Button>
-                                  </div>
-                                </div>
-                              </PopoverContent>
-                            </Popover>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-                </div>
-              </div>
-            )}
-          </ModalBody>
-          <ModalFooter>
-            <Button variant="flat" onPress={onClose}>
-              {t('actions.close')}
-            </Button>
-          </ModalFooter>
-        </ModalContent>
+                    <div className="overflow-x-auto">
+                      <Table aria-label={t('title')}>
+                        <TableContent>
+                          <TableHeader>
+                            <TableColumn isRowHeader>{t('table.key')}</TableColumn>
+                            <TableColumn>{t('table.type')}</TableColumn>
+                            <TableColumn>{t('table.value')}</TableColumn>
+                            <TableColumn>{t('table.updated')}</TableColumn>
+                            <TableColumn>{t('table.actions')}</TableColumn>
+                          </TableHeader>
+                          <TableBody>
+                            {rows.length === 0 ? (
+                              <TableRow>
+                                <TableCell>{t('table.empty')}</TableCell>
+                                <TableCell>{null}</TableCell>
+                                <TableCell>{null}</TableCell>
+                                <TableCell>{null}</TableCell>
+                                <TableCell>{null}</TableCell>
+                              </TableRow>
+                            ) : (
+                              rows.map((row) => (
+                                <TableRow key={rowKey(row)}>
+                                  <TableCell className="font-mono">{row.key}</TableCell>
+                                  <TableCell>
+                                    <Chip variant="soft">{String(row.valueType)}</Chip>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Tooltip>
+                                      <TooltipTrigger>
+                                        <span className="font-mono text-sm">{previewValue(row.value as unknown)}</span>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        <pre className="max-w-md whitespace-pre-wrap">
+                                          {fullValue(row.value as unknown)}
+                                        </pre>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TableCell>
+                                  <TableCell className="text-sm text-default-500">
+                                    {formatDateTime(row.updatedAt)}
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="flex flex-row justify-end gap-1">
+                                      <Button
+                                        isIconOnly
+                                        variant="ghost"
+                                        aria-label={t('actions.edit')}
+                                        onPress={() => handleEdit(row)}
+                                      >
+                                        <Pencil className="h-4 w-4" />
+                                      </Button>
+                                      {pendingDeleteKey === rowKey(row) ? (
+                                        <>
+                                          <Button
+                                            variant="ghost"
+                                            onPress={() => setPendingDeleteKey(null)}
+                                          >
+                                            {t('actions.confirmDeleteNo')}
+                                          </Button>
+                                          <Button
+                                            variant="danger"
+                                            isPending={remove.isPending}
+                                            onPress={() => handleDelete(row)}
+                                          >
+                                            {t('actions.confirmDeleteYes')}
+                                          </Button>
+                                        </>
+                                      ) : (
+                                        <Button
+                                          isIconOnly
+                                          variant="danger-soft"
+                                          aria-label={t('actions.delete')}
+                                          onPress={() => setPendingDeleteKey(rowKey(row))}
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              ))
+                            )}
+                          </TableBody>
+                        </TableContent>
+                      </Table>
+                    </div>
+                  </div>
+                )}
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="ghost" onPress={close}>
+                  {t('actions.close')}
+                </Button>
+              </ModalFooter>
+            </ModalDialog>
+          </ModalContainer>
+        </ModalBackdrop>
       </Modal>
     </>
   );

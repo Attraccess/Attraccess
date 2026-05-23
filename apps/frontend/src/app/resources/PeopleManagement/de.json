@@ -1,0 +1,82 @@
+{
+  "title": "Personen & Berechtigungen",
+  "subtitle": "Einweiser und Einweisungen für diese Ressource verwalten",
+  "addPerson": "Person hinzufügen",
+  "addOptions": {
+    "introducer": "Als Einweiser ernennen",
+    "introduction": "Einweisung gewähren"
+  },
+  "filters": {
+    "all": "Alle",
+    "introducers": "Nur Einweiser",
+    "introduced": "Nur Eingewiesene"
+  },
+  "columns": {
+    "name": "Name",
+    "introducer": "Einweiser",
+    "introduced": "Eingewiesen",
+    "actions": "Aktionen"
+  },
+  "value": {
+    "yes": "Ja",
+    "no": "—"
+  },
+  "rowActions": {
+    "history": "Verlauf anzeigen",
+    "revokeIntroducer": "Einweiser-Status entziehen",
+    "revokeIntroduction": "Einweisung widerrufen",
+    "grantIntroduction": "Einweisung erneut gewähren"
+  },
+  "addModal": {
+    "title": {
+      "introducer": "Einweiser ernennen",
+      "introduction": "Einweisung gewähren"
+    },
+    "userLabel": "Benutzer",
+    "commentLabel": "Kommentar (optional)",
+    "submit": "Bestätigen",
+    "cancel": "Abbrechen"
+  },
+  "commentModal": {
+    "title": "Kommentar hinzufügen",
+    "submit": "Absenden",
+    "cancel": "Abbrechen"
+  },
+  "emptyState": "Noch keine Einweiser oder Einweisungen",
+  "loadError": "Daten konnten nicht geladen werden",
+  "loadErrorDescription": "Bitte versuchen Sie es später erneut.",
+  "toasts": {
+    "introducerGranted": {
+      "title": "Einweiser hinzugefügt",
+      "description": "Der Benutzer hat erfolgreich Einweiser-Privilegien erhalten."
+    },
+    "introducerGrantFailed": {
+      "title": "Fehler beim Hinzufügen des Einweisers",
+      "description": "{{error}}"
+    },
+    "introducerRevoked": {
+      "title": "Einweiser entfernt",
+      "description": "Die Einweiser-Privilegien wurden widerrufen."
+    },
+    "introducerRevokeFailed": {
+      "title": "Fehler beim Entfernen des Einweisers",
+      "description": "{{error}}"
+    },
+    "introductionGranted": {
+      "title": "Einweisung gewährt",
+      "description": "Die Einweisung wurde gewährt."
+    },
+    "introductionGrantFailed": {
+      "title": "Fehler beim Gewähren der Einweisung",
+      "description": "{{error}}"
+    },
+    "introductionRevoked": {
+      "title": "Einweisung widerrufen",
+      "description": "Die Einweisung wurde widerrufen."
+    },
+    "introductionRevokeFailed": {
+      "title": "Fehler beim Widerrufen der Einweisung",
+      "description": "{{error}}"
+    }
+  }
+}

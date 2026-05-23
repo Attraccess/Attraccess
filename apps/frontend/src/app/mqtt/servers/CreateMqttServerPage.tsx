@@ -1,12 +1,12 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Button, Card, CardHeader, Input, Checkbox, Form, Select, SelectItem } from '@heroui/react';
-import { ArrowLeft } from 'lucide-react';
+import { Button, Checkbox, Form, Input, Label, TextField } from "@heroui/react";
+import { Select } from '../../../components/select';
+import { LabeledSwitch } from '../../../components/labeledSwitch';
 import { PasswordInput } from '../../../components/PasswordInput';
-import { useNavigate } from 'react-router-dom';
 import { useToastMessage } from '../../../components/toastProvider';
 import en from './translations/create/en.json';
 import de from './translations/create/de.json';
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import {
   useMqttServiceMqttServersCreateOne,
   CreateMqttServerDto,
@@ -15,15 +15,14 @@ import {
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 
-interface CreateMqttServerPageProps {
+interface CreateMqttServerFormProps {
   onSuccess?: (createdServer: MqttServer) => void;
   onCancel?: () => void;
 }
 
-export function CreateMqttServerForm(props?: Readonly<CreateMqttServerPageProps>) {
-  const { onSuccess } = props || {};
+export function CreateMqttServerForm(props?: Readonly<CreateMqttServerFormProps>) {
+  const { onSuccess, onCancel } = props || {};
   const { t } = useTranslations({ en, de });
-  const navigate = useNavigate();
   const toast = useToastMessage();
   const queryClient = useQueryClient();
 
@@ -49,11 +48,7 @@ export function CreateMqttServerForm(props?: Readonly<CreateMqttServerPageProps>
       queryClient.invalidateQueries({
         queryKey: [useMqttServiceMqttServersGetAllKey],
       });
-      if (onSuccess) {
-        onSuccess(server);
-      } else {
-        navigate('/mqtt/servers');
-      }
+      onSuccess?.(server);
     },
     onError: (err: Error) => {
       toast.error({
@@ -63,25 +58,6 @@ export function CreateMqttServerForm(props?: Readonly<CreateMqttServerPageProps>
     },
   });
 
-  const handleCancel = useCallback(() => {
-    if (props?.onCancel) {
-      props.onCancel();
-    } else {
-      navigate('/mqtt/servers');
-    }
-  }, [props, navigate]);
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type, checked } = e.target;
-    const valueAsNumber = type === 'number' ? parseInt(value, 10) : value;
-    const newValue = type === 'checkbox' ? checked : valueAsNumber;
-
-    setFormValues((prev) => ({
-      ...prev,
-      [name]: newValue,
-    }));
-  };
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     createMqttServer.mutate({ requestBody: formValues });
@@ -90,181 +66,162 @@ export function CreateMqttServerForm(props?: Readonly<CreateMqttServerPageProps>
   const qosOptions = [0, 1, 2] as const;
 
   return (
-    <Form onSubmit={handleSubmit} data-cy="create-mqtt-server-form">
-      <Input
-        id="name"
-        name="name"
-        label={t('nameLabel')}
-        placeholder={t('namePlaceholder')}
-        value={formValues.name}
-        onChange={handleInputChange}
-        required
-        fullWidth
-        data-cy="create-mqtt-server-form-name-input"
-      />
+    <Form onSubmit={handleSubmit} className="gap-8" data-cy="create-mqtt-server-form">
+      <section className="w-full flex flex-col gap-4 pt-6 border-t border-default-200 first:pt-0 first:border-t-0">
+        <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
+          {t('sections.connection')}
+        </h3>
+        <TextField
+          value={formValues.name}
+          onChange={(v) => setFormValues((p) => ({ ...p, name: v }))}
+          className="w-full"
+        >
+          <Label>{t('nameLabel')}</Label>
+          <Input
+            id="name"
+            name="name"
+            placeholder={t('namePlaceholder')}
+            required
+            data-cy="create-mqtt-server-form-name-input"
+          />
+        </TextField>
 
-      <Input
-        label={t('hostLabel')}
-        id="host"
-        name="host"
-        placeholder={t('hostPlaceholder')}
-        value={formValues.host}
-        onChange={handleInputChange}
-        required
-        fullWidth
-        data-cy="create-mqtt-server-form-host-input"
-      />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
+          <TextField
+            value={formValues.host}
+            onChange={(v) => setFormValues((p) => ({ ...p, host: v }))}
+            className="md:col-span-2"
+          >
+            <Label>{t('hostLabel')}</Label>
+            <Input
+              id="host"
+              name="host"
+              placeholder={t('hostPlaceholder')}
+              required
+              data-cy="create-mqtt-server-form-host-input"
+            />
+          </TextField>
 
-      <Input
-        label={t('portLabel')}
-        id="port"
-        name="port"
-        type="number"
-        placeholder={t('portPlaceholder')}
-        value={String(formValues.port ?? 1883)}
-        onChange={handleInputChange}
-        required
-        fullWidth
-        data-cy="create-mqtt-server-form-port-input"
-      />
+          <TextField
+            value={String(formValues.port ?? 1883)}
+            onChange={(v) => setFormValues((p) => ({ ...p, port: parseInt(v, 10) }))}
+          >
+            <Label>{t('portLabel')}</Label>
+            <Input
+              id="port"
+              name="port"
+              type="number"
+              placeholder={t('portPlaceholder')}
+              required
+              data-cy="create-mqtt-server-form-port-input"
+            />
+          </TextField>
+        </div>
+      </section>
 
-      <Input
-        label={t('clientIdLabel')}
-        id="clientId"
-        name="clientId"
-        placeholder={t('clientIdPlaceholder')}
-        value={formValues.clientId}
-        onChange={handleInputChange}
-        fullWidth
-        data-cy="create-mqtt-server-form-client-id-input"
-      />
+      <section className="w-full flex flex-col gap-4 pt-6 border-t border-default-200 first:pt-0 first:border-t-0">
+        <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
+          {t('sections.authentication')}
+        </h3>
+        <TextField
+          value={formValues.clientId}
+          onChange={(v) => setFormValues((p) => ({ ...p, clientId: v }))}
+          className="w-full"
+        >
+          <Label>{t('clientIdLabel')}</Label>
+          <Input
+            id="clientId"
+            name="clientId"
+            placeholder={t('clientIdPlaceholder')}
+            data-cy="create-mqtt-server-form-client-id-input"
+          />
+        </TextField>
 
-      <Input
-        label={t('usernameLabel')}
-        id="username"
-        name="username"
-        placeholder={t('usernamePlaceholder')}
-        value={formValues.username}
-        onChange={handleInputChange}
-        fullWidth
-        data-cy="create-mqtt-server-form-username-input"
-      />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
+          <TextField
+            value={formValues.username}
+            onChange={(v) => setFormValues((p) => ({ ...p, username: v }))}
+          >
+            <Label>{t('usernameLabel')}</Label>
+            <Input
+              id="username"
+              name="username"
+              placeholder={t('usernamePlaceholder')}
+              data-cy="create-mqtt-server-form-username-input"
+            />
+          </TextField>
 
-      <PasswordInput
-        label={t('passwordLabel')}
-        id="password"
-        name="password"
-        placeholder={t('passwordPlaceholder')}
-        value={formValues.password}
-        onChange={handleInputChange}
-        fullWidth
-        data-cy="create-mqtt-server-form-password-input"
-        autoComplete="off"
-      />
+          <PasswordInput
+            label={t('passwordLabel')}
+            id="password"
+            name="password"
+            placeholder={t('passwordPlaceholder')}
+            value={formValues.password}
+            onChange={(v: string) => setFormValues((p) => ({ ...p, password: v }))}
+            data-cy="create-mqtt-server-form-password-input"
+            autoComplete="off"
+          />
+        </div>
 
-      <Checkbox
-        id="useTls"
-        name="useTls"
-        isSelected={formValues.useTls}
-        onValueChange={(checked) => setFormValues((prev) => ({ ...prev, useTls: checked }))}
-        data-cy="create-mqtt-server-form-use-tls-checkbox"
-      >
-        {t('useTls')}
-      </Checkbox>
+        <Checkbox
+          id="useTls"
+          name="useTls"
+          isSelected={formValues.useTls}
+          onChange={(checked) => setFormValues((prev) => ({ ...prev, useTls: checked }))}
+          data-cy="create-mqtt-server-form-use-tls-checkbox"
+        >
+          {t('useTls')}
+        </Checkbox>
+      </section>
 
-      <Select
-        label={t('defaultPublishQosLabel')}
-        selectedKeys={new Set([String(formValues.defaultPublishQos ?? 0)])}
-        onSelectionChange={(keys) => {
-          if (keys === 'all') return;
-          const key = Array.from(keys)[0];
-          setFormValues((prev) => ({ ...prev, defaultPublishQos: Number(key) }));
-        }}
-        disallowEmptySelection
-        data-cy="create-mqtt-server-form-default-publish-qos-input"
-      >
-        {qosOptions.map((option) => (
-          <SelectItem key={String(option)}>{t(`qosOption.${option}`)}</SelectItem>
-        ))}
-      </Select>
+      <section className="w-full flex flex-col gap-4 pt-6 border-t border-default-200 first:pt-0 first:border-t-0">
+        <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
+          {t('sections.publishDefaults')}
+        </h3>
+        <Select
+          label={t('defaultPublishQosLabel')}
+          value={String(formValues.defaultPublishQos ?? 0)}
+          onChange={(key) => setFormValues((prev) => ({ ...prev, defaultPublishQos: Number(key) }))}
+          data-cy="create-mqtt-server-form-default-publish-qos-input"
+          items={qosOptions.map((option) => ({ key: String(option), label: t(`qosOption.${option}`) }))}
+        />
 
-      <Checkbox
-        id="defaultPublishRetain"
-        name="defaultPublishRetain"
-        isSelected={!!formValues.defaultPublishRetain}
-        onValueChange={(checked) => setFormValues((prev) => ({ ...prev, defaultPublishRetain: checked }))}
-        data-cy="create-mqtt-server-form-default-publish-retain-checkbox"
-      >
-        {t('defaultPublishRetainLabel')}
-      </Checkbox>
+        <LabeledSwitch
+          id="defaultPublishRetain"
+          name="defaultPublishRetain"
+          isSelected={!!formValues.defaultPublishRetain}
+          onChange={(checked) => setFormValues((prev) => ({ ...prev, defaultPublishRetain: checked }))}
+          data-cy="create-mqtt-server-form-default-publish-retain-checkbox"
+        >
+          {t('defaultPublishRetainLabel')}
+        </LabeledSwitch>
+      </section>
 
-      <Select
-        label={t('defaultSubscribeQosLabel')}
-        selectedKeys={new Set([String(formValues.defaultSubscribeQos ?? 0)])}
-        onSelectionChange={(keys) => {
-          if (keys === 'all') return;
-          const key = Array.from(keys)[0];
-          setFormValues((prev) => ({ ...prev, defaultSubscribeQos: Number(key) }));
-        }}
-        disallowEmptySelection
-        data-cy="create-mqtt-server-form-default-subscribe-qos-input"
-      >
-        {qosOptions.map((option) => (
-          <SelectItem key={String(option)}>{t(`qosOption.${option}`)}</SelectItem>
-        ))}
-      </Select>
+      <section className="w-full flex flex-col gap-4 pt-6 border-t border-default-200 first:pt-0 first:border-t-0">
+        <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
+          {t('sections.subscribeDefaults')}
+        </h3>
+        <Select
+          label={t('defaultSubscribeQosLabel')}
+          value={String(formValues.defaultSubscribeQos ?? 0)}
+          onChange={(key) => setFormValues((prev) => ({ ...prev, defaultSubscribeQos: Number(key) }))}
+          data-cy="create-mqtt-server-form-default-subscribe-qos-input"
+          items={qosOptions.map((option) => ({ key: String(option), label: t(`qosOption.${option}`) }))}
+        />
+      </section>
 
-      <div className="flex justify-end space-x-3 mt-4">
-        <Button color="default" variant="flat" onPress={handleCancel} data-cy="create-mqtt-server-form-cancel-button">
+      <div className="flex justify-end space-x-3 mt-4 w-full">
+        <Button variant="secondary" onPress={onCancel} data-cy="create-mqtt-server-form-cancel-button">
           {t('cancel')}
         </Button>
-        <Button
-          color="primary"
+        <Button variant="primary"
           type="submit"
-          isLoading={createMqttServer.isPending}
+          isPending={createMqttServer.isPending}
           data-cy="create-mqtt-server-form-create-button"
         >
           {t('create')}
         </Button>
       </div>
     </Form>
-  );
-}
-
-export function CreateMqttServerPage(props?: Readonly<CreateMqttServerPageProps>) {
-  const navigate = useNavigate();
-
-  const { t } = useTranslations({ en, de });
-
-  const handleCancel = useCallback(() => {
-    if (props?.onCancel) {
-      props.onCancel();
-    } else {
-      navigate('/mqtt/servers');
-    }
-  }, [props, navigate]);
-
-  return (
-    <Card data-cy="create-mqtt-server-page-card">
-      <CardHeader>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Button
-              isIconOnly
-              variant="light"
-              onPress={handleCancel}
-              aria-label={t('back')}
-              data-cy="create-mqtt-server-page-back-button"
-            >
-              <ArrowLeft size={20} />
-            </Button>
-            <h2>{t('addNewMqttServer')}</h2>
-          </div>
-        </div>
-      </CardHeader>
-      <div style={{ padding: '1rem' }}>
-        <CreateMqttServerForm {...props} onCancel={handleCancel} />
-      </div>
-    </Card>
   );
 }

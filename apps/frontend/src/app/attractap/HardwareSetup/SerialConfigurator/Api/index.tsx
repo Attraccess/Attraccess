@@ -1,5 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Alert, Button, CircularProgress, cn } from '@heroui/react';
+import { Alert, AlertContent, AlertTitle, Button, cn } from '@heroui/react';
 import { useCallback, useMemo, useState } from 'react';
 import { getBaseUrl } from '../../../../../api';
 import { PageHeader } from '../../../../../components/pageHeader';
@@ -136,31 +136,36 @@ export function AttractapSerialConfiguratorApi({
       <PageHeader
         noMargin
         title={<span onDoubleClick={manualUpdateApiData}>{t('title')}</span>}
-        actions={
-          isFetchingConfiguration || isUpdatingApi ? (
-            <CircularProgress isIndeterminate />
-          ) : (
-            <Button size="sm" onPress={handleRefresh}>
-              {t('actions.refreshStatus')}
-            </Button>
-          )
-        }
+        actions={[
+          {
+            key: 'refresh-status',
+            label: t('actions.refreshStatus'),
+            isPending: isFetchingConfiguration || isUpdatingApi,
+            onPress: handleRefresh,
+          },
+        ]}
       />
 
-      <Alert color={alertColor} title={alertTitle}>
+      <Alert status={alertColor}>
+        <AlertContent>
+          <AlertTitle>{alertTitle}</AlertTitle>
+        </AlertContent>
         {alertDescription}
         {status?.status === 'authenticated' && (
-          <Button onPress={handleOpenDeviceSettings} color="primary">
+          <Button variant="primary" onPress={handleOpenDeviceSettings}>
             {t('status.authenticated.openDeviceSettings.button')}
           </Button>
         )}
       </Alert>
 
       {apiDataMatchesServer === false && (
-        <Alert color="primary" title={t('apiDataDoesNotMatchesServer.alert.title')}>
+        <Alert status="default">
+          <AlertContent>
+            <AlertTitle>{t('apiDataDoesNotMatchesServer.alert.title')}</AlertTitle>
+          </AlertContent>
           <div className="flex flex-row flex-wrap gap-4">
             <div>{t('apiDataDoesNotMatchesServer.alert.description')}</div>
-            <Button onPress={() => updateApiData()} color="primary" isLoading={isUpdatingApi}>
+            <Button variant="primary" onPress={() => updateApiData()} isPending={isUpdatingApi}>
               {t('apiDataDoesNotMatchesServer.alert.button')}
             </Button>
           </div>

@@ -6,7 +6,8 @@
     "name": "Name"
   },
   "actions": {
-    "pair": "Pair"
+    "pair": "Pair",
+    "cancel": "Cancel"
   },
   "success": {
     "toast": {

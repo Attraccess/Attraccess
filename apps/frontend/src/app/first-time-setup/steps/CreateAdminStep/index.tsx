@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { Button, Form, Input } from '@heroui/react';
+import { Button, Form, TextField, Label, Input } from '@heroui/react';
 import { UserPlusIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useQueryClient } from '@tanstack/react-query';
@@ -134,16 +134,13 @@ export function CreateAdminStep({ onSuccess, isOverwrite }: CreateAdminStepProps
           })}
           validationMessages={usernameValidationMessages}
           value={username}
-          onValueChange={setUsername}
+          onChange={setUsername}
           isRequired
         />
-        <Input
-          label={t('email')}
-          type="email"
-          value={email}
-          onValueChange={setEmail}
-          isRequired
-        />
+        <TextField value={email} onChange={setEmail} isRequired>
+          <Label>{t('email')}</Label>
+          <Input type="email" />
+        </TextField>
         <PasswordField
           value={password}
           onValueChange={(v) => {
@@ -164,10 +161,9 @@ export function CreateAdminStep({ onSuccess, isOverwrite }: CreateAdminStepProps
         />
         <input type="submit" hidden />
       </Form>
-      <Button
-        color="primary"
+      <Button variant="primary"
         onPress={handleSubmit}
-        isLoading={isPending}
+        isPending={isPending}
         isDisabled={!canSubmit}
       >
         {isPending ? t('creating') : t('actions.create')}

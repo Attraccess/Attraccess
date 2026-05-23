@@ -1,13 +1,12 @@
 import { Route, Routes, useNavigate } from 'react-router-dom';
 import { Unauthorized } from './unauthorized/unauthorized';
-import { useTheme } from '@heroui/use-theme';
 import { PropsWithChildren, useEffect, useMemo } from 'react';
 import { Layout } from './layout/layout';
 import { useAuth } from '../hooks/useAuth';
 import { useAllRoutes } from './routes';
 import { VerifyEmail } from './verify-email';
 import { ToastProvider } from '../components/toastProvider';
-import { HeroUIProvider, Spinner } from '@heroui/react';
+import { I18nProvider, RouterProvider, Spinner, useTheme } from '@heroui/react';
 import { OpenAPI, SystemPermissions } from '@attraccess/react-query-client';
 import { RouteConfig } from '@attraccess/plugins-frontend-sdk';
 import PullToRefresh from 'react-simple-pull-to-refresh';
@@ -20,7 +19,6 @@ import { UnauthorizedLayout } from './unauthorized/unauthorized-layout/layout';
 import { BootScreen } from '../components/bootScreen';
 import { usePtrStore } from '../stores/ptr.store';
 import { ReactFlowProvider } from '@xyflow/react';
-import { ServerNotAvailable } from './serverNotAvailable';
 import { AccessDenied } from './unauthorized/accessDenied';
 import { getBaseUrl } from '../api';
 import { AcceptInvitation } from './accept-invitation';
@@ -96,16 +94,17 @@ function AppLayout(props: PropsWithChildren) {
       }
       isPullable={pullToRefreshIsEnabled}
     >
-      <HeroUIProvider navigate={navigate} labelPlacement="inside" locale={language}>
-        <ToastProvider>
-          <ReactFlowProvider>
-            <Layout noLayout={!isAuthenticated}>
-              <ServerNotAvailable />
-              {props.children}
-            </Layout>
-          </ReactFlowProvider>
-        </ToastProvider>
-      </HeroUIProvider>
+      <RouterProvider navigate={navigate}>
+        <I18nProvider locale={language}>
+          <ToastProvider>
+            <ReactFlowProvider>
+              <Layout noLayout={!isAuthenticated}>
+                {props.children}
+              </Layout>
+            </ReactFlowProvider>
+          </ToastProvider>
+        </I18nProvider>
+      </RouterProvider>
     </PullToRefresh>
   );
 }

@@ -1,63 +1,97 @@
+// Simple single-selection wrapper over HeroUI v3 Select compound component
+// FEATURE: Select utility wrapping v3 compound for consistent single-select API
 import {
   Select as HeroUiSelect,
-  SelectItem as HeroUiSelectItem,
-  SelectProps as HeroUiSelectProps,
-  SharedSelection,
+  SelectTrigger,
+  SelectValue,
+  SelectIndicator,
+  SelectPopover,
+  ListBox,
+  ListBoxItem,
+  Label,
 } from '@heroui/react';
-import { ReactNode, useCallback, useEffect, useState } from 'react';
+import { ReactNode } from 'react';
 
 interface SelectItem {
   key: string;
   label: ReactNode;
+  textValue?: string;
 }
 
-export type Props = Omit<
-  HeroUiSelectProps,
-  'items' | 'selectedKeys' | 'onChange' | 'children' | 'onSelectionChange'
-> & {
-  selectedKey: string;
-  onSelectionChange: (key: string) => unknown;
+export interface Props {
+  value?: string;
+  defaultValue?: string;
+  onChange?: (key: string) => unknown;
   items: SelectItem[];
-};
+  label?: ReactNode;
+  placeholder?: string;
+  className?: string;
+  isDisabled?: boolean;
+  isRequired?: boolean;
+  isInvalid?: boolean;
+  name?: string;
+  disabledKeys?: Iterable<string | number>;
+  variant?: 'primary' | 'secondary';
+  fullWidth?: boolean;
+  'aria-label'?: string;
+  'data-cy'?: string;
+  isLoading?: boolean;
+}
 
-export function Select(props: Props) {
-  const { selectedKey, onSelectionChange, items, ...selectProps } = props;
-
-  const selectionToSet = useCallback((selection: Props['selectedKey']) => {
-    return new Set(selection ? [selection] : []);
-  }, []);
-
-  const [value, setValue] = useState(selectionToSet(selectedKey));
-
-  useEffect(() => {
-    setValue(selectionToSet(selectedKey));
-  }, [selectedKey, selectionToSet]);
-
-  const handleSelectionChange = useCallback(
-    (keys: SharedSelection) => {
-      if (keys === 'all') {
-        return;
-      }
-
-      setValue(keys as Set<string>);
-      const selected = keys.values().next().value as string | undefined;
-      onSelectionChange(selected ?? '');
-    },
-    [onSelectionChange],
-  );
-
+export function Select({
+  value,
+  defaultValue,
+  onChange,
+  items,
+  label,
+  placeholder,
+  className,
+  isDisabled,
+  isRequired,
+  isInvalid,
+  name,
+  disabledKeys,
+  variant,
+  fullWidth,
+  'aria-label': ariaLabel,
+  'data-cy': dataCy,
+}: Props) {
   return (
-    <HeroUiSelect
-      {...selectProps}
-      items={items}
-      selectedKeys={value}
-      onSelectionChange={handleSelectionChange}
+    <HeroUiSelect<SelectItem>
+      value={value}
+      defaultValue={defaultValue}
+      onChange={(key) => onChange?.(key as string)}
+      placeholder={placeholder}
+      isDisabled={isDisabled}
+      isRequired={isRequired}
+      isInvalid={isInvalid}
+      name={name}
+      disabledKeys={disabledKeys}
+      variant={variant}
+      fullWidth={fullWidth}
+      className={className}
+      aria-label={ariaLabel}
+      data-cy={dataCy}
     >
-      {items.map((item) => (
-        <HeroUiSelectItem key={item.key} data-cy={`select-item-${item.key}`}>
-          {item.label}
-        </HeroUiSelectItem>
-      ))}
+      {label && <Label>{label}</Label>}
+      <SelectTrigger>
+        <SelectValue />
+        <SelectIndicator />
+      </SelectTrigger>
+      <SelectPopover>
+        <ListBox>
+          {items.map((item) => (
+            <ListBoxItem
+              key={item.key}
+              id={item.key}
+              textValue={item.textValue ?? (typeof item.label === 'string' ? item.label : item.key)}
+              data-cy={`select-item-${item.key}`}
+            >
+              {item.label}
+            </ListBoxItem>
+          ))}
+        </ListBox>
+      </SelectPopover>
     </HeroUiSelect>
   );
 }

@@ -1,4 +1,6 @@
-import { Card, CardBody, CardHeader, Input, Select, SelectItem, Switch, Textarea } from '@heroui/react';
+import { Input, TextArea } from "@heroui/react";
+import { Select } from '../../../../../components/select';
+import { LabeledSwitch } from '../../../../../components/labeledSwitch';
 import { FormFieldType } from '@attraccess/react-query-client';
 import { EditableFormField, TextFieldOptions, NumberFieldOptions, SelectFieldOptions } from '../types';
 
@@ -10,27 +12,29 @@ interface FormPreviewProps {
 export function FormPreview({ fields, t }: FormPreviewProps) {
   if (!fields.length) {
     return (
-      <Card className="h-full">
-        <CardHeader>
-          <p className="text-sm font-medium text-default-500">{t('preview.empty')}</p>
-        </CardHeader>
-      </Card>
+      <div className="rounded-lg border border-dashed border-default-200 p-6 text-center">
+        <p className="text-sm font-medium text-default-500">{t('preview.empty')}</p>
+      </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      {fields.map((field) => (
-        <Card key={field.id ?? field.name}>
-          <CardHeader className="flex flex-col items-start gap-1 pb-0">
+    <div className="flex flex-col gap-6">
+      {fields.map((field, index) => (
+        <div
+          key={field.id ?? field.name}
+          className="flex flex-col gap-2 pt-6 border-t border-default-200 first:pt-0 first:border-t-0"
+          data-cy={`form-preview-field-${index}`}
+        >
+          <div className="flex flex-col items-start gap-1">
             <p className="text-base font-semibold text-default-700">
               {field.name}
               {field.isRequired && <span className="text-danger-500 ml-1">*</span>}
             </p>
             {field.description && <p className="text-sm text-default-500">{field.description}</p>}
-          </CardHeader>
-          <CardBody className="pt-2">{renderPreviewField(field, t)}</CardBody>
-        </Card>
+          </div>
+          {renderPreviewField(field, t)}
+        </div>
       ))}
     </div>
   );
@@ -53,7 +57,7 @@ function renderPreviewField(field: EditableFormField, t: (key: string) => string
 
 function renderPreviewText(options: TextFieldOptions) {
   if (options.multiline) {
-    return <Textarea placeholder={options.placeholder ?? '…'} />;
+    return <TextArea placeholder={options.placeholder ?? '…'} />;
   }
 
   return <Input placeholder={options.placeholder ?? '…'} />;
@@ -70,11 +74,11 @@ function renderPreviewNumber(options: NumberFieldOptions) {
 function renderPreviewSelect(options: SelectFieldOptions, t: (key: string) => string, fieldName: string) {
   const items = options.options ?? [];
   return (
-    <Select placeholder={t('preview.selectPlaceholder')} aria-label={fieldName}>
-      {items.map((option) => (
-        <SelectItem key={option}>{option}</SelectItem>
-      ))}
-    </Select>
+    <Select
+      placeholder={t('preview.selectPlaceholder')}
+      aria-label={fieldName}
+      items={items.map((option) => ({ key: option, label: option }))}
+    />
   );
 }
 
@@ -82,7 +86,7 @@ function renderPreviewBoolean(t: (key: string) => string) {
   return (
     <div className="flex items-center gap-3">
       <span className="text-xs text-default-500">{t('preview.booleanNo')}</span>
-      <Switch aria-label={t('preview.booleanLabel')} />
+      <LabeledSwitch aria-label={t('preview.booleanLabel')} />
       <span className="text-xs text-default-500">{t('preview.booleanYes')}</span>
     </div>
   );

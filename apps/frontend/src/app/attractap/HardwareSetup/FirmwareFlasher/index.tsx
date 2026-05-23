@@ -1,6 +1,6 @@
 import { AttractapFirmware, useAttractapServiceGetFirmwareBinary } from '@attraccess/react-query-client';
 import { ESPTools, ESPToolsErrorType } from '../../../../utils/esp-tools';
-import { Accordion, AccordionItem, Alert, Button, CircularProgress, Progress } from '@heroui/react';
+import { Accordion, AccordionItem, AccordionHeading, AccordionTrigger, AccordionPanel, AccordionBody, Alert, AlertContent, AlertTitle, Button, ProgressBar, ProgressBarFill, ProgressBarTrack, ProgressCircle, ProgressCircleFillCircle, ProgressCircleTrack, ProgressCircleTrackCircle } from '@heroui/react';
 import { useCallback, useState } from 'react';
 import { useToastMessage } from '../../../../components/toastProvider';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -97,7 +97,12 @@ export function FirmwareFlasher(props: Props) {
   if (isDownloadingFirmware) {
     return (
       <div className="flex flex-col items-center justify-center h-full">
-        <CircularProgress isIndeterminate label={t('downloading.label')} />
+        <ProgressCircle isIndeterminate aria-label={t('downloading.label')}>
+          <ProgressCircleTrack>
+            <ProgressCircleTrackCircle />
+            <ProgressCircleFillCircle />
+          </ProgressCircleTrack>
+        </ProgressCircle>
       </div>
     );
   }
@@ -105,7 +110,7 @@ export function FirmwareFlasher(props: Props) {
   if (flashProgress === 0 && logLines.length === 0 && !flashError) {
     return (
       <div className="space-y-4">
-        <Button isLoading={isFlashing} onPress={flashFirmware} color="primary">
+        <Button variant="primary" isPending={isFlashing} onPress={flashFirmware}>
           {t('action.flash')}
         </Button>
       </div>
@@ -115,28 +120,36 @@ export function FirmwareFlasher(props: Props) {
   return (
     <div className="space-y-4">
       {flashError && (
-        <Alert title={t('errors.' + flashError.type)} color="danger" className="flex-row flex-wrap flex-gap-2">
+        <Alert status="danger" className="flex-row flex-wrap flex-gap-2">
+          <AlertContent>
+            <AlertTitle>{t('errors.' + flashError.type)}</AlertTitle>
+          </AlertContent>
           <div>{(flashError.details as string) || 'Unknown error occurred'}</div>
 
-          <Button size="sm" color="primary" onPress={flashFirmware}>
+          <Button variant="primary" onPress={flashFirmware}>
             {t('action.retryFlash')}
           </Button>
         </Alert>
       )}
 
       {!flashError && (
-        <Progress
+        <ProgressBar
           isIndeterminate={flashProgress === 0}
           value={flashProgress}
           minValue={0}
           maxValue={100}
-          showValueLabel={true}
-        />
+
+        >
+          <ProgressBarTrack>
+            <ProgressBarFill />
+          </ProgressBarTrack>
+        </ProgressBar>
       )}
 
       <Accordion>
-        <AccordionItem key="terminal" title={t('terminal.title')}>
-          <Terminal logLines={logLines} maxHeight="30vh" />
+        <AccordionItem key="terminal" id="terminal">
+          <AccordionHeading><AccordionTrigger>{t('terminal.title')}</AccordionTrigger></AccordionHeading>
+          <AccordionPanel><AccordionBody><Terminal logLines={logLines} maxHeight="30vh" /></AccordionBody></AccordionPanel>
         </AccordionItem>
       </Accordion>
     </div>

@@ -1,4 +1,5 @@
-import { Button, ButtonGroup, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from '@heroui/react';
+import { Button, ButtonGroup, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, DropdownPopover } from '@heroui/react';
+import { buttonVariants } from '@heroui/styles';
 import { ChevronDownIcon, PlayIcon } from 'lucide-react';
 import { ProjectsSelect } from '../../../../../components/projectsSelect';
 import { TFunction } from '@attraccess/plugins-frontend-ui';
@@ -25,29 +26,28 @@ export function MachineStartControls({
       <p className="text-gray-500 dark:text-gray-400">{t('machine.noActiveSession')}</p>
       <ProjectsSelect
         value={selectedProjectId}
-        onValueChange={onProjectChange}
+        onChange={onProjectChange}
         label={t('machine.project.label')}
         placeholder={t('machine.project.placeholder')}
       />
-      <ButtonGroup fullWidth color="primary">
-        <Button isLoading={isStarting} startContent={<PlayIcon className="w-4 h-4" />} onPress={onStart}>
+      <ButtonGroup className="w-full">
+        <Button isPending={isStarting} onPress={onStart}><PlayIcon className="w-4 h-4" />
           {t('machine.startSession')}
         </Button>
-        <Dropdown placement="bottom-end">
-          <DropdownTrigger>
-            <Button isIconOnly>
-              <ChevronDownIcon />
-            </Button>
+        <Dropdown>
+          <DropdownTrigger className={buttonVariants({ isIconOnly: true })}>
+            <ChevronDownIcon />
           </DropdownTrigger>
-          <DropdownMenu disallowEmptySelection aria-label={t('machine.alternativeStartSessionOptionsMenu.label')}>
-            <DropdownItem
-              key="startWithNotes"
-              description={t('machine.alternativeStartSessionOptionsMenu.startWithNotes.description')}
-              onPress={onStartWithNotes}
-            >
-              {t('machine.alternativeStartSessionOptionsMenu.startWithNotes.label')}
-            </DropdownItem>
-          </DropdownMenu>
+          <DropdownPopover>
+            <DropdownMenu aria-label={t('machine.alternativeStartSessionOptionsMenu.label')}>
+              <DropdownItem
+                key="startWithNotes" id="startWithNotes"
+                onPress={onStartWithNotes}
+              >
+                {t('machine.alternativeStartSessionOptionsMenu.startWithNotes.label')}
+              </DropdownItem>
+            </DropdownMenu>
+          </DropdownPopover>
         </Dropdown>
       </ButtonGroup>
     </>

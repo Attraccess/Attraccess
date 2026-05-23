@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Button, Card, CardBody, CardFooter, CardHeader } from '@heroui/react';
+import { Button, Card } from '@heroui/react';
 import { ShieldX, ArrowLeft, Home } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -23,7 +23,7 @@ export const AccessDenied = memo(function AccessDeniedComponent() {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen">
       <Card className="w-full max-w-md">
-        <CardHeader className="flex flex-col items-center justify-center">
+        <Card.Header className="flex flex-col items-center justify-center">
           {/* Icon */}
           <div className="flex justify-center mb-6">
             <div className="w-20 h-20 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center">
@@ -33,38 +33,32 @@ export const AccessDenied = memo(function AccessDeniedComponent() {
 
           {/* Title */}
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('title')}</h1>
-        </CardHeader>
+        </Card.Header>
 
-        <CardBody>
+        <Card.Content>
           {/* Description */}
           <p className="text-center text-gray-600 dark:text-gray-300 leading-relaxed">{t('description')}</p>
-        </CardBody>
+        </Card.Content>
 
-        <CardFooter className="flex flex-col gap-2">
+        <Card.Footer className="flex flex-col gap-2">
           {/* Action Buttons */}
 
-          <Button
-            color="primary"
-            variant="solid"
-            startContent={<ArrowLeft className="w-4 h-4" />}
+          <Button variant="primary"
             onPress={handleGoBack}
-            fullWidth
+            className="w-full"
             data-cy="access-denied-go-back-button"
-          >
+          ><ArrowLeft className="w-4 h-4" />
             {t('goBack')}
           </Button>
 
-          <Button
-            color="default"
-            variant="bordered"
-            startContent={<Home className="w-4 h-4" />}
+          <Button variant="outline"
             onPress={handleGoHome}
-            fullWidth
+            className="w-full"
             data-cy="access-denied-go-home-button"
-          >
+          ><Home className="w-4 h-4" />
             {t('goHome')}
           </Button>
-        </CardFooter>
+        </Card.Footer>
       </Card>
     </div>
   );

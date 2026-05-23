@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo } from 'react';
-import { Button, ButtonGroup, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from '@heroui/react';
+import { Button, ButtonGroup, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, DropdownPopover } from '@heroui/react';
+import { buttonVariants } from '@heroui/styles';
 import { UserX, ChevronDownIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { AttraccessUser, DateTimeDisplay } from '@attraccess/plugins-frontend-ui';
@@ -201,29 +202,27 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
         {canTakeover && (
           <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
             <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">{t('takeover.available')}</p>
-            <ButtonGroup fullWidth color="warning">
+            <ButtonGroup className="w-full">
               <Button
-                isLoading={startSession.isPending}
-                startContent={<UserX className="w-4 h-4" />}
+                isPending={startSession.isPending}
                 onPress={handleImmediateTakeover}
-              >
+              ><UserX className="w-4 h-4" />
                 {t('takeover.button')}
               </Button>
-              <Dropdown placement="bottom-end">
-                <DropdownTrigger>
-                  <Button isIconOnly>
-                    <ChevronDownIcon />
-                  </Button>
+              <Dropdown>
+                <DropdownTrigger className={buttonVariants({ isIconOnly: true })}>
+                  <ChevronDownIcon />
                 </DropdownTrigger>
-                <DropdownMenu disallowEmptySelection aria-label={t('takeover.optionsMenu.label')}>
-                  <DropdownItem
-                    key="takeoverWithNotes"
-                    description={t('takeover.optionsMenu.takeoverWithNotes.description')}
-                    onPress={handleOpenTakeoverModal}
-                  >
-                    {t('takeover.optionsMenu.takeoverWithNotes.label')}
-                  </DropdownItem>
-                </DropdownMenu>
+                <DropdownPopover>
+                  <DropdownMenu aria-label={t('takeover.optionsMenu.label')}>
+                    <DropdownItem
+                      key="takeoverWithNotes" id="takeoverWithNotes"
+                      onPress={handleOpenTakeoverModal}
+                    >
+                      {t('takeover.optionsMenu.takeoverWithNotes.label')}
+                    </DropdownItem>
+                  </DropdownMenu>
+                </DropdownPopover>
               </Dropdown>
             </ButtonGroup>
           </div>
@@ -232,29 +231,27 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
         {canStopOtherUserSession && (
           <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
             <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">{t('stopOtherUserSession.available')}</p>
-            <ButtonGroup fullWidth color="danger">
+            <ButtonGroup className="w-full">
               <Button
-                isLoading={startSession.isPending}
-                startContent={<UserX className="w-4 h-4" />}
+                isPending={startSession.isPending}
                 onPress={handleImmediateStopOtherUserSession}
-              >
+              ><UserX className="w-4 h-4" />
                 {t('stopOtherUserSession.button')}
               </Button>
-              <Dropdown placement="bottom-end">
-                <DropdownTrigger>
-                  <Button isIconOnly>
-                    <ChevronDownIcon />
-                  </Button>
+              <Dropdown>
+                <DropdownTrigger className={buttonVariants({ isIconOnly: true })}>
+                  <ChevronDownIcon />
                 </DropdownTrigger>
-                <DropdownMenu disallowEmptySelection aria-label={t('stopOtherUserSession.optionsMenu.label')}>
-                  <DropdownItem
-                    key="stopOtherUserSessionWithNotes"
-                    description={t('stopOtherUserSession.optionsMenu.stopOtherUserSessionWithNotes.description')}
-                    onPress={handleOpenStopOtherUserSessionModal}
-                  >
-                    {t('stopOtherUserSession.optionsMenu.stopOtherUserSessionWithNotes.label')}
-                  </DropdownItem>
-                </DropdownMenu>
+                <DropdownPopover>
+                  <DropdownMenu aria-label={t('stopOtherUserSession.optionsMenu.label')}>
+                    <DropdownItem
+                      key="stopOtherUserSessionWithNotes" id="stopOtherUserSessionWithNotes"
+                      onPress={handleOpenStopOtherUserSessionModal}
+                    >
+                      {t('stopOtherUserSession.optionsMenu.stopOtherUserSessionWithNotes.label')}
+                    </DropdownItem>
+                  </DropdownMenu>
+                </DropdownPopover>
               </Dropdown>
             </ButtonGroup>
           </div>

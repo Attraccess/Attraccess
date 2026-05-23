@@ -1,23 +1,10 @@
-import { useState, useMemo, useCallback } from 'react';
-import {
-  Card,
-  CardBody,
-  CardHeader,
-  Table,
-  TableHeader,
-  TableColumn,
-  TableBody,
-  TableRow,
-  TableCell,
-  Pagination,
-} from '@heroui/react';
+import { useState, useCallback } from 'react';
+import { Card, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow } from '@heroui/react';
 import { DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useProjectsServiceGetProjectUsageHistory, ResourceUsage } from '@attraccess/react-query-client';
 import en from './en.json';
 import de from './de.json';
-import { TableDataLoadingIndicator } from '../../../../../components/tableComponents';
 import { EmptyState } from '../../../../../components/emptyState';
-import { useReactQueryStatusToHeroUiTableLoadingState } from '../../../../../hooks/useReactQueryStatusToHeroUiTableLoadingState';
 import { UsageNotesModal } from '../../../../resources/usage/components/UsageNotesModal';
 import { AttraccessUser } from '@attraccess/plugins-frontend-ui';
 import { HistoryHeader } from '../../../../resources/usage/components/HistoryHeader';
@@ -30,24 +17,15 @@ const ROWS_PER_PAGE = 10;
 
 export function ProjectUsageHistory({ projectId }: ProjectUsageHistoryProps) {
   const { t } = useTranslations({ en, de });
-  const [page, setPage] = useState(1);
+  const [page] = useState(1);
   const [selectedSession, setSelectedSession] = useState<ResourceUsage | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const { data, status } = useProjectsServiceGetProjectUsageHistory({
+  const { data } = useProjectsServiceGetProjectUsageHistory({
     id: projectId,
     page,
     limit: ROWS_PER_PAGE,
   });
-
-  const loadingState = useReactQueryStatusToHeroUiTableLoadingState(status);
-
-  const totalPages = useMemo(() => {
-    if (!data?.total) {
-      return 1;
-    }
-    return Math.max(1, Math.ceil(data.total / ROWS_PER_PAGE));
-  }, [data?.total]);
 
   const handleRowAction = useCallback(
     (session: ResourceUsage) => {
@@ -65,34 +43,19 @@ export function ProjectUsageHistory({ projectId }: ProjectUsageHistoryProps) {
   return (
     <>
       <Card>
-        <CardHeader>
+        <Card.Header>
           <HistoryHeader
             title={t('history.title')}
             showAllUsers={false}
             setShowAllUsers={() => undefined}
             canManageResources={false}
           />
-        </CardHeader>
-        <CardBody>
-          <Table
-            aria-label={t('history.title')}
-            shadow="none"
-            removeWrapper
-            data-cy="project-usage-history-table"
-            bottomContent={
-              data?.total ? (
-                <Pagination
-                  page={page}
-                  total={totalPages}
-                  showControls
-                  onChange={(nextPage) => setPage(nextPage)}
-                  className="justify-center"
-                />
-              ) : null
-            }
-          >
+        </Card.Header>
+        <Card.Content>
+          <Table data-cy="project-usage-history-table">
+            <TableContent aria-label={t('history.title')}>
             <TableHeader>
-              <TableColumn>{t('history.columns.resource')}</TableColumn>
+              <TableColumn isRowHeader>{t('history.columns.resource')}</TableColumn>
               <TableColumn>{t('history.columns.user')}</TableColumn>
               <TableColumn>{t('history.columns.start')}</TableColumn>
               <TableColumn>{t('history.columns.end')}</TableColumn>
@@ -100,13 +63,11 @@ export function ProjectUsageHistory({ projectId }: ProjectUsageHistoryProps) {
             </TableHeader>
             <TableBody
               items={data?.data ?? []}
-              loadingState={loadingState}
-              loadingContent={<TableDataLoadingIndicator />}
-              emptyContent={<EmptyState message={t('history.empty')} />}
+              renderEmptyState={() => <EmptyState message={t('history.empty')} />}
             >
               {(session: ResourceUsage) => (
                 <TableRow
-                  key={session.id}
+                  key={session.id} id={session.id}
                   className="cursor-pointer hover:bg-primary-50 transition-bg duration-300"
                   onClick={() => handleRowAction(session)}
                 >
@@ -128,8 +89,9 @@ export function ProjectUsageHistory({ projectId }: ProjectUsageHistoryProps) {
                 </TableRow>
               )}
             </TableBody>
+            </TableContent>
           </Table>
-        </CardBody>
+        </Card.Content>
       </Card>
 
       <UsageNotesModal isOpen={isModalOpen} onClose={closeModal} session={selectedSession} />

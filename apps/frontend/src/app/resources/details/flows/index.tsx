@@ -14,19 +14,18 @@ import {
   useResourcesServiceGetOneResourceById,
 } from '@attraccess/react-query-client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useTheme } from '@heroui/use-theme';
+import { useTheme } from '@heroui/react';
 import { usePtrStore } from '../../../../stores/ptr.store';
 import Dagre from '@dagrejs/dagre';
 import { Button } from '@heroui/react';
 import {
-  CheckIcon,
+  Braces as BracesIcon,
+  DownloadIcon,
   LayoutGridIcon,
   LogsIcon,
   PlusIcon,
   SaveIcon,
-  Download as DownloadIcon,
-  Upload as UploadIcon,
-  Braces as BracesIcon,
+  UploadIcon,
 } from 'lucide-react';
 import { nanoid } from 'nanoid';
 import { NodePickerModal } from './nodePickerModal';
@@ -131,7 +130,6 @@ function FlowsPageInner() {
 
   const {
     mutate: saveFlow,
-    isSuccess: saveSucceeded,
     isError: saveFailed,
     isPending: isSaving,
   } = useResourceFlowsServiceSaveResourceFlow({
@@ -385,41 +383,48 @@ function FlowsPageInner() {
           <Panel position="top-right" className="flex flex-row flex-wrap gap-2">
             <Button
               isIconOnly
-              isLoading={isSaving}
-              startContent={saveSucceeded && !flowHasChanged ? <CheckIcon /> : <SaveIcon />}
+              isPending={isSaving}
               onPress={save}
               isDisabled={!flowHasChanged}
-              color={saveFailed ? 'danger' : flowHasChanged ? 'primary' : 'default'}
-            />
-            <Button isIconOnly startContent={<UploadIcon />} onPress={handleImportClick} aria-label={t('actions.import')} />
-            <Button
-              isIconOnly
-              startContent={<DownloadIcon />}
-              onPress={handleExport}
-              aria-label={t('actions.export')}
-            />
+              variant={saveFailed ? 'danger-soft' : flowHasChanged ? 'primary' : 'ghost'}
+            >
+              <SaveIcon />
+            </Button>
+            <Button isIconOnly onPress={handleImportClick} aria-label={t('actions.import')}>
+              <UploadIcon />
+            </Button>
+            <Button isIconOnly onPress={handleExport} aria-label={t('actions.export')}>
+              <DownloadIcon />
+            </Button>
             <LogViewer resourceId={Number(resourceId)}>
-              {(open) => <Button isIconOnly startContent={<LogsIcon />} onPress={open} />}
+              {(open) => (
+                <Button isIconOnly onPress={open}>
+                  <LogsIcon />
+                </Button>
+              )}
             </LogViewer>
 
             <VariablesModal resourceId={Number(resourceId)}>
               {(open) => (
-                <Button
-                  isIconOnly
-                  startContent={<BracesIcon />}
-                  onPress={open}
-                  aria-label={t('actions.variables')}
-                />
+                <Button isIconOnly onPress={open} aria-label={t('actions.variables')}>
+                  <BracesIcon />
+                </Button>
               )}
             </VariablesModal>
 
-            <Button isIconOnly startContent={<LayoutGridIcon />} onPress={layout} />
+            <Button isIconOnly onPress={layout}>
+              <LayoutGridIcon />
+            </Button>
             <NodePickerModal
               tNodeTranslations={tNodeTranslations}
               onSelect={addStartNode}
               resourceId={Number(resourceId)}
             >
-              {(open) => <Button color="primary" isIconOnly startContent={<PlusIcon />} onPress={open} />}
+              {(open) => (
+                <Button variant="primary" isIconOnly onPress={open}>
+                  <PlusIcon />
+                </Button>
+              )}
             </NodePickerModal>
           </Panel>
         </ReactFlow>

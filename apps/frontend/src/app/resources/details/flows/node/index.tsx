@@ -1,6 +1,7 @@
 import { ResourceFlowLogType, ResourceFlowNodeSchemaDto } from '@attraccess/react-query-client';
+
 import { NodeProps } from '@xyflow/react';
-import { Button, Card, CardBody, CardHeader, cn, Code, Tooltip, useDisclosure } from '@heroui/react';
+import { Button, Card, Code, cn, Tooltip, TooltipContent, TooltipTrigger, useOverlayState } from '@heroui/react';
 import { Handle, NodeToolbar, Position, useNodeId } from '@xyflow/react';
 import { Edit2Icon, Trash2Icon, TriangleAlertIcon } from 'lucide-react';
 import { useFlowContext } from '../flowContext';
@@ -86,9 +87,9 @@ export function AttraccessNode(props: Props) {
 
   const {
     isOpen: showDeleteConfirmation,
-    onOpen: userWantsToDelete,
-    onClose: userDoesNotWantToDelete,
-  } = useDisclosure();
+    open: userWantsToDelete,
+    close: userDoesNotWantToDelete,
+  } = useOverlayState();
 
   const isSelected = props.node?.selected ?? false;
 
@@ -167,59 +168,56 @@ export function AttraccessNode(props: Props) {
           <NodeToolbar isVisible={data?.forceToolbarVisible || undefined} position={data?.toolbarPosition}>
             <div className="flex flex-row gap-2">
               {isEditable && (
-                <Button size="sm" isIconOnly startContent={<Edit2Icon size={12} />} onPress={openEditor} />
+                <Button isIconOnly onPress={openEditor} ><Edit2Icon size={12} /></Button>
               )}
               {!previewMode && (
-                <Button
-                  isIconOnly
-                  color="danger"
-                  size="sm"
-                  startContent={<Trash2Icon size={12} />}
-                  onPress={userWantsToDelete}
-                />
+                <Button variant="danger" isIconOnly onPress={userWantsToDelete}>
+                  <Trash2Icon size={12} />
+                </Button>
               )}
             </div>
           </NodeToolbar>
           <Card className={cardClasses} onDoubleClick={isEditable ? openEditor : undefined}>
-            <CardHeader className="flex flex-col gap-1">
+            <Card.Header className="flex flex-col gap-1">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center min-w-0">
                   <span className="font-bold text-sm truncate">{t('nodes.' + schema.type + '.title')}</span>
                 </div>
                 {!previewMode && (
-                  <Tooltip
-                    content={
-                      processingState === ProcessingState.PROCESSING
+                  <Tooltip>
+                    <TooltipTrigger tabIndex={0}>
+                      <span
+                        className={cn(
+                          'w-2 h-2 rounded-full shrink-0',
+                          processingState === ProcessingState.PROCESSING
+                            ? 'bg-blue-500 animate-pulse'
+                            : processingState === ProcessingState.COMPLETED
+                              ? 'bg-green-500'
+                              : processingState === ProcessingState.FAILED
+                                ? 'bg-red-500'
+                                : 'bg-default-400',
+                        )}
+                      />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {processingState === ProcessingState.PROCESSING
                         ? 'Processing'
                         : processingState === ProcessingState.COMPLETED
                           ? 'Completed'
                           : processingState === ProcessingState.FAILED
                             ? 'Failed'
-                            : 'Idle'
-                    }
-                  >
-                    <span
-                      className={cn(
-                        'w-2 h-2 rounded-full shrink-0',
-                        processingState === ProcessingState.PROCESSING
-                          ? 'bg-blue-500 animate-pulse'
-                          : processingState === ProcessingState.COMPLETED
-                            ? 'bg-green-500'
-                            : processingState === ProcessingState.FAILED
-                              ? 'bg-red-500'
-                              : 'bg-default-400',
-                      )}
-                    />
+                            : 'Idle'}
+                    </TooltipContent>
                   </Tooltip>
                 )}
               </div>
               {previewMode && (
                 <span className="text-xs text-default-500 text-wrap">{t('nodes.' + schema.type + '.description')}</span>
               )}
-            </CardHeader>
+            </Card.Header>
 
             {!previewMode && previewRows.length > 0 && (
-              <CardBody className="pt-0">
+              <Card.Content className="pt-0">
                 <div className="flex flex-col gap-2">
                   {previewRows.map((row) => (
                     <div className="flex flex-col gap-1" key={row.label}>
@@ -260,7 +258,7 @@ export function AttraccessNode(props: Props) {
                     </div>
                   ))}
                 </div>
-              </CardBody>
+              </Card.Content>
             )}
           </Card>
 
@@ -272,22 +270,27 @@ export function AttraccessNode(props: Props) {
 
           {!previewMode &&
             targetHandlesWithStyles.map(({ id: handleId, label, style }) => (
-              <Tooltip content={label} key={handleId} isDisabled={!label}>
-                <Handle
-                  key={handleId}
-                  type="target"
-                  position={Position.Top}
-                  className="!w-4 !h-4"
-                  style={style}
-                  id={handleId}
-                />
+              <Tooltip key={handleId} isDisabled={!label}>
+                <TooltipTrigger tabIndex={0}>
+                  <Handle
+                    type="target"
+                    position={Position.Top}
+                    className="!w-4 !h-4"
+                    style={style}
+                    id={handleId}
+                  />
+                </TooltipTrigger>
+                <TooltipContent>{label}</TooltipContent>
               </Tooltip>
             ))}
           <div style={{ position: 'relative', marginInline: '25px' }}>
             {!previewMode &&
               sourceHandlesWithStyles.map(({ id: handleId, label, style }) => (
-                <Tooltip content={label} key={handleId} isDisabled={!label}>
-                  <Handle style={style} type="source" position={Position.Bottom} className="!w-4 !h-4" id={handleId} />
+                <Tooltip key={handleId} isDisabled={!label}>
+                  <TooltipTrigger tabIndex={0}>
+                    <Handle style={style} type="source" position={Position.Bottom} className="!w-4 !h-4" id={handleId} />
+                  </TooltipTrigger>
+                  <TooltipContent>{label}</TooltipContent>
                 </Tooltip>
               ))}
           </div>

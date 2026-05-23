@@ -1,0 +1,23 @@
+import { ResourceIntroducer, ResourceIntroduction, User } from '@attraccess/react-query-client';
+
+export type AddMode = 'introducer' | 'introduction';
+export type FilterMode = 'all' | 'introducers' | 'introduced';
+
+export type PeopleTarget = { type: 'resource'; id: number } | { type: 'group'; id: number };
+
+export interface PersonRow {
+  user: User;
+  isIntroducer: boolean;
+  introducer: ResourceIntroducer | null;
+  introduction: ResourceIntroduction | null;
+  hasValidIntroduction: boolean;
+  introductionLastEventAt: string | null;
+  activityAt: string;
+}
+
+export interface PeopleManagementProps {
+  target: PeopleTarget;
+  canManageIntroducers: boolean;
+  canManageIntroductions: boolean;
+  flat?: boolean;
+}

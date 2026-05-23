@@ -4,7 +4,7 @@ import {
   useUsersServiceGetCurrent,
   useUsersServiceGetCurrentKey,
 } from '@attraccess/react-query-client';
-import { Button, Input } from '@heroui/react';
+import { Button, TextField, Label, Input } from '@heroui/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useState } from 'react';
 import { useToastMessage } from '../../../components/toastProvider';
@@ -59,8 +59,11 @@ export function UsernameForm() {
 
   return (
     <div className="flex flex-col gap-4">
-      <Input label={t('username.label')} value={username} onValueChange={setUsername} isDisabled={isLoadingMe} />
-      <Button isLoading={isPending} onPress={onSubmit} color="primary">
+      <TextField value={username} onChange={setUsername} isDisabled={isLoadingMe}>
+        <Label>{t('username.label')}</Label>
+        <Input />
+      </TextField>
+      <Button variant="primary" isPending={isPending} onPress={onSubmit}>
         {t('actions.save')}
       </Button>
     </div>

@@ -1,13 +1,21 @@
 import { useParams, useNavigate } from 'react-router-dom';
+import { Button, Spinner, useOverlayState } from '@heroui/react';
 import { useAuth } from '../../../hooks/useAuth';
 import { useToastMessage } from '../../../components/toastProvider';
-import { ArrowLeft, BookOpen, ListChecks, PenSquareIcon, ShapesIcon, Trash, WorkflowIcon } from 'lucide-react';
-import { Button } from '@heroui/react';
-import { Spinner, Link } from '@heroui/react';
-import { useDisclosure } from '@heroui/react';
+import {
+  ArrowLeft,
+  BookOpen,
+  ListChecks,
+  PenSquareIcon,
+  ShapesIcon,
+  Trash,
+  WorkflowIcon,
+  WrenchIcon,
+} from 'lucide-react';
+
 import { ResourceUsageSession } from '../usage/resourceUsageSession';
 import { ResourceUsageHistory } from '../usage/resourceUsageHistory';
-import { PageHeader } from '../../../components/pageHeader';
+import { PageHeader, PageAction } from '../../../components/pageHeader';
 import { DeleteConfirmationModal } from '../../../components/deleteConfirmationModal';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { memo, useState } from 'react';
@@ -24,13 +32,11 @@ import { DocumentationModal } from '../documentation';
 import de from './resourceDetails.de.json';
 import en from './resourceDetails.en.json';
 import { ResourceEditModal } from '../editModal/resourceEditModal';
-import { ResoureIntroducerManagement } from '../IntroducerManagement';
-import { ResourceIntroductionsManagement } from '../IntroductionsManagement';
+import { PeopleManagement } from '../PeopleManagement';
 import { ResourceQrCode } from './qrcode';
 import { useQrCodeAction } from './useQrCodeAction';
 import { filenameToUrl } from '../../../api';
 import { MaintenanceManagement } from './maintenance-management';
-import { MaintenanceSchedules } from './maintenance-schedules';
 import { ResourceBillingInfo } from './resourceBillingInfo';
 import { ResourceHealthWarning } from './health-state';
 
@@ -41,7 +47,7 @@ function ResourceDetailsComponent() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const { isOpen, onOpen, onOpenChange } = useDisclosure();
+  const { isOpen, open, close: closeDeleteModal } = useOverlayState();
 
   const { hasPermission, user } = useAuth();
   const { success, error: showError } = useToastMessage();
@@ -100,7 +106,7 @@ function ResourceDetailsComponent() {
   if (isLoadingResource) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <Spinner size="lg" color="primary" data-cy="resource-details-loading-spinner" />
+        <Spinner color="accent" data-cy="resource-details-loading-spinner" />
       </div>
     );
   }
@@ -110,12 +116,10 @@ function ResourceDetailsComponent() {
       <div className="max-w-7xl mx-auto px-4 flex flex-col items-center justify-center min-h-screen">
         <h2 className="text-xl font-semibold mb-2">{t('error.resourceNotFound.title')}</h2>
         <p className="text-gray-500 mb-4">{t('error.resourceNotFound.description')}</p>
-        <Button
+        <Button variant="ghost"
           onPress={() => navigate('/resources')}
-          variant="light"
-          startContent={<ArrowLeft className="w-4 h-4" />}
           data-cy="back-to-resources-button"
-        >
+        ><ArrowLeft className="w-4 h-4" />
           {t('error.resourceNotFound.backToResources')}
         </Button>
       </div>
@@ -131,133 +135,132 @@ function ResourceDetailsComponent() {
         thumbnailAlt={resource.name}
         subtitle={resource.description ?? undefined}
         backTo="/resources"
-        actions={
-          <>
-            <DocumentationModal resourceId={resourceId}>
-              {(onOpenDocumentation) => (
-                <Button
-                  variant="light"
-                  startContent={<BookOpen className="w-4 h-4" />}
-                  onPress={onOpenDocumentation}
-                  data-cy="documentation-button"
-                >
-                  {t('actions.documentation')}
-                </Button>
-              )}
-            </DocumentationModal>
-
-            {canManageResources && (
-              <>
-                <ResourceQrCode resourceId={resourceId} variant="light" buttonIconSize={16} />
-
-                <Button
-                  as={Link}
-                  href={`/resources/${resourceId}/flows`}
-                  variant="light"
-                  startContent={<WorkflowIcon className="w-4 h-4" />}
-                  data-cy="flows-button"
-                >
-                  {t('navItems.flows')}
-                </Button>
-
-                <Button
-                  as={Link}
-                  href={`/resources/${resourceId}/forms`}
-                  variant="light"
-                  startContent={<ListChecks className="w-4 h-4" />}
-                  data-cy="forms-button"
-                >
-                  {t('navItems.forms')}
-                </Button>
-
-                <ResourceEditModal resourceId={resourceId} closeOnSuccess>
-                  {(onOpen) => (
-                    <Button
-                      onPress={onOpen}
-                      variant="light"
-                      startContent={<PenSquareIcon className="w-4 h-4" />}
-                      data-cy="edit-resource-button"
-                    >
-                      {t('actions.edit')}
-                    </Button>
-                  )}
-                </ResourceEditModal>
-
-                <Button
-                  onPress={onOpen}
-                  color="danger"
-                  variant="light"
-                  startContent={<Trash className="w-4 h-4" />}
-                  data-cy="delete-resource-button"
-                >
-                  {t('actions.delete')}
-                </Button>
-              </>
-            )}
-          </>
-        }
+        actions={[
+          {
+            key: 'documentation',
+            label: t('actions.documentation'),
+            icon: <BookOpen className="w-4 h-4" />,
+            dataCy: 'documentation-button',
+            renderTrigger: (triggerProps) => (
+              <DocumentationModal resourceId={resourceId}>
+                {(onOpenDocumentation) => <Button {...triggerProps} onPress={onOpenDocumentation} />}
+              </DocumentationModal>
+            ),
+          },
+          {
+            key: 'qr',
+            label: t('actions.qrCode'),
+            isHidden: !canManageResources,
+            renderTrigger: (triggerProps) => (
+              <ResourceQrCode
+                resourceId={resourceId}
+                variant={triggerProps.variant}
+                size={triggerProps.size}
+                buttonIconSize={16}
+              />
+            ),
+          },
+          {
+            key: 'flows',
+            label: t('navItems.flows'),
+            icon: <WorkflowIcon className="w-4 h-4" />,
+            isHidden: !canManageResources,
+            onPress: () => navigate(`/resources/${resourceId}/flows`),
+            dataCy: 'flows-button',
+          },
+          {
+            key: 'forms',
+            label: t('navItems.forms'),
+            icon: <ListChecks className="w-4 h-4" />,
+            isHidden: !canManageResources,
+            onPress: () => navigate(`/resources/${resourceId}/forms`),
+            dataCy: 'forms-button',
+          },
+          {
+            key: 'maintenance',
+            label: t('actions.maintenance'),
+            icon: <WrenchIcon className="w-4 h-4" />,
+            isHidden: !canManageResources || !maintenancePermissions?.canManage,
+            onPress: () => navigate(`/resources/${resourceId}/maintenance`),
+            dataCy: 'maintenance-button',
+          },
+          {
+            key: 'edit',
+            label: t('actions.edit'),
+            icon: <PenSquareIcon className="w-4 h-4" />,
+            isHidden: !canManageResources,
+            dataCy: 'edit-resource-button',
+            renderTrigger: (triggerProps) => (
+              <ResourceEditModal resourceId={resourceId} closeOnSuccess>
+                {(onOpen) => <Button {...triggerProps} onPress={onOpen} />}
+              </ResourceEditModal>
+            ),
+          },
+          {
+            key: 'delete',
+            label: t('actions.delete'),
+            icon: <Trash className="w-4 h-4" />,
+            variant: 'destructive',
+            isHidden: !canManageResources,
+            onPress: open,
+            dataCy: 'delete-resource-button',
+          },
+        ] satisfies PageAction[]}
       />
 
-      <div className="w-full space-y-6 mb-6">
+      <div className="mb-6">
         <ResourceHealthWarning resourceId={resourceId} />
-        <div className="flex flex-row flex-wrap w-full gap-6 items-stretch">
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6 lg:items-start">
+        <div className="lg:col-span-2 space-y-6">
           <ResourceUsageSession
             resourceId={resourceId}
             resource={resource}
             data-cy="resource-usage-session"
-            className="flex-grow"
             insufficientBalanceDesiredAmount={insufficientBalanceDesiredAmount}
           />
+
+          <ResourceUsageHistory resourceId={resourceId} data-cy="resource-usage-history" />
+        </div>
+
+        <aside className="lg:col-span-1 space-y-8">
           <ResourceBillingInfo
+            variant="flat"
             resourceId={resourceId}
-            className="flex-grow"
             onExampleAmountChange={(value) => setInsufficientBalanceDesiredAmount(Math.ceil(value))}
           />
-        </div>
-
-        <div className="flex flex-row flex-wrap w-full gap-6 items-stretch">
-          <ResourceUsageHistory resourceId={resourceId} data-cy="resource-usage-history" className="flex-grow" />
-
           {maintenancePermissions?.canManage && (
-            <>
-              <MaintenanceManagement resourceId={resourceId} className="flex-grow" />
-              <MaintenanceSchedules resourceId={resourceId} className="flex-grow" />
-            </>
+            <MaintenanceManagement variant="flat" resourceId={resourceId} />
           )}
-        </div>
+        </aside>
       </div>
 
       <div className="flex flex-row flex-wrap w-full gap-6 items-stretch">
         {(isIntroducer?.isIntroducer || canManageResources) && (
-          <ResourceIntroductionsManagement
-            resourceId={resourceId}
+          <PeopleManagement
+            target={{ type: 'resource', id: resourceId }}
+            canManageIntroducers={canManageResources}
+            canManageIntroductions={isIntroducer?.isIntroducer || canManageResources}
+            flat
             className="flex-1 min-w-80"
-            data-cy="manage-resource-introductions"
+            data-cy="manage-resource-people"
           />
         )}
 
         {canManageResources && (
-          <>
-            <ResoureIntroducerManagement
-              resourceId={resourceId}
-              className="flex-1 min-w-80"
-              data-cy="manage-resource-introducers"
-            />
-
-            <ManageResourceGroups
-              resourceId={resourceId}
-              data-cy="manage-resource-groups"
-              className="flex-1 min-w-80"
-            />
-          </>
+          <ManageResourceGroups
+            resourceId={resourceId}
+            data-cy="manage-resource-groups"
+            className="flex-1 min-w-80"
+          />
         )}
       </div>
 
       {canManageResources && (
         <DeleteConfirmationModal
           isOpen={isOpen}
-          onOpenChange={onOpenChange}
-          onClose={() => onOpenChange()}
+          onClose={closeDeleteModal}
           onConfirm={handleDelete}
           itemName={resource.name}
           data-cy="delete-confirmation-modal"

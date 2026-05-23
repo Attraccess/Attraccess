@@ -1,16 +1,18 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   Button,
+  DrawerBody,
+  DrawerFooter,
+  DrawerHeader,
   Form,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  NumberInput,
-  useDisclosure,
+  NumberField,
+  NumberFieldDecrementButton,
+  NumberFieldGroup,
+  NumberFieldIncrementButton,
+  NumberFieldInput,
+  useOverlayState,
 } from '@heroui/react';
-import { PageHeader } from '../../../../../../components/pageHeader';
+import { StandardDrawer } from '../../../../../../components/standardDrawer';
 import en from './en.json';
 import de from './de.json';
 import { useCallback, useEffect, useState } from 'react';
@@ -48,7 +50,7 @@ export function RefundModal(props: Props) {
     },
   });
 
-  const { onOpen, isOpen, onOpenChange, onClose } = useDisclosure();
+  const { open, isOpen, setOpen, close } = useOverlayState();
   const toast = useToastMessage();
   const queryClient = useQueryClient();
 
@@ -73,7 +75,7 @@ export function RefundModal(props: Props) {
       queryClient.invalidateQueries({
         queryKey: UseBillingServiceGetBillingBalanceKeyFn({ userId: transaction?.userId ?? 0 }),
       });
-      onClose();
+      close();
     },
     onError: (error) => {
       toast.apiError({
@@ -101,33 +103,37 @@ export function RefundModal(props: Props) {
 
   return (
     <>
-      {children && children(onOpen)}
-      <Modal isOpen={isOpen} onOpenChange={onOpenChange} size="xs" scrollBehavior="inside">
-        <ModalContent>
-          <ModalHeader>
-            <PageHeader title={t('title')} noMargin />
-          </ModalHeader>
+      {children && children(open)}
+      <StandardDrawer isOpen={isOpen} onOpenChange={setOpen}>
+        <DrawerHeader>
+          <h2 className="text-lg font-semibold">{t('title')}</h2>
+        </DrawerHeader>
 
-          <ModalBody>
-            <Form onSubmit={onSubmit}>
-              <NumberInput
-                label={t('inputs.amount')}
-                value={dbCurrencyToUserCurrency(amount, configuration.minorUnit)}
-                onValueChange={(value) => setAmount(userCurrencyToDbCurrency(value, configuration.minorUnit))}
-                minValue={0}
-                maxValue={dbCurrencyToUserCurrency(Math.abs(transaction.amount), configuration.minorUnit)}
-              />
-              <input type="submit" hidden />
-            </Form>
-          </ModalBody>
+        <DrawerBody>
+          <Form onSubmit={onSubmit} className="flex flex-col gap-4">
+            <NumberField
+              aria-label={t('inputs.amount')}
+              value={dbCurrencyToUserCurrency(amount, configuration.minorUnit)}
+              onChange={(value) => setAmount(userCurrencyToDbCurrency(value, configuration.minorUnit))}
+              minValue={0}
+              maxValue={dbCurrencyToUserCurrency(Math.abs(transaction.amount), configuration.minorUnit)}
+            >
+              <NumberFieldGroup>
+                <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
+                <NumberFieldInput />
+                <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
+              </NumberFieldGroup>
+            </NumberField>
+            <input type="submit" hidden />
+          </Form>
+        </DrawerBody>
 
-          <ModalFooter>
-            <Button color="primary" onPress={onSubmit} isLoading={isRefunding}>
-              {t('actions.refund')}
-            </Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
+        <DrawerFooter>
+          <Button variant="primary" onPress={onSubmit} isPending={isRefunding}>
+            {t('actions.refund')}
+          </Button>
+        </DrawerFooter>
+      </StandardDrawer>
     </>
   );
 }

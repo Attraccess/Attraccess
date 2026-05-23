@@ -1,18 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Button,
+  TextField,
+  FieldError,
   Input,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  Select,
-  SelectItem,
-  Selection,
-  Switch,
-  Textarea,
+  DrawerBody,
+  DrawerFooter,
+  DrawerHeader,
+  TextArea,
 } from '@heroui/react';
+import { StandardDrawer } from '../../../../components/standardDrawer';
+import { Select } from '../../../../components/select';
+import { LabeledSwitch } from '../../../../components/labeledSwitch';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { FormFieldType, FormResponseDto, FormSubmissionRequestDto } from '@attraccess/react-query-client';
 import {
@@ -129,58 +128,59 @@ export function ResourceFormsModal({ isOpen, action, forms, onSubmit, onCancel }
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onCancel} size="lg" scrollBehavior="inside">
-      <ModalContent>
-        <>
-          <ModalHeader className="flex flex-col gap-1">
-            <span>{modalTitle}</span>
-            <span className="text-sm text-default-500">{t('modal.description')}</span>
-          </ModalHeader>
-          <ModalBody>
-            {forms.map((form) => (
-              <div key={form.id} className="space-y-4 rounded-lg border border-default-200 p-4">
-                <p className="font-semibold text-default-600">{t('modal.formHeading', { name: form.name })}</p>
-                {form.fields.map((field) => {
-                  const rawOptions = field.options as Record<string, unknown> | null | undefined;
-                  const parsedOptions = parseFieldOptions(field.type, rawOptions ?? null);
-                  const selectOptions =
-                    field.type === FormFieldType.SELECT ? extractSelectOptions(field.options) : null;
+    <StandardDrawer
+      isOpen={isOpen}
+      onOpenChange={(open) => {
+        if (!open) onCancel();
+      }}
+    >
+      <DrawerHeader className="flex flex-col gap-1">
+        <span>{modalTitle}</span>
+        <span className="text-sm text-default-500">{t('modal.description')}</span>
+      </DrawerHeader>
+      <DrawerBody>
+        {forms.map((form) => (
+          <div key={form.id} className="space-y-4 rounded-lg border border-default-200 p-4">
+            <p className="font-semibold text-default-600">{t('modal.formHeading', { name: form.name })}</p>
+            {form.fields.map((field) => {
+              const rawOptions = field.options as Record<string, unknown> | null | undefined;
+              const parsedOptions = parseFieldOptions(field.type, rawOptions ?? null);
+              const selectOptions =
+                field.type === FormFieldType.SELECT ? extractSelectOptions(field.options) : null;
 
-                  return (
-                    <div key={field.id} className="space-y-2">
-                      <div>
-                        <p className="text-sm font-medium text-default-600">
-                          {field.name}
-                          {field.isRequired && <span className="text-danger-500 ml-1">*</span>}
-                        </p>
-                        {field.description && <p className="text-xs text-default-400">{field.description}</p>}
-                      </div>
-                      {renderFieldInput(
-                        field,
-                        parsedOptions,
-                        selectOptions ?? undefined,
-                        values[field.id],
-                        (value) => handleValueChange(field.id, value),
-                        errors[field.id],
-                        t,
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            ))}
-          </ModalBody>
-          <ModalFooter>
-            <Button variant="light" onPress={onCancel}>
-              {t('modal.cancel')}
-            </Button>
-            <Button color="primary" onPress={handleSubmit}>
-              {t('modal.submit')}
-            </Button>
-          </ModalFooter>
-        </>
-      </ModalContent>
-    </Modal>
+              return (
+                <div key={field.id} className="space-y-2">
+                  <div>
+                    <p className="text-sm font-medium text-default-600">
+                      {field.name}
+                      {field.isRequired && <span className="text-danger-500 ml-1">*</span>}
+                    </p>
+                    {field.description && <p className="text-xs text-default-400">{field.description}</p>}
+                  </div>
+                  {renderFieldInput(
+                    field,
+                    parsedOptions,
+                    selectOptions ?? undefined,
+                    values[field.id],
+                    (value) => handleValueChange(field.id, value),
+                    errors[field.id],
+                    t,
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </DrawerBody>
+      <DrawerFooter>
+        <Button variant="ghost" onPress={onCancel}>
+          {t('modal.cancel')}
+        </Button>
+        <Button variant="primary" onPress={handleSubmit}>
+          {t('modal.submit')}
+        </Button>
+      </DrawerFooter>
+    </StandardDrawer>
   );
 }
 
@@ -204,12 +204,14 @@ function renderFieldInput(
       return renderSelectInput(selectOptions ?? [], value, onChange, error, t, field.name);
     default:
       return (
-        <Input
+        <TextField
           value={(value as string) ?? ''}
-          onChange={(event) => onChange(event.target.value)}
+          onChange={onChange as (v: string) => void}
           isInvalid={Boolean(error)}
-          errorMessage={error ?? undefined}
-        />
+        >
+          <Input />
+          {error && <FieldError>{error}</FieldError>}
+        </TextField>
       );
   }
 }
@@ -270,24 +272,20 @@ function renderTextInput(
 ) {
   if (options.multiline) {
     return (
-      <Textarea
+      <TextArea
         value={(value as string) ?? ''}
         placeholder={options.placeholder ?? ''}
-        onChange={(event) => onChange(event.target.value)}
-        isInvalid={Boolean(error)}
-        errorMessage={error ?? undefined}
+        onChange={(e) => onChange(e.target.value)}
+        aria-invalid={Boolean(error)}
       />
     );
   }
 
   return (
-    <Input
-      value={(value as string) ?? ''}
-      placeholder={options.placeholder ?? ''}
-      onChange={(event) => onChange(event.target.value)}
-      isInvalid={Boolean(error)}
-      errorMessage={error ?? undefined}
-    />
+    <TextField value={(value as string) ?? ''} onChange={onChange as (v: string) => void} isInvalid={Boolean(error)}>
+      <Input placeholder={options.placeholder ?? ''} />
+      {error && <FieldError>{error}</FieldError>}
+    </TextField>
   );
 }
 
@@ -302,16 +300,10 @@ function renderNumberInput(
   const step = typeof options.step === 'number' ? options.step : undefined;
 
   return (
-    <Input
-      type="number"
-      min={min}
-      max={max}
-      step={step}
-      value={(value as string) ?? ''}
-      onChange={(event) => onChange(event.target.value)}
-      isInvalid={Boolean(error)}
-      errorMessage={error ?? undefined}
-    />
+    <TextField value={(value as string) ?? ''} onChange={onChange as (v: string) => void} isInvalid={Boolean(error)}>
+      <Input type="number" min={min} max={max} step={step} />
+      {error && <FieldError>{error}</FieldError>}
+    </TextField>
   );
 }
 
@@ -327,11 +319,11 @@ function renderBooleanInput(
     <div className="space-y-1">
       <div className="flex items-center gap-3">
         <span className="text-xs text-default-500">{t('modal.booleanNo')}</span>
-        <Switch
+        <LabeledSwitch
           isSelected={isChecked}
-          onValueChange={(checked) => onChange(checked)}
-          color={error ? 'danger' : 'primary'}
+          onChange={(checked) => onChange(checked)}
           aria-label={t('modal.booleanLabel')}
+          className={error ? 'text-danger' : undefined}
         />
         <span className="text-xs text-default-500">{t('modal.booleanYes')}</span>
       </div>
@@ -348,29 +340,17 @@ function renderSelectInput(
   t: (key: string) => string,
   fieldName: string,
 ) {
-  const selected = typeof value === 'string' && options.includes(value) ? new Set([value]) : new Set<string>();
-  const handleSelectionChange = (keys: Selection) => {
-    if (keys === 'all') {
-      return;
-    }
-    const first = keys.values().next().value as string | undefined;
-    onChange(first ?? '');
-  };
+  const selectedKey = typeof value === 'string' && options.includes(value) ? value : '';
 
   return (
     <Select
-      selectedKeys={selected}
-      onSelectionChange={handleSelectionChange}
       placeholder={options.length ? t('modal.selectPlaceholder') : t('modal.selectUnavailable')}
       isDisabled={!options.length}
-      isInvalid={Boolean(error)}
-      errorMessage={error ?? undefined}
       aria-label={fieldName}
-    >
-      {options.map((option) => (
-        <SelectItem key={option}>{option}</SelectItem>
-      ))}
-    </Select>
+      value={selectedKey}
+      onChange={(key) => onChange(key ?? '')}
+      items={options.map((option) => ({ key: option, label: option }))}
+    />
   );
 }
 

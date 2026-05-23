@@ -3,18 +3,18 @@ import { User } from '@attraccess/react-query-client';
 import {
   Button,
   ButtonProps,
-  Pagination,
   Table,
   TableBody,
   TableCell,
   TableColumn,
+  TableContent,
   TableHeader,
   TableProps,
   TableRow,
 } from '@heroui/react';
 import { ReactNode, useCallback, useMemo, useState } from 'react';
+import { SimplePagination } from '../simplePagination';
 import { PlusIcon } from 'lucide-react';
-import { TableDataLoadingIndicator } from '../tableComponents';
 import { EmptyState } from '../emptyState';
 
 import de from './de.json';
@@ -23,6 +23,7 @@ import en from './en.json';
 export interface Action<TUser> extends Omit<ButtonProps, 'onClick' | 'children' | 'key'> {
   key: string;
   label?: string;
+  startContent?: ReactNode;
   onClick: (user: TUser) => void;
 }
 
@@ -40,7 +41,7 @@ interface Props<TUser> {
   onAddToSelection: (user: User) => void;
   addToSelectionIsLoading?: boolean;
   actions?: Action<TUser>[] | ((user: TUser) => Action<TUser>[]);
-  tableProps?: Omit<TableProps, 'bottomContent' | 'children'>;
+  tableProps?: Omit<TableProps, 'children'>;
   additionalColumns?: Column<TUser>[];
   rowClassName?: string | ((user: TUser) => string | undefined);
 }
@@ -48,7 +49,6 @@ interface Props<TUser> {
 export function UserSelectionList<TUser extends User = User>(props: Readonly<Props<TUser>>) {
   const {
     selectedUsers,
-    selectedUserIsLoading,
     onAddToSelection,
     addToSelectionIsLoading,
     actions,
@@ -107,38 +107,22 @@ export function UserSelectionList<TUser extends User = User>(props: Readonly<Pro
         autocompleteProps={{ size: 'sm' }}
         afterSelection={
           userSearchSelection && (
-            <Button
+            <Button variant="primary"
               onPress={onAddUser}
-              color="primary"
-              isLoading={addToSelectionIsLoading}
+              isPending={addToSelectionIsLoading}
               isIconOnly
-              startContent={<PlusIcon className="w-4 h-4" />}
-            />
+            ><PlusIcon className="w-4 h-4" /></Button>
           )
         }
       />
 
-      <Table
-        {...tableProps}
-        aria-label={t('table.ariaLabel')}
-        bottomContent={
-          selectedUsers && (
-            <Pagination
-              aria-label={t('table.pagination.label')}
-              isCompact
-              showControls
-              page={page}
-              total={totalPages}
-              onChange={(page) => setPage(page)}
-            />
-          )
-        }
-      >
+      <Table {...tableProps}>
+        <TableContent aria-label={t('table.ariaLabel')}>
         <TableHeader>
-          <TableColumn>{t('selectedUsers.columns.user')}</TableColumn>
+          <TableColumn isRowHeader>{t('selectedUsers.columns.user')}</TableColumn>
           {
             (additionalColumns ?? []).map((col) => (
-              <TableColumn className={col.headerClassName} key={col.key}>
+              <TableColumn className={col.headerClassName} key={col.key} id={col.key}>
                 {col.label}
               </TableColumn>
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -148,12 +132,10 @@ export function UserSelectionList<TUser extends User = User>(props: Readonly<Pro
         </TableHeader>
         <TableBody
           items={currentPage}
-          loadingState={selectedUserIsLoading ? 'loading' : 'idle'}
-          loadingContent={<TableDataLoadingIndicator />}
-          emptyContent={<EmptyState />}
+          renderEmptyState={() => <EmptyState />}
         >
           {(user) => (
-            <TableRow key={user.id} className={typeof rowClassName === 'function' ? rowClassName(user) : rowClassName}>
+            <TableRow key={user.id} id={user.id} className={typeof rowClassName === 'function' ? rowClassName(user) : rowClassName}>
               <TableCell className="w-full">
                 <AttraccessUser user={user} />
               </TableCell>
@@ -171,12 +153,12 @@ export function UserSelectionList<TUser extends User = User>(props: Readonly<Pro
                 <div className="flex gap-4 flex-row flex-wrap md:flex-nowrap">
                   {parseActions(user).map((action) => (
                     <Button
-                      {...{ ...action, label: undefined, onClick: undefined }}
+                      {...{ ...action, label: undefined, onClick: undefined, startContent: undefined }}
                       key={action.key}
                       onPress={() => action.onClick(user)}
                       className="flex"
                     >
-                      {action.label}
+                      {action.startContent}{action.label}
                     </Button>
                   ))}
                 </div>
@@ -184,7 +166,17 @@ export function UserSelectionList<TUser extends User = User>(props: Readonly<Pro
             </TableRow>
           )}
         </TableBody>
+        </TableContent>
       </Table>
+      {selectedUsers && totalPages > 1 && (
+        <SimplePagination
+          aria-label={t('table.pagination.label')}
+          showControls
+          page={page}
+          total={totalPages}
+          onChange={setPage}
+        />
+      )}
     </div>
   );
 }

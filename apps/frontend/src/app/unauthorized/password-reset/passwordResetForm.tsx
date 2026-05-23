@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { Button } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -6,7 +6,7 @@ import en from './en.json';
 import de from './de.json';
 import { useUsersServiceRequestPasswordReset } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../components/toastProvider';
-import { Input } from '@heroui/react';
+import { TextField, Label, Input } from '@heroui/react';
 
 interface PasswordResetFormProps {
   onGoBack: () => void;
@@ -37,46 +37,36 @@ export function PasswordResetForm({ onGoBack }: PasswordResetFormProps) {
     },
   });
 
-  const memoizedArrowRight = useMemo(
-    () => <ArrowRight className="group-hover:translate-x-1 transition-transform" />,
-    [],
-  );
+  const arrowRight = <ArrowRight className="group-hover:translate-x-1 transition-transform" />;
 
   return (
     <>
       <div>
         <h2 className="text-3xl font-bold">{t('title')}</h2>
         <p className="mt-2 text-gray-600 dark:text-gray-300">
-          <Button
+          <Button variant="secondary"
             onPress={onGoBack}
-            variant="light"
-            color="secondary"
-            startContent={<ArrowLeft />}
             data-cy="password-reset-form-go-back-button"
-          >
+          ><ArrowLeft />
             {t('goBackButton')}
           </Button>
         </p>
       </div>
 
-      <Input
-        label={t('emailLabel')}
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        data-cy="password-reset-form-email-input"
-      />
+      <TextField value={email} onChange={setEmail}>
+        <Label>{t('emailLabel')}</Label>
+        <Input data-cy="password-reset-form-email-input" />
+      </TextField>
 
-      <Button
+      <Button variant="primary"
         onPress={() => requestPasswordReset({ requestBody: { email } })}
-        fullWidth
-        color="primary"
-        endContent={memoizedArrowRight}
-        isLoading={isPending}
+        className="w-full"
+        isPending={isPending}
         isDisabled={isPending}
         data-cy="password-reset-form-submit-button"
       >
         {t('mainButton')}
-      </Button>
+      {arrowRight}</Button>
     </>
   );
 }

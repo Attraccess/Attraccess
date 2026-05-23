@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Card, CardBody, CardHeader, Chip, Input, Spinner } from '@heroui/react';
+import { Button, Card, Chip, Input, Label, Spinner, TextField } from '@heroui/react';
 import { CheckIcon, EyeIcon, EyeOffIcon, XIcon } from 'lucide-react';
 import type { PolicyError } from '@attraccess/shared';
 import {
@@ -81,32 +81,25 @@ export function PreviewSection({ policy }: Props) {
 
   return (
     <Card>
-      <CardHeader className="flex flex-col items-start gap-1">
+      <Card.Header className="flex flex-col items-start gap-1">
         <span className="text-base font-semibold">{t('preview.title')}</span>
         <span className="text-sm text-default-500">{t('preview.subtitle')}</span>
-      </CardHeader>
-      <CardBody className="flex flex-col gap-4">
-        <Input
-          label={t('preview.passwordLabel')}
-          value={candidate}
-          onValueChange={setCandidate}
-          variant="bordered"
-          type={reveal ? 'text' : 'password'}
-          autoComplete="new-password"
-          data-testid="policy-preview-input"
-          endContent={
-            <Button
-              isIconOnly
-              size="sm"
-              variant="light"
-              aria-label={reveal ? t('preview.hide') : t('preview.reveal')}
-              onPress={() => setReveal((v) => !v)}
-              data-testid="policy-preview-reveal"
-            >
-              {reveal ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}
-            </Button>
-          }
-        />
+      </Card.Header>
+      <Card.Content className="flex flex-col gap-4">
+        <TextField value={candidate} onChange={setCandidate} data-testid="policy-preview-input">
+          <Label>{t('preview.passwordLabel')}</Label>
+          <Input type={reveal ? 'text' : 'password'} autoComplete="new-password" />
+          <Button
+            isIconOnly
+            size="sm"
+            variant="ghost"
+            aria-label={reveal ? t('preview.hide') : t('preview.reveal')}
+            onPress={() => setReveal((v) => !v)}
+            data-testid="policy-preview-reveal"
+          >
+            {reveal ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}
+          </Button>
+        </TextField>
         {candidate.length > 0 && (
           <div className="flex flex-col gap-2" data-testid="policy-preview-result">
             {loading && !result ? (
@@ -115,11 +108,8 @@ export function PreviewSection({ policy }: Props) {
               </div>
             ) : result ? (
               <>
-                <Chip
-                  color={result.ok ? 'success' : 'danger'}
-                  startContent={result.ok ? <CheckIcon size={14} /> : <XIcon size={14} />}
-                  variant="flat"
-                >
+                <Chip color={result.ok ? 'success' : 'danger'} variant="soft">
+                  {result.ok ? <CheckIcon size={14} /> : <XIcon size={14} />}
                   {result.ok ? t('preview.pass') : t('preview.fail')}
                 </Chip>
                 {result.errors.length === 0 ? (
@@ -136,7 +126,7 @@ export function PreviewSection({ policy }: Props) {
             ) : null}
           </div>
         )}
-      </CardBody>
+      </Card.Content>
     </Card>
   );
 }

@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Button, Card, CardBody, CardHeader, Chip, Skeleton } from '@heroui/react';
+import { Button, Card, Chip, Skeleton } from '@heroui/react';
 import {
   ApiError,
   ProjectsServiceRemoveProjectMemberMutationResult,
@@ -81,16 +81,14 @@ export function TeamMembersCard(props: Readonly<TeamMembersCardProps>) {
       >
         <AttraccessUser user={member.user} />
         <div className="flex items-center gap-2">
-          <Chip size="sm" variant="flat">
+          <Chip variant="soft">
             {t(`roles.${member.role}` as const)}
           </Chip>
-          <Button
-            color="danger"
-            size="sm"
-            variant="light"
+          <Button variant="danger-soft"
+
             isIconOnly
             aria-label={t('actions.remove')}
-            isLoading={removingMemberId === member.id}
+            isPending={removingMemberId === member.id}
             onPress={async () => {
               setRemovingMemberId(member.id);
               await removeMember({ id: projectId, memberId: member.id });
@@ -109,18 +107,18 @@ export function TeamMembersCard(props: Readonly<TeamMembersCardProps>) {
 
   return (
     <Card>
-      <CardHeader>
+      <Card.Header>
         <p className="text-large font-semibold">{t('sections.members.title')}</p>
-      </CardHeader>
-      <CardBody className="space-y-4">
+      </Card.Header>
+      <Card.Content className="space-y-4">
         <div className="flex items-center justify-between gap-4 rounded-medium border border-default-200 p-3">
           {data?.owner ? <AttraccessUser user={data.owner} /> : <Skeleton className="h-10 w-full" />}
-          <Chip size="sm" color="primary" variant="flat">
+          <Chip color="accent" variant="soft">
             {t('owner')}
           </Chip>
         </div>
         <div className="space-y-3">{memberRows}</div>
-      </CardBody>
+      </Card.Content>
     </Card>
   );
 }

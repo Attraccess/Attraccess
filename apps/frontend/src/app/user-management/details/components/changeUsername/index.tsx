@@ -5,7 +5,7 @@ import {
   useUsersServiceGetOneUserById,
   useUsersServiceGetOneUserByIdKey,
 } from '@attraccess/react-query-client';
-import { Button, cn, Input } from '@heroui/react';
+import { Button, cn, TextField, Label, Input } from '@heroui/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { HTMLAttributes, useCallback, useEffect, useState } from 'react';
 
@@ -78,9 +78,12 @@ export function ChangeUsernameForm({ userId, ...divProps }: Props & Omit<HTMLAtt
 
   return (
     <div {...divProps} className={cn(divProps.className, 'flex flex-col gap-4')}>
-      <Input label={t('username.label')} value={username} onValueChange={setUsername} isDisabled={isLoadingUser} />
+      <TextField value={username} onChange={setUsername} isDisabled={isLoadingUser}>
+        <Label>{t('username.label')}</Label>
+        <Input />
+      </TextField>
       <div className="flex w-full justify-end">
-        <Button isLoading={isPending} onPress={onSubmit} color="primary">
+        <Button variant="primary" isPending={isPending} onPress={onSubmit}>
           {t('actions.save')}
         </Button>
       </div>

@@ -15,7 +15,8 @@ import de from './de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../global-translations/api-errors.en.json';
 import API_ERROR_TRANSLATIONS_DE from '../../global-translations/api-errors.de.json';
 import { PageHeader } from '../../components/pageHeader';
-import { Button, Card, CardBody, CardHeader, Chip, Skeleton, Switch } from '@heroui/react';
+import { Button, Card, Chip, Skeleton } from '@heroui/react';
+import { LabeledSwitch } from '../../components/labeledSwitch';
 import { FolderIcon, PlusIcon } from 'lucide-react';
 import { UpsertProjectModal } from './upsertModal';
 import { EmptyState } from '../../components/emptyState';
@@ -160,25 +161,22 @@ export function ProjectsListPage() {
               {t('invitations.invitedBy', { username: invitation.inviter?.username ?? '—' })}
             </p>
           </div>
-          <Chip size="sm" variant="flat">
+          <Chip variant="soft">
             {t(`invitations.roles.${invitation.requestedRole}` as const)}
           </Chip>
         </div>
         <div className="text-tiny text-default-400">{new Date(invitation.createdAt).toLocaleString()}</div>
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <Button
-            color="primary"
-            size="sm"
-            isLoading={acceptingInvitationId === invitation.id}
+          <Button variant="primary"
+
+            isPending={acceptingInvitationId === invitation.id}
             onPress={() => handleAccept(invitation.id)}
           >
             {t('invitations.actions.accept')}
           </Button>
-          <Button
-            variant="light"
-            color="danger"
-            size="sm"
-            isLoading={decliningInvitationId === invitation.id}
+          <Button variant="danger-soft"
+
+            isPending={decliningInvitationId === invitation.id}
             onPress={() => handleDecline(invitation.id)}
           >
             {t('invitations.actions.decline')}
@@ -204,29 +202,34 @@ export function ProjectsListPage() {
         title={t('title')}
         subtitle={t('subtitle')}
         icon={<FolderIcon />}
-        actions={
-          <div className="flex flex-wrap items-center gap-3">
-            <Switch isSelected={includeArchived} onValueChange={setIncludeArchived}>
-              {t('filters.includeArchived')}
-            </Switch>
-            <UpsertProjectModal>
-              {(onOpen) => (
-                <Button onPress={onOpen} startContent={<PlusIcon size="24" />} variant="light">
-                  {t('actions.create')}
-                </Button>
-              )}
-            </UpsertProjectModal>
-          </div>
-        }
+        actions={[
+          {
+            key: 'create',
+            label: t('actions.create'),
+            icon: <PlusIcon size={18} />,
+            variant: 'primary',
+            renderTrigger: (triggerProps) => (
+              <UpsertProjectModal>
+                {(onOpen) => <Button {...triggerProps} onPress={onOpen} />}
+              </UpsertProjectModal>
+            ),
+          },
+        ]}
       />
+
+      <div className="flex flex-wrap items-center justify-end gap-3 mb-4">
+        <LabeledSwitch isSelected={includeArchived} onChange={setIncludeArchived}>
+          {t('filters.includeArchived')}
+        </LabeledSwitch>
+      </div>
 
       {(isLoadingInvitations || hasInvitations) && (
         <Card className="mb-6">
-          <CardHeader className="flex flex-col items-start gap-1">
+          <Card.Header className="flex flex-col items-start gap-1">
             <p className="text-large font-semibold">{t('invitations.title')}</p>
             <p className="text-small text-default-500">{t('invitations.description')}</p>
-          </CardHeader>
-          <CardBody className="space-y-3">{invitationContent}</CardBody>
+          </Card.Header>
+          <Card.Content className="space-y-3">{invitationContent}</Card.Content>
         </Card>
       )}
 

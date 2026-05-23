@@ -1,22 +1,26 @@
 import { useEmailTemplatesServiceEmailTemplateControllerFindAll } from '@attraccess/react-query-client';
-import { Table, TableHeader, TableColumn, TableBody, TableRow, TableCell, Button } from '@heroui/react';
-import { Edit3, Mail } from 'lucide-react'; // Mail for PageHeader icon
+import { Table, TableContent, TableHeader, TableColumn, TableBody, TableRow, TableCell, Button } from '@heroui/react';
+import { Edit3, Mail } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../../components/pageHeader'; // Assuming PageHeader exists
-import { Link } from 'react-router-dom'; // For edit button link
-import { TableDataLoadingIndicator } from '../../components/tableComponents';
 import { EmptyState } from '../../components/emptyState';
-import { useReactQueryStatusToHeroUiTableLoadingState } from '../../hooks/useReactQueryStatusToHeroUiTableLoadingState';
 
 import en from './en.json';
 import de from './de.json';
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 
 export function EmailTemplatesPage() {
   const { t } = useTranslations({ en, de });
-  const { data: emailTemplates, status: fetchStatus } = useEmailTemplatesServiceEmailTemplateControllerFindAll();
+  const navigate = useNavigate();
+  const { data: emailTemplates } = useEmailTemplatesServiceEmailTemplateControllerFindAll();
 
-  const loadingState = useReactQueryStatusToHeroUiTableLoadingState(fetchStatus);
+  const openEditor = useCallback(
+    (type: string) => {
+      navigate(`/email-templates/${type}`);
+    },
+    [navigate],
+  );
 
   const tableItems = useMemo(() => {
     return (emailTemplates ?? []).map((item) => ({
@@ -25,42 +29,46 @@ export function EmailTemplatesPage() {
       subject: item.subject,
       actions: (
         <Button
-          as={Link}
-          to={`/email-templates/${item.type}`}
-          variant="light"
-          color="primary"
+          variant="ghost"
           isIconOnly
           aria-label={t('editButton')}
-          startContent={<Edit3 size={18} />}
-        />
+          onPress={() => openEditor(item.type)}
+        >
+          <Edit3 size={18} />
+        </Button>
       ),
     }));
-  }, [emailTemplates, t]);
+  }, [emailTemplates, t, openEditor]);
 
   return (
     <>
       <PageHeader title={t('title')} subtitle={t('subtitle')} icon={<Mail className="w-6 h-6" />} />
 
-      <Table aria-label="Email templates table">
-        <TableHeader>
-          <TableColumn>{t('columns.type')}</TableColumn>
+      <Table>
+        <TableContent aria-label="Email templates table">
+          <TableHeader>
+          <TableColumn isRowHeader>{t('columns.type')}</TableColumn>
           <TableColumn>{t('columns.subject')}</TableColumn>
           <TableColumn>{t('columns.actions')}</TableColumn>
         </TableHeader>
         <TableBody
           items={tableItems}
-          loadingState={loadingState}
-          loadingContent={<TableDataLoadingIndicator />}
-          emptyContent={<EmptyState />}
+          renderEmptyState={() => <EmptyState />}
         >
           {(item) => (
-            <TableRow key={item.key}>
+            <TableRow
+              key={item.key}
+              id={item.key}
+              className="cursor-pointer hover:bg-primary-50 transition-colors duration-300"
+              onAction={() => openEditor(item.key)}
+            >
               <TableCell>{item.type}</TableCell>
               <TableCell>{item.subject}</TableCell>
               <TableCell>{item.actions}</TableCell>
             </TableRow>
           )}
         </TableBody>
+        </TableContent>
       </Table>
     </>
   );

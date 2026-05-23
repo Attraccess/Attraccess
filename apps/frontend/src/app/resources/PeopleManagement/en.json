@@ -1,0 +1,82 @@
+{
+  "title": "People & Permissions",
+  "subtitle": "Manage introducers and introductions for this resource",
+  "addPerson": "Add person",
+  "addOptions": {
+    "introducer": "Appoint as introducer",
+    "introduction": "Grant introduction"
+  },
+  "filters": {
+    "all": "All",
+    "introducers": "Only introducers",
+    "introduced": "Only introduced"
+  },
+  "columns": {
+    "name": "Name",
+    "introducer": "Introducer",
+    "introduced": "Introduced",
+    "actions": "Actions"
+  },
+  "value": {
+    "yes": "Yes",
+    "no": "—"
+  },
+  "rowActions": {
+    "history": "View history",
+    "revokeIntroducer": "Revoke introducer status",
+    "revokeIntroduction": "Revoke introduction",
+    "grantIntroduction": "Re-grant introduction"
+  },
+  "addModal": {
+    "title": {
+      "introducer": "Appoint introducer",
+      "introduction": "Grant introduction"
+    },
+    "userLabel": "User",
+    "commentLabel": "Comment (optional)",
+    "submit": "Confirm",
+    "cancel": "Cancel"
+  },
+  "commentModal": {
+    "title": "Add comment",
+    "submit": "Submit",
+    "cancel": "Cancel"
+  },
+  "emptyState": "No introducers or introductions yet",
+  "loadError": "Failed to load data",
+  "loadErrorDescription": "Please try again later.",
+  "toasts": {
+    "introducerGranted": {
+      "title": "Introducer added",
+      "description": "The user has been granted introducer privileges."
+    },
+    "introducerGrantFailed": {
+      "title": "Failed to add introducer",
+      "description": "{{error}}"
+    },
+    "introducerRevoked": {
+      "title": "Introducer removed",
+      "description": "Introducer privileges have been revoked."
+    },
+    "introducerRevokeFailed": {
+      "title": "Failed to remove introducer",
+      "description": "{{error}}"
+    },
+    "introductionGranted": {
+      "title": "Introduction granted",
+      "description": "The introduction has been granted."
+    },
+    "introductionGrantFailed": {
+      "title": "Failed to grant introduction",
+      "description": "{{error}}"
+    },
+    "introductionRevoked": {
+      "title": "Introduction revoked",
+      "description": "The introduction has been revoked."
+    },
+    "introductionRevokeFailed": {
+      "title": "Failed to revoke introduction",
+      "description": "{{error}}"
+    }
+  }
+}

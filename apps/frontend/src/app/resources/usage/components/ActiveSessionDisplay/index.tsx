@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
-import { Button, ButtonGroup, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from '@heroui/react';
+import { Button, ButtonGroup, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, DropdownPopover } from '@heroui/react';
+import { buttonVariants } from '@heroui/styles';
 import { StopCircle, ChevronDownIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../../../components/toastProvider';
@@ -127,29 +128,27 @@ export function ActiveSessionDisplay({ resourceId, startTime }: ActiveSessionDis
 
         <FlowButtons resourceId={resourceId} />
 
-        <ButtonGroup fullWidth color="danger">
+        <ButtonGroup className="w-full">
           <Button
-            isLoading={endSession.isPending}
-            startContent={<StopCircle className="w-4 h-4" />}
+            isPending={endSession.isPending}
             onPress={immediatelyEndSession}
-          >
+          ><StopCircle className="w-4 h-4" />
             {t('endSession')}
           </Button>
-          <Dropdown placement="bottom-end">
-            <DropdownTrigger>
-              <Button isIconOnly>
-                <ChevronDownIcon />
-              </Button>
+          <Dropdown>
+            <DropdownTrigger className={buttonVariants({ isIconOnly: true })}>
+              <ChevronDownIcon />
             </DropdownTrigger>
-            <DropdownMenu disallowEmptySelection aria-label={t('alternativeEndSessionOptionsMenu.label')}>
-              <DropdownItem
-                key="endWithNotes"
-                description={t('alternativeEndSessionOptionsMenu.endWithNotes.description')}
-                onPress={handleOpenEndSessionModal}
-              >
-                {t('alternativeEndSessionOptionsMenu.endWithNotes.label')}
-              </DropdownItem>
-            </DropdownMenu>
+            <DropdownPopover>
+              <DropdownMenu aria-label={t('alternativeEndSessionOptionsMenu.label')}>
+                <DropdownItem
+                  key="endWithNotes" id="endWithNotes"
+                  onPress={handleOpenEndSessionModal}
+                >
+                  {t('alternativeEndSessionOptionsMenu.endWithNotes.label')}
+                </DropdownItem>
+              </DropdownMenu>
+            </DropdownPopover>
           </Dropdown>
         </ButtonGroup>
       </div>

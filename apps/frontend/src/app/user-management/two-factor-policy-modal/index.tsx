@@ -7,20 +7,19 @@ import {
 } from '@attraccess/react-query-client';
 import {
   Alert,
+  AlertContent,
+  AlertDescription,
+  AlertTitle,
   Button,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  Select,
-  SelectItem,
-  Selection,
-  useDisclosure,
+  DrawerBody,
+  DrawerFooter,
+  DrawerHeader,
+  useOverlayState,
 } from '@heroui/react';
+import { StandardDrawer } from '../../../components/standardDrawer';
+import { Select } from '../../../components/select';
 import { Settings2Icon } from 'lucide-react';
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
-import { PageHeader } from '../../../components/pageHeader';
 import { useToastMessage } from '../../../components/toastProvider';
 import API_ERROR_TRANSLATIONS_DE from '../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../global-translations/api-errors.en.json';
@@ -32,7 +31,7 @@ interface Props {
 }
 
 export function TwoFactorPolicyModal(props: Props) {
-  const { isOpen, onOpen, onOpenChange, onClose } = useDisclosure();
+  const { isOpen, open, setOpen, close } = useOverlayState();
   const { t, tExists } = useTranslations({
     de: {
       ...de,
@@ -83,20 +82,13 @@ export function TwoFactorPolicyModal(props: Props) {
     [policyOptions, selectedPolicy],
   );
 
-  const onSelectionChange = useCallback((keys: Selection) => {
-    const [value] = Array.from(keys as Set<string>);
-    if (value) {
-      setSelectedPolicy(value as TwoFactorPolicy);
-    }
-  }, []);
-
   const { mutate: savePolicy, isPending: isSaving } = useTwoFactorAuthenticationServiceSetTwoFactorPolicy({
     onSuccess: () => {
       toast.success({
         title: t('actions.save.success.title'),
         description: t('actions.save.success.description'),
       });
-      onClose();
+      close();
     },
     onError: (error) => {
       toast.apiError({
@@ -117,39 +109,48 @@ export function TwoFactorPolicyModal(props: Props) {
 
   return (
     <>
-      {props.children(onOpen)}
-      <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
-        <ModalContent>
-          <ModalHeader>
-            <PageHeader title={t('title')} subtitle={t('subtitle')} icon={<Settings2Icon />} noMargin={true} />
-          </ModalHeader>
-          <ModalBody>
-            <Alert color="warning" variant="flat" title={t('warning.title')} description={t('warning.description')} />
-            <Select
-              label={t('inputs.policy.label')}
-              selectedKeys={selectedPolicy ? new Set([selectedPolicy]) : new Set([])}
-              onSelectionChange={onSelectionChange}
-              disallowEmptySelection
-              isDisabled={isLoading}
-            >
-              {policyOptions.map((option) => (
-                <SelectItem key={option.value} textValue={option.label}>
-                  <div className="flex flex-col gap-1">
-                    <span>{option.label}</span>
-                    <span className="text-xs text-default-500">{option.description}</span>
-                  </div>
-                </SelectItem>
-              ))}
-            </Select>
-            {selectedOption && <div className="text-sm text-default-500">{selectedOption.description}</div>}
-          </ModalBody>
-          <ModalFooter>
-            <Button onPress={onSave} isLoading={isSaving} color="primary" isDisabled={!selectedPolicy}>
-              {t('actions.save.label')}
-            </Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
+      {props.children(open)}
+      <StandardDrawer isOpen={isOpen} onOpenChange={setOpen}>
+        <DrawerHeader>
+          <div className="flex items-center gap-2">
+            <Settings2Icon className="w-5 h-5" />
+            <h2 className="text-lg font-semibold">{t('title')}</h2>
+          </div>
+          <p className="text-sm text-muted">{t('subtitle')}</p>
+        </DrawerHeader>
+        <DrawerBody className="flex flex-col gap-4">
+          <Alert status="warning">
+            <AlertContent>
+              <AlertTitle>{t('warning.title')}</AlertTitle>
+              <AlertDescription>{t('warning.description')}</AlertDescription>
+            </AlertContent>
+          </Alert>
+          <Select
+            label={t('inputs.policy.label')}
+            isDisabled={isLoading}
+            value={selectedPolicy ?? undefined}
+            onChange={(key) => {
+              if (key) setSelectedPolicy(key as TwoFactorPolicy);
+            }}
+            items={policyOptions.map((option) => ({
+              key: option.value,
+              textValue: option.label,
+              label: (
+                <div className="flex flex-col gap-1">
+                  <span>{option.label}</span>
+                  <span className="text-xs text-default-500">{option.description}</span>
+                </div>
+              ),
+            }))}
+          />
+          {selectedOption && <div className="text-sm text-default-500">{selectedOption.description}</div>}
+        </DrawerBody>
+        <DrawerFooter>
+          <Button variant="primary" onPress={onSave} isPending={isSaving} isDisabled={!selectedPolicy}>
+            {t('actions.save.label')}
+          </Button>
+        </DrawerFooter>
+      </StandardDrawer>
     </>
   );
 }

@@ -1,11 +1,12 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useOverlayState } from '@heroui/react';
 import de from './de.json';
 import en from './en.json';
 import {
   useBillingServiceGetSumUpReadersKey,
   useBillingServiceRemoveSumUpReader,
 } from '@attraccess/react-query-client';
-import { useDisclosure } from '@heroui/react';
+
 import { useToastMessage } from '../../../../../../components/toastProvider';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
@@ -35,11 +36,11 @@ export function SumUpReaderDeleteModal(props: Props) {
   const toast = useToastMessage();
   const queryClient = useQueryClient();
 
-  const { onOpen, onClose, isOpen } = useDisclosure();
+  const { open, close, isOpen } = useOverlayState();
   const { mutate: removeReader, isPending: isRemovingReader } = useBillingServiceRemoveSumUpReader({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [useBillingServiceGetSumUpReadersKey] });
-      onClose();
+      close();
     },
     onError: (error: Error) => {
       toast.apiError({
@@ -57,10 +58,10 @@ export function SumUpReaderDeleteModal(props: Props) {
 
   return (
     <>
-      {activator(onOpen)}
+      {activator(open)}
       <DeleteConfirmationModal
         isOpen={isOpen}
-        onClose={onClose}
+        onClose={close}
         onConfirm={onConfirm}
         isDeleting={isRemovingReader}
         itemName={readerName}

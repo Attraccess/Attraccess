@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Button,
+  DrawerBody,
+  DrawerFooter,
+  DrawerHeader,
   Form,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
   Tab,
+  TabList,
+  TabPanel,
   Tabs,
-  useDisclosure,
+  useOverlayState,
 } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './resourceEditModal.en.json';
@@ -26,6 +26,7 @@ import {
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToastMessage } from '../../../components/toastProvider';
+import { StandardDrawer } from '../../../components/standardDrawer';
 import { SharedDataTab } from './tabs/shared';
 import { MachineTab } from './tabs/machine';
 import { DoorTab } from './tabs/door';
@@ -49,7 +50,7 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
     en,
     de,
   });
-  const { isOpen, onOpen, onOpenChange, onClose } = useDisclosure();
+  const { isOpen, open, setOpen, close } = useOverlayState();
 
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -88,7 +89,7 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
       }
 
       if (props.closeOnSuccess) {
-        onClose();
+        close();
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -160,7 +161,6 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
     setDeleteImage(file === null);
   }, []);
 
-  // Update form data when resource changes
   useEffect(() => {
     if (!isOpen) {
       return;
@@ -205,85 +205,77 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
 
   return (
     <>
-      {props.children?.(onOpen)}
-      <Modal
-        isOpen={isOpen}
-        onOpenChange={onOpenChange}
-        scrollBehavior="inside"
-        data-cy="resource-edit-modal"
-        size="3xl"
-      >
-        <ModalContent>
-          {(onClose) => (
-            <>
-              <ModalHeader>{t(`modalTitle.${props.resourceId ? 'update' : 'create'}`)}</ModalHeader>
+      {props.children?.(open)}
+      <StandardDrawer isOpen={isOpen} onOpenChange={setOpen}>
+        <div data-cy="resource-edit-modal" className="contents">
+          <DrawerHeader>
+            <h2 className="text-lg font-semibold">
+              {t(`modalTitle.${props.resourceId ? 'update' : 'create'}`)}
+            </h2>
+          </DrawerHeader>
 
-              <ModalBody className="w-full space-y-4">
-                <Form
-                  ref={formRef}
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    onSubmit();
-                  }}
-                  className="grid grid-cols-1 lg:grid-cols-2 gap-4 w-full"
-                >
-                  <div className="flex flex-col gap-2 w-full">
-                    <SharedDataTab
-                      t={t}
-                      formData={formData}
-                      setField={setField}
-                      onImageSelected={onImageSelected}
-                      resource={resource}
-                    />
-                  </div>
+          <DrawerBody className="w-full space-y-4">
+            <Form
+              ref={formRef}
+              onSubmit={(e) => {
+                e.preventDefault();
+                onSubmit();
+              }}
+              className="flex flex-col gap-4 w-full"
+            >
+              <div className="flex flex-col gap-2 w-full">
+                <SharedDataTab
+                  t={t}
+                  formData={formData}
+                  setField={setField}
+                  onImageSelected={onImageSelected}
+                  resource={resource}
+                />
+              </div>
 
-                  <div className="flex flex-col gap-2 w-full">
-                    <Tabs
-                      onSelectionChange={(key) => setField('type', key as UpdateResourceDto['type'])}
-                      selectedKey={formData.type}
-                      destroyInactiveTabPanel={false}
-                    >
-                      <Tab key="machine" title={t('inputs.type.options.machine')}>
-                        <MachineTab t={t} formData={formData} setField={setField} />
-                      </Tab>
-                      <Tab key="door" title={t('inputs.type.options.door')}>
-                        <DoorTab t={t} formData={formData} setField={setField} />
-                      </Tab>
-                    </Tabs>
-                  </div>
+              <div className="flex flex-col gap-2 w-full">
+                <Tabs selectedKey={formData.type} onSelectionChange={(k) => setField('type', k as ResourceType)}>
+                  <TabList>
+                    <Tab id="machine">{t('inputs.type.options.machine')}</Tab>
+                    <Tab id="door">{t('inputs.type.options.door')}</Tab>
+                  </TabList>
+                  <TabPanel id="machine">
+                    <MachineTab t={t} formData={formData} setField={setField} />
+                  </TabPanel>
+                  <TabPanel id="door">
+                    <DoorTab t={t} formData={formData} setField={setField} />
+                  </TabPanel>
+                </Tabs>
+              </div>
 
-                  <div className="lg:col-span-2">
-                    <ResourceMetadataEditor
-                      t={t}
-                      value={formData.metadata}
-                      onChange={(value) => setField('metadata', value)}
-                    />
-                  </div>
-                </Form>
-              </ModalBody>
+              <ResourceMetadataEditor
+                t={t}
+                value={formData.metadata}
+                onChange={(value) => setField('metadata', value)}
+              />
+            </Form>
+          </DrawerBody>
 
-              <ModalFooter className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center w-full">
-                <Button
-                  variant="bordered"
-                  className="w-full sm:w-auto min-w-full sm:min-w-fit"
-                  onPress={onClose}
-                  data-cy="resource-edit-modal-cancel-button"
-                >
-                  {t('buttons.cancel')}
-                </Button>
-                <Button
-                  color="primary"
-                  className="w-full sm:w-auto min-w-full sm:min-w-fit"
-                  onPress={onSubmit}
-                  data-cy={`resource-edit-modal-${props.resourceId ? 'update' : 'create'}-button`}
-                >
-                  {props.resourceId ? t('buttons.update') : t('buttons.create')}
-                </Button>
-              </ModalFooter>
-            </>
-          )}
-        </ModalContent>
-      </Modal>
+          <DrawerFooter className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center w-full">
+            <Button
+              variant="outline"
+              className="w-full sm:w-auto min-w-full sm:min-w-fit"
+              onPress={close}
+              data-cy="resource-edit-modal-cancel-button"
+            >
+              {t('buttons.cancel')}
+            </Button>
+            <Button
+              variant="primary"
+              className="w-full sm:w-auto min-w-full sm:min-w-fit"
+              onPress={onSubmit}
+              data-cy={`resource-edit-modal-${props.resourceId ? 'update' : 'create'}-button`}
+            >
+              {props.resourceId ? t('buttons.update') : t('buttons.create')}
+            </Button>
+          </DrawerFooter>
+        </div>
+      </StandardDrawer>
     </>
   );
 }

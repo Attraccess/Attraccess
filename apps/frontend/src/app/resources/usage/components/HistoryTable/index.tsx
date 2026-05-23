@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Table, TableHeader, TableBody, TableRow, Pagination } from '@heroui/react';
+import { Table, TableContent, TableHeader, TableBody, TableRow } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { generateHeaderColumns } from './utils/tableHeaders';
 import { generateRowCells } from './utils/tableRows';
@@ -11,12 +11,11 @@ import {
   ResourceUsageAction,
 } from '@attraccess/react-query-client';
 import { useAuth } from '../../../../../hooks/useAuth';
-import { TableDataLoadingIndicator } from '../../../../../components/tableComponents';
 import { EmptyState } from '../../../../../components/emptyState';
-import { useReactQueryStatusToHeroUiTableLoadingState } from '../../../../../hooks/useReactQueryStatusToHeroUiTableLoadingState';
 import { ProjectsSelect } from '../../../../../components/projectsSelect';
 import en from './utils/translations/en.json';
 import de from './utils/translations/de.json';
+import { SimplePagination } from '../../../../../components/simplePagination';
 
 interface HistoryTableProps {
   resourceId: number;
@@ -56,7 +55,7 @@ const ProjectAssignmentCell = ({
     <div onClick={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()}>
       <ProjectsSelect
         value={projectId ?? undefined}
-        onValueChange={onChange}
+        onChange={onChange}
         placeholder={placeholder}
         includeUnassignedOption
         unassignedLabel={unassignedLabel}
@@ -89,8 +88,6 @@ export const HistoryTable = ({
   const {
     data: usageHistory,
     error,
-    status: fetchStatus,
-    isFetched: isFetchedUsageHistory,
   } = useResourcesServiceResourceUsageGetHistory(
     {
       resourceId,
@@ -113,8 +110,6 @@ export const HistoryTable = ({
 
     return generateHeaderColumns(t, resource, showAllUsers, canManageResources);
   }, [t, showAllUsers, canManageResources, resource]);
-
-  const loadingState = useReactQueryStatusToHeroUiTableLoadingState(fetchStatus);
 
   const totalPages = useMemo(() => {
     if (!usageHistory?.total) {
@@ -151,23 +146,18 @@ export const HistoryTable = ({
   }
 
   return (
-    <Table
-      aria-label={t('table.ariaLabel')}
-      shadow="none"
-      data-cy="resource-usage-history-table"
-      bottomContent={isFetchedUsageHistory && <Pagination total={totalPages} page={page} onChange={handlePageChange} />}
-    >
+    <>
+    <Table data-cy="resource-usage-history-table">
+      <TableContent aria-label={t('table.ariaLabel')}>
       <TableHeader>{headerColumns}</TableHeader>
       <TableBody
-        loadingState={loadingState}
-        loadingContent={<TableDataLoadingIndicator />}
-        emptyContent={<EmptyState />}
+        renderEmptyState={() => <EmptyState />}
       >
         {filteredHistory.map((session: ResourceUsage) => (
           <TableRow
-            key={session.id}
+            key={session.id} id={session.id}
             className="cursor-pointer hover:bg-primary-50 transition-bg duration-300"
-            onClick={() => onSessionClick(session)}
+            onAction={() => onSessionClick(session)}
           >
             {resource
               ? generateRowCells(session, t, resource, showAllUsers, canManageResources, (sessionToRender) => (
@@ -185,6 +175,9 @@ export const HistoryTable = ({
           </TableRow>
         ))}
       </TableBody>
+      </TableContent>
     </Table>
+    <SimplePagination total={totalPages} page={page} onChange={handlePageChange} />
+    </>
   );
 };

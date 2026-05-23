@@ -1,15 +1,15 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  useDisclosure,
-  Button,
-  Textarea,
-  Form,
   Alert,
+  AlertContent,
+  AlertDescription,
+  Button,
+  DrawerBody,
+  DrawerFooter,
+  DrawerHeader,
+  Form,
+  TextArea,
+  useOverlayState,
 } from '@heroui/react';
 import de from '../de.json';
 import en from '../en.json';
@@ -19,6 +19,8 @@ import {
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useRef, useState } from 'react';
+import { AlertStatusIcon } from '../../../../../components/AlertStatusIcon';
+import { StandardDrawer } from '../../../../../components/standardDrawer';
 
 interface Props {
   resourceId: number;
@@ -28,7 +30,7 @@ interface Props {
 
 export function MarkDoneModal(props: Props) {
   const { resourceId, maintenanceId, children } = props;
-  const { isOpen, onOpen, onOpenChange, onClose } = useDisclosure();
+  const { isOpen, open, setOpen, close } = useOverlayState();
   const queryClient = useQueryClient();
   const formRef = useRef<HTMLFormElement>(null);
   const [notes, setNotes] = useState('');
@@ -43,10 +45,14 @@ export function MarkDoneModal(props: Props) {
       queryKey: [useResourceMaintenancesServiceFindMaintenancesKey],
     });
     setNotes('');
-    onClose();
-  }, [queryClient, onClose]);
+    close();
+  }, [queryClient, close]);
 
-  const { mutate: finishMaintenance, isPending, error } = useResourceMaintenancesServiceFinishMaintenance({
+  const {
+    mutate: finishMaintenance,
+    isPending,
+    error,
+  } = useResourceMaintenancesServiceFinishMaintenance({
     onSuccess,
   });
 
@@ -59,52 +65,56 @@ export function MarkDoneModal(props: Props) {
   }, [finishMaintenance, resourceId, maintenanceId, notes]);
 
   const onOpenChangeHandler = useCallback(
-    (open: boolean) => {
-      if (!open) setNotes('');
-      onOpenChange();
+    (isOpen: boolean) => {
+      if (!isOpen) setNotes('');
+      setOpen(isOpen);
     },
-    [onOpenChange]
+    [setOpen],
   );
 
   return (
     <>
-      {children(onOpen)}
-      <Modal isOpen={isOpen} onOpenChange={onOpenChangeHandler}>
-        <ModalContent>
-          <ModalHeader>{t('actions.markDone.modal.title')}</ModalHeader>
-          <ModalBody>
-            <Form
-              ref={formRef}
-              onSubmit={(e) => {
-                e.preventDefault();
-                onSubmit();
-              }}
-            >
-              <Textarea
-                label={t('actions.markDone.modal.notesLabel')}
-                placeholder={t('actions.markDone.modal.notesPlaceholder')}
-                description={t('actions.markDone.modal.notesOptional')}
-                value={notes}
-                onValueChange={setNotes}
-              />
-              {error ? (
-                <Alert color="danger" variant="flat">
-                  {(error as Error).message}
-                </Alert>
-              ) : null}
-              <button type="submit" hidden />
-            </Form>
-          </ModalBody>
-          <ModalFooter>
-            <Button variant="light" onPress={onClose}>
-              {t('actions.markDone.modal.cancel')}
-            </Button>
-            <Button color="primary" onPress={onSubmit} isLoading={isPending}>
-              {t('actions.markDone.modal.confirm')}
-            </Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
+      {children(open)}
+      <StandardDrawer isOpen={isOpen} onOpenChange={onOpenChangeHandler}>
+        <DrawerHeader>
+          <h2 className="text-lg font-semibold">{t('actions.markDone.modal.title')}</h2>
+        </DrawerHeader>
+        <DrawerBody>
+          <Form
+            ref={formRef}
+            onSubmit={(e) => {
+              e.preventDefault();
+              onSubmit();
+            }}
+            className="flex flex-col gap-4"
+          >
+            <TextArea
+              placeholder={t('actions.markDone.modal.notesPlaceholder')}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={5}
+              className="w-full min-h-32 resize-y"
+            />
+            {error ? (
+              <Alert status="danger">
+                <AlertStatusIcon status="danger" />
+                <AlertContent>
+                  <AlertDescription>{(error as Error).message}</AlertDescription>
+                </AlertContent>
+              </Alert>
+            ) : null}
+            <button type="submit" hidden />
+          </Form>
+        </DrawerBody>
+        <DrawerFooter>
+          <Button variant="ghost" onPress={() => setOpen(false)}>
+            {t('actions.markDone.modal.cancel')}
+          </Button>
+          <Button variant="primary" onPress={onSubmit} isPending={isPending}>
+            {t('actions.markDone.modal.confirm')}
+          </Button>
+        </DrawerFooter>
+      </StandardDrawer>
     </>
   );
 }

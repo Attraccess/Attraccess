@@ -1,12 +1,19 @@
 import {
   Accordion,
   AccordionItem,
+  AccordionHeading,
+  AccordionTrigger,
+  AccordionPanel,
+  AccordionBody,
   Modal,
+  ModalBackdrop,
   ModalBody,
-  ModalContent,
+  ModalContainer,
+  ModalDialog,
   ModalFooter,
   ModalHeader,
-  useDisclosure,
+  ModalHeading,
+  useOverlayState,
 } from '@heroui/react';
 import { useCallback, useMemo } from 'react';
 import { TFunction, useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -28,7 +35,7 @@ interface NodeGroup {
 }
 
 export function NodePickerModal(props: Props) {
-  const { isOpen, onOpenChange, onClose, onOpen } = useDisclosure();
+  const { isOpen, setOpen, close, open } = useOverlayState();
 
   const { t } = useTranslations({
     de,
@@ -86,42 +93,59 @@ export function NodePickerModal(props: Props) {
   const onSelect = useCallback(
     (nodeType: string) => {
       props.onSelect(nodeType);
-      onClose();
+      close();
     },
-    [props, onClose],
+    [props, close],
   );
 
   return (
     <>
-      {props.children(onOpen)}
-      <Modal scrollBehavior="inside" isOpen={isOpen} onOpenChange={onOpenChange} size="4xl">
-        <ModalContent>
-          <ModalHeader>{t('title')}</ModalHeader>
-          <ModalBody className="flex flex-col gap-4">
-            <Accordion defaultExpandedKeys={nodeGroups.map((_, index) => index.toString())}>
-              {nodeGroups.map((group, index) => (
-                <AccordionItem key={index} title={t('nodeType.' + group.category)}>
-                  <div className="flex flex-row flex-wrap gap-4">
-                    {group.nodes.map((nodeSchema) => (
-                      <div
-                        key={nodeSchema.type}
-                        onClick={() => onSelect(nodeSchema.type)}
-                        className="cursor-pointer hover:bg-primary-50 transition-bg duration-300"
-                      >
-                        <AttraccessNode
-                          tNodeTranslations={props.tNodeTranslations}
-                          schema={nodeSchema}
-                          previewMode={true}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </AccordionItem>
-              ))}
-            </Accordion>
-          </ModalBody>
-          <ModalFooter></ModalFooter>
-        </ModalContent>
+      {props.children(open)}
+      <Modal isOpen={isOpen} onOpenChange={setOpen}>
+        <ModalBackdrop>
+          <ModalContainer size="lg">
+            <ModalDialog>
+              {() => (
+                <>
+                  <ModalHeader>
+                    <ModalHeading>{t('title')}</ModalHeading>
+                  </ModalHeader>
+                  <ModalBody className="flex flex-col gap-4">
+                    <Accordion defaultExpandedKeys={nodeGroups.map((_, index) => index.toString())}>
+                      {nodeGroups.map((group, index) => (
+                        <AccordionItem key={index} id={index}>
+                          <AccordionHeading>
+                            <AccordionTrigger>{t('nodeType.' + group.category)}</AccordionTrigger>
+                          </AccordionHeading>
+                          <AccordionPanel>
+                            <AccordionBody>
+                              <div className="flex flex-row flex-wrap gap-4">
+                                {group.nodes.map((nodeSchema) => (
+                                  <div
+                                    key={nodeSchema.type}
+                                    onClick={() => onSelect(nodeSchema.type)}
+                                    className="cursor-pointer hover:bg-primary-50 transition-bg duration-300"
+                                  >
+                                    <AttraccessNode
+                                      tNodeTranslations={props.tNodeTranslations}
+                                      schema={nodeSchema}
+                                      previewMode={true}
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            </AccordionBody>
+                          </AccordionPanel>
+                        </AccordionItem>
+                      ))}
+                    </Accordion>
+                  </ModalBody>
+                  <ModalFooter></ModalFooter>
+                </>
+              )}
+            </ModalDialog>
+          </ModalContainer>
+        </ModalBackdrop>
       </Modal>
     </>
   );

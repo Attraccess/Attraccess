@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { HTMLAttributes, useCallback, useMemo, useState } from 'react';
 import {
   ResourceGroup,
   useResourcesServiceGetAllResourcesKey,
@@ -8,49 +8,30 @@ import {
   useResourcesServiceResourceGroupsGetMany,
   useResourcesServiceResourceGroupsRemoveResource,
 } from '@attraccess/react-query-client';
-import {
-  Button,
-  Card,
-  CardBody,
-  CardHeader,
-  CardProps,
-  Checkbox,
-  Link,
-  Pagination,
-  Table,
-  TableBody,
-  TableCell,
-  TableColumn,
-  TableHeader,
-  TableRow,
-} from '@heroui/react';
-import { TableDataLoadingIndicator } from '../../../components/tableComponents';
+import { Button, Checkbox, Link, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow } from '@heroui/react';
 import { EmptyState } from '../../../components/emptyState';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { GroupIcon, PlusIcon } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
-import { PageHeader } from '../../../components/pageHeader';
-import { useReactQueryStatusToHeroUiTableLoadingState } from '../../../hooks/useReactQueryStatusToHeroUiTableLoadingState';
 import en from './en.json';
 import de from './de.json';
 import { ResourceGroupUpsertModal } from '../../resource-groups/upsertModal/resourceGroupUpsertModal';
+import { FlatSection } from '../../../components/flatSection';
 
-interface ManageResourceGroupsProps {
+type ManageResourceGroupsProps = Omit<HTMLAttributes<HTMLElement>, 'children'> & {
   resourceId: number;
-}
+};
 
 export function ManageResourceGroups({
   resourceId,
-  ...cardProps
-}: Readonly<ManageResourceGroupsProps & Omit<CardProps, 'children'>>) {
+  ...rest
+}: Readonly<ManageResourceGroupsProps>) {
   const { t } = useTranslations({ de, en });
   const queryClient = useQueryClient();
 
   const { data: resource } = useResourcesServiceGetOneResourceById({ id: resourceId });
 
-  const { data: groups, status: fetchStatus, isFetched: isFetchedGroups } = useResourcesServiceResourceGroupsGetMany();
-
-  const loadingState = useReactQueryStatusToHeroUiTableLoadingState(fetchStatus);
+  const { data: groups } = useResourcesServiceResourceGroupsGetMany();
 
   const { mutateAsync: addResourceToGroup } = useResourcesServiceResourceGroupsAddResource();
 
@@ -108,11 +89,8 @@ export function ManageResourceGroups({
       });
   }, [groups, resource, isAdded]);
 
-  const [page, setPage] = useState(1);
+  const [page] = useState(1);
   const perPage = 10;
-  const totalPages = useMemo(() => {
-    return Math.ceil((groupsWithResource?.length ?? 0) / perPage);
-  }, [groupsWithResource]);
 
   const currentPage = useMemo(() => {
     if (!groupsWithResource) {
@@ -129,78 +107,57 @@ export function ManageResourceGroups({
     [handleGroupClick],
   );
 
-  return (
-    <Card {...cardProps}>
-      <CardHeader>
-        <PageHeader
-          title={t('title')}
-          subtitle={t('subtitle')}
-          icon={<GroupIcon />}
-          noMargin
-          actions={
-            <ResourceGroupUpsertModal onUpserted={onGroupCreated}>
-              {(onOpen: () => void) => (
-                <Button
-                  radius="full"
-                  onPress={onOpen}
-                  startContent={<PlusIcon size={18} />}
-                  color="secondary"
-                  size="sm"
-                  data-cy="toolbar-open-create-resource-group-modal-button"
-                >
-                  {t('addGroup')}
-                </Button>
-              )}
-            </ResourceGroupUpsertModal>
-          }
-        />
-      </CardHeader>
-      <CardBody>
-        <Table
-          aria-label={t('table.ariaLabel')}
-          shadow="none"
-          removeWrapper
-          bottomContent={
-            isFetchedGroups && (
-              <Pagination isCompact showControls page={page} total={totalPages} onChange={(page) => setPage(page)} />
-            )
-          }
+  const actions = (
+    <ResourceGroupUpsertModal onUpserted={onGroupCreated}>
+      {(onOpen: () => void) => (
+        <Button
+          variant="primary"
+          size="sm"
+          onPress={onOpen}
+          data-cy="toolbar-open-create-resource-group-modal-button"
         >
-          <TableHeader>
-            <TableColumn>{t('columns.group')}</TableColumn>
-            <TableColumn>{t('columns.actions')}</TableColumn>
-          </TableHeader>
-          <TableBody
-            items={currentPage}
-            loadingState={loadingState}
-            loadingContent={<TableDataLoadingIndicator />}
-            emptyContent={<EmptyState />}
-          >
-            {(group) => (
-              <TableRow
-                key={group.id}
-                className={isAdded(group) ? 'border-l-8 border-l-success' : 'border-l-8 border-l-danger'}
-              >
-                <TableCell className="w-full">{group.name}</TableCell>
-                <TableCell className="text-right flex items-center gap-2">
-                  <Checkbox
-                    size="lg"
-                    onValueChange={() => {
-                      handleGroupClick(group);
-                    }}
-                    aria-label={group.name}
-                    color={isAdded(group) ? 'danger' : 'primary'}
-                    isSelected={isAdded(group)}
-                  />
-                  <Link size="lg" href={`/resource-groups/${group.id}`} showAnchorIcon>
-                    {t('actions.openGroup')}
-                  </Link>
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
+          <PlusIcon size={16} />
+          {t('addGroup')}
+        </Button>
+      )}
+    </ResourceGroupUpsertModal>
+  );
+
+  return (
+    <FlatSection icon={<GroupIcon className="w-4 h-4" />} title={t('title')} actions={actions} {...rest}>
+      {currentPage.length === 0 ? (
+        <EmptyState />
+      ) : (
+        <Table>
+          <TableContent aria-label={t('table.ariaLabel')}>
+            <TableHeader>
+              <TableColumn isRowHeader>{t('columns.group')}</TableColumn>
+              <TableColumn>{t('columns.actions')}</TableColumn>
+            </TableHeader>
+            <TableBody items={currentPage}>
+              {(group) => (
+                <TableRow
+                  key={group.id}
+                  id={group.id}
+                  className={isAdded(group) ? 'border-l-8 border-l-success' : 'border-l-8 border-l-danger'}
+                >
+                  <TableCell className="w-full">{group.name}</TableCell>
+                  <TableCell className="text-right flex items-center gap-2">
+                    <Checkbox
+                      onChange={() => {
+                        handleGroupClick(group);
+                      }}
+                      aria-label={group.name}
+                      isSelected={isAdded(group)}
+                    />
+                    <Link href={`/resource-groups/${group.id}`}>{t('actions.openGroup')}</Link>
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </TableContent>
         </Table>
-      </CardBody>
-    </Card>
+      )}
+    </FlatSection>
   );
 }

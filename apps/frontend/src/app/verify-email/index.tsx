@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useUrlQuery } from '@attraccess/plugins-frontend-ui';
 import { useNavigate } from 'react-router-dom';
 import { Loading } from '../loading';
-import { Alert, Button, Card, CardBody, CardFooter, CardHeader, Spacer } from '@heroui/react';
+import { Alert, AlertContent, AlertDescription, AlertTitle, Button, Card } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
@@ -76,17 +76,17 @@ export function VerifyEmail() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Card className="max-w-md w-full" data-cy="verify-email-success-card">
-          <CardHeader className="text-center">
+          <Card.Header className="text-center">
             <h2 className="text-3xl font-bold">{t('success.title')}</h2>
-          </CardHeader>
-          <CardBody>
+          </Card.Header>
+          <Card.Content>
             <p className="text-sm text-gray-600 dark:text-gray-400 text-center">{t('success.message')}</p>
-          </CardBody>
-          <CardFooter>
-            <Button fullWidth color="primary" onPress={() => navigate('/')} data-cy="verify-email-success-login-button">
+          </Card.Content>
+          <Card.Footer>
+            <Button variant="primary" className="w-full" onPress={() => navigate('/')} data-cy="verify-email-success-login-button">
               {t('success.goToLogin')}
             </Button>
-          </CardFooter>
+          </Card.Footer>
         </Card>
       </div>
     );
@@ -96,37 +96,36 @@ export function VerifyEmail() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Card className="max-w-md w-full" data-cy="verify-email-error-card">
-          <CardHeader className="text-center">
+          <Card.Header className="text-center">
             <h2 className="text-3xl font-bold">{t('error.title')}</h2>
-          </CardHeader>
-          <CardBody>
-            <Alert
-              color="danger"
-              title={t('error.errorTitle')}
-              description={error}
+          </Card.Header>
+          <Card.Content>
+            <Alert status="danger"
               data-cy="verify-email-error-alert"
-            />
-          </CardBody>
-          <CardFooter>
-            <Button
-              fullWidth
-              color="primary"
+            >
+              <AlertContent>
+                <AlertTitle>{t('error.errorTitle')}</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+              </AlertContent>
+            </Alert>
+          </Card.Content>
+          <Card.Footer className="flex flex-col gap-2">
+            <Button variant="primary"
+              className="w-full"
               onPress={activateEmail}
               isDisabled={verifyEmail.isPending}
               data-cy="verify-email-error-try-again-button"
             >
               {t('error.tryAgain')}
             </Button>
-            <Spacer y={2} />
-            <Button
-              fullWidth
-              variant="bordered"
+            <Button variant="outline"
+              className="w-full"
               onPress={() => navigate('/')}
               data-cy="verify-email-error-back-to-login-button"
             >
               {t('error.backToLogin')}
             </Button>
-          </CardFooter>
+          </Card.Footer>
         </Card>
       </div>
     );

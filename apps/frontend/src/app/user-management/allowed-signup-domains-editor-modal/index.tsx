@@ -6,26 +6,28 @@ import {
 } from '@attraccess/react-query-client';
 import {
   Alert,
+  AlertContent,
+  AlertDescription,
   Button,
-  Input,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
+  DrawerBody,
+  DrawerFooter,
+  DrawerHeader,
+  InputGroup,
+  Label,
   Table,
   TableBody,
   TableCell,
   TableColumn,
+  TableContent,
   TableHeader,
   TableRow,
-  useDisclosure,
+  TextField,
+  useOverlayState,
 } from '@heroui/react';
+import { StandardDrawer } from '../../../components/standardDrawer';
 import { EmptyState } from '../../../components/emptyState';
-import { PageHeader } from '../../../components/pageHeader';
-import { TableDataLoadingIndicator } from '../../../components/tableComponents';
-import { useReactQueryStatusToHeroUiTableLoadingState } from '../../../hooks/useReactQueryStatusToHeroUiTableLoadingState';
 import { PlusIcon, Settings2Icon, Trash2Icon } from 'lucide-react';
+import { AlertStatusIcon } from '../../../components/AlertStatusIcon';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import en from './en.json';
 import de from './de.json';
@@ -38,7 +40,7 @@ interface Props {
 }
 
 export function AllowedSignupDomainsEditorModal(props: Props) {
-  const { isOpen, onOpen, onOpenChange, onClose } = useDisclosure();
+  const { isOpen, open, setOpen, close: closeModal } = useOverlayState();
   const { t, tExists } = useTranslations({
     de: {
       ...de,
@@ -50,15 +52,13 @@ export function AllowedSignupDomainsEditorModal(props: Props) {
     },
   });
 
-  const { data: allowedSignupDomains, status } = useUsersServiceGetLocalSignupDomainWhitelist();
+  const { data: allowedSignupDomains } = useUsersServiceGetLocalSignupDomainWhitelist();
 
   const [domainToAdd, setDomainToAdd] = useState<string>('');
   const [editedDomains, setEditedDomains] = useState<string[]>(allowedSignupDomains ?? []);
   useEffect(() => {
     setEditedDomains(allowedSignupDomains ?? []);
   }, [allowedSignupDomains]);
-
-  const loadingState = useReactQueryStatusToHeroUiTableLoadingState(status);
 
   const addDomainInputRef = useRef<HTMLInputElement>(null);
 
@@ -99,7 +99,7 @@ export function AllowedSignupDomainsEditorModal(props: Props) {
         title: t('actions.save.success.title'),
         description: t('actions.save.success.description'),
       });
-      onClose();
+      closeModal();
     },
     onError: (error) => {
       toast.apiError({
@@ -117,71 +117,74 @@ export function AllowedSignupDomainsEditorModal(props: Props) {
 
   return (
     <>
-      {props.children(onOpen)}
-      <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
-        <ModalContent>
-          <ModalHeader>
-            <PageHeader title={t('title')} subtitle={t('subtitle')} icon={<Settings2Icon />} noMargin={true} />
-          </ModalHeader>
+      {props.children(open)}
+      <StandardDrawer isOpen={isOpen} onOpenChange={setOpen}>
+        <DrawerHeader className="flex flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <Settings2Icon className="w-5 h-5" />
+            <h2 className="text-lg font-semibold">{t('title')}</h2>
+          </div>
+          <p className="text-sm text-default-500">{t('subtitle')}</p>
+        </DrawerHeader>
 
-          <ModalBody>
-            <Alert variant="flat" color="warning" className="whitespace-pre-wrap">
-              {t('noteAboutNoneAndWildcard')}
-            </Alert>
-            <Input
-              ref={addDomainInputRef}
-              label={t('inputs.addDomain.label')}
-              onValueChange={setDomainToAdd}
-              value={domainToAdd}
-              type="string"
-              endContent={
-                <Button onPress={onAddDomain} variant="light" color="primary" isIconOnly startContent={<PlusIcon />} />
-              }
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  onAddDomain();
-                }
-              }}
-            />
+        <DrawerBody className="flex flex-col gap-4">
+          <Alert status="warning" className="whitespace-pre-wrap">
+            <AlertStatusIcon status="warning" />
+            <AlertContent>
+              <AlertDescription>{t('noteAboutNoneAndWildcard')}</AlertDescription>
+            </AlertContent>
+          </Alert>
+          <TextField value={domainToAdd} onChange={setDomainToAdd}>
+            <Label>{t('inputs.addDomain.label')}</Label>
+            <InputGroup>
+              <InputGroup.Input
+                ref={addDomainInputRef}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    onAddDomain();
+                  }
+                }}
+              />
+              <InputGroup.Suffix>
+                <Button variant="ghost" onPress={onAddDomain} isIconOnly>
+                  <PlusIcon />
+                </Button>
+              </InputGroup.Suffix>
+            </InputGroup>
+          </TextField>
 
-            <Table removeWrapper aria-label={t('table.ariaLabel')}>
+          <Table>
+            <TableContent aria-label={t('table.ariaLabel')}>
               <TableHeader>
-                <TableColumn>{t('table.columns.domain')}</TableColumn>
+                <TableColumn isRowHeader>{t('table.columns.domain')}</TableColumn>
                 <TableColumn>{t('table.columns.actions')}</TableColumn>
               </TableHeader>
               <TableBody
                 items={(editedDomains ?? []).map((domain) => ({ value: domain }))}
-                loadingState={loadingState}
-                loadingContent={<TableDataLoadingIndicator />}
-                emptyContent={<EmptyState />}
+                renderEmptyState={() => <EmptyState />}
               >
                 {(domain) => (
-                  <TableRow key={domain.value}>
+                  <TableRow key={domain.value} id={domain.value}>
                     <TableCell className="w-full">{domain.value}</TableCell>
                     <TableCell className="flex-row flex">
-                      <Button
-                        startContent={<Trash2Icon className="w-4 h-4" />}
-                        size="sm"
-                        color="danger"
-                        variant="light"
-                        onPress={() => onRemoveDomain(domain.value)}
-                      >
+                      <Button variant="danger-soft" onPress={() => onRemoveDomain(domain.value)}>
+                        <Trash2Icon className="w-4 h-4" />
                         {t('table.actions.removeDomain')}
                       </Button>
                     </TableCell>
                   </TableRow>
                 )}
               </TableBody>
-            </Table>
-          </ModalBody>
+            </TableContent>
+          </Table>
+        </DrawerBody>
 
-          <ModalFooter>
-            <Button onPress={onSave} isLoading={isSaving} color="primary">
-              {t('actions.save.label')}
-            </Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
+        <DrawerFooter>
+          <Button variant="primary" onPress={onSave} isPending={isSaving}>
+            {t('actions.save.label')}
+          </Button>
+        </DrawerFooter>
+      </StandardDrawer>
     </>
   );
 }

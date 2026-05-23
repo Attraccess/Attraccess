@@ -1,10 +1,11 @@
-import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, ModalProps } from '@heroui/react';
+import { ModalHeader, ModalBody, ModalFooter } from '@heroui/react';
+import { Modal, ModalBackdrop, ModalContainer, ModalDialog, ModalHeading } from '@heroui/react';
 import { Button } from '@heroui/react';
 import { useTranslations, I18nTransComponent } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 
-interface DeleteConfirmationModalProps extends Omit<ModalProps, 'children'> {
+interface DeleteConfirmationModalProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: () => unknown;
@@ -18,7 +19,6 @@ export function DeleteConfirmationModal({
   onConfirm,
   itemName,
   isDeleting,
-  ...rest
 }: Readonly<DeleteConfirmationModalProps>) {
   const { t } = useTranslations({
     en,
@@ -26,35 +26,50 @@ export function DeleteConfirmationModal({
   });
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} scrollBehavior="inside" {...rest}>
-      <ModalContent>
-        <ModalHeader>{t('title')}</ModalHeader>
-        <ModalBody>
-          <div className="text-lg">
-            <I18nTransComponent
-              t={t}
-              count={1}
-              i18nKey="message"
-              values={{ itemName }}
-              components={{
-                br: <br />,
-                bold: <span className="text-2xl font-bold block my-4" />,
-                alert: (
-                  <div className="text-red-500 bg-red-100 p-2 rounded-md dark:bg-red-900 dark:text-red-100 mt-8" />
-                ),
-              }}
-            />
-          </div>
-        </ModalBody>
-        <ModalFooter>
-          <Button variant="light" onPress={onClose} data-cy="cancel-button">
-            {t('cancelButton')}
-          </Button>
-          <Button data-cy="delete-button" onPress={() => onConfirm()} isLoading={isDeleting} color="danger">
-            {t('deleteButton')}
-          </Button>
-        </ModalFooter>
-      </ModalContent>
+    <Modal
+      isOpen={isOpen}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
+      <ModalBackdrop>
+        <ModalContainer size="sm">
+          <ModalDialog>
+            {({ close }) => (
+              <>
+                <ModalHeader>
+                  <ModalHeading>{t('title')}</ModalHeading>
+                </ModalHeader>
+                <ModalBody>
+                  <div className="text-lg">
+                    <I18nTransComponent
+                      t={t}
+                      count={1}
+                      i18nKey="message"
+                      values={{ itemName }}
+                      components={{
+                        br: <br />,
+                        bold: <span className="text-2xl font-bold block my-4" />,
+                        alert: (
+                          <div className="text-red-500 bg-red-100 p-2 rounded-md dark:bg-red-900 dark:text-red-100 mt-8" />
+                        ),
+                      }}
+                    />
+                  </div>
+                </ModalBody>
+                <ModalFooter>
+                  <Button variant="ghost" onPress={close} data-cy="cancel-button">
+                    {t('cancelButton')}
+                  </Button>
+                  <Button variant="danger" data-cy="delete-button" onPress={() => onConfirm()} isPending={isDeleting}>
+                    {t('deleteButton')}
+                  </Button>
+                </ModalFooter>
+              </>
+            )}
+          </ModalDialog>
+        </ModalContainer>
+      </ModalBackdrop>
     </Modal>
   );
 }

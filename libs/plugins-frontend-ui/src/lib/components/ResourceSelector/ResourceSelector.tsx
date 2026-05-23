@@ -1,6 +1,8 @@
+// Resource selector table with search and selection state
+// FEATURE: Resource selection for plugins using HeroUI v3 Table compound
 import { useTranslations } from '../../i18n';
 import { useResourcesServiceGetAllResources } from '@attraccess/react-query-client';
-import { Input, Spinner, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from '@heroui/react';
+import { TextField, Label, InputGroup, Input, Spinner, TableRoot, TableContent, TableBody, TableCell, TableColumn, TableHeader, TableRow } from '@heroui/react';
 import { useState, PropsWithChildren } from 'react';
 import de from './ResourceSelector.de.json';
 import en from './ResourceSelector.en.json';
@@ -19,10 +21,7 @@ export function ResourceSelector(props: Readonly<Props>) {
   const { selection, onSelectionChange, multiple = true } = props;
   const [search, setSearch] = useState('');
 
-  const { t } = useTranslations({
-    de,
-    en,
-  });
+  const { t } = useTranslations({ de, en });
 
   const { data: resourceSearchResults, isLoading: isResourceSearchLoading } = useResourcesServiceGetAllResources({
     limit: 15,
@@ -32,36 +31,39 @@ export function ResourceSelector(props: Readonly<Props>) {
 
   return (
     <div className="flex flex-col gap-2">
-      <Input
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        label={t('search.label')}
-        placeholder={t('search.placeholder')}
-        className="w-full"
-        variant="flat"
-        endContent={isResourceSearchLoading ? <Spinner /> : null}
-      />
-      <Table
-        aria-label={t('table.ariaLabel')}
-        selectedKeys={selection.map((id) => id.toString())}
-        onSelectionChange={(keys) => onSelectionChange(Array.from(keys as Set<number>).map((key) => Number(key)))}
-        selectionMode={multiple ? 'multiple' : 'single'}
-        color="primary"
-        removeWrapper
-      >
-        <TableHeader>
-          <TableColumn align="start" className="w-full">
-            {t('table.columns.name.header')}
-          </TableColumn>
-        </TableHeader>
-        <TableBody items={resourceSearchResults?.data ?? []}>
-          {(resource) => (
-            <TableRow key={resource.id}>
-              <TableCell>{resource.name}</TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
+      <TextField value={search} onChange={setSearch} className="w-full">
+        <Label>{t('search.label')}</Label>
+        <InputGroup>
+          <Input placeholder={t('search.placeholder')} />
+          {isResourceSearchLoading ? <Spinner /> : null}
+        </InputGroup>
+      </TextField>
+      <TableRoot aria-label={t('table.ariaLabel')}>
+        <TableContent
+          selectionMode={multiple ? 'multiple' : 'single'}
+          selectedKeys={new Set(selection.map(String))}
+          onSelectionChange={(keys) => {
+            if (keys === 'all') {
+              onSelectionChange((resourceSearchResults?.data ?? []).map((r) => r.id));
+              return;
+            }
+            onSelectionChange(Array.from(keys).map((k) => Number(k)));
+          }}
+        >
+          <TableHeader>
+            <TableColumn className="w-full">
+              {t('table.columns.name.header')}
+            </TableColumn>
+          </TableHeader>
+          <TableBody items={resourceSearchResults?.data ?? []}>
+            {(resource) => (
+              <TableRow key={resource.id} id={String(resource.id)}>
+                <TableCell>{resource.name}</TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </TableContent>
+      </TableRoot>
     </div>
   );
 }

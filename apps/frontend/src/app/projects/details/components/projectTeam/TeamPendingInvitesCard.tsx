@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Button, Card, CardBody, CardHeader, Chip, Skeleton } from '@heroui/react';
+import { Button, Card, Chip, Skeleton } from '@heroui/react';
 import {
   ApiError,
   ProjectInvitation,
@@ -117,15 +117,15 @@ export function TeamPendingInvitesCard(props: Readonly<TeamPendingInvitesCardPro
 
   return (
     <Card>
-      <CardHeader className="flex items-center justify-between gap-4">
+      <Card.Header className="flex items-center justify-between gap-4">
         <p className="text-large font-semibold">{t('sections.pending.title')}</p>
-        <Chip size="sm" variant="flat">
+        <Chip variant="soft">
           {pendingInvitations.length}
         </Chip>
-      </CardHeader>
-      <CardBody>
+      </Card.Header>
+      <Card.Content>
         <div className="space-y-3">{content}</div>
-      </CardBody>
+      </Card.Content>
     </Card>
   );
 }
@@ -153,7 +153,7 @@ function PendingInvitationRow(props: Readonly<PendingInvitationRowProps>) {
     <div className="flex flex-col gap-2 rounded-medium border border-default-200 p-3">
       <div className="flex items-center justify-between gap-3">
         <AttraccessUser user={invitation.invitedUser} />
-        <Chip size="sm" color={statusColor[invitation.status]} variant="flat">
+        <Chip color={statusColor[invitation.status]} variant="soft">
           {t(`statuses.${invitation.status}` as const)}
         </Chip>
       </div>
@@ -164,23 +164,18 @@ function PendingInvitationRow(props: Readonly<PendingInvitationRowProps>) {
         {invitation.inviter && <span>{invitation.inviter.username}</span>}
       </div>
       <div className="flex items-center justify-end gap-2">
-        <Button
-          size="sm"
-          variant="light"
-          startContent={<RefreshCcwIcon className="size-4" />}
-          isLoading={isLoadingResend}
+        <Button variant="ghost"
+
+          isPending={isLoadingResend}
           onPress={onResend}
-        >
+        ><RefreshCcwIcon className="size-4" />
           {t('actions.resend')}
         </Button>
-        <Button
-          size="sm"
-          variant="light"
-          color="danger"
-          startContent={<XIcon className="size-4" />}
-          isLoading={isLoadingCancel}
+        <Button variant="danger-soft"
+
+          isPending={isLoadingCancel}
           onPress={onCancel}
-        >
+        ><XIcon className="size-4" />
           {t('actions.cancel')}
         </Button>
       </div>

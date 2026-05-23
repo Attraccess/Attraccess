@@ -4,6 +4,7 @@
   "transactions": {
     "table": {
       "ariaLabel": "Transaktionen",
+      "empty": "Noch keine Transaktionen.",
       "columns": {
         "id": "ID",
         "dateTime": "Datum",
@@ -11,6 +12,9 @@
         "details": "Details",
         "amount": "Betrag",
         "actions": "Aktionen"
+      },
+      "actions": {
+        "refund": "Transaktion erstatten"
       },
       "cells": {
         "details": {

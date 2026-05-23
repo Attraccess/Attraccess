@@ -7,6 +7,7 @@
       "openSerialConsole": "Serielle Konsole"
     }
   },
+  "workInProgressTitle": "In Arbeit",
   "workInProgress": "Dieses Feature ist noch in Arbeit, benutzung auf eigene Gefahr!",
   "error": {
     "fetchReaders": "Attractap konnten nicht abgerufen werden"

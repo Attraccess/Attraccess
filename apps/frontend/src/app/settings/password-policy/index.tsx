@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Card, CardBody, CardHeader, Spinner } from '@heroui/react';
+import { Button, Card, Spinner } from '@heroui/react';
 import { ShieldCheckIcon } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -85,24 +85,24 @@ export function PasswordPolicySettingsPage() {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
-          <CardHeader className="flex flex-col items-start gap-1">
+          <Card.Header className="flex flex-col items-start gap-1">
             <span className="text-base font-semibold">{t('global.title')}</span>
             <span className="text-sm text-default-500">{t('global.subtitle')}</span>
-          </CardHeader>
-          <CardBody className="flex flex-col gap-4">
+          </Card.Header>
+          <Card.Content className="flex flex-col gap-4">
             <PolicyFields value={form} onChange={setForm} testIdPrefix="global-policy" />
             <div>
               <Button
-                color="primary"
+                variant="primary"
                 onPress={() => setConfirmOpen(true)}
                 isDisabled={!isDirty}
-                isLoading={isPending}
+                isPending={isPending}
                 data-testid="policy-save-button"
               >
                 {t('global.saveButton')}
               </Button>
             </div>
-          </CardBody>
+          </Card.Content>
         </Card>
 
         <PreviewSection policy={form} />

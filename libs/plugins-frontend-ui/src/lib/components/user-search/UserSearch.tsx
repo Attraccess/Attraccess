@@ -1,5 +1,7 @@
+// User search component with server-driven ComboBox and rich user list items
+// FEATURE: User search with async loading and selection display
 import { HTMLAttributes, useCallback, useEffect, useMemo, useState } from 'react';
-import { Autocomplete, AutocompleteItem, AutocompleteProps } from '@heroui/react';
+import { ComboBox, Input, Label, ListBox, ListBoxItem } from '@heroui/react';
 import { useTranslations } from '../../i18n';
 import { AttraccessUser } from '../attraccess-user/AttraccessUser';
 import { User, useUsersServiceFindMany, useUsersServiceGetOneUserById } from '@attraccess/react-query-client';
@@ -7,94 +9,100 @@ import { User, useUsersServiceFindMany, useUsersServiceGetOneUserById } from '@a
 import en from './en.json';
 import de from './de.json';
 
+type SelectionKey = string | number;
+
 interface UserSearchProps {
   label?: string;
   placeholder?: string;
   onSelectionChange?: (user: User | null) => void;
-  autocompleteProps?: { size?: AutocompleteProps['size'] };
+  autocompleteProps?: { size?: 'sm' | 'md' | 'lg' };
   wrapperProps?: Omit<HTMLAttributes<HTMLDivElement>, 'children'>;
   afterAutocomplete?: React.ReactNode;
   afterSelection?: React.ReactNode;
 }
 
 export function UserSearch(props: Readonly<UserSearchProps>) {
-  const { label, placeholder, onSelectionChange, autocompleteProps, afterAutocomplete, wrapperProps, afterSelection } =
-    props;
+  const { label, placeholder, onSelectionChange, afterAutocomplete, wrapperProps, afterSelection } = props;
 
-  const { t } = useTranslations({
-    en,
-    de,
-  });
+  const { t } = useTranslations({ en, de });
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  const handleClearSelection = useCallback(() => {
-    setSelectedKey(null);
-    setSearchTerm('');
-  }, []);
-  const selectedUserId = useMemo(() => (selectedKey ? Number(selectedKey) : null), [selectedKey]);
+  const [selectedKey, setSelectedKey] = useState<SelectionKey | null>(null);
+
+  const selectedUserId = useMemo(() => (selectedKey != null ? Number(selectedKey) : null), [selectedKey]);
 
   const searchUsers = useUsersServiceFindMany({ search: searchTerm, limit: 10, page: 1 });
-
   const users = useMemo(() => {
-    return searchUsers.data?.data ?? [];
-  }, [searchUsers.data]);
+    const data = searchUsers.data?.data ?? [];
+    const needle = searchTerm.trim().toLowerCase();
+    if (!needle) return data;
+    return data.filter((u) => u.username.toLowerCase().includes(needle));
+  }, [searchUsers.data, searchTerm]);
 
   const selectedUserDetails = useUsersServiceGetOneUserById({ id: selectedUserId as number }, undefined, {
     enabled: !!selectedUserId,
   });
 
   const selectedUser = useMemo(() => {
-    if (!selectedUserId) {
-      return null;
-    }
-
-    if (selectedUserDetails.data?.id === selectedUserId) {
-      return selectedUserDetails.data;
-    }
-
-    const userFromSearch = users.find((user) => user.id === selectedUserId);
-    if (userFromSearch) {
-      return userFromSearch;
-    }
-
-    return null;
+    if (!selectedUserId) return null;
+    if (selectedUserDetails.data?.id === selectedUserId) return selectedUserDetails.data;
+    return users.find((user) => user.id === selectedUserId) ?? null;
   }, [selectedUserId, selectedUserDetails.data, users]);
 
   useEffect(() => {
-    if (typeof onSelectionChange !== 'function') {
-      return;
-    }
+    if (typeof onSelectionChange !== 'function') return;
+    onSelectionChange(selectedUser);
+  }, [selectedUser, onSelectionChange]);
 
-    const selectedUser = users.find((user) => user.id === selectedUserId);
+  const handleSelectionChange = useCallback(
+    (key: SelectionKey | null) => {
+      setSelectedKey(key);
+      if (key != null) {
+        const picked = users.find((u) => u.id === Number(key));
+        if (picked) setSearchTerm(picked.username);
+      }
+    },
+    [users],
+  );
 
-    onSelectionChange(selectedUser ?? null);
-  }, [selectedUserId, onSelectionChange, users]);
+  const handleInputChange = useCallback(
+    (value: string) => {
+      setSearchTerm(value);
+      if (selectedKey != null && selectedUser && value !== selectedUser.username) {
+        setSelectedKey(null);
+      }
+    },
+    [selectedKey, selectedUser],
+  );
 
   return (
     <div {...wrapperProps}>
       <div className="flex gap-2 items-center">
-        <Autocomplete
-          inputValue={searchTerm}
-          isLoading={searchUsers.isLoading}
+        <ComboBox<User>
+          className="flex-1"
           items={users}
-          label={label ?? t('label')}
-          placeholder={placeholder ?? t('placeholder')}
-          onInputChange={setSearchTerm}
           selectedKey={selectedKey}
-          onSelectionChange={(key) => setSelectedKey(key as string | null)}
-          isClearable
-          inputProps={{ autoComplete: 'off', type: 'search' }}
-          clearButtonProps={{ onPress: handleClearSelection }}
-          size={autocompleteProps?.size}
+          onSelectionChange={handleSelectionChange}
+          inputValue={searchTerm}
+          onInputChange={handleInputChange}
+          menuTrigger="input"
+          allowsEmptyCollection
         >
-          {(item) => (
-            <AutocompleteItem key={(item as User).id} textValue={(item as User).username}>
-              <AttraccessUser user={item as User} />
-            </AutocompleteItem>
-          )}
-        </Autocomplete>
-
+          <Label>{label ?? t('label')}</Label>
+          <ComboBox.InputGroup>
+            <Input placeholder={placeholder ?? t('placeholder')} autoComplete="off" />
+            <ComboBox.Trigger />
+          </ComboBox.InputGroup>
+          <ComboBox.Popover>
+            <ListBox<User>>
+              {(user) => (
+                <ListBoxItem id={String(user.id)} textValue={user.username}>
+                  <AttraccessUser user={user} />
+                </ListBoxItem>
+              )}
+            </ListBox>
+          </ComboBox.Popover>
+        </ComboBox>
         {afterAutocomplete}
       </div>
 

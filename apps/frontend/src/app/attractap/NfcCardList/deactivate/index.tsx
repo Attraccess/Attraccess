@@ -1,8 +1,8 @@
-import { Button, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, useDisclosure } from '@heroui/react';
+import { Button, DrawerBody, DrawerFooter, DrawerHeader, useOverlayState } from '@heroui/react';
+import { StandardDrawer } from '../../../../components/standardDrawer';
 import de from './de.json';
 import en from './en.json';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { PageHeader } from '../../../../components/pageHeader';
 import {
   UseAttractapServiceGetAllCardsKeyFn,
   useAttractapServiceToggleCardActive,
@@ -25,12 +25,12 @@ export function NfcCardDeactivateModal(props: Props) {
     en,
   });
 
-  const { onOpen, isOpen, onOpenChange, onClose } = useDisclosure();
+  const { open, isOpen, setOpen, close } = useOverlayState();
 
   const { mutate, isPending } = useAttractapServiceToggleCardActive({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: UseAttractapServiceGetAllCardsKeyFn() });
-      onClose();
+      close();
     },
   });
 
@@ -41,22 +41,24 @@ export function NfcCardDeactivateModal(props: Props) {
   return (
     <>
       {activator(() => {
-        onOpen();
+        open();
       })}
-      <Modal isOpen={isOpen} onOpenChange={onOpenChange} scrollBehavior="inside" data-cy="nfc-card-deactivate-modal">
-        <ModalContent>
-          <ModalHeader>
-            <PageHeader title={t('title')} noMargin />
-          </ModalHeader>
-          <ModalBody>{t('description')}</ModalBody>
-          <ModalFooter>
-            <Button onPress={onClose}>{t('cancel')}</Button>
-            <Button onPress={onDeactivate} isLoading={isPending}>
+      <StandardDrawer isOpen={isOpen} onOpenChange={setOpen}>
+        <div data-cy="nfc-card-deactivate-modal" className="contents">
+          <DrawerHeader>
+            <h2 className="text-lg font-semibold">{t('title')}</h2>
+          </DrawerHeader>
+          <DrawerBody>{t('description')}</DrawerBody>
+          <DrawerFooter>
+            <Button variant="secondary" onPress={close}>
+              {t('cancel')}
+            </Button>
+            <Button variant="primary" onPress={onDeactivate} isPending={isPending}>
               {t('deactivate')}
             </Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
+          </DrawerFooter>
+        </div>
+      </StandardDrawer>
     </>
   );
 }

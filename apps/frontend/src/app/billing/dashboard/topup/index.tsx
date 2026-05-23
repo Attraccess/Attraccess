@@ -3,16 +3,17 @@ import en from './en.json';
 import de from './de.json';
 import {
   Alert,
+  AlertContent,
+  AlertTitle,
   Button,
-  Card,
-  CardBody,
-  CardFooter,
-  CardHeader,
-  CardProps,
-  Spinner,
   cn,
   Form,
-  NumberInput,
+  NumberField,
+  NumberFieldDecrementButton,
+  NumberFieldGroup,
+  NumberFieldIncrementButton,
+  NumberFieldInput,
+  Spinner,
 } from '@heroui/react';
 import { PageHeader } from '../../../../components/pageHeader';
 import { SumUpIcon } from '../../../../components/icons/sumup.icon';
@@ -35,15 +36,16 @@ import { dbCurrencyToUserCurrency, userCurrencyToDbCurrency } from '@attraccess/
 import API_ERROR_TRANSLATIONS_DE from '../../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../global-translations/api-errors.en.json';
 
-type Props = Omit<CardProps, 'children'> & {
+interface Props {
+  className?: string;
   title?: string;
   subtitle?: string;
   desiredAmount?: number;
   onProcessingComplete?: () => void;
-};
+}
 
 export function BillingDashboardTopupCard(props: Props) {
-  const { title, subtitle, desiredAmount, onProcessingComplete, ...cardProps } = props;
+  const { className, title, subtitle, desiredAmount, onProcessingComplete } = props;
   const { t, tExists } = useTranslations({
     en: {
       ...en,
@@ -129,33 +131,26 @@ export function BillingDashboardTopupCard(props: Props) {
 
   if (isLoadingSumUpConfiguration) {
     return (
-      <Card {...cardProps} className={cn('max-w-full', cardProps.className)}>
-        <CardHeader>
-          <PageHeader title={title ?? t('title')} subtitle={subtitle ?? t('subtitle')} icon={<SumUpIcon />} noMargin />
-        </CardHeader>
-        <CardBody className="flex justify-center py-8">
-          <Spinner label={t('loading')} />
-        </CardBody>
-      </Card>
+      <div className={cn('w-full flex flex-col gap-6', className)}>
+        <PageHeader title={title ?? t('title')} subtitle={subtitle ?? t('subtitle')} icon={<SumUpIcon />} noMargin />
+        <div className="flex justify-center py-8">
+          <Spinner />
+        </div>
+      </div>
     );
   }
 
   if (isSumUpConfigurationError || !sumUpConfiguration?.enabled) {
     return (
-      <Card {...cardProps} className={cn('max-w-full', cardProps.className)}>
-        <CardHeader>
-          <PageHeader title={title ?? t('title')} subtitle={subtitle ?? t('subtitle')} icon={<SumUpIcon />} noMargin />
-        </CardHeader>
-        <CardBody>
-          <Alert
-            color={isSumUpConfigurationError ? 'danger' : 'warning'}
-            variant="flat"
-            title={t('unavailable.title')}
-          >
-            <p className="text-sm">{t('unavailable.description')}</p>
-          </Alert>
-        </CardBody>
-      </Card>
+      <div className={cn('w-full flex flex-col gap-6', className)}>
+        <PageHeader title={title ?? t('title')} subtitle={subtitle ?? t('subtitle')} icon={<SumUpIcon />} noMargin />
+        <Alert status={isSumUpConfigurationError ? 'danger' : 'warning'}>
+          <AlertContent>
+            <AlertTitle>{t('unavailable.title')}</AlertTitle>
+          </AlertContent>
+          <p className="text-sm">{t('unavailable.description')}</p>
+        </Alert>
+      </div>
     );
   }
 
@@ -172,54 +167,57 @@ export function BillingDashboardTopupCard(props: Props) {
   }
 
   return (
-    <Card {...cardProps} className={cn('max-w-full', props.className)}>
-      <CardHeader>
-        <PageHeader title={title ?? t('title')} subtitle={subtitle ?? t('subtitle')} icon={<SumUpIcon />} noMargin />
-      </CardHeader>
+    <div className={cn('w-full flex flex-col gap-6', className)}>
+      <PageHeader title={title ?? t('title')} subtitle={subtitle ?? t('subtitle')} icon={<SumUpIcon />} noMargin />
 
-      <CardBody>
-        <Form
-          onSubmit={(e) => {
-            e.preventDefault();
-            onSubmit();
-          }}
-        >
-          {(readers ?? []).length > 1 && (
-            <Select
-              items={readers?.map((reader) => ({ key: reader.id, label: reader.name })) ?? []}
-              label={t('inputs.reader.label')}
-              selectedKey={readerId}
-              onSelectionChange={(key) => setReaderId(key as string)}
-            />
-          )}
-
-          <NumberInput
-            label={t('inputs.amount.label')}
-            description={t('inputs.amount.description')}
-            value={amount}
-            onValueChange={(value) => setAmount(value)}
-            minValue={1}
+      <Form
+        className="gap-4"
+        onSubmit={(e) => {
+          e.preventDefault();
+          onSubmit();
+        }}
+      >
+        {(readers ?? []).length > 1 && (
+          <Select
+            items={readers?.map((reader) => ({ key: reader.id, label: reader.name })) ?? []}
+            label={t('inputs.reader.label')}
+            value={readerId}
+            onChange={(key) => setReaderId(key as string)}
           />
-          <input type="submit" hidden />
-        </Form>
+        )}
 
-        <div>
-          <Alert color="warning" variant="flat" title={t('topUpInstructions.title')}>
-            <p className="max-w-[600px] text-sm whitespace-pre-wrap text-wrap">{t('topUpInstructions.description')}</p>
-          </Alert>
-        </div>
-      </CardBody>
+        <NumberField
+          aria-label={t('inputs.amount.label')}
+          value={amount}
+          onChange={(value) => setAmount(value)}
+          minValue={1}
+        >
+          <NumberFieldGroup>
+            <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
+            <NumberFieldInput />
+            <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
+          </NumberFieldGroup>
+        </NumberField>
+        <input type="submit" hidden />
+      </Form>
 
-      <CardFooter>
+      <Alert status="warning">
+        <AlertContent>
+          <AlertTitle>{t('topUpInstructions.title')}</AlertTitle>
+        </AlertContent>
+        <p className="max-w-[600px] text-sm whitespace-pre-wrap text-wrap">{t('topUpInstructions.description')}</p>
+      </Alert>
+
+      <div className="flex justify-end">
         <Button
-          color="primary"
+          variant="primary"
           onPress={onSubmit}
-          isLoading={isPendingTopUpWithSumUpReader}
+          isPending={isPendingTopUpWithSumUpReader}
           isDisabled={!readerId || amount === 0}
         >
           {t('actions.topUp', { amount: formatNumber(amount), currency: configuration?.currency })}
         </Button>
-      </CardFooter>
-    </Card>
+      </div>
+    </div>
   );
 }

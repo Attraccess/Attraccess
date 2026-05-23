@@ -9,9 +9,10 @@ import {
   useSettingsServiceUpdateSystemSettings,
   useSettingsServiceGetSystemSettingsKey,
 } from '@attraccess/react-query-client';
-import { Button, Form, Input, Spinner, Switch } from '@heroui/react';
+import { Button, Form, TextField, Label, Input, Description, Spinner } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PasswordInput } from '../../../../components/PasswordInput';
+import { LabeledSwitch } from '../../../../components/labeledSwitch';
 import { Select } from '../../../../components/select';
 import { useToastMessage } from '../../../../components/toastProvider';
 import API_ERROR_TRANSLATIONS_DE from '../../../../global-translations/api-errors.de.json';
@@ -132,7 +133,7 @@ export function SmtpSettingsForm({ variant, endpoint, onNext }: SmtpSettingsForm
   if (showLoading) {
     return (
       <div className="flex items-center gap-2 text-sm text-default-500">
-        <Spinner size="sm" />
+        <Spinner />
         {t('loading')}
       </div>
     );
@@ -149,8 +150,8 @@ export function SmtpSettingsForm({ variant, endpoint, onNext }: SmtpSettingsForm
     >
       <Select
         label={t('inputs.service.label')}
-        selectedKey={smtpService}
-        onSelectionChange={(key) => {
+        value={smtpService}
+        onChange={(key) => {
           const next = key as SmtpServiceType;
           setSmtpService(next);
           if (next === SmtpServiceType.OUTLOOK365) {
@@ -161,55 +162,53 @@ export function SmtpSettingsForm({ variant, endpoint, onNext }: SmtpSettingsForm
         items={smtpServiceOptions}
         isRequired
       />
-      <Input
-        label={t('inputs.host.label')}
-        description={t('inputs.host.description')}
+      <TextField
+        isRequired
+        isDisabled={smtpService !== SmtpServiceType.SMTP}
         value={smtpHost}
-        onValueChange={setSmtpHost}
+        onChange={setSmtpHost}
+      >
+        <Label>{t('inputs.host.label')}</Label>
+        <Input />
+        <Description>{t('inputs.host.description')}</Description>
+      </TextField>
+      <TextField
         isRequired
         isDisabled={smtpService !== SmtpServiceType.SMTP}
-      />
-      <Input
-        label={t('inputs.port.label')}
-        description={t('inputs.port.description')}
-        type="number"
         value={smtpPort}
-        onValueChange={setSmtpPort}
-        isRequired
-        isDisabled={smtpService !== SmtpServiceType.SMTP}
-        min={1}
-      />
-      <Switch
+        onChange={setSmtpPort}
+      >
+        <Label>{t('inputs.port.label')}</Label>
+        <Input type="number" min={1} />
+        <Description>{t('inputs.port.description')}</Description>
+      </TextField>
+      <LabeledSwitch
         isSelected={smtpSecure}
-        onValueChange={setSmtpSecure}
+        onChange={setSmtpSecure}
         isDisabled={smtpService !== SmtpServiceType.SMTP}
       >
         {t('inputs.secure.label')}
-      </Switch>
-      <Input
-        label={t('inputs.user.label')}
-        description={t('inputs.user.description')}
-        value={smtpUser}
-        onValueChange={setSmtpUser}
-      />
+      </LabeledSwitch>
+      <TextField value={smtpUser} onChange={setSmtpUser}>
+        <Label>{t('inputs.user.label')}</Label>
+        <Input />
+        <Description>{t('inputs.user.description')}</Description>
+      </TextField>
       <PasswordInput
         label={t('inputs.pass.label')}
         description={t('inputs.pass.description')}
         value={smtpPass}
-        onValueChange={setSmtpPass}
+        onChange={setSmtpPass}
         autoComplete="off"
       />
-      <Input
-        label={t('inputs.from.label')}
-        description={t('inputs.from.description')}
-        value={smtpFrom}
-        onValueChange={setSmtpFrom}
-        isRequired
-      />
-      <Button
-        color="primary"
+      <TextField isRequired value={smtpFrom} onChange={setSmtpFrom}>
+        <Label>{t('inputs.from.label')}</Label>
+        <Input />
+        <Description>{t('inputs.from.description')}</Description>
+      </TextField>
+      <Button variant="primary"
         onPress={handleSubmit}
-        isLoading={isSaving}
+        isPending={isSaving}
         isDisabled={showLoading}
       >
         {variant === 'wizard' ? t('actions.next') : t('actions.save')}

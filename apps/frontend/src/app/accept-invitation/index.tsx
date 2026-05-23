@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useUrlQuery } from '@attraccess/plugins-frontend-ui';
 import { useNavigate } from 'react-router-dom';
-import { Alert, Button, Form } from '@heroui/react';
+import { Alert, AlertContent, AlertDescription, AlertTitle, Button, Form } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
@@ -81,11 +81,13 @@ export function AcceptInvitation() {
 
   if (!token || !email) {
     return (
-      <Alert
-        color="danger"
-        title={t('error.noTokenOrEmail.title')}
-        description={t('error.noTokenOrEmail.description')}
-      />
+      <Alert status="danger"
+      >
+        <AlertContent>
+          <AlertTitle>{t('error.noTokenOrEmail.title')}</AlertTitle>
+          <AlertDescription>{t('error.noTokenOrEmail.description')}</AlertDescription>
+        </AlertContent>
+      </Alert>
     );
   }
 
@@ -119,7 +121,7 @@ export function AcceptInvitation() {
           dataCyPrefix="accept-invitation"
         />
 
-        <Button color="primary" isLoading={isPending} type="submit">
+        <Button variant="primary" isPending={isPending} type="submit">
           {t('actions.acceptInvitation')}
         </Button>
       </Form>

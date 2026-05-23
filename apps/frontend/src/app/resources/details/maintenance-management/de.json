@@ -15,6 +15,9 @@
     }
   },
   "actions": {
+    "manageHub": {
+      "label": "Wartung verwalten"
+    },
     "create": {
       "title": "Wartungszeitraum anlegen",
       "label": "Neu"

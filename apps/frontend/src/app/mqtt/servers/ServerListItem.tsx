@@ -19,10 +19,10 @@ export function ServerListItem({ id, name, host, port, onEdit, onDelete }: Serve
         </p>
       </div>
       <div className="space-x-2">
-        <Button color="secondary" variant="flat" size="sm" onPress={() => onEdit(id)}>
+        <Button variant="secondary" onPress={() => onEdit(id)}>
           Edit
         </Button>
-        <Button color="danger" variant="flat" size="sm" onPress={() => onDelete(id)}>
+        <Button variant="danger-soft" onPress={() => onDelete(id)}>
           Delete
         </Button>
       </div>

@@ -1,23 +1,26 @@
 import {
   Button,
   Chip,
-  Divider,
+  Separator,
   Modal,
+  ModalBackdrop,
   ModalBody,
-  ModalContent,
+  ModalContainer,
+  ModalDialog,
   ModalHeader,
+  ModalHeading,
   Table,
   TableBody,
   TableCell,
   TableColumn,
+  TableContent,
   TableHeader,
   TableRow,
-  useDisclosure,
+  useOverlayState,
 } from '@heroui/react';
 import de from './de.json';
 import en from './en.json';
 import { AttraccessUser, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { PageHeader } from '../../../../../components/pageHeader';
 import {
   BillingTransaction,
   BillingTransactionStatus,
@@ -41,7 +44,11 @@ export function TransactionDetailsModal(props: Props) {
 
   const { t, tExists } = useTranslations({ en, de });
 
-  const { onOpen, isOpen, onOpenChange, onClose } = useDisclosure({ onClose: onCloseProp });
+  const { open, isOpen, setOpen, close } = useOverlayState({
+    onOpenChange: (o) => {
+      if (!o) onCloseProp?.();
+    },
+  });
 
   useEffect(() => {
     if (isOpenProp === undefined) {
@@ -49,11 +56,11 @@ export function TransactionDetailsModal(props: Props) {
     }
 
     if (isOpenProp) {
-      onOpen();
+      open();
     } else {
-      onClose();
+      close();
     }
-  }, [isOpenProp, onOpen, onClose]);
+  }, [isOpenProp, open, close]);
 
   const { data: transaction } = useBillingServiceGetBillingTransaction({ transactionId });
   const { data: configuration } = useBillingServiceGetBillingConfiguration();
@@ -81,149 +88,167 @@ export function TransactionDetailsModal(props: Props) {
 
   return (
     <>
-      {children && children(onOpen)}
-      <Modal isOpen={isOpen} onOpenChange={onOpenChange} size="2xl" scrollBehavior="inside">
-        <ModalContent>
-          <ModalHeader>
-            <PageHeader
-              title={t('title')}
-              noMargin
-              actions={
-                <RefundModal transactionId={transactionId}>
-                  {(onOpen) => (
-                    <Button color="danger" variant="light" onPress={onOpen}>
-                      {t('actions.refund')}
-                    </Button>
-                  )}
-                </RefundModal>
-              }
-            />
-          </ModalHeader>
-          <ModalBody>
-            {!transaction ? (
-              <div className="py-6 text-center text-default-500">{t('loading')}</div>
-            ) : (
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div>
-                    <div className="text-small text-default-500">{t('meta.id')}</div>
-                    <div className="font-medium">#{transaction.id}</div>
-                  </div>
-                  <div>
-                    <div className="text-small text-default-500">{t('meta.date')}</div>
-                    <div className="font-medium">
-                      <DateTimeDisplay date={transaction.createdAt} />
+      {children && children(open)}
+      <Modal isOpen={isOpen} onOpenChange={setOpen}>
+        <ModalBackdrop>
+          <ModalContainer size="lg">
+            <ModalDialog>
+              {() => (
+                <>
+                  <ModalHeader>
+                    <div className="flex w-full items-center justify-between gap-2">
+                      <ModalHeading>{t('title')}</ModalHeading>
+                      <RefundModal transactionId={transactionId}>
+                        {(onOpen) => (
+                          <Button variant="danger-soft" onPress={onOpen}>
+                            {t('actions.refund')}
+                          </Button>
+                        )}
+                      </RefundModal>
                     </div>
-                  </div>
-                  <div>
-                    <div className="text-small text-default-500">{t('meta.type')}</div>
-                    <div className="font-medium">
-                      {transaction.refundOfId
-                        ? t('type.refund')
-                        : transaction.resourceUsageId
-                          ? t('type.resourceUsage')
-                          : transaction.initiatorId
-                            ? t('type.manual')
-                            : transaction.externalReference?.startsWith('sumup_topup_transaction')
-                              ? t('type.sumupTopup')
-                              : t('type.unknown')}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-small text-default-500">{t('meta.status')}</div>
-                    <Chip color={statusColor(transaction.status)} size="sm" variant="flat">
-                      {t('status.' + transaction.status)}
-                    </Chip>
-                  </div>
-                  <div>
-                    <div className="text-small text-default-500">{t('meta.amount')}</div>
-                    <div
-                      className={transaction.amount < 0 ? 'text-danger font-semibold' : 'text-success font-semibold'}
-                    >
-                      {transaction.amount > 0 && '+'}
-                      {formatNumber(dbCurrencyToUserCurrency(transaction.amount, configuration?.minorUnit ?? 2))}
-                    </div>
-                  </div>
-                  {transaction.initiator && (
-                    <div className="sm:col-span-2">
-                      <div className="text-small text-default-500">{t('meta.initiator')}</div>
-                      <AttraccessUser user={transaction.initiator} />
-                    </div>
-                  )}
-                  {transaction.resourceUsage && (
-                    <div className="sm:col-span-2">
-                      <div className="text-small text-default-500">{t('meta.resourceUsage')}</div>
-                      <div className="font-medium">
-                        {transaction.resourceUsage.resource?.name ?? `Usage #${transaction.resourceUsage.id}`}
-                      </div>
-                    </div>
-                  )}
-                  {transaction.refundOfId && (
-                    <div>
-                      <div className="text-small text-default-500">{t('meta.refundOf')}</div>
-                      <div className="font-medium">#{transaction.refundOfId}</div>
-                    </div>
-                  )}
-                  {transaction.externalReference && (
-                    <div>
-                      <div className="text-small text-default-500">{t('meta.externalReference')}</div>
-                      <div className="font-medium break-all">{transaction.externalReference}</div>
-                    </div>
-                  )}
-                </div>
-
-                <Divider />
-
-                <div>
-                  <div className="mb-2 font-semibold">{t('items.title')}</div>
-                  <Table removeWrapper aria-label="Transaction items">
-                    <TableHeader>
-                      <TableColumn>{t('items.columns.name')}</TableColumn>
-                      <TableColumn>{t('items.columns.description')}</TableColumn>
-                      <TableColumn align="end">{t('items.columns.quantity')}</TableColumn>
-                      <TableColumn align="end">{t('items.columns.unitPrice')}</TableColumn>
-                      <TableColumn align="end">{t('items.columns.subtotal')}</TableColumn>
-                    </TableHeader>
-                    <TableBody emptyContent={t('items.empty')}>
-                      {(transaction.items ?? []).map((item) => (
-                        <TableRow key={item.id}>
-                          <TableCell>
+                  </ModalHeader>
+                  <ModalBody>
+                    {!transaction ? (
+                      <div className="py-6 text-center text-default-500">{t('loading')}</div>
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                          <div>
+                            <div className="text-small text-default-500">{t('meta.id')}</div>
+                            <div className="font-medium">#{transaction.id}</div>
+                          </div>
+                          <div>
+                            <div className="text-small text-default-500">{t('meta.date')}</div>
                             <div className="font-medium">
-                              {tExists('items.system.' + item.name) ? t('items.system.' + item.name) : item.name}
+                              <DateTimeDisplay date={transaction.createdAt} />
                             </div>
-                            {item.externalReference && (
-                              <div className="text-tiny text-default-400">{item.externalReference}</div>
-                            )}
-                          </TableCell>
-                          <TableCell className="max-w-[28ch] truncate" title={item.description ?? undefined}>
-                            {item.description}
-                          </TableCell>
-                          <TableCell className="text-right">{item.quantity}</TableCell>
-                          <TableCell className="text-right">
-                            {formatNumber(dbCurrencyToUserCurrency(item.unitPrice, configuration?.minorUnit ?? 2))}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {formatNumber(
-                              dbCurrencyToUserCurrency(item.unitPrice * item.quantity, configuration?.minorUnit ?? 2),
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                  <div className="mt-2 flex justify-end text-small text-default-500">
-                    <div>
-                      {t('items.total')}:{' '}
-                      <span className="font-semibold text-foreground">
-                        {formatNumber(dbCurrencyToUserCurrency(totalItemsAmount, configuration?.minorUnit ?? 2))}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </ModalBody>
-        </ModalContent>
+                          </div>
+                          <div>
+                            <div className="text-small text-default-500">{t('meta.type')}</div>
+                            <div className="font-medium">
+                              {transaction.refundOfId
+                                ? t('type.refund')
+                                : transaction.resourceUsageId
+                                  ? t('type.resourceUsage')
+                                  : transaction.initiatorId
+                                    ? t('type.manual')
+                                    : transaction.externalReference?.startsWith('sumup_topup_transaction')
+                                      ? t('type.sumupTopup')
+                                      : t('type.unknown')}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-small text-default-500">{t('meta.status')}</div>
+                            <Chip color={statusColor(transaction.status)} variant="soft">
+                              {t('status.' + transaction.status)}
+                            </Chip>
+                          </div>
+                          <div>
+                            <div className="text-small text-default-500">{t('meta.amount')}</div>
+                            <div
+                              className={
+                                transaction.amount < 0 ? 'text-danger font-semibold' : 'text-success font-semibold'
+                              }
+                            >
+                              {transaction.amount > 0 && '+'}
+                              {formatNumber(
+                                dbCurrencyToUserCurrency(transaction.amount, configuration?.minorUnit ?? 2),
+                              )}
+                            </div>
+                          </div>
+                          {transaction.initiator && (
+                            <div className="sm:col-span-2">
+                              <div className="text-small text-default-500">{t('meta.initiator')}</div>
+                              <AttraccessUser user={transaction.initiator} />
+                            </div>
+                          )}
+                          {transaction.resourceUsage && (
+                            <div className="sm:col-span-2">
+                              <div className="text-small text-default-500">{t('meta.resourceUsage')}</div>
+                              <div className="font-medium">
+                                {transaction.resourceUsage.resource?.name ?? `Usage #${transaction.resourceUsage.id}`}
+                              </div>
+                            </div>
+                          )}
+                          {transaction.refundOfId && (
+                            <div>
+                              <div className="text-small text-default-500">{t('meta.refundOf')}</div>
+                              <div className="font-medium">#{transaction.refundOfId}</div>
+                            </div>
+                          )}
+                          {transaction.externalReference && (
+                            <div>
+                              <div className="text-small text-default-500">{t('meta.externalReference')}</div>
+                              <div className="font-medium break-all">{transaction.externalReference}</div>
+                            </div>
+                          )}
+                        </div>
+
+                        <Separator />
+
+                        <div>
+                          <div className="mb-2 font-semibold">{t('items.title')}</div>
+                          <Table>
+                            <TableContent aria-label="Transaction items">
+                            <TableHeader>
+                              <TableColumn isRowHeader>{t('items.columns.name')}</TableColumn>
+                              <TableColumn>{t('items.columns.description')}</TableColumn>
+                              <TableColumn>{t('items.columns.quantity')}</TableColumn>
+                              <TableColumn>{t('items.columns.unitPrice')}</TableColumn>
+                              <TableColumn>{t('items.columns.subtotal')}</TableColumn>
+                            </TableHeader>
+                            <TableBody renderEmptyState={() => t('items.empty')}>
+                              {(transaction.items ?? []).map((item) => (
+                                <TableRow key={item.id} id={item.id}>
+                                  <TableCell>
+                                    <div className="font-medium">
+                                      {tExists('items.system.' + item.name)
+                                        ? t('items.system.' + item.name)
+                                        : item.name}
+                                    </div>
+                                    {item.externalReference && (
+                                      <div className="text-tiny text-default-400">{item.externalReference}</div>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="max-w-[28ch] truncate">{item.description}</TableCell>
+                                  <TableCell className="text-right">{item.quantity}</TableCell>
+                                  <TableCell className="text-right">
+                                    {formatNumber(
+                                      dbCurrencyToUserCurrency(item.unitPrice, configuration?.minorUnit ?? 2),
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    {formatNumber(
+                                      dbCurrencyToUserCurrency(
+                                        item.unitPrice * item.quantity,
+                                        configuration?.minorUnit ?? 2,
+                                      ),
+                                    )}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                            </TableContent>
+                          </Table>
+                          <div className="mt-2 flex justify-end text-small text-default-500">
+                            <div>
+                              {t('items.total')}:{' '}
+                              <span className="font-semibold text-foreground">
+                                {formatNumber(
+                                  dbCurrencyToUserCurrency(totalItemsAmount, configuration?.minorUnit ?? 2),
+                                )}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </ModalBody>
+                </>
+              )}
+            </ModalDialog>
+          </ModalContainer>
+        </ModalBackdrop>
       </Modal>
     </>
   );

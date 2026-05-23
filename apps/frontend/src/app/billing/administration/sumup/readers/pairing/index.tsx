@@ -4,15 +4,19 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   Button,
   Form,
+  TextField,
+  Label,
   Input,
   Modal,
+  ModalBackdrop,
   ModalBody,
-  ModalContent,
+  ModalContainer,
+  ModalDialog,
   ModalFooter,
   ModalHeader,
-  useDisclosure,
+  ModalHeading,
+  useOverlayState,
 } from '@heroui/react';
-import { PageHeader } from '../../../../../../components/pageHeader';
 import { PasswordInput } from '../../../../../../components/PasswordInput';
 import { useCallback, useRef, useState } from 'react';
 import { useBillingServiceGetSumUpReadersKey, useBillingServicePairSumUpReader } from '@attraccess/react-query-client';
@@ -40,7 +44,7 @@ export function SumUpReadersPairing(props: Props) {
   const toast = useToastMessage();
   const queryClient = useQueryClient();
 
-  const { isOpen, onOpen, onOpenChange, onClose } = useDisclosure();
+  const { isOpen, open, setOpen, close } = useOverlayState();
   const { mutate: pairReader, isPending: isPairingReader } = useBillingServicePairSumUpReader({
     onSuccess: () => {
       toast.success({
@@ -48,7 +52,7 @@ export function SumUpReadersPairing(props: Props) {
         description: t('success.toast.description'),
       });
       queryClient.invalidateQueries({ queryKey: [useBillingServiceGetSumUpReadersKey] });
-      onClose();
+      close();
     },
     onError: (error: Error) => {
       toast.apiError({
@@ -79,37 +83,52 @@ export function SumUpReadersPairing(props: Props) {
 
   return (
     <>
-      {children(onOpen)}
+      {children(open)}
 
-      <Modal isOpen={isOpen} onOpenChange={onOpenChange} scrollBehavior="inside">
-        <ModalContent>
-          <ModalHeader>
-            <PageHeader title={t('title')} subtitle={t('subtitle')} noMargin onBack={onClose} />
-          </ModalHeader>
-          <ModalBody>
-            <Form onSubmit={onSubmit} ref={formRef}>
-              <PasswordInput
-                label={t('inputs.pairingCode')}
-                value={pairingCode}
-                onValueChange={setPairingCode}
-                autoComplete="off"
-                isRequired
-                minLength={8}
-                maxLength={9}
-              />
+      <Modal isOpen={isOpen} onOpenChange={setOpen}>
+        <ModalBackdrop>
+          <ModalContainer size="md">
+            <ModalDialog>
+              {({ close }) => (
+                <>
+                  <ModalHeader>
+                    <ModalHeading>{t('title')}</ModalHeading>
+                    <p className="text-sm text-muted">{t('subtitle')}</p>
+                  </ModalHeader>
+                  <ModalBody>
+                    <Form onSubmit={onSubmit} ref={formRef} className="flex flex-col gap-4">
+                      <PasswordInput
+                        label={t('inputs.pairingCode')}
+                        value={pairingCode}
+                        onChange={setPairingCode}
+                        autoComplete="off"
+                        isRequired
+                        minLength={8}
+                        maxLength={9}
+                      />
 
-              <Input label={t('inputs.name')} value={name} onValueChange={setName} autoComplete="off" isRequired />
+                      <TextField value={name} onChange={setName} isRequired>
+                        <Label>{t('inputs.name')}</Label>
+                        <Input autoComplete="off" />
+                      </TextField>
 
-              <input type="submit" hidden />
-            </Form>
-          </ModalBody>
+                      <input type="submit" hidden />
+                    </Form>
+                  </ModalBody>
 
-          <ModalFooter>
-            <Button color="primary" onPress={onSubmit} isLoading={isPairingReader}>
-              {t('actions.pair')}
-            </Button>
-          </ModalFooter>
-        </ModalContent>
+                  <ModalFooter>
+                    <Button variant="secondary" onPress={close}>
+                      {t('actions.cancel')}
+                    </Button>
+                    <Button variant="primary" onPress={onSubmit} isPending={isPairingReader}>
+                      {t('actions.pair')}
+                    </Button>
+                  </ModalFooter>
+                </>
+              )}
+            </ModalDialog>
+          </ModalContainer>
+        </ModalBackdrop>
       </Modal>
     </>
   );

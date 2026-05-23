@@ -1,22 +1,7 @@
 import { DateTimeDisplay, useNumberFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
-import {
-  Card,
-  CardBody,
-  CardHeader,
-  CardProps,
-  Chip,
-  cn,
-  Pagination,
-  Skeleton,
-  Spinner,
-  Table,
-  TableBody,
-  TableCell,
-  TableColumn,
-  TableHeader,
-  TableRow,
-} from '@heroui/react';
+import { Button, Chip, cn, Skeleton, Spinner, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow } from '@heroui/react';
 import { PageHeader } from '../../../../components/pageHeader';
+import { EmptyState } from '../../../../components/emptyState';
 import de from './de.json';
 import en from './en.json';
 import { useAuth } from '../../../../hooks/useAuth';
@@ -27,19 +12,21 @@ import {
   useBillingServiceGetBillingConfiguration,
   useBillingServiceGetBillingTransactions,
 } from '@attraccess/react-query-client';
-import { CreditCardIcon, ReceiptTextIcon } from 'lucide-react';
+import { CreditCardIcon, RotateCcwIcon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { dbCurrencyToUserCurrency } from '@attraccess/shared';
 import { TransactionDetailsModal } from './transactionDetailsModal';
+import { RefundModal } from './transactionDetailsModal/refund';
 
 interface Props {
+  className?: string;
   transactionsPerPage?: number;
   userId?: number;
   isDisabled?: boolean;
 }
 
-export function SummaryCard(props: Omit<CardProps, 'children'> & Props) {
-  const { transactionsPerPage = 5, userId: userIdFromProps, isDisabled, ...cardProps } = props;
+export function SummaryCard(props: Props) {
+  const { className, transactionsPerPage = 5, userId: userIdFromProps, isDisabled } = props;
   const { t } = useTranslations({ en, de });
 
   const { user: currentUser } = useAuth();
@@ -55,12 +42,10 @@ export function SummaryCard(props: Omit<CardProps, 'children'> & Props) {
     },
   );
 
-  const [transactionsPage, setTransactionsPage] = useState(1);
+  const [transactionsPage] = useState(1);
 
   const {
     data: transactions,
-    isLoading: isLoadingTransactions,
-    isFetched: isFetchedTransactions,
   } = useBillingServiceGetBillingTransactions(
     { userId: userId ?? 0, page: transactionsPage, limit: transactionsPerPage },
     undefined,
@@ -135,10 +120,6 @@ export function SummaryCard(props: Omit<CardProps, 'children'> & Props) {
     [t, transactions],
   );
 
-  const totalAmountOfTransactionsPages = useMemo(() => {
-    return Math.ceil((transactions?.total ?? 0) / transactionsPerPage);
-  }, [transactions?.total, transactionsPerPage]);
-
   const statusColor = useCallback((status: BillingTransaction['status']) => {
     switch (status) {
       case BillingTransactionStatus.PENDING:
@@ -167,53 +148,33 @@ export function SummaryCard(props: Omit<CardProps, 'children'> & Props) {
   }
 
   return (
-    <Card {...cardProps}>
-      <CardHeader>
-        <PageHeader title={t('title')} noMargin icon={<CreditCardIcon />} />
-      </CardHeader>
-      <CardBody>
-        <div className="mb-4">
-          {isLoadingBalance ? (
-            <Spinner />
-          ) : (
-            <p className="text-2xl font-bold">
-              {t('balance', {
-                balance: formatNumber(dbCurrencyToUserCurrency(balance?.value ?? 0, configuration.minorUnit)),
-                currency: configuration.currency,
-              })}
-            </p>
-          )}
-        </div>
+    <div className={cn('w-full flex flex-col gap-6', className)}>
+      <PageHeader title={t('title')} noMargin icon={<CreditCardIcon />} />
 
-        <Table
-          aria-label={t('transactions.table.ariaLabel')}
-          removeWrapper
-          bottomContent={
-            isFetchedTransactions && (
-              <Pagination
-                isCompact
-                showControls
-                page={transactionsPage}
-                total={totalAmountOfTransactionsPages}
-                onChange={(page) => setTransactionsPage(page)}
-              />
-            )
-          }
-          onRowAction={(key) => openDetails(key as number)}
-        >
+      {isLoadingBalance ? (
+        <Spinner />
+      ) : (
+        <p className="text-2xl font-bold">
+          {t('balance', {
+            balance: formatNumber(dbCurrencyToUserCurrency(balance?.value ?? 0, configuration.minorUnit)),
+            currency: configuration.currency,
+          })}
+        </p>
+      )}
+
+      <Table>
+        <TableContent aria-label={t('transactions.table.ariaLabel')} onRowAction={(key) => openDetails(Number(key))}>
           <TableHeader>
-            <TableColumn align="start">{t('transactions.table.columns.id')}</TableColumn>
-            <TableColumn align="start">{t('transactions.table.columns.dateTime')}</TableColumn>
-            <TableColumn align="start">{t('transactions.table.columns.status')}</TableColumn>
-            <TableColumn align="start" className="w-full">
-              {t('transactions.table.columns.details')}
-            </TableColumn>
-            <TableColumn align="end">{t('transactions.table.columns.amount')}</TableColumn>
-            <TableColumn align="end">{t('transactions.table.columns.actions')}</TableColumn>
+            <TableColumn isRowHeader>{t('transactions.table.columns.id')}</TableColumn>
+            <TableColumn>{t('transactions.table.columns.dateTime')}</TableColumn>
+            <TableColumn>{t('transactions.table.columns.status')}</TableColumn>
+            <TableColumn className="w-full">{t('transactions.table.columns.details')}</TableColumn>
+            <TableColumn>{t('transactions.table.columns.amount')}</TableColumn>
+            <TableColumn>{t('transactions.table.columns.actions')}</TableColumn>
           </TableHeader>
-          <TableBody items={transactions?.data ?? []} isLoading={isLoadingTransactions}>
+          <TableBody items={transactions?.data ?? []} renderEmptyState={() => <EmptyState message={t('transactions.table.empty') as string} />}>
             {(transaction) => (
-              <TableRow key={transaction.id} className="wrap-none cursor-pointer">
+              <TableRow key={transaction.id} id={transaction.id} className="wrap-none cursor-pointer">
                 <TableCell>{transaction.id}</TableCell>
                 <TableCell className="whitespace-nowrap">
                   <DateTimeDisplay date={transaction.createdAt} />
@@ -231,21 +192,32 @@ export function SummaryCard(props: Omit<CardProps, 'children'> & Props) {
                   {formatNumber(dbCurrencyToUserCurrency(transaction.amount, configuration.minorUnit))}
                 </TableCell>
                 <TableCell>
-                  <ReceiptTextIcon />
+                  <RefundModal transactionId={transaction.id}>
+                    {(onOpen) => (
+                      <Button
+                        isIconOnly
+                        variant="danger-soft"
+                        aria-label={t('transactions.table.actions.refund') as string}
+                        onPress={onOpen}
+                      >
+                        <RotateCcwIcon />
+                      </Button>
+                    )}
+                  </RefundModal>
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
-        </Table>
+        </TableContent>
+      </Table>
 
-        {openedTransactionId && (
-          <TransactionDetailsModal
-            transactionId={openedTransactionId}
-            isOpen={isOpenDetails}
-            onClose={() => setIsOpenDetails(false)}
-          />
-        )}
-      </CardBody>
-    </Card>
+      {openedTransactionId && (
+        <TransactionDetailsModal
+          transactionId={openedTransactionId}
+          isOpen={isOpenDetails}
+          onClose={() => setIsOpenDetails(false)}
+        />
+      )}
+    </div>
   );
 }

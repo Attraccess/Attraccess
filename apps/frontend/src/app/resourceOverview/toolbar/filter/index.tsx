@@ -1,9 +1,11 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { DrawerBody, Drawer, DrawerContent, DrawerHeader, useDisclosure, Switch } from '@heroui/react';
+import { DrawerBody, DrawerHeader, useOverlayState } from '@heroui/react';
+import { LabeledSwitch } from '../../../../components/labeledSwitch';
 
 import de from './de.json';
 import en from './en.json';
 import { FilterProps } from '../../filterProps';
+import { StandardDrawer } from '../../../../components/standardDrawer';
 
 interface Props {
   children: (props: { onOpen: () => void }) => React.ReactNode;
@@ -11,7 +13,7 @@ interface Props {
 
 export function ResourceFilter(props: Props & Omit<FilterProps, 'onSearchChanged' | 'search'>) {
   const { children, ...filterProps } = props;
-  const { isOpen, onOpenChange, onOpen } = useDisclosure();
+  const { isOpen, setOpen, open } = useOverlayState();
 
   const { t } = useTranslations({
     de,
@@ -20,29 +22,27 @@ export function ResourceFilter(props: Props & Omit<FilterProps, 'onSearchChanged
 
   return (
     <>
-      {children({ onOpen })}
-      <Drawer isOpen={isOpen} onOpenChange={onOpenChange}>
-        <DrawerContent>
-          <DrawerHeader>{t('drawer.title')}</DrawerHeader>
-          <DrawerBody>
-            <Switch isSelected={filterProps.onlyInUseByMe} onValueChange={filterProps.onOnlyInUseByMeChanged}>
-              {t('drawer.options.onlyInUseByMe')}
-            </Switch>
-            <Switch
-              isSelected={filterProps.onlyWithPermissions}
-              onValueChange={filterProps.onOnlyWithPermissionsChanged}
-            >
-              {t('drawer.options.onlyWithPermissions')}
-            </Switch>
-            <Switch
-              isSelected={filterProps.hideEmptyResourceGroups}
-              onValueChange={filterProps.onHideEmptyResourceGroupsChanged}
-            >
-              {t('drawer.options.hideEmptyResourceGroups')}
-            </Switch>
-          </DrawerBody>
-        </DrawerContent>
-      </Drawer>
+      {children({ onOpen: open })}
+      <StandardDrawer isOpen={isOpen} onOpenChange={setOpen}>
+        <DrawerHeader>{t('drawer.title')}</DrawerHeader>
+        <DrawerBody>
+          <LabeledSwitch isSelected={filterProps.onlyInUseByMe} onChange={filterProps.onOnlyInUseByMeChanged}>
+            {t('drawer.options.onlyInUseByMe')}
+          </LabeledSwitch>
+          <LabeledSwitch
+            isSelected={filterProps.onlyWithPermissions}
+            onChange={filterProps.onOnlyWithPermissionsChanged}
+          >
+            {t('drawer.options.onlyWithPermissions')}
+          </LabeledSwitch>
+          <LabeledSwitch
+            isSelected={filterProps.hideEmptyResourceGroups}
+            onChange={filterProps.onHideEmptyResourceGroupsChanged}
+          >
+            {t('drawer.options.hideEmptyResourceGroups')}
+          </LabeledSwitch>
+        </DrawerBody>
+      </StandardDrawer>
     </>
   );
 }
