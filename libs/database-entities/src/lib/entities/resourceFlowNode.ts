@@ -5,30 +5,37 @@ import { Resource } from './resource.entity';
 import { EventNodeDataSchema } from '../entities-index';
 
 export enum ResourceFlowNodeType {
-  MANUAL_BUTTON = 'manual.button',
-  RESOURCE_USAGE_STARTED = 'resource.usage.started',
-  RESOURCE_USAGE_STOPPED = 'resource.usage.stopped',
-  RESOURCE_USAGE_TAKEOVER = 'resource.usage.takeover',
-  RESOURCE_USAGE_END_SESSION = 'resource.usage.end-session',
-  RESOURCE_ACTIVITY_NO_ACTIVITY = 'resource.activity.no-activity',
-  RESOURCE_ACTIVITY_TRACK_ACTIVITY = 'resource.activity.track-activity',
-  RESOURCE_BILLING_SET_ADDITIONAL_ITEMS = 'resource.billing.set-additional-items',
-  DOOR_UNLOCKED = 'door.unlocked',
-  DOOR_LOCKED = 'door.locked',
-  DOOR_UNLATCHED = 'door.unlatched',
-  MQTT_MESSAGE_RECEIVED = 'mqtt.message.received',
-  MQTT_SEND_MESSAGE = 'mqtt.send-message',
-  MQTT_WAIT_FOR_MESSAGE = 'mqtt.wait-for-message',
-  HTTP_SEND_REQUEST = 'http.send-request',
-  LOGIC_WAIT = 'logic.wait',
-  LOGIC_IF = 'logic.if',
-  LOGIC_SET_PAYLOAD = 'logic.set-payload',
-  LOGIC_ERROR = 'logic.error',
-  HEALTH_HEARTBEAT = 'health.heartbeat',
-  HEALTH_SET = 'health.set',
+  INPUT_BUTTON = 'input.button',
+  INPUT_RESOURCE_USAGE_STARTED = 'input.resource.usage.started',
+  INPUT_RESOURCE_USAGE_STOPPED = 'input.resource.usage.stopped',
+  INPUT_RESOURCE_USAGE_TAKEOVER = 'input.resource.usage.takeover',
+  INPUT_RESOURCE_DOOR_UNLOCKED = 'input.resource.door.unlocked',
+  INPUT_RESOURCE_DOOR_LOCKED = 'input.resource.door.locked',
+  INPUT_RESOURCE_DOOR_UNLATCHED = 'input.resource.door.unlatched',
+  INPUT_MQTT_MESSAGE_RECEIVED = 'input.mqtt.message.received',
+  INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY = 'input.resource.activity.no-activity',
+  INPUT_VARIABLE_CHANGED = 'input.variable.changed',
+  OUTPUT_HTTP_SEND_REQUEST = 'output.http.sendRequest',
+  OUTPUT_MQTT_SEND_MESSAGE = 'output.mqtt.sendMessage',
+  OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS = 'output.resource.billing.calculation.set-additional-items',
+  OUTPUT_RESOURCE_USAGE_END_SESSION = 'output.resource.usage.end-session',
+  OUTPUT_RESOURCE_ACTIVITY_TRACK_ACTIVITY = 'output.resource.activity.track-activity',
+  PROCESSING_WAIT = 'processing.wait',
+  PROCESSING_IF = 'processing.if',
+  PROCESSING_SET_PAYLOAD = 'processing.set-payload',
+  PROCESSING_MQTT_WAIT_FOR_MESSAGE = 'processing.mqtt.waitForMessage',
+  PROCESSING_ERROR = 'processing.error',
+  PROCESSING_SET_VARIABLES = 'processing.variables.set',
+  PROCESSING_GET_VARIABLES = 'processing.variables.get',
+  OUTPUT_RESOURCE_HEALTH_HEARTBEAT = 'output.resource.health.heartbeat',
+  OUTPUT_RESOURCE_HEALTH_SET = 'output.resource.health.set',
 }
 
 // Zod schemas for node data validation
+export const VariableScopeSchema = z.enum(['resource', 'global']);
+
+const VariableKeySchema = z.string().min(1, 'Key is required');
+
 export const NodeWithoutDataSchema = z.object({}).optional();
 
 export const ButtonNodeDataSchema = z.object({
@@ -119,6 +126,37 @@ export const SetPayloadNodeDataSchema = z.object({
     .default([]),
 });
 
+export const SetVariablesNodeDataSchema = z.object({
+  variables: z
+    .array(
+      z.object({
+        key: VariableKeySchema,
+        value: z.string().optional().default('').meta({ stringVariant: 'multiline' }),
+        scope: VariableScopeSchema,
+      }),
+    )
+    .min(1, 'At least one variable is required'),
+});
+
+export const GetVariablesNodeDataSchema = z.object({
+  variables: z
+    .array(
+      z.object({
+        key: VariableKeySchema,
+        scope: VariableScopeSchema,
+        payloadPath: z.string().min(1, 'Payload path is required'),
+      }),
+    )
+    .min(1, 'At least one variable is required'),
+});
+
+export const VariableChangedNodeDataSchema = z.object({
+  watches: z
+    .array(z.object({ key: VariableKeySchema, scope: VariableScopeSchema }))
+    .min(1, 'At least one watch is required'),
+  source: z.enum(['any', 'exclude-self']).default('any'),
+});
+
 export const MqttWaitForMessageNodeDataSchema = z.object({
   serverId: MqttServerIdSchema,
   topic: z.string().min(1, 'Topic is required'),
@@ -180,58 +218,67 @@ export const ResourceHealthSetNodeDataSchema = z.object({
 // Helper function to get the appropriate schema for a node type
 export function getNodeDataSchema(nodeType: ResourceFlowNodeType) {
   switch (nodeType) {
-    case ResourceFlowNodeType.MANUAL_BUTTON:
+    case ResourceFlowNodeType.INPUT_BUTTON:
       return ButtonNodeDataSchema;
 
-    case ResourceFlowNodeType.RESOURCE_USAGE_STARTED:
-    case ResourceFlowNodeType.RESOURCE_USAGE_STOPPED:
-    case ResourceFlowNodeType.RESOURCE_USAGE_TAKEOVER:
-    case ResourceFlowNodeType.DOOR_UNLOCKED:
-    case ResourceFlowNodeType.DOOR_LOCKED:
-    case ResourceFlowNodeType.DOOR_UNLATCHED:
+    case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED:
+    case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED:
+    case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER:
+    case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLOCKED:
+    case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_LOCKED:
+    case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLATCHED:
       return EventNodeDataSchema;
 
-    case ResourceFlowNodeType.MQTT_MESSAGE_RECEIVED:
+    case ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED:
       return MqttMessageReceivedNodeDataSchema;
 
-    case ResourceFlowNodeType.RESOURCE_ACTIVITY_NO_ACTIVITY:
+    case ResourceFlowNodeType.INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY:
       return InputResourceActivityNoActivityNodeDataSchema;
 
-    case ResourceFlowNodeType.RESOURCE_BILLING_SET_ADDITIONAL_ITEMS:
+    case ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS:
       return BillingTransactionItemCreateSchema;
 
-    case ResourceFlowNodeType.HTTP_SEND_REQUEST:
+    case ResourceFlowNodeType.OUTPUT_HTTP_SEND_REQUEST:
       return HttpRequestNodeDataSchema;
 
-    case ResourceFlowNodeType.MQTT_SEND_MESSAGE:
+    case ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE:
       return MqttSendMessageNodeDataSchema;
 
-    case ResourceFlowNodeType.LOGIC_WAIT:
+    case ResourceFlowNodeType.PROCESSING_WAIT:
       return WaitNodeDataSchema;
 
-    case ResourceFlowNodeType.LOGIC_IF:
+    case ResourceFlowNodeType.PROCESSING_IF:
       return IfNodeDataSchema;
 
-    case ResourceFlowNodeType.LOGIC_SET_PAYLOAD:
+    case ResourceFlowNodeType.PROCESSING_SET_PAYLOAD:
       return SetPayloadNodeDataSchema;
 
-    case ResourceFlowNodeType.MQTT_WAIT_FOR_MESSAGE:
+    case ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE:
       return MqttWaitForMessageNodeDataSchema;
 
-    case ResourceFlowNodeType.LOGIC_ERROR:
+    case ResourceFlowNodeType.PROCESSING_ERROR:
       return ErrorNodeDataSchema;
 
-    case ResourceFlowNodeType.RESOURCE_USAGE_END_SESSION:
+    case ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION:
       return ResourceUsageEndSessionNodeDataSchema;
 
-    case ResourceFlowNodeType.RESOURCE_ACTIVITY_TRACK_ACTIVITY:
+    case ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_TRACK_ACTIVITY:
       return ResourceActivityTrackActivityNodeDataSchema;
 
-    case ResourceFlowNodeType.HEALTH_HEARTBEAT:
+    case ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT:
       return ResourceHealthHeartbeatNodeDataSchema;
 
-    case ResourceFlowNodeType.HEALTH_SET:
+    case ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_SET:
       return ResourceHealthSetNodeDataSchema;
+
+    case ResourceFlowNodeType.PROCESSING_SET_VARIABLES:
+      return SetVariablesNodeDataSchema;
+
+    case ResourceFlowNodeType.PROCESSING_GET_VARIABLES:
+      return GetVariablesNodeDataSchema;
+
+    case ResourceFlowNodeType.INPUT_VARIABLE_CHANGED:
+      return VariableChangedNodeDataSchema;
 
     default: {
       const exhaustiveCheck: never = nodeType;
@@ -270,7 +317,7 @@ export class ResourceFlowNode {
   })
   @ApiProperty({
     description: 'The type of the node',
-    example: ResourceFlowNodeType.RESOURCE_USAGE_STARTED,
+    example: ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED,
     enum: ResourceFlowNodeType,
     enumName: 'ResourceFlowNodeType',
   })

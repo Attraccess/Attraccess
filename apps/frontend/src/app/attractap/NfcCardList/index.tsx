@@ -4,6 +4,9 @@ import {
   AlertDescription,
   AlertTitle,
   Button,
+  DrawerBody,
+  DrawerFooter,
+  DrawerHeader,
   Modal,
   ModalBackdrop,
   ModalBody,
@@ -20,6 +23,7 @@ import {
   TableRow,
   cn,
 } from '@heroui/react';
+import { StandardDrawer } from '../../../components/standardDrawer';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AttraccessUser, DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
@@ -39,7 +43,7 @@ import { NfcCardDeactivateModal } from './deactivate';
 import { NfcCardActivateModal } from './activate';
 import { CheckIcon, PlusIcon, ServerIcon, Trash2Icon, XIcon } from 'lucide-react';
 import { AlertStatusIcon } from '../../../components/AlertStatusIcon';
-import { PageHeader } from '../../../components/pageHeader';
+import { PageAction, PageHeader } from '../../../components/pageHeader';
 import { useAuth } from '../../../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 
@@ -195,7 +199,11 @@ const NfcCardTableCell = (props: NfcCardTableCellProps) => {
   return props.card[props.header as keyof NFCCard] as React.ReactNode;
 };
 
-const EnrollNfcCardButton = () => {
+interface EnrollNfcCardProps {
+  children: (onOpen: () => void) => React.ReactNode;
+}
+
+const EnrollNfcCard = ({ children }: EnrollNfcCardProps) => {
   const { t } = useTranslations({
     de,
     en,
@@ -206,64 +214,59 @@ const EnrollNfcCardButton = () => {
 
   const { mutate: enrollNfcCardMutation } = useAttractapServiceEnrollNfcCard();
 
+  const close = useCallback(() => setShow(false), []);
+
   const enrollNfcCard = useCallback(() => {
     if (!readerId) {
       return;
     }
 
     enrollNfcCardMutation({ requestBody: { readerId } });
-  }, [readerId, enrollNfcCardMutation]);
+    close();
+  }, [readerId, enrollNfcCardMutation, close]);
 
   return (
     <>
-      <Button variant="ghost" onPress={() => setShow(true)} data-cy="enroll-nfc-card-button-trigger">
-        <PlusIcon />
-        {t('enroll')}
-      </Button>
-      <Modal
+      {children(() => setShow(true))}
+      <StandardDrawer
         isOpen={show}
         onOpenChange={(open) => {
-          if (!open) setShow(false);
+          if (!open) close();
         }}
-        data-cy="enroll-nfc-card-modal"
       >
-        <ModalBackdrop>
-          <ModalContainer size="md">
-            <ModalDialog>
-              {({ close }) => (
-                <>
-                  <ModalHeader>
-                    <h1>{t('enrollModal.title')}</h1>
-                  </ModalHeader>
-                  <ModalBody>
-                    <p>{t('enrollModal.description')}</p>
-                    <AttractapSelect
-                      label={t('enrollModal.readerLabel')}
-                      placeholder={t('enrollModal.readerPlaceholder')}
-                      selection={readerId}
-                      onSelectionChange={(readerId) => setReaderId(readerId ?? null)}
-                      data-cy="enroll-nfc-card-modal-reader-select"
-                      requiredCapabilities={{ cardEnrollment: true }}
-                    />
-                  </ModalBody>
-                  <ModalFooter>
-                    <Button onPress={close} data-cy="enroll-nfc-card-modal-cancel-button">
-                      {t('enrollModal.cancel')}
-                    </Button>
-                    <Button
-                      isDisabled={!readerId}
-                      onPress={enrollNfcCard}
-                      data-cy="enroll-nfc-card-modal-enroll-button"
-                    >
-                      {t('enrollModal.enroll')}
-                    </Button>
-                  </ModalFooter>
-                </>
-              )}
-            </ModalDialog>
-          </ModalContainer>
-        </ModalBackdrop>
-      </Modal>
+        <DrawerHeader>
+          <div className="flex w-full items-start justify-between gap-3">
+            <h2 className="text-lg font-semibold">{t('enrollModal.title')}</h2>
+            <Button isIconOnly variant="ghost" aria-label={t('enrollModal.cancel')} onPress={close}>
+              <XIcon size={16} />
+            </Button>
+          </div>
+        </DrawerHeader>
+        <DrawerBody>
+          <p>{t('enrollModal.description')}</p>
+          <AttractapSelect
+            label={t('enrollModal.readerLabel')}
+            placeholder={t('enrollModal.readerPlaceholder')}
+            selection={readerId}
+            onSelectionChange={(readerId) => setReaderId(readerId ?? null)}
+            data-cy="enroll-nfc-card-modal-reader-select"
+            requiredCapabilities={{ cardEnrollment: true }}
+          />
+        </DrawerBody>
+        <DrawerFooter>
+          <Button variant="secondary" onPress={close} data-cy="enroll-nfc-card-modal-cancel-button">
+            {t('enrollModal.cancel')}
+          </Button>
+          <Button
+            variant="primary"
+            isDisabled={!readerId}
+            onPress={enrollNfcCard}
+            data-cy="enroll-nfc-card-modal-enroll-button"
+          >
+            {t('enrollModal.enroll')}
+          </Button>
+        </DrawerFooter>
+      </StandardDrawer>
     </>
   );
 };
@@ -304,17 +307,27 @@ export function NfcCardList() {
     <>
       <PageHeader
         title={t('nfcCards')}
-        actions={
-          <>
-            <EnrollNfcCardButton />
-            {hasPermission('canManageResources') && (
-              <Button variant="ghost" onPress={() => navigate('/attractap/readers')}>
-                <ServerIcon />
-                {t('readers')}
-              </Button>
-            )}
-          </>
-        }
+        actions={[
+          {
+            key: 'enroll',
+            label: t('enroll'),
+            icon: <PlusIcon />,
+            variant: 'primary',
+            dataCy: 'enroll-nfc-card-button-trigger',
+            renderTrigger: (triggerProps) => (
+              <EnrollNfcCard>
+                {(onOpen) => <Button {...triggerProps} onPress={onOpen} />}
+              </EnrollNfcCard>
+            ),
+          },
+          {
+            key: 'readers',
+            label: t('readers'),
+            icon: <ServerIcon />,
+            isHidden: !hasPermission('canManageResources'),
+            onPress: () => navigate('/attractap/readers'),
+          },
+        ] satisfies PageAction[]}
       />
 
       <Alert status="warning" className="mb-4">

@@ -1,4 +1,4 @@
-import { Button, Card, cn, NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput, Skeleton, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow } from "@heroui/react";
+import { Button, Card, cn, NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput, Skeleton } from "@heroui/react";
 import { CreditCard, Edit2Icon } from 'lucide-react';
 import {
   useBillingServiceGetBillingBalance,
@@ -10,12 +10,12 @@ import {
 import { useNumberFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import de from './de.json';
 import en from './en.json';
-import { PageHeader } from '../../../../components/pageHeader';
+import { PageHeader, PageAction } from '../../../../components/pageHeader';
 import { ResourceBillingInfoEditor } from './editor';
-import { HTMLAttributes, useEffect, useMemo, useState } from 'react';
+import { Fragment, HTMLAttributes, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../../../hooks/useAuth';
 import { dbCurrencyToUserCurrency } from '@attraccess/shared';
-import { FlatSection } from '../flatSection';
+import { FlatSection } from '../../../../components/flatSection';
 
 interface Props extends Omit<HTMLAttributes<HTMLElement>, 'children'> {
   resourceId: number;
@@ -120,101 +120,115 @@ export function ResourceBillingInfo(props: Props) {
     return null;
   }
 
-  const tableContent = (
-    <Table>
-      <TableContent aria-label={t('table.ariaLabel')}>
-          <TableHeader>
-            <TableColumn isRowHeader> </TableColumn>
-            <TableColumn> </TableColumn>
-          </TableHeader>
-          <TableBody>
-            <TableRow className="border-b-4 border-divider">
-              <TableCell>{t('balance.label')}</TableCell>
-              <TableCell className={cn('whitespace-nowrap text-right', adjustedBalance < 0 ? 'text-danger' : 'text-success')}>
-                {t('billingValue', {
-                  credits: formatNumber(adjustedBalance),
-                  currency: configuration.currency,
-                })}
-              </TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell>{t('perUse.label')}</TableCell>
-              <TableCell className="text-warning whitespace-nowrap text-right">
-                {t('billingValue', { credits: formatNumber(creditsPerUsage), currency: configuration.currency })}
-              </TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell>{t('perMinute.label')}</TableCell>
-              <TableCell className="text-warning whitespace-nowrap text-right">
-                {t('billingValue', {
-                  credits: formatNumber(creditsPerMinute),
-                  currency: configuration.currency,
-                })}
-              </TableCell>
-            </TableRow>
-            {
-              resourceBillingConfiguration.additionalItems.map((item) => (
-                <TableRow key={JSON.stringify(item)} id={JSON.stringify(item)}>
-                  <TableCell>{item.name}</TableCell>
-                  <TableCell className="text-warning whitespace-nowrap text-right">
-                    {t('billingValue', {
-                      credits: formatNumber(
-                        dbCurrencyToUserCurrency(item.unitPrice * item.quantity, configuration.minorUnit),
-                      ),
-                      currency: configuration.currency,
-                    })}
-                    <br />
-                    <small>{t('perUnit')}</small>
-                  </TableCell>
-                </TableRow>
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              )) as any
-            }
-            <TableRow className="border-t border-b-4 border-divider">
-              <TableCell>
-                <NumberField
-                  aria-label={t('example.label', { minutes: exampleMinutes })}
-                  value={exampleMinutes}
-                  onChange={(value) => setExampleMinutes(value)}
-                  minValue={0}
-                  defaultValue={10}
-                >
-                  <NumberFieldGroup>
-                    <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
-                    <NumberFieldInput />
-                    <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
-                  </NumberFieldGroup>
-                </NumberField>
-              </TableCell>
-              <TableCell className="whitespace-nowrap text-right">
-                {t('billingValue', {
-                  credits: formatNumber(exampleCost),
-                  currency: configuration.currency,
-                  minutes: exampleMinutes,
-                })}
-              </TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell>{t('exampleResultingBalance.label')}</TableCell>
-              <TableCell className={cn('whitespace-nowrap text-right', exampleResultingBalance < 0 ? 'text-danger' : 'text-success')}>
-                {t('billingValue', {
-                  credits: formatNumber(exampleResultingBalance),
-                  currency: configuration.currency,
-                })}
-              </TableCell>
-            </TableRow>
-          </TableBody>
-          </TableContent>
-        </Table>
+  const dlClass = 'grid grid-cols-[1fr_max-content] gap-x-4 gap-y-2 text-sm items-center';
+  const valueClass = 'text-right whitespace-nowrap';
+
+  const billingContent = (
+    <div className="flex flex-col gap-3">
+      <dl className={dlClass} aria-label={t('table.ariaLabel')}>
+        <dt>{t('balance.label')}</dt>
+        <dd className={cn(valueClass, 'font-medium', adjustedBalance < 0 ? 'text-danger' : 'text-success')}>
+          {t('billingValue', {
+            credits: formatNumber(adjustedBalance),
+            currency: configuration.currency,
+          })}
+        </dd>
+      </dl>
+
+      <dl className={cn(dlClass, 'border-t border-divider pt-3')}>
+        <dt>{t('perUse.label')}</dt>
+        <dd className={cn(valueClass, 'text-warning')}>
+          {t('billingValue', { credits: formatNumber(creditsPerUsage), currency: configuration.currency })}
+        </dd>
+        <dt>{t('perMinute.label')}</dt>
+        <dd className={cn(valueClass, 'text-warning')}>
+          {t('billingValue', {
+            credits: formatNumber(creditsPerMinute),
+            currency: configuration.currency,
+          })}
+        </dd>
+        {resourceBillingConfiguration.additionalItems.map((item) => (
+          <Fragment key={JSON.stringify(item)}>
+            <dt>{item.name}</dt>
+            <dd className={cn(valueClass, 'text-warning')}>
+              {t('billingValue', {
+                credits: formatNumber(
+                  dbCurrencyToUserCurrency(item.unitPrice * item.quantity, configuration.minorUnit),
+                ),
+                currency: configuration.currency,
+              })}
+              <br />
+              <small>{t('perUnit')}</small>
+            </dd>
+          </Fragment>
+        ))}
+      </dl>
+
+      <dl className={cn(dlClass, 'border-t border-divider pt-3')}>
+        <dt>
+          <NumberField
+            aria-label={t('example.label', { minutes: exampleMinutes })}
+            value={exampleMinutes}
+            onChange={(value) => setExampleMinutes(value)}
+            minValue={0}
+            defaultValue={10}
+          >
+            <NumberFieldGroup>
+              <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
+              <NumberFieldInput />
+              <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
+            </NumberFieldGroup>
+          </NumberField>
+        </dt>
+        <dd className={valueClass}>
+          {t('billingValue', {
+            credits: formatNumber(exampleCost),
+            currency: configuration.currency,
+            minutes: exampleMinutes,
+          })}
+        </dd>
+        <dt className="font-medium">{t('exampleResultingBalance.label')}</dt>
+        <dd
+          className={cn(
+            valueClass,
+            'font-semibold text-base',
+            exampleResultingBalance < 0 ? 'text-danger' : 'text-success',
+          )}
+        >
+          {t('billingValue', {
+            credits: formatNumber(exampleResultingBalance),
+            currency: configuration.currency,
+          })}
+        </dd>
+      </dl>
+    </div>
   );
 
   const editorAction = (
     <ResourceBillingInfoEditor resourceId={resourceId}>
       {(onOpen) => (
-        <Button variant="primary" isIconOnly onPress={onOpen}><Edit2Icon size={12} /></Button>
+        <Button variant="primary" isIconOnly onPress={onOpen} aria-label={t('actions.edit')}>
+
+          <Edit2Icon size={12} />
+        </Button>
       )}
     </ResourceBillingInfoEditor>
   );
+
+  const pageHeaderActions = [
+    {
+      key: 'edit',
+      label: t('actions.edit'),
+      icon: <Edit2Icon size={12} />,
+      variant: 'primary',
+      isIconOnly: true,
+      renderTrigger: (triggerProps) => (
+        <ResourceBillingInfoEditor resourceId={resourceId}>
+          {(onOpen) => <Button {...triggerProps} onPress={onOpen} />}
+        </ResourceBillingInfoEditor>
+      ),
+    },
+  ] satisfies PageAction[];
 
   if (variant === 'flat') {
     return (
@@ -225,7 +239,7 @@ export function ResourceBillingInfo(props: Props) {
         className={className}
         {...htmlProps}
       >
-        <div className="text-sm">{tableContent}</div>
+        {billingContent}
       </FlatSection>
     );
   }
@@ -236,12 +250,12 @@ export function ResourceBillingInfo(props: Props) {
         <PageHeader
           title={t('title')}
           icon={<CreditCard />}
-          actions={editorAction}
+          actions={pageHeaderActions}
           noMargin
         />
       </Card.Header>
 
-      <Card.Content>{tableContent}</Card.Content>
+      <Card.Content>{billingContent}</Card.Content>
     </Card>
   );
 }

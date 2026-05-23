@@ -16,6 +16,7 @@
     "password-changed": "Passwort geändert",
     "resource-usage-billing-transaction-summary": "Ressourcen-Nutzung Kostenübersicht",
     "user-invitation": "Benutzereinladung",
-    "project-invitation": "Projekteinladung"
+    "project-invitation": "Projekteinladung",
+    "delete-account-confirmation": "Kontolöschung Bestätigung"
   }
 }

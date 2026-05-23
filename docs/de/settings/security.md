@@ -49,6 +49,105 @@ Die Sitzungssicherheit wird ueber Umgebungsvariablen gesteuert:
 - Erzeugen Sie bei der Ersteinrichtung einen starken `AUTH_SESSION_SECRET` und bewahren Sie ihn sicher auf.
 - Passen Sie `SESSION_COOKIE_MAX_AGE` an Ihre Sicherheitsanforderungen an. Kuerzere Dauern sind sicherer, erfordern aber haeufigeres Anmelden.
 
+## Drosselung und Kontosperre
+
+Fehlgeschlagene Anmeldungen, Registrierungen und Passwort-Zuruecksetzungen werden pro IP gedrosselt. Wiederholte Login-Fehlversuche sperren zusaetzlich das betroffene Konto. Werte sind unter **Einstellungen -> Drosselung & Kontosperre** einstellbar.
+
+| Einstellung | Standard | Beschreibung |
+|-------------|----------|-------------|
+| `maxAttempts` | `5` | Erlaubte Fehlversuche pro Zeitfenster, bevor Drosselung oder Sperre greift. |
+| `windowSeconds` | `900` | Zeitfenster fuer das Zaehlen der Fehlversuche. |
+| `lockoutDurationSeconds` | `900` | Grundsperrdauer. |
+| `exponentialBackoff` | `false` | Wenn `true`, waechst die Sperrdauer bei jeder Wiederholung um den Faktor `backoffMultiplier`. |
+| `backoffMultiplier` | `2` | Multiplikator fuer die Sperrdauer bei wiederholten Sperren. |
+
+Antworten bei Ausloesung:
+
+- **`429 Too Many Requests`** mit `Retry-After`-Header, wenn eine IP die Schwelle ueberschreitet.
+- **`423 Locked`** mit `Retry-After`-Header bei einem gesperrten Konto.
+
+Erfolgreicher Login oder Admin-Unlock entsperrt das Konto. Admin-Unlock erfolgt ueber die Benutzerverwaltung.
+
+## Format des Anmelde-Audit-Logs
+
+Jeder Anmeldeversuch erzeugt eine einzeilige, leerzeichengetrennte Log-Zeile im `AuthAudit`-Kontext. Feldnamen und Reihenfolge sind stabil und fail2ban-tauglich.
+
+```
+auth.failed type=login outcome=invalid_credentials ip=1.2.3.4 user_id=42 username=alice ts=2026-05-15T12:34:56.000Z reason=bad_password
+```
+
+| Feld | Beschreibung |
+|------|-------------|
+| `prefix` | `auth.success` bei Erfolg, sonst `auth.failed`. |
+| `type` | `login`, `register`, `password_reset_request`, `password_reset_complete`. |
+| `outcome` | `success`, `invalid_credentials`, `account_locked`, `rate_limited`, `two_factor_required`, `two_factor_invalid`, `email_not_verified`, `invalid_token`, `invalid_input`, `unknown_user`. |
+| `ip` | Client-IP, sonst `unknown`. |
+| `user_id` | Numerische User-ID, sonst `-`. |
+| `username` | Benutzername, sonst `-`. Whitespace und Quotes werden durch `_` ersetzt. |
+| `ts` | ISO-8601-UTC-Zeitstempel. |
+| `reason` | Optionaler Kurz-Grund. |
+
+Passwoerter, Tokens oder andere Secrets werden nie geloggt.
+
+### fail2ban-Regex
+
+Minimaler `failregex` fuer `/etc/fail2ban/filter.d/attraccess-auth.conf`:
+
+```
+failregex = ^.*auth\.failed type=(?:login|register|password_reset_request|password_reset_complete) outcome=\S+ ip=<HOST> .*$
+ignoreregex =
+```
+
+Der mitgelieferte Docker-Compose-Stack verdrahtet beide Dateien hinter dem Profil `fail2ban` automatisch — siehe [Docker-Compose-Installation](installation/docker-compose.md#brute-force-ip-sperre-mit-fail2ban).
+
+## fail2ban-Administration
+
+Wenn das Profil `fail2ban` laeuft, koennen Sie das Jail mit diesen Kommandos verwalten.
+
+### Aktive Sperren auflisten
+
+```bash
+docker compose exec fail2ban fail2ban-client status attraccess-auth
+```
+
+Die Ausgabe enthaelt `Currently banned`, `Total banned` und die `Banned IP list`.
+
+### IP entsperren
+
+```bash
+docker compose exec fail2ban fail2ban-client set attraccess-auth unbanip 1.2.3.4
+```
+
+### IP manuell sperren
+
+```bash
+docker compose exec fail2ban fail2ban-client set attraccess-auth banip 1.2.3.4
+```
+
+### Schwellenwerte anpassen
+
+Standardwerte werden beim Container-Start aus `F2B_ATTRACCESS_MAXRETRY`, `F2B_ATTRACCESS_FINDTIME` und `F2B_ATTRACCESS_BANTIME` gelesen. Bearbeiten Sie `.env.docker-compose` (oder Ihr `.env`) und erstellen Sie den Dienst neu:
+
+```bash
+docker compose up -d --force-recreate fail2ban
+```
+
+Fuer ephemere Anpassung ohne Neustart:
+
+```bash
+docker compose exec fail2ban fail2ban-client set attraccess-auth maxretry 10
+docker compose exec fail2ban fail2ban-client set attraccess-auth findtime 600
+docker compose exec fail2ban fail2ban-client set attraccess-auth bantime 3600
+```
+
+Diese Live-Aenderungen gehen beim naechsten Neustart verloren — fuer den Dauerbetrieb sollten Sie sie ueber Umgebungsvariablen persistieren.
+
+### Auth-Audit-Log inspizieren
+
+```bash
+docker compose logs attraccess | grep -E 'auth\.failed'
+```
+
 ## Siehe auch
 
 - [Umgebungsvariablen](installation/environment-variables.md) -- Alle Konfigurationsoptionen

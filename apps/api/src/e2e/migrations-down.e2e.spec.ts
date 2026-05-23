@@ -18,6 +18,11 @@ import {
   IntroductionHistoryAction,
   MqttServer,
   NFCCard,
+  PasswordHistory,
+  PasswordPolicyAudit,
+  PasswordPolicyAuditEvent,
+  PasswordPolicyOverride,
+  PasswordPolicyRole,
   Project,
   ProjectInvitation,
   ProjectInvitationStatus,
@@ -30,6 +35,8 @@ import {
   ResourceFlowLogType,
   ResourceFlowNode,
   ResourceFlowNodeType,
+  ResourceFlowVariable,
+  ResourceFlowVariableScope,
   ResourceFormAction,
   ResourceGroup,
   ResourceIntroduction,
@@ -150,6 +157,7 @@ const seedDatabase = async (dataSource: DataSource) => {
   const flowNodeRepo = dataSource.getRepository(ResourceFlowNode);
   const flowEdgeRepo = dataSource.getRepository(ResourceFlowEdge);
   const flowLogRepo = dataSource.getRepository(ResourceFlowLog);
+  const flowVariableRepo = dataSource.getRepository(ResourceFlowVariable);
   const usageRepo = dataSource.getRepository(ResourceUsage);
   const billingTransactionRepo = dataSource.getRepository(BillingTransaction);
   const billingItemRepo = dataSource.getRepository(BillingTransactionItem);
@@ -163,6 +171,9 @@ const seedDatabase = async (dataSource: DataSource) => {
   const formSubmissionRepo = dataSource.getRepository(FormSubmission);
   const nfcCardRepo = dataSource.getRepository(NFCCard);
   const emailTemplateRepo = dataSource.getRepository(EmailTemplate);
+  const passwordHistoryRepo = dataSource.getRepository(PasswordHistory);
+  const passwordPolicyOverrideRepo = dataSource.getRepository(PasswordPolicyOverride);
+  const passwordPolicyAuditRepo = dataSource.getRepository(PasswordPolicyAudit);
 
   const resourceGroup = await ensureEntity(resourceGroupRepo, () => ({
     name: `Seed Group ${seedTag}`,
@@ -330,7 +341,7 @@ const seedDatabase = async (dataSource: DataSource) => {
 
   const flowNode = await ensureEntity(flowNodeRepo, () => ({
     id: `seed-node-${seedTag}`,
-    type: ResourceFlowNodeType.RESOURCE_USAGE_STARTED,
+    type: ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED,
     position: { x: 10, y: 10 },
     data: {},
     resourceId: resource.id,
@@ -343,6 +354,14 @@ const seedDatabase = async (dataSource: DataSource) => {
     sourceHandle: null,
     targetHandle: null,
     resourceId: flowNode.resourceId,
+  }));
+
+  await ensureEntity(flowVariableRepo, () => ({
+    scope: ResourceFlowVariableScope.RESOURCE,
+    resourceId: resource.id,
+    key: `seed-var-${seedTag}`,
+    value: '"seed"',
+    valueType: 'string' as const,
   }));
 
   await ensureEntity(flowLogRepo, () => ({
@@ -460,6 +479,40 @@ const seedDatabase = async (dataSource: DataSource) => {
     subject: 'Verify your email',
     body: 'Hello {{name}}',
     variables: ['{{name}}', '{{url}}'],
+  }));
+
+  await ensureEntity(passwordHistoryRepo, () => ({
+    userId: primaryUser.id,
+    passwordHash: `$2b$04$seed.${seedTag}.placeholder.bcrypt.hash.value.padding`,
+  }));
+
+  await ensureEntity(passwordPolicyOverrideRepo, () => ({
+    role: PasswordPolicyRole.ADMIN,
+    minLength: 16,
+    maxLength: null,
+    allowAllUnicode: null,
+    requireUppercase: null,
+    requireLowercase: null,
+    requireDigit: null,
+    requireSpecial: null,
+    checkHIBP: null,
+    checkCommonPasswords: null,
+    minZxcvbnScore: null,
+    historySize: null,
+    rotationDays: null,
+  }));
+
+  await ensureEntity(passwordPolicyAuditRepo, () => ({
+    event: PasswordPolicyAuditEvent.GLOBAL_POLICY_UPDATED,
+    actorId: primaryUser.id,
+    actorUsername: primaryUser.username,
+    ip: '127.0.0.1',
+    userAgent: 'seed-agent',
+    requestId: `seed-req-${seedTag}`,
+    role: null,
+    before: JSON.stringify({ minLength: 12 }),
+    after: JSON.stringify({ minLength: 16 }),
+    changedFields: JSON.stringify(['minLength']),
   }));
 };
 

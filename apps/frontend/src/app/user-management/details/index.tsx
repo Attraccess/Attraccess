@@ -19,7 +19,7 @@ import { ChangeEmailForm } from './components/changeEmail';
 
 import en from './en.json';
 import de from './de.json';
-import { Button, Chip, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Separator, useOverlayState } from '@heroui/react';
+import { Button, Card, Chip, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Separator, useOverlayState } from '@heroui/react';
 import { useToastMessage } from '../../../components/toastProvider';
 import API_ERROR_TRANSLATIONS_EN from '../../../global-translations/api-errors.en.json';
 import API_ERROR_TRANSLATIONS_DE from '../../../global-translations/api-errors.de.json';
@@ -155,120 +155,122 @@ export function UserManagementDetailsPage() {
       />
 
       {user && (
-        <div className="w-full flex flex-col gap-8" data-cy="user-details-sections">
-          <UserPermissionForm
-            user={user}
-            ssoManagedProviders={ssoManagedProviders}
-            ssoManagedPermissionKeys={ssoManagedPermissionKeys}
-          />
+        <div
+          className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 items-start"
+          data-cy="user-details-sections"
+        >
+          <Card className="w-full" data-cy="user-details-permissions-card">
+            <Card.Content className="flex flex-col gap-4">
+              <UserPermissionForm
+                user={user}
+                ssoManagedProviders={ssoManagedProviders}
+                ssoManagedPermissionKeys={ssoManagedPermissionKeys}
+              />
+            </Card.Content>
+          </Card>
 
-          <section
-            className="w-full flex flex-col gap-4 pt-6 border-t border-default-200"
-            data-cy="user-details-username-section"
-          >
-            <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
-              {t('profile.usernameTitle')}
-            </h3>
-            <ChangeUsernameForm userId={user.id} />
-          </section>
-
-          <section
-            className="w-full flex flex-col gap-4 pt-6 border-t border-default-200"
-            data-cy="user-details-email-section"
-          >
-            <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
-              {t('profile.emailTitle')}
-            </h3>
-            <ChangeEmailForm userId={user.id} />
-          </section>
-
-          <section
-            className="w-full flex flex-col gap-4 pt-6 border-t border-default-200"
-            data-cy="user-details-password-section"
-          >
-            <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
-              {t('profile.passwordTitle')}
-            </h3>
-            <SetPasswordForm userId={user.id} />
-          </section>
-
-          <section
-            className="w-full flex flex-col gap-4 pt-6 border-t border-default-200"
-            data-cy="user-details-sso-section"
-          >
-            <div className="flex items-center justify-between gap-2">
+          <Card className="w-full" data-cy="user-details-username-section">
+            <Card.Content className="flex flex-col gap-4">
               <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
-                {t('sso.title')}
+                {t('profile.usernameTitle')}
               </h3>
-              <Chip
-                color={ssoDetails.length > 0 ? 'accent' : 'default'}
-                variant={ssoDetails.length > 0 ? 'secondary' : 'primary'}
-              >
-                {ssoDetails.length > 0 ? t('sso.linked', { count: ssoDetails.length }) : t('sso.notLinkedChip')}
-              </Chip>
-            </div>
-            {ssoDetails.length === 0 ? (
-              <div className="flex items-center gap-2">
-                <Chip color="default" variant="soft">
-                  {t('sso.notLinked')}
-                </Chip>
-                <span className="text-sm text-default-500">{t('sso.notLinkedHint')}</span>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-4">
-                {ssoDetails.map((detail, index) => {
-                  const providerName = detail.providerId ? providersById.get(detail.providerId)?.name : undefined;
-                  const providerLabel =
-                    providerName ??
-                    (detail.providerType && detail.providerId
-                      ? `${detail.providerType} #${detail.providerId}`
-                      : (detail.providerType ?? '-'));
-                  const itemKey = `${detail.providerId ?? 'unknown'}-${detail.ssoSubject ?? 'unknown'}-${
-                    detail.providerType ?? 'unknown'
-                  }`;
-                  return (
-                    <div key={itemKey} className="flex flex-col gap-2">
-                      <div className="flex flex-col gap-1">
-                        <span className="text-xs uppercase tracking-wide text-default-500">
-                          {t('sso.provider')}
-                        </span>
-                        <div className="text-sm font-semibold text-default-900 break-words">{providerLabel}</div>
-                        <div className="text-xs text-default-500">{detail.providerType ?? '-'}</div>
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <span className="text-xs uppercase tracking-wide text-default-500">{t('sso.userId')}</span>
-                        <div className="font-mono text-xs text-default-800 break-all">
-                          {detail.ssoSubject ?? '-'}
-                        </div>
-                      </div>
-                      {index < ssoDetails.length - 1 ? <Separator /> : null}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </section>
+              <ChangeUsernameForm userId={user.id} />
+            </Card.Content>
+          </Card>
 
-          <section
-            className="w-full flex flex-col gap-4 pt-6 border-t border-default-200"
-            data-cy="user-details-delete-section"
-          >
-            <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
-              {t('delete.title')}
-            </h3>
-            <p className="text-sm text-default-500">{t('delete.description')}</p>
-            <div className="flex w-full justify-end">
-              <Button
-                variant="danger-soft"
-                onPress={open}
-                isDisabled={isSelf}
-                data-cy="admin-delete-user-open-modal"
-              >
-                {t('delete.actions.open')}
-              </Button>
-            </div>
-            {isSelf ? <p className="text-xs text-default-400">{t('delete.selfDisabled')}</p> : null}
-          </section>
+          <Card className="w-full" data-cy="user-details-email-section">
+            <Card.Content className="flex flex-col gap-4">
+              <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
+                {t('profile.emailTitle')}
+              </h3>
+              <ChangeEmailForm userId={user.id} />
+            </Card.Content>
+          </Card>
+
+          <Card className="w-full" data-cy="user-details-password-section">
+            <Card.Content className="flex flex-col gap-4">
+              <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
+                {t('profile.passwordTitle')}
+              </h3>
+              <SetPasswordForm userId={user.id} username={user.username} />
+            </Card.Content>
+          </Card>
+
+          <Card className="w-full" data-cy="user-details-sso-section">
+            <Card.Content className="flex flex-col gap-4">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
+                  {t('sso.title')}
+                </h3>
+                <Chip
+                  color={ssoDetails.length > 0 ? 'accent' : 'default'}
+                  variant={ssoDetails.length > 0 ? 'secondary' : 'primary'}
+                >
+                  {ssoDetails.length > 0 ? t('sso.linked', { count: ssoDetails.length }) : t('sso.notLinkedChip')}
+                </Chip>
+              </div>
+              {ssoDetails.length === 0 ? (
+                <div className="flex items-center gap-2">
+                  <Chip color="default" variant="soft">
+                    {t('sso.notLinked')}
+                  </Chip>
+                  <span className="text-sm text-default-500">{t('sso.notLinkedHint')}</span>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-4">
+                  {ssoDetails.map((detail, index) => {
+                    const providerName = detail.providerId ? providersById.get(detail.providerId)?.name : undefined;
+                    const providerLabel =
+                      providerName ??
+                      (detail.providerType && detail.providerId
+                        ? `${detail.providerType} #${detail.providerId}`
+                        : (detail.providerType ?? '-'));
+                    const itemKey = `${detail.providerId ?? 'unknown'}-${detail.ssoSubject ?? 'unknown'}-${
+                      detail.providerType ?? 'unknown'
+                    }`;
+                    return (
+                      <div key={itemKey} className="flex flex-col gap-2">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-xs uppercase tracking-wide text-default-500">
+                            {t('sso.provider')}
+                          </span>
+                          <div className="text-sm font-semibold text-default-900 break-words">{providerLabel}</div>
+                          <div className="text-xs text-default-500">{detail.providerType ?? '-'}</div>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <span className="text-xs uppercase tracking-wide text-default-500">{t('sso.userId')}</span>
+                          <div className="font-mono text-xs text-default-800 break-all">
+                            {detail.ssoSubject ?? '-'}
+                          </div>
+                        </div>
+                        {index < ssoDetails.length - 1 ? <Separator /> : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </Card.Content>
+          </Card>
+
+          <Card className="w-full" data-cy="user-details-delete-section">
+            <Card.Content className="flex flex-col gap-4">
+              <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
+                {t('delete.title')}
+              </h3>
+              <p className="text-sm text-default-500">{t('delete.description')}</p>
+              <div className="flex w-full justify-end">
+                <Button
+                  variant="danger-soft"
+                  onPress={open}
+                  isDisabled={isSelf}
+                  data-cy="admin-delete-user-open-modal"
+                >
+                  {t('delete.actions.open')}
+                </Button>
+              </div>
+              {isSelf ? <p className="text-xs text-default-400">{t('delete.selfDisabled')}</p> : null}
+            </Card.Content>
+          </Card>
         </div>
       )}
 

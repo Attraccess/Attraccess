@@ -1,0 +1,64 @@
+{
+  "title": "Flow variables",
+  "subtitle": "Inspect and edit variables read and written by your flow nodes.",
+  "tabs": {
+    "resource": "Resource",
+    "global": "Global"
+  },
+  "table": {
+    "key": "Key",
+    "type": "Type",
+    "value": "Value",
+    "updated": "Updated",
+    "actions": "Actions",
+    "empty": "No variables yet."
+  },
+  "actions": {
+    "add": "Add variable",
+    "edit": "Edit",
+    "delete": "Delete",
+    "save": "Save",
+    "cancel": "Cancel",
+    "close": "Close",
+    "confirmDelete": "Delete this variable?",
+    "confirmDeleteYes": "Delete",
+    "confirmDeleteNo": "Cancel"
+  },
+  "editor": {
+    "createTitle": "Add variable",
+    "editTitle": "Edit variable: {{key}}",
+    "scope": "Scope",
+    "scopeResource": "Resource",
+    "scopeGlobal": "Global",
+    "key": "Key",
+    "keyPlaceholder": "e.g. door_unlocked",
+    "type": "Type",
+    "types": {
+      "string": "Text",
+      "number": "Number",
+      "boolean": "Boolean",
+      "object": "Object",
+      "array": "Array",
+      "null": "Null"
+    },
+    "value": "Value",
+    "valuePlaceholderString": "Some text…",
+    "valuePlaceholderNumber": "42",
+    "valuePlaceholderJson": "{\n  \"key\": \"value\"\n}",
+    "errors": {
+      "keyRequired": "Key is required.",
+      "numberInvalid": "Value must be a number.",
+      "jsonInvalid": "Value must be valid JSON.",
+      "typeMismatchObject": "Value must be a JSON object.",
+      "typeMismatchArray": "Value must be a JSON array."
+    }
+  },
+  "toast": {
+    "saved": {
+      "title": "Variable saved"
+    },
+    "deleted": {
+      "title": "Variable deleted"
+    }
+  }
+}

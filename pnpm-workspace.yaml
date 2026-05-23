@@ -1,0 +1,3 @@
+packages:
+  - 'apps/attractap/hardware/*'
+  - 'libs/attractap-hw-shared'

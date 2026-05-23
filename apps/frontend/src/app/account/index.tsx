@@ -1,5 +1,7 @@
 import { PageHeader } from '../../components/pageHeader';
-import { Button, Card, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, useOverlayState } from '@heroui/react';
+import { Button, DrawerBody, DrawerFooter, DrawerHeader, useOverlayState } from '@heroui/react';
+import { AlertTriangleIcon, ShieldIcon, UserIcon } from 'lucide-react';
+import { StandardDrawer } from '../../components/standardDrawer';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
@@ -10,6 +12,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { TwoFactorCard } from './two-factor';
 import { useUsersServiceRequestDeleteAccount, ApiError } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../components/toastProvider';
+import { FlatSection } from '../../components/flatSection';
 import API_ERROR_TRANSLATIONS_EN from '../../global-translations/api-errors.en.json';
 import API_ERROR_TRANSLATIONS_DE from '../../global-translations/api-errors.de.json';
 
@@ -45,71 +48,54 @@ export default function AccountPage() {
     <div>
       <PageHeader title={t('title')} backTo="/" />
 
-      <div className="flex flex-row flex-wrap gap-4">
-        <Card className="max-w-md">
-          <Card.Header>
-            <PageHeader title={t('sections.profile')} noMargin />
-          </Card.Header>
-          <Card.Content className="flex flex-col gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
+        <FlatSection icon={<UserIcon size={16} />} title={t('sections.profile')}>
+          <div className="flex flex-col gap-6">
             <EmailForm />
             <UsernameForm />
-          </Card.Content>
-        </Card>
+          </div>
+        </FlatSection>
 
-        <Card className="max-w-md">
-          <Card.Header>
-            <PageHeader title={t('sections.security')} noMargin />
-          </Card.Header>
-          <Card.Content className="flex flex-col gap-6">
-            {me && <SetPasswordForm userId={me.id} />}
+        <FlatSection icon={<ShieldIcon size={16} />} title={t('sections.security')}>
+          <div className="flex flex-col gap-6">
+            {me && <SetPasswordForm userId={me.id} username={me.username} />}
             {me && <TwoFactorCard />}
-          </Card.Content>
-        </Card>
+          </div>
+        </FlatSection>
 
-        <Card className="max-w-md">
-          <Card.Header>
-            <PageHeader title={t('sections.dangerZone')} noMargin />
-          </Card.Header>
-          <Card.Content className="flex flex-col gap-4">
+        <FlatSection icon={<AlertTriangleIcon size={16} className="text-danger" />} title={t('sections.dangerZone')}>
+          <div className="flex flex-col gap-4">
             <p className="text-sm text-default-500">{t('deleteAccount.description')}</p>
-            <Button variant="danger-soft" onPress={open} data-cy="delete-account-open-modal">
-              {t('deleteAccount.actions.request')}
-            </Button>
-          </Card.Content>
-        </Card>
+            <div>
+              <Button variant="danger" onPress={open} data-cy="delete-account-open-modal">
+                {t('deleteAccount.actions.request')}
+              </Button>
+            </div>
+          </div>
+        </FlatSection>
       </div>
 
-      <Modal isOpen={isOpen} onOpenChange={setOpen}>
-        <ModalBackdrop>
-          <ModalContainer size="sm">
-            <ModalDialog>
-              {({ close }) => (
-                <>
-                  <ModalHeader>
-                    <ModalHeading>{t('deleteAccount.modal.title')}</ModalHeading>
-                  </ModalHeader>
-                  <ModalBody>
-                    <p className="text-sm text-default-500">{t('deleteAccount.modal.description')}</p>
-                  </ModalBody>
-                  <ModalFooter>
-                    <Button variant="ghost" onPress={close} isDisabled={isRequestingDelete}>
-                      {t('deleteAccount.actions.cancel')}
-                    </Button>
-                    <Button
-                      variant="danger"
-                      onPress={() => requestDelete()}
-                      isPending={isRequestingDelete}
-                      data-cy="delete-account-confirm-button"
-                    >
-                      {t('deleteAccount.actions.confirm')}
-                    </Button>
-                  </ModalFooter>
-                </>
-              )}
-            </ModalDialog>
-          </ModalContainer>
-        </ModalBackdrop>
-      </Modal>
+      <StandardDrawer isOpen={isOpen} onOpenChange={setOpen}>
+        <DrawerHeader>
+          <h2 className="text-lg font-semibold">{t('deleteAccount.modal.title')}</h2>
+        </DrawerHeader>
+        <DrawerBody>
+          <p className="text-sm text-default-500">{t('deleteAccount.modal.description')}</p>
+        </DrawerBody>
+        <DrawerFooter>
+          <Button variant="ghost" onPress={close} isDisabled={isRequestingDelete}>
+            {t('deleteAccount.actions.cancel')}
+          </Button>
+          <Button
+            variant="danger"
+            onPress={() => requestDelete()}
+            isPending={isRequestingDelete}
+            data-cy="delete-account-confirm-button"
+          >
+            {t('deleteAccount.actions.confirm')}
+          </Button>
+        </DrawerFooter>
+      </StandardDrawer>
     </div>
   );
 }

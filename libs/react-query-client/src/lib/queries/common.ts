@@ -1,8 +1,8 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { UseQueryResult } from "@tanstack/react-query";
-import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceHealthService, ResourceMaintenanceSchedulesService, ResourceMaintenancesService, ResourcesService, SettingsService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
-import { EmailTemplateType, PermissionFilter } from "../requests/types.gen";
+import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, FlowVariablesService, LicenseService, MqttService, PasswordPolicyAdminService, PasswordPolicyService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceHealthService, ResourceMaintenanceSchedulesService, ResourceMaintenancesService, ResourcesService, SettingsService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
+import { EmailTemplateType, PasswordPolicyRole, PermissionFilter } from "../requests/types.gen";
 export type SystemServiceInfoDefaultResponse = Awaited<ReturnType<typeof SystemService.info>>;
 export type SystemServiceInfoQueryResult<TData = SystemServiceInfoDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useSystemServiceInfoKey = "SystemServiceInfo";
@@ -143,10 +143,32 @@ export type SettingsServiceGetMetricsSettingsDefaultResponse = Awaited<ReturnTyp
 export type SettingsServiceGetMetricsSettingsQueryResult<TData = SettingsServiceGetMetricsSettingsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useSettingsServiceGetMetricsSettingsKey = "SettingsServiceGetMetricsSettings";
 export const UseSettingsServiceGetMetricsSettingsKeyFn = (queryKey?: Array<unknown>) => [useSettingsServiceGetMetricsSettingsKey, ...(queryKey ?? [])];
+export type SettingsServiceGetAuthRateLimitSettingsDefaultResponse = Awaited<ReturnType<typeof SettingsService.getAuthRateLimitSettings>>;
+export type SettingsServiceGetAuthRateLimitSettingsQueryResult<TData = SettingsServiceGetAuthRateLimitSettingsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useSettingsServiceGetAuthRateLimitSettingsKey = "SettingsServiceGetAuthRateLimitSettings";
+export const UseSettingsServiceGetAuthRateLimitSettingsKeyFn = (queryKey?: Array<unknown>) => [useSettingsServiceGetAuthRateLimitSettingsKey, ...(queryKey ?? [])];
 export type LicenseServiceGetLicenseInformationDefaultResponse = Awaited<ReturnType<typeof LicenseService.getLicenseInformation>>;
 export type LicenseServiceGetLicenseInformationQueryResult<TData = LicenseServiceGetLicenseInformationDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useLicenseServiceGetLicenseInformationKey = "LicenseServiceGetLicenseInformation";
 export const UseLicenseServiceGetLicenseInformationKeyFn = (queryKey?: Array<unknown>) => [useLicenseServiceGetLicenseInformationKey, ...(queryKey ?? [])];
+export type PasswordPolicyServiceGetPublicPasswordPolicyDefaultResponse = Awaited<ReturnType<typeof PasswordPolicyService.getPublicPasswordPolicy>>;
+export type PasswordPolicyServiceGetPublicPasswordPolicyQueryResult<TData = PasswordPolicyServiceGetPublicPasswordPolicyDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const usePasswordPolicyServiceGetPublicPasswordPolicyKey = "PasswordPolicyServiceGetPublicPasswordPolicy";
+export const UsePasswordPolicyServiceGetPublicPasswordPolicyKeyFn = (queryKey?: Array<unknown>) => [usePasswordPolicyServiceGetPublicPasswordPolicyKey, ...(queryKey ?? [])];
+export type PasswordPolicyAdminServiceGetAdminPasswordPolicyDefaultResponse = Awaited<ReturnType<typeof PasswordPolicyAdminService.getAdminPasswordPolicy>>;
+export type PasswordPolicyAdminServiceGetAdminPasswordPolicyQueryResult<TData = PasswordPolicyAdminServiceGetAdminPasswordPolicyDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const usePasswordPolicyAdminServiceGetAdminPasswordPolicyKey = "PasswordPolicyAdminServiceGetAdminPasswordPolicy";
+export const UsePasswordPolicyAdminServiceGetAdminPasswordPolicyKeyFn = (queryKey?: Array<unknown>) => [usePasswordPolicyAdminServiceGetAdminPasswordPolicyKey, ...(queryKey ?? [])];
+export type PasswordPolicyAdminServiceListPasswordPolicyOverridesDefaultResponse = Awaited<ReturnType<typeof PasswordPolicyAdminService.listPasswordPolicyOverrides>>;
+export type PasswordPolicyAdminServiceListPasswordPolicyOverridesQueryResult<TData = PasswordPolicyAdminServiceListPasswordPolicyOverridesDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const usePasswordPolicyAdminServiceListPasswordPolicyOverridesKey = "PasswordPolicyAdminServiceListPasswordPolicyOverrides";
+export const UsePasswordPolicyAdminServiceListPasswordPolicyOverridesKeyFn = (queryKey?: Array<unknown>) => [usePasswordPolicyAdminServiceListPasswordPolicyOverridesKey, ...(queryKey ?? [])];
+export type PasswordPolicyAdminServiceGetPasswordPolicyOverrideDefaultResponse = Awaited<ReturnType<typeof PasswordPolicyAdminService.getPasswordPolicyOverride>>;
+export type PasswordPolicyAdminServiceGetPasswordPolicyOverrideQueryResult<TData = PasswordPolicyAdminServiceGetPasswordPolicyOverrideDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const usePasswordPolicyAdminServiceGetPasswordPolicyOverrideKey = "PasswordPolicyAdminServiceGetPasswordPolicyOverride";
+export const UsePasswordPolicyAdminServiceGetPasswordPolicyOverrideKeyFn = ({ role }: {
+  role: PasswordPolicyRole;
+}, queryKey?: Array<unknown>) => [usePasswordPolicyAdminServiceGetPasswordPolicyOverrideKey, ...(queryKey ?? [{ role }])];
 export type ResourcesServiceGetAllResourcesDefaultResponse = Awaited<ReturnType<typeof ResourcesService.getAllResources>>;
 export type ResourcesServiceGetAllResourcesQueryResult<TData = ResourcesServiceGetAllResourcesDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useResourcesServiceGetAllResourcesKey = "ResourcesServiceGetAllResources";
@@ -380,6 +402,12 @@ export const useResourceFlowsServiceGetButtonsKey = "ResourceFlowsServiceGetButt
 export const UseResourceFlowsServiceGetButtonsKeyFn = ({ resourceId }: {
   resourceId: number;
 }, queryKey?: Array<unknown>) => [useResourceFlowsServiceGetButtonsKey, ...(queryKey ?? [{ resourceId }])];
+export type FlowVariablesServiceListFlowVariablesDefaultResponse = Awaited<ReturnType<typeof FlowVariablesService.listFlowVariables>>;
+export type FlowVariablesServiceListFlowVariablesQueryResult<TData = FlowVariablesServiceListFlowVariablesDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useFlowVariablesServiceListFlowVariablesKey = "FlowVariablesServiceListFlowVariables";
+export const UseFlowVariablesServiceListFlowVariablesKeyFn = ({ resourceId }: {
+  resourceId: number;
+}, queryKey?: Array<unknown>) => [useFlowVariablesServiceListFlowVariablesKey, ...(queryKey ?? [{ resourceId }])];
 export type ResourceHealthServiceGetResourceHealthDefaultResponse = Awaited<ReturnType<typeof ResourceHealthService.getResourceHealth>>;
 export type ResourceHealthServiceGetResourceHealthQueryResult<TData = ResourceHealthServiceGetResourceHealthDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useResourceHealthServiceGetResourceHealthKey = "ResourceHealthServiceGetResourceHealth";
@@ -543,6 +571,7 @@ export type TwoFactorAuthenticationServiceSetTwoFactorPolicyMutationResult = Awa
 export type EmailTemplatesServiceEmailTemplateControllerPreviewMjmlMutationResult = Awaited<ReturnType<typeof EmailTemplatesService.emailTemplateControllerPreviewMjml>>;
 export type SettingsServiceApplyFirstTimeSetupSettingsMutationResult = Awaited<ReturnType<typeof SettingsService.applyFirstTimeSetupSettings>>;
 export type SettingsServiceGenerateMetricsApiKeyMutationResult = Awaited<ReturnType<typeof SettingsService.generateMetricsApiKey>>;
+export type PasswordPolicyAdminServicePreviewAdminPasswordPolicyMutationResult = Awaited<ReturnType<typeof PasswordPolicyAdminService.previewAdminPasswordPolicy>>;
 export type ResourcesServiceCreateOneResourceMutationResult = Awaited<ReturnType<typeof ResourcesService.createOneResource>>;
 export type ResourcesServiceResourceGroupsCreateOneMutationResult = Awaited<ReturnType<typeof ResourcesService.resourceGroupsCreateOne>>;
 export type ResourcesServiceResourceGroupsAddResourceMutationResult = Awaited<ReturnType<typeof ResourcesService.resourceGroupsAddResource>>;
@@ -582,6 +611,7 @@ export type AttractapServiceEnrollNfcCardMutationResult = Awaited<ReturnType<typ
 export type AttractapServiceResetNfcCardMutationResult = Awaited<ReturnType<typeof AttractapService.resetNfcCard>>;
 export type AttractapServiceGetAppKeyByUidMutationResult = Awaited<ReturnType<typeof AttractapService.getAppKeyByUid>>;
 export type AuthenticationServiceUpdateOneSsoProviderMutationResult = Awaited<ReturnType<typeof AuthenticationService.updateOneSsoProvider>>;
+export type PasswordPolicyAdminServiceUpsertPasswordPolicyOverrideMutationResult = Awaited<ReturnType<typeof PasswordPolicyAdminService.upsertPasswordPolicyOverride>>;
 export type ResourcesServiceUpdateOneResourceMutationResult = Awaited<ReturnType<typeof ResourcesService.updateOneResource>>;
 export type ResourcesServiceResourceGroupsUpdateOneMutationResult = Awaited<ReturnType<typeof ResourcesService.resourceGroupsUpdateOne>>;
 export type ResourcesServiceResourceUsageEndSessionMutationResult = Awaited<ReturnType<typeof ResourcesService.resourceUsageEndSession>>;
@@ -589,6 +619,7 @@ export type ResourcesServiceResourceUsageUpdateSessionProjectMutationResult = Aw
 export type MqttServiceMqttServersUpdateOneMutationResult = Awaited<ReturnType<typeof MqttService.mqttServersUpdateOne>>;
 export type ResourceMaintenanceSchedulesServiceUpdateMaintenanceScheduleMutationResult = Awaited<ReturnType<typeof ResourceMaintenanceSchedulesService.updateMaintenanceSchedule>>;
 export type ResourceFlowsServiceSaveResourceFlowMutationResult = Awaited<ReturnType<typeof ResourceFlowsService.saveResourceFlow>>;
+export type FlowVariablesServiceUpsertFlowVariableMutationResult = Awaited<ReturnType<typeof FlowVariablesService.upsertFlowVariable>>;
 export type ProjectsServiceUpdateProjectMutationResult = Awaited<ReturnType<typeof ProjectsService.updateProject>>;
 export type ResourceFormsServiceResourceFormsUpdateMutationResult = Awaited<ReturnType<typeof ResourceFormsService.resourceFormsUpdate>>;
 export type UsersServiceChangeMyUsernameMutationResult = Awaited<ReturnType<typeof UsersService.changeMyUsername>>;
@@ -600,12 +631,15 @@ export type UsersServiceChangeUserBillingFactorMutationResult = Awaited<ReturnTy
 export type EmailTemplatesServiceEmailTemplateControllerUpdateMutationResult = Awaited<ReturnType<typeof EmailTemplatesService.emailTemplateControllerUpdate>>;
 export type SettingsServiceUpdateSystemSettingsMutationResult = Awaited<ReturnType<typeof SettingsService.updateSystemSettings>>;
 export type SettingsServiceUpdateMetricsSettingsMutationResult = Awaited<ReturnType<typeof SettingsService.updateMetricsSettings>>;
+export type SettingsServiceUpdateAuthRateLimitSettingsMutationResult = Awaited<ReturnType<typeof SettingsService.updateAuthRateLimitSettings>>;
+export type PasswordPolicyAdminServiceUpdateAdminPasswordPolicyMutationResult = Awaited<ReturnType<typeof PasswordPolicyAdminService.updateAdminPasswordPolicy>>;
 export type AttractapServiceUpdateReaderMutationResult = Awaited<ReturnType<typeof AttractapService.updateReader>>;
 export type AttractapServiceToggleCardActiveMutationResult = Awaited<ReturnType<typeof AttractapService.toggleCardActive>>;
 export type UsersServiceDeleteUserMutationResult = Awaited<ReturnType<typeof UsersService.deleteUser>>;
 export type AuthenticationServiceEndSessionMutationResult = Awaited<ReturnType<typeof AuthenticationService.endSession>>;
 export type AuthenticationServiceDeleteOneSsoProviderMutationResult = Awaited<ReturnType<typeof AuthenticationService.deleteOneSsoProvider>>;
 export type SettingsServiceDeleteMetricsApiKeyMutationResult = Awaited<ReturnType<typeof SettingsService.deleteMetricsApiKey>>;
+export type PasswordPolicyAdminServiceDeletePasswordPolicyOverrideMutationResult = Awaited<ReturnType<typeof PasswordPolicyAdminService.deletePasswordPolicyOverride>>;
 export type ResourcesServiceDeleteOneResourceMutationResult = Awaited<ReturnType<typeof ResourcesService.deleteOneResource>>;
 export type ResourcesServiceResourceGroupsRemoveResourceMutationResult = Awaited<ReturnType<typeof ResourcesService.resourceGroupsRemoveResource>>;
 export type ResourcesServiceResourceGroupsDeleteOneMutationResult = Awaited<ReturnType<typeof ResourcesService.resourceGroupsDeleteOne>>;
@@ -614,6 +648,7 @@ export type AccessControlServiceResourceIntroducersRevokeMutationResult = Awaite
 export type AccessControlServiceResourceIntroductionsRevokeMutationResult = Awaited<ReturnType<typeof AccessControlService.resourceIntroductionsRevoke>>;
 export type ResourceMaintenanceSchedulesServiceDeleteMaintenanceScheduleMutationResult = Awaited<ReturnType<typeof ResourceMaintenanceSchedulesService.deleteMaintenanceSchedule>>;
 export type BillingServiceRemoveSumUpReaderMutationResult = Awaited<ReturnType<typeof BillingService.removeSumUpReader>>;
+export type FlowVariablesServiceDeleteFlowVariableMutationResult = Awaited<ReturnType<typeof FlowVariablesService.deleteFlowVariable>>;
 export type ResourceHealthServiceClearResourceHealthEntryMutationResult = Awaited<ReturnType<typeof ResourceHealthService.clearResourceHealthEntry>>;
 export type ProjectsServiceDeleteOneProjectMutationResult = Awaited<ReturnType<typeof ProjectsService.deleteOneProject>>;
 export type ProjectsServiceRemoveProjectMemberMutationResult = Awaited<ReturnType<typeof ProjectsService.removeProjectMember>>;

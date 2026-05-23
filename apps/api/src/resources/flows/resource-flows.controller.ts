@@ -263,6 +263,6 @@ export class ResourceFlowsController {
     description: 'Insufficient permissions to manage resources',
   })
   async getButtons(@Param('resourceId', ParseIntPipe) resourceId: number): Promise<ResourceFlowNode[]> {
-    return await this.resourceFlowsService.getNodes(resourceId, ResourceFlowNodeType.MANUAL_BUTTON);
+    return await this.resourceFlowsService.getNodes(resourceId, ResourceFlowNodeType.INPUT_BUTTON);
   }
 }

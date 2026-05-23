@@ -1,0 +1,191 @@
+name: Hardware
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    paths:
+      - 'apps/attractap/hardware/**'
+      - 'libs/attractap-hw-shared/**'
+      - '.github/workflows/hardware.yml'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  RENDERS_BRANCH: hardware-renders
+
+jobs:
+  build-and-render:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup PNPM
+        uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061
+
+      - name: Setup Node.js (hardware toolchain)
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22.17.1'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium (for 3D PNG render)
+        run: pnpm --filter @attraccess/attractap-hw-beeper exec playwright install --with-deps chromium
+
+      - name: Typecheck hardware libs
+        run: pnpm nx run-many --target=typecheck --parallel=3 --projects=tag:scope:hardware
+      - name: Test hardware libs
+        run: pnpm nx run-many --target=test --parallel=3 --projects=tag:scope:hardware
+      - name: Check generated docs in sync
+        run: pnpm nx run-many --target=doc-check --parallel=3 --projects=tag:scope:hardware
+
+      - name: Lint hardware (DRC/ERC)
+        run: pnpm nx run-many --target=lint --parallel=3 --projects=tag:scope:hardware
+      - name: Build hardware (circuit JSON)
+        run: pnpm nx run-many --target=build --parallel=3 --projects=tag:scope:hardware
+      - name: Export fab files (gerbers, BOM, CPL)
+        run: pnpm nx run-many --target=export --parallel=3 --projects=tag:scope:hardware
+      - name: Render previews (PCB + schematic + assembly)
+        run: pnpm nx run-many --target=render --parallel=3 --projects=tag:scope:hardware
+      - name: Render 3D (GLB + STEP)
+        run: pnpm nx run-many --target=render-3d --parallel=3 --projects=tag:scope:hardware
+
+      - name: Upload 3D renders
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hardware-3d-${{ github.event.pull_request.number }}-${{ github.run_attempt }}
+          path: apps/attractap/hardware/**/dist/render-3d/*.{glb,step,png}
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload gerber ZIPs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hardware-gerbers-${{ github.event.pull_request.number }}-${{ github.run_attempt }}
+          path: apps/attractap/hardware/**/dist/export/*.zip
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload render PNGs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hardware-renders-${{ github.event.pull_request.number }}-${{ github.run_attempt }}
+          path: apps/attractap/hardware/**/dist/render/*.png
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Collect render PNG list
+        id: collect-renders
+        if: always()
+        run: |
+          set -euo pipefail
+          shopt -s nullglob globstar
+          list_file="$(mktemp)"
+          for png in apps/attractap/hardware/**/dist/render/*.png apps/attractap/hardware/**/dist/render-3d/*.png; do
+            board="$(basename "$(dirname "$(dirname "$(dirname "$png")")")")"
+            echo "${board}|$(basename "$png")|${png}" >> "$list_file"
+          done
+          if [ -s "$list_file" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "list_file=$list_file" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish renders to orphan branch
+        id: publish-renders
+        if: always() && steps.collect-renders.outputs.found == 'true'
+        env:
+          LIST_FILE: ${{ steps.collect-renders.outputs.list_file }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          RENDERS_BRANCH: ${{ env.RENDERS_BRANCH }}
+        run: |
+          set -euo pipefail
+          worktree="$(mktemp -d)/renders"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          if git ls-remote --exit-code --heads origin "$RENDERS_BRANCH" >/dev/null 2>&1; then
+            git fetch origin "$RENDERS_BRANCH"
+            git worktree add -B "$RENDERS_BRANCH" "$worktree" "origin/$RENDERS_BRANCH"
+          else
+            git worktree add --detach "$worktree"
+            (cd "$worktree" && git checkout --orphan "$RENDERS_BRANCH" && git rm -rf --quiet . 2>/dev/null || true)
+          fi
+          dest_dir="$worktree/pr-${PR_NUMBER}/${HEAD_SHA}"
+          mkdir -p "$dest_dir"
+          while IFS='|' read -r board name file; do
+            cp "$file" "$dest_dir/${board}-${name}"
+          done < "$LIST_FILE"
+          (
+            cd "$worktree"
+            git add "pr-${PR_NUMBER}/${HEAD_SHA}"
+            if git diff --cached --quiet; then
+              echo "no new renders to publish"
+            else
+              git commit -m "renders: pr #${PR_NUMBER} sha ${HEAD_SHA}"
+              git push origin "HEAD:${RENDERS_BRANCH}"
+            fi
+          )
+          raw_base="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${RENDERS_BRANCH}/pr-${PR_NUMBER}/${HEAD_SHA}"
+          md_file="$(mktemp)"
+          declare -A seen=()
+          while IFS='|' read -r board name file; do
+            if [ -z "${seen[$board]+x}" ]; then
+              echo "### \`${board}\`" >> "$md_file"
+              seen[$board]=1
+            fi
+            title="${name%.png}"
+            echo "" >> "$md_file"
+            echo "**${title}**" >> "$md_file"
+            echo "" >> "$md_file"
+            echo "![${title}](${raw_base}/${board}-${name})" >> "$md_file"
+            echo "" >> "$md_file"
+          done < "$LIST_FILE"
+          echo "md_file=$md_file" >> "$GITHUB_OUTPUT"
+
+      - name: Build PR comment body
+        id: comment-body
+        if: always()
+        env:
+          RENDERS_FOUND: ${{ steps.collect-renders.outputs.found }}
+          MD_FILE: ${{ steps.publish-renders.outputs.md_file }}
+          LIST_FILE: ${{ steps.collect-renders.outputs.list_file }}
+        run: |
+          set -euo pipefail
+          out="$(mktemp)"
+          {
+            echo "## Hardware render previews"
+            echo ""
+            echo "Commit \`${{ github.event.pull_request.head.sha }}\` · workflow run [\`${{ github.run_id }}\`](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+            echo ""
+            if [ "$RENDERS_FOUND" != "true" ]; then
+              echo "_No render PNGs were produced for this PR._"
+            else
+              cat "$MD_FILE"
+            fi
+            echo ""
+            echo "Download the full-resolution PNGs + gerber ZIPs from the [workflow artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})."
+          } > "$out"
+          {
+            echo 'body<<EOF_BODY'
+            cat "$out"
+            echo 'EOF_BODY'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Post sticky PR comment with renders
+        if: always()
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: hardware-renders
+          message: ${{ steps.comment-body.outputs.body }}

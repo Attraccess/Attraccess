@@ -9,7 +9,7 @@ import {
 } from '@attraccess/react-query-client';
 import { Skeleton, Button, Chip } from '@heroui/react';
 import { filenameToUrl } from '../../../api';
-import { PageHeader } from '../../../components/pageHeader';
+import { PageHeader, PageAction } from '../../../components/pageHeader';
 import { ArchiveIcon, ArchiveRestoreIcon, Edit2Icon, FoldersIcon, Trash2Icon, UsersIcon } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { DeleteConfirmationModal } from '../../../components/deleteConfirmationModal';
@@ -147,42 +147,48 @@ export function ProjectDetailsPage() {
         }
         backTo="/projects"
         actions={
-          project?.access.isOwner && (
-            <>
-              <Button variant="ghost"
-                onPress={() => navigate(`/projects/${projectId}/team`)}
-              ><UsersIcon className="size-4" />
-                {t('actions.members.label')}
-              </Button>
-              <UpsertProjectModal projectId={projectId}>
-                {(onOpen) => (
-                  <Button variant="ghost" onPress={onOpen}><Edit2Icon className="size-4" />
-                    {t('actions.update.label')}
-                  </Button>
-                )}
-              </UpsertProjectModal>
-              {project.archivedAt ? (
-                <Button variant="tertiary"
-                  onPress={() => unarchiveProject({ id: projectId })}
-                  isPending={isUnarchiving}
-                ><ArchiveRestoreIcon className="size-4" />
-                  {t('actions.unarchive.label')}
-                </Button>
-              ) : (
-                <Button variant="tertiary"
-                  onPress={() => archiveProject({ id: projectId })}
-                  isPending={isArchiving}
-                ><ArchiveIcon className="size-4" />
-                  {t('actions.archive.label')}
-                </Button>
-              )}
-              <Button variant="danger-soft"
-                onPress={() => setShowDeleteConfirmationModal(true)}
-              ><Trash2Icon className="size-4" />
-                {t('actions.delete.label')}
-              </Button>
-            </>
-          )
+          project?.access.isOwner
+            ? ([
+                {
+                  key: 'members',
+                  label: t('actions.members.label'),
+                  icon: <UsersIcon className="size-4" />,
+                  onPress: () => navigate(`/projects/${projectId}/team`),
+                },
+                {
+                  key: 'update',
+                  label: t('actions.update.label'),
+                  icon: <Edit2Icon className="size-4" />,
+                  renderTrigger: (triggerProps) => (
+                    <UpsertProjectModal projectId={projectId}>
+                      {(onOpen) => <Button {...triggerProps} onPress={onOpen} />}
+                    </UpsertProjectModal>
+                  ),
+                },
+                project.archivedAt
+                  ? {
+                      key: 'unarchive',
+                      label: t('actions.unarchive.label'),
+                      icon: <ArchiveRestoreIcon className="size-4" />,
+                      isPending: isUnarchiving,
+                      onPress: () => unarchiveProject({ id: projectId }),
+                    }
+                  : {
+                      key: 'archive',
+                      label: t('actions.archive.label'),
+                      icon: <ArchiveIcon className="size-4" />,
+                      isPending: isArchiving,
+                      onPress: () => archiveProject({ id: projectId }),
+                    },
+                {
+                  key: 'delete',
+                  label: t('actions.delete.label'),
+                  icon: <Trash2Icon className="size-4" />,
+                  variant: 'destructive',
+                  onPress: () => setShowDeleteConfirmationModal(true),
+                },
+              ] satisfies PageAction[])
+            : undefined
         }
       />
 

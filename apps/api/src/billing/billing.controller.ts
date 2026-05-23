@@ -133,7 +133,7 @@ export class BillingController {
 
     const additionalItemsFlowNodes = await this.flowsService.getNodes(
       resourceId,
-      ResourceFlowNodeType.RESOURCE_BILLING_SET_ADDITIONAL_ITEMS,
+      ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS,
     );
 
     return {

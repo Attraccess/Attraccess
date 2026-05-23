@@ -11,17 +11,12 @@ import {
   AlertDescription,
   AlertTitle,
   Button,
-  Modal,
-  ModalBackdrop,
-  ModalBody,
-  ModalContainer,
-  ModalDialog,
-  ModalFooter,
-  ModalHeader,
-  ModalHeading,
-  ModalIcon,
+  DrawerBody,
+  DrawerFooter,
+  DrawerHeader,
   useOverlayState,
 } from '@heroui/react';
+import { StandardDrawer } from '../../../components/standardDrawer';
 import { Select } from '../../../components/select';
 import { Settings2Icon } from 'lucide-react';
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
@@ -115,55 +110,47 @@ export function TwoFactorPolicyModal(props: Props) {
   return (
     <>
       {props.children(open)}
-      <Modal isOpen={isOpen} onOpenChange={setOpen}>
-        <ModalBackdrop>
-          <ModalContainer size="md">
-            <ModalDialog>
-              {() => (
-                <>
-                  <ModalHeader>
-                    <ModalIcon><Settings2Icon /></ModalIcon>
-                    <ModalHeading>{t('title')}</ModalHeading>
-                    <p className="text-sm text-muted">{t('subtitle')}</p>
-                  </ModalHeader>
-                  <ModalBody className="flex flex-col gap-4">
-                    <Alert status="warning">
-                      <AlertContent>
-                        <AlertTitle>{t('warning.title')}</AlertTitle>
-                        <AlertDescription>{t('warning.description')}</AlertDescription>
-                      </AlertContent>
-                    </Alert>
-                    <Select
-                      label={t('inputs.policy.label')}
-                      isDisabled={isLoading}
-                      value={selectedPolicy ?? undefined}
-                      onChange={(key) => {
-                        if (key) setSelectedPolicy(key as TwoFactorPolicy);
-                      }}
-                      items={policyOptions.map((option) => ({
-                        key: option.value,
-                        textValue: option.label,
-                        label: (
-                          <div className="flex flex-col gap-1">
-                            <span>{option.label}</span>
-                            <span className="text-xs text-default-500">{option.description}</span>
-                          </div>
-                        ),
-                      }))}
-                    />
-                    {selectedOption && <div className="text-sm text-default-500">{selectedOption.description}</div>}
-                  </ModalBody>
-                  <ModalFooter>
-                    <Button variant="primary" onPress={onSave} isPending={isSaving} isDisabled={!selectedPolicy}>
-                      {t('actions.save.label')}
-                    </Button>
-                  </ModalFooter>
-                </>
-              )}
-            </ModalDialog>
-          </ModalContainer>
-        </ModalBackdrop>
-      </Modal>
+      <StandardDrawer isOpen={isOpen} onOpenChange={setOpen}>
+        <DrawerHeader>
+          <div className="flex items-center gap-2">
+            <Settings2Icon className="w-5 h-5" />
+            <h2 className="text-lg font-semibold">{t('title')}</h2>
+          </div>
+          <p className="text-sm text-muted">{t('subtitle')}</p>
+        </DrawerHeader>
+        <DrawerBody className="flex flex-col gap-4">
+          <Alert status="warning">
+            <AlertContent>
+              <AlertTitle>{t('warning.title')}</AlertTitle>
+              <AlertDescription>{t('warning.description')}</AlertDescription>
+            </AlertContent>
+          </Alert>
+          <Select
+            label={t('inputs.policy.label')}
+            isDisabled={isLoading}
+            value={selectedPolicy ?? undefined}
+            onChange={(key) => {
+              if (key) setSelectedPolicy(key as TwoFactorPolicy);
+            }}
+            items={policyOptions.map((option) => ({
+              key: option.value,
+              textValue: option.label,
+              label: (
+                <div className="flex flex-col gap-1">
+                  <span>{option.label}</span>
+                  <span className="text-xs text-default-500">{option.description}</span>
+                </div>
+              ),
+            }))}
+          />
+          {selectedOption && <div className="text-sm text-default-500">{selectedOption.description}</div>}
+        </DrawerBody>
+        <DrawerFooter>
+          <Button variant="primary" onPress={onSave} isPending={isSaving} isDisabled={!selectedPolicy}>
+            {t('actions.save.label')}
+          </Button>
+        </DrawerFooter>
+      </StandardDrawer>
     </>
   );
 }

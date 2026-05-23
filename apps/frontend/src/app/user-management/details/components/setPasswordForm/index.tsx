@@ -3,34 +3,49 @@ import { Button, cn } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../../../components/toastProvider';
 import { useUsersServiceSetUserPassword } from '@attraccess/react-query-client';
-import { PasswordInput } from '../../../../../components/PasswordInput';
+import { PasswordField } from '../../../../../components/PasswordField';
+import { PolicyError } from '@attraccess/shared';
+import { extractPolicyErrors } from '../../../../../utils/policyErrors';
 
 import en from './en.json';
 import de from './de.json';
 
 interface SetPasswordFormProps {
   userId: number;
+  username?: string;
+  email?: string;
 }
 
 export const SetPasswordForm: React.FC<SetPasswordFormProps & Omit<HTMLAttributes<HTMLDivElement>, 'children'>> = ({
   userId,
+  username,
+  email,
   ...divProps
 }) => {
   const { t } = useTranslations({ en, de });
   const { showToast } = useToastMessage();
+
+  const [password, setPassword] = useState<string>('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [serverErrors, setServerErrors] = useState<PolicyError[]>([]);
+
   const { mutate: setPasswordMutate, isPending: isSettingPassword } = useUsersServiceSetUserPassword({
     onSuccess: () => {
       showToast({
         title: t('passwordUpdated'),
         type: 'success',
       });
-
-      // Reset form
       setPassword('');
       setConfirmPassword('');
+      setServerErrors([]);
     },
     onError: (error) => {
-      console.error('Error setting password:', error);
+      const policyErrors = extractPolicyErrors(error);
+      if (policyErrors) {
+        setServerErrors(policyErrors);
+        return;
+      }
+      setServerErrors([]);
       showToast({
         title: t('errorUpdatingPassword'),
         type: 'error',
@@ -38,22 +53,11 @@ export const SetPasswordForm: React.FC<SetPasswordFormProps & Omit<HTMLAttribute
     },
   });
 
-  const [password, setPassword] = useState<string>('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-
-  const passwordWasEntered = useMemo(() => {
-    return password.length > 0 || confirmPassword.length > 0;
-  }, [password, confirmPassword]);
-
-  const passwordTooShort = useMemo(() => {
-    return password.length < 8;
-  }, [password]);
-
-  const passwordsDontMatch = useMemo(() => {
-    return password !== confirmPassword;
-  }, [password, confirmPassword]);
+  const passwordsDontMatch = useMemo(() => password !== confirmPassword, [password, confirmPassword]);
+  const passwordEntered = useMemo(() => password.length > 0 && confirmPassword.length > 0, [password, confirmPassword]);
 
   const handleSubmit = useCallback(() => {
+    setServerErrors([]);
     setPasswordMutate({
       id: userId,
       requestBody: { password },
@@ -62,24 +66,23 @@ export const SetPasswordForm: React.FC<SetPasswordFormProps & Omit<HTMLAttribute
 
   return (
     <div {...divProps} className={cn(divProps.className, 'flex flex-col gap-4')}>
-      <PasswordInput
-        label={t('newPassword')}
+      <PasswordField
         value={password}
-        onChange={setPassword}
-        data-cy="set-password-form-new-password"
-        errorMessage={t('errors.passwordTooShort')}
-        isInvalid={passwordTooShort && passwordWasEntered}
+        onValueChange={(v) => {
+          setPassword(v);
+          setServerErrors([]);
+        }}
+        username={username}
+        email={email}
+        serverErrors={serverErrors}
+        passwordLabel={t('newPassword')}
+        confirmationLabel={t('confirmPassword')}
+        showConfirmation
+        confirmationValue={confirmPassword}
+        onConfirmationChange={setConfirmPassword}
+        isRequired
         autoComplete="new-password"
-      />
-
-      <PasswordInput
-        label={t('confirmPassword')}
-        value={confirmPassword}
-        onChange={setConfirmPassword}
-        data-cy="set-password-form-confirm-password"
-        errorMessage={t('errors.passwordsDoNotMatch')}
-        isInvalid={passwordsDontMatch && passwordWasEntered}
-        autoComplete="new-password"
+        dataCyPrefix="set-password-form"
       />
 
       <div className="flex w-full justify-end">
@@ -87,7 +90,7 @@ export const SetPasswordForm: React.FC<SetPasswordFormProps & Omit<HTMLAttribute
           onPress={handleSubmit}
           isPending={isSettingPassword}
           data-cy="set-password-form-save-button"
-          isDisabled={passwordTooShort || passwordsDontMatch}
+          isDisabled={!passwordEntered || passwordsDontMatch}
         >
           {t('actions.setPassword')}
         </Button>

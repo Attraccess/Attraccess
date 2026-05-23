@@ -85,12 +85,15 @@ export function MaintenanceHubPage() {
         subtitle={t('subtitle', { resourceName: resource.name })}
         icon={<ConstructionIcon className="w-6 h-6" />}
         backTo={`/resources/${resourceId}`}
-        actions={
-          <Button variant="primary" onPress={openCreateDrawer}>
-            <PlusIcon className="w-4 h-4" />
-            {t('actions.newSchedule')}
-          </Button>
-        }
+        actions={[
+          {
+            key: 'new-schedule',
+            label: t('actions.newSchedule'),
+            icon: <PlusIcon className="w-4 h-4" />,
+            variant: 'primary',
+            onPress: openCreateDrawer,
+          },
+        ]}
       />
 
       <div className="space-y-6 mb-6">

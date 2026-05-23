@@ -1,6 +1,21 @@
 import { memo, useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Button, Card, FieldError, Input, Label, Radio, RadioGroup, Spinner, Tab, TabList, TabPanel, Tabs, TextArea, TextField } from '@heroui/react';
+import {
+  Button,
+  FieldError,
+  Form,
+  Input,
+  Label,
+  Radio,
+  RadioGroup,
+  Spinner,
+  Tab,
+  TabList,
+  TabPanel,
+  Tabs,
+  TextArea,
+  TextField,
+} from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { ArrowLeft, Save } from 'lucide-react';
 import { useToastMessage } from '../../../components/toastProvider';
@@ -32,10 +47,9 @@ function DocumentationEditorComponent() {
   const [documentationType, setDocumentationType] = useState<DocumentationType | ''>('');
   const [markdownContent, setMarkdownContent] = useState('');
   const [urlContent, setUrlContent] = useState('');
-  const [selectedTab] = useState('edit');
+  const [selectedTab, setSelectedTab] = useState<'edit' | 'preview'>('edit');
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
-  // Get resource query key for cache operations
   const resourceQueryKey = UseResourcesServiceGetOneResourceByIdKeyFn({ id: resourceId });
 
   const {
@@ -49,11 +63,8 @@ function DocumentationEditorComponent() {
   });
 
   const updateResource = useResourcesServiceUpdateOneResource({
-    // Invalidate queries after successful update
     onSuccess: () => {
-      // Invalidate the specific resource query
       queryClient.invalidateQueries({ queryKey: resourceQueryKey });
-      // Invalidate the resources list query if needed
       queryClient.invalidateQueries({ queryKey: [useResourcesServiceGetAllResourcesKey] });
 
       success({
@@ -63,20 +74,16 @@ function DocumentationEditorComponent() {
 
       navigate(`/resources/${resourceId}`);
     },
-    // Handle errors
-    onError: (error) => {
+    onError: () => {
       showError({
         title: t('notifications.saveError.title'),
         description: t('notifications.saveError.description'),
       });
-      console.error('Failed to save documentation:', error);
     },
   });
 
-  // Initialize form with resource data
   useEffect(() => {
     if (resource) {
-      // Set the documentation type directly from the resource
       if (resource.documentationType) {
         setDocumentationType(resource.documentationType as DocumentationType);
       } else {
@@ -115,7 +122,6 @@ function DocumentationEditorComponent() {
       return;
     }
 
-    // Perform mutation
     updateResource.mutate({
       id: resourceId,
       formData: {
@@ -126,7 +132,14 @@ function DocumentationEditorComponent() {
     });
   }, [documentationType, markdownContent, resource, resourceId, updateResource, urlContent, validateForm]);
 
-  // Handle loading state
+  const handleSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      handleSave();
+    },
+    [handleSave]
+  );
+
   if (isLoadingResource) {
     return (
       <div className="flex justify-center items-center h-[50vh]">
@@ -135,80 +148,83 @@ function DocumentationEditorComponent() {
     );
   }
 
-  // Handle error state
   if (isResourceError) {
     return (
-      <Card className="max-w-xl mx-auto my-8">
-        <Card.Header>
-          <h2 className="text-xl">{t('error.title')}</h2>
-        </Card.Header>
-        <Card.Content>
+      <div className="max-w-7xl mx-auto px-4 py-8" data-cy="documentation-editor-error">
+        <PageHeader title={t('error.title')} backTo="/resources" />
+        <div className="flex flex-col items-center gap-4 mt-6">
           <p className="text-danger">{resourceError instanceof Error ? resourceError.message : t('error.unknown')}</p>
-        </Card.Content>
-        <Card.Footer className="flex justify-center gap-4">
-          <Button variant="primary" onPress={() => refetchResource()} data-cy="documentation-editor-error-retry-button">
-            {t('actions.retry')}
-          </Button>
-          <Button variant="secondary"
-            onPress={() => navigate('/resources')}
-            data-cy="documentation-editor-error-back-to-resources-button"
-          ><ArrowLeft size={16} />
-            {t('actions.backToResources')}
-          </Button>
-        </Card.Footer>
-      </Card>
+          <div className="flex gap-4">
+            <Button
+              variant="primary"
+              onPress={() => refetchResource()}
+              data-cy="documentation-editor-error-retry-button"
+            >
+              {t('actions.retry')}
+            </Button>
+            <Button
+              variant="secondary"
+              onPress={() => navigate('/resources')}
+              data-cy="documentation-editor-error-back-to-resources-button"
+            >
+              <ArrowLeft size={16} />
+              {t('actions.backToResources')}
+            </Button>
+          </div>
+        </div>
+      </div>
     );
   }
 
-  // Handle not found state
   if (!resource) {
     return (
-      <Card className="max-w-xl mx-auto my-8">
-        <Card.Header>
-          <h2 className="text-xl">{t('notFound.title')}</h2>
-        </Card.Header>
-        <Card.Content>
+      <div className="max-w-7xl mx-auto px-4 py-8" data-cy="documentation-editor-not-found">
+        <PageHeader title={t('notFound.title')} backTo="/resources" />
+        <div className="flex flex-col items-center gap-4 mt-6">
           <p>{t('notFound.message')}</p>
-        </Card.Content>
-        <Card.Footer className="justify-center">
-          <Button variant="secondary"
+          <Button
+            variant="secondary"
             onPress={() => navigate('/resources')}
             data-cy="documentation-editor-not-found-back-to-resources-button"
-          ><ArrowLeft size={16} />
+          >
+            <ArrowLeft size={16} />
             {t('actions.backToResources')}
           </Button>
-        </Card.Footer>
-      </Card>
+        </div>
+      </div>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
+    <div className="max-w-7xl mx-auto px-4 py-8" data-cy="documentation-editor-page">
       <PageHeader
         title={t('title')}
         subtitle={resource.name}
         backTo={`/resources/${resourceId}`}
-        actions={
-          <Button variant="primary"
-            onPress={handleSave}
-            isPending={updateResource.isPending}
-            data-cy="documentation-editor-header-save-button"
-          ><Save className="w-4 h-4" />
-            {t('actions.save')}
-          </Button>
-        }
+        actions={[
+          {
+            key: 'save',
+            label: t('actions.save'),
+            icon: <Save className="w-4 h-4" />,
+            variant: 'primary',
+            isPending: updateResource.isPending,
+            onPress: handleSave,
+            dataCy: 'documentation-editor-header-save-button',
+          },
+        ]}
       />
 
-      <Card className="mt-6">
-        <Card.Header>
+      <Form onSubmit={handleSubmit} className="gap-8" data-cy="documentation-editor-form">
+        <section className="w-full flex flex-col gap-4 pt-6 border-t border-default-200 first:pt-0 first:border-t-0">
+          <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">{t('sections.type')}</h3>
           <RadioGroup
-           
             orientation="horizontal"
             value={documentationType}
             onChange={setDocumentationType as (value: string) => void}
             isDisabled={updateResource.isPending}
             data-cy="documentation-editor-type-radiogroup"
           >
+            <Label className="sr-only">{t('documentationType.label')}</Label>
             <Radio value={DocumentationType.MARKDOWN} data-cy="documentation-editor-type-markdown-radio">
               {t('documentationType.markdown')}
             </Radio>
@@ -216,29 +232,44 @@ function DocumentationEditorComponent() {
               {t('documentationType.url')}
             </Radio>
           </RadioGroup>
-        </Card.Header>
-        <Card.Content>
-          {documentationType === DocumentationType.MARKDOWN && (
+        </section>
+
+        {documentationType === DocumentationType.MARKDOWN && (
+          <section className="w-full flex flex-col gap-4 pt-6 border-t border-default-200 first:pt-0 first:border-t-0">
+            <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">{t('sections.content')}</h3>
             <Tabs
               selectedKey={selectedTab}
+              onSelectionChange={(k) => setSelectedTab(k as 'edit' | 'preview')}
+              className="w-full"
               data-cy="documentation-editor-markdown-tabs"
             >
               <TabList>
-                <Tab id="edit" data-cy="documentation-editor-markdown-edit-tab">{t('edit')}</Tab>
-                <Tab id="preview" data-cy="documentation-editor-markdown-preview-tab">{t('preview')}</Tab>
+                <Tab id="edit" data-cy="documentation-editor-markdown-edit-tab">
+                  {t('edit')}
+                </Tab>
+                <Tab id="preview" data-cy="documentation-editor-markdown-preview-tab">
+                  {t('preview')}
+                </Tab>
               </TabList>
-              <TabPanel id="edit">
-                <TextArea
-                  placeholder={t('markdownContent.placeholder')}
+              <TabPanel id="edit" className="pt-4">
+                <TextField
                   value={markdownContent}
-                  onChange={(e) => setMarkdownContent(e.target.value)}
-                  aria-invalid={!!validationErrors.markdown}
-                  disabled={updateResource.isPending}
-                  data-cy="documentation-editor-markdown-textarea"
-                />
+                  onChange={setMarkdownContent}
+                  isInvalid={!!validationErrors.markdown}
+                  isDisabled={updateResource.isPending}
+                  className="w-full"
+                >
+                  <Label className="sr-only">{t('markdownContent.label')}</Label>
+                  <TextArea
+                    placeholder={t('markdownContent.placeholder')}
+                    className="w-full min-h-[300px] resize-y"
+                    data-cy="documentation-editor-markdown-textarea"
+                  />
+                  {validationErrors.markdown && <FieldError>{validationErrors.markdown}</FieldError>}
+                </TextField>
               </TabPanel>
-              <TabPanel id="preview">
-                <div className="border rounded p-4 min-h-[300px] prose max-w-none">
+              <TabPanel id="preview" className="pt-4">
+                <div className="border border-default-200 rounded-md p-4 min-h-[300px] prose dark:prose-invert max-w-none">
                   {markdownContent ? (
                     <ReactMarkdown>{markdownContent}</ReactMarkdown>
                   ) : (
@@ -247,41 +278,45 @@ function DocumentationEditorComponent() {
                 </div>
               </TabPanel>
             </Tabs>
-          )}
+          </section>
+        )}
 
-          {documentationType === DocumentationType.URL && (
+        {documentationType === DocumentationType.URL && (
+          <section className="w-full flex flex-col gap-4 pt-6 border-t border-default-200 first:pt-0 first:border-t-0">
+            <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">{t('sections.content')}</h3>
             <TextField
               value={urlContent}
               onChange={setUrlContent}
               isInvalid={!!validationErrors.url}
               isDisabled={updateResource.isPending}
-              data-cy="documentation-editor-url-input"
+              className="w-full"
             >
               <Label>{t('urlContent.label')}</Label>
-              <Input placeholder={t('urlContent.placeholder')} />
+              <Input placeholder={t('urlContent.placeholder')} data-cy="documentation-editor-url-input" />
               {validationErrors.url && <FieldError>{validationErrors.url}</FieldError>}
             </TextField>
-          )}
-        </Card.Content>
-        <Card.Footer>
-          <div className="flex justify-end space-x-2">
-            <Button variant="ghost"
-              onPress={() => navigate(`/resources/${resourceId}`)}
-              isDisabled={updateResource.isPending}
-              data-cy="documentation-editor-footer-cancel-button"
-            >
-              {t('actions.cancel')}
-            </Button>
-            <Button variant="primary"
-              onPress={handleSave}
-              isPending={updateResource.isPending}
-              data-cy="documentation-editor-footer-save-button"
-            >
-              {t('actions.save')}
-            </Button>
-          </div>
-        </Card.Footer>
-      </Card>
+          </section>
+        )}
+
+        <div className="flex justify-end gap-3 w-full mt-4">
+          <Button
+            variant="secondary"
+            onPress={() => navigate(`/resources/${resourceId}`)}
+            isDisabled={updateResource.isPending}
+            data-cy="documentation-editor-footer-cancel-button"
+          >
+            {t('actions.cancel')}
+          </Button>
+          <Button
+            variant="primary"
+            type="submit"
+            isPending={updateResource.isPending}
+            data-cy="documentation-editor-footer-save-button"
+          >
+            {t('actions.save')}
+          </Button>
+        </div>
+      </Form>
     </div>
   );
 }

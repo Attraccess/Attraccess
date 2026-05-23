@@ -664,7 +664,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     );
 
     const getFlowButtons = async (resourceId: number) => {
-      const nodes = await this.resourceFlowsService.getNodes(resourceId, ResourceFlowNodeType.MANUAL_BUTTON);
+      const nodes = await this.resourceFlowsService.getNodes(resourceId, ResourceFlowNodeType.INPUT_BUTTON);
       return nodes.map((node) => ({
         id: node.id,
         label: node.data.label || node.id,

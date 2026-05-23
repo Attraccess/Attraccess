@@ -15,14 +15,28 @@
   },
   "preview": "Vorschau",
   "edit": "Bearbeiten",
+  "sections": {
+    "type": "Dokumentationstyp",
+    "content": "Inhalt"
+  },
   "actions": {
     "save": "Speichern",
-    "cancel": "Abbrechen"
+    "cancel": "Abbrechen",
+    "retry": "Erneut versuchen",
+    "backToResources": "Zurück zu Ressourcen"
   },
   "validation": {
     "urlRequired": "URL ist erforderlich, wenn URL-Typ ausgewählt ist",
     "markdownRequired": "Markdown-Inhalt ist erforderlich, wenn Markdown-Typ ausgewählt ist",
     "invalidUrl": "Bitte geben Sie eine gültige URL ein"
+  },
+  "error": {
+    "title": "Fehler beim Laden der Dokumentation",
+    "unknown": "Beim Laden der Ressource ist ein unbekannter Fehler aufgetreten."
+  },
+  "notFound": {
+    "title": "Ressource nicht gefunden",
+    "message": "Die angeforderte Ressource konnte nicht gefunden werden."
   },
   "notifications": {
     "saveSuccess": {

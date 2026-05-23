@@ -1,13 +1,16 @@
-import { Card, Chip } from '@heroui/react';
+import { Chip, cn } from '@heroui/react';
 import { ActivityIcon, CheckIcon, XIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { PageHeader } from '../../../../components/pageHeader';
 import { MetricsSettingsForm } from '../../forms/MetricsSettingsForm';
 import { useSettingsServiceGetMetricsSettings } from '@attraccess/react-query-client';
 import en from './en.json';
 import de from './de.json';
 
-export function MetricsSettingsCard() {
+export type MetricsSettingsCardProps = {
+  className?: string;
+};
+
+export function MetricsSettingsCard({ className }: MetricsSettingsCardProps = {}) {
   const { t } = useTranslations({ en, de });
   const { data: metricsSettings } = useSettingsServiceGetMetricsSettings();
 
@@ -23,19 +26,21 @@ export function MetricsSettingsCard() {
   ) : null;
 
   return (
-    <Card className="flex-1 min-w-[300px]">
-      <Card.Header>
-        <PageHeader
-          title={t('title')}
-          subtitle={t('subtitle')}
-          icon={<ActivityIcon size={18} />}
-          noMargin
-          actions={statusChip}
-        />
-      </Card.Header>
-      <Card.Content className="flex flex-col gap-4">
-        <MetricsSettingsForm />
-      </Card.Content>
-    </Card>
+    <section
+      className={cn(
+        'w-full flex flex-col gap-4 rounded-large border border-default-200 bg-default-50 p-6',
+        className,
+      )}
+      data-cy="metrics-settings-section"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 text-default-700">
+          <ActivityIcon size={18} />
+          <h3 className="text-sm uppercase tracking-wide font-semibold">{t('title')}</h3>
+        </div>
+        {statusChip}
+      </div>
+      <MetricsSettingsForm />
+    </section>
   );
 }

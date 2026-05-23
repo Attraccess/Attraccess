@@ -1,15 +1,10 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   Button,
+  DrawerBody,
+  DrawerFooter,
+  DrawerHeader,
   Form,
-  Modal,
-  ModalBackdrop,
-  ModalBody,
-  ModalContainer,
-  ModalDialog,
-  ModalFooter,
-  ModalHeader,
-  ModalHeading,
   NumberField,
   NumberFieldDecrementButton,
   NumberFieldGroup,
@@ -17,6 +12,7 @@ import {
   NumberFieldInput,
   useOverlayState,
 } from '@heroui/react';
+import { StandardDrawer } from '../../../../../../components/standardDrawer';
 import en from './en.json';
 import de from './de.json';
 import { useCallback, useEffect, useState } from 'react';
@@ -108,46 +104,36 @@ export function RefundModal(props: Props) {
   return (
     <>
       {children && children(open)}
-      <Modal isOpen={isOpen} onOpenChange={setOpen}>
-        <ModalBackdrop>
-          <ModalContainer size="sm">
-            <ModalDialog>
-              {() => (
-                <>
-                  <ModalHeader>
-                    <ModalHeading>{t('title')}</ModalHeading>
-                  </ModalHeader>
+      <StandardDrawer isOpen={isOpen} onOpenChange={setOpen}>
+        <DrawerHeader>
+          <h2 className="text-lg font-semibold">{t('title')}</h2>
+        </DrawerHeader>
 
-                  <ModalBody>
-                    <Form onSubmit={onSubmit} className="flex flex-col gap-4">
-                      <NumberField
-                        aria-label={t('inputs.amount')}
-                        value={dbCurrencyToUserCurrency(amount, configuration.minorUnit)}
-                        onChange={(value) => setAmount(userCurrencyToDbCurrency(value, configuration.minorUnit))}
-                        minValue={0}
-                        maxValue={dbCurrencyToUserCurrency(Math.abs(transaction.amount), configuration.minorUnit)}
-                      >
-                        <NumberFieldGroup>
-                          <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
-                          <NumberFieldInput />
-                          <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
-                        </NumberFieldGroup>
-                      </NumberField>
-                      <input type="submit" hidden />
-                    </Form>
-                  </ModalBody>
+        <DrawerBody>
+          <Form onSubmit={onSubmit} className="flex flex-col gap-4">
+            <NumberField
+              aria-label={t('inputs.amount')}
+              value={dbCurrencyToUserCurrency(amount, configuration.minorUnit)}
+              onChange={(value) => setAmount(userCurrencyToDbCurrency(value, configuration.minorUnit))}
+              minValue={0}
+              maxValue={dbCurrencyToUserCurrency(Math.abs(transaction.amount), configuration.minorUnit)}
+            >
+              <NumberFieldGroup>
+                <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
+                <NumberFieldInput />
+                <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
+              </NumberFieldGroup>
+            </NumberField>
+            <input type="submit" hidden />
+          </Form>
+        </DrawerBody>
 
-                  <ModalFooter>
-                    <Button variant="primary" onPress={onSubmit} isPending={isRefunding}>
-                      {t('actions.refund')}
-                    </Button>
-                  </ModalFooter>
-                </>
-              )}
-            </ModalDialog>
-          </ModalContainer>
-        </ModalBackdrop>
-      </Modal>
+        <DrawerFooter>
+          <Button variant="primary" onPress={onSubmit} isPending={isRefunding}>
+            {t('actions.refund')}
+          </Button>
+        </DrawerFooter>
+      </StandardDrawer>
     </>
   );
 }

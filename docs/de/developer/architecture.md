@@ -9,7 +9,8 @@ Attraccess/
 ├── apps/
 │   ├── api/                  # NestJS-Backend
 │   ├── frontend/             # React-Frontend
-│   └── attractap-firmware/   # Attractap NFC-Leser Firmware
+│   └── attractap/
+│       └── firmware/         # Attractap NFC-Leser Firmware
 ├── libs/
 │   ├── api-client/           # Generierter OpenAPI-Client
 │   ├── react-query-client/   # Generierte TanStack-Query-Hooks
@@ -50,7 +51,7 @@ Das Frontend ist eine React-Anwendung, die folgende Technologien nutzt:
 
 Der Vite-Entwicklungsserver leitet alle `/api`-Anfragen an das Backend weiter, sodass das Frontend immer über denselben Ursprung kommuniziert.
 
-### Attractap Firmware (`apps/attractap-firmware`)
+### Attractap Firmware (`apps/attractap/firmware`)
 
 Firmware für die ESP32-basierte Attractap NFC-Kartenleser-Hardware. Dies ist ein eigenständiges Embedded-Projekt.
 

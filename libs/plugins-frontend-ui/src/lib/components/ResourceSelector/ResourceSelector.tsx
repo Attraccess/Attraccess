@@ -2,7 +2,7 @@
 // FEATURE: Resource selection for plugins using HeroUI v3 Table compound
 import { useTranslations } from '../../i18n';
 import { useResourcesServiceGetAllResources } from '@attraccess/react-query-client';
-import { TextField, InputGroup, Input, Spinner, TableRoot, TableContent, TableBody, TableCell, TableColumn, TableHeader, TableRow } from '@heroui/react';
+import { TextField, Label, InputGroup, Input, Spinner, TableRoot, TableContent, TableBody, TableCell, TableColumn, TableHeader, TableRow } from '@heroui/react';
 import { useState, PropsWithChildren } from 'react';
 import de from './ResourceSelector.de.json';
 import en from './ResourceSelector.en.json';
@@ -31,7 +31,8 @@ export function ResourceSelector(props: Readonly<Props>) {
 
   return (
     <div className="flex flex-col gap-2">
-      <TextField value={search} onChange={setSearch} aria-label={t('search.label')} className="w-full">
+      <TextField value={search} onChange={setSearch} className="w-full">
+        <Label>{t('search.label')}</Label>
         <InputGroup>
           <Input placeholder={t('search.placeholder')} />
           {isResourceSearchLoading ? <Spinner /> : null}

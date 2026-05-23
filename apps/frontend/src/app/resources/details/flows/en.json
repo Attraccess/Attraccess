@@ -4,7 +4,8 @@
   "actions": {
     "export": "Export",
     "import": "Import",
-    "addNode": "Add node"
+    "addNode": "Add node",
+    "variables": "Variables"
   },
   "export": {
     "success": {

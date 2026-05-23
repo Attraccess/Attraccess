@@ -202,21 +202,26 @@ export function ProjectsListPage() {
         title={t('title')}
         subtitle={t('subtitle')}
         icon={<FolderIcon />}
-        actions={
-          <div className="flex flex-wrap items-center gap-3">
-            <LabeledSwitch isSelected={includeArchived} onChange={setIncludeArchived}>
-              {t('filters.includeArchived')}
-            </LabeledSwitch>
-            <UpsertProjectModal>
-              {(onOpen) => (
-                <Button variant="ghost" onPress={onOpen}><PlusIcon size="24" />
-                  {t('actions.create')}
-                </Button>
-              )}
-            </UpsertProjectModal>
-          </div>
-        }
+        actions={[
+          {
+            key: 'create',
+            label: t('actions.create'),
+            icon: <PlusIcon size={18} />,
+            variant: 'primary',
+            renderTrigger: (triggerProps) => (
+              <UpsertProjectModal>
+                {(onOpen) => <Button {...triggerProps} onPress={onOpen} />}
+              </UpsertProjectModal>
+            ),
+          },
+        ]}
       />
+
+      <div className="flex flex-wrap items-center justify-end gap-3 mb-4">
+        <LabeledSwitch isSelected={includeArchived} onChange={setIncludeArchived}>
+          {t('filters.includeArchived')}
+        </LabeledSwitch>
+      </div>
 
       {(isLoadingInvitations || hasInvitations) && (
         <Card className="mb-6">

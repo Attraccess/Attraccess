@@ -16,10 +16,10 @@ vi.mock('@attraccess/plugins-frontend-ui', () => ({
       empty: 'No nodes available.',
       'domains.manual': 'Manual',
       'domains.door': 'Door',
-      'nodes.manual.button.title': 'Button',
-      'nodes.manual.button.description': 'User-triggered start',
-      'nodes.door.locked.title': 'Door locked',
-      'nodes.door.locked.description': 'Fires on lock',
+      'nodes.input.button.title': 'Button',
+      'nodes.input.button.description': 'User-triggered start',
+      'nodes.input.resource.door.locked.title': 'Door locked',
+      'nodes.input.resource.door.locked.description': 'Fires on lock',
       toggleOpen: 'Open catalog',
       toggleClose: 'Close catalog',
       collapse: 'Collapse',
@@ -37,8 +37,8 @@ vi.mock('@attraccess/react-query-client', async (importOriginal) => {
     ...actual,
     useResourceFlowsServiceGetNodeSchemas: () => ({
       data: [
-        { type: 'manual.button', inputs: [], outputs: ['out'], isOutput: false, supportedByResource: true, configSchema: {} },
-        { type: 'door.locked', inputs: [], outputs: ['out'], isOutput: false, supportedByResource: true, configSchema: {} },
+        { type: 'input.button', inputs: [], outputs: ['out'], isOutput: false, supportedByResource: true, configSchema: {} },
+        { type: 'input.resource.door.locked', inputs: [], outputs: ['out'], isOutput: false, supportedByResource: true, configSchema: {} },
       ],
     }),
   };
@@ -46,10 +46,10 @@ vi.mock('@attraccess/react-query-client', async (importOriginal) => {
 
 const tNodeTranslations = ((key: string) => {
   const dict: Record<string, string> = {
-    'nodes.manual.button.title': 'Button',
-    'nodes.manual.button.description': 'User-triggered start',
-    'nodes.door.locked.title': 'Door locked',
-    'nodes.door.locked.description': 'Fires on lock',
+    'nodes.input.button.title': 'Button',
+    'nodes.input.button.description': 'User-triggered start',
+    'nodes.input.resource.door.locked.title': 'Door locked',
+    'nodes.input.resource.door.locked.description': 'Fires on lock',
   };
   return dict[key] ?? key;
 }) as unknown as TFunction;
@@ -94,6 +94,6 @@ describe('NodeCatalogPanel', () => {
     act(() => { ref.current?.open(); });
     const buttons = screen.getAllByRole('button', { name: /Button/ });
     await user.click(buttons[buttons.length - 1]);
-    expect(onSelect).toHaveBeenCalledWith('manual.button');
+    expect(onSelect).toHaveBeenCalledWith('input.button');
   });
 });

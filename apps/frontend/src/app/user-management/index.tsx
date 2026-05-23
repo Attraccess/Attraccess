@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { PageHeader } from '../../components/pageHeader';
+import { PageHeader, PageAction } from '../../components/pageHeader';
 import { AttraccessUser, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   Button,
@@ -89,44 +89,46 @@ export const UserManagementPage: React.FC = () => {
         backTo="/"
         icon={<Users className="w-6 h-6" />}
         data-cy="user-management-page-header"
-        actions={
-          <>
-            <InviteUserModal>
-              {(onOpen) => (
-                <Button variant="ghost" onPress={onOpen}>
-                  <UserPlusIcon className="w-4 h-4" />
-                  {t('actions.inviteUser')}
-                </Button>
-              )}
-            </InviteUserModal>
-            <TwoFactorPolicyModal>
-              {(onOpenTwoFactorPolicy) => (
-                <Button variant="ghost"
-                  onPress={onOpenTwoFactorPolicy}
-
-                ><ShieldCheckIcon className="w-4 h-4" />
-                  {t('actions.twoFactorPolicy')}
-                </Button>
-              )}
-            </TwoFactorPolicyModal>
-            <AllowedSignupDomainsEditorModal>
-              {(onOpen) => (
-                <Button variant="ghost" onPress={onOpen}>
-                  <Settings2Icon className="w-4 h-4" />
-                  {t('actions.editAllowedSignupDomains')}
-                </Button>
-              )}
-            </AllowedSignupDomainsEditorModal>
-            {license?.modules.includes('sso') ? (
-              <Button variant="ghost"
-                onPress={() => navigate('/sso/providers')}
-
-              ><KeyIcon className="w-4 h-4" />
-                {t('actions.sso')}
-              </Button>
-            ) : null}
-          </>
-        }
+        actions={[
+          {
+            key: 'invite-user',
+            label: t('actions.inviteUser'),
+            icon: <UserPlusIcon className="w-4 h-4" />,
+            variant: 'primary',
+            renderTrigger: (triggerProps) => (
+              <InviteUserModal>
+                {(onOpen) => <Button {...triggerProps} onPress={onOpen} />}
+              </InviteUserModal>
+            ),
+          },
+          {
+            key: 'two-factor-policy',
+            label: t('actions.twoFactorPolicy'),
+            icon: <ShieldCheckIcon className="w-4 h-4" />,
+            renderTrigger: (triggerProps) => (
+              <TwoFactorPolicyModal>
+                {(onOpenTwoFactorPolicy) => <Button {...triggerProps} onPress={onOpenTwoFactorPolicy} />}
+              </TwoFactorPolicyModal>
+            ),
+          },
+          {
+            key: 'allowed-signup-domains',
+            label: t('actions.editAllowedSignupDomains'),
+            icon: <Settings2Icon className="w-4 h-4" />,
+            renderTrigger: (triggerProps) => (
+              <AllowedSignupDomainsEditorModal>
+                {(onOpen) => <Button {...triggerProps} onPress={onOpen} />}
+              </AllowedSignupDomainsEditorModal>
+            ),
+          },
+          {
+            key: 'sso',
+            label: t('actions.sso'),
+            icon: <KeyIcon className="w-4 h-4" />,
+            isHidden: !license?.modules.includes('sso'),
+            onPress: () => navigate('/sso/providers'),
+          },
+        ] satisfies PageAction[]}
       />
 
       <div className="mt-6">

@@ -1,10 +1,10 @@
 import { ResourceFlowNodeDto, useBillingServiceGetBillingConfiguration } from '@attraccess/react-query-client';
-import { Button, Card, Input, Label, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalHeader, NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput, TextArea, TextField } from '@heroui/react';
+import { Button, Input, Label, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalHeader, NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput, TextArea, TextField } from '@heroui/react';
 import { Select } from '../../../../../../../components/select';
 import { MqttServerSelect } from '../../../../../../../components/mqttServerSelect';
 import { LabeledSwitch } from '../../../../../../../components/labeledSwitch';
 import { PlusIcon, XIcon } from 'lucide-react';
-import { TFunction } from '@attraccess/plugins-frontend-ui';
+import { TExists, TFunction } from '@attraccess/plugins-frontend-ui';
 import { useCallback, useMemo, useState } from 'react';
 import { dbCurrencyToUserCurrency, userCurrencyToDbCurrency } from '@attraccess/shared';
 import { CreateMqttServerForm } from '../../../../../../mqtt/servers/CreateMqttServerPage';
@@ -34,6 +34,7 @@ interface Props<TValue> {
   name: string;
   schema: Property<TValue>;
   tNodeTranslations: TFunction;
+  tNodeExists?: TExists;
   value: TValue;
   onChange: (value: TValue) => void;
   isRequired: boolean;
@@ -41,7 +42,37 @@ interface Props<TValue> {
 }
 
 export function PropertyInput<TValue>(props: Props<TValue>) {
-  const { name, isRequired, schema, tNodeTranslations: t, nodeType, value, onChange, hideLabel } = props;
+  const { name, isRequired, schema, tNodeTranslations: t, tNodeExists, nodeType, value, onChange, hideLabel } = props;
+
+  const helpTextKey = `nodes.${nodeType}.config.${name}.helpText`;
+  const docsUrlKey = `nodes.${nodeType}.config.${name}.docsUrl`;
+  const docsLabelKey = `nodes.${nodeType}.config.${name}.docsLabel`;
+  const helpText = tNodeExists?.(helpTextKey) ? t(helpTextKey) : undefined;
+  const docsUrl = tNodeExists?.(docsUrlKey) ? t(docsUrlKey) : undefined;
+  const docsLabel = tNodeExists?.(docsLabelKey) ? t(docsLabelKey) : docsUrl;
+
+  let description: React.ReactNode = undefined;
+  if (schema.overrideWithInput) {
+    description = t('nodes.genericConfig.overridableByInput', { fieldName: schema.overrideWithInput });
+  }
+  if (helpText || docsUrl) {
+    description = (
+      <span className="flex flex-col gap-0.5">
+        {description ? <span>{description}</span> : null}
+        {helpText ? <span>{helpText}</span> : null}
+        {docsUrl ? (
+          <a
+            href={docsUrl}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="text-primary-500 hover:underline w-fit"
+          >
+            {docsLabel}
+          </a>
+        ) : null}
+      </span>
+    );
+  }
 
   const { data: configuration } = useBillingServiceGetBillingConfiguration();
 
@@ -230,11 +261,7 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
         let content = null;
         if (Object.entries((value ?? {}) as Record<string, unknown>)?.length === 0) {
           content = (
-            <Card>
-              <Card.Content>
-                <p className="text-sm text-gray-500">{t('nodes.' + nodeType + '.config.' + name + '.empty')}</p>
-              </Card.Content>
-            </Card>
+            <p className="text-sm text-default-500">{t('nodes.' + nodeType + '.config.' + name + '.empty')}</p>
           );
         } else {
           content = (
@@ -298,76 +325,68 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
 
       let content = null;
       if (arrayValue.length === 0) {
-        content = (
-          <Card>
-            <Card.Content>
-              <p className="text-sm text-gray-500">{emptyText}</p>
-            </Card.Content>
-          </Card>
-        );
+        content = <p className="text-sm text-default-500">{emptyText}</p>;
       } else {
         content = (
-          <div className="flex flex-col gap-2 w-full">
+          <div className="flex flex-col w-full divide-y divide-default-200">
             {arrayValue.map((row, index) => (
-              <Card key={index} className="p-2 w-full">
-                <Card.Content className="p-0">
-                  <div className="grid grid-cols-[1fr_auto] gap-2 items-start">
-                    <div className="flex flex-col gap-2 p-2 w-full">
-                      {items && items.type === 'object' && items.properties ? (
-                        <>
-                          {Object.entries(items.properties).map(([propName, propSchema]) => (
-                            <PropertyInput
-                              key={propName}
-                              nodeType={nodeType}
-                              tNodeTranslations={t}
-                              name={name + '.items.' + propName}
-                              schema={propSchema as Property<unknown>}
-                              value={(row as Record<string, unknown>)?.[propName]}
-                              onChange={(newItemPropValue) => {
-                                const newArrayValue = [...arrayValue] as Array<Record<string, unknown>>;
-                                newArrayValue[index] = {
-                                  ...(newArrayValue[index] ?? {}),
-                                  [propName]: newItemPropValue,
-                                };
-                                onChange(newArrayValue as TValue);
-                              }}
-                              isRequired={false}
-                              hideLabel
-                            />
-                          ))}
-                        </>
-                      ) : items ? (
+              <div key={index} className="grid grid-cols-[1fr_auto] gap-2 items-start py-2 first:pt-0 last:pb-0">
+                <div className="flex flex-col gap-2 w-full">
+                  {items && items.type === 'object' && items.properties ? (
+                    <>
+                      {Object.entries(items.properties).map(([propName, propSchema]) => (
                         <PropertyInput
+                          key={propName}
                           nodeType={nodeType}
                           tNodeTranslations={t}
-                          name={name + '.items'}
-                          schema={items as unknown as Property<unknown>}
-                          value={row as unknown}
-                          onChange={(newItemValue) => {
-                            const newArrayValue = [...arrayValue];
-                            newArrayValue[index] = newItemValue as unknown;
+                          tNodeExists={tNodeExists}
+                          name={name + '.items.' + propName}
+                          schema={propSchema as Property<unknown>}
+                          value={(row as Record<string, unknown>)?.[propName]}
+                          onChange={(newItemPropValue) => {
+                            const newArrayValue = [...arrayValue] as Array<Record<string, unknown>>;
+                            newArrayValue[index] = {
+                              ...(newArrayValue[index] ?? {}),
+                              [propName]: newItemPropValue,
+                            };
                             onChange(newArrayValue as TValue);
                           }}
                           isRequired={false}
                           hideLabel
                         />
-                      ) : null}
-                    </div>
-                    <div className="row-span-2 flex items-start p-2">
-                      <Button
-                        variant="danger-soft"
-                        isIconOnly
-                        onPress={() => {
-                          const copy = (arrayValue as Array<unknown>).filter((_, i) => i !== index);
-                          onChange(copy as TValue);
-                        }}
-                      >
-                        <XIcon size={16} />
-                      </Button>
-                    </div>
-                  </div>
-                </Card.Content>
-              </Card>
+                      ))}
+                    </>
+                  ) : items ? (
+                    <PropertyInput
+                      nodeType={nodeType}
+                      tNodeTranslations={t}
+                      tNodeExists={tNodeExists}
+                      name={name + '.items'}
+                      schema={items as unknown as Property<unknown>}
+                      value={row as unknown}
+                      onChange={(newItemValue) => {
+                        const newArrayValue = [...arrayValue];
+                        newArrayValue[index] = newItemValue as unknown;
+                        onChange(newArrayValue as TValue);
+                      }}
+                      isRequired={false}
+                      hideLabel
+                    />
+                  ) : null}
+                </div>
+                <div className="flex items-start">
+                  <Button
+                    variant="danger-soft"
+                    isIconOnly
+                    onPress={() => {
+                      const copy = (arrayValue as Array<unknown>).filter((_, i) => i !== index);
+                      onChange(copy as TValue);
+                    }}
+                  >
+                    <XIcon size={16} />
+                  </Button>
+                </div>
+              </div>
             ))}
           </div>
         );

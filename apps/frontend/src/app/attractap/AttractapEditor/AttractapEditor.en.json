@@ -3,6 +3,7 @@
   "readerName": "Reader Name",
   "enterReaderName": "Enter reader name",
   "connectedResources": "Connected Resources",
+  "connectedResourcesDescription": "Select which resources this reader controls. Users tap the reader to unlock the selected resources.",
   "enterResourceIds": "Enter resource IDs (comma separated)",
   "resourcesDescription": "Enter resource IDs separated by commas (e.g. 1, 2, 3)",
   "cancel": "Cancel",

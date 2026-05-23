@@ -11,17 +11,18 @@ import { useNodeId, useNodesData } from '@xyflow/react';
 import { useFlowContext } from '../../flowContext';
 import { Property, PropertyInput } from './property-input';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { TFunction } from '@attraccess/plugins-frontend-ui';
+import { TExists, TFunction } from '@attraccess/plugins-frontend-ui';
 import { StandardDrawer } from '../../../../../../components/standardDrawer';
 
 interface Props {
   schema: ResourceFlowNodeSchemaDto;
   children: (onOpen: () => void) => React.ReactNode;
   tNodeTranslations: TFunction;
+  tNodeExists?: TExists;
 }
 
 export function NodeEditor(props: Props) {
-  const { tNodeTranslations: t, schema } = props;
+  const { tNodeTranslations: t, tNodeExists, schema } = props;
   const { isOpen, open, setOpen, close } = useOverlayState();
 
   const nodeId = useNodeId();
@@ -55,9 +56,9 @@ export function NodeEditor(props: Props) {
     <>
       {props.children(open)}
       <StandardDrawer isOpen={isOpen} onOpenChange={setOpen}>
-        <DrawerHeader>
+        <DrawerHeader className="flex flex-col gap-1">
           <h2 className="text-lg font-semibold">{t('nodes.' + schema.type + '.title')}</h2>
-          <p className="text-sm text-muted">{t('nodes.' + schema.type + '.description')}</p>
+          <p className="text-sm text-default-500">{t('nodes.' + schema.type + '.description')}</p>
         </DrawerHeader>
 
         <DrawerBody className="flex flex-col gap-2">
@@ -69,6 +70,7 @@ export function NodeEditor(props: Props) {
                   isRequired={(schema.configSchema.required as string[])?.includes(propertyName)}
                   nodeType={schema.type}
                   tNodeTranslations={t}
+                  tNodeExists={tNodeExists}
                   name={propertyName}
                   schema={property}
                   value={data[propertyName]}
@@ -80,7 +82,10 @@ export function NodeEditor(props: Props) {
           </Form>
         </DrawerBody>
 
-        <DrawerFooter>
+        <DrawerFooter className="flex flex-wrap gap-2 justify-end">
+          <Button variant="ghost" onPress={close}>
+            {t('editor.buttons.cancel')}
+          </Button>
           <Button variant="primary" onPress={onSave}>
             {t('editor.buttons.save')}
           </Button>

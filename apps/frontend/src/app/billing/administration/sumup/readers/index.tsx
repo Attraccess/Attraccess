@@ -33,15 +33,19 @@ export function SumUpReadersCard(props: Omit<CardProps, 'children'>) {
           title={t('title')}
           subtitle={t('subtitle')}
           noMargin
-          actions={
-            <SumUpReadersPairing>
-              {(onOpen) => (
-                <Button variant="primary" onPress={onOpen}><Trash2Icon className="w-4 h-4" />
-                  {t('actions.pairReader')}
-                </Button>
-              )}
-            </SumUpReadersPairing>
-          }
+          actions={[
+            {
+              key: 'pair-reader',
+              label: t('actions.pairReader'),
+              icon: <Trash2Icon className="w-4 h-4" />,
+              variant: 'primary',
+              renderTrigger: (triggerProps) => (
+                <SumUpReadersPairing>
+                  {(onOpen) => <Button {...triggerProps} onPress={onOpen} />}
+                </SumUpReadersPairing>
+              ),
+            },
+          ]}
         />
       </Card.Header>
 

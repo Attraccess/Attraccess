@@ -17,7 +17,13 @@
   "example": {
     "label": "Beispielkosten ({{minutes}} Min)"
   },
+  "simulator": {
+    "minutesLabel": "Minuten simulieren"
+  },
   "exampleResultingBalance": {
     "label": "Resultierendes Guthaben"
+  },
+  "actions": {
+    "edit": "Abrechnung bearbeiten"
   }
 }

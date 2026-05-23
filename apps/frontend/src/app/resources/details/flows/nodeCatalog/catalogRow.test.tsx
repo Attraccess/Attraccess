@@ -8,13 +8,13 @@ import type { TFunction } from '@attraccess/plugins-frontend-ui';
 import { ResourceFlowNodeType } from '@attraccess/react-query-client';
 
 const tStub: TFunction = ((key: string) => {
-  if (key === 'nodes.manual.button.title') return 'Button';
-  if (key === 'nodes.manual.button.description') return 'User-triggered start';
+  if (key === 'nodes.input.button.title') return 'Button';
+  if (key === 'nodes.input.button.description') return 'User-triggered start';
   return key;
 }) as unknown as TFunction;
 
 const node: CatalogNode = {
-  schema: { type: ResourceFlowNodeType.MANUAL_BUTTON, inputs: [], outputs: ['out'], isOutput: false, supportedByResource: true, configSchema: {} },
+  schema: { type: ResourceFlowNodeType.INPUT_BUTTON, inputs: [], outputs: ['out'], isOutput: false, supportedByResource: true, configSchema: {} },
   direction: 'down',
 };
 
@@ -30,7 +30,7 @@ describe('CatalogRow', () => {
     const user = userEvent.setup();
     render(<CatalogRow node={node} tNodeTranslations={tStub} onSelect={onSelect} />);
     await user.click(screen.getByRole('button', { name: /Button/ }));
-    expect(onSelect).toHaveBeenCalledWith('manual.button');
+    expect(onSelect).toHaveBeenCalledWith('input.button');
   });
 
   it('sets dataTransfer payload on drag start', () => {
@@ -38,7 +38,7 @@ describe('CatalogRow', () => {
     const row = screen.getByRole('button', { name: /Button/ });
     const setData = vi.fn();
     fireEvent.dragStart(row, { dataTransfer: { setData, effectAllowed: '' } });
-    expect(setData).toHaveBeenCalledWith('application/reactflow', 'manual.button');
+    expect(setData).toHaveBeenCalledWith('application/reactflow', 'input.button');
   });
 
   it('shows direction glyph for down/up/both', () => {

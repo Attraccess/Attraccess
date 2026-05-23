@@ -17,7 +17,7 @@ export type CreateUserDto = {
      */
     email: string;
     /**
-     * The password for the new user
+     * The password for the new user (validated server-side against the active password policy)
      */
     password: string;
     /**
@@ -203,7 +203,7 @@ export type ResetPasswordDto = {
 
 export type ChangePasswordDto = {
     /**
-     * The new password for the user
+     * The new password (validated server-side against the active password policy)
      */
     password: string;
     /**
@@ -293,7 +293,7 @@ export enum PermissionFilter {
 
 export type SetUserPasswordDto = {
     /**
-     * The new password for the user
+     * The new password (validated server-side against the active password policy)
      */
     password: string;
 };
@@ -881,7 +881,8 @@ export enum EmailTemplateType {
     PASSWORD_CHANGED = 'password-changed',
     RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY = 'resource-usage-billing-transaction-summary',
     PROJECT_INVITATION = 'project-invitation',
-    DELETE_ACCOUNT_CONFIRMATION = 'delete-account-confirmation'
+    DELETE_ACCOUNT_CONFIRMATION = 'delete-account-confirmation',
+    RESOURCE_HEALTH_CHANGED = 'resource-health-changed'
 }
 
 export type EmailTemplate = {
@@ -1173,6 +1174,52 @@ export type GenerateMetricsApiKeyResponseDto = {
     apiKey: string;
 };
 
+export type AuthRateLimitSettingsDto = {
+    /**
+     * Max failed attempts within the window before lockout
+     */
+    maxAttempts: number;
+    /**
+     * Sliding window length, in seconds, for counting attempts
+     */
+    windowSeconds: number;
+    /**
+     * Base lockout duration in seconds after the threshold is reached
+     */
+    lockoutDurationSeconds: number;
+    /**
+     * Whether to extend lockout exponentially on repeat lockouts
+     */
+    exponentialBackoff: boolean;
+    /**
+     * Multiplier applied to lockout duration when exponentialBackoff is on
+     */
+    backoffMultiplier: number;
+};
+
+export type UpdateAuthRateLimitSettingsDto = {
+    /**
+     * Max failed attempts within the window before lockout
+     */
+    maxAttempts?: number;
+    /**
+     * Sliding window length, in seconds
+     */
+    windowSeconds?: number;
+    /**
+     * Base lockout duration in seconds
+     */
+    lockoutDurationSeconds?: number;
+    /**
+     * Whether to extend lockout exponentially on repeat lockouts
+     */
+    exponentialBackoff?: boolean;
+    /**
+     * Multiplier applied to lockout duration
+     */
+    backoffMultiplier?: number;
+};
+
 export type LicenseDataDto = {
     /**
      * Whether the license is valid
@@ -1196,6 +1243,132 @@ export type LicenseDataDto = {
      * Are you using this software for free as a non-profit?
      */
     isNonProfit: boolean;
+};
+
+export type PublicPasswordPolicyDto = {
+    minLength: number;
+    maxLength: number;
+    allowAllUnicode: boolean;
+    requireUppercase: boolean;
+    requireLowercase: boolean;
+    requireDigit: boolean;
+    requireSpecial: boolean;
+    /**
+     * Minimum required zxcvbn score (0-4)
+     */
+    minZxcvbnScore: number;
+};
+
+export type PasswordPolicyDto = {
+    minLength: number;
+    maxLength: number;
+    allowAllUnicode: boolean;
+    requireUppercase: boolean;
+    requireLowercase: boolean;
+    requireDigit: boolean;
+    requireSpecial: boolean;
+    checkHIBP: boolean;
+    checkCommonPasswords: boolean;
+    /**
+     * Minimum required zxcvbn score (0-4)
+     */
+    minZxcvbnScore: number;
+    /**
+     * Number of recent passwords to remember (0 disables)
+     */
+    historySize: number;
+    /**
+     * Forced rotation interval in days (0 disables)
+     */
+    rotationDays: number;
+};
+
+export type UpdatePasswordPolicyDto = {
+    minLength?: number;
+    maxLength?: number;
+    allowAllUnicode?: boolean;
+    requireUppercase?: boolean;
+    requireLowercase?: boolean;
+    requireDigit?: boolean;
+    requireSpecial?: boolean;
+    checkHIBP?: boolean;
+    checkCommonPasswords?: boolean;
+    minZxcvbnScore?: number;
+    historySize?: number;
+    rotationDays?: number;
+};
+
+/**
+ * Evaluate against the effective policy for this role (uses global if omitted).
+ */
+export enum PasswordPolicyRole {
+    ADMIN = 'admin'
+}
+
+export type PreviewPasswordDto = {
+    /**
+     * Password candidate to evaluate against the policy
+     */
+    password: string;
+    /**
+     * Evaluate against the effective policy for this role (uses global if omitted).
+     */
+    role?: PasswordPolicyRole;
+    /**
+     * Draft policy overrides to merge over the persisted policy for this evaluation only.
+     */
+    draftPolicy?: UpdatePasswordPolicyDto;
+};
+
+export type PreviewPasswordResultDto = {
+    /**
+     * Whether the candidate satisfies every rule of the (draft-merged) policy
+     */
+    ok: boolean;
+    /**
+     * Structured policy errors with codes and per-rule parameters
+     */
+    errors: Array<{
+        [key: string]: unknown;
+    }>;
+    /**
+     * zxcvbn evaluation summary
+     */
+    zxcvbn: {
+        score?: number;
+        required?: number;
+    };
+};
+
+export type PasswordPolicyOverrideDto = {
+    role: PasswordPolicyRole;
+    minLength: number | null;
+    maxLength: number | null;
+    allowAllUnicode: boolean | null;
+    requireUppercase: boolean | null;
+    requireLowercase: boolean | null;
+    requireDigit: boolean | null;
+    requireSpecial: boolean | null;
+    checkHIBP: boolean | null;
+    checkCommonPasswords: boolean | null;
+    minZxcvbnScore: number | null;
+    historySize: number | null;
+    rotationDays: number | null;
+};
+
+export type UpsertPasswordPolicyOverrideDto = {
+    minLength?: number | null;
+    maxLength?: number | null;
+    allowAllUnicode?: boolean | null;
+    requireUppercase?: boolean | null;
+    requireLowercase?: boolean | null;
+    requireDigit?: boolean | null;
+    requireSpecial?: boolean | null;
+    checkHIBP?: boolean | null;
+    checkCommonPasswords?: boolean | null;
+    minZxcvbnScore?: number | null;
+    historySize?: number | null;
+    rotationDays?: number | null;
 };
 
 /**
@@ -2787,27 +2960,30 @@ export type RefundTransactionDto = {
  * The name of the node type
  */
 export enum ResourceFlowNodeType {
-    MANUAL_BUTTON = 'manual.button',
-    RESOURCE_USAGE_STARTED = 'resource.usage.started',
-    RESOURCE_USAGE_STOPPED = 'resource.usage.stopped',
-    RESOURCE_USAGE_TAKEOVER = 'resource.usage.takeover',
-    RESOURCE_USAGE_END_SESSION = 'resource.usage.end-session',
-    RESOURCE_ACTIVITY_NO_ACTIVITY = 'resource.activity.no-activity',
-    RESOURCE_ACTIVITY_TRACK_ACTIVITY = 'resource.activity.track-activity',
-    RESOURCE_BILLING_SET_ADDITIONAL_ITEMS = 'resource.billing.set-additional-items',
-    DOOR_UNLOCKED = 'door.unlocked',
-    DOOR_LOCKED = 'door.locked',
-    DOOR_UNLATCHED = 'door.unlatched',
-    MQTT_MESSAGE_RECEIVED = 'mqtt.message.received',
-    MQTT_SEND_MESSAGE = 'mqtt.send-message',
-    MQTT_WAIT_FOR_MESSAGE = 'mqtt.wait-for-message',
-    HTTP_SEND_REQUEST = 'http.send-request',
-    LOGIC_WAIT = 'logic.wait',
-    LOGIC_IF = 'logic.if',
-    LOGIC_SET_PAYLOAD = 'logic.set-payload',
-    LOGIC_ERROR = 'logic.error',
-    HEALTH_HEARTBEAT = 'health.heartbeat',
-    HEALTH_SET = 'health.set'
+    INPUT_BUTTON = 'input.button',
+    INPUT_RESOURCE_USAGE_STARTED = 'input.resource.usage.started',
+    INPUT_RESOURCE_USAGE_STOPPED = 'input.resource.usage.stopped',
+    INPUT_RESOURCE_USAGE_TAKEOVER = 'input.resource.usage.takeover',
+    INPUT_RESOURCE_DOOR_UNLOCKED = 'input.resource.door.unlocked',
+    INPUT_RESOURCE_DOOR_LOCKED = 'input.resource.door.locked',
+    INPUT_RESOURCE_DOOR_UNLATCHED = 'input.resource.door.unlatched',
+    INPUT_MQTT_MESSAGE_RECEIVED = 'input.mqtt.message.received',
+    INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY = 'input.resource.activity.no-activity',
+    INPUT_VARIABLE_CHANGED = 'input.variable.changed',
+    OUTPUT_HTTP_SEND_REQUEST = 'output.http.sendRequest',
+    OUTPUT_MQTT_SEND_MESSAGE = 'output.mqtt.sendMessage',
+    OUTPUT_RESOURCE_BILLING_CALCULATION_SET_ADDITIONAL_ITEMS = 'output.resource.billing.calculation.set-additional-items',
+    OUTPUT_RESOURCE_USAGE_END_SESSION = 'output.resource.usage.end-session',
+    OUTPUT_RESOURCE_ACTIVITY_TRACK_ACTIVITY = 'output.resource.activity.track-activity',
+    PROCESSING_WAIT = 'processing.wait',
+    PROCESSING_IF = 'processing.if',
+    PROCESSING_SET_PAYLOAD = 'processing.set-payload',
+    PROCESSING_MQTT_WAIT_FOR_MESSAGE = 'processing.mqtt.waitForMessage',
+    PROCESSING_ERROR = 'processing.error',
+    PROCESSING_VARIABLES_SET = 'processing.variables.set',
+    PROCESSING_VARIABLES_GET = 'processing.variables.get',
+    OUTPUT_RESOURCE_HEALTH_HEARTBEAT = 'output.resource.health.heartbeat',
+    OUTPUT_RESOURCE_HEALTH_SET = 'output.resource.health.set'
 }
 
 export type ResourceFlowNodeSchemaDto = {
@@ -3047,6 +3223,38 @@ export type ResourceFlowNode = {
      * The resource being this node belongs to
      */
     resource?: Resource;
+};
+
+export enum ResourceFlowVariableScope {
+    RESOURCE = 'resource',
+    GLOBAL = 'global'
+}
+
+export type FlowVariableDto = {
+    id: number;
+    scope: ResourceFlowVariableScope;
+    resourceId: number | null;
+    key: string;
+    /**
+     * Parsed JSON value
+     */
+    value: {
+        [key: string]: unknown;
+    };
+    valueType: {
+        [key: string]: unknown;
+    };
+    createdAt: string;
+    updatedAt: string;
+};
+
+export type FlowVariableUpsertDto = {
+    /**
+     * Any JSON value
+     */
+    value: {
+        [key: string]: unknown;
+    };
 };
 
 export enum ResourceHealthStatus {
@@ -4345,7 +4553,52 @@ export type GenerateMetricsApiKeyResponse = GenerateMetricsApiKeyResponseDto;
 
 export type DeleteMetricsApiKeyResponse = MetricsSettingsDto;
 
+export type GetAuthRateLimitSettingsResponse = AuthRateLimitSettingsDto;
+
+export type UpdateAuthRateLimitSettingsData = {
+    requestBody: UpdateAuthRateLimitSettingsDto;
+};
+
+export type UpdateAuthRateLimitSettingsResponse = AuthRateLimitSettingsDto;
+
 export type GetLicenseInformationResponse = LicenseDataDto;
+
+export type GetPublicPasswordPolicyResponse = PublicPasswordPolicyDto;
+
+export type GetAdminPasswordPolicyResponse = PasswordPolicyDto;
+
+export type UpdateAdminPasswordPolicyData = {
+    requestBody: UpdatePasswordPolicyDto;
+};
+
+export type UpdateAdminPasswordPolicyResponse = PasswordPolicyDto;
+
+export type PreviewAdminPasswordPolicyData = {
+    requestBody: PreviewPasswordDto;
+};
+
+export type PreviewAdminPasswordPolicyResponse = PreviewPasswordResultDto;
+
+export type ListPasswordPolicyOverridesResponse = Array<PasswordPolicyOverrideDto>;
+
+export type GetPasswordPolicyOverrideData = {
+    role: PasswordPolicyRole;
+};
+
+export type GetPasswordPolicyOverrideResponse = PasswordPolicyOverrideDto | null;
+
+export type UpsertPasswordPolicyOverrideData = {
+    requestBody: UpsertPasswordPolicyOverrideDto;
+    role: PasswordPolicyRole;
+};
+
+export type UpsertPasswordPolicyOverrideResponse = PasswordPolicyOverrideDto;
+
+export type DeletePasswordPolicyOverrideData = {
+    role: PasswordPolicyRole;
+};
+
+export type DeletePasswordPolicyOverrideResponse = void;
 
 export type CreateOneResourceData = {
     formData: CreateResourceDto;
@@ -5028,6 +5281,29 @@ export type GetButtonsData = {
 };
 
 export type GetButtonsResponse = Array<ResourceFlowNode>;
+
+export type ListFlowVariablesData = {
+    resourceId: number;
+};
+
+export type ListFlowVariablesResponse = Array<FlowVariableDto>;
+
+export type UpsertFlowVariableData = {
+    key: string;
+    requestBody: FlowVariableUpsertDto;
+    resourceId: number;
+    scope: ResourceFlowVariableScope;
+};
+
+export type UpsertFlowVariableResponse = void;
+
+export type DeleteFlowVariableData = {
+    key: string;
+    resourceId: number;
+    scope: ResourceFlowVariableScope;
+};
+
+export type DeleteFlowVariableResponse = void;
 
 export type GetResourceHealthData = {
     resourceId: number;
@@ -6466,6 +6742,33 @@ export type $OpenApiTs = {
             };
         };
     };
+    '/api/settings/auth/rate-limit': {
+        get: {
+            res: {
+                /**
+                 * Current auth rate-limit settings.
+                 */
+                200: AuthRateLimitSettingsDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+        patch: {
+            req: UpdateAuthRateLimitSettingsData;
+            res: {
+                /**
+                 * Auth rate-limit settings updated.
+                 */
+                200: AuthRateLimitSettingsDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
     '/api/license-data': {
         get: {
             res: {
@@ -6476,6 +6779,113 @@ export type $OpenApiTs = {
                 /**
                  * Unauthorized - User is not authenticated
                  *
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/password-policy/public': {
+        get: {
+            res: {
+                /**
+                 * The currently active public password policy
+                 */
+                200: PublicPasswordPolicyDto;
+            };
+        };
+    };
+    '/api/admin/password-policy': {
+        get: {
+            res: {
+                /**
+                 * The global password policy.
+                 */
+                200: PasswordPolicyDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+        patch: {
+            req: UpdateAdminPasswordPolicyData;
+            res: {
+                /**
+                 * Password policy updated.
+                 */
+                200: PasswordPolicyDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/admin/password-policy/preview': {
+        post: {
+            req: PreviewAdminPasswordPolicyData;
+            res: {
+                /**
+                 * Full preview result including zxcvbn + HIBP + history checks.
+                 */
+                200: PreviewPasswordResultDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/admin/password-policy/overrides': {
+        get: {
+            res: {
+                /**
+                 * All defined overrides.
+                 */
+                200: Array<PasswordPolicyOverrideDto>;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/admin/password-policy/overrides/{role}': {
+        get: {
+            req: GetPasswordPolicyOverrideData;
+            res: {
+                /**
+                 * The override row, or null if unset.
+                 */
+                200: PasswordPolicyOverrideDto | null;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+        put: {
+            req: UpsertPasswordPolicyOverrideData;
+            res: {
+                /**
+                 * The saved override row.
+                 */
+                200: PasswordPolicyOverrideDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+        delete: {
+            req: DeletePasswordPolicyOverrideData;
+            res: {
+                /**
+                 * Override removed.
+                 */
+                204: void;
+                /**
                  * Unauthorized
                  */
                 401: unknown;
@@ -7825,6 +8235,40 @@ export type $OpenApiTs = {
                  * Resource not found
                  */
                 404: unknown;
+            };
+        };
+    };
+    '/api/resources/{resourceId}/flow-variables': {
+        get: {
+            req: ListFlowVariablesData;
+            res: {
+                200: Array<FlowVariableDto>;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/resources/{resourceId}/flow-variables/{scope}/{key}': {
+        put: {
+            req: UpsertFlowVariableData;
+            res: {
+                204: void;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+        delete: {
+            req: DeleteFlowVariableData;
+            res: {
+                204: void;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
             };
         };
     };

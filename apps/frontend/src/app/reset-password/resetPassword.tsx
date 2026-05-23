@@ -4,11 +4,13 @@ import { useNavigate } from 'react-router-dom';
 import { Loading } from '../loading';
 import { Button, Card, Form } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { PasswordInput } from '../../components/PasswordInput';
+import { PasswordField } from '../../components/PasswordField';
 import en from './en.json';
 import de from './de.json';
 import { useUsersServiceChangePasswordViaResetToken } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../components/toastProvider';
+import { PolicyError } from '@attraccess/shared';
+import { extractPolicyErrors } from '../../utils/policyErrors';
 
 export function ResetPassword() {
   const query = useUrlQuery();
@@ -16,6 +18,7 @@ export function ResetPassword() {
   const { t } = useTranslations({ en, de });
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [serverErrors, setServerErrors] = useState<PolicyError[]>([]);
 
   const token = useMemo(() => query.get('token'), [query]);
   const userId = useMemo(() => query.get('userId'), [query]);
@@ -28,6 +31,12 @@ export function ResetPassword() {
     isSuccess,
   } = useUsersServiceChangePasswordViaResetToken({
     onError: (error) => {
+      const policyErrors = extractPolicyErrors(error);
+      if (policyErrors) {
+        setServerErrors(policyErrors);
+        return;
+      }
+      setServerErrors([]);
       toast.error({
         title: t('error.title'),
         description: t('error.message'),
@@ -44,6 +53,7 @@ export function ResetPassword() {
       return;
     }
 
+    setServerErrors([]);
     changeMutation({ userId: parseInt(userId as string), requestBody: { token: token as string, password } });
   }, [password, confirmPassword, userId, token, t, changeMutation, toast]);
 
@@ -74,47 +84,36 @@ export function ResetPassword() {
   }
 
   return (
-    <Card data-cy="reset-password-form-card">
+    <div className="min-h-screen flex items-center justify-center px-4 py-8">
       <Form
         onSubmit={(e) => {
           e.preventDefault();
           onMainButtonPress();
         }}
+        className="max-w-md w-full gap-4"
         data-cy="reset-password-form"
       >
-        <Card.Header>{t('title')}</Card.Header>
-        <Card.Content>
-          <PasswordInput
-            label={t('inputs.password')}
-            value={password}
-            onChange={(setPassword)}
-            className="mb-4"
-            minLength={8}
-            required
-            data-cy="reset-password-password-input"
-            autoComplete="new-password"
-          />
-          <PasswordInput
-            label={t('inputs.confirmPassword')}
-            value={confirmPassword}
-            onChange={(setConfirmPassword)}
-            required
-            validate={() => {
-              if (password !== confirmPassword) {
-                return t('error.passwordsDoNotMatch.description');
-              }
-              return true;
-            }}
-            data-cy="reset-password-confirm-password-input"
-            autoComplete="new-password"
-          />
-        </Card.Content>
-        <Card.Footer>
-          <Button variant="primary" className="w-full" type="submit" data-cy="reset-password-submit-button">
-            {t('submit')}
-          </Button>
-        </Card.Footer>
+        <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">{t('title')}</h3>
+        <PasswordField
+          value={password}
+          onValueChange={(v) => {
+            setPassword(v);
+            setServerErrors([]);
+          }}
+          serverErrors={serverErrors}
+          passwordLabel={t('inputs.password')}
+          confirmationLabel={t('inputs.confirmPassword')}
+          showConfirmation
+          confirmationValue={confirmPassword}
+          onConfirmationChange={setConfirmPassword}
+          isRequired
+          autoComplete="new-password"
+          dataCyPrefix="reset-password"
+        />
+        <Button variant="primary" className="w-full mt-2" type="submit" data-cy="reset-password-submit-button">
+          {t('submit')}
+        </Button>
       </Form>
-    </Card>
+    </div>
   );
 }

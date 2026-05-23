@@ -1,4 +1,4 @@
-import { Button, Card, Chip, Spinner } from '@heroui/react';
+import { Card, Chip, Spinner } from '@heroui/react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PageHeader } from '../../../../components/pageHeader';
@@ -32,11 +32,14 @@ export function FormListPage() {
         title={t('list.title', { resourceName: resource?.name ?? '' })}
         subtitle={t('list.subtitle')}
         backTo={`/resources/${resourceId}`}
-        actions={
-          <Button variant="primary">
-            {t('list.create')}
-          </Button>
-        }
+        actions={[
+          {
+            key: 'create',
+            label: t('list.create'),
+            variant: 'primary',
+            onPress: () => navigate(`/resources/${resourceId}/forms/new`),
+          },
+        ]}
       />
 
       {isLoading && (

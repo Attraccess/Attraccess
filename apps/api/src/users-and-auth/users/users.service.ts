@@ -59,6 +59,9 @@ type UpdateUserData = Partial<
     | 'isEmailVerified'
     | 'passwordResetToken'
     | 'passwordResetTokenExpiresAt'
+    | 'lockedUntil'
+    | 'failedLoginAttempts'
+    | 'firstFailedLoginAt'
   > & {
     systemPermissions: Partial<SystemPermissions>;
   }
@@ -330,6 +333,9 @@ export class UsersService {
       passwordResetToken: updateData.passwordResetToken?.trim() ?? undefined,
       passwordResetTokenExpiresAt: updateData.passwordResetTokenExpiresAt ?? undefined,
       systemPermissions: updateData.systemPermissions ?? undefined,
+      lockedUntil: 'lockedUntil' in updateData ? updateData.lockedUntil : undefined,
+      failedLoginAttempts: updateData.failedLoginAttempts ?? undefined,
+      firstFailedLoginAt: 'firstFailedLoginAt' in updateData ? updateData.firstFailedLoginAt : undefined,
     };
     this.logger.debug(`Updating user with ID: ${id}, updates: ${JSON.stringify(updates)}`);
 

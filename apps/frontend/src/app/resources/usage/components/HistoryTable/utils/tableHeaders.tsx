@@ -27,7 +27,6 @@ export function generateHeaderColumns(
       <TableColumn key="project" id="project" className="hidden 2xl:table-cell">
         {t('headers.machine.project')}
       </TableColumn>,
-      <TableColumn key="icons" id="icons">{''}</TableColumn>,
     );
   } else if (resource.type === 'door') {
     headers.push(

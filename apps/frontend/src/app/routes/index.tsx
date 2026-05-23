@@ -1,7 +1,8 @@
 import { Navigate } from 'react-router-dom';
 import { ResourceDetails } from '../resources/details/resourceDetails';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { MqttServersPage, CreateMqttServerPage, EditMqttServerPage } from '../mqtt';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { Spinner } from '@heroui/react';
+import { MqttServersPage, EditMqttServerPage } from '../mqtt';
 import { SSOProvidersPage } from '../sso/SSOProvidersPage';
 import { UserManagementPage } from '../user-management';
 import { usePluginStore } from 'react-pluggable';
@@ -34,6 +35,8 @@ import { ProjectTeamPage } from '../projects/details/team';
 import SystemSettingsPage from '../settings';
 import FirstTimeSetupPage from '../first-time-setup';
 import { UnauthorizedLayout } from '../unauthorized/unauthorized-layout/layout';
+
+const PasswordPolicySettingsPage = lazy(() => import('../settings/password-policy'));
 
 const coreRoutes: RouteConfig[] = [
   {
@@ -116,11 +119,6 @@ const coreRoutes: RouteConfig[] = [
     authRequired: 'canManageResources',
   },
   {
-    path: '/mqtt/servers/create',
-    element: <CreateMqttServerPage />,
-    authRequired: 'canManageResources',
-  },
-  {
     path: '/mqtt/servers/:serverId',
     element: <EditMqttServerPage />,
     authRequired: 'canManageResources',
@@ -188,6 +186,15 @@ const coreRoutes: RouteConfig[] = [
   {
     path: '/settings',
     element: <SystemSettingsPage />,
+    authRequired: 'canManageSystemConfiguration',
+  },
+  {
+    path: '/settings/security/password-policy',
+    element: (
+      <Suspense fallback={<div className="flex items-center justify-center p-8"><Spinner size="sm" /></div>}>
+        <PasswordPolicySettingsPage />
+      </Suspense>
+    ),
     authRequired: 'canManageSystemConfiguration',
   },
   {

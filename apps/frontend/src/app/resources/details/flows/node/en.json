@@ -1,7 +1,8 @@
 {
   "editor": {
     "buttons": {
-      "save": "Save"
+      "save": "Save",
+      "cancel": "Cancel"
     }
   },
   "nodes": {
@@ -13,7 +14,7 @@
       "overridableByInput": "Overridable by input: {{fieldName}}",
       "createMqttServer": "Create MQTT server"
     },
-    "manual": {
+    "input": {
       "button": {
         "title": "Button",
         "description": "This node is triggered when the button is pressed.",
@@ -28,221 +29,141 @@
             "label": "Label"
           }
         }
-      }
-    },
-    "resource": {
-      "usage": {
-        "started": {
-          "title": "Resource usage started",
-          "description": "This node is triggered when a resource is started.",
-          "outputs": {
-            "output": "Output"
-          }
-        },
-        "stopped": {
-          "title": "Resource usage stopped",
-          "description": "This node is triggered when a resource is stopped.",
-          "outputs": {
-            "output": "Output"
-          }
-        },
-        "takeover": {
-          "title": "Resource usage takeover",
-          "description": "This node is triggered when a resource is taken over.",
-          "outputs": {
-            "output": "Output"
-          }
-        },
-        "end-session": {
-          "title": "End usage session",
-          "description": "Ends the active usage session. Optionally sends notes (template or static).",
-          "inputs": {
-            "input": "Input"
-          },
-          "outputs": {
-            "output": "Output"
-          },
-          "config": {
-            "notes": {
-              "label": "Notes (templates allowed)"
+      },
+      "resource": {
+        "usage": {
+          "started": {
+            "title": "Resource usage started",
+            "description": "This node is triggered when a resource is started.",
+            "outputs": {
+              "output": "Output"
             }
           },
-          "preview": {
-            "notes": "Notes"
-          }
-        }
-      },
-      "activity": {
-        "no-activity": {
-          "title": "Resource is inactive",
-          "description": "This node is triggered when a resource is inactive for a certain time.",
-          "outputs": {
-            "output": "Output"
+          "stopped": {
+            "title": "Resource usage stopped",
+            "description": "This node is triggered when a resource is stopped.",
+            "outputs": {
+              "output": "Output"
+            }
           },
-          "preview": {
-            "minInactivityMinutes": "Minimum inactivity (minutes)"
-          },
-          "config": {
-            "minInactivityMinutes": {
-              "label": "Minimum inactivity (minutes)"
+          "takeover": {
+            "title": "Resource usage takeover",
+            "description": "This node is triggered when a resource is taken over.",
+            "outputs": {
+              "output": "Output"
             }
           }
         },
-        "track-activity": {
-          "title": "Resource was active",
-          "description": "Use this node to indicate that the resource was active.",
-          "inputs": {
-            "input": "Input"
-          },
-          "outputs": {
-            "output": "Output"
+        "activity": {
+          "no-activity": {
+            "title": "Resource is inactive",
+            "description": "This node is triggered when a resource is inactive for a certain time.",
+            "outputs": {
+              "output": "Output"
+            },
+            "preview": {
+              "minInactivityMinutes": "Minimum inactivity (minutes)"
+            },
+            "config": {
+              "minInactivityMinutes": {
+                "label": "Minimum inactivity (minutes)"
+              }
+            }
           }
-        }
-      },
-      "billing": {
-        "set-additional-items": {
-          "title": "Add billing item",
-          "description": "With this node you can add an additional item to the billing.",
-          "inputs": {
-            "input": "Input"
+        },
+        "door": {
+          "locked": {
+            "title": "Door locked",
+            "description": "This node is triggered when the door is locked.",
+            "outputs": {
+              "output": "Output"
+            }
           },
-          "preview": {
-            "position": "Position"
+          "unlocked": {
+            "title": "Door unlocked",
+            "description": "This node is triggered when the door is unlocked.",
+            "outputs": {
+              "output": "Output"
+            }
           },
-          "config": {
-            "name": {
-              "label": "Name"
-            },
-            "unitPrice": {
-              "label": "Unit price"
-            },
-            "quantity": {
-              "label": "Quantity"
-            },
-            "description": {
-              "label": "Description"
-            },
-            "externalReference": {
-              "label": "External reference"
+          "unlatched": {
+            "title": "Door unlatched",
+            "description": "This node is triggered when the door is unlatched.",
+            "outputs": {
+              "output": "Output"
+            }
+          }
+        },
+        "billing": {
+          "calculation": {
+            "started": {
+              "title": "Billing calculation started",
+              "description": "This node is triggered when the billing calculation is started. It is mandatory to trigger the 'Add billing items' node afterwards."
             }
           }
         }
-      }
-    },
-    "door": {
-      "locked": {
-        "title": "Door locked",
-        "description": "This node is triggered when the door is locked.",
-        "outputs": {
-          "output": "Output"
+      },
+      "mqtt": {
+        "message": {
+          "received": {
+            "title": "MQTT message received",
+            "description": "This node is triggered when a MQTT message is received.",
+            "outputs": {
+              "output": "Output"
+            },
+            "preview": {
+              "topic": "Topic"
+            },
+            "config": {
+              "topic": {
+                "label": "Topic"
+              },
+              "serverId": {
+                "label": "Server"
+              }
+            }
+          }
         }
       },
-      "unlocked": {
-        "title": "Door unlocked",
-        "description": "This node is triggered when the door is unlocked.",
-        "outputs": {
-          "output": "Output"
-        }
-      },
-      "unlatched": {
-        "title": "Door unlatched",
-        "description": "This node is triggered when the door is unlatched.",
-        "outputs": {
-          "output": "Output"
-        }
-      }
-    },
-    "mqtt": {
-      "message": {
-        "received": {
-          "title": "MQTT message received",
-          "description": "This node is triggered when a MQTT message is received.",
+      "variable": {
+        "changed": {
+          "title": "Variable changed",
+          "description": "Triggered when a watched flow variable changes value.",
           "outputs": {
             "output": "Output"
           },
           "preview": {
-            "topic": "Topic"
+            "watches": "Watching",
+            "source": "Source"
           },
           "config": {
-            "topic": {
-              "label": "Topic"
+            "watches": {
+              "label": "Watched variables",
+              "empty": "No variables watched.",
+              "add": "Add watch",
+              "items": {
+                "key": { "label": "Key" },
+                "scope": {
+                  "label": "Scope",
+                  "enum": {
+                    "resource": "Resource",
+                    "global": "Global"
+                  }
+                }
+              }
             },
-            "serverId": {
-              "label": "Server"
+            "source": {
+              "label": "Trigger source",
+              "enum": {
+                "any": "Any change (including this resource)",
+                "exclude-self": "Only changes from other resources"
+              }
             }
-          }
-        }
-      },
-      "wait-for-message": {
-        "title": "Wait for MQTT message",
-        "description": "Waits for the next MQTT message matching the topic filter; forwards {topic, payload}.",
-        "inputs": {
-          "input": "Input"
-        },
-        "outputs": {
-          "output": "Output"
-        },
-        "preview": {
-          "topic": "Topic",
-          "timeoutSeconds": "Timeout (s)"
-        },
-        "config": {
-          "serverId": {
-            "label": "Server"
-          },
-          "topic": {
-            "label": "Topic (supports + and #)"
-          },
-          "timeoutSeconds": {
-            "label": "Timeout (seconds)"
-          },
-          "subscribeQos": {
-            "label": "QoS (effective is min(publish, subscribe))",
-            "enum": {
-              "0": "0 - At most once (fire and forget)",
-              "1": "1 - At least once (acknowledged)",
-              "2": "2 - Exactly once (two-phase handshake)"
-            }
-          }
-        }
-      },
-      "send-message": {
-        "title": "Send MQTT message",
-        "description": "This node sends a MQTT message.",
-        "inputs": {
-          "input": "Input"
-        },
-        "outputs": {
-          "output": "Output"
-        },
-        "preview": {
-          "topic": "Topic"
-        },
-        "config": {
-          "topic": {
-            "label": "Topic"
-          },
-          "serverId": {
-            "label": "Server"
-          },
-          "payload": {
-            "label": "Payload"
-          },
-          "qos": {
-            "label": "QoS",
-            "enum": {
-              "0": "0 - At most once (fire and forget)",
-              "1": "1 - At least once (acknowledged)",
-              "2": "2 - Exactly once (two-phase handshake)"
-            }
-          },
-          "retain": {
-            "label": "Retain message"
           }
         }
       }
     },
-    "logic": {
+    "processing": {
       "wait": {
         "title": "Wait",
         "description": "This node waits for a certain time.",
@@ -265,6 +186,31 @@
               "seconds": "Seconds",
               "minutes": "Minutes",
               "hours": "Hours"
+            }
+          }
+        }
+      },
+      "mqtt": {
+        "waitForMessage": {
+          "title": "Wait for MQTT message",
+          "description": "Waits for the next MQTT message matching the topic filter; forwards {topic, payload}.",
+          "inputs": { "input": "Input" },
+          "outputs": { "output": "Output" },
+          "preview": {
+            "topic": "Topic",
+            "timeoutSeconds": "Timeout (s)"
+          },
+          "config": {
+            "serverId": { "label": "Server" },
+            "topic": { "label": "Topic (supports + and #)" },
+            "timeoutSeconds": { "label": "Timeout (seconds)" },
+            "subscribeQos": {
+              "label": "QoS (effective is min(publish, subscribe))",
+              "enum": {
+                "0": "0 - At most once (fire and forget)",
+                "1": "1 - At least once (acknowledged)",
+                "2": "2 - Exactly once (two-phase handshake)"
+              }
             }
           }
         }
@@ -323,12 +269,8 @@
             "empty": "No entries configured.",
             "add": "Add entry",
             "items": {
-              "key": {
-                "label": "Key (path)"
-              },
-              "value": {
-                "label": "Value template"
-              }
+              "key": { "label": "Key (path)" },
+              "value": { "label": "Value template" }
             }
           }
         }
@@ -347,101 +289,260 @@
             "label": "Error message template"
           }
         }
-      }
-    },
-    "http": {
-      "send-request": {
-        "title": "Send HTTP request",
-        "description": "This node sends a HTTP request.",
-        "inputs": {
-          "input": "Input"
-        },
-        "outputs": {
-          "output": "Output"
-        },
-        "preview": {
-          "method": "Method",
-          "url": "URL"
-        },
-        "config": {
-          "url": {
-            "label": "URL"
+      },
+      "variables": {
+        "set": {
+          "title": "Set variables",
+          "description": "Stores one or more flow variables. Keys and values support Handlebars templates.",
+          "inputs": {
+            "input": "Input"
           },
-          "method": {
-            "label": "Method",
-            "enum": {
-              "GET": "GET",
-              "POST": "POST",
-              "PUT": "PUT",
-              "PATCH": "PATCH",
-              "DELETE": "DELETE",
-              "HEAD": "HEAD",
-              "OPTIONS": "OPTIONS"
+          "outputs": {
+            "output": "Output"
+          },
+          "preview": {
+            "assignments": "Sets"
+          },
+          "config": {
+            "variables": {
+              "label": "Variables",
+              "empty": "No variables configured.",
+              "add": "Add variable",
+              "items": {
+                "key": {
+                  "label": "Key",
+                  "helpText": "Identifier for this variable. Letters, digits, dot, dash and underscore."
+                },
+                "value": {
+                  "label": "Value template",
+                  "helpText": "Handlebars template. Reference payload as \\{{path.to.field}} and existing variables as \\{{variables.KEY}}. Plain text without \\{{ }} is stored as-is.",
+                  "docsUrl": "https://handlebarsjs.com/guide/expressions.html",
+                  "docsLabel": "Handlebars syntax reference"
+                },
+                "scope": {
+                  "label": "Scope",
+                  "helpText": "Resource: only this resource sees the value. Global: shared across all resources.",
+                  "enum": {
+                    "resource": "Resource",
+                    "global": "Global"
+                  }
+                }
+              }
             }
+          }
+        },
+        "get": {
+          "title": "Get variables",
+          "description": "Reads flow variables and writes them onto the payload at the configured paths.",
+          "inputs": {
+            "input": "Input"
           },
-          "headers": {
-            "label": "Headers",
-            "add": "Add header",
-            "empty": "No headers"
+          "outputs": {
+            "output": "Output"
           },
-          "body": {
-            "label": "Body"
+          "preview": {
+            "reads": "Reads"
+          },
+          "config": {
+            "variables": {
+              "label": "Variables",
+              "empty": "No variables configured.",
+              "add": "Add variable",
+              "items": {
+                "key": {
+                  "label": "Key",
+                  "helpText": "Variable to read."
+                },
+                "scope": {
+                  "label": "Scope",
+                  "helpText": "Resource: only variables stored on this resource. Global: shared across all resources.",
+                  "enum": {
+                    "resource": "Resource",
+                    "global": "Global"
+                  }
+                },
+                "payloadPath": {
+                  "label": "Payload path",
+                  "helpText": "Dot path on the payload where the value will be written, e.g. user.email."
+                }
+              }
+            }
           }
         }
       }
     },
-    "health": {
-      "heartbeat": {
-        "title": "Health heartbeat",
-        "description": "Marks the resource healthy when this node fires. If no heartbeat arrives within the configured timeout the resource is automatically marked unhealthy.",
-        "inputs": {
-          "input": "Input"
-        },
-        "outputs": {
-          "output": "Output"
-        },
-        "preview": {
-          "identifier": "Identifier",
-          "timeoutSeconds": "Timeout (s)"
-        },
-        "config": {
-          "identifier": {
-            "label": "Identifier (optional)"
+    "output": {
+      "http": {
+        "sendRequest": {
+          "title": "Send HTTP request",
+          "description": "This node sends a HTTP request.",
+          "inputs": {
+            "input": "Input"
           },
-          "timeoutSeconds": {
-            "label": "Timeout (seconds)"
+          "outputs": {
+            "output": "Output"
           },
-          "unhealthyReason": {
-            "label": "Reason on timeout (optional)"
+          "preview": {
+            "method": "Method",
+            "url": "URL"
+          },
+          "config": {
+            "url": {
+              "label": "URL"
+            },
+            "method": {
+              "label": "Method",
+              "enum": {
+                "GET": "GET",
+                "POST": "POST",
+                "PUT": "PUT",
+                "PATCH": "PATCH",
+                "DELETE": "DELETE",
+                "HEAD": "HEAD",
+                "OPTIONS": "OPTIONS"
+              }
+            },
+            "headers": {
+              "label": "Headers",
+              "add": "Add header",
+              "empty": "No headers"
+            },
+            "body": {
+              "label": "Body"
+            }
           }
         }
       },
-      "set": {
-        "title": "Set health state",
-        "description": "Sets the resource health state. Static config values can be overridden by payload fields (health.identifier, health.status, health.reason).",
-        "inputs": {
-          "input": "Input"
-        },
-        "outputs": {
-          "output": "Output"
-        },
-        "preview": {
-          "identifier": "Identifier",
-          "status": "Status"
-        },
-        "config": {
-          "identifier": {
-            "label": "Identifier (optional)"
+      "mqtt": {
+        "sendMessage": {
+          "title": "Send MQTT message",
+          "description": "This node sends a MQTT message.",
+          "inputs": {
+            "input": "Input"
           },
-          "status": {
-            "label": "Status",
-            "enum": {
-              "healthy": "Healthy",
-              "unhealthy": "Unhealthy"
+          "outputs": {
+            "output": "Output"
+          },
+          "preview": {
+            "topic": "Topic"
+          },
+          "config": {
+            "topic": {
+              "label": "Topic"
+            },
+            "serverId": {
+              "label": "Server"
+            },
+            "payload": {
+              "label": "Payload"
+            },
+            "qos": {
+              "label": "QoS",
+              "enum": {
+                "0": "0 - At most once (fire and forget)",
+                "1": "1 - At least once (acknowledged)",
+                "2": "2 - Exactly once (two-phase handshake)"
+              }
+            },
+            "retain": { "label": "Retain message" }
+          }
+        }
+      },
+      "resource": {
+        "usage": {
+          "end-session": {
+            "title": "End usage session",
+            "description": "Ends the active usage session. Optionally sends notes (template or static).",
+            "inputs": { "input": "Input" },
+            "outputs": { "output": "Output" },
+            "config": {
+              "notes": { "label": "Notes (templates allowed)" }
+            },
+            "preview": {
+              "notes": "Notes"
+            }
+          }
+        },
+        "billing": {
+          "calculation": {
+            "set-additional-items": {
+              "title": "Add billing item",
+              "description": "With this node you can add an additional item to the billing.",
+              "inputs": {
+                "input": "Input"
+              },
+              "preview": {
+                "position": "Position"
+              },
+              "config": {
+                "name": {
+                  "label": "Name"
+                },
+                "unitPrice": {
+                  "label": "Unit price"
+                },
+                "quantity": {
+                  "label": "Quantity"
+                },
+                "description": {
+                  "label": "Description"
+                },
+                "externalReference": {
+                  "label": "External reference"
+                }
+              }
+            }
+          }
+        },
+
+        "activity": {
+          "track-activity": {
+            "title": "Resource was active",
+            "description": "Use this node to indicate that the resource was active.",
+            "inputs": {
+              "input": "Input"
+            },
+            "outputs": {
+              "output": "Output"
+            }
+          }
+        },
+        "health": {
+          "heartbeat": {
+            "title": "Health heartbeat",
+            "description": "Marks the resource healthy when this node fires. If no heartbeat arrives within the configured timeout the resource is automatically marked unhealthy.",
+            "inputs": { "input": "Input" },
+            "outputs": { "output": "Output" },
+            "preview": {
+              "identifier": "Identifier",
+              "timeoutSeconds": "Timeout (s)"
+            },
+            "config": {
+              "identifier": { "label": "Identifier (optional)" },
+              "timeoutSeconds": { "label": "Timeout (seconds)" },
+              "unhealthyReason": { "label": "Reason on timeout (optional)" }
             }
           },
-          "reason": {
-            "label": "Reason (optional, templates allowed)"
+          "set": {
+            "title": "Set health state",
+            "description": "Sets the resource health state. Static config values can be overridden by payload fields (health.identifier, health.status, health.reason).",
+            "inputs": { "input": "Input" },
+            "outputs": { "output": "Output" },
+            "preview": {
+              "identifier": "Identifier",
+              "status": "Status"
+            },
+            "config": {
+              "identifier": { "label": "Identifier (optional)" },
+              "status": {
+                "label": "Status",
+                "enum": {
+                  "healthy": "Healthy",
+                  "unhealthy": "Unhealthy"
+                }
+              },
+              "reason": { "label": "Reason (optional, templates allowed)" }
+            }
           }
         }
       }

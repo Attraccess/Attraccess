@@ -374,7 +374,7 @@ export class ResourceUsageService {
 
         await this.flowExecutorService.runFlow(
           existingActiveSession.resourceId,
-          ResourceFlowNodeType.RESOURCE_USAGE_TAKEOVER,
+          ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER,
           {
             ...this.getResourceUsageFlowPayload(existingActiveSession, formSubmissions),
             takeOverTime: now,
@@ -395,7 +395,7 @@ export class ResourceUsageService {
 
         await this.flowExecutorService.runFlow(
           createdSession.resourceId,
-          ResourceFlowNodeType.RESOURCE_USAGE_STARTED,
+          ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED,
           this.getResourceUsageFlowPayload(createdSession, formSubmissions),
           transactionalEntityManager,
         );
@@ -491,7 +491,7 @@ export class ResourceUsageService {
         this.logger.debug(`Running flow for resource ${activeSession.resourceId} on end session`, { updateData });
         await this.flowExecutorService.runFlow(
           activeSession.resourceId,
-          ResourceFlowNodeType.RESOURCE_USAGE_STOPPED,
+          ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
           { ...this.getResourceUsageFlowPayload(activeSession, formSubmissions), ...updateData },
           transactionalEntityManager,
         );

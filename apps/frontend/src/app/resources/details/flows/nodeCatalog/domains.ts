@@ -33,5 +33,11 @@ export const DOMAINS: Record<Domain, DomainDef> = {
 };
 
 export function nodeTypeDomain(nodeType: string): Domain {
-  return nodeType.split('.', 1)[0] as Domain;
+  if (nodeType === 'input.button') return 'manual';
+  if (nodeType.includes('.door.')) return 'door';
+  if (nodeType.includes('.health.')) return 'health';
+  if (nodeType.includes('.http.')) return 'http';
+  if (nodeType.includes('.mqtt.')) return 'mqtt';
+  if (nodeType.includes('.resource.')) return 'resource';
+  return 'logic';
 }

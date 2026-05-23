@@ -4,11 +4,20 @@
   },
   "inputs": {
     "columns": {
-      "label": "Columns"
+      "label": "Columns",
+      "search": "Search columns",
+      "selectAll": "All",
+      "selectNone": "None",
+      "selectedCount": "{{selected}} / {{total}} selected"
     }
+  },
+  "preview": {
+    "title": "Preview (first {{n}})",
+    "rowCount": "{{count}} total rows"
   },
   "actions": {
     "refetch": "Refresh",
-    "downloadCsv": "Download CSV"
+    "downloadCsv": "Download CSV",
+    "cancel": "Cancel"
   }
 }

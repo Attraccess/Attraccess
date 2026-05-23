@@ -19,6 +19,7 @@ import { usePtrStore } from '../../../../stores/ptr.store';
 import Dagre from '@dagrejs/dagre';
 import { Button } from '@heroui/react';
 import {
+  Braces as BracesIcon,
   DownloadIcon,
   LayoutGridIcon,
   LogsIcon,
@@ -34,6 +35,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { EdgeWithDeleteButton } from './edgeWithDeleteButton';
 import JSConfetti from 'js-confetti';
 import { LogViewer } from './logViewer';
+import { VariablesModal } from './variablesModal';
 import de from './de.json';
 import en from './en.json';
 import nodesDeTranslations from './node/de.json';
@@ -449,6 +451,14 @@ function FlowsPageInner() {
                   </Button>
                 )}
               </LogViewer>
+
+              <VariablesModal resourceId={Number(resourceId)}>
+                {(open) => (
+                  <Button isIconOnly onPress={open} aria-label={t('actions.variables')}>
+                    <BracesIcon />
+                  </Button>
+                )}
+              </VariablesModal>
 
               <Button isIconOnly onPress={layout}>
                 <LayoutGridIcon />

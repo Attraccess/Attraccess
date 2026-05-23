@@ -8,6 +8,8 @@ import { UpdateSystemSettingsDto } from './dto/update-system-settings.dto';
 import { MetricsSettingsDto } from './dto/metrics-settings.dto';
 import { UpdateMetricsSettingsDto } from './dto/update-metrics-settings.dto';
 import { GenerateMetricsApiKeyResponseDto } from './dto/generate-metrics-api-key-response.dto';
+import { AuthRateLimitSettingsDto } from './dto/auth-rate-limit-settings.dto';
+import { UpdateAuthRateLimitSettingsDto } from './dto/update-auth-rate-limit-settings.dto';
 
 @ApiTags('Settings')
 @Controller('settings')
@@ -89,6 +91,24 @@ export class SettingsController {
       this.settingsService.getMetricsSlowQueryThresholdSeconds(),
     ]);
     return { apiKeyConfigured: configured, toggles, slowQueryThresholdSeconds };
+  }
+
+  @Get('auth/rate-limit')
+  @Auth('canManageSystemConfiguration')
+  @ApiOperation({ summary: 'Get auth rate-limit settings', operationId: 'getAuthRateLimitSettings' })
+  @ApiResponse({ status: 200, description: 'Current auth rate-limit settings.', type: AuthRateLimitSettingsDto })
+  async getAuthRateLimitSettings(): Promise<AuthRateLimitSettingsDto> {
+    return this.settingsService.getAuthRateLimitSettings();
+  }
+
+  @Patch('auth/rate-limit')
+  @Auth('canManageSystemConfiguration')
+  @ApiOperation({ summary: 'Update auth rate-limit settings', operationId: 'updateAuthRateLimitSettings' })
+  @ApiResponse({ status: 200, description: 'Auth rate-limit settings updated.', type: AuthRateLimitSettingsDto })
+  async updateAuthRateLimitSettings(
+    @Body() body: UpdateAuthRateLimitSettingsDto,
+  ): Promise<AuthRateLimitSettingsDto> {
+    return this.settingsService.updateAuthRateLimitSettings(body);
   }
 
   @Post('first-time-setup')
