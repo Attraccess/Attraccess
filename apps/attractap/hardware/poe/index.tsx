@@ -154,8 +154,8 @@ export default () => (
 
     {/* ─── AMS1117-3.3 — V5V -> +3V3 for LAN8720A VDDIO/VDDA ──────────────── */}
     <Ams1117_3v3 name="U_LDO33" pn="C6186" pcbX={-5} pcbY={10} />
-    <C0402 name="C_LDO_IN" pn="C307331" capacitance="1uF" pcbX={-9} pcbY={10} />
-    <C0402 name="C_LDO_OUT" pn="C307331" capacitance="10uF" pcbX={-1} pcbY={10} />
+    <C0402 name="C_LDO_IN" pn="C52923" capacitance="1uF" pcbX={-9} pcbY={10} />
+    <C0402 name="C_LDO_OUT" pn="C15525" capacitance="10uF" pcbX={-1} pcbY={10} />
 
     <net name="V3V3" />
 
@@ -171,16 +171,16 @@ export default () => (
     {/* ─── LAN8720A PHY + 25 MHz crystal + decoupling + strap resistors ──── */}
     <Lan8720a name="U_PHY" pn="C17146" pcbX={-10} pcbY={-10} />
     <Crystal25M_5032 name="Y1" pn="C20617602" pcbX={-20} pcbY={-14} />
-    <C0402 name="C_XTAL1" pn="C307331" capacitance="18pF" pcbX={-22} pcbY={-15} />
-    <C0402 name="C_XTAL2" pn="C307331" capacitance="18pF" pcbX={-18} pcbY={-15} />
+    <C0402 name="C_XTAL1" pn="C1549" capacitance="18pF" pcbX={-22} pcbY={-15} />
+    <C0402 name="C_XTAL2" pn="C1549" capacitance="18pF" pcbX={-18} pcbY={-15} />
 
     <C0402 name="C_VDDIO_HF" pn="C307331" capacitance="100nF" pcbX={-7} pcbY={-6} />
-    <C0402 name="C_VDDIO_LF" pn="C307331" capacitance="4.7uF" pcbX={-5} pcbY={-6} />
+    <C0402 name="C_VDDIO_LF" pn="C23733" capacitance="4.7uF" pcbX={-5} pcbY={-6} />
     <L0603 name="L_VDDA_FB" pn="C85833" inductance="600R" pcbX={-13} pcbY={-14} />
     <C0402 name="C_VDDA_HF" pn="C307331" capacitance="100nF" pcbX={-15} pcbY={-7} />
-    <C0402 name="C_VDDA_LF" pn="C307331" capacitance="4.7uF" pcbX={-14} pcbY={-5} />
-    <C0402 name="C_VDDCR_HF" pn="C307331" capacitance="470pF" pcbX={-10} pcbY={-6} />
-    <C0402 name="C_VDDCR_LF" pn="C307331" capacitance="1uF" pcbX={-12} pcbY={-6} />
+    <C0402 name="C_VDDA_LF" pn="C23733" capacitance="4.7uF" pcbX={-14} pcbY={-5} />
+    <C0402 name="C_VDDCR_HF" pn="C1537" capacitance="470pF" pcbX={-10} pcbY={-6} />
+    <C0402 name="C_VDDCR_LF" pn="C52923" capacitance="1uF" pcbX={-12} pcbY={-6} />
 
     <R0402 name="R_RBIAS" pn="C25754" resistance="12.1k" tolerance="1%" pcbX={-12} pcbY={-10} />
     <R0402 name="R_MDIO_PU" pn="C25771" resistance="1.5k" tolerance="1%" pcbX={0} pcbY={-12} />
