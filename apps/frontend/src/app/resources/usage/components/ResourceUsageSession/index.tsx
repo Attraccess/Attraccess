@@ -17,7 +17,7 @@ import {
 import en from './translations/en.json';
 import de from './translations/de.json';
 import { MaintenanceInProgressDisplay } from './maintenance';
-import { FlatSection } from '../../../details/flatSection';
+import { FlatSection } from '../../../../../components/flatSection';
 
 type ResourceUsageSessionProps = Omit<HTMLAttributes<HTMLElement>, 'children' | 'resource'> & {
   resourceId: number;

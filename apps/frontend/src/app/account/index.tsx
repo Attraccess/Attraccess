@@ -12,7 +12,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { TwoFactorCard } from './two-factor';
 import { useUsersServiceRequestDeleteAccount, ApiError } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../components/toastProvider';
-import { FlatSection } from '../resources/details/flatSection';
+import { FlatSection } from '../../components/flatSection';
 import API_ERROR_TRANSLATIONS_EN from '../../global-translations/api-errors.en.json';
 import API_ERROR_TRANSLATIONS_DE from '../../global-translations/api-errors.de.json';
 

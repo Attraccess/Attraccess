@@ -1,5 +1,5 @@
-// Shared flat sidebar section wrapper for icon, title, actions, body
-// FEATURE: Resource details visual hierarchy (ATT-289 secondary sidebar chrome)
+// Shared section wrapper rendering icon, uppercase title, optional actions, body
+// FEATURE: Cross-page visual hierarchy after Card-wrapper removal (ATT-359)
 import { cn } from '@heroui/react';
 import { HTMLAttributes, ReactNode } from 'react';
 

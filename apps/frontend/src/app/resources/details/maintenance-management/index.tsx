@@ -14,7 +14,7 @@ import { MarkDoneModal } from './mark-done';
 import { CheckCircleIcon, CogIcon, ConstructionIcon, ExternalLinkIcon, PlusIcon } from 'lucide-react';
 import { useNow } from '../../../../hooks/useNow';
 import { EmptyState } from '../../../../components/emptyState';
-import { FlatSection } from '../flatSection';
+import { FlatSection } from '../../../../components/flatSection';
 
 interface Props extends Omit<HTMLAttributes<HTMLElement>, 'children'> {
   resourceId: number;

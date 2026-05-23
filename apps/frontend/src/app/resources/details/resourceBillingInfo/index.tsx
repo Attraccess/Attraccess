@@ -15,7 +15,7 @@ import { ResourceBillingInfoEditor } from './editor';
 import { Fragment, HTMLAttributes, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../../../hooks/useAuth';
 import { dbCurrencyToUserCurrency } from '@attraccess/shared';
-import { FlatSection } from '../flatSection';
+import { FlatSection } from '../../../../components/flatSection';
 
 interface Props extends Omit<HTMLAttributes<HTMLElement>, 'children'> {
   resourceId: number;

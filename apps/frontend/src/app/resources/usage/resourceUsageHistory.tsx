@@ -18,7 +18,7 @@ import historyTableEn from './components/HistoryTable/utils/translations/en.json
 import historyTableDe from './components/HistoryTable/utils/translations/de.json';
 import historyHeaderEn from './components/HistoryHeader/translations/en';
 import historyHeaderDe from './components/HistoryHeader/translations/de';
-import { FlatSection } from '../details/flatSection';
+import { FlatSection } from '../../../components/flatSection';
 
 type ResourceUsageHistoryProps = Omit<HTMLAttributes<HTMLElement>, 'children'> & {
   resourceId: number;

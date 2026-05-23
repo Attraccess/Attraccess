@@ -16,7 +16,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import en from './en.json';
 import de from './de.json';
 import { ResourceGroupUpsertModal } from '../../resource-groups/upsertModal/resourceGroupUpsertModal';
-import { FlatSection } from '../details/flatSection';
+import { FlatSection } from '../../../components/flatSection';
 
 type ManageResourceGroupsProps = Omit<HTMLAttributes<HTMLElement>, 'children'> & {
   resourceId: number;
