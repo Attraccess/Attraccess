@@ -213,13 +213,15 @@ export function FormEditorPage() {
         title={isCreateMode ? t('editor.createTitle') : t('editor.editTitle', { formName: formResponse?.name ?? '' })}
         subtitle={resource?.name}
         backTo={`/resources/${resourceId}/forms`}
-        actions={
-          !isCreateMode && (
-            <Button variant="danger-soft" onPress={() => setDeleteModalOpen(true)}>
-              {t('editor.delete')}
-            </Button>
-          )
-        }
+        actions={[
+          {
+            key: 'delete',
+            label: t('editor.delete'),
+            variant: 'destructive',
+            isHidden: isCreateMode,
+            onPress: () => setDeleteModalOpen(true),
+          },
+        ]}
       />
 
       <div className="grid gap-8 lg:grid-cols-[2fr_1fr]" data-cy="form-editor-page">

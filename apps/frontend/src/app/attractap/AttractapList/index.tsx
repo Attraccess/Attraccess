@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, AlertContent, AlertDescription, AlertTitle, Button, Card, Chip, Dropdown, DropdownItem, DropdownMenu, DropdownPopover, DropdownTrigger, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow } from '@heroui/react';
-import { buttonVariants } from '@heroui/styles';
-import { ArrowRightIcon, CpuIcon, LogsIcon, MoreVertical, PencilIcon, Trash2Icon } from 'lucide-react';
+import { Alert, AlertContent, AlertDescription, AlertTitle, Button, Card, Chip, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow } from '@heroui/react';
+import { ArrowRightIcon, CpuIcon, LogsIcon, PencilIcon, Trash2Icon } from 'lucide-react';
 import { AlertStatusIcon } from '../../../components/AlertStatusIcon';
 import { EmptyState } from '../../../components/emptyState';
 import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -12,7 +11,7 @@ import {
   useAttractapServiceGetReaders,
 } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../components/toastProvider';
-import { PageHeader } from '../../../components/pageHeader';
+import { PageAction, PageHeader } from '../../../components/pageHeader';
 import { AttractapHardwareSetup } from '../HardwareSetup';
 import { WebSerialConsole } from '../HardwareSetup/WebSerialConsole';
 import { useNow } from '../../../hooks/useNow';
@@ -101,49 +100,38 @@ export function AttractapList() {
 
   return (
     <>
-      <PageHeader
-        title={t('page.title')}
-        backTo="/attractap"
-        actions={
-          <AttractapHardwareSetup
-            openDeviceSettings={(deviceId) => {
-              setOpenedReaderEditor(Number(deviceId));
-            }}
-          >
-            {(onOpenHardwareSetup) => (
-              <WebSerialConsole>
-                {(onOpenSerialConsole) => (
-                  <Dropdown>
-                    <DropdownTrigger className={`${buttonVariants({ variant: 'ghost' })} whitespace-nowrap`}>
-                      <MoreVertical className="w-4 h-4" />
-                      {t('page.actions.menu')}
-                    </DropdownTrigger>
-                    <DropdownPopover>
-                      <DropdownMenu aria-label="Attractap actions">
-                        <DropdownItem
-                          key="serial-console" id="serial-console"
-                          onPress={onOpenSerialConsole}
-                          data-cy="attractap-list-open-console-button"
-                        ><LogsIcon className="w-4 h-4" />
-                          {t('page.actions.openSerialConsole')}
-                        </DropdownItem>
-
-                        <DropdownItem
-                          key="hardware-setup" id="hardware-setup"
-                          onPress={onOpenHardwareSetup}
-                          data-cy="attractap-list-open-flasher-button"
-                        ><CpuIcon className="w-4 h-4" />
-                          {t('page.actions.openHardwareSetup')}
-                        </DropdownItem>
-                      </DropdownMenu>
-                    </DropdownPopover>
-                  </Dropdown>
-                )}
-              </WebSerialConsole>
+      <AttractapHardwareSetup
+        openDeviceSettings={(deviceId) => {
+          setOpenedReaderEditor(Number(deviceId));
+        }}
+      >
+        {(onOpenHardwareSetup) => (
+          <WebSerialConsole>
+            {(onOpenSerialConsole) => (
+              <PageHeader
+                title={t('page.title')}
+                backTo="/attractap"
+                actions={[
+                  {
+                    key: 'serial-console',
+                    label: t('page.actions.openSerialConsole'),
+                    icon: <LogsIcon className="w-4 h-4" />,
+                    onPress: onOpenSerialConsole,
+                    dataCy: 'attractap-list-open-console-button',
+                  },
+                  {
+                    key: 'hardware-setup',
+                    label: t('page.actions.openHardwareSetup'),
+                    icon: <CpuIcon className="w-4 h-4" />,
+                    onPress: onOpenHardwareSetup,
+                    dataCy: 'attractap-list-open-flasher-button',
+                  },
+                ] satisfies PageAction[]}
+              />
             )}
-          </AttractapHardwareSetup>
-        }
-      />
+          </WebSerialConsole>
+        )}
+      </AttractapHardwareSetup>
 
       <Alert status="danger" className="mb-4">
         <AlertStatusIcon status="danger" />

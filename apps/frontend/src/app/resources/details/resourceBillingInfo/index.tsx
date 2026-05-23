@@ -10,7 +10,7 @@ import {
 import { useNumberFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import de from './de.json';
 import en from './en.json';
-import { PageHeader } from '../../../../components/pageHeader';
+import { PageHeader, PageAction } from '../../../../components/pageHeader';
 import { ResourceBillingInfoEditor } from './editor';
 import { Fragment, HTMLAttributes, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../../../hooks/useAuth';
@@ -207,17 +207,28 @@ export function ResourceBillingInfo(props: Props) {
   const editorAction = (
     <ResourceBillingInfoEditor resourceId={resourceId}>
       {(onOpen) => (
-        <Button
-          variant="primary"
-          isIconOnly
-          onPress={onOpen}
-          aria-label={t('actions.edit')}
-        >
+        <Button variant="primary" isIconOnly onPress={onOpen} aria-label={t('actions.edit')}>
+
           <Edit2Icon size={12} />
         </Button>
       )}
     </ResourceBillingInfoEditor>
   );
+
+  const pageHeaderActions = [
+    {
+      key: 'edit',
+      label: t('actions.edit'),
+      icon: <Edit2Icon size={12} />,
+      variant: 'primary',
+      isIconOnly: true,
+      renderTrigger: (triggerProps) => (
+        <ResourceBillingInfoEditor resourceId={resourceId}>
+          {(onOpen) => <Button {...triggerProps} onPress={onOpen} />}
+        </ResourceBillingInfoEditor>
+      ),
+    },
+  ] satisfies PageAction[];
 
   if (variant === 'flat') {
     return (
@@ -239,7 +250,7 @@ export function ResourceBillingInfo(props: Props) {
         <PageHeader
           title={t('title')}
           icon={<CreditCard />}
-          actions={editorAction}
+          actions={pageHeaderActions}
           noMargin
         />
       </Card.Header>
