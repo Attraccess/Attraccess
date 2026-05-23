@@ -25,7 +25,7 @@ export function ResourceFilter(props: Props & Omit<FilterProps, 'onSearchChanged
       {children({ onOpen: open })}
       <StandardDrawer isOpen={isOpen} onOpenChange={setOpen}>
         <DrawerHeader>{t('drawer.title')}</DrawerHeader>
-        <DrawerBody>
+        <DrawerBody className="flex flex-col gap-4">
           <LabeledSwitch isSelected={filterProps.onlyInUseByMe} onChange={filterProps.onOnlyInUseByMeChanged}>
             {t('drawer.options.onlyInUseByMe')}
           </LabeledSwitch>
