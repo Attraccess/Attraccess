@@ -6,7 +6,7 @@ import {
   boardCoord,
 } from '@attraccess/attractap-hw-shared';
 
-const SWD_HEADER_PN = 'C2935458';
+const SWD_HEADER_PN = 'C7501289';
 
 export interface JtagBlockProps {
   readonly boardW: number;
@@ -17,7 +17,7 @@ export const JtagBlock = ({ boardW, boardH }: JtagBlockProps) => {
   const at = (x: number, y: number) => boardCoord({ x, y, boardW, boardH });
   return (
     <>
-      <B2B_127_2xN name="J_SWD" pn={SWD_HEADER_PN} pinsPerRow={5} {...at(42, 4)} />
+      <B2B_127_2xN name="J_SWD" pn={SWD_HEADER_PN} pinsPerRow={5} {...at(50, 40)} />
     </>
   );
 };

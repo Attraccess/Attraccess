@@ -14,8 +14,8 @@ import { McuP4 } from './mcu-p4';
 import { Power } from './power';
 import { UsbBlock } from './usb';
 
-const W = 50;
-const H = 35;
+const W = 60;
+const H = 45;
 const at = (x: number, y: number) => boardCoord({ x, y, boardW: W, boardH: H });
 
 export default () => (
@@ -34,15 +34,15 @@ export default () => (
     <Connectors boardW={W} boardH={H} />
 
     <hole diameter="3.2mm" {...at(3, 3)} />
-    <hole diameter="3.2mm" {...at(47, 3)} />
-    <hole diameter="3.2mm" {...at(3, 32)} />
-    <hole diameter="3.2mm" {...at(47, 32)} />
+    <hole diameter="3.2mm" {...at(57, 3)} />
+    <hole diameter="3.2mm" {...at(3, 42)} />
+    <hole diameter="3.2mm" {...at(57, 42)} />
 
-    <BoardLabel name="ATT-349 CORE" rev="v0" {...at(25, 14)} />
-    <AttraccessLogo {...at(8, 9)} scale={1.0} />
-    <AttraccessLogo {...at(42, 9)} scale={1.0} />
-    <Pin1Marker {...at(20.2, 32)} />
-    <Pin1Marker {...at(20.2, 3)} />
+    <BoardLabel name="ATT-349 CORE" rev="v0" {...at(30, 12)} />
+    <AttraccessLogo {...at(10, 7)} scale={1.0} />
+    <AttraccessLogo {...at(50, 7)} scale={1.0} />
+    <Pin1Marker {...at(15.2, 42)} />
+    <Pin1Marker {...at(15.2, 3)} />
 
     <trace from=".J_POE > .pin1" to=".D_VBUS > .cathode" />
     <trace from=".J_POE > .pin2" to=".J_POE > .pin1" />

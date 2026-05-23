@@ -25,21 +25,21 @@ export const McuC6 = ({ boardW, boardH }: McuC6Props) => {
   const at = (x: number, y: number) => boardCoord({ x, y, boardW, boardH });
   return (
     <>
-      <Esp32C6Mini1 name="U_C6" pn={C6_PN} {...at(38, 28)} />
+      <Esp32C6Mini1 name="U_C6" pn={C6_PN} {...at(45, 27)} />
 
-      <C0603 name="C_C6_BULK" pn={C_22UF_PN} capacitance="22uF" {...at(33, 28)} />
-      <C0402 name="C_C6_VDD" pn={C_100NF_PN} capacitance="100nF" {...at(33, 29.5)} />
-      <C0603 name="C_C6_10U" pn={C_10UF_PN} capacitance="10uF" {...at(33, 26.5)} />
-      <C0402 name="C_C6_EN" pn={C_1UF_PN} capacitance="1uF" {...at(33, 31)} />
+      <C0603 name="C_C6_BULK" pn={C_22UF_PN} capacitance="22uF" {...at(40, 16)} />
+      <C0402 name="C_C6_VDD" pn={C_100NF_PN} capacitance="100nF" {...at(43, 16)} />
+      <C0603 name="C_C6_10U" pn={C_10UF_PN} capacitance="10uF" {...at(46, 16)} />
+      <C0402 name="C_C6_EN" pn={C_1UF_PN} capacitance="1uF" {...at(49, 16)} />
 
-      <R0402 name="R_C6_EN" pn={R_10K_PN} resistance="10k" {...at(34.5, 31)} />
-      <R0402 name="R_C6_BOOT" pn={R_10K_PN} resistance="10k" {...at(34.5, 25)} />
+      <R0402 name="R_C6_EN" pn={R_10K_PN} resistance="10k" {...at(40, 14)} />
+      <R0402 name="R_C6_BOOT" pn={R_10K_PN} resistance="10k" {...at(43, 14)} />
 
-      <R0402 name="R_SDIO_CMD" pn={R_10K_PN} resistance="10k" {...at(31, 24)} />
-      <R0402 name="R_SDIO_D0" pn={R_10K_PN} resistance="10k" {...at(31, 23)} />
-      <R0402 name="R_SDIO_D1" pn={R_10K_PN} resistance="10k" {...at(31, 22)} />
-      <R0402 name="R_SDIO_D2" pn={R_10K_PN} resistance="10k" {...at(31, 21)} />
-      <R0402 name="R_SDIO_D3" pn={R_10K_PN} resistance="10k" {...at(31, 20)} />
+      <R0402 name="R_SDIO_CMD" pn={R_10K_PN} resistance="10k" {...at(35, 28)} />
+      <R0402 name="R_SDIO_D0" pn={R_10K_PN} resistance="10k" {...at(35, 26.5)} />
+      <R0402 name="R_SDIO_D1" pn={R_10K_PN} resistance="10k" {...at(35, 25)} />
+      <R0402 name="R_SDIO_D2" pn={R_10K_PN} resistance="10k" {...at(35, 23.5)} />
+      <R0402 name="R_SDIO_D3" pn={R_10K_PN} resistance="10k" {...at(35, 22)} />
 
       <trace from=".C_C6_BULK > .pin1" to=".U_C6 > .VDD3V3" />
       <trace from=".C_C6_BULK > .pin2" to=".U_C6 > .GND1" />

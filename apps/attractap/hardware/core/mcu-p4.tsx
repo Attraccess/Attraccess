@@ -39,55 +39,55 @@ export const McuP4 = ({ boardW, boardH }: McuP4Props) => {
   });
   return (
     <>
-      <Esp32P4Nrw32 name="U_P4" pn={P4_PN} {...at(25, 18)} />
+      <Esp32P4Nrw32 name="U_P4" pn={P4_PN} {...at(25, 22)} />
 
-      <C0402 name="C_VDDPST1" pn={C_100NF_PN} capacitance="100nF" {...atBottom(20.5, 18)} />
-      <C0402 name="C_VDDPST2" pn={C_100NF_PN} capacitance="100nF" {...atBottom(20.5, 19)} />
-      <C0402 name="C_VDDPST3" pn={C_100NF_PN} capacitance="100nF" {...atBottom(20.5, 20)} />
-      <C0402 name="C_VDDPST4" pn={C_100NF_PN} capacitance="100nF" {...atBottom(20.5, 21)} />
-      <C0402 name="C_VDDPST5" pn={C_100NF_PN} capacitance="100nF" {...atBottom(29.5, 18)} />
-      <C0402 name="C_VDDPST6" pn={C_100NF_PN} capacitance="100nF" {...atBottom(29.5, 19)} />
-      <C0402 name="C_VDDPST_A" pn={C_100NF_PN} capacitance="100nF" {...atBottom(29.5, 20)} />
-      <C0402 name="C_VDDPST_B" pn={C_100NF_PN} capacitance="100nF" {...atBottom(29.5, 21)} />
-      <C0402 name="C_VDDPST_LDO" pn={C_100NF_PN} capacitance="100nF" {...atBottom(25, 13)} />
-      <C0402 name="C_VDDPST_DCDC" pn={C_100NF_PN} capacitance="100nF" {...atBottom(26, 13)} />
-      <C0402 name="C_VDD_HP_0" pn={C_100NF_PN} capacitance="100nF" {...atBottom(22, 23)} />
-      <C0402 name="C_VDD_HP_2" pn={C_100NF_PN} capacitance="100nF" {...atBottom(24, 23)} />
-      <C0402 name="C_VDD_HP_3" pn={C_100NF_PN} capacitance="100nF" {...atBottom(26, 23)} />
-      <C0402 name="C_VDD_MIPI" pn={C_100NF_PN} capacitance="100nF" {...atBottom(28, 23)} />
-      <C0402 name="C_VCCA" pn={C_100NF_PN} capacitance="100nF" {...atBottom(30, 23)} />
-      <C0603 name="C_VDD_BULK_T" pn={C_10UF_PN} capacitance="10uF" {...atBottom(22, 13)} />
-      <C0603 name="C_VDD_BULK_B" pn={C_10UF_PN} capacitance="10uF" {...atBottom(28, 13)} />
+      <C0402 name="C_VDDPST1" pn={C_100NF_PN} capacitance="100nF" {...atBottom(19.5, 19)} />
+      <C0402 name="C_VDDPST2" pn={C_100NF_PN} capacitance="100nF" {...atBottom(19.5, 20.5)} />
+      <C0402 name="C_VDDPST3" pn={C_100NF_PN} capacitance="100nF" {...atBottom(19.5, 22)} />
+      <C0402 name="C_VDDPST4" pn={C_100NF_PN} capacitance="100nF" {...atBottom(19.5, 23.5)} />
+      <C0402 name="C_VDDPST5" pn={C_100NF_PN} capacitance="100nF" {...atBottom(30.5, 19)} />
+      <C0402 name="C_VDDPST6" pn={C_100NF_PN} capacitance="100nF" {...atBottom(30.5, 20.5)} />
+      <C0402 name="C_VDDPST_A" pn={C_100NF_PN} capacitance="100nF" {...atBottom(30.5, 22)} />
+      <C0402 name="C_VDDPST_B" pn={C_100NF_PN} capacitance="100nF" {...atBottom(30.5, 23.5)} />
+      <C0402 name="C_VDDPST_LDO" pn={C_100NF_PN} capacitance="100nF" {...atBottom(23, 16)} />
+      <C0402 name="C_VDDPST_DCDC" pn={C_100NF_PN} capacitance="100nF" {...atBottom(27, 16)} />
+      <C0402 name="C_VDD_HP_0" pn={C_100NF_PN} capacitance="100nF" {...atBottom(20, 28)} />
+      <C0402 name="C_VDD_HP_2" pn={C_100NF_PN} capacitance="100nF" {...atBottom(22.5, 28)} />
+      <C0402 name="C_VCCA" pn={C_100NF_PN} capacitance="100nF" {...atBottom(25, 28)} />
+      <C0402 name="C_VDD_HP_3" pn={C_100NF_PN} capacitance="100nF" {...atBottom(27.5, 28)} />
+      <C0402 name="C_VDD_MIPI" pn={C_100NF_PN} capacitance="100nF" {...atBottom(30, 28)} />
+      <C0603 name="C_VDD_BULK_T" pn={C_10UF_PN} capacitance="10uF" {...atBottom(20, 16)} />
+      <C0603 name="C_VDD_BULK_B" pn={C_10UF_PN} capacitance="10uF" {...atBottom(30, 16)} />
 
-      <L0603 name="FB_VDDA" pn={FB_PN} inductance="120R@100MHz" {...atBottom(31, 18)} />
-      <C0402 name="C_VDDA" pn={C_100NF_PN} capacitance="100nF" {...atBottom(31.5, 19)} />
-      <C0603 name="C_VBAT" pn={C_10UF_PN} capacitance="10uF" {...atBottom(31, 20)} />
+      <L0603 name="FB_VDDA" pn={FB_PN} inductance="120R@100MHz" {...atBottom(34, 22)} />
+      <C0402 name="C_VDDA" pn={C_100NF_PN} capacitance="100nF" {...atBottom(34, 24)} />
+      <C0603 name="C_VBAT" pn={C_10UF_PN} capacitance="10uF" {...atBottom(34, 20)} />
 
-      <C0402 name="C_FB_LDO1" pn={C_1UF_PN} capacitance="1uF" {...atBottom(31.5, 15)} />
-      <C0402 name="C_FB_LDO2" pn={C_1UF_PN} capacitance="1uF" {...atBottom(31.5, 14)} />
-      <C0402 name="C_FB_LDO3" pn={C_1UF_PN} capacitance="1uF" {...atBottom(30.5, 14)} />
-      <C0402 name="C_FB_LDO4" pn={C_1UF_PN} capacitance="1uF" {...atBottom(29.5, 14)} />
-      <C0402 name="C_FB_DCDC" pn={C_1UF_PN} capacitance="1uF" {...atBottom(28.5, 14)} />
+      <C0402 name="C_FB_LDO1" pn={C_1UF_PN} capacitance="1uF" {...atBottom(27, 13.5)} />
+      <C0402 name="C_FB_LDO2" pn={C_1UF_PN} capacitance="1uF" {...atBottom(25, 13.5)} />
+      <C0402 name="C_FB_LDO3" pn={C_1UF_PN} capacitance="1uF" {...atBottom(23, 13.5)} />
+      <C0402 name="C_FB_LDO4" pn={C_1UF_PN} capacitance="1uF" {...atBottom(21, 13.5)} />
+      <C0402 name="C_FB_DCDC" pn={C_1UF_PN} capacitance="1uF" {...atBottom(29, 13.5)} />
 
-      <Crystal40Mhz name="Y1" pn={XTAL40_PN} {...at(25, 25)} />
-      <C0402 name="C_XTAL_P" pn={C_10PF_PN} capacitance="10pF" {...at(23, 25)} />
-      <C0402 name="C_XTAL_N" pn={C_10PF_PN} capacitance="10pF" {...at(27, 25)} />
+      <Crystal40Mhz name="Y1" pn={XTAL40_PN} {...at(25, 30)} />
+      <C0402 name="C_XTAL_P" pn={C_10PF_PN} capacitance="10pF" {...at(22, 30)} />
+      <C0402 name="C_XTAL_N" pn={C_10PF_PN} capacitance="10pF" {...at(28, 30)} />
 
-      <W25q128Jv name="U_FLASH" pn={W25Q128_PN} {...atBottom(25, 9)} />
-      <C0402 name="C_FLASH" pn={C_100NF_PN} capacitance="100nF" {...atBottom(28, 9)} />
-      <R0402 name="R_FLASH_CS" pn={R_10K_PN} resistance="10k" {...atBottom(22, 9)} />
-      <R0402 name="R_FLASH_WP" pn={R_10K_PN} resistance="10k" {...atBottom(22, 10)} />
-      <R0402 name="R_FLASH_HOLD" pn={R_10K_PN} resistance="10k" {...atBottom(22, 11)} />
+      <W25q128Jv name="U_FLASH" pn={W25Q128_PN} {...atBottom(25, 10)} />
+      <C0402 name="C_FLASH" pn={C_100NF_PN} capacitance="100nF" {...atBottom(29, 10)} />
+      <R0402 name="R_FLASH_CS" pn={R_10K_PN} resistance="10k" {...atBottom(21, 9)} />
+      <R0402 name="R_FLASH_WP" pn={R_10K_PN} resistance="10k" {...atBottom(21, 10.5)} />
+      <R0402 name="R_FLASH_HOLD" pn={R_10K_PN} resistance="10k" {...atBottom(21, 12)} />
 
       <R0402 name="R_EN" pn={R_10K_PN} resistance="10k" {...at(33, 18)} />
-      <C0402 name="C_EN" pn={C_100NF_PN} capacitance="100nF" {...at(33, 19)} />
-      <TactileTs1088 name="SW_RESET" pn={TS1088_PN} {...at(36, 18)} />
-      <TactileTs1088 name="SW_BOOT" pn={TS1088_PN} {...at(36, 22)} />
-      <R0402 name="R_BOOT_PU" pn={R_10K_PN} resistance="10k" {...at(33, 22)} />
+      <C0402 name="C_EN" pn={C_100NF_PN} capacitance="100nF" {...at(33, 20)} />
+      <TactileTs1088 name="SW_RESET" pn={TS1088_PN} {...at(33, 30)} />
+      <TactileTs1088 name="SW_BOOT" pn={TS1088_PN} {...at(33, 36)} />
+      <R0402 name="R_BOOT_PU" pn={R_10K_PN} resistance="10k" {...at(33, 33)} />
 
-      <R0402 name="R_MDIO_PU" pn={R_4K7_PN} resistance="4.7k" {...at(17, 14)} />
-      <R0402 name="R_MDC_PU" pn={R_4K7_PN} resistance="4.7k" {...at(17, 15)} />
-      <R0402 name="R_REFCLK" pn={R_33R_PN} resistance="33" {...at(17, 16)} />
+      <R0402 name="R_MDIO_PU" pn={R_4K7_PN} resistance="4.7k" {...at(16, 25)} />
+      <R0402 name="R_MDC_PU" pn={R_4K7_PN} resistance="4.7k" {...at(16, 23)} />
+      <R0402 name="R_REFCLK" pn={R_33R_PN} resistance="33" {...at(16, 21)} />
 
       <trace from=".Y1 > .XIN" to=".U_P4 > .XTAL_P" />
       <trace from=".Y1 > .XOUT" to=".U_P4 > .XTAL_N" />

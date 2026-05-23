@@ -21,10 +21,10 @@ export const UsbBlock = ({ boardW, boardH }: UsbBlockProps) => {
   const at = (x: number, y: number) => boardCoord({ x, y, boardW, boardH });
   return (
     <>
-      <UsbCRecept16P_2MD name="J_USB" pn={USBC_PN} {...at(47, 8)} />
-      <Usblc6_2Sc6 name="U_USB_ESD" pn={USBLC6_PN} {...at(44, 12)} />
-      <R0402 name="R_USB_DM" pn={R_22R_PN} resistance="22" {...at(41, 11)} />
-      <R0402 name="R_USB_DP" pn={R_22R_PN} resistance="22" {...at(41, 13)} />
+      <UsbCRecept16P_2MD name="J_USB" pn={USBC_PN} {...at(55, 9)} />
+      <Usblc6_2Sc6 name="U_USB_ESD" pn={USBLC6_PN} {...at(48, 9)} />
+      <R0402 name="R_USB_DM" pn={R_22R_PN} resistance="22" {...at(43, 9)} />
+      <R0402 name="R_USB_DP" pn={R_22R_PN} resistance="22" {...at(43, 10.5)} />
 
       <trace from=".J_USB > .Dn1" to=".J_USB > .Dn2" />
       <trace from=".J_USB > .Dp1" to=".J_USB > .Dp2" />

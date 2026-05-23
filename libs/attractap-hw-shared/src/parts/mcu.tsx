@@ -117,7 +117,7 @@ const ESP32_P4_NRW32_PIN_LABELS: Record<string, string[]> = {
 export const Esp32P4Nrw32 = ({ name, pn, ...rest }: Esp32MiniProps) => (
   <chip
     name={name}
-    footprint="qfn104_p0.4_w10_h10"
+    footprint="qfn104_p0.3_w10_h10_pl0.5_pw0.2"
     supplierPartNumbers={jlcSupplier(pn)}
     pinLabels={ESP32_P4_NRW32_PIN_LABELS}
     {...rest}
@@ -189,12 +189,97 @@ const ESP32_C6_MINI_1_PIN_LABELS: Record<string, string[]> = {
   pin53: ['GND53'],
 };
 
+const C6_BODY_W = 13.2;
+const C6_BODY_H = 16.6;
+const C6_PERIM_PAD_W = 0.5;
+const C6_PERIM_PAD_H = 0.9;
+const C6_PERIM_PITCH = 1.0;
+const C6_PAD_TO_BODY_EDGE = 0.45;
+const C6_LEFT_COUNT = 11;
+const C6_BOTTOM_COUNT = 13;
+const C6_RIGHT_COUNT = 11;
+const C6_PERIM_TOTAL = C6_LEFT_COUNT + C6_BOTTOM_COUNT + C6_RIGHT_COUNT;
+const C6_THERM_COLS = 3;
+const C6_THERM_ROWS = 6;
+const C6_THERM_PAD = 1.2;
+const C6_THERM_PITCH_X = 1.8;
+const C6_THERM_PITCH_Y = 1.8;
+
+const c6MiniPadAt = (idx: number) => {
+  if (idx < C6_LEFT_COUNT) {
+    const x = -C6_BODY_W / 2 - C6_PAD_TO_BODY_EDGE;
+    const start_y = ((C6_LEFT_COUNT - 1) / 2) * C6_PERIM_PITCH;
+    const y = start_y - idx * C6_PERIM_PITCH;
+    return { x, y, rotation: 0 };
+  }
+  if (idx < C6_LEFT_COUNT + C6_BOTTOM_COUNT) {
+    const local = idx - C6_LEFT_COUNT;
+    const y = -C6_BODY_H / 2 - C6_PAD_TO_BODY_EDGE;
+    const start_x = -((C6_BOTTOM_COUNT - 1) / 2) * C6_PERIM_PITCH;
+    const x = start_x + local * C6_PERIM_PITCH;
+    return { x, y, rotation: 90 };
+  }
+  const local = idx - C6_LEFT_COUNT - C6_BOTTOM_COUNT;
+  const x = C6_BODY_W / 2 + C6_PAD_TO_BODY_EDGE;
+  const start_y = -((C6_RIGHT_COUNT - 1) / 2) * C6_PERIM_PITCH;
+  const y = start_y + local * C6_PERIM_PITCH;
+  return { x, y, rotation: 0 };
+};
+
+const c6ThermalPadAt = (idx: number) => {
+  const col = idx % C6_THERM_COLS;
+  const row = Math.floor(idx / C6_THERM_COLS);
+  const start_x = -((C6_THERM_COLS - 1) / 2) * C6_THERM_PITCH_X;
+  const start_y = -((C6_THERM_ROWS - 1) / 2) * C6_THERM_PITCH_Y;
+  return { x: start_x + col * C6_THERM_PITCH_X, y: start_y + row * C6_THERM_PITCH_Y };
+};
+
 export const Esp32C6Mini1 = ({ name, pn, ...rest }: Esp32MiniProps) => (
   <chip
     name={name}
-    footprint="esp32-c6-mini-1"
     supplierPartNumbers={jlcSupplier(pn)}
     pinLabels={ESP32_C6_MINI_1_PIN_LABELS}
     {...rest}
-  />
+  >
+    <footprint>
+      {Array.from({ length: C6_PERIM_TOTAL }).map((_, idx) => {
+        const p = c6MiniPadAt(idx);
+        const isVert = p.rotation === 90;
+        return (
+          <smtpad
+            shape="rect"
+            portHints={[`pin${idx + 1}`]}
+            pcbX={p.x}
+            pcbY={p.y}
+            width={`${isVert ? C6_PERIM_PAD_H : C6_PERIM_PAD_W}mm`}
+            height={`${isVert ? C6_PERIM_PAD_W : C6_PERIM_PAD_H}mm`}
+          />
+        );
+      })}
+      {Array.from({ length: C6_THERM_COLS * C6_THERM_ROWS }).map((_, idx) => {
+        const p = c6ThermalPadAt(idx);
+        return (
+          <smtpad
+            shape="rect"
+            portHints={[`pin${C6_PERIM_TOTAL + idx + 1}`]}
+            pcbX={p.x}
+            pcbY={p.y}
+            width={`${C6_THERM_PAD}mm`}
+            height={`${C6_THERM_PAD}mm`}
+          />
+        );
+      })}
+      <silkscreenpath
+        route={[
+          { x: -C6_BODY_W / 2, y: -C6_BODY_H / 2 },
+          { x:  C6_BODY_W / 2, y: -C6_BODY_H / 2 },
+          { x:  C6_BODY_W / 2, y:  C6_BODY_H / 2 },
+          { x: -C6_BODY_W / 2, y:  C6_BODY_H / 2 },
+          { x: -C6_BODY_W / 2, y: -C6_BODY_H / 2 },
+        ]}
+        strokeWidth="0.12mm"
+      />
+      <silkscreencircle pcbX={-C6_BODY_W / 2 - 1.2} pcbY={C6_BODY_H / 2 - 0.5} radius={0.2} strokeWidth="0.12mm" />
+    </footprint>
+  </chip>
 );

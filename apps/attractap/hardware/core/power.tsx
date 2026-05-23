@@ -34,29 +34,29 @@ export const Power = ({ boardW, boardH }: PowerProps) => {
   const at = (x: number, y: number) => boardCoord({ x, y, boardW, boardH });
   return (
     <>
-      <Lm66200 name="U_OR" pn={LM66200_PN} {...at(7, 28)} />
-      <C0603 name="C_PoE_IN" pn={C_10UF_PN} capacitance="10uF" {...at(3.5, 28)} />
-      <C0603 name="C_DC_IN" pn={C_10UF_PN} capacitance="10uF" {...at(3.5, 26.5)} />
-      <C0603 name="C_5V_BULK1" pn={C_10UF_PN} capacitance="10uF" {...at(10.5, 28)} />
-      <C0603 name="C_5V_BULK2" pn={C_10UF_PN} capacitance="10uF" {...at(10.5, 26.5)} />
-      <R0402 name="R_OR_EN" pn={R_10K_PN} resistance="10k" {...at(5, 30)} />
+      <Lm66200 name="U_OR" pn={LM66200_PN} {...at(8, 10)} />
+      <C0603 name="C_PoE_IN" pn={C_10UF_PN} capacitance="10uF" {...at(4, 10)} />
+      <C0603 name="C_DC_IN" pn={C_10UF_PN} capacitance="10uF" {...at(4, 8)} />
+      <C0603 name="C_5V_BULK1" pn={C_10UF_PN} capacitance="10uF" {...at(12, 10)} />
+      <C0603 name="C_5V_BULK2" pn={C_10UF_PN} capacitance="10uF" {...at(12, 8)} />
+      <R0402 name="R_OR_EN" pn={R_10K_PN} resistance="10k" {...at(8, 12.5)} />
 
-      <Ss34 name="D_VBUS" pn={SS34_PN} {...at(13, 30)} />
-      <C0402 name="C_VBUS_Y" pn={C_10NF_PN} capacitance="10nF" {...at(15, 30)} />
-      <C0603 name="C_VBUS_BULK" pn={C_22UF_PN} capacitance="22uF" {...at(15.5, 28)} />
+      <Ss34 name="D_VBUS" pn={SS34_PN} {...at(28, 10)} />
+      <C0402 name="C_VBUS_Y" pn={C_10NF_PN} capacitance="10nF" {...at(35, 8)} />
+      <C0603 name="C_VBUS_BULK" pn={C_22UF_PN} capacitance="22uF" {...at(35, 12)} />
 
-      <Tps62933 name="U_BUCK" pn={TPS62933_PN} {...at(7, 23)} />
-      <C0603 name="C_BUCK_IN" pn={C_10UF_PN} capacitance="10uF" {...at(3.5, 23)} />
-      <C0402 name="C_BUCK_BST" pn={C_100NF_PN} capacitance="100nF" {...at(5, 21)} />
-      <R0402 name="R_BUCK_FB_H" pn={R_36K_PN} resistance="36k" {...at(9, 21)} />
-      <R0402 name="R_BUCK_FB_L" pn={R_10K_PN} resistance="10k" {...at(11, 21)} />
-      <R0402 name="R_BUCK_EN" pn={R_100K_PN} resistance="100k" {...at(9, 25.5)} />
-      <L0603 name="L_BUCK" pn={L_2P2UH_PN} inductance="2.2uH" {...at(10.5, 23)} />
-      <C0603 name="C_3V3_BULK1" pn={C_10UF_PN} capacitance="10uF" {...at(13, 23)} />
-      <C0603 name="C_3V3_BULK2" pn={C_22UF_PN} capacitance="22uF" {...at(13, 21.5)} />
+      <Tps62933 name="U_BUCK" pn={TPS62933_PN} {...at(8, 17)} />
+      <C0603 name="C_BUCK_IN" pn={C_10UF_PN} capacitance="10uF" {...at(4, 17)} />
+      <C0402 name="C_BUCK_BST" pn={C_100NF_PN} capacitance="100nF" {...at(4, 15)} />
+      <R0402 name="R_BUCK_FB_H" pn={R_36K_PN} resistance="36k" {...at(10, 15)} />
+      <R0402 name="R_BUCK_FB_L" pn={R_10K_PN} resistance="10k" {...at(12, 15)} />
+      <R0402 name="R_BUCK_EN" pn={R_100K_PN} resistance="100k" {...at(6, 19)} />
+      <L0603 name="L_BUCK" pn={L_2P2UH_PN} inductance="2.2uH" {...at(12, 17)} />
+      <C0603 name="C_3V3_BULK1" pn={C_10UF_PN} capacitance="10uF" {...at(16, 17)} />
+      <C0603 name="C_3V3_BULK2" pn={C_22UF_PN} capacitance="22uF" {...at(16, 19)} />
 
-      <R0402 name="R_USB_CC1" pn={R_5K1_PN} resistance="5.1k" {...at(46, 13)} />
-      <R0402 name="R_USB_CC2" pn={R_5K1_PN} resistance="5.1k" {...at(46, 11.5)} />
+      <R0402 name="R_USB_CC1" pn={R_5K1_PN} resistance="5.1k" {...at(48, 12)} />
+      <R0402 name="R_USB_CC2" pn={R_5K1_PN} resistance="5.1k" {...at(48, 13.5)} />
 
       <trace from=".U_OR > .VIN1" to=".C_PoE_IN > .pin1" />
       <trace from=".U_OR > .VIN2" to=".C_DC_IN > .pin1" />
