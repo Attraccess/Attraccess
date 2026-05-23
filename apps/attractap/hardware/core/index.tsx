@@ -122,6 +122,22 @@ export default () => (
     <trace from=".U_P4 > .GPIO53" to=".U_C6 > .IO22" />
     <trace from=".U_P4 > .GPIO54" to=".U_C6 > .IO23" />
 
+    <trace from=".U_P4 > .GPIO1" to=".U_C6 > .EN" />
+    <trace from=".U_P4 > .GPIO2" to=".U_C6 > .IO9" />
+    <trace from=".U_P4 > .GPIO3" to=".U_C6 > .RXD0" />
+    <trace from=".U_P4 > .GPIO4" to=".U_C6 > .TXD0" />
+
+    <trace from=".R_USB_C6_DM > .pin2" to=".U_C6 > .IO12" />
+    <trace from=".R_USB_C6_DP > .pin2" to=".U_C6 > .IO13" />
+
+    <trace from=".J_USB_C6 > .VBUS" to=".D_VBUS_C6 > .anode" />
+    <trace from=".J_USB_C6 > .GND_A1B12" to=".U_OR > .GND_A" />
+
+    <trace from=".R_USB_C6_CC1 > .pin1" to=".J_USB_C6 > .CC1" />
+    <trace from=".R_USB_C6_CC2 > .pin1" to=".J_USB_C6 > .CC2" />
+    <trace from=".R_USB_C6_CC1 > .pin2" to=".U_OR > .GND_A" />
+    <trace from=".R_USB_C6_CC2 > .pin2" to=".U_OR > .GND_A" />
+
     <trace from=".U_P4 > .GPIO24" to=".J_DISP > .pin16" />
     <trace from=".U_P4 > .GPIO25" to=".J_DISP > .pin17" />
     <trace from=".U_P4 > .GPIO26" to=".J_BEEP > .pin3" />

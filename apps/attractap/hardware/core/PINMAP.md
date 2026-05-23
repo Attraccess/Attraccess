@@ -44,15 +44,32 @@ IDF ethernet + esp_hosted examples to minimise sdkconfig surgery.
 `GPIO0` doubles as the user BOOT button; the button shorts it to GND when held
 during a reset pulse.
 
-## 3. USB 2.0 (fixed)
+## 3. USB 2.0 — dual USB-C
+
+### 3.1. `J_USB` → P4 (primary, right edge)
 
 | Function | P4 pin | Net |
 |----------|--------|-----|
-| `DM` | 49 | Through 22 Ω → USB-C D− (USB-2.0 HS) |
-| `DP` | 50 | Through 22 Ω → USB-C D+ |
+| `DM` | 49 | Through 22 Ω → `J_USB` D− (USB-2.0 HS) |
+| `DP` | 50 | Through 22 Ω → `J_USB` D+ |
 
-USB-C VBUS is gated through SS34 Schottky → +5V rail. ESD on D±/CC handled by
-USBLC6-2SC6 located ≤ 5 mm from the USB-C receptacle.
+`J_USB.VBUS` gated through `D_VBUS` SS34 Schottky → +5V rail. ESD on D±/CC handled by
+`U_USB_ESD` (USBLC6-2SC6) located ≤ 5 mm from `J_USB`.
+
+### 3.2. `J_USB_C6` → C6 native USB-Serial-JTAG (left edge, rotated 90°)
+
+Second USB-C dedicated to ESP32-C6 native USB-Serial-JTAG controller. Lets the
+PC flash C6 over a standard cable even when P4 is dead or not yet programmed.
+
+| Function | C6 module pin (signal) | Net |
+|----------|------------------------|-----|
+| `C6_USB_DM` | pin 17 (`IO12`, GPIO12) | Through 22 Ω → `J_USB_C6` D− |
+| `C6_USB_DP` | pin 18 (`IO13`, GPIO13) | Through 22 Ω → `J_USB_C6` D+ |
+
+`J_USB_C6.VBUS` gated through `D_VBUS_C6` SS34 → same +5V rail (so either USB
+cable also powers the board for bench bring-up). ESD on D±/CC handled by
+`U_USB_C6_ESD` (USBLC6-2SC6) ≤ 5 mm from `J_USB_C6`. CC sink pull-downs
+`R_USB_C6_CC1/CC2` (5.1 kΩ).
 
 ## 4. Octal flash (fixed)
 
@@ -116,13 +133,17 @@ firmware on the C6). 4-bit bus + clock + cmd at +3V3.
 | `SDIO_D1`     | 95 (GPIO52)   | C6 pin 27 (IO21)  | 10 kΩ to +3V3 |
 | `SDIO_D2`     | 97 (GPIO53)   | C6 pin 28 (IO22)  | 10 kΩ to +3V3 |
 | `SDIO_D3`     | 98 (GPIO54)   | C6 pin 29 (IO23)  | 10 kΩ to +3V3 |
-| `C6_EN`       | 80→GPIO39 (TBV) | C6 pin 8 (EN)   | 10 kΩ to +3V3 + 1 µF to GND |
-| `C6_BOOT`     | 81→GPIO40 (TBV) | C6 pin 23 (IO9) | 10 kΩ to +3V3 (bootstrap on C6) |
+| `C6_EN`       | 3 (GPIO1)     | C6 pin 8 (EN)     | 10 kΩ to +3V3 + 1 µF to GND. P4 open-drain drives LOW to reset C6. |
+| `C6_BOOT`     | 4 (GPIO2)     | C6 pin 23 (IO9)   | 10 kΩ to +3V3. P4 open-drain pulls LOW during EN release for download mode. |
+| `C6_U0RXD`    | 5 (GPIO3)     | C6 pin 30 (RXD0)  | P4 TX → C6 U0 RX. esptool-stub UART path. |
+| `C6_U0TXD`    | 6 (GPIO4)     | C6 pin 31 (TXD0)  | C6 U0 TX → P4 RX. esptool-stub UART path. |
 
-> **Note**: GPIO39–48 already carry RMII. The TBV rows on `C6_EN`/`C6_BOOT`
-> are the conflict. Resolve at PINMAP-lock review — easy fix is to route
-> `C6_EN` from `GPIO53/54` rotation and `C6_BOOT` from a free GPIO in the
-> 24–34 range. Updated table will land before tape-out.
+> **Note**: GPIO1–4 are LP/RTC-domain IO. Drive strength sufficient for
+> open-drain reset + 921600 baud UART; validate at first bring-up.
+> The four lines together let P4 act as a USB-Serial-stub bridge so the user
+> can flash both P4 and C6 over the single `J_USB` USB-C without unplugging.
+> Independent flashing of C6 also possible directly via `J_USB_C6` (see §3.2)
+> using the native USB-Serial-JTAG controller on C6.IO12/IO13.
 
 ## 8. I²C — split into two buses to keep `J_NFC` and `J_DISP` independent
 
@@ -173,8 +194,9 @@ dongle can be attached without USB-C.
 
 ## Open follow-ups handed back to ATT-349 schematic step
 
-1. `C6_EN` / `C6_BOOT` conflict (§7, §8) — final GPIO picks before tape-out.
-2. `FLASH_CK` 33 Ω series — confirm against the W25Q128 datasheet at 80 MHz.
-3. Touch `INT`/`RST` pull-up values — confirm against GT911 datasheet.
-4. RMII length match against ATT-352 PoE board ticket — both sides need the
+1. `FLASH_CK` 33 Ω series — confirm against the W25Q128 datasheet at 80 MHz.
+2. Touch `INT`/`RST` pull-up values — confirm against GT911 datasheet.
+3. RMII length match against ATT-352 PoE board ticket — both sides need the
    same numeric target.
+4. LP-IO drive strength on `C6_EN`/`C6_BOOT`/`C6_U0RXD`/`C6_U0TXD` (GPIO1–4)
+   — first-bring-up smoke test confirms UART works at 921600 baud.

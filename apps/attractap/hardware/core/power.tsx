@@ -42,6 +42,7 @@ export const Power = ({ boardW, boardH }: PowerProps) => {
       <R0402 name="R_OR_EN" pn={R_10K_PN} resistance="10k" {...at(8, 12.5)} />
 
       <Ss34 name="D_VBUS" pn={SS34_PN} {...at(28, 10)} />
+      <Ss34 name="D_VBUS_C6" pn={SS34_PN} {...at(5, 22)} />
       <C0402 name="C_VBUS_Y" pn={C_10NF_PN} capacitance="10nF" {...at(35, 8)} />
       <C0603 name="C_VBUS_BULK" pn={C_22UF_PN} capacitance="22uF" {...at(35, 12)} />
 
@@ -57,6 +58,8 @@ export const Power = ({ boardW, boardH }: PowerProps) => {
 
       <R0402 name="R_USB_CC1" pn={R_5K1_PN} resistance="5.1k" {...at(48, 12)} />
       <R0402 name="R_USB_CC2" pn={R_5K1_PN} resistance="5.1k" {...at(48, 13.5)} />
+      <R0402 name="R_USB_C6_CC1" pn={R_5K1_PN} resistance="5.1k" {...at(11, 25)} />
+      <R0402 name="R_USB_C6_CC2" pn={R_5K1_PN} resistance="5.1k" {...at(13, 25)} />
 
       <trace from=".U_OR > .VIN1" to=".C_PoE_IN > .pin1" />
       <trace from=".U_OR > .VIN2" to=".C_DC_IN > .pin1" />
@@ -75,6 +78,7 @@ export const Power = ({ boardW, boardH }: PowerProps) => {
       <trace from=".C_VBUS_Y > .pin2" to=".U_OR > .GND_A" />
       <trace from=".D_VBUS > .cathode" to=".C_VBUS_BULK > .pin1" />
       <trace from=".C_VBUS_BULK > .pin2" to=".U_OR > .GND_A" />
+      <trace from=".D_VBUS_C6 > .cathode" to=".U_OR > .VOUT_A" />
 
       <trace from=".U_BUCK > .VIN" to=".U_OR > .VOUT_A" />
       <trace from=".U_BUCK > .VIN" to=".C_BUCK_IN > .pin1" />
