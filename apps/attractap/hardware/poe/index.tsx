@@ -75,7 +75,7 @@ export default () => (
     {/* ─── WS3203 PD interface — detect, classify, hot-swap pass FET ─────── */}
     <Ws3203 name="U_PD" pn="C5143001" pcbX={5} pcbY={0} />
     <R0402 name="R_DEN" pn="C138027" resistance="24.9k" tolerance="1%" pcbX={5} pcbY={-6} />
-    <R0402 name="R_CLS" pn="C49656920" resistance="768" tolerance="1%" pcbX={9} pcbY={-6} />
+    <R0402 name="R_CLS" pn="C185397" resistance="768" tolerance="1%" pcbX={9} pcbY={-6} />
     <R0402 name="R_ILIM" pn="C25768" resistance="22k" tolerance="1%" pcbX={5} pcbY={6} />
     <C0402 name="C_SS" pn="C307331" capacitance="100nF" pcbX={9} pcbY={6} />
     <C0402 name="C_VSS_BIAS" pn="C307331" capacitance="100nF" pcbX={13} pcbY={6} />
