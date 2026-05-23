@@ -1,0 +1,12 @@
+{
+  "name": "@attraccess/attractap-hw-poe",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@attraccess/attractap-hw-shared": "workspace:*",
+    "@tscircuit/cli": "0.1.1399",
+    "tscircuit": "0.0.1774",
+    "tsx": "^4.20.3"
+  }
+}

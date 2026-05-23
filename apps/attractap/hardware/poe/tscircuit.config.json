@@ -1,0 +1,9 @@
+{
+  "pcb": {
+    "layerCount": 4,
+    "boardThickness": 1.6,
+    "drc": {
+      "preset": "jlcpcb4"
+    }
+  }
+}
