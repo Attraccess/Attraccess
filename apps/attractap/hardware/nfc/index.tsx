@@ -84,7 +84,7 @@ export default () => (
     autorouter="sequential-trace"
     defaultTraceWidth="0.2mm"
   >
-    <NfcPcbAntenna name="ANT1" outerMm={22} turns={8} traceWidthMm={0.5} gapMm={0.3} {...at(25, 25)} />
+    <NfcPcbAntenna name="ANT1" outerMm={22} turns={9} traceWidthMm={0.4} gapMm={0.3} {...at(25, 25)} />
 
     {leds.map((l) => (
       <Ws2812Mini

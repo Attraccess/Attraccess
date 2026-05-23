@@ -134,15 +134,15 @@ Geometry (parametric in `libs/attractap-hw-shared/src/parts/nfc.tsx::NfcPcbAnten
 
 | Field         | Value (v0)            |
 |---------------|-----------------------|
-| Shape         | Square spiral         |
-| Outer side    | 22 mm (constrained: outer / √2 ≤ LED-ring inner edge 16.25 mm — sets the upper bound on `outerMm` for the 24-LED ring layout) |
-| Turns         | 8                     |
-| Trace width   | 0.5 mm (~19.7 mil — comfortable for JLC 6/6 mil baseline) |
-| Gap           | 0.3 mm (~11.8 mil)    |
-| Inner side    | 22 − 2 × 8 × 0.8 = 9.2 mm |
-| Estimated L   | ~1.4 µH (Wheeler approximation for square spiral, d_avg ≈ 15.6 mm, fill ratio ρ ≈ 0.41) |
-| Estimated Q   | ~40 @ 13.56 MHz on 1 oz Cu |
-| Resonance net | L_ant ≈ 1.4 µH with C2 = 100 pF → f₀ ≈ 13.45 MHz (within tuning trim range) |
+| Shape         | Circular spiral (polar polyline, 32 segments / turn rotated-rect SMT pads on top layer) |
+| Outer Ø       | 22 mm — fits comfortably inside LED-ring inner edge (R ≈ 16.25 mm → Ø 32.5 mm free zone) |
+| Turns         | 9                     |
+| Trace width   | 0.4 mm (~15.7 mil — well above JLC 5/5 mil baseline) |
+| Gap           | 0.3 mm (~11.8 mil) — radial pitch 0.7 mm / turn |
+| Inner Ø       | 22 − 2 × 9 × 0.7 = 9.4 mm |
+| Estimated L   | ~1.5 µH (Wheeler approximation for circular spiral, d_avg ≈ 15.7 mm, fill ratio ρ ≈ 0.40) |
+| Estimated Q   | ~45 @ 13.56 MHz on 1 oz Cu — circular shape avoids the corner current-crowding losses a square-spiral takes (~10 % Q gain) |
+| Resonance net | L_ant ≈ 1.5 µH with C2 = 100 pF → f₀ ≈ 13.0 MHz (within tuning trim range) |
 
 Matching-network retune from the discrete-coil ~2.85 µH target:
 
@@ -164,10 +164,12 @@ Expected first-board behaviour and tuning loop:
 4. v1 board rev (if needed) bakes the trimmed values.
 
 `NfcPcbAntenna` in the shared lib emits a chip with two named pads
-(P1 = outer-corner anchor on the right side, P2 = inner-end anchor) and
-a footprint built from `8 turns × 4 segments = 32` rotated rect SMT
-pads on the top layer, all bound to `pin1` so they form one continuous
-copper net. The matching-network `<trace>` declarations connect to
+(P1 = outer anchor at angle 0°, P2 = inner-end anchor) and a footprint
+built from `9 turns × 32 segments-per-turn = 288` rotated-rect SMT pads
+on the top layer, all bound to `pin1`. Each pad is a short chord of
+the polar spiral (Archimedean: `r(θ) = R_outer − (θ / 2π) · pitch`)
+oriented along its chord direction; pad lengths overlap neighbours by
+half a trace-width so the copper fuses into one continuous net at fab. The matching-network `<trace>` declarations connect to
 `pin1` (outer perimeter) and `pin2` (inner end); the autorouter routes
 these from the bottom-layer matching caps through vias up to the
 antenna anchors.
@@ -265,7 +267,7 @@ sub-issue may upgrade.
 | Ref            | Qty | Part                                  | JLC PN     | Footprint     |
 |----------------|-----|---------------------------------------|------------|---------------|
 | U1             | 1   | PN5321A3HN                            | C28925     | QFN-40-EP     |
-| ANT1           | 1   | PCB-trace 13.56 MHz spiral, 22 × 22 mm, 8 turns, 0.5 / 0.3 mm trace / gap | (etched copper, no part placed) | top-layer copper |
+| ANT1           | 1   | PCB-trace 13.56 MHz circular spiral, Ø 22 mm, 9 turns, 0.4 / 0.3 mm trace / gap | (etched copper, no part placed) | top-layer copper |
 | LED1…LED24     | 24  | WS2812B-MINI-X2                       | C4154873   | SMD3535-4P    |
 | J1             | 1   | B2B 1.27 mm 2×5 male SMD              | C2935458   | pinrow10_p1.27 |
 | R_SDA, R_SCL   | 2   | 4.7 kΩ 0402 1%                        | C25900     | 0402          |
