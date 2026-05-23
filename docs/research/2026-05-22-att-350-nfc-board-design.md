@@ -132,13 +132,13 @@ against the case-CAD enclosure window aperture):
 | Field            | Value / target                                                |
 |------------------|---------------------------------------------------------------|
 | Frequency        | 13.56 MHz                                                     |
-| Inductance       | ~1.4–2.5 µH (matches L0 560 nH × 2 + C1/C2 47 pF tuning net)  |
-| Q (un-loaded)    | ≥ 60 @ 13.56 MHz                                              |
-| Body footprint   | 22 × 22 mm (max), 2-pad SMT, 18 mm pad pitch                  |
+| Inductance       | ~1.4–3.0 µH (matches L0 560 nH × 2 + C1/C2 47 pF tuning net, retuneable inside this range without a layout rev) |
+| Q (unloaded)     | ≥ 60 @ 13.56 MHz                                              |
+| Body footprint   | ≤ 22 × 22 mm fits the v0 layout drop-in; up to 25 × 24 mm fits inside the LED-ring inner edge (R ≈ 16.25 mm) but tightens the antenna-to-LED keep-out to ~4 mm (vs the 6 mm baseline in §2). 2-pad SMT, 18 mm pad pitch. |
 | Termination      | Surface-mount pads (no through-hole / no wire leads)          |
-| Reference family | Abracon ANFCA-2522-D00-T (22 × 22 mm, ~2.85 µH, SMT)          |
-|                  | Würth WE-MCA 760308141 series (24.4 × 23 mm, ~2.4 µH, SMT)    |
-|                  | Pulse PA0742.000NLT (24.7 × 23.5 mm, ~3.0 µH, SMT)            |
+| Reference family | Abracon ANFCA-2522-D00-T — 22 × 22 mm, ~2.85 µH, drop-in for v0 |
+|                  | Würth WE-MCA 760308141 series — 24.4 × 23 mm, ~2.4 µH; needs the relaxed (~4 mm) keep-out variant of the layout |
+|                  | Pulse PA0742.000NLT — 24.7 × 23.5 mm, ~3.0 µH; same relaxed-keep-out caveat as the Würth |
 
 ATT-376 locks the final PN once the enclosure-window dielectric load is
 characterised. **ANT1 ships from JLC with an empty Part # column** —
@@ -275,17 +275,20 @@ except ANT1, which is hand-soldered post-SMT.
 ## 11. JLC assembly tier — Standard PCBA required
 
 This board requires JLCPCB's **Standard PCBA** tier, not Economic PCBA.
-Three independent constraints force Standard tier; any one is sufficient:
+Two independent constraints force Standard tier; either one is sufficient
+on its own:
 
 1. **Double-sided assembly** — PN532, matching network, decoupling, and
    I2C pulls are on the bottom side; antenna + WS2812 ring + connector
-   are on the top side. JLC Economic PCBA only places parts on one side.
-2. **PN532 QFN-40 fine pitch (0.5 mm)** — within Economic PCBA limits in
-   theory, but combined with the bottom-side placement it forces Standard.
-3. **Library type — Extended parts on the BOM** (each carries a one-time
-   $3 component-setup fee, *not* a per-board fee). Exhaustive list and
-   why each is on the BOM in Extended (no Basic / Preferred equivalent
-   exists at JLC for the required value or footprint):
+   are on the top side. JLC Economic PCBA only places parts on one side,
+   so as long as the board uses both layers for SMT, Standard is the only
+   option.
+2. **Library type — Extended parts on the BOM**. Economic PCBA accepts
+   Basic and Preferred parts only; any Extended part on the BOM bumps the
+   order to Standard. This board's BOM has the seven Extended PNs listed
+   in the table below. Each carries a one-time $3 component-setup fee
+   (*not* a per-board fee). The notes column records why no Basic /
+   Preferred equivalent exists at JLC for the required value or footprint:
 
 | JLC PN     | Designator(s)         | Part                          | Why no Basic alt           |
 |------------|-----------------------|-------------------------------|----------------------------|
@@ -296,6 +299,15 @@ Three independent constraints force Standard tier; any one is sufficient:
 | C20069329  | C0_TX1, C0_TX2        | 180 pF 0402 C0G               | No 0402 180 pF cap is Basic/Preferred  |
 | C76947     | Cs1, Cs2              | 1 nF 0402 C0G NP0             | Basic 1 nF 0402 is X7R-only — the RF receive shunt path wants C0G temperature stability |
 | C25132     | Rs1, Rs2              | 750 Ω 0402 1%                 | No 750 Ω 0402 is Basic/Preferred — E96 values outside the JLC Basic library at 0402 |
+
+> **Independence check:** the PN532 QFN-40-EP (0.5 mm pitch) is, by
+> itself, within JLC Economic PCBA's package limits — Economic accepts
+> QFN-40 on the top side at 0.5 mm pitch. So the PN532 is not an
+> independent third forcing factor; it is forced to Standard only via
+> constraint (1) (it sits on the bottom layer). Moving the PN532 to the
+> top side would not unlock Economic on its own — constraint (2) still
+> applies — but it is worth noting that the QFN-40 itself is not the
+> blocker.
 
 Search methodology (for future PRs that touch this BOM): use
 `pcbparts:jlc_search` with `library_type="no_fee"` (basic + preferred,
