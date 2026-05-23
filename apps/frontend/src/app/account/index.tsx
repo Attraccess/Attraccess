@@ -48,7 +48,7 @@ export default function AccountPage() {
     <div>
       <PageHeader title={t('title')} backTo="/" />
 
-      <div className="w-full max-w-2xl flex flex-col gap-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
         <FlatSection icon={<UserIcon size={16} />} title={t('sections.profile')}>
           <div className="flex flex-col gap-6">
             <EmailForm />
