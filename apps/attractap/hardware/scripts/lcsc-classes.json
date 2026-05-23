@@ -41,5 +41,8 @@
   "C2856803": { "category": "Connectors", "subcategory": "FFC, FPC (Flat Flexible) Connector Assemblies", "model": "FPC-05F-20PH20" },
   "C25092": { "category": "Resistors", "subcategory": "Chip Resistor - Surface Mount", "model": "0402WGF220JTCE" },
   "C15849": { "category": "Capacitors", "subcategory": "Multilayer Ceramic Capacitors MLCC - SMD/SMT", "model": "CL10A105KB8NNNC" },
-  "C32949": { "category": "Capacitors", "subcategory": "Multilayer Ceramic Capacitors MLCC - SMD/SMT", "model": "CL05C100JB5NNNC" }
+  "C32949": { "category": "Capacitors", "subcategory": "Multilayer Ceramic Capacitors MLCC - SMD/SMT", "model": "CL05C100JB5NNNC" },
+  "C2935956": { "category": "Connectors", "subcategory": "Pin Headers", "model": "DW127R-22-16-23" },
+  "C7501289": { "category": "Connectors", "subcategory": "Pin Headers", "model": "ZX-PZ1.27-2-5PZZ" },
+  "C504989": { "category": "Connectors", "subcategory": "Wire To Board Connector", "model": "530470410" }
 }
