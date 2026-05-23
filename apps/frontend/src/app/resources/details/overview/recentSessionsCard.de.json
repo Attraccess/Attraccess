@@ -1,0 +1,16 @@
+{
+  "title": "Letzte Nutzungen",
+  "empty": "Du hast diese Ressource noch nicht genutzt.",
+  "viewAll": "Alle anzeigen →",
+  "columns": {
+    "date": "Datum",
+    "duration": "Dauer",
+    "cost": "Kosten",
+    "status": "Status"
+  },
+  "status": {
+    "running": "Läuft",
+    "completed": "Beendet"
+  },
+  "noCost": "—"
+}

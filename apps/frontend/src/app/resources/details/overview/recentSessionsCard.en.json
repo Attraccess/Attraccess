@@ -1,0 +1,16 @@
+{
+  "title": "Recent sessions",
+  "empty": "No runs yet on this resource.",
+  "viewAll": "View all →",
+  "columns": {
+    "date": "Date",
+    "duration": "Duration",
+    "cost": "Cost",
+    "status": "Status"
+  },
+  "status": {
+    "running": "In progress",
+    "completed": "Completed"
+  },
+  "noCost": "—"
+}
