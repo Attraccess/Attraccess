@@ -122,7 +122,7 @@ function buildSpiralSegments(turns: number, half: number, pitch: number): Spiral
   const segments: SpiralSegment[] = [];
   for (let k = 0; k < turns; k++) {
     const h = half - k * pitch;
-    const yRightStart = k === 0 ? -h : -h + pitch;
+    const yRightStart = k === 0 ? -h : -(h + pitch);
     segments.push({ x1: h, y1: yRightStart, x2: h, y2: h });
     segments.push({ x1: h, y1: h, x2: -h, y2: h });
     segments.push({ x1: -h, y1: h, x2: -h, y2: -h });
