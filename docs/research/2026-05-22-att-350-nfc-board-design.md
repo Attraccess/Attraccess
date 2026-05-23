@@ -124,8 +124,29 @@ v0 uses a **discrete pre-wound 13.56 MHz NFC coil antenna**, hand-populated
 through a 2-pad SMT footprint. Default footprint: 22 × 22 mm body,
 18 mm pad pitch, 1.8 × 2.5 mm pads — matches the common Abracon
 ANFCA-2521 / Wurth WE-MCA / Pulse PA0742 form factor for 22-mm-class
-NFC coils. Exact PN is locked by ATT-376 once the case-CAD enclosure
-window aperture is known.
+NFC coils.
+
+ANT1 target spec (for prototype builds before ATT-376 locks the final PN
+against the case-CAD enclosure window aperture):
+
+| Field            | Value / target                                                |
+|------------------|---------------------------------------------------------------|
+| Frequency        | 13.56 MHz                                                     |
+| Inductance       | ~1.4–2.5 µH (matches L0 560 nH × 2 + C1/C2 47 pF tuning net)  |
+| Q (un-loaded)    | ≥ 60 @ 13.56 MHz                                              |
+| Body footprint   | 22 × 22 mm (max), 2-pad SMT, 18 mm pad pitch                  |
+| Termination      | Surface-mount pads (no through-hole / no wire leads)          |
+| Reference family | Abracon ANFCA-2522-D00-T (22 × 22 mm, ~2.85 µH, SMT)          |
+|                  | Würth WE-MCA 760308141 series (24.4 × 23 mm, ~2.4 µH, SMT)    |
+|                  | Pulse PA0742.000NLT (24.7 × 23.5 mm, ~3.0 µH, SMT)            |
+
+ATT-376 locks the final PN once the enclosure-window dielectric load is
+characterised. **ANT1 ships from JLC with an empty Part # column** —
+JLC SMT does not stock 13.56 MHz NFC antenna coils — so ANT1 is
+hand-soldered post-SMT regardless of which vendor PN is picked.
+The BOM validator (`apps/attractap/hardware/scripts/validate-bom.mjs`)
+explicitly whitelists `ANT`-prefixed designators for missing JLC PN
+(see `allowMissingPn` on the `ANT` REF_CLASS row).
 
 The antenna sits **top-side, centred at (25, 25)**, with the 24 WS2812
 LEDs in a ring around it on the same layer. The PN532 IC, matching
@@ -250,3 +271,39 @@ except ANT1, which is hand-soldered post-SMT.
 
 - Antenna geometry for the final case (case CAD is its own epic).
 - Multi-protocol RF (ISO-14443A only via PN532).
+
+## 11. JLC assembly tier — Standard PCBA required
+
+This board requires JLCPCB's **Standard PCBA** tier, not Economic PCBA.
+Three independent constraints force Standard tier; any one is sufficient:
+
+1. **Double-sided assembly** — PN532, matching network, decoupling, and
+   I2C pulls are on the bottom side; antenna + WS2812 ring + connector
+   are on the top side. JLC Economic PCBA only places parts on one side.
+2. **PN532 QFN-40 fine pitch (0.5 mm)** — within Economic PCBA limits in
+   theory, but combined with the bottom-side placement it forces Standard.
+3. **Library type — Extended parts on the BOM** (each carries a one-time
+   $3 component-setup fee, *not* a per-board fee). Exhaustive list and
+   why each is on the BOM in Extended (no Basic / Preferred equivalent
+   exists at JLC for the required value or footprint):
+
+| JLC PN     | Designator(s)         | Part                          | Why no Basic alt           |
+|------------|-----------------------|-------------------------------|----------------------------|
+| C28925     | U1                    | PN5321A3HN (PN532) QFN-40-EP  | Sole NFC reader IC at JLC  |
+| C4154873   | LED1…LED24            | WS2812B-MINI-X2 SMD3535       | WS2812 family is Extended-only at JLC across all sizes |
+| C2935458   | J1                    | 2×5 1.27 mm SMT pin header    | All 1454 in-stock 1.27 mm headers at JLC are Extended |
+| C502009    | L0_TX1, L0_TX2        | 560 nH high-Q RF inductor     | No 0603 RF inductor at this value is Basic/Preferred  |
+| C20069329  | C0_TX1, C0_TX2        | 180 pF 0402 C0G               | No 0402 180 pF cap is Basic/Preferred  |
+| C76947     | Cs1, Cs2              | 1 nF 0402 C0G NP0             | Basic 1 nF 0402 is X7R-only — the RF receive shunt path wants C0G temperature stability |
+| C25132     | Rs1, Rs2              | 750 Ω 0402 1%                 | No 750 Ω 0402 is Basic/Preferred — E96 values outside the JLC Basic library at 0402 |
+
+Search methodology (for future PRs that touch this BOM): use
+`pcbparts:jlc_search` with `library_type="no_fee"` (basic + preferred,
+no setup fee) and the part's package + value as `spec_filters`. Each
+Extended row above was checked individually and returned 0 no-fee
+matches in the current JLC catalogue.
+
+**Net cost impact**: 7 Extended part-types × $3 setup fee = **$21 one-time
+component-setup fee per JLC order**, on top of the Standard PCBA base
+assembly fee. Per-piece cost is unaffected. ANT1 is excluded from JLC
+SMT and hand-soldered post-shipment (see §4.5).
