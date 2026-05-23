@@ -215,16 +215,18 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
                   key={group.translationKey} id={group.translationKey}
                 >
                   <AccordionHeading>
-                    <AccordionTrigger>
-                      <span className="flex items-center gap-2">
-                        <group.icon size={16} />
+                    <AccordionTrigger className="px-2 py-2 text-sm font-normal rounded-md">
+                      <span className="flex items-center">
+                        <span className="mr-3 flex items-center">
+                          <group.icon size={16} />
+                        </span>
                         {t('groups.' + group.translationKey + '.label')}
                       </span>
                       <AccordionIndicator />
                     </AccordionTrigger>
                   </AccordionHeading>
                   <AccordionPanel>
-                    <AccordionBody>
+                    <AccordionBody className="px-0 pt-0 pb-0">
                       {group.items.map((item) => (
                         <NavLink
                           key={item.path}
@@ -252,16 +254,18 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
                   className="text-sm"
                 >
                   <AccordionHeading>
-                    <AccordionTrigger>
-                      <span className="flex items-center gap-2">
-                        <group.icon size={16} />
+                    <AccordionTrigger className="px-2 py-2 text-sm font-normal rounded-md">
+                      <span className="flex items-center">
+                        <span className="mr-3 flex items-center">
+                          <group.icon size={16} />
+                        </span>
                         {t('endItems.groups.' + group.translationKey + '.label')}
                       </span>
                       <AccordionIndicator />
                     </AccordionTrigger>
                   </AccordionHeading>
                   <AccordionPanel>
-                    <AccordionBody>
+                    <AccordionBody className="px-0 pt-0 pb-0">
                       {group.items.map((item) => (
                         <NavLink
                           key={item.path}
