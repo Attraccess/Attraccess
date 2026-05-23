@@ -10,7 +10,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { filenameToUrl } from '../../../api';
 import { StatusChip } from './statusChip';
-import { ChevronRightIcon, ShapesIcon } from 'lucide-react';
+import { ChevronRightIcon, CogIcon, ShapesIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useAuth } from '../../../hooks/useAuth';
 import { useDebounce } from '../../../hooks/useDebounce';
@@ -126,7 +126,9 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
             onPress={() => navigate(`/resource-groups/${groupId}`)}
             isIconOnly
             aria-label={t('actions.openGroupSettings')}
-          />
+          >
+            <CogIcon />
+          </Button>
         )}
       </Card.Header>
 
