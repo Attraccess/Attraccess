@@ -1,6 +1,6 @@
 import { Route, Routes, useNavigate } from 'react-router-dom';
 import { Unauthorized } from './unauthorized/unauthorized';
-import { PropsWithChildren, useEffect, useMemo } from 'react';
+import { PropsWithChildren, useEffect, useMemo, useState } from 'react';
 import { Layout } from './layout/layout';
 import { useAuth } from '../hooks/useAuth';
 import { useAllRoutes } from './routes';
@@ -72,6 +72,24 @@ function useRoutesWithAuthElements(routes: RouteConfig[]) {
   );
 }
 
+function useIsTouchDevice() {
+  const [isTouch, setIsTouch] = useState(() =>
+    typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      ? window.matchMedia('(pointer: coarse)').matches
+      : false,
+  );
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+    const mql = window.matchMedia('(pointer: coarse)');
+    const handler = (event: MediaQueryListEvent) => setIsTouch(event.matches);
+    mql.addEventListener('change', handler);
+    return () => mql.removeEventListener('change', handler);
+  }, []);
+
+  return isTouch;
+}
+
 function AppLayout(props: PropsWithChildren) {
   const { isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
@@ -80,6 +98,7 @@ function AppLayout(props: PropsWithChildren) {
   const { t, language } = useTranslations({ de, en });
 
   const { pullToRefreshIsEnabled } = usePtrStore();
+  const isTouchDevice = useIsTouchDevice();
 
   return (
     <PullToRefresh
@@ -92,7 +111,7 @@ function AppLayout(props: PropsWithChildren) {
           <div style={{ fontSize: '24px' }}>↓</div>
         </div>
       }
-      isPullable={pullToRefreshIsEnabled}
+      isPullable={pullToRefreshIsEnabled && isTouchDevice}
     >
       <RouterProvider navigate={navigate}>
         <I18nProvider locale={language}>
