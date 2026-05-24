@@ -8,15 +8,18 @@ import {
   useResourcesServiceResourceGroupsGetMany,
   useResourcesServiceResourceGroupsRemoveResource,
 } from '@attraccess/react-query-client';
-import { Button, Checkbox, Link, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow } from '@heroui/react';
-import { EmptyState } from '../../../components/emptyState';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { GroupIcon, PlusIcon } from 'lucide-react';
+import { GroupIcon } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import en from './en.json';
 import de from './de.json';
-import { ResourceGroupUpsertModal } from '../../resource-groups/upsertModal/resourceGroupUpsertModal';
+import { EmptyState } from '../../../components/emptyState';
 import { FlatSection } from '../../../components/flatSection';
+import { useToastMessage } from '../../../components/toastProvider';
+import { ResourceGroupUpsertModal } from '../../resource-groups/upsertModal/resourceGroupUpsertModal';
+import { GroupsToolbar } from './GroupsToolbar';
+import { ResourceGroupRow } from './ResourceGroupRow';
+import { filterAndSortGroups, GroupFilter } from './groupsFilter';
 
 type ManageResourceGroupsProps = Omit<HTMLAttributes<HTMLElement>, 'children'> & {
   resourceId: number;
@@ -30,148 +33,151 @@ export function ManageResourceGroups({
 }: Readonly<ManageResourceGroupsProps>) {
   const { t } = useTranslations({ de, en });
   const queryClient = useQueryClient();
+  const toast = useToastMessage();
 
   const { data: resource } = useResourcesServiceGetOneResourceById({ id: resourceId });
-
   const { data: groups } = useResourcesServiceResourceGroupsGetMany();
 
-  const { mutateAsync: addResourceToGroup } = useResourcesServiceResourceGroupsAddResource();
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState<GroupFilter>('all');
+  const [pendingGroupIds, setPendingGroupIds] = useState<ReadonlySet<number>>(new Set());
 
-  const { mutateAsync: removeResourceFromGroup } = useResourcesServiceResourceGroupsRemoveResource({
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: UseResourcesServiceGetOneResourceByIdKeyFn({ id: resourceId }) });
-    },
-  });
-
-  const isAdded = useCallback(
-    (group: ResourceGroup) => {
-      return resource?.groups.some((g) => g.id === group.id);
-    },
+  const assignedIds = useMemo<ReadonlySet<number>>(
+    () => new Set(resource?.groups?.map((g) => g.id) ?? []),
     [resource?.groups],
   );
 
-  const handleGroupClick = useCallback(
+  const allGroups = useMemo(() => groups ?? [], [groups]);
+
+  const invalidateAll = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: [useResourcesServiceGetAllResourcesKey] });
+    queryClient.invalidateQueries({
+      queryKey: UseResourcesServiceGetOneResourceByIdKeyFn({ id: resourceId }),
+    });
+  }, [queryClient, resourceId]);
+
+  const markPending = useCallback((groupId: number, on: boolean) => {
+    setPendingGroupIds((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(groupId);
+      else next.delete(groupId);
+      return next;
+    });
+  }, []);
+
+  const { mutateAsync: addResourceToGroup } = useResourcesServiceResourceGroupsAddResource();
+  const { mutateAsync: removeResourceFromGroup } = useResourcesServiceResourceGroupsRemoveResource();
+
+  const handleToggle = useCallback(
     async (group: ResourceGroup) => {
-      if (!isAdded(group)) {
-        await addResourceToGroup({
-          groupId: group.id,
-          resourceId,
-        });
-      } else {
-        await removeResourceFromGroup({
-          groupId: group.id,
-          resourceId,
-        });
-      }
-
-      queryClient.invalidateQueries({
-        queryKey: [useResourcesServiceGetAllResourcesKey],
-      });
-      queryClient.invalidateQueries({ queryKey: UseResourcesServiceGetOneResourceByIdKeyFn({ id: resourceId }) });
-    },
-    [addResourceToGroup, removeResourceFromGroup, resourceId, isAdded, queryClient],
-  );
-
-  const groupsWithResource = useMemo(() => {
-    if (!groups) {
-      return [];
-    }
-
-    return groups
-      .map((group) => ({
-        ...group,
-        resource: isAdded(group) ? resource : null,
-      }))
-      .sort((a, b) => {
-        if ((a.resource && b.resource) || (!a.resource && !b.resource)) {
-          return a.name.localeCompare(b.name);
+      const wasAssigned = assignedIds.has(group.id);
+      markPending(group.id, true);
+      try {
+        if (wasAssigned) {
+          await removeResourceFromGroup({ groupId: group.id, resourceId });
+        } else {
+          await addResourceToGroup({ groupId: group.id, resourceId });
         }
-
-        return a.resource ? -1 : 1;
-      });
-  }, [groups, resource, isAdded]);
-
-  const [page] = useState(1);
-  const perPage = 10;
-
-  const currentPage = useMemo(() => {
-    if (!groupsWithResource) {
-      return [];
-    }
-
-    return groupsWithResource.slice((page - 1) * perPage, page * perPage);
-  }, [groupsWithResource, page]);
+        invalidateAll();
+      } catch {
+        toast.error({ title: t('errors.toggleFailed') });
+      } finally {
+        markPending(group.id, false);
+      }
+    },
+    [addResourceToGroup, removeResourceFromGroup, assignedIds, invalidateAll, markPending, resourceId, toast, t],
+  );
 
   const onGroupCreated = useCallback(
     (group: ResourceGroup) => {
-      handleGroupClick(group);
+      handleToggle(group);
     },
-    [handleGroupClick],
+    [handleToggle],
   );
 
-  const actions = (
+  const visibleGroups = useMemo(
+    () => filterAndSortGroups({ groups: allGroups, assignedIds, search, filter }),
+    [allGroups, assignedIds, search, filter],
+  );
+
+  const counts = useMemo(() => {
+    let assigned = 0;
+    for (const g of allGroups) if (assignedIds.has(g.id)) assigned += 1;
+    return { assigned, available: allGroups.length - assigned };
+  }, [allGroups, assignedIds]);
+
+  const resourceName = resource?.name ?? '';
+
+  const renderBody = () => {
+    if (allGroups.length === 0) {
+      return <EmptyState message={t('empty.noGroups')} />;
+    }
+    if (visibleGroups.length === 0) {
+      return <EmptyState message={t('empty.noMatch')} />;
+    }
+    return (
+      <ul className="flex flex-col gap-1" data-cy="resource-groups-list">
+        {visibleGroups.map((group) => {
+          const isAssigned = assignedIds.has(group.id);
+          return (
+            <ResourceGroupRow
+              key={group.id}
+              groupId={group.id}
+              groupName={group.name}
+              description={group.description}
+              isAssigned={isAssigned}
+              isPending={pendingGroupIds.has(group.id)}
+              toggleLabel={t(isAssigned ? 'row.toggleOff' : 'row.toggleOn', {
+                resource: resourceName,
+                group: group.name,
+              })}
+              openLabel={t('row.openGroup')}
+              openHref={`/resource-groups/${group.id}`}
+              onToggle={() => handleToggle(group)}
+            />
+          );
+        })}
+      </ul>
+    );
+  };
+
+  const renderToolbar = (onNewGroup: () => void) => (
+    <GroupsToolbar
+      search={search}
+      onSearchChange={setSearch}
+      searchPlaceholder={t('search.placeholder')}
+      filter={filter}
+      onFilterChange={setFilter}
+      filterLabels={{
+        all: t('filter.all'),
+        assigned: t('filter.assigned'),
+        available: t('filter.available'),
+      }}
+      assignedCount={counts.assigned}
+      availableCount={counts.available}
+      newGroupLabel={t('newGroup')}
+      onNewGroup={onNewGroup}
+    />
+  );
+
+  const content = (
     <ResourceGroupUpsertModal onUpserted={onGroupCreated}>
       {(onOpen: () => void) => (
-        <Button
-          variant="primary"
-          size="sm"
-          onPress={onOpen}
-          data-cy="toolbar-open-create-resource-group-modal-button"
-        >
-          <PlusIcon size={16} />
-          {t('addGroup')}
-        </Button>
+        <>
+          {renderToolbar(onOpen)}
+          {renderBody()}
+        </>
       )}
     </ResourceGroupUpsertModal>
   );
 
-  const tableBody =
-    currentPage.length === 0 ? (
-      <EmptyState />
-    ) : (
-      <Table>
-        <TableContent aria-label={t('table.ariaLabel')}>
-          <TableHeader>
-            <TableColumn isRowHeader>{t('columns.group')}</TableColumn>
-            <TableColumn>{t('columns.actions')}</TableColumn>
-          </TableHeader>
-          <TableBody items={currentPage}>
-            {(group) => (
-              <TableRow
-                key={group.id}
-                id={group.id}
-                className={isAdded(group) ? 'border-l-8 border-l-success' : 'border-l-8 border-l-danger'}
-              >
-                <TableCell className="w-full">{group.name}</TableCell>
-                <TableCell className="text-right flex items-center gap-2">
-                  <Checkbox
-                    onChange={() => {
-                      handleGroupClick(group);
-                    }}
-                    aria-label={group.name}
-                    isSelected={isAdded(group)}
-                  />
-                  <Link href={`/resource-groups/${group.id}`}>{t('actions.openGroup')}</Link>
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </TableContent>
-      </Table>
-    );
-
   if (hideHeader) {
-    return (
-      <section {...rest}>
-        <div className="flex justify-end mb-4">{actions}</div>
-        {tableBody}
-      </section>
-    );
+    return <section {...rest}>{content}</section>;
   }
 
   return (
-    <FlatSection icon={<GroupIcon className="w-4 h-4" />} title={t('title')} actions={actions} {...rest}>
-      {tableBody}
+    <FlatSection icon={<GroupIcon className="w-4 h-4" />} title={t('title')} {...rest}>
+      {content}
     </FlatSection>
   );
 }

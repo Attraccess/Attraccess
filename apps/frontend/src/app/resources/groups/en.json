@@ -10,7 +10,6 @@
     "available": "Available"
   },
   "row": {
-    "members": "{{count}} members",
     "toggleOn": "Add {{resource}} to {{group}}",
     "toggleOff": "Remove {{resource}} from {{group}}",
     "openGroup": "open"

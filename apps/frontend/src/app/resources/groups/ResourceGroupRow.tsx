@@ -5,7 +5,7 @@ import { LabeledSwitch } from '../../../components/labeledSwitch';
 export interface ResourceGroupRowProps {
   groupId: number;
   groupName: string;
-  membersLabel?: string;
+  description?: string;
   isAssigned: boolean;
   isPending: boolean;
   toggleLabel: string;
@@ -17,7 +17,7 @@ export interface ResourceGroupRowProps {
 export function ResourceGroupRow({
   groupId,
   groupName,
-  membersLabel,
+  description,
   isAssigned,
   isPending,
   toggleLabel,
@@ -42,7 +42,11 @@ export function ResourceGroupRow({
         <p className="text-sm truncate" title={groupName}>
           {groupName}
         </p>
-        {membersLabel ? <p className="text-xs text-default-500">{membersLabel}</p> : null}
+        {description ? (
+          <p className="text-xs text-default-500 truncate" title={description}>
+            {description}
+          </p>
+        ) : null}
       </div>
       <LabeledSwitch
         size="sm"

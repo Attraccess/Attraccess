@@ -10,7 +10,6 @@
     "available": "Verfügbar"
   },
   "row": {
-    "members": "{{count}} Mitglieder",
     "toggleOn": "{{resource}} zur Gruppe {{group}} hinzufügen",
     "toggleOff": "{{resource}} aus der Gruppe {{group}} entfernen",
     "openGroup": "öffnen"
