@@ -133,11 +133,7 @@ const coreRoutes: RouteConfig[] = [
   },
   {
     path: '/resources/:id/forms/:formId',
-    element: (
-      <ResourceTabsLayout>
-        <FormEditorPage />
-      </ResourceTabsLayout>
-    ),
+    element: <FormEditorPage />,
     authRequired: 'canManageResources',
   },
   {

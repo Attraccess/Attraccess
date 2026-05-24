@@ -1,4 +1,3 @@
-import { PageHeader } from '../../../../components/pageHeader';
 import { useParams } from 'react-router-dom';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { Background, BackgroundVariant, Controls, ReactFlow, Node, Panel, Edge, useReactFlow, SelectionMode } from '@xyflow/react';
@@ -11,7 +10,6 @@ import {
   useResourceFlowsServiceGetResourceFlow,
   UseResourceFlowsServiceGetResourceFlowKeyFn,
   useResourceFlowsServiceSaveResourceFlow,
-  useResourcesServiceGetOneResourceById,
 } from '@attraccess/react-query-client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTheme } from '@heroui/react';
@@ -93,7 +91,6 @@ const jsConfetti = new JSConfetti();
 function FlowsPageInner() {
   const { id: resourceId } = useParams();
   const { theme } = useTheme();
-  const { data: resource } = useResourcesServiceGetOneResourceById({ id: Number(resourceId) });
   const { t, tExists } = useTranslations({
     en: {
       ...en,
@@ -347,15 +344,9 @@ function FlowsPageInner() {
   );
 
   return (
-    <div className="h-full w-full flex flex-col">
-      <PageHeader
-        title={t('title', { resourceName: resource?.name })}
-        subtitle={t('subtitle')}
-        backTo={`/resources/${resourceId}`}
-      />
-
+    <div className="h-full w-full flex flex-col min-h-[70vh]">
       <div
-        className="w-full h-full rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800"
+        className="w-full h-full min-h-[60vh] rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800"
         onMouseMove={(e) => {
           mousePosRef.current = { x: e.clientX, y: e.clientY };
         }}
