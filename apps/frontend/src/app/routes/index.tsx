@@ -1,5 +1,9 @@
 import { Navigate } from 'react-router-dom';
-import { ResourceDetails } from '../resources/details/resourceDetails';
+import { ResourceTabsLayout } from '../resources/details/layout/ResourceTabsLayout';
+import { ResourceOverviewTab } from '../resources/details/overview/ResourceOverviewTab';
+import { ResourceHistoryTab } from '../resources/details/history/ResourceHistoryTab';
+import { ResourcePeopleTab } from '../resources/details/people/ResourcePeopleTab';
+import { ResourceGroupsTab } from '../resources/details/groups/ResourceGroupsTab';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { Spinner } from '@heroui/react';
 import { MqttServersPage, EditMqttServerPage } from '../mqtt';
@@ -75,17 +79,56 @@ const coreRoutes: RouteConfig[] = [
   },
   {
     path: '/resources/:id',
-    element: <ResourceDetails />,
+    element: (
+      <ResourceTabsLayout>
+        <ResourceOverviewTab />
+      </ResourceTabsLayout>
+    ),
     authRequired: true,
   },
   {
+    path: '/resources/:id/history',
+    element: (
+      <ResourceTabsLayout>
+        <ResourceHistoryTab />
+      </ResourceTabsLayout>
+    ),
+    authRequired: true,
+  },
+  {
+    path: '/resources/:id/people',
+    element: (
+      <ResourceTabsLayout>
+        <ResourcePeopleTab />
+      </ResourceTabsLayout>
+    ),
+    authRequired: true,
+  },
+  {
+    path: '/resources/:id/groups',
+    element: (
+      <ResourceTabsLayout>
+        <ResourceGroupsTab />
+      </ResourceTabsLayout>
+    ),
+    authRequired: 'canManageResources',
+  },
+  {
     path: '/resources/:id/flows',
-    element: <FlowsPage />,
+    element: (
+      <ResourceTabsLayout>
+        <FlowsPage />
+      </ResourceTabsLayout>
+    ),
     authRequired: true,
   },
   {
     path: '/resources/:id/forms',
-    element: <FormListPage />,
+    element: (
+      <ResourceTabsLayout>
+        <FormListPage />
+      </ResourceTabsLayout>
+    ),
     authRequired: 'canManageResources',
   },
   {
@@ -105,7 +148,11 @@ const coreRoutes: RouteConfig[] = [
   },
   {
     path: '/resources/:id/maintenance',
-    element: <MaintenanceHubPage />,
+    element: (
+      <ResourceTabsLayout>
+        <MaintenanceHubPage />
+      </ResourceTabsLayout>
+    ),
     authRequired: true,
   },
   {

@@ -118,7 +118,12 @@ export function PageHeaderActions({ actions, maxVisible = DEFAULT_MAX_VISIBLE, m
   const nonDestructive = visibleActions.filter((a) => a.variant !== 'destructive');
 
   const lockedCount = nonDestructive.filter((a) => 'renderTrigger' in a && a.renderTrigger).length;
-  const overflowBudget = destructive.length > 0 ? Math.max(1, maxVisible - 1) : maxVisible;
+  const overflowBudget =
+    destructive.length > 0
+      ? maxVisible === 0
+        ? 0
+        : Math.max(1, maxVisible - 1)
+      : maxVisible;
   const collapsibleSlots = Math.max(0, overflowBudget - lockedCount);
 
   const inline: PageAction[] = [];

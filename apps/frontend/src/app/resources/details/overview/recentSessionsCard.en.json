@@ -1,0 +1,9 @@
+{
+  "title": "Recent sessions",
+  "empty": "No runs yet on this resource.",
+  "viewAll": "View all →",
+  "status": {
+    "running": "In progress",
+    "completed": "Completed"
+  }
+}
