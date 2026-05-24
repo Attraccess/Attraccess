@@ -145,7 +145,7 @@ export default () => (
     <L0603 name="L_LED" pn={FB_FERRITE_PN} inductance="120R@100MHz" {...at(14, 45)} />
     <C0603 name="C_LED_BULK" pn={C_10UF_PN} capacitance="10uF" {...at(18, 45)} />
 
-    <B2B_127_2xN name="J1" pn={HEADER_PN} pinsPerRow={5} {...at(35, 47)} />
+    <B2B_127_2xN name="J1" pn={HEADER_PN} pinsPerRow={5} {...atBottom(35, 47)} />
 
     <hole diameter="3.2mm" {...at(3, 3)} />
     <hole diameter="3.2mm" {...at(47, 3)} />
@@ -155,7 +155,7 @@ export default () => (
     <BoardLabel name="ATT-350 NFC" rev="v0" {...at(25, 3)} />
     <AttraccessLogo {...at(7, 4.5)} scale={1.1} />
     <AttraccessLogo {...at(43, 4.5)} scale={1.1} />
-    <Pin1Marker {...at(32.2, 47)} />
+    <Pin1Marker {...atBottom(32.2, 47)} />
 
     <trace from=".J1 > .pin1" to=".C_VBUS > .pin1" />
     <trace from=".C_VBUS > .pin1" to=".U1 > .VBUS" />

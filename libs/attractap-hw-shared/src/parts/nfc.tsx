@@ -109,51 +109,36 @@ export interface NfcPcbAntennaProps extends Omit<BasePartProps, 'pn'> {
   readonly turns?: number;
   readonly traceWidthMm?: number;
   readonly gapMm?: number;
-  readonly segmentsPerTurn?: number;
+  readonly stepMm?: number;
 }
 
-interface SpiralSegment {
-  readonly x1: number;
-  readonly y1: number;
-  readonly x2: number;
-  readonly y2: number;
+interface SpiralPoint {
+  readonly x: number;
+  readonly y: number;
 }
 
-function buildCircularSpiralSegments(turns: number, outerR: number, pitch: number, segmentsPerTurn: number): SpiralSegment[] {
-  const segments: SpiralSegment[] = [];
-  const total = turns * segmentsPerTurn;
-  let prev = { x: outerR, y: 0 };
-  for (let i = 1; i <= total; i++) {
-    const t = i / segmentsPerTurn;
-    const theta = t * 2 * Math.PI;
-    const r = outerR - t * pitch;
-    const cur = { x: r * Math.cos(theta), y: r * Math.sin(theta) };
-    segments.push({ x1: prev.x, y1: prev.y, x2: cur.x, y2: cur.y });
-    prev = cur;
-  }
-  return segments;
+interface SpiralCirclePadProps {
+  readonly x: number;
+  readonly y: number;
+  readonly radiusMm: number;
 }
 
-interface SpiralPadProps {
-  readonly cx: number;
-  readonly cy: number;
-  readonly lengthMm: number;
-  readonly widthMm: number;
-  readonly rotationDeg: number;
-  readonly portHint: 'pin1' | 'pin2';
-}
-
-const SpiralPad = ({ cx, cy, lengthMm, widthMm, rotationDeg, portHint }: SpiralPadProps) => (
-  <smtpad
-    shape="rotated_rect"
-    portHints={[portHint]}
-    pcbX={cx}
-    pcbY={cy}
-    width={`${lengthMm}mm`}
-    height={`${widthMm}mm`}
-    ccwRotation={rotationDeg}
-  />
+const SpiralCirclePad = ({ x, y, radiusMm }: SpiralCirclePadProps) => (
+  <smtpad shape="circle" portHints={['pin1']} pcbX={x} pcbY={y} radius={`${radiusMm}mm`} />
 );
+
+function buildSpiralPoints(turns: number, outerR: number, pitch: number, stepMm: number): SpiralPoint[] {
+  const points: SpiralPoint[] = [];
+  const totalAngle = turns * 2 * Math.PI;
+  let theta = 0;
+  while (theta <= totalAngle) {
+    const r = outerR - (theta / (2 * Math.PI)) * pitch;
+    points.push({ x: r * Math.cos(theta), y: r * Math.sin(theta) });
+    const dTheta = r > 0 ? stepMm / r : stepMm;
+    theta += dTheta;
+  }
+  return points;
+}
 
 export const NfcPcbAntenna = ({
   name,
@@ -161,53 +146,38 @@ export const NfcPcbAntenna = ({
   turns = 9,
   traceWidthMm = 0.4,
   gapMm = 0.3,
-  segmentsPerTurn = 32,
+  stepMm = 0.25,
   ...rest
 }: NfcPcbAntennaProps) => {
   const pitch = traceWidthMm + gapMm;
   const outerR = outerMm / 2;
-  const segments = buildCircularSpiralSegments(turns, outerR, pitch, segmentsPerTurn);
-  const innerEnd = segments[segments.length - 1];
-  const outerStart = segments[0];
+  const points = buildSpiralPoints(turns, outerR, pitch, stepMm);
+  const outerStart = points[0];
+  const innerEnd = points[points.length - 1];
   const anchorSize = traceWidthMm * 2;
   return (
     <chip name={name} pinLabels={{ pin1: ['P1'], pin2: ['P2'] }} {...rest}>
       <footprint>
-        {segments.map((s, i) => {
-          const cx = (s.x1 + s.x2) / 2;
-          const cy = (s.y1 + s.y2) / 2;
-          const dx = s.x2 - s.x1;
-          const dy = s.y2 - s.y1;
-          const chord = Math.sqrt(dx * dx + dy * dy);
-          const padLength = chord + traceWidthMm;
-          const rotation = (Math.atan2(dy, dx) * 180) / Math.PI;
-          return (
-            <SpiralPad
-              key={`spiral-${i}`}
-              cx={cx}
-              cy={cy}
-              lengthMm={padLength}
-              widthMm={traceWidthMm}
-              rotationDeg={rotation}
-              portHint="pin1"
-            />
-          );
+        {points.map((p, i) => {
+          const isTerminal = i === 0 || i === points.length - 1;
+          if (isTerminal) return null;
+          return <SpiralCirclePad key={`spiral-${i}`} x={p.x} y={p.y} radiusMm={traceWidthMm / 2} />;
         })}
-        <SpiralPad
-          cx={outerStart.x1}
-          cy={outerStart.y1}
-          lengthMm={anchorSize}
-          widthMm={anchorSize}
-          rotationDeg={0}
-          portHint="pin1"
+        <smtpad
+          shape="rect"
+          portHints={['pin1']}
+          pcbX={outerStart.x}
+          pcbY={outerStart.y}
+          width={`${anchorSize}mm`}
+          height={`${anchorSize}mm`}
         />
-        <SpiralPad
-          cx={innerEnd.x2}
-          cy={innerEnd.y2}
-          lengthMm={anchorSize}
-          widthMm={anchorSize}
-          rotationDeg={0}
-          portHint="pin2"
+        <smtpad
+          shape="rect"
+          portHints={['pin2']}
+          pcbX={innerEnd.x}
+          pcbY={innerEnd.y}
+          width={`${anchorSize}mm`}
+          height={`${anchorSize}mm`}
         />
       </footprint>
     </chip>

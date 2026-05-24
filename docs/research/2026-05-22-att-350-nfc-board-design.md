@@ -165,14 +165,17 @@ Expected first-board behaviour and tuning loop:
 
 `NfcPcbAntenna` in the shared lib emits a chip with two named pads
 (P1 = outer anchor at angle 0°, P2 = inner-end anchor) and a footprint
-built from `9 turns × 32 segments-per-turn = 288` rotated-rect SMT pads
-on the top layer, all bound to `pin1`. Each pad is a short chord of
-the polar spiral (Archimedean: `r(θ) = R_outer − (θ / 2π) · pitch`)
-oriented along its chord direction; pad lengths overlap neighbours by
-half a trace-width so the copper fuses into one continuous net at fab. The matching-network `<trace>` declarations connect to
-`pin1` (outer perimeter) and `pin2` (inner end); the autorouter routes
-these from the bottom-layer matching caps through vias up to the
-antenna anchors.
+built from ~1.9k overlapping 0.4 mm circular SMT pads tiled along the
+spiral centerline at `stepMm = 0.25` mm. Centerline follows the polar
+Archimedean spiral `r(θ) = R_outer − (θ / 2π) · pitch` over 9 turns;
+adjacent circle pads overlap by `traceWidthMm − stepMm = 0.15` mm so
+the copper fuses into one continuous net at fab. Circular pads are
+rotation-invariant in gerber export, sidestepping the `rotated_rect`
+→ axis-aligned-flash bug in `circuit-json-to-gerber@0.0.50` that
+broke the earlier chord-pad implementation. The matching-network
+`<trace>` declarations connect to `pin1` (outer perimeter) and `pin2`
+(inner end); the autorouter routes these from the bottom-layer matching
+caps through vias up to the antenna anchors.
 
 Because the antenna is etched copper (not a placed component), JLC SMT
 populates everything else and ships the board with the antenna already
@@ -284,10 +287,11 @@ sub-issue may upgrade.
 | C_PA, C_LED_BULK, C_LED_G1…6 | 8 | 10 µF 25 V X5R                  | C96446     | 0603          |
 | C_VBUS, C_PVDD, C_SVDD, C_AVDD, C_VMID, C_TVDD | 6 | 100 nF 50 V X7R     | C307331    | 0402          |
 
-**~60 part placements**. PN532 + matching network + decoupling on
-bottom layer (under antenna); WS2812 ring + bulk decoupling + LED
-filter + connector on top layer. JLC SMT assembly populates everything
-except ANT1, which is hand-soldered post-SMT.
+**~60 part placements**. PN532 + matching network + decoupling + J1
+header on bottom layer (under antenna, ribbon plugs in from inside the
+enclosure leaving the user-facing top face clean); WS2812 ring + bulk
+decoupling + LED filter on top layer. JLC SMT assembly populates every
+designator; ANT1 is etched copper and needs no placement.
 
 ## 9. Acceptance + deferral
 
