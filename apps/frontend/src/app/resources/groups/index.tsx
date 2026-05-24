@@ -1,5 +1,15 @@
 import { HTMLAttributes, useCallback, useMemo, useState } from 'react';
 import {
+  Link,
+  Table,
+  TableBody,
+  TableCell,
+  TableColumn,
+  TableContent,
+  TableHeader,
+  TableRow,
+} from '@heroui/react';
+import {
   ResourceGroup,
   useResourcesServiceGetAllResourcesKey,
   useResourcesServiceGetOneResourceById,
@@ -9,16 +19,16 @@ import {
   useResourcesServiceResourceGroupsRemoveResource,
 } from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { GroupIcon } from 'lucide-react';
+import { ChevronRightIcon, GroupIcon } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import en from './en.json';
 import de from './de.json';
 import { EmptyState } from '../../../components/emptyState';
 import { FlatSection } from '../../../components/flatSection';
+import { LabeledSwitch } from '../../../components/labeledSwitch';
 import { useToastMessage } from '../../../components/toastProvider';
 import { ResourceGroupUpsertModal } from '../../resource-groups/upsertModal/resourceGroupUpsertModal';
 import { GroupsToolbar } from './GroupsToolbar';
-import { ResourceGroupRow } from './ResourceGroupRow';
 import { filterAndSortGroups, GroupFilter } from './groupsFilter';
 
 type ManageResourceGroupsProps = Omit<HTMLAttributes<HTMLElement>, 'children'> & {
@@ -108,38 +118,81 @@ export function ManageResourceGroups({
 
   const resourceName = resource?.name ?? '';
 
-  const renderBody = () => {
-    if (allGroups.length === 0) {
-      return <EmptyState message={t('empty.noGroups')} />;
-    }
-    if (visibleGroups.length === 0) {
-      return <EmptyState message={t('empty.noMatch')} />;
-    }
-    return (
-      <ul className="flex flex-col gap-1" data-cy="resource-groups-list">
-        {visibleGroups.map((group) => {
-          const isAssigned = assignedIds.has(group.id);
-          return (
-            <ResourceGroupRow
-              key={group.id}
-              groupId={group.id}
-              groupName={group.name}
-              description={group.description}
-              isAssigned={isAssigned}
-              isPending={pendingGroupIds.has(group.id)}
-              toggleLabel={t(isAssigned ? 'row.toggleOff' : 'row.toggleOn', {
-                resource: resourceName,
-                group: group.name,
-              })}
-              openLabel={t('row.openGroup')}
-              openHref={`/resource-groups/${group.id}`}
-              onToggle={() => handleToggle(group)}
-            />
-          );
-        })}
-      </ul>
-    );
-  };
+  const emptyMessage = allGroups.length === 0 ? t('empty.noGroups') : t('empty.noMatch');
+
+  const renderTable = () => (
+    <Table data-cy="resource-groups-list">
+      <TableContent aria-label={t('table.ariaLabel')}>
+        <TableHeader>
+          <TableColumn isRowHeader>{t('columns.name')}</TableColumn>
+          <TableColumn>{t('columns.assigned')}</TableColumn>
+          <TableColumn>{t('columns.actions')}</TableColumn>
+        </TableHeader>
+        <TableBody
+          items={visibleGroups}
+          renderEmptyState={() => <EmptyState message={emptyMessage} />}
+        >
+          {(group) => {
+            const isAssigned = assignedIds.has(group.id);
+            const dotClass = isAssigned ? 'bg-success' : 'bg-default-300';
+            const ringClass = isAssigned ? 'ring-success/30' : 'ring-default-300/30';
+            const toggleLabel = t(isAssigned ? 'row.toggleOff' : 'row.toggleOn', {
+              resource: resourceName,
+              group: group.name,
+            });
+            return (
+              <TableRow
+                key={group.id}
+                id={group.id}
+                data-cy={`resource-group-row-${group.id}`}
+                data-assigned={isAssigned ? 'true' : 'false'}
+              >
+                <TableCell>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span
+                      aria-hidden
+                      className={`inline-block w-2.5 h-2.5 rounded-full ring-2 shrink-0 ${dotClass} ${ringClass}`}
+                    />
+                    <div className="min-w-0">
+                      <p className="truncate" title={group.name}>
+                        {group.name}
+                      </p>
+                      {group.description ? (
+                        <p className="text-xs text-default-500 truncate max-w-md" title={group.description}>
+                          {group.description}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <LabeledSwitch
+                    size="sm"
+                    isSelected={isAssigned}
+                    isDisabled={pendingGroupIds.has(group.id)}
+                    onChange={() => handleToggle(group)}
+                    aria-label={toggleLabel}
+                    data-cy={`resource-group-row-${group.id}-switch`}
+                  />
+                </TableCell>
+                <TableCell>
+                  <Link
+                    href={`/resource-groups/${group.id}`}
+                    className="text-xs inline-flex items-center gap-0.5"
+                    data-cy={`resource-group-row-${group.id}-open`}
+                    aria-label={`${t('row.openGroup')}: ${group.name}`}
+                  >
+                    {t('row.openGroup')}
+                    <ChevronRightIcon size={14} />
+                  </Link>
+                </TableCell>
+              </TableRow>
+            );
+          }}
+        </TableBody>
+      </TableContent>
+    </Table>
+  );
 
   const renderToolbar = (onNewGroup: () => void) => (
     <GroupsToolbar
@@ -165,7 +218,7 @@ export function ManageResourceGroups({
       {(onOpen: () => void) => (
         <>
           {renderToolbar(onOpen)}
-          {renderBody()}
+          {renderTable()}
         </>
       )}
     </ResourceGroupUpsertModal>

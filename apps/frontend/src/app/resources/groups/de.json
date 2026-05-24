@@ -9,6 +9,14 @@
     "assigned": "Zugewiesen",
     "available": "Verfügbar"
   },
+  "table": {
+    "ariaLabel": "Ressourcen-Gruppen"
+  },
+  "columns": {
+    "name": "Name",
+    "assigned": "Zugewiesen",
+    "actions": "Aktionen"
+  },
   "row": {
     "toggleOn": "{{resource}} zur Gruppe {{group}} hinzufügen",
     "toggleOff": "{{resource}} aus der Gruppe {{group}} entfernen",

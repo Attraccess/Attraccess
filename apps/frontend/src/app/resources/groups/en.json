@@ -9,6 +9,14 @@
     "assigned": "Assigned",
     "available": "Available"
   },
+  "table": {
+    "ariaLabel": "Resource groups"
+  },
+  "columns": {
+    "name": "Name",
+    "assigned": "Assigned",
+    "actions": "Actions"
+  },
   "row": {
     "toggleOn": "Add {{resource}} to {{group}}",
     "toggleOff": "Remove {{resource}} from {{group}}",
