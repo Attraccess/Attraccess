@@ -6,19 +6,19 @@ import { useAuth } from '../../../../hooks/useAuth';
 import { useToastMessage } from '../../../../components/toastProvider';
 import {
   ArrowLeft,
-  BookOpen,
   FolderIcon,
   Gauge,
   History as HistoryIcon,
   ListChecks,
   PenSquareIcon,
+  QrCodeIcon,
   ShapesIcon,
   Trash,
   Users,
   WorkflowIcon,
   WrenchIcon,
 } from 'lucide-react';
-import { memo, ReactNode, useMemo } from 'react';
+import { memo, ReactNode, useMemo, useRef } from 'react';
 import type { JSX } from 'react';
 import {
   useResourcesServiceDeleteOneResource,
@@ -29,7 +29,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PageHeader, PageAction } from '../../../../components/pageHeader';
 import { DeleteConfirmationModal } from '../../../../components/deleteConfirmationModal';
-import { DocumentationModal } from '../../documentation';
 import { ResourceEditModal } from '../../editModal/resourceEditModal';
 import { ResourceQrCode } from '../qrcode';
 import { useQrCodeAction } from '../useQrCodeAction';
@@ -74,6 +73,9 @@ function ResourceTabsLayoutComponent({ children }: { children?: ReactNode }) {
   } = useResourcesServiceGetOneResourceById({ id: resourceId });
 
   const deleteResource = useResourcesServiceDeleteOneResource();
+
+  const editOpenRef = useRef<() => void>(() => undefined);
+  const qrOpenRef = useRef<() => void>(() => undefined);
 
   const { tabs } = useResourceTabs(resourceId);
 
@@ -127,40 +129,20 @@ function ResourceTabsLayoutComponent({ children }: { children?: ReactNode }) {
 
   const overflowActions: PageAction[] = [
     {
-      key: 'documentation',
-      label: t('actions.documentation'),
-      icon: <BookOpen className="w-4 h-4" />,
-      dataCy: 'documentation-button',
-      renderTrigger: (triggerProps) => (
-        <DocumentationModal resourceId={resourceId}>
-          {(onOpenDocumentation) => <Button {...triggerProps} onPress={onOpenDocumentation} />}
-        </DocumentationModal>
-      ),
-    },
-    {
       key: 'qr',
       label: t('actions.qrCode'),
+      icon: <QrCodeIcon className="w-4 h-4" />,
       isHidden: !canManageResources,
-      renderTrigger: (triggerProps) => (
-        <ResourceQrCode
-          resourceId={resourceId}
-          variant={triggerProps.variant}
-          size={triggerProps.size}
-          buttonIconSize={16}
-        />
-      ),
+      onPress: () => qrOpenRef.current(),
+      dataCy: 'qr-code-button',
     },
     {
       key: 'edit',
       label: t('actions.edit'),
       icon: <PenSquareIcon className="w-4 h-4" />,
       isHidden: !canManageResources,
+      onPress: () => editOpenRef.current(),
       dataCy: 'edit-resource-button',
-      renderTrigger: (triggerProps) => (
-        <ResourceEditModal resourceId={resourceId} closeOnSuccess>
-          {(onOpen) => <Button {...triggerProps} onPress={onOpen} />}
-        </ResourceEditModal>
-      ),
     },
     {
       key: 'delete',
@@ -235,13 +217,28 @@ function ResourceTabsLayoutComponent({ children }: { children?: ReactNode }) {
       {children ?? <Outlet />}
 
       {canManageResources && (
-        <DeleteConfirmationModal
-          isOpen={isOpen}
-          onClose={closeDeleteModal}
-          onConfirm={handleDelete}
-          itemName={resource.name}
-          data-cy="delete-confirmation-modal"
-        />
+        <>
+          <DeleteConfirmationModal
+            isOpen={isOpen}
+            onClose={closeDeleteModal}
+            onConfirm={handleDelete}
+            itemName={resource.name}
+            data-cy="delete-confirmation-modal"
+          />
+          <ResourceEditModal resourceId={resourceId} closeOnSuccess>
+            {(onOpen) => {
+              editOpenRef.current = onOpen;
+              return null;
+            }}
+          </ResourceEditModal>
+          <ResourceQrCode
+            resourceId={resourceId}
+            renderTrigger={(onOpen) => {
+              qrOpenRef.current = onOpen;
+              return null;
+            }}
+          />
+        </>
       )}
 
       {tabs.find((tab) => tab.key === activeTabKey) ? null : <Navigate to={`/resources/${resourceId}`} replace />}

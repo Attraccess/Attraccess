@@ -27,10 +27,11 @@ import { nanoid } from 'nanoid';
 interface Props {
   resourceId: number;
   buttonIconSize?: number;
+  renderTrigger?: (onOpen: () => void) => React.ReactNode;
 }
 
 export function ResourceQrCode(props: Props & Omit<ButtonProps, 'children' | 'startContent' | 'onPress'>) {
-  const { resourceId, buttonIconSize, ...buttonProps } = props;
+  const { resourceId, buttonIconSize, renderTrigger, ...buttonProps } = props;
 
   const { t } = useTranslations({ de, en });
 
@@ -62,10 +63,14 @@ export function ResourceQrCode(props: Props & Omit<ButtonProps, 'children' | 'st
 
   return (
     <>
-      <Button {...buttonProps} onPress={open}>
-        <QrCodeIcon size={buttonIconSize} />
-        {t('button.label')}
-      </Button>
+      {renderTrigger ? (
+        renderTrigger(open)
+      ) : (
+        <Button {...buttonProps} onPress={open}>
+          <QrCodeIcon size={buttonIconSize} />
+          {t('button.label')}
+        </Button>
+      )}
 
       <Modal isOpen={isOpen} onOpenChange={setOpen}>
         <ModalBackdrop>
