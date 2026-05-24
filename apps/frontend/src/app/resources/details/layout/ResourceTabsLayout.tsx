@@ -171,7 +171,7 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
   };
 
   return (
-    <div>
+    <div className="flex flex-col h-full min-h-0">
       <PageHeader
         title={resource.name}
         icon={!resource.imageFilename && <ShapesIcon className="w-6 h-6" />}
@@ -222,7 +222,7 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
         </div>
       </div>
 
-      {children ?? <Outlet />}
+      <div className="flex-1 min-h-0 overflow-auto">{children ?? <Outlet />}</div>
 
       {canManageResources && (
         <>
