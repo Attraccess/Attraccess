@@ -1,15 +1,26 @@
 {
   "title": "Gruppen",
-  "subtitle": "Gruppen verwalten",
-  "table": {
-    "ariaLabel": "Gruppen"
+  "subtitle": "Wähle aus, welchen Gruppen diese Ressource angehört",
+  "search": {
+    "placeholder": "Gruppen suchen…"
   },
-  "columns": {
-    "group": "Gruppe",
-    "actions": "Aktionen"
+  "filter": {
+    "all": "Alle",
+    "assigned": "Zugewiesen",
+    "available": "Verfügbar"
   },
-  "addGroup": "Gruppe hinzufügen",
-  "actions": {
+  "row": {
+    "members": "{{count}} Mitglieder",
+    "toggleOn": "{{resource}} zur Gruppe {{group}} hinzufügen",
+    "toggleOff": "{{resource}} aus der Gruppe {{group}} entfernen",
     "openGroup": "öffnen"
+  },
+  "newGroup": "Neue Gruppe",
+  "empty": {
+    "noGroups": "Es existieren noch keine Gruppen.",
+    "noMatch": "Keine Gruppen passen zu deiner Suche."
+  },
+  "errors": {
+    "toggleFailed": "Gruppenzugehörigkeit konnte nicht aktualisiert werden. Bitte erneut versuchen."
   }
 }

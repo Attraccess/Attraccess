@@ -1,15 +1,26 @@
 {
   "title": "Groups",
-  "subtitle": "Manage groups",
-  "table": {
-    "ariaLabel": "Groups"
+  "subtitle": "Choose which groups this resource belongs to",
+  "search": {
+    "placeholder": "Search groups…"
   },
-  "columns": {
-    "group": "Group",
-    "actions": "Actions"
+  "filter": {
+    "all": "All",
+    "assigned": "Assigned",
+    "available": "Available"
   },
-  "addGroup": "Add Group",
-  "actions": {
+  "row": {
+    "members": "{{count}} members",
+    "toggleOn": "Add {{resource}} to {{group}}",
+    "toggleOff": "Remove {{resource}} from {{group}}",
     "openGroup": "open"
+  },
+  "newGroup": "New group",
+  "empty": {
+    "noGroups": "No groups exist yet.",
+    "noMatch": "No groups match your search."
+  },
+  "errors": {
+    "toggleFailed": "Could not update group membership. Please try again."
   }
 }
