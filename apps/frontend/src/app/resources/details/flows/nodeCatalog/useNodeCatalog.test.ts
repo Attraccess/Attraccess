@@ -1,0 +1,85 @@
+// Tests for useNodeCatalog hook covering grouping, direction, and localStorage state
+// FEATURE: Node catalog redesign — state management
+import '@testing-library/jest-dom/vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { renderHook, act } from '@testing-library/react';
+import { useNodeCatalog } from './useNodeCatalog';
+
+vi.mock('@attraccess/react-query-client', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@attraccess/react-query-client')>();
+  return {
+    ...actual,
+    useResourceFlowsServiceGetNodeSchemas: () => ({
+      data: [
+        { type: 'input.button', inputs: [], outputs: ['output'], isOutput: false, supportedByResource: true, configSchema: {} },
+        { type: 'input.resource.door.locked', inputs: [], outputs: ['output'], isOutput: false, supportedByResource: true, configSchema: {} },
+        { type: 'output.http.sendRequest', inputs: ['input'], outputs: [], isOutput: true, supportedByResource: true, configSchema: {} },
+        { type: 'processing.wait', inputs: ['input'], outputs: ['output'], isOutput: false, supportedByResource: true, configSchema: {} },
+        { type: 'input.mqtt.message.received', inputs: [], outputs: ['output'], isOutput: false, supportedByResource: false, configSchema: {} },
+      ],
+    }),
+  };
+});
+
+describe('useNodeCatalog', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  it('groups supported schemas by domain in DOMAIN_ORDER', () => {
+    const { result } = renderHook(() => useNodeCatalog({ resourceId: 1 }));
+    const domains = result.current.groups.map((g) => g.domain);
+    expect(domains).toEqual(['manual', 'door', 'http', 'logic']);
+    expect(result.current.groups.find((g) => g.domain === 'manual')?.nodes).toHaveLength(1);
+  });
+
+  it('omits unsupported schemas', () => {
+    const { result } = renderHook(() => useNodeCatalog({ resourceId: 1 }));
+    const mqttGroup = result.current.groups.find((g) => g.domain === 'mqtt');
+    expect(mqttGroup).toBeUndefined();
+  });
+
+  it('annotates each row with a direction (down/up/both)', () => {
+    const { result } = renderHook(() => useNodeCatalog({ resourceId: 1 }));
+    const rows = result.current.groups.flatMap((g) => g.nodes);
+    expect(rows.find((n) => n.schema.type === 'input.button')?.direction).toBe('down');
+    expect(rows.find((n) => n.schema.type === 'output.http.sendRequest')?.direction).toBe('up');
+    expect(rows.find((n) => n.schema.type === 'processing.wait')?.direction).toBe('both');
+  });
+
+  it('expands all domains by default and toggles via setDomainExpanded', () => {
+    const { result } = renderHook(() => useNodeCatalog({ resourceId: 1 }));
+    expect(result.current.isDomainExpanded('manual')).toBe(true);
+    act(() => result.current.setDomainExpanded('manual', false));
+    expect(result.current.isDomainExpanded('manual')).toBe(false);
+    expect(window.localStorage.getItem('nodeCatalog.expanded.manual')).toBe('false');
+  });
+
+  it('hydrates expanded state from localStorage', () => {
+    window.localStorage.setItem('nodeCatalog.expanded.door', 'false');
+    const { result } = renderHook(() => useNodeCatalog({ resourceId: 1 }));
+    expect(result.current.isDomainExpanded('door')).toBe(false);
+  });
+
+  it('toggles sidebar collapsed state and persists it', () => {
+    const { result } = renderHook(() => useNodeCatalog({ resourceId: 1 }));
+    expect(result.current.collapsed).toBe(false);
+    act(() => result.current.setCollapsed(true));
+    expect(result.current.collapsed).toBe(true);
+    expect(window.localStorage.getItem('nodeCatalog.collapsed')).toBe('true');
+  });
+
+  it('updates isDomainExpanded result after setDomainExpanded across renders', () => {
+    const { result, rerender } = renderHook(() => useNodeCatalog({ resourceId: 1 }));
+    expect(result.current.isDomainExpanded('manual')).toBe(true);
+    act(() => result.current.setDomainExpanded('manual', false));
+    rerender();
+    expect(result.current.isDomainExpanded('manual')).toBe(false);
+  });
+
+  it('returns at least one group when supported schemas exist', () => {
+    const { result } = renderHook(() => useNodeCatalog({ resourceId: 1 }));
+    expect(Array.isArray(result.current.groups)).toBe(true);
+    expect(result.current.groups.length).toBeGreaterThan(0);
+  });
+});

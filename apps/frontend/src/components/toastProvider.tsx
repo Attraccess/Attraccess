@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { Toaster, toast } from 'sonner';
 import { AlertCircle, CheckCircle2, Info, XCircle } from 'lucide-react';
 import { getTranslationKeyForApiError, Props as ApiErrorToastProps } from '../utils/apiError';
@@ -66,12 +66,15 @@ export function useToastMessage() {
     [showToast],
   );
 
-  return {
-    showToast,
-    success: (options: Omit<ToastOptions, 'type'>) => showToast({ ...options, type: 'success' }),
-    error: (options: Omit<ToastOptions, 'type'>) => showToast({ ...options, type: 'error' }),
-    warning: (options: Omit<ToastOptions, 'type'>) => showToast({ ...options, type: 'warning' }),
-    info: (options: Omit<ToastOptions, 'type'>) => showToast({ ...options, type: 'info' }),
-    apiError: showApiErrorToast,
-  };
+  return useMemo(
+    () => ({
+      showToast,
+      success: (options: Omit<ToastOptions, 'type'>) => showToast({ ...options, type: 'success' }),
+      error: (options: Omit<ToastOptions, 'type'>) => showToast({ ...options, type: 'error' }),
+      warning: (options: Omit<ToastOptions, 'type'>) => showToast({ ...options, type: 'warning' }),
+      info: (options: Omit<ToastOptions, 'type'>) => showToast({ ...options, type: 'info' }),
+      apiError: showApiErrorToast,
+    }),
+    [showToast, showApiErrorToast]
+  );
 }

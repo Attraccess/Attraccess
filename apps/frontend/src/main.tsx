@@ -13,22 +13,23 @@ import { detectAndSetLanguage } from '@attraccess/plugins-frontend-ui';
 
 detectAndSetLanguage();
 
-const oneMinute = 60 * 1000;
-const intervalMS = 15 * oneMinute;
+if (import.meta.env.PROD) {
+  const oneMinute = 60 * 1000;
+  const intervalMS = 15 * oneMinute;
 
-// auto update SW and reload immediately when a new version is available
-const updateSW = registerSW({
-  immediate: true,
-  onRegistered(r) {
-    r &&
-      setInterval(() => {
-        r.update();
-      }, intervalMS);
-  },
-  onNeedRefresh() {
-    updateSW(true);
-  },
-});
+  const updateSW = registerSW({
+    immediate: true,
+    onRegistered(r) {
+      r &&
+        setInterval(() => {
+          r.update();
+        }, intervalMS);
+    },
+    onNeedRefresh() {
+      updateSW(true);
+    },
+  });
+}
 
 const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
 
