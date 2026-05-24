@@ -28,6 +28,7 @@ export function ResourcePeopleTab() {
       canManageIntroducers={canManageResources}
       canManageIntroductions={isIntroducer?.isIntroducer || canManageResources}
       flat
+      hideHeader
       data-cy="manage-resource-people"
     />
   );

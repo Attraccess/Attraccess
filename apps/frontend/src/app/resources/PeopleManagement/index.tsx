@@ -1,6 +1,6 @@
 import { HTMLAttributes, useCallback, useMemo, useState } from 'react';
-import { Card, CardProps, useOverlayState } from '@heroui/react';
-import { AlertCircle } from 'lucide-react';
+import { Button, Card, CardProps, useOverlayState } from '@heroui/react';
+import { AlertCircle, AwardIcon, ShieldCheckIcon, UserPlusIcon } from 'lucide-react';
 import { User } from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { Select } from '../../../components/select';
@@ -16,7 +16,7 @@ import en from './en.json';
 import de from './de.json';
 
 export function PeopleManagement(props: Readonly<PeopleManagementProps & Omit<CardProps, 'children'>>) {
-  const { target, canManageIntroducers, canManageIntroductions, flat, className, ...rest } = props;
+  const { target, canManageIntroducers, canManageIntroductions, flat, hideHeader, className, ...rest } = props;
   const { t } = useTranslations({ en, de });
 
   const [filter, setFilter] = useState<FilterMode>('all');
@@ -210,6 +210,43 @@ export function PeopleManagement(props: Readonly<PeopleManagementProps & Omit<Ca
       )}
     </>
   );
+
+  if (hideHeader) {
+    const showBothAdd = canManageIntroducers && canManageIntroductions;
+    const addButtons = (
+      <div className="flex flex-wrap gap-2">
+        {showBothAdd ? (
+          <>
+            <Button variant="primary" onPress={() => handleAddOpen('introduction')} data-cy="people-add-introduction">
+              <ShieldCheckIcon className="w-4 h-4" />
+              {t('addOptions.introduction')}
+            </Button>
+            <Button variant="primary" onPress={() => handleAddOpen('introducer')} data-cy="people-add-introducer">
+              <AwardIcon className="w-4 h-4" />
+              {t('addOptions.introducer')}
+            </Button>
+          </>
+        ) : canManageIntroducers || canManageIntroductions ? (
+          <Button
+            variant="primary"
+            onPress={() => handleAddOpen(canManageIntroducers ? 'introducer' : 'introduction')}
+            data-cy="people-add-person"
+          >
+            <UserPlusIcon className="w-4 h-4" />
+            {canManageIntroducers ? t('addOptions.introducer') : t('addOptions.introduction')}
+          </Button>
+        ) : null}
+      </div>
+    );
+
+    return (
+      <section className={className} {...(rest as HTMLAttributes<HTMLElement>)}>
+        <div className="flex justify-end mb-4">{addButtons}</div>
+        <div className="flex flex-col gap-4">{body}</div>
+        {modals}
+      </section>
+    );
+  }
 
   if (flat) {
     return (

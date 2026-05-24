@@ -6,5 +6,5 @@ import { ResourceUsageHistory } from '../../usage/resourceUsageHistory';
 export function ResourceHistoryTab() {
   const { id } = useParams<{ id: string }>();
   const resourceId = parseInt(id || '', 10);
-  return <ResourceUsageHistory resourceId={resourceId} data-cy="resource-usage-history" />;
+  return <ResourceUsageHistory resourceId={resourceId} hideHeader data-cy="resource-usage-history" />;
 }

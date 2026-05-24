@@ -6,5 +6,5 @@ import { ManageResourceGroups } from '../../groups';
 export function ResourceGroupsTab() {
   const { id } = useParams<{ id: string }>();
   const resourceId = parseInt(id || '', 10);
-  return <ManageResourceGroups resourceId={resourceId} data-cy="manage-resource-groups" />;
+  return <ManageResourceGroups resourceId={resourceId} hideHeader data-cy="manage-resource-groups" />;
 }

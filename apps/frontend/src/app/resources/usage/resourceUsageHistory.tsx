@@ -22,9 +22,10 @@ import { FlatSection } from '../../../components/flatSection';
 
 type ResourceUsageHistoryProps = Omit<HTMLAttributes<HTMLElement>, 'children'> & {
   resourceId: number;
+  hideHeader?: boolean;
 };
 
-export function ResourceUsageHistory({ resourceId, ...rest }: ResourceUsageHistoryProps) {
+export function ResourceUsageHistory({ resourceId, hideHeader, ...rest }: ResourceUsageHistoryProps) {
   const { t } = useTranslations({ en, de });
   const { t: tHistoryTable } = useTranslations({ en: historyTableEn, de: historyTableDe });
   const { t: tHistoryHeader } = useTranslations({ en: historyHeaderEn, de: historyHeaderDe });
@@ -143,6 +144,42 @@ export function ResourceUsageHistory({ resourceId, ...rest }: ResourceUsageHisto
     </div>
   ) : undefined;
 
+  const table = (
+    <HistoryTable
+      resourceId={resourceId}
+      showAllUsers={showAllUsers}
+      canManageResources={canManageResources}
+      onSessionClick={handleSessionClick}
+      projectPlaceholder={projectPlaceholder}
+      resolveProjectId={resolveProjectId}
+      updatingSessionIds={updatingSessionIds}
+      onProjectChange={handleProjectChange}
+    />
+  );
+
+  const notesModal = (
+    <UsageNotesModal
+      isOpen={isModalOpen}
+      onClose={handleCloseModal}
+      session={selectedSession}
+      projectLabel={projectLabel}
+      projectPlaceholder={projectPlaceholder}
+      resolveProjectId={resolveProjectId}
+      updatingSessionIds={updatingSessionIds}
+      onProjectChange={handleProjectChange}
+    />
+  );
+
+  if (hideHeader) {
+    return (
+      <section {...rest}>
+        {showAllUsersToggle ? <div className="flex justify-end mb-4">{showAllUsersToggle}</div> : null}
+        {table}
+        {notesModal}
+      </section>
+    );
+  }
+
   return (
     <FlatSection
       icon={<History className="w-4 h-4" />}
@@ -150,27 +187,8 @@ export function ResourceUsageHistory({ resourceId, ...rest }: ResourceUsageHisto
       actions={showAllUsersToggle}
       {...rest}
     >
-      <HistoryTable
-        resourceId={resourceId}
-        showAllUsers={showAllUsers}
-        canManageResources={canManageResources}
-        onSessionClick={handleSessionClick}
-        projectPlaceholder={projectPlaceholder}
-        resolveProjectId={resolveProjectId}
-        updatingSessionIds={updatingSessionIds}
-        onProjectChange={handleProjectChange}
-      />
-
-      <UsageNotesModal
-        isOpen={isModalOpen}
-        onClose={handleCloseModal}
-        session={selectedSession}
-        projectLabel={projectLabel}
-        projectPlaceholder={projectPlaceholder}
-        resolveProjectId={resolveProjectId}
-        updatingSessionIds={updatingSessionIds}
-        onProjectChange={handleProjectChange}
-      />
+      {table}
+      {notesModal}
     </FlatSection>
   );
 }
