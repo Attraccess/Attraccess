@@ -51,8 +51,16 @@ const TAB_ICONS: Record<ResourceTabKey, JSX.Element> = {
 
 function ResourceTabsLayoutComponent({ children }: { children?: ReactNode }) {
   const { id } = useParams<{ id: string }>();
-  const resourceId = parseInt(id || '', 10);
+  const resourceId = Number.parseInt(id ?? '', 10);
 
+  if (!Number.isFinite(resourceId)) {
+    return <Navigate to="/resources" replace />;
+  }
+
+  return <ResourceTabsLayoutInner resourceId={resourceId}>{children}</ResourceTabsLayoutInner>;
+}
+
+function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number; children?: ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
