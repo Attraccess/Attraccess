@@ -16,18 +16,18 @@ import { getBaseUrl } from '../../api';
 const pluginStore = createPluginStore();
 export function PluginProvider(props: PropsWithChildren) {
   const { refetch: refetchPlugins } = usePluginsServiceGetPlugins();
-  const { addPlugin, isInstalled, plugins } = usePluginState();
+  const addPlugin = usePluginState((s) => s.addPlugin);
+  const isInstalled = usePluginState((s) => s.isInstalled);
+  const plugins = usePluginState((s) => s.plugins);
   const toast = useToastMessage();
   const { user } = useAuth();
 
-  // Add refs to track initialization state
-  const isPluginSystemInitialized = useRef(false);
+  const toastRef = useRef(toast);
+  toastRef.current = toast;
+
   const arePluginsLoaded = useRef(false);
 
   useEffect(() => {
-    if (isPluginSystemInitialized.current) return;
-    isPluginSystemInitialized.current = true;
-
     console.debug('Attraccess Plugin System: initializing');
 
     console.debug('Attraccess Plugin System: installing renderer plugin');
@@ -38,7 +38,7 @@ export function PluginProvider(props: PropsWithChildren) {
     pluginStore.addFunction(
       'notificationToast',
       (params: { title: string; description: string; type: ToastType; duration?: number }) => {
-        toast.showToast({
+        toastRef.current.showToast({
           title: params.title,
           description: params.description,
           type: params.type,
@@ -53,11 +53,8 @@ export function PluginProvider(props: PropsWithChildren) {
 
       console.debug('Attraccess Plugin System: removing notificationToast function');
       pluginStore.removeFunction('notificationToast');
-
-      // Reset the initialization state on unmount
-      isPluginSystemInitialized.current = false;
     };
-  }, [toast]);
+  }, []);
 
   const loadPlugin = useCallback(
     async (pluginManifest: LoadedPluginManifest, plugin?: AttraccessFrontendPlugin) => {

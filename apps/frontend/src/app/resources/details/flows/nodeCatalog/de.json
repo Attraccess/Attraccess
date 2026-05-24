@@ -1,0 +1,17 @@
+{
+  "title": "Knotenkatalog",
+  "toggleOpen": "Katalog öffnen",
+  "toggleClose": "Katalog schließen",
+  "collapse": "Einklappen",
+  "expand": "Ausklappen",
+  "empty": "Keine Knoten für diese Ressource verfügbar.",
+  "domains": {
+    "manual": "Manuell",
+    "resource": "Ressource",
+    "door": "Tür",
+    "mqtt": "MQTT",
+    "http": "HTTP",
+    "logic": "Logik",
+    "health": "Gesundheit"
+  }
+}
