@@ -383,8 +383,8 @@ function FlowsPageInner() {
   );
 
   return (
-    <div className="h-full w-full flex flex-col min-h-[70vh]">
-      <div className="flex flex-row w-full h-full min-h-[60vh] rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800">
+    <div className="h-full w-full flex flex-col">
+      <div className="flex flex-row w-full flex-1 min-h-0 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800">
         <NodeCatalogPanel
           ref={nodeCatalogRef}
           resourceId={Number(resourceId)}
