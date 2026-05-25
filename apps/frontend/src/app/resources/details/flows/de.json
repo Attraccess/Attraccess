@@ -5,7 +5,9 @@
     "export": "Exportieren",
     "import": "Importieren",
     "addNode": "Knoten hinzufügen",
-    "variables": "Variablen"
+    "variables": "Variablen",
+    "modePan": "Canvas verschieben",
+    "modeSelect": "Auswählen"
   },
   "export": {
     "success": {
