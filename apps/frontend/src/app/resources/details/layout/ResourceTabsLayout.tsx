@@ -163,8 +163,6 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
     },
   ];
 
-  const useMobilePicker = tabs.length > 5;
-
   const navigateToTab = (key: ResourceTabKey) => {
     const next = tabs.find((tab) => tab.key === key);
     if (next) navigate(`/resources/${resourceId}${next.path ? '/' + next.path : ''}`);
@@ -182,26 +180,23 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
         actions={overflowActions}
         maxVisibleActions={0}
         moreActionsLabel={t('actions.moreLabel')}
+        noMargin
       />
 
-      <div className="mb-6">
-        <ResourceHealthWarning resourceId={resourceId} />
-      </div>
+      <ResourceHealthWarning resourceId={resourceId} />
 
-      <div className="mb-6">
-        {useMobilePicker ? (
-          <div className="sm:hidden">
-            <Select
-              aria-label={t('tabs.mobilePickerLabel')}
-              value={activeTabKey}
-              onChange={(key) => navigateToTab(key as ResourceTabKey)}
-              items={tabs.map((tab) => ({ key: tab.key, label: t(tab.translationKey) }))}
-              data-cy="resource-tabs-mobile-picker"
-            />
-          </div>
-        ) : null}
+      <div className="mt-4 mb-4">
+        <div className="sm:hidden">
+          <Select
+            aria-label={t('tabs.mobilePickerLabel')}
+            value={activeTabKey}
+            onChange={(key) => navigateToTab(key as ResourceTabKey)}
+            items={tabs.map((tab) => ({ key: tab.key, label: t(tab.translationKey) }))}
+            data-cy="resource-tabs-mobile-picker"
+          />
+        </div>
 
-        <div className={useMobilePicker ? 'hidden sm:block' : ''}>
+        <div className="hidden sm:block">
           <Tabs
             aria-label={t('tabs.mobilePickerLabel')}
             selectedKey={activeTabKey}
