@@ -21,7 +21,7 @@ export function SharedDataTab(props: EditorTabProps & Props) {
       >
         <Label>{t('inputs.name.label')}</Label>
         <Input required className="w-full" />
-        {!formData.name && <FieldError />}
+        {!formData.name && <FieldError>{t('inputs.name.required')}</FieldError>}
       </TextField>
       <TextField
         value={formData.description}
