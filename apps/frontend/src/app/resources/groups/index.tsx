@@ -154,6 +154,7 @@ export function ManageResourceGroups({
           </TableHeader>
           <TableBody
             items={visibleGroups}
+            dependencies={[assignedIds, pendingGroupIds]}
             renderEmptyState={() => <EmptyState message={emptyMessage} />}
           >
             {(group) => {
