@@ -130,13 +130,14 @@ export function ActiveSessionDisplay({ resourceId, startTime }: ActiveSessionDis
 
         <ButtonGroup className="w-full">
           <Button
+            variant="danger"
             isPending={endSession.isPending}
             onPress={immediatelyEndSession}
           ><StopCircle className="w-4 h-4" />
             {t('endSession')}
           </Button>
           <Dropdown>
-            <DropdownTrigger className={buttonVariants({ isIconOnly: true })}>
+            <DropdownTrigger className={buttonVariants({ isIconOnly: true, variant: 'danger' })}>
               <ChevronDownIcon />
             </DropdownTrigger>
             <DropdownPopover>
