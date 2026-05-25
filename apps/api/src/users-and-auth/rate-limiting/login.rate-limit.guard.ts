@@ -121,12 +121,7 @@ async function observableToPromise(observable: Observable<boolean>): Promise<boo
 }
 
 export function resolveIp(request: Request): string {
-  return (
-    request.ip ||
-    (request.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim() ||
-    request.socket?.remoteAddress ||
-    'unknown'
-  );
+  return request.ip || request.socket?.remoteAddress || 'unknown';
 }
 
 export function sanitizeUsername(value: unknown): string | null {

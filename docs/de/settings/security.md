@@ -68,6 +68,22 @@ Antworten bei Ausloesung:
 
 Erfolgreicher Login oder Admin-Unlock entsperrt das Konto. Admin-Unlock erfolgt ueber die Benutzerverwaltung.
 
+### Reverse Proxies und die echte Client-IP
+
+Die Drosselung pro IP funktioniert nur, wenn Attraccess die **echte Client-IP** sieht. Laeuft die Anwendung hinter einem Reverse Proxy (nginx, Traefik, Caddy, einem CDN oder dem mitgelieferten Docker-Stack), kommt die Verbindung vom Proxy — ohne Konfiguration scheint daher jede Anfrage von der Proxy-IP zu stammen. Ein einzelner Angreifer wuerde so alle Benutzer drosseln, und das Audit-Log zeigt fuer alle die Proxy-IP.
+
+Setzen Sie die Umgebungsvariable `TRUST_PROXY` auf die Anzahl vertrauenswuerdiger Proxy-Hops zwischen Client und Attraccess. Die Client-IP wird dann aus dem vom Proxy gesetzten `X-Forwarded-For`-Header gelesen:
+
+| Deployment | `TRUST_PROXY` |
+|------------|---------------|
+| Kein Reverse Proxy (direkt) | nicht gesetzt (Standard) |
+| Einzelner Reverse Proxy (nginx/Traefik/Caddy) | `1` |
+| CDN vor einem Reverse Proxy | `2` |
+| Nur bestimmte vertrauenswuerdige Proxies | kommagetrennte IPs/CIDRs, z.B. `10.0.0.0/8, 172.16.0.0/12`, oder `uniquelocal` |
+
+> [!WARNING]
+> Vertrauen Sie nur so vielen Hops, wie tatsaechlich existieren. Vertraut `TRUST_PROXY` mehr Hops als Ihre reale Proxy-Kette, koennen Clients `X-Forwarded-For` faelschen, ihre scheinbare IP rotieren und das Rate-Limiting umgehen. Nicht gesetzt vertraut Attraccess keinen Weiterleitungs-Headern (sicherer Standard). Aenderungen werden nach einem Neustart wirksam.
+
 ## Format des Anmelde-Audit-Logs
 
 Jeder Anmeldeversuch erzeugt eine einzeilige, leerzeichengetrennte Log-Zeile im `AuthAudit`-Kontext. Feldnamen und Reihenfolge sind stabil und fail2ban-tauglich.
