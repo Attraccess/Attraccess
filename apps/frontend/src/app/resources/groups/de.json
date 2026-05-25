@@ -20,6 +20,8 @@
   "row": {
     "toggleOn": "{{resource}} zur Gruppe {{group}} hinzufügen",
     "toggleOff": "{{resource}} aus der Gruppe {{group}} entfernen",
+    "add": "Hinzufügen",
+    "remove": "Entfernen",
     "openGroup": "öffnen"
   },
   "newGroup": "Neue Gruppe",
