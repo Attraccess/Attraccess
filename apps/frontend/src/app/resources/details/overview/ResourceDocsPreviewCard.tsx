@@ -4,6 +4,8 @@ import { useMemo } from 'react';
 import { Button } from '@heroui/react';
 import { BookOpen } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useResourcesServiceGetOneResourceById } from '@attraccess/react-query-client';
 import { useAuth } from '../../../../hooks/useAuth';
@@ -81,7 +83,19 @@ export function ResourceDocsPreviewCard({ resourceId }: ResourceDocsPreviewCardP
         </DocumentationModal>
       }
     >
-      <p className="text-sm text-foreground-600 whitespace-pre-wrap">{previewText}</p>
+      <div
+        className="prose prose-sm prose-slate dark:prose-invert max-w-none text-foreground-600
+                   prose-headings:text-foreground prose-headings:font-semibold prose-headings:mt-0 prose-headings:mb-2
+                   prose-h1:text-base prose-h2:text-base prose-h3:text-sm
+                   prose-p:my-1 prose-p:text-foreground-600
+                   prose-a:text-primary prose-a:no-underline hover:prose-a:underline
+                   prose-code:text-primary prose-code:bg-default-100 prose-code:px-1 prose-code:rounded prose-code:before:content-none prose-code:after:content-none
+                   prose-blockquote:border-l-primary prose-blockquote:my-1 prose-blockquote:py-0 prose-blockquote:text-foreground-600
+                   prose-ul:my-1 prose-ol:my-1 prose-li:my-0"
+        data-cy="docs-preview-content"
+      >
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>{previewText}</ReactMarkdown>
+      </div>
     </FlatSection>
   );
 }
