@@ -1,5 +1,6 @@
 import { HTMLAttributes, useCallback, useMemo, useState } from 'react';
 import {
+  Button,
   Link,
   Table,
   TableBody,
@@ -11,6 +12,7 @@ import {
   TableScrollContainer,
 } from '@heroui/react';
 import {
+  Resource,
   ResourceGroup,
   useResourcesServiceGetAllResourcesKey,
   useResourcesServiceGetOneResourceById,
@@ -20,13 +22,12 @@ import {
   useResourcesServiceResourceGroupsRemoveResource,
 } from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { ChevronRightIcon, GroupIcon } from 'lucide-react';
+import { ChevronRightIcon, GroupIcon, MinusIcon, PlusIcon } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import en from './en.json';
 import de from './de.json';
 import { EmptyState } from '../../../components/emptyState';
 import { FlatSection } from '../../../components/flatSection';
-import { LabeledSwitch } from '../../../components/labeledSwitch';
 import { useToastMessage } from '../../../components/toastProvider';
 import { ResourceGroupUpsertModal } from '../../resource-groups/upsertModal/resourceGroupUpsertModal';
 import { GroupsToolbar } from './GroupsToolbar';
@@ -83,6 +84,16 @@ export function ManageResourceGroups({
     async (group: ResourceGroup) => {
       const wasAssigned = assignedIds.has(group.id);
       markPending(group.id, true);
+
+      const resourceKey = UseResourcesServiceGetOneResourceByIdKeyFn({ id: resourceId });
+      const previous = queryClient.getQueryData<Resource>(resourceKey);
+      if (previous) {
+        const nextGroups = wasAssigned
+          ? (previous.groups ?? []).filter((g) => g.id !== group.id)
+          : [...(previous.groups ?? []), group];
+        queryClient.setQueryData<Resource>(resourceKey, { ...previous, groups: nextGroups });
+      }
+
       try {
         if (wasAssigned) {
           await removeResourceFromGroup({ groupId: group.id, resourceId });
@@ -91,12 +102,23 @@ export function ManageResourceGroups({
         }
         invalidateAll();
       } catch {
+        if (previous) queryClient.setQueryData<Resource>(resourceKey, previous);
         toast.error({ title: t('errors.toggleFailed') });
       } finally {
         markPending(group.id, false);
       }
     },
-    [addResourceToGroup, removeResourceFromGroup, assignedIds, invalidateAll, markPending, resourceId, toast, t],
+    [
+      addResourceToGroup,
+      removeResourceFromGroup,
+      assignedIds,
+      invalidateAll,
+      markPending,
+      queryClient,
+      resourceId,
+      toast,
+      t,
+    ],
   );
 
   const onGroupCreated = useCallback(
@@ -138,10 +160,12 @@ export function ManageResourceGroups({
               const isAssigned = assignedIds.has(group.id);
               const dotClass = isAssigned ? 'bg-success' : 'bg-default-300';
               const ringClass = isAssigned ? 'ring-success/30' : 'ring-default-300/30';
-              const toggleLabel = t(isAssigned ? 'row.toggleOff' : 'row.toggleOn', {
+              const actionLabel = t(isAssigned ? 'row.toggleOff' : 'row.toggleOn', {
                 resource: resourceName,
                 group: group.name,
               });
+              const buttonLabel = t(isAssigned ? 'row.remove' : 'row.add');
+              const isPending = pendingGroupIds.has(group.id);
               return (
                 <TableRow
                   key={group.id}
@@ -168,14 +192,18 @@ export function ManageResourceGroups({
                     </div>
                   </TableCell>
                   <TableCell>
-                    <LabeledSwitch
+                    <Button
                       size="sm"
-                      isSelected={isAssigned}
-                      isDisabled={pendingGroupIds.has(group.id)}
-                      onChange={() => handleToggle(group)}
-                      aria-label={toggleLabel}
-                      data-cy={`resource-group-row-${group.id}-switch`}
-                    />
+                      variant={isAssigned ? 'danger-soft' : 'primary'}
+                      isDisabled={isPending}
+                      isPending={isPending}
+                      onPress={() => handleToggle(group)}
+                      aria-label={actionLabel}
+                      data-cy={`resource-group-row-${group.id}-toggle`}
+                    >
+                      {isPending ? null : isAssigned ? <MinusIcon size={14} /> : <PlusIcon size={14} />}
+                      {buttonLabel}
+                    </Button>
                   </TableCell>
                   <TableCell>
                     <Link
