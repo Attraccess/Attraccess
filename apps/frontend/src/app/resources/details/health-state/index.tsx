@@ -55,7 +55,7 @@ export function ResourceHealthWarning({ resourceId }: Props) {
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3 mb-6">
       {summary.unhealthyEntries.map((entry: ResourceHealthStateDto) => {
         const identifierLabel =
           entry.identifier && entry.identifier.length > 0

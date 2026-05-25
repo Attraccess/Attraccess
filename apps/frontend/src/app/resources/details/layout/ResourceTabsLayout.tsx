@@ -180,13 +180,12 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
         actions={overflowActions}
         maxVisibleActions={0}
         moreActionsLabel={t('actions.moreLabel')}
+        noMargin
       />
 
-      <div className="mb-6">
-        <ResourceHealthWarning resourceId={resourceId} />
-      </div>
+      <ResourceHealthWarning resourceId={resourceId} />
 
-      <div className="mb-6">
+      <div className="mt-4 mb-4">
         <div className="sm:hidden">
           <Select
             aria-label={t('tabs.mobilePickerLabel')}
