@@ -8,6 +8,7 @@ import {
   TableContent,
   TableHeader,
   TableRow,
+  TableScrollContainer,
 } from '@heroui/react';
 import {
   ResourceGroup,
@@ -122,75 +123,77 @@ export function ManageResourceGroups({
 
   const renderTable = () => (
     <Table data-cy="resource-groups-list">
-      <TableContent aria-label={t('table.ariaLabel')}>
-        <TableHeader>
-          <TableColumn isRowHeader>{t('columns.name')}</TableColumn>
-          <TableColumn>{t('columns.assigned')}</TableColumn>
-          <TableColumn>{t('columns.actions')}</TableColumn>
-        </TableHeader>
-        <TableBody
-          items={visibleGroups}
-          renderEmptyState={() => <EmptyState message={emptyMessage} />}
-        >
-          {(group) => {
-            const isAssigned = assignedIds.has(group.id);
-            const dotClass = isAssigned ? 'bg-success' : 'bg-default-300';
-            const ringClass = isAssigned ? 'ring-success/30' : 'ring-default-300/30';
-            const toggleLabel = t(isAssigned ? 'row.toggleOff' : 'row.toggleOn', {
-              resource: resourceName,
-              group: group.name,
-            });
-            return (
-              <TableRow
-                key={group.id}
-                id={group.id}
-                data-cy={`resource-group-row-${group.id}`}
-                data-assigned={isAssigned ? 'true' : 'false'}
-              >
-                <TableCell>
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span
-                      aria-hidden
-                      className={`inline-block w-2.5 h-2.5 rounded-full ring-2 shrink-0 ${dotClass} ${ringClass}`}
-                    />
-                    <div className="min-w-0">
-                      <p className="truncate" title={group.name}>
-                        {group.name}
-                      </p>
-                      {group.description ? (
-                        <p className="text-xs text-default-500 truncate max-w-md" title={group.description}>
-                          {group.description}
+      <TableScrollContainer>
+        <TableContent aria-label={t('table.ariaLabel')}>
+          <TableHeader>
+            <TableColumn isRowHeader>{t('columns.name')}</TableColumn>
+            <TableColumn>{t('columns.assigned')}</TableColumn>
+            <TableColumn>{t('columns.actions')}</TableColumn>
+          </TableHeader>
+          <TableBody
+            items={visibleGroups}
+            renderEmptyState={() => <EmptyState message={emptyMessage} />}
+          >
+            {(group) => {
+              const isAssigned = assignedIds.has(group.id);
+              const dotClass = isAssigned ? 'bg-success' : 'bg-default-300';
+              const ringClass = isAssigned ? 'ring-success/30' : 'ring-default-300/30';
+              const toggleLabel = t(isAssigned ? 'row.toggleOff' : 'row.toggleOn', {
+                resource: resourceName,
+                group: group.name,
+              });
+              return (
+                <TableRow
+                  key={group.id}
+                  id={group.id}
+                  data-cy={`resource-group-row-${group.id}`}
+                  data-assigned={isAssigned ? 'true' : 'false'}
+                >
+                  <TableCell>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span
+                        aria-hidden
+                        className={`inline-block w-2.5 h-2.5 rounded-full ring-2 shrink-0 ${dotClass} ${ringClass}`}
+                      />
+                      <div className="min-w-0">
+                        <p className="truncate" title={group.name}>
+                          {group.name}
                         </p>
-                      ) : null}
+                        {group.description ? (
+                          <p className="text-xs text-default-500 truncate max-w-md" title={group.description}>
+                            {group.description}
+                          </p>
+                        ) : null}
+                      </div>
                     </div>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <LabeledSwitch
-                    size="sm"
-                    isSelected={isAssigned}
-                    isDisabled={pendingGroupIds.has(group.id)}
-                    onChange={() => handleToggle(group)}
-                    aria-label={toggleLabel}
-                    data-cy={`resource-group-row-${group.id}-switch`}
-                  />
-                </TableCell>
-                <TableCell>
-                  <Link
-                    href={`/resource-groups/${group.id}`}
-                    className="text-xs inline-flex items-center gap-0.5"
-                    data-cy={`resource-group-row-${group.id}-open`}
-                    aria-label={`${t('row.openGroup')}: ${group.name}`}
-                  >
-                    {t('row.openGroup')}
-                    <ChevronRightIcon size={14} />
-                  </Link>
-                </TableCell>
-              </TableRow>
-            );
-          }}
-        </TableBody>
-      </TableContent>
+                  </TableCell>
+                  <TableCell>
+                    <LabeledSwitch
+                      size="sm"
+                      isSelected={isAssigned}
+                      isDisabled={pendingGroupIds.has(group.id)}
+                      onChange={() => handleToggle(group)}
+                      aria-label={toggleLabel}
+                      data-cy={`resource-group-row-${group.id}-switch`}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Link
+                      href={`/resource-groups/${group.id}`}
+                      className="text-xs inline-flex items-center gap-0.5"
+                      data-cy={`resource-group-row-${group.id}-open`}
+                      aria-label={`${t('row.openGroup')}: ${group.name}`}
+                    >
+                      {t('row.openGroup')}
+                      <ChevronRightIcon size={14} />
+                    </Link>
+                  </TableCell>
+                </TableRow>
+              );
+            }}
+          </TableBody>
+        </TableContent>
+      </TableScrollContainer>
     </Table>
   );
 
