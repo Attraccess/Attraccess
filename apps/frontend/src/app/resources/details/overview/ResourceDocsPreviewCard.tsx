@@ -2,7 +2,7 @@
 // FEATURE: ATT-386 Resource details page Overview tab
 import { useMemo } from 'react';
 import { Button } from '@heroui/react';
-import { BookOpen } from 'lucide-react';
+import { BookOpen, ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useResourcesServiceGetOneResourceById } from '@attraccess/react-query-client';
@@ -26,7 +26,9 @@ export function ResourceDocsPreviewCard({ resourceId }: ResourceDocsPreviewCardP
 
   const { data: resource, isLoading } = useResourcesServiceGetOneResourceById({ id: resourceId });
 
-  const markdown = resource?.documentationType === 'markdown' ? (resource.documentationMarkdown ?? '') : '';
+  const documentationType = resource?.documentationType;
+  const markdown = documentationType === 'markdown' ? (resource?.documentationMarkdown ?? '') : '';
+  const url = documentationType === 'url' ? (resource?.documentationUrl ?? '') : '';
 
   const previewText = useMemo(() => {
     if (!markdown) return '';
@@ -34,6 +36,8 @@ export function ResourceDocsPreviewCard({ resourceId }: ResourceDocsPreviewCardP
       ? markdown.slice(0, PREVIEW_CHAR_COUNT).trimEnd() + '…'
       : markdown;
   }, [markdown]);
+
+  const hasContent = Boolean(previewText) || Boolean(url);
 
   if (isLoading) {
     return (
@@ -43,7 +47,7 @@ export function ResourceDocsPreviewCard({ resourceId }: ResourceDocsPreviewCardP
     );
   }
 
-  if (!previewText) {
+  if (!hasContent) {
     if (!canManageResources) return null;
     return (
       <FlatSection
@@ -81,7 +85,15 @@ export function ResourceDocsPreviewCard({ resourceId }: ResourceDocsPreviewCardP
         </DocumentationModal>
       }
     >
-      <p className="text-sm text-foreground-600 whitespace-pre-wrap">{previewText}</p>
+      {previewText && <p className="text-sm text-foreground-600 whitespace-pre-wrap">{previewText}</p>}
+      {url && (
+        <div className="flex items-center gap-2 py-1 text-sm text-foreground-600">
+          <ExternalLink className="w-4 h-4 shrink-0 text-foreground-500" />
+          <span className="truncate" data-cy="docs-preview-url">
+            {url}
+          </span>
+        </div>
+      )}
     </FlatSection>
   );
 }
