@@ -28,7 +28,7 @@ export const Connectors = ({ boardW, boardH }: ConnectorsProps) => {
       <Pico125_4P name="J_PWR_DC" pn={J_PWR_DC_PN} {...at(28, 4)} />
       <B2B_127_2xN name="J_NFC" pn={J_NFC_PN} pinsPerRow={5} {...at(12, 42)} />
       <Pico125_3P name="J_BEEP" pn={J_BEEP_PN} {...at(45, 4)} />
-      <Ffc05Ra_N name="J_DISP" pn={J_DISP_PN} pinCount={20} {...at(34, 41)} />
+      <Ffc05Ra_N name="J_DISP" pn={J_DISP_PN} pinCount={20} pcbRotation={180} {...at(34, 41)} />
     </>
   );
 };

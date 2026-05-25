@@ -88,8 +88,8 @@ const FFC05_MECH_PAD_W = 1.8;
 const FFC05_MECH_PAD_H = 1.8;
 const FFC05_BODY_W_MARGIN = 1.4;
 const FFC05_BODY_DEPTH = 5.0;
-const FFC05_PAD_ROW_Y = -1.5;
-const FFC05_MECH_ROW_Y = 1.0;
+const FFC05_PAD_ROW_Y = 1.5;
+const FFC05_MECH_ROW_Y = -1.0;
 
 export interface Ffc05Ra_N_Props extends BasePartProps {
   readonly pinCount: number;
@@ -137,11 +137,11 @@ export const Ffc05Ra_N = ({ name, pn, pinCount, ...rest }: Ffc05Ra_N_Props) => {
         />
         <silkscreenpath
           route={[
-            { x: -half_body_w, y: FFC05_PAD_ROW_Y - 0.7 },
-            { x:  half_body_w, y: FFC05_PAD_ROW_Y - 0.7 },
-            { x:  half_body_w, y: FFC05_PAD_ROW_Y - 0.7 + FFC05_BODY_DEPTH },
-            { x: -half_body_w, y: FFC05_PAD_ROW_Y - 0.7 + FFC05_BODY_DEPTH },
-            { x: -half_body_w, y: FFC05_PAD_ROW_Y - 0.7 },
+            { x: -half_body_w, y: FFC05_PAD_ROW_Y + 0.7 },
+            { x:  half_body_w, y: FFC05_PAD_ROW_Y + 0.7 },
+            { x:  half_body_w, y: FFC05_PAD_ROW_Y + 0.7 - FFC05_BODY_DEPTH },
+            { x: -half_body_w, y: FFC05_PAD_ROW_Y + 0.7 - FFC05_BODY_DEPTH },
+            { x: -half_body_w, y: FFC05_PAD_ROW_Y + 0.7 },
           ]}
           strokeWidth="0.12mm"
         />
