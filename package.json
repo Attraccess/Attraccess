@@ -142,7 +142,7 @@
     "@cyclonedx/cdxgen": "^12.3.3",
     "@nx/esbuild": "22.7.1",
     "@nx/eslint": "22.7.1",
-    "@nx/eslint-plugin": "22.7.2",
+    "@nx/eslint-plugin": "22.7.4",
     "@nx/jest": "22.7.1",
     "@nx/js": "22.7.1",
     "@nx/nest": "22.7.1",
