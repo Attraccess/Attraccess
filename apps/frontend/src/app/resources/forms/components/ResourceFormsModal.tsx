@@ -272,12 +272,20 @@ function renderTextInput(
 ) {
   if (options.multiline) {
     return (
-      <TextArea
-        value={(value as string) ?? ''}
-        placeholder={options.placeholder ?? ''}
-        onChange={(e) => onChange(e.target.value)}
-        aria-invalid={Boolean(error)}
-      />
+      <div className="space-y-1">
+        <TextArea
+          value={(value as string) ?? ''}
+          placeholder={options.placeholder ?? ''}
+          onChange={(e) => onChange(e.target.value)}
+          aria-invalid={Boolean(error)}
+        />
+        {error && (
+          <p className="flex items-start gap-1 text-sm font-medium text-danger">
+            <span aria-hidden="true">⚠</span>
+            <span>{error}</span>
+          </p>
+        )}
+      </div>
     );
   }
 
@@ -327,7 +335,12 @@ function renderBooleanInput(
         />
         <span className="text-xs text-default-500">{t('modal.booleanYes')}</span>
       </div>
-      {error && <p className="text-xs text-danger-500">{error}</p>}
+      {error && (
+        <p className="flex items-start gap-1 text-sm font-medium text-danger">
+          <span aria-hidden="true">⚠</span>
+          <span>{error}</span>
+        </p>
+      )}
     </div>
   );
 }
