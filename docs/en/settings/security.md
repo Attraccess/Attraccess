@@ -68,6 +68,22 @@ Rate limit triggers:
 
 A successful login or admin unlock clears the lockout. Admin unlock is available via the user management UI.
 
+### Reverse proxies and the real client IP
+
+Per-IP throttling only works if Attraccess sees the **real client IP**. When it runs behind a reverse proxy (nginx, Traefik, Caddy, a CDN, or the bundled Docker stack), the connection arrives from the proxy, so without configuration every request looks like it comes from the proxy IP. One abusive client would then rate-limit everyone, and the audit log shows the proxy IP for all users.
+
+Set the `TRUST_PROXY` environment variable to the number of trusted proxy hops between the client and Attraccess. The client IP is then taken from the `X-Forwarded-For` header added by your proxy:
+
+| Deployment | `TRUST_PROXY` |
+|------------|---------------|
+| No reverse proxy (direct) | unset (default) |
+| Single reverse proxy (nginx/Traefik/Caddy) | `1` |
+| CDN in front of a reverse proxy | `2` |
+| Specific trusted proxies only | comma-separated IPs/CIDRs, e.g. `10.0.0.0/8, 172.16.0.0/12`, or `uniquelocal` |
+
+> [!WARNING]
+> Trust only as many hops as actually exist in your deployment. If `TRUST_PROXY` trusts more hops than your real proxy chain, clients can forge `X-Forwarded-For` to rotate their apparent IP and evade rate limiting entirely. When unset, Attraccess trusts no forwarding headers (safe default). Changes take effect after a restart.
+
 ## Auth Audit Log Format
 
 Every auth attempt produces a single-line, space-separated log record under the `AuthAudit` logger context. Field names and order are stable so the log is fail2ban-friendly.

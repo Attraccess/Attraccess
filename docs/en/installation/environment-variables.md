@@ -18,6 +18,10 @@ All configuration options for Attraccess that can be set via environment variabl
 | `LOG_LEVELS` | `error,warn,log` | Comma-separated log levels: `error`, `warn`, `log`, `debug`, `verbose` |
 | `LICENSE_KEY` | – | Attraccess license key |
 | `TZ` | – | Time zone, e.g. `Europe/Berlin` |
+| `TRUST_PROXY` | – | Trusted reverse-proxy hops so auth rate limiting uses the real client IP. `1` = single proxy (nginx/Traefik/Caddy), `2` = CDN + proxy, or a comma-separated list of trusted proxy IPs/CIDRs (or `loopback`, `linklocal`, `uniquelocal`). Unset = trust no proxy. |
+
+> [!NOTE]
+> `TRUST_PROXY` is **off by default**. Behind a reverse proxy, every request otherwise appears to come from the proxy IP, so auth rate limiting throttles all users together instead of the real attacker. Set it to match your proxy chain (usually `1`). Trusting more hops than actually exist lets clients spoof their IP — see [Security](settings/security.md#reverse-proxies-and-the-real-client-ip). Takes effect after a restart.
 
 ## Storage
 

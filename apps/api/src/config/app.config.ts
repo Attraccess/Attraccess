@@ -50,6 +50,7 @@ const AppEnvSchema = z
     SSL_GENERATE_SELF_SIGNED_CERTIFICATES: z.coerce.boolean().default(false),
     SSL_KEY_FILE: z.string().optional(),
     SSL_CERT_FILE: z.string().optional(),
+    TRUST_PROXY: z.string().optional(),
   })
   .refine(
     (config) => {
