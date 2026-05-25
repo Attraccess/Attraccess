@@ -1,9 +1,6 @@
 import { memo } from 'react';
-import { Checkbox } from '@heroui/react';
-import { History, Users } from 'lucide-react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import en from './translations/en';
-import de from './translations/de';
+import { History } from 'lucide-react';
+import { ShowAllUsersToggle } from '../ShowAllUsersToggle';
 
 interface HistoryHeaderProps {
   title: string;
@@ -14,8 +11,6 @@ interface HistoryHeaderProps {
 
 export const HistoryHeader = memo(
   ({ title, showAllUsers, setShowAllUsers, canManageResources }: HistoryHeaderProps) => {
-    const { t } = useTranslations({ en, de });
-
     return (
       <div className="flex items-center justify-between gap-x-4 gap-y-4 flex-wrap">
         <div className="flex items-center">
@@ -23,12 +18,7 @@ export const HistoryHeader = memo(
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h3>
         </div>
         {canManageResources && (
-          <div className="flex items-center">
-            <Checkbox isSelected={showAllUsers} onChange={setShowAllUsers} />
-            <span className="ml-2 text-sm flex items-center">
-              <Users className="w-4 h-4 mr-1" /> {t('showAllUsers')}
-            </span>
-          </div>
+          <ShowAllUsersToggle showAllUsers={showAllUsers} setShowAllUsers={setShowAllUsers} />
         )}
       </div>
     );
