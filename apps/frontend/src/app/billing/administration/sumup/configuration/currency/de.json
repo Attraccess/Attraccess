@@ -1,22 +1,7 @@
 {
   "title": "Konfiguration",
   "subtitle": "Konfigurieren Sie Attraccess für SumUp",
-  "status": {
-    "enabled": {
-      "title": "Aktiviert"
-    },
-    "disabled": {
-      "title": "Deaktiviert"
-    },
-    "loading": {
-      "title": "Wird geladen..."
-    }
-  },
   "inputs": {
-    "apiKey": {
-      "label": "API-Schlüssel",
-      "description": "Sie können Ihren API-Schlüssel in der SumUp-Konsole finden."
-    },
     "currency": {
       "label": "Währung",
       "description": "Wählen Sie die Währung für die Zahlungen"
