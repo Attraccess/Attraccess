@@ -5,7 +5,9 @@
     "export": "Export",
     "import": "Import",
     "addNode": "Add node",
-    "variables": "Variables"
+    "variables": "Variables",
+    "modePan": "Pan canvas",
+    "modeSelect": "Select"
   },
   "export": {
     "success": {

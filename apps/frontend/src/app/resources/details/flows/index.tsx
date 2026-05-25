@@ -2,6 +2,7 @@ import { useParams } from 'react-router-dom';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { Background, BackgroundVariant, Controls, ReactFlow, Node, Panel, Edge, useReactFlow, SelectionMode } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import { ButtonGroup } from '@heroui/react';
 import {
   ApiError,
   ResourceFlowEdgeDto,
@@ -17,8 +18,10 @@ import { usePtrStore } from '../../../../stores/ptr.store';
 import Dagre from '@dagrejs/dagre';
 import { Button } from '@heroui/react';
 import {
+  BoxSelectIcon,
   Braces as BracesIcon,
   DownloadIcon,
+  HandIcon,
   LayoutGridIcon,
   LogsIcon,
   PlusIcon,
@@ -302,6 +305,15 @@ function FlowsPageInner() {
   const [flowIsRunning, setFlowIsRunning] = useState(false);
   const [, setFlowExecutionHadError] = useState(false);
 
+  const [interactionMode, setInteractionMode] = useState<'pan' | 'select'>(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return 'select';
+    }
+    return window.matchMedia('(hover: none) and (pointer: coarse)').matches ? 'pan' : 'select';
+  });
+  const panOnDrag = interactionMode === 'pan' ? true : [1, 2];
+  const selectionOnDrag = interactionMode === 'select';
+
   const onLiveLog = useCallback(
     (log: ResourceFlowLog) => {
       if (log.type === 'node.processing.failed') {
@@ -405,8 +417,8 @@ function FlowsPageInner() {
             onConnect={onConnect}
             onDrop={onDropNode}
             onDragOver={onDragOver}
-            selectionOnDrag
-            panOnDrag={[1, 2]}
+            selectionOnDrag={selectionOnDrag}
+            panOnDrag={panOnDrag}
             selectionMode={SelectionMode.Partial}
             deleteKeyCode={['Backspace', 'Delete']}
             multiSelectionKeyCode="Shift"
@@ -418,6 +430,29 @@ function FlowsPageInner() {
           >
             <Controls />
             <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
+
+            <Panel position="top-left">
+              <ButtonGroup>
+                <Button
+                  isIconOnly
+                  variant={interactionMode === 'pan' ? 'primary' : 'ghost'}
+                  onPress={() => setInteractionMode('pan')}
+                  aria-label={t('actions.modePan')}
+                  aria-pressed={interactionMode === 'pan'}
+                >
+                  <HandIcon />
+                </Button>
+                <Button
+                  isIconOnly
+                  variant={interactionMode === 'select' ? 'primary' : 'ghost'}
+                  onPress={() => setInteractionMode('select')}
+                  aria-label={t('actions.modeSelect')}
+                  aria-pressed={interactionMode === 'select'}
+                >
+                  <BoxSelectIcon />
+                </Button>
+              </ButtonGroup>
+            </Panel>
 
             <Panel position="top-right" className="flex flex-row flex-wrap gap-2">
               <Button
