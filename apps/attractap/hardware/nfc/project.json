@@ -40,6 +40,7 @@
         "commands": [
           "rm -rf dist/export && mkdir -p dist/export",
           "pnpm exec tscircuit-cli export index.tsx -f gerbers -o dist/export/nfc-gerbers.zip",
+          "node ../scripts/strip-dnp.mjs dist/export/nfc-gerbers.zip",
           "node ../scripts/validate-bom.mjs dist/export/nfc-gerbers.zip"
         ],
         "parallel": false

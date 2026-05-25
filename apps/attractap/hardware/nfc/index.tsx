@@ -9,7 +9,7 @@ import {
   C0402,
   C0603,
   L0603,
-  NfcCoilAntenna,
+  NfcPcbAntenna,
   Pin1Marker,
   Pn532Ic,
   R0402,
@@ -37,6 +37,7 @@ const C_100NF_PN = 'C307331';
 const C_10UF_PN = 'C96446';
 const C_1NF_PN = 'C76947';
 const C_47PF_PN = 'C1567';
+const C_100PF_PN = 'C1546';
 const C_180PF_PN = 'C20069329';
 const R_4K7_PN = 'C25900';
 const R_10K_PN = 'C25744';
@@ -83,7 +84,7 @@ export default () => (
     autorouter="sequential-trace"
     defaultTraceWidth="0.2mm"
   >
-    <NfcCoilAntenna name="ANT1" padPitchMm={18} bodyWidthMm={22} bodyHeightMm={22} {...at(25, 25)} />
+    <NfcPcbAntenna name="ANT1" outerMm={22} turns={9} traceWidthMm={0.4} gapMm={0.3} {...at(25, 25)} />
 
     {leds.map((l) => (
       <Ws2812Mini
@@ -128,7 +129,7 @@ export default () => (
     <L0603 name="L0_TX1" pn={L_560NH_PN} inductance="560nH" {...atBottom(33.66, 20)} />
     <C0402 name="C0_TX1" pn={C_180PF_PN} capacitance="180pF" {...atBottom(34.66, 22.41)} />
     <C0402 name="C1_TX1" pn={C_47PF_PN} capacitance="47pF" {...atBottom(35, 25)} />
-    <C0402 name="C2_TX1" pn={C_47PF_PN} capacitance="47pF" {...atBottom(34.66, 27.59)} />
+    <C0402 name="C2_TX1" pn={C_100PF_PN} capacitance="100pF" {...atBottom(34.66, 27.59)} />
     <R0402 name="Rs1" pn={R_750R_PN} resistance="750" {...atBottom(33.66, 30)} />
     <C0402 name="Cs1" pn={C_1NF_PN} capacitance="1nF" {...atBottom(32.07, 32.07)} />
 
@@ -136,7 +137,7 @@ export default () => (
     <L0603 name="L0_TX2" pn={L_560NH_PN} inductance="560nH" {...atBottom(16.34, 30)} />
     <C0402 name="C0_TX2" pn={C_180PF_PN} capacitance="180pF" {...atBottom(15.34, 27.59)} />
     <C0402 name="C1_TX2" pn={C_47PF_PN} capacitance="47pF" {...atBottom(15, 25)} />
-    <C0402 name="C2_TX2" pn={C_47PF_PN} capacitance="47pF" {...atBottom(15.34, 22.41)} />
+    <C0402 name="C2_TX2" pn={C_100PF_PN} capacitance="100pF" {...atBottom(15.34, 22.41)} />
     <R0402 name="Rs2" pn={R_750R_PN} resistance="750" {...atBottom(16.34, 20)} />
     <C0402 name="Cs2" pn={C_1NF_PN} capacitance="1nF" {...atBottom(17.93, 17.93)} />
 
@@ -144,7 +145,7 @@ export default () => (
     <L0603 name="L_LED" pn={FB_FERRITE_PN} inductance="120R@100MHz" {...at(14, 45)} />
     <C0603 name="C_LED_BULK" pn={C_10UF_PN} capacitance="10uF" {...at(18, 45)} />
 
-    <B2B_127_2xN name="J1" pn={HEADER_PN} pinsPerRow={5} {...at(35, 47)} />
+    <B2B_127_2xN name="J1" pn={HEADER_PN} pinsPerRow={5} {...atBottom(35, 47)} />
 
     <hole diameter="3.2mm" {...at(3, 3)} />
     <hole diameter="3.2mm" {...at(47, 3)} />
@@ -154,7 +155,7 @@ export default () => (
     <BoardLabel name="ATT-350 NFC" rev="v0" {...at(25, 3)} />
     <AttraccessLogo {...at(7, 4.5)} scale={1.1} />
     <AttraccessLogo {...at(43, 4.5)} scale={1.1} />
-    <Pin1Marker {...at(32.2, 47)} />
+    <Pin1Marker {...atBottom(32.2, 47)} />
 
     <trace from=".J1 > .pin1" to=".C_VBUS > .pin1" />
     <trace from=".C_VBUS > .pin1" to=".U1 > .VBUS" />

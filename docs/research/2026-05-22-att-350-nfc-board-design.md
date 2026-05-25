@@ -118,14 +118,74 @@ TX2 side. Receive path: antenna node → `Csa/Rsa` → PN532 `RX/LA/LB`. The
 exact parametrics depend on enclosure dielectric — these are the
 defaults the deep-research sub-issue (§6) will refine.
 
-### 4.5 Discrete coil antenna (v0)
+### 4.5 PCB-trace coil antenna (v0)
 
-v0 uses a **discrete pre-wound 13.56 MHz NFC coil antenna**, hand-populated
-through a 2-pad SMT footprint. Default footprint: 22 × 22 mm body,
-18 mm pad pitch, 1.8 × 2.5 mm pads — matches the common Abracon
-ANFCA-2521 / Wurth WE-MCA / Pulse PA0742 form factor for 22-mm-class
-NFC coils. Exact PN is locked by ATT-376 once the case-CAD enclosure
-window aperture is known.
+v0 uses a **PCB-trace 13.56 MHz NFC antenna** etched directly into the
+top-layer copper — no discrete part, no hand-soldering, no JLC custom-part
+pre-order. JLC ships the board with the antenna already on it.
+
+Trade-off vs the discrete pre-wound coil that an earlier revision of
+this doc proposed: PCB-trace Q is lower (~30–50 vs ~60+ for wirewound),
+so read range is shorter, but the design is fully fabricated by JLC at
+no extra cost. Reference range target: ~5 cm for MIFARE / NTAG cards
+against the PN532's full TX power.
+
+Geometry (parametric in `libs/attractap-hw-shared/src/parts/nfc.tsx::NfcPcbAntenna`):
+
+| Field         | Value (v0)            |
+|---------------|-----------------------|
+| Shape         | Circular spiral (polar polyline, 32 segments / turn rotated-rect SMT pads on top layer) |
+| Outer Ø       | 22 mm — fits comfortably inside LED-ring inner edge (R ≈ 16.25 mm → Ø 32.5 mm free zone) |
+| Turns         | 9                     |
+| Trace width   | 0.4 mm (~15.7 mil — well above JLC 5/5 mil baseline) |
+| Gap           | 0.3 mm (~11.8 mil) — radial pitch 0.7 mm / turn |
+| Inner Ø       | 22 − 2 × 9 × 0.7 = 9.4 mm |
+| Estimated L   | ~1.5 µH (Wheeler approximation for circular spiral, d_avg ≈ 15.7 mm, fill ratio ρ ≈ 0.40) |
+| Estimated Q   | ~45 @ 13.56 MHz on 1 oz Cu — circular shape avoids the corner current-crowding losses a square-spiral takes (~10 % Q gain) |
+| Resonance net | L_ant ≈ 1.5 µH with C2 = 100 pF → f₀ ≈ 13.0 MHz (within tuning trim range) |
+
+Matching-network retune from the discrete-coil ~2.85 µH target:
+
+- `C2_TX1`, `C2_TX2`: **47 pF → 100 pF** (JLC C1546, 0402 C0G, **basic + preferred** — no fee). Brings the resonance from ~19.6 MHz (with 47 pF and 1.4 µH) down to ~13.45 MHz at the antenna node.
+- `C1_TX1`, `C1_TX2`: stay at 47 pF (series tuning, sets impedance match).
+- `L0_TX1`, `L0_TX2`, `C0_TX1`, `C0_TX2`: unchanged (EMC pre-filter).
+- `Rs1`/`Rs2`/`Cs1`/`Cs2`: unchanged (RX divider).
+
+Expected first-board behaviour and tuning loop:
+
+1. Initial read range likely **2–4 cm** because L_ant comes out of the
+   etch tolerance ±15 % and C2 100 pF is a single-step E12 jump, not a
+   measured trim.
+2. Bench step (gate 5): NanoVNA on TP_ANT (the two antenna pad anchors)
+   → measure actual L_ant and series-resonant frequency.
+3. Swap C1 (47 pF → 33 pF or 56 pF) and / or C2 (100 pF → 82 pF or 120 pF)
+   to centre the antenna network on 13.56 MHz with the case-loaded
+   dielectric.
+4. v1 board rev (if needed) bakes the trimmed values.
+
+`NfcPcbAntenna` in the shared lib emits a chip with two named pads
+(P1 = outer anchor at angle 0°, P2 = inner-end anchor) and a footprint
+built from ~1.9k overlapping 0.4 mm circular SMT pads tiled along the
+spiral centerline at `stepMm = 0.25` mm. Centerline follows the polar
+Archimedean spiral `r(θ) = R_outer − (θ / 2π) · pitch` over 9 turns;
+adjacent circle pads overlap by `traceWidthMm − stepMm = 0.15` mm so
+the copper fuses into one continuous net at fab. Circular pads are
+rotation-invariant in gerber export, sidestepping the `rotated_rect`
+→ axis-aligned-flash bug in `circuit-json-to-gerber@0.0.50` that
+broke the earlier chord-pad implementation. The matching-network
+`<trace>` declarations connect to `pin1` (outer perimeter) and `pin2`
+(inner end); the autorouter routes these from the bottom-layer matching
+caps through vias up to the antenna anchors.
+
+Because the antenna is etched copper (not a placed component), JLC SMT
+populates everything else and ships the board with the antenna already
+on it — no `Pre-order Service`, no hand-soldering. The BOM/CPL still
+runs through `apps/attractap/hardware/scripts/strip-dnp.mjs` which
+removes any `ANT`-prefixed rows from the gerber-zip CSVs before fab
+upload (defensive in case a future design adds a hand-populated antenna
+variant alongside this one). For the current board the strip is a
+no-op because `NfcPcbAntenna` doesn't emit an ANT row into the
+JLC-bound BOM at all (it lives in PCB copper, not the BOM).
 
 The antenna sits **top-side, centred at (25, 25)**, with the 24 WS2812
 LEDs in a ring around it on the same layer. The PN532 IC, matching
@@ -134,15 +194,10 @@ layer**, directly under the antenna and ring; bottom mech-envelope
 height budget (1.0 mm) accommodates the QFN-40 (0.85 mm) plus 0402 /
 0603 passives.
 
-Going discrete-component rather than PCB-trace antenna trades the
-RF-trace tuning work (Q-factor sweep, multi-turn spiral routing) for
-a vendor-spec'd antenna with known inductance and Q — the matching
-network values from NXP AN1445 (§4.4) are now a single tuning pass
-against the chosen coil's L/R/Q datasheet numbers, not a re-layout.
-
-BOM emits `ANT1` with an empty JLC PN column; the validator allows
-this for `ANT` designators since JLC SMT doesn't stock NFC antennas.
-Antenna is hand-soldered after JLC SMT assembly.
+The legacy `NfcCoilAntenna` wrapper stays in the shared lib (for future
+designs that need a discrete vendor coil — e.g. once ATT-376 picks
+between Abracon ANFCA-2522-D00-T / Würth WE-MCA / Pulse PA0742 for a
+closer-range higher-Q variant) but is no longer used by this board.
 
 ## 5. WS2812 ring
 
@@ -215,7 +270,7 @@ sub-issue may upgrade.
 | Ref            | Qty | Part                                  | JLC PN     | Footprint     |
 |----------------|-----|---------------------------------------|------------|---------------|
 | U1             | 1   | PN5321A3HN                            | C28925     | QFN-40-EP     |
-| ANT1           | 1   | NFC coil antenna 22 × 22 mm (hand-pop)| —          | 2-pad 18 mm pitch SMT |
+| ANT1           | 1   | PCB-trace 13.56 MHz circular spiral, Ø 22 mm, 9 turns, 0.4 / 0.3 mm trace / gap | (etched copper, no part placed) | top-layer copper |
 | LED1…LED24     | 24  | WS2812B-MINI-X2                       | C4154873   | SMD3535-4P    |
 | J1             | 1   | B2B 1.27 mm 2×5 male SMD              | C2935458   | pinrow10_p1.27 |
 | R_SDA, R_SCL   | 2   | 4.7 kΩ 0402 1%                        | C25900     | 0402          |
@@ -227,15 +282,16 @@ sub-issue may upgrade.
 | L0_TX1, L0_TX2 | 2   | 560 nH ±5%                            | C502009    | 0603          |
 | C0_TX1, C0_TX2 | 2   | 180 pF 50 V C0G                       | C20069329  | 0402          |
 | C1_TX1, C1_TX2 | 2   | 47 pF 50 V C0G                        | C1567      | 0402          |
-| C2_TX1, C2_TX2 | 2   | 47 pF 50 V C0G                        | C1567      | 0402          |
+| C2_TX1, C2_TX2 | 2   | 100 pF 50 V C0G                       | C1546      | 0402          |
 | Cs1, Cs2       | 2   | 1 nF 50 V C0G                         | C76947     | 0402          |
 | C_PA, C_LED_BULK, C_LED_G1…6 | 8 | 10 µF 25 V X5R                  | C96446     | 0603          |
 | C_VBUS, C_PVDD, C_SVDD, C_AVDD, C_VMID, C_TVDD | 6 | 100 nF 50 V X7R     | C307331    | 0402          |
 
-**~60 part placements**. PN532 + matching network + decoupling on
-bottom layer (under antenna); WS2812 ring + bulk decoupling + LED
-filter + connector on top layer. JLC SMT assembly populates everything
-except ANT1, which is hand-soldered post-SMT.
+**~60 part placements**. PN532 + matching network + decoupling + J1
+header on bottom layer (under antenna, ribbon plugs in from inside the
+enclosure leaving the user-facing top face clean); WS2812 ring + bulk
+decoupling + LED filter on top layer. JLC SMT assembly populates every
+designator; ANT1 is etched copper and needs no placement.
 
 ## 9. Acceptance + deferral
 
@@ -250,3 +306,51 @@ except ANT1, which is hand-soldered post-SMT.
 
 - Antenna geometry for the final case (case CAD is its own epic).
 - Multi-protocol RF (ISO-14443A only via PN532).
+
+## 11. JLC assembly tier — Standard PCBA required
+
+This board requires JLCPCB's **Standard PCBA** tier, not Economic PCBA.
+Two independent constraints force Standard tier; either one is sufficient
+on its own:
+
+1. **Double-sided assembly** — PN532, matching network, decoupling, and
+   I2C pulls are on the bottom side; antenna + WS2812 ring + connector
+   are on the top side. JLC Economic PCBA only places parts on one side,
+   so as long as the board uses both layers for SMT, Standard is the only
+   option.
+2. **Library type — Extended parts on the BOM**. Economic PCBA accepts
+   Basic and Preferred parts only; any Extended part on the BOM bumps the
+   order to Standard. This board's BOM has the seven Extended PNs listed
+   in the table below. Each carries a one-time $3 component-setup fee
+   (*not* a per-board fee). The notes column records why no Basic /
+   Preferred equivalent exists at JLC for the required value or footprint:
+
+| JLC PN     | Designator(s)         | Part                          | Why no Basic alt           |
+|------------|-----------------------|-------------------------------|----------------------------|
+| C28925     | U1                    | PN5321A3HN (PN532) QFN-40-EP  | Sole NFC reader IC at JLC  |
+| C4154873   | LED1…LED24            | WS2812B-MINI-X2 SMD3535       | WS2812 family is Extended-only at JLC across all sizes |
+| C2935458   | J1                    | 2×5 1.27 mm SMT pin header    | All 1454 in-stock 1.27 mm headers at JLC are Extended |
+| C502009    | L0_TX1, L0_TX2        | 560 nH high-Q RF inductor     | No 0603 RF inductor at this value is Basic/Preferred  |
+| C20069329  | C0_TX1, C0_TX2        | 180 pF 0402 C0G               | No 0402 180 pF cap is Basic/Preferred  |
+| C76947     | Cs1, Cs2              | 1 nF 0402 C0G NP0             | Basic 1 nF 0402 is X7R-only — the RF receive shunt path wants C0G temperature stability |
+| C25132     | Rs1, Rs2              | 750 Ω 0402 1%                 | No 750 Ω 0402 is Basic/Preferred — E96 values outside the JLC Basic library at 0402 |
+
+> **Independence check:** the PN532 QFN-40-EP (0.5 mm pitch) is, by
+> itself, within JLC Economic PCBA's package limits — Economic accepts
+> QFN-40 on the top side at 0.5 mm pitch. So the PN532 is not an
+> independent third forcing factor; it is forced to Standard only via
+> constraint (1) (it sits on the bottom layer). Moving the PN532 to the
+> top side would not unlock Economic on its own — constraint (2) still
+> applies — but it is worth noting that the QFN-40 itself is not the
+> blocker.
+
+Search methodology (for future PRs that touch this BOM): use
+`pcbparts:jlc_search` with `library_type="no_fee"` (basic + preferred,
+no setup fee) and the part's package + value as `spec_filters`. Each
+Extended row above was checked individually and returned 0 no-fee
+matches in the current JLC catalogue.
+
+**Net cost impact**: 7 Extended part-types × $3 setup fee = **$21 one-time
+component-setup fee per JLC order**, on top of the Standard PCBA base
+assembly fee. Per-piece cost is unaffected. ANT1 is excluded from JLC
+SMT and hand-soldered post-shipment (see §4.5).

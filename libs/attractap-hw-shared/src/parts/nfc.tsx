@@ -1,4 +1,4 @@
-// PN532 NFC front-end IC plus discrete 13.56 MHz coil antenna wrappers
+// PN532 NFC front-end IC plus 13.56 MHz coil and PCB-trace antenna wrappers
 // FEATURE: shared lib parts — NFC board on-board RFID front-end + antenna
 
 import type { BasePartProps } from './types';
@@ -46,6 +46,7 @@ export const Pn532Ic = ({ name, pn, ...rest }: Pn532IcProps) => (
 
 export interface NfcCoilAntennaProps extends Omit<BasePartProps, 'pn'> {
   readonly pn?: string;
+  readonly mpn?: string;
   readonly padPitchMm?: number;
   readonly bodyWidthMm?: number;
   readonly bodyHeightMm?: number;
@@ -56,6 +57,7 @@ export interface NfcCoilAntennaProps extends Omit<BasePartProps, 'pn'> {
 export const NfcCoilAntenna = ({
   name,
   pn,
+  mpn,
   padPitchMm = 25,
   bodyWidthMm = 32,
   bodyHeightMm = 22,
@@ -67,6 +69,7 @@ export const NfcCoilAntenna = ({
     name={name}
     pinLabels={{ pin1: ['P1'], pin2: ['P2'] }}
     {...(pn ? { supplierPartNumbers: jlcSupplier(pn) } : {})}
+    {...(mpn ? { manufacturerPartNumber: mpn } : {})}
     {...rest}
   >
     <footprint>
@@ -100,3 +103,83 @@ export const NfcCoilAntenna = ({
     </footprint>
   </chip>
 );
+
+export interface NfcPcbAntennaProps extends Omit<BasePartProps, 'pn'> {
+  readonly outerMm?: number;
+  readonly turns?: number;
+  readonly traceWidthMm?: number;
+  readonly gapMm?: number;
+  readonly stepMm?: number;
+}
+
+interface SpiralPoint {
+  readonly x: number;
+  readonly y: number;
+}
+
+interface SpiralCirclePadProps {
+  readonly x: number;
+  readonly y: number;
+  readonly radiusMm: number;
+}
+
+const SpiralCirclePad = ({ x, y, radiusMm }: SpiralCirclePadProps) => (
+  <smtpad shape="circle" portHints={['pin1']} pcbX={x} pcbY={y} radius={`${radiusMm}mm`} />
+);
+
+function buildSpiralPoints(turns: number, outerR: number, pitch: number, stepMm: number): SpiralPoint[] {
+  const points: SpiralPoint[] = [];
+  const totalAngle = turns * 2 * Math.PI;
+  let theta = 0;
+  while (theta <= totalAngle) {
+    const r = outerR - (theta / (2 * Math.PI)) * pitch;
+    points.push({ x: r * Math.cos(theta), y: r * Math.sin(theta) });
+    const dTheta = r > 0 ? stepMm / r : stepMm;
+    theta += dTheta;
+  }
+  return points;
+}
+
+export const NfcPcbAntenna = ({
+  name,
+  outerMm = 22,
+  turns = 9,
+  traceWidthMm = 0.4,
+  gapMm = 0.3,
+  stepMm = 0.25,
+  ...rest
+}: NfcPcbAntennaProps) => {
+  const pitch = traceWidthMm + gapMm;
+  const outerR = outerMm / 2;
+  const points = buildSpiralPoints(turns, outerR, pitch, stepMm);
+  const outerStart = points[0];
+  const innerEnd = points[points.length - 1];
+  const anchorSize = traceWidthMm * 2;
+  return (
+    <chip name={name} pinLabels={{ pin1: ['P1'], pin2: ['P2'] }} {...rest}>
+      <footprint>
+        {points.map((p, i) => {
+          const isTerminal = i === 0 || i === points.length - 1;
+          if (isTerminal) return null;
+          return <SpiralCirclePad key={`spiral-${i}`} x={p.x} y={p.y} radiusMm={traceWidthMm / 2} />;
+        })}
+        <smtpad
+          shape="rect"
+          portHints={['pin1']}
+          pcbX={outerStart.x}
+          pcbY={outerStart.y}
+          width={`${anchorSize}mm`}
+          height={`${anchorSize}mm`}
+        />
+        <smtpad
+          shape="rect"
+          portHints={['pin2']}
+          pcbX={innerEnd.x}
+          pcbY={innerEnd.y}
+          width={`${anchorSize}mm`}
+          height={`${anchorSize}mm`}
+        />
+      </footprint>
+    </chip>
+  );
+};
