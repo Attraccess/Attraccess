@@ -1,0 +1,17 @@
+{
+  "title": "Node catalog",
+  "toggleOpen": "Open catalog",
+  "toggleClose": "Close catalog",
+  "collapse": "Collapse",
+  "expand": "Expand",
+  "empty": "No nodes available for this resource.",
+  "domains": {
+    "manual": "Manual",
+    "resource": "Resource",
+    "door": "Door",
+    "mqtt": "MQTT",
+    "http": "HTTP",
+    "logic": "Logic",
+    "health": "Health"
+  }
+}

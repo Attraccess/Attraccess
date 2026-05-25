@@ -115,8 +115,8 @@ export function AttraccessNode(props: Props) {
         label: t('nodes.' + schema.type + '.inputs.' + inputName),
         style: {
           left: `${leftPercentage}%`,
-          top: '-15px',
-          transform: 'translateX(-50%)',
+          top: 0,
+          transform: 'translate(-50%, -50%)',
         },
       };
     });
@@ -131,8 +131,8 @@ export function AttraccessNode(props: Props) {
         label: t('nodes.' + schema.type + '.outputs.' + outputName),
         style: {
           left: `${leftPercentage}%`,
-          bottom: '-15px',
-          transform: 'translateX(-50%)',
+          bottom: 0,
+          transform: 'translate(-50%, 50%)',
         },
       };
     });
@@ -177,6 +177,7 @@ export function AttraccessNode(props: Props) {
               )}
             </div>
           </NodeToolbar>
+          <div className="relative">
           <Card className={cardClasses} onDoubleClick={isEditable ? openEditor : undefined}>
             <Card.Header className="flex flex-col gap-1">
               <div className="flex items-center justify-between gap-2">
@@ -262,38 +263,48 @@ export function AttraccessNode(props: Props) {
             )}
           </Card>
 
+          {!previewMode &&
+            targetHandlesWithStyles.map(({ id: handleId, label, style }) => (
+              <div key={handleId} className="absolute z-10" style={style}>
+                <Tooltip isDisabled={!label}>
+                  <TooltipTrigger tabIndex={0}>
+                    <Handle
+                      type="target"
+                      position={Position.Top}
+                      className="!w-4 !h-4"
+                      style={{ position: 'relative', top: 'auto', left: 'auto', transform: 'none' }}
+                      id={handleId}
+                    />
+                  </TooltipTrigger>
+                  <TooltipContent>{label}</TooltipContent>
+                </Tooltip>
+              </div>
+            ))}
+
+          {!previewMode &&
+            sourceHandlesWithStyles.map(({ id: handleId, label, style }) => (
+              <div key={handleId} className="absolute z-10" style={style}>
+                <Tooltip isDisabled={!label}>
+                  <TooltipTrigger tabIndex={0}>
+                    <Handle
+                      type="source"
+                      position={Position.Bottom}
+                      className="!w-4 !h-4"
+                      style={{ position: 'relative', bottom: 'auto', left: 'auto', transform: 'none' }}
+                      id={handleId}
+                    />
+                  </TooltipTrigger>
+                  <TooltipContent>{label}</TooltipContent>
+                </Tooltip>
+              </div>
+            ))}
+          </div>
+
           {!previewMode && !schema.supportedByResource && (
             <div className="text-xs text-warning-600 dark:text-warning-400 mt-1 px-1 flex flex-row items-center gap-1">
               <TriangleAlertIcon size={12} /> {t('nodes.unsupportedForResourceType')}
             </div>
           )}
-
-          {!previewMode &&
-            targetHandlesWithStyles.map(({ id: handleId, label, style }) => (
-              <Tooltip key={handleId} isDisabled={!label}>
-                <TooltipTrigger tabIndex={0}>
-                  <Handle
-                    type="target"
-                    position={Position.Top}
-                    className="!w-4 !h-4"
-                    style={style}
-                    id={handleId}
-                  />
-                </TooltipTrigger>
-                <TooltipContent>{label}</TooltipContent>
-              </Tooltip>
-            ))}
-          <div style={{ position: 'relative', marginInline: '25px' }}>
-            {!previewMode &&
-              sourceHandlesWithStyles.map(({ id: handleId, label, style }) => (
-                <Tooltip key={handleId} isDisabled={!label}>
-                  <TooltipTrigger tabIndex={0}>
-                    <Handle style={style} type="source" position={Position.Bottom} className="!w-4 !h-4" id={handleId} />
-                  </TooltipTrigger>
-                  <TooltipContent>{label}</TooltipContent>
-                </Tooltip>
-              ))}
-          </div>
         </div>
       )}
     </NodeEditor>

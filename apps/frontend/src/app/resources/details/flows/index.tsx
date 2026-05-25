@@ -1,8 +1,8 @@
-import { PageHeader } from '../../../../components/pageHeader';
 import { useParams } from 'react-router-dom';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { Background, BackgroundVariant, Controls, ReactFlow, Node, Panel, Edge, useReactFlow, SelectionMode } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import { ButtonGroup } from '@heroui/react';
 import {
   ApiError,
   ResourceFlowEdgeDto,
@@ -11,7 +11,6 @@ import {
   useResourceFlowsServiceGetResourceFlow,
   UseResourceFlowsServiceGetResourceFlowKeyFn,
   useResourceFlowsServiceSaveResourceFlow,
-  useResourcesServiceGetOneResourceById,
 } from '@attraccess/react-query-client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTheme } from '@heroui/react';
@@ -19,8 +18,10 @@ import { usePtrStore } from '../../../../stores/ptr.store';
 import Dagre from '@dagrejs/dagre';
 import { Button } from '@heroui/react';
 import {
+  BoxSelectIcon,
   Braces as BracesIcon,
   DownloadIcon,
+  HandIcon,
   LayoutGridIcon,
   LogsIcon,
   PlusIcon,
@@ -28,7 +29,7 @@ import {
   UploadIcon,
 } from 'lucide-react';
 import { nanoid } from 'nanoid';
-import { NodePickerModal } from './nodePickerModal';
+import { NodeCatalogHandle, NodeCatalogPanel } from './nodeCatalog';
 import { FlowProvider, useFlowContext } from './flowContext';
 import { useFlowImportExport } from './flowImportExport';
 import { useQueryClient } from '@tanstack/react-query';
@@ -93,7 +94,6 @@ const jsConfetti = new JSConfetti();
 function FlowsPageInner() {
   const { id: resourceId } = useParams();
   const { theme } = useTheme();
-  const { data: resource } = useResourcesServiceGetOneResourceById({ id: Number(resourceId) });
   const { t, tExists } = useTranslations({
     en: {
       ...en,
@@ -150,6 +150,7 @@ function FlowsPageInner() {
 
   const { fitView, screenToFlowPosition } = useReactFlow();
   const mousePosRef = useRef<{ x: number; y: number } | null>(null);
+  const nodeCatalogRef = useRef<NodeCatalogHandle>(null);
   const {
     nodes,
     edges,
@@ -263,8 +264,55 @@ function FlowsPageInner() {
     [addNode, nodes, fitView],
   );
 
+  const onDragOver = useCallback((event: React.DragEvent) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  }, []);
+
+  const onDropNode = useCallback(
+    (event: React.DragEvent) => {
+      event.preventDefault();
+      const nodeType = event.dataTransfer.getData('application/reactflow');
+      if (!nodeType) return;
+      const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
+      addNode({ id: nanoid(), position, type: nodeType, data: { __centerOnDrop: true } });
+    },
+    [addNode, screenToFlowPosition],
+  );
+
+  useEffect(() => {
+    const pending = nodes.find((n) => {
+      const flagged = (n.data as { __centerOnDrop?: boolean })?.__centerOnDrop === true;
+      return flagged && n.measured?.width != null && n.measured?.height != null;
+    });
+    if (!pending) return;
+    const w = pending.measured?.width ?? 0;
+    const h = pending.measured?.height ?? 0;
+    setNodes((prev) =>
+      prev.map((n) => {
+        if (n.id !== pending.id) return n;
+        const nextData = { ...(n.data as Record<string, unknown>) };
+        delete nextData.__centerOnDrop;
+        return {
+          ...n,
+          position: { x: n.position.x - w / 2, y: n.position.y - h / 2 },
+          data: nextData,
+        };
+      }),
+    );
+  }, [nodes, setNodes]);
+
   const [flowIsRunning, setFlowIsRunning] = useState(false);
   const [, setFlowExecutionHadError] = useState(false);
+
+  const [interactionMode, setInteractionMode] = useState<'pan' | 'select'>(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return 'select';
+    }
+    return window.matchMedia('(hover: none) and (pointer: coarse)').matches ? 'pan' : 'select';
+  });
+  const panOnDrag = interactionMode === 'pan' ? true : [1, 2];
+  const selectionOnDrag = interactionMode === 'select';
 
   const onLiveLog = useCallback(
     (log: ResourceFlowLog) => {
@@ -348,86 +396,111 @@ function FlowsPageInner() {
 
   return (
     <div className="h-full w-full flex flex-col">
-      <PageHeader
-        title={t('title', { resourceName: resource?.name })}
-        subtitle={t('subtitle')}
-        backTo={`/resources/${resourceId}`}
-      />
-
-      <div
-        className="w-full h-full rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800"
-        onMouseMove={(e) => {
-          mousePosRef.current = { x: e.clientX, y: e.clientY };
-        }}
-      >
-        <ReactFlow
-          nodes={nodes}
-          edges={edgesWithCorrectType}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          selectionOnDrag
-          panOnDrag={[1, 2]}
-          selectionMode={SelectionMode.Partial}
-          deleteKeyCode={['Backspace', 'Delete']}
-          multiSelectionKeyCode="Shift"
-          colorMode={theme === 'dark' ? 'dark' : 'light'}
-          fitView
-          defaultEdgeOptions={{ style: { strokeWidth: 4 } }}
-          nodeTypes={flowNodeTypes}
-          edgeTypes={edgeTypes}
+      <div className="flex flex-row w-full flex-1 min-h-0 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800">
+        <NodeCatalogPanel
+          ref={nodeCatalogRef}
+          resourceId={Number(resourceId)}
+          onSelect={addStartNode}
+          tNodeTranslations={tNodeTranslations}
+        />
+        <div
+          className="flex-1 h-full"
+          onMouseMove={(e) => {
+            mousePosRef.current = { x: e.clientX, y: e.clientY };
+          }}
         >
-          <Controls />
-          <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
+          <ReactFlow
+            nodes={nodes}
+            edges={edgesWithCorrectType}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            onDrop={onDropNode}
+            onDragOver={onDragOver}
+            selectionOnDrag={selectionOnDrag}
+            panOnDrag={panOnDrag}
+            selectionMode={SelectionMode.Partial}
+            deleteKeyCode={['Backspace', 'Delete']}
+            multiSelectionKeyCode="Shift"
+            colorMode={theme === 'dark' ? 'dark' : 'light'}
+            fitView
+            defaultEdgeOptions={{ style: { strokeWidth: 4 } }}
+            nodeTypes={flowNodeTypes}
+            edgeTypes={edgeTypes}
+          >
+            <Controls />
+            <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
 
-          <Panel position="top-right" className="flex flex-row flex-wrap gap-2">
-            <Button
-              isIconOnly
-              isPending={isSaving}
-              onPress={save}
-              isDisabled={!flowHasChanged}
-              variant={saveFailed ? 'danger-soft' : flowHasChanged ? 'primary' : 'ghost'}
-            >
-              <SaveIcon />
-            </Button>
-            <Button isIconOnly onPress={handleImportClick} aria-label={t('actions.import')}>
-              <UploadIcon />
-            </Button>
-            <Button isIconOnly onPress={handleExport} aria-label={t('actions.export')}>
-              <DownloadIcon />
-            </Button>
-            <LogViewer resourceId={Number(resourceId)}>
-              {(open) => (
-                <Button isIconOnly onPress={open}>
-                  <LogsIcon />
+            <Panel position="top-left">
+              <ButtonGroup>
+                <Button
+                  isIconOnly
+                  variant={interactionMode === 'pan' ? 'primary' : 'ghost'}
+                  onPress={() => setInteractionMode('pan')}
+                  aria-label={t('actions.modePan')}
+                  aria-pressed={interactionMode === 'pan'}
+                >
+                  <HandIcon />
                 </Button>
-              )}
-            </LogViewer>
+                <Button
+                  isIconOnly
+                  variant={interactionMode === 'select' ? 'primary' : 'ghost'}
+                  onPress={() => setInteractionMode('select')}
+                  aria-label={t('actions.modeSelect')}
+                  aria-pressed={interactionMode === 'select'}
+                >
+                  <BoxSelectIcon />
+                </Button>
+              </ButtonGroup>
+            </Panel>
 
-            <VariablesModal resourceId={Number(resourceId)}>
-              {(open) => (
-                <Button isIconOnly onPress={open} aria-label={t('actions.variables')}>
-                  <BracesIcon />
-                </Button>
-              )}
-            </VariablesModal>
+            <Panel position="top-right" className="flex flex-row flex-wrap gap-2">
+              <Button
+                isIconOnly
+                isPending={isSaving}
+                onPress={save}
+                isDisabled={!flowHasChanged}
+                variant={saveFailed ? 'danger-soft' : flowHasChanged ? 'primary' : 'ghost'}
+              >
+                <SaveIcon />
+              </Button>
+              <Button isIconOnly onPress={handleImportClick} aria-label={t('actions.import')}>
+                <UploadIcon />
+              </Button>
+              <Button isIconOnly onPress={handleExport} aria-label={t('actions.export')}>
+                <DownloadIcon />
+              </Button>
+              <LogViewer resourceId={Number(resourceId)}>
+                {(open) => (
+                  <Button isIconOnly onPress={open}>
+                    <LogsIcon />
+                  </Button>
+                )}
+              </LogViewer>
 
-            <Button isIconOnly onPress={layout}>
-              <LayoutGridIcon />
-            </Button>
-            <NodePickerModal
-              tNodeTranslations={tNodeTranslations}
-              onSelect={addStartNode}
-              resourceId={Number(resourceId)}
-            >
-              {(open) => (
-                <Button variant="primary" isIconOnly onPress={open}>
-                  <PlusIcon />
-                </Button>
-              )}
-            </NodePickerModal>
-          </Panel>
-        </ReactFlow>
+              <VariablesModal resourceId={Number(resourceId)}>
+                {(open) => (
+                  <Button isIconOnly onPress={open} aria-label={t('actions.variables')}>
+                    <BracesIcon />
+                  </Button>
+                )}
+              </VariablesModal>
+
+              <Button isIconOnly onPress={layout}>
+                <LayoutGridIcon />
+              </Button>
+              <Button
+                isIconOnly
+                variant="primary"
+                onPress={() => nodeCatalogRef.current?.open()}
+                aria-label={t('actions.addNode')}
+                className="md:hidden"
+              >
+                <PlusIcon />
+              </Button>
+            </Panel>
+          </ReactFlow>
+        </div>
       </div>
     </div>
   );

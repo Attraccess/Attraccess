@@ -20,4 +20,5 @@ export interface PeopleManagementProps {
   canManageIntroducers: boolean;
   canManageIntroductions: boolean;
   flat?: boolean;
+  hideHeader?: boolean;
 }

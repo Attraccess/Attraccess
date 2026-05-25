@@ -1,5 +1,18 @@
 import { HTMLAttributes, useCallback, useMemo, useState } from 'react';
 import {
+  Button,
+  Link,
+  Table,
+  TableBody,
+  TableCell,
+  TableColumn,
+  TableContent,
+  TableHeader,
+  TableRow,
+  TableScrollContainer,
+} from '@heroui/react';
+import {
+  Resource,
   ResourceGroup,
   useResourcesServiceGetAllResourcesKey,
   useResourcesServiceGetOneResourceById,
@@ -8,156 +21,248 @@ import {
   useResourcesServiceResourceGroupsGetMany,
   useResourcesServiceResourceGroupsRemoveResource,
 } from '@attraccess/react-query-client';
-import { Button, Checkbox, Link, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow } from '@heroui/react';
-import { EmptyState } from '../../../components/emptyState';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { GroupIcon, PlusIcon } from 'lucide-react';
+import { ChevronRightIcon, GroupIcon, MinusIcon, PlusIcon } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import en from './en.json';
 import de from './de.json';
-import { ResourceGroupUpsertModal } from '../../resource-groups/upsertModal/resourceGroupUpsertModal';
+import { EmptyState } from '../../../components/emptyState';
 import { FlatSection } from '../../../components/flatSection';
+import { useToastMessage } from '../../../components/toastProvider';
+import { ResourceGroupUpsertModal } from '../../resource-groups/upsertModal/resourceGroupUpsertModal';
+import { GroupsToolbar } from './GroupsToolbar';
+import { filterAndSortGroups, GroupFilter } from './groupsFilter';
 
 type ManageResourceGroupsProps = Omit<HTMLAttributes<HTMLElement>, 'children'> & {
   resourceId: number;
+  hideHeader?: boolean;
 };
 
 export function ManageResourceGroups({
   resourceId,
+  hideHeader,
   ...rest
 }: Readonly<ManageResourceGroupsProps>) {
   const { t } = useTranslations({ de, en });
   const queryClient = useQueryClient();
+  const toast = useToastMessage();
 
   const { data: resource } = useResourcesServiceGetOneResourceById({ id: resourceId });
-
   const { data: groups } = useResourcesServiceResourceGroupsGetMany();
 
-  const { mutateAsync: addResourceToGroup } = useResourcesServiceResourceGroupsAddResource();
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState<GroupFilter>('all');
+  const [pendingGroupIds, setPendingGroupIds] = useState<ReadonlySet<number>>(new Set());
 
-  const { mutateAsync: removeResourceFromGroup } = useResourcesServiceResourceGroupsRemoveResource({
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: UseResourcesServiceGetOneResourceByIdKeyFn({ id: resourceId }) });
-    },
-  });
-
-  const isAdded = useCallback(
-    (group: ResourceGroup) => {
-      return resource?.groups.some((g) => g.id === group.id);
-    },
+  const assignedIds = useMemo<ReadonlySet<number>>(
+    () => new Set(resource?.groups?.map((g) => g.id) ?? []),
     [resource?.groups],
   );
 
-  const handleGroupClick = useCallback(
+  const allGroups = useMemo(() => groups ?? [], [groups]);
+
+  const invalidateAll = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: [useResourcesServiceGetAllResourcesKey] });
+    queryClient.invalidateQueries({
+      queryKey: UseResourcesServiceGetOneResourceByIdKeyFn({ id: resourceId }),
+    });
+  }, [queryClient, resourceId]);
+
+  const markPending = useCallback((groupId: number, on: boolean) => {
+    setPendingGroupIds((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(groupId);
+      else next.delete(groupId);
+      return next;
+    });
+  }, []);
+
+  const { mutateAsync: addResourceToGroup } = useResourcesServiceResourceGroupsAddResource();
+  const { mutateAsync: removeResourceFromGroup } = useResourcesServiceResourceGroupsRemoveResource();
+
+  const handleToggle = useCallback(
     async (group: ResourceGroup) => {
-      if (!isAdded(group)) {
-        await addResourceToGroup({
-          groupId: group.id,
-          resourceId,
-        });
-      } else {
-        await removeResourceFromGroup({
-          groupId: group.id,
-          resourceId,
-        });
+      const wasAssigned = assignedIds.has(group.id);
+      markPending(group.id, true);
+
+      const resourceKey = UseResourcesServiceGetOneResourceByIdKeyFn({ id: resourceId });
+      const previous = queryClient.getQueryData<Resource>(resourceKey);
+      if (previous) {
+        const nextGroups = wasAssigned
+          ? (previous.groups ?? []).filter((g) => g.id !== group.id)
+          : [...(previous.groups ?? []), group];
+        queryClient.setQueryData<Resource>(resourceKey, { ...previous, groups: nextGroups });
       }
 
-      queryClient.invalidateQueries({
-        queryKey: [useResourcesServiceGetAllResourcesKey],
-      });
-      queryClient.invalidateQueries({ queryKey: UseResourcesServiceGetOneResourceByIdKeyFn({ id: resourceId }) });
-    },
-    [addResourceToGroup, removeResourceFromGroup, resourceId, isAdded, queryClient],
-  );
-
-  const groupsWithResource = useMemo(() => {
-    if (!groups) {
-      return [];
-    }
-
-    return groups
-      .map((group) => ({
-        ...group,
-        resource: isAdded(group) ? resource : null,
-      }))
-      .sort((a, b) => {
-        if ((a.resource && b.resource) || (!a.resource && !b.resource)) {
-          return a.name.localeCompare(b.name);
+      try {
+        if (wasAssigned) {
+          await removeResourceFromGroup({ groupId: group.id, resourceId });
+        } else {
+          await addResourceToGroup({ groupId: group.id, resourceId });
         }
-
-        return a.resource ? -1 : 1;
-      });
-  }, [groups, resource, isAdded]);
-
-  const [page] = useState(1);
-  const perPage = 10;
-
-  const currentPage = useMemo(() => {
-    if (!groupsWithResource) {
-      return [];
-    }
-
-    return groupsWithResource.slice((page - 1) * perPage, page * perPage);
-  }, [groupsWithResource, page]);
+        invalidateAll();
+      } catch {
+        if (previous) queryClient.setQueryData<Resource>(resourceKey, previous);
+        toast.error({ title: t('errors.toggleFailed') });
+      } finally {
+        markPending(group.id, false);
+      }
+    },
+    [
+      addResourceToGroup,
+      removeResourceFromGroup,
+      assignedIds,
+      invalidateAll,
+      markPending,
+      queryClient,
+      resourceId,
+      toast,
+      t,
+    ],
+  );
 
   const onGroupCreated = useCallback(
     (group: ResourceGroup) => {
-      handleGroupClick(group);
+      handleToggle(group);
     },
-    [handleGroupClick],
+    [handleToggle],
   );
 
-  const actions = (
+  const visibleGroups = useMemo(
+    () => filterAndSortGroups({ groups: allGroups, assignedIds, search, filter }),
+    [allGroups, assignedIds, search, filter],
+  );
+
+  const counts = useMemo(() => {
+    let assigned = 0;
+    for (const g of allGroups) if (assignedIds.has(g.id)) assigned += 1;
+    return { assigned, available: allGroups.length - assigned };
+  }, [allGroups, assignedIds]);
+
+  const resourceName = resource?.name ?? '';
+
+  const emptyMessage = allGroups.length === 0 ? t('empty.noGroups') : t('empty.noMatch');
+
+  const renderTable = () => (
+    <Table data-cy="resource-groups-list">
+      <TableScrollContainer>
+        <TableContent aria-label={t('table.ariaLabel')}>
+          <TableHeader>
+            <TableColumn isRowHeader>{t('columns.name')}</TableColumn>
+            <TableColumn>{t('columns.assigned')}</TableColumn>
+            <TableColumn>{t('columns.actions')}</TableColumn>
+          </TableHeader>
+          <TableBody
+            items={visibleGroups}
+            dependencies={[assignedIds, pendingGroupIds]}
+            renderEmptyState={() => <EmptyState message={emptyMessage} />}
+          >
+            {(group) => {
+              const isAssigned = assignedIds.has(group.id);
+              const dotClass = isAssigned ? 'bg-success' : 'bg-default-300';
+              const ringClass = isAssigned ? 'ring-success/30' : 'ring-default-300/30';
+              const actionLabel = t(isAssigned ? 'row.toggleOff' : 'row.toggleOn', {
+                resource: resourceName,
+                group: group.name,
+              });
+              const buttonLabel = t(isAssigned ? 'row.remove' : 'row.add');
+              const isPending = pendingGroupIds.has(group.id);
+              return (
+                <TableRow
+                  key={group.id}
+                  id={group.id}
+                  data-cy={`resource-group-row-${group.id}`}
+                  data-assigned={isAssigned ? 'true' : 'false'}
+                >
+                  <TableCell>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span
+                        aria-hidden
+                        className={`inline-block w-2.5 h-2.5 rounded-full ring-2 shrink-0 ${dotClass} ${ringClass}`}
+                      />
+                      <div className="min-w-0">
+                        <p className="truncate" title={group.name}>
+                          {group.name}
+                        </p>
+                        {group.description ? (
+                          <p className="text-xs text-default-500 truncate max-w-md" title={group.description}>
+                            {group.description}
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      size="sm"
+                      variant={isAssigned ? 'danger-soft' : 'primary'}
+                      isDisabled={isPending}
+                      isPending={isPending}
+                      onPress={() => handleToggle(group)}
+                      aria-label={actionLabel}
+                      data-cy={`resource-group-row-${group.id}-toggle`}
+                    >
+                      {isPending ? null : isAssigned ? <MinusIcon size={14} /> : <PlusIcon size={14} />}
+                      {buttonLabel}
+                    </Button>
+                  </TableCell>
+                  <TableCell>
+                    <Link
+                      href={`/resource-groups/${group.id}`}
+                      className="text-xs inline-flex items-center gap-0.5"
+                      data-cy={`resource-group-row-${group.id}-open`}
+                      aria-label={`${t('row.openGroup')}: ${group.name}`}
+                    >
+                      {t('row.openGroup')}
+                      <ChevronRightIcon size={14} />
+                    </Link>
+                  </TableCell>
+                </TableRow>
+              );
+            }}
+          </TableBody>
+        </TableContent>
+      </TableScrollContainer>
+    </Table>
+  );
+
+  const renderToolbar = (onNewGroup: () => void) => (
+    <GroupsToolbar
+      search={search}
+      onSearchChange={setSearch}
+      searchPlaceholder={t('search.placeholder')}
+      filter={filter}
+      onFilterChange={setFilter}
+      filterLabels={{
+        all: t('filter.all'),
+        assigned: t('filter.assigned'),
+        available: t('filter.available'),
+      }}
+      assignedCount={counts.assigned}
+      availableCount={counts.available}
+      newGroupLabel={t('newGroup')}
+      onNewGroup={onNewGroup}
+    />
+  );
+
+  const content = (
     <ResourceGroupUpsertModal onUpserted={onGroupCreated}>
       {(onOpen: () => void) => (
-        <Button
-          variant="primary"
-          size="sm"
-          onPress={onOpen}
-          data-cy="toolbar-open-create-resource-group-modal-button"
-        >
-          <PlusIcon size={16} />
-          {t('addGroup')}
-        </Button>
+        <>
+          {renderToolbar(onOpen)}
+          {renderTable()}
+        </>
       )}
     </ResourceGroupUpsertModal>
   );
 
+  if (hideHeader) {
+    return <section {...rest}>{content}</section>;
+  }
+
   return (
-    <FlatSection icon={<GroupIcon className="w-4 h-4" />} title={t('title')} actions={actions} {...rest}>
-      {currentPage.length === 0 ? (
-        <EmptyState />
-      ) : (
-        <Table>
-          <TableContent aria-label={t('table.ariaLabel')}>
-            <TableHeader>
-              <TableColumn isRowHeader>{t('columns.group')}</TableColumn>
-              <TableColumn>{t('columns.actions')}</TableColumn>
-            </TableHeader>
-            <TableBody items={currentPage}>
-              {(group) => (
-                <TableRow
-                  key={group.id}
-                  id={group.id}
-                  className={isAdded(group) ? 'border-l-8 border-l-success' : 'border-l-8 border-l-danger'}
-                >
-                  <TableCell className="w-full">{group.name}</TableCell>
-                  <TableCell className="text-right flex items-center gap-2">
-                    <Checkbox
-                      onChange={() => {
-                        handleGroupClick(group);
-                      }}
-                      aria-label={group.name}
-                      isSelected={isAdded(group)}
-                    />
-                    <Link href={`/resource-groups/${group.id}`}>{t('actions.openGroup')}</Link>
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </TableContent>
-        </Table>
-      )}
+    <FlatSection icon={<GroupIcon className="w-4 h-4" />} title={t('title')} {...rest}>
+      {content}
     </FlatSection>
   );
 }

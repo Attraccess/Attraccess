@@ -4,7 +4,10 @@
   "actions": {
     "export": "Exportieren",
     "import": "Importieren",
-    "variables": "Variablen"
+    "addNode": "Knoten hinzufügen",
+    "variables": "Variablen",
+    "modePan": "Canvas verschieben",
+    "modeSelect": "Auswählen"
   },
   "export": {
     "success": {

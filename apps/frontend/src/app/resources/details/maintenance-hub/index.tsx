@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { Button, Tabs, TabList, Tab, TabPanel, Spinner, Card } from '@heroui/react';
-import { ConstructionIcon, PlusIcon, ArrowLeft } from 'lucide-react';
+import { PlusIcon, ArrowLeft } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   useResourceMaintenancesServiceCanManageMaintenance,
@@ -9,7 +9,6 @@ import {
   useResourceMaintenancesServiceFindMaintenances,
   useResourcesServiceGetOneResourceById,
 } from '@attraccess/react-query-client';
-import { PageHeader } from '../../../../components/pageHeader';
 import { useNow } from '../../../../hooks/useNow';
 import { StatStrip } from './stat-strip';
 import { SchedulesTab } from './schedules-tab';
@@ -80,21 +79,12 @@ export function MaintenanceHubPage() {
 
   return (
     <div>
-      <PageHeader
-        title={t('title')}
-        subtitle={t('subtitle', { resourceName: resource.name })}
-        icon={<ConstructionIcon className="w-6 h-6" />}
-        backTo={`/resources/${resourceId}`}
-        actions={[
-          {
-            key: 'new-schedule',
-            label: t('actions.newSchedule'),
-            icon: <PlusIcon className="w-4 h-4" />,
-            variant: 'primary',
-            onPress: openCreateDrawer,
-          },
-        ]}
-      />
+      <div className="flex justify-end mb-4">
+        <Button variant="primary" onPress={openCreateDrawer}>
+          <PlusIcon className="w-4 h-4" />
+          {t('actions.newSchedule')}
+        </Button>
+      </div>
 
       <div className="space-y-6 mb-6">
         <StatStrip

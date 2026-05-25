@@ -1,12 +1,9 @@
-import { Card, Chip, Spinner } from '@heroui/react';
+import { Button, Card, Chip, Spinner } from '@heroui/react';
+import { PlusIcon } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { PageHeader } from '../../../../components/pageHeader';
 import { EmptyState } from '../../../../components/emptyState';
-import {
-  useResourceFormsServiceResourceFormsList,
-  useResourcesServiceGetOneResourceById,
-} from '@attraccess/react-query-client';
+import { useResourceFormsServiceResourceFormsList } from '@attraccess/react-query-client';
 import en from './en.json';
 import de from './de.json';
 import { DateTimeDisplay } from '@attraccess/plugins-frontend-ui';
@@ -17,7 +14,6 @@ export function FormListPage() {
   const navigate = useNavigate();
   const { t } = useTranslations({ en, de });
 
-  const { data: resource } = useResourcesServiceGetOneResourceById({ id: resourceId });
   const {
     data: forms,
     isLoading,
@@ -28,19 +24,12 @@ export function FormListPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader
-        title={t('list.title', { resourceName: resource?.name ?? '' })}
-        subtitle={t('list.subtitle')}
-        backTo={`/resources/${resourceId}`}
-        actions={[
-          {
-            key: 'create',
-            label: t('list.create'),
-            variant: 'primary',
-            onPress: () => navigate(`/resources/${resourceId}/forms/new`),
-          },
-        ]}
-      />
+      <div className="flex justify-end">
+        <Button variant="primary" onPress={() => navigate(`/resources/${resourceId}/forms/new`)}>
+          <PlusIcon className="w-4 h-4" />
+          {t('list.create')}
+        </Button>
+      </div>
 
       {isLoading && (
         <div className="flex justify-center py-10">
@@ -57,7 +46,6 @@ export function FormListPage() {
           {forms.map((form) => (
             <Card
               key={form.id}
-
               onClick={() => navigate(`/resources/${resourceId}/forms/${form.id}`)}
               className="border border-default-200 dark:border-default-100"
             >

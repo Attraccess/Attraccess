@@ -4,7 +4,10 @@
   "actions": {
     "export": "Export",
     "import": "Import",
-    "variables": "Variables"
+    "addNode": "Add node",
+    "variables": "Variables",
+    "modePan": "Pan canvas",
+    "modeSelect": "Select"
   },
   "export": {
     "success": {
