@@ -11,8 +11,10 @@
       "takeover": "On takeover",
       "end": "On end"
     },
-    "fieldCount_one": "{{count}} field",
-    "fieldCount_other": "{{count}} fields"
+    "fieldCount": {
+      "one": "{{count}} field",
+      "many": "{{count}} fields"
+    }
   },
   "editor": {
     "createTitle": "Create form",
