@@ -39,9 +39,10 @@ export function ResourceOverviewTab() {
         </aside>
       </div>
 
-      <ResourceDocsPreviewCard resourceId={resourceId} />
-
-      <RecentSessionsCard resourceId={resourceId} />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:items-start">
+        <ResourceDocsPreviewCard resourceId={resourceId} />
+        <RecentSessionsCard resourceId={resourceId} />
+      </div>
     </div>
   );
 }
