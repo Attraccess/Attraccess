@@ -35,4 +35,9 @@ describe('resolveIp', () => {
     const req = createRequest({ ip: undefined, socket: { remoteAddress: undefined } as Request['socket'] });
     expect(resolveIp(req)).toBe('unknown');
   });
+
+  it('collapses IPv4-mapped IPv6 addresses to their IPv4 form so each client gets one bucket', () => {
+    expect(resolveIp(createRequest({ ip: '::ffff:127.0.0.1' }))).toBe('127.0.0.1');
+    expect(resolveIp(createRequest({ ip: '::ffff:203.0.113.42' }))).toBe('203.0.113.42');
+  });
 });
