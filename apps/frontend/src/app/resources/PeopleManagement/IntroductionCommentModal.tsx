@@ -1,5 +1,4 @@
 import {
-  Button,
   Form,
   Label,
   Modal,
@@ -13,6 +12,7 @@ import {
   TextArea,
   TextField,
 } from '@heroui/react';
+import { Button } from '../../../components/button';
 import { TFunction } from '@attraccess/plugins-frontend-ui';
 
 interface IntroductionCommentModalProps {

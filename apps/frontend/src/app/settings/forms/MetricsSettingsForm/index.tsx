@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
 import {
-  Button,
   Chip,
   NumberField,
   NumberFieldDecrementButton,
@@ -24,6 +23,7 @@ import {
   TooltipContent,
   useOverlayState,
 } from '@heroui/react';
+import { Button } from '../../../../components/button';
 import { AlertTriangleIcon, ClipboardCopyIcon, KeyIcon, RefreshCwIcon, Trash2Icon } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';

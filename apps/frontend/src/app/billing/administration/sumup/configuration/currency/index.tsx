@@ -7,7 +7,8 @@ import {
   useBillingServiceGetBillingConfigurationKey,
   useBillingServiceSetBillingConfiguration,
 } from '@attraccess/react-query-client';
-import { Button, Form } from '@heroui/react';
+import { Form } from '@heroui/react';
+import { Button } from '../../../../../../components/button';
 import { PageHeader } from '../../../../../../components/pageHeader';
 import { ComponentPropsWithoutRef, useCallback, useEffect, useRef, useState } from 'react';
 import { twMerge } from 'tailwind-merge';

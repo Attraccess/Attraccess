@@ -1,5 +1,6 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Button, Card, CardProps, NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput } from "@heroui/react";
+import { Card, CardProps, NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput } from '@heroui/react';
+import { Button } from '../../../../components/button';
 import { PageHeader } from '../../../../components/pageHeader';
 import { useToastMessage } from '../../../../components/toastProvider';
 import { HandCoinsIcon } from 'lucide-react';

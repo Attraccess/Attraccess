@@ -1,5 +1,6 @@
 import React, { HTMLAttributes, useCallback, useMemo, useState } from 'react';
-import { Button, cn } from '@heroui/react';
+import { cn } from '@heroui/react';
+import { Button } from '../../../../../components/button';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../../../components/toastProvider';
 import { useUsersServiceSetUserPassword } from '@attraccess/react-query-client';

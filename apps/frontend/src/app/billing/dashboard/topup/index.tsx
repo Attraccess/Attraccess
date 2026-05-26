@@ -5,7 +5,6 @@ import {
   Alert,
   AlertContent,
   AlertTitle,
-  Button,
   cn,
   Form,
   NumberField,
@@ -15,6 +14,7 @@ import {
   NumberFieldInput,
   Spinner,
 } from '@heroui/react';
+import { Button } from '../../../../components/button';
 import { PageHeader } from '../../../../components/pageHeader';
 import { SumUpIcon } from '../../../../components/icons/sumup.icon';
 import {

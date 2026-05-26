@@ -1,6 +1,7 @@
 import { AttractapFirmware, useAttractapServiceGetFirmwareBinary } from '@attraccess/react-query-client';
 import { ESPTools, ESPToolsErrorType } from '../../../../utils/esp-tools';
-import { Accordion, AccordionItem, AccordionHeading, AccordionTrigger, AccordionPanel, AccordionBody, Alert, AlertContent, AlertTitle, Button, ProgressBar, ProgressBarFill, ProgressBarTrack, ProgressCircle, ProgressCircleFillCircle, ProgressCircleTrack, ProgressCircleTrackCircle } from '@heroui/react';
+import { Accordion, AccordionItem, AccordionHeading, AccordionTrigger, AccordionPanel, AccordionBody, Alert, AlertContent, AlertTitle, ProgressBar, ProgressBarFill, ProgressBarTrack, ProgressCircle, ProgressCircleFillCircle, ProgressCircleTrack, ProgressCircleTrackCircle } from '@heroui/react';
+import { Button } from '../../../../components/button';
 import { useCallback, useState } from 'react';
 import { useToastMessage } from '../../../../components/toastProvider';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';

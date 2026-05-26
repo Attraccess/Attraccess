@@ -1,5 +1,4 @@
 import {
-  Button,
   DrawerBody,
   DrawerFooter,
   DrawerHeader,
@@ -13,6 +12,7 @@ import {
   Tabs,
   useOverlayState,
 } from '@heroui/react';
+import { Button } from '../../../components/button';
 import { StandardDrawer } from '../../../components/standardDrawer';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';

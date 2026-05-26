@@ -1,6 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
-  Button,
   DrawerBody,
   DrawerFooter,
   DrawerHeader,
@@ -12,6 +11,7 @@ import {
   NumberFieldInput,
   useOverlayState,
 } from '@heroui/react';
+import { Button } from '../../../../../../components/button';
 import { StandardDrawer } from '../../../../../../components/standardDrawer';
 import en from './en.json';
 import de from './de.json';

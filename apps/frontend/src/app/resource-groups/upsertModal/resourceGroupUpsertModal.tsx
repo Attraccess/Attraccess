@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState, useRef } from 'react';
 import {
-  Button,
   Form,
   TextField,
   Label,
@@ -11,6 +10,7 @@ import {
   DrawerHeader,
   useOverlayState,
 } from '@heroui/react';
+import { Button } from '../../../components/button';
 import { StandardDrawer } from '../../../components/standardDrawer';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './resourceGroupUpsertModal.en.json';

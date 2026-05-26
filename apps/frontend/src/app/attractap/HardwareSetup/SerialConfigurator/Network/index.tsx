@@ -1,5 +1,6 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Alert, AlertContent, AlertTitle, Button, Label, ProgressBar, ProgressBarFill, ProgressBarTrack, TextField, Input, cn } from '@heroui/react';
+import { Alert, AlertContent, AlertTitle, Label, ProgressBar, ProgressBarFill, ProgressBarTrack, TextField, Input, cn } from '@heroui/react';
+import { Button } from '../../../../../components/button';
 import { useMemo, useState } from 'react';
 import { PasswordInput } from '../../../../../components/PasswordInput';
 import { PageHeader } from '../../../../../components/pageHeader';

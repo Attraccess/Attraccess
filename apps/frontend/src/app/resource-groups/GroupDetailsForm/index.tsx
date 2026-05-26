@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, HTMLAttributes } from 'react';
-import { Button, Form, Input, Label, Spinner, TextArea, TextField } from '@heroui/react';
+import { Form, Input, Label, Spinner, TextArea, TextField } from '@heroui/react';
+import { Button } from '../../../components/button';
 import { Save, Edit3, Trash2Icon } from 'lucide-react';
 import {
   useResourcesServiceResourceGroupsGetOne,

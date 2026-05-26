@@ -8,7 +8,8 @@ import {
   UseSettingsServiceGetSystemSettingsKeyFn,
   useSettingsServiceUpdateSystemSettings,
 } from '@attraccess/react-query-client';
-import { Button, Form, TextField, Label, Input, Description, Spinner } from '@heroui/react';
+import { Form, TextField, Label, Input, Description, Spinner } from '@heroui/react';
+import { Button } from '../../../../components/button';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PasswordInput } from '../../../../components/PasswordInput';
 import { CommunityLicenseButton } from '../../../../components/CommunityLicenseButton';

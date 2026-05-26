@@ -8,7 +8,6 @@ import {
   Alert,
   AlertContent,
   AlertDescription,
-  Button,
   DrawerBody,
   DrawerFooter,
   DrawerHeader,
@@ -24,6 +23,7 @@ import {
   TextField,
   useOverlayState,
 } from '@heroui/react';
+import { Button } from '../../../components/button';
 import { StandardDrawer } from '../../../components/standardDrawer';
 import { EmptyState } from '../../../components/emptyState';
 import { PlusIcon, Settings2Icon, Trash2Icon } from 'lucide-react';

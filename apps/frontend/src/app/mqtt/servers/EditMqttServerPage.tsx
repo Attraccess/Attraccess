@@ -1,5 +1,6 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Button, Checkbox, Form, Input, Label, Spinner, TextField } from '@heroui/react';
+import { Checkbox, Form, Input, Label, Spinner, TextField } from '@heroui/react';
+import { Button } from '../../../components/button';
 import { Select } from '../../../components/select';
 import { LabeledSwitch } from '../../../components/labeledSwitch';
 import { PageHeader } from '../../../components/pageHeader';

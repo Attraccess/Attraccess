@@ -1,5 +1,4 @@
 import {
-  Button,
   DrawerBody,
   DrawerFooter,
   DrawerHeader,
@@ -7,6 +6,7 @@ import {
   TextArea,
   TextField,
 } from '@heroui/react';
+import { Button } from '../../../components/button';
 import { TFunction, UserSearch } from '@attraccess/plugins-frontend-ui';
 import { User } from '@attraccess/react-query-client';
 import { StandardDrawer } from '../../../components/standardDrawer';
