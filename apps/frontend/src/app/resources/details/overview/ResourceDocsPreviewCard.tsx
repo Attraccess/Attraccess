@@ -8,6 +8,7 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useResourcesServiceGetOneResourceById } from '@attraccess/react-query-client';
 import { useAuth } from '../../../../hooks/useAuth';
 import { FlatSection } from '../../../../components/flatSection';
+import { Markdown } from '../../../../components/markdown';
 import { DocumentationModal } from '../../documentation';
 import en from './resourceDocsPreviewCard.en.json';
 import de from './resourceDocsPreviewCard.de.json';
@@ -85,7 +86,11 @@ export function ResourceDocsPreviewCard({ resourceId }: ResourceDocsPreviewCardP
         </DocumentationModal>
       }
     >
-      {previewText && <p className="text-sm text-foreground-600 whitespace-pre-wrap">{previewText}</p>}
+      {previewText && (
+        <Markdown variant="compact" data-cy="docs-preview-content">
+          {previewText}
+        </Markdown>
+      )}
       {url && (
         <div className="flex items-center gap-2 py-1 text-sm text-foreground-600">
           <ExternalLink className="w-4 h-4 shrink-0 text-foreground-500" />

@@ -11,11 +11,10 @@ import {
 } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { ArrowUpCircle, ExternalLink, X } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import { useSystemServiceGetUpdateStatus } from '@attraccess/react-query-client';
 import { UPDATE_CHECK_CACHE_TTL_MS } from '@attraccess/shared';
 import { useAuth } from '../../hooks/useAuth';
+import { Markdown } from '../markdown';
 import { readDismissedVersion, writeDismissedVersion } from './storage';
 import en from './en.json';
 import de from './de.json';
@@ -114,9 +113,7 @@ export function UpdateNotificationBanner() {
                   <ModalHeader>{t('releaseNotesModalTitle', { version: release.version })}</ModalHeader>
                   <ModalBody>
                     {release.body?.trim() ? (
-                      <div className="prose prose-sm dark:prose-invert max-w-none">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{release.body}</ReactMarkdown>
-                      </div>
+                      <Markdown variant="compact">{release.body}</Markdown>
                     ) : (
                       <div className="text-default-500">{t('releaseNotesFallback')}</div>
                     )}
