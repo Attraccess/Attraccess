@@ -1,6 +1,5 @@
 import { memo, useCallback, useState, useEffect } from 'react';
 import {
-  Button,
   Modal,
   ModalBackdrop,
   ModalBody,
@@ -11,6 +10,7 @@ import {
   Spinner,
   useOverlayState,
 } from '@heroui/react';
+import { Button } from '../../../components/button';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { Edit, ExternalLink, Maximize, Minimize, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';

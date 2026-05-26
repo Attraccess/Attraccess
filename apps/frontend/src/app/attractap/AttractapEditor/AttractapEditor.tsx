@@ -2,7 +2,6 @@ import { useTranslations, ResourceSelector } from '@attraccess/plugins-frontend-
 import de from './AttractapEditor.de.json';
 import en from './AttractapEditor.en.json';
 import {
-  Button,
   DrawerBody,
   DrawerFooter,
   DrawerHeader,
@@ -13,6 +12,7 @@ import {
   SliderFill,
   SliderThumb,
 } from '@heroui/react';
+import { Button } from '../../../components/button';
 import { TextField, Label, Input } from '@heroui/react';
 import { StandardDrawer } from '../../../components/standardDrawer';
 import { useCallback, useState, useEffect } from 'react';

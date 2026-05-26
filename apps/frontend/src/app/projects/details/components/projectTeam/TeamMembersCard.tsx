@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Button, Card, Chip, Skeleton } from '@heroui/react';
+import { Card, Chip, Skeleton } from '@heroui/react';
+import { Button } from '../../../../../components/button';
 import {
   ApiError,
   ProjectsServiceRemoveProjectMemberMutationResult,

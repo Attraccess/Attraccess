@@ -1,5 +1,4 @@
 import {
-  Button,
   TextField,
   Label,
   Input,
@@ -13,6 +12,7 @@ import {
   ModalHeading,
   useOverlayState,
 } from '@heroui/react';
+import { Button } from '../../../../../components/button';
 import { OpenIDConfiguration } from '../OpenIDC.data';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useCallback, useState } from 'react';

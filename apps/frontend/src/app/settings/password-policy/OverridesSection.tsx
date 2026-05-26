@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Button,
   Card,
   Chip,
   Modal,
@@ -24,6 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from '@heroui/react';
+import { Button } from '../../../components/button';
 import { LabeledSwitch } from '../../../components/labeledSwitch';
 import { useQueryClient } from '@tanstack/react-query';
 import {

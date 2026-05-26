@@ -1,4 +1,5 @@
-import { Alert, AlertContent, AlertDescription, AlertTitle, Button } from '@heroui/react';
+import { Alert, AlertContent, AlertDescription, AlertTitle } from '@heroui/react';
+import { Button } from '../../../../components/button';
 import { CheckCircleIcon } from 'lucide-react';
 import {
   ResourceHealthStateDto,

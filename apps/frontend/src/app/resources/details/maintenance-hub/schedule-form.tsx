@@ -4,12 +4,12 @@ import {
   Alert,
   AlertContent,
   AlertTitle,
-  Button,
   Form,
   Input,
   Label,
   TextField,
 } from '@heroui/react';
+import { Button } from '../../../../components/button';
 import { Select } from '../../../../components/select';
 import { LabeledSwitch } from '../../../../components/labeledSwitch';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';

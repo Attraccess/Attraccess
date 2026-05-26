@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { Button, Form, TextField, Label, Input } from '@heroui/react';
+import { Form, TextField, Label, Input } from '@heroui/react';
+import { Button } from '../../../../components/button';
 import { UserPlusIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useQueryClient } from '@tanstack/react-query';

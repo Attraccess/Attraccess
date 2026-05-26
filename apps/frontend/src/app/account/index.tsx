@@ -1,5 +1,6 @@
 import { PageHeader } from '../../components/pageHeader';
-import { Button, DrawerBody, DrawerFooter, DrawerHeader, useOverlayState } from '@heroui/react';
+import { DrawerBody, DrawerFooter, DrawerHeader, useOverlayState } from '@heroui/react';
+import { Button } from '../../components/button';
 import { AlertTriangleIcon, ShieldIcon, UserIcon } from 'lucide-react';
 import { StandardDrawer } from '../../components/standardDrawer';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';

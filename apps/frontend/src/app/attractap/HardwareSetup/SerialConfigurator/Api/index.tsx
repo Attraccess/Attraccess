@@ -1,5 +1,6 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Alert, AlertContent, AlertTitle, Button, cn } from '@heroui/react';
+import { Alert, AlertContent, AlertTitle, cn } from '@heroui/react';
+import { Button } from '../../../../../components/button';
 import { useCallback, useMemo, useState } from 'react';
 import { getBaseUrl } from '../../../../../api';
 import { PageHeader } from '../../../../../components/pageHeader';

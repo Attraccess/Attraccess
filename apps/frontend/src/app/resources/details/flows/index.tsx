@@ -16,7 +16,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTheme } from '@heroui/react';
 import { usePtrStore } from '../../../../stores/ptr.store';
 import Dagre from '@dagrejs/dagre';
-import { Button } from '@heroui/react';
+import { Button } from '../../../../components/button';
 import {
   BoxSelectIcon,
   Braces as BracesIcon,

@@ -1,5 +1,6 @@
 import { HTMLAttributes, useCallback, useMemo, useState } from 'react';
-import { Button, Card, CardProps, useOverlayState } from '@heroui/react';
+import { Card, CardProps, useOverlayState } from '@heroui/react';
+import { Button } from '../../../components/button';
 import { AlertCircle, AwardIcon, ShieldCheckIcon, UserPlusIcon } from 'lucide-react';
 import { User } from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';

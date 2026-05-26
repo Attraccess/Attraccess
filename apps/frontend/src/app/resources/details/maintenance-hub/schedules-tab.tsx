@@ -1,4 +1,5 @@
-import { Accordion, Button, Skeleton } from '@heroui/react';
+import { Accordion, Skeleton } from '@heroui/react';
+import { Button } from '../../../../components/button';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PlusIcon, CalendarClockIcon } from 'lucide-react';
 import { useState } from 'react';

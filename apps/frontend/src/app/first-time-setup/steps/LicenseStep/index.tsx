@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { Alert, AlertContent, AlertDescription, Button, Form } from '@heroui/react';
+import { Alert, AlertContent, AlertDescription, Form } from '@heroui/react';
+import { Button } from '../../../../components/button';
 import { KeyRoundIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useQueryClient } from '@tanstack/react-query';

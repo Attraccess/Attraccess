@@ -2,7 +2,6 @@ import en from './en.json';
 import de from './de.json';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
-  Button,
   Form,
   TextField,
   Label,
@@ -17,6 +16,7 @@ import {
   ModalHeading,
   useOverlayState,
 } from '@heroui/react';
+import { Button } from '../../../../../../components/button';
 import { PasswordInput } from '../../../../../../components/PasswordInput';
 import { useCallback, useRef, useState } from 'react';
 import { useBillingServiceGetSumUpReadersKey, useBillingServicePairSumUpReader } from '@attraccess/react-query-client';

@@ -1,7 +1,8 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useUrlQuery } from '@attraccess/plugins-frontend-ui';
 import { useNavigate } from 'react-router-dom';
-import { Alert, AlertContent, AlertDescription, AlertTitle, Button, Form } from '@heroui/react';
+import { Alert, AlertContent, AlertDescription, AlertTitle, Form } from '@heroui/react';
+import { Button } from '../../components/button';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';

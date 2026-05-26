@@ -1,4 +1,5 @@
-import { Button, Input, Label, TextArea, TextField } from '@heroui/react';
+import { Input, Label, TextArea, TextField } from '@heroui/react';
+import { Button } from '../../../../../components/button';
 import { Select } from '../../../../../components/select';
 import { LabeledSwitch } from '../../../../../components/labeledSwitch';
 import { ResourceFlowVariableScope } from '@attraccess/react-query-client';

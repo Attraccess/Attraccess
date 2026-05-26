@@ -1,5 +1,4 @@
 import {
-  Button,
   Chip,
   Modal,
   ModalBackdrop,
@@ -21,6 +20,7 @@ import {
   TooltipTrigger,
   useOverlayState,
 } from '@heroui/react';
+import { Button } from '../../../../../components/button';
 import { useCallback, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2 } from 'lucide-react';

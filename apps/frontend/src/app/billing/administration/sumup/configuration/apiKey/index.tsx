@@ -7,7 +7,8 @@ import {
   useBillingServiceGetSumUpReadersKey,
   useBillingServiceSetSumUpApiKey,
 } from '@attraccess/react-query-client';
-import { Button, Chip, Form, Link, Spinner } from '@heroui/react';
+import { Chip, Form, Link, Spinner } from '@heroui/react';
+import { Button } from '../../../../../../components/button';
 import { PageHeader } from '../../../../../../components/pageHeader';
 import { PasswordInput } from '../../../../../../components/PasswordInput';
 import { ComponentPropsWithoutRef, useCallback, useRef, useState } from 'react';

@@ -65,3 +65,20 @@ export function daysBetween(range: RangeValue<DateValue> | null | undefined): nu
   const diff = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
   return diff;
 }
+
+export interface DateBounds {
+  start: Date;
+  end: Date;
+}
+
+export function rangeToDateBounds(
+  range: RangeValue<DateValue> | null | undefined,
+  fallback: Date,
+): DateBounds {
+  const tz = getLocalTimeZone();
+  const start = range?.start?.toDate(tz) ?? fallback;
+  const endRaw = range?.end?.toDate(tz) ?? fallback;
+  const end = new Date(endRaw);
+  end.setHours(23, 59, 59, 999);
+  return { start, end };
+}
