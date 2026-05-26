@@ -121,7 +121,8 @@ async function observableToPromise(observable: Observable<boolean>): Promise<boo
 }
 
 export function resolveIp(request: Request): string {
-  return request.ip || request.socket?.remoteAddress || 'unknown';
+  const raw = request.ip || request.socket?.remoteAddress || 'unknown';
+  return raw.startsWith('::ffff:') ? raw.slice(7) : raw;
 }
 
 export function sanitizeUsername(value: unknown): string | null {
