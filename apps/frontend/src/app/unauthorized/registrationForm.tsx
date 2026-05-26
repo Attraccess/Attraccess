@@ -5,7 +5,6 @@ import {
   AlertContent,
   AlertDescription,
   AlertTitle,
-  Button,
   Input,
   Label,
   Modal,
@@ -18,6 +17,7 @@ import {
   TextField,
   useOverlayState,
 } from '@heroui/react';
+import { Button } from '../../components/button';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { UsernameInput, USERNAME_RULES, useUsernameValidation } from '../../components/UsernameInput';
 import en from './registrationForm.en.json';

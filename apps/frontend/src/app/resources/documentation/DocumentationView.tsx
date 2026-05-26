@@ -1,6 +1,7 @@
 import { memo, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Button, Card, Spinner } from '@heroui/react';
+import { Card, Spinner } from '@heroui/react';
+import { Button } from '../../../components/button';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { ArrowLeft, Edit, RefreshCw } from 'lucide-react';
 import { PageHeader } from '../../../components/pageHeader';

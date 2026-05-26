@@ -1,12 +1,12 @@
 import { ReactNode } from 'react';
 import {
-  Button,
   Dropdown,
   DropdownItem,
   DropdownMenu,
   DropdownPopover,
   DropdownTrigger,
 } from '@heroui/react';
+import { Button } from '../button';
 import { MoreVerticalIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 

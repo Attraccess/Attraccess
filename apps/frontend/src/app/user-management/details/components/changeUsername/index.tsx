@@ -5,7 +5,8 @@ import {
   useUsersServiceGetOneUserById,
   useUsersServiceGetOneUserByIdKey,
 } from '@attraccess/react-query-client';
-import { Button, cn, TextField, Label, Input } from '@heroui/react';
+import { cn, TextField, Label, Input } from '@heroui/react';
+import { Button } from '../../../../../components/button';
 import { useQueryClient } from '@tanstack/react-query';
 import { HTMLAttributes, useCallback, useEffect, useState } from 'react';
 

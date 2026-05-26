@@ -1,4 +1,5 @@
-import { Alert, AlertContent, AlertDescription, AlertTitle, Button, Input, Label, Skeleton, TextField } from '@heroui/react';
+import { Alert, AlertContent, AlertDescription, AlertTitle, Input, Label, Skeleton, TextField } from '@heroui/react';
+import { Button } from '../../../components/button';
 import { QRCode } from 'react-qrcode-logo';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';

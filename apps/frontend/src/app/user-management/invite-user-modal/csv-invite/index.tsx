@@ -1,6 +1,5 @@
 import {
   Badge,
-  Button,
   Chip,
   TextField,
   Label,
@@ -13,6 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from '@heroui/react';
+import { Button } from '../../../../components/button';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';

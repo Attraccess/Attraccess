@@ -4,7 +4,7 @@ import {
   useResourceFlowsServiceGetButtons,
   useResourceFlowsServicePressButton,
 } from '@attraccess/react-query-client';
-import { Button } from '@heroui/react';
+import { Button } from '../../../../../../components/button';
 import { useState } from 'react';
 import API_ERROR_TRANSLATIONS_DE from '../../../../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../../../global-translations/api-errors.en.json';

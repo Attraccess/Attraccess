@@ -1,13 +1,5 @@
-import {
-  Button,
-  ButtonGroup,
-  Dropdown,
-  DropdownTrigger,
-  DropdownMenu,
-  DropdownItem,
-  DropdownPopover,
-  Spinner,
-} from '@heroui/react';
+import { ButtonGroup, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, DropdownPopover } from '@heroui/react';
+import { Button } from '../../../../../components/button';
 import { buttonVariants } from '@heroui/styles';
 import { ChevronDownIcon, PlayIcon } from 'lucide-react';
 import { ProjectsSelect } from '../../../../../components/projectsSelect';
@@ -40,17 +32,8 @@ export function MachineStartControls({
         placeholder={t('machine.project.placeholder')}
       />
       <ButtonGroup className="w-full">
-        <Button isPending={isStarting} onPress={onStart}>
-          {({ isPending }) =>
-            isPending ? (
-              <Spinner color="current" />
-            ) : (
-              <>
-                <PlayIcon className="w-4 h-4" />
-                {t('machine.startSession')}
-              </>
-            )
-          }
+        <Button isPending={isStarting} onPress={onStart}><PlayIcon className="w-4 h-4" />
+          {t('machine.startSession')}
         </Button>
         <Dropdown>
           <DropdownTrigger className={buttonVariants({ isIconOnly: true })}>

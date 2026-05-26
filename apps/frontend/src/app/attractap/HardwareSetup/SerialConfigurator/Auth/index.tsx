@@ -1,5 +1,6 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Alert, AlertContent, AlertDescription, Button, Input, Label, ProgressCircle, ProgressCircleFillCircle, ProgressCircleTrack, ProgressCircleTrackCircle, TextField } from '@heroui/react';
+import { Alert, AlertContent, AlertDescription, Input, Label, ProgressCircle, ProgressCircleFillCircle, ProgressCircleTrack, ProgressCircleTrackCircle, TextField } from '@heroui/react';
+import { Button } from '../../../../../components/button';
 import { AlertStatusIcon } from '../../../../../components/AlertStatusIcon';
 import {
   createContext,

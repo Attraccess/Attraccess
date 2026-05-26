@@ -1,6 +1,7 @@
 import { usePluginsServiceDeletePlugin, usePluginsServiceGetPlugins } from '@attraccess/react-query-client';
 import { useState } from 'react';
-import { Alert, AlertContent, AlertDescription, AlertTitle, Button, Card, Chip, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow, Tooltip, TooltipContent } from '@heroui/react';
+import { Alert, AlertContent, AlertDescription, AlertTitle, Card, Chip, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow, Tooltip, TooltipContent } from '@heroui/react';
+import { Button } from '../../components/button';
 import { Trash2, Upload } from 'lucide-react';
 import { AlertStatusIcon } from '../../components/AlertStatusIcon';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';

@@ -1,7 +1,6 @@
 import { memo, useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
-  Button,
   FieldError,
   Form,
   Input,
@@ -16,6 +15,7 @@ import {
   TextArea,
   TextField,
 } from '@heroui/react';
+import { Button } from '../../../components/button';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { ArrowLeft, Save } from 'lucide-react';
 import { useToastMessage } from '../../../components/toastProvider';

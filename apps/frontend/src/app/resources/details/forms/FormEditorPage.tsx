@@ -12,7 +12,8 @@ import {
   UseResourceFormsServiceResourceFormsGetOneKeyFn,
   UseResourceFormsServiceResourceFormsListKeyFn,
 } from '@attraccess/react-query-client';
-import { Accordion, AccordionBody, AccordionHeading, AccordionIndicator, AccordionItem, AccordionPanel, AccordionTrigger, Button, Input, Label, Selection, Spinner, TextField } from '@heroui/react';
+import { Accordion, AccordionBody, AccordionHeading, AccordionIndicator, AccordionItem, AccordionPanel, AccordionTrigger, Input, Label, Selection, Spinner, TextField } from '@heroui/react';
+import { Button } from '../../../../components/button';
 import { useToastMessage } from '../../../../components/toastProvider';
 import { LabeledSwitch } from '../../../../components/labeledSwitch';
 import { useQueryClient } from '@tanstack/react-query';

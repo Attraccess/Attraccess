@@ -1,7 +1,6 @@
 import { usePluginsServiceUploadPlugin } from '@attraccess/react-query-client';
 import { useState, useRef } from 'react';
 import {
-  Button,
   DrawerBody,
   DrawerFooter,
   DrawerHeader,
@@ -10,6 +9,7 @@ import {
   Input,
   Description,
 } from '@heroui/react';
+import { Button } from '../../components/button';
 import { Upload } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './UploadPluginModal.en.json';

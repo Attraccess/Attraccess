@@ -3,7 +3,6 @@ import {
   Alert,
   AlertContent,
   AlertDescription,
-  Button,
   Modal,
   ModalBackdrop,
   ModalBody,
@@ -15,6 +14,7 @@ import {
   Spinner,
   useOverlayState,
 } from '@heroui/react';
+import { Button } from '../../../components/button';
 import { useNavigate } from 'react-router-dom';
 import { useToastMessage } from '../../../components/toastProvider';
 import en from './translations/list/en.json';

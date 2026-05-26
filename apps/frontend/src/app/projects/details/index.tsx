@@ -7,7 +7,8 @@ import {
   useProjectsServiceFindOneProjectKey,
   useProjectsServiceUnarchiveProject,
 } from '@attraccess/react-query-client';
-import { Skeleton, Button, Chip } from '@heroui/react';
+import { Skeleton, Chip } from '@heroui/react';
+import { Button } from '../../../components/button';
 import { filenameToUrl } from '../../../api';
 import { PageHeader, PageAction } from '../../../components/pageHeader';
 import { ArchiveIcon, ArchiveRestoreIcon, Edit2Icon, FoldersIcon, Trash2Icon, UsersIcon } from 'lucide-react';

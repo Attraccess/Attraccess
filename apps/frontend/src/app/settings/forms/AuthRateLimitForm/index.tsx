@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  Button,
   NumberField,
   NumberFieldDecrementButton,
   NumberFieldGroup,
@@ -9,6 +8,7 @@ import {
   Separator,
   Spinner,
 } from '@heroui/react';
+import { Button } from '../../../../components/button';
 import { HelpCircleIcon } from 'lucide-react';
 import { LabeledSwitch } from '../../../../components/labeledSwitch';
 import { useQueryClient } from '@tanstack/react-query';

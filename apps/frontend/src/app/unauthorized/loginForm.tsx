@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo } from 'react';
 import { ArrowRight, LogInIcon } from 'lucide-react';
 import { Accordion, AccordionItem, AccordionHeading, AccordionTrigger, AccordionPanel, AccordionBody, AlertContent, AlertDescription, AlertTitle, Description, Input, Label, Skeleton, TextField } from '@heroui/react';
-import { Button } from '@heroui/react';
+import { Button } from '../../components/button';
 import { Alert } from '@heroui/react';
 import { TExists, TFunction, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PasswordInput } from '../../components/PasswordInput';

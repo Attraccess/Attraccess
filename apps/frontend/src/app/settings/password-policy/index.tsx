@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Card, Spinner } from '@heroui/react';
+import { Card, Spinner } from '@heroui/react';
+import { Button } from '../../../components/button';
 import { ShieldCheckIcon } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import {

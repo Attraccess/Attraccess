@@ -1,14 +1,13 @@
 import { useState, useCallback } from 'react';
 import {
-  Button,
   ButtonGroup,
   Dropdown,
   DropdownTrigger,
   DropdownMenu,
   DropdownItem,
   DropdownPopover,
-  Spinner,
 } from '@heroui/react';
+import { Button } from '../../../../../components/button';
 import { buttonVariants } from '@heroui/styles';
 import { StopCircle, ChevronDownIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -142,17 +141,8 @@ export function ActiveSessionDisplay({ resourceId, startTime }: ActiveSessionDis
             variant="danger"
             isPending={endSession.isPending}
             onPress={immediatelyEndSession}
-          >
-            {({ isPending }) =>
-              isPending ? (
-                <Spinner color="current" />
-              ) : (
-                <>
-                  <StopCircle className="w-4 h-4" />
-                  {t('endSession')}
-                </>
-              )
-            }
+          ><StopCircle className="w-4 h-4" />
+            {t('endSession')}
           </Button>
           <Dropdown>
             <DropdownTrigger className={buttonVariants({ isIconOnly: true, variant: 'danger' })}>

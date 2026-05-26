@@ -7,7 +7,6 @@ import {
   EmailTemplateType,
 } from '@attraccess/react-query-client';
 import {
-  Button,
   Chip,
   DrawerBody,
   DrawerFooter,
@@ -19,6 +18,7 @@ import {
   TextField,
   useTheme,
 } from '@heroui/react';
+import { Button } from '../../../components/button';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../components/toastProvider';
 import { PageHeader } from '../../../components/pageHeader';

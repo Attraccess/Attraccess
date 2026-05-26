@@ -1,6 +1,5 @@
 import { HTMLAttributes, useCallback, useMemo, useState } from 'react';
 import {
-  Button,
   Link,
   Table,
   TableBody,
@@ -11,6 +10,7 @@ import {
   TableRow,
   TableScrollContainer,
 } from '@heroui/react';
+import { Button } from '../../../components/button';
 import {
   Resource,
   ResourceGroup,
