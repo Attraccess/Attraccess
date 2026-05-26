@@ -58,6 +58,14 @@ export function ResourceOverview() {
     );
   }, []);
 
+  const setFilterByHideEmptyResourceGroups = useCallback((value: boolean) => {
+    setFilterByHideEmptyResourceGroupsState(value);
+    localStorage.setItem(
+      getLocalStorageFilterKey(PersistedFilterProps.hideEmptyResourceGroups),
+      value === true ? 'true' : 'false'
+    );
+  }, []);
+
   const groupIds = useMemo(() => {
     const ids: Array<number | 'none'> = ['none'];
 
@@ -85,7 +93,7 @@ export function ResourceOverview() {
         onlyWithPermissions={filterByOnlyWithPermissions}
         onOnlyWithPermissionsChanged={setFilterByOnlyWithPermissions}
         hideEmptyResourceGroups={filterByHideEmptyResourceGroups}
-        onHideEmptyResourceGroupsChanged={setFilterByHideEmptyResourceGroupsState}
+        onHideEmptyResourceGroupsChanged={setFilterByHideEmptyResourceGroups}
         highlightSearch={allResources?.data.length === 0}
         highlightFilter={allResources?.data.length === 0}
       />
