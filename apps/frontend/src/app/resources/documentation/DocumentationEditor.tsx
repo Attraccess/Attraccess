@@ -27,10 +27,10 @@ import {
   DocumentationType,
   useResourcesServiceGetAllResourcesKey,
 } from '@attraccess/react-query-client';
-import ReactMarkdown from 'react-markdown';
 import en from './documentationEditor.en.json';
 import de from './documentationEditor.de.json';
 import { useQueryClient } from '@tanstack/react-query';
+import { Markdown } from '../../../components/markdown';
 
 function DocumentationEditorComponent() {
   const { id } = useParams<{ id: string }>();
@@ -269,13 +269,15 @@ function DocumentationEditorComponent() {
                 </TextField>
               </TabPanel>
               <TabPanel id="preview" className="pt-4">
-                <div className="border border-default-200 rounded-md p-4 min-h-[300px] prose dark:prose-invert max-w-none">
-                  {markdownContent ? (
-                    <ReactMarkdown>{markdownContent}</ReactMarkdown>
-                  ) : (
+                {markdownContent ? (
+                  <Markdown className="border border-default-200 rounded-md p-4 min-h-[300px]">
+                    {markdownContent}
+                  </Markdown>
+                ) : (
+                  <div className="border border-default-200 rounded-md p-4 min-h-[300px]">
                     <p className="text-default-400 italic">{t('markdownContent.placeholder')}</p>
-                  )}
-                </div>
+                  </div>
+                )}
               </TabPanel>
             </Tabs>
           </section>

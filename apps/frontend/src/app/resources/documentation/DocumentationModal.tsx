@@ -17,9 +17,8 @@ import { useNavigate } from 'react-router-dom';
 import { useResourcesServiceGetOneResourceById } from '@attraccess/react-query-client';
 import en from './documentationModal.en.json';
 import de from './documentationModal.de.json';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import { useAuth } from '../../../hooks/useAuth';
+import { Markdown } from '../../../components/markdown';
 
 interface DocumentationModalProps {
   resourceId: number;
@@ -98,27 +97,7 @@ function DocumentationModalComponent({ resourceId, children }: Readonly<Document
     }
 
     if (resource.documentationType === 'markdown' && resource.documentationMarkdown) {
-      return (
-        <div
-          className="prose prose-slate dark:prose-invert max-w-none p-6 
-                        prose-headings:text-foreground prose-headings:font-semibold
-                        prose-h1:text-2xl prose-h1:border-b prose-h1:border-divider prose-h1:pb-2
-                        prose-h2:text-xl prose-h2:mt-8 prose-h2:mb-4
-                        prose-h3:text-lg prose-h3:mt-6 prose-h3:mb-3
-                        prose-p:text-foreground prose-p:leading-relaxed
-                        prose-a:text-primary prose-a:no-underline hover:prose-a:underline
-                        prose-strong:text-foreground prose-strong:font-semibold
-                        prose-code:text-primary prose-code:bg-default-100 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-sm prose-code:font-mono prose-code:before:content-none prose-code:after:content-none
-                        prose-pre:bg-default-100 prose-pre:border prose-pre:border-divider prose-pre:rounded-lg
-                        prose-blockquote:border-l-primary prose-blockquote:bg-default-50 prose-blockquote:rounded-r-lg prose-blockquote:py-2 prose-blockquote:text-foreground-600
-                        prose-ul:text-foreground prose-ol:text-foreground
-                        prose-li:text-foreground prose-li:marker:text-foreground-400
-                        prose-hr:border-divider
-                        prose-table:text-foreground prose-thead:border-divider prose-tbody:border-divider prose-th:text-foreground prose-td:text-foreground"
-        >
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>{resource.documentationMarkdown}</ReactMarkdown>
-        </div>
-      );
+      return <Markdown className="p-6">{resource.documentationMarkdown}</Markdown>;
     }
 
     if (resource.documentationType === 'url' && resource.documentationUrl) {

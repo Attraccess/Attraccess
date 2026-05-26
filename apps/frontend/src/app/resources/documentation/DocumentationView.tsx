@@ -5,10 +5,10 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { ArrowLeft, Edit, RefreshCw } from 'lucide-react';
 import { PageHeader } from '../../../components/pageHeader';
 import { useResourcesServiceGetOneResourceById } from '@attraccess/react-query-client';
-import ReactMarkdown from 'react-markdown';
 import en from './documentationModal.en.json';
 import de from './documentationModal.de.json';
 import { useAuth } from '../../../hooks/useAuth';
+import { Markdown } from '../../../components/markdown';
 
 function DocumentationViewComponent() {
   const { id } = useParams<{ id: string }>();
@@ -135,9 +135,7 @@ function DocumentationViewComponent() {
           {!resource.documentationType && <p className="text-center text-default-400 p-4">{t('noDocumentation')}</p>}
 
           {resource.documentationType === 'markdown' && resource.documentationMarkdown && (
-            <div className="prose max-w-none">
-              <ReactMarkdown>{resource.documentationMarkdown}</ReactMarkdown>
-            </div>
+            <Markdown>{resource.documentationMarkdown}</Markdown>
           )}
 
           {resource.documentationType === 'url' && resource.documentationUrl && (
