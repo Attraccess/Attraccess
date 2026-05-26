@@ -2,9 +2,10 @@
 // FEATURE: CSV export — step 2 of new export flow
 import { DateValue, RangeValue } from '@heroui/react';
 import { useAnalyticsServiceGetResourceUsageHoursInDateRange } from '@attraccess/react-query-client';
-import { getLocalTimeZone } from '@internationalized/date';
 import { DatabaseIcon } from 'lucide-react';
+import { useMemo } from 'react';
 import { ExportTypeCard } from './export-type-card';
+import { rangeToDateBounds } from '../date-range-section/compute-range';
 
 interface Props {
   range: RangeValue<DateValue> | null;
@@ -16,8 +17,11 @@ export function ResourceUsageCard(props: Props) {
   const { range, onPress, t } = props;
 
   const hasRange = Boolean(range?.start && range?.end);
-  const start = range?.start ? range.start.toDate(getLocalTimeZone()).toISOString() : '';
-  const end = range?.end ? range.end.toDate(getLocalTimeZone()).toISOString() : '';
+  const { start, end } = useMemo(() => {
+    if (!hasRange) return { start: '', end: '' };
+    const bounds = rangeToDateBounds(range, new Date());
+    return { start: bounds.start.toISOString(), end: bounds.end.toISOString() };
+  }, [range, hasRange]);
 
   const { data, status } = useAnalyticsServiceGetResourceUsageHoursInDateRange(
     { start, end },
