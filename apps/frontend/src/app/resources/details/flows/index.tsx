@@ -431,7 +431,7 @@ function FlowsPageInner() {
             <Controls />
             <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
 
-            <Panel position="top-left">
+            <Panel position="top-left" className="hidden md:block">
               <ButtonGroup>
                 <Button
                   isIconOnly
