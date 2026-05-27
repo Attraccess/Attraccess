@@ -16,7 +16,7 @@
 
 services:
   attraccess:
-    image: ${ATTRACCESS_IMAGE:-ghcr.io/attraccess/attraccess:latest}
+    image: ${ATTRACCESS_IMAGE:-attraccess/attraccess:latest}
     restart: unless-stopped
     environment:
       - SERVICE_FQDN_ATTRACCESS_3000
@@ -84,7 +84,7 @@ services:
         condition: service_healthy
 
   monitoring-init:
-    image: ${ATTRACCESS_IMAGE:-ghcr.io/attraccess/attraccess:latest}
+    image: ${ATTRACCESS_IMAGE:-attraccess/attraccess:latest}
     restart: 'no'
     entrypoint: ['/bin/sh', '-c']
     environment:
