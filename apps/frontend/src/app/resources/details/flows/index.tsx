@@ -431,7 +431,7 @@ function FlowsPageInner() {
             <Controls />
             <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
 
-            <Panel position="top-left">
+            <Panel position="top-right" className="flex flex-row flex-wrap gap-2">
               <ButtonGroup>
                 <Button
                   isIconOnly
@@ -452,9 +452,6 @@ function FlowsPageInner() {
                   <BoxSelectIcon />
                 </Button>
               </ButtonGroup>
-            </Panel>
-
-            <Panel position="top-right" className="flex flex-row flex-wrap gap-2">
               <Button
                 isIconOnly
                 isPending={isSaving}
