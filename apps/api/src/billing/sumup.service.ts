@@ -233,10 +233,8 @@ export class SumUpService {
 
     switch (sumUpTransactionData.status) {
       case 'CANCELLED':
-        transaction.status = BillingTransactionStatus.Failed;
-        break;
-
       case 'FAILED':
+      case 'REFUNDED':
         transaction.status = BillingTransactionStatus.Failed;
         break;
 

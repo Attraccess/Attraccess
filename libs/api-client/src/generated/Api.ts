@@ -9598,7 +9598,7 @@ export class Api<
      * @secure
      */
     getUpdateStatus: (
-      query: GetUpdateStatusParams,
+      query: GetUpdateStatusParams = {},
       params: RequestParams = {},
     ) =>
       this.request<GetUpdateStatusData, void>({
@@ -9678,7 +9678,7 @@ export class Api<
      * @request GET:/api/users
      * @secure
      */
-    findMany: (query: FindManyParams, params: RequestParams = {}) =>
+    findMany: (query: FindManyParams = {}, params: RequestParams = {}) =>
       this.request<FindManyData, void>({
         path: `/api/users`,
         method: "GET",
@@ -10035,7 +10035,7 @@ export class Api<
      * @secure
      */
     getAllWithPermission: (
-      query: GetAllWithPermissionParams,
+      query: GetAllWithPermissionParams = {},
       params: RequestParams = {},
     ) =>
       this.request<GetAllWithPermissionData, void>({
@@ -11192,7 +11192,7 @@ export class Api<
      * @secure
      */
     getAllResources: (
-      query: GetAllResourcesParams,
+      query: GetAllResourcesParams = {},
       params: RequestParams = {},
     ) =>
       this.request<GetAllResourcesData, void>({
@@ -12927,7 +12927,7 @@ export class Api<
      * @secure
      */
     findManyProjects: (
-      query: FindManyProjectsParams,
+      query: FindManyProjectsParams = {},
       params: RequestParams = {},
     ) =>
       this.request<FindManyProjectsData, void>({
