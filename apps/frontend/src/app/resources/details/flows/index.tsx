@@ -305,13 +305,17 @@ function FlowsPageInner() {
   const [flowIsRunning, setFlowIsRunning] = useState(false);
   const [, setFlowExecutionHadError] = useState(false);
 
-  const [interactionMode, setInteractionMode] = useState<'pan' | 'select'>(() => {
+  const isCoarsePointer = useMemo(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
-      return 'select';
+      return false;
     }
-    return window.matchMedia('(hover: none) and (pointer: coarse)').matches ? 'pan' : 'select';
-  });
-  const panOnDrag = interactionMode === 'pan' ? true : [1, 2];
+    return window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+  }, []);
+  const [interactionMode, setInteractionMode] = useState<'pan' | 'select'>(() =>
+    isCoarsePointer ? 'pan' : 'select',
+  );
+  // @xyflow/react's mouse-button array in panOnDrag doesn't apply to touch, so for select mode on touch we must disable pan entirely.
+  const panOnDrag = interactionMode === 'pan' ? true : isCoarsePointer ? false : [1, 2];
   const selectionOnDrag = interactionMode === 'select';
 
   const onLiveLog = useCallback(
