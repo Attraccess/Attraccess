@@ -104,7 +104,7 @@ export default () => (
     <ElecCap_22uF_100V name="C_VIN_BULK" pn="C46550391" pcbX={9} pcbY={-15} />
     <C0402 name="C_VIN_LF" pn="C307331" capacitance="100nF" pcbX={10.5} pcbY={-9} />
     <C0402 name="C_BST" pn="C307331" capacitance="100nF" pcbX={13} pcbY={1} />
-    <Ss34 name="D_CATCH" pn="C8678" pcbX={25} pcbY={-10} />
+    <Ss34 name="D_CATCH" pn="C8678" pcbX={21} pcbY={-10} />
     <inductor
       name="L_BUCK"
       inductance="47uH"
@@ -122,7 +122,7 @@ export default () => (
     <R0402 name="R_FB_BOT" pn="C25744" resistance="10k" tolerance="1%" pcbX={23} pcbY={-4} />
     <R0402 name="R_EN" pn="C25741" resistance="100k" tolerance="1%" pcbX={9} pcbY={-1} />
     <C0402 name="C_OUT_HF" pn="C307331" capacitance="100nF" pcbX={21} pcbY={-3} />
-    <ElecCap_22uF_100V name="C_OUT_BULK" pn="C46550391" pcbX={28} pcbY={-3} />
+    <ElecCap_22uF_100V name="C_OUT_BULK" pn="C46550391" pcbX={29} pcbY={-3} />
 
     <net name="SW_NODE" />
     <net name="V5V" />
