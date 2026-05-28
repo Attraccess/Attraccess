@@ -183,14 +183,21 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
       }
 
       if (schema.stringVariant === 'multiline') {
+        const multilineLabel = t('nodes.' + nodeType + '.config.' + name + '.label');
+        const multilineId = `property-input-${nodeType}-${name}`;
         return (
-          <TextArea
-            required={isRequired}
-            placeholder={hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined}
-            value={value ? String(value) : undefined}
-            defaultValue={schema.default ? String(schema.default) : undefined}
-            onChange={(e) => onChange(e.target.value as TValue)}
-          />
+          <div className="flex flex-col gap-2 w-full">
+            {!hideLabel && <Label htmlFor={multilineId}>{multilineLabel}</Label>}
+            <TextArea
+              id={multilineId}
+              aria-label={multilineLabel}
+              required={isRequired}
+              placeholder={hideLabel ? multilineLabel : undefined}
+              value={value ? String(value) : undefined}
+              defaultValue={schema.default ? String(schema.default) : undefined}
+              onChange={(e) => onChange(e.target.value as TValue)}
+            />
+          </div>
         );
       }
 
