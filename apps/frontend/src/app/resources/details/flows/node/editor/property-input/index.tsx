@@ -243,17 +243,14 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
       return (
         <NumberField
           isRequired={isRequired}
-          aria-label={
-            !hideLabel
-              ? t('nodes.' + nodeType + '.config.' + name + '.label')
-              : t('nodes.' + nodeType + '.config.' + name + '.label')
-          }
+          aria-label={t('nodes.' + nodeType + '.config.' + name + '.label')}
           value={Number(parsedValue)}
           defaultValue={schema.default ? Number(schema.default) : undefined}
           onChange={(newValue) => setValue(newValue as TValue)}
           minValue={schema.exclusiveMinimum !== undefined ? schema.exclusiveMinimum + 1 : undefined}
           maxValue={schema.maximum}
         >
+          {!hideLabel && <Label>{t('nodes.' + nodeType + '.config.' + name + '.label')}</Label>}
           <NumberFieldGroup>
             <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
             <NumberFieldInput />
