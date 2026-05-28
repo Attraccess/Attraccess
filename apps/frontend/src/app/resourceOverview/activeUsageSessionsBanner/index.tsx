@@ -225,9 +225,9 @@ export function ActiveUsageSessionsBanner({ onShowMySessions }: ActiveUsageSessi
         isOpen={isModalOpen}
         onOpenChange={(open) => { if (!open && !isEndingAll) setIsModalOpen(false); }}
       >
-        <ModalBackdrop isDismissable={!isEndingAll} />
-        <ModalContainer size="md">
-          <ModalDialog>
+        <ModalBackdrop>
+          <ModalContainer size="md">
+            <ModalDialog>
             {({ close }) => (
               <>
                 <ModalHeader>
@@ -306,8 +306,9 @@ export function ActiveUsageSessionsBanner({ onShowMySessions }: ActiveUsageSessi
                 )}
               </>
             )}
-          </ModalDialog>
-        </ModalContainer>
+            </ModalDialog>
+          </ModalContainer>
+        </ModalBackdrop>
       </Modal>
     </div>
   );
