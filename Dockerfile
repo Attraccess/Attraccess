@@ -43,7 +43,9 @@ RUN pnpm nx run-many -t build --projects=api,frontend
 # pnpm 10 only respects pnpm.overrides / pnpm.onlyBuiltDependencies at the workspace root.
 RUN node -e "for (const p of ['dist/apps/api/package.json','dist/apps/api-swagger/package.json']) { const fs = require('fs'); if (!fs.existsSync(p)) continue; const j = JSON.parse(fs.readFileSync(p, 'utf8')); delete j.pnpm; fs.writeFileSync(p, JSON.stringify(j, null, 2) + '\n'); }"
 
-RUN pnpm --ignore-workspace --filter ./dist/apps/api deploy --prod /app/deploy/api
+# pnpm 10's new deploy requires a workspace shared lockfile; --ignore-workspace
+# strips that, so use --legacy for the self-contained dist/apps/api package.
+RUN pnpm --ignore-workspace --filter ./dist/apps/api deploy --legacy --prod /app/deploy/api
 RUN cd /app/deploy/api && npm rebuild bcrypt sqlite3
 
 
