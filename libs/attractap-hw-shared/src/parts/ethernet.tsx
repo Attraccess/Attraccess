@@ -54,12 +54,14 @@ const HY931147C_PINS = {
   pin6: ['RX_N', 'J6'],
   pin7: ['CABLE_7', 'J7'],
   pin8: ['CABLE_8', 'J8'],
-  pin9: ['SHIELD_1'],
-  pin10: ['SHIELD_2'],
+  pin9: ['NC9'],
+  pin10: ['NC10'],
   pin11: ['LED_LINK_A'],
   pin12: ['LED_LINK_K'],
   pin13: ['LED_ACT_A'],
   pin14: ['LED_ACT_K'],
+  pin15: ['SHIELD_1'],
+  pin16: ['SHIELD_2'],
 } as const;
 
 export type Hy931147cProps = BasePartProps;
@@ -71,25 +73,29 @@ export const Hy931147c = ({ name, pn, ...rest }: Hy931147cProps) => (
     supplierPartNumbers={jlcSupplier(pn)}
     footprint={
       <footprint>
-        <platedhole shape="circle" portHints={['pin1']} pcbX={8.890} pcbY={-5.715} holeDiameter="0.9mm" outerDiameter="1.6mm" />
-        <platedhole shape="circle" portHints={['pin2']} pcbX={6.350} pcbY={-4.445} holeDiameter="0.9mm" outerDiameter="1.6mm" />
-        <platedhole shape="circle" portHints={['pin3']} pcbX={8.890} pcbY={-3.175} holeDiameter="0.9mm" outerDiameter="1.6mm" />
-        <platedhole shape="circle" portHints={['pin4']} pcbX={6.350} pcbY={-1.905} holeDiameter="0.9mm" outerDiameter="1.6mm" />
-        <platedhole shape="circle" portHints={['pin5']} pcbX={8.890} pcbY={-0.635} holeDiameter="0.9mm" outerDiameter="1.6mm" />
-        <platedhole shape="circle" portHints={['pin6']} pcbX={6.350} pcbY={0.635} holeDiameter="0.9mm" outerDiameter="1.6mm" />
-        <platedhole shape="circle" portHints={['pin7']} pcbX={8.890} pcbY={1.905} holeDiameter="0.9mm" outerDiameter="1.6mm" />
-        <platedhole shape="circle" portHints={['pin8']} pcbX={6.350} pcbY={3.175} holeDiameter="0.9mm" outerDiameter="1.6mm" />
-        <platedhole shape="circle" portHints={['pin9']} pcbX={8.890} pcbY={4.445} holeDiameter="0.9mm" outerDiameter="1.6mm" />
-        <platedhole shape="circle" portHints={['pin10']} pcbX={6.350} pcbY={5.715} holeDiameter="0.9mm" outerDiameter="1.6mm" />
-        <platedhole shape="circle" portHints={['pin11']} pcbX={-4.089} pcbY={-6.629} holeDiameter="1.1mm" outerDiameter="1.8mm" />
-        <platedhole shape="circle" portHints={['pin12']} pcbX={-4.089} pcbY={-4.089} holeDiameter="1.1mm" outerDiameter="1.8mm" />
-        <platedhole shape="circle" portHints={['pin13']} pcbX={-4.089} pcbY={4.089} holeDiameter="1.1mm" outerDiameter="1.8mm" />
-        <platedhole shape="circle" portHints={['pin14']} pcbX={-4.089} pcbY={6.629} holeDiameter="1.1mm" outerDiameter="1.8mm" />
+        <platedhole shape="circle" portHints={['pin1']} pcbX={6.490} pcbY={-5.715} holeDiameter="0.9mm" outerDiameter="1.5mm" />
+        <platedhole shape="circle" portHints={['pin2']} pcbX={3.950} pcbY={-4.445} holeDiameter="0.9mm" outerDiameter="1.5mm" />
+        <platedhole shape="circle" portHints={['pin3']} pcbX={6.490} pcbY={-3.175} holeDiameter="0.9mm" outerDiameter="1.5mm" />
+        <platedhole shape="circle" portHints={['pin4']} pcbX={3.950} pcbY={-1.905} holeDiameter="0.9mm" outerDiameter="1.5mm" />
+        <platedhole shape="circle" portHints={['pin5']} pcbX={6.490} pcbY={-0.635} holeDiameter="0.9mm" outerDiameter="1.5mm" />
+        <platedhole shape="circle" portHints={['pin6']} pcbX={3.950} pcbY={0.635} holeDiameter="0.9mm" outerDiameter="1.5mm" />
+        <platedhole shape="circle" portHints={['pin7']} pcbX={6.490} pcbY={1.905} holeDiameter="0.9mm" outerDiameter="1.5mm" />
+        <platedhole shape="circle" portHints={['pin8']} pcbX={3.950} pcbY={3.175} holeDiameter="0.9mm" outerDiameter="1.5mm" />
+        <platedhole shape="circle" portHints={['pin9']} pcbX={6.490} pcbY={4.445} holeDiameter="0.9mm" outerDiameter="1.5mm" />
+        <platedhole shape="circle" portHints={['pin10']} pcbX={3.950} pcbY={5.715} holeDiameter="0.9mm" outerDiameter="1.5mm" />
+        <platedhole shape="circle" portHints={['pin11']} pcbX={-6.490} pcbY={-6.629} holeDiameter="1.1mm" outerDiameter="1.6mm" />
+        <platedhole shape="circle" portHints={['pin12']} pcbX={-6.490} pcbY={-4.089} holeDiameter="1.1mm" outerDiameter="1.6mm" />
+        <platedhole shape="circle" portHints={['pin13']} pcbX={-6.490} pcbY={4.089} holeDiameter="1.1mm" outerDiameter="1.6mm" />
+        <platedhole shape="circle" portHints={['pin14']} pcbX={-6.490} pcbY={6.629} holeDiameter="1.1mm" outerDiameter="1.6mm" />
+        <platedhole shape="circle" portHints={['pin15']} pcbX={0.648} pcbY={-7.747} holeDiameter="1.6mm" outerDiameter="2.0mm" />
+        <platedhole shape="circle" portHints={['pin16']} pcbX={0.648} pcbY={7.747} holeDiameter="1.6mm" outerDiameter="2.0mm" />
+        <hole shape="circle" pcbX={-2.400} pcbY={-5.700} diameter="1.625mm" />
+        <hole shape="circle" pcbX={-2.400} pcbY={5.700} diameter="1.625mm" />
       </footprint>
     }
     {...rest}
   >
-    <fabricationnotetext text="HY931147C PoE RJ45 magjack. Pins 4,5,7,8 = spare-pair direct cable contacts for Mode A PoE." />
+    <fabricationnotetext text="HY931147C PoE RJ45 magjack. Pins 4,5,7,8 = spare-pair cable contacts (Mode A). Pin15/16 = chassis shield mounting pegs." />
   </chip>
 );
 
