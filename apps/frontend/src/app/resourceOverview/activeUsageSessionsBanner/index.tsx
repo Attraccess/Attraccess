@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, AlertContent, AlertTitle, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Spinner } from '@heroui/react';
+import { Alert, AlertContent, AlertDescription, AlertTitle, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Spinner } from '@heroui/react';
 import { Button } from '../../../components/button';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -209,10 +209,8 @@ export function ActiveUsageSessionsBanner({ onShowMySessions }: ActiveUsageSessi
       <Alert status="warning">
         <AlertContent>
           <AlertTitle>{t('title', { count: activeCount })}</AlertTitle>
-        </AlertContent>
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 w-full">
-          <div className="flex flex-1">{t('description', { count: activeCount })}</div>
-          <div className="flex flex-shrink gap-2">
+          <AlertDescription>{t('description', { count: activeCount })}</AlertDescription>
+          <div className="mt-2 flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
             <Button variant="primary" onPress={onShowMySessions}>
               {t('showMine')}
             </Button>
@@ -220,7 +218,7 @@ export function ActiveUsageSessionsBanner({ onShowMySessions }: ActiveUsageSessi
               {t('endAll')}
             </Button>
           </div>
-        </div>
+        </AlertContent>
       </Alert>
 
       <Modal
