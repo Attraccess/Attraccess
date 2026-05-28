@@ -38,6 +38,11 @@ COPY . .
 
 # Build the application
 RUN pnpm nx run-many -t build --projects=api,frontend
+
+# Strip stray pnpm config Nx copies into generated dist package.json files;
+# pnpm 10 only respects pnpm.overrides / pnpm.onlyBuiltDependencies at the workspace root.
+RUN node -e "for (const p of ['dist/apps/api/package.json','dist/apps/api-swagger/package.json']) { const fs = require('fs'); if (!fs.existsSync(p)) continue; const j = JSON.parse(fs.readFileSync(p, 'utf8')); delete j.pnpm; fs.writeFileSync(p, JSON.stringify(j, null, 2) + '\n'); }"
+
 RUN pnpm --ignore-workspace --filter ./dist/apps/api deploy --prod /app/deploy/api
 RUN cd /app/deploy/api && npm rebuild bcrypt sqlite3
 
