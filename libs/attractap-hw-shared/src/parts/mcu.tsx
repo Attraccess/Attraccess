@@ -204,6 +204,9 @@ const C6_THERM_ROWS = 6;
 const C6_THERM_PAD = 1.2;
 const C6_THERM_PITCH_X = 1.8;
 const C6_THERM_PITCH_Y = 1.8;
+const C6_PAD_BBOX_Y_TOP = ((C6_LEFT_COUNT - 1) / 2) * C6_PERIM_PITCH + C6_PERIM_PAD_H / 2;
+const C6_PAD_BBOX_Y_BOTTOM = -C6_BODY_H / 2 - C6_PAD_TO_BODY_EDGE - C6_PERIM_PAD_W / 2;
+const C6_BBOX_CENTER_Y = (C6_PAD_BBOX_Y_TOP + C6_PAD_BBOX_Y_BOTTOM) / 2;
 
 const c6MiniPadAt = (idx: number) => {
   if (idx < C6_LEFT_COUNT) {
@@ -271,15 +274,15 @@ export const Esp32C6Mini1 = ({ name, pn, ...rest }: Esp32MiniProps) => (
       })}
       <silkscreenpath
         route={[
-          { x: -C6_BODY_W / 2, y: -C6_BODY_H / 2 },
-          { x:  C6_BODY_W / 2, y: -C6_BODY_H / 2 },
-          { x:  C6_BODY_W / 2, y:  C6_BODY_H / 2 },
-          { x: -C6_BODY_W / 2, y:  C6_BODY_H / 2 },
-          { x: -C6_BODY_W / 2, y: -C6_BODY_H / 2 },
+          { x: -C6_BODY_W / 2, y: -C6_BODY_H / 2 + C6_BBOX_CENTER_Y },
+          { x:  C6_BODY_W / 2, y: -C6_BODY_H / 2 + C6_BBOX_CENTER_Y },
+          { x:  C6_BODY_W / 2, y:  C6_BODY_H / 2 + C6_BBOX_CENTER_Y },
+          { x: -C6_BODY_W / 2, y:  C6_BODY_H / 2 + C6_BBOX_CENTER_Y },
+          { x: -C6_BODY_W / 2, y: -C6_BODY_H / 2 + C6_BBOX_CENTER_Y },
         ]}
         strokeWidth="0.12mm"
       />
-      <silkscreencircle pcbX={-C6_BODY_W / 2 - 1.2} pcbY={C6_BODY_H / 2 - 0.5} radius={0.2} strokeWidth="0.12mm" />
+      <silkscreencircle pcbX={-C6_BODY_W / 2 - 1.2} pcbY={C6_BODY_H / 2 - 0.5 + C6_BBOX_CENTER_Y} radius={0.2} strokeWidth="0.12mm" />
     </footprint>
   </chip>
 );
