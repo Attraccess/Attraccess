@@ -104,13 +104,25 @@ export default () => (
     <ElecCap_22uF_100V name="C_VIN_BULK" pn="C46550391" pcbX={9} pcbY={-15} />
     <C0402 name="C_VIN_LF" pn="C307331" capacitance="100nF" pcbX={10.5} pcbY={-9} />
     <C0402 name="C_BST" pn="C307331" capacitance="100nF" pcbX={13} pcbY={1} />
-    <Ss34 name="D_CATCH" pn="C8678" pcbX={21} pcbY={-10} />
-    <L0603 name="L_BUCK" pn="C168137" inductance="47uH" pcbX={17} pcbY={-1} />
+    <Ss34 name="D_CATCH" pn="C8678" pcbX={25} pcbY={-10} />
+    <inductor
+      name="L_BUCK"
+      inductance="47uH"
+      supplierPartNumbers={{ jlcpcb: ['C168137'] }}
+      pcbX={18}
+      pcbY={-13}
+      footprint={
+        <footprint>
+          <smtpad portHints={['pin1']} shape="rect" pcbX={-2.80} pcbY={0} width="2.40mm" height="3.40mm" layer="top" />
+          <smtpad portHints={['pin2']} shape="rect" pcbX={2.80} pcbY={0} width="2.40mm" height="3.40mm" layer="top" />
+        </footprint>
+      }
+    />
     <R0402 name="R_FB_TOP" pn="C25904" resistance="51.1k" tolerance="1%" pcbX={23} pcbY={-6} />
     <R0402 name="R_FB_BOT" pn="C25744" resistance="10k" tolerance="1%" pcbX={23} pcbY={-4} />
     <R0402 name="R_EN" pn="C25741" resistance="100k" tolerance="1%" pcbX={9} pcbY={-1} />
     <C0402 name="C_OUT_HF" pn="C307331" capacitance="100nF" pcbX={21} pcbY={-3} />
-    <ElecCap_22uF_100V name="C_OUT_BULK" pn="C46550391" pcbX={26} pcbY={-15} />
+    <ElecCap_22uF_100V name="C_OUT_BULK" pn="C46550391" pcbX={28} pcbY={-3} />
 
     <net name="SW_NODE" />
     <net name="V5V" />
@@ -159,7 +171,7 @@ export default () => (
     <trace from=".U_LDO33 > .VIN" to="net.V5V" />
     <trace from=".U_LDO33 > .VOUT" to="net.V3V3" />
     <trace from=".U_LDO33 > .ADJ_GND" to="net.PD_GND" />
-    <trace from=".U_LDO33 > .TAB" to="net.PD_GND" />
+    <trace from=".U_LDO33 > .TAB" to="net.V3V3" />
     <trace from=".C_LDO_IN > .pin1" to="net.V5V" />
     <trace from=".C_LDO_IN > .pin2" to="net.PD_GND" />
     <trace from=".C_LDO_OUT > .pin1" to="net.V3V3" />
