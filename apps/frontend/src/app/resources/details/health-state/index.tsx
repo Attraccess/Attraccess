@@ -64,40 +64,38 @@ export function ResourceHealthWarning({ resourceId }: Props) {
             : t('alert.identifier.default');
 
         return (
-          <Alert status="danger"
-            key={entry.id}
-          >
+          <Alert status="danger" key={entry.id}>
             <AlertContent>
               <AlertTitle>{t('alert.title')}</AlertTitle>
               <AlertDescription>{t('alert.description')}</AlertDescription>
-            </AlertContent>
-            <div className="flex flex-col gap-1 mt-2 text-sm">
-              <div>
-                <span className="text-gray-500 mr-1">{t('alert.identifier.label')}:</span>
-                <span className="font-medium">{identifierLabel}</span>
-              </div>
-              <div>
-                <span className="text-gray-500 mr-1">{t('alert.reason.label')}:</span>
-                <span className="whitespace-pre-wrap">
-                  {entry.reason && entry.reason.length > 0 ? entry.reason : t('alert.reason.noReason')}
-                </span>
-              </div>
-              <div>
-                <span className="text-gray-500 mr-1">{t('alert.lastSeen')}:</span>
-                <span>{formatDateTime(entry.lastReportedAt, '')}</span>
+              <div className="flex flex-col gap-1 mt-2 text-sm w-full">
+                <div>
+                  <span className="text-gray-500 mr-1">{t('alert.identifier.label')}:</span>
+                  <span className="font-medium">{identifierLabel}</span>
+                </div>
+                <div>
+                  <span className="text-gray-500 mr-1">{t('alert.reason.label')}:</span>
+                  <span className="whitespace-pre-wrap">
+                    {entry.reason && entry.reason.length > 0 ? entry.reason : t('alert.reason.noReason')}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-500 mr-1">{t('alert.lastSeen')}:</span>
+                  <span>{formatDateTime(entry.lastReportedAt, '')}</span>
+                </div>
               </div>
               {canManage && (
-                <div className="mt-2">
-                  <Button variant="danger-soft"
-
-                    onPress={() => handleClear(entry.id)}
-                    isPending={clearEntry.isPending}
-                  ><CheckCircleIcon size={16} />
-                    {t('actions.markHealthy')}
-                  </Button>
-                </div>
+                <Button
+                  className="mt-3 self-start"
+                  variant="danger-soft"
+                  onPress={() => handleClear(entry.id)}
+                  isPending={clearEntry.isPending}
+                >
+                  <CheckCircleIcon size={16} />
+                  {t('actions.markHealthy')}
+                </Button>
               )}
-            </div>
+            </AlertContent>
           </Alert>
         );
       })}
