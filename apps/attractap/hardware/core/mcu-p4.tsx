@@ -74,10 +74,10 @@ export const McuP4 = ({ boardW, boardH }: McuP4Props) => {
       <C0402 name="C_XTAL_N" pn={C_10PF_PN} capacitance="10pF" {...at(28, 30)} />
 
       <W25q128Jv name="U_FLASH" pn={W25Q128_PN} {...atBottom(25, 10)} />
-      <C0402 name="C_FLASH" pn={C_100NF_PN} capacitance="100nF" {...atBottom(29, 10)} />
-      <R0402 name="R_FLASH_CS" pn={R_10K_PN} resistance="10k" {...atBottom(21, 9)} />
-      <R0402 name="R_FLASH_WP" pn={R_10K_PN} resistance="10k" {...atBottom(21, 10.5)} />
-      <R0402 name="R_FLASH_HOLD" pn={R_10K_PN} resistance="10k" {...atBottom(21, 12)} />
+      <C0402 name="C_FLASH" pn={C_100NF_PN} capacitance="100nF" {...atBottom(31, 10)} />
+      <R0402 name="R_FLASH_CS" pn={R_10K_PN} resistance="10k" {...atBottom(19, 8)} />
+      <R0402 name="R_FLASH_WP" pn={R_10K_PN} resistance="10k" {...atBottom(19, 10)} />
+      <R0402 name="R_FLASH_HOLD" pn={R_10K_PN} resistance="10k" {...atBottom(19, 12)} />
 
       <R0402 name="R_EN" pn={R_10K_PN} resistance="10k" {...at(33, 18)} />
       <C0402 name="C_EN" pn={C_100NF_PN} capacitance="100nF" {...at(33, 20)} />

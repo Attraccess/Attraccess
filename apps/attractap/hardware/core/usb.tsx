@@ -26,7 +26,7 @@ export const UsbBlock = ({ boardW, boardH }: UsbBlockProps) => {
       <R0402 name="R_USB_DM" pn={R_22R_PN} resistance="22" {...at(43, 9)} />
       <R0402 name="R_USB_DP" pn={R_22R_PN} resistance="22" {...at(43, 10.5)} />
 
-      <UsbCRecept16P_2MD name="J_USB_C6" pn={USBC_PN} pcbRotation={270} {...at(5, 30)} />
+      <UsbCRecept16P_2MD name="J_USB_C6" pn={USBC_PN} pcbRotation={90} {...at(4, 30)} />
       <Usblc6_2Sc6 name="U_USB_C6_ESD" pn={USBLC6_PN} {...at(12, 30)} />
       <R0402 name="R_USB_C6_DM" pn={R_22R_PN} resistance="22" {...at(17, 30)} />
       <R0402 name="R_USB_C6_DP" pn={R_22R_PN} resistance="22" {...at(17, 31.5)} />
