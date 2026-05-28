@@ -109,7 +109,12 @@ export function LogViewer(props: Props) {
                         <AccordionHeading><AccordionTrigger>{log.title}</AccordionTrigger></AccordionHeading>
                         <AccordionPanel><AccordionBody>
                           {log.payload && (
-                            <TextArea readOnly value={JSON.stringify(JSON.parse(log.payload), null, 2)} />
+                            <TextArea
+                              readOnly
+                              rows={16}
+                              className="font-mono text-sm w-full"
+                              value={JSON.stringify(JSON.parse(log.payload), null, 2)}
+                            />
                           )}
                         </AccordionBody></AccordionPanel>
                       </AccordionItem>
