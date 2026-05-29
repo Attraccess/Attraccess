@@ -204,20 +204,16 @@
       "@attraccess/source"
     ],
     "projectsRelationship": "fixed",
+    "git": {
+      "commit": true,
+      "tag": true,
+      "commitMessage": "chore(release): {version} [skip ci]"
+    },
     "version": {
       "conventionalCommits": true,
-      "fallbackCurrentVersionResolver": "disk",
-      "git": {
-        "commit": true,
-        "tag": true,
-        "commitMessage": "chore(release): {version} [skip ci]"
-      }
+      "fallbackCurrentVersionResolver": "disk"
     },
     "changelog": {
-      "git": {
-        "commit": false,
-        "tag": false
-      },
       "workspaceChangelog": {
         "createRelease": "github"
       }
