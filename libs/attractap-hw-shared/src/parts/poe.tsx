@@ -30,20 +30,20 @@ export const Ws3203 = ({ name, pn, ...rest }: Ws3203Props) => (
     supplierPartNumbers={jlcSupplier(pn)}
     footprint={
       <footprint>
-        <smtpad portHints={['pin1']} shape="rect" pcbX={-2.85} pcbY={1.95} width="1.40mm" height="0.40mm" layer="top" />
-        <smtpad portHints={['pin2']} shape="rect" pcbX={-2.85} pcbY={1.30} width="1.40mm" height="0.40mm" layer="top" />
-        <smtpad portHints={['pin3']} shape="rect" pcbX={-2.85} pcbY={0.65} width="1.40mm" height="0.40mm" layer="top" />
-        <smtpad portHints={['pin4']} shape="rect" pcbX={-2.85} pcbY={0.00} width="1.40mm" height="0.40mm" layer="top" />
-        <smtpad portHints={['pin5']} shape="rect" pcbX={-2.85} pcbY={-0.65} width="1.40mm" height="0.40mm" layer="top" />
-        <smtpad portHints={['pin6']} shape="rect" pcbX={-2.85} pcbY={-1.30} width="1.40mm" height="0.40mm" layer="top" />
-        <smtpad portHints={['pin7']} shape="rect" pcbX={-2.85} pcbY={-1.95} width="1.40mm" height="0.40mm" layer="top" />
-        <smtpad portHints={['pin8']} shape="rect" pcbX={2.85} pcbY={-1.95} width="1.40mm" height="0.40mm" layer="top" />
-        <smtpad portHints={['pin9']} shape="rect" pcbX={2.85} pcbY={-1.30} width="1.40mm" height="0.40mm" layer="top" />
-        <smtpad portHints={['pin10']} shape="rect" pcbX={2.85} pcbY={-0.65} width="1.40mm" height="0.40mm" layer="top" />
-        <smtpad portHints={['pin11']} shape="rect" pcbX={2.85} pcbY={0.00} width="1.40mm" height="0.40mm" layer="top" />
-        <smtpad portHints={['pin12']} shape="rect" pcbX={2.85} pcbY={0.65} width="1.40mm" height="0.40mm" layer="top" />
-        <smtpad portHints={['pin13']} shape="rect" pcbX={2.85} pcbY={1.30} width="1.40mm" height="0.40mm" layer="top" />
-        <smtpad portHints={['pin14']} shape="rect" pcbX={2.85} pcbY={1.95} width="1.40mm" height="0.40mm" layer="top" />
+        <smtpad portHints={['pin1']} shape="rect" pcbX={-2.50} pcbY={1.95} width="1.40mm" height="0.40mm" layer="top" />
+        <smtpad portHints={['pin2']} shape="rect" pcbX={-2.50} pcbY={1.30} width="1.40mm" height="0.40mm" layer="top" />
+        <smtpad portHints={['pin3']} shape="rect" pcbX={-2.50} pcbY={0.65} width="1.40mm" height="0.40mm" layer="top" />
+        <smtpad portHints={['pin4']} shape="rect" pcbX={-2.50} pcbY={0.00} width="1.40mm" height="0.40mm" layer="top" />
+        <smtpad portHints={['pin5']} shape="rect" pcbX={-2.50} pcbY={-0.65} width="1.40mm" height="0.40mm" layer="top" />
+        <smtpad portHints={['pin6']} shape="rect" pcbX={-2.50} pcbY={-1.30} width="1.40mm" height="0.40mm" layer="top" />
+        <smtpad portHints={['pin7']} shape="rect" pcbX={-2.50} pcbY={-1.95} width="1.40mm" height="0.40mm" layer="top" />
+        <smtpad portHints={['pin8']} shape="rect" pcbX={2.50} pcbY={-1.95} width="1.40mm" height="0.40mm" layer="top" />
+        <smtpad portHints={['pin9']} shape="rect" pcbX={2.50} pcbY={-1.30} width="1.40mm" height="0.40mm" layer="top" />
+        <smtpad portHints={['pin10']} shape="rect" pcbX={2.50} pcbY={-0.65} width="1.40mm" height="0.40mm" layer="top" />
+        <smtpad portHints={['pin11']} shape="rect" pcbX={2.50} pcbY={0.00} width="1.40mm" height="0.40mm" layer="top" />
+        <smtpad portHints={['pin12']} shape="rect" pcbX={2.50} pcbY={0.65} width="1.40mm" height="0.40mm" layer="top" />
+        <smtpad portHints={['pin13']} shape="rect" pcbX={2.50} pcbY={1.30} width="1.40mm" height="0.40mm" layer="top" />
+        <smtpad portHints={['pin14']} shape="rect" pcbX={2.50} pcbY={1.95} width="1.40mm" height="0.40mm" layer="top" />
       </footprint>
     }
     {...rest}
@@ -72,14 +72,14 @@ export const Mp9486a = ({ name, pn, ...rest }: Mp9486aProps) => (
     supplierPartNumbers={jlcSupplier(pn)}
     footprint={
       <footprint>
-        <smtpad portHints={['pin1']} shape="rect" pcbX={-2.35} pcbY={1.905} width="1.55mm" height="0.60mm" layer="top" />
-        <smtpad portHints={['pin2']} shape="rect" pcbX={-2.35} pcbY={0.635} width="1.55mm" height="0.60mm" layer="top" />
-        <smtpad portHints={['pin3']} shape="rect" pcbX={-2.35} pcbY={-0.635} width="1.55mm" height="0.60mm" layer="top" />
-        <smtpad portHints={['pin4']} shape="rect" pcbX={-2.35} pcbY={-1.905} width="1.55mm" height="0.60mm" layer="top" />
-        <smtpad portHints={['pin5']} shape="rect" pcbX={2.35} pcbY={-1.905} width="1.55mm" height="0.60mm" layer="top" />
-        <smtpad portHints={['pin6']} shape="rect" pcbX={2.35} pcbY={-0.635} width="1.55mm" height="0.60mm" layer="top" />
-        <smtpad portHints={['pin7']} shape="rect" pcbX={2.35} pcbY={0.635} width="1.55mm" height="0.60mm" layer="top" />
-        <smtpad portHints={['pin8']} shape="rect" pcbX={2.35} pcbY={1.905} width="1.55mm" height="0.60mm" layer="top" />
+        <smtpad portHints={['pin1']} shape="rect" pcbX={-2.225} pcbY={1.905} width="1.55mm" height="0.60mm" layer="top" />
+        <smtpad portHints={['pin2']} shape="rect" pcbX={-2.225} pcbY={0.635} width="1.55mm" height="0.60mm" layer="top" />
+        <smtpad portHints={['pin3']} shape="rect" pcbX={-2.225} pcbY={-0.635} width="1.55mm" height="0.60mm" layer="top" />
+        <smtpad portHints={['pin4']} shape="rect" pcbX={-2.225} pcbY={-1.905} width="1.55mm" height="0.60mm" layer="top" />
+        <smtpad portHints={['pin5']} shape="rect" pcbX={2.225} pcbY={-1.905} width="1.55mm" height="0.60mm" layer="top" />
+        <smtpad portHints={['pin6']} shape="rect" pcbX={2.225} pcbY={-0.635} width="1.55mm" height="0.60mm" layer="top" />
+        <smtpad portHints={['pin7']} shape="rect" pcbX={2.225} pcbY={0.635} width="1.55mm" height="0.60mm" layer="top" />
+        <smtpad portHints={['pin8']} shape="rect" pcbX={2.225} pcbY={1.905} width="1.55mm" height="0.60mm" layer="top" />
         <smtpad portHints={['pin4', 'GND']} shape="rect" pcbX={0} pcbY={0} width="2.50mm" height="2.50mm" layer="top" />
       </footprint>
     }

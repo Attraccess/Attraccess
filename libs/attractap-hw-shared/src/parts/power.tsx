@@ -10,10 +10,10 @@ export const Ams1117_3v3 = ({ name, pn, ...rest }: Ams1117Props) => (
     pinLabels={{ pin1: ['ADJ_GND'], pin2: ['VOUT'], pin3: ['VIN'], pin4: ['TAB'] }}
     footprint={
       <footprint>
-        <smtpad portHints={['pin1']} shape="rect" pcbX={-2.30} pcbY={-3.10} width="1.00mm" height="2.00mm" layer="top" />
-        <smtpad portHints={['pin2']} shape="rect" pcbX={0.00} pcbY={-3.10} width="1.00mm" height="2.00mm" layer="top" />
-        <smtpad portHints={['pin3']} shape="rect" pcbX={2.30} pcbY={-3.10} width="1.00mm" height="2.00mm" layer="top" />
-        <smtpad portHints={['pin4']} shape="rect" pcbX={0.00} pcbY={3.10} width="3.60mm" height="2.20mm" layer="top" />
+        <smtpad portHints={['pin1']} shape="rect" pcbX={3.10} pcbY={-2.30} width="2.00mm" height="1.00mm" layer="top" />
+        <smtpad portHints={['pin2']} shape="rect" pcbX={3.10} pcbY={0.00} width="2.00mm" height="1.00mm" layer="top" />
+        <smtpad portHints={['pin3']} shape="rect" pcbX={3.10} pcbY={2.30} width="2.00mm" height="1.00mm" layer="top" />
+        <smtpad portHints={['pin4']} shape="rect" pcbX={-3.10} pcbY={0.00} width="2.20mm" height="3.60mm" layer="top" />
       </footprint>
     }
     {...rest}

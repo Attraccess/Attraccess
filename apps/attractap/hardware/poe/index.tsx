@@ -104,13 +104,13 @@ export default () => (
     <ElecCap_22uF_100V name="C_VIN_BULK" pn="C46550391" pcbX={9} pcbY={-15} />
     <C0402 name="C_VIN_LF" pn="C307331" capacitance="100nF" pcbX={10.5} pcbY={-9} />
     <C0402 name="C_BST" pn="C307331" capacitance="100nF" pcbX={13} pcbY={1} />
-    <Ss34 name="D_CATCH" pn="C8678" pcbX={21} pcbY={-10} />
+    <Ss34 name="D_CATCH" pn="C8678" pcbX={21} pcbY={-8.5} />
     <inductor
       name="L_BUCK"
       inductance="47uH"
       supplierPartNumbers={{ jlcpcb: ['C168137'] }}
       pcbX={18}
-      pcbY={-13}
+      pcbY={-14}
       footprint={
         <footprint>
           <smtpad portHints={['pin1']} shape="rect" pcbX={-2.80} pcbY={0} width="2.40mm" height="3.40mm" layer="top" />
