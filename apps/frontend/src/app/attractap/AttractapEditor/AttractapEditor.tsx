@@ -6,11 +6,14 @@ import {
   DrawerFooter,
   DrawerHeader,
   Form,
-  Separator,
   Slider,
   SliderTrack,
   SliderFill,
   SliderThumb,
+  Tab,
+  TabList,
+  TabPanel,
+  Tabs,
 } from '@heroui/react';
 import { Button } from '../../../components/button';
 import { TextField, Label, Input } from '@heroui/react';
@@ -48,6 +51,7 @@ export function AttractapEditor(props: Readonly<Props>) {
   const [name, setName] = useState('');
   const [ledBrightness, setLedBrightness] = useState<number>(255);
   const [connectedResourceIds, setConnectedResourceIds] = useState<number[]>([]);
+  const [selectedTab, setSelectedTab] = useState<'general' | 'resources'>('general');
   const updateReaderMutation = useAttractapServiceUpdateReader({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [useAttractapServiceGetReadersKey] });
@@ -103,40 +107,57 @@ export function AttractapEditor(props: Readonly<Props>) {
         </DrawerHeader>
         <DrawerBody>
           <Form onSubmit={onSubmit} className="flex flex-col gap-4">
-            <TextField value={name} onChange={setName} className="w-full">
-              <Label>{t('readerName')}</Label>
-              <Input placeholder={t('enterReaderName')} data-cy="attractap-editor-name-input" />
-            </TextField>
-            {reader?.firmware.capabilities.hasLeds && (
-              <Slider
-                step={1}
-                minValue={0}
-                maxValue={255}
-                value={ledBrightness}
-                onChange={(val) => setLedBrightness(val as number)}
-                className="w-full"
-                data-cy="attractap-editor-led-brightness-slider"
-              >
-                <Label>{t('ledBrightness')}</Label>
-                <SliderTrack>
-                  <SliderFill />
-                  <SliderThumb />
-                </SliderTrack>
-              </Slider>
-            )}
-            <Separator className="my-6" />
-            <div className="flex flex-col gap-3 w-full">
-              <div className="flex flex-col gap-1">
-                <h3 className="text-base font-semibold">{t('connectedResources')}</h3>
-                <p className="text-sm text-default-500">{t('connectedResourcesDescription')}</p>
-              </div>
-              <ResourceSelector
-                selection={connectedResourceIds}
-                onSelectionChange={setConnectedResourceIds}
-                data-cy="attractap-editor-resource-selector"
-                multiple={reader?.firmware.capabilities.resourceSelection ?? true}
-              />
-            </div>
+            <Tabs
+              selectedKey={selectedTab}
+              onSelectionChange={(k) => setSelectedTab(k as 'general' | 'resources')}
+              className="w-full"
+              data-cy="attractap-editor-tabs"
+            >
+              <TabList>
+                <Tab id="general" data-cy="attractap-editor-general-tab">
+                  {t('tabs.general')}
+                </Tab>
+                <Tab id="resources" data-cy="attractap-editor-resources-tab">
+                  {t('tabs.resources')}
+                </Tab>
+              </TabList>
+              <TabPanel id="general" className="pt-4">
+                <div className="flex flex-col gap-4">
+                  <TextField value={name} onChange={setName} className="w-full">
+                    <Label>{t('readerName')}</Label>
+                    <Input placeholder={t('enterReaderName')} data-cy="attractap-editor-name-input" />
+                  </TextField>
+                  {reader?.firmware.capabilities.hasLeds && (
+                    <Slider
+                      step={1}
+                      minValue={0}
+                      maxValue={255}
+                      value={ledBrightness}
+                      onChange={(val) => setLedBrightness(val as number)}
+                      className="w-full"
+                      data-cy="attractap-editor-led-brightness-slider"
+                    >
+                      <Label>{t('ledBrightness')}</Label>
+                      <SliderTrack>
+                        <SliderFill />
+                        <SliderThumb />
+                      </SliderTrack>
+                    </Slider>
+                  )}
+                </div>
+              </TabPanel>
+              <TabPanel id="resources" className="pt-4">
+                <div className="flex flex-col gap-3 w-full">
+                  <p className="text-sm text-default-500">{t('connectedResourcesDescription')}</p>
+                  <ResourceSelector
+                    selection={connectedResourceIds}
+                    onSelectionChange={setConnectedResourceIds}
+                    data-cy="attractap-editor-resource-selector"
+                    multiple={reader?.firmware.capabilities.resourceSelection ?? true}
+                  />
+                </div>
+              </TabPanel>
+            </Tabs>
           </Form>
         </DrawerBody>
         <DrawerFooter>
