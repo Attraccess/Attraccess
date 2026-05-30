@@ -180,6 +180,14 @@ void API::processIncomingMessage(const char *buf, size_t len)
     {
         this->onResourceUsageFormRequest(inboundDoc["data"].as<JsonObject>());
     }
+    else if (strcmp(eventType, "RESOURCE_USAGE_FORM_FIELDS") == 0)
+    {
+        this->onResourceUsageFormFields(inboundDoc["data"].as<JsonObject>());
+    }
+    else if (strcmp(eventType, "RESOURCE_USAGE_FORM_PAGE_RESULT") == 0)
+    {
+        this->onResourceUsageFormPageResult(inboundDoc["data"].as<JsonObject>());
+    }
     else
     {
         logger.error((String("Unknown event type: ") + eventType).c_str());

@@ -166,10 +166,15 @@ private:
     uint32_t pendingActionResourceId = 0;
     uint32_t pendingActionProjectId = 0;
     bool hasPendingFormRequest = false;
-    // Flag set by websocket callback when a form request arrives; processed by main loop
+    // Flags set by websocket callbacks when form events arrive; processed by LVGL thread
     volatile bool pendingFormRequestReady = false;
+    volatile bool pendingFormFieldsReady = false;
+    volatile bool pendingFormPageResultReady = false;
     API::ResourceUsageFormRequest pendingFormRequest;
-    API::FormSubmissionList formSubmissionBuffer;
+    API::ResourceUsageFormFieldsPage pendingFormFields;
+    API::ResourceUsageFormPageResult pendingFormPageResult;
+    uint8_t formCursorFormIdx = 0;
+    uint32_t formCursorOffset = 0;
 
     void selectResource(const API::ResourceBrief &resource);
 
@@ -177,8 +182,18 @@ private:
     void clearProjectSelection();
     void handleProjectSelection(uint32_t projectId, const String &projectName);
     void handleFormsRequest(const API::ResourceUsageFormRequest &request);
-    void handleFormsSubmit(const API::FormSubmissionList &submissions);
+    void handleFormFields(const API::ResourceUsageFormFieldsPage &page);
+    void handleFormPageResult(const API::ResourceUsageFormPageResult &result);
+    void handleFormPageNext(const API::FormPageSubmission &page);
+    void handleFormPageBack();
     void handleFormsCancel();
+    void requestCurrentFormField();
+    void advanceFormCursor();
+    void retreatFormCursor();
+    void finishFormFlow();
+    uint32_t totalFormFields() const;
+    uint32_t globalFormFieldNumber() const;
+    bool isLastFormField() const;
     void onActionResult(const String &eventType);
 #endif
 

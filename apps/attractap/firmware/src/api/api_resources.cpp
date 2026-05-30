@@ -190,7 +190,7 @@ void API::setResourceListUpdateCallback(std::function<void(const ResourceList &)
     this->resourceListUpdateCallback = callback;
 }
 
-void API::startResourceUsageSession(uint32_t resourceId, uint32_t projectId, const FormSubmissionList *formSubmissions)
+void API::startResourceUsageSession(uint32_t resourceId, uint32_t projectId)
 {
     this->logger.info("Starting resource usage session");
     JsonDocument doc;
@@ -200,17 +200,15 @@ void API::startResourceUsageSession(uint32_t resourceId, uint32_t projectId, con
     {
         payload["projectId"] = projectId;
     }
-    this->serializeFormSubmissions(payload, formSubmissions);
     this->sendMessage("START_RESOURCE_USAGE_SESSION", payload);
 }
 
-void API::stopResourceUsageSession(uint32_t resourceId, const FormSubmissionList *formSubmissions)
+void API::stopResourceUsageSession(uint32_t resourceId)
 {
     this->logger.info("Stopping resource usage session");
     JsonDocument doc;
     JsonObject payload = doc.to<JsonObject>();
     payload["resourceId"] = resourceId;
-    this->serializeFormSubmissions(payload, formSubmissions);
     this->sendMessage("STOP_RESOURCE_USAGE_SESSION", payload);
 }
 

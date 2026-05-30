@@ -613,14 +613,19 @@ void ResourceDetailsScreen::destroy()
    this->formsModalContent = nullptr;
    this->formsModalList = nullptr;
    this->formsModalErrorLabel = nullptr;
+   this->formsModalProgressLabel = nullptr;
    this->formsKeyboard = nullptr;
+   this->formsBackButton = nullptr;
+   this->formsNextButton = nullptr;
+   this->formsNextLabel = nullptr;
    this->elapsedTime = nullptr;
    this->sessionTimeoutIndicator = nullptr;
    this->noIntroductionPanel = nullptr;
    this->introducersListLabel = nullptr;
    this->actionOverlayLabel = nullptr;
    this->successToast = nullptr;
-   this->formsModalRequest = nullptr;
+   this->formsModalMeta = nullptr;
+   this->formsModalPage = nullptr;
    this->formFieldWidgetCount = 0;
 }
 
@@ -654,8 +659,15 @@ void ResourceDetailsScreen::resetFormsModalState()
    this->formsModalContent = nullptr;
    this->formsModalList = nullptr;
    this->formsModalErrorLabel = nullptr;
+   this->formsModalProgressLabel = nullptr;
    this->formsKeyboard = nullptr;
-   this->formsModalRequest = nullptr;
+   this->formsBackButton = nullptr;
+   this->formsNextButton = nullptr;
+   this->formsNextLabel = nullptr;
+   this->formsModalMeta = nullptr;
+   this->formsModalPage = nullptr;
+   this->formsCanGoBack = false;
+   this->formsIsLastField = false;
    this->formFieldWidgetCount = 0;
 }
 
@@ -1026,9 +1038,14 @@ void ResourceDetailsScreen::setProjectSelectionCallback(std::function<void(uint3
    this->projectSelectionCallback = callback;
 }
 
-void ResourceDetailsScreen::setFormsSubmitCallback(std::function<void(const API::FormSubmissionList &)> callback)
+void ResourceDetailsScreen::setFormPageNextCallback(std::function<void(const API::FormPageSubmission &)> callback)
 {
-   this->formsSubmitCallback = callback;
+   this->formPageNextCallback = callback;
+}
+
+void ResourceDetailsScreen::setFormPageBackCallback(std::function<void()> callback)
+{
+   this->formPageBackCallback = callback;
 }
 
 void ResourceDetailsScreen::setFormsCancelCallback(std::function<void()> callback)
@@ -1055,21 +1072,97 @@ void ResourceDetailsScreen::setSelectedProject(uint32_t projectId, const char *p
    }
 }
 
-void ResourceDetailsScreen::showFormsModal(const API::ResourceUsageFormRequest &request)
+void ResourceDetailsScreen::showFormsModal(const API::ResourceUsageFormRequest &meta)
 {
-   this->formsModalRequest = &request;
+   this->formsModalMeta = &meta;
+   this->formsModalPage = nullptr;
+   this->formFieldWidgetCount = 0;
    this->ensureFormsModal();
-   this->rebuildFormsModal();
-   if (this->formsModalContent)
+
+   if (this->formsModalList)
    {
-      lv_obj_scroll_to_y(this->formsModalContent, 0, LV_ANIM_OFF);
+      lv_obj_clean(this->formsModalList);
+      lv_obj_t *loading = lv_label_create(this->formsModalList);
+      lv_label_set_text(loading, "Laden...");
+      lv_obj_set_style_text_color(loading, lv_color_hex(0xE5E7EB), LV_PART_MAIN | LV_STATE_DEFAULT);
    }
+   if (this->formsModalErrorLabel)
+   {
+      lv_label_set_text(this->formsModalErrorLabel, "");
+   }
+   if (this->formsModalProgressLabel)
+   {
+      lv_label_set_text(this->formsModalProgressLabel, "");
+   }
+   if (this->formsBackButton)
+   {
+      lv_obj_add_state(this->formsBackButton, LV_STATE_DISABLED);
+   }
+
    this->hideFormsKeyboard();
    if (this->formsModalOverlay)
    {
       lv_obj_clear_flag(this->formsModalOverlay, LV_OBJ_FLAG_HIDDEN);
    }
    this->updateFormsModalLayoutForKeyboard(false);
+}
+
+void ResourceDetailsScreen::renderFormField(const API::ResourceUsageFormFieldsPage &page, bool canGoBack, bool isLast, uint32_t fieldNumber, uint32_t totalFields)
+{
+   this->formsModalPage = &page;
+   this->formsCanGoBack = canGoBack;
+   this->formsIsLastField = isLast;
+   this->ensureFormsModal();
+
+   if (this->formsModalProgressLabel)
+   {
+      String progress = "Feld " + String(fieldNumber) + " / " + String(totalFields);
+      lv_label_set_text(this->formsModalProgressLabel, progress.c_str());
+   }
+
+   this->buildCurrentFormField();
+
+   if (this->formsBackButton)
+   {
+      if (canGoBack)
+      {
+         lv_obj_clear_state(this->formsBackButton, LV_STATE_DISABLED);
+      }
+      else
+      {
+         lv_obj_add_state(this->formsBackButton, LV_STATE_DISABLED);
+      }
+   }
+   if (this->formsNextLabel)
+   {
+      lv_label_set_text(this->formsNextLabel, isLast ? "Absenden" : "Weiter");
+   }
+
+   if (this->formsModalContent)
+   {
+      lv_obj_scroll_to_y(this->formsModalContent, 0, LV_ANIM_OFF);
+   }
+   this->hideFormsKeyboard();
+   this->updateFormsModalLayoutForKeyboard(false);
+}
+
+void ResourceDetailsScreen::showFormPageErrors(const API::ResourceUsageFormPageResult &result)
+{
+   this->clearFormFieldErrors();
+   bool shown = false;
+   for (uint8_t i = 0; i < result.errorCount; ++i)
+   {
+      FormFieldWidget *widget = this->findFieldWidget(result.formId, result.errors[i].fieldId);
+      if (widget && widget->errorLabel)
+      {
+         lv_label_set_text(widget->errorLabel, result.errors[i].message.c_str());
+         shown = true;
+      }
+   }
+   if (this->formsModalErrorLabel)
+   {
+      lv_label_set_text(this->formsModalErrorLabel, shown ? "Bitte Eingabe korrigieren." : "Eingabe ungueltig.");
+   }
 }
 
 void ResourceDetailsScreen::hideFormsModal()
@@ -1426,6 +1519,11 @@ void ResourceDetailsScreen::ensureFormsModal()
    lv_obj_set_scroll_dir(content, LV_DIR_VER);
    lv_obj_set_flex_grow(content, 1);
 
+   this->formsModalProgressLabel = lv_label_create(content);
+   lv_label_set_text(this->formsModalProgressLabel, "");
+   lv_obj_set_style_text_color(this->formsModalProgressLabel, lv_color_hex(0x9CA3AF), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_font(this->formsModalProgressLabel, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+
    this->formsModalErrorLabel = lv_label_create(content);
    lv_label_set_text(this->formsModalErrorLabel, "");
    lv_obj_set_style_text_color(this->formsModalErrorLabel, lv_color_hex(0xF31260), LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -1447,24 +1545,42 @@ void ResourceDetailsScreen::ensureFormsModal()
    lv_obj_remove_flag(footer, LV_OBJ_FLAG_SCROLLABLE);
    lv_obj_set_width(footer, lv_pct(100));
    lv_obj_set_height(footer, LV_SIZE_CONTENT);
-   lv_obj_set_flex_flow(footer, LV_FLEX_FLOW_ROW);
-   lv_obj_set_flex_align(footer, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+   lv_obj_set_flex_flow(footer, LV_FLEX_FLOW_ROW_WRAP);
+   lv_obj_set_flex_align(footer, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
    lv_obj_set_style_pad_top(footer, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_pad_column(footer, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_column(footer, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_row(footer, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   lv_obj_t *backBtn = lv_button_create(footer);
+   this->formsBackButton = backBtn;
+   lv_obj_set_width(backBtn, LV_SIZE_CONTENT);
+   lv_obj_set_height(backBtn, LV_SIZE_CONTENT);
+   lv_obj_set_style_pad_all(backBtn, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_t *backLabel = lv_label_create(backBtn);
+   lv_label_set_text(backLabel, "Zurueck");
+   lv_obj_set_align(backLabel, LV_ALIGN_CENTER);
+   lv_obj_add_event_cb(backBtn, &ResourceDetailsScreen::onFormsBack, LV_EVENT_CLICKED, this);
 
    lv_obj_t *cancelBtn = lv_button_create(footer);
    lv_obj_set_width(cancelBtn, LV_SIZE_CONTENT);
    lv_obj_set_height(cancelBtn, LV_SIZE_CONTENT);
-   lv_label_set_text(lv_label_create(cancelBtn), "Abbrechen");
+   lv_obj_set_style_pad_all(cancelBtn, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_t *cancelLabel = lv_label_create(cancelBtn);
+   lv_label_set_text(cancelLabel, "Abbrechen");
+   lv_obj_set_align(cancelLabel, LV_ALIGN_CENTER);
    lv_obj_add_event_cb(cancelBtn, &ResourceDetailsScreen::onFormsCancel, LV_EVENT_CLICKED, this);
 
-   lv_obj_t *submitBtn = lv_button_create(footer);
-   lv_obj_set_width(submitBtn, LV_SIZE_CONTENT);
-   lv_obj_set_height(submitBtn, LV_SIZE_CONTENT);
-   lv_obj_set_style_bg_color(submitBtn, lv_color_hex(0x10B981), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_bg_opa(submitBtn, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_label_set_text(lv_label_create(submitBtn), "Absenden");
-   lv_obj_add_event_cb(submitBtn, &ResourceDetailsScreen::onFormsSubmit, LV_EVENT_CLICKED, this);
+   lv_obj_t *nextBtn = lv_button_create(footer);
+   this->formsNextButton = nextBtn;
+   lv_obj_set_width(nextBtn, LV_SIZE_CONTENT);
+   lv_obj_set_height(nextBtn, LV_SIZE_CONTENT);
+   lv_obj_set_style_pad_all(nextBtn, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_bg_color(nextBtn, lv_color_hex(0x10B981), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_bg_opa(nextBtn, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+   this->formsNextLabel = lv_label_create(nextBtn);
+   lv_label_set_text(this->formsNextLabel, "Weiter");
+   lv_obj_set_align(this->formsNextLabel, LV_ALIGN_CENTER);
+   lv_obj_add_event_cb(nextBtn, &ResourceDetailsScreen::onFormsNext, LV_EVENT_CLICKED, this);
 
    this->formsKeyboard = lv_keyboard_create(overlay);
    lv_obj_set_width(this->formsKeyboard, lv_pct(100));
@@ -1472,7 +1588,7 @@ void ResourceDetailsScreen::ensureFormsModal()
    lv_obj_add_event_cb(this->formsKeyboard, &ResourceDetailsScreen::onFormsKeyboardEvent, LV_EVENT_ALL, this);
 }
 
-void ResourceDetailsScreen::rebuildFormsModal()
+void ResourceDetailsScreen::buildCurrentFormField()
 {
    if (!this->formsModalList)
    {
@@ -1487,27 +1603,45 @@ void ResourceDetailsScreen::rebuildFormsModal()
       lv_label_set_text(this->formsModalErrorLabel, "");
    }
 
+   if (!this->formsModalPage || this->formsModalPage->fieldCount == 0)
+   {
+      return;
+   }
+
    String pageTitle = "Bitte Formular ausfuellen";
    String resourceName = "";
 
-   if (this->formsModalRequest)
+   if (this->formsModalMeta)
    {
-      if (this->formsModalRequest->action == API::ResourceUsageFormActionType::START)
+      if (this->formsModalMeta->action == API::ResourceUsageFormActionType::START)
       {
          pageTitle = "Bitte vor dem Start ausfuellen";
       }
-      else if (this->formsModalRequest->action == API::ResourceUsageFormActionType::END)
+      else if (this->formsModalMeta->action == API::ResourceUsageFormActionType::END)
       {
          pageTitle = "Bitte vor dem Ende ausfuellen";
       }
-      else if (this->formsModalRequest->action == API::ResourceUsageFormActionType::TAKEOVER)
+      else if (this->formsModalMeta->action == API::ResourceUsageFormActionType::TAKEOVER)
       {
          pageTitle = "Bitte vor der Uebernahme ausfuellen";
       }
 
-      if (this->formsModalRequest->resourceName.length() > 0)
+      if (this->formsModalMeta->resourceName.length() > 0)
       {
-         resourceName = this->formsModalRequest->resourceName;
+         resourceName = this->formsModalMeta->resourceName;
+      }
+   }
+
+   String formName = "";
+   if (this->formsModalMeta)
+   {
+      for (uint8_t i = 0; i < this->formsModalMeta->formCount && i < API::MAX_FORMS_PER_REQUEST; ++i)
+      {
+         if (this->formsModalMeta->forms[i].id == this->formsModalPage->formId)
+         {
+            formName = this->formsModalMeta->forms[i].name;
+            break;
+         }
       }
    }
 
@@ -1522,11 +1656,7 @@ void ResourceDetailsScreen::rebuildFormsModal()
    lv_obj_set_style_width(resourceNameLabel, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_label_set_long_mode(resourceNameLabel, LV_LABEL_LONG_WRAP);
 
-   if (!this->formsModalRequest)
-      return;
-   for (uint8_t i = 0; i < this->formsModalRequest->formCount && i < API::MAX_FORMS_PER_REQUEST; ++i)
    {
-      const API::ResourceUsageForm &form = this->formsModalRequest->forms[i];
       lv_obj_t *formCard = lv_obj_create(this->formsModalList);
       lv_obj_remove_style_all(formCard);
       lv_obj_remove_flag(formCard, LV_OBJ_FLAG_SCROLLABLE);
@@ -1541,15 +1671,14 @@ void ResourceDetailsScreen::rebuildFormsModal()
       lv_obj_set_flex_align(formCard, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
 
       lv_obj_t *formTitle = lv_label_create(formCard);
-      lv_label_set_text(formTitle, form.name.c_str());
+      lv_label_set_text(formTitle, formName.c_str());
       lv_obj_set_style_text_font(formTitle, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
       lv_obj_set_style_text_color(formTitle, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
       lv_label_set_long_mode(formTitle, LV_LABEL_LONG_WRAP);
       lv_obj_set_style_width(formTitle, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
 
-      for (uint8_t f = 0; f < form.fieldCount && this->formFieldWidgetCount < API::MAX_FORMS_PER_REQUEST * API::MAX_FORM_FIELDS_PER_FORM; ++f)
       {
-         const API::ResourceUsageFormField &field = form.fields[f];
+         const API::ResourceUsageFormField &field = this->formsModalPage->fields[0];
          lv_obj_t *fieldContainer = lv_obj_create(formCard);
          lv_obj_remove_style_all(fieldContainer);
          lv_obj_remove_flag(fieldContainer, LV_OBJ_FLAG_SCROLLABLE);
@@ -1582,7 +1711,7 @@ void ResourceDetailsScreen::rebuildFormsModal()
 
          FormFieldWidget &widget = this->formFieldWidgets[this->formFieldWidgetCount++];
          widget.widgetIndex = this->formFieldWidgetCount - 1;
-         widget.formId = form.id;
+         widget.formId = this->formsModalPage->formId;
          widget.fieldId = field.id;
          widget.type = field.type;
          widget.isRequired = field.isRequired;
@@ -1596,6 +1725,10 @@ void ResourceDetailsScreen::rebuildFormsModal()
          {
             lv_obj_t *sw = lv_switch_create(fieldContainer);
             widget.input = sw;
+            if (field.hasValue && field.value == "true")
+            {
+               lv_obj_add_state(sw, LV_STATE_CHECKED);
+            }
             if (field.options.boolean.trueLabel.length() > 0 || field.options.boolean.falseLabel.length() > 0)
             {
                String boolLabels = field.options.boolean.trueLabel.length() ? field.options.boolean.trueLabel : "An";
@@ -1667,6 +1800,18 @@ void ResourceDetailsScreen::rebuildFormsModal()
 
                   lv_obj_add_event_cb(optBtn, &ResourceDetailsScreen::onSelectOptionClick, LV_EVENT_CLICKED, &evtData);
                }
+               if (field.hasValue && field.value.length() > 0)
+               {
+                  for (uint8_t optIndex = 0; optIndex < field.options.select.count; ++optIndex)
+                  {
+                     if (field.options.select.values[optIndex] == field.value)
+                     {
+                        widget.selectedOptionIndex = static_cast<uint8_t>(optIndex + 1);
+                        break;
+                     }
+                  }
+                  this->updateSelectButtonStyles(widget);
+               }
                this->updateSelectOptionLayout(widget);
             }
          }
@@ -1674,6 +1819,10 @@ void ResourceDetailsScreen::rebuildFormsModal()
          {
             lv_obj_t *ta = lv_textarea_create(fieldContainer);
             widget.input = ta;
+            if (field.hasValue && field.value.length() > 0)
+            {
+               lv_textarea_set_text(ta, field.value.c_str());
+            }
             lv_obj_set_width(ta, lv_pct(100));
             lv_obj_set_style_bg_color(ta, lv_color_hex(0x374151), LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_obj_set_style_text_color(ta, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -1705,38 +1854,22 @@ void ResourceDetailsScreen::rebuildFormsModal()
    lv_obj_update_layout(this->formsModalList);
 }
 
-bool ResourceDetailsScreen::collectFormSubmissions(API::FormSubmissionList &outSubmissions)
+bool ResourceDetailsScreen::collectCurrentField(API::FormPageSubmission &outPage)
 {
-   outSubmissions.submissionCount = 0;
    this->clearFormFieldErrors();
 
-   if (!this->formsModalRequest)
+   if (!this->formsModalPage)
       return false;
-   for (uint8_t i = 0; i < this->formsModalRequest->formCount && i < API::MAX_FORM_SUBMISSIONS; ++i)
-   {
-      API::FormSubmission &submission = outSubmissions.submissions[outSubmissions.submissionCount++];
-      submission.formId = this->formsModalRequest->forms[i].id;
-      submission.answerCount = 0;
-   }
+
+   outPage.formId = this->formsModalPage->formId;
+   outPage.offset = this->formsModalPage->offset;
+   outPage.answerCount = 0;
 
    bool hasErrors = false;
 
-   for (uint16_t i = 0; i < this->formFieldWidgetCount; ++i)
+   for (uint16_t i = 0; i < this->formFieldWidgetCount && i < API::MAX_FORM_PAGE_FIELDS; ++i)
    {
       FormFieldWidget &widget = this->formFieldWidgets[i];
-      API::FormSubmission *submission = nullptr;
-      for (uint8_t s = 0; s < outSubmissions.submissionCount; ++s)
-      {
-         if (outSubmissions.submissions[s].formId == widget.formId)
-         {
-            submission = &outSubmissions.submissions[s];
-            break;
-         }
-      }
-      if (!submission)
-      {
-         continue;
-      }
 
       auto setError = [&](const char *msg)
       {
@@ -1756,11 +1889,7 @@ bool ResourceDetailsScreen::collectFormSubmissions(API::FormSubmissionList &outS
             setError("Pflichtfeld");
             continue;
          }
-         if (submission->answerCount >= API::MAX_FORM_FIELD_ANSWERS)
-         {
-            continue;
-         }
-         API::FormSubmissionAnswer &answer = submission->answers[submission->answerCount++];
+         API::FormSubmissionAnswer &answer = outPage.answers[outPage.answerCount++];
          answer.fieldId = widget.fieldId;
          answer.type = API::FormSubmissionAnswer::ValueType::BOOLEAN;
          answer.boolValue = isChecked;
@@ -1784,15 +1913,10 @@ bool ResourceDetailsScreen::collectFormSubmissions(API::FormSubmissionList &outS
             setError(SELECT_FIELD_INVALID);
             continue;
          }
-         String selectedValue = widget.definition->options.select.values[valueIndex];
-         if (submission->answerCount >= API::MAX_FORM_FIELD_ANSWERS)
-         {
-            continue;
-         }
-         API::FormSubmissionAnswer &answer = submission->answers[submission->answerCount++];
+         API::FormSubmissionAnswer &answer = outPage.answers[outPage.answerCount++];
          answer.fieldId = widget.fieldId;
          answer.type = API::FormSubmissionAnswer::ValueType::STRING;
-         answer.stringValue = selectedValue;
+         answer.stringValue = widget.definition->options.select.values[valueIndex];
          continue;
       }
 
@@ -1809,12 +1933,7 @@ bool ResourceDetailsScreen::collectFormSubmissions(API::FormSubmissionList &outS
          continue;
       }
 
-      if (submission->answerCount >= API::MAX_FORM_FIELD_ANSWERS)
-      {
-         continue;
-      }
-
-      API::FormSubmissionAnswer &answer = submission->answers[submission->answerCount++];
+      API::FormSubmissionAnswer &answer = outPage.answers[outPage.answerCount++];
       answer.fieldId = widget.fieldId;
 
       if (widget.type == API::ResourceUsageFormFieldType::NUMBER)
@@ -1927,7 +2046,7 @@ void ResourceDetailsScreen::showKeyboardForWidget(FormFieldWidget &widget, lv_ob
    this->updateFormsModalLayoutForKeyboard(true);
 }
 
-void ResourceDetailsScreen::onFormsSubmit(lv_event_t *e)
+void ResourceDetailsScreen::onFormsNext(lv_event_t *e)
 {
    if (lv_event_get_code(e) != LV_EVENT_CLICKED)
    {
@@ -1938,14 +2057,35 @@ void ResourceDetailsScreen::onFormsSubmit(lv_event_t *e)
    {
       return;
    }
-   API::FormSubmissionList &submissions = self->formSubmissionScratch;
-   if (!self->collectFormSubmissions(submissions))
+   API::FormPageSubmission &page = self->formPageScratch;
+   if (!self->collectCurrentField(page))
    {
       return;
    }
-   if (self->formsSubmitCallback)
+   if (self->formPageNextCallback)
    {
-      self->formsSubmitCallback(submissions);
+      self->formPageNextCallback(page);
+   }
+}
+
+void ResourceDetailsScreen::onFormsBack(lv_event_t *e)
+{
+   if (lv_event_get_code(e) != LV_EVENT_CLICKED)
+   {
+      return;
+   }
+   auto *self = static_cast<ResourceDetailsScreen *>(lv_event_get_user_data(e));
+   if (!self)
+   {
+      return;
+   }
+   if (!self->formsCanGoBack)
+   {
+      return;
+   }
+   if (self->formPageBackCallback)
+   {
+      self->formPageBackCallback();
    }
 }
 
