@@ -1545,41 +1545,41 @@ void ResourceDetailsScreen::ensureFormsModal()
    lv_obj_remove_flag(footer, LV_OBJ_FLAG_SCROLLABLE);
    lv_obj_set_width(footer, lv_pct(100));
    lv_obj_set_height(footer, LV_SIZE_CONTENT);
-   lv_obj_set_flex_flow(footer, LV_FLEX_FLOW_ROW);
-   lv_obj_set_flex_align(footer, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+   lv_obj_set_flex_flow(footer, LV_FLEX_FLOW_ROW_WRAP);
+   lv_obj_set_flex_align(footer, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
    lv_obj_set_style_pad_top(footer, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_pad_column(footer, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_column(footer, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_row(footer, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    lv_obj_t *backBtn = lv_button_create(footer);
    this->formsBackButton = backBtn;
    lv_obj_set_width(backBtn, LV_SIZE_CONTENT);
    lv_obj_set_height(backBtn, LV_SIZE_CONTENT);
-   lv_label_set_text(lv_label_create(backBtn), "Zurueck");
+   lv_obj_set_style_pad_all(backBtn, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_t *backLabel = lv_label_create(backBtn);
+   lv_label_set_text(backLabel, "Zurueck");
+   lv_obj_set_align(backLabel, LV_ALIGN_CENTER);
    lv_obj_add_event_cb(backBtn, &ResourceDetailsScreen::onFormsBack, LV_EVENT_CLICKED, this);
 
-   lv_obj_t *rightGroup = lv_obj_create(footer);
-   lv_obj_remove_style_all(rightGroup);
-   lv_obj_remove_flag(rightGroup, LV_OBJ_FLAG_SCROLLABLE);
-   lv_obj_set_width(rightGroup, LV_SIZE_CONTENT);
-   lv_obj_set_height(rightGroup, LV_SIZE_CONTENT);
-   lv_obj_set_flex_flow(rightGroup, LV_FLEX_FLOW_ROW);
-   lv_obj_set_flex_align(rightGroup, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-   lv_obj_set_style_pad_column(rightGroup, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-   lv_obj_t *cancelBtn = lv_button_create(rightGroup);
+   lv_obj_t *cancelBtn = lv_button_create(footer);
    lv_obj_set_width(cancelBtn, LV_SIZE_CONTENT);
    lv_obj_set_height(cancelBtn, LV_SIZE_CONTENT);
-   lv_label_set_text(lv_label_create(cancelBtn), "Abbrechen");
+   lv_obj_set_style_pad_all(cancelBtn, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_t *cancelLabel = lv_label_create(cancelBtn);
+   lv_label_set_text(cancelLabel, "Abbrechen");
+   lv_obj_set_align(cancelLabel, LV_ALIGN_CENTER);
    lv_obj_add_event_cb(cancelBtn, &ResourceDetailsScreen::onFormsCancel, LV_EVENT_CLICKED, this);
 
-   lv_obj_t *nextBtn = lv_button_create(rightGroup);
+   lv_obj_t *nextBtn = lv_button_create(footer);
    this->formsNextButton = nextBtn;
    lv_obj_set_width(nextBtn, LV_SIZE_CONTENT);
    lv_obj_set_height(nextBtn, LV_SIZE_CONTENT);
+   lv_obj_set_style_pad_all(nextBtn, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_bg_color(nextBtn, lv_color_hex(0x10B981), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_bg_opa(nextBtn, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
    this->formsNextLabel = lv_label_create(nextBtn);
    lv_label_set_text(this->formsNextLabel, "Weiter");
+   lv_obj_set_align(this->formsNextLabel, LV_ALIGN_CENTER);
    lv_obj_add_event_cb(nextBtn, &ResourceDetailsScreen::onFormsNext, LV_EVENT_CLICKED, this);
 
    this->formsKeyboard = lv_keyboard_create(overlay);
