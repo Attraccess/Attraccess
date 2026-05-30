@@ -15,12 +15,16 @@ interface Props {
   listClassName?: string;
 }
 
+const MAX_VISIBLE_ROWS = 7;
+const LIST_ROW_HEIGHT_PX = 49;
+const LIST_HEADER_HEIGHT_PX = 44;
+
 export const ListboxWrapper = ({ children }: PropsWithChildren) => (
   <div className="border-small px-1 py-2 rounded-small border-default-200 dark:border-default-100">{children}</div>
 );
 
 export function ResourceSelector(props: Readonly<Props>) {
-  const { selection, onSelectionChange, multiple = true, listClassName = 'max-h-80 overflow-y-auto' } = props;
+  const { selection, onSelectionChange, multiple = true, listClassName = '' } = props;
   const [search, setSearch] = useState('');
 
   const { t } = useTranslations({ de, en });
@@ -47,7 +51,11 @@ export function ResourceSelector(props: Readonly<Props>) {
           ) : null}
         </InputGroup>
       </TextField>
-      <TableRoot aria-label={t('table.ariaLabel')} className={listClassName}>
+      <TableRoot
+        aria-label={t('table.ariaLabel')}
+        className={listClassName}
+        style={{ maxHeight: LIST_HEADER_HEIGHT_PX + MAX_VISIBLE_ROWS * LIST_ROW_HEIGHT_PX, overflowY: 'auto' }}
+      >
         <TableContent
           selectionMode={multiple ? 'multiple' : 'single'}
           selectedKeys={new Set(selection.map(String))}
