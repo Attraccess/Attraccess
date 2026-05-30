@@ -111,6 +111,24 @@ services:
     env_file:
       - .env.docker-compose
 
+  dns:
+    image: technitium/dns-server:13.7.0
+    restart: unless-stopped
+    profiles: ['dns']
+    ports:
+      - '53:53/udp'
+      - '53:53/tcp'
+      - '5381:5380'
+    volumes:
+      - dns-data:/etc/dns
+    environment:
+      DNS_SERVER_DOMAIN: ${DNS_SERVER_DOMAIN:-dns.attraccess.local}
+      DNS_SERVER_ADMIN_PASSWORD: ${DNS_SERVER_ADMIN_PASSWORD:?DNS_SERVER_ADMIN_PASSWORD is required when running with --profile dns}
+    env_file:
+      - .env.docker-compose
+    sysctls:
+      - net.ipv4.ip_local_port_range=1024 65000
+
   hetzner-dns-updater:
     build:
       context: ./tools/hetzner-dns-updater
@@ -135,9 +153,6 @@ services:
       context: ./tools/config-ui
       dockerfile: Dockerfile
     restart: unless-stopped
-    ports:
-      - '53:53/udp'
-      - '53:53/tcp'
     expose:
       - '5380'
     volumes:
@@ -228,6 +243,7 @@ services:
       - prometheus-data:/external-storage/prometheus
       - grafana-data:/external-storage/grafana
       - config-ui-data:/external-storage/config-ui
+      - dns-data:/external-storage/dns
     env_file:
       - .env.docker-compose
 
@@ -239,6 +255,7 @@ volumes:
   rabbitmq_data:
   zigbee2mqtt:
   config-ui-data:
+  dns-data:
   prometheus-config:
   prometheus-data:
   grafana-data:
