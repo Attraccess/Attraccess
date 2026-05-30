@@ -2,7 +2,8 @@
 // FEATURE: Resource selection for plugins using HeroUI v3 Table compound
 import { useTranslations } from '../../i18n';
 import { useResourcesServiceGetAllResources } from '@attraccess/react-query-client';
-import { TextField, Label, InputGroup, Input, Spinner, TableRoot, TableContent, TableBody, TableCell, TableColumn, TableHeader, TableRow } from '@heroui/react';
+import { Checkbox, TextField, Label, InputGroup, Spinner, TableRoot, TableContent, TableBody, TableCell, TableColumn, TableHeader, TableRow } from '@heroui/react';
+import { SearchIcon } from 'lucide-react';
 import { useState, PropsWithChildren } from 'react';
 import de from './ResourceSelector.de.json';
 import en from './ResourceSelector.en.json';
@@ -34,8 +35,15 @@ export function ResourceSelector(props: Readonly<Props>) {
       <TextField value={search} onChange={setSearch} className="w-full">
         <Label>{t('search.label')}</Label>
         <InputGroup>
-          <Input placeholder={t('search.placeholder')} />
-          {isResourceSearchLoading ? <Spinner /> : null}
+          <InputGroup.Prefix>
+            <SearchIcon className="size-4 text-muted" />
+          </InputGroup.Prefix>
+          <InputGroup.Input placeholder={t('search.placeholder')} />
+          {isResourceSearchLoading ? (
+            <InputGroup.Suffix>
+              <Spinner size="sm" />
+            </InputGroup.Suffix>
+          ) : null}
         </InputGroup>
       </TextField>
       <TableRoot aria-label={t('table.ariaLabel')}>
@@ -51,13 +59,29 @@ export function ResourceSelector(props: Readonly<Props>) {
           }}
         >
           <TableHeader>
-            <TableColumn className="w-full">
+            <TableColumn className="pr-0 w-0">
+              {multiple ? (
+                <Checkbox aria-label={t('table.ariaLabel')} slot="selection">
+                  <Checkbox.Control>
+                    <Checkbox.Indicator />
+                  </Checkbox.Control>
+                </Checkbox>
+              ) : null}
+            </TableColumn>
+            <TableColumn className="w-full" isRowHeader>
               {t('table.columns.name.header')}
             </TableColumn>
           </TableHeader>
           <TableBody items={resourceSearchResults?.data ?? []}>
             {(resource) => (
               <TableRow key={resource.id} id={String(resource.id)}>
+                <TableCell className="pr-0">
+                  <Checkbox aria-label={resource.name} slot="selection" variant="secondary">
+                    <Checkbox.Control>
+                      <Checkbox.Indicator />
+                    </Checkbox.Control>
+                  </Checkbox>
+                </TableCell>
                 <TableCell>{resource.name}</TableCell>
               </TableRow>
             )}
