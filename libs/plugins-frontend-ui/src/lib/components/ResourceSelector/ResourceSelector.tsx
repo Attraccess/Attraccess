@@ -12,6 +12,7 @@ interface Props {
   selection: number[];
   onSelectionChange: (selection: number[]) => void;
   multiple?: boolean;
+  listClassName?: string;
 }
 
 export const ListboxWrapper = ({ children }: PropsWithChildren) => (
@@ -19,7 +20,7 @@ export const ListboxWrapper = ({ children }: PropsWithChildren) => (
 );
 
 export function ResourceSelector(props: Readonly<Props>) {
-  const { selection, onSelectionChange, multiple = true } = props;
+  const { selection, onSelectionChange, multiple = true, listClassName = 'max-h-80 overflow-y-auto' } = props;
   const [search, setSearch] = useState('');
 
   const { t } = useTranslations({ de, en });
@@ -46,7 +47,7 @@ export function ResourceSelector(props: Readonly<Props>) {
           ) : null}
         </InputGroup>
       </TextField>
-      <TableRoot aria-label={t('table.ariaLabel')}>
+      <TableRoot aria-label={t('table.ariaLabel')} className={listClassName}>
         <TableContent
           selectionMode={multiple ? 'multiple' : 'single'}
           selectedKeys={new Set(selection.map(String))}

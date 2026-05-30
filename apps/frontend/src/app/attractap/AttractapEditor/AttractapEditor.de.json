@@ -11,5 +11,9 @@
   "errorUpdatingReader": "Fehler beim Aktualisieren des Readers",
   "readerUpdated": "Reader aktualisiert",
   "readerUpdatedDescription": "Reader erfolgreich aktualisiert",
-  "ledBrightness": "LED Helligkeit"
+  "ledBrightness": "LED Helligkeit",
+  "tabs": {
+    "general": "Allgemein",
+    "resources": "Ressourcen"
+  }
 }
