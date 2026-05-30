@@ -1,6 +1,6 @@
 {
   "name": "@attraccess/api",
-  "version": "1.5.2",
+  "version": "1.6.0",
   "private": true,
   "dependencies": {
     "@nestjs-modules/mailer": "^2.0.2",
