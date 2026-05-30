@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, AlertContent, AlertDescription, AlertTitle, Button, Card, Chip, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow } from '@heroui/react';
+import { Alert, AlertContent, AlertDescription, AlertTitle, Button, Card, Chip, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow, TableScrollContainer } from '@heroui/react';
 import { ArrowRightIcon, CpuIcon, LogsIcon, PencilIcon, Trash2Icon } from 'lucide-react';
 import { AlertStatusIcon } from '../../../components/AlertStatusIcon';
 import { EmptyState } from '../../../components/emptyState';
@@ -159,54 +159,57 @@ export function AttractapList() {
               />
             </Card.Header>
             <Card.Content>
-              <Table
-                data-cy={`attractap-list-table-${tableIndex === 0 ? 'active' : 'stale'}`}
-              >
-                <TableContent aria-label={`${tableIndex === 0 ? 'active' : 'stale'} attractaps`}>
-                <TableHeader>
-                  <TableColumn isRowHeader>{t('table.columns.name')}</TableColumn>
-                  <TableColumn>{t('table.columns.type')}</TableColumn>
-                  <TableColumn>{t('table.columns.lastConnection')}</TableColumn>
-                  <TableColumn>{t('table.columns.actions')}</TableColumn>
-                </TableHeader>
-                <TableBody
-                  items={readers ?? []}
-                  renderEmptyState={() => <EmptyState />}
-                >
-                  {(reader) => (
-                    <TableRow key={reader.id} id={reader.id} className={tableIndex === 1 ? 'border-l-8 border-l-warning' : ''}>
-                      <TableCell>{reader.name}</TableCell>
-                      <TableCell className="whitespace-nowrap">
-                        {reader.firmware.name} ({reader.firmware.variant})
-                        <br />
-                        {firmwareUpdateChip(reader)}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap">{formatDateTime(reader.lastConnection)}</TableCell>
-                      <TableCell className="flex-row flex">
-                        <Button variant="ghost"
-
-                          onPress={() => setOpenedReaderEditor(reader.id)}
-                          data-cy={`attractap-list-edit-reader-button-${reader.id}`}
-                        ><PencilIcon className="w-4 h-4" />
-                          {t('table.actions.editReader')}
-                        </Button>
-
-                        <AttractapDeleteModal readerId={reader.id}>
-                          {(onOpen) => (
-                            <Button variant="danger-soft"
-
-                              onPress={onOpen}
-                              data-cy={`attractap-list-delete-reader-button-${reader.id}`}
-                            ><Trash2Icon className="w-4 h-4" />
-                              {t('table.actions.deleteReader')}
+              <Table data-cy={`attractap-list-table-${tableIndex === 0 ? 'active' : 'stale'}`}>
+                <TableScrollContainer>
+                  <TableContent aria-label={`${tableIndex === 0 ? 'active' : 'stale'} attractaps`}>
+                    <TableHeader>
+                      <TableColumn isRowHeader>{t('table.columns.name')}</TableColumn>
+                      <TableColumn>{t('table.columns.type')}</TableColumn>
+                      <TableColumn>{t('table.columns.lastConnection')}</TableColumn>
+                      <TableColumn>{t('table.columns.actions')}</TableColumn>
+                    </TableHeader>
+                    <TableBody items={readers ?? []} renderEmptyState={() => <EmptyState />}>
+                      {(reader) => (
+                        <TableRow
+                          key={reader.id}
+                          id={reader.id}
+                          className={tableIndex === 1 ? 'border-l-8 border-l-warning' : ''}
+                        >
+                          <TableCell>{reader.name}</TableCell>
+                          <TableCell className="whitespace-nowrap">
+                            {reader.firmware.name} ({reader.firmware.variant})
+                            <br />
+                            {firmwareUpdateChip(reader)}
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap">{formatDateTime(reader.lastConnection)}</TableCell>
+                          <TableCell className="flex-row flex">
+                            <Button
+                              variant="ghost"
+                              onPress={() => setOpenedReaderEditor(reader.id)}
+                              data-cy={`attractap-list-edit-reader-button-${reader.id}`}
+                            >
+                              <PencilIcon className="w-4 h-4" />
+                              {t('table.actions.editReader')}
                             </Button>
-                          )}
-                        </AttractapDeleteModal>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-                </TableContent>
+
+                            <AttractapDeleteModal readerId={reader.id}>
+                              {(onOpen) => (
+                                <Button
+                                  variant="danger-soft"
+                                  onPress={onOpen}
+                                  data-cy={`attractap-list-delete-reader-button-${reader.id}`}
+                                >
+                                  <Trash2Icon className="w-4 h-4" />
+                                  {t('table.actions.deleteReader')}
+                                </Button>
+                              )}
+                            </AttractapDeleteModal>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </TableContent>
+                </TableScrollContainer>
               </Table>
             </Card.Content>
           </Card>
