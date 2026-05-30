@@ -41,7 +41,7 @@ export const Power = ({ boardW, boardH }: PowerProps) => {
       <C0603 name="C_5V_BULK2" pn={C_10UF_PN} capacitance="10uF" {...at(12, 8)} />
       <R0402 name="R_OR_EN" pn={R_10K_PN} resistance="10k" {...at(8, 12.5)} />
 
-      <Ss34 name="D_VBUS" pn={SS34_PN} {...at(28, 10)} />
+      <Ss34 name="D_VBUS" pn={SS34_PN} {...at(40, 6)} />
       <Ss34 name="D_VBUS_C6" pn={SS34_PN} {...at(5, 22)} />
       <C0402 name="C_VBUS_Y" pn={C_10NF_PN} capacitance="10nF" {...at(35, 8)} />
       <C0603 name="C_VBUS_BULK" pn={C_22UF_PN} capacitance="22uF" {...at(35, 12)} />
