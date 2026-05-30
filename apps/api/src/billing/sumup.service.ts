@@ -231,27 +231,24 @@ export class SumUpService {
       }),
     );
 
-    if (sumUpTransactionData.simple_status === 'REFUNDED') {
-      transaction.status = BillingTransactionStatus.Failed;
-    } else {
-      switch (sumUpTransactionData.status) {
-        case 'CANCELLED':
-        case 'FAILED':
-          transaction.status = BillingTransactionStatus.Failed;
-          break;
+    switch (sumUpTransactionData.status) {
+      case 'CANCELLED':
+      case 'FAILED':
+      case 'REFUNDED':
+        transaction.status = BillingTransactionStatus.Failed;
+        break;
 
-        case 'PENDING':
-          transaction.status = BillingTransactionStatus.Pending;
-          break;
+      case 'PENDING':
+        transaction.status = BillingTransactionStatus.Pending;
+        break;
 
-        case 'SUCCESSFUL':
-          transaction.status = BillingTransactionStatus.Completed;
-          break;
+      case 'SUCCESSFUL':
+        transaction.status = BillingTransactionStatus.Completed;
+        break;
 
-        default: {
-          const exhaustiveCheck: never = sumUpTransactionData.status;
-          throw new Error(`Unknown sumup transaction status: ${exhaustiveCheck}`);
-        }
+      default: {
+        const exhaustiveCheck: never = sumUpTransactionData.status;
+        throw new Error(`Unknown sumup transaction status: ${exhaustiveCheck}`);
       }
     }
 
