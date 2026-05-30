@@ -182,28 +182,30 @@ export function AttractapList() {
                             {firmwareUpdateChip(reader)}
                           </TableCell>
                           <TableCell className="whitespace-nowrap">{formatDateTime(reader.lastConnection)}</TableCell>
-                          <TableCell className="flex-row flex">
-                            <Button
-                              variant="ghost"
-                              onPress={() => setOpenedReaderEditor(reader.id)}
-                              data-cy={`attractap-list-edit-reader-button-${reader.id}`}
-                            >
-                              <PencilIcon className="w-4 h-4" />
-                              {t('table.actions.editReader')}
-                            </Button>
+                          <TableCell>
+                            <div className="flex flex-row gap-2">
+                              <Button
+                                variant="ghost"
+                                onPress={() => setOpenedReaderEditor(reader.id)}
+                                data-cy={`attractap-list-edit-reader-button-${reader.id}`}
+                              >
+                                <PencilIcon className="w-4 h-4" />
+                                {t('table.actions.editReader')}
+                              </Button>
 
-                            <AttractapDeleteModal readerId={reader.id}>
-                              {(onOpen) => (
-                                <Button
-                                  variant="danger-soft"
-                                  onPress={onOpen}
-                                  data-cy={`attractap-list-delete-reader-button-${reader.id}`}
-                                >
-                                  <Trash2Icon className="w-4 h-4" />
-                                  {t('table.actions.deleteReader')}
-                                </Button>
-                              )}
-                            </AttractapDeleteModal>
+                              <AttractapDeleteModal readerId={reader.id}>
+                                {(onOpen) => (
+                                  <Button
+                                    variant="danger-soft"
+                                    onPress={onOpen}
+                                    data-cy={`attractap-list-delete-reader-button-${reader.id}`}
+                                  >
+                                    <Trash2Icon className="w-4 h-4" />
+                                    {t('table.actions.deleteReader')}
+                                  </Button>
+                                )}
+                              </AttractapDeleteModal>
+                            </div>
                           </TableCell>
                         </TableRow>
                       )}
