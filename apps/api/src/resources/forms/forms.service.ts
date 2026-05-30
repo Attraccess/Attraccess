@@ -153,6 +153,55 @@ export class ResourceFormsService {
     return forms.map((form) => this.mapFormResponse(form));
   }
 
+  async getFormMetaForAction(
+    resourceId: number,
+    action: ResourceFormAction,
+  ): Promise<{ id: number; name: string; fieldCount: number }[]> {
+    await this.ensureResourceExists(resourceId);
+    const forms = await this.getFormsByAction(resourceId, action);
+    return forms.map((form) => ({ id: form.id, name: form.name, fieldCount: (form.fields ?? []).length }));
+  }
+
+  async getFieldsWindow(
+    resourceId: number,
+    formId: number,
+    offset: number,
+    limit: number,
+  ): Promise<{ totalFieldCount: number; fields: FormFieldResponseDto[] }> {
+    await this.ensureResourceExists(resourceId);
+    const form = await this.getFormOrThrow(resourceId, formId);
+    const fields = (form.fields ?? []).sort((a, b) => a.id - b.id);
+    const safeOffset = Math.max(0, offset);
+    const safeLimit = Math.max(1, limit);
+    const window = fields.slice(safeOffset, safeOffset + safeLimit).map((field) => this.mapFieldResponse(field));
+    return { totalFieldCount: fields.length, fields: window };
+  }
+
+  async validatePageAnswers(
+    resourceId: number,
+    formId: number,
+    answers: { fieldId: number; value: unknown }[],
+  ): Promise<{ valid: boolean; errors: { fieldId: number; message: string }[] }> {
+    await this.ensureResourceExists(resourceId);
+    const form = await this.getFormOrThrow(resourceId, formId);
+    const errors: { fieldId: number; message: string }[] = [];
+
+    for (const answer of answers) {
+      const field = form.fields?.find((item) => item.id === answer.fieldId);
+      if (!field) {
+        errors.push({ fieldId: answer.fieldId, message: `Unknown field #${answer.fieldId}.` });
+        continue;
+      }
+      try {
+        this.validateFieldAnswer(form, field, answer.value);
+      } catch (error) {
+        errors.push({ fieldId: field.id, message: (error as Error).message });
+      }
+    }
+
+    return { valid: errors.length === 0, errors };
+  }
+
   async saveRequiredSubmissions(options: {
     resourceId: number;
     action: ResourceFormAction;
@@ -283,29 +332,43 @@ export class ResourceFormsService {
 
     for (const field of form.fields ?? []) {
       const answer = submission.answers.find((item) => item.fieldId === field.id);
-
-      // For boolean fields, check if it's required and must be true
-      if (field.type === 'boolean' && field.isRequired) {
-        const boolValue = answer?.value === true || answer?.value === 'true';
-        if (!boolValue) {
-          throw new BadRequestException(`Field "${field.name}" must be checked on form "${form.name}".`);
-        }
-      }
-
-      if (!answer || answer.value === undefined || answer.value === null || answer.value === '') {
-        if (field.isRequired) {
-          throw new BadRequestException(`Field "${field.name}" is required on form "${form.name}".`);
-        }
+      const value = this.validateFieldAnswer(form, field, answer?.value);
+      if (value === undefined) {
         continue;
       }
-
-      data[field.id.toString()] = {
-        value: parseFieldValue(field.type, answer.value, field.options),
-        fieldDefinition: field,
-      };
+      data[field.id.toString()] = { value, fieldDefinition: field };
     }
 
     return data;
+  }
+
+  private validateFieldAnswer(form: Form, field: FormField, rawValue: unknown): string | undefined {
+    if (field.type === 'boolean' && field.isRequired) {
+      const boolValue = rawValue === true || rawValue === 'true';
+      if (!boolValue) {
+        throw new BadRequestException(`Field "${field.name}" must be checked on form "${form.name}".`);
+      }
+    }
+
+    if (rawValue === undefined || rawValue === null || rawValue === '') {
+      if (field.isRequired) {
+        throw new BadRequestException(`Field "${field.name}" is required on form "${form.name}".`);
+      }
+      return undefined;
+    }
+
+    return parseFieldValue(field.type, rawValue, field.options);
+  }
+
+  private mapFieldResponse(field: FormField): FormFieldResponseDto {
+    const fieldDto = new FormFieldResponseDto();
+    fieldDto.id = field.id;
+    fieldDto.name = field.name;
+    fieldDto.type = field.type;
+    fieldDto.isRequired = field.isRequired;
+    fieldDto.description = field.description;
+    fieldDto.options = field.options;
+    return fieldDto;
   }
 
   private mapFormResponse(form: Form): FormResponseDto {
@@ -318,16 +381,7 @@ export class ResourceFormsService {
     response.isRequiredOnResourceUsageTakeOver = form.isRequiredOnResourceUsageTakeOver;
     response.isRequiredOnResourceUsageEnd = form.isRequiredOnResourceUsageEnd;
     response.resourceId = form.resourceId;
-    response.fields = (form.fields ?? []).map((field) => {
-      const fieldDto = new FormFieldResponseDto();
-      fieldDto.id = field.id;
-      fieldDto.name = field.name;
-      fieldDto.type = field.type;
-      fieldDto.isRequired = field.isRequired;
-      fieldDto.description = field.description;
-      fieldDto.options = field.options;
-      return fieldDto;
-    });
+    response.fields = (form.fields ?? []).map((field) => this.mapFieldResponse(field));
 
     return response;
   }

@@ -61,9 +61,12 @@ public:
     void setProjectsPageRequestCallback(std::function<void(uint32_t)> callback);
     void setProjectSelectionCallback(std::function<void(uint32_t, const String &)> callback);
     void setSelectedProject(uint32_t projectId, const char *projectName);
-    void showFormsModal(const API::ResourceUsageFormRequest &request);
+    void showFormsModal(const API::ResourceUsageFormRequest &meta);
+    void renderFormField(const API::ResourceUsageFormFieldsPage &page, bool canGoBack, bool isLast, uint32_t fieldNumber, uint32_t totalFields);
+    void showFormPageErrors(const API::ResourceUsageFormPageResult &result);
     void hideFormsModal();
-    void setFormsSubmitCallback(std::function<void(const API::FormSubmissionList &)> callback);
+    void setFormPageNextCallback(std::function<void(const API::FormPageSubmission &)> callback);
+    void setFormPageBackCallback(std::function<void()> callback);
     void setFormsCancelCallback(std::function<void()> callback);
 
     // UI helpers for async actions
@@ -124,8 +127,15 @@ private:
     lv_obj_t *formsModalContent = nullptr;
     lv_obj_t *formsModalList = nullptr;
     lv_obj_t *formsModalErrorLabel = nullptr;
+    lv_obj_t *formsModalProgressLabel = nullptr;
     lv_obj_t *formsKeyboard = nullptr;
-    const API::ResourceUsageFormRequest *formsModalRequest = nullptr;
+    lv_obj_t *formsBackButton = nullptr;
+    lv_obj_t *formsNextButton = nullptr;
+    lv_obj_t *formsNextLabel = nullptr;
+    const API::ResourceUsageFormRequest *formsModalMeta = nullptr;
+    const API::ResourceUsageFormFieldsPage *formsModalPage = nullptr;
+    bool formsCanGoBack = false;
+    bool formsIsLastField = false;
     struct SelectOptionEventData
     {
         ResourceDetailsScreen *self;
@@ -149,10 +159,11 @@ private:
         uint8_t selectOptionEventCount = 0;
     };
 
-    FormFieldWidget formFieldWidgets[API::MAX_FORMS_PER_REQUEST * API::MAX_FORM_FIELDS_PER_FORM];
+    FormFieldWidget formFieldWidgets[API::MAX_FORM_PAGE_FIELDS];
     uint16_t formFieldWidgetCount = 0;
-    API::FormSubmissionList formSubmissionScratch;
-    std::function<void(const API::FormSubmissionList &)> formsSubmitCallback;
+    API::FormPageSubmission formPageScratch;
+    std::function<void(const API::FormPageSubmission &)> formPageNextCallback;
+    std::function<void()> formPageBackCallback;
     std::function<void()> formsCancelCallback;
 
     void updateElapsedTimeDisplay();
@@ -177,7 +188,8 @@ private:
     static void onProjectListItemDelete(lv_event_t *e);
     static void onProjectsPrevPage(lv_event_t *e);
     static void onProjectsNextPage(lv_event_t *e);
-    static void onFormsSubmit(lv_event_t *e);
+    static void onFormsNext(lv_event_t *e);
+    static void onFormsBack(lv_event_t *e);
     static void onFormsCancel(lv_event_t *e);
     static void onFormFieldFocus(lv_event_t *e);
     static void onFormsKeyboardEvent(lv_event_t *e);
@@ -211,8 +223,8 @@ private:
     void showProjectsLoading();
     void updateProjectsPaginationControls();
     void ensureFormsModal();
-    void rebuildFormsModal();
-    bool collectFormSubmissions(API::FormSubmissionList &outSubmissions);
+    void buildCurrentFormField();
+    bool collectCurrentField(API::FormPageSubmission &outPage);
     FormFieldWidget *findFieldWidget(uint32_t formId, uint32_t fieldId);
     FormFieldWidget *findFieldWidgetByObject(lv_obj_t *object);
     void clearFormFieldErrors();

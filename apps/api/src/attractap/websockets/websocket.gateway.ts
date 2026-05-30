@@ -34,7 +34,14 @@ import { ResourceFlowNodeType, ResourceFormAction } from '@attraccess/database-e
 import { ProjectsService } from '../../projects/projects.service';
 import { ResourceFormsService } from '../../resources/forms/forms.service';
 import { FormSubmissionRequestDto } from '../../resources/forms/dto/form-submission-request.dto';
-import { ResourceUsageFormRequestPayload } from './websocket.types';
+import {
+  ResourceUsageFormRequestPayload,
+  ResourceUsageFormGetFieldsPayload,
+  ResourceUsageFormFieldsPayload,
+  ResourceUsageFormSubmitPagePayload,
+  ResourceUsageFormPageResultPayload,
+  FormFieldAnswerValue,
+} from './websocket.types';
 import { MetricsService } from '../../metrics/metrics.service';
 import { MetricsToggleService } from '../../metrics/settings/metrics-toggle.service';
 import { WS_METRICS } from '../../metrics/definitions/tokens';
@@ -442,6 +449,14 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
         await this.handleProjectsOfUserRequest(socket, eventData);
         break;
 
+      case AttractapEventType.RESOURCE_USAGE_FORM_GET_FIELDS:
+        await this.handleResourceUsageFormGetFields(socket, eventData);
+        break;
+
+      case AttractapEventType.RESOURCE_USAGE_FORM_SUBMIT_PAGE:
+        await this.handleResourceUsageFormSubmitPage(socket, eventData);
+        break;
+
       case AttractapEventType.READER_FIRMWARE_UPDATE_REQUIRED:
         // no-op on server; metadata-only event sent by server
         break;
@@ -452,6 +467,8 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       case AttractapEventType.CARD_AUTHENTICATION_DATA:
       case AttractapEventType.ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO:
       case AttractapEventType.RESOURCE_USAGE_FORM_REQUEST:
+      case AttractapEventType.RESOURCE_USAGE_FORM_FIELDS:
+      case AttractapEventType.RESOURCE_USAGE_FORM_PAGE_RESULT:
         this.logger.error(
           `Received event of type ${eventData.type} from client ${socket.id}, this is a server side only event, clients should not send this event`,
         );
@@ -960,26 +977,55 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     return true;
   }
 
+  private formDraftKey(resourceId: number, action: ResourceFormAction): string {
+    return `${resourceId}:${action}`;
+  }
+
+  private getFormDraft(
+    socket: AuthenticatedWebSocket,
+    resourceId: number,
+    action: ResourceFormAction,
+  ): Record<number, FormFieldAnswerValue> {
+    return socket.state.formDrafts?.[this.formDraftKey(resourceId, action)] ?? {};
+  }
+
+  private clearFormDraft(socket: AuthenticatedWebSocket, resourceId: number, action: ResourceFormAction): void {
+    if (socket.state.formDrafts) {
+      delete socket.state.formDrafts[this.formDraftKey(resourceId, action)];
+    }
+  }
+
   private async ensureFormsSatisfied({
     socket,
     resourceId,
     action,
-    formSubmissions,
   }: {
     socket: AuthenticatedWebSocket;
     resourceId: number;
     action: ResourceFormAction;
-    formSubmissions?: FormSubmissionRequestDto[];
-  }): Promise<boolean> {
+  }): Promise<FormSubmissionRequestDto[] | null> {
     const forms = await this.resourceFormsService.getFormsForAction(resourceId, action);
     if (!forms.length) {
-      return true;
+      return [];
     }
 
-    const submissionIds = new Set((formSubmissions ?? []).map((submission) => submission.formId));
-    const allProvided = forms.every((form) => submissionIds.has(form.id));
-    if (allProvided) {
-      return true;
+    const draft = this.getFormDraft(socket, resourceId, action);
+    const hasValue = (fieldId: number) => {
+      const value = draft[fieldId];
+      return value !== undefined && value !== null && value !== '';
+    };
+
+    const complete = forms.every((form) =>
+      form.fields.filter((field) => field.isRequired).every((field) => hasValue(field.id)),
+    );
+
+    if (complete) {
+      return forms.map((form) => ({
+        formId: form.id,
+        answers: form.fields
+          .filter((field) => draft[field.id] !== undefined)
+          .map((field) => ({ fieldId: field.id, value: draft[field.id] })),
+      }));
     }
 
     let resourceName: string | undefined;
@@ -995,43 +1041,86 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       resourceId,
       resourceName,
       action,
-      forms: forms.map((form) => ({
-        id: form.id,
-        name: form.name,
-        fields: form.fields.map((field) => ({
-          id: field.id,
-          name: field.name,
-          description: field.description ?? null,
-          type: field.type,
-          isRequired: field.isRequired,
-          options: field.options ?? null,
-        })),
-      })),
+      forms: forms.map((form) => ({ id: form.id, name: form.name, fieldCount: form.fields.length })),
     };
 
     await socket.sendMessage(new AttractapEvent(AttractapEventType.RESOURCE_USAGE_FORM_REQUEST, payload));
-    return false;
+    return null;
+  }
+
+  private async handleResourceUsageFormGetFields(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
+    const { resourceId, action, formId, offset, limit } = data.payload as ResourceUsageFormGetFieldsPayload;
+
+    if (!(await this.validateResourceAction(socket, resourceId, AttractapEventType.START_RESOURCE_USAGE_SESSION))) {
+      return;
+    }
+
+    const { totalFieldCount, fields } = await this.resourceFormsService.getFieldsWindow(
+      resourceId,
+      formId,
+      offset,
+      limit,
+    );
+
+    const draft = this.getFormDraft(socket, resourceId, action);
+    const payload: ResourceUsageFormFieldsPayload = {
+      resourceId,
+      action,
+      formId,
+      offset,
+      totalFieldCount,
+      fields: fields.map((field) => ({
+        id: field.id,
+        name: field.name,
+        description: field.description ?? null,
+        type: field.type,
+        isRequired: field.isRequired,
+        options: field.options ?? null,
+        value: draft[field.id] ?? null,
+      })),
+    };
+
+    await socket.sendMessage(new AttractapEvent(AttractapEventType.RESOURCE_USAGE_FORM_FIELDS, payload));
+  }
+
+  private async handleResourceUsageFormSubmitPage(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
+    const { resourceId, action, formId, offset, answers } = data.payload as ResourceUsageFormSubmitPagePayload;
+
+    if (!(await this.validateResourceAction(socket, resourceId, AttractapEventType.START_RESOURCE_USAGE_SESSION))) {
+      return;
+    }
+
+    const { valid, errors } = await this.resourceFormsService.validatePageAnswers(resourceId, formId, answers);
+
+    if (valid) {
+      const key = this.formDraftKey(resourceId, action);
+      socket.state.formDrafts ??= {};
+      socket.state.formDrafts[key] ??= {};
+      for (const answer of answers) {
+        socket.state.formDrafts[key][answer.fieldId] = answer.value;
+      }
+    }
+
+    const payload: ResourceUsageFormPageResultPayload = { resourceId, action, formId, offset, valid, errors };
+    await socket.sendMessage(new AttractapEvent(AttractapEventType.RESOURCE_USAGE_FORM_PAGE_RESULT, payload));
   }
 
   private async handleStartResourceUsageSession(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
-    const { resourceId, projectId, formSubmissions } = data.payload as {
+    const { resourceId, projectId } = data.payload as {
       resourceId: number;
       projectId?: number;
-      formSubmissions?: FormSubmissionRequestDto[];
     };
 
     if (!(await this.validateResourceAction(socket, resourceId, AttractapEventType.START_RESOURCE_USAGE_SESSION))) {
       return;
     }
 
-    if (
-      !(await this.ensureFormsSatisfied({
-        socket,
-        resourceId,
-        action: ResourceFormAction.START,
-        formSubmissions,
-      }))
-    ) {
+    const formSubmissions = await this.ensureFormsSatisfied({
+      socket,
+      resourceId,
+      action: ResourceFormAction.START,
+    });
+    if (formSubmissions === null) {
       return;
     }
 
@@ -1045,6 +1134,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
     try {
       await this.resourceUsageService.startSession(resourceId, user, { projectId, formSubmissions });
+      this.clearFormDraft(socket, resourceId, ResourceFormAction.START);
       await socket.sendMessage(new AttractapEvent(AttractapEventType.START_RESOURCE_USAGE_SESSION, { success: true }));
     } catch (error) {
       if (error instanceof ResourceInUseError) {
@@ -1071,23 +1161,20 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   }
 
   private async handleStopResourceUsageSession(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
-    const { resourceId, formSubmissions } = data.payload as {
+    const { resourceId } = data.payload as {
       resourceId: number;
-      formSubmissions?: FormSubmissionRequestDto[];
     };
 
     if (!(await this.validateResourceAction(socket, resourceId, AttractapEventType.START_RESOURCE_USAGE_SESSION))) {
       return;
     }
 
-    if (
-      !(await this.ensureFormsSatisfied({
-        socket,
-        resourceId,
-        action: ResourceFormAction.END,
-        formSubmissions,
-      }))
-    ) {
+    const formSubmissions = await this.ensureFormsSatisfied({
+      socket,
+      resourceId,
+      action: ResourceFormAction.END,
+    });
+    if (formSubmissions === null) {
       return;
     }
 
@@ -1101,6 +1188,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
     try {
       await this.resourceUsageService.endSession(resourceId, user, { formSubmissions });
+      this.clearFormDraft(socket, resourceId, ResourceFormAction.END);
       await socket.sendMessage(new AttractapEvent(AttractapEventType.STOP_RESOURCE_USAGE_SESSION, { success: true }));
     } catch (error) {
       this.logger.error(`Failed to stop resource usage session: ${error.message}`);
