@@ -264,10 +264,12 @@ void Application::setup() {
       [this](uint32_t projectId, const String &projectName) {
         this->handleProjectSelection(projectId, projectName);
       });
-  Display::resourceDetailsScreen.setFormsSubmitCallback(
-      [this](const API::FormSubmissionList &submissions) {
-        this->handleFormsSubmit(submissions);
+  Display::resourceDetailsScreen.setFormPageNextCallback(
+      [this](const API::FormPageSubmission &page) {
+        this->handleFormPageNext(page);
       });
+  Display::resourceDetailsScreen.setFormPageBackCallback(
+      [this]() { this->handleFormPageBack(); });
   Display::resourceDetailsScreen.setFormsCancelCallback(
       [this]() { this->handleFormsCancel(); });
 
@@ -346,6 +348,38 @@ void Application::setup() {
                 // stack/heap)
                 self->pendingFormRequest = self->api.getFormRequestScratch();
                 self->handleFormsRequest(self->pendingFormRequest);
+              }
+            },
+            this);
+      });
+
+  this->api.setResourceFormFieldsCallback(
+      [this](const API::ResourceUsageFormFieldsPage &page) {
+        (void)page; // The data is in api.getFormFieldsScratch()
+        this->pendingFormFieldsReady = true;
+        lv_async_call(
+            [](void *u) {
+              auto *self = static_cast<Application *>(u);
+              if (self && self->pendingFormFieldsReady) {
+                self->pendingFormFieldsReady = false;
+                self->pendingFormFields = self->api.getFormFieldsScratch();
+                self->handleFormFields(self->pendingFormFields);
+              }
+            },
+            this);
+      });
+
+  this->api.setResourceFormPageResultCallback(
+      [this](const API::ResourceUsageFormPageResult &result) {
+        (void)result; // The data is in api.getFormPageResultScratch()
+        this->pendingFormPageResultReady = true;
+        lv_async_call(
+            [](void *u) {
+              auto *self = static_cast<Application *>(u);
+              if (self && self->pendingFormPageResultReady) {
+                self->pendingFormPageResultReady = false;
+                self->pendingFormPageResult = self->api.getFormPageResultScratch();
+                self->handleFormPageResult(self->pendingFormPageResult);
               }
             },
             this);
@@ -980,36 +1014,153 @@ void Application::handleProjectSelection(uint32_t projectId,
 
 void Application::handleFormsRequest(
     const API::ResourceUsageFormRequest &request) {
-  // Note: 'request' is already a reference to this->pendingFormRequest from the
-  // callback, so we don't need to copy it again. Just set the flag and show the
-  // modal.
-  (void)request; // Suppress unused parameter warning; we use pendingFormRequest
-                 // directly
+  // 'request' aliases this->pendingFormRequest (filled by the callback).
+  (void)request;
   this->hasPendingFormRequest = true;
+  this->formCursorFormIdx = 0;
+  this->formCursorOffset = 0;
   Display::resourceDetailsScreen.hideActionProgress();
-  // Pass the stored copy since showFormsModal stores a pointer
   Display::resourceDetailsScreen.showFormsModal(this->pendingFormRequest);
+  this->requestCurrentFormField();
 }
 
-void Application::handleFormsSubmit(
-    const API::FormSubmissionList &submissions) {
-  if (this->pendingActionType == PENDING_ACTION_NONE) {
-    this->handleFormsCancel();
+uint32_t Application::totalFormFields() const {
+  uint32_t total = 0;
+  for (uint8_t i = 0;
+       i < this->pendingFormRequest.formCount && i < API::MAX_FORMS_PER_REQUEST;
+       ++i) {
+    total += this->pendingFormRequest.forms[i].fieldCount;
+  }
+  return total;
+}
+
+uint32_t Application::globalFormFieldNumber() const {
+  uint32_t number = 0;
+  for (uint8_t i = 0;
+       i < this->formCursorFormIdx && i < API::MAX_FORMS_PER_REQUEST; ++i) {
+    number += this->pendingFormRequest.forms[i].fieldCount;
+  }
+  return number + this->formCursorOffset + 1;
+}
+
+bool Application::isLastFormField() const {
+  // Last when no later field exists in this or any subsequent form.
+  if (this->formCursorFormIdx >= this->pendingFormRequest.formCount) {
+    return true;
+  }
+  if (this->formCursorOffset + 1 <
+      this->pendingFormRequest.forms[this->formCursorFormIdx].fieldCount) {
+    return false;
+  }
+  for (uint8_t i = this->formCursorFormIdx + 1;
+       i < this->pendingFormRequest.formCount && i < API::MAX_FORMS_PER_REQUEST;
+       ++i) {
+    if (this->pendingFormRequest.forms[i].fieldCount > 0) {
+      return false;
+    }
+  }
+  return true;
+}
+
+void Application::requestCurrentFormField() {
+  // Skip forms that carry no fields, finish when the cursor runs past the end.
+  while (this->formCursorFormIdx < this->pendingFormRequest.formCount &&
+         this->pendingFormRequest.forms[this->formCursorFormIdx].fieldCount ==
+             0) {
+    this->formCursorFormIdx++;
+    this->formCursorOffset = 0;
+  }
+  if (this->formCursorFormIdx >= this->pendingFormRequest.formCount) {
+    this->finishFormFlow();
     return;
   }
+  const API::ResourceUsageFormMeta &form =
+      this->pendingFormRequest.forms[this->formCursorFormIdx];
+  this->api.requestFormFields(this->pendingFormRequest.resourceId,
+                              this->pendingFormRequest.action, form.id,
+                              this->formCursorOffset, API::MAX_FORM_PAGE_FIELDS);
+}
 
-  this->formSubmissionBuffer = submissions;
+void Application::advanceFormCursor() {
+  this->formCursorOffset += API::MAX_FORM_PAGE_FIELDS;
+  if (this->formCursorFormIdx < this->pendingFormRequest.formCount &&
+      this->formCursorOffset >=
+          this->pendingFormRequest.forms[this->formCursorFormIdx].fieldCount) {
+    this->formCursorFormIdx++;
+    this->formCursorOffset = 0;
+  }
+}
+
+void Application::retreatFormCursor() {
+  if (this->formCursorOffset > 0) {
+    this->formCursorOffset--;
+  } else {
+    if (this->formCursorFormIdx == 0) {
+      return;
+    }
+    int16_t idx = static_cast<int16_t>(this->formCursorFormIdx) - 1;
+    while (idx >= 0 && this->pendingFormRequest.forms[idx].fieldCount == 0) {
+      idx--;
+    }
+    if (idx < 0) {
+      return;
+    }
+    this->formCursorFormIdx = static_cast<uint8_t>(idx);
+    this->formCursorOffset = this->pendingFormRequest.forms[idx].fieldCount - 1;
+  }
+  this->requestCurrentFormField();
+}
+
+void Application::handleFormFields(const API::ResourceUsageFormFieldsPage &page) {
+  if (!this->hasPendingFormRequest) {
+    return;
+  }
+  bool canGoBack = this->globalFormFieldNumber() > 1;
+  Display::resourceDetailsScreen.renderFormField(
+      page, canGoBack, this->isLastFormField(), this->globalFormFieldNumber(),
+      this->totalFormFields());
+}
+
+void Application::handleFormPageNext(const API::FormPageSubmission &page) {
+  if (!this->hasPendingFormRequest) {
+    return;
+  }
+  this->api.submitFormPage(this->pendingFormRequest.resourceId,
+                           this->pendingFormRequest.action, page);
+}
+
+void Application::handleFormPageResult(
+    const API::ResourceUsageFormPageResult &result) {
+  if (!this->hasPendingFormRequest) {
+    return;
+  }
+  if (result.valid) {
+    this->advanceFormCursor();
+    this->requestCurrentFormField();
+  } else {
+    Display::resourceDetailsScreen.showFormPageErrors(result);
+  }
+}
+
+void Application::handleFormPageBack() {
+  if (!this->hasPendingFormRequest) {
+    return;
+  }
+  this->retreatFormCursor();
+}
+
+void Application::finishFormFlow() {
   this->hasPendingFormRequest = false;
   Display::resourceDetailsScreen.hideFormsModal();
   Display::resourceDetailsScreen.showActionProgress("Sende Formular");
 
   if (this->pendingActionType == PENDING_ACTION_START_SESSION) {
     this->api.startResourceUsageSession(this->pendingActionResourceId,
-                                        this->pendingActionProjectId,
-                                        &this->formSubmissionBuffer);
+                                        this->pendingActionProjectId);
   } else if (this->pendingActionType == PENDING_ACTION_STOP_SESSION) {
-    this->api.stopResourceUsageSession(this->pendingActionResourceId,
-                                       &this->formSubmissionBuffer);
+    this->api.stopResourceUsageSession(this->pendingActionResourceId);
+  } else {
+    this->handleFormsCancel();
   }
 }
 
@@ -1019,6 +1170,8 @@ void Application::handleFormsCancel() {
   }
   this->hasPendingFormRequest = false;
   this->pendingActionType = PENDING_ACTION_NONE;
+  this->formCursorFormIdx = 0;
+  this->formCursorOffset = 0;
   Display::resourceDetailsScreen.hideFormsModal();
   Display::resourceDetailsScreen.hideActionProgress();
   this->endActionPause();
@@ -1171,6 +1324,10 @@ void Application::resetSessionOnDisconnect() {
   this->pendingActionProjectId = 0;
   this->hasPendingFormRequest = false;
   this->pendingFormRequestReady = false;
+  this->pendingFormFieldsReady = false;
+  this->pendingFormPageResultReady = false;
+  this->formCursorFormIdx = 0;
+  this->formCursorOffset = 0;
 
   this->clearProjectSelection();
   this->currentProjectsUser = "";

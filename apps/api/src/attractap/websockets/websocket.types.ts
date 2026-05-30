@@ -33,6 +33,10 @@ export enum AttractapEventType {
   BILLING_REQUEST_TOPUP = 'BILLING_REQUEST_TOPUP',
   PROJECTS_OF_USER = 'PROJECTS_OF_USER',
   RESOURCE_USAGE_FORM_REQUEST = 'RESOURCE_USAGE_FORM_REQUEST',
+  RESOURCE_USAGE_FORM_GET_FIELDS = 'RESOURCE_USAGE_FORM_GET_FIELDS',
+  RESOURCE_USAGE_FORM_FIELDS = 'RESOURCE_USAGE_FORM_FIELDS',
+  RESOURCE_USAGE_FORM_SUBMIT_PAGE = 'RESOURCE_USAGE_FORM_SUBMIT_PAGE',
+  RESOURCE_USAGE_FORM_PAGE_RESULT = 'RESOURCE_USAGE_FORM_PAGE_RESULT',
 }
 
 export interface ResourceThumbnailDescriptorPayload {
@@ -81,6 +85,7 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
       fd?: number;
       lastLoggedPct?: number;
     } | null;
+    formDrafts?: Record<string, Record<number, FormFieldAnswerValue>>;
   };
 }
 
@@ -108,6 +113,8 @@ export interface FirmwareUpdateResponse {
   bytes_received_before_timeout?: number;
 }
 
+export type FormFieldAnswerValue = string | number | boolean;
+
 export interface ResourceUsageFormFieldPayload {
   id: number;
   name: string;
@@ -115,18 +122,57 @@ export interface ResourceUsageFormFieldPayload {
   type: string;
   isRequired: boolean;
   options: Record<string, unknown> | string[] | null;
+  value?: FormFieldAnswerValue | null;
 }
 
-export interface ResourceUsageFormPayload {
+export interface ResourceUsageFormMetaPayload {
   id: number;
   name: string;
-  description?: string | null;
-  fields: ResourceUsageFormFieldPayload[];
+  fieldCount: number;
 }
 
 export interface ResourceUsageFormRequestPayload {
   resourceId: number;
   resourceName?: string;
   action: ResourceFormAction;
-  forms: ResourceUsageFormPayload[];
+  forms: ResourceUsageFormMetaPayload[];
+}
+
+export interface ResourceUsageFormGetFieldsPayload {
+  resourceId: number;
+  action: ResourceFormAction;
+  formId: number;
+  offset: number;
+  limit: number;
+}
+
+export interface ResourceUsageFormFieldsPayload {
+  resourceId: number;
+  action: ResourceFormAction;
+  formId: number;
+  offset: number;
+  totalFieldCount: number;
+  fields: ResourceUsageFormFieldPayload[];
+}
+
+export interface ResourceUsageFormSubmitPagePayload {
+  resourceId: number;
+  action: ResourceFormAction;
+  formId: number;
+  offset: number;
+  answers: { fieldId: number; value: FormFieldAnswerValue }[];
+}
+
+export interface ResourceUsageFormPageErrorPayload {
+  fieldId: number;
+  message: string;
+}
+
+export interface ResourceUsageFormPageResultPayload {
+  resourceId: number;
+  action: ResourceFormAction;
+  formId: number;
+  offset: number;
+  valid: boolean;
+  errors: ResourceUsageFormPageErrorPayload[];
 }
