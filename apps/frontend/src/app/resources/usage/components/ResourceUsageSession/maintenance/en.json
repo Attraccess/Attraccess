@@ -7,5 +7,6 @@
       "noReason": "No reason"
     },
     "noDate": "Date not known"
-  }
+  },
+  "maintainers": "Users allowed to perform maintenance"
 }
