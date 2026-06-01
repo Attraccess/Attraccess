@@ -7,6 +7,7 @@ import { AttractapFirmwareService } from '../firmware.service';
 import { SumUpService } from '../../billing/sumup.service';
 import { LicenseService } from '../../license/license.service';
 import { ResourceUsageService } from '../../resources/usage/resourceUsage.service';
+import { ResourceMaintenanceService } from '../../resources/maintenances/maintenance.service';
 import { ResourceIntroductionsService } from '../../resources/introductions/resouceIntroductions.service';
 import { ResourceIntroducersService } from '../../resources/introducers/resourceIntroducers.service';
 import { ResourceFlowsService } from '../../resources/flows/resource-flows.service';
@@ -76,6 +77,7 @@ describe('AttractapGateway', () => {
         { provide: SumUpService, useValue: {} },
         { provide: LicenseService, useValue: licenseService },
         { provide: ResourceUsageService, useValue: {} },
+        { provide: ResourceMaintenanceService, useValue: { hasActiveMaintenance: jest.fn().mockResolvedValue(false) } },
         { provide: ResourceIntroductionsService, useValue: {} },
         { provide: ResourceIntroducersService, useValue: {} },
         { provide: ResourceFlowsService, useValue: {} },
