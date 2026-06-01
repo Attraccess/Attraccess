@@ -9513,7 +9513,7 @@ export class HttpClient<SecurityDataType = unknown> {
 
 /**
  * @title Attraccess API
- * @version 1.5.2
+ * @version 1.6.0
  * @contact
  *
  * The Attraccess API used to manage machine and tool access in a Makerspace or FabLab
