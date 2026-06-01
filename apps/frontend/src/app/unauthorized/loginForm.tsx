@@ -229,27 +229,27 @@ function LoginFormContent(props: LoginFormProps & { t: TFunction; tExists: TExis
       {isEmailNotVerified && !resendSuccess && (
         <div className="space-y-2" data-testid="resend-verification-section">
           <p className="text-sm text-gray-600 dark:text-gray-400">{t('resendVerification.prompt')}</p>
-          <Input
-            type="email"
-            label={t('resendVerification.emailLabel')}
+          <TextField
             value={resendEmail}
-            onValueChange={(value) => {
+            onChange={(value) => {
               setResendEmail(value);
               setResendError(null);
             }}
-            data-testid="resend-email-input"
-          />
+          >
+            <Label>{t('resendVerification.emailLabel')}</Label>
+            <Input type="email" data-testid="resend-email-input" />
+          </TextField>
           {resendError && (
-            <Alert
-              color="danger"
-              title={resendError.title}
-              description={resendError.description}
-              data-testid="resend-error-alert"
-            />
+            <Alert status="danger" data-testid="resend-error-alert">
+              <AlertContent>
+                <AlertTitle>{resendError.title}</AlertTitle>
+                <AlertDescription>{resendError.description}</AlertDescription>
+              </AlertContent>
+            </Alert>
           )}
           <Button
-            fullWidth
-            color="secondary"
+            variant="secondary"
+            className="w-full"
             onPress={() => {
               const trimmed = resendEmail.trim();
               if (!isValidEmail(trimmed)) {
@@ -257,7 +257,7 @@ function LoginFormContent(props: LoginFormProps & { t: TFunction; tExists: TExis
               }
               resendVerification.mutate({ requestBody: { email: trimmed } });
             }}
-            isLoading={resendVerification.isPending}
+            isPending={resendVerification.isPending}
             isDisabled={!isValidEmail(resendEmail.trim()) || resendVerification.isPending}
             data-testid="resend-verification-button"
           >
@@ -267,12 +267,12 @@ function LoginFormContent(props: LoginFormProps & { t: TFunction; tExists: TExis
       )}
 
       {resendSuccess && (
-        <Alert
-          color="success"
-          title={t('resendVerification.successTitle')}
-          description={t('resendVerification.successMessage')}
-          data-testid="resend-success-alert"
-        />
+        <Alert status="success" data-testid="resend-success-alert">
+          <AlertContent>
+            <AlertTitle>{t('resendVerification.successTitle')}</AlertTitle>
+            <AlertDescription>{t('resendVerification.successMessage')}</AlertDescription>
+          </AlertContent>
+        </Alert>
       )}
     </form>
   );

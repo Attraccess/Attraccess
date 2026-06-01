@@ -5,6 +5,9 @@ import { AuthService } from '../auth/auth.service';
 import { EmailService } from '../../email/email.service';
 import { SSOService } from '../auth/sso/sso.service';
 import { TokenHashService } from '../../encryption/token-hash.service';
+import { PasswordPolicyService } from '../password-policy/password-policy.service';
+import { BruteForceProtectionService } from '../rate-limiting/brute-force.service';
+import { AuthAuditLogger } from '../rate-limiting/auth-audit.logger';
 import { ServiceUnavailableException } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Setting, User } from '@attraccess/database-entities';
@@ -74,6 +77,27 @@ describe('UsersController – resendVerificationEmail', () => {
         { provide: SSOService, useValue: ssoService },
         { provide: getRepositoryToken(Setting), useValue: settingRepository },
         { provide: TokenHashService, useValue: tokenHashService },
+        {
+          provide: PasswordPolicyService,
+          useValue: {
+            validate: jest.fn(async () => ({ ok: true, errors: [], zxcvbn: { score: 4, required: 3 } })),
+            getPolicy: jest.fn(),
+            getPublicPolicy: jest.fn(),
+          },
+        },
+        {
+          provide: BruteForceProtectionService,
+          useValue: {
+            assertIpAllowed: jest.fn().mockResolvedValue(undefined),
+            assertAccountAllowed: jest.fn().mockResolvedValue(undefined),
+            recordFailure: jest.fn().mockResolvedValue(undefined),
+            recordSuccess: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: AuthAuditLogger,
+          useValue: { log: jest.fn() },
+        },
       ],
     }).compile();
 

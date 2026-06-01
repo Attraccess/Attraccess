@@ -141,14 +141,9 @@ export function VerifyEmail() {
             ) : (
               <div className="space-y-2">
                 <p className="text-sm text-gray-600 dark:text-gray-400">{t('resend.prompt')}</p>
-                <TextField>
+                <TextField value={resendEmail} onChange={setResendEmail}>
                   <Label>{t('resend.emailLabel')}</Label>
-                  <Input
-                    type="email"
-                    value={resendEmail}
-                    onValueChange={setResendEmail}
-                    data-testid="resend-email-input"
-                  />
+                  <Input type="email" data-testid="resend-email-input" />
                 </TextField>
                 <Button
                   variant="secondary"
