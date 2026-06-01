@@ -21,6 +21,7 @@ import { ResourceIntroducersService } from '../introducers/resourceIntroducers.s
 import { ResourceGroupsIntroductionsService } from '../groups/introductions/resourceGroups.introductions.service';
 import { ResourceGroupsIntroducersService } from '../groups/introducers/resourceGroups.introducers.service';
 import { ResourceGroupsService } from '../groups/resourceGroups.service';
+import { ResourceRetrainingService } from '../retraining/resourceRetraining.service';
 import { ResourceMaintenanceService } from '../maintenances/maintenance.service';
 import { ResourceNotFoundException } from '../../exceptions/resource.notFound.exception';
 import { ResourceUsageImpossibleMaintenanceInProgressException } from '../../exceptions/resource.maintenance.inUse.exception';
@@ -106,6 +107,12 @@ describe('ResourceUsageService', () => {
 
   const mockResourceGroupsService = {
     getGroupsOfResource: jest.fn(),
+  };
+
+  const mockResourceRetrainingService = {
+    isResourceIntroductionBlocked: jest.fn().mockResolvedValue(false),
+    isGroupIntroductionBlocked: jest.fn().mockResolvedValue(false),
+    getResourceRetrainingStatus: jest.fn(),
   };
 
   const mockResourceMaintenanceService = {
@@ -195,6 +202,10 @@ describe('ResourceUsageService', () => {
         {
           provide: ResourceGroupsService,
           useValue: mockResourceGroupsService,
+        },
+        {
+          provide: ResourceRetrainingService,
+          useValue: mockResourceRetrainingService,
         },
         {
           provide: ResourceMaintenanceService,

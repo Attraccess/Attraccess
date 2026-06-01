@@ -882,7 +882,8 @@ export enum EmailTemplateType {
     RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY = 'resource-usage-billing-transaction-summary',
     PROJECT_INVITATION = 'project-invitation',
     DELETE_ACCOUNT_CONFIRMATION = 'delete-account-confirmation',
-    RESOURCE_HEALTH_CHANGED = 'resource-health-changed'
+    RESOURCE_HEALTH_CHANGED = 'resource-health-changed',
+    USER_RETRAINING_REQUIRED = 'user-retraining-required'
 }
 
 export type EmailTemplate = {
@@ -1430,6 +1431,18 @@ export type CreateResourceDto = {
      * Whether this resource allows overtaking by the next user without the prior user ending their session
      */
     allowTakeOver?: boolean;
+    /**
+     * Days after a user was trained before retraining is required. Null disables the age-based trigger.
+     */
+    retrainingMaxAgeDays?: number | null;
+    /**
+     * Days a user may go without using this resource before retraining is required. Null disables the inactivity trigger.
+     */
+    retrainingMaxInactivityDays?: number | null;
+    /**
+     * Whether to block resource access once retraining is due until the user is retrained
+     */
+    retrainingBlocksAccess?: boolean;
 };
 
 export type ResourceGroup = {
@@ -1445,6 +1458,18 @@ export type ResourceGroup = {
      * A detailed description of the resource
      */
     description?: string;
+    /**
+     * Days after a user was trained on this group before retraining is required. Null disables the age-based trigger.
+     */
+    retrainingMaxAgeDays?: number | null;
+    /**
+     * Days a user may go without using a resource in this group before retraining is required. Null disables the inactivity trigger.
+     */
+    retrainingMaxInactivityDays?: number | null;
+    /**
+     * Whether to block access to grouped resources once retraining is due until the user is retrained
+     */
+    retrainingBlocksAccess: boolean;
     /**
      * When the resource was created
      */
@@ -1553,6 +1578,18 @@ export type Resource = {
      * Whether this resource allows overtaking by the next user without the prior user ending their session
      */
     allowTakeOver: boolean;
+    /**
+     * Days after a user was trained on this resource before retraining is required. Null disables the age-based trigger.
+     */
+    retrainingMaxAgeDays?: number | null;
+    /**
+     * Days a user may go without using this resource before retraining is required. Null disables the inactivity trigger.
+     */
+    retrainingMaxInactivityDays?: number | null;
+    /**
+     * Whether to block resource access once retraining is due until the user is retrained
+     */
+    retrainingBlocksAccess: boolean;
     /**
      * Custom metadata key-value pairs configured for this resource
      */
@@ -1945,6 +1982,18 @@ export type UpdateResourceDto = {
      * Whether this resource allows overtaking by the next user without the prior user ending their session
      */
     allowTakeOver?: boolean;
+    /**
+     * Days after a user was trained before retraining is required. Null disables the age-based trigger.
+     */
+    retrainingMaxAgeDays?: number | null;
+    /**
+     * Days a user may go without using this resource before retraining is required. Null disables the inactivity trigger.
+     */
+    retrainingMaxInactivityDays?: number | null;
+    /**
+     * Whether to block resource access once retraining is due until the user is retrained
+     */
+    retrainingBlocksAccess?: boolean;
 };
 
 export type MqttServer = {
@@ -2097,6 +2146,18 @@ export type CreateResourceGroupDto = {
      * The description of the resource group
      */
     description?: string;
+    /**
+     * Days after a user was trained before retraining is required. Null disables the age-based trigger.
+     */
+    retrainingMaxAgeDays?: number | null;
+    /**
+     * Days a user may go without using a grouped resource before retraining is required. Null disables the inactivity trigger.
+     */
+    retrainingMaxInactivityDays?: number | null;
+    /**
+     * Whether to block access to grouped resources once retraining is due until the user is retrained
+     */
+    retrainingBlocksAccess?: boolean;
 };
 
 export type UpdateResourceGroupDto = {
@@ -2108,6 +2169,18 @@ export type UpdateResourceGroupDto = {
      * The description of the resource group
      */
     description?: string;
+    /**
+     * Days after a user was trained before retraining is required. Null disables the age-based trigger.
+     */
+    retrainingMaxAgeDays?: number | null;
+    /**
+     * Days a user may go without using a grouped resource before retraining is required. Null disables the inactivity trigger.
+     */
+    retrainingMaxInactivityDays?: number | null;
+    /**
+     * Whether to block access to grouped resources once retraining is due until the user is retrained
+     */
+    retrainingBlocksAccess?: boolean;
 };
 
 /**
@@ -2174,6 +2247,10 @@ export type ResourceIntroduction = {
      * When the introduction was completed
      */
     completedAt: string;
+    /**
+     * When the user was last notified that retraining is due (used to avoid repeat notifications)
+     */
+    retrainingNotifiedAt?: string | null;
     /**
      * When the introduction record was created
      */
@@ -2327,6 +2404,41 @@ export type UpdateResourceIntroductionDto = {
      */
     comment?: string;
 };
+
+export type RetrainingStatusResponseDto = {
+    /**
+     * Whether the current user has any introduction granting access to this resource
+     */
+    hasIntroduction: boolean;
+    /**
+     * Whether a retraining policy applies to the current user for this resource
+     */
+    applies: boolean;
+    /**
+     * Whether retraining is currently due for the current user
+     */
+    isDue: boolean;
+    /**
+     * Whether access is blocked because retraining is due
+     */
+    blocksAccess: boolean;
+    /**
+     * When retraining becomes (or became) due
+     */
+    dueAt: string | null;
+    /**
+     * Which trigger drives the retraining requirement
+     */
+    reason: 'age' | 'inactivity' | null;
+};
+
+/**
+ * Which trigger drives the retraining requirement
+ */
+export enum reason {
+    AGE = 'age',
+    INACTIVITY = 'inactivity'
+}
 
 export type CanManageMaintenanceResponseDto = {
     /**
@@ -4797,6 +4909,12 @@ export type ResourceUsageCanControlData = {
 };
 
 export type ResourceUsageCanControlResponse = CanControlResponseDto;
+
+export type ResourceRetrainingGetStatusData = {
+    resourceId: number;
+};
+
+export type ResourceRetrainingGetStatusResponse = RetrainingStatusResponseDto;
 
 export type MqttServersGetAllResponse = Array<MqttServer>;
 
@@ -7293,6 +7411,21 @@ export type $OpenApiTs = {
                  * User can control resource
                  */
                 200: CanControlResponseDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/resources/{resourceId}/retraining/status': {
+        get: {
+            req: ResourceRetrainingGetStatusData;
+            res: {
+                /**
+                 * Retraining status retrieved successfully.
+                 */
+                200: RetrainingStatusResponseDto;
                 /**
                  * Unauthorized
                  */

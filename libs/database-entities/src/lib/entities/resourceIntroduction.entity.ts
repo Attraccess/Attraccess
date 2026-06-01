@@ -51,6 +51,15 @@ export class ResourceIntroduction {
   })
   completedAt!: Date;
 
+  @Column({ type: 'datetime', nullable: true })
+  @ApiProperty({
+    description: 'When the user was last notified that retraining is due (used to avoid repeat notifications)',
+    example: '2021-01-01T00:00:00.000Z',
+    required: false,
+    nullable: true,
+  })
+  retrainingNotifiedAt!: Date | null;
+
   @CreateDateColumn()
   @ApiProperty({
     description: 'When the introduction record was created',
