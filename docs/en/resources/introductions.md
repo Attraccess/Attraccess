@@ -16,8 +16,12 @@ A user who has not been introduced cannot start a usage session on the resource.
 | Role | Can Do |
 |------|--------|
 | **User** | Use the resource after receiving an introduction |
-| **Introducer** | Grant and revoke introductions for other users |
-| **Resource Manager** | All of the above, plus manage introducers and resource settings |
+| **Maintainer** | Use and control the resource, and manage its maintenance — but cannot grant introductions |
+| **Introducer** | Everything a maintainer can do, plus grant and revoke introductions for other users |
+| **Resource Manager** | All of the above, plus manage introducers/maintainers and resource settings |
+
+> [!NOTE]
+> **Introducer vs Maintainer:** Both can operate the machine and put it into (or take it out of) maintenance. The difference is that only an **introducer** can grant introductions to other users. Use **maintainer** for people who service the machine but should not decide who else gets access.
 
 ## Granting an Introduction
 
@@ -44,14 +48,16 @@ You need the **Introducer** or **Resource Manager** role for the resource.
 > [!WARNING]
 > Revoking an introduction immediately removes the user's ability to start new sessions on the resource. If the user currently has an active session, it will not be interrupted.
 
-## Managing Introducers
+## Managing Introducers and Maintainers
 
-Resource managers can promote users to the introducer role:
+Resource managers can promote users to the introducer or maintainer role:
 
 1. Open the resource detail page
-2. Scroll to the **Introducers** section
-3. Click **Add Introducer**
+2. Scroll to the **People & Permissions** section
+3. Click **Appoint as introducer** (full rights) or **Appoint as maintainer** (maintenance and machine control only)
 4. Select the user
+
+The role each person holds is shown in the **Role** column, and you can filter the list by introducers or maintainers. Revoking a role removes that person's permissions immediately.
 
 ## Group Introductions
 

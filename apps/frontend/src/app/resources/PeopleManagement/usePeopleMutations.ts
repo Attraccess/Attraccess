@@ -15,6 +15,7 @@ import {
   useAccessControlServiceResourceIntroductionsGrant,
   useAccessControlServiceResourceIntroductionsRevoke,
 } from '@attraccess/react-query-client';
+import { ResourceIntroducerType } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { TFunction } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../components/toastProvider';
@@ -27,6 +28,7 @@ interface Params {
 
 export interface PeopleMutations {
   grantIntroducer: (userId: number) => Promise<void>;
+  grantMaintainer: (userId: number) => Promise<void>;
   revokeIntroducer: (userId: number) => Promise<void>;
   grantIntroduction: (userId: number, comment?: string) => Promise<void>;
   revokeIntroduction: (userId: number, comment?: string) => Promise<void>;
@@ -71,10 +73,13 @@ export function usePeopleMutations({ target, t }: Params): PeopleMutations {
   );
 
   const grantIntroducerToasts = {
-    onSuccess: () => {
+    onSuccess: (_data: unknown, variables: { requestBody?: { type?: ResourceIntroducerType } }) => {
+      const isMaintainer = variables?.requestBody?.type === ResourceIntroducerType.MAINTAINER;
       toast.success({
-        title: t('toasts.introducerGranted.title'),
-        description: t('toasts.introducerGranted.description'),
+        title: isMaintainer ? t('toasts.maintainerGranted.title') : t('toasts.introducerGranted.title'),
+        description: isMaintainer
+          ? t('toasts.maintainerGranted.description')
+          : t('toasts.introducerGranted.description'),
       });
       invalidateIntroducers();
     },
@@ -157,20 +162,30 @@ export function usePeopleMutations({ target, t }: Params): PeopleMutations {
   const isGrantingIntroduction = isResource ? isGrantingResourceIntroduction : isGrantingGroupIntroduction;
   const isRevokingIntroduction = isResource ? isRevokingResourceIntroduction : isRevokingGroupIntroduction;
 
-  const grantIntroducer = useCallback(
-    async (userId: number) => {
+  const grantIntroducerRow = useCallback(
+    async (userId: number, type: ResourceIntroducerType) => {
       setPendingIntroducerUserId(userId);
       try {
         if (isResource) {
-          await grantResourceIntroducerMut({ resourceId: target.id, userId });
+          await grantResourceIntroducerMut({ resourceId: target.id, userId, requestBody: { type } });
         } else {
-          await grantGroupIntroducerMut({ groupId: target.id, userId });
+          await grantGroupIntroducerMut({ groupId: target.id, userId, requestBody: { type } });
         }
       } finally {
         setPendingIntroducerUserId(null);
       }
     },
     [grantResourceIntroducerMut, grantGroupIntroducerMut, isResource, target.id],
+  );
+
+  const grantIntroducer = useCallback(
+    (userId: number) => grantIntroducerRow(userId, ResourceIntroducerType.INTRODUCER),
+    [grantIntroducerRow],
+  );
+
+  const grantMaintainer = useCallback(
+    (userId: number) => grantIntroducerRow(userId, ResourceIntroducerType.MAINTAINER),
+    [grantIntroducerRow],
   );
 
   const revokeIntroducer = useCallback(
@@ -225,6 +240,7 @@ export function usePeopleMutations({ target, t }: Params): PeopleMutations {
 
   return {
     grantIntroducer,
+    grantMaintainer,
     revokeIntroducer,
     grantIntroduction,
     revokeIntroduction,

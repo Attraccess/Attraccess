@@ -1,21 +1,28 @@
 {
   "title": "Personen & Berechtigungen",
-  "subtitle": "Einweiser und Einweisungen für diese Ressource verwalten",
+  "subtitle": "Einweiser, Wartende und Einweisungen für diese Ressource verwalten",
   "addPerson": "Person hinzufügen",
   "addOptions": {
     "introducer": "Als Einweiser ernennen",
+    "maintainer": "Als Wartenden ernennen",
     "introduction": "Einweisung gewähren"
   },
   "filters": {
     "all": "Alle",
     "introducers": "Nur Einweiser",
+    "maintainers": "Nur Wartende",
     "introduced": "Nur Eingewiesene"
   },
   "columns": {
     "name": "Name",
     "introducer": "Einweiser",
+    "role": "Rolle",
     "introduced": "Eingewiesen",
     "actions": "Aktionen"
+  },
+  "roles": {
+    "introducer": "Einweiser",
+    "maintainer": "Wartender"
   },
   "value": {
     "yes": "Ja",
@@ -24,12 +31,14 @@
   "rowActions": {
     "history": "Verlauf anzeigen",
     "revokeIntroducer": "Einweiser-Status entziehen",
+    "revokeMaintainer": "Wartenden-Status entziehen",
     "revokeIntroduction": "Einweisung widerrufen",
     "grantIntroduction": "Einweisung erneut gewähren"
   },
   "addModal": {
     "title": {
       "introducer": "Einweiser ernennen",
+      "maintainer": "Wartenden ernennen",
       "introduction": "Einweisung gewähren"
     },
     "userLabel": "Benutzer",
@@ -61,6 +70,10 @@
     "introducerRevokeFailed": {
       "title": "Fehler beim Entfernen des Einweisers",
       "description": "{{error}}"
+    },
+    "maintainerGranted": {
+      "title": "Wartender hinzugefügt",
+      "description": "Der Benutzer hat erfolgreich Wartungs-Privilegien erhalten."
     },
     "introductionGranted": {
       "title": "Einweisung gewährt",

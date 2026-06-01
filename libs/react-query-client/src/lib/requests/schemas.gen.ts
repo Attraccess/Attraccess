@@ -3385,6 +3385,12 @@ export const $UpdateResourceGroupIntroductionDto = {
     }
 } as const;
 
+export const $ResourceIntroducerType = {
+    type: 'string',
+    enum: ['introducer', 'maintainer'],
+    description: "The kind of access: 'introducer' can give introductions and do maintenance; 'maintainer' can only do maintenance and control the machine"
+} as const;
+
 export const $ResourceIntroducer = {
     type: 'object',
     properties: {
@@ -3392,6 +3398,15 @@ export const $ResourceIntroducer = {
             type: 'number',
             description: 'The unique identifier of the introduction permission',
             example: 1
+        },
+        type: {
+            description: "The kind of access: 'introducer' can give introductions and do maintenance; 'maintainer' can only do maintenance and control the machine",
+            example: 'introducer',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/ResourceIntroducerType'
+                }
+            ]
         },
         resourceId: {
             type: 'number',
@@ -3422,7 +3437,7 @@ export const $ResourceIntroducer = {
             ]
         }
     },
-    required: ['id', 'userId', 'grantedAt', 'user']
+    required: ['id', 'type', 'userId', 'grantedAt', 'user']
 } as const;
 
 export const $IsResourceGroupIntroducerResponseDto = {
@@ -3434,6 +3449,21 @@ export const $IsResourceGroupIntroducerResponseDto = {
         }
     },
     required: ['isIntroducer']
+} as const;
+
+export const $GrantIntroducerDto = {
+    type: 'object',
+    properties: {
+        type: {
+            description: "The kind of access to grant. 'introducer' (default) can give introductions and do maintenance; 'maintainer' can only do maintenance and control the machine",
+            default: 'introducer',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/ResourceIntroducerType'
+                }
+            ]
+        }
+    }
 } as const;
 
 export const $FormSubmissionFieldAnswerDto = {

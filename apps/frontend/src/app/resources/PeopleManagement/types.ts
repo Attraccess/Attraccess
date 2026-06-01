@@ -1,13 +1,15 @@
-import { ResourceIntroducer, ResourceIntroduction, User } from '@attraccess/react-query-client';
+import { ResourceIntroducer, ResourceIntroducerType, ResourceIntroduction, User } from '@attraccess/react-query-client';
 
-export type AddMode = 'introducer' | 'introduction';
-export type FilterMode = 'all' | 'introducers' | 'introduced';
+export type AddMode = 'introducer' | 'introduction' | 'maintainer';
+export type FilterMode = 'all' | 'introducers' | 'maintainers' | 'introduced';
 
 export type PeopleTarget = { type: 'resource'; id: number } | { type: 'group'; id: number };
 
 export interface PersonRow {
   user: User;
   isIntroducer: boolean;
+  isMaintainer: boolean;
+  introducerType: ResourceIntroducerType | null;
   introducer: ResourceIntroducer | null;
   introduction: ResourceIntroduction | null;
   hasValidIntroduction: boolean;

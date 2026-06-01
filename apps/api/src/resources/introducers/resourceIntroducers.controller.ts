@@ -1,9 +1,10 @@
-import { Controller, Delete, Get, Param, ParseIntPipe, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ResourceIntroducersService } from './resourceIntroducers.service';
 import { ResourceIntroducer } from '@attraccess/database-entities';
 import { Auth } from '@attraccess/plugins-backend-sdk';
 import { IsResourceIntroducerResponseDto } from './dtos/isIntroducer.response.dto';
+import { GrantIntroducerDto } from './dtos/grantIntroducer.dto';
 
 @ApiTags('Access Control')
 @Controller('resources/:resourceId/introducers')
@@ -56,9 +57,10 @@ export class ResourceIntroducersController {
   @Auth('canManageResources')
   async grant(
     @Param('resourceId', ParseIntPipe) resourceId: number,
-    @Param('userId', ParseIntPipe) userId: number
+    @Param('userId', ParseIntPipe) userId: number,
+    @Body() body?: GrantIntroducerDto
   ): Promise<ResourceIntroducer> {
-    return await this.resourceIntroducersService.grant(resourceId, userId);
+    return await this.resourceIntroducersService.grant(resourceId, userId, body?.type);
   }
 
   @Delete('/:userId/revoke')

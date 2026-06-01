@@ -2392,6 +2392,7 @@ export class AccessControlService {
      * @param data The data for the request.
      * @param data.userId The ID of the user
      * @param data.groupId The ID of the resource group
+     * @param data.requestBody
      * @returns unknown The introducer has been successfully granted.
      * @throws ApiError
      */
@@ -2403,6 +2404,8 @@ export class AccessControlService {
                 userId: data.userId,
                 groupId: data.groupId
             },
+            body: data.requestBody,
+            mediaType: 'application/json',
             errors: {
                 401: 'Unauthorized'
             }
@@ -2476,6 +2479,7 @@ export class AccessControlService {
      * @param data The data for the request.
      * @param data.resourceId
      * @param data.userId
+     * @param data.requestBody
      * @returns ResourceIntroducer Introduction permissions granted
      * @throws ApiError
      */
@@ -2487,6 +2491,8 @@ export class AccessControlService {
                 resourceId: data.resourceId,
                 userId: data.userId
             },
+            body: data.requestBody,
+            mediaType: 'application/json',
             errors: {
                 401: 'Unauthorized'
             }
