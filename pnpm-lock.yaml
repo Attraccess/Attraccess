@@ -150,9 +150,6 @@ importers:
       '@types/multer':
         specifier: ^2.1.0
         version: 2.1.0
-      '@types/uuid':
-        specifier: ^11.0.0
-        version: 11.0.0
       '@xyflow/react':
         specifier: ^12.11.0
         version: 12.11.0(@types/react-dom@19.2.3(@types/react@19.2.16))(@types/react@19.2.16)(immer@11.1.4)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -6417,10 +6414,6 @@ packages:
 
   '@types/use-sync-external-store@0.0.6':
     resolution: {integrity: sha512-zFDAD+tlpf2r4asuHEj0XH6pY6i0g5NeAHPn+15wk3BV6JA69eERFXC1gyGThDkVa1zCyKr5jox1+2LbV/AMLg==}
-
-  '@types/uuid@11.0.0':
-    resolution: {integrity: sha512-HVyk8nj2m+jcFRNazzqyVKiZezyhDKrGUA3jlEcg/nZ6Ms+qHwocba1Y/AaVaznJTAM9xpdFSh+ptbNrhOGvZA==}
-    deprecated: This is a stub types definition. uuid provides its own type definitions, so you do not need this installed.
 
   '@types/validator@13.15.10':
     resolution: {integrity: sha512-T8L6i7wCuyoK8A/ZeLYt1+q0ty3Zb9+qbSSvrIVitzT3YjZqkTZ40IbRsPanlB4h1QB3JVL1SYCdR6ngtFYcuA==}
@@ -19719,7 +19712,7 @@ snapshots:
       cli-high: 0.4.3
       diff: 5.2.2
       effect: 3.21.2
-      nanoid: 5.1.9
+      nanoid: 5.1.11
       recast: 0.23.11
       xycolors: 0.1.2
 
@@ -23457,10 +23450,6 @@ snapshots:
   '@types/unist@3.0.3': {}
 
   '@types/use-sync-external-store@0.0.6': {}
-
-  '@types/uuid@11.0.0':
-    dependencies:
-      uuid: 14.0.0
 
   '@types/validator@13.15.10': {}
 
@@ -36194,7 +36183,7 @@ snapshots:
       clsx: 2.1.1
       dayjs: 1.11.20
       dompurify: 3.4.2
-      nanoid: 5.1.9
+      nanoid: 5.1.11
       tailwind-merge: 3.6.0
     optionalDependencies:
       react: 19.2.7
