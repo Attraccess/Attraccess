@@ -22,7 +22,6 @@ export function PeopleManagement(props: Readonly<PeopleManagementProps & Omit<Ca
 
   const [filter, setFilter] = useState<FilterMode>('all');
   const [addMode, setAddMode] = useState<AddMode | null>(null);
-  const [addUser, setAddUser] = useState<User | null>(null);
   const [addComment, setAddComment] = useState('');
   const { isOpen: isAddOpen, open: openAdd, close: closeAdd } = useOverlayState();
 
@@ -46,7 +45,6 @@ export function PeopleManagement(props: Readonly<PeopleManagementProps & Omit<Ca
   const handleAddOpen = useCallback(
     (mode: AddMode) => {
       setAddMode(mode);
-      setAddUser(null);
       setAddComment('');
       openAdd();
     },
@@ -54,21 +52,22 @@ export function PeopleManagement(props: Readonly<PeopleManagementProps & Omit<Ca
   );
 
   const resetAddState = useCallback(() => {
-    setAddUser(null);
     setAddComment('');
     setAddMode(null);
   }, []);
 
-  const handleAddSubmit = useCallback(async () => {
-    if (!addUser || !addMode) return;
-    if (addMode === 'introducer') {
-      await mutations.grantIntroducer(addUser.id);
-    } else {
-      await mutations.grantIntroduction(addUser.id, addComment);
-    }
-    resetAddState();
-    closeAdd();
-  }, [addUser, addMode, addComment, mutations, resetAddState, closeAdd]);
+  const handleAdd = useCallback(
+    async (user: User) => {
+      if (!addMode) return;
+      if (addMode === 'introducer') {
+        await mutations.grantIntroducer(user.id);
+      } else {
+        await mutations.grantIntroduction(user.id, addComment);
+        setAddComment('');
+      }
+    },
+    [addMode, addComment, mutations],
+  );
 
   const handleIntroductionToggle = useCallback(
     (user: User, action: 'grant' | 'revoke') => {
@@ -172,12 +171,10 @@ export function PeopleManagement(props: Readonly<PeopleManagementProps & Omit<Ca
         t={t}
         isOpen={isAddOpen}
         mode={addMode}
-        user={addUser}
         comment={addComment}
         isPending={mutations.isMutating}
-        onUserChange={setAddUser}
         onCommentChange={setAddComment}
-        onSubmit={handleAddSubmit}
+        onAdd={handleAdd}
         onClose={() => {
           closeAdd();
           resetAddState();

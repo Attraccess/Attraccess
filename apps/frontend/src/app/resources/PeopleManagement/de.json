@@ -34,8 +34,10 @@
     },
     "userLabel": "Benutzer",
     "commentLabel": "Kommentar (optional)",
+    "hint": "Benutzer aus der Liste auswählen, um ihn sofort hinzuzufügen.",
     "submit": "Bestätigen",
-    "cancel": "Abbrechen"
+    "cancel": "Abbrechen",
+    "done": "Fertig"
   },
   "commentModal": {
     "title": "Kommentar hinzufügen",
