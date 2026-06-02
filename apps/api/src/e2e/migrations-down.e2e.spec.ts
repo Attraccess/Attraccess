@@ -9,6 +9,8 @@ import {
   BillingTransaction,
   BillingTransactionItem,
   BillingTransactionStatus,
+  Conversation,
+  ConversationParticipant,
   EmailTemplate,
   EmailTemplateType,
   Form,
@@ -16,6 +18,7 @@ import {
   FormFieldType,
   FormSubmission,
   IntroductionHistoryAction,
+  Message,
   MqttServer,
   NFCCard,
   PasswordHistory,
@@ -174,6 +177,9 @@ const seedDatabase = async (dataSource: DataSource) => {
   const passwordHistoryRepo = dataSource.getRepository(PasswordHistory);
   const passwordPolicyOverrideRepo = dataSource.getRepository(PasswordPolicyOverride);
   const passwordPolicyAuditRepo = dataSource.getRepository(PasswordPolicyAudit);
+  const conversationRepo = dataSource.getRepository(Conversation);
+  const conversationParticipantRepo = dataSource.getRepository(ConversationParticipant);
+  const messageRepo = dataSource.getRepository(Message);
 
   const resourceGroup = await ensureEntity(resourceGroupRepo, () => ({
     name: `Seed Group ${seedTag}`,
@@ -513,6 +519,24 @@ const seedDatabase = async (dataSource: DataSource) => {
     before: JSON.stringify({ minLength: 12 }),
     after: JSON.stringify({ minLength: 16 }),
     changedFields: JSON.stringify(['minLength']),
+  }));
+
+  const conversation = await ensureEntity(conversationRepo, () => ({}));
+
+  await ensureEntity(conversationParticipantRepo, () => ({
+    conversationId: conversation.id,
+    userId: primaryUser.id,
+    lastReadAt: null,
+  }));
+
+  await ensureEntity(messageRepo, () => ({
+    conversationId: conversation.id,
+    senderId: primaryUser.id,
+    content: 'Seed message',
+    referenceType: null,
+    referenceId: null,
+    referenceLabel: null,
+    referenceUrl: null,
   }));
 };
 
