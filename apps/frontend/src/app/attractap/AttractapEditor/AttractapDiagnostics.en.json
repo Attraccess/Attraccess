@@ -1,0 +1,25 @@
+{
+  "heading": "Crash diagnostics",
+  "description": "Self-reported reset reasons and pre-freeze heap state, newest first.",
+  "empty": "No crash reports received from this reader yet.",
+  "loading": "Loading crash reports…",
+  "error": "Failed to load crash reports",
+  "heapTrend": "Heap trend (free bytes before reset)",
+  "heapTrendEmpty": "No heap samples available yet.",
+  "resetHistory": "Reset reason history",
+  "fields": {
+    "resetReason": "Reset reason",
+    "heapFree": "Free heap",
+    "largestBlock": "Largest block",
+    "uptime": "Uptime before reset",
+    "wsState": "WebSocket",
+    "wifiState": "WiFi",
+    "firmware": "Firmware",
+    "receivedAt": "Received"
+  },
+  "notAvailable": "n/a",
+  "coredump": "Coredump",
+  "downloadCoredump": "Download coredump",
+  "noCoredump": "No coredump",
+  "downloadFailed": "Failed to download coredump"
+}

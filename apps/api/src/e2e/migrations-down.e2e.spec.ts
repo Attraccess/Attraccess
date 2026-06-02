@@ -4,6 +4,7 @@ import * as path from 'path';
 import type { DataSource, DeepPartial, Repository } from 'typeorm';
 import {
   Attractap,
+  AttractapCrashReport,
   AuthenticationDetail,
   AuthenticationType,
   BillingTransaction,
@@ -272,7 +273,7 @@ const seedDatabase = async (dataSource: DataSource) => {
     value: 'true',
   }));
 
-  await ensureEntity(attractapRepo, () => ({
+  const attractap = await ensureEntity(attractapRepo, () => ({
     name: `Seed Reader ${seedTag}`,
     apiTokenHash: `seed-token-${seedTag}`,
     firmware: {
@@ -285,6 +286,20 @@ const seedDatabase = async (dataSource: DataSource) => {
         cardEnrollment: true,
       },
     },
+  }));
+
+  const attractapCrashReportRepo = dataSource.getRepository(AttractapCrashReport);
+  await ensureEntity(attractapCrashReportRepo, () => ({
+    attractapId: attractap.id,
+    resetReason: 'TASK_WDT',
+    heapFreeBytes: 48213,
+    largestFreeBlockBytes: 20480,
+    uptimeBeforeResetMs: 372000,
+    wsState: 'CONNECTED',
+    wifiState: 'GOT_IP',
+    firmwareVersion: '1.0.0',
+    coredumpSize: null,
+    coredump: null,
   }));
 
   await ensureEntity(billingConfigRepo, () => ({

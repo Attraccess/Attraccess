@@ -10,6 +10,7 @@ import {
   LightbulbIcon,
   LucideProps,
   MailIcon,
+  MessageSquareIcon,
   NfcIcon,
   PackageIcon,
   Settings2Icon,
@@ -59,6 +60,11 @@ export function useSidebarItems(): (SidebarItem | SidebarItemGroup)[] {
         translationKey: 'projects',
         path: '/projects',
         icon: FolderIcon,
+      },
+      {
+        translationKey: 'messages',
+        path: '/messages',
+        icon: MessageSquareIcon,
       },
     ];
 

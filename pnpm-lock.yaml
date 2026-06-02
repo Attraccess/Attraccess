@@ -349,8 +349,8 @@ importers:
         specifier: ^5.1.7
         version: 5.1.7
       swagger-typescript-api:
-        specifier: ^13.10.0
-        version: 13.10.0(encoding@0.1.13)(magicast@0.3.5)(react@19.2.6)
+        specifier: ^13.12.0
+        version: 13.12.0(encoding@0.1.13)(magicast@0.3.5)(react@19.2.6)
       tailwind-merge:
         specifier: ^3.5.0
         version: 3.6.0
@@ -2047,8 +2047,8 @@ packages:
       '@biomejs/wasm-web':
         optional: true
 
-  '@biomejs/wasm-nodejs@2.4.15':
-    resolution: {integrity: sha512-5mfoUf66sFwBkR9T82KRxapviesSadJH+qH4+w06gge87sYwjLKTXw4rxGOiJkUTCRtxCuMSUT9VO6VAqhsmkg==}
+  '@biomejs/wasm-nodejs@2.4.16':
+    resolution: {integrity: sha512-3BSGXHJ25Is+9gRgV+Gwz7YdMktrMOBP+Vw3RwXy3Y/CHqXbbNSyhaMt6VFk1J/WAGutdYfBy+NzhlvOftwd+g==}
 
   '@borewit/text-codec@0.2.2':
     resolution: {integrity: sha512-DDaRehssg1aNrH4+2hnj1B7vnUGEjU6OIlyRdkMd0aUdIUvKXrJfXsy8LVtXAy7DRvYVluWbMspsRhz2lcW0mQ==}
@@ -8697,6 +8697,9 @@ packages:
   dayjs@1.11.20:
     resolution: {integrity: sha512-YbwwqR/uYpeoP4pu043q+LTDLFBLApUP6VxRihdfNTqu4ubqMlGDLd6ErXhEgsyvY0K6nCs7nggYumAN+9uEuQ==}
 
+  dayjs@1.11.21:
+    resolution: {integrity: sha512-98IT+HOahAisibz/yjKbzuOBwYcjJ7BCLPzARyHiyEBmRz4fatF+KPJszEHXsGYjUG234aH/cOjW1wwTbKUZlA==}
+
   de-indent@1.0.2:
     resolution: {integrity: sha512-e/1zu3xH5MQryN2zdVaF0OrdNLUbvWxzMbi+iNA6Bky7l1RoP8a2fIbRocyHclXt/arDrrR6lL3TqFD9pMQTsg==}
 
@@ -8979,8 +8982,8 @@ packages:
     resolution: {integrity: sha512-cgwlv/1iFQiFnU96XXgROh8xTeetsnJiDsTc7TYCLFd9+/WNkIqPTxiM/8pSd8VIrhXGTf1Ny1q1hquVqDJB5w==}
     engines: {node: '>= 4'}
 
-  dompurify@3.4.2:
-    resolution: {integrity: sha512-lHeS9SA/IKeIFFyYciHBr2n0v1VMPlSj843HdLOwjb2OxNwdq9Xykxqhk+FE42MzAdHvInbAolSE4mhahPpjXA==}
+  dompurify@3.4.7:
+    resolution: {integrity: sha512-2jBxDJY4RR06tQNy4w5FlFH7kfxsQZlufd0sbv+chfHCxeJwrFw2baUDsSwvBISD4K4RDbd0PTfy3uNXsR6siA==}
 
   domutils@2.8.0:
     resolution: {integrity: sha512-w96Cjofp72M5IIhpjgobBimYEfoPjx1Vx0BSX9P30WBdZW2WIKU0T1Bd0kz2eNZ9ikjKgHbEyKx8BB6H1L3h3A==}
@@ -9239,6 +9242,9 @@ packages:
 
   es-toolkit@1.46.1:
     resolution: {integrity: sha512-5eNtXOs3tbfxXOj04tjjseeWkRWaoCjdEI+96DgwzZoe6c9juL49pXlzAFTI72aWC9Y8p7168g6XIKjh7k6pyQ==}
+
+  es-toolkit@1.47.0:
+    resolution: {integrity: sha512-n1GuoD0WEQZMBk5tttoZSqwgyLx01oqa5XsBmCHwPyNe1S9jPBEmtR2pSgp2kJuWE3ciFZ6yRHmY4pM4C3OOkw==}
 
   es5-ext@0.10.64:
     resolution: {integrity: sha512-p2snDhiLaXe6dahss1LddxqEm+SkuDvV8dnIQG0MWjyHpcMNfXKPE+/Cc0y+PhxJX3A4xGNeFCj5oc0BUh6deg==}
@@ -11188,6 +11194,10 @@ packages:
     resolution: {integrity: sha512-qQKT4zQxXl8lLwBtHMWwaTcGfFOZviOJet3Oy/xmGk2gZH677CJM9EvtfdSkgWcATZhj/55JZ0rmy3myCT5lsA==}
     hasBin: true
 
+  js-yaml@4.2.0:
+    resolution: {integrity: sha512-ePWsvanv0DWuDRsW8dnt+R4jQ31SCRCQ7hhNcPXZPsoBZiemuZNYGf7adZdqX2D86j6rvKp3RpCxVTSb8WQlOw==}
+    hasBin: true
+
   jsbn@0.1.1:
     resolution: {integrity: sha512-UVU9dibq2JcFWxQPA6KCqj5O42VOmAY3zQUfEKxU0KpTGXwNoCjkX1e13eHNvw/xPynt6pU0rZ1htjWTNTSXsg==}
 
@@ -12336,6 +12346,11 @@ packages:
   nanoid@3.3.12:
     resolution: {integrity: sha512-ZB9RH/39qpq5Vu6Y+NmUaFhQR6pp+M2Xt76XBnEwDaGcVAqhlvxrl3B2bKS5D3NH3QR76v3aSrKaF/Kiy7lEtQ==}
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
+    hasBin: true
+
+  nanoid@5.1.11:
+    resolution: {integrity: sha512-v+KEsUv2ps74PaSKv0gHTxTCgMXOIfBEbaqa6w6ISIGC7ZsvHN4N9oJ8d4cmf0n5oTzQz2SLmThbQWhjd/8eKg==}
+    engines: {node: ^18 || >=20}
     hasBin: true
 
   nanoid@5.1.9:
@@ -15004,8 +15019,8 @@ packages:
   swagger-schema-official@2.0.0-bab6bed:
     resolution: {integrity: sha512-rCC0NWGKr/IJhtRuPq/t37qvZHI/mH4I4sxflVM+qgVe5Z2uOCivzWaVbuioJaB61kvm5UvB7b49E+oBY0M8jA==}
 
-  swagger-typescript-api@13.10.0:
-    resolution: {integrity: sha512-E45a1DLPfJQnM14+lAl6SiWs6EQ0Xj6XRDaygzu68aBT7swcRI1j5xyEfbYvduzZGr+DdYTaMMoq6+YynK2PEg==}
+  swagger-typescript-api@13.12.0:
+    resolution: {integrity: sha512-tE9bHjN3luZeVJEitha7R7PSgYRjPa7+G1491MMVZxkmnUaOZspHg/G9+++OsY3+S6pz4v1aiLPt4mwsyRjZgg==}
     engines: {node: '>=20'}
     hasBin: true
 
@@ -15495,6 +15510,10 @@ packages:
 
   type-fest@5.6.0:
     resolution: {integrity: sha512-8ZiHFm91orbSAe2PSAiSVBVko18pbhbiB3U9GglSzF/zCGkR+rxpHx6sEMCUm4kxY4LjDIUGgCfUMtwfZfjfUA==}
+    engines: {node: '>=20'}
+
+  type-fest@5.7.0:
+    resolution: {integrity: sha512-1URUxUqfHFM1c+zfSPsa3gnkO7Aq21qyH75SIduNYz4SzY964rn1X2vCMQaHSHhktiw+0kPa2iyb6PUpXqB6Vg==}
     engines: {node: '>=20'}
 
   type-is@1.6.18:
@@ -16778,12 +16797,12 @@ snapshots:
     dependencies:
       '@jsdevtools/ono': 7.1.3
       '@types/json-schema': 7.0.15
-      js-yaml: 4.1.1
+      js-yaml: 4.2.0
 
   '@apidevtools/json-schema-ref-parser@14.0.1':
     dependencies:
       '@types/json-schema': 7.0.15
-      js-yaml: 4.1.1
+      js-yaml: 4.2.0
 
   '@apidevtools/openapi-schemas@2.1.0': {}
 
@@ -18336,11 +18355,11 @@ snapshots:
   '@biomejs/cli-win32-x64@2.4.15':
     optional: true
 
-  '@biomejs/js-api@4.0.0(@biomejs/wasm-nodejs@2.4.15)':
+  '@biomejs/js-api@4.0.0(@biomejs/wasm-nodejs@2.4.16)':
     optionalDependencies:
-      '@biomejs/wasm-nodejs': 2.4.15
+      '@biomejs/wasm-nodejs': 2.4.16
 
-  '@biomejs/wasm-nodejs@2.4.15': {}
+  '@biomejs/wasm-nodejs@2.4.16': {}
 
   '@borewit/text-codec@0.2.2': {}
 
@@ -18903,7 +18922,7 @@ snapshots:
 
   '@eslint/eslintrc@3.3.5':
     dependencies:
-      ajv: 6.14.0
+      ajv: 6.15.0
       debug: 4.4.3
       espree: 10.4.0
       globals: 14.0.0
@@ -19698,7 +19717,7 @@ snapshots:
       cli-high: 0.4.3
       diff: 5.2.2
       effect: 3.21.2
-      nanoid: 5.1.9
+      nanoid: 5.1.11
       recast: 0.23.11
       xycolors: 0.1.2
 
@@ -22874,7 +22893,7 @@ snapshots:
       circuit-json-to-connectivity-map: 0.0.23(typescript@6.0.3)
       css-select: 5.1.0
       format-si-unit: 0.0.3(typescript@6.0.3)
-      nanoid: 5.1.9
+      nanoid: 5.1.11
       performance-now: 2.1.0
       react-reconciler: 0.32.0(react@19.2.6)
       schematic-symbols: 0.0.208(typescript@6.0.3)
@@ -24850,7 +24869,7 @@ snapshots:
 
   balena-settings-client@6.0.3:
     dependencies:
-      es-toolkit: 1.46.1
+      es-toolkit: 1.47.0
       hidepath: 1.0.1
       home-or-tmp: 2.0.0
       js-yaml: 3.14.2
@@ -25883,7 +25902,7 @@ snapshots:
   cosmiconfig@8.3.6(typescript@6.0.3):
     dependencies:
       import-fresh: 3.3.1
-      js-yaml: 4.1.1
+      js-yaml: 4.2.0
       parse-json: 5.2.0
       path-type: 4.0.0
     optionalDependencies:
@@ -25893,7 +25912,7 @@ snapshots:
     dependencies:
       env-paths: 2.2.1
       import-fresh: 3.3.1
-      js-yaml: 4.1.1
+      js-yaml: 4.2.0
       parse-json: 5.2.0
     optionalDependencies:
       typescript: 6.0.3
@@ -26184,6 +26203,8 @@ snapshots:
 
   dayjs@1.11.20: {}
 
+  dayjs@1.11.21: {}
+
   de-indent@1.0.2:
     optional: true
 
@@ -26459,7 +26480,7 @@ snapshots:
     dependencies:
       domelementtype: 2.3.0
 
-  dompurify@3.4.2:
+  dompurify@3.4.7:
     optionalDependencies:
       '@types/trusted-types': 2.0.7
 
@@ -26490,7 +26511,7 @@ snapshots:
 
   dotenv-expand@12.0.3:
     dependencies:
-      dotenv: 16.4.7
+      dotenv: 16.6.1
 
   dotenv@16.4.7: {}
 
@@ -26832,6 +26853,8 @@ snapshots:
   es-toolkit@1.46.0: {}
 
   es-toolkit@1.46.1: {}
+
+  es-toolkit@1.47.0: {}
 
   es5-ext@0.10.64:
     dependencies:
@@ -29278,6 +29301,10 @@ snapshots:
     dependencies:
       argparse: 2.0.1
 
+  js-yaml@4.2.0:
+    dependencies:
+      argparse: 2.0.1
+
   jsbn@0.1.1: {}
 
   jscad-electronics@0.0.129(@jscad/modeling@2.13.0)(@tscircuit/alphabet@0.0.25(typescript@6.0.3))(@tscircuit/footprinter@0.0.357(circuit-json@0.0.425)(typescript@6.0.3))(circuit-json@0.0.425)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(three@0.179.1):
@@ -31072,6 +31099,8 @@ snapshots:
       thenify-all: 1.6.0
 
   nanoid@3.3.12: {}
+
+  nanoid@5.1.11: {}
 
   nanoid@5.1.9: {}
 
@@ -34259,22 +34288,22 @@ snapshots:
 
   swagger-schema-official@2.0.0-bab6bed: {}
 
-  swagger-typescript-api@13.10.0(encoding@0.1.13)(magicast@0.3.5)(react@19.2.6):
+  swagger-typescript-api@13.12.0(encoding@0.1.13)(magicast@0.3.5)(react@19.2.6):
     dependencies:
       '@apidevtools/swagger-parser': 12.1.0(openapi-types@12.1.3)
-      '@biomejs/js-api': 4.0.0(@biomejs/wasm-nodejs@2.4.15)
-      '@biomejs/wasm-nodejs': 2.4.15
+      '@biomejs/js-api': 4.0.0(@biomejs/wasm-nodejs@2.4.16)
+      '@biomejs/wasm-nodejs': 2.4.16
       '@types/swagger-schema-official': 2.0.25
       c12: 3.3.4(magicast@0.3.5)
       citty: 0.2.2
       consola: 3.4.2
-      es-toolkit: 1.46.1
+      es-toolkit: 1.47.0
       eta: 3.5.0
-      nanoid: 5.1.9
+      nanoid: 5.1.11
       openapi-types: 12.1.3
       swagger-schema-official: 2.0.0-bab6bed
       swagger2openapi: 7.0.8(encoding@0.1.13)
-      type-fest: 5.6.0
+      type-fest: 5.7.0
       typescript: 6.0.3
       yaml: 2.9.0
       yummies: 7.19.4(react@19.2.6)
@@ -34846,6 +34875,10 @@ snapshots:
   type-fest@4.41.0: {}
 
   type-fest@5.6.0:
+    dependencies:
+      tagged-tag: 1.0.0
+
+  type-fest@5.7.0:
     dependencies:
       tagged-tag: 1.0.0
 
@@ -36148,9 +36181,9 @@ snapshots:
     dependencies:
       class-variance-authority: 0.7.1
       clsx: 2.1.1
-      dayjs: 1.11.20
-      dompurify: 3.4.2
-      nanoid: 5.1.9
+      dayjs: 1.11.21
+      dompurify: 3.4.7
+      nanoid: 5.1.11
       tailwind-merge: 3.6.0
     optionalDependencies:
       react: 19.2.6
@@ -36183,4 +36216,4 @@ snapshots:
   zxing-wasm@2.2.4(@types/emscripten@1.40.1):
     dependencies:
       '@types/emscripten': 1.40.1
-      type-fest: 5.6.0
+      type-fest: 5.7.0

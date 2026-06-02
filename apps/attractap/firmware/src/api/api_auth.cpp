@@ -128,6 +128,7 @@ void API::onReaderAuthenticated(JsonObject data)
     logger.info("Reader Authentication successful.");
 
     this->sendFirmwareInfo();
+    this->sendPendingCrashReport();
 }
 
 void API::onDeviceName(std::function<void(String)> callback)

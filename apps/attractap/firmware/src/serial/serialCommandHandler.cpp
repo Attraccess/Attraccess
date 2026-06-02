@@ -195,6 +195,14 @@ void SerialCommandHandler::handleCommand(const String &topic, const String &payl
         payloadObj = payloadDoc.to<JsonObject>(); // empty object
     }
 
+    if (topic == "debug.crash")
+    {
+        logger.error("debug.crash received - forcing panic for crash-report e2e test (ATT-474)");
+        Serial.flush();
+        abort();
+        return;
+    }
+
     if (topic == "auth.status.get")
     {
         DynamicJsonDocument resp(64);

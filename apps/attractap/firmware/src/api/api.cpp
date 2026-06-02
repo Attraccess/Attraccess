@@ -72,8 +72,12 @@ void API::processIncomingMessage(const char *buf, size_t len)
         return;
     }
 
+    // Crash-report responses carry their own error codes (e.g. INVALID_CRASH_REPORT)
+    // that must not surface as a user-facing error dialog; route them to the handler.
+    bool isCrashReportEvent = strcmp(eventType, "READER_CRASH_REPORT") == 0;
+
     // Early error handling: if payload.error is present and non-empty, raise error callback and stop
-    if (inboundDoc["data"]["payload"].is<JsonObject>())
+    if (!isCrashReportEvent && inboundDoc["data"]["payload"].is<JsonObject>())
     {
         JsonObject payload = inboundDoc["data"]["payload"].as<JsonObject>();
         if (payload["error"].is<String>())
@@ -175,6 +179,10 @@ void API::processIncomingMessage(const char *buf, size_t len)
     else if (strcmp(eventType, "PROJECTS_OF_USER") == 0)
     {
         this->onProjectsOfUserResponse(inboundDoc["data"].as<JsonObject>());
+    }
+    else if (strcmp(eventType, "READER_CRASH_REPORT") == 0)
+    {
+        this->onCrashReportResponse(inboundDoc["data"].as<JsonObject>());
     }
     else if (strcmp(eventType, "RESOURCE_USAGE_FORM_REQUEST") == 0)
     {

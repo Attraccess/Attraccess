@@ -1,0 +1,20 @@
+{
+  "name": "@attraccess-example/poc-backend-plugin",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "description": "Standalone example backend plugin for ATT-454 — built in isolation (own bundler, own node_modules resolution) to prove real-world dynamic loading.",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "peerDependencies": {
+    "@nestjs/common": "^11.0.0",
+    "@nestjs/event-emitter": "^3.0.0",
+    "typeorm": "^0.3.0"
+  },
+  "devDependencies": {
+    "@attraccess/plugins-backend-sdk": "^1.0.0",
+    "esbuild": "^0.28.0"
+  }
+}

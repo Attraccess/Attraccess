@@ -23,6 +23,7 @@
     "noData": "No Attractaps found",
     "actions": {
       "editReader": "Edit",
+      "diagnostics": "Diagnostics",
       "deleteReader": "Delete"
     },
     "active": {
