@@ -2,7 +2,7 @@
 
 import { useMutation, UseMutationOptions, useQuery, UseQueryOptions } from "@tanstack/react-query";
 import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, FlowVariablesService, LicenseService, MessagingService, MqttService, PasswordPolicyAdminService, PasswordPolicyService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceHealthService, ResourceMaintenanceSchedulesService, ResourceMaintenancesService, ResourcesService, SettingsService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
-import { AcceptInvitationDto, AppKeyRequestDto, BulkUpdateUserPermissionsDto, ChangeBillingFactorDto, ChangeEmailDto, ChangePasswordDto, ChangeUsernameDto, CreateFormDto, CreateMaintenanceDto, CreateMaintenanceScheduleDto, CreateMqttServerDto, CreateProjectDto, CreateProjectInvitationDto, CreateResourceDto, CreateResourceGroupDto, CreateSSOProviderDto, CreateUserDto, CsvInviteUploadDto, DeleteAccountConfirmDto, EmailTemplateType, EndUsageSessionDto, EnrollNfcCardDto, FinishMaintenanceDto, FlowVariableUpsertDto, GrantIntroducerDto, InviteUserDto, LinkUserToExternalAccountRequestDto, ModifyBalanceDto, NfcCardSetActiveStateDto, PairSumUpReaderDto, PasswordPolicyRole, PermissionFilter, PreviewMjmlDto, PreviewPasswordDto, RefundTransactionDto, ResendVerificationEmailDto, ResetNfcCardDto, ResetPasswordDto, ResourceFlowSaveDto, ResourceFlowVariableScope, ResourceIntroducerType, SendMessageDto, SetBillingConfigurationDto, SetSumUpApiKeyDto, SetUserPasswordDto, SSOProvisioningPermissionsDto, SSOProvisioningUserDto, StartUsageSessionDto, SumupTopUpDto, SumupTransactionCallbackDto, TwoFactorCodeDto, TwoFactorPolicyDto, UpdateAuthRateLimitSettingsDto, UpdateEmailTemplateDto, UpdateFormDto, UpdateMaintenanceScheduleDto, UpdateMetricsSettingsDto, UpdateMqttServerDto, UpdateNotificationPreferenceDto, UpdatePasswordPolicyDto, UpdateProjectDto, UpdateReaderDto, UpdateResourceBillingConfigurationDto, UpdateResourceDto, UpdateResourceGroupDto, UpdateResourceGroupIntroductionDto, UpdateResourceIntroductionDto, UpdateSSOProviderDto, UpdateSystemSettingsDto, UpdateUsageSessionProjectDto, UpdateUserPermissionsDto, UploadPluginDto, UpsertPasswordPolicyOverrideDto, VerifyEmailDto } from "../requests/types.gen";
+import { AcceptInvitationDto, AppKeyRequestDto, BulkUpdateUserPermissionsDto, ChangeBillingFactorDto, ChangeEmailDto, ChangePasswordDto, ChangeUsernameDto, CreateFormDto, CreateMaintenanceDto, CreateMaintenanceRequestDto, CreateMaintenanceScheduleDto, CreateMqttServerDto, CreateProjectDto, CreateProjectInvitationDto, CreateResourceDto, CreateResourceGroupDto, CreateSSOProviderDto, CreateUserDto, CsvInviteUploadDto, DeleteAccountConfirmDto, EmailTemplateType, EndUsageSessionDto, EnrollNfcCardDto, FinishMaintenanceDto, FlowVariableUpsertDto, GrantIntroducerDto, InviteUserDto, LinkUserToExternalAccountRequestDto, MaintenanceRequestStatus, ModifyBalanceDto, NfcCardSetActiveStateDto, PairSumUpReaderDto, PasswordPolicyRole, PermissionFilter, PreviewMjmlDto, PreviewPasswordDto, RefundTransactionDto, ResendVerificationEmailDto, ResetNfcCardDto, ResetPasswordDto, ResolveMaintenanceRequestDto, ResourceFlowSaveDto, ResourceFlowVariableScope, ResourceIntroducerType, SendMessageDto, SetBillingConfigurationDto, SetSumUpApiKeyDto, SetUserPasswordDto, SSOProvisioningPermissionsDto, SSOProvisioningUserDto, StartUsageSessionDto, SumupTopUpDto, SumupTransactionCallbackDto, TwoFactorCodeDto, TwoFactorPolicyDto, UpdateAuthRateLimitSettingsDto, UpdateEmailTemplateDto, UpdateFormDto, UpdateMaintenanceScheduleDto, UpdateMetricsSettingsDto, UpdateMqttServerDto, UpdatePasswordPolicyDto, UpdateProjectDto, UpdateReaderDto, UpdateResourceBillingConfigurationDto, UpdateResourceDto, UpdateResourceGroupDto, UpdateResourceGroupIntroductionDto, UpdateResourceIntroductionDto, UpdateSSOProviderDto, UpdateSystemSettingsDto, UpdateUsageSessionProjectDto, UpdateUserPermissionsDto, UploadPluginDto, UpsertPasswordPolicyOverrideDto, VerifyEmailDto } from "../requests/types.gen";
 import * as Common from "./common";
 /**
 * Return API information
@@ -541,6 +541,23 @@ export const useResourceMaintenancesServiceGetMaintenance = <TData = Common.Reso
   resourceId: number;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseResourceMaintenancesServiceGetMaintenanceKeyFn({ maintenanceId, resourceId }, queryKey), queryFn: () => ResourceMaintenancesService.getMaintenance({ maintenanceId, resourceId }) as TData, ...options });
 /**
+* List maintenance requests for a resource
+* Retrieve paginated maintenance requests. Only maintenance users can call this.
+* @param data The data for the request.
+* @param data.resourceId The ID of the resource
+* @param data.page Page number for pagination
+* @param data.limit Number of items per page
+* @param data.status Filter by request status (defaults to open requests only)
+* @returns PaginatedMaintenanceRequestResponse Requests retrieved
+* @throws ApiError
+*/
+export const useResourceMaintenancesServiceListMaintenanceRequests = <TData = Common.ResourceMaintenancesServiceListMaintenanceRequestsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ limit, page, resourceId, status }: {
+  limit?: number | undefined;
+  page?: number | undefined;
+  resourceId: number;
+  status?: MaintenanceRequestStatus | undefined;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseResourceMaintenancesServiceListMaintenanceRequestsKeyFn({ limit, page, resourceId, status }, queryKey), queryFn: () => ResourceMaintenancesService.listMaintenanceRequests({ limit, page, resourceId, status }) as TData, ...options });
+/**
 * List maintenance schedules for a resource
 * Get all maintenance schedules for the given resource
 * @param data The data for the request.
@@ -954,12 +971,6 @@ export const useMessagingServiceMessagingLive = <TData = Common.MessagingService
 */
 export const useMessagingServiceMessagingListConversations = <TData = Common.MessagingServiceMessagingListConversationsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseMessagingServiceMessagingListConversationsKeyFn(queryKey), queryFn: () => MessagingService.messagingListConversations() as TData, ...options });
 /**
-* Get the total number of unread messages for the authenticated user
-* @returns UnreadCountResponseDto The total unread message count
-* @throws ApiError
-*/
-export const useMessagingServiceMessagingGetUnreadCount = <TData = Common.MessagingServiceMessagingGetUnreadCountDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseMessagingServiceMessagingGetUnreadCountKeyFn(queryKey), queryFn: () => MessagingService.messagingGetUnreadCount() as TData, ...options });
-/**
 * List paginated messages of a conversation
 * @param data The data for the request.
 * @param data.id
@@ -973,12 +984,6 @@ export const useMessagingServiceMessagingListMessages = <TData = Common.Messagin
   limit?: number | undefined;
   page?: number | undefined;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseMessagingServiceMessagingListMessagesKeyFn({ id, limit, page }, queryKey), queryFn: () => MessagingService.messagingListMessages({ id, limit, page }) as TData, ...options });
-/**
-* Get the authenticated user notification preferences
-* @returns NotificationPreferenceDto The notification preferences
-* @throws ApiError
-*/
-export const useMessagingServiceMessagingGetNotificationPreferences = <TData = Common.MessagingServiceMessagingGetNotificationPreferencesDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseMessagingServiceMessagingGetNotificationPreferencesKeyFn(queryKey), queryFn: () => MessagingService.messagingGetNotificationPreferences() as TData, ...options });
 /**
 * Reboot the host machine (only for balena devices)
 * @returns unknown Host rebooted successfully
@@ -1654,6 +1659,41 @@ export const useResourceMaintenancesServiceFinishMaintenance = <TData = Common.R
   resourceId: number;
 }, TContext>({ mutationFn: ({ maintenanceId, requestBody, resourceId }) => ResourceMaintenancesService.finishMaintenance({ maintenanceId, requestBody, resourceId }) as unknown as Promise<TData>, ...options });
 /**
+* Request maintenance for a resource
+* Any authenticated user can report a resource as broken and request maintenance.
+* @param data The data for the request.
+* @param data.resourceId The ID of the resource
+* @param data.requestBody
+* @returns ResourceMaintenanceRequest Maintenance request created
+* @throws ApiError
+*/
+export const useResourceMaintenancesServiceCreateMaintenanceRequest = <TData = Common.ResourceMaintenancesServiceCreateMaintenanceRequestMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  requestBody: CreateMaintenanceRequestDto;
+  resourceId: number;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  requestBody: CreateMaintenanceRequestDto;
+  resourceId: number;
+}, TContext>({ mutationFn: ({ requestBody, resourceId }) => ResourceMaintenancesService.createMaintenanceRequest({ requestBody, resourceId }) as unknown as Promise<TData>, ...options });
+/**
+* Resolve a maintenance request
+* Resolve an open request: 'convert' starts an instant maintenance from it, 'dismiss' closes it. Only maintenance users can call this.
+* @param data The data for the request.
+* @param data.resourceId The ID of the resource
+* @param data.requestId The ID of the maintenance request
+* @param data.requestBody
+* @returns ResourceMaintenanceRequest Request resolved
+* @throws ApiError
+*/
+export const useResourceMaintenancesServiceResolveMaintenanceRequest = <TData = Common.ResourceMaintenancesServiceResolveMaintenanceRequestMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  requestBody: ResolveMaintenanceRequestDto;
+  requestId: number;
+  resourceId: number;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  requestBody: ResolveMaintenanceRequestDto;
+  requestId: number;
+  resourceId: number;
+}, TContext>({ mutationFn: ({ requestBody, requestId, resourceId }) => ResourceMaintenancesService.resolveMaintenanceRequest({ requestBody, requestId, resourceId }) as unknown as Promise<TData>, ...options });
+/**
 * Create a maintenance schedule
 * Create a new maintenance schedule for the resource
 * @param data The data for the request.
@@ -1966,18 +2006,6 @@ export const useMessagingServiceMessagingContactResourceHolder = <TData = Common
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {
   resourceId: number;
 }, TContext>({ mutationFn: ({ resourceId }) => MessagingService.messagingContactResourceHolder({ resourceId }) as unknown as Promise<TData>, ...options });
-/**
-* Mark a conversation as read for the authenticated user
-* @param data The data for the request.
-* @param data.id
-* @returns UnreadCountResponseDto The updated total unread message count
-* @throws ApiError
-*/
-export const useMessagingServiceMessagingMarkConversationRead = <TData = Common.MessagingServiceMessagingMarkConversationReadMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
-  id: number;
-}, TContext>, "mutationFn">) => useMutation<TData, TError, {
-  id: number;
-}, TContext>({ mutationFn: ({ id }) => MessagingService.messagingMarkConversationRead({ id }) as unknown as Promise<TData>, ...options });
 /**
 * Send a message to a conversation
 * @param data The data for the request.
@@ -2367,18 +2395,6 @@ export const useAttractapServiceToggleCardActive = <TData = Common.AttractapServ
   id: number;
   requestBody: NfcCardSetActiveStateDto;
 }, TContext>({ mutationFn: ({ id, requestBody }) => AttractapService.toggleCardActive({ id, requestBody }) as unknown as Promise<TData>, ...options });
-/**
-* Update the authenticated user notification preferences
-* @param data The data for the request.
-* @param data.requestBody
-* @returns NotificationPreferenceDto The updated notification preferences
-* @throws ApiError
-*/
-export const useMessagingServiceMessagingUpdateNotificationPreferences = <TData = Common.MessagingServiceMessagingUpdateNotificationPreferencesMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
-  requestBody: UpdateNotificationPreferenceDto;
-}, TContext>, "mutationFn">) => useMutation<TData, TError, {
-  requestBody: UpdateNotificationPreferenceDto;
-}, TContext>({ mutationFn: ({ requestBody }) => MessagingService.messagingUpdateNotificationPreferences({ requestBody }) as unknown as Promise<TData>, ...options });
 /**
 * Delete a user
 * @param data The data for the request.

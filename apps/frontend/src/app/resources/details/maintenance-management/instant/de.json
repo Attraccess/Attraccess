@@ -1,0 +1,14 @@
+{
+  "trigger": "Sofort-Wartung",
+  "modal": {
+    "title": "Sofort-Wartung starten",
+    "description": "Die Ressource wird sofort in den Wartungsmodus versetzt und ist für alle außer Wartungsberechtigte gesperrt, bis die Wartung als erledigt markiert wird.",
+    "reasonLabel": "Grund (optional)",
+    "reasonPlaceholder": "z.B. Spindel macht schleifende Geräusche",
+    "cancel": "Abbrechen",
+    "confirm": "Jetzt starten"
+  },
+  "error": {
+    "title": "Wartung konnte nicht gestartet werden"
+  }
+}

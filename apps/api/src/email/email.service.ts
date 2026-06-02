@@ -328,6 +328,35 @@ export class EmailService {
     await this.sendEmail(user, EmailTemplateType.USER_RETRAINING_REQUIRED, context);
   }
 
+  async sendMaintenanceRequestedEmail(
+    recipient: User,
+    resource: Pick<Resource, 'id' | 'name'>,
+    request: { id: number; reason: string; requestedBy: string },
+  ) {
+    if (!recipient?.email) {
+      return;
+    }
+
+    const base = await this.getBaseContext(recipient);
+    const resourceUrl = `${base.host.frontend}/resources/${resource.id}`;
+
+    const context = {
+      ...base,
+      resource: {
+        id: resource.id,
+        name: resource.name,
+        url: resourceUrl,
+      },
+      request: {
+        id: request.id,
+        reason: request.reason,
+        requestedBy: request.requestedBy,
+      },
+    };
+
+    await this.sendEmail(recipient, EmailTemplateType.MAINTENANCE_REQUEST_CREATED, context);
+  }
+
   private async createTransporter(): Promise<{ transporter: ReturnType<typeof createTransport>; from: string }> {
     const smtpConfig = await this.settingsService.getSmtpConfiguration();
     if (!smtpConfig) {

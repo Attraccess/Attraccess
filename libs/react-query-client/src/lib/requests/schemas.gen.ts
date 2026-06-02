@@ -1370,7 +1370,7 @@ export const $PreviewMjmlResponseDto = {
 
 export const $EmailTemplateType = {
     type: 'string',
-    enum: ['verify-email', 'user-invitation', 'reset-password', 'username-changed', 'password-changed', 'resource-usage-billing-transaction-summary', 'project-invitation', 'delete-account-confirmation', 'resource-health-changed', 'user-retraining-required'],
+    enum: ['verify-email', 'user-invitation', 'reset-password', 'username-changed', 'password-changed', 'resource-usage-billing-transaction-summary', 'project-invitation', 'delete-account-confirmation', 'resource-health-changed', 'user-retraining-required', 'maintenance-request-created'],
     description: 'Template type/key used by the system'
 } as const;
 
@@ -4267,6 +4267,144 @@ export const $UpdateMaintenanceScheduleDto = {
             description: 'Whether the schedule is enabled'
         }
     }
+} as const;
+
+export const $CreateMaintenanceRequestDto = {
+    type: 'object',
+    properties: {
+        reason: {
+            type: 'string',
+            description: 'Why the user thinks the resource needs maintenance',
+            example: 'The spindle makes a grinding noise and stops mid-cut.',
+            minLength: 3,
+            maxLength: 2000
+        }
+    },
+    required: ['reason']
+} as const;
+
+export const $MaintenanceRequestStatus = {
+    type: 'string',
+    enum: ['open', 'resolved', 'dismissed'],
+    description: 'The current status of the request'
+} as const;
+
+export const $ResourceMaintenanceRequest = {
+    type: 'object',
+    properties: {
+        id: {
+            type: 'number',
+            description: 'The unique identifier of the maintenance request',
+            example: 1
+        },
+        createdAt: {
+            format: 'date-time',
+            type: 'string',
+            description: 'When the request was created'
+        },
+        updatedAt: {
+            format: 'date-time',
+            type: 'string',
+            description: 'When the request was last updated'
+        },
+        resourceId: {
+            type: 'number',
+            description: 'The ID of the resource the request is for',
+            example: 1
+        },
+        reason: {
+            type: 'string',
+            description: 'Why the user thinks the resource needs maintenance',
+            example: 'The spindle makes a grinding noise and stops mid-cut.'
+        },
+        status: {
+            description: 'The current status of the request',
+            example: 'open',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/MaintenanceRequestStatus'
+                }
+            ]
+        },
+        createdByUser: {
+            description: 'The user who reported the resource as broken',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/User'
+                }
+            ]
+        },
+        resolvedByUser: {
+            description: 'The maintainer who resolved or dismissed the request',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/User'
+                }
+            ]
+        },
+        resolvedAt: {
+            type: 'string',
+            description: 'When the request was resolved or dismissed',
+            nullable: true,
+            format: 'date-time'
+        },
+        resultingMaintenance: {
+            description: 'The maintenance created from this request (null until converted)',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/ResourceMaintenance'
+                }
+            ]
+        }
+    },
+    required: ['id', 'createdAt', 'updatedAt', 'resourceId', 'reason', 'status']
+} as const;
+
+export const $PaginatedMaintenanceRequestResponse = {
+    type: 'object',
+    properties: {
+        data: {
+            description: 'The maintenance requests for the current page',
+            type: 'array',
+            items: {
+                '$ref': '#/components/schemas/ResourceMaintenanceRequest'
+            }
+        },
+        total: {
+            type: 'number',
+            description: 'Total number of matching requests',
+            example: 5
+        },
+        page: {
+            type: 'number',
+            description: 'Current page number',
+            example: 1
+        },
+        limit: {
+            type: 'number',
+            description: 'Number of items per page',
+            example: 10
+        }
+    },
+    required: ['data', 'total', 'page', 'limit']
+} as const;
+
+export const $ResolveMaintenanceRequestDto = {
+    type: 'object',
+    properties: {
+        action: {
+            type: 'string',
+            description: "How to resolve the request: 'convert' starts an instant maintenance from it, 'dismiss' closes it without action",
+            enum: ['convert', 'dismiss'],
+            example: 'convert'
+        },
+        reason: {
+            type: 'string',
+            description: 'Optional reason override for the maintenance when converting',
+            maxLength: 2000
+        }
+    },
+    required: ['action']
 } as const;
 
 export const $BalanceDto = {

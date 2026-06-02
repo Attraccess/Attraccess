@@ -1,0 +1,19 @@
+{
+  "trigger": "Problem melden",
+  "modal": {
+    "title": "Wartung anfragen",
+    "description": "Ist dir an dieser Ressource etwas aufgefallen? Informiere die Wartungsberechtigten. Sie werden benachrichtigt und entscheiden, ob eine Wartung nötig ist.",
+    "reasonLabel": "Was ist das Problem?",
+    "reasonPlaceholder": "z.B. Der Not-Aus-Schalter klemmt",
+    "cancel": "Abbrechen",
+    "submit": "Anfrage senden",
+    "close": "Schließen"
+  },
+  "success": {
+    "title": "Danke für den Hinweis",
+    "description": "Die Wartungsberechtigten wurden über diese Ressource benachrichtigt."
+  },
+  "error": {
+    "title": "Anfrage konnte nicht gesendet werden"
+  }
+}

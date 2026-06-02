@@ -19,6 +19,8 @@ import en from './translations/en.json';
 import de from './translations/de.json';
 import { MaintenanceInProgressDisplay } from './maintenance';
 import { FlatSection } from '../../../../../components/flatSection';
+import { RequestMaintenanceButton } from '../../../details/maintenance-management/request';
+import { InstantMaintenanceButton } from '../../../details/maintenance-management/instant';
 
 type ResourceUsageSessionProps = Omit<HTMLAttributes<HTMLElement>, 'children' | 'resource'> & {
   resourceId: number;
@@ -109,6 +111,12 @@ export function ResourceUsageSession({
       <div className="space-y-4">
         <RetrainingStatusBanner resourceId={resourceId} />
         {renderContent()}
+        {!isLoading && !(activeMaintenances?.data?.length && activeMaintenances.data.length > 0) && (
+          <div className="flex justify-end gap-2">
+            <RequestMaintenanceButton resourceId={resourceId} />
+            <InstantMaintenanceButton resourceId={resourceId} />
+          </div>
+        )}
       </div>
     </FlatSection>
   );

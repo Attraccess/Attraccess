@@ -10,6 +10,12 @@
  * ---------------------------------------------------------------
  */
 
+/** Type of context this suggested message references */
+export enum MessageReferenceType {
+  RESOURCE = "RESOURCE",
+  ACTIVITY = "ACTIVITY",
+}
+
 export enum ResourceHealthSource {
   Payload = "payload",
   Heartbeat = "heartbeat",
@@ -80,6 +86,13 @@ export enum BillingTransactionStatus {
   Pending = "pending",
   Completed = "completed",
   Failed = "failed",
+}
+
+/** The current status of the request */
+export enum MaintenanceRequestStatus {
+  Open = "open",
+  Resolved = "resolved",
+  Dismissed = "dismissed",
 }
 
 /** Unit for duration (MINUTES, HOURS, or DAYS) */
@@ -178,6 +191,7 @@ export enum EmailTemplateType {
   DeleteAccountConfirmation = "delete-account-confirmation",
   ResourceHealthChanged = "resource-health-changed",
   UserRetrainingRequired = "user-retraining-required",
+  MaintenanceRequestCreated = "maintenance-request-created",
 }
 
 /** The type of the provider */
@@ -2832,6 +2846,93 @@ export interface UpdateMaintenanceScheduleDto {
   enabled?: boolean;
 }
 
+export interface CreateMaintenanceRequestDto {
+  /**
+   * Why the user thinks the resource needs maintenance
+   * @minLength 3
+   * @maxLength 2000
+   * @example "The spindle makes a grinding noise and stops mid-cut."
+   */
+  reason: string;
+}
+
+export interface ResourceMaintenanceRequest {
+  /**
+   * The unique identifier of the maintenance request
+   * @example 1
+   */
+  id: number;
+  /**
+   * When the request was created
+   * @format date-time
+   */
+  createdAt: string;
+  /**
+   * When the request was last updated
+   * @format date-time
+   */
+  updatedAt: string;
+  /**
+   * The ID of the resource the request is for
+   * @example 1
+   */
+  resourceId: number;
+  /**
+   * Why the user thinks the resource needs maintenance
+   * @example "The spindle makes a grinding noise and stops mid-cut."
+   */
+  reason: string;
+  /**
+   * The current status of the request
+   * @example "open"
+   */
+  status: MaintenanceRequestStatus;
+  /** The user who reported the resource as broken */
+  createdByUser?: User;
+  /** The maintainer who resolved or dismissed the request */
+  resolvedByUser?: User;
+  /**
+   * When the request was resolved or dismissed
+   * @format date-time
+   */
+  resolvedAt?: string | null;
+  /** The maintenance created from this request (null until converted) */
+  resultingMaintenance?: ResourceMaintenance;
+}
+
+export interface PaginatedMaintenanceRequestResponse {
+  /** The maintenance requests for the current page */
+  data: ResourceMaintenanceRequest[];
+  /**
+   * Total number of matching requests
+   * @example 5
+   */
+  total: number;
+  /**
+   * Current page number
+   * @example 1
+   */
+  page: number;
+  /**
+   * Number of items per page
+   * @example 10
+   */
+  limit: number;
+}
+
+export interface ResolveMaintenanceRequestDto {
+  /**
+   * How to resolve the request: 'convert' starts an instant maintenance from it, 'dismiss' closes it without action
+   * @example "convert"
+   */
+  action: "convert" | "dismiss";
+  /**
+   * Optional reason override for the maintenance when converting
+   * @maxLength 2000
+   */
+  reason?: string;
+}
+
 export interface BalanceDto {
   /** The balance of the user */
   value: number;
@@ -3883,6 +3984,19 @@ export interface LoadedPluginManifest {
   version: string;
   attraccessVersion: PluginAttraccessVersion;
   /**
+   * Host capabilities this plugin is permitted to use at runtime
+   * @example ["EMIT_EVENTS","READ_SETTINGS"]
+   */
+  permissions: (
+    | "READ_USERS"
+    | "ACCESS_RESOURCES"
+    | "READ_SETTINGS"
+    | "DATABASE_ACCESS"
+    | "EMIT_EVENTS"
+    | "LISTEN_EVENTS"
+    | "RESOLVE_HOST_PROVIDERS"
+  )[];
+  /**
    * The directory of the plugin
    * @example "plugin-name"
    */
@@ -4042,6 +4156,65 @@ export interface UpdateReaderResponseDto {
   reader: Attractap;
 }
 
+export interface AttractapCrashReport {
+  /**
+   * The unique identifier of the crash report
+   * @example 1
+   */
+  id: number;
+  /**
+   * The ID of the reader this crash report belongs to
+   * @example 1
+   */
+  attractapId: number;
+  /**
+   * The reset reason reported by the reader (esp_reset_reason)
+   * @example "TASK_WDT"
+   */
+  resetReason: string;
+  /**
+   * Free heap in bytes captured before the freeze/reset
+   * @example 48213
+   */
+  heapFreeBytes: number | null;
+  /**
+   * Largest contiguous free heap block in bytes before the freeze/reset
+   * @example 20480
+   */
+  largestFreeBlockBytes: number | null;
+  /**
+   * Uptime in milliseconds before the reset occurred
+   * @example 372000
+   */
+  uptimeBeforeResetMs: number | null;
+  /**
+   * WebSocket connection state at the time of the freeze/reset
+   * @example "CONNECTED"
+   */
+  wsState: string | null;
+  /**
+   * WiFi connection state at the time of the freeze/reset
+   * @example "GOT_IP"
+   */
+  wifiState: string | null;
+  /**
+   * Firmware version string reported by the reader at crash time
+   * @example "1.2.3"
+   */
+  firmwareVersion: string | null;
+  /**
+   * Size of the attached coredump blob in bytes, if any
+   * @example 16384
+   */
+  coredumpSize: number | null;
+  /**
+   * When this crash report was received by the server
+   * @format date-time
+   * @example "2026-06-02T12:00:00.000Z"
+   */
+  createdAt: string;
+}
+
 export interface AppKeyRequestDto {
   /**
    * The UID of the card to get the app key for
@@ -4152,6 +4325,144 @@ export interface AttractapFirmware {
    * @example "16MB"
    */
   flashSize: string;
+}
+
+export interface SuggestedMessageDto {
+  /**
+   * Suggested prefilled message content referencing the resource
+   * @example "Hi, are you currently using the Laser Cutter?"
+   */
+  content: string;
+  /** Type of context this suggested message references */
+  referenceType: MessageReferenceType;
+  /**
+   * ID of the referenced entity, scoped by referenceType
+   * @example 1
+   */
+  referenceId: number;
+}
+
+export interface ContactResponseDto {
+  /**
+   * The ID of the existing or newly created 1:1 conversation
+   * @example 1
+   */
+  conversationId: number;
+  /** Optional suggested prefilled message referencing the resource */
+  suggestedMessage?: SuggestedMessageDto | null;
+}
+
+export interface Conversation {
+  /**
+   * The unique identifier of the conversation
+   * @example 1
+   */
+  id: number;
+  /**
+   * When this conversation was created
+   * @format date-time
+   * @example "2025-01-18T12:00:00.000Z"
+   */
+  createdAt: string;
+  /**
+   * When this conversation was last updated
+   * @format date-time
+   * @example "2025-01-18T12:30:00.000Z"
+   */
+  updatedAt: string;
+}
+
+export interface Message {
+  /**
+   * The unique identifier of the message
+   * @example 1
+   */
+  id: number;
+  /**
+   * The ID of the conversation this message belongs to
+   * @example 1
+   */
+  conversationId: number;
+  /**
+   * The ID of the user who sent this message
+   * @example 1
+   */
+  senderId: number;
+  /**
+   * The text content of the message
+   * @example "Hello there"
+   */
+  content: string;
+  /**
+   * Optional type of context this message references
+   * @example "RESOURCE"
+   */
+  referenceType: "RESOURCE" | "ACTIVITY" | null;
+  /**
+   * Optional ID of the referenced entity, scoped by referenceType
+   * @example 1
+   */
+  referenceId: number | null;
+  /**
+   * Optional cached label of the referenced entity for rendering
+   * @example "Laser Cutter"
+   */
+  referenceLabel: string | null;
+  /**
+   * Optional cached URL of the referenced entity for rendering
+   * @example "/resources/1"
+   */
+  referenceUrl: string | null;
+  /**
+   * When this message was created
+   * @format date-time
+   * @example "2025-01-18T12:00:00.000Z"
+   */
+  createdAt: string;
+  /** The conversation this message belongs to */
+  conversation: Conversation;
+  /** The user who sent this message */
+  sender: User;
+}
+
+export interface ConversationListItemDto {
+  /**
+   * The unique identifier of the conversation
+   * @example 1
+   */
+  id: number;
+  /** The other participant of this 1:1 conversation */
+  otherParticipant: User | null;
+  /** The most recent message in the conversation */
+  lastMessage: Message | null;
+  /**
+   * When this conversation was last updated
+   * @format date-time
+   * @example "2025-01-18T12:30:00.000Z"
+   */
+  updatedAt: string;
+}
+
+export interface ListMessagesResponseDto {
+  total: number;
+  page: number;
+  limit: number;
+  data: Message[];
+}
+
+export interface SendMessageDto {
+  /**
+   * The text content of the message
+   * @example "Hello there"
+   */
+  content: string;
+  /** Optional type of context this message references */
+  referenceType?: MessageReferenceType;
+  /**
+   * Optional ID of the referenced entity, scoped by referenceType
+   * @example 1
+   */
+  referenceId?: number;
 }
 
 export interface InfoData {
@@ -4970,6 +5281,41 @@ export interface DeleteMaintenanceScheduleParams {
 
 export type DeleteMaintenanceScheduleData = any;
 
+export interface CreateMaintenanceRequestParams {
+  /** The ID of the resource */
+  resourceId: number;
+}
+
+export type CreateMaintenanceRequestData = ResourceMaintenanceRequest;
+
+export interface ListMaintenanceRequestsParams {
+  /**
+   * Page number for pagination
+   * @example 1
+   */
+  page?: number;
+  /**
+   * Number of items per page
+   * @example 10
+   */
+  limit?: number;
+  /** Filter by request status (defaults to open requests only) */
+  status?: MaintenanceRequestStatus;
+  /** The ID of the resource */
+  resourceId: number;
+}
+
+export type ListMaintenanceRequestsData = PaginatedMaintenanceRequestResponse;
+
+export interface ResolveMaintenanceRequestParams {
+  /** The ID of the resource */
+  resourceId: number;
+  /** The ID of the maintenance request */
+  requestId: number;
+}
+
+export type ResolveMaintenanceRequestData = ResourceMaintenanceRequest;
+
 export interface GetBillingBalanceParams {
   userId: number;
 }
@@ -5436,6 +5782,31 @@ export type DeleteReaderData = any;
 
 export type GetReadersData = Attractap[];
 
+export interface GetReaderCrashReportsParams {
+  /**
+   * The ID of the reader
+   * @example 1
+   */
+  readerId: number;
+}
+
+export type GetReaderCrashReportsData = AttractapCrashReport[];
+
+export interface GetReaderCrashReportCoredumpParams {
+  /**
+   * The ID of the reader
+   * @example 1
+   */
+  readerId: number;
+  /**
+   * The ID of the crash report
+   * @example 1
+   */
+  reportId: number;
+}
+
+export type GetReaderCrashReportCoredumpData = any;
+
 export type GetAppKeyByUidData = AppKeyResponseDto;
 
 export type GetAllCardsData = NFCCard[];
@@ -5496,6 +5867,42 @@ export interface GetBillingTransactionsInDateRangeParams {
 }
 
 export type GetBillingTransactionsInDateRangeData = BillingTransaction[];
+
+export interface MessagingContactUserParams {
+  userId: number;
+}
+
+export type MessagingContactUserData = ContactResponseDto;
+
+export interface MessagingContactResourceHolderParams {
+  resourceId: number;
+}
+
+export type MessagingContactResourceHolderData = ContactResponseDto;
+
+export type MessagingListConversationsData = ConversationListItemDto[];
+
+export interface MessagingListMessagesParams {
+  /**
+   * The page number to retrieve
+   * @example 1
+   */
+  page?: number;
+  /**
+   * The number of items per page
+   * @example 20
+   */
+  limit?: number;
+  id: number;
+}
+
+export type MessagingListMessagesData = ListMessagesResponseDto;
+
+export interface MessagingSendMessageParams {
+  id: number;
+}
+
+export type MessagingSendMessageData = Message;
 
 export namespace System {
   /**
@@ -7953,6 +8360,78 @@ export namespace ResourceMaintenances {
     export type RequestHeaders = {};
     export type ResponseBody = FinishMaintenanceData;
   }
+
+  /**
+   * @description Any authenticated user can report a resource as broken and request maintenance.
+   * @tags Resource Maintenances
+   * @name CreateMaintenanceRequest
+   * @summary Request maintenance for a resource
+   * @request POST:/api/resources/{resourceId}/maintenance-requests
+   * @secure
+   */
+  export namespace CreateMaintenanceRequest {
+    export type RequestParams = {
+      /** The ID of the resource */
+      resourceId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = CreateMaintenanceRequestDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = CreateMaintenanceRequestData;
+  }
+
+  /**
+   * @description Retrieve paginated maintenance requests. Only maintenance users can call this.
+   * @tags Resource Maintenances
+   * @name ListMaintenanceRequests
+   * @summary List maintenance requests for a resource
+   * @request GET:/api/resources/{resourceId}/maintenance-requests
+   * @secure
+   */
+  export namespace ListMaintenanceRequests {
+    export type RequestParams = {
+      /** The ID of the resource */
+      resourceId: number;
+    };
+    export type RequestQuery = {
+      /**
+       * Page number for pagination
+       * @example 1
+       */
+      page?: number;
+      /**
+       * Number of items per page
+       * @example 10
+       */
+      limit?: number;
+      /** Filter by request status (defaults to open requests only) */
+      status?: MaintenanceRequestStatus;
+    };
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = ListMaintenanceRequestsData;
+  }
+
+  /**
+   * @description Resolve an open request: 'convert' starts an instant maintenance from it, 'dismiss' closes it. Only maintenance users can call this.
+   * @tags Resource Maintenances
+   * @name ResolveMaintenanceRequest
+   * @summary Resolve a maintenance request
+   * @request POST:/api/resources/{resourceId}/maintenance-requests/{requestId}/resolve
+   * @secure
+   */
+  export namespace ResolveMaintenanceRequest {
+    export type RequestParams = {
+      /** The ID of the resource */
+      resourceId: number;
+      /** The ID of the maintenance request */
+      requestId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = ResolveMaintenanceRequestDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = ResolveMaintenanceRequestData;
+  }
 }
 
 export namespace ResourceMaintenanceSchedules {
@@ -9296,6 +9775,55 @@ export namespace Attractap {
   /**
    * No description
    * @tags Attractap
+   * @name GetReaderCrashReports
+   * @summary Get crash reports for a reader
+   * @request GET:/api/attractap/readers/{readerId}/crash-reports
+   * @secure
+   */
+  export namespace GetReaderCrashReports {
+    export type RequestParams = {
+      /**
+       * The ID of the reader
+       * @example 1
+       */
+      readerId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetReaderCrashReportsData;
+  }
+
+  /**
+   * No description
+   * @tags Attractap
+   * @name GetReaderCrashReportCoredump
+   * @summary Download the coredump blob of a crash report
+   * @request GET:/api/attractap/readers/{readerId}/crash-reports/{reportId}/coredump
+   * @secure
+   */
+  export namespace GetReaderCrashReportCoredump {
+    export type RequestParams = {
+      /**
+       * The ID of the reader
+       * @example 1
+       */
+      readerId: number;
+      /**
+       * The ID of the crash report
+       * @example 1
+       */
+      reportId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetReaderCrashReportCoredumpData;
+  }
+
+  /**
+   * No description
+   * @tags Attractap
    * @name GetAppKeyByUid
    * @summary Get the app key for a card by UID
    * @request POST:/api/attractap/cards/keys
@@ -9454,6 +9982,123 @@ export namespace Analytics {
     export type RequestBody = never;
     export type RequestHeaders = {};
     export type ResponseBody = GetBillingTransactionsInDateRangeData;
+  }
+}
+
+export namespace Messaging {
+  /**
+   * No description
+   * @tags Messaging
+   * @name MessagingLive
+   * @summary Subscribe to live new messages for the authenticated user
+   * @request GET:/api/messaging/live
+   * @secure
+   */
+  export namespace MessagingLive {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = any;
+  }
+
+  /**
+   * No description
+   * @tags Messaging
+   * @name MessagingContactUser
+   * @summary Get or create a 1:1 conversation with a target user
+   * @request POST:/api/messaging/users/{userId}/contact
+   * @secure
+   */
+  export namespace MessagingContactUser {
+    export type RequestParams = {
+      userId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = MessagingContactUserData;
+  }
+
+  /**
+   * No description
+   * @tags Messaging
+   * @name MessagingContactResourceHolder
+   * @summary Resolve the active holder of a resource and open a 1:1 conversation with them
+   * @request POST:/api/messaging/resources/{resourceId}/contact
+   * @secure
+   */
+  export namespace MessagingContactResourceHolder {
+    export type RequestParams = {
+      resourceId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = MessagingContactResourceHolderData;
+  }
+
+  /**
+   * No description
+   * @tags Messaging
+   * @name MessagingListConversations
+   * @summary List the authenticated user inbox conversations
+   * @request GET:/api/messaging/conversations
+   * @secure
+   */
+  export namespace MessagingListConversations {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = MessagingListConversationsData;
+  }
+
+  /**
+   * No description
+   * @tags Messaging
+   * @name MessagingListMessages
+   * @summary List paginated messages of a conversation
+   * @request GET:/api/messaging/conversations/{id}/messages
+   * @secure
+   */
+  export namespace MessagingListMessages {
+    export type RequestParams = {
+      id: number;
+    };
+    export type RequestQuery = {
+      /**
+       * The page number to retrieve
+       * @example 1
+       */
+      page?: number;
+      /**
+       * The number of items per page
+       * @example 20
+       */
+      limit?: number;
+    };
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = MessagingListMessagesData;
+  }
+
+  /**
+   * No description
+   * @tags Messaging
+   * @name MessagingSendMessage
+   * @summary Send a message to a conversation
+   * @request POST:/api/messaging/conversations/{id}/messages
+   * @secure
+   */
+  export namespace MessagingSendMessage {
+    export type RequestParams = {
+      id: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = SendMessageDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = MessagingSendMessageData;
   }
 }
 
@@ -12446,6 +13091,76 @@ export class Api<
         format: "json",
         ...params,
       }),
+
+    /**
+     * @description Any authenticated user can report a resource as broken and request maintenance.
+     *
+     * @tags Resource Maintenances
+     * @name CreateMaintenanceRequest
+     * @summary Request maintenance for a resource
+     * @request POST:/api/resources/{resourceId}/maintenance-requests
+     * @secure
+     */
+    createMaintenanceRequest: (
+      { resourceId }: CreateMaintenanceRequestParams,
+      data: CreateMaintenanceRequestDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<CreateMaintenanceRequestData, void>({
+        path: `/api/resources/${resourceId}/maintenance-requests`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description Retrieve paginated maintenance requests. Only maintenance users can call this.
+     *
+     * @tags Resource Maintenances
+     * @name ListMaintenanceRequests
+     * @summary List maintenance requests for a resource
+     * @request GET:/api/resources/{resourceId}/maintenance-requests
+     * @secure
+     */
+    listMaintenanceRequests: (
+      { resourceId, ...query }: ListMaintenanceRequestsParams,
+      params: RequestParams = {},
+    ) =>
+      this.request<ListMaintenanceRequestsData, void>({
+        path: `/api/resources/${resourceId}/maintenance-requests`,
+        method: "GET",
+        query: query,
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description Resolve an open request: 'convert' starts an instant maintenance from it, 'dismiss' closes it. Only maintenance users can call this.
+     *
+     * @tags Resource Maintenances
+     * @name ResolveMaintenanceRequest
+     * @summary Resolve a maintenance request
+     * @request POST:/api/resources/{resourceId}/maintenance-requests/{requestId}/resolve
+     * @secure
+     */
+    resolveMaintenanceRequest: (
+      { resourceId, requestId }: ResolveMaintenanceRequestParams,
+      data: ResolveMaintenanceRequestDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResolveMaintenanceRequestData, void>({
+        path: `/api/resources/${resourceId}/maintenance-requests/${requestId}/resolve`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
   };
   resourceMaintenanceSchedules = {
     /**
@@ -13885,6 +14600,47 @@ export class Api<
      * No description
      *
      * @tags Attractap
+     * @name GetReaderCrashReports
+     * @summary Get crash reports for a reader
+     * @request GET:/api/attractap/readers/{readerId}/crash-reports
+     * @secure
+     */
+    getReaderCrashReports: (
+      { readerId }: GetReaderCrashReportsParams,
+      params: RequestParams = {},
+    ) =>
+      this.request<GetReaderCrashReportsData, void>({
+        path: `/api/attractap/readers/${readerId}/crash-reports`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Attractap
+     * @name GetReaderCrashReportCoredump
+     * @summary Download the coredump blob of a crash report
+     * @request GET:/api/attractap/readers/{readerId}/crash-reports/{reportId}/coredump
+     * @secure
+     */
+    getReaderCrashReportCoredump: (
+      { readerId, reportId }: GetReaderCrashReportCoredumpParams,
+      params: RequestParams = {},
+    ) =>
+      this.request<GetReaderCrashReportCoredumpData, void>({
+        path: `/api/attractap/readers/${readerId}/crash-reports/${reportId}/coredump`,
+        method: "GET",
+        secure: true,
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Attractap
      * @name GetAppKeyByUid
      * @summary Get the app key for a card by UID
      * @request POST:/api/attractap/cards/keys
@@ -14040,6 +14796,130 @@ export class Api<
         method: "GET",
         query: query,
         secure: true,
+        format: "json",
+        ...params,
+      }),
+  };
+  messaging = {
+    /**
+     * No description
+     *
+     * @tags Messaging
+     * @name MessagingLive
+     * @summary Subscribe to live new messages for the authenticated user
+     * @request GET:/api/messaging/live
+     * @secure
+     */
+    messagingLive: (params: RequestParams = {}) =>
+      this.request<any, void>({
+        path: `/api/messaging/live`,
+        method: "GET",
+        secure: true,
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Messaging
+     * @name MessagingContactUser
+     * @summary Get or create a 1:1 conversation with a target user
+     * @request POST:/api/messaging/users/{userId}/contact
+     * @secure
+     */
+    messagingContactUser: (
+      { userId }: MessagingContactUserParams,
+      params: RequestParams = {},
+    ) =>
+      this.request<MessagingContactUserData, void>({
+        path: `/api/messaging/users/${userId}/contact`,
+        method: "POST",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Messaging
+     * @name MessagingContactResourceHolder
+     * @summary Resolve the active holder of a resource and open a 1:1 conversation with them
+     * @request POST:/api/messaging/resources/{resourceId}/contact
+     * @secure
+     */
+    messagingContactResourceHolder: (
+      { resourceId }: MessagingContactResourceHolderParams,
+      params: RequestParams = {},
+    ) =>
+      this.request<MessagingContactResourceHolderData, void>({
+        path: `/api/messaging/resources/${resourceId}/contact`,
+        method: "POST",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Messaging
+     * @name MessagingListConversations
+     * @summary List the authenticated user inbox conversations
+     * @request GET:/api/messaging/conversations
+     * @secure
+     */
+    messagingListConversations: (params: RequestParams = {}) =>
+      this.request<MessagingListConversationsData, void>({
+        path: `/api/messaging/conversations`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Messaging
+     * @name MessagingListMessages
+     * @summary List paginated messages of a conversation
+     * @request GET:/api/messaging/conversations/{id}/messages
+     * @secure
+     */
+    messagingListMessages: (
+      { id, ...query }: MessagingListMessagesParams,
+      params: RequestParams = {},
+    ) =>
+      this.request<MessagingListMessagesData, void>({
+        path: `/api/messaging/conversations/${id}/messages`,
+        method: "GET",
+        query: query,
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Messaging
+     * @name MessagingSendMessage
+     * @summary Send a message to a conversation
+     * @request POST:/api/messaging/conversations/{id}/messages
+     * @secure
+     */
+    messagingSendMessage: (
+      { id }: MessagingSendMessageParams,
+      data: SendMessageDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<MessagingSendMessageData, void>({
+        path: `/api/messaging/conversations/${id}/messages`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
         format: "json",
         ...params,
       }),

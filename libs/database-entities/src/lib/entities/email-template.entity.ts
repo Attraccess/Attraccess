@@ -13,6 +13,7 @@ export enum EmailTemplateType {
   DELETE_ACCOUNT_CONFIRMATION = 'delete-account-confirmation',
   RESOURCE_HEALTH_CHANGED = 'resource-health-changed',
   USER_RETRAINING_REQUIRED = 'user-retraining-required',
+  MAINTENANCE_REQUEST_CREATED = 'maintenance-request-created',
 }
 
 @Entity('email_templates')

@@ -54,6 +54,7 @@ import {
 import { ResourceFlowEdge } from './entities/resourceFlowEdge';
 import { ResourceFlowLog, ResourceFlowLogType } from './entities/resourceFlowLog';
 import { ResourceMaintenance } from './entities/resource.maintenance';
+import { ResourceMaintenanceRequest, MaintenanceRequestStatus } from './entities/resource-maintenance-request.entity';
 import {
   ResourceMaintenanceSchedule,
   ResourceMaintenanceScheduleTriggerType,
@@ -130,6 +131,8 @@ export {
   ResourceFlowLogType,
   AttractapFirmwareVersion,
   ResourceMaintenance,
+  ResourceMaintenanceRequest,
+  MaintenanceRequestStatus,
   ResourceMaintenanceSchedule,
   ResourceMaintenanceScheduleTriggerType,
   ResourceMaintenanceScheduleUsageHoursConfig,
@@ -214,6 +217,7 @@ export const entities = {
   ResourceFlowEdge,
   ResourceFlowLog,
   ResourceMaintenance,
+  ResourceMaintenanceRequest,
   ResourceMaintenanceSchedule,
   ResourceMaintenanceScheduleUsageHoursConfig,
   ResourceMaintenanceScheduleUsageCountConfig,

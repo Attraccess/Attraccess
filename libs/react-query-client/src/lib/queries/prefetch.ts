@@ -2,7 +2,7 @@
 
 import { type QueryClient } from "@tanstack/react-query";
 import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, FlowVariablesService, LicenseService, MessagingService, MqttService, PasswordPolicyAdminService, PasswordPolicyService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceHealthService, ResourceMaintenanceSchedulesService, ResourceMaintenancesService, ResourcesService, SettingsService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
-import { EmailTemplateType, PasswordPolicyRole, PermissionFilter, ResourceIntroducerType } from "../requests/types.gen";
+import { EmailTemplateType, MaintenanceRequestStatus, PasswordPolicyRole, PermissionFilter, ResourceIntroducerType } from "../requests/types.gen";
 import * as Common from "./common";
 /**
 * Return API information
@@ -540,6 +540,23 @@ export const prefetchUseResourceMaintenancesServiceGetMaintenance = (queryClient
   maintenanceId: number;
   resourceId: number;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseResourceMaintenancesServiceGetMaintenanceKeyFn({ maintenanceId, resourceId }), queryFn: () => ResourceMaintenancesService.getMaintenance({ maintenanceId, resourceId }) });
+/**
+* List maintenance requests for a resource
+* Retrieve paginated maintenance requests. Only maintenance users can call this.
+* @param data The data for the request.
+* @param data.resourceId The ID of the resource
+* @param data.page Page number for pagination
+* @param data.limit Number of items per page
+* @param data.status Filter by request status (defaults to open requests only)
+* @returns PaginatedMaintenanceRequestResponse Requests retrieved
+* @throws ApiError
+*/
+export const prefetchUseResourceMaintenancesServiceListMaintenanceRequests = (queryClient: QueryClient, { limit, page, resourceId, status }: {
+  limit?: number | undefined;
+  page?: number | undefined;
+  resourceId: number;
+  status?: MaintenanceRequestStatus | undefined;
+}) => queryClient.prefetchQuery({ queryKey: Common.UseResourceMaintenancesServiceListMaintenanceRequestsKeyFn({ limit, page, resourceId, status }), queryFn: () => ResourceMaintenancesService.listMaintenanceRequests({ limit, page, resourceId, status }) });
 /**
 * List maintenance schedules for a resource
 * Get all maintenance schedules for the given resource

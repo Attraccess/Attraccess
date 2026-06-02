@@ -39,6 +39,13 @@
     "actions": {
       "create": "New maintenance"
     },
+    "requests": {
+      "label": "Maintenance requests",
+      "reportedBy": "Reported by {{name}}",
+      "someone": "a user",
+      "convert": "Start maintenance",
+      "dismiss": "Dismiss"
+    },
     "live": {
       "label": "Live now",
       "count": "{{count}} running",
