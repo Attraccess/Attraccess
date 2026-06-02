@@ -69,7 +69,7 @@
     "cookie-session": "^2.1.1",
     "csv": "^6.5.1",
     "csv-parse": "^6.2.1",
-    "date-fns": "^4.1.0",
+    "date-fns": "^4.4.0",
     "decompress": "^4.2.1",
     "docsify-cli": "^4.4.4",
     "esptool-js": "^0.6.0",
