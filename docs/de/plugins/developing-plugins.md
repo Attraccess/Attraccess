@@ -44,6 +44,41 @@ Ein Backend-Plugin kann:
 3. Erstellen und verpacken Sie Ihr Plugin
 4. Laden Sie es ueber die [Plugins](plugins/installing-plugins.md)-Seite hoch
 
+### Backend-Plugins verpacken
+
+Ein Backend-Plugin laeuft **innerhalb** des Attraccess-Serverprozesses und teilt sich die NestJS-Laufzeit, den Event-Bus und die Datenbankverbindung des Hosts. Damit das funktioniert, muss Ihr Build *dieselben* Kopien dieser Pakete verwenden, die der Host bereits geladen hat -- er darf keine eigenen mitbuendeln.
+
+Teilen Sie Ihre Abhaengigkeiten in zwei Gruppen auf:
+
+| Abhaengigkeit | Deklaration | Grund |
+|---------------|-------------|-------|
+| `@nestjs/common`, `@nestjs/core`, `@nestjs/event-emitter`, `eventemitter2`, `typeorm`, `reflect-metadata` | `peerDependencies`, beim Build **externalisiert** (nie gebuendelt) | Sie tragen die Dependency-Injection-Identitaeten, den gemeinsamen Event-Bus und die einzelne Datenbankverbindung. Eine gebuendelte Kopie gilt als *anderer* Typ und verbindet sich stillschweigend nicht. |
+| `@attraccess/plugins-backend-sdk` und Ihr eigener Code | Normal buendeln | Kann sicher in Ihr Artefakt aufgenommen werden. |
+
+Liefern Sie einen **CommonJS**-Einstiegspunkt (`index.js`) aus, kein ES-Modul (`index.mjs`). Verweisen Sie im `plugin.json`-Manifest darauf:
+
+```json
+{
+  "name": "my-plugin",
+  "version": "1.0.0",
+  "main": { "backend": { "directory": "dist", "entryPoint": "index.js" } },
+  "attraccessVersion": { "min": "1.0.0" }
+}
+```
+
+Ein minimaler [esbuild](https://esbuild.github.io/)-Build, der die Regel befolgt:
+
+```bash
+esbuild src/index.ts \
+  --bundle --platform=node --format=cjs --outfile=dist/index.js \
+  --external:@nestjs/common --external:@nestjs/core \
+  --external:@nestjs/event-emitter --external:eventemitter2 \
+  --external:typeorm --external:reflect-metadata
+```
+
+> [!WARNING]
+> Wenn Sie eines der externalisierten Pakete mitbuendeln, laedt Ihr Plugin moeglicherweise fehlerfrei, empfaengt aber stillschweigend keine Events, teilt sich nicht die Datenbank oder kann keine Host-Dienste aufloesen. Halten Sie die obige Abhaengigkeitsliste im Zweifel extern.
+
 ## Kombinierte Plugins
 
 Sie koennen ein Plugin erstellen, das sowohl Frontend- als auch Backend-Funktionalitaet umfasst. Dies ist nuetzlich, wenn Ihre Erweiterung benutzerdefinierte API-Endpunkte zusammen mit einer Benutzeroberflaeche benoetigt.
