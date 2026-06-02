@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
+#include <Preferences.h>
 #include "../nfc/nfc.hpp"
 #include "../logger/logger.hpp"
 #include "settings/settings.hpp"
@@ -104,6 +105,26 @@ private:
 #endif
 
     void processState();
+
+    // Persistent boot/crash diagnostics stored in NVS. The record describes the
+    // currently running session and is refreshed periodically so the last value
+    // before a freeze/crash survives the reboot.
+    struct BootDiagnostics_t
+    {
+        uint32_t magic;
+        uint8_t resetReason;
+        uint32_t uptimeMs;
+        uint32_t freeInternalHeap;
+        uint32_t largestFreeBlock;
+        bool websocketConnected;
+        bool wifiConnected;
+    };
+
+    Preferences bootDiagPreferences;
+    uint32_t lastBootSnapshotMs = 0;
+
+    void setupBootDiagnostics();
+    void snapshotBootDiagnostics();
 
 #ifdef HAS_LVGL_DISPLAY
     void handleConnectionConfigurationSave(const ConnectionConfigurationScreen::ConnectionConfig &cfg);
