@@ -88,6 +88,9 @@ import {
   PasswordPolicyAudit,
   PasswordPolicyAuditEvent,
 } from './entities/password-policy-audit.entity';
+import { Conversation } from './entities/conversation.entity';
+import { ConversationParticipant } from './entities/conversation-participant.entity';
+import { Message, MessageReferenceType } from './entities/message.entity';
 
 // Export all entities individually
 export {
@@ -178,6 +181,10 @@ export {
   PASSWORD_POLICY_ROLES,
   PasswordPolicyAudit,
   PasswordPolicyAuditEvent,
+  Conversation,
+  ConversationParticipant,
+  Message,
+  MessageReferenceType,
 };
 
 // Export the entities object
@@ -222,4 +229,7 @@ export const entities = {
   PasswordHistory,
   PasswordPolicyOverride,
   PasswordPolicyAudit,
+  Conversation,
+  ConversationParticipant,
+  Message,
 };
