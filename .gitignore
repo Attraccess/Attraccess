@@ -25,6 +25,10 @@ storage-docker/
 data/
 log/
 .cursor/debug.log
+
+# Auto-generated API + react-query client libs (regenerated from the OpenAPI spec on build)
+libs/api-client/src/generated/
+libs/react-query-client/src/lib/
 .github/instructions/nx.instructions.md
 
 apps/api/src/assets/attractap-firmwares/
