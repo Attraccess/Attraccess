@@ -2,7 +2,7 @@
 
 import { UseQueryOptions, useSuspenseQuery } from "@tanstack/react-query";
 import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, FlowVariablesService, LicenseService, MqttService, PasswordPolicyAdminService, PasswordPolicyService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceHealthService, ResourceMaintenanceSchedulesService, ResourceMaintenancesService, ResourcesService, SettingsService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
-import { EmailTemplateType, PasswordPolicyRole, PermissionFilter } from "../requests/types.gen";
+import { EmailTemplateType, PasswordPolicyRole, PermissionFilter, ResourceIntroducerType } from "../requests/types.gen";
 import * as Common from "./common";
 /**
 * Return API information
@@ -455,12 +455,14 @@ export const useAccessControlServiceResourceIntroducersIsIntroducerSuspense = <T
 * Get all introducers for a resource
 * @param data The data for the request.
 * @param data.resourceId
+* @param data.type Filter by access type. Omit to return both introducers and maintainers.
 * @returns ResourceIntroducer All introducers for a resource
 * @throws ApiError
 */
-export const useAccessControlServiceResourceIntroducersGetManySuspense = <TData = Common.AccessControlServiceResourceIntroducersGetManyDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ resourceId }: {
+export const useAccessControlServiceResourceIntroducersGetManySuspense = <TData = Common.AccessControlServiceResourceIntroducersGetManyDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ resourceId, type }: {
   resourceId: number;
-}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseAccessControlServiceResourceIntroducersGetManyKeyFn({ resourceId }, queryKey), queryFn: () => AccessControlService.resourceIntroducersGetMany({ resourceId }) as TData, ...options });
+  type?: ResourceIntroducerType | undefined;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseAccessControlServiceResourceIntroducersGetManyKeyFn({ resourceId, type }, queryKey), queryFn: () => AccessControlService.resourceIntroducersGetMany({ resourceId, type }) as TData, ...options });
 /**
 * Get all introductions for a resource
 * @param data The data for the request.

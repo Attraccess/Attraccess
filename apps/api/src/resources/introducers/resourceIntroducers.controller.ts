@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Query } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ResourceIntroducersService } from './resourceIntroducers.service';
-import { ResourceIntroducer } from '@attraccess/database-entities';
+import { ResourceIntroducer, ResourceIntroducerType } from '@attraccess/database-entities';
 import { Auth } from '@attraccess/plugins-backend-sdk';
 import { IsResourceIntroducerResponseDto } from './dtos/isIntroducer.response.dto';
 import { GrantIntroducerDto } from './dtos/grantIntroducer.dto';
@@ -40,8 +40,18 @@ export class ResourceIntroducersController {
     description: 'All introducers for a resource',
     type: [ResourceIntroducer],
   })
-  async getMany(@Param('resourceId', ParseIntPipe) resourceId: number): Promise<ResourceIntroducer[]> {
-    return await this.resourceIntroducersService.getMany(resourceId);
+  @ApiQuery({
+    name: 'type',
+    required: false,
+    enum: ResourceIntroducerType,
+    enumName: 'ResourceIntroducerType',
+    description: 'Filter by access type. Omit to return both introducers and maintainers.',
+  })
+  async getMany(
+    @Param('resourceId', ParseIntPipe) resourceId: number,
+    @Query('type') type?: ResourceIntroducerType
+  ): Promise<ResourceIntroducer[]> {
+    return await this.resourceIntroducersService.getMany(resourceId, type);
   }
 
   @Post('/:userId/grant')

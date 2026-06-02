@@ -4953,6 +4953,10 @@ export type ResourceIntroducersIsIntroducerResponse = IsResourceIntroducerRespon
 
 export type ResourceIntroducersGetManyData = {
     resourceId: number;
+    /**
+     * Filter by access type. Omit to return both introducers and maintainers.
+     */
+    type?: ResourceIntroducerType;
 };
 
 export type ResourceIntroducersGetManyResponse = Array<ResourceIntroducer>;

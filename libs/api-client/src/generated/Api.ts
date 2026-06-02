@@ -4665,6 +4665,8 @@ export type ResourceIntroducersIsIntroducerData =
   IsResourceIntroducerResponseDto;
 
 export interface ResourceIntroducersGetManyParams {
+  /** Filter by access type. Omit to return both introducers and maintainers. */
+  type?: ResourceIntroducerType;
   resourceId: number;
 }
 
@@ -7520,7 +7522,10 @@ export namespace AccessControl {
     export type RequestParams = {
       resourceId: number;
     };
-    export type RequestQuery = {};
+    export type RequestQuery = {
+      /** Filter by access type. Omit to return both introducers and maintainers. */
+      type?: ResourceIntroducerType;
+    };
     export type RequestBody = never;
     export type RequestHeaders = {};
     export type ResponseBody = ResourceIntroducersGetManyData;
@@ -11967,12 +11972,13 @@ export class Api<
      * @request GET:/api/resources/{resourceId}/introducers
      */
     resourceIntroducersGetMany: (
-      { resourceId }: ResourceIntroducersGetManyParams,
+      { resourceId, ...query }: ResourceIntroducersGetManyParams,
       params: RequestParams = {},
     ) =>
       this.request<ResourceIntroducersGetManyData, any>({
         path: `/api/resources/${resourceId}/introducers`,
         method: "GET",
+        query: query,
         format: "json",
         ...params,
       }),

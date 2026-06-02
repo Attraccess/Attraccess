@@ -14,8 +14,11 @@ export class ResourceIntroducersService {
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
-  public async getMany(resourceId: number): Promise<ResourceIntroducer[]> {
-    return await this.resourceIntroducerRepository.find({ where: { resourceId }, relations: ['user'] });
+  public async getMany(resourceId: number, type?: ResourceIntroducerType): Promise<ResourceIntroducer[]> {
+    return await this.resourceIntroducerRepository.find({
+      where: { resourceId, ...(type ? { type } : {}) },
+      relations: ['user'],
+    });
   }
 
   public async getByResourceIdAndUserId(

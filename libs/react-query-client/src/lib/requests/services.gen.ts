@@ -2461,6 +2461,7 @@ export class AccessControlService {
      * Get all introducers for a resource
      * @param data The data for the request.
      * @param data.resourceId
+     * @param data.type Filter by access type. Omit to return both introducers and maintainers.
      * @returns ResourceIntroducer All introducers for a resource
      * @throws ApiError
      */
@@ -2470,6 +2471,9 @@ export class AccessControlService {
             url: '/api/resources/{resourceId}/introducers',
             path: {
                 resourceId: data.resourceId
+            },
+            query: {
+                type: data.type
             }
         });
     }
