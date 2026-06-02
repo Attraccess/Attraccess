@@ -23,6 +23,7 @@ import { AccessDenied } from './unauthorized/accessDenied';
 import { getBaseUrl } from '../api';
 import { AcceptInvitation } from './accept-invitation';
 import { TwoFactorGate } from './two-factor-gate';
+import { AttraccessUserActionsBridge } from '../components/attraccessUserActionsBridge';
 
 function useRoutesWithAuthElements(routes: RouteConfig[]) {
   const { user } = useAuth();
@@ -117,9 +118,11 @@ function AppLayout(props: PropsWithChildren) {
         <I18nProvider locale={language}>
           <ToastProvider>
             <ReactFlowProvider>
-              <Layout noLayout={!isAuthenticated}>
-                {props.children}
-              </Layout>
+              <AttraccessUserActionsBridge>
+                <Layout noLayout={!isAuthenticated}>
+                  {props.children}
+                </Layout>
+              </AttraccessUserActionsBridge>
             </ReactFlowProvider>
           </ToastProvider>
         </I18nProvider>
