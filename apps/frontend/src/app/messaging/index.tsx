@@ -29,6 +29,9 @@ export function MessagesPage() {
 
   const { data: conversations, isLoading } = useMessagingServiceMessagingListConversations();
 
+  const selectedConversation = conversations?.find((conversation) => conversation.id === selectedConversationId);
+  const partnerName = selectedConversation?.otherParticipant?.username ?? t('conversations.unknownUser');
+
   const handleLiveMessage = useCallback(
     (message: Message) => {
       queryClient.invalidateQueries({ queryKey: UseMessagingServiceMessagingListConversationsKeyFn() });
@@ -64,17 +67,24 @@ export function MessagesPage() {
           <div className={cn('min-h-0', selectedConversationId ? 'flex flex-col' : 'hidden lg:flex')}>
             {selectedConversationId && user ? (
               <div className="flex h-full min-h-0 flex-col">
-                <div className="flex items-center gap-2 border-b border-zinc-200 p-2 dark:border-zinc-700 lg:hidden">
+                <div className="flex items-center gap-2 border-b border-zinc-200 p-2 dark:border-zinc-700">
                   <Button
                     variant="ghost"
                     size="sm"
+                    isIconOnly
+                    className="lg:hidden"
                     onPress={() => setSelectedConversationId(null)}
                     aria-label={t('thread.back')}
                     data-cy="thread-back-button"
                   >
-                    <ArrowLeftIcon size={16} />
-                    {t('thread.back')}
+                    <ArrowLeftIcon size={18} />
                   </Button>
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-200 text-small font-medium uppercase text-zinc-600 dark:bg-zinc-700 dark:text-zinc-200">
+                    {partnerName.charAt(0)}
+                  </div>
+                  <p className="truncate font-medium" data-cy="thread-partner-name">
+                    {partnerName}
+                  </p>
                 </div>
                 <div className="min-h-0 flex-1">
                   <MessageThread conversationId={selectedConversationId} currentUserId={user.id} />
