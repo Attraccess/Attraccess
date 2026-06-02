@@ -2,7 +2,7 @@
 
 ### 🚀 Features
 
-- **ATT-452:** AttraccessUser popover with user info + "Start direct message" action that opens/creates a 1:1 conversation and routes to `/messages` ([ATT-452](https://linear.app/attraccess/issue/ATT-452))
+- **ATT-452:** AttraccessUser popover with user info + "Start direct message" action that opens/creates a 1:1 conversation and routes to `/messages` ([ATT-452](https://linear.app/attraccess/issue/ATT-452), [#1158](https://github.com/Attraccess/Attraccess/pull/1158))
 
 ## 1.6.0 (2026-05-30)
 
