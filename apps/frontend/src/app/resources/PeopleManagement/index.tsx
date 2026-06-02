@@ -1,7 +1,7 @@
 import { HTMLAttributes, useCallback, useMemo, useState } from 'react';
 import { Card, CardProps, useOverlayState } from '@heroui/react';
 import { Button } from '../../../components/button';
-import { AlertCircle, AwardIcon, ShieldCheckIcon, UserPlusIcon } from 'lucide-react';
+import { AlertCircle, AwardIcon, ShieldCheckIcon, WrenchIcon } from 'lucide-react';
 import { User } from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { Select } from '../../../components/select';
@@ -38,6 +38,7 @@ export function PeopleManagement(props: Readonly<PeopleManagementProps & Omit<Ca
 
   const filteredRows = useMemo(() => {
     if (filter === 'introducers') return rows.filter((r) => r.isIntroducer);
+    if (filter === 'maintainers') return rows.filter((r) => r.isMaintainer);
     if (filter === 'introduced') return rows.filter((r) => r.hasValidIntroduction);
     return rows;
   }, [rows, filter]);
@@ -61,6 +62,8 @@ export function PeopleManagement(props: Readonly<PeopleManagementProps & Omit<Ca
       if (!addMode) return;
       if (addMode === 'introducer') {
         await mutations.grantIntroducer(user.id);
+      } else if (addMode === 'maintainer') {
+        await mutations.grantMaintainer(user.id);
       } else {
         await mutations.grantIntroduction(user.id, addComment);
         setAddComment('');
@@ -141,6 +144,7 @@ export function PeopleManagement(props: Readonly<PeopleManagementProps & Omit<Ca
         items={[
           { key: 'all', label: t('filters.all') },
           { key: 'introducers', label: t('filters.introducers') },
+          { key: 'maintainers', label: t('filters.maintainers') },
           { key: 'introduced', label: t('filters.introduced') },
         ]}
         data-cy="people-filter"
@@ -210,30 +214,26 @@ export function PeopleManagement(props: Readonly<PeopleManagementProps & Omit<Ca
   );
 
   if (hideHeader) {
-    const showBothAdd = canManageIntroducers && canManageIntroductions;
     const addButtons = (
       <div className="flex flex-wrap gap-2">
-        {showBothAdd ? (
+        {canManageIntroductions && (
+          <Button variant="primary" onPress={() => handleAddOpen('introduction')} data-cy="people-add-introduction">
+            <ShieldCheckIcon className="w-4 h-4" />
+            {t('addOptions.introduction')}
+          </Button>
+        )}
+        {canManageIntroducers && (
           <>
-            <Button variant="primary" onPress={() => handleAddOpen('introduction')} data-cy="people-add-introduction">
-              <ShieldCheckIcon className="w-4 h-4" />
-              {t('addOptions.introduction')}
-            </Button>
             <Button variant="primary" onPress={() => handleAddOpen('introducer')} data-cy="people-add-introducer">
               <AwardIcon className="w-4 h-4" />
               {t('addOptions.introducer')}
             </Button>
+            <Button variant="primary" onPress={() => handleAddOpen('maintainer')} data-cy="people-add-maintainer">
+              <WrenchIcon className="w-4 h-4" />
+              {t('addOptions.maintainer')}
+            </Button>
           </>
-        ) : canManageIntroducers || canManageIntroductions ? (
-          <Button
-            variant="primary"
-            onPress={() => handleAddOpen(canManageIntroducers ? 'introducer' : 'introduction')}
-            data-cy="people-add-person"
-          >
-            <UserPlusIcon className="w-4 h-4" />
-            {canManageIntroducers ? t('addOptions.introducer') : t('addOptions.introduction')}
-          </Button>
-        ) : null}
+        )}
       </div>
     );
 

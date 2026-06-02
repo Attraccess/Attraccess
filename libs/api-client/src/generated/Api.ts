@@ -102,6 +102,12 @@ export enum RetrainingReason {
   Inactivity = "inactivity",
 }
 
+/** The kind of access: 'introducer' can give introductions and do maintenance; 'maintainer' can only do maintenance and control the machine */
+export enum ResourceIntroducerType {
+  Introducer = "introducer",
+  Maintainer = "maintainer",
+}
+
 /** The action performed (revoke or grant) */
 export enum IntroductionHistoryAction {
   Revoke = "revoke",
@@ -2415,6 +2421,11 @@ export interface ResourceIntroducer {
    */
   id: number;
   /**
+   * The kind of access: 'introducer' can give introductions and do maintenance; 'maintainer' can only do maintenance and control the machine
+   * @example "introducer"
+   */
+  type: ResourceIntroducerType;
+  /**
    * The ID of the resource (if permission is for a specific resource)
    * @example 1
    */
@@ -2441,6 +2452,14 @@ export interface ResourceIntroducer {
 export interface IsResourceGroupIntroducerResponseDto {
   /** Whether the user is an introducer for the resource */
   isIntroducer: boolean;
+}
+
+export interface GrantIntroducerDto {
+  /**
+   * The kind of access to grant. 'introducer' (default) can give introductions and do maintenance; 'maintainer' can only do maintenance and control the machine
+   * @default "introducer"
+   */
+  type?: ResourceIntroducerType;
 }
 
 export interface FormSubmissionFieldAnswerDto {
@@ -4784,6 +4803,8 @@ export type ResourceIntroducersIsIntroducerData =
   IsResourceIntroducerResponseDto;
 
 export interface ResourceIntroducersGetManyParams {
+  /** Filter by access type. Omit to return both introducers and maintainers. */
+  type?: ResourceIntroducerType;
   resourceId: number;
 }
 
@@ -7621,7 +7642,7 @@ export namespace AccessControl {
       groupId: number;
     };
     export type RequestQuery = {};
-    export type RequestBody = never;
+    export type RequestBody = GrantIntroducerDto;
     export type RequestHeaders = {};
     export type ResponseBody = ResourceGroupIntroducersGrantData;
   }
@@ -7678,7 +7699,10 @@ export namespace AccessControl {
     export type RequestParams = {
       resourceId: number;
     };
-    export type RequestQuery = {};
+    export type RequestQuery = {
+      /** Filter by access type. Omit to return both introducers and maintainers. */
+      type?: ResourceIntroducerType;
+    };
     export type RequestBody = never;
     export type RequestHeaders = {};
     export type ResponseBody = ResourceIntroducersGetManyData;
@@ -7698,7 +7722,7 @@ export namespace AccessControl {
       userId: number;
     };
     export type RequestQuery = {};
-    export type RequestBody = never;
+    export type RequestBody = GrantIntroducerDto;
     export type RequestHeaders = {};
     export type ResponseBody = ResourceIntroducersGrantData;
   }
@@ -12106,12 +12130,15 @@ export class Api<
      */
     resourceGroupIntroducersGrant: (
       { userId, groupId }: ResourceGroupIntroducersGrantParams,
+      data: GrantIntroducerDto,
       params: RequestParams = {},
     ) =>
       this.request<ResourceGroupIntroducersGrantData, void>({
         path: `/api/resource-groups/${groupId}/introducers/${userId}/grant`,
         method: "POST",
+        body: data,
         secure: true,
+        type: ContentType.Json,
         ...params,
       }),
 
@@ -12164,12 +12191,13 @@ export class Api<
      * @request GET:/api/resources/{resourceId}/introducers
      */
     resourceIntroducersGetMany: (
-      { resourceId }: ResourceIntroducersGetManyParams,
+      { resourceId, ...query }: ResourceIntroducersGetManyParams,
       params: RequestParams = {},
     ) =>
       this.request<ResourceIntroducersGetManyData, any>({
         path: `/api/resources/${resourceId}/introducers`,
         method: "GET",
+        query: query,
         format: "json",
         ...params,
       }),
@@ -12185,12 +12213,15 @@ export class Api<
      */
     resourceIntroducersGrant: (
       { resourceId, userId }: ResourceIntroducersGrantParams,
+      data: GrantIntroducerDto,
       params: RequestParams = {},
     ) =>
       this.request<ResourceIntroducersGrantData, void>({
         path: `/api/resources/${resourceId}/introducers/${userId}/grant`,
         method: "POST",
+        body: data,
         secure: true,
+        type: ContentType.Json,
         format: "json",
         ...params,
       }),

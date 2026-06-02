@@ -95,6 +95,7 @@ describe('ResourceUsageService', () => {
 
   const mockResourceIntroducersService = {
     isIntroducer: jest.fn(),
+    canMaintain: jest.fn(),
   };
 
   const mockResourceGroupsIntroductionsService = {
@@ -986,7 +987,7 @@ describe('ResourceUsageService', () => {
       const result = await service.endSession(mockActiveSession.resourceId, managerUser, dto);
 
       expect(result).toBe(mockUpdatedSession);
-      expect(resourceIntroducersService.isIntroducer).not.toHaveBeenCalled();
+      expect(resourceIntroducersService.canMaintain).not.toHaveBeenCalled();
       expect(mockUpdateQueryBuilder.update).toHaveBeenCalledWith(ResourceUsage);
       expect(billingService.chargeForResourceUsage).toHaveBeenCalledWith(mockUpdatedSession, expect.anything());
       expect(eventEmitter.emitAsync).toHaveBeenCalledWith(ResourceUsageEvent.EVENT_NAME, expect.any(Object));
@@ -998,7 +999,7 @@ describe('ResourceUsageService', () => {
       );
     });
 
-    it('allows resource introducers to end sessions owned by others', async () => {
+    it('allows resource introducers and maintainers to end sessions owned by others', async () => {
       const dto: EndUsageSessionDto = { notes: 'Introducer stop' };
       const sessionOwner = { id: 31, username: 'member' } as User;
       const introducerUser = { id: 44, username: 'resource-introducer' } as User;
@@ -1016,7 +1017,7 @@ describe('ResourceUsageService', () => {
         endNotes: prefixedNotes,
       };
 
-      resourceIntroducersService.isIntroducer.mockResolvedValue(true);
+      resourceIntroducersService.canMaintain.mockResolvedValue(true);
       resourceUsageRepository.findOne
         .mockResolvedValueOnce(mockActiveSession)
         .mockResolvedValueOnce(mockUpdatedSession)
@@ -1030,7 +1031,7 @@ describe('ResourceUsageService', () => {
       const result = await service.endSession(mockActiveSession.resourceId, introducerUser, dto);
 
       expect(result).toBe(mockUpdatedSession);
-      expect(resourceIntroducersService.isIntroducer).toHaveBeenCalledWith(
+      expect(resourceIntroducersService.canMaintain).toHaveBeenCalledWith(
         mockActiveSession.resourceId,
         introducerUser.id,
         true,
@@ -1061,7 +1062,7 @@ describe('ResourceUsageService', () => {
         endNotes: prefixedNotes,
       };
 
-      resourceIntroducersService.isIntroducer.mockImplementation(async (_resId, _userId, includeGroupIntroducers) =>
+      resourceIntroducersService.canMaintain.mockImplementation(async (_resId, _userId, includeGroupIntroducers) =>
         includeGroupIntroducers ? true : false,
       );
       resourceUsageRepository.findOne
@@ -1077,12 +1078,12 @@ describe('ResourceUsageService', () => {
       const result = await service.endSession(mockActiveSession.resourceId, groupIntroducer, dto);
 
       expect(result).toBe(mockUpdatedSession);
-      expect(resourceIntroducersService.isIntroducer).toHaveBeenCalledWith(
+      expect(resourceIntroducersService.canMaintain).toHaveBeenCalledWith(
         mockActiveSession.resourceId,
         groupIntroducer.id,
         true,
       );
-      await expect(resourceIntroducersService.isIntroducer.mock.results.at(-1)?.value).resolves.toBe(true);
+      await expect(resourceIntroducersService.canMaintain.mock.results.at(-1)?.value).resolves.toBe(true);
       expect(flowExecutorService.runFlow).toHaveBeenCalledWith(
         mockActiveSession.resourceId,
         ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,

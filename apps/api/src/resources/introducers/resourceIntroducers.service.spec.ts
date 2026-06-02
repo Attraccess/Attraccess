@@ -1,0 +1,133 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { ResourceIntroducer, ResourceIntroducerType } from '@attraccess/database-entities';
+import { ResourceIntroducersService } from './resourceIntroducers.service';
+
+describe('ResourceIntroducersService', () => {
+  let service: ResourceIntroducersService;
+  let repository: {
+    findOne: jest.Mock;
+    create: jest.Mock;
+    save: jest.Mock;
+    remove: jest.Mock;
+    createQueryBuilder: jest.Mock;
+  };
+  let eventEmitter: { emit: jest.Mock };
+
+  const emptyGroupQuery = {
+    leftJoin: jest.fn().mockReturnThis(),
+    where: jest.fn().mockReturnThis(),
+    andWhere: jest.fn().mockReturnThis(),
+    getMany: jest.fn().mockResolvedValue([]),
+  };
+
+  beforeEach(async () => {
+    repository = {
+      findOne: jest.fn(),
+      create: jest.fn(),
+      save: jest.fn(),
+      remove: jest.fn(),
+      createQueryBuilder: jest.fn().mockReturnValue(emptyGroupQuery),
+    };
+    eventEmitter = { emit: jest.fn() };
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        ResourceIntroducersService,
+        { provide: getRepositoryToken(ResourceIntroducer), useValue: repository },
+        { provide: EventEmitter2, useValue: eventEmitter },
+      ],
+    }).compile();
+
+    service = module.get(ResourceIntroducersService);
+  });
+
+  describe('isIntroducer', () => {
+    it('returns true for a direct introducer row', async () => {
+      repository.findOne.mockResolvedValue({ type: ResourceIntroducerType.INTRODUCER } as ResourceIntroducer);
+      await expect(service.isIntroducer(1, 2, false)).resolves.toBe(true);
+    });
+
+    it('returns false for a maintainer row (maintainers cannot give introductions)', async () => {
+      repository.findOne.mockResolvedValue({ type: ResourceIntroducerType.MAINTAINER } as ResourceIntroducer);
+      await expect(service.isIntroducer(1, 2, false)).resolves.toBe(false);
+    });
+
+    it('returns false when there is no row', async () => {
+      repository.findOne.mockResolvedValue(null);
+      await expect(service.isIntroducer(1, 2, false)).resolves.toBe(false);
+    });
+  });
+
+  describe('canMaintain', () => {
+    it('returns true for a maintainer row', async () => {
+      repository.findOne.mockResolvedValue({ type: ResourceIntroducerType.MAINTAINER } as ResourceIntroducer);
+      await expect(service.canMaintain(1, 2, false)).resolves.toBe(true);
+    });
+
+    it('returns true for an introducer row', async () => {
+      repository.findOne.mockResolvedValue({ type: ResourceIntroducerType.INTRODUCER } as ResourceIntroducer);
+      await expect(service.canMaintain(1, 2, false)).resolves.toBe(true);
+    });
+
+    it('returns false when there is no row', async () => {
+      repository.findOne.mockResolvedValue(null);
+      await expect(service.canMaintain(1, 2, false)).resolves.toBe(false);
+    });
+  });
+
+  describe('grant', () => {
+    it('creates a maintainer row when none exists', async () => {
+      repository.findOne.mockResolvedValue(null);
+      repository.create.mockImplementation((data) => data);
+      repository.save.mockImplementation(async (data) => data);
+
+      const result = await service.grant(1, 2, ResourceIntroducerType.MAINTAINER);
+
+      expect(repository.create).toHaveBeenCalledWith({
+        resourceId: 1,
+        userId: 2,
+        type: ResourceIntroducerType.MAINTAINER,
+      });
+      expect(result.type).toBe(ResourceIntroducerType.MAINTAINER);
+      expect(eventEmitter.emit).toHaveBeenCalled();
+    });
+
+    it('defaults to introducer when no type is provided', async () => {
+      repository.findOne.mockResolvedValue(null);
+      repository.create.mockImplementation((data) => data);
+      repository.save.mockImplementation(async (data) => data);
+
+      await service.grant(1, 2);
+
+      expect(repository.create).toHaveBeenCalledWith({
+        resourceId: 1,
+        userId: 2,
+        type: ResourceIntroducerType.INTRODUCER,
+      });
+    });
+
+    it('upgrades an existing row to the requested type', async () => {
+      const existing = { type: ResourceIntroducerType.MAINTAINER } as ResourceIntroducer;
+      repository.findOne.mockResolvedValue(existing);
+      repository.save.mockImplementation(async (data) => data);
+
+      const result = await service.grant(1, 2, ResourceIntroducerType.INTRODUCER);
+
+      expect(result.type).toBe(ResourceIntroducerType.INTRODUCER);
+      expect(repository.save).toHaveBeenCalledWith(existing);
+      expect(eventEmitter.emit).toHaveBeenCalled();
+    });
+
+    it('does not re-save when the existing row already matches', async () => {
+      const existing = { type: ResourceIntroducerType.INTRODUCER } as ResourceIntroducer;
+      repository.findOne.mockResolvedValue(existing);
+
+      await service.grant(1, 2, ResourceIntroducerType.INTRODUCER);
+
+      expect(repository.save).not.toHaveBeenCalled();
+      expect(eventEmitter.emit).not.toHaveBeenCalled();
+    });
+  });
+});

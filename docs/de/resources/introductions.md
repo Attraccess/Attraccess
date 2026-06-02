@@ -16,8 +16,12 @@ Ein Benutzer, der nicht eingewiesen wurde, kann keine Nutzungssitzung an der Res
 | Rolle | Berechtigungen |
 |-------|---------------|
 | **Benutzer** | Ressource nach erfolgter Einweisung nutzen |
-| **Einweiser** | Einweisungen für andere Benutzer erteilen und entziehen |
-| **Ressourcenverwalter** | Alle oben genannten Rechte, plus Einweiser verwalten und Ressourceneinstellungen anpassen |
+| **Wartender** | Ressource nutzen und steuern sowie Wartungen verwalten — kann jedoch keine Einweisungen erteilen |
+| **Einweiser** | Alles, was ein Wartender darf, plus Einweisungen für andere Benutzer erteilen und entziehen |
+| **Ressourcenverwalter** | Alle oben genannten Rechte, plus Einweiser/Wartende verwalten und Ressourceneinstellungen anpassen |
+
+> [!NOTE]
+> **Einweiser vs. Wartender:** Beide können die Maschine bedienen und in den Wartungsmodus versetzen (oder daraus entfernen). Der Unterschied: Nur ein **Einweiser** kann anderen Benutzern Einweisungen erteilen. Verwende **Wartender** für Personen, die die Maschine warten, aber nicht über den Zugang anderer entscheiden sollen.
 
 ## Einweisung erteilen
 
@@ -44,14 +48,16 @@ Sie benötigen die Rolle **Einweiser** oder **Ressourcenverwalter** für die jew
 > [!WARNING]
 > Das Entziehen einer Einweisung entzieht dem Benutzer sofort die Möglichkeit, neue Sitzungen an der Ressource zu starten. Falls der Benutzer gerade eine aktive Sitzung hat, wird diese nicht unterbrochen.
 
-## Einweiser verwalten
+## Einweiser und Wartende verwalten
 
-Ressourcenverwalter können Benutzer zur Einweiser-Rolle befördern:
+Ressourcenverwalter können Benutzer zur Einweiser- oder Wartenden-Rolle befördern:
 
 1. Öffnen Sie die Detailseite der Ressource
-2. Scrollen Sie zum Bereich **Einweiser**
-3. Klicken Sie auf **Einweiser hinzufügen**
+2. Scrollen Sie zum Bereich **Personen & Berechtigungen**
+3. Klicken Sie auf **Als Einweiser ernennen** (volle Rechte) oder **Als Wartenden ernennen** (nur Wartung und Maschinensteuerung)
 4. Wählen Sie den Benutzer aus
+
+Die Rolle jeder Person wird in der Spalte **Rolle** angezeigt, und Sie können die Liste nach Einweisern oder Wartenden filtern. Das Entziehen einer Rolle entfernt die Berechtigungen sofort.
 
 ## Gruppeneinweisungen
 

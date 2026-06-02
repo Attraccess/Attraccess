@@ -37,7 +37,11 @@ export function AddPersonModal(props: Readonly<AddPersonModalProps>) {
     >
       <DrawerHeader>
         <h2 className="text-lg font-semibold">
-          {mode === 'introducer' ? t('addModal.title.introducer') : t('addModal.title.introduction')}
+          {mode === 'introducer'
+            ? t('addModal.title.introducer')
+            : mode === 'maintainer'
+            ? t('addModal.title.maintainer')
+            : t('addModal.title.introduction')}
         </h2>
       </DrawerHeader>
       <DrawerBody className="flex flex-col gap-4">

@@ -1,6 +1,6 @@
 import { InjectRepository } from '@nestjs/typeorm';
 import { Inject, Injectable } from '@nestjs/common';
-import { ResourceIntroducer } from '@attraccess/database-entities';
+import { ResourceIntroducer, ResourceIntroducerType } from '@attraccess/database-entities';
 import { Repository } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResourceGroupIntroducerChangedEvent } from './events/resource-group-introducer-changed.event';
@@ -25,14 +25,26 @@ export class ResourceGroupsIntroducersService {
     });
   }
 
-  public async grant(groupId: number, userId: number): Promise<ResourceIntroducer> {
+  public async grant(
+    groupId: number,
+    userId: number,
+    type: ResourceIntroducerType = ResourceIntroducerType.INTRODUCER,
+  ): Promise<ResourceIntroducer> {
     const existingIntroducer = await this.getByResourceGroupIdAndUserId(groupId, userId);
 
     if (existingIntroducer) {
+      if (existingIntroducer.type !== type) {
+        existingIntroducer.type = type;
+        await this.resourceIntroducerRepository.save(existingIntroducer);
+        this.eventEmitter.emit(
+          ResourceGroupIntroducerChangedEvent.EVENT_NAME,
+          new ResourceGroupIntroducerChangedEvent(groupId),
+        );
+      }
       return existingIntroducer;
     }
 
-    const savedIntroducer = await this.createOne(groupId, userId);
+    const savedIntroducer = await this.createOne(groupId, userId, type);
     this.eventEmitter.emit(
       ResourceGroupIntroducerChangedEvent.EVENT_NAME,
       new ResourceGroupIntroducerChangedEvent(groupId),
@@ -40,10 +52,15 @@ export class ResourceGroupsIntroducersService {
     return savedIntroducer;
   }
 
-  private async createOne(groupId: number, userId: number): Promise<ResourceIntroducer> {
+  private async createOne(
+    groupId: number,
+    userId: number,
+    type: ResourceIntroducerType,
+  ): Promise<ResourceIntroducer> {
     const introducer = this.resourceIntroducerRepository.create({
       resourceGroup: { id: groupId },
       user: { id: userId },
+      type,
     });
 
     return await this.resourceIntroducerRepository.save(introducer, { reload: true });
@@ -76,6 +93,6 @@ export class ResourceGroupsIntroducersService {
   public async isIntroducer({ groupId, userId }: { groupId: number; userId: number }): Promise<boolean> {
     const introducer = await this.getByResourceGroupIdAndUserId(groupId, userId);
 
-    return !!introducer;
+    return introducer?.type === ResourceIntroducerType.INTRODUCER;
   }
 }

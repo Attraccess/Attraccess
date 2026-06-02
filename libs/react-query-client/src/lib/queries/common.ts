@@ -2,7 +2,7 @@
 
 import { UseQueryResult } from "@tanstack/react-query";
 import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, FlowVariablesService, LicenseService, MqttService, PasswordPolicyAdminService, PasswordPolicyService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceHealthService, ResourceMaintenanceSchedulesService, ResourceMaintenancesService, ResourcesService, SettingsService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
-import { EmailTemplateType, PasswordPolicyRole, PermissionFilter } from "../requests/types.gen";
+import { EmailTemplateType, PasswordPolicyRole, PermissionFilter, ResourceIntroducerType } from "../requests/types.gen";
 export type SystemServiceInfoDefaultResponse = Awaited<ReturnType<typeof SystemService.info>>;
 export type SystemServiceInfoQueryResult<TData = SystemServiceInfoDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useSystemServiceInfoKey = "SystemServiceInfo";
@@ -281,9 +281,10 @@ export const UseAccessControlServiceResourceIntroducersIsIntroducerKeyFn = ({ in
 export type AccessControlServiceResourceIntroducersGetManyDefaultResponse = Awaited<ReturnType<typeof AccessControlService.resourceIntroducersGetMany>>;
 export type AccessControlServiceResourceIntroducersGetManyQueryResult<TData = AccessControlServiceResourceIntroducersGetManyDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useAccessControlServiceResourceIntroducersGetManyKey = "AccessControlServiceResourceIntroducersGetMany";
-export const UseAccessControlServiceResourceIntroducersGetManyKeyFn = ({ resourceId }: {
+export const UseAccessControlServiceResourceIntroducersGetManyKeyFn = ({ resourceId, type }: {
   resourceId: number;
-}, queryKey?: Array<unknown>) => [useAccessControlServiceResourceIntroducersGetManyKey, ...(queryKey ?? [{ resourceId }])];
+  type?: ResourceIntroducerType | undefined;
+}, queryKey?: Array<unknown>) => [useAccessControlServiceResourceIntroducersGetManyKey, ...(queryKey ?? [{ resourceId, type }])];
 export type AccessControlServiceResourceIntroductionsGetManyDefaultResponse = Awaited<ReturnType<typeof AccessControlService.resourceIntroductionsGetMany>>;
 export type AccessControlServiceResourceIntroductionsGetManyQueryResult<TData = AccessControlServiceResourceIntroductionsGetManyDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useAccessControlServiceResourceIntroductionsGetManyKey = "AccessControlServiceResourceIntroductionsGetMany";
