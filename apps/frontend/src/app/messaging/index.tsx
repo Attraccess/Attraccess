@@ -42,6 +42,12 @@ export function MessagesPage() {
   const selectedConversation = conversations?.find((conversation) => conversation.id === selectedConversationId);
   const partnerName = selectedConversation?.otherParticipant?.username ?? t('conversations.unknownUser');
 
+  const deepLinkResourceId = Number(searchParams.get('resourceRef'));
+  const pendingResourceId =
+    Number.isFinite(deepLinkResourceId) && deepLinkResourceId > 0 && selectedConversationId === conversationParam
+      ? deepLinkResourceId
+      : undefined;
+
   const handleLiveMessage = useCallback(
     (message: Message) => {
       applyIncomingMessage(queryClient, message);
@@ -94,7 +100,11 @@ export function MessagesPage() {
                   </p>
                 </div>
                 <div className="min-h-0 flex-1">
-                  <MessageThread conversationId={selectedConversationId} currentUserId={user.id} />
+                  <MessageThread
+                    conversationId={selectedConversationId}
+                    currentUserId={user.id}
+                    pendingResourceId={pendingResourceId}
+                  />
                 </div>
               </div>
             ) : (

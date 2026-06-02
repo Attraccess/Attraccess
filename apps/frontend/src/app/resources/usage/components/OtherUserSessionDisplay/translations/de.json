@@ -2,6 +2,11 @@
   "resourceInUseBy": "Ressource wird derzeit verwendet von:",
   "unknownUser": "Unbekannter Benutzer",
   "sessionStarted": "Sitzung gestartet",
+  "contact": {
+    "button": "Aktuellen Nutzer kontaktieren",
+    "error": "Kontaktaufnahme fehlgeschlagen",
+    "errorDescription": "Konnte keine Unterhaltung mit dem aktuellen Nutzer öffnen. Bitte versuchen Sie es erneut."
+  },
   "takeover": {
     "available": "Diese Ressource erlaubt Übernahme. Sie können die aktuelle Sitzung beenden und Ihre eigene starten.",
     "button": "Ressource übernehmen",

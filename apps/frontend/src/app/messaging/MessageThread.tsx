@@ -1,13 +1,16 @@
 // Conversation thread with paginated history and a reply composer
 // FEATURE: Messaging thread view and composer
 import {
+  MessageReferenceType,
   useMessagingServiceMessagingListMessages,
   useMessagingServiceMessagingSendMessage,
+  useResourcesServiceGetOneResourceById,
 } from '@attraccess/react-query-client';
 import { Spinner, TextArea, cn } from '@heroui/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { FormEvent, KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { SendIcon } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { SendIcon, BoxIcon, XIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
@@ -17,18 +20,30 @@ import { applyIncomingMessage } from './messageCache';
 interface Props {
   conversationId: number;
   currentUserId: number;
+  pendingResourceId?: number;
 }
 
 const PAGE_SIZE = 20;
 
 export function MessageThread(props: Props) {
-  const { conversationId, currentUserId } = props;
+  const { conversationId, currentUserId, pendingResourceId } = props;
 
   const { t } = useTranslations({ en, de });
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState('');
   const [limit, setLimit] = useState(PAGE_SIZE);
+  const [attachedResourceId, setAttachedResourceId] = useState<number | undefined>(pendingResourceId);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    setAttachedResourceId(pendingResourceId);
+  }, [pendingResourceId, conversationId]);
+
+  const { data: attachedResource } = useResourcesServiceGetOneResourceById(
+    { id: attachedResourceId as number },
+    undefined,
+    { enabled: !!attachedResourceId },
+  );
 
   const { data, isLoading } = useMessagingServiceMessagingListMessages({ id: conversationId, page: 1, limit });
 
@@ -38,6 +53,7 @@ export function MessageThread(props: Props) {
   const { mutate: sendMessage, isPending: isSending } = useMessagingServiceMessagingSendMessage({
     onSuccess: (created) => {
       setDraft('');
+      setAttachedResourceId(undefined);
       applyIncomingMessage(queryClient, created);
     },
   });
@@ -47,8 +63,13 @@ export function MessageThread(props: Props) {
     if (!content || isSending) {
       return;
     }
-    sendMessage({ id: conversationId, requestBody: { content } });
-  }, [conversationId, draft, isSending, sendMessage]);
+    sendMessage({
+      id: conversationId,
+      requestBody: attachedResourceId
+        ? { content, referenceType: MessageReferenceType.RESOURCE, referenceId: attachedResourceId }
+        : { content },
+    });
+  }, [attachedResourceId, conversationId, draft, isSending, sendMessage]);
 
   const handleSubmit = useCallback(
     (event: FormEvent) => {
@@ -112,6 +133,20 @@ export function MessageThread(props: Props) {
                 >
                   {message.content}
                 </div>
+                {message.referenceLabel && (
+                  <Link
+                    to={message.referenceUrl ?? '#'}
+                    className={cn(
+                      'mt-1 inline-flex max-w-[75%] items-center gap-1 rounded-lg border px-2 py-1 text-tiny',
+                      'border-zinc-200 bg-zinc-50 text-zinc-600 hover:bg-zinc-100',
+                      'dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700',
+                    )}
+                    data-cy={`message-reference-${message.id}`}
+                  >
+                    <BoxIcon size={12} className="shrink-0" />
+                    <span className="truncate">{message.referenceLabel}</span>
+                  </Link>
+                )}
                 <span className="mt-0.5 text-tiny text-zinc-400">
                   {new Date(message.createdAt).toLocaleString()}
                 </span>
@@ -122,9 +157,33 @@ export function MessageThread(props: Props) {
         <div ref={bottomRef} />
       </div>
 
+      {attachedResourceId && (
+        <div className="flex items-center gap-2 border-t border-zinc-200 px-3 pt-2 dark:border-zinc-700">
+          <span
+            className="inline-flex items-center gap-1 rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-1 text-tiny text-zinc-600 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
+            data-cy="composer-resource-reference"
+          >
+            <BoxIcon size={12} className="shrink-0" />
+            <span className="truncate">{attachedResource?.name ?? t('composer.attachedResource')}</span>
+            <button
+              type="button"
+              onClick={() => setAttachedResourceId(undefined)}
+              aria-label={t('composer.removeReference')}
+              data-cy="composer-remove-reference"
+              className="ml-0.5 rounded p-0.5 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+            >
+              <XIcon size={12} />
+            </button>
+          </span>
+        </div>
+      )}
+
       <form
         onSubmit={handleSubmit}
-        className="flex items-end gap-2 border-t border-zinc-200 p-3 dark:border-zinc-700"
+        className={cn(
+          'flex items-end gap-2 p-3',
+          attachedResourceId ? '' : 'border-t border-zinc-200 dark:border-zinc-700',
+        )}
       >
         <TextArea
           value={draft}

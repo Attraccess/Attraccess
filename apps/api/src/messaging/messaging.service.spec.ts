@@ -8,6 +8,7 @@ import {
   ConversationParticipant,
   Message,
   MessageReferenceType,
+  Resource,
   User,
 } from '@attraccess/database-entities';
 import { MessagingService } from './messaging.service';
@@ -20,6 +21,7 @@ describe('MessagingService', () => {
   let participantRepository: { findOne: jest.Mock; find: jest.Mock; createQueryBuilder: jest.Mock };
   let messageRepository: { findOne: jest.Mock; create: jest.Mock; save: jest.Mock; findAndCount: jest.Mock };
   let userRepository: { findOne: jest.Mock };
+  let resourceRepository: { findOne: jest.Mock };
   let dataSource: { transaction: jest.Mock };
   let resourceUsageService: { getActiveSession: jest.Mock };
   let eventEmitter: { emit: jest.Mock };
@@ -42,6 +44,7 @@ describe('MessagingService', () => {
     };
     messageRepository = { findOne: jest.fn(), create: jest.fn(), save: jest.fn(), findAndCount: jest.fn() };
     userRepository = { findOne: jest.fn() };
+    resourceRepository = { findOne: jest.fn() };
     dataSource = { transaction: jest.fn() };
     resourceUsageService = { getActiveSession: jest.fn() };
     eventEmitter = { emit: jest.fn() };
@@ -53,6 +56,7 @@ describe('MessagingService', () => {
         { provide: getRepositoryToken(ConversationParticipant), useValue: participantRepository },
         { provide: getRepositoryToken(Message), useValue: messageRepository },
         { provide: getRepositoryToken(User), useValue: userRepository },
+        { provide: getRepositoryToken(Resource), useValue: resourceRepository },
         { provide: DataSource, useValue: dataSource },
         { provide: ResourceUsageService, useValue: resourceUsageService },
         { provide: EventEmitter2, useValue: eventEmitter },
