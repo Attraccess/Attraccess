@@ -15,11 +15,12 @@ import de from './resourceDocsPreviewCard.de.json';
 
 interface ResourceDocsPreviewCardProps {
   resourceId: number;
+  className?: string;
 }
 
 const PREVIEW_CHAR_COUNT = 220;
 
-export function ResourceDocsPreviewCard({ resourceId }: ResourceDocsPreviewCardProps) {
+export function ResourceDocsPreviewCard({ resourceId, className }: ResourceDocsPreviewCardProps) {
   const { t } = useTranslations({ en, de });
   const { hasPermission } = useAuth();
   const canManageResources = hasPermission('canManageResources');
@@ -42,7 +43,7 @@ export function ResourceDocsPreviewCard({ resourceId }: ResourceDocsPreviewCardP
 
   if (isLoading) {
     return (
-      <FlatSection icon={<BookOpen className="w-4 h-4" />} title={t('title')} data-cy="docs-preview-card">
+      <FlatSection className={className} icon={<BookOpen className="w-4 h-4" />} title={t('title')} data-cy="docs-preview-card">
         <div className="h-8" />
       </FlatSection>
     );
@@ -52,6 +53,7 @@ export function ResourceDocsPreviewCard({ resourceId }: ResourceDocsPreviewCardP
     if (!canManageResources) return null;
     return (
       <FlatSection
+        className={className}
         icon={<BookOpen className="w-4 h-4" />}
         title={t('title')}
         data-cy="docs-preview-card"
@@ -73,6 +75,7 @@ export function ResourceDocsPreviewCard({ resourceId }: ResourceDocsPreviewCardP
 
   return (
     <FlatSection
+      className={className}
       icon={<BookOpen className="w-4 h-4" />}
       title={t('title')}
       data-cy="docs-preview-card"

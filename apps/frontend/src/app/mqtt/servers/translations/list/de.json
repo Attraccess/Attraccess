@@ -1,6 +1,10 @@
 {
   "editServer": "Server bearbeiten",
   "deleteServer": "Server löschen",
+  "tableLabel": "MQTT-Server",
+  "columnName": "Name",
+  "columnAddress": "Adresse",
+  "columnActions": "Aktionen",
   "errorLoading": "Fehler beim Laden der MQTT-Server.",
   "noServersConfigured": "Noch keine MQTT-Server konfiguriert. Klicken Sie auf \"Neuen Server hinzufügen\", um einen zu erstellen.",
   "deleteConfirmation": "Sind Sie sicher, dass Sie diesen MQTT-Server löschen möchten?",

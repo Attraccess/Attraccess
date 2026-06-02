@@ -5,6 +5,7 @@ import {
   useAccessControlServiceResourceIntroducersGetMany,
   useAccessControlServiceResourceIntroductionsGetMany,
 } from '@attraccess/react-query-client';
+import { ResourceIntroducerType } from '@attraccess/react-query-client';
 import { useHasValidIntroduction } from '../../../hooks/useHasValidIntroduction';
 import { PeopleTarget, PersonRow } from './types';
 
@@ -70,7 +71,9 @@ export function usePeopleRows({ target }: Params): UsePeopleRowsResult {
       if (!introducer.user) return;
       byUserId.set(introducer.user.id, {
         user: introducer.user,
-        isIntroducer: true,
+        isIntroducer: introducer.type === ResourceIntroducerType.INTRODUCER,
+        isMaintainer: introducer.type === ResourceIntroducerType.MAINTAINER,
+        introducerType: introducer.type,
         introducer,
         introduction: null,
         hasValidIntroduction: false,
@@ -105,6 +108,8 @@ export function usePeopleRows({ target }: Params): UsePeopleRowsResult {
         byUserId.set(user.id, {
           user,
           isIntroducer: false,
+          isMaintainer: false,
+          introducerType: null,
           introducer: null,
           introduction,
           hasValidIntroduction: isValid,

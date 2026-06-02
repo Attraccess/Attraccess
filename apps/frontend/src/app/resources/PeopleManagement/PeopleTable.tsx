@@ -8,7 +8,7 @@ import {
   TableHeader,
   TableRow,
 } from '@heroui/react';
-import { CheckIcon } from 'lucide-react';
+import { AwardIcon, CheckIcon, WrenchIcon } from 'lucide-react';
 import { User } from '@attraccess/react-query-client';
 import { AttraccessUser, DateTimeDisplay, TFunction } from '@attraccess/plugins-frontend-ui';
 import { EmptyState } from '../../../components/emptyState';
@@ -53,7 +53,7 @@ export function PeopleTable(props: Readonly<PeopleTableProps>) {
       <TableContent aria-label={t('title')}>
         <TableHeader>
           <TableColumn isRowHeader>{t('columns.name')}</TableColumn>
-          <TableColumn>{t('columns.introducer')}</TableColumn>
+          <TableColumn>{t('columns.role')}</TableColumn>
           <TableColumn>{t('columns.introduced')}</TableColumn>
           <TableColumn>{t('columns.actions')}</TableColumn>
         </TableHeader>
@@ -77,8 +77,13 @@ export function PeopleTable(props: Readonly<PeopleTableProps>) {
               <TableCell>
                 {row.isIntroducer ? (
                   <span className="inline-flex items-center gap-1 text-success">
-                    <CheckIcon className="w-4 h-4" />
-                    {t('value.yes')}
+                    <AwardIcon className="w-4 h-4" />
+                    {t('roles.introducer')}
+                  </span>
+                ) : row.isMaintainer ? (
+                  <span className="inline-flex items-center gap-1 text-primary">
+                    <WrenchIcon className="w-4 h-4" />
+                    {t('roles.maintainer')}
                   </span>
                 ) : (
                   <span className="text-foreground-400">{t('value.no')}</span>

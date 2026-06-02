@@ -91,6 +91,8 @@ void API::onResourceList(JsonObject data)
             dst.description[0] = '\0';
         }
 
+        dst.isUnderMaintenance = resource["isUnderMaintenance"].is<bool>() ? resource["isUnderMaintenance"].as<bool>() : false;
+
         JsonObject aus = resource["activeUsageSession"].as<JsonObject>();
         if (!aus.isNull() && aus["user"]["username"].is<const char *>() && aus["startTime"].is<const char *>())
         {

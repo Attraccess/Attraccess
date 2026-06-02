@@ -90,7 +90,7 @@ export function PeopleRowActions(props: Readonly<PeopleRowActionsProps>) {
           </Tooltip>
         ) : null)}
 
-      {canManageIntroducers && row.isIntroducer && (
+      {canManageIntroducers && row.introducer && (
         <Tooltip>
           <Tooltip.Trigger>
             <Button
@@ -98,13 +98,15 @@ export function PeopleRowActions(props: Readonly<PeopleRowActionsProps>) {
               isIconOnly
               isPending={isRevokingIntroducer && pendingIntroducerUserId === row.user.id}
               onPress={() => onRevokeIntroducer(row.user.id)}
-              aria-label={t('rowActions.revokeIntroducer')}
+              aria-label={row.isMaintainer ? t('rowActions.revokeMaintainer') : t('rowActions.revokeIntroducer')}
               data-cy={`people-row-revoke-introducer-${row.user.id}`}
             >
               <Trash2Icon className="w-4 h-4" />
             </Button>
           </Tooltip.Trigger>
-          <Tooltip.Content>{t('rowActions.revokeIntroducer')}</Tooltip.Content>
+          <Tooltip.Content>
+            {row.isMaintainer ? t('rowActions.revokeMaintainer') : t('rowActions.revokeIntroducer')}
+          </Tooltip.Content>
         </Tooltip>
       )}
     </div>

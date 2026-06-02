@@ -23,6 +23,7 @@ import { LicenseModuleType, LicenseService } from '../../license/license.service
 import { AttractapFirmware } from '../dtos/firmware.dto';
 import { verifyToken } from './websocket.utils';
 import { ResourceUsageService } from '../../resources/usage/resourceUsage.service';
+import { ResourceMaintenanceService } from '../../resources/maintenances/maintenance.service';
 import { ResourceIntroductionsService } from '../../resources/introductions/resouceIntroductions.service';
 import { ResourceIntroducersService } from '../../resources/introducers/resourceIntroducers.service';
 import { ResourceFlowsService } from '../../resources/flows/resource-flows.service';
@@ -74,6 +75,9 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
   @Inject(ResourceUsageService)
   private resourceUsageService: ResourceUsageService;
+
+  @Inject(ResourceMaintenanceService)
+  private resourceMaintenanceService: ResourceMaintenanceService;
 
   @Inject(ResourceIntroductionsService)
   private resourceIntroductionService: ResourceIntroductionsService;
@@ -677,6 +681,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       resources.map(async (resource) => ({
         ...resource,
         activeUsageSession: await this.resourceUsageService.getActiveSession(resource.id, true),
+        isUnderMaintenance: await this.resourceMaintenanceService.hasActiveMaintenance(resource.id),
       })),
     );
 
@@ -706,6 +711,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
         description: resource.description,
         allowTakeOver: resource.allowTakeOver,
         introducers: resource.introducers.map((introducer) => introducer.user.username),
+        isUnderMaintenance: resource.isUnderMaintenance,
         activeUsageSession: resource.activeUsageSession
           ? {
             user: {

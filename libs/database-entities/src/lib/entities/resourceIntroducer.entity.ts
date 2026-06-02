@@ -4,6 +4,11 @@ import { Resource } from './resource.entity';
 import { User } from './user.entity';
 import { ResourceGroup } from './resourceGroup.entity';
 
+export enum ResourceIntroducerType {
+  INTRODUCER = 'introducer',
+  MAINTAINER = 'maintainer',
+}
+
 @Entity()
 export class ResourceIntroducer {
   @PrimaryGeneratedColumn()
@@ -12,6 +17,20 @@ export class ResourceIntroducer {
     example: 1,
   })
   id!: number;
+
+  @Column({
+    type: 'simple-enum',
+    enum: ResourceIntroducerType,
+    default: ResourceIntroducerType.INTRODUCER,
+  })
+  @ApiProperty({
+    description:
+      "The kind of access: 'introducer' can give introductions and do maintenance; 'maintainer' can only do maintenance and control the machine",
+    enum: ResourceIntroducerType,
+    example: ResourceIntroducerType.INTRODUCER,
+    enumName: 'ResourceIntroducerType',
+  })
+  type!: ResourceIntroducerType;
 
   @Column({ type: 'integer', nullable: true })
   @ApiProperty({

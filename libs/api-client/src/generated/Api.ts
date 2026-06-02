@@ -96,6 +96,12 @@ export enum ResourceMaintenanceScheduleTriggerType {
   TIME_INTERVAL = "TIME_INTERVAL",
 }
 
+/** The kind of access: 'introducer' can give introductions and do maintenance; 'maintainer' can only do maintenance and control the machine */
+export enum ResourceIntroducerType {
+  Introducer = "introducer",
+  Maintainer = "maintainer",
+}
+
 /** The action performed (revoke or grant) */
 export enum IntroductionHistoryAction {
   Revoke = "revoke",
@@ -368,6 +374,14 @@ export interface VerifyEmailDto {
   token: string;
   /**
    * The email to verify
+   * @example "john.doe@example.com"
+   */
+  email: string;
+}
+
+export interface ResendVerificationEmailDto {
+  /**
+   * The email address to resend the verification email to
    * @example "john.doe@example.com"
    */
   email: string;
@@ -2300,6 +2314,11 @@ export interface ResourceIntroducer {
    */
   id: number;
   /**
+   * The kind of access: 'introducer' can give introductions and do maintenance; 'maintainer' can only do maintenance and control the machine
+   * @example "introducer"
+   */
+  type: ResourceIntroducerType;
+  /**
    * The ID of the resource (if permission is for a specific resource)
    * @example 1
    */
@@ -2326,6 +2345,14 @@ export interface ResourceIntroducer {
 export interface IsResourceGroupIntroducerResponseDto {
   /** Whether the user is an introducer for the resource */
   isIntroducer: boolean;
+}
+
+export interface GrantIntroducerDto {
+  /**
+   * The kind of access to grant. 'introducer' (default) can give introductions and do maintenance; 'maintainer' can only do maintenance and control the machine
+   * @default "introducer"
+   */
+  type?: ResourceIntroducerType;
 }
 
 export interface FormSubmissionFieldAnswerDto {
@@ -4047,6 +4074,11 @@ export interface VerifyEmailData {
   message?: string;
 }
 
+export interface ResendVerificationEmailData {
+  /** @example "OK" */
+  message?: string;
+}
+
 export type AcceptInvitationData = User;
 
 export type RequestPasswordResetData = any;
@@ -4646,6 +4678,8 @@ export type ResourceIntroducersIsIntroducerData =
   IsResourceIntroducerResponseDto;
 
 export interface ResourceIntroducersGetManyParams {
+  /** Filter by access type. Omit to return both introducers and maintainers. */
+  type?: ResourceIntroducerType;
   resourceId: number;
 }
 
@@ -5548,6 +5582,21 @@ export namespace Users {
     export type RequestBody = VerifyEmailDto;
     export type RequestHeaders = {};
     export type ResponseBody = VerifyEmailData;
+  }
+
+  /**
+   * No description
+   * @tags Users
+   * @name ResendVerificationEmail
+   * @summary Resend the email verification link
+   * @request POST:/api/users/resend-verification-email
+   */
+  export namespace ResendVerificationEmail {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = ResendVerificationEmailDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = ResendVerificationEmailData;
   }
 
   /**
@@ -7444,7 +7493,7 @@ export namespace AccessControl {
       groupId: number;
     };
     export type RequestQuery = {};
-    export type RequestBody = never;
+    export type RequestBody = GrantIntroducerDto;
     export type RequestHeaders = {};
     export type ResponseBody = ResourceGroupIntroducersGrantData;
   }
@@ -7501,7 +7550,10 @@ export namespace AccessControl {
     export type RequestParams = {
       resourceId: number;
     };
-    export type RequestQuery = {};
+    export type RequestQuery = {
+      /** Filter by access type. Omit to return both introducers and maintainers. */
+      type?: ResourceIntroducerType;
+    };
     export type RequestBody = never;
     export type RequestHeaders = {};
     export type ResponseBody = ResourceIntroducersGetManyData;
@@ -7521,7 +7573,7 @@ export namespace AccessControl {
       userId: number;
     };
     export type RequestQuery = {};
-    export type RequestBody = never;
+    export type RequestBody = GrantIntroducerDto;
     export type RequestHeaders = {};
     export type ResponseBody = ResourceIntroducersGrantData;
   }
@@ -9513,7 +9565,7 @@ export class HttpClient<SecurityDataType = unknown> {
 
 /**
  * @title Attraccess API
- * @version 1.5.2
+ * @version 1.6.0
  * @contact
  *
  * The Attraccess API used to manage machine and tool access in a Makerspace or FabLab
@@ -9758,6 +9810,27 @@ export class Api<
     verifyEmail: (data: VerifyEmailDto, params: RequestParams = {}) =>
       this.request<VerifyEmailData, void>({
         path: `/api/users/verify-email`,
+        method: "POST",
+        body: data,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Users
+     * @name ResendVerificationEmail
+     * @summary Resend the email verification link
+     * @request POST:/api/users/resend-verification-email
+     */
+    resendVerificationEmail: (
+      data: ResendVerificationEmailDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResendVerificationEmailData, void>({
+        path: `/api/users/resend-verification-email`,
         method: "POST",
         body: data,
         type: ContentType.Json,
@@ -11887,12 +11960,15 @@ export class Api<
      */
     resourceGroupIntroducersGrant: (
       { userId, groupId }: ResourceGroupIntroducersGrantParams,
+      data: GrantIntroducerDto,
       params: RequestParams = {},
     ) =>
       this.request<ResourceGroupIntroducersGrantData, void>({
         path: `/api/resource-groups/${groupId}/introducers/${userId}/grant`,
         method: "POST",
+        body: data,
         secure: true,
+        type: ContentType.Json,
         ...params,
       }),
 
@@ -11945,12 +12021,13 @@ export class Api<
      * @request GET:/api/resources/{resourceId}/introducers
      */
     resourceIntroducersGetMany: (
-      { resourceId }: ResourceIntroducersGetManyParams,
+      { resourceId, ...query }: ResourceIntroducersGetManyParams,
       params: RequestParams = {},
     ) =>
       this.request<ResourceIntroducersGetManyData, any>({
         path: `/api/resources/${resourceId}/introducers`,
         method: "GET",
+        query: query,
         format: "json",
         ...params,
       }),
@@ -11966,12 +12043,15 @@ export class Api<
      */
     resourceIntroducersGrant: (
       { resourceId, userId }: ResourceIntroducersGrantParams,
+      data: GrantIntroducerDto,
       params: RequestParams = {},
     ) =>
       this.request<ResourceIntroducersGrantData, void>({
         path: `/api/resources/${resourceId}/introducers/${userId}/grant`,
         method: "POST",
+        body: data,
         secure: true,
+        type: ContentType.Json,
         format: "json",
         ...params,
       }),
