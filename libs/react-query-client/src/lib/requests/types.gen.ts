@@ -2405,6 +2405,14 @@ export type UpdateResourceIntroductionDto = {
     comment?: string;
 };
 
+/**
+ * Which trigger drives the retraining requirement
+ */
+export enum RetrainingReason {
+    AGE = 'age',
+    INACTIVITY = 'inactivity'
+}
+
 export type RetrainingStatusResponseDto = {
     /**
      * Whether the current user has any introduction granting access to this resource
@@ -2429,16 +2437,8 @@ export type RetrainingStatusResponseDto = {
     /**
      * Which trigger drives the retraining requirement
      */
-    reason: 'age' | 'inactivity' | null;
+    reason: (RetrainingReason) | null;
 };
-
-/**
- * Which trigger drives the retraining requirement
- */
-export enum reason {
-    AGE = 'age',
-    INACTIVITY = 'inactivity'
-}
 
 export type CanManageMaintenanceResponseDto = {
     /**

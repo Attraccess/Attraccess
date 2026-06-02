@@ -81,9 +81,9 @@ export const ToNumber = () => {
   };
 };
 
-export const valueToNumber = (value: unknown): number | null | undefined => {
+export const valueToNumber = (value: unknown): unknown => {
   if (value === null || value === undefined) {
-    return value as null | undefined;
+    return value;
   }
 
   if (typeof value === 'number') {
@@ -96,10 +96,10 @@ export const valueToNumber = (value: unknown): number | null | undefined => {
       return null;
     }
     const parsed = Number(trimmed);
-    return Number.isNaN(parsed) ? undefined : parsed;
+    return Number.isNaN(parsed) ? value : parsed;
   }
 
-  return undefined;
+  return value;
 };
 
 export const valueToBoolean = (value: unknown): boolean | undefined => {

@@ -36,6 +36,7 @@ export class RetrainingStatusResponseDto {
   @ApiProperty({
     description: 'Which trigger drives the retraining requirement',
     enum: ['age', 'inactivity'],
+    enumName: 'RetrainingReason',
     nullable: true,
   })
   reason!: 'age' | 'inactivity' | null;

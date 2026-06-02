@@ -3729,6 +3729,12 @@ export const $UpdateResourceIntroductionDto = {
     }
 } as const;
 
+export const $RetrainingReason = {
+    type: 'string',
+    enum: ['age', 'inactivity'],
+    description: 'Which trigger drives the retraining requirement'
+} as const;
+
 export const $RetrainingStatusResponseDto = {
     type: 'object',
     properties: {
@@ -3755,10 +3761,13 @@ export const $RetrainingStatusResponseDto = {
             nullable: true
         },
         reason: {
-            type: 'string',
             description: 'Which trigger drives the retraining requirement',
-            enum: ['age', 'inactivity'],
-            nullable: true
+            nullable: true,
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/RetrainingReason'
+                }
+            ]
         }
     },
     required: ['hasIntroduction', 'applies', 'isDue', 'blocksAccess', 'dueAt', 'reason']

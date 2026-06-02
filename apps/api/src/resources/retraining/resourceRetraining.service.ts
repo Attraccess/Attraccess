@@ -132,7 +132,16 @@ export class ResourceRetrainingService {
   @Cron('0 3 * * *')
   public async evaluateAndNotify(): Promise<void> {
     const now = new Date();
-    const introductions = await this.resourceIntroductionRepository.find({ relations: ['receiverUser'] });
+    const introductions = await this.resourceIntroductionRepository
+      .createQueryBuilder('introduction')
+      .leftJoinAndSelect('introduction.receiverUser', 'receiverUser')
+      .leftJoin('introduction.resource', 'resource')
+      .leftJoin('introduction.resourceGroup', 'resourceGroup')
+      .where('resource.retrainingMaxAgeDays IS NOT NULL')
+      .orWhere('resource.retrainingMaxInactivityDays IS NOT NULL')
+      .orWhere('resourceGroup.retrainingMaxAgeDays IS NOT NULL')
+      .orWhere('resourceGroup.retrainingMaxInactivityDays IS NOT NULL')
+      .getMany();
 
     for (const introduction of introductions) {
       try {
