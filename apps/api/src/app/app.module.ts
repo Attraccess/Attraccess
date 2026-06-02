@@ -27,6 +27,7 @@ import { SettingsModule } from '../settings/settings.module';
 import { SettingsService } from '../settings/settings.service';
 import { MetricsModule } from '../metrics/metrics.module';
 import { VersionModule } from '../version/version.module';
+import { MessagingModule } from '../messaging/messaging.module';
 
 @Module({
   imports: [
@@ -118,6 +119,7 @@ import { VersionModule } from '../version/version.module';
     BillingModule,
     EncryptionModule,
     ProjectsModule,
+    MessagingModule,
   ],
   controllers: [AppController],
   providers: [AppService],
