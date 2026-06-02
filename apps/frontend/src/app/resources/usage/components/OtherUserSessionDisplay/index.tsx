@@ -16,7 +16,6 @@ import {
   useAccessControlServiceResourceIntroducersIsIntroducer,
   useResourcesServiceResourceUsageEndSession,
   useMessagingServiceMessagingContactResourceHolder,
-  useMessagingServiceMessagingSendMessage,
   FormSubmissionRequestDto,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
@@ -121,26 +120,9 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
     },
   });
 
-  const sendOpeningMessage = useMessagingServiceMessagingSendMessage();
-
   const contactHolder = useMessagingServiceMessagingContactResourceHolder({
-    onSuccess: ({ conversationId, suggestedMessage }) => {
-      const goToConversation = () => navigate(`/messages?conversation=${conversationId}`);
-      if (!suggestedMessage) {
-        goToConversation();
-        return;
-      }
-      sendOpeningMessage.mutate(
-        {
-          id: conversationId,
-          requestBody: {
-            content: suggestedMessage.content,
-            referenceType: suggestedMessage.referenceType,
-            referenceId: suggestedMessage.referenceId,
-          },
-        },
-        { onSettled: goToConversation },
-      );
+    onSuccess: ({ conversationId }) => {
+      navigate(`/messages?conversation=${conversationId}&resourceRef=${resourceId}`);
     },
     onError: () => {
       showError({ title: t('contact.error'), description: t('contact.errorDescription') });
@@ -234,13 +216,14 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
           ({t('sessionStarted')} <DateTimeDisplay date={activeSession.startTime} />)
         </p>
 
-        <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+        <div>
           <Button
-            className="w-full"
-            isPending={contactHolder.isPending || sendOpeningMessage.isPending}
+            variant="ghost"
+            size="sm"
+            isPending={contactHolder.isPending}
             onPress={handleContactHolder}
             data-cy="contact-current-user-button"
-          ><MessageCircle className="w-4 h-4" />
+          ><MessageCircle className="w-3.5 h-3.5" />
             {t('contact.button')}
           </Button>
         </div>

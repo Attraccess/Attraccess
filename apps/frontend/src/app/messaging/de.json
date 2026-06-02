@@ -16,6 +16,8 @@
   },
   "composer": {
     "placeholder": "Nachricht schreiben…",
-    "send": "Senden"
+    "send": "Senden",
+    "attachedResource": "Ressource",
+    "removeReference": "Angehängte Ressource entfernen"
   }
 }
