@@ -1,4 +1,5 @@
 export * from './attraccess-user/AttraccessUser';
+export * from './attraccess-user/AttraccessUserActionsContext';
 export * from './datetime-display/DateTimeDisplay';
 export * from './duration-display/DurationDisplay';
 export * from './user-search/UserSearch';
