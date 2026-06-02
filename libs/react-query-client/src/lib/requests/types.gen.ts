@@ -889,7 +889,8 @@ export enum EmailTemplateType {
     RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY = 'resource-usage-billing-transaction-summary',
     PROJECT_INVITATION = 'project-invitation',
     DELETE_ACCOUNT_CONFIRMATION = 'delete-account-confirmation',
-    RESOURCE_HEALTH_CHANGED = 'resource-health-changed'
+    RESOURCE_HEALTH_CHANGED = 'resource-health-changed',
+    USER_RETRAINING_REQUIRED = 'user-retraining-required'
 }
 
 export type EmailTemplate = {
@@ -1437,6 +1438,18 @@ export type CreateResourceDto = {
      * Whether this resource allows overtaking by the next user without the prior user ending their session
      */
     allowTakeOver?: boolean;
+    /**
+     * Days after a user was trained before retraining is required. Null disables the age-based trigger.
+     */
+    retrainingMaxAgeDays?: number | null;
+    /**
+     * Days a user may go without using this resource before retraining is required. Null disables the inactivity trigger.
+     */
+    retrainingMaxInactivityDays?: number | null;
+    /**
+     * Whether to block resource access once retraining is due until the user is retrained
+     */
+    retrainingBlocksAccess?: boolean;
 };
 
 export type ResourceGroup = {
@@ -1452,6 +1465,18 @@ export type ResourceGroup = {
      * A detailed description of the resource
      */
     description?: string;
+    /**
+     * Days after a user was trained on this group before retraining is required. Null disables the age-based trigger.
+     */
+    retrainingMaxAgeDays?: number | null;
+    /**
+     * Days a user may go without using a resource in this group before retraining is required. Null disables the inactivity trigger.
+     */
+    retrainingMaxInactivityDays?: number | null;
+    /**
+     * Whether to block access to grouped resources once retraining is due until the user is retrained
+     */
+    retrainingBlocksAccess: boolean;
     /**
      * When the resource was created
      */
@@ -1560,6 +1585,18 @@ export type Resource = {
      * Whether this resource allows overtaking by the next user without the prior user ending their session
      */
     allowTakeOver: boolean;
+    /**
+     * Days after a user was trained on this resource before retraining is required. Null disables the age-based trigger.
+     */
+    retrainingMaxAgeDays?: number | null;
+    /**
+     * Days a user may go without using this resource before retraining is required. Null disables the inactivity trigger.
+     */
+    retrainingMaxInactivityDays?: number | null;
+    /**
+     * Whether to block resource access once retraining is due until the user is retrained
+     */
+    retrainingBlocksAccess: boolean;
     /**
      * Custom metadata key-value pairs configured for this resource
      */
@@ -1952,6 +1989,18 @@ export type UpdateResourceDto = {
      * Whether this resource allows overtaking by the next user without the prior user ending their session
      */
     allowTakeOver?: boolean;
+    /**
+     * Days after a user was trained before retraining is required. Null disables the age-based trigger.
+     */
+    retrainingMaxAgeDays?: number | null;
+    /**
+     * Days a user may go without using this resource before retraining is required. Null disables the inactivity trigger.
+     */
+    retrainingMaxInactivityDays?: number | null;
+    /**
+     * Whether to block resource access once retraining is due until the user is retrained
+     */
+    retrainingBlocksAccess?: boolean;
 };
 
 export type MqttServer = {
@@ -2104,6 +2153,18 @@ export type CreateResourceGroupDto = {
      * The description of the resource group
      */
     description?: string;
+    /**
+     * Days after a user was trained before retraining is required. Null disables the age-based trigger.
+     */
+    retrainingMaxAgeDays?: number | null;
+    /**
+     * Days a user may go without using a grouped resource before retraining is required. Null disables the inactivity trigger.
+     */
+    retrainingMaxInactivityDays?: number | null;
+    /**
+     * Whether to block access to grouped resources once retraining is due until the user is retrained
+     */
+    retrainingBlocksAccess?: boolean;
 };
 
 export type UpdateResourceGroupDto = {
@@ -2115,6 +2176,18 @@ export type UpdateResourceGroupDto = {
      * The description of the resource group
      */
     description?: string;
+    /**
+     * Days after a user was trained before retraining is required. Null disables the age-based trigger.
+     */
+    retrainingMaxAgeDays?: number | null;
+    /**
+     * Days a user may go without using a grouped resource before retraining is required. Null disables the inactivity trigger.
+     */
+    retrainingMaxInactivityDays?: number | null;
+    /**
+     * Whether to block access to grouped resources once retraining is due until the user is retrained
+     */
+    retrainingBlocksAccess?: boolean;
 };
 
 /**
@@ -2181,6 +2254,10 @@ export type ResourceIntroduction = {
      * When the introduction was completed
      */
     completedAt: string;
+    /**
+     * When the user was last notified that retraining is due (used to avoid repeat notifications)
+     */
+    retrainingNotifiedAt?: string | null;
     /**
      * When the introduction record was created
      */
@@ -2352,6 +2429,41 @@ export type UpdateResourceIntroductionDto = {
      * The comment for the action
      */
     comment?: string;
+};
+
+/**
+ * Which trigger drives the retraining requirement
+ */
+export enum RetrainingReason {
+    AGE = 'age',
+    INACTIVITY = 'inactivity'
+}
+
+export type RetrainingStatusResponseDto = {
+    /**
+     * Whether the current user has any introduction granting access to this resource
+     */
+    hasIntroduction: boolean;
+    /**
+     * Whether a retraining policy applies to the current user for this resource
+     */
+    applies: boolean;
+    /**
+     * Whether retraining is currently due for the current user
+     */
+    isDue: boolean;
+    /**
+     * Whether access is blocked because retraining is due
+     */
+    blocksAccess: boolean;
+    /**
+     * When retraining becomes (or became) due
+     */
+    dueAt: string | null;
+    /**
+     * Which trigger drives the retraining requirement
+     */
+    reason: (RetrainingReason) | null;
 };
 
 export type CanManageMaintenanceResponseDto = {
@@ -4039,6 +4151,151 @@ export type AttractapFirmware = {
     flashSize: string;
 };
 
+/**
+ * Type of context this suggested message references
+ */
+export enum MessageReferenceType {
+    RESOURCE = 'RESOURCE',
+    ACTIVITY = 'ACTIVITY'
+}
+
+export type SuggestedMessageDto = {
+    /**
+     * Suggested prefilled message content referencing the resource
+     */
+    content: string;
+    /**
+     * Type of context this suggested message references
+     */
+    referenceType: MessageReferenceType;
+    /**
+     * ID of the referenced entity, scoped by referenceType
+     */
+    referenceId: number;
+};
+
+export type ContactResponseDto = {
+    /**
+     * The ID of the existing or newly created 1:1 conversation
+     */
+    conversationId: number;
+    /**
+     * Optional suggested prefilled message referencing the resource
+     */
+    suggestedMessage?: (SuggestedMessageDto) | null;
+};
+
+export type Conversation = {
+    /**
+     * The unique identifier of the conversation
+     */
+    id: number;
+    /**
+     * When this conversation was created
+     */
+    createdAt: string;
+    /**
+     * When this conversation was last updated
+     */
+    updatedAt: string;
+};
+
+export type Message = {
+    /**
+     * The unique identifier of the message
+     */
+    id: number;
+    /**
+     * The ID of the conversation this message belongs to
+     */
+    conversationId: number;
+    /**
+     * The ID of the user who sent this message
+     */
+    senderId: number;
+    /**
+     * The text content of the message
+     */
+    content: string;
+    /**
+     * Optional type of context this message references
+     */
+    referenceType: 'RESOURCE' | 'ACTIVITY' | null;
+    /**
+     * Optional ID of the referenced entity, scoped by referenceType
+     */
+    referenceId: number | null;
+    /**
+     * Optional cached label of the referenced entity for rendering
+     */
+    referenceLabel: string | null;
+    /**
+     * Optional cached URL of the referenced entity for rendering
+     */
+    referenceUrl: string | null;
+    /**
+     * When this message was created
+     */
+    createdAt: string;
+    /**
+     * The conversation this message belongs to
+     */
+    conversation: Conversation;
+    /**
+     * The user who sent this message
+     */
+    sender: User;
+};
+
+/**
+ * Optional type of context this message references
+ */
+export enum referenceType {
+    RESOURCE = 'RESOURCE',
+    ACTIVITY = 'ACTIVITY'
+}
+
+export type ConversationListItemDto = {
+    /**
+     * The unique identifier of the conversation
+     */
+    id: number;
+    /**
+     * The other participant of this 1:1 conversation
+     */
+    otherParticipant: (User) | null;
+    /**
+     * The most recent message in the conversation
+     */
+    lastMessage: (Message) | null;
+    /**
+     * When this conversation was last updated
+     */
+    updatedAt: string;
+};
+
+export type ListMessagesResponseDto = {
+    total: number;
+    page: number;
+    limit: number;
+    data: Array<Message>;
+};
+
+export type SendMessageDto = {
+    /**
+     * The text content of the message
+     */
+    content: string;
+    /**
+     * Optional type of context this message references
+     */
+    referenceType?: MessageReferenceType;
+    /**
+     * Optional ID of the referenced entity, scoped by referenceType
+     */
+    referenceId?: number;
+};
+
 export type InfoResponse = {
     name?: string;
     status?: string;
@@ -4831,6 +5088,12 @@ export type ResourceUsageCanControlData = {
 };
 
 export type ResourceUsageCanControlResponse = CanControlResponseDto;
+
+export type ResourceRetrainingGetStatusData = {
+    resourceId: number;
+};
+
+export type ResourceRetrainingGetStatusResponse = RetrainingStatusResponseDto;
 
 export type MqttServersGetAllResponse = Array<MqttServer>;
 
@@ -5665,6 +5928,41 @@ export type GetBillingTransactionsInDateRangeData = {
 };
 
 export type GetBillingTransactionsInDateRangeResponse = Array<BillingTransaction>;
+
+export type MessagingContactUserData = {
+    userId: number;
+};
+
+export type MessagingContactUserResponse = ContactResponseDto;
+
+export type MessagingContactResourceHolderData = {
+    resourceId: number;
+};
+
+export type MessagingContactResourceHolderResponse = ContactResponseDto;
+
+export type MessagingListConversationsResponse = Array<ConversationListItemDto>;
+
+export type MessagingListMessagesData = {
+    id: number;
+    /**
+     * The number of items per page
+     */
+    limit?: number;
+    /**
+     * The page number to retrieve
+     */
+    page?: number;
+};
+
+export type MessagingListMessagesResponse = ListMessagesResponseDto;
+
+export type MessagingSendMessageData = {
+    id: number;
+    requestBody: SendMessageDto;
+};
+
+export type MessagingSendMessageResponse = Message;
 
 export type $OpenApiTs = {
     '/api/info': {
@@ -7357,6 +7655,21 @@ export type $OpenApiTs = {
             };
         };
     };
+    '/api/resources/{resourceId}/retraining/status': {
+        get: {
+            req: ResourceRetrainingGetStatusData;
+            res: {
+                /**
+                 * Retraining status retrieved successfully.
+                 */
+                200: RetrainingStatusResponseDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
     '/api/mqtt/servers': {
         get: {
             res: {
@@ -8933,6 +9246,90 @@ export type $OpenApiTs = {
                  * Unauthorized
                  */
                 401: unknown;
+            };
+        };
+    };
+    '/api/messaging/users/{userId}/contact': {
+        post: {
+            req: MessagingContactUserData;
+            res: {
+                /**
+                 * The existing or newly created conversation
+                 */
+                201: ContactResponseDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/messaging/resources/{resourceId}/contact': {
+        post: {
+            req: MessagingContactResourceHolderData;
+            res: {
+                /**
+                 * The conversation with the resource holder
+                 */
+                201: ContactResponseDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+                /**
+                 * No active session for this resource
+                 */
+                404: unknown;
+            };
+        };
+    };
+    '/api/messaging/conversations': {
+        get: {
+            res: {
+                /**
+                 * The inbox conversations
+                 */
+                200: Array<ConversationListItemDto>;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/messaging/conversations/{id}/messages': {
+        get: {
+            req: MessagingListMessagesData;
+            res: {
+                /**
+                 * The paginated messages
+                 */
+                200: ListMessagesResponseDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+                /**
+                 * You are not a participant of this conversation
+                 */
+                403: unknown;
+            };
+        };
+        post: {
+            req: MessagingSendMessageData;
+            res: {
+                /**
+                 * The created message
+                 */
+                201: Message;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+                /**
+                 * You are not a participant of this conversation
+                 */
+                403: unknown;
             };
         };
     };

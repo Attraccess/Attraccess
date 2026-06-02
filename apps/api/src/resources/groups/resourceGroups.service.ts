@@ -30,6 +30,9 @@ export class ResourceGroupsService {
     const resourceGroup = this.resourceGroupRepository.create({
       name: dto.name,
       description: dto.description,
+      retrainingMaxAgeDays: dto.retrainingMaxAgeDays ?? null,
+      retrainingMaxInactivityDays: dto.retrainingMaxInactivityDays ?? null,
+      retrainingBlocksAccess: dto.retrainingBlocksAccess ?? false,
     });
     const savedResourceGroup = await this.resourceGroupRepository.save(resourceGroup);
     this.eventEmitter.emit(
@@ -67,6 +70,16 @@ export class ResourceGroupsService {
       ...resourceGroup,
       name: updateDto.name,
       description: updateDto.description,
+      retrainingMaxAgeDays:
+        updateDto.retrainingMaxAgeDays !== undefined ? updateDto.retrainingMaxAgeDays : resourceGroup.retrainingMaxAgeDays,
+      retrainingMaxInactivityDays:
+        updateDto.retrainingMaxInactivityDays !== undefined
+          ? updateDto.retrainingMaxInactivityDays
+          : resourceGroup.retrainingMaxInactivityDays,
+      retrainingBlocksAccess:
+        updateDto.retrainingBlocksAccess !== undefined
+          ? updateDto.retrainingBlocksAccess
+          : resourceGroup.retrainingBlocksAccess,
     });
     this.eventEmitter.emit(
       ResourceGroupIntroductionChangedEvent.EVENT_NAME,

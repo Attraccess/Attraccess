@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { type QueryClient } from "@tanstack/react-query";
-import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, FlowVariablesService, LicenseService, MqttService, PasswordPolicyAdminService, PasswordPolicyService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceHealthService, ResourceMaintenanceSchedulesService, ResourceMaintenancesService, ResourcesService, SettingsService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
+import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, FlowVariablesService, LicenseService, MessagingService, MqttService, PasswordPolicyAdminService, PasswordPolicyService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceHealthService, ResourceMaintenanceSchedulesService, ResourceMaintenancesService, ResourcesService, SettingsService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
 import { EmailTemplateType, PasswordPolicyRole, PermissionFilter, ResourceIntroducerType } from "../requests/types.gen";
 import * as Common from "./common";
 /**
@@ -377,6 +377,16 @@ export const ensureUseResourcesServiceResourceUsageGetActiveSessionData = (query
 export const ensureUseResourcesServiceResourceUsageCanControlData = (queryClient: QueryClient, { resourceId }: {
   resourceId: number;
 }) => queryClient.ensureQueryData({ queryKey: Common.UseResourcesServiceResourceUsageCanControlKeyFn({ resourceId }), queryFn: () => ResourcesService.resourceUsageCanControl({ resourceId }) });
+/**
+* Get the retraining status of the current user for a resource
+* @param data The data for the request.
+* @param data.resourceId
+* @returns RetrainingStatusResponseDto Retraining status retrieved successfully.
+* @throws ApiError
+*/
+export const ensureUseResourcesServiceResourceRetrainingGetStatusData = (queryClient: QueryClient, { resourceId }: {
+  resourceId: number;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseResourcesServiceResourceRetrainingGetStatusKeyFn({ resourceId }), queryFn: () => ResourcesService.resourceRetrainingGetStatus({ resourceId }) });
 /**
 * Get all MQTT servers
 * @returns MqttServer Returns all MQTT servers
@@ -910,3 +920,23 @@ export const ensureUseAnalyticsServiceGetBillingTransactionsInDateRangeData = (q
   end: string;
   start: string;
 }) => queryClient.ensureQueryData({ queryKey: Common.UseAnalyticsServiceGetBillingTransactionsInDateRangeKeyFn({ end, start }), queryFn: () => AnalyticsService.getBillingTransactionsInDateRange({ end, start }) });
+/**
+* List the authenticated user inbox conversations
+* @returns ConversationListItemDto The inbox conversations
+* @throws ApiError
+*/
+export const ensureUseMessagingServiceMessagingListConversationsData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseMessagingServiceMessagingListConversationsKeyFn(), queryFn: () => MessagingService.messagingListConversations() });
+/**
+* List paginated messages of a conversation
+* @param data The data for the request.
+* @param data.id
+* @param data.page The page number to retrieve
+* @param data.limit The number of items per page
+* @returns ListMessagesResponseDto The paginated messages
+* @throws ApiError
+*/
+export const ensureUseMessagingServiceMessagingListMessagesData = (queryClient: QueryClient, { id, limit, page }: {
+  id: number;
+  limit?: number | undefined;
+  page?: number | undefined;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseMessagingServiceMessagingListMessagesKeyFn({ id, limit, page }), queryFn: () => MessagingService.messagingListMessages({ id, limit, page }) });

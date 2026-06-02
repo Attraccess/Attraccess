@@ -11,6 +11,7 @@ import {
   useOverlayState,
 } from '@heroui/react';
 import { Button } from '../../../components/button';
+import { LabeledSwitch } from '../../../components/labeledSwitch';
 import { StandardDrawer } from '../../../components/standardDrawer';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './resourceGroupUpsertModal.en.json';
@@ -56,6 +57,9 @@ export function ResourceGroupUpsertModal(props: Readonly<Props>) {
   const [formData, setFormData] = useState<FormData>({
     name: '',
     description: '',
+    retrainingMaxAgeDays: null,
+    retrainingMaxInactivityDays: null,
+    retrainingBlocksAccess: false,
   });
   const [apiErrors, setApiErrors] = useState<{ [key: string]: string[] | undefined }>({});
 
@@ -128,10 +132,19 @@ export function ResourceGroupUpsertModal(props: Readonly<Props>) {
         setFormData({
           name: props.resourceGroup.name,
           description: props.resourceGroup.description ?? '',
+          retrainingMaxAgeDays: props.resourceGroup.retrainingMaxAgeDays ?? null,
+          retrainingMaxInactivityDays: props.resourceGroup.retrainingMaxInactivityDays ?? null,
+          retrainingBlocksAccess: props.resourceGroup.retrainingBlocksAccess ?? false,
         });
       } else {
         // Reset form for create mode or when no resource group is provided
-        setFormData({ name: '', description: '' });
+        setFormData({
+          name: '',
+          description: '',
+          retrainingMaxAgeDays: null,
+          retrainingMaxInactivityDays: null,
+          retrainingBlocksAccess: false,
+        });
       }
       setApiErrors({}); // Clear errors when modal opens
     }
@@ -152,6 +165,9 @@ export function ResourceGroupUpsertModal(props: Readonly<Props>) {
       const requestBody = {
         name: formData.name,
         description: formData.description,
+        retrainingMaxAgeDays: formData.retrainingMaxAgeDays,
+        retrainingMaxInactivityDays: formData.retrainingMaxInactivityDays,
+        retrainingBlocksAccess: formData.retrainingBlocksAccess,
       };
 
       if (isEditMode && props.resourceGroup) {
@@ -212,6 +228,47 @@ export function ResourceGroupUpsertModal(props: Readonly<Props>) {
               <Input />
               {getFieldError('description') && <FieldError>{getFieldError('description')}</FieldError>}
             </TextField>
+
+            <div className="flex flex-col gap-3">
+              <h3 className="text-small font-semibold">{t('retraining.sectionTitle')}</h3>
+              <span className="text-tiny text-default-400">{t('retraining.description')}</span>
+
+              <TextField
+                value={formData.retrainingMaxAgeDays == null ? '' : String(formData.retrainingMaxAgeDays)}
+                onChange={(v) =>
+                  setFormData({
+                    ...formData,
+                    retrainingMaxAgeDays: v.trim() === '' ? null : Math.max(0, Math.floor(Number(v))),
+                  })
+                }
+                data-cy="resource-group-retraining-max-age-input"
+              >
+                <Label>{t('retraining.maxAgeDays.label')}</Label>
+                <Input type="number" min={0} placeholder={t('retraining.disabledPlaceholder')} />
+              </TextField>
+
+              <TextField
+                value={formData.retrainingMaxInactivityDays == null ? '' : String(formData.retrainingMaxInactivityDays)}
+                onChange={(v) =>
+                  setFormData({
+                    ...formData,
+                    retrainingMaxInactivityDays: v.trim() === '' ? null : Math.max(0, Math.floor(Number(v))),
+                  })
+                }
+                data-cy="resource-group-retraining-max-inactivity-input"
+              >
+                <Label>{t('retraining.maxInactivityDays.label')}</Label>
+                <Input type="number" min={0} placeholder={t('retraining.disabledPlaceholder')} />
+              </TextField>
+
+              <LabeledSwitch
+                isSelected={formData.retrainingBlocksAccess ?? false}
+                onChange={(value) => setFormData({ ...formData, retrainingBlocksAccess: value })}
+                data-cy="resource-group-retraining-blocks-access-switch"
+              >
+                <span className="text-small">{t('retraining.blocksAccess.label')}</span>
+              </LabeledSwitch>
+            </div>
           </DrawerBody>
 
           <DrawerFooter>

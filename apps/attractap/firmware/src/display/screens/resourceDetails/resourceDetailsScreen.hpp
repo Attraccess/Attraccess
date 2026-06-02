@@ -200,6 +200,10 @@ private:
 
     lv_obj_t *noIntroductionPanel;
     lv_obj_t *introducersListLabel;
+    lv_obj_t *maintenancePanel = nullptr;
+    lv_obj_t *maintenanceIntroducersLabel = nullptr;
+    String buildIntroducersText(const API::ResourceBrief &resource);
+    void refreshAccessState();
 
     // overlay/toast state
     lv_obj_t *actionOverlay = nullptr;
