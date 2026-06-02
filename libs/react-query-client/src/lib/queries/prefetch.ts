@@ -2,7 +2,7 @@
 
 import { type QueryClient } from "@tanstack/react-query";
 import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, FlowVariablesService, LicenseService, MqttService, PasswordPolicyAdminService, PasswordPolicyService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceHealthService, ResourceMaintenanceSchedulesService, ResourceMaintenancesService, ResourcesService, SettingsService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
-import { EmailTemplateType, PasswordPolicyRole, PermissionFilter } from "../requests/types.gen";
+import { EmailTemplateType, PasswordPolicyRole, PermissionFilter, ResourceIntroducerType } from "../requests/types.gen";
 import * as Common from "./common";
 /**
 * Return API information
@@ -455,12 +455,14 @@ export const prefetchUseAccessControlServiceResourceIntroducersIsIntroducer = (q
 * Get all introducers for a resource
 * @param data The data for the request.
 * @param data.resourceId
+* @param data.type Filter by access type. Omit to return both introducers and maintainers.
 * @returns ResourceIntroducer All introducers for a resource
 * @throws ApiError
 */
-export const prefetchUseAccessControlServiceResourceIntroducersGetMany = (queryClient: QueryClient, { resourceId }: {
+export const prefetchUseAccessControlServiceResourceIntroducersGetMany = (queryClient: QueryClient, { resourceId, type }: {
   resourceId: number;
-}) => queryClient.prefetchQuery({ queryKey: Common.UseAccessControlServiceResourceIntroducersGetManyKeyFn({ resourceId }), queryFn: () => AccessControlService.resourceIntroducersGetMany({ resourceId }) });
+  type?: ResourceIntroducerType | undefined;
+}) => queryClient.prefetchQuery({ queryKey: Common.UseAccessControlServiceResourceIntroducersGetManyKeyFn({ resourceId, type }), queryFn: () => AccessControlService.resourceIntroducersGetMany({ resourceId, type }) });
 /**
 * Get all introductions for a resource
 * @param data The data for the request.

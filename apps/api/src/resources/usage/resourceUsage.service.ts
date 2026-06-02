@@ -92,8 +92,8 @@ export class ResourceUsageService {
       return true;
     }
 
-    if (await this.resourceIntroducersService.isIntroducer(resourceId, user.id, true, transactionalEntityManager)) {
-      this.logger.debug(`User ${user.id} is an introducer for resource ${resourceId}`);
+    if (await this.resourceIntroducersService.canMaintain(resourceId, user.id, true, transactionalEntityManager)) {
+      this.logger.debug(`User ${user.id} is an introducer or maintainer for resource ${resourceId}`);
       return true;
     }
 
@@ -448,8 +448,8 @@ export class ResourceUsageService {
     const isSessionOwner = activeSession.user.id === user.id;
 
     if (!isSessionOwner && !canManageResources) {
-      const isIntroducer = await this.resourceIntroducersService.isIntroducer(activeSession.resourceId, user.id, true);
-      if (!isIntroducer) {
+      const canMaintain = await this.resourceIntroducersService.canMaintain(activeSession.resourceId, user.id, true);
+      if (!canMaintain) {
         this.logger.warn(
           `User ${user.id} not authorized to end session ${activeSession.id} owned by user ${activeSession.user.id}`,
         );

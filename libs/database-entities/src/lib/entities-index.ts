@@ -11,7 +11,7 @@ import {
   ResourceIntroductionHistoryItem,
   IntroductionHistoryAction,
 } from './entities/resourceIntroductionHistoryItem.entity';
-import { ResourceIntroducer } from './entities/resourceIntroducer.entity';
+import { ResourceIntroducer, ResourceIntroducerType } from './entities/resourceIntroducer.entity';
 import { ResourceUsage } from './entities/resourceUsage.entity';
 import { SSOProvider, SSOProviderType } from './entities/ssoProvider.entity';
 import { SSOProviderOIDCConfiguration } from './entities/ssoProvider.oidc';
@@ -102,6 +102,7 @@ export {
   ResourceIntroductionHistoryItem,
   IntroductionHistoryAction,
   ResourceIntroducer,
+  ResourceIntroducerType,
   ResourceUsage,
   SSOProvider,
   SSOProviderType,

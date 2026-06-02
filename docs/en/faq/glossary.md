@@ -8,7 +8,8 @@ This glossary explains key terms used throughout the Attraccess documentation.
 |------|-------------|
 | **Resource** | A machine, tool, piece of equipment, or door managed in Attraccess. Resources can be booked, tracked, and access-controlled. |
 | **Introduction** | A safety briefing that grants a user permission to use a specific resource. Introductions are typically conducted in person at the machine. |
-| **Introducer** | A person authorized to grant introductions for a resource. Introducers confirm that a user has received a safety briefing and can operate the machine safely. |
+| **Introducer** | A person authorized to grant introductions for a resource. Introducers confirm that a user has received a safety briefing and can operate the machine safely. They can also control the machine and manage maintenance. |
+| **Maintainer** | A person who can control a resource and manage its maintenance, but who cannot grant introductions to other users. Use this for people who service a machine without deciding who else gets access. |
 | **Usage Session** | A recorded period during which a user is actively using a resource. Sessions have a start and end time. |
 | **Flow** | A visual automation workflow created in the flow editor. Flows connect triggers, actions, and conditions to automate tasks. |
 | **Project** | A way to organize work and team collaboration. Usage sessions can be linked to projects for tracking. |
