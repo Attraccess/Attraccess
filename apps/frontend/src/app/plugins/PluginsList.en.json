@@ -8,8 +8,10 @@
     "name": "Name",
     "version": "0.0.16",
     "directory": "Directory",
+    "permissions": "Permissions",
     "actions": "Actions"
   },
+  "noPermissions": "None requested",
   "deleteTooltip": "Remove plugin",
   "deleteConfirmation": {
     "title": "Confirm Deletion",

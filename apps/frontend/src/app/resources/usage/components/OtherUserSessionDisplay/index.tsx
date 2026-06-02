@@ -233,13 +233,14 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
             <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">{t('takeover.available')}</p>
             <ButtonGroup className="w-full">
               <Button
+                variant="danger-soft"
                 isPending={startSession.isPending}
                 onPress={handleImmediateTakeover}
               ><UserX className="w-4 h-4" />
                 {t('takeover.button')}
               </Button>
               <Dropdown>
-                <DropdownTrigger className={buttonVariants({ isIconOnly: true })}>
+                <DropdownTrigger className={buttonVariants({ isIconOnly: true, variant: 'danger-soft' })}>
                   <ChevronDownIcon />
                 </DropdownTrigger>
                 <DropdownPopover>
@@ -262,13 +263,14 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
             <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">{t('stopOtherUserSession.available')}</p>
             <ButtonGroup className="w-full">
               <Button
+                variant="danger"
                 isPending={startSession.isPending}
                 onPress={handleImmediateStopOtherUserSession}
               ><UserX className="w-4 h-4" />
                 {t('stopOtherUserSession.button')}
               </Button>
               <Dropdown>
-                <DropdownTrigger className={buttonVariants({ isIconOnly: true })}>
+                <DropdownTrigger className={buttonVariants({ isIconOnly: true, variant: 'danger' })}>
                   <ChevronDownIcon />
                 </DropdownTrigger>
                 <DropdownPopover>

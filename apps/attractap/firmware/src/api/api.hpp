@@ -305,6 +305,14 @@ private:
     void sendAuthenticationRequest();
     void onReaderAuthenticated(JsonObject data);
     void sendFirmwareInfo();
+
+    // Persisted crash/boot diagnostics upload (ATT-474). On a successful
+    // connect the stored NVS record + (if present) the coredump blob are
+    // pushed to the server; both are cleared once the server confirms receipt.
+    void sendPendingCrashReport();
+    void onCrashReportResponse(JsonObject data);
+    bool crashReportAwaitingAck = false;
+    bool crashReportSentCoredump = false;
     void onResourceList(JsonObject data);
     void onProjectsOfUserResponse(JsonObject data);
     void onCardAuthenticationDetailsResponse(JsonObject data);

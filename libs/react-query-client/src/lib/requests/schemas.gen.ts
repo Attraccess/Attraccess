@@ -6187,6 +6187,15 @@ export const $LoadedPluginManifest = {
         attraccessVersion: {
             '$ref': '#/components/schemas/PluginAttraccessVersion'
         },
+        permissions: {
+            type: 'array',
+            description: 'Host capabilities this plugin is permitted to use at runtime',
+            example: ['EMIT_EVENTS', 'READ_SETTINGS'],
+            items: {
+                type: 'string',
+                enum: ['READ_USERS', 'ACCESS_RESOURCES', 'READ_SETTINGS', 'DATABASE_ACCESS', 'EMIT_EVENTS', 'LISTEN_EVENTS', 'RESOLVE_HOST_PROVIDERS']
+            }
+        },
         pluginDirectory: {
             type: 'string',
             description: 'The directory of the plugin',
@@ -6198,7 +6207,7 @@ export const $LoadedPluginManifest = {
             example: '123e4567-e89b-12d3-a456-426614174000'
         }
     },
-    required: ['name', 'main', 'version', 'attraccessVersion', 'pluginDirectory', 'id']
+    required: ['name', 'main', 'version', 'attraccessVersion', 'permissions', 'pluginDirectory', 'id']
 } as const;
 
 export const $UploadPluginDto = {
@@ -6422,6 +6431,76 @@ export const $UpdateReaderResponseDto = {
         }
     },
     required: ['message', 'reader']
+} as const;
+
+export const $AttractapCrashReport = {
+    type: 'object',
+    properties: {
+        id: {
+            type: 'number',
+            description: 'The unique identifier of the crash report',
+            example: 1
+        },
+        attractapId: {
+            type: 'number',
+            description: 'The ID of the reader this crash report belongs to',
+            example: 1
+        },
+        resetReason: {
+            type: 'string',
+            description: 'The reset reason reported by the reader (esp_reset_reason)',
+            example: 'TASK_WDT'
+        },
+        heapFreeBytes: {
+            type: 'number',
+            description: 'Free heap in bytes captured before the freeze/reset',
+            example: 48213,
+            nullable: true
+        },
+        largestFreeBlockBytes: {
+            type: 'number',
+            description: 'Largest contiguous free heap block in bytes before the freeze/reset',
+            example: 20480,
+            nullable: true
+        },
+        uptimeBeforeResetMs: {
+            type: 'number',
+            description: 'Uptime in milliseconds before the reset occurred',
+            example: 372000,
+            nullable: true
+        },
+        wsState: {
+            type: 'string',
+            description: 'WebSocket connection state at the time of the freeze/reset',
+            example: 'CONNECTED',
+            nullable: true
+        },
+        wifiState: {
+            type: 'string',
+            description: 'WiFi connection state at the time of the freeze/reset',
+            example: 'GOT_IP',
+            nullable: true
+        },
+        firmwareVersion: {
+            type: 'string',
+            description: 'Firmware version string reported by the reader at crash time',
+            example: '1.2.3',
+            nullable: true
+        },
+        coredumpSize: {
+            type: 'number',
+            description: 'Size of the attached coredump blob in bytes, if any',
+            example: 16384,
+            nullable: true
+        },
+        createdAt: {
+            format: 'date-time',
+            type: 'string',
+            description: 'When this crash report was received by the server',
+            example: '2026-06-02T12:00:00.000Z'
+        }
+    },
+    required: ['id', 'attractapId', 'resetReason', 'heapFreeBytes', 'largestFreeBlockBytes', 'uptimeBeforeResetMs', 'wsState', 'wifiState', 'firmwareVersion', 'coredumpSize', 'createdAt']
 } as const;
 
 export const $AppKeyRequestDto = {

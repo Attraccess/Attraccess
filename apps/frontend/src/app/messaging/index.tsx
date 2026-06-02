@@ -25,29 +25,26 @@ export function MessagesPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  const [selectedConversationId, setSelectedConversationId] = useState<number | null>(null);
   const [searchParams] = useSearchParams();
+  const conversationParam = Number(searchParams.get('conversation'));
+  const [selectedConversationId, setSelectedConversationId] = useState<number | null>(
+    Number.isInteger(conversationParam) && conversationParam > 0 ? conversationParam : null,
+  );
 
   useEffect(() => {
-    const raw = searchParams.get('conversation');
-    if (raw === null) {
-      return;
+    if (Number.isInteger(conversationParam) && conversationParam > 0) {
+      setSelectedConversationId(conversationParam);
     }
-    const id = Number(raw);
-    if (Number.isFinite(id) && id > 0) {
-      setSelectedConversationId(id);
-    }
-  }, [searchParams]);
+  }, [conversationParam]);
 
   const { data: conversations, isLoading } = useMessagingServiceMessagingListConversations();
 
   const selectedConversation = conversations?.find((conversation) => conversation.id === selectedConversationId);
   const partnerName = selectedConversation?.otherParticipant?.username ?? t('conversations.unknownUser');
 
-  const deepLinkConversationId = Number(searchParams.get('conversation'));
   const deepLinkResourceId = Number(searchParams.get('resourceRef'));
   const pendingResourceId =
-    Number.isFinite(deepLinkResourceId) && deepLinkResourceId > 0 && selectedConversationId === deepLinkConversationId
+    Number.isFinite(deepLinkResourceId) && deepLinkResourceId > 0 && selectedConversationId === conversationParam
       ? deepLinkResourceId
       : undefined;
 
