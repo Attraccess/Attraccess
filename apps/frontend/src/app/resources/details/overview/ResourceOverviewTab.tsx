@@ -8,6 +8,8 @@ import { useResourcesServiceGetOneResourceById } from '@attraccess/react-query-c
 import { RecentSessionsCard } from './RecentSessionsCard';
 import { ResourceDocsPreviewCard } from './ResourceDocsPreviewCard';
 
+const CARD_CLASS = 'break-inside-avoid mb-6';
+
 export function ResourceOverviewTab() {
   const { id } = useParams<{ id: string }>();
   const resourceId = parseInt(id || '', 10);
@@ -18,31 +20,22 @@ export function ResourceOverviewTab() {
   if (!resource) return null;
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:items-start">
-        <div className="lg:col-span-2">
-          <ResourceUsageSession
-            resourceId={resourceId}
-            resource={resource}
-            data-cy="resource-usage-session"
-            insufficientBalanceDesiredAmount={insufficientBalanceDesiredAmount}
-          />
-        </div>
-        <aside className="lg:col-span-1">
-          <ResourceBillingInfo
-            variant="flat"
-            resourceId={resourceId}
-            onExampleAmountChange={(value) =>
-              setInsufficientBalanceDesiredAmount(Math.ceil(value))
-            }
-          />
-        </aside>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:items-start">
-        <ResourceDocsPreviewCard resourceId={resourceId} />
-        <RecentSessionsCard resourceId={resourceId} />
-      </div>
+    <div className="columns-1 lg:columns-2 gap-6 [&>*:last-child]:mb-0">
+      <ResourceUsageSession
+        className={CARD_CLASS}
+        resourceId={resourceId}
+        resource={resource}
+        data-cy="resource-usage-session"
+        insufficientBalanceDesiredAmount={insufficientBalanceDesiredAmount}
+      />
+      <ResourceBillingInfo
+        className={CARD_CLASS}
+        variant="flat"
+        resourceId={resourceId}
+        onExampleAmountChange={(value) => setInsufficientBalanceDesiredAmount(Math.ceil(value))}
+      />
+      <ResourceDocsPreviewCard className={CARD_CLASS} resourceId={resourceId} />
+      <RecentSessionsCard className={CARD_CLASS} resourceId={resourceId} />
     </div>
   );
 }

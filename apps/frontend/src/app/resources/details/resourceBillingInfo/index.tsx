@@ -20,11 +20,13 @@ import { FlatSection } from '../../../../components/flatSection';
 interface Props extends Omit<HTMLAttributes<HTMLElement>, 'children'> {
   resourceId: number;
   onExampleAmountChange?: (amount: number) => void;
+  /** Reports whether the component renders any content. Lets parents reclaim layout space when hidden. */
+  onVisibilityChange?: (visible: boolean) => void;
   variant?: 'card' | 'flat';
 }
 
 export function ResourceBillingInfo(props: Props) {
-  const { resourceId, onExampleAmountChange, variant = 'card', className, ...htmlProps } = props;
+  const { resourceId, onExampleAmountChange, onVisibilityChange, variant = 'card', className, ...htmlProps } = props;
 
   const { t } = useTranslations({ en, de });
   const { data: configuration } = useBillingServiceGetBillingConfiguration();
@@ -99,6 +101,18 @@ export function ResourceBillingInfo(props: Props) {
   useEffect(() => {
     onExampleAmountChange?.(exampleCost);
   }, [exampleCost, onExampleAmountChange]);
+
+  const isVisible = useMemo(() => {
+    if (!license?.modules.includes('billing')) return false;
+    if (!resourceBillingConfiguration) return false;
+    if (resource?.type !== 'machine') return false;
+    if (isFree && !hasPermission('canManageBilling')) return false;
+    return true;
+  }, [license, resourceBillingConfiguration, resource, isFree, hasPermission]);
+
+  useEffect(() => {
+    onVisibilityChange?.(isVisible);
+  }, [isVisible, onVisibilityChange]);
 
   if (!license?.modules.includes('billing')) {
     return null;
