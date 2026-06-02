@@ -1,8 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsOptional, IsEnum, IsUrl, ValidateIf, IsBoolean, IsObject } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsUrl, ValidateIf, IsBoolean, IsObject, IsInt, Min } from 'class-validator';
 import { FileUpload } from '../../common/types/file-upload.types';
 import { DocumentationType, ResourceType } from '@attraccess/database-entities';
-import { ToBoolean, ToJson } from '../../common/request-transformers';
+import { ToBoolean, ToJson, ToNumber } from '../../common/request-transformers';
 
 export class UpdateResourceDto {
   @ApiProperty({
@@ -120,4 +120,44 @@ export class UpdateResourceDto {
   @ToBoolean()
   @IsOptional()
   allowTakeOver?: boolean;
+
+  @ApiProperty({
+    description: 'Days after a user was trained before retraining is required. Null disables the age-based trigger.',
+    required: false,
+    nullable: true,
+    example: 365,
+    type: Number,
+  })
+  @ToNumber()
+  @ValidateIf((o) => o.retrainingMaxAgeDays !== null && o.retrainingMaxAgeDays !== undefined)
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  retrainingMaxAgeDays?: number | null;
+
+  @ApiProperty({
+    description:
+      'Days a user may go without using this resource before retraining is required. Null disables the inactivity trigger.',
+    required: false,
+    nullable: true,
+    example: 180,
+    type: Number,
+  })
+  @ToNumber()
+  @ValidateIf((o) => o.retrainingMaxInactivityDays !== null && o.retrainingMaxInactivityDays !== undefined)
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  retrainingMaxInactivityDays?: number | null;
+
+  @ApiProperty({
+    description: 'Whether to block resource access once retraining is due until the user is retrained',
+    required: false,
+    example: false,
+    type: Boolean,
+  })
+  @IsBoolean()
+  @ToBoolean()
+  @IsOptional()
+  retrainingBlocksAccess?: boolean;
 }

@@ -13,5 +13,19 @@
   "successTitleUpdate": "Group Updated",
   "successDescriptionUpdate": "Resource group \"{{name}}\" was successfully updated.",
   "errorTitleUpdate": "Update Failed",
-  "errorDescriptionUpdate": "Failed to update the resource group. Please try again."
+  "errorDescriptionUpdate": "Failed to update the resource group. Please try again.",
+  "retraining": {
+    "sectionTitle": "Retraining Requirement",
+    "description": "Applies to users introduced to this group. Leave a field empty to disable that trigger.",
+    "disabledPlaceholder": "Disabled",
+    "maxAgeDays": {
+      "label": "Retrain after (days since training)"
+    },
+    "maxInactivityDays": {
+      "label": "Retrain after inactivity (days)"
+    },
+    "blocksAccess": {
+      "label": "Block access until retrained"
+    }
+  }
 }
