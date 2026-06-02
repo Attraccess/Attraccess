@@ -1,7 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Resource, Setting, User } from '@attraccess/database-entities';
-import { PluginContext, PluginPermission, PluginPermissionError } from '@attraccess/plugins-backend-sdk';
+import { PluginContext, PluginPermission, PluginPermissionError, SystemEvent } from '@attraccess/plugins-backend-sdk';
 import { PluginSandboxService } from './plugin-sandbox.service';
 
 function buildBaseContext(events: EventEmitter2): PluginContext {
@@ -29,6 +29,8 @@ function buildBaseContext(events: EventEmitter2): PluginContext {
     logger: new Logger('test-plugin'),
     getRepository: (entity) => ({ entity } as never),
     get: (token) => ({ token } as never),
+    onEvent: () => ({ off: () => undefined }),
+    emitEvent: () => undefined,
   };
 }
 
@@ -122,6 +124,30 @@ describe('PluginSandboxService', () => {
       const listener = ctx.events.on('x', () => undefined, { objectify: true }) as unknown as Record<string, unknown>;
       expect(listener.emitter).toBeUndefined();
       expect(typeof listener.off).toBe('function');
+    });
+
+    it('throws when subscribing to a SystemEvent without LISTEN_EVENTS', () => {
+      const ctx = PluginSandboxService.createGuardedContext(buildBaseContext(events), []);
+      expect(() => ctx.onEvent(SystemEvent.RESOURCE_USAGE_STARTED, () => null)).toThrow(/LISTEN_EVENTS/);
+    });
+
+    it('allows subscribing to a SystemEvent with LISTEN_EVENTS', () => {
+      const ctx = PluginSandboxService.createGuardedContext(buildBaseContext(events), [PluginPermission.LISTEN_EVENTS]);
+      expect(() => ctx.onEvent(SystemEvent.RESOURCE_USAGE_STARTED, () => null)).not.toThrow();
+    });
+
+    it('throws when emitting a SystemEvent without EMIT_EVENTS', () => {
+      const ctx = PluginSandboxService.createGuardedContext(buildBaseContext(events), []);
+      expect(() => ctx.emitEvent(SystemEvent.RESOURCE_USAGE_ENDED, { resource: {} as never, user: {} as never })).toThrow(
+        /EMIT_EVENTS/
+      );
+    });
+
+    it('allows emitting a SystemEvent with EMIT_EVENTS', () => {
+      const ctx = PluginSandboxService.createGuardedContext(buildBaseContext(events), [PluginPermission.EMIT_EVENTS]);
+      expect(() =>
+        ctx.emitEvent(SystemEvent.RESOURCE_USAGE_ENDED, { resource: {} as never, user: {} as never })
+      ).not.toThrow();
     });
 
     it('throws when accessing dataSource without DATABASE_ACCESS', () => {

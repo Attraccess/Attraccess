@@ -2,11 +2,19 @@ import { DynamicModule, Global, Logger, Module, Type } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource, EntityTarget, ObjectLiteral, Repository } from 'typeorm';
-import { PluginContext, PluginBackendModule } from '@attraccess/plugins-backend-sdk';
+import {
+  PluginContext,
+  PluginBackendModule,
+  SystemEvent,
+  SystemEventHandler,
+  SystemEventPayload,
+  SystemEventSubscription,
+} from '@attraccess/plugins-backend-sdk';
 import { createRequire } from 'module';
 import { LoadedPluginManifest } from './plugin.manifest';
 import { PluginService } from './plugin.service';
 import { PluginSandboxService } from './plugin-sandbox.service';
+import { PluginEventsService } from './plugin-events.service';
 import { PluginController } from './plugin.controller';
 import { join } from 'path';
 
@@ -42,7 +50,8 @@ export class PluginModule {
 
       return {
         module: PluginModule,
-        providers: [PluginService, PluginSandboxService],
+        providers: [PluginService, PluginSandboxService, PluginEventsService],
+        exports: [PluginEventsService],
         controllers: [PluginController],
       };
     }
@@ -65,7 +74,8 @@ export class PluginModule {
 
     return {
       module: PluginModule,
-      providers: [PluginService, PluginSandboxService],
+      providers: [PluginService, PluginSandboxService, PluginEventsService],
+      exports: [PluginEventsService],
       imports: [...pluginModules],
       controllers: [PluginController],
     };
@@ -115,9 +125,19 @@ export class PluginModule {
       get<T>(token: Type<T> | string | symbol): T {
         return PluginModule.requireRef(PluginModule.moduleRef, 'ModuleRef').get<T>(token, { strict: false });
       },
+      onEvent<E extends SystemEvent>(event: E, handler: SystemEventHandler<E>): SystemEventSubscription {
+        return PluginModule.pluginEvents().onEvent(event, handler);
+      },
+      emitEvent<E extends SystemEvent>(event: E, payload: SystemEventPayload[E]): void {
+        PluginModule.pluginEvents().emit(event, payload);
+      },
     };
 
     return PluginSandboxService.createGuardedContext(base, manifest.permissions ?? []);
+  }
+
+  private static pluginEvents(): PluginEventsService {
+    return PluginModule.requireRef(PluginModule.moduleRef, 'ModuleRef').get(PluginEventsService, { strict: false });
   }
 
   private static requireRef<T>(ref: T | null, name: string): T {

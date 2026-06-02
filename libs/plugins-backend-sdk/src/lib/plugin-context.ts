@@ -1,6 +1,7 @@
 import { DynamicModule, LoggerService, Type } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource, EntityTarget, ObjectLiteral, Repository } from 'typeorm';
+import { SystemEvent, SystemEventHandler, SystemEventPayload, SystemEventSubscription } from './plugin.interface';
 
 /**
  * DI token under which a plugin's own services can inject the PluginContext.
@@ -45,6 +46,19 @@ export interface PluginContext {
    * this is where a future capability/permission gate is enforced.
    */
   get<T>(token: Type<T> | string | symbol): T;
+
+  /**
+   * Subscribe to a typed host SystemEvent. The handler is invoked with the
+   * event's payload whenever a domain service emits it. Requires the
+   * LISTEN_EVENTS permission. Returns a handle to detach the handler.
+   */
+  onEvent<E extends SystemEvent>(event: E, handler: SystemEventHandler<E>): SystemEventSubscription;
+
+  /**
+   * Emit a typed host SystemEvent onto the shared bus. Requires the
+   * EMIT_EVENTS permission. The payload is type-checked against the event.
+   */
+  emitEvent<E extends SystemEvent>(event: E, payload: SystemEventPayload[E]): void;
 }
 
 /**
