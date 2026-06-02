@@ -2,6 +2,7 @@ import { DynamicModule, Global, Logger, Module } from '@nestjs/common';
 import { createRequire } from 'module';
 import { PluginManifest } from './plugin.manifest';
 import { PluginService } from './plugin.service';
+import { PluginSandboxService } from './plugin-sandbox.service';
 import { PluginController } from './plugin.controller';
 import { join } from 'path';
 
@@ -24,7 +25,7 @@ export class PluginModule {
 
       return {
         module: PluginModule,
-        providers: [PluginService],
+        providers: [PluginService, PluginSandboxService],
         controllers: [PluginController],
       };
     }
@@ -47,7 +48,7 @@ export class PluginModule {
 
     return {
       module: PluginModule,
-      providers: [PluginService],
+      providers: [PluginService, PluginSandboxService],
       imports: [...pluginModules],
       controllers: [PluginController],
     };
