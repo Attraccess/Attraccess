@@ -92,6 +92,7 @@ import {
 import { Conversation } from './entities/conversation.entity';
 import { ConversationParticipant } from './entities/conversation-participant.entity';
 import { Message, MessageReferenceType } from './entities/message.entity';
+import { NotificationPreference } from './entities/notification-preference.entity';
 
 // Export all entities individually
 export {
@@ -187,6 +188,7 @@ export {
   ConversationParticipant,
   Message,
   MessageReferenceType,
+  NotificationPreference,
 };
 
 // Export the entities object
@@ -235,4 +237,5 @@ export const entities = {
   Conversation,
   ConversationParticipant,
   Message,
+  NotificationPreference,
 };

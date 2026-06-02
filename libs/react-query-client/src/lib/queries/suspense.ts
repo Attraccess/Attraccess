@@ -967,3 +967,9 @@ export const useMessagingServiceMessagingListMessagesSuspense = <TData = Common.
   limit?: number | undefined;
   page?: number | undefined;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseMessagingServiceMessagingListMessagesKeyFn({ id, limit, page }, queryKey), queryFn: () => MessagingService.messagingListMessages({ id, limit, page }) as TData, ...options });
+/**
+* Get the authenticated user notification preferences
+* @returns NotificationPreferenceDto The notification preferences
+* @throws ApiError
+*/
+export const useMessagingServiceMessagingGetNotificationPreferencesSuspense = <TData = Common.MessagingServiceMessagingGetNotificationPreferencesDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseMessagingServiceMessagingGetNotificationPreferencesKeyFn(queryKey), queryFn: () => MessagingService.messagingGetNotificationPreferences() as TData, ...options });

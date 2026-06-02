@@ -1,0 +1,12 @@
+{
+  "messagesEmailOnOffline": {
+    "label": "Email me about messages when I'm offline",
+    "description": "When you receive a direct message while you are not online, we send you an email so you don't miss it."
+  },
+  "messages": {
+    "updated": "Notification preferences updated"
+  },
+  "errors": {
+    "updateFailed": "Could not update notification preferences"
+  }
+}

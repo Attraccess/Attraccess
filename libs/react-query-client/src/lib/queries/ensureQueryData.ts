@@ -967,3 +967,9 @@ export const ensureUseMessagingServiceMessagingListMessagesData = (queryClient: 
   limit?: number | undefined;
   page?: number | undefined;
 }) => queryClient.ensureQueryData({ queryKey: Common.UseMessagingServiceMessagingListMessagesKeyFn({ id, limit, page }), queryFn: () => MessagingService.messagingListMessages({ id, limit, page }) });
+/**
+* Get the authenticated user notification preferences
+* @returns NotificationPreferenceDto The notification preferences
+* @throws ApiError
+*/
+export const ensureUseMessagingServiceMessagingGetNotificationPreferencesData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseMessagingServiceMessagingGetNotificationPreferencesKeyFn(), queryFn: () => MessagingService.messagingGetNotificationPreferences() });
