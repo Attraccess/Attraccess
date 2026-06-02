@@ -1,5 +1,6 @@
 import { BadRequestException, Logger, NotFoundException } from '@nestjs/common';
 import { join } from 'path';
+import type { PluginManifestInfo } from '@attraccess/plugins-backend-sdk';
 import { PluginManifest, PluginManifestSchema, LoadedPluginManifest } from './plugin.manifest';
 import { PluginSandboxService } from './plugin-sandbox.service';
 import { existsSync, readdirSync, readFileSync } from 'fs';
@@ -38,6 +39,19 @@ export class PluginService {
     }
 
     return PluginService.plugins;
+  }
+
+  public static getManifestById(id: string): LoadedPluginManifest | undefined {
+    return PluginService.getPlugins().find((plugin) => plugin.id === id);
+  }
+
+  public static toManifestInfo(manifest: LoadedPluginManifest): PluginManifestInfo {
+    return {
+      id: manifest.id,
+      name: manifest.name,
+      version: manifest.version,
+      pluginDirectory: manifest.pluginDirectory,
+    };
   }
 
   public static markPluginAsLoaded(pluginName: string): void {

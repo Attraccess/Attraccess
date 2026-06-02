@@ -138,11 +138,10 @@ export class PluginSandboxService {
     pluginName: string,
     require: (permission: PluginPermission, capability: string) => void
   ): PluginContext['events'] {
-    const target = base.events;
     const holder: { proxy: PluginContext['events'] | null } = { proxy: null };
 
-    const sanitize = (result: unknown): unknown => {
-      if (result === target) {
+    const sanitize = (emitter: unknown, result: unknown): unknown => {
+      if (result === emitter) {
         return holder.proxy;
       }
       if (result && typeof result === 'object' && 'emitter' in (result as object)) {
@@ -152,8 +151,8 @@ export class PluginSandboxService {
       return result;
     };
 
-    const proxy = new Proxy(target, {
-      get(emitter, property, receiver) {
+    const proxy = new Proxy({} as PluginContext['events'], {
+      get(_stub, property) {
         if (typeof property !== 'string') {
           return undefined;
         }
@@ -165,14 +164,15 @@ export class PluginSandboxService {
           );
         }
 
-        const original = Reflect.get(emitter, property, receiver);
+        const emitter = base.events;
+        const original = Reflect.get(emitter, property, emitter);
         if (typeof original !== 'function') {
           return undefined;
         }
 
         return (...args: unknown[]) => {
           require(permission, `events.${property}`);
-          return sanitize((original as (...a: unknown[]) => unknown).apply(emitter, args));
+          return sanitize(emitter, (original as (...a: unknown[]) => unknown).apply(emitter, args));
         };
       },
     });
