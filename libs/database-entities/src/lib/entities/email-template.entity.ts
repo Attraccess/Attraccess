@@ -12,6 +12,7 @@ export enum EmailTemplateType {
   PROJECT_INVITATION = 'project-invitation',
   DELETE_ACCOUNT_CONFIRMATION = 'delete-account-confirmation',
   RESOURCE_HEALTH_CHANGED = 'resource-health-changed',
+  USER_RETRAINING_REQUIRED = 'user-retraining-required',
 }
 
 @Entity('email_templates')

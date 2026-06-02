@@ -1,8 +1,11 @@
-import { Body, Controller, Get, NotFoundException, Param, ParseIntPipe, Post, Query, Req } from '@nestjs/common';
+import { Body, Controller, Get, NotFoundException, Param, ParseIntPipe, Post, Query, Req, Sse } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { Message, MessageReferenceType } from '@attraccess/database-entities';
+import { Observable } from 'rxjs';
 import { MessagingService } from './messaging.service';
+import { MessagingLiveService } from './messaging-live.service';
+import { SseInstrumentation } from '../metrics/instrumentation/sse/sse.helper';
 import { ContactResponseDto } from './dtos/contactResponse.dto';
 import { SendMessageDto } from './dtos/sendMessage.dto';
 import { ListMessagesQueryDto } from './dtos/listMessagesQuery.dto';
@@ -12,7 +15,19 @@ import { ConversationListItemDto } from './dtos/conversationListItem.dto';
 @ApiTags('Messaging')
 @Controller('messaging')
 export class MessagingController {
-  constructor(private readonly messagingService: MessagingService) {}
+  constructor(
+    private readonly messagingService: MessagingService,
+    private readonly messagingLiveService: MessagingLiveService,
+    private readonly sse: SseInstrumentation,
+  ) {}
+
+  @Sse('live')
+  @Auth()
+  @ApiOperation({ summary: 'Subscribe to live new messages for the authenticated user', operationId: 'messagingLive' })
+  streamMessages(@Req() req: AuthenticatedRequest): Observable<{ data: Message }> {
+    const subject = this.messagingLiveService.getUserMessageSubject(req.user.id);
+    return this.sse.wrap('messaging', subject.asObservable());
+  }
 
   @Post('users/:userId/contact')
   @Auth()

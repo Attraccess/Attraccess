@@ -228,6 +228,12 @@ export const useResourcesServiceResourceUsageCanControlKey = "ResourcesServiceRe
 export const UseResourcesServiceResourceUsageCanControlKeyFn = ({ resourceId }: {
   resourceId: number;
 }, queryKey?: Array<unknown>) => [useResourcesServiceResourceUsageCanControlKey, ...(queryKey ?? [{ resourceId }])];
+export type ResourcesServiceResourceRetrainingGetStatusDefaultResponse = Awaited<ReturnType<typeof ResourcesService.resourceRetrainingGetStatus>>;
+export type ResourcesServiceResourceRetrainingGetStatusQueryResult<TData = ResourcesServiceResourceRetrainingGetStatusDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useResourcesServiceResourceRetrainingGetStatusKey = "ResourcesServiceResourceRetrainingGetStatus";
+export const UseResourcesServiceResourceRetrainingGetStatusKeyFn = ({ resourceId }: {
+  resourceId: number;
+}, queryKey?: Array<unknown>) => [useResourcesServiceResourceRetrainingGetStatusKey, ...(queryKey ?? [{ resourceId }])];
 export type MqttServiceMqttServersGetAllDefaultResponse = Awaited<ReturnType<typeof MqttService.mqttServersGetAll>>;
 export type MqttServiceMqttServersGetAllQueryResult<TData = MqttServiceMqttServersGetAllDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useMqttServiceMqttServersGetAllKey = "MqttServiceMqttServersGetAll";
@@ -504,6 +510,19 @@ export type AttractapServiceGetReadersDefaultResponse = Awaited<ReturnType<typeo
 export type AttractapServiceGetReadersQueryResult<TData = AttractapServiceGetReadersDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useAttractapServiceGetReadersKey = "AttractapServiceGetReaders";
 export const UseAttractapServiceGetReadersKeyFn = (queryKey?: Array<unknown>) => [useAttractapServiceGetReadersKey, ...(queryKey ?? [])];
+export type AttractapServiceGetReaderCrashReportsDefaultResponse = Awaited<ReturnType<typeof AttractapService.getReaderCrashReports>>;
+export type AttractapServiceGetReaderCrashReportsQueryResult<TData = AttractapServiceGetReaderCrashReportsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useAttractapServiceGetReaderCrashReportsKey = "AttractapServiceGetReaderCrashReports";
+export const UseAttractapServiceGetReaderCrashReportsKeyFn = ({ readerId }: {
+  readerId: number;
+}, queryKey?: Array<unknown>) => [useAttractapServiceGetReaderCrashReportsKey, ...(queryKey ?? [{ readerId }])];
+export type AttractapServiceGetReaderCrashReportCoredumpDefaultResponse = Awaited<ReturnType<typeof AttractapService.getReaderCrashReportCoredump>>;
+export type AttractapServiceGetReaderCrashReportCoredumpQueryResult<TData = AttractapServiceGetReaderCrashReportCoredumpDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useAttractapServiceGetReaderCrashReportCoredumpKey = "AttractapServiceGetReaderCrashReportCoredump";
+export const UseAttractapServiceGetReaderCrashReportCoredumpKeyFn = ({ readerId, reportId }: {
+  readerId: number;
+  reportId: number;
+}, queryKey?: Array<unknown>) => [useAttractapServiceGetReaderCrashReportCoredumpKey, ...(queryKey ?? [{ readerId, reportId }])];
 export type AttractapServiceGetAllCardsDefaultResponse = Awaited<ReturnType<typeof AttractapService.getAllCards>>;
 export type AttractapServiceGetAllCardsQueryResult<TData = AttractapServiceGetAllCardsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useAttractapServiceGetAllCardsKey = "AttractapServiceGetAllCards";
@@ -541,6 +560,10 @@ export const UseAnalyticsServiceGetBillingTransactionsInDateRangeKeyFn = ({ end,
   end: string;
   start: string;
 }, queryKey?: Array<unknown>) => [useAnalyticsServiceGetBillingTransactionsInDateRangeKey, ...(queryKey ?? [{ end, start }])];
+export type MessagingServiceMessagingLiveDefaultResponse = Awaited<ReturnType<typeof MessagingService.messagingLive>>;
+export type MessagingServiceMessagingLiveQueryResult<TData = MessagingServiceMessagingLiveDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useMessagingServiceMessagingLiveKey = "MessagingServiceMessagingLive";
+export const UseMessagingServiceMessagingLiveKeyFn = (queryKey?: Array<unknown>) => [useMessagingServiceMessagingLiveKey, ...(queryKey ?? [])];
 export type MessagingServiceMessagingListConversationsDefaultResponse = Awaited<ReturnType<typeof MessagingService.messagingListConversations>>;
 export type MessagingServiceMessagingListConversationsQueryResult<TData = MessagingServiceMessagingListConversationsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useMessagingServiceMessagingListConversationsKey = "MessagingServiceMessagingListConversations";

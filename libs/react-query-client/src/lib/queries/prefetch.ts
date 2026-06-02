@@ -378,6 +378,16 @@ export const prefetchUseResourcesServiceResourceUsageCanControl = (queryClient: 
   resourceId: number;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseResourcesServiceResourceUsageCanControlKeyFn({ resourceId }), queryFn: () => ResourcesService.resourceUsageCanControl({ resourceId }) });
 /**
+* Get the retraining status of the current user for a resource
+* @param data The data for the request.
+* @param data.resourceId
+* @returns RetrainingStatusResponseDto Retraining status retrieved successfully.
+* @throws ApiError
+*/
+export const prefetchUseResourcesServiceResourceRetrainingGetStatus = (queryClient: QueryClient, { resourceId }: {
+  resourceId: number;
+}) => queryClient.prefetchQuery({ queryKey: Common.UseResourcesServiceResourceRetrainingGetStatusKeyFn({ resourceId }), queryFn: () => ResourcesService.resourceRetrainingGetStatus({ resourceId }) });
+/**
 * Get all MQTT servers
 * @returns MqttServer Returns all MQTT servers
 * @throws ApiError
@@ -849,6 +859,28 @@ export const prefetchUseAttractapServiceGetReaderById = (queryClient: QueryClien
 */
 export const prefetchUseAttractapServiceGetReaders = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseAttractapServiceGetReadersKeyFn(), queryFn: () => AttractapService.getReaders() });
 /**
+* Get crash reports for a reader
+* @param data The data for the request.
+* @param data.readerId The ID of the reader
+* @returns AttractapCrashReport The list of crash reports for the reader, newest first
+* @throws ApiError
+*/
+export const prefetchUseAttractapServiceGetReaderCrashReports = (queryClient: QueryClient, { readerId }: {
+  readerId: number;
+}) => queryClient.prefetchQuery({ queryKey: Common.UseAttractapServiceGetReaderCrashReportsKeyFn({ readerId }), queryFn: () => AttractapService.getReaderCrashReports({ readerId }) });
+/**
+* Download the coredump blob of a crash report
+* @param data The data for the request.
+* @param data.readerId The ID of the reader
+* @param data.reportId The ID of the crash report
+* @returns unknown The coredump binary blob
+* @throws ApiError
+*/
+export const prefetchUseAttractapServiceGetReaderCrashReportCoredump = (queryClient: QueryClient, { readerId, reportId }: {
+  readerId: number;
+  reportId: number;
+}) => queryClient.prefetchQuery({ queryKey: Common.UseAttractapServiceGetReaderCrashReportCoredumpKeyFn({ readerId, reportId }), queryFn: () => AttractapService.getReaderCrashReportCoredump({ readerId, reportId }) });
+/**
 * Get all of your cards
 * @returns NFCCard The list of all cards
 * @throws ApiError
@@ -910,6 +942,11 @@ export const prefetchUseAnalyticsServiceGetBillingTransactionsInDateRange = (que
   end: string;
   start: string;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseAnalyticsServiceGetBillingTransactionsInDateRangeKeyFn({ end, start }), queryFn: () => AnalyticsService.getBillingTransactionsInDateRange({ end, start }) });
+/**
+* Subscribe to live new messages for the authenticated user
+* @throws ApiError
+*/
+export const prefetchUseMessagingServiceMessagingLive = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseMessagingServiceMessagingLiveKeyFn(), queryFn: () => MessagingService.messagingLive() });
 /**
 * List the authenticated user inbox conversations
 * @returns ConversationListItemDto The inbox conversations

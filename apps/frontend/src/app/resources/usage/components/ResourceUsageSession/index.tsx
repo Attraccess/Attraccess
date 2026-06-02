@@ -6,6 +6,7 @@ import { useAuth } from '../../../../../hooks/useAuth';
 import { ActiveSessionDisplay } from '../ActiveSessionDisplay';
 import { OtherUserSessionDisplay } from '../OtherUserSessionDisplay';
 import { IntroductionRequiredDisplay } from '../IntroductionRequiredDisplay';
+import { RetrainingStatusBanner } from '../RetrainingStatusBanner';
 import { StartSessionControls } from '../StartSessionControls';
 import {
   useAccessControlServiceResourceIntroducersGetMany,
@@ -105,7 +106,10 @@ export function ResourceUsageSession({
 
   return (
     <FlatSection icon={<Clock className="w-4 h-4" />} title={t('title.' + resource.type)} {...rest}>
-      {renderContent()}
+      <div className="space-y-4">
+        <RetrainingStatusBanner resourceId={resourceId} />
+        {renderContent()}
+      </div>
     </FlatSection>
   );
 }

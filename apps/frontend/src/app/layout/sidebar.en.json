@@ -11,6 +11,7 @@
       "items": {
         "resources": "Resources",
         "projects": "Projects",
+        "messages": "Messages",
         "billing": "Billing",
         "attractap": "NFC-Cards",
         "userManagement": "User Management"

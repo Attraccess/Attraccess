@@ -36,6 +36,34 @@ export class ResourceGroup {
   })
   description!: string | null;
 
+  @Column({ type: 'integer', nullable: true })
+  @ApiProperty({
+    description:
+      'Days after a user was trained on this group before retraining is required. Null disables the age-based trigger.',
+    example: 365,
+    required: false,
+    nullable: true,
+  })
+  retrainingMaxAgeDays!: number | null;
+
+  @Column({ type: 'integer', nullable: true })
+  @ApiProperty({
+    description:
+      'Days a user may go without using a resource in this group before retraining is required. Null disables the inactivity trigger.',
+    example: 180,
+    required: false,
+    nullable: true,
+  })
+  retrainingMaxInactivityDays!: number | null;
+
+  @Column({ type: 'boolean', default: false })
+  @ApiProperty({
+    description: 'Whether to block access to grouped resources once retraining is due until the user is retrained',
+    example: false,
+    default: false,
+  })
+  retrainingBlocksAccess!: boolean;
+
   @CreateDateColumn()
   @ApiProperty({
     description: 'When the resource was created',

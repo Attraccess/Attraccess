@@ -1,0 +1,25 @@
+{
+  "heading": "Absturz-Diagnose",
+  "description": "Selbst gemeldete Reset-Gründe und Heap-Zustand vor dem Einfrieren, neueste zuerst.",
+  "empty": "Von diesem Reader wurden noch keine Absturzberichte empfangen.",
+  "loading": "Absturzberichte werden geladen…",
+  "error": "Absturzberichte konnten nicht geladen werden",
+  "heapTrend": "Heap-Verlauf (freie Bytes vor Reset)",
+  "heapTrendEmpty": "Noch keine Heap-Messwerte verfügbar.",
+  "resetHistory": "Verlauf der Reset-Gründe",
+  "fields": {
+    "resetReason": "Reset-Grund",
+    "heapFree": "Freier Heap",
+    "largestBlock": "Größter Block",
+    "uptime": "Laufzeit vor Reset",
+    "wsState": "WebSocket",
+    "wifiState": "WLAN",
+    "firmware": "Firmware",
+    "receivedAt": "Empfangen"
+  },
+  "notAvailable": "n.v.",
+  "coredump": "Coredump",
+  "downloadCoredump": "Coredump herunterladen",
+  "noCoredump": "Kein Coredump",
+  "downloadFailed": "Coredump-Download fehlgeschlagen"
+}

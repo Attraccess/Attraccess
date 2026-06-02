@@ -378,6 +378,16 @@ export const useResourcesServiceResourceUsageCanControlSuspense = <TData = Commo
   resourceId: number;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseResourcesServiceResourceUsageCanControlKeyFn({ resourceId }, queryKey), queryFn: () => ResourcesService.resourceUsageCanControl({ resourceId }) as TData, ...options });
 /**
+* Get the retraining status of the current user for a resource
+* @param data The data for the request.
+* @param data.resourceId
+* @returns RetrainingStatusResponseDto Retraining status retrieved successfully.
+* @throws ApiError
+*/
+export const useResourcesServiceResourceRetrainingGetStatusSuspense = <TData = Common.ResourcesServiceResourceRetrainingGetStatusDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ resourceId }: {
+  resourceId: number;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseResourcesServiceResourceRetrainingGetStatusKeyFn({ resourceId }, queryKey), queryFn: () => ResourcesService.resourceRetrainingGetStatus({ resourceId }) as TData, ...options });
+/**
 * Get all MQTT servers
 * @returns MqttServer Returns all MQTT servers
 * @throws ApiError
@@ -849,6 +859,28 @@ export const useAttractapServiceGetReaderByIdSuspense = <TData = Common.Attracta
 */
 export const useAttractapServiceGetReadersSuspense = <TData = Common.AttractapServiceGetReadersDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseAttractapServiceGetReadersKeyFn(queryKey), queryFn: () => AttractapService.getReaders() as TData, ...options });
 /**
+* Get crash reports for a reader
+* @param data The data for the request.
+* @param data.readerId The ID of the reader
+* @returns AttractapCrashReport The list of crash reports for the reader, newest first
+* @throws ApiError
+*/
+export const useAttractapServiceGetReaderCrashReportsSuspense = <TData = Common.AttractapServiceGetReaderCrashReportsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ readerId }: {
+  readerId: number;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseAttractapServiceGetReaderCrashReportsKeyFn({ readerId }, queryKey), queryFn: () => AttractapService.getReaderCrashReports({ readerId }) as TData, ...options });
+/**
+* Download the coredump blob of a crash report
+* @param data The data for the request.
+* @param data.readerId The ID of the reader
+* @param data.reportId The ID of the crash report
+* @returns unknown The coredump binary blob
+* @throws ApiError
+*/
+export const useAttractapServiceGetReaderCrashReportCoredumpSuspense = <TData = Common.AttractapServiceGetReaderCrashReportCoredumpDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ readerId, reportId }: {
+  readerId: number;
+  reportId: number;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseAttractapServiceGetReaderCrashReportCoredumpKeyFn({ readerId, reportId }, queryKey), queryFn: () => AttractapService.getReaderCrashReportCoredump({ readerId, reportId }) as TData, ...options });
+/**
 * Get all of your cards
 * @returns NFCCard The list of all cards
 * @throws ApiError
@@ -910,6 +942,11 @@ export const useAnalyticsServiceGetBillingTransactionsInDateRangeSuspense = <TDa
   end: string;
   start: string;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseAnalyticsServiceGetBillingTransactionsInDateRangeKeyFn({ end, start }, queryKey), queryFn: () => AnalyticsService.getBillingTransactionsInDateRange({ end, start }) as TData, ...options });
+/**
+* Subscribe to live new messages for the authenticated user
+* @throws ApiError
+*/
+export const useMessagingServiceMessagingLiveSuspense = <TData = Common.MessagingServiceMessagingLiveDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseMessagingServiceMessagingLiveKeyFn(queryKey), queryFn: () => MessagingService.messagingLive() as TData, ...options });
 /**
 * List the authenticated user inbox conversations
 * @returns ConversationListItemDto The inbox conversations

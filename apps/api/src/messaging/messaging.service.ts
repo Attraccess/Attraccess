@@ -7,6 +7,7 @@ import {
   ConversationParticipant,
   Message,
   MessageReferenceType,
+  Resource,
   User,
 } from '@attraccess/database-entities';
 import { ResourceUsageService } from '../resources/usage/resourceUsage.service';
@@ -29,6 +30,8 @@ export class MessagingService {
     private readonly messageRepository: Repository<Message>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    @InjectRepository(Resource)
+    private readonly resourceRepository: Repository<Resource>,
     private readonly dataSource: DataSource,
     private readonly resourceUsageService: ResourceUsageService,
     private readonly eventEmitter: EventEmitter2,
@@ -86,6 +89,8 @@ export class MessagingService {
   ): Promise<Message> {
     await this.assertParticipant(conversationId, senderId);
 
+    const decoration = await this.resolveReferenceDecoration(reference);
+
     const message = await this.messageRepository.save(
       this.messageRepository.create({
         conversationId,
@@ -93,6 +98,8 @@ export class MessagingService {
         content,
         referenceType: reference?.referenceType ?? null,
         referenceId: reference?.referenceId ?? null,
+        referenceLabel: decoration.referenceLabel,
+        referenceUrl: decoration.referenceUrl,
       }),
     );
 
@@ -161,6 +168,19 @@ export class MessagingService {
       .getOne();
 
     return other?.user ?? null;
+  }
+
+  private async resolveReferenceDecoration(
+    reference?: MessageReference,
+  ): Promise<{ referenceLabel: string | null; referenceUrl: string | null }> {
+    if (reference?.referenceType === MessageReferenceType.RESOURCE) {
+      const resource = await this.resourceRepository.findOne({ where: { id: reference.referenceId } });
+      if (resource) {
+        return { referenceLabel: resource.name, referenceUrl: `/resources/${resource.id}` };
+      }
+    }
+
+    return { referenceLabel: null, referenceUrl: null };
   }
 
   public async resolveResourceHolder(resourceId: number): Promise<User | null> {
