@@ -911,6 +911,11 @@ export const useAnalyticsServiceGetBillingTransactionsInDateRangeSuspense = <TDa
   start: string;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseAnalyticsServiceGetBillingTransactionsInDateRangeKeyFn({ end, start }, queryKey), queryFn: () => AnalyticsService.getBillingTransactionsInDateRange({ end, start }) as TData, ...options });
 /**
+* Subscribe to live new messages for the authenticated user
+* @throws ApiError
+*/
+export const useMessagingServiceMessagingLiveSuspense = <TData = Common.MessagingServiceMessagingLiveDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseMessagingServiceMessagingLiveKeyFn(queryKey), queryFn: () => MessagingService.messagingLive() as TData, ...options });
+/**
 * List the authenticated user inbox conversations
 * @returns ConversationListItemDto The inbox conversations
 * @throws ApiError

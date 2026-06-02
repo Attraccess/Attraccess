@@ -541,6 +541,10 @@ export const UseAnalyticsServiceGetBillingTransactionsInDateRangeKeyFn = ({ end,
   end: string;
   start: string;
 }, queryKey?: Array<unknown>) => [useAnalyticsServiceGetBillingTransactionsInDateRangeKey, ...(queryKey ?? [{ end, start }])];
+export type MessagingServiceMessagingLiveDefaultResponse = Awaited<ReturnType<typeof MessagingService.messagingLive>>;
+export type MessagingServiceMessagingLiveQueryResult<TData = MessagingServiceMessagingLiveDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useMessagingServiceMessagingLiveKey = "MessagingServiceMessagingLive";
+export const UseMessagingServiceMessagingLiveKeyFn = (queryKey?: Array<unknown>) => [useMessagingServiceMessagingLiveKey, ...(queryKey ?? [])];
 export type MessagingServiceMessagingListConversationsDefaultResponse = Awaited<ReturnType<typeof MessagingService.messagingListConversations>>;
 export type MessagingServiceMessagingListConversationsQueryResult<TData = MessagingServiceMessagingListConversationsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useMessagingServiceMessagingListConversationsKey = "MessagingServiceMessagingListConversations";

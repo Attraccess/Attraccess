@@ -911,6 +911,11 @@ export const ensureUseAnalyticsServiceGetBillingTransactionsInDateRangeData = (q
   start: string;
 }) => queryClient.ensureQueryData({ queryKey: Common.UseAnalyticsServiceGetBillingTransactionsInDateRangeKeyFn({ end, start }), queryFn: () => AnalyticsService.getBillingTransactionsInDateRange({ end, start }) });
 /**
+* Subscribe to live new messages for the authenticated user
+* @throws ApiError
+*/
+export const ensureUseMessagingServiceMessagingLiveData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseMessagingServiceMessagingLiveKeyFn(), queryFn: () => MessagingService.messagingLive() });
+/**
 * List the authenticated user inbox conversations
 * @returns ConversationListItemDto The inbox conversations
 * @throws ApiError
