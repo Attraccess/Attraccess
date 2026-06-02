@@ -11,6 +11,7 @@
     "selectPrompt": "Select a conversation to view messages.",
     "empty": "No messages in this conversation yet.",
     "loadOlder": "Load older messages",
+    "back": "Inbox",
     "you": "You"
   },
   "composer": {

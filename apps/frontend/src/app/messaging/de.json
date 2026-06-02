@@ -11,6 +11,7 @@
     "selectPrompt": "Wähle eine Unterhaltung, um Nachrichten anzuzeigen.",
     "empty": "Noch keine Nachrichten in dieser Unterhaltung.",
     "loadOlder": "Ältere Nachrichten laden",
+    "back": "Posteingang",
     "you": "Du"
   },
   "composer": {
