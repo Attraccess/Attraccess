@@ -1,0 +1,21 @@
+{
+  "title": "Nachrichten",
+  "subtitle": "Deine Unterhaltungen",
+  "conversations": {
+    "title": "Posteingang",
+    "empty": "Du hast noch keine Unterhaltungen.",
+    "unknownUser": "Unbekannter Nutzer",
+    "noMessages": "Noch keine Nachrichten"
+  },
+  "thread": {
+    "selectPrompt": "Wähle eine Unterhaltung, um Nachrichten anzuzeigen.",
+    "empty": "Noch keine Nachrichten in dieser Unterhaltung.",
+    "loadOlder": "Ältere Nachrichten laden",
+    "back": "Posteingang",
+    "you": "Du"
+  },
+  "composer": {
+    "placeholder": "Nachricht schreiben…",
+    "send": "Senden"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "title": "Messages",
+  "subtitle": "Your conversations",
+  "conversations": {
+    "title": "Inbox",
+    "empty": "You have no conversations yet.",
+    "unknownUser": "Unknown user",
+    "noMessages": "No messages yet"
+  },
+  "thread": {
+    "selectPrompt": "Select a conversation to view messages.",
+    "empty": "No messages in this conversation yet.",
+    "loadOlder": "Load older messages",
+    "back": "Inbox",
+    "you": "You"
+  },
+  "composer": {
+    "placeholder": "Write a message…",
+    "send": "Send"
+  }
+}

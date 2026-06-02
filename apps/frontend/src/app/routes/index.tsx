@@ -35,6 +35,7 @@ import { BillingAdministrationPage } from '../billing/administration';
 import { SumUpPage } from '../billing/administration/sumup';
 import { BalenaPage } from '../balena';
 import { ProjectsListPage } from '../projects';
+import { MessagesPage } from '../messaging';
 import { ProjectDetailsPage } from '../projects/details';
 import { ProjectTeamPage } from '../projects/details/team';
 import SystemSettingsPage from '../settings';
@@ -264,6 +265,11 @@ const coreRoutes: RouteConfig[] = [
     path: '/email-templates/:type',
     element: <EditEmailTemplatePage />,
     authRequired: 'canManageSystemConfiguration',
+  },
+  {
+    path: '/messages',
+    element: <MessagesPage />,
+    authRequired: true,
   },
   {
     path: '/projects',
