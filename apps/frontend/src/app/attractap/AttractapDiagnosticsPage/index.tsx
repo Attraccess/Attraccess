@@ -1,5 +1,4 @@
 import { useParams } from 'react-router-dom';
-import { Card } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useAttractapServiceGetReaderById } from '@attraccess/react-query-client';
 import { PageHeader } from '../../../components/pageHeader';
@@ -23,11 +22,7 @@ export function AttractapDiagnosticsPage() {
         subtitle={t('subtitle', { name: reader?.name ?? '' })}
         backTo="/attractap/readers"
       />
-      <Card>
-        <Card.Content>
-          <AttractapDiagnostics readerId={id} />
-        </Card.Content>
-      </Card>
+      <AttractapDiagnostics readerId={id} />
     </>
   );
 }
