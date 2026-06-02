@@ -14,6 +14,7 @@ import { RouteConfig } from '@attraccess/plugins-frontend-sdk';
 import { PluginsList } from '../plugins/PluginsList';
 import usePluginState, { PluginManifestWithPlugin } from '../plugins/plugin.state';
 import { AttractapList } from '../attractap/AttractapList';
+import { AttractapDiagnosticsPage } from '../attractap/AttractapDiagnosticsPage';
 import { NfcCardList } from '../attractap/NfcCardList';
 import { CsvExport } from '../csv-export';
 import { DocumentationEditor, DocumentationView } from '../resources/documentation';
@@ -203,6 +204,11 @@ const coreRoutes: RouteConfig[] = [
   {
     path: '/attractap/readers',
     element: <AttractapList />,
+    authRequired: 'canManageResources',
+  },
+  {
+    path: '/attractap/readers/:readerId/diagnostics',
+    element: <AttractapDiagnosticsPage />,
     authRequired: 'canManageResources',
   },
   {

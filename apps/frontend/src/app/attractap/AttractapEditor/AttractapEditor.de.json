@@ -14,7 +14,6 @@
   "ledBrightness": "LED Helligkeit",
   "tabs": {
     "general": "Allgemein",
-    "resources": "Ressourcen",
-    "diagnostics": "Diagnose"
+    "resources": "Ressourcen"
   }
 }

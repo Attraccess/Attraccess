@@ -9,7 +9,6 @@ import en from './AttractapDiagnostics.en.json';
 
 interface Props {
   readerId?: number;
-  isActive: boolean;
 }
 
 function formatBytes(value: number | null | undefined, fallback: string): string {
@@ -42,7 +41,7 @@ export function AttractapDiagnostics(props: Readonly<Props>) {
     isLoading,
     isError,
   } = useAttractapServiceGetReaderCrashReports({ readerId: props.readerId as number }, undefined, {
-    enabled: props.readerId !== undefined && props.isActive,
+    enabled: props.readerId !== undefined,
   });
 
   const downloadCoredump = useCallback(

@@ -14,7 +14,6 @@
   "ledBrightness": "LED Brightness",
   "tabs": {
     "general": "General",
-    "resources": "Resources",
-    "diagnostics": "Diagnostics"
+    "resources": "Resources"
   }
 }
