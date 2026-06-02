@@ -6566,3 +6566,239 @@ export const $AttractapFirmware = {
     },
     required: ['name', 'friendlyName', 'variant', 'variantFriendlyName', 'version', 'boardFamily', 'filename', 'filenameOTA', 'chip', 'flashMode', 'flashFreq', 'flashSize']
 } as const;
+
+export const $MessageReferenceType = {
+    type: 'string',
+    enum: ['RESOURCE', 'ACTIVITY'],
+    description: 'Type of context this suggested message references'
+} as const;
+
+export const $SuggestedMessageDto = {
+    type: 'object',
+    properties: {
+        content: {
+            type: 'string',
+            description: 'Suggested prefilled message content referencing the resource',
+            example: 'Hi, are you currently using the Laser Cutter?'
+        },
+        referenceType: {
+            description: 'Type of context this suggested message references',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/MessageReferenceType'
+                }
+            ]
+        },
+        referenceId: {
+            type: 'number',
+            description: 'ID of the referenced entity, scoped by referenceType',
+            example: 1
+        }
+    },
+    required: ['content', 'referenceType', 'referenceId']
+} as const;
+
+export const $ContactResponseDto = {
+    type: 'object',
+    properties: {
+        conversationId: {
+            type: 'number',
+            description: 'The ID of the existing or newly created 1:1 conversation',
+            example: 1
+        },
+        suggestedMessage: {
+            description: 'Optional suggested prefilled message referencing the resource',
+            nullable: true,
+            type: 'object',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/SuggestedMessageDto'
+                }
+            ]
+        }
+    },
+    required: ['conversationId']
+} as const;
+
+export const $Conversation = {
+    type: 'object',
+    properties: {
+        id: {
+            type: 'number',
+            description: 'The unique identifier of the conversation',
+            example: 1
+        },
+        createdAt: {
+            format: 'date-time',
+            type: 'string',
+            description: 'When this conversation was created',
+            example: '2025-01-18T12:00:00.000Z'
+        },
+        updatedAt: {
+            format: 'date-time',
+            type: 'string',
+            description: 'When this conversation was last updated',
+            example: '2025-01-18T12:30:00.000Z'
+        }
+    },
+    required: ['id', 'createdAt', 'updatedAt']
+} as const;
+
+export const $Message = {
+    type: 'object',
+    properties: {
+        id: {
+            type: 'number',
+            description: 'The unique identifier of the message',
+            example: 1
+        },
+        conversationId: {
+            type: 'number',
+            description: 'The ID of the conversation this message belongs to',
+            example: 1
+        },
+        senderId: {
+            type: 'number',
+            description: 'The ID of the user who sent this message',
+            example: 1
+        },
+        content: {
+            type: 'string',
+            description: 'The text content of the message',
+            example: 'Hello there'
+        },
+        referenceType: {
+            type: 'string',
+            description: 'Optional type of context this message references',
+            enum: ['RESOURCE', 'ACTIVITY'],
+            example: 'RESOURCE',
+            nullable: true
+        },
+        referenceId: {
+            type: 'number',
+            description: 'Optional ID of the referenced entity, scoped by referenceType',
+            example: 1,
+            nullable: true
+        },
+        referenceLabel: {
+            type: 'string',
+            description: 'Optional cached label of the referenced entity for rendering',
+            example: 'Laser Cutter',
+            nullable: true
+        },
+        referenceUrl: {
+            type: 'string',
+            description: 'Optional cached URL of the referenced entity for rendering',
+            example: '/resources/1',
+            nullable: true
+        },
+        createdAt: {
+            format: 'date-time',
+            type: 'string',
+            description: 'When this message was created',
+            example: '2025-01-18T12:00:00.000Z'
+        },
+        conversation: {
+            description: 'The conversation this message belongs to',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/Conversation'
+                }
+            ]
+        },
+        sender: {
+            description: 'The user who sent this message',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/User'
+                }
+            ]
+        }
+    },
+    required: ['id', 'conversationId', 'senderId', 'content', 'referenceType', 'referenceId', 'referenceLabel', 'referenceUrl', 'createdAt', 'conversation', 'sender']
+} as const;
+
+export const $ConversationListItemDto = {
+    type: 'object',
+    properties: {
+        id: {
+            type: 'number',
+            description: 'The unique identifier of the conversation',
+            example: 1
+        },
+        otherParticipant: {
+            description: 'The other participant of this 1:1 conversation',
+            nullable: true,
+            type: 'object',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/User'
+                }
+            ]
+        },
+        lastMessage: {
+            description: 'The most recent message in the conversation',
+            nullable: true,
+            type: 'object',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/Message'
+                }
+            ]
+        },
+        updatedAt: {
+            format: 'date-time',
+            type: 'string',
+            description: 'When this conversation was last updated',
+            example: '2025-01-18T12:30:00.000Z'
+        }
+    },
+    required: ['id', 'otherParticipant', 'lastMessage', 'updatedAt']
+} as const;
+
+export const $ListMessagesResponseDto = {
+    type: 'object',
+    properties: {
+        total: {
+            type: 'number'
+        },
+        page: {
+            type: 'number'
+        },
+        limit: {
+            type: 'number'
+        },
+        data: {
+            type: 'array',
+            items: {
+                '$ref': '#/components/schemas/Message'
+            }
+        }
+    },
+    required: ['total', 'page', 'limit', 'data']
+} as const;
+
+export const $SendMessageDto = {
+    type: 'object',
+    properties: {
+        content: {
+            type: 'string',
+            description: 'The text content of the message',
+            example: 'Hello there'
+        },
+        referenceType: {
+            description: 'Optional type of context this message references',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/MessageReferenceType'
+                }
+            ]
+        },
+        referenceId: {
+            type: 'number',
+            description: 'Optional ID of the referenced entity, scoped by referenceType',
+            example: 1
+        }
+    },
+    required: ['content']
+} as const;

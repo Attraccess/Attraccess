@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { UseQueryResult } from "@tanstack/react-query";
-import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, FlowVariablesService, LicenseService, MqttService, PasswordPolicyAdminService, PasswordPolicyService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceHealthService, ResourceMaintenanceSchedulesService, ResourceMaintenancesService, ResourcesService, SettingsService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
+import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, FlowVariablesService, LicenseService, MessagingService, MqttService, PasswordPolicyAdminService, PasswordPolicyService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceHealthService, ResourceMaintenanceSchedulesService, ResourceMaintenancesService, ResourcesService, SettingsService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
 import { EmailTemplateType, PasswordPolicyRole, PermissionFilter, ResourceIntroducerType } from "../requests/types.gen";
 export type SystemServiceInfoDefaultResponse = Awaited<ReturnType<typeof SystemService.info>>;
 export type SystemServiceInfoQueryResult<TData = SystemServiceInfoDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
@@ -547,6 +547,18 @@ export const UseAnalyticsServiceGetBillingTransactionsInDateRangeKeyFn = ({ end,
   end: string;
   start: string;
 }, queryKey?: Array<unknown>) => [useAnalyticsServiceGetBillingTransactionsInDateRangeKey, ...(queryKey ?? [{ end, start }])];
+export type MessagingServiceMessagingListConversationsDefaultResponse = Awaited<ReturnType<typeof MessagingService.messagingListConversations>>;
+export type MessagingServiceMessagingListConversationsQueryResult<TData = MessagingServiceMessagingListConversationsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useMessagingServiceMessagingListConversationsKey = "MessagingServiceMessagingListConversations";
+export const UseMessagingServiceMessagingListConversationsKeyFn = (queryKey?: Array<unknown>) => [useMessagingServiceMessagingListConversationsKey, ...(queryKey ?? [])];
+export type MessagingServiceMessagingListMessagesDefaultResponse = Awaited<ReturnType<typeof MessagingService.messagingListMessages>>;
+export type MessagingServiceMessagingListMessagesQueryResult<TData = MessagingServiceMessagingListMessagesDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useMessagingServiceMessagingListMessagesKey = "MessagingServiceMessagingListMessages";
+export const UseMessagingServiceMessagingListMessagesKeyFn = ({ id, limit, page }: {
+  id: number;
+  limit?: number | undefined;
+  page?: number | undefined;
+}, queryKey?: Array<unknown>) => [useMessagingServiceMessagingListMessagesKey, ...(queryKey ?? [{ id, limit, page }])];
 export type SystemServiceRebootHostMutationResult = Awaited<ReturnType<typeof SystemService.rebootHost>>;
 export type SystemServiceShutdownHostMutationResult = Awaited<ReturnType<typeof SystemService.shutdownHost>>;
 export type UsersServiceSetLocalSignupDomainWhitelistMutationResult = Awaited<ReturnType<typeof UsersService.setLocalSignupDomainWhitelist>>;
@@ -618,6 +630,9 @@ export type PluginsServiceUploadPluginMutationResult = Awaited<ReturnType<typeof
 export type AttractapServiceEnrollNfcCardMutationResult = Awaited<ReturnType<typeof AttractapService.enrollNfcCard>>;
 export type AttractapServiceResetNfcCardMutationResult = Awaited<ReturnType<typeof AttractapService.resetNfcCard>>;
 export type AttractapServiceGetAppKeyByUidMutationResult = Awaited<ReturnType<typeof AttractapService.getAppKeyByUid>>;
+export type MessagingServiceMessagingContactUserMutationResult = Awaited<ReturnType<typeof MessagingService.messagingContactUser>>;
+export type MessagingServiceMessagingContactResourceHolderMutationResult = Awaited<ReturnType<typeof MessagingService.messagingContactResourceHolder>>;
+export type MessagingServiceMessagingSendMessageMutationResult = Awaited<ReturnType<typeof MessagingService.messagingSendMessage>>;
 export type AuthenticationServiceUpdateOneSsoProviderMutationResult = Awaited<ReturnType<typeof AuthenticationService.updateOneSsoProvider>>;
 export type PasswordPolicyAdminServiceUpsertPasswordPolicyOverrideMutationResult = Awaited<ReturnType<typeof PasswordPolicyAdminService.upsertPasswordPolicyOverride>>;
 export type ResourcesServiceUpdateOneResourceMutationResult = Awaited<ReturnType<typeof ResourcesService.updateOneResource>>;
