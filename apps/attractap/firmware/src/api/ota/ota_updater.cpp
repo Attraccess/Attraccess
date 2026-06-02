@@ -145,7 +145,7 @@ void OtaUpdater::onChunk(esp_websocket_event_data_t data)
 
     if (this->ota.bytesWritten < this->ota.totalSize)
     {
-        this->logger.debug("firmware update last chunk writte, ready for next one");
+        this->logger.debug("firmware update last chunk written, ready for next one");
         this->readyForNextFirmwareChunk = true;
         return;
     }
@@ -220,11 +220,10 @@ void OtaUpdater::updateFirmwareProgress(int percent)
     if (this->progressCallback)
     {
         this->logger.debugf("calling firmware update progress handler %d", percent);
+        this->progressCallback(percent);
     }
     else
     {
         this->logger.error("firmware update progress callback not set");
     }
-
-    this->progressCallback(percent);
 }
