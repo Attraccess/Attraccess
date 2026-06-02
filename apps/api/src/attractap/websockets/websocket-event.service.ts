@@ -46,7 +46,7 @@ export class WebSocketEventService {
 
   @OnEvent(ResourceMaintenanceChangedEvent.EVENT_NAME)
   public async onResourceMaintenanceChanged(event: ResourceMaintenanceChangedEvent) {
-    this.logger.debug('Got resource maintenance changed event');
+    this.logger.debug({ resourceId: event.resourceId }, 'Got resource maintenance changed event');
     this.attractapGateway.sendResourceListToReadersWithResource(event.resourceId);
   }
 }

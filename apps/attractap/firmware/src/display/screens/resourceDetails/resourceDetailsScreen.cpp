@@ -6,6 +6,7 @@
 static const char *SELECT_FIELD_PLACEHOLDER = "Bitte Option waehlen";
 static const char *SELECT_FIELD_NO_OPTIONS = "Keine Optionen verfuegbar";
 static const char *SELECT_FIELD_INVALID = "Ungueltige Auswahl";
+static const char *MAINTENANCE_INFO_TEXT = "Diese Ressource ist wegen Wartungsarbeiten nicht verfuegbar. Wartungsarbeiten duerfen nur von den unten aufgefuehrten Personen durchgefuehrt werden.";
 static const lv_coord_t SELECT_FIELD_OPTION_GAP = 6;
 
 void ResourceDetailsScreen::init()
@@ -409,7 +410,7 @@ void ResourceDetailsScreen::init()
    lv_obj_set_width(maintenanceInfoLabel, lv_pct(100));
    lv_obj_set_height(maintenanceInfoLabel, LV_SIZE_CONTENT);
    lv_obj_set_align(maintenanceInfoLabel, LV_ALIGN_CENTER);
-   lv_label_set_text(maintenanceInfoLabel, "Diese Ressource ist wegen Wartungsarbeiten nicht verfuegbar. Wartungsarbeiten duerfen nur von den unten aufgefuehrten Personen durchgefuehrt werden.");
+   lv_label_set_text(maintenanceInfoLabel, MAINTENANCE_INFO_TEXT);
    lv_obj_set_style_text_color(maintenanceInfoLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_opa(maintenanceInfoLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
 
