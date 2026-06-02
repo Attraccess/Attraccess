@@ -13,9 +13,10 @@ import de from './recentSessionsCard.de.json';
 
 interface RecentSessionsCardProps {
   resourceId: number;
+  className?: string;
 }
 
-export function RecentSessionsCard({ resourceId }: RecentSessionsCardProps) {
+export function RecentSessionsCard({ resourceId, className }: RecentSessionsCardProps) {
   const { t } = useTranslations({ en, de });
   const { user } = useAuth();
 
@@ -29,6 +30,7 @@ export function RecentSessionsCard({ resourceId }: RecentSessionsCardProps) {
 
   return (
     <FlatSection
+      className={className}
       icon={<History className="w-4 h-4" />}
       title={t('title')}
       actions={

@@ -10,9 +10,17 @@
     "backToLogin": "Zurück zum Login",
     "errorTitle": "Fehler"
   },
+  "resend": {
+    "prompt": "Neuen Verifizierungslink benötigt? Gib deine E-Mail-Adresse ein und wir senden dir einen neuen.",
+    "emailLabel": "E-Mail-Adresse",
+    "button": "Verifizierungsmail erneut senden",
+    "successTitle": "E-Mail gesendet!",
+    "successMessage": "Wenn ein Konto mit dieser E-Mail-Adresse existiert und noch nicht verifiziert ist, wurde ein neuer Verifizierungslink gesendet. Bitte überprüfe deinen Posteingang."
+  },
   "apiErrors": {
-    "UserEmailInvalidVerificationTokenException": "Ungültiger Verifizierungstoken. Bitte fordern Sie einen neuen Verifizierungslink an.",
-    "invalidLink": "Ungültiger Verifizierungslink. Bitte fordern Sie einen neuen an.",
+    "UserEmailInvalidVerificationTokenException": "Ungültiger Verifizierungstoken. Bitte fordere einen neuen Verifizierungslink an.",
+    "UserEmailVerificationTokenExpiredException": "Dein Verifizierungslink ist abgelaufen. Bitte fordere unten einen neuen an.",
+    "invalidLink": "Ungültiger Verifizierungslink. Bitte fordere einen neuen an.",
     "unexpectedError": "Ein unerwarteter Fehler ist aufgetreten"
   }
 }
