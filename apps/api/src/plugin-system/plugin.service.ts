@@ -1,6 +1,8 @@
 import { BadRequestException, Logger, NotFoundException } from '@nestjs/common';
 import { join } from 'path';
+import type { PluginManifestInfo } from '@attraccess/plugins-backend-sdk';
 import { PluginManifest, PluginManifestSchema, LoadedPluginManifest } from './plugin.manifest';
+import { PluginSandboxService } from './plugin-sandbox.service';
 import { existsSync, readdirSync, readFileSync } from 'fs';
 import { FileUpload } from '../common/types/file-upload.types';
 import { rename, rm } from 'fs/promises';
@@ -22,6 +24,7 @@ export class PluginService {
   public static configure(config: { PLUGIN_DIR: string, RESTART_BY_EXIT: boolean }): void {
     PluginService.PLUGIN_PATH = config.PLUGIN_DIR; // Assume PLUGIN_DIR from appConfig is already resolved or correct
     PluginService.RESTART_BY_EXIT_FLAG = config.RESTART_BY_EXIT;
+    PluginService.plugins = null; // Discovery may have been cached with an unset path before configure() ran; force a re-scan.
     PluginService.logger.log(`PluginService configured. Path: ${PluginService.PLUGIN_PATH}, RestartByExit: ${PluginService.RESTART_BY_EXIT_FLAG}`);
     if (!PluginService.PLUGIN_PATH) {
         PluginService.logger.error('PLUGIN_DIR is not configured in AppConfig! Plugin system may not work.');
@@ -36,6 +39,19 @@ export class PluginService {
     }
 
     return PluginService.plugins;
+  }
+
+  public static getManifestById(id: string): LoadedPluginManifest | undefined {
+    return PluginService.getPlugins().find((plugin) => plugin.id === id);
+  }
+
+  public static toManifestInfo(manifest: LoadedPluginManifest): PluginManifestInfo {
+    return {
+      id: manifest.id,
+      name: manifest.name,
+      version: manifest.version,
+      pluginDirectory: manifest.pluginDirectory,
+    };
   }
 
   public static markPluginAsLoaded(pluginName: string): void {
@@ -64,10 +80,20 @@ export class PluginService {
           rootFolder,
           pluginFolder
         ) as LoadedPluginManifest | null;
-        if (manifest) {
-          manifest.pluginDirectory = pluginFolder;
-          manifest.id = randomBytes(16).toString('base64url').slice(0, 21);
+        if (!manifest) {
+          return null;
         }
+
+        manifest.pluginDirectory = pluginFolder;
+        manifest.id = randomBytes(16).toString('base64url').slice(0, 21);
+
+        try {
+          manifest.permissions = PluginSandboxService.validateDeclaredPermissions(manifest.name, manifest.permissions);
+        } catch (error) {
+          PluginService.setPluginLoadError(`${manifest.name}@${manifest.version}`, error as Error);
+          return null;
+        }
+
         return manifest;
       })
       .filter((manifest) => manifest !== null);

@@ -8,8 +8,10 @@
     "name": "Name",
     "version": "0.0.16",
     "directory": "Verzeichnis",
+    "permissions": "Berechtigungen",
     "actions": "Aktionen"
   },
+  "noPermissions": "Keine angefordert",
   "deleteTooltip": "Plugin entfernen",
   "deleteConfirmation": {
     "title": "Löschen bestätigen",

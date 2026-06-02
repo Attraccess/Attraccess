@@ -11,6 +11,7 @@
       "items": {
         "resources": "Ressourcen",
         "projects": "Projekte",
+        "messages": "Nachrichten",
         "billing": "Zahlungen",
         "attractap": "NFC-Karten",
         "userManagement": "Benutzerverwaltung"

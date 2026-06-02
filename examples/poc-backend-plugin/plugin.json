@@ -1,0 +1,13 @@
+{
+  "name": "poc-backend-plugin",
+  "version": "1.0.0",
+  "main": {
+    "backend": {
+      "directory": "dist",
+      "entryPoint": "index.js"
+    }
+  },
+  "attraccessVersion": {
+    "min": "1.0.0"
+  }
+}

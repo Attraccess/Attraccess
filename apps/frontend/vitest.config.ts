@@ -12,6 +12,11 @@ export const reactCompilerBabelConfig: TransformOptions = {
 
 export default defineConfig({
   plugins: [react({ babel: reactCompilerBabelConfig }), nxViteTsPaths()],
+  resolve: {
+    alias: {
+      'virtual:__federation__': path.join(__dirname, 'src/test-utils/federation-stub.ts'),
+    },
+  },
   test: {
     root: __dirname,
     globals: true,

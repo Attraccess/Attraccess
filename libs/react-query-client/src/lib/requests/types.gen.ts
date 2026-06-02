@@ -889,7 +889,8 @@ export enum EmailTemplateType {
     RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY = 'resource-usage-billing-transaction-summary',
     PROJECT_INVITATION = 'project-invitation',
     DELETE_ACCOUNT_CONFIRMATION = 'delete-account-confirmation',
-    RESOURCE_HEALTH_CHANGED = 'resource-health-changed'
+    RESOURCE_HEALTH_CHANGED = 'resource-health-changed',
+    USER_RETRAINING_REQUIRED = 'user-retraining-required'
 }
 
 export type EmailTemplate = {
@@ -1437,6 +1438,18 @@ export type CreateResourceDto = {
      * Whether this resource allows overtaking by the next user without the prior user ending their session
      */
     allowTakeOver?: boolean;
+    /**
+     * Days after a user was trained before retraining is required. Null disables the age-based trigger.
+     */
+    retrainingMaxAgeDays?: number | null;
+    /**
+     * Days a user may go without using this resource before retraining is required. Null disables the inactivity trigger.
+     */
+    retrainingMaxInactivityDays?: number | null;
+    /**
+     * Whether to block resource access once retraining is due until the user is retrained
+     */
+    retrainingBlocksAccess?: boolean;
 };
 
 export type ResourceGroup = {
@@ -1452,6 +1465,18 @@ export type ResourceGroup = {
      * A detailed description of the resource
      */
     description?: string;
+    /**
+     * Days after a user was trained on this group before retraining is required. Null disables the age-based trigger.
+     */
+    retrainingMaxAgeDays?: number | null;
+    /**
+     * Days a user may go without using a resource in this group before retraining is required. Null disables the inactivity trigger.
+     */
+    retrainingMaxInactivityDays?: number | null;
+    /**
+     * Whether to block access to grouped resources once retraining is due until the user is retrained
+     */
+    retrainingBlocksAccess: boolean;
     /**
      * When the resource was created
      */
@@ -1560,6 +1585,18 @@ export type Resource = {
      * Whether this resource allows overtaking by the next user without the prior user ending their session
      */
     allowTakeOver: boolean;
+    /**
+     * Days after a user was trained on this resource before retraining is required. Null disables the age-based trigger.
+     */
+    retrainingMaxAgeDays?: number | null;
+    /**
+     * Days a user may go without using this resource before retraining is required. Null disables the inactivity trigger.
+     */
+    retrainingMaxInactivityDays?: number | null;
+    /**
+     * Whether to block resource access once retraining is due until the user is retrained
+     */
+    retrainingBlocksAccess: boolean;
     /**
      * Custom metadata key-value pairs configured for this resource
      */
@@ -1952,6 +1989,18 @@ export type UpdateResourceDto = {
      * Whether this resource allows overtaking by the next user without the prior user ending their session
      */
     allowTakeOver?: boolean;
+    /**
+     * Days after a user was trained before retraining is required. Null disables the age-based trigger.
+     */
+    retrainingMaxAgeDays?: number | null;
+    /**
+     * Days a user may go without using this resource before retraining is required. Null disables the inactivity trigger.
+     */
+    retrainingMaxInactivityDays?: number | null;
+    /**
+     * Whether to block resource access once retraining is due until the user is retrained
+     */
+    retrainingBlocksAccess?: boolean;
 };
 
 export type MqttServer = {
@@ -2104,6 +2153,18 @@ export type CreateResourceGroupDto = {
      * The description of the resource group
      */
     description?: string;
+    /**
+     * Days after a user was trained before retraining is required. Null disables the age-based trigger.
+     */
+    retrainingMaxAgeDays?: number | null;
+    /**
+     * Days a user may go without using a grouped resource before retraining is required. Null disables the inactivity trigger.
+     */
+    retrainingMaxInactivityDays?: number | null;
+    /**
+     * Whether to block access to grouped resources once retraining is due until the user is retrained
+     */
+    retrainingBlocksAccess?: boolean;
 };
 
 export type UpdateResourceGroupDto = {
@@ -2115,6 +2176,18 @@ export type UpdateResourceGroupDto = {
      * The description of the resource group
      */
     description?: string;
+    /**
+     * Days after a user was trained before retraining is required. Null disables the age-based trigger.
+     */
+    retrainingMaxAgeDays?: number | null;
+    /**
+     * Days a user may go without using a grouped resource before retraining is required. Null disables the inactivity trigger.
+     */
+    retrainingMaxInactivityDays?: number | null;
+    /**
+     * Whether to block access to grouped resources once retraining is due until the user is retrained
+     */
+    retrainingBlocksAccess?: boolean;
 };
 
 /**
@@ -2181,6 +2254,10 @@ export type ResourceIntroduction = {
      * When the introduction was completed
      */
     completedAt: string;
+    /**
+     * When the user was last notified that retraining is due (used to avoid repeat notifications)
+     */
+    retrainingNotifiedAt?: string | null;
     /**
      * When the introduction record was created
      */
@@ -2352,6 +2429,41 @@ export type UpdateResourceIntroductionDto = {
      * The comment for the action
      */
     comment?: string;
+};
+
+/**
+ * Which trigger drives the retraining requirement
+ */
+export enum RetrainingReason {
+    AGE = 'age',
+    INACTIVITY = 'inactivity'
+}
+
+export type RetrainingStatusResponseDto = {
+    /**
+     * Whether the current user has any introduction granting access to this resource
+     */
+    hasIntroduction: boolean;
+    /**
+     * Whether a retraining policy applies to the current user for this resource
+     */
+    applies: boolean;
+    /**
+     * Whether retraining is currently due for the current user
+     */
+    isDue: boolean;
+    /**
+     * Whether access is blocked because retraining is due
+     */
+    blocksAccess: boolean;
+    /**
+     * When retraining becomes (or became) due
+     */
+    dueAt: string | null;
+    /**
+     * Which trigger drives the retraining requirement
+     */
+    reason: (RetrainingReason) | null;
 };
 
 export type CanManageMaintenanceResponseDto = {
@@ -3792,6 +3904,10 @@ export type LoadedPluginManifest = {
     version: string;
     attraccessVersion: PluginAttraccessVersion;
     /**
+     * Host capabilities this plugin is permitted to use at runtime
+     */
+    permissions: Array<('READ_USERS' | 'ACCESS_RESOURCES' | 'READ_SETTINGS' | 'DATABASE_ACCESS' | 'EMIT_EVENTS' | 'LISTEN_EVENTS' | 'RESOLVE_HOST_PROVIDERS')>;
+    /**
      * The directory of the plugin
      */
     pluginDirectory: string;
@@ -3933,6 +4049,53 @@ export type UpdateReaderResponseDto = {
      * The updated reader
      */
     reader: Attractap;
+};
+
+export type AttractapCrashReport = {
+    /**
+     * The unique identifier of the crash report
+     */
+    id: number;
+    /**
+     * The ID of the reader this crash report belongs to
+     */
+    attractapId: number;
+    /**
+     * The reset reason reported by the reader (esp_reset_reason)
+     */
+    resetReason: string;
+    /**
+     * Free heap in bytes captured before the freeze/reset
+     */
+    heapFreeBytes: number | null;
+    /**
+     * Largest contiguous free heap block in bytes before the freeze/reset
+     */
+    largestFreeBlockBytes: number | null;
+    /**
+     * Uptime in milliseconds before the reset occurred
+     */
+    uptimeBeforeResetMs: number | null;
+    /**
+     * WebSocket connection state at the time of the freeze/reset
+     */
+    wsState: string | null;
+    /**
+     * WiFi connection state at the time of the freeze/reset
+     */
+    wifiState: string | null;
+    /**
+     * Firmware version string reported by the reader at crash time
+     */
+    firmwareVersion: string | null;
+    /**
+     * Size of the attached coredump blob in bytes, if any
+     */
+    coredumpSize: number | null;
+    /**
+     * When this crash report was received by the server
+     */
+    createdAt: string;
 };
 
 export type AppKeyRequestDto = {
@@ -4977,6 +5140,12 @@ export type ResourceUsageCanControlData = {
 
 export type ResourceUsageCanControlResponse = CanControlResponseDto;
 
+export type ResourceRetrainingGetStatusData = {
+    resourceId: number;
+};
+
+export type ResourceRetrainingGetStatusResponse = RetrainingStatusResponseDto;
+
 export type MqttServersGetAllResponse = Array<MqttServer>;
 
 export type MqttServersCreateOneData = {
@@ -5752,6 +5921,28 @@ export type DeleteReaderData = {
 export type DeleteReaderResponse = unknown;
 
 export type GetReadersResponse = Array<Attractap>;
+
+export type GetReaderCrashReportsData = {
+    /**
+     * The ID of the reader
+     */
+    readerId: number;
+};
+
+export type GetReaderCrashReportsResponse = Array<AttractapCrashReport>;
+
+export type GetReaderCrashReportCoredumpData = {
+    /**
+     * The ID of the reader
+     */
+    readerId: number;
+    /**
+     * The ID of the crash report
+     */
+    reportId: number;
+};
+
+export type GetReaderCrashReportCoredumpResponse = unknown;
 
 export type GetAppKeyByUidData = {
     requestBody: AppKeyRequestDto;
@@ -7537,6 +7728,21 @@ export type $OpenApiTs = {
             };
         };
     };
+    '/api/resources/{resourceId}/retraining/status': {
+        get: {
+            req: ResourceRetrainingGetStatusData;
+            res: {
+                /**
+                 * Retraining status retrieved successfully.
+                 */
+                200: RetrainingStatusResponseDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
     '/api/mqtt/servers': {
         get: {
             res: {
@@ -9006,6 +9212,40 @@ export type $OpenApiTs = {
             };
         };
     };
+    '/api/attractap/readers/{readerId}/crash-reports': {
+        get: {
+            req: GetReaderCrashReportsData;
+            res: {
+                /**
+                 * The list of crash reports for the reader, newest first
+                 */
+                200: Array<AttractapCrashReport>;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/attractap/readers/{readerId}/crash-reports/{reportId}/coredump': {
+        get: {
+            req: GetReaderCrashReportCoredumpData;
+            res: {
+                /**
+                 * The coredump binary blob
+                 */
+                200: unknown;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+                /**
+                 * Crash report or coredump not found
+                 */
+                404: unknown;
+            };
+        };
+    };
     '/api/attractap/cards/keys': {
         post: {
             req: GetAppKeyByUidData;
@@ -9109,6 +9349,16 @@ export type $OpenApiTs = {
                  * The billing transactions in the date range
                  */
                 200: Array<BillingTransaction>;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/messaging/live': {
+        get: {
+            res: {
                 /**
                  * Unauthorized
                  */
