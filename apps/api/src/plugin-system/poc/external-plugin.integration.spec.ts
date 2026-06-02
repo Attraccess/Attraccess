@@ -3,13 +3,21 @@ import { Logger } from '@nestjs/common';
 import { EventEmitter2, EventEmitterModule } from '@nestjs/event-emitter';
 import { ModuleRef } from '@nestjs/core';
 import { Test, TestingModule } from '@nestjs/testing';
-import { DataSource, EntityTarget, ObjectLiteral, Repository } from 'typeorm';
+import { Column, DataSource, Entity, EntityTarget, ObjectLiteral, PrimaryGeneratedColumn, Repository } from 'typeorm';
 import { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { build } from 'esbuild';
 import { createRequire } from 'module';
 import { existsSync, mkdirSync, rmSync } from 'fs';
 import { dirname, join, resolve } from 'path';
-import { PocNote } from './poc-note.entity';
+
+@Entity()
+class PocNote {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @Column()
+  message!: string;
+}
 
 interface PocPongPayload {
   eventsInstanceMatch: boolean;
