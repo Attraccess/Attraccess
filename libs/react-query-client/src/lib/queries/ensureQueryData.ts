@@ -849,6 +849,28 @@ export const ensureUseAttractapServiceGetReaderByIdData = (queryClient: QueryCli
 */
 export const ensureUseAttractapServiceGetReadersData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseAttractapServiceGetReadersKeyFn(), queryFn: () => AttractapService.getReaders() });
 /**
+* Get crash reports for a reader
+* @param data The data for the request.
+* @param data.readerId The ID of the reader
+* @returns AttractapCrashReport The list of crash reports for the reader, newest first
+* @throws ApiError
+*/
+export const ensureUseAttractapServiceGetReaderCrashReportsData = (queryClient: QueryClient, { readerId }: {
+  readerId: number;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseAttractapServiceGetReaderCrashReportsKeyFn({ readerId }), queryFn: () => AttractapService.getReaderCrashReports({ readerId }) });
+/**
+* Download the coredump blob of a crash report
+* @param data The data for the request.
+* @param data.readerId The ID of the reader
+* @param data.reportId The ID of the crash report
+* @returns unknown The coredump binary blob
+* @throws ApiError
+*/
+export const ensureUseAttractapServiceGetReaderCrashReportCoredumpData = (queryClient: QueryClient, { readerId, reportId }: {
+  readerId: number;
+  reportId: number;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseAttractapServiceGetReaderCrashReportCoredumpKeyFn({ readerId, reportId }), queryFn: () => AttractapService.getReaderCrashReportCoredump({ readerId, reportId }) });
+/**
 * Get all of your cards
 * @returns NFCCard The list of all cards
 * @throws ApiError

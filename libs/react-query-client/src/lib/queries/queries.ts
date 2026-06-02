@@ -849,6 +849,28 @@ export const useAttractapServiceGetReaderById = <TData = Common.AttractapService
 */
 export const useAttractapServiceGetReaders = <TData = Common.AttractapServiceGetReadersDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseAttractapServiceGetReadersKeyFn(queryKey), queryFn: () => AttractapService.getReaders() as TData, ...options });
 /**
+* Get crash reports for a reader
+* @param data The data for the request.
+* @param data.readerId The ID of the reader
+* @returns AttractapCrashReport The list of crash reports for the reader, newest first
+* @throws ApiError
+*/
+export const useAttractapServiceGetReaderCrashReports = <TData = Common.AttractapServiceGetReaderCrashReportsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ readerId }: {
+  readerId: number;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseAttractapServiceGetReaderCrashReportsKeyFn({ readerId }, queryKey), queryFn: () => AttractapService.getReaderCrashReports({ readerId }) as TData, ...options });
+/**
+* Download the coredump blob of a crash report
+* @param data The data for the request.
+* @param data.readerId The ID of the reader
+* @param data.reportId The ID of the crash report
+* @returns unknown The coredump binary blob
+* @throws ApiError
+*/
+export const useAttractapServiceGetReaderCrashReportCoredump = <TData = Common.AttractapServiceGetReaderCrashReportCoredumpDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ readerId, reportId }: {
+  readerId: number;
+  reportId: number;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseAttractapServiceGetReaderCrashReportCoredumpKeyFn({ readerId, reportId }, queryKey), queryFn: () => AttractapService.getReaderCrashReportCoredump({ readerId, reportId }) as TData, ...options });
+/**
 * Get all of your cards
 * @returns NFCCard The list of all cards
 * @throws ApiError

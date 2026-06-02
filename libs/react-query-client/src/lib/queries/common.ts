@@ -504,6 +504,19 @@ export type AttractapServiceGetReadersDefaultResponse = Awaited<ReturnType<typeo
 export type AttractapServiceGetReadersQueryResult<TData = AttractapServiceGetReadersDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useAttractapServiceGetReadersKey = "AttractapServiceGetReaders";
 export const UseAttractapServiceGetReadersKeyFn = (queryKey?: Array<unknown>) => [useAttractapServiceGetReadersKey, ...(queryKey ?? [])];
+export type AttractapServiceGetReaderCrashReportsDefaultResponse = Awaited<ReturnType<typeof AttractapService.getReaderCrashReports>>;
+export type AttractapServiceGetReaderCrashReportsQueryResult<TData = AttractapServiceGetReaderCrashReportsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useAttractapServiceGetReaderCrashReportsKey = "AttractapServiceGetReaderCrashReports";
+export const UseAttractapServiceGetReaderCrashReportsKeyFn = ({ readerId }: {
+  readerId: number;
+}, queryKey?: Array<unknown>) => [useAttractapServiceGetReaderCrashReportsKey, ...(queryKey ?? [{ readerId }])];
+export type AttractapServiceGetReaderCrashReportCoredumpDefaultResponse = Awaited<ReturnType<typeof AttractapService.getReaderCrashReportCoredump>>;
+export type AttractapServiceGetReaderCrashReportCoredumpQueryResult<TData = AttractapServiceGetReaderCrashReportCoredumpDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useAttractapServiceGetReaderCrashReportCoredumpKey = "AttractapServiceGetReaderCrashReportCoredump";
+export const UseAttractapServiceGetReaderCrashReportCoredumpKeyFn = ({ readerId, reportId }: {
+  readerId: number;
+  reportId: number;
+}, queryKey?: Array<unknown>) => [useAttractapServiceGetReaderCrashReportCoredumpKey, ...(queryKey ?? [{ readerId, reportId }])];
 export type AttractapServiceGetAllCardsDefaultResponse = Awaited<ReturnType<typeof AttractapService.getAllCards>>;
 export type AttractapServiceGetAllCardsQueryResult<TData = AttractapServiceGetAllCardsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useAttractapServiceGetAllCardsKey = "AttractapServiceGetAllCards";

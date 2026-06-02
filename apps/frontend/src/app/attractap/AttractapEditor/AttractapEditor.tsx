@@ -18,6 +18,7 @@ import {
 import { Button } from '../../../components/button';
 import { TextField, Label, Input } from '@heroui/react';
 import { StandardDrawer } from '../../../components/standardDrawer';
+import { AttractapDiagnostics } from './AttractapDiagnostics';
 import { useCallback, useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -51,7 +52,7 @@ export function AttractapEditor(props: Readonly<Props>) {
   const [name, setName] = useState('');
   const [ledBrightness, setLedBrightness] = useState<number>(255);
   const [connectedResourceIds, setConnectedResourceIds] = useState<number[]>([]);
-  const [selectedTab, setSelectedTab] = useState<'general' | 'resources'>('general');
+  const [selectedTab, setSelectedTab] = useState<'general' | 'resources' | 'diagnostics'>('general');
   const updateReaderMutation = useAttractapServiceUpdateReader({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [useAttractapServiceGetReadersKey] });
@@ -109,7 +110,7 @@ export function AttractapEditor(props: Readonly<Props>) {
           <Form onSubmit={onSubmit} className="flex flex-col gap-4">
             <Tabs
               selectedKey={selectedTab}
-              onSelectionChange={(k) => setSelectedTab(k as 'general' | 'resources')}
+              onSelectionChange={(k) => setSelectedTab(k as 'general' | 'resources' | 'diagnostics')}
               className="w-full"
               data-cy="attractap-editor-tabs"
             >
@@ -119,6 +120,9 @@ export function AttractapEditor(props: Readonly<Props>) {
                 </Tab>
                 <Tab id="resources" data-cy="attractap-editor-resources-tab">
                   {t('tabs.resources')}
+                </Tab>
+                <Tab id="diagnostics" data-cy="attractap-editor-diagnostics-tab">
+                  {t('tabs.diagnostics')}
                 </Tab>
               </TabList>
               <TabPanel id="general" className="pt-4">
@@ -156,6 +160,9 @@ export function AttractapEditor(props: Readonly<Props>) {
                     multiple={reader?.firmware.capabilities.resourceSelection ?? true}
                   />
                 </div>
+              </TabPanel>
+              <TabPanel id="diagnostics" className="pt-4">
+                <AttractapDiagnostics readerId={props.readerId} isActive={selectedTab === 'diagnostics'} />
               </TabPanel>
             </Tabs>
           </Form>

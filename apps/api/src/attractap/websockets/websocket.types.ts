@@ -17,6 +17,7 @@ export enum AttractapEventType {
   READER_AUTHENTICATED = 'READER_AUTHENTICATED',
   READER_FIRMWARE_UPDATE_REQUIRED = 'READER_FIRMWARE_UPDATE_REQUIRED',
   READER_FIRMWARE_INFO = 'READER_FIRMWARE_INFO',
+  READER_CRASH_REPORT = 'READER_CRASH_REPORT',
   FIRMWARE_REQUEST_CHUNK = 'FIRMWARE_REQUEST_CHUNK',
   RESOURCE_LIST = 'RESOURCE_LIST',
   REQUEST_CARD_AUTHENTICATION_DATA = 'REQUEST_CARD_AUTHENTICATION_DATA',
@@ -37,6 +38,17 @@ export enum AttractapEventType {
   RESOURCE_USAGE_FORM_FIELDS = 'RESOURCE_USAGE_FORM_FIELDS',
   RESOURCE_USAGE_FORM_SUBMIT_PAGE = 'RESOURCE_USAGE_FORM_SUBMIT_PAGE',
   RESOURCE_USAGE_FORM_PAGE_RESULT = 'RESOURCE_USAGE_FORM_PAGE_RESULT',
+}
+
+export interface ReaderCrashReportPayload {
+  resetReason: string;
+  heapFreeBytes?: number | null;
+  largestFreeBlockBytes?: number | null;
+  uptimeBeforeResetMs?: number | null;
+  wsState?: string | null;
+  wifiState?: string | null;
+  firmwareVersion?: string | null;
+  coredumpBase64?: string | null;
 }
 
 export interface ResourceThumbnailDescriptorPayload {
