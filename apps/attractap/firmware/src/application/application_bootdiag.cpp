@@ -74,6 +74,13 @@ void Application::setupBootDiagnostics() {
         resetReasonToString(reason), prior.uptimeMs, prior.freeInternalHeap,
         prior.largestFreeBlock, prior.websocketConnected, prior.wifiConnected,
         failureClass);
+
+    // Preserve the prior session's last snapshot as a pending crash report so
+    // the API layer can upload it on the next successful connect (ATT-474).
+    // The live "record" key is overwritten with the current session just below.
+    this->bootDiagPreferences.begin(BOOT_DIAG_NAMESPACE, false);
+    this->bootDiagPreferences.putBytes("pending", &prior, sizeof(prior));
+    this->bootDiagPreferences.end();
   } else {
     this->logger.infof("No prior boot record (reset=%s)",
                        resetReasonToString(reason));
