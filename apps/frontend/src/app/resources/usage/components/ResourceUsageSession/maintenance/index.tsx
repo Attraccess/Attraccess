@@ -4,6 +4,7 @@ import {
 } from '@attraccess/react-query-client';
 import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { MaintenanceReasonDisplay } from '../../../../../../components/MaintenanceReasonDisplay';
+import { ResourceIntroducersList } from '../../../../../../components/ResourceIntroducersList';
 import { StartSessionControls } from '../../StartSessionControls';
 import { Alert, AlertContent, AlertDescription, AlertTitle } from '@heroui/react';
 
@@ -50,13 +51,17 @@ export function MaintenanceInProgressDisplay(props: Props) {
             start: formatDateTime(maintenance.startTime, t('alert.noDate')),
             end: formatDateTime(maintenance.endTime, t('alert.noDate')),
           })}</AlertDescription>
+            <div className="mt-4 flex flex-col">
+              <small className="text-sm text-gray-500">{t('alert.reason.label')}</small>
+              <p className="text-lg whitespace-pre-wrap">
+                <MaintenanceReasonDisplay reason={maintenance.reason} fallback={t('alert.reason.noReason')} />
+              </p>
+            </div>
           </AlertContent>
-          <small className="text-sm text-gray-500 mt-4 ">{t('alert.reason.label')}</small>
-          <p className="text-lg whitespace-pre-wrap">
-            <MaintenanceReasonDisplay reason={maintenance.reason} fallback={t('alert.reason.noReason')} />
-          </p>
         </Alert>
       ))}
+
+      <ResourceIntroducersList resourceId={resourceId} title={t('maintainers')} />
 
       {permissions?.canManage && <StartSessionControls resourceId={resourceId} />}
     </div>

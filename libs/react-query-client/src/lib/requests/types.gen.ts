@@ -182,6 +182,13 @@ export type VerifyEmailDto = {
     email: string;
 };
 
+export type ResendVerificationEmailDto = {
+    /**
+     * The email address to resend the verification email to
+     */
+    email: string;
+};
+
 export type AcceptInvitationDto = {
     /**
      * The token to accept the invitation
@@ -2199,11 +2206,23 @@ export type UpdateResourceGroupIntroductionDto = {
     comment?: string;
 };
 
+/**
+ * The kind of access: 'introducer' can give introductions and do maintenance; 'maintainer' can only do maintenance and control the machine
+ */
+export enum ResourceIntroducerType {
+    INTRODUCER = 'introducer',
+    MAINTAINER = 'maintainer'
+}
+
 export type ResourceIntroducer = {
     /**
      * The unique identifier of the introduction permission
      */
     id: number;
+    /**
+     * The kind of access: 'introducer' can give introductions and do maintenance; 'maintainer' can only do maintenance and control the machine
+     */
+    type: ResourceIntroducerType;
     /**
      * The ID of the resource (if permission is for a specific resource)
      */
@@ -2231,6 +2250,13 @@ export type IsResourceGroupIntroducerResponseDto = {
      * Whether the user is an introducer for the resource
      */
     isIntroducer: boolean;
+};
+
+export type GrantIntroducerDto = {
+    /**
+     * The kind of access to grant. 'introducer' (default) can give introductions and do maintenance; 'maintainer' can only do maintenance and control the machine
+     */
+    type?: ResourceIntroducerType;
 };
 
 export type FormSubmissionFieldAnswerDto = {
@@ -4090,6 +4116,14 @@ export type VerifyEmailResponse = {
     message?: string;
 };
 
+export type ResendVerificationEmailData = {
+    requestBody: ResendVerificationEmailDto;
+};
+
+export type ResendVerificationEmailResponse = {
+    message?: string;
+};
+
 export type AcceptInvitationData = {
     requestBody: AcceptInvitationDto;
 };
@@ -4902,6 +4936,7 @@ export type ResourceGroupIntroducersGrantData = {
      * The ID of the resource group
      */
     groupId: number;
+    requestBody: GrantIntroducerDto;
     /**
      * The ID of the user
      */
@@ -4933,11 +4968,16 @@ export type ResourceIntroducersIsIntroducerResponse = IsResourceIntroducerRespon
 
 export type ResourceIntroducersGetManyData = {
     resourceId: number;
+    /**
+     * Filter by access type. Omit to return both introducers and maintainers.
+     */
+    type?: ResourceIntroducerType;
 };
 
 export type ResourceIntroducersGetManyResponse = Array<ResourceIntroducer>;
 
 export type ResourceIntroducersGrantData = {
+    requestBody: GrantIntroducerDto;
     resourceId: number;
     userId: number;
 };
@@ -5838,6 +5878,23 @@ export type $OpenApiTs = {
                 };
                 /**
                  * Invalid token or email.
+                 */
+                400: unknown;
+            };
+        };
+    };
+    '/api/users/resend-verification-email': {
+        post: {
+            req: ResendVerificationEmailData;
+            res: {
+                /**
+                 * If the email exists and is not yet verified, a new verification email will be sent.
+                 */
+                200: {
+                    message?: string;
+                };
+                /**
+                 * Invalid input data.
                  */
                 400: unknown;
             };

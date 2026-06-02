@@ -1,13 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { isValidEmail } from '../../utils/email';
 import { useUrlQuery } from '@attraccess/plugins-frontend-ui';
 import { useNavigate } from 'react-router-dom';
 import { Loading } from '../loading';
-import { Alert, AlertContent, AlertDescription, AlertTitle, Card } from '@heroui/react';
+import { Alert, AlertContent, AlertDescription, AlertTitle, Card, Input, Label, TextField } from '@heroui/react';
 import { Button } from '../../components/button';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
-import { useUsersServiceVerifyEmail, useUsersServiceGetCurrentKey, ApiError } from '@attraccess/react-query-client';
+import {
+  useUsersServiceVerifyEmail,
+  useUsersServiceResendVerificationEmail,
+  useUsersServiceGetCurrentKey,
+  ApiError,
+} from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { getTranslationKeyForApiError } from '../../utils/apiError';
 
@@ -16,6 +22,8 @@ export function VerifyEmail() {
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [resendEmail, setResendEmail] = useState('');
+  const [resendSuccess, setResendSuccess] = useState(false);
   const { t, tExists } = useTranslations({ en, de });
 
   const token = useMemo(() => query.get('token'), [query]);
@@ -42,8 +50,24 @@ export function VerifyEmail() {
       });
       const translation = t(key, { error: errorMessage });
       setError(translation);
-      // Reset the ref so user can try again
       didSendRequest.current = false;
+    },
+  });
+
+  const resendVerification = useUsersServiceResendVerificationEmail({
+    onSuccess: () => {
+      setResendSuccess(true);
+    },
+    onError: (error) => {
+      const { key, errorMessage } = getTranslationKeyForApiError({
+        error: error as ApiError,
+        t,
+        tExists,
+        baseTranslationKey: 'apiErrors',
+        fallbackKey: 'unexpectedError',
+      });
+      const translation = t(key, { error: errorMessage });
+      setError(translation);
     },
   });
 
@@ -63,11 +87,10 @@ export function VerifyEmail() {
   }, [token, email, t, verifyEmail]);
 
   useEffect(() => {
-    // Only activate if we have both token and email
     if (token && email) {
       activateEmail();
+      setResendEmail(email);
     } else if (token !== null && email !== null) {
-      // Both are defined but one is empty - show error immediately
       setError(t('apiErrors.invalidLink'));
       didSendRequest.current = true;
     }
@@ -100,18 +123,50 @@ export function VerifyEmail() {
           <Card.Header className="text-center">
             <h2 className="text-3xl font-bold">{t('error.title')}</h2>
           </Card.Header>
-          <Card.Content>
-            <Alert status="danger"
-              data-cy="verify-email-error-alert"
-            >
+          <Card.Content className="flex flex-col gap-4">
+            <Alert status="danger" data-cy="verify-email-error-alert">
               <AlertContent>
                 <AlertTitle>{t('error.errorTitle')}</AlertTitle>
                 <AlertDescription>{error}</AlertDescription>
               </AlertContent>
             </Alert>
+
+            {resendSuccess ? (
+              <Alert status="success" data-testid="resend-success-alert">
+                <AlertContent>
+                  <AlertTitle>{t('resend.successTitle')}</AlertTitle>
+                  <AlertDescription>{t('resend.successMessage')}</AlertDescription>
+                </AlertContent>
+              </Alert>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-sm text-gray-600 dark:text-gray-400">{t('resend.prompt')}</p>
+                <TextField value={resendEmail} onChange={setResendEmail}>
+                  <Label>{t('resend.emailLabel')}</Label>
+                  <Input type="email" data-testid="resend-email-input" />
+                </TextField>
+                <Button
+                  variant="secondary"
+                  className="w-full"
+                  onPress={() => {
+                    const trimmed = resendEmail.trim();
+                    if (!isValidEmail(trimmed)) {
+                      return;
+                    }
+                    resendVerification.mutate({ requestBody: { email: trimmed } });
+                  }}
+                  isPending={resendVerification.isPending}
+                  isDisabled={!isValidEmail(resendEmail.trim()) || resendVerification.isPending}
+                  data-testid="resend-verification-button"
+                >
+                  {t('resend.button')}
+                </Button>
+              </div>
+            )}
           </Card.Content>
           <Card.Footer className="flex flex-col gap-2">
-            <Button variant="primary"
+            <Button
+              variant="primary"
               className="w-full"
               onPress={activateEmail}
               isDisabled={verifyEmail.isPending}

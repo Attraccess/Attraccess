@@ -113,3 +113,5 @@ export * from './1778000000000-flow-variables';
 export * from './1779000000000-password-policy';
 export * from './1779100000000-password-history';
 export * from './1779380000000-password-policy-slice-c';
+export * from './1779400000000-resource-introducer-type';
+export * from './1779400000000-messaging';
