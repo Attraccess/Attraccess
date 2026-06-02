@@ -144,7 +144,10 @@ void API::sendPendingCrashReport()
         return;
     }
 
-    const char *resetStr = crashResetReasonToString(rec.resetReason);
+    // esp_reset_reason() reports what ENDED the previous session (the crash we
+    // are reporting). The stored record's resetReason is what started it, so the
+    // live reset reason is the correct label to pair with the pre-freeze snapshot.
+    const char *resetStr = crashResetReasonToString((uint8_t)esp_reset_reason());
 
     size_t b64Len = 0;
     std::unique_ptr<char[]> coredump = readCoredumpBase64(this->logger, b64Len);
