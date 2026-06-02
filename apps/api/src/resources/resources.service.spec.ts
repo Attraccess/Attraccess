@@ -532,6 +532,9 @@ describe('ResourcesService', () => {
         allowTakeOver: createDto.allowTakeOver || false,
         separateUnlockAndUnlatch: false,
         metadata: createDto.metadata ?? null,
+        retrainingMaxAgeDays: createDto.retrainingMaxAgeDays ?? null,
+        retrainingMaxInactivityDays: createDto.retrainingMaxInactivityDays ?? null,
+        retrainingBlocksAccess: createDto.retrainingBlocksAccess ?? false,
       });
       expect(resourceRepository.save).toHaveBeenCalled();
     });

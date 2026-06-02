@@ -378,6 +378,16 @@ export const useResourcesServiceResourceUsageCanControl = <TData = Common.Resour
   resourceId: number;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseResourcesServiceResourceUsageCanControlKeyFn({ resourceId }, queryKey), queryFn: () => ResourcesService.resourceUsageCanControl({ resourceId }) as TData, ...options });
 /**
+* Get the retraining status of the current user for a resource
+* @param data The data for the request.
+* @param data.resourceId
+* @returns RetrainingStatusResponseDto Retraining status retrieved successfully.
+* @throws ApiError
+*/
+export const useResourcesServiceResourceRetrainingGetStatus = <TData = Common.ResourcesServiceResourceRetrainingGetStatusDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ resourceId }: {
+  resourceId: number;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseResourcesServiceResourceRetrainingGetStatusKeyFn({ resourceId }, queryKey), queryFn: () => ResourcesService.resourceRetrainingGetStatus({ resourceId }) as TData, ...options });
+/**
 * Get all MQTT servers
 * @returns MqttServer Returns all MQTT servers
 * @throws ApiError

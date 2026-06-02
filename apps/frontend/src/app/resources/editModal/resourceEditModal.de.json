@@ -49,6 +49,23 @@
         "label": "Aufsperren und Falle öffnen separat",
         "description": "Kann sinnvoll sein, wenn die Tür nicht nur aufsperren muss, sondern auch die Falle öffnen muss"
       }
+    },
+    "retraining": {
+      "sectionTitle": "Nachschulungspflicht",
+      "description": "Benutzer müssen nach einer bestimmten Zeit oder bei Inaktivität nachgeschult werden. Feld leer lassen, um den jeweiligen Auslöser zu deaktivieren.",
+      "disabledPlaceholder": "Deaktiviert",
+      "maxAgeDays": {
+        "label": "Nachschulung nach (Tagen seit Einweisung)",
+        "description": "Die Nachschulung wird so viele Tage nach der Einweisung fällig, unabhängig von der Nutzung."
+      },
+      "maxInactivityDays": {
+        "label": "Nachschulung nach Inaktivität (Tage)",
+        "description": "Die Nachschulung wird fällig, wenn der Benutzer die Ressource so viele Tage nicht genutzt hat."
+      },
+      "blocksAccess": {
+        "label": "Zugriff bis zur Nachschulung sperren",
+        "description": "Wenn aktiviert, verlieren Benutzer den Zugriff, sobald die Nachschulung fällig ist, bis ein Einweiser sie nachschult."
+      }
     }
   },
   "create": {

@@ -13,5 +13,19 @@
   "successTitleUpdate": "Gruppe aktualisiert",
   "successDescriptionUpdate": "Ressourcengruppe \"{{name}}\" wurde erfolgreich aktualisiert.",
   "errorTitleUpdate": "Aktualisierung fehlgeschlagen",
-  "errorDescriptionUpdate": "Fehler beim Aktualisieren der Ressourcengruppe. Bitte versuchen Sie es erneut."
+  "errorDescriptionUpdate": "Fehler beim Aktualisieren der Ressourcengruppe. Bitte versuchen Sie es erneut.",
+  "retraining": {
+    "sectionTitle": "Nachschulungspflicht",
+    "description": "Gilt für Benutzer, die in diese Gruppe eingewiesen wurden. Feld leer lassen, um den Auslöser zu deaktivieren.",
+    "disabledPlaceholder": "Deaktiviert",
+    "maxAgeDays": {
+      "label": "Nachschulung nach (Tagen seit Einweisung)"
+    },
+    "maxInactivityDays": {
+      "label": "Nachschulung nach Inaktivität (Tage)"
+    },
+    "blocksAccess": {
+      "label": "Zugriff bis zur Nachschulung sperren"
+    }
+  }
 }

@@ -1,0 +1,14 @@
+{
+  "due": {
+    "title": "Nachschulung fällig",
+    "description": "Deine Einweisung für diese Ressource muss erneuert werden."
+  },
+  "blocked": {
+    "title": "Zugriff gesperrt - Nachschulung erforderlich",
+    "description": "Der Zugriff ist gesperrt, bis ein Einweiser dich nachschult."
+  },
+  "reason": {
+    "age": "Deine Einweisung hat ihr maximales Alter erreicht.",
+    "inactivity": "Du hast diese Ressource im festgelegten Zeitraum nicht genutzt."
+  }
+}

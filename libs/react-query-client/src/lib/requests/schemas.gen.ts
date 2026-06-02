@@ -1370,7 +1370,7 @@ export const $PreviewMjmlResponseDto = {
 
 export const $EmailTemplateType = {
     type: 'string',
-    enum: ['verify-email', 'user-invitation', 'reset-password', 'username-changed', 'password-changed', 'resource-usage-billing-transaction-summary', 'project-invitation', 'delete-account-confirmation', 'resource-health-changed'],
+    enum: ['verify-email', 'user-invitation', 'reset-password', 'username-changed', 'password-changed', 'resource-usage-billing-transaction-summary', 'project-invitation', 'delete-account-confirmation', 'resource-health-changed', 'user-retraining-required'],
     description: 'Template type/key used by the system'
 } as const;
 
@@ -2327,6 +2327,24 @@ This is a markdown documentation for the resource.`
             description: 'Whether this resource allows overtaking by the next user without the prior user ending their session',
             example: false,
             default: false
+        },
+        retrainingMaxAgeDays: {
+            type: 'number',
+            description: 'Days after a user was trained before retraining is required. Null disables the age-based trigger.',
+            nullable: true,
+            example: 365
+        },
+        retrainingMaxInactivityDays: {
+            type: 'number',
+            description: 'Days a user may go without using this resource before retraining is required. Null disables the inactivity trigger.',
+            nullable: true,
+            example: 180
+        },
+        retrainingBlocksAccess: {
+            type: 'boolean',
+            description: 'Whether to block resource access once retraining is due until the user is retrained',
+            default: false,
+            example: false
         }
     },
     required: ['name', 'type']
@@ -2350,6 +2368,24 @@ export const $ResourceGroup = {
             description: 'A detailed description of the resource',
             example: 'Prusa i3 MK3S+ 3D printer with 0.4mm nozzle'
         },
+        retrainingMaxAgeDays: {
+            type: 'number',
+            description: 'Days after a user was trained on this group before retraining is required. Null disables the age-based trigger.',
+            example: 365,
+            nullable: true
+        },
+        retrainingMaxInactivityDays: {
+            type: 'number',
+            description: 'Days a user may go without using a resource in this group before retraining is required. Null disables the inactivity trigger.',
+            example: 180,
+            nullable: true
+        },
+        retrainingBlocksAccess: {
+            type: 'boolean',
+            description: 'Whether to block access to grouped resources once retraining is due until the user is retrained',
+            example: false,
+            default: false
+        },
         createdAt: {
             format: 'date-time',
             type: 'string',
@@ -2361,7 +2397,7 @@ export const $ResourceGroup = {
             description: 'When the resource was last updated'
         }
     },
-    required: ['id', 'name', 'createdAt', 'updatedAt']
+    required: ['id', 'name', 'retrainingBlocksAccess', 'createdAt', 'updatedAt']
 } as const;
 
 export const $FormFieldType = {
@@ -2488,6 +2524,24 @@ This is a markdown documentation for the resource.`
             example: false,
             default: false
         },
+        retrainingMaxAgeDays: {
+            type: 'number',
+            description: 'Days after a user was trained on this resource before retraining is required. Null disables the age-based trigger.',
+            example: 365,
+            nullable: true
+        },
+        retrainingMaxInactivityDays: {
+            type: 'number',
+            description: 'Days a user may go without using this resource before retraining is required. Null disables the inactivity trigger.',
+            example: 180,
+            nullable: true
+        },
+        retrainingBlocksAccess: {
+            type: 'boolean',
+            description: 'Whether to block resource access once retraining is due until the user is retrained',
+            example: false,
+            default: false
+        },
         metadata: {
             type: 'object',
             description: 'Custom metadata key-value pairs configured for this resource',
@@ -2528,7 +2582,7 @@ This is a markdown documentation for the resource.`
             }
         }
     },
-    required: ['id', 'name', 'type', 'separateUnlockAndUnlatch', 'allowTakeOver', 'createdAt', 'updatedAt', 'deletedAt', 'groups', 'forms']
+    required: ['id', 'name', 'type', 'separateUnlockAndUnlatch', 'allowTakeOver', 'retrainingBlocksAccess', 'createdAt', 'updatedAt', 'deletedAt', 'groups', 'forms']
 } as const;
 
 export const $ProjectMemberRole = {
@@ -3049,6 +3103,23 @@ This is a markdown documentation for the resource.`
             type: 'boolean',
             description: 'Whether this resource allows overtaking by the next user without the prior user ending their session',
             example: false
+        },
+        retrainingMaxAgeDays: {
+            type: 'number',
+            description: 'Days after a user was trained before retraining is required. Null disables the age-based trigger.',
+            nullable: true,
+            example: 365
+        },
+        retrainingMaxInactivityDays: {
+            type: 'number',
+            description: 'Days a user may go without using this resource before retraining is required. Null disables the inactivity trigger.',
+            nullable: true,
+            example: 180
+        },
+        retrainingBlocksAccess: {
+            type: 'boolean',
+            description: 'Whether to block resource access once retraining is due until the user is retrained',
+            example: false
         }
     }
 } as const;
@@ -3241,6 +3312,24 @@ export const $CreateResourceGroupDto = {
             type: 'string',
             description: 'The description of the resource group',
             example: 'This is a resource group'
+        },
+        retrainingMaxAgeDays: {
+            type: 'number',
+            description: 'Days after a user was trained before retraining is required. Null disables the age-based trigger.',
+            nullable: true,
+            example: 365
+        },
+        retrainingMaxInactivityDays: {
+            type: 'number',
+            description: 'Days a user may go without using a grouped resource before retraining is required. Null disables the inactivity trigger.',
+            nullable: true,
+            example: 180
+        },
+        retrainingBlocksAccess: {
+            type: 'boolean',
+            description: 'Whether to block access to grouped resources once retraining is due until the user is retrained',
+            default: false,
+            example: false
         }
     },
     required: ['name']
@@ -3258,6 +3347,23 @@ export const $UpdateResourceGroupDto = {
             type: 'string',
             description: 'The description of the resource group',
             example: 'This is a resource group'
+        },
+        retrainingMaxAgeDays: {
+            type: 'number',
+            description: 'Days after a user was trained before retraining is required. Null disables the age-based trigger.',
+            nullable: true,
+            example: 365
+        },
+        retrainingMaxInactivityDays: {
+            type: 'number',
+            description: 'Days a user may go without using a grouped resource before retraining is required. Null disables the inactivity trigger.',
+            nullable: true,
+            example: 180
+        },
+        retrainingBlocksAccess: {
+            type: 'boolean',
+            description: 'Whether to block access to grouped resources once retraining is due until the user is retrained',
+            example: false
         }
     },
     required: ['name']
@@ -3352,6 +3458,13 @@ export const $ResourceIntroduction = {
             type: 'string',
             description: 'When the introduction was completed',
             example: '2021-01-01T00:00:00.000Z'
+        },
+        retrainingNotifiedAt: {
+            format: 'date-time',
+            type: 'string',
+            description: 'When the user was last notified that retraining is due (used to avoid repeat notifications)',
+            example: '2021-01-01T00:00:00.000Z',
+            nullable: true
         },
         createdAt: {
             format: 'date-time',
@@ -3656,6 +3769,50 @@ export const $UpdateResourceIntroductionDto = {
             example: 'This is a comment'
         }
     }
+} as const;
+
+export const $RetrainingReason = {
+    type: 'string',
+    enum: ['age', 'inactivity'],
+    description: 'Which trigger drives the retraining requirement'
+} as const;
+
+export const $RetrainingStatusResponseDto = {
+    type: 'object',
+    properties: {
+        hasIntroduction: {
+            type: 'boolean',
+            description: 'Whether the current user has any introduction granting access to this resource'
+        },
+        applies: {
+            type: 'boolean',
+            description: 'Whether a retraining policy applies to the current user for this resource'
+        },
+        isDue: {
+            type: 'boolean',
+            description: 'Whether retraining is currently due for the current user'
+        },
+        blocksAccess: {
+            type: 'boolean',
+            description: 'Whether access is blocked because retraining is due'
+        },
+        dueAt: {
+            type: 'string',
+            description: 'When retraining becomes (or became) due',
+            format: 'date-time',
+            nullable: true
+        },
+        reason: {
+            description: 'Which trigger drives the retraining requirement',
+            nullable: true,
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/RetrainingReason'
+                }
+            ]
+        }
+    },
+    required: ['hasIntroduction', 'applies', 'isDue', 'blocksAccess', 'dueAt', 'reason']
 } as const;
 
 export const $CanManageMaintenanceResponseDto = {
