@@ -1,0 +1,14 @@
+{
+  "due": {
+    "title": "Retraining due",
+    "description": "Your training for this resource needs to be renewed."
+  },
+  "blocked": {
+    "title": "Access blocked - retraining required",
+    "description": "Access is blocked until an introducer retrains you."
+  },
+  "reason": {
+    "age": "Your training has reached its maximum age.",
+    "inactivity": "You have not used this resource for the configured period."
+  }
+}

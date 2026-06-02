@@ -9,7 +9,7 @@ import 'sqlite3';
 import '@nestjs/common';
 import { WebSocketEventService } from './websockets/websocket-event.service';
 import { EventEmitterModule } from '@nestjs/event-emitter';
-import { Attractap, NFCCard, Resource, User } from '@attraccess/database-entities';
+import { Attractap, AttractapCrashReport, NFCCard, Resource, User } from '@attraccess/database-entities';
 import { UsersAndAuthModule } from '../users-and-auth/users-and-auth.module';
 import { ResourcesModule } from '../resources/resources.module';
 import { ResourceUsageModule } from '../resources/usage/resourceUsage.module';
@@ -27,7 +27,7 @@ import { ResourceFormsModule } from '../resources/forms/forms.module';
 @Module({
   imports: [
     EventEmitterModule.forRoot(),
-    TypeOrmModule.forFeature([Attractap, NFCCard, Resource, User]),
+    TypeOrmModule.forFeature([Attractap, AttractapCrashReport, NFCCard, Resource, User]),
     UsersAndAuthModule,
     ResourcesModule,
     ResourceUsageModule,

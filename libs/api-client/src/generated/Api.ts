@@ -96,6 +96,12 @@ export enum ResourceMaintenanceScheduleTriggerType {
   TIME_INTERVAL = "TIME_INTERVAL",
 }
 
+/** Which trigger drives the retraining requirement */
+export enum RetrainingReason {
+  Age = "age",
+  Inactivity = "inactivity",
+}
+
 /** The kind of access: 'introducer' can give introductions and do maintenance; 'maintainer' can only do maintenance and control the machine */
 export enum ResourceIntroducerType {
   Introducer = "introducer",
@@ -171,6 +177,7 @@ export enum EmailTemplateType {
   ProjectInvitation = "project-invitation",
   DeleteAccountConfirmation = "delete-account-confirmation",
   ResourceHealthChanged = "resource-health-changed",
+  UserRetrainingRequired = "user-retraining-required",
 }
 
 /** The type of the provider */
@@ -1636,6 +1643,22 @@ export interface CreateResourceDto {
    * @example false
    */
   allowTakeOver?: boolean;
+  /**
+   * Days after a user was trained before retraining is required. Null disables the age-based trigger.
+   * @example 365
+   */
+  retrainingMaxAgeDays?: number | null;
+  /**
+   * Days a user may go without using this resource before retraining is required. Null disables the inactivity trigger.
+   * @example 180
+   */
+  retrainingMaxInactivityDays?: number | null;
+  /**
+   * Whether to block resource access once retraining is due until the user is retrained
+   * @default false
+   * @example false
+   */
+  retrainingBlocksAccess?: boolean;
 }
 
 export interface ResourceGroup {
@@ -1654,6 +1677,22 @@ export interface ResourceGroup {
    * @example "Prusa i3 MK3S+ 3D printer with 0.4mm nozzle"
    */
   description?: string;
+  /**
+   * Days after a user was trained on this group before retraining is required. Null disables the age-based trigger.
+   * @example 365
+   */
+  retrainingMaxAgeDays?: number | null;
+  /**
+   * Days a user may go without using a resource in this group before retraining is required. Null disables the inactivity trigger.
+   * @example 180
+   */
+  retrainingMaxInactivityDays?: number | null;
+  /**
+   * Whether to block access to grouped resources once retraining is due until the user is retrained
+   * @default false
+   * @example false
+   */
+  retrainingBlocksAccess: boolean;
   /**
    * When the resource was created
    * @format date-time
@@ -1740,6 +1779,22 @@ export interface Resource {
    * @example false
    */
   allowTakeOver: boolean;
+  /**
+   * Days after a user was trained on this resource before retraining is required. Null disables the age-based trigger.
+   * @example 365
+   */
+  retrainingMaxAgeDays?: number | null;
+  /**
+   * Days a user may go without using this resource before retraining is required. Null disables the inactivity trigger.
+   * @example 180
+   */
+  retrainingMaxInactivityDays?: number | null;
+  /**
+   * Whether to block resource access once retraining is due until the user is retrained
+   * @default false
+   * @example false
+   */
+  retrainingBlocksAccess: boolean;
   /**
    * Custom metadata key-value pairs configured for this resource
    * @example {"location":"lab-1","template":"door-access"}
@@ -2045,6 +2100,21 @@ export interface UpdateResourceDto {
    * @example false
    */
   allowTakeOver?: boolean;
+  /**
+   * Days after a user was trained before retraining is required. Null disables the age-based trigger.
+   * @example 365
+   */
+  retrainingMaxAgeDays?: number | null;
+  /**
+   * Days a user may go without using this resource before retraining is required. Null disables the inactivity trigger.
+   * @example 180
+   */
+  retrainingMaxInactivityDays?: number | null;
+  /**
+   * Whether to block resource access once retraining is due until the user is retrained
+   * @example false
+   */
+  retrainingBlocksAccess?: boolean;
 }
 
 export interface MqttServer {
@@ -2202,6 +2272,22 @@ export interface CreateResourceGroupDto {
    * @example "This is a resource group"
    */
   description?: string;
+  /**
+   * Days after a user was trained before retraining is required. Null disables the age-based trigger.
+   * @example 365
+   */
+  retrainingMaxAgeDays?: number | null;
+  /**
+   * Days a user may go without using a grouped resource before retraining is required. Null disables the inactivity trigger.
+   * @example 180
+   */
+  retrainingMaxInactivityDays?: number | null;
+  /**
+   * Whether to block access to grouped resources once retraining is due until the user is retrained
+   * @default false
+   * @example false
+   */
+  retrainingBlocksAccess?: boolean;
 }
 
 export interface UpdateResourceGroupDto {
@@ -2215,6 +2301,21 @@ export interface UpdateResourceGroupDto {
    * @example "This is a resource group"
    */
   description?: string;
+  /**
+   * Days after a user was trained before retraining is required. Null disables the age-based trigger.
+   * @example 365
+   */
+  retrainingMaxAgeDays?: number | null;
+  /**
+   * Days a user may go without using a grouped resource before retraining is required. Null disables the inactivity trigger.
+   * @example 180
+   */
+  retrainingMaxInactivityDays?: number | null;
+  /**
+   * Whether to block access to grouped resources once retraining is due until the user is retrained
+   * @example false
+   */
+  retrainingBlocksAccess?: boolean;
 }
 
 export interface ResourceIntroductionHistoryItem {
@@ -2285,6 +2386,12 @@ export interface ResourceIntroduction {
    * @example "2021-01-01T00:00:00.000Z"
    */
   completedAt: string;
+  /**
+   * When the user was last notified that retraining is due (used to avoid repeat notifications)
+   * @format date-time
+   * @example "2021-01-01T00:00:00.000Z"
+   */
+  retrainingNotifiedAt?: string | null;
   /**
    * When the introduction record was created
    * @format date-time
@@ -2446,6 +2553,24 @@ export interface UpdateResourceIntroductionDto {
    * @example "This is a comment"
    */
   comment?: string;
+}
+
+export interface RetrainingStatusResponseDto {
+  /** Whether the current user has any introduction granting access to this resource */
+  hasIntroduction: boolean;
+  /** Whether a retraining policy applies to the current user for this resource */
+  applies: boolean;
+  /** Whether retraining is currently due for the current user */
+  isDue: boolean;
+  /** Whether access is blocked because retraining is due */
+  blocksAccess: boolean;
+  /**
+   * When retraining becomes (or became) due
+   * @format date-time
+   */
+  dueAt: string | null;
+  /** Which trigger drives the retraining requirement */
+  reason: RetrainingReason | null;
 }
 
 export interface CanManageMaintenanceResponseDto {
@@ -4728,6 +4853,12 @@ export interface ResourceIntroductionsGetHistoryParams {
 
 export type ResourceIntroductionsGetHistoryData =
   ResourceIntroductionHistoryItem[];
+
+export interface ResourceRetrainingGetStatusParams {
+  resourceId: number;
+}
+
+export type ResourceRetrainingGetStatusData = RetrainingStatusResponseDto;
 
 export interface CanManageMaintenanceParams {
   /** The ID of the resource */
@@ -7265,6 +7396,24 @@ export namespace Resources {
     export type RequestBody = never;
     export type RequestHeaders = {};
     export type ResponseBody = ResourceUsageCanControlData;
+  }
+
+  /**
+   * No description
+   * @tags Resources
+   * @name ResourceRetrainingGetStatus
+   * @summary Get the retraining status of the current user for a resource
+   * @request GET:/api/resources/{resourceId}/retraining/status
+   * @secure
+   */
+  export namespace ResourceRetrainingGetStatus {
+    export type RequestParams = {
+      resourceId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = ResourceRetrainingGetStatusData;
   }
 }
 
@@ -11707,6 +11856,27 @@ export class Api<
     ) =>
       this.request<ResourceUsageCanControlData, void>({
         path: `/api/resources/${resourceId}/usage/can-control`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Resources
+     * @name ResourceRetrainingGetStatus
+     * @summary Get the retraining status of the current user for a resource
+     * @request GET:/api/resources/{resourceId}/retraining/status
+     * @secure
+     */
+    resourceRetrainingGetStatus: (
+      { resourceId }: ResourceRetrainingGetStatusParams,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResourceRetrainingGetStatusData, void>({
+        path: `/api/resources/${resourceId}/retraining/status`,
         method: "GET",
         secure: true,
         format: "json",

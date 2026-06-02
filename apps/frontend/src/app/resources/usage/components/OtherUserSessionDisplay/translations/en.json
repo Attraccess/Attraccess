@@ -2,6 +2,11 @@
   "resourceInUseBy": "Resource currently in use by:",
   "unknownUser": "Unknown User",
   "sessionStarted": "Session Started",
+  "contact": {
+    "button": "Contact current user",
+    "error": "Could not contact user",
+    "errorDescription": "Failed to open a conversation with the current user. Please try again."
+  },
   "takeover": {
     "available": "This resource allows takeover. You can end the current session and start your own.",
     "button": "Takeover Resource",

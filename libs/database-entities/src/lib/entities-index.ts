@@ -19,6 +19,7 @@ import { SSOProviderSAMLConfiguration } from './entities/ssoProvider.saml';
 import { User, SystemPermissions, type SystemPermission } from './entities/user.entity';
 import { Session } from './entities/session.entity';
 import { Attractap, AttractapFirmwareVersion } from './entities/attractap.entity';
+import { AttractapCrashReport } from './entities/attractapCrashReport.entity';
 import {
   ResourceFlowNode,
   ResourceFlowNodeType,
@@ -114,6 +115,7 @@ export {
   Session,
   NFCCard,
   Attractap,
+  AttractapCrashReport,
   EmailTemplate,
   ResourceFlowNode,
   ResourceFlowNodeType,
@@ -204,6 +206,7 @@ export const entities = {
   SSOProviderSAMLConfiguration,
   NFCCard,
   Attractap,
+  AttractapCrashReport,
   EmailTemplate,
   ResourceFlowNode,
   ResourceFlowEdge,

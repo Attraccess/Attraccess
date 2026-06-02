@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { PluginPermission } from '@attraccess/plugins-backend-sdk';
 import { z } from 'zod';
 
 export class PluginMainFrontend {
@@ -91,6 +92,14 @@ export class PluginManifest {
     type: PluginAttraccessVersion,
   })
   attraccessVersion: PluginAttraccessVersion;
+
+  @ApiProperty({
+    description: 'Host capabilities this plugin is permitted to use at runtime',
+    enum: PluginPermission,
+    isArray: true,
+    example: [PluginPermission.EMIT_EVENTS, PluginPermission.READ_SETTINGS],
+  })
+  permissions: PluginPermission[];
 }
 
 export class LoadedPluginManifest extends PluginManifest {
@@ -145,4 +154,8 @@ export const PluginManifestSchema = z.object({
       },
       { message: 'min, max or exact must be provided' }
     ),
+  permissions: z
+    .array(z.nativeEnum(PluginPermission, { message: 'unknown plugin permission' }))
+    .optional()
+    .default([]),
 });

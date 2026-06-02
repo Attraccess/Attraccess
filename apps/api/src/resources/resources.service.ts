@@ -54,6 +54,9 @@ export class ResourcesService {
       type: dto.type,
       separateUnlockAndUnlatch: dto.separateUnlockAndUnlatch || false,
       metadata: dto.metadata ?? null,
+      retrainingMaxAgeDays: dto.retrainingMaxAgeDays ?? null,
+      retrainingMaxInactivityDays: dto.retrainingMaxInactivityDays ?? null,
+      retrainingBlocksAccess: dto.retrainingBlocksAccess ?? false,
     });
 
     // Save the resource first to get an ID
@@ -116,6 +119,11 @@ export class ResourcesService {
 
     // Handle allowTakeOver field
     if (dto.allowTakeOver !== undefined) resource.allowTakeOver = dto.allowTakeOver;
+
+    if (dto.retrainingMaxAgeDays !== undefined) resource.retrainingMaxAgeDays = dto.retrainingMaxAgeDays;
+    if (dto.retrainingMaxInactivityDays !== undefined)
+      resource.retrainingMaxInactivityDays = dto.retrainingMaxInactivityDays;
+    if (dto.retrainingBlocksAccess !== undefined) resource.retrainingBlocksAccess = dto.retrainingBlocksAccess;
 
     if (image && dto.deleteImage) {
       throw new BadRequestException('Image and deleteImage cannot be used together');

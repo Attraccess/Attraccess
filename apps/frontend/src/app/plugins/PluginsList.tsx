@@ -88,6 +88,7 @@ export function PluginsList() {
               <TableColumn isRowHeader>{t('columns.name')}</TableColumn>
               <TableColumn>{t('columns.version')}</TableColumn>
               <TableColumn>{t('columns.directory')}</TableColumn>
+              <TableColumn>{t('columns.permissions')}</TableColumn>
               <TableColumn>{t('columns.actions')}</TableColumn>
             </TableHeader>
             <TableBody items={plugins} renderEmptyState={() => <EmptyState />}>
@@ -100,6 +101,19 @@ export function PluginsList() {
                     </Chip>
                   </TableCell>
                   <TableCell>{plugin.pluginDirectory || '-'}</TableCell>
+                  <TableCell>
+                    {plugin.permissions && plugin.permissions.length > 0 ? (
+                      <div className="flex flex-wrap gap-1" data-cy={`plugins-list-permissions-${plugin.id}`}>
+                        {plugin.permissions.map((permission) => (
+                          <Chip key={permission} variant="soft" color="warning">
+                            {permission}
+                          </Chip>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-default-400">{t('noPermissions')}</span>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <Tooltip>
                       <Button
