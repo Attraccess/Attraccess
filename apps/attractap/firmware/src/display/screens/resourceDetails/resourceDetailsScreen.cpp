@@ -6,6 +6,7 @@
 static const char *SELECT_FIELD_PLACEHOLDER = "Bitte Option waehlen";
 static const char *SELECT_FIELD_NO_OPTIONS = "Keine Optionen verfuegbar";
 static const char *SELECT_FIELD_INVALID = "Ungueltige Auswahl";
+static const char *MAINTENANCE_INFO_TEXT = "Diese Ressource ist wegen Wartungsarbeiten nicht verfuegbar. Wartungsarbeiten duerfen nur von den unten aufgefuehrten Personen durchgefuehrt werden.";
 static const lv_coord_t SELECT_FIELD_OPTION_GAP = 6;
 
 void ResourceDetailsScreen::init()
@@ -394,6 +395,31 @@ void ResourceDetailsScreen::init()
    lv_obj_set_align(this->introducersListLabel, LV_ALIGN_CENTER);
    lv_label_set_text(this->introducersListLabel, "???");
 
+   this->maintenancePanel = lv_obj_create(this->screen);
+   lv_obj_set_width(this->maintenancePanel, lv_pct(100));
+   lv_obj_set_height(this->maintenancePanel, LV_SIZE_CONTENT);
+   lv_obj_set_align(this->maintenancePanel, LV_ALIGN_CENTER);
+   lv_obj_set_flex_flow(this->maintenancePanel, LV_FLEX_FLOW_COLUMN);
+   lv_obj_set_flex_align(this->maintenancePanel, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+   lv_obj_remove_flag(this->maintenancePanel, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_set_style_bg_color(this->maintenancePanel, lv_color_hex(0xF31260), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_bg_opa(this->maintenancePanel, 200, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_add_flag(this->maintenancePanel, LV_OBJ_FLAG_HIDDEN);
+
+   lv_obj_t *maintenanceInfoLabel = lv_label_create(this->maintenancePanel);
+   lv_obj_set_width(maintenanceInfoLabel, lv_pct(100));
+   lv_obj_set_height(maintenanceInfoLabel, LV_SIZE_CONTENT);
+   lv_obj_set_align(maintenanceInfoLabel, LV_ALIGN_CENTER);
+   lv_label_set_text(maintenanceInfoLabel, MAINTENANCE_INFO_TEXT);
+   lv_obj_set_style_text_color(maintenanceInfoLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_opa(maintenanceInfoLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   this->maintenanceIntroducersLabel = lv_label_create(this->maintenancePanel);
+   lv_obj_set_width(this->maintenanceIntroducersLabel, LV_SIZE_CONTENT);
+   lv_obj_set_height(this->maintenanceIntroducersLabel, LV_SIZE_CONTENT);
+   lv_obj_set_align(this->maintenanceIntroducersLabel, LV_ALIGN_CENTER);
+   lv_label_set_text(this->maintenanceIntroducersLabel, "???");
+
    // action overlay is created lazily on lv_layer_top() when needed
    this->actionOverlay = nullptr;
    this->actionOverlayLabel = nullptr;
@@ -413,23 +439,15 @@ void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief 
    lv_label_set_text(this->resourceName, resource.name);
    lv_label_set_text(this->resourceDescription, resource.description);
 
-   // Update introducers panel list
+   // Update introducer/maintainer panel lists (same set of allowed users)
+   String introducersText = this->buildIntroducersText(resource);
    if (this->introducersListLabel)
    {
-      String list;
-      for (uint8_t i = 0; i < resource.introducerCount; ++i)
-      {
-         if (i > 0)
-         {
-            list += "\n";
-         }
-         list += resource.introducers[i];
-      }
-      if (list.length() == 0)
-      {
-         list = "-- kein Einweiser verfuegbar --";
-      }
-      lv_label_set_text(this->introducersListLabel, list.c_str());
+      lv_label_set_text(this->introducersListLabel, introducersText.c_str());
+   }
+   if (this->maintenanceIntroducersLabel)
+   {
+      lv_label_set_text(this->maintenanceIntroducersLabel, introducersText.c_str());
    }
 
    // Toggle sections based on type and usage
@@ -500,6 +518,61 @@ void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief 
    }
 
    this->updateElapsedTimeDisplay();
+   this->refreshAccessState();
+}
+
+String ResourceDetailsScreen::buildIntroducersText(const API::ResourceBrief &resource)
+{
+   String list;
+   for (uint8_t i = 0; i < resource.introducerCount; ++i)
+   {
+      if (i > 0)
+      {
+         list += "\n";
+      }
+      list += resource.introducers[i];
+   }
+   if (list.length() == 0)
+   {
+      list = "-- kein Einweiser verfuegbar --";
+   }
+   return list;
+}
+
+void ResourceDetailsScreen::refreshAccessState()
+{
+   bool underMaintenance = this->resourceCacheValid && this->resourceCache.isUnderMaintenance;
+
+   if (this->maintenancePanel)
+   {
+      lv_obj_set_flag(this->maintenancePanel, LV_OBJ_FLAG_HIDDEN, !underMaintenance);
+   }
+
+   if (!this->userDetailsInitialized)
+   {
+      return;
+   }
+
+   const UserDetails &user = this->userDetailsCache;
+   bool isMaintainer = user.isIntroducer || user.canManageResource;
+
+   // No-introduction panel is shown only when the user is missing an introduction
+   // and the resource is not blocked by maintenance (maintenance panel takes priority).
+   if (this->noIntroductionPanel)
+   {
+      lv_obj_set_flag(this->noIntroductionPanel, LV_OBJ_FLAG_HIDDEN, user.hasIntroduction || underMaintenance);
+   }
+
+   // Session controls require access; during maintenance only maintainers may use the resource.
+   bool canUse = user.hasIntroduction || user.isIntroducer || user.canManageResource;
+   if (underMaintenance)
+   {
+      canUse = isMaintainer;
+   }
+   if (this->sessionControls)
+   {
+      lv_obj_set_flag(this->sessionControls, LV_OBJ_FLAG_HIDDEN, !canUse);
+   }
 }
 
 void ResourceDetailsScreen::updateElapsedTimeDisplay()
@@ -622,6 +695,8 @@ void ResourceDetailsScreen::destroy()
    this->sessionTimeoutIndicator = nullptr;
    this->noIntroductionPanel = nullptr;
    this->introducersListLabel = nullptr;
+   this->maintenancePanel = nullptr;
+   this->maintenanceIntroducersLabel = nullptr;
    this->actionOverlayLabel = nullptr;
    this->successToast = nullptr;
    this->formsModalMeta = nullptr;
@@ -892,17 +967,7 @@ void ResourceDetailsScreen::setUserDetails(UserDetails userDetails)
    this->logger.debugf("Setting login user label text: %s", userDetails.username.c_str());
    lv_label_set_text(this->loginUserLabel, userDetails.username.c_str());
 
-   // show introduction panel only if user does not have introduction
-   if (this->noIntroductionPanel)
-   {
-      lv_obj_set_flag(this->noIntroductionPanel, LV_OBJ_FLAG_HIDDEN, userDetails.hasIntroduction);
-   }
-
-   // show session controls only if the user hasIntroduction, isIntroducer or canManageResource
-   if (this->sessionControls)
-   {
-      lv_obj_set_flag(this->sessionControls, LV_OBJ_FLAG_HIDDEN, !userDetails.hasIntroduction && !userDetails.isIntroducer && !userDetails.canManageResource);
-   }
+   this->refreshAccessState();
 }
 
 void ResourceDetailsScreen::showActionProgress(const char *text)

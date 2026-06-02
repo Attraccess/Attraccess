@@ -44,6 +44,7 @@ public:
         char name[MAX_RESOURCE_NAME_LEN];
         char description[MAX_DESC_LEN];
         bool hasActiveUsage;
+        bool isUnderMaintenance;
         char activeUser[MAX_USERNAME_LEN];
         uint32_t activeStartEpoch; // seconds since epoch
         uint8_t introducerCount;
