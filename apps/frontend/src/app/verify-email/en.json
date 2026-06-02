@@ -10,8 +10,16 @@
     "backToLogin": "Back to Login",
     "errorTitle": "Error"
   },
+  "resend": {
+    "prompt": "Need a new verification link? Enter your email and we'll send you one.",
+    "emailLabel": "Email address",
+    "button": "Resend verification email",
+    "successTitle": "Email sent!",
+    "successMessage": "If an account with that email exists and is not yet verified, a new verification link has been sent. Please check your inbox."
+  },
   "apiErrors": {
     "UserEmailInvalidVerificationTokenException": "Invalid verification token. Please request a new verification link.",
+    "UserEmailVerificationTokenExpiredException": "Your verification link has expired. Please request a new one below.",
     "invalidLink": "Invalid verification link. Please request a new one.",
     "unexpectedError": "An unexpected error occurred"
   }
