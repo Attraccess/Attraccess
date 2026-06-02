@@ -116,3 +116,4 @@ export * from './1779380000000-password-policy-slice-c';
 export * from './1779400000000-resource-introducer-type';
 export * from './1779400000000-messaging';
 export * from './1779500000000-attractap-crash-report';
+export * from './1780000000000-user-retraining-requirement';

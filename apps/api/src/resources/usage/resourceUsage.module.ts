@@ -12,6 +12,7 @@ import { ResourceFlowsModule } from '../flows/resource-flows.module';
 import { ProjectsModule } from '../../projects/projects.module';
 import { ResourceFormsModule } from '../forms/forms.module';
 import { ResourceHealthModule } from '../health/resource-health.module';
+import { ResourceRetrainingModule } from '../retraining/resourceRetraining.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { ResourceHealthModule } from '../health/resource-health.module';
     ResourceIntroducersModule,
     ResourceIntroductionsModule,
     ResourceGroupsModule,
+    ResourceRetrainingModule,
     ResourceMaintenanceModule,
     forwardRef(() => BillingModule),
     forwardRef(() => ResourceFlowsModule),

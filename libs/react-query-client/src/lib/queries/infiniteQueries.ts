@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { InfiniteData, useInfiniteQuery, UseInfiniteQueryOptions } from "@tanstack/react-query";
-import { BillingService, ProjectsService, ResourceFlowsService, ResourceMaintenancesService, ResourcesService, UsersService } from "../requests/services.gen";
+import { BillingService, MessagingService, ProjectsService, ResourceFlowsService, ResourceMaintenancesService, ResourcesService, UsersService } from "../requests/services.gen";
 import { PermissionFilter } from "../requests/types.gen";
 import * as Common from "./common";
 /**
@@ -178,6 +178,23 @@ export const useProjectsServiceGetProjectUsageHistoryInfinite = <TData = Infinit
   startDate?: string | undefined;
 }, queryKey?: TQueryKey, options?: Omit<UseInfiniteQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useInfiniteQuery({
   queryKey: Common.UseProjectsServiceGetProjectUsageHistoryKeyFn({ endDate, id, limit, startDate }, queryKey), queryFn: ({ pageParam }) => ProjectsService.getProjectUsageHistory({ endDate, id, limit, page: pageParam as number, startDate }) as TData, initialPageParam: 1, getNextPageParam: response => (response as {
+    nextPage: number;
+  }).nextPage, ...options
+});
+/**
+* List paginated messages of a conversation
+* @param data The data for the request.
+* @param data.id
+* @param data.page The page number to retrieve
+* @param data.limit The number of items per page
+* @returns ListMessagesResponseDto The paginated messages
+* @throws ApiError
+*/
+export const useMessagingServiceMessagingListMessagesInfinite = <TData = InfiniteData<Common.MessagingServiceMessagingListMessagesDefaultResponse>, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ id, limit }: {
+  id: number;
+  limit?: number | undefined;
+}, queryKey?: TQueryKey, options?: Omit<UseInfiniteQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useInfiniteQuery({
+  queryKey: Common.UseMessagingServiceMessagingListMessagesKeyFn({ id, limit }, queryKey), queryFn: ({ pageParam }) => MessagingService.messagingListMessages({ id, limit, page: pageParam as number }) as TData, initialPageParam: 1, getNextPageParam: response => (response as {
     nextPage: number;
   }).nextPage, ...options
 });

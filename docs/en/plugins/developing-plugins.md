@@ -44,6 +44,41 @@ A backend plugin can:
 3. Build and package your plugin
 4. Upload it through the [Plugins](plugins/installing-plugins.md) page
 
+### Packaging Backend Plugins
+
+A backend plugin runs **inside** the Attraccess server process and shares the host's NestJS runtime, event bus and database connection. For this to work, your build must use the *same* copies of those packages that the host already loaded -- it must **not** bundle its own.
+
+Split your dependencies into two groups:
+
+| Dependency | How to declare it | Why |
+|-----------|-------------------|-----|
+| `@nestjs/common`, `@nestjs/core`, `@nestjs/event-emitter`, `eventemitter2`, `typeorm`, `reflect-metadata` | `peerDependencies`, **externalized** at build time (never bundled) | They carry the dependency-injection identities, the shared event bus and the single database connection. A bundled copy is treated as a *different* type and silently fails to connect. |
+| `@attraccess/plugins-backend-sdk` and your own code | Bundle normally | Safe to include in your artifact. |
+
+Ship a **CommonJS** entry point (`index.js`), not an ES module (`index.mjs`). Point your `plugin.json` manifest at it:
+
+```json
+{
+  "name": "my-plugin",
+  "version": "1.0.0",
+  "main": { "backend": { "directory": "dist", "entryPoint": "index.js" } },
+  "attraccessVersion": { "min": "1.0.0" }
+}
+```
+
+A minimal [esbuild](https://esbuild.github.io/) build that follows the rule:
+
+```bash
+esbuild src/index.ts \
+  --bundle --platform=node --format=cjs --outfile=dist/index.js \
+  --external:@nestjs/common --external:@nestjs/core \
+  --external:@nestjs/event-emitter --external:eventemitter2 \
+  --external:typeorm --external:reflect-metadata
+```
+
+> [!WARNING]
+> If you bundle any of the externalized packages, your plugin may load without errors but quietly fail to receive events, share the database, or resolve host services. When in doubt, keep the dependency list above external.
+
 ## Combined Plugins
 
 You can create a plugin that includes both frontend and backend functionality. This is useful when your extension needs custom API endpoints together with a user interface.

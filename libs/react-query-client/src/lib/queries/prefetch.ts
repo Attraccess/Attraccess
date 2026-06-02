@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { type QueryClient } from "@tanstack/react-query";
-import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, FlowVariablesService, LicenseService, MqttService, PasswordPolicyAdminService, PasswordPolicyService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceHealthService, ResourceMaintenanceSchedulesService, ResourceMaintenancesService, ResourcesService, SettingsService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
+import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, FlowVariablesService, LicenseService, MessagingService, MqttService, PasswordPolicyAdminService, PasswordPolicyService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceHealthService, ResourceMaintenanceSchedulesService, ResourceMaintenancesService, ResourcesService, SettingsService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
 import { EmailTemplateType, PasswordPolicyRole, PermissionFilter, ResourceIntroducerType } from "../requests/types.gen";
 import * as Common from "./common";
 /**
@@ -377,6 +377,16 @@ export const prefetchUseResourcesServiceResourceUsageGetActiveSession = (queryCl
 export const prefetchUseResourcesServiceResourceUsageCanControl = (queryClient: QueryClient, { resourceId }: {
   resourceId: number;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseResourcesServiceResourceUsageCanControlKeyFn({ resourceId }), queryFn: () => ResourcesService.resourceUsageCanControl({ resourceId }) });
+/**
+* Get the retraining status of the current user for a resource
+* @param data The data for the request.
+* @param data.resourceId
+* @returns RetrainingStatusResponseDto Retraining status retrieved successfully.
+* @throws ApiError
+*/
+export const prefetchUseResourcesServiceResourceRetrainingGetStatus = (queryClient: QueryClient, { resourceId }: {
+  resourceId: number;
+}) => queryClient.prefetchQuery({ queryKey: Common.UseResourcesServiceResourceRetrainingGetStatusKeyFn({ resourceId }), queryFn: () => ResourcesService.resourceRetrainingGetStatus({ resourceId }) });
 /**
 * Get all MQTT servers
 * @returns MqttServer Returns all MQTT servers
@@ -932,3 +942,28 @@ export const prefetchUseAnalyticsServiceGetBillingTransactionsInDateRange = (que
   end: string;
   start: string;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseAnalyticsServiceGetBillingTransactionsInDateRangeKeyFn({ end, start }), queryFn: () => AnalyticsService.getBillingTransactionsInDateRange({ end, start }) });
+/**
+* Subscribe to live new messages for the authenticated user
+* @throws ApiError
+*/
+export const prefetchUseMessagingServiceMessagingLive = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseMessagingServiceMessagingLiveKeyFn(), queryFn: () => MessagingService.messagingLive() });
+/**
+* List the authenticated user inbox conversations
+* @returns ConversationListItemDto The inbox conversations
+* @throws ApiError
+*/
+export const prefetchUseMessagingServiceMessagingListConversations = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseMessagingServiceMessagingListConversationsKeyFn(), queryFn: () => MessagingService.messagingListConversations() });
+/**
+* List paginated messages of a conversation
+* @param data The data for the request.
+* @param data.id
+* @param data.page The page number to retrieve
+* @param data.limit The number of items per page
+* @returns ListMessagesResponseDto The paginated messages
+* @throws ApiError
+*/
+export const prefetchUseMessagingServiceMessagingListMessages = (queryClient: QueryClient, { id, limit, page }: {
+  id: number;
+  limit?: number | undefined;
+  page?: number | undefined;
+}) => queryClient.prefetchQuery({ queryKey: Common.UseMessagingServiceMessagingListMessagesKeyFn({ id, limit, page }), queryFn: () => MessagingService.messagingListMessages({ id, limit, page }) });
