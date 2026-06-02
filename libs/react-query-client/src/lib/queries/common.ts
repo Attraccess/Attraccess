@@ -547,6 +547,7 @@ export type UsersServiceCreateOneUserMutationResult = Awaited<ReturnType<typeof 
 export type UsersServiceInviteUserMutationResult = Awaited<ReturnType<typeof UsersService.inviteUser>>;
 export type UsersServiceInviteUsersFromCsvMutationResult = Awaited<ReturnType<typeof UsersService.inviteUsersFromCsv>>;
 export type UsersServiceVerifyEmailMutationResult = Awaited<ReturnType<typeof UsersService.verifyEmail>>;
+export type UsersServiceResendVerificationEmailMutationResult = Awaited<ReturnType<typeof UsersService.resendVerificationEmail>>;
 export type UsersServiceAcceptInvitationMutationResult = Awaited<ReturnType<typeof UsersService.acceptInvitation>>;
 export type UsersServiceRequestPasswordResetMutationResult = Awaited<ReturnType<typeof UsersService.requestPasswordReset>>;
 export type UsersServiceChangePasswordViaResetTokenMutationResult = Awaited<ReturnType<typeof UsersService.changePasswordViaResetToken>>;
