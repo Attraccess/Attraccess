@@ -2,12 +2,19 @@
 #include "../serial/serialCommandHandler.hpp"
 #ifdef ESP_PLATFORM
 #include "esp_heap_caps.h"
+#include "esp_task_wdt.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #endif
 
 void Application::networkTask(void *parameter) {
+#ifdef ESP_PLATFORM
+  esp_task_wdt_add(NULL);
+#endif
   while (true) {
+#ifdef ESP_PLATFORM
+    esp_task_wdt_reset();
+#endif
     Network::loop();
     vTaskDelay(100 / portTICK_PERIOD_MS);
   }
@@ -454,6 +461,10 @@ void Application::setup() {
   xTaskCreate(Application::networkTask, "NetworkTask", 4096, nullptr,
               tskIDLE_PRIORITY, nullptr);
 
+#ifdef ESP_PLATFORM
+  esp_task_wdt_add(NULL);
+#endif
+
 #ifdef HAS_LVGL_DISPLAY
   this->bootTime = millis();
 #else
@@ -462,6 +473,10 @@ void Application::setup() {
 }
 
 void Application::loop() {
+#ifdef ESP_PLATFORM
+  esp_task_wdt_reset();
+#endif
+
   this->snapshotBootDiagnostics();
 
   SerialCommandHandler::loop();

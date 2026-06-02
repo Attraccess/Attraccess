@@ -4039,6 +4039,151 @@ export type AttractapFirmware = {
     flashSize: string;
 };
 
+/**
+ * Type of context this suggested message references
+ */
+export enum MessageReferenceType {
+    RESOURCE = 'RESOURCE',
+    ACTIVITY = 'ACTIVITY'
+}
+
+export type SuggestedMessageDto = {
+    /**
+     * Suggested prefilled message content referencing the resource
+     */
+    content: string;
+    /**
+     * Type of context this suggested message references
+     */
+    referenceType: MessageReferenceType;
+    /**
+     * ID of the referenced entity, scoped by referenceType
+     */
+    referenceId: number;
+};
+
+export type ContactResponseDto = {
+    /**
+     * The ID of the existing or newly created 1:1 conversation
+     */
+    conversationId: number;
+    /**
+     * Optional suggested prefilled message referencing the resource
+     */
+    suggestedMessage?: (SuggestedMessageDto) | null;
+};
+
+export type Conversation = {
+    /**
+     * The unique identifier of the conversation
+     */
+    id: number;
+    /**
+     * When this conversation was created
+     */
+    createdAt: string;
+    /**
+     * When this conversation was last updated
+     */
+    updatedAt: string;
+};
+
+export type Message = {
+    /**
+     * The unique identifier of the message
+     */
+    id: number;
+    /**
+     * The ID of the conversation this message belongs to
+     */
+    conversationId: number;
+    /**
+     * The ID of the user who sent this message
+     */
+    senderId: number;
+    /**
+     * The text content of the message
+     */
+    content: string;
+    /**
+     * Optional type of context this message references
+     */
+    referenceType: 'RESOURCE' | 'ACTIVITY' | null;
+    /**
+     * Optional ID of the referenced entity, scoped by referenceType
+     */
+    referenceId: number | null;
+    /**
+     * Optional cached label of the referenced entity for rendering
+     */
+    referenceLabel: string | null;
+    /**
+     * Optional cached URL of the referenced entity for rendering
+     */
+    referenceUrl: string | null;
+    /**
+     * When this message was created
+     */
+    createdAt: string;
+    /**
+     * The conversation this message belongs to
+     */
+    conversation: Conversation;
+    /**
+     * The user who sent this message
+     */
+    sender: User;
+};
+
+/**
+ * Optional type of context this message references
+ */
+export enum referenceType {
+    RESOURCE = 'RESOURCE',
+    ACTIVITY = 'ACTIVITY'
+}
+
+export type ConversationListItemDto = {
+    /**
+     * The unique identifier of the conversation
+     */
+    id: number;
+    /**
+     * The other participant of this 1:1 conversation
+     */
+    otherParticipant: (User) | null;
+    /**
+     * The most recent message in the conversation
+     */
+    lastMessage: (Message) | null;
+    /**
+     * When this conversation was last updated
+     */
+    updatedAt: string;
+};
+
+export type ListMessagesResponseDto = {
+    total: number;
+    page: number;
+    limit: number;
+    data: Array<Message>;
+};
+
+export type SendMessageDto = {
+    /**
+     * The text content of the message
+     */
+    content: string;
+    /**
+     * Optional type of context this message references
+     */
+    referenceType?: MessageReferenceType;
+    /**
+     * Optional ID of the referenced entity, scoped by referenceType
+     */
+    referenceId?: number;
+};
+
 export type InfoResponse = {
     name?: string;
     status?: string;
@@ -5665,6 +5810,41 @@ export type GetBillingTransactionsInDateRangeData = {
 };
 
 export type GetBillingTransactionsInDateRangeResponse = Array<BillingTransaction>;
+
+export type MessagingContactUserData = {
+    userId: number;
+};
+
+export type MessagingContactUserResponse = ContactResponseDto;
+
+export type MessagingContactResourceHolderData = {
+    resourceId: number;
+};
+
+export type MessagingContactResourceHolderResponse = ContactResponseDto;
+
+export type MessagingListConversationsResponse = Array<ConversationListItemDto>;
+
+export type MessagingListMessagesData = {
+    id: number;
+    /**
+     * The number of items per page
+     */
+    limit?: number;
+    /**
+     * The page number to retrieve
+     */
+    page?: number;
+};
+
+export type MessagingListMessagesResponse = ListMessagesResponseDto;
+
+export type MessagingSendMessageData = {
+    id: number;
+    requestBody: SendMessageDto;
+};
+
+export type MessagingSendMessageResponse = Message;
 
 export type $OpenApiTs = {
     '/api/info': {
@@ -8933,6 +9113,90 @@ export type $OpenApiTs = {
                  * Unauthorized
                  */
                 401: unknown;
+            };
+        };
+    };
+    '/api/messaging/users/{userId}/contact': {
+        post: {
+            req: MessagingContactUserData;
+            res: {
+                /**
+                 * The existing or newly created conversation
+                 */
+                201: ContactResponseDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/messaging/resources/{resourceId}/contact': {
+        post: {
+            req: MessagingContactResourceHolderData;
+            res: {
+                /**
+                 * The conversation with the resource holder
+                 */
+                201: ContactResponseDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+                /**
+                 * No active session for this resource
+                 */
+                404: unknown;
+            };
+        };
+    };
+    '/api/messaging/conversations': {
+        get: {
+            res: {
+                /**
+                 * The inbox conversations
+                 */
+                200: Array<ConversationListItemDto>;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/messaging/conversations/{id}/messages': {
+        get: {
+            req: MessagingListMessagesData;
+            res: {
+                /**
+                 * The paginated messages
+                 */
+                200: ListMessagesResponseDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+                /**
+                 * You are not a participant of this conversation
+                 */
+                403: unknown;
+            };
+        };
+        post: {
+            req: MessagingSendMessageData;
+            res: {
+                /**
+                 * The created message
+                 */
+                201: Message;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+                /**
+                 * You are not a participant of this conversation
+                 */
+                403: unknown;
             };
         };
     };

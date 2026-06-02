@@ -14,3 +14,8 @@ CONFIG_MBEDTLS_PEM_WRITE_C=y
 # Disable legacy/unused ones
 # CONFIG_MBEDTLS_KEY_EXCHANGE_RSA_ENABLED is not set
 # CONFIG_MBEDTLS_KEY_EXCHANGE_DHE_RSA_ENABLED is not set
+
+# Task Watchdog: panic + reboot if loopTask or networkTask hangs > 10s
+CONFIG_ESP_TASK_WDT_INIT=y
+CONFIG_ESP_TASK_WDT_TIMEOUT_S=10
+CONFIG_ESP_TASK_WDT_PANIC=y
