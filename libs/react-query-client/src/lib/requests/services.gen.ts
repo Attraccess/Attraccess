@@ -4447,6 +4447,20 @@ export class AnalyticsService {
 
 export class MessagingService {
     /**
+     * Subscribe to live new messages for the authenticated user
+     * @throws ApiError
+     */
+    public static messagingLive(): CancelablePromise<void> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/messaging/live',
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
      * Get or create a 1:1 conversation with a target user
      * @param data The data for the request.
      * @param data.userId

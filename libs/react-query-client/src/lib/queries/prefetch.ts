@@ -921,6 +921,11 @@ export const prefetchUseAnalyticsServiceGetBillingTransactionsInDateRange = (que
   start: string;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseAnalyticsServiceGetBillingTransactionsInDateRangeKeyFn({ end, start }), queryFn: () => AnalyticsService.getBillingTransactionsInDateRange({ end, start }) });
 /**
+* Subscribe to live new messages for the authenticated user
+* @throws ApiError
+*/
+export const prefetchUseMessagingServiceMessagingLive = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseMessagingServiceMessagingLiveKeyFn(), queryFn: () => MessagingService.messagingLive() });
+/**
 * List the authenticated user inbox conversations
 * @returns ConversationListItemDto The inbox conversations
 * @throws ApiError

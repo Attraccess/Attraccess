@@ -9249,6 +9249,16 @@ export type $OpenApiTs = {
             };
         };
     };
+    '/api/messaging/live': {
+        get: {
+            res: {
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
     '/api/messaging/users/{userId}/contact': {
         post: {
             req: MessagingContactUserData;
