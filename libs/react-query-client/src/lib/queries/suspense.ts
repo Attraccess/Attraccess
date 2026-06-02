@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { UseQueryOptions, useSuspenseQuery } from "@tanstack/react-query";
-import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, FlowVariablesService, LicenseService, MqttService, PasswordPolicyAdminService, PasswordPolicyService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceHealthService, ResourceMaintenanceSchedulesService, ResourceMaintenancesService, ResourcesService, SettingsService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
+import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, FlowVariablesService, LicenseService, MessagingService, MqttService, PasswordPolicyAdminService, PasswordPolicyService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceHealthService, ResourceMaintenanceSchedulesService, ResourceMaintenancesService, ResourcesService, SettingsService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
 import { EmailTemplateType, PasswordPolicyRole, PermissionFilter, ResourceIntroducerType } from "../requests/types.gen";
 import * as Common from "./common";
 /**
@@ -910,3 +910,23 @@ export const useAnalyticsServiceGetBillingTransactionsInDateRangeSuspense = <TDa
   end: string;
   start: string;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseAnalyticsServiceGetBillingTransactionsInDateRangeKeyFn({ end, start }, queryKey), queryFn: () => AnalyticsService.getBillingTransactionsInDateRange({ end, start }) as TData, ...options });
+/**
+* List the authenticated user inbox conversations
+* @returns ConversationListItemDto The inbox conversations
+* @throws ApiError
+*/
+export const useMessagingServiceMessagingListConversationsSuspense = <TData = Common.MessagingServiceMessagingListConversationsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseMessagingServiceMessagingListConversationsKeyFn(queryKey), queryFn: () => MessagingService.messagingListConversations() as TData, ...options });
+/**
+* List paginated messages of a conversation
+* @param data The data for the request.
+* @param data.id
+* @param data.page The page number to retrieve
+* @param data.limit The number of items per page
+* @returns ListMessagesResponseDto The paginated messages
+* @throws ApiError
+*/
+export const useMessagingServiceMessagingListMessagesSuspense = <TData = Common.MessagingServiceMessagingListMessagesDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ id, limit, page }: {
+  id: number;
+  limit?: number | undefined;
+  page?: number | undefined;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseMessagingServiceMessagingListMessagesKeyFn({ id, limit, page }, queryKey), queryFn: () => MessagingService.messagingListMessages({ id, limit, page }) as TData, ...options });
