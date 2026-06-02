@@ -6187,6 +6187,15 @@ export const $LoadedPluginManifest = {
         attraccessVersion: {
             '$ref': '#/components/schemas/PluginAttraccessVersion'
         },
+        permissions: {
+            type: 'array',
+            description: 'Host capabilities this plugin is permitted to use at runtime',
+            example: ['EMIT_EVENTS', 'READ_SETTINGS'],
+            items: {
+                type: 'string',
+                enum: ['READ_USERS', 'ACCESS_RESOURCES', 'READ_SETTINGS', 'DATABASE_ACCESS', 'EMIT_EVENTS', 'LISTEN_EVENTS', 'RESOLVE_HOST_PROVIDERS']
+            }
+        },
         pluginDirectory: {
             type: 'string',
             description: 'The directory of the plugin',
@@ -6198,7 +6207,7 @@ export const $LoadedPluginManifest = {
             example: '123e4567-e89b-12d3-a456-426614174000'
         }
     },
-    required: ['name', 'main', 'version', 'attraccessVersion', 'pluginDirectory', 'id']
+    required: ['name', 'main', 'version', 'attraccessVersion', 'permissions', 'pluginDirectory', 'id']
 } as const;
 
 export const $UploadPluginDto = {

@@ -79,6 +79,59 @@ esbuild src/index.ts \
 > [!WARNING]
 > Wenn Sie eines der externalisierten Pakete mitbuendeln, laedt Ihr Plugin moeglicherweise fehlerfrei, empfaengt aber stillschweigend keine Events, teilt sich nicht die Datenbank oder kann keine Host-Dienste aufloesen. Halten Sie die obige Abhaengigkeitsliste im Zweifel extern.
 
+### Backend-Plugin-Berechtigungen
+
+Ein Backend-Plugin fuehrt beliebigen Code im Host-Prozess aus, daher muss jede
+Host-Faehigkeit, die es nutzt, vorab deklariert werden. Fuegen Sie Ihrer
+`plugin.json` ein `permissions`-Array hinzu, das nur die benoetigten
+Faehigkeiten auflistet. Zur Laufzeit erhaelt Ihr Plugin einen **abgesicherten**
+`PluginContext`: Der Zugriff auf eine Faehigkeit, deren Berechtigung nicht
+deklariert wurde, loest einen klaren Fehler aus, der die fehlende Berechtigung
+nennt.
+
+```json
+{
+  "name": "my-plugin",
+  "version": "1.0.0",
+  "main": { "backend": { "directory": "dist", "entryPoint": "index.js" } },
+  "attraccessVersion": { "min": "1.0.0" },
+  "permissions": ["READ_USERS", "EMIT_EVENTS"]
+}
+```
+
+| Berechtigung | Gewaehrt Zugriff auf |
+|-----------|------------------|
+| `READ_USERS` | `context.getRepository(User)` -- Benutzerkonten lesen. |
+| `ACCESS_RESOURCES` | `context.getRepository(Resource)` -- Ressourcen lesen und schreiben. |
+| `READ_SETTINGS` | `context.getRepository(Setting)` -- Anwendungseinstellungen lesen. |
+| `DATABASE_ACCESS` | `context.dataSource` und `context.getRepository(...)` fuer jede andere Entitaet. |
+| `EMIT_EVENTS` | `context.events.emit(...)` / `emitAsync(...)` -- auf dem geteilten Event-Bus senden. |
+| `LISTEN_EVENTS` | `context.events.on(...)` / `once(...)` / ... -- den geteilten Event-Bus abonnieren. |
+| `RESOLVE_HOST_PROVIDERS` | `context.get(token)` -- beliebige Host-Dienste per Injection-Token aufloesen. |
+
+`context.manifest` und `context.logger` sind immer verfuegbar und benoetigen
+keine Berechtigung. Eine unbekannte Berechtigung fuehrt dazu, dass das Plugin
+nicht geladen wird.
+
+Einige Hinweise zur Grenze:
+
+- `DATABASE_ACCESS` ist die weitreichende Berechtigung: sie umfasst die rohe
+  `dataSource` (inkl. Verbindungskonfiguration) und ein Repository fuer **jede**
+  Entitaet und schliesst damit implizit `READ_USERS`, `ACCESS_RESOURCES` und
+  `READ_SETTINGS` ein. Bevorzugen Sie die engeren Entitaets-Berechtigungen, wenn
+  Sie nur eine dieser Tabellen brauchen.
+- Der Event-Bus wird als **eingeschraenkte** Oberflaeche bereitgestellt. Nur
+  `emit`/`emitAsync` (unter `EMIT_EVENTS`) und die Listener-Methoden `on`, `once`,
+  `addListener`, `prependListener`, `prependOnceListener`, `many`, `prependMany`,
+  `onAny`, `prependAny`, `off`, `offAny`, `removeListener`, `waitFor` (unter
+  `LISTEN_EVENTS`) sind verfuegbar. Globale Operationen wie `removeAllListeners`
+  und `listenTo` werden nicht freigegeben.
+
+> [!WARNING]
+> Fordern Sie nur die minimal noetigen Berechtigungen an. Administratoren sehen
+> auf der Plugins-Seite jede angeforderte Berechtigung, bevor sie einem Plugin
+> vertrauen.
+
 ## Kombinierte Plugins
 
 Sie koennen ein Plugin erstellen, das sowohl Frontend- als auch Backend-Funktionalitaet umfasst. Dies ist nuetzlich, wenn Ihre Erweiterung benutzerdefinierte API-Endpunkte zusammen mit einer Benutzeroberflaeche benoetigt.

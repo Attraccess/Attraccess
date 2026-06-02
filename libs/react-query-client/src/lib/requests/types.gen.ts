@@ -3904,6 +3904,10 @@ export type LoadedPluginManifest = {
     version: string;
     attraccessVersion: PluginAttraccessVersion;
     /**
+     * Host capabilities this plugin is permitted to use at runtime
+     */
+    permissions: Array<('READ_USERS' | 'ACCESS_RESOURCES' | 'READ_SETTINGS' | 'DATABASE_ACCESS' | 'EMIT_EVENTS' | 'LISTEN_EVENTS' | 'RESOLVE_HOST_PROVIDERS')>;
+    /**
      * The directory of the plugin
      */
     pluginDirectory: string;
