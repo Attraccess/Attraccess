@@ -128,22 +128,31 @@ export function MessageThread(props: Props) {
         <div ref={bottomRef} />
       </div>
 
-      <form onSubmit={handleSubmit} className="flex items-end gap-2 border-t border-zinc-200 p-3 dark:border-zinc-700">
+      <form
+        onSubmit={handleSubmit}
+        className="flex items-end gap-2 border-t border-zinc-200 p-3 dark:border-zinc-700"
+      >
         <TextArea
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
           placeholder={t('composer.placeholder')}
           data-cy="message-composer-input"
           onKeyDown={handleKeyDown}
+          fullWidth
+          variant="primary"
+          rows={2}
+          className="flex-1 resize-none"
         />
         <Button
           type="submit"
           variant="primary"
           isIconOnly
+          size="lg"
           isPending={isSending}
           isDisabled={draft.trim().length === 0}
           aria-label={t('composer.send')}
           data-cy="message-send-button"
+          className="shrink-0"
         >
           <SendIcon size={18} />
         </Button>
