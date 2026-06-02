@@ -1,8 +1,6 @@
 // Conversation thread with paginated history and a reply composer
 // FEATURE: Messaging thread view and composer
 import {
-  UseMessagingServiceMessagingListConversationsKeyFn,
-  UseMessagingServiceMessagingListMessagesKeyFn,
   useMessagingServiceMessagingListMessages,
   useMessagingServiceMessagingSendMessage,
 } from '@attraccess/react-query-client';
@@ -14,6 +12,7 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 import { Button } from '../../components/button';
+import { applyIncomingMessage } from './messageCache';
 
 interface Props {
   conversationId: number;
@@ -36,15 +35,10 @@ export function MessageThread(props: Props) {
   const messages = useMemo(() => (data ? [...data.data].reverse() : []), [data]);
   const hasOlder = data ? data.total > data.data.length : false;
 
-  const invalidateConversation = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: UseMessagingServiceMessagingListMessagesKeyFn({ id: conversationId }) });
-    queryClient.invalidateQueries({ queryKey: UseMessagingServiceMessagingListConversationsKeyFn() });
-  }, [conversationId, queryClient]);
-
   const { mutate: sendMessage, isPending: isSending } = useMessagingServiceMessagingSendMessage({
-    onSuccess: () => {
+    onSuccess: (created) => {
       setDraft('');
-      invalidateConversation();
+      applyIncomingMessage(queryClient, created);
     },
   });
 

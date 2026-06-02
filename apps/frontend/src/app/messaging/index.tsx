@@ -2,8 +2,6 @@
 // FEATURE: Messaging inbox page
 import {
   Message,
-  UseMessagingServiceMessagingListConversationsKeyFn,
-  UseMessagingServiceMessagingListMessagesKeyFn,
   useMessagingServiceMessagingListConversations,
 } from '@attraccess/react-query-client';
 import { Card, cn } from '@heroui/react';
@@ -19,6 +17,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { ConversationList } from './ConversationList';
 import { MessageThread } from './MessageThread';
 import { useMessagingLive } from './useMessagingLive';
+import { applyIncomingMessage } from './messageCache';
 
 export function MessagesPage() {
   const { t } = useTranslations({ en, de });
@@ -34,10 +33,7 @@ export function MessagesPage() {
 
   const handleLiveMessage = useCallback(
     (message: Message) => {
-      queryClient.invalidateQueries({ queryKey: UseMessagingServiceMessagingListConversationsKeyFn() });
-      queryClient.invalidateQueries({
-        queryKey: UseMessagingServiceMessagingListMessagesKeyFn({ id: message.conversationId }),
-      });
+      applyIncomingMessage(queryClient, message);
     },
     [queryClient],
   );
