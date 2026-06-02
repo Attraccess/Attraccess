@@ -6,10 +6,15 @@
 > `DataSource` are shared, whether hot enable/disable is feasible, and the
 > security boundary. **Blocks Phase-3 sub-issues 2–8.**
 
-This document is the chosen approach. A throwaway proof-of-concept lives next to
-the loader (`apps/api/src/plugin-system/poc/`) and a Nest integration test
-(`poc-plugin.integration.spec.ts`) proves repository injection plus one event
-round-trip through real Nest DI.
+This document is the chosen approach. The proof-of-concept is a **standalone
+plugin package** (`examples/poc-backend-plugin/`) built in isolation with its own
+bundler and its own `package.json` — it is *not* part of the api's TypeScript
+program or Nx build. An integration test
+(`apps/api/src/plugin-system/poc/external-plugin.integration.spec.ts`) builds that
+package with esbuild and loads the resulting artifact through the **same
+`createRequire(...)` path the production loader uses**, proving that DI token
+identity, the shared event bus and the shared `DataSource` survive the
+separate-build boundary — and that mis-bundling a shared dependency breaks it.
 
 ---
 
@@ -40,14 +45,34 @@ bundle didn't ship its own copy of `@nestjs/*` / `typeorm` (which would break
 token identity). We need a **curated, versioned facade** handed to the plugin at
 load time.
 
-### 1.1 Why token identity already mostly works
+### 1.1 The token-identity linchpin (and the precise condition for it)
 
-`createRequire(__filename)` resolves the plugin entry point's *bare* imports
-(`@nestjs/common`, `typeorm`, `@nestjs/event-emitter`, `@attraccess/plugins-backend-sdk`)
-against the **API process's** `node_modules`, **not** the plugin folder's. So a
-plugin that lists those as `peerDependencies` (and does **not** bundle them)
-shares the exact class objects the host uses as DI tokens. This is the linchpin
-the whole design relies on, and it is the #1 packaging rule for plugin authors.
+DI in Nest is keyed by **class/symbol object identity**: `@Injectable`,
+`@Inject`, `instanceof EventEmitter2`, `Repository<T>` and the provider registry
+all compare *the same class object*, not its name. A plugin therefore only
+integrates if the `@nestjs/*` / `typeorm` classes it references are the **exact
+same objects** the host loaded.
+
+This holds **only when both of these are true**:
+
+1. **The plugin externalizes those packages** (declares them as
+   `peerDependencies` and does *not* bundle them). A bundled copy is a different
+   class object → identity breaks (proven below in §9).
+2. **The plugin artifact resolves those bare imports to the host's copy.** Node
+   resolves a module's `require('@nestjs/common')` starting from *the artifact's
+   own directory* and walking up — **not** from the host file that required it.
+   So the artifact must sit somewhere whose `node_modules` chain reaches the
+   host's packages. The production loader satisfies this because plugins live in
+   `PLUGIN_DIR`, nested under the running app's `node_modules` ancestry. **This is
+   a real deployment constraint, not an automatic guarantee** — a plugin unpacked
+   outside that chain (e.g. with its own private `node_modules`) would resolve a
+   *different* `@nestjs/common` and fail. The loader should resolve/normalise
+   `PLUGIN_DIR` accordingly (sub-issue 2).
+
+The original in-app PoC could not surface this at all: being co-compiled with the
+host, it shared classes *by construction*. The standalone PoC (§9) builds the
+plugin separately and loads it through `createRequire`, so condition (1) is now
+exercised — and its negative case fails exactly as predicted.
 
 ---
 
@@ -152,6 +177,39 @@ from the host injector at the time `forRoot()` runs.
 > `PluginModule` itself, and resolves `DataSource`/services on first use
 > (`onApplicationBootstrap`). The PoC test models this by constructing the
 > context from an already-booted `ModuleRef`.
+
+### 2.3 Packaging & build (the separate-repo reality)
+
+A real plugin ships from its own repo with its own bundler. The host shares state
+with it **only** through object identity (§1.1), so the build must split
+dependencies into two buckets:
+
+| Bucket | Packages | Build treatment |
+| --- | --- | --- |
+| **Must be `peerDependencies` + externalized** | `@nestjs/common`, `@nestjs/core`, `@nestjs/event-emitter`, `eventemitter2`, `typeorm`, `reflect-metadata` | `--external:` — never bundled. These carry DI tokens, the `EventEmitter2` class, the `DataSource`/`Repository` classes, and the single metadata registry. |
+| **May be bundled** | `@attraccess/plugins-backend-sdk` | Its only runtime value is `PLUGIN_CONTEXT = Symbol.for('attraccess.plugin.context')`. `Symbol.for` uses the process-global registry, so a bundled copy yields the *same* symbol. Everything else in the SDK is types (erased). The PoC plugin imports the SDK as `import type` and recreates the symbol locally → **zero** SDK runtime dependency. |
+
+`examples/poc-backend-plugin/build.mjs` is the reference build: one esbuild call,
+CJS output, the first bucket externalized, producing a single `dist/index.js`.
+This is the canonical packaging recipe for plugin authors.
+
+### 2.4 Module format: the loader is CJS-only (manifest examples are wrong)
+
+The production loader is **synchronous** — `createRequire(__filename)(entryPath)`
+(`plugin.module.ts`). On Node 24 `require()` can load *synchronous* ESM, but not
+ESM with top-level `await`, and the path is brittle. Yet the manifest examples in
+`plugin.manifest.ts` advertise `entryPoint: 'index.mjs'` (ESM). **That is a
+latent contradiction**: a plugin that actually ships ESM with any async init
+throws `ERR_REQUIRE_ESM` at load.
+
+**Decision for v1:** plugins ship **CommonJS** (`entryPoint: 'index.js'`, as the
+PoC manifest does). Two cheap follow-ups for sub-issue 2:
+
+- Fix the manifest examples/docs to say `index.js` (CJS) so authors are not misled.
+- If ESM plugins are wanted later, switch the loader to dynamic
+  `import(pathToFileURL(entryPath))` and make `loadPluginModule`/`forRoot` async.
+  Contained change, but it touches the `DynamicModule` bootstrap flow, so it is
+  deferred — not silently assumed to work.
 
 ---
 
@@ -262,7 +320,7 @@ Feeds the permissions sub-issue.
 
 | Sub-issue | Unblocked by | Named artifact |
 | --- | --- | --- |
-| 2 — Loader + context wiring | §2.2 | `plugin.module.ts` `register()` hook + `plugin-context.factory.ts` (`buildContext`) |
+| 2 — Loader + context wiring | §2.2, §2.4, §1.1 | `plugin.module.ts` `register()` hook + `plugin-context.factory.ts` (`buildContext`), CJS entrypoint, `PLUGIN_DIR` resolution |
 | 3 — Repositories / DataSource | §4 | `PluginContext.getRepository` / `.dataSource` |
 | 4 — Event bus access | §3 | `PluginContext.events`, `SystemEvent` enum extension |
 | 5 — Core service access | §2.1 | `PluginContext.get(token)` |
@@ -275,21 +333,51 @@ contract.
 
 ---
 
-## 9. Proof of concept
+## 9. Proof of concept (separate build, loaded across the boundary)
 
-- `apps/api/src/plugin-system/poc/poc-plugin.service.ts` — example plugin service
-  that injects the host repository (via `PluginContext`) and round-trips an event.
-- `apps/api/src/plugin-system/poc/poc-plugin.module.ts` — example default export
-  implementing `PluginBackendModule.register(context)`.
-- `apps/api/src/plugin-system/poc/poc-plugin.integration.spec.ts` — boots a Nest
-  `TestingModule` with a real `EventEmitter2` and a host repository, calls
-  `register(context)`, and asserts: (a) the plugin reads a row through the
-  injected host repository, and (b) an event emitted by the plugin is received by
-  a host listener and vice-versa.
+> The first PoC lived inside `apps/api` and was co-compiled with the host. That
+> made token identity true *by construction* and proved nothing reproducible in
+> the real world. This PoC replaces it with a genuinely separate build.
 
-The PoC deliberately does **not** modify the production loader — it exercises the
-exact `register(context)` contract through real Nest DI, so sub-issue 2 can wire
-the one-line loader change with confidence.
+**The plugin** — `examples/poc-backend-plugin/`:
+
+- Its own `package.json`, `tsconfig.json`, and bundler call (`build.mjs`,
+  esbuild). It is **not** in the api's TS program or Nx build.
+- Declares the host-shared packages as `peerDependencies` and externalizes them
+  (§2.3); imports the SDK as `import type` only. Output is a single CJS
+  `dist/index.js`.
+
+**The test** — `apps/api/src/plugin-system/poc/external-plugin.integration.spec.ts`:
+
+1. Builds the plugin **twice** with esbuild, writing artifacts under
+   `node_modules/.cache/...` so they resolve bare imports against the host's
+   `node_modules` (the §1.1 condition):
+   - **good** — host-shared packages externalized;
+   - **bad** — same source, but `@nestjs/event-emitter` (+ `eventemitter2`)
+     deliberately bundled, simulating an author who runs a bundler with no
+     externals.
+2. Loads each artifact through the **production loader's exact mechanism** —
+   `createRequire(__filename)(artifactPath).default` — then calls
+   `register(context)` and boots a real Nest `TestingModule`
+   (`EventEmitterModule.forRoot()` + sqlite `DataSource` + a host provider).
+3. Drives one host→plugin→host round-trip and asserts:
+
+| | good build | bad build |
+| --- | --- | --- |
+| `context.events instanceof EventEmitter2` (plugin's copy) | ✅ `true` | ❌ `false` |
+| `context.dataSource instanceof DataSource` (typeorm still external) | ✅ `true` | ✅ `true` |
+| repo write via shared `DataSource` + event round-trip + `context.get('HOST')` | ✅ works | ✅ works |
+
+**What this proves.** Externalized, the separately-built plugin shares the host's
+exact classes — DI, the event bus and the `DataSource` all line up across the
+build boundary. Mis-bundled, `EventEmitter2` token identity silently breaks while
+the *imperative* round-trip still works (because `events`/`dataSource` are passed
+by value through the context). That last point is the subtle trap the §2.3
+packaging rule exists to prevent, and the test makes it falsifiable.
+
+The PoC still does **not** modify the production loader — it reuses the loader's
+own `createRequire` call — so sub-issue 2 wires the one-line `register()` hook
+plus the `PLUGIN_DIR` resolution constraint (§1.1) with confidence.
 
 ---
 
@@ -297,7 +385,9 @@ the one-line loader change with confidence.
 
 | Risk | Mitigation |
 | --- | --- |
-| Plugin bundles its own `@nestjs/*`/`typeorm` → token identity breaks | Document peerDependencies rule; loader can warn if a duplicate `DataSource` instance is detected. |
+| Plugin bundles its own `@nestjs/*`/`typeorm` → token identity breaks | **Proven** in §9 (the "bad build"). Mitigated by the §2.3 packaging rule + reference `build.mjs`; loader can warn if a duplicate `DataSource`/`EventEmitter2` instance is detected. |
+| Plugin unpacked outside the host's `node_modules` chain → resolves a different `@nestjs/common` | §1.1 deployment constraint; sub-issue 2 normalises `PLUGIN_DIR` under the app's resolution chain. |
+| Loader is sync CJS but manifest examples say `.mjs` | §2.4 — ship CJS for v1, fix manifest examples; async `import()` path deferred. |
 | Bootstrap ordering (context needs injector before graph is built) | Lazy context backed by `ModuleRef` injected into `PluginModule`; resolve on `onApplicationBootstrap`. |
 | `context.get()` is an unrestricted escape hatch | Permission gate in `buildContext()` (sub-issue 6); document as privileged. |
 | Restart-based UX (every toggle restarts the app) | Accepted for v1; hot-load deferred (§5). |
