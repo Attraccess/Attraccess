@@ -5,7 +5,6 @@ import { useMemo } from 'react';
 import { ResourceMaintenance } from '@attraccess/react-query-client';
 import { useNow } from '../../../../hooks/useNow';
 import { ResourceMaintenanceUpsertModal } from '../maintenance-management/upsert';
-import { InstantMaintenanceButton } from '../maintenance-management/instant';
 import { RequestsSection } from './requests-section';
 import { LiveSection } from './live-section';
 import { UpcomingSection } from './upcoming-section';
@@ -52,8 +51,7 @@ export function ActivityTab(props: Props) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex justify-end gap-2">
-        <InstantMaintenanceButton resourceId={resourceId} />
+      <div className="flex justify-end">
         <ResourceMaintenanceUpsertModal resourceId={resourceId}>
           {(open) => (
             <Button variant="primary" onPress={open}>
