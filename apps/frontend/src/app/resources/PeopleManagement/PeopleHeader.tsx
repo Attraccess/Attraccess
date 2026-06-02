@@ -1,4 +1,4 @@
-import { AwardIcon, ShieldCheckIcon, UserPlusIcon } from 'lucide-react';
+import { AwardIcon, ShieldCheckIcon, WrenchIcon } from 'lucide-react';
 import { TFunction } from '@attraccess/plugins-frontend-ui';
 import { PageAction, PageHeader } from '../../../components/pageHeader';
 import { AddMode } from './types';
@@ -18,37 +18,39 @@ export function PeopleHeader(props: Readonly<PeopleHeaderProps>) {
     return <PageHeader title={t('title')} subtitle={t('subtitle')} icon={<ShieldCheckIcon />} noMargin />;
   }
 
-  const showBothAdd = canManageIntroducers && canManageIntroductions;
+  const actions: PageAction[] = [];
 
-  const actions: PageAction[] = showBothAdd
-    ? [
-        {
-          key: 'add-introduction',
-          label: t('addOptions.introduction'),
-          icon: <ShieldCheckIcon className="w-4 h-4" />,
-          variant: 'primary',
-          onPress: () => onAdd('introduction'),
-          dataCy: 'people-add-introduction',
-        },
-        {
-          key: 'add-introducer',
-          label: t('addOptions.introducer'),
-          icon: <AwardIcon className="w-4 h-4" />,
-          variant: 'primary',
-          onPress: () => onAdd('introducer'),
-          dataCy: 'people-add-introducer',
-        },
-      ]
-    : [
-        {
-          key: 'add-person',
-          label: canManageIntroducers ? t('addOptions.introducer') : t('addOptions.introduction'),
-          icon: <UserPlusIcon className="w-4 h-4" />,
-          variant: 'primary',
-          onPress: () => onAdd(canManageIntroducers ? 'introducer' : 'introduction'),
-          dataCy: 'people-add-person',
-        },
-      ];
+  if (canManageIntroductions) {
+    actions.push({
+      key: 'add-introduction',
+      label: t('addOptions.introduction'),
+      icon: <ShieldCheckIcon className="w-4 h-4" />,
+      variant: 'primary',
+      onPress: () => onAdd('introduction'),
+      dataCy: 'people-add-introduction',
+    });
+  }
+
+  if (canManageIntroducers) {
+    actions.push(
+      {
+        key: 'add-introducer',
+        label: t('addOptions.introducer'),
+        icon: <AwardIcon className="w-4 h-4" />,
+        variant: 'primary',
+        onPress: () => onAdd('introducer'),
+        dataCy: 'people-add-introducer',
+      },
+      {
+        key: 'add-maintainer',
+        label: t('addOptions.maintainer'),
+        icon: <WrenchIcon className="w-4 h-4" />,
+        variant: 'primary',
+        onPress: () => onAdd('maintainer'),
+        dataCy: 'people-add-maintainer',
+      },
+    );
+  }
 
   return (
     <PageHeader

@@ -1,7 +1,10 @@
 import { Separator, Spinner } from '@heroui/react';
 import { Users } from 'lucide-react';
 import { useTranslations, AttraccessUser } from '@attraccess/plugins-frontend-ui';
-import { useAccessControlServiceResourceIntroducersGetMany } from '@attraccess/react-query-client';
+import {
+  useAccessControlServiceResourceIntroducersGetMany,
+  ResourceIntroducerType,
+} from '@attraccess/react-query-client';
 
 import de from './de.json';
 import en from './en.json';
@@ -12,6 +15,8 @@ export interface ResourceIntroducersListProps {
   title?: string;
   /** Shown when no introducers exist. Defaults to translated message. */
   emptyText?: string;
+  /** Restrict the list to a single access type. Omit to show introducers and maintainers. */
+  type?: ResourceIntroducerType;
 }
 
 /**
@@ -19,11 +24,17 @@ export interface ResourceIntroducersListProps {
  * maintenance on) a resource. Used on the "introduction required" and
  * "maintenance in progress" displays so a blocked user can see who to contact.
  */
-export function ResourceIntroducersList({ resourceId, title, emptyText }: Readonly<ResourceIntroducersListProps>) {
+export function ResourceIntroducersList({
+  resourceId,
+  title,
+  emptyText,
+  type,
+}: Readonly<ResourceIntroducersListProps>) {
   const { t } = useTranslations({ en, de });
 
   const { data: introducers, isLoading } = useAccessControlServiceResourceIntroducersGetMany({
     resourceId,
+    type,
   });
 
   if (isLoading) {

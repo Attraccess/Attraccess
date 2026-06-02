@@ -1,21 +1,28 @@
 {
   "title": "People & Permissions",
-  "subtitle": "Manage introducers and introductions for this resource",
+  "subtitle": "Manage introducers, maintainers and introductions for this resource",
   "addPerson": "Add person",
   "addOptions": {
     "introducer": "Appoint as introducer",
+    "maintainer": "Appoint as maintainer",
     "introduction": "Grant introduction"
   },
   "filters": {
     "all": "All",
     "introducers": "Only introducers",
+    "maintainers": "Only maintainers",
     "introduced": "Only introduced"
   },
   "columns": {
     "name": "Name",
     "introducer": "Introducer",
+    "role": "Role",
     "introduced": "Introduced",
     "actions": "Actions"
+  },
+  "roles": {
+    "introducer": "Introducer",
+    "maintainer": "Maintainer"
   },
   "value": {
     "yes": "Yes",
@@ -24,12 +31,14 @@
   "rowActions": {
     "history": "View history",
     "revokeIntroducer": "Revoke introducer status",
+    "revokeMaintainer": "Revoke maintainer status",
     "revokeIntroduction": "Revoke introduction",
     "grantIntroduction": "Re-grant introduction"
   },
   "addModal": {
     "title": {
       "introducer": "Appoint introducer",
+      "maintainer": "Appoint maintainer",
       "introduction": "Grant introduction"
     },
     "userLabel": "User",
@@ -63,6 +72,10 @@
     "introducerRevokeFailed": {
       "title": "Failed to remove introducer",
       "description": "{{error}}"
+    },
+    "maintainerGranted": {
+      "title": "Maintainer added",
+      "description": "The user has been granted maintainer privileges."
     },
     "introductionGranted": {
       "title": "Introduction granted",
