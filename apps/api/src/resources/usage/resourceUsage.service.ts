@@ -23,6 +23,7 @@ import { ResourceIntroductionsService } from '../introductions/resouceIntroducti
 import { ResourceIntroducersService } from '../introducers/resourceIntroducers.service';
 import { ResourceGroupsIntroductionsService } from '../groups/introductions/resourceGroups.introductions.service';
 import { ResourceGroupsService } from '../groups/resourceGroups.service';
+import { ResourceRetrainingService } from '../retraining/resourceRetraining.service';
 import { ResourceMaintenanceService } from '../maintenances/maintenance.service';
 import { BillingService } from '../../billing/billing.service';
 import { ResourceFlowsExecutorService } from '../flows/resource-flows-executor.service';
@@ -67,6 +68,7 @@ export class ResourceUsageService {
     private readonly resourceIntroducersService: ResourceIntroducersService,
     private readonly resourceGroupsIntroductionsService: ResourceGroupsIntroductionsService,
     private readonly resourceGroupsService: ResourceGroupsService,
+    private readonly resourceRetrainingService: ResourceRetrainingService,
     private readonly resourceMaintenanceService: ResourceMaintenanceService,
     private readonly eventEmitter: EventEmitter2,
     private readonly billingService: BillingService,
@@ -88,8 +90,11 @@ export class ResourceUsageService {
     }
 
     if (await this.resourceIntroductionService.hasValidIntroduction(resourceId, user.id, transactionalEntityManager)) {
-      this.logger.debug(`User ${user.id} has valid introduction for resource ${resourceId}`);
-      return true;
+      if (!(await this.resourceRetrainingService.isResourceIntroductionBlocked(resourceId, user.id))) {
+        this.logger.debug(`User ${user.id} has valid introduction for resource ${resourceId}`);
+        return true;
+      }
+      this.logger.debug(`User ${user.id} introduction for resource ${resourceId} is blocked pending retraining`);
     }
 
     if (await this.resourceIntroducersService.canMaintain(resourceId, user.id, true, transactionalEntityManager)) {
@@ -108,8 +113,13 @@ export class ResourceUsageService {
           transactionalEntityManager,
         )
       ) {
-        this.logger.debug(`User ${user.id} has valid group introduction for resource ${resourceId}`);
-        return true;
+        if (!(await this.resourceRetrainingService.isGroupIntroductionBlocked(group.id, user.id))) {
+          this.logger.debug(`User ${user.id} has valid group introduction for resource ${resourceId}`);
+          return true;
+        }
+        this.logger.debug(
+          `User ${user.id} group introduction (${group.id}) for resource ${resourceId} is blocked pending retraining`,
+        );
       }
     }
 

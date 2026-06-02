@@ -228,6 +228,12 @@ export const useResourcesServiceResourceUsageCanControlKey = "ResourcesServiceRe
 export const UseResourcesServiceResourceUsageCanControlKeyFn = ({ resourceId }: {
   resourceId: number;
 }, queryKey?: Array<unknown>) => [useResourcesServiceResourceUsageCanControlKey, ...(queryKey ?? [{ resourceId }])];
+export type ResourcesServiceResourceRetrainingGetStatusDefaultResponse = Awaited<ReturnType<typeof ResourcesService.resourceRetrainingGetStatus>>;
+export type ResourcesServiceResourceRetrainingGetStatusQueryResult<TData = ResourcesServiceResourceRetrainingGetStatusDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useResourcesServiceResourceRetrainingGetStatusKey = "ResourcesServiceResourceRetrainingGetStatus";
+export const UseResourcesServiceResourceRetrainingGetStatusKeyFn = ({ resourceId }: {
+  resourceId: number;
+}, queryKey?: Array<unknown>) => [useResourcesServiceResourceRetrainingGetStatusKey, ...(queryKey ?? [{ resourceId }])];
 export type MqttServiceMqttServersGetAllDefaultResponse = Awaited<ReturnType<typeof MqttService.mqttServersGetAll>>;
 export type MqttServiceMqttServersGetAllQueryResult<TData = MqttServiceMqttServersGetAllDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useMqttServiceMqttServersGetAllKey = "MqttServiceMqttServersGetAll";

@@ -48,6 +48,23 @@
         "label": "Separate Unlock and Unlatch",
         "description": "Can be useful if the door needs to be unlocked and the latch needs to be opened separately"
       }
+    },
+    "retraining": {
+      "sectionTitle": "Retraining Requirement",
+      "description": "Require users to be retrained after a period of time or inactivity. Leave a field empty to disable that trigger.",
+      "disabledPlaceholder": "Disabled",
+      "maxAgeDays": {
+        "label": "Retrain after (days since training)",
+        "description": "Retraining becomes due this many days after a user was trained, regardless of usage."
+      },
+      "maxInactivityDays": {
+        "label": "Retrain after inactivity (days)",
+        "description": "Retraining becomes due if the user has not used this resource for this many days."
+      },
+      "blocksAccess": {
+        "label": "Block access until retrained",
+        "description": "If enabled, users lose access once retraining is due until an introducer retrains them."
+      }
     }
   },
   "create": {

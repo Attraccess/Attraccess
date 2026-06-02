@@ -378,6 +378,16 @@ export const prefetchUseResourcesServiceResourceUsageCanControl = (queryClient: 
   resourceId: number;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseResourcesServiceResourceUsageCanControlKeyFn({ resourceId }), queryFn: () => ResourcesService.resourceUsageCanControl({ resourceId }) });
 /**
+* Get the retraining status of the current user for a resource
+* @param data The data for the request.
+* @param data.resourceId
+* @returns RetrainingStatusResponseDto Retraining status retrieved successfully.
+* @throws ApiError
+*/
+export const prefetchUseResourcesServiceResourceRetrainingGetStatus = (queryClient: QueryClient, { resourceId }: {
+  resourceId: number;
+}) => queryClient.prefetchQuery({ queryKey: Common.UseResourcesServiceResourceRetrainingGetStatusKeyFn({ resourceId }), queryFn: () => ResourcesService.resourceRetrainingGetStatus({ resourceId }) });
+/**
 * Get all MQTT servers
 * @returns MqttServer Returns all MQTT servers
 * @throws ApiError

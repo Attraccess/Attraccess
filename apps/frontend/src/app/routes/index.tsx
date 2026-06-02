@@ -4,13 +4,13 @@ import { ResourceOverviewTab } from '../resources/details/overview/ResourceOverv
 import { ResourceHistoryTab } from '../resources/details/history/ResourceHistoryTab';
 import { ResourcePeopleTab } from '../resources/details/people/ResourcePeopleTab';
 import { ResourceGroupsTab } from '../resources/details/groups/ResourceGroupsTab';
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo } from 'react';
 import { Spinner } from '@heroui/react';
 import { MqttServersPage, EditMqttServerPage } from '../mqtt';
 import { SSOProvidersPage } from '../sso/SSOProvidersPage';
 import { UserManagementPage } from '../user-management';
-import { usePluginStore } from 'react-pluggable';
 import { RouteConfig } from '@attraccess/plugins-frontend-sdk';
+import { PluginRouteBoundary } from '../../components/pluginRouteBoundary';
 import { PluginsList } from '../plugins/PluginsList';
 import usePluginState, { PluginManifestWithPlugin } from '../plugins/plugin.state';
 import { AttractapList } from '../attractap/AttractapList';
@@ -282,28 +282,41 @@ const coreRoutes: RouteConfig[] = [
   },
 ];
 
+function getRoutesOfPlugin(pluginManifest: PluginManifestWithPlugin): RouteConfig[] {
+  const plugin = pluginManifest.plugin;
+  const pluginName = plugin.getPluginName();
+
+  let routes: RouteConfig[] | undefined;
+  try {
+    routes = plugin.getRoutes?.();
+  } catch (error) {
+    console.error(`Attraccess Plugin System: getRoutes() of plugin "${pluginName}" threw`, error);
+    return [];
+  }
+
+  if (!routes) {
+    return [];
+  }
+
+  if (!Array.isArray(routes)) {
+    console.error(`Attraccess Plugin System: getRoutes() of plugin "${pluginName}" did not return an array`);
+    return [];
+  }
+
+  // Wrap each plugin route element so a throwing render can't crash the app shell.
+  return routes.map((route) => ({
+    ...route,
+    element: <PluginRouteBoundary pluginName={pluginName}>{route.element}</PluginRouteBoundary>,
+  }));
+}
+
 export function useAllRoutes() {
   const { plugins: pluginManifests } = usePluginState();
-  const pluginStore = usePluginStore();
 
-  const [pluginRoutes, setPluginRoutes] = useState<RouteConfig[]>([]);
-
-  const getRoutesOfPlugin = useCallback(
-    (pluginManifest: PluginManifestWithPlugin) => {
-      const pluginRoutes = pluginStore.executeFunction(
-        `${pluginManifest.plugin.getPluginName()}.GET_ROUTES`,
-        pluginManifest,
-      );
-
-      return pluginRoutes;
-    },
-    [pluginStore],
+  const pluginRoutes = useMemo(
+    () => pluginManifests.flatMap((pluginManifest) => getRoutesOfPlugin(pluginManifest)),
+    [pluginManifests],
   );
-
-  useEffect(() => {
-    const routesOfAllPlugins = pluginManifests.map((pluginManifest) => getRoutesOfPlugin(pluginManifest)).flat();
-    setPluginRoutes(routesOfAllPlugins);
-  }, [pluginManifests, getRoutesOfPlugin]);
 
   return useMemo(() => [...coreRoutes, ...pluginRoutes], [pluginRoutes]);
 }

@@ -1,4 +1,5 @@
 export * from './lib/plugin.interface';
+export * from './lib/plugin-context';
 export * from './lib/semver';
 
 export * from './lib/auth-decorator';

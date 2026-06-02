@@ -42,6 +42,7 @@ void Application::setup() {
   }
 
   Settings::setup();
+  this->setupBootDiagnostics();
   SerialCommandHandler::setup();
   Network::setup();
 
@@ -475,6 +476,8 @@ void Application::loop() {
 #ifdef ESP_PLATFORM
   esp_task_wdt_reset();
 #endif
+
+  this->snapshotBootDiagnostics();
 
   SerialCommandHandler::loop();
 
