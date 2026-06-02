@@ -6,7 +6,8 @@ import {
 } from '@attraccess/react-query-client';
 import { Card, cn } from '@heroui/react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { MailIcon, ArrowLeftIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
@@ -25,6 +26,18 @@ export function MessagesPage() {
   const queryClient = useQueryClient();
 
   const [selectedConversationId, setSelectedConversationId] = useState<number | null>(null);
+  const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    const raw = searchParams.get('conversation');
+    if (raw === null) {
+      return;
+    }
+    const id = Number(raw);
+    if (Number.isFinite(id) && id > 0) {
+      setSelectedConversationId(id);
+    }
+  }, [searchParams]);
 
   const { data: conversations, isLoading } = useMessagingServiceMessagingListConversations();
 

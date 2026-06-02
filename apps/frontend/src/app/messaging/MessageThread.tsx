@@ -7,7 +7,8 @@ import {
 import { Spinner, TextArea, cn } from '@heroui/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { FormEvent, KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { SendIcon } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { SendIcon, BoxIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
@@ -112,6 +113,20 @@ export function MessageThread(props: Props) {
                 >
                   {message.content}
                 </div>
+                {message.referenceLabel && (
+                  <Link
+                    to={message.referenceUrl ?? '#'}
+                    className={cn(
+                      'mt-1 inline-flex max-w-[75%] items-center gap-1 rounded-lg border px-2 py-1 text-tiny',
+                      'border-zinc-200 bg-zinc-50 text-zinc-600 hover:bg-zinc-100',
+                      'dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700',
+                    )}
+                    data-cy={`message-reference-${message.id}`}
+                  >
+                    <BoxIcon size={12} className="shrink-0" />
+                    <span className="truncate">{message.referenceLabel}</span>
+                  </Link>
+                )}
                 <span className="mt-0.5 text-tiny text-zinc-400">
                   {new Date(message.createdAt).toLocaleString()}
                 </span>

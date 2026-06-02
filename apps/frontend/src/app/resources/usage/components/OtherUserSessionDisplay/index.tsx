@@ -2,7 +2,8 @@ import { useState, useCallback, useMemo } from 'react';
 import { ButtonGroup, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, DropdownPopover } from '@heroui/react';
 import { Button } from '../../../../../components/button';
 import { buttonVariants } from '@heroui/styles';
-import { UserX, ChevronDownIcon } from 'lucide-react';
+import { UserX, ChevronDownIcon, MessageCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { AttraccessUser, DateTimeDisplay } from '@attraccess/plugins-frontend-ui';
 import {
@@ -14,6 +15,8 @@ import {
   useResourcesServiceGetOneResourceById,
   useAccessControlServiceResourceIntroducersIsIntroducer,
   useResourcesServiceResourceUsageEndSession,
+  useMessagingServiceMessagingContactResourceHolder,
+  useMessagingServiceMessagingSendMessage,
   FormSubmissionRequestDto,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
@@ -33,6 +36,7 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
   const { hasPermission, user } = useAuth();
   const { success, error: showError } = useToastMessage();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [isTakeoverNotesModalOpen, setIsTakeoverNotesModalOpen] = useState(false);
   const [isStopOtherUserSessionNotesModalOpen, setIsStopOtherUserSessionNotesModalOpen] = useState(false);
   const { requestForms, modal: formsModal } = useResourceFormsSubmission(resourceId);
@@ -117,6 +121,36 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
     },
   });
 
+  const sendOpeningMessage = useMessagingServiceMessagingSendMessage();
+
+  const contactHolder = useMessagingServiceMessagingContactResourceHolder({
+    onSuccess: ({ conversationId, suggestedMessage }) => {
+      const goToConversation = () => navigate(`/messages?conversation=${conversationId}`);
+      if (!suggestedMessage) {
+        goToConversation();
+        return;
+      }
+      sendOpeningMessage.mutate(
+        {
+          id: conversationId,
+          requestBody: {
+            content: suggestedMessage.content,
+            referenceType: suggestedMessage.referenceType,
+            referenceId: suggestedMessage.referenceId,
+          },
+        },
+        { onSettled: goToConversation },
+      );
+    },
+    onError: () => {
+      showError({ title: t('contact.error'), description: t('contact.errorDescription') });
+    },
+  });
+
+  const handleContactHolder = useCallback(() => {
+    contactHolder.mutate({ resourceId });
+  }, [contactHolder, resourceId]);
+
   const runTakeover = useCallback(
     async (body: { notes?: string }) => {
       let formSubmissions: FormSubmissionRequestDto[] = [];
@@ -199,6 +233,17 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
         <p className="text-xs text-gray-400 dark:text-gray-500">
           ({t('sessionStarted')} <DateTimeDisplay date={activeSession.startTime} />)
         </p>
+
+        <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+          <Button
+            className="w-full"
+            isPending={contactHolder.isPending || sendOpeningMessage.isPending}
+            onPress={handleContactHolder}
+            data-cy="contact-current-user-button"
+          ><MessageCircle className="w-4 h-4" />
+            {t('contact.button')}
+          </Button>
+        </div>
 
         {canTakeover && (
           <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
