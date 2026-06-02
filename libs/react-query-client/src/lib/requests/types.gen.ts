@@ -4047,6 +4047,53 @@ export type UpdateReaderResponseDto = {
     reader: Attractap;
 };
 
+export type AttractapCrashReport = {
+    /**
+     * The unique identifier of the crash report
+     */
+    id: number;
+    /**
+     * The ID of the reader this crash report belongs to
+     */
+    attractapId: number;
+    /**
+     * The reset reason reported by the reader (esp_reset_reason)
+     */
+    resetReason: string;
+    /**
+     * Free heap in bytes captured before the freeze/reset
+     */
+    heapFreeBytes: number | null;
+    /**
+     * Largest contiguous free heap block in bytes before the freeze/reset
+     */
+    largestFreeBlockBytes: number | null;
+    /**
+     * Uptime in milliseconds before the reset occurred
+     */
+    uptimeBeforeResetMs: number | null;
+    /**
+     * WebSocket connection state at the time of the freeze/reset
+     */
+    wsState: string | null;
+    /**
+     * WiFi connection state at the time of the freeze/reset
+     */
+    wifiState: string | null;
+    /**
+     * Firmware version string reported by the reader at crash time
+     */
+    firmwareVersion: string | null;
+    /**
+     * Size of the attached coredump blob in bytes, if any
+     */
+    coredumpSize: number | null;
+    /**
+     * When this crash report was received by the server
+     */
+    createdAt: string;
+};
+
 export type AppKeyRequestDto = {
     /**
      * The UID of the card to get the app key for
@@ -5870,6 +5917,28 @@ export type DeleteReaderData = {
 export type DeleteReaderResponse = unknown;
 
 export type GetReadersResponse = Array<Attractap>;
+
+export type GetReaderCrashReportsData = {
+    /**
+     * The ID of the reader
+     */
+    readerId: number;
+};
+
+export type GetReaderCrashReportsResponse = Array<AttractapCrashReport>;
+
+export type GetReaderCrashReportCoredumpData = {
+    /**
+     * The ID of the reader
+     */
+    readerId: number;
+    /**
+     * The ID of the crash report
+     */
+    reportId: number;
+};
+
+export type GetReaderCrashReportCoredumpResponse = unknown;
 
 export type GetAppKeyByUidData = {
     requestBody: AppKeyRequestDto;
@@ -9136,6 +9205,40 @@ export type $OpenApiTs = {
                  * Unauthorized
                  */
                 401: unknown;
+            };
+        };
+    };
+    '/api/attractap/readers/{readerId}/crash-reports': {
+        get: {
+            req: GetReaderCrashReportsData;
+            res: {
+                /**
+                 * The list of crash reports for the reader, newest first
+                 */
+                200: Array<AttractapCrashReport>;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/attractap/readers/{readerId}/crash-reports/{reportId}/coredump': {
+        get: {
+            req: GetReaderCrashReportCoredumpData;
+            res: {
+                /**
+                 * The coredump binary blob
+                 */
+                200: unknown;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+                /**
+                 * Crash report or coredump not found
+                 */
+                404: unknown;
             };
         };
     };

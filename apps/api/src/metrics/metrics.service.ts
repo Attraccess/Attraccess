@@ -36,6 +36,7 @@ export class MetricsService implements OnModuleInit {
   public readonly attractapDevicesConnected: Gauge;
   public readonly attractapNfcTapsTotal: Counter;
   public readonly attractapFirmwareUpdatesTotal: Counter;
+  public readonly attractapCrashReportsTotal: Counter;
 
   public readonly billingTransactionsTotal: Counter;
   public readonly billingTransactionAmount: Histogram;
@@ -173,6 +174,12 @@ export class MetricsService implements OnModuleInit {
     this.attractapFirmwareUpdatesTotal = new Counter({
       name: 'attraccess_attractap_firmware_updates_total',
       help: 'Total number of firmware update events',
+      registers: [this.registry],
+    });
+
+    this.attractapCrashReportsTotal = new Counter({
+      name: 'attraccess_attractap_crash_reports_total',
+      help: 'Total number of crash reports received from Attractap readers',
       registers: [this.registry],
     });
 
