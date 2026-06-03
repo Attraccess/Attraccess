@@ -483,6 +483,8 @@ export class ResourceUsageService {
     user: User,
     dto: EndUsageSessionDto,
     skipFormSubmissions = false,
+    // Flow-ended sessions carry an auto-generated note, not a human one — skip personnel notification.
+    skipNoteNotification = false,
   ): Promise<ResourceUsage> {
     this.logger.debug(`Ending session for resource ${resourceId} by user ${user.id}`, { dto });
 
@@ -591,7 +593,7 @@ export class ResourceUsageService {
       this.metricsService.resourceUsageDurationSeconds.observe(durationSeconds);
     }
 
-    if (dto.notes?.trim()) {
+    if (!skipNoteNotification && dto.notes?.trim()) {
       this.eventEmitter.emit(
         ResourceUsageNoteAddedEvent.EVENT_NAME,
         new ResourceUsageNoteAddedEvent(resourceId, dto.notes.trim(), 'end', {

@@ -962,7 +962,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
       finalNotes = compiled && compiled.trim().length > 0 ? compiled : notes;
     }
 
-    await this.resourceUsageService.endSession(node.resourceId, activeUsage.user, { notes: finalNotes }, true);
+    await this.resourceUsageService.endSession(node.resourceId, activeUsage.user, { notes: finalNotes }, true, true);
 
     return { payload: input };
   }
