@@ -7,6 +7,7 @@ import { ResourceIntroducersService } from './resourceIntroducers.service';
 describe('ResourceIntroducersService', () => {
   let service: ResourceIntroducersService;
   let repository: {
+    find: jest.Mock;
     findOne: jest.Mock;
     create: jest.Mock;
     save: jest.Mock;
@@ -24,6 +25,7 @@ describe('ResourceIntroducersService', () => {
 
   beforeEach(async () => {
     repository = {
+      find: jest.fn().mockResolvedValue([]),
       findOne: jest.fn(),
       create: jest.fn(),
       save: jest.fn(),
@@ -41,6 +43,72 @@ describe('ResourceIntroducersService', () => {
     }).compile();
 
     service = module.get(ResourceIntroducersService);
+  });
+
+  describe('getMany', () => {
+    it('returns both direct and group-inherited introducers, deduped by user', async () => {
+      const directIntroducer = {
+        id: 1,
+        userId: 10,
+        resourceId: 1,
+        type: ResourceIntroducerType.INTRODUCER,
+        user: { id: 10 },
+      } as unknown as ResourceIntroducer;
+      const groupIntroducer = {
+        id: 2,
+        userId: 20,
+        resourceGroupId: 5,
+        type: ResourceIntroducerType.INTRODUCER,
+        user: { id: 20 },
+      } as unknown as ResourceIntroducer;
+
+      repository.find.mockResolvedValue([directIntroducer]);
+
+      const groupQuery = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([groupIntroducer]),
+      };
+      repository.createQueryBuilder.mockReturnValue(groupQuery);
+
+      const result = await service.getMany(1);
+
+      expect(result).toEqual([directIntroducer, groupIntroducer]);
+    });
+
+    it('does not list a user twice when they are both a direct and a group introducer', async () => {
+      const directIntroducer = {
+        id: 1,
+        userId: 10,
+        resourceId: 1,
+        type: ResourceIntroducerType.INTRODUCER,
+        user: { id: 10 },
+      } as unknown as ResourceIntroducer;
+      const groupIntroducer = {
+        id: 2,
+        userId: 10,
+        resourceGroupId: 5,
+        type: ResourceIntroducerType.INTRODUCER,
+        user: { id: 10 },
+      } as unknown as ResourceIntroducer;
+
+      repository.find.mockResolvedValue([directIntroducer]);
+
+      const groupQuery = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([groupIntroducer]),
+      };
+      repository.createQueryBuilder.mockReturnValue(groupQuery);
+
+      const result = await service.getMany(1);
+
+      expect(result).toEqual([directIntroducer]);
+    });
   });
 
   describe('isIntroducer', () => {
