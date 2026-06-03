@@ -37,6 +37,15 @@ void API::setFirmwareUpdateMetaCallback(std::function<void(String availableVersi
     this->firmwareUpdateMetaCallback = callback;
 }
 
+#ifdef BENCH_FREEZE_REPRO
+void API::dropWebsocket()
+{
+    this->logger.warn("BENCH drop_ws: tearing down websocket, reconnect will follow");
+    this->websocket.disableConnectionAttempts();
+    this->websocket.enableConnectionAttempts();
+}
+#endif
+
 void API::loop()
 {
     this->websocket.loop();

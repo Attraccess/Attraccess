@@ -5,11 +5,19 @@
 #include "../network/wifi/wifi.hpp"
 #include "../logger/logger.hpp"
 
+#ifdef BENCH_FREEZE_REPRO
+#include <functional>
+#endif
+
 class SerialCommandHandler
 {
 public:
     static void setup();
     static void loop();
+
+#ifdef BENCH_FREEZE_REPRO
+    static void setDropWebsocketHook(std::function<void()> hook);
+#endif
 
 private:
     static constexpr size_t MAX_COMMAND_LENGTH = 256;
@@ -19,6 +27,11 @@ private:
 
     static void processLine(const String &line);
     static void handleCommand(const String &topic, const String &payload);
+
+#ifdef BENCH_FREEZE_REPRO
+    static std::function<void()> dropWebsocketHook;
+    static bool handleBenchFaultCommand(const String &topic);
+#endif
 
     static bool pinIsSet();
     static bool validateNewCode(const char *code);
