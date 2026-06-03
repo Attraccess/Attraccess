@@ -3,7 +3,27 @@
 void Websocket::setup()
 {
     logger.info("Websocket setup");
+    if (!ws_client_mutex)
+    {
+        ws_client_mutex = xSemaphoreCreateMutex();
+    }
     this->_certManager.begin();
+}
+
+void Websocket::lockWsClient()
+{
+    if (ws_client_mutex)
+    {
+        xSemaphoreTake(ws_client_mutex, portMAX_DELAY);
+    }
+}
+
+void Websocket::unlockWsClient()
+{
+    if (ws_client_mutex)
+    {
+        xSemaphoreGive(ws_client_mutex);
+    }
 }
 
 void Websocket::loop()
@@ -75,10 +95,13 @@ void Websocket::connectWebSocket()
     _lastApiConfig = apiConfig;
     setState(CONNECTING);
 
-    if (ws_client)
+    lockWsClient();
+    esp_websocket_client_handle_t oldClient = ws_client;
+    ws_client = nullptr;
+    unlockWsClient();
+    if (oldClient)
     {
-        esp_websocket_client_destroy(ws_client);
-        ws_client = nullptr;
+        esp_websocket_client_destroy(oldClient);
     }
 
     String serverHostname = apiConfig.hostname;
@@ -125,8 +148,8 @@ void Websocket::connectWebSocket()
         }
     }
 
-    ws_client = esp_websocket_client_init(&websocket_cfg);
-    if (!ws_client)
+    esp_websocket_client_handle_t newClient = esp_websocket_client_init(&websocket_cfg);
+    if (!newClient)
     {
         logger.error("Failed to initialize WebSocket client");
         setState(INIT);
@@ -135,17 +158,22 @@ void Websocket::connectWebSocket()
     }
 
     // Register event handler
-    esp_websocket_register_events(ws_client, WEBSOCKET_EVENT_ANY, websocket_event_handler, this);
+    esp_websocket_register_events(newClient, WEBSOCKET_EVENT_ANY, websocket_event_handler, this);
 
     // Start connection
-    esp_err_t ret = esp_websocket_client_start(ws_client);
+    esp_err_t ret = esp_websocket_client_start(newClient);
     if (ret != ESP_OK)
     {
         logger.error((String("Failed to start WebSocket client: ") + esp_err_to_name(ret)).c_str());
+        esp_websocket_client_destroy(newClient);
         setState(INIT);
 
         return;
     }
+
+    lockWsClient();
+    ws_client = newClient;
+    unlockWsClient();
 
     logger.info("connectWebSocket: WebSocket started");
 }
@@ -226,7 +254,16 @@ void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, v
 void Websocket::sendMessage(const String &message)
 {
     this->logger.debug(("sendMessage: " + message).c_str());
+
+    lockWsClient();
+    if (!ws_client)
+    {
+        unlockWsClient();
+        logger.error("sendMessage: ws_client not initialized");
+        return;
+    }
     int ret = esp_websocket_client_send_text(ws_client, message.c_str(), message.length(), pdMS_TO_TICKS(5000));
+    unlockWsClient();
 
     if (ret == -1)
     {
@@ -236,12 +273,15 @@ void Websocket::sendMessage(const String &message)
 
 void Websocket::sendMessage(const char *message, size_t length)
 {
+    lockWsClient();
     if (!ws_client)
     {
+        unlockWsClient();
         logger.error("sendMessage(raw): ws_client not initialized");
         return;
     }
     int ret = esp_websocket_client_send_text(ws_client, message, static_cast<int>(length), pdMS_TO_TICKS(5000));
+    unlockWsClient();
     if (ret == -1)
     {
         logger.error("sendMessage(raw): failed");
@@ -274,10 +314,13 @@ void Websocket::disableConnectionAttempts()
 {
     this->connectionAttemptsEnabled = false;
 
-    if (ws_client)
+    lockWsClient();
+    esp_websocket_client_handle_t oldClient = ws_client;
+    ws_client = nullptr;
+    unlockWsClient();
+    if (oldClient)
     {
-        esp_websocket_client_destroy(ws_client);
-        ws_client = nullptr;
+        esp_websocket_client_destroy(oldClient);
     }
 
     setState(INIT);
