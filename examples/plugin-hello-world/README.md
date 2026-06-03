@@ -9,7 +9,9 @@ guide and exercises every core capability:
 | Backend controller | [`backend/plugin.ts`](backend/plugin.ts) | Adds `GET /hello-world/greetings` to the host API. |
 | Injected repository | [`backend/plugin.ts`](backend/plugin.ts) | Reads users via `context.getRepository('User')` (needs `READ_USERS`). |
 | Event handler | [`backend/plugin.ts`](backend/plugin.ts) | Subscribes to `RESOURCE_USAGE_STARTED` via `context.onEvent` (needs `LISTEN_EVENTS`). |
-| Frontend route | [`frontend/src/plugin.tsx`](frontend/src/plugin.tsx) | Registers the `/hello-world` page through `getRoutes()`. |
+| Frontend routes | [`frontend/src/plugin.tsx`](frontend/src/plugin.tsx) | Registers the `/hello-world` and `/hello-world/capabilities` pages through `getRoutes()`. |
+| Sidebar entry | [`frontend/src/plugin.tsx`](frontend/src/plugin.tsx) | Adds a "Hello World" navigation item through `getSidebarItems()`. |
+| Shared router | [`frontend/vite.config.ts`](frontend/vite.config.ts) | Reuses the host's `react-router-dom` so in-plugin `<Link>`s navigate without a reload. |
 
 ## Layout
 

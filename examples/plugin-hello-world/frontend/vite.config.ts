@@ -8,9 +8,11 @@ import federation from '@originjs/vite-plugin-federation';
 // `shared` must list every host singleton the plugin *imports at runtime* so the
 // plugin reuses the host's copy instead of bundling its own. The host shares
 // (see apps/frontend/vite.config.ts): react, react-dom, react-router-dom,
-// react-pluggable, @heroui/react, @tanstack/react-query. This example only
-// renders plain React, so it shares just react + react-dom. Add the others here
-// if your plugin imports them (e.g. @heroui/react for host-styled components).
+// react-pluggable, @heroui/react, @tanstack/react-query. This example renders
+// plain React and uses the host's router for in-plugin links, so it shares
+// react + react-dom + react-router-dom. Add the others here if your plugin
+// imports them (e.g. @heroui/react for host-styled components). Sharing the
+// router is what lets the plugin's <Link>s reuse the host navigation context.
 export default defineConfig({
   plugins: [
     react(),
@@ -20,7 +22,16 @@ export default defineConfig({
       exposes: {
         './plugin': './src/plugin.tsx',
       },
-      shared: ['react', 'react-dom'],
+      // Object form with requiredVersion '*' mirrors the host (see
+      // apps/frontend/vite.config.ts): the plugin accepts whatever version the
+      // host shares instead of pinning its own, so React stays a single
+      // instance. A version mismatch here yields two Reacts → "Invalid hook
+      // call" at runtime.
+      shared: {
+        react: { singleton: true, requiredVersion: '*' },
+        'react-dom': { singleton: true, requiredVersion: '*' },
+        'react-router-dom': { singleton: true, requiredVersion: '*' },
+      },
     }),
   ],
   build: {

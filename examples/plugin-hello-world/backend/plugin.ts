@@ -59,7 +59,11 @@ class HelloWorldService implements OnModuleInit {
 // `GET /hello-world/greetings` to the Attraccess API.
 @Controller('hello-world')
 class HelloWorldController {
-  constructor(private readonly service: HelloWorldService) {}
+  // Inject by an EXPLICIT token. esbuild (used by build.mjs) does not emit
+  // `emitDecoratorMetadata`, so Nest cannot infer constructor types for
+  // injection — without `@Inject(...)` the dependency resolves to undefined at
+  // runtime. Real plugins built with esbuild must always inject by explicit token.
+  constructor(@Inject(HelloWorldService) private readonly service: HelloWorldService) {}
 
   @Get('greetings')
   async greetings(): Promise<{ greetings: string[] }> {
