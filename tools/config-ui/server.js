@@ -175,13 +175,10 @@ function main() {
     process.exit(1);
   }
 
-  const dnsmasqModule = require('./modules/dnsmasq');
   const prometheusModule = require('./modules/prometheus');
 
-  dnsmasqModule.init();
   prometheusModule.init();
 
-  registerModule(dnsmasqModule);
   registerModule(prometheusModule);
 
   const server = http.createServer((req, res) => {

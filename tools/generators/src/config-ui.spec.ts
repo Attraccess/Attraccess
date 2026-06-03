@@ -1,29 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-
-const ROOT = path.resolve(__dirname, '..', '..', '..');
-
-function readFile(relativePath: string): string {
-  return fs.readFileSync(path.join(ROOT, relativePath), 'utf-8').trim();
-}
-
-function fileExists(relativePath: string): boolean {
-  return fs.existsSync(path.join(ROOT, relativePath));
-}
-
-function extractServiceBlock(compose: string, serviceName: string): string {
-  const lines = compose.split('\n');
-  const start = lines.findIndex((l) => new RegExp(`^\\s{2}${serviceName}:\\s*$`).test(l));
-  if (start === -1) return '';
-  let end = lines.length;
-  for (let i = start + 1; i < lines.length; i++) {
-    if (/^\s{2}\S/.test(lines[i]) || /^\S/.test(lines[i])) {
-      end = i;
-      break;
-    }
-  }
-  return lines.slice(start, end).join('\n');
-}
+import { ROOT, extractServiceBlock, fileExists, readFile } from './compose-test-utils';
 
 describe('config-ui', () => {
   describe('Dockerfile', () => {
@@ -41,10 +18,6 @@ describe('config-ui', () => {
       expect(content).toMatch(/FROM\s+node:\S+-alpine/);
     });
 
-    it('should install dnsmasq via apk --no-cache', () => {
-      expect(content).toMatch(/apk\s+add\s+--no-cache\b[^\n]*\bdnsmasq\b/);
-    });
-
     it('should COPY entrypoint.sh and make it executable', () => {
       expect(content).toMatch(/COPY\s+entrypoint\.sh\b/);
       expect(content).toMatch(/chmod\s+\+x\s+.*entrypoint\.sh/);
@@ -56,18 +29,12 @@ describe('config-ui', () => {
       expect(content).toMatch(/COPY\s+public\/index\.html\b/);
     });
 
-    it('should EXPOSE DNS ports 53/udp and 53/tcp', () => {
-      expect(content).toMatch(/EXPOSE\s+53\/udp/);
-      expect(content).toMatch(/EXPOSE\s+53\/tcp/);
-    });
-
     it('should EXPOSE admin UI port 5380', () => {
       expect(content).toMatch(/EXPOSE\s+5380/);
     });
 
-    it('should create /data and /etc/dnsmasq.d and /etc/prometheus', () => {
+    it('should create /data and /etc/prometheus', () => {
       expect(content).toMatch(/mkdir[^\n]*\/data\b/);
-      expect(content).toMatch(/mkdir[^\n]*\/etc\/dnsmasq\.d\b/);
       expect(content).toMatch(/mkdir[^\n]*\/etc\/prometheus\b/);
     });
 
@@ -96,12 +63,6 @@ describe('config-ui', () => {
     it('should use restart: unless-stopped', () => {
       const section = extractServiceBlock(content, 'config-ui');
       expect(section).toContain('restart: unless-stopped');
-    });
-
-    it('should publish DNS ports 53 UDP and TCP', () => {
-      const section = extractServiceBlock(content, 'config-ui');
-      expect(section).toContain('53:53/udp');
-      expect(section).toContain('53:53/tcp');
     });
 
     it('should expose admin UI port 5380', () => {
@@ -168,21 +129,6 @@ describe('config-ui', () => {
   });
 
   describe('cross-file consistency', () => {
-    it('all DNS_* env vars from .env.docker-compose are consumed by dnsmasq module', () => {
-      const envContent = readFile('.env.docker-compose');
-      const dnsmasqModule = readFile('tools/config-ui/modules/dnsmasq.js');
-
-      const dnsVars = envContent
-        .split('\n')
-        .filter((l) => /^DNS_[A-Z_]+=/.test(l))
-        .map((l) => l.split('=')[0]);
-
-      expect(dnsVars.length).toBeGreaterThan(0);
-      dnsVars.forEach((varName) => {
-        expect(dnsmasqModule).toContain(varName);
-      });
-    });
-
     it('CONFIG_UI_PASSWORD is required by server.js (refuses to start when empty)', () => {
       const server = readFile('tools/config-ui/server.js');
       expect(server).toContain('CONFIG_UI_PASSWORD');
@@ -197,12 +143,6 @@ describe('config-ui', () => {
       expect(server).toContain('5380');
     });
 
-    it('data volume path is consistent between docker-compose and dnsmasq module', () => {
-      const compose = readFile('docker-compose.yml');
-      const dnsmasqModule = readFile('tools/config-ui/modules/dnsmasq.js');
-      expect(compose).toContain('config-ui-data:/data');
-      expect(dnsmasqModule).toContain("'/data'");
-    });
   });
 
   describe('security', () => {
@@ -227,11 +167,6 @@ describe('config-ui', () => {
       expect(mod).toContain('sanitizeYamlValue');
     });
 
-    it('dnsmasq module validates hostnames and ips before writing config', () => {
-      const mod = readFile('tools/config-ui/modules/dnsmasq.js');
-      expect(mod).toContain('isValidHostname');
-      expect(mod).toContain('isValidIp');
-    });
   });
 
   describe('file structure', () => {
@@ -247,7 +182,6 @@ describe('config-ui', () => {
         'entrypoint.sh',
         'server.js',
         'public/index.html',
-        'modules/dnsmasq.js',
         'modules/prometheus.js',
       ].forEach((f) => {
         expect(fileExists(`tools/config-ui/${f}`)).toBe(true);
