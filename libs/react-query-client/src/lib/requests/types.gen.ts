@@ -4323,6 +4323,17 @@ export type ConversationListItemDto = {
      * When this conversation was last updated
      */
     updatedAt: string;
+    /**
+     * Number of messages in this conversation the authenticated user has not read yet
+     */
+    unreadCount: number;
+};
+
+export type UnreadCountResponseDto = {
+    /**
+     * Total number of unread messages across all conversations of the authenticated user
+     */
+    total: number;
 };
 
 export type ListMessagesResponseDto = {
@@ -6029,6 +6040,14 @@ export type MessagingContactResourceHolderData = {
 export type MessagingContactResourceHolderResponse = ContactResponseDto;
 
 export type MessagingListConversationsResponse = Array<ConversationListItemDto>;
+
+export type MessagingGetUnreadCountResponse = UnreadCountResponseDto;
+
+export type MessagingMarkConversationReadData = {
+    id: number;
+};
+
+export type MessagingMarkConversationReadResponse = UnreadCountResponseDto;
 
 export type MessagingListMessagesData = {
     id: number;
@@ -9433,6 +9452,39 @@ export type $OpenApiTs = {
                  * Unauthorized
                  */
                 401: unknown;
+            };
+        };
+    };
+    '/api/messaging/unread-count': {
+        get: {
+            res: {
+                /**
+                 * The total unread message count
+                 */
+                200: UnreadCountResponseDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/messaging/conversations/{id}/read': {
+        post: {
+            req: MessagingMarkConversationReadData;
+            res: {
+                /**
+                 * The updated total unread message count
+                 */
+                201: UnreadCountResponseDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+                /**
+                 * You are not a participant of this conversation
+                 */
+                403: unknown;
             };
         };
     };

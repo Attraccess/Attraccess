@@ -34,13 +34,26 @@ interface NavLinkProps {
   isExternal?: boolean;
   target?: string;
   indent?: boolean;
+  badgeCount?: number;
   'data-cy'?: string;
 }
 
-function NavLink({ href, label, icon, isExternal, target, indent, ...rest }: NavLinkProps) {
+function NavBadge({ count }: { count: number }) {
+  return (
+    <span
+      data-cy="sidebar-nav-badge"
+      className="ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-tiny font-semibold text-primary-foreground"
+    >
+      {count > 99 ? '99+' : count}
+    </span>
+  );
+}
+
+function NavLink({ href, label, icon, isExternal, target, indent, badgeCount, ...rest }: NavLinkProps) {
   const resolvedTarget = target ?? (isExternal ? '_blank' : undefined);
   const paddingClass = indent ? 'pl-6 pr-2' : 'px-2';
   const className = `flex items-center ${paddingClass} py-2 rounded-md text-sm text-default-foreground no-underline hover:bg-default hover:text-default-foreground`;
+  const badge = badgeCount && badgeCount > 0 ? <NavBadge count={badgeCount} /> : null;
 
   if (isExternal) {
     return (
@@ -62,6 +75,7 @@ function NavLink({ href, label, icon, isExternal, target, indent, ...rest }: Nav
     <RouterLink {...rest} to={href} target={resolvedTarget} className={className}>
       <span className="mr-3">{icon}</span>
       <span className="flex-1">{label}</span>
+      {badge}
     </RouterLink>
   );
 }
@@ -208,6 +222,7 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
                 icon={<item.icon size={16} />}
                 label={t('groups.##default##.items.' + item.translationKey)}
                 data-cy={`sidebar-nav-${item.path?.replace('/', '')}`}
+                badgeCount={item.badgeCount}
               />
             ))}
             <Accordion>

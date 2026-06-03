@@ -1,7 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, MoreThan, Not, Repository } from 'typeorm';
 import {
   Conversation,
   ConversationParticipant,
@@ -153,6 +153,7 @@ export class MessagingService {
           otherParticipant: await this.resolveOtherParticipant(participation.conversationId, userId),
           lastMessage,
           updatedAt: participation.conversation.updatedAt,
+          unreadCount: await this.countUnread(participation.conversationId, userId, participation.lastReadAt),
         };
       }),
     );
@@ -161,6 +162,32 @@ export class MessagingService {
       const aTime = a.lastMessage?.createdAt?.getTime() ?? a.updatedAt.getTime();
       const bTime = b.lastMessage?.createdAt?.getTime() ?? b.updatedAt.getTime();
       return bTime - aTime;
+    });
+  }
+
+  public async markConversationRead(conversationId: number, userId: number): Promise<number> {
+    await this.assertParticipant(conversationId, userId);
+    await this.participantRepository.update({ conversationId, userId }, { lastReadAt: new Date() });
+    return this.getTotalUnreadCount(userId);
+  }
+
+  public async getTotalUnreadCount(userId: number): Promise<number> {
+    const participations = await this.participantRepository.find({ where: { userId } });
+    const counts = await Promise.all(
+      participations.map((participation) =>
+        this.countUnread(participation.conversationId, userId, participation.lastReadAt),
+      ),
+    );
+    return counts.reduce((total, count) => total + count, 0);
+  }
+
+  private async countUnread(conversationId: number, userId: number, lastReadAt: Date | null): Promise<number> {
+    return this.messageRepository.count({
+      where: {
+        conversationId,
+        senderId: Not(userId),
+        ...(lastReadAt ? { createdAt: MoreThan(lastReadAt) } : {}),
+      },
     });
   }
 

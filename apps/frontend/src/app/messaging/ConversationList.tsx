@@ -38,6 +38,8 @@ export function ConversationList(props: Props) {
       {conversations.map((conversation) => {
         const username = conversation.otherParticipant?.username ?? t('conversations.unknownUser');
         const preview = conversation.lastMessage?.content ?? t('conversations.noMessages');
+        const unreadCount = conversation.unreadCount ?? 0;
+        const hasUnread = unreadCount > 0;
 
         return (
           <button
@@ -62,7 +64,19 @@ export function ConversationList(props: Props) {
                   </span>
                 )}
               </div>
-              <p className="truncate text-small text-zinc-500">{preview}</p>
+              <div className="flex items-center justify-between gap-2">
+                <p className={cn('truncate text-small', hasUnread ? 'font-medium text-foreground' : 'text-zinc-500')}>
+                  {preview}
+                </p>
+                {hasUnread && (
+                  <span
+                    data-cy={`conversation-unread-badge-${conversation.id}`}
+                    className="ml-auto inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-primary px-1.5 text-tiny font-semibold text-primary-foreground"
+                  >
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
+              </div>
             </div>
           </button>
         );

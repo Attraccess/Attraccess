@@ -27,4 +27,10 @@ export class ConversationListItemDto {
     example: '2025-01-18T12:30:00.000Z',
   })
   updatedAt!: Date;
+
+  @ApiProperty({
+    description: 'Number of messages in this conversation the authenticated user has not read yet',
+    example: 3,
+  })
+  unreadCount!: number;
 }

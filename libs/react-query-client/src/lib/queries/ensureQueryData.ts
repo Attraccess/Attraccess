@@ -954,6 +954,12 @@ export const ensureUseMessagingServiceMessagingLiveData = (queryClient: QueryCli
 */
 export const ensureUseMessagingServiceMessagingListConversationsData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseMessagingServiceMessagingListConversationsKeyFn(), queryFn: () => MessagingService.messagingListConversations() });
 /**
+* Get the total number of unread messages for the authenticated user
+* @returns UnreadCountResponseDto The total unread message count
+* @throws ApiError
+*/
+export const ensureUseMessagingServiceMessagingGetUnreadCountData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseMessagingServiceMessagingGetUnreadCountKeyFn(), queryFn: () => MessagingService.messagingGetUnreadCount() });
+/**
 * List paginated messages of a conversation
 * @param data The data for the request.
 * @param data.id

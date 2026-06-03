@@ -568,6 +568,10 @@ export type MessagingServiceMessagingListConversationsDefaultResponse = Awaited<
 export type MessagingServiceMessagingListConversationsQueryResult<TData = MessagingServiceMessagingListConversationsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useMessagingServiceMessagingListConversationsKey = "MessagingServiceMessagingListConversations";
 export const UseMessagingServiceMessagingListConversationsKeyFn = (queryKey?: Array<unknown>) => [useMessagingServiceMessagingListConversationsKey, ...(queryKey ?? [])];
+export type MessagingServiceMessagingGetUnreadCountDefaultResponse = Awaited<ReturnType<typeof MessagingService.messagingGetUnreadCount>>;
+export type MessagingServiceMessagingGetUnreadCountQueryResult<TData = MessagingServiceMessagingGetUnreadCountDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useMessagingServiceMessagingGetUnreadCountKey = "MessagingServiceMessagingGetUnreadCount";
+export const UseMessagingServiceMessagingGetUnreadCountKeyFn = (queryKey?: Array<unknown>) => [useMessagingServiceMessagingGetUnreadCountKey, ...(queryKey ?? [])];
 export type MessagingServiceMessagingListMessagesDefaultResponse = Awaited<ReturnType<typeof MessagingService.messagingListMessages>>;
 export type MessagingServiceMessagingListMessagesQueryResult<TData = MessagingServiceMessagingListMessagesDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useMessagingServiceMessagingListMessagesKey = "MessagingServiceMessagingListMessages";
@@ -653,6 +657,7 @@ export type AttractapServiceResetNfcCardMutationResult = Awaited<ReturnType<type
 export type AttractapServiceGetAppKeyByUidMutationResult = Awaited<ReturnType<typeof AttractapService.getAppKeyByUid>>;
 export type MessagingServiceMessagingContactUserMutationResult = Awaited<ReturnType<typeof MessagingService.messagingContactUser>>;
 export type MessagingServiceMessagingContactResourceHolderMutationResult = Awaited<ReturnType<typeof MessagingService.messagingContactResourceHolder>>;
+export type MessagingServiceMessagingMarkConversationReadMutationResult = Awaited<ReturnType<typeof MessagingService.messagingMarkConversationRead>>;
 export type MessagingServiceMessagingSendMessageMutationResult = Awaited<ReturnType<typeof MessagingService.messagingSendMessage>>;
 export type AuthenticationServiceUpdateOneSsoProviderMutationResult = Awaited<ReturnType<typeof AuthenticationService.updateOneSsoProvider>>;
 export type PasswordPolicyAdminServiceUpsertPasswordPolicyOverrideMutationResult = Awaited<ReturnType<typeof PasswordPolicyAdminService.upsertPasswordPolicyOverride>>;

@@ -25,6 +25,7 @@ import { ListMessagesResponseDto } from './dtos/listMessagesResponse.dto';
 import { ConversationListItemDto } from './dtos/conversationListItem.dto';
 import { NotificationPreferenceDto } from './dtos/notificationPreference.dto';
 import { UpdateNotificationPreferenceDto } from './dtos/updateNotificationPreference.dto';
+import { UnreadCountResponseDto } from './dtos/unreadCountResponse.dto';
 
 @ApiTags('Messaging')
 @Controller('messaging')
@@ -93,6 +94,32 @@ export class MessagingController {
   @ApiResponse({ status: 200, description: 'The inbox conversations', type: [ConversationListItemDto] })
   async listConversations(@Req() req: AuthenticatedRequest): Promise<ConversationListItemDto[]> {
     return this.messagingService.listConversations(req.user.id);
+  }
+
+  @Get('unread-count')
+  @Auth()
+  @ApiOperation({
+    summary: 'Get the total number of unread messages for the authenticated user',
+    operationId: 'messagingGetUnreadCount',
+  })
+  @ApiResponse({ status: 200, description: 'The total unread message count', type: UnreadCountResponseDto })
+  async getUnreadCount(@Req() req: AuthenticatedRequest): Promise<UnreadCountResponseDto> {
+    return { total: await this.messagingService.getTotalUnreadCount(req.user.id) };
+  }
+
+  @Post('conversations/:id/read')
+  @Auth()
+  @ApiOperation({
+    summary: 'Mark a conversation as read for the authenticated user',
+    operationId: 'messagingMarkConversationRead',
+  })
+  @ApiResponse({ status: 201, description: 'The updated total unread message count', type: UnreadCountResponseDto })
+  @ApiResponse({ status: 403, description: 'You are not a participant of this conversation' })
+  async markConversationRead(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<UnreadCountResponseDto> {
+    return { total: await this.messagingService.markConversationRead(id, req.user.id) };
   }
 
   @Get('conversations/:id/messages')

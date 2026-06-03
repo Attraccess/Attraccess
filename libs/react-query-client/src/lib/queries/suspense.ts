@@ -954,6 +954,12 @@ export const useMessagingServiceMessagingLiveSuspense = <TData = Common.Messagin
 */
 export const useMessagingServiceMessagingListConversationsSuspense = <TData = Common.MessagingServiceMessagingListConversationsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseMessagingServiceMessagingListConversationsKeyFn(queryKey), queryFn: () => MessagingService.messagingListConversations() as TData, ...options });
 /**
+* Get the total number of unread messages for the authenticated user
+* @returns UnreadCountResponseDto The total unread message count
+* @throws ApiError
+*/
+export const useMessagingServiceMessagingGetUnreadCountSuspense = <TData = Common.MessagingServiceMessagingGetUnreadCountDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseMessagingServiceMessagingGetUnreadCountKeyFn(queryKey), queryFn: () => MessagingService.messagingGetUnreadCount() as TData, ...options });
+/**
 * List paginated messages of a conversation
 * @param data The data for the request.
 * @param data.id

@@ -6830,9 +6830,26 @@ export const $ConversationListItemDto = {
             type: 'string',
             description: 'When this conversation was last updated',
             example: '2025-01-18T12:30:00.000Z'
+        },
+        unreadCount: {
+            type: 'number',
+            description: 'Number of messages in this conversation the authenticated user has not read yet',
+            example: 3
         }
     },
-    required: ['id', 'otherParticipant', 'lastMessage', 'updatedAt']
+    required: ['id', 'otherParticipant', 'lastMessage', 'updatedAt', 'unreadCount']
+} as const;
+
+export const $UnreadCountResponseDto = {
+    type: 'object',
+    properties: {
+        total: {
+            type: 'number',
+            description: 'Total number of unread messages across all conversations of the authenticated user',
+            example: 5
+        }
+    },
+    required: ['total']
 } as const;
 
 export const $ListMessagesResponseDto = {
