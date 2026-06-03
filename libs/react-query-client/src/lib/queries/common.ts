@@ -576,6 +576,10 @@ export const UseMessagingServiceMessagingListMessagesKeyFn = ({ id, limit, page 
   limit?: number | undefined;
   page?: number | undefined;
 }, queryKey?: Array<unknown>) => [useMessagingServiceMessagingListMessagesKey, ...(queryKey ?? [{ id, limit, page }])];
+export type MessagingServiceMessagingGetNotificationPreferencesDefaultResponse = Awaited<ReturnType<typeof MessagingService.messagingGetNotificationPreferences>>;
+export type MessagingServiceMessagingGetNotificationPreferencesQueryResult<TData = MessagingServiceMessagingGetNotificationPreferencesDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useMessagingServiceMessagingGetNotificationPreferencesKey = "MessagingServiceMessagingGetNotificationPreferences";
+export const UseMessagingServiceMessagingGetNotificationPreferencesKeyFn = (queryKey?: Array<unknown>) => [useMessagingServiceMessagingGetNotificationPreferencesKey, ...(queryKey ?? [])];
 export type SystemServiceRebootHostMutationResult = Awaited<ReturnType<typeof SystemService.rebootHost>>;
 export type SystemServiceShutdownHostMutationResult = Awaited<ReturnType<typeof SystemService.shutdownHost>>;
 export type UsersServiceSetLocalSignupDomainWhitelistMutationResult = Awaited<ReturnType<typeof UsersService.setLocalSignupDomainWhitelist>>;
@@ -675,6 +679,7 @@ export type SettingsServiceUpdateAuthRateLimitSettingsMutationResult = Awaited<R
 export type PasswordPolicyAdminServiceUpdateAdminPasswordPolicyMutationResult = Awaited<ReturnType<typeof PasswordPolicyAdminService.updateAdminPasswordPolicy>>;
 export type AttractapServiceUpdateReaderMutationResult = Awaited<ReturnType<typeof AttractapService.updateReader>>;
 export type AttractapServiceToggleCardActiveMutationResult = Awaited<ReturnType<typeof AttractapService.toggleCardActive>>;
+export type MessagingServiceMessagingUpdateNotificationPreferencesMutationResult = Awaited<ReturnType<typeof MessagingService.messagingUpdateNotificationPreferences>>;
 export type UsersServiceDeleteUserMutationResult = Awaited<ReturnType<typeof UsersService.deleteUser>>;
 export type AuthenticationServiceEndSessionMutationResult = Awaited<ReturnType<typeof AuthenticationService.endSession>>;
 export type AuthenticationServiceDeleteOneSsoProviderMutationResult = Awaited<ReturnType<typeof AuthenticationService.deleteOneSsoProvider>>;

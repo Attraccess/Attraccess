@@ -7,12 +7,15 @@ import {
   ConversationParticipant,
   Message,
   MessageReferenceType,
+  NotificationPreference,
   Resource,
   User,
 } from '@attraccess/database-entities';
 import { ResourceUsageService } from '../resources/usage/resourceUsage.service';
 import { MessageCreatedEvent } from './events/message-created.event';
 import { ConversationListItemDto } from './dtos/conversationListItem.dto';
+import { NotificationPreferenceDto } from './dtos/notificationPreference.dto';
+import { UpdateNotificationPreferenceDto } from './dtos/updateNotificationPreference.dto';
 
 export interface MessageReference {
   referenceType: MessageReferenceType;
@@ -32,6 +35,8 @@ export class MessagingService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(Resource)
     private readonly resourceRepository: Repository<Resource>,
+    @InjectRepository(NotificationPreference)
+    private readonly notificationPreferenceRepository: Repository<NotificationPreference>,
     private readonly dataSource: DataSource,
     private readonly resourceUsageService: ResourceUsageService,
     private readonly eventEmitter: EventEmitter2,
@@ -193,5 +198,30 @@ export class MessagingService {
     if (!participant) {
       throw new ForbiddenException('You are not a participant of this conversation');
     }
+  }
+
+  public async getNotificationPreference(userId: number): Promise<NotificationPreferenceDto> {
+    const preference = await this.notificationPreferenceRepository.findOne({ where: { userId } });
+    return { messagesEmailOnOffline: preference?.messagesEmailOnOffline ?? true };
+  }
+
+  public async updateNotificationPreference(
+    userId: number,
+    dto: UpdateNotificationPreferenceDto,
+  ): Promise<NotificationPreferenceDto> {
+    const existing = await this.notificationPreferenceRepository.findOne({ where: { userId } });
+    const preference =
+      existing ?? this.notificationPreferenceRepository.create({ userId, messagesEmailOnOffline: true });
+
+    if (dto.messagesEmailOnOffline !== undefined) {
+      preference.messagesEmailOnOffline = dto.messagesEmailOnOffline;
+    }
+
+    const saved = await this.notificationPreferenceRepository.save(preference);
+    return { messagesEmailOnOffline: saved.messagesEmailOnOffline };
+  }
+
+  public async shouldEmailMessageOnOffline(userId: number): Promise<boolean> {
+    return (await this.getNotificationPreference(userId)).messagesEmailOnOffline;
   }
 }

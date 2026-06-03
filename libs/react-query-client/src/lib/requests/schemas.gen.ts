@@ -6881,3 +6881,26 @@ export const $SendMessageDto = {
     },
     required: ['content']
 } as const;
+
+export const $NotificationPreferenceDto = {
+    type: 'object',
+    properties: {
+        messagesEmailOnOffline: {
+            type: 'boolean',
+            description: 'Whether to send an email when a direct message arrives while the user is offline',
+            example: true
+        }
+    },
+    required: ['messagesEmailOnOffline']
+} as const;
+
+export const $UpdateNotificationPreferenceDto = {
+    type: 'object',
+    properties: {
+        messagesEmailOnOffline: {
+            type: 'boolean',
+            description: 'Whether to send an email when a direct message arrives while the user is offline',
+            example: true
+        }
+    }
+} as const;

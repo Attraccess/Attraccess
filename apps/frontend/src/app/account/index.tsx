@@ -1,7 +1,7 @@
 import { PageHeader } from '../../components/pageHeader';
 import { DrawerBody, DrawerFooter, DrawerHeader, useOverlayState } from '@heroui/react';
 import { Button } from '../../components/button';
-import { AlertTriangleIcon, ShieldIcon, UserIcon } from 'lucide-react';
+import { AlertTriangleIcon, BellIcon, ShieldIcon, UserIcon } from 'lucide-react';
 import { StandardDrawer } from '../../components/standardDrawer';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
@@ -11,6 +11,7 @@ import { EmailForm } from './email';
 import { SetPasswordForm } from '../user-management/details/components/setPasswordForm';
 import { useAuth } from '../../hooks/useAuth';
 import { TwoFactorCard } from './two-factor';
+import { NotificationPreferencesForm } from './notifications';
 import { useUsersServiceRequestDeleteAccount, ApiError } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../components/toastProvider';
 import { FlatSection } from '../../components/flatSection';
@@ -61,6 +62,12 @@ export default function AccountPage() {
           <div className="flex flex-col gap-6">
             {me && <SetPasswordForm userId={me.id} username={me.username} />}
             {me && <TwoFactorCard />}
+          </div>
+        </FlatSection>
+
+        <FlatSection icon={<BellIcon size={16} />} title={t('sections.notifications')}>
+          <div className="flex flex-col gap-6">
+            <NotificationPreferencesForm />
           </div>
         </FlatSection>
 
