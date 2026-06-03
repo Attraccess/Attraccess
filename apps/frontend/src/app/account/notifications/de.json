@@ -1,0 +1,12 @@
+{
+  "messagesEmailOnOffline": {
+    "label": "Benachrichtige mich per E-Mail über Nachrichten, wenn ich offline bin",
+    "description": "Wenn du eine Direktnachricht erhältst, während du nicht online bist, senden wir dir eine E-Mail, damit du sie nicht verpasst."
+  },
+  "messages": {
+    "updated": "Benachrichtigungseinstellungen aktualisiert"
+  },
+  "errors": {
+    "updateFailed": "Benachrichtigungseinstellungen konnten nicht aktualisiert werden"
+  }
+}

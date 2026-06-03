@@ -5,6 +5,7 @@ import { useMemo } from 'react';
 import { ResourceMaintenance } from '@attraccess/react-query-client';
 import { useNow } from '../../../../hooks/useNow';
 import { ResourceMaintenanceUpsertModal } from '../maintenance-management/upsert';
+import { RequestsSection } from './requests-section';
 import { LiveSection } from './live-section';
 import { UpcomingSection } from './upcoming-section';
 import { HistorySection } from './history-section';
@@ -61,6 +62,7 @@ export function ActivityTab(props: Props) {
         </ResourceMaintenanceUpsertModal>
       </div>
 
+      <RequestsSection resourceId={resourceId} />
       <LiveSection resourceId={resourceId} liveMaintenances={partitioned.live} />
       <UpcomingSection upcomingMaintenances={partitioned.upcoming} />
       <HistorySection pastMaintenances={partitioned.past} />

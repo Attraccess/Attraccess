@@ -2,6 +2,8 @@
 // FEATURE: dev-server-port-isolation
 
 import { spawn } from 'node:child_process';
+import { writeFileSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
 import { findFreePort, isPortFree } from './lib/find-free-port.mts';
 
 type Target = 'api' | 'frontend' | 'both';
@@ -12,8 +14,29 @@ interface Resolved {
   previewPort?: number;
 }
 
-function parseArgs(argv: string[]): { only: Target; passthroughArgs: string[] } {
+const PORTS_FILE = join(process.cwd(), '.dev-serve-ports.json');
+
+function url(port: number): string {
+  return `http://localhost:${port}`;
+}
+
+function writePortsFile(r: Resolved): void {
+  const payload = {
+    pid: process.pid,
+    api: r.apiPort !== undefined ? { port: r.apiPort, url: url(r.apiPort) } : undefined,
+    frontend: r.frontendPort !== undefined ? { port: r.frontendPort, url: url(r.frontendPort) } : undefined,
+    preview: r.previewPort !== undefined ? { port: r.previewPort, url: url(r.previewPort) } : undefined,
+  };
+  writeFileSync(PORTS_FILE, `${JSON.stringify(payload, null, 2)}\n`);
+}
+
+function removePortsFile(): void {
+  rmSync(PORTS_FILE, { force: true });
+}
+
+function parseArgs(argv: string[]): { only: Target; tui: boolean; passthroughArgs: string[] } {
   let only: Target = 'both';
+  let tui = false;
   const passthroughArgs: string[] = [];
   const args = argv.slice(2);
   let sawDelimiter = false;
@@ -24,6 +47,10 @@ function parseArgs(argv: string[]): { only: Target; passthroughArgs: string[] } 
     }
     if (arg === '--') {
       sawDelimiter = true;
+      continue;
+    }
+    if (arg === '--tui') {
+      tui = true;
       continue;
     }
     const m = arg.match(/^--only=(.+)$/);
@@ -39,7 +66,7 @@ function parseArgs(argv: string[]): { only: Target; passthroughArgs: string[] } 
       passthroughArgs.push(arg);
     }
   }
-  return { only, passthroughArgs };
+  return { only, tui, passthroughArgs };
 }
 
 async function resolvePort(envName: string, defaultStart: number, label: string): Promise<number> {
@@ -69,7 +96,7 @@ function banner(r: Resolved): string {
 }
 
 async function main() {
-  const { only, passthroughArgs } = parseArgs(process.argv);
+  const { only, tui, passthroughArgs } = parseArgs(process.argv);
   const resolved: Resolved = {};
   const childEnv: NodeJS.ProcessEnv = { ...process.env };
 
@@ -88,13 +115,21 @@ async function main() {
   }
 
   console.log(banner(resolved));
+  writePortsFile(resolved);
+  process.on('exit', removePortsFile);
 
   const projects = only === 'both' ? 'api,frontend' : only;
-  const child = spawn(
-    'pnpm',
-    ['nx', 'run-many', '-t', 'serve', `--projects=${projects}`, '--outputStyle=stream', ...passthroughArgs],
-    { stdio: 'inherit', env: childEnv },
-  );
+  // Default: streamed output (agent/CI friendly). --tui: nx interactive terminal UI.
+  const outputArgs = tui ? ['--tui'] : ['--outputStyle=stream'];
+  if (tui) {
+    // nx auto-detects the TUI from the terminal, but that detection fails when
+    // nx runs as a grandchild process (here: pnpm → node launcher → nx) even
+    // with an inherited TTY, so it silently downgrades to streamed output.
+    // NX_TUI=true forces it on. The terminal is still a real TTY, so it renders.
+    childEnv.NX_TUI = 'true';
+  }
+  const nxArgs = ['run-many', '-t', 'serve', `--projects=${projects}`, ...outputArgs, ...passthroughArgs];
+  const child = spawn('pnpm', ['nx', ...nxArgs], { stdio: 'inherit', env: childEnv });
 
   const forward = (sig: NodeJS.Signals) => {
     if (!child.killed) child.kill(sig);
@@ -104,6 +139,7 @@ async function main() {
 
   child.on('exit', (code, signal) => {
     if (signal) {
+      removePortsFile();
       process.removeAllListeners('SIGINT');
       process.removeAllListeners('SIGTERM');
       process.kill(process.pid, signal);

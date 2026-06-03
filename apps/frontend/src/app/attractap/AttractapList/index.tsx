@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, AlertContent, AlertDescription, AlertTitle, Button, Card, Chip, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow, TableScrollContainer } from '@heroui/react';
-import { ArrowRightIcon, CpuIcon, LogsIcon, PencilIcon, Trash2Icon } from 'lucide-react';
+import { ActivityIcon, ArrowRightIcon, CpuIcon, LogsIcon, PencilIcon, Trash2Icon } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { AlertStatusIcon } from '../../../components/AlertStatusIcon';
 import { EmptyState } from '../../../components/emptyState';
 import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -36,6 +37,7 @@ export function AttractapList() {
   });
 
   const toast = useToastMessage();
+  const navigate = useNavigate();
 
   const [openedReaderEditor, setOpenedReaderEditor] = useState<number | null>(null);
 
@@ -191,6 +193,15 @@ export function AttractapList() {
                               >
                                 <PencilIcon className="w-4 h-4" />
                                 {t('table.actions.editReader')}
+                              </Button>
+
+                              <Button
+                                variant="ghost"
+                                onPress={() => navigate(`/attractap/readers/${reader.id}/diagnostics`)}
+                                data-cy={`attractap-list-diagnostics-reader-button-${reader.id}`}
+                              >
+                                <ActivityIcon className="w-4 h-4" />
+                                {t('table.actions.diagnostics')}
                               </Button>
 
                               <AttractapDeleteModal readerId={reader.id}>

@@ -12,7 +12,13 @@ import { existsSync, statSync, openSync, readSync, closeSync } from 'fs';
 import { join } from 'path';
 import { Inject, Logger, UseInterceptors } from '@nestjs/common';
 import { WebsocketService } from './websocket.service';
-import { AuthenticatedWebSocket, AttractapEvent, AttractapMessage, AttractapEventType } from './websocket.types';
+import {
+  AuthenticatedWebSocket,
+  AttractapEvent,
+  AttractapMessage,
+  AttractapEventType,
+  ReaderCrashReportPayload,
+} from './websocket.types';
 import { AttractapService } from '../attractap.service';
 import { randomBytes } from 'crypto';
 import { UsersService } from '../../users-and-auth/users/users.service';
@@ -23,6 +29,7 @@ import { LicenseModuleType, LicenseService } from '../../license/license.service
 import { AttractapFirmware } from '../dtos/firmware.dto';
 import { verifyToken } from './websocket.utils';
 import { ResourceUsageService } from '../../resources/usage/resourceUsage.service';
+import { ResourceMaintenanceService } from '../../resources/maintenances/maintenance.service';
 import { ResourceIntroductionsService } from '../../resources/introductions/resouceIntroductions.service';
 import { ResourceIntroducersService } from '../../resources/introducers/resourceIntroducers.service';
 import { ResourceFlowsService } from '../../resources/flows/resource-flows.service';
@@ -74,6 +81,9 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
   @Inject(ResourceUsageService)
   private resourceUsageService: ResourceUsageService;
+
+  @Inject(ResourceMaintenanceService)
+  private resourceMaintenanceService: ResourceMaintenanceService;
 
   @Inject(ResourceIntroductionsService)
   private resourceIntroductionService: ResourceIntroductionsService;
@@ -410,6 +420,9 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       case AttractapEventType.READER_FIRMWARE_INFO:
         await this.handleFirmwareInfo(socket, eventData);
         break;
+      case AttractapEventType.READER_CRASH_REPORT:
+        await this.handleCrashReport(socket, eventData);
+        break;
       case AttractapEventType.REQUEST_CARD_AUTHENTICATION_DATA:
         await this.handleCardAuthenticationRequest(socket, eventData);
         break;
@@ -585,6 +598,36 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     }
   }
 
+  private async handleCrashReport(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
+    const payload = data.payload as ReaderCrashReportPayload;
+
+    if (!payload?.resetReason || typeof payload.resetReason !== 'string') {
+      this.logger.error(`READER_CRASH_REPORT from reader ${socket.readerId} missing resetReason; ignoring.`);
+      await socket.sendMessage(
+        new AttractapEvent(AttractapEventType.READER_CRASH_REPORT, { error: 'INVALID_CRASH_REPORT' }),
+      );
+      return;
+    }
+
+    try {
+      const report = await this.attractapService.createCrashReport(socket.readerId, payload);
+      this.logger.warn(
+        `Stored crash report ${report.id} for reader ${socket.readerId}: reason=${report.resetReason} ` +
+          `heapFree=${report.heapFreeBytes ?? 'n/a'} largestBlock=${report.largestFreeBlockBytes ?? 'n/a'} ` +
+          `uptimeMs=${report.uptimeBeforeResetMs ?? 'n/a'} ws=${report.wsState ?? 'n/a'} wifi=${report.wifiState ?? 'n/a'}`,
+      );
+      this.metricsService.attractapCrashReportsTotal.inc();
+      await socket.sendMessage(
+        new AttractapEvent(AttractapEventType.READER_CRASH_REPORT, { received: true, id: report.id }),
+      );
+    } catch (error) {
+      this.logger.error(`Failed to store crash report for reader ${socket.readerId}: ${(error as Error).message}`);
+      await socket.sendMessage(
+        new AttractapEvent(AttractapEventType.READER_CRASH_REPORT, { error: 'CRASH_REPORT_STORE_FAILED' }),
+      );
+    }
+  }
+
   private async isFirmwareLatest(firmware: AttractapFirmware): Promise<boolean> {
     const firmwareDefinition = await this.firmwareService.getFirmwareDefinition(firmware.name, firmware.variant);
 
@@ -677,6 +720,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       resources.map(async (resource) => ({
         ...resource,
         activeUsageSession: await this.resourceUsageService.getActiveSession(resource.id, true),
+        isUnderMaintenance: await this.resourceMaintenanceService.hasActiveMaintenance(resource.id),
       })),
     );
 
@@ -706,6 +750,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
         description: resource.description,
         allowTakeOver: resource.allowTakeOver,
         introducers: resource.introducers.map((introducer) => introducer.user.username),
+        isUnderMaintenance: resource.isUnderMaintenance,
         activeUsageSession: resource.activeUsageSession
           ? {
             user: {

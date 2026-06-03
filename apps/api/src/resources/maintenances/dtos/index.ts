@@ -8,3 +8,7 @@ export { TimeIntervalTriggerConfigDto } from './time-interval-trigger-config.dto
 export { CreateMaintenanceScheduleDto } from './create-maintenance-schedule.dto';
 export { UpdateMaintenanceScheduleDto } from './update-maintenance-schedule.dto';
 export { FinishMaintenanceDto } from './finish-maintenance.dto';
+export { CreateMaintenanceRequestDto } from './create-maintenance-request.dto';
+export { ResolveMaintenanceRequestDto, ResolveMaintenanceRequestAction } from './resolve-maintenance-request.dto';
+export { ListMaintenanceRequestsDto } from './list-maintenance-requests.dto';
+export { PaginatedMaintenanceRequestResponse } from './paginated-maintenance-request-response.dto';

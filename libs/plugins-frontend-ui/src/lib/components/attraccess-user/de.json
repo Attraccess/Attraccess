@@ -1,4 +1,6 @@
 {
-  "unknown": "Gelöscht"
+  "unknown": "Gelöscht",
+  "startDirectMessage": "Direktnachricht starten",
+  "emailVerified": "E-Mail bestätigt",
+  "emailUnverified": "E-Mail nicht bestätigt"
 }
-

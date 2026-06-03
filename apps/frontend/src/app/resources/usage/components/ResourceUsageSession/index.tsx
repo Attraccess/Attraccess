@@ -6,6 +6,7 @@ import { useAuth } from '../../../../../hooks/useAuth';
 import { ActiveSessionDisplay } from '../ActiveSessionDisplay';
 import { OtherUserSessionDisplay } from '../OtherUserSessionDisplay';
 import { IntroductionRequiredDisplay } from '../IntroductionRequiredDisplay';
+import { RetrainingStatusBanner } from '../RetrainingStatusBanner';
 import { StartSessionControls } from '../StartSessionControls';
 import {
   useAccessControlServiceResourceIntroducersGetMany,
@@ -18,6 +19,8 @@ import en from './translations/en.json';
 import de from './translations/de.json';
 import { MaintenanceInProgressDisplay } from './maintenance';
 import { FlatSection } from '../../../../../components/flatSection';
+import { RequestMaintenanceButton } from '../../../details/maintenance-management/request';
+import { InstantMaintenanceButton } from '../../../details/maintenance-management/instant';
 
 type ResourceUsageSessionProps = Omit<HTMLAttributes<HTMLElement>, 'children' | 'resource'> & {
   resourceId: number;
@@ -105,7 +108,16 @@ export function ResourceUsageSession({
 
   return (
     <FlatSection icon={<Clock className="w-4 h-4" />} title={t('title.' + resource.type)} {...rest}>
-      {renderContent()}
+      <div className="space-y-4">
+        <RetrainingStatusBanner resourceId={resourceId} />
+        {renderContent()}
+        {!isLoading && !(activeMaintenances?.data?.length && activeMaintenances.data.length > 0) && (
+          <div className="flex justify-end gap-2">
+            <RequestMaintenanceButton resourceId={resourceId} />
+            <InstantMaintenanceButton resourceId={resourceId} />
+          </div>
+        )}
+      </div>
     </FlatSection>
   );
 }

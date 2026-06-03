@@ -19,6 +19,7 @@ import { SSOProviderSAMLConfiguration } from './entities/ssoProvider.saml';
 import { User, SystemPermissions, type SystemPermission } from './entities/user.entity';
 import { Session } from './entities/session.entity';
 import { Attractap, AttractapFirmwareVersion } from './entities/attractap.entity';
+import { AttractapCrashReport } from './entities/attractapCrashReport.entity';
 import {
   ResourceFlowNode,
   ResourceFlowNodeType,
@@ -53,6 +54,7 @@ import {
 import { ResourceFlowEdge } from './entities/resourceFlowEdge';
 import { ResourceFlowLog, ResourceFlowLogType } from './entities/resourceFlowLog';
 import { ResourceMaintenance } from './entities/resource.maintenance';
+import { ResourceMaintenanceRequest, MaintenanceRequestStatus } from './entities/resource-maintenance-request.entity';
 import {
   ResourceMaintenanceSchedule,
   ResourceMaintenanceScheduleTriggerType,
@@ -91,6 +93,7 @@ import {
 import { Conversation } from './entities/conversation.entity';
 import { ConversationParticipant } from './entities/conversation-participant.entity';
 import { Message, MessageReferenceType } from './entities/message.entity';
+import { NotificationPreference } from './entities/notification-preference.entity';
 
 // Export all entities individually
 export {
@@ -114,6 +117,7 @@ export {
   Session,
   NFCCard,
   Attractap,
+  AttractapCrashReport,
   EmailTemplate,
   ResourceFlowNode,
   ResourceFlowNodeType,
@@ -127,6 +131,8 @@ export {
   ResourceFlowLogType,
   AttractapFirmwareVersion,
   ResourceMaintenance,
+  ResourceMaintenanceRequest,
+  MaintenanceRequestStatus,
   ResourceMaintenanceSchedule,
   ResourceMaintenanceScheduleTriggerType,
   ResourceMaintenanceScheduleUsageHoursConfig,
@@ -185,6 +191,7 @@ export {
   ConversationParticipant,
   Message,
   MessageReferenceType,
+  NotificationPreference,
 };
 
 // Export the entities object
@@ -204,11 +211,13 @@ export const entities = {
   SSOProviderSAMLConfiguration,
   NFCCard,
   Attractap,
+  AttractapCrashReport,
   EmailTemplate,
   ResourceFlowNode,
   ResourceFlowEdge,
   ResourceFlowLog,
   ResourceMaintenance,
+  ResourceMaintenanceRequest,
   ResourceMaintenanceSchedule,
   ResourceMaintenanceScheduleUsageHoursConfig,
   ResourceMaintenanceScheduleUsageCountConfig,
@@ -232,4 +241,5 @@ export const entities = {
   Conversation,
   ConversationParticipant,
   Message,
+  NotificationPreference,
 };

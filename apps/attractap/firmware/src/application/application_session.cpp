@@ -1,0 +1,245 @@
+// Session coordination: resource/project selection, action buttons, pause timing
+// FEATURE: application-session
+
+#include "application.hpp"
+
+#ifdef HAS_LVGL_DISPLAY
+void Application::handleConnectionConfigurationSave(
+    const ConnectionConfigurationScreen::ConnectionConfig &cfg) {
+  // split cfg.host into hostname and port (if no port present, use 443)
+  String hostname = cfg.host;
+  String port = "443";
+  if (cfg.host.indexOf(":") != -1) {
+    hostname = cfg.host.substring(0, cfg.host.indexOf(":"));
+    port = cfg.host.substring(cfg.host.indexOf(":") + 1);
+  }
+  Settings::saveNetworkConfig(cfg.ssid, cfg.password);
+  Settings::saveAttraccessApiConfig(hostname, port.toInt(), cfg.useSSL);
+
+    Settings::setDevicePin(cfg.devicePin);
+    Settings::setBeeperEnabled(cfg.beeperEnabled);
+
+    this->state = APPLICATION_STATE_INIT;
+    this->api.enableConnectionAttempts();
+    Display::transitionToScreen(&Display::initScreen);
+};
+
+void Application::handleResourceListUpdate(
+    const API::ResourceList &resourceList) {
+  this->logger.infof("Resource list updated: %d resources", resourceList.count);
+
+  this->resourceList = resourceList;
+  this->resourceCount = resourceList.count;
+  this->resourceListUpdated = true;
+
+  // If a resource is already selected, try to find it in the new list and
+  // refresh the details screen.
+  if (this->resourceIsSelected) {
+    this->logger.info(
+        "Resource is selected, trying to find it in the new list");
+    for (uint16_t i = 0; i < this->resourceList.count; ++i) {
+      const auto &obj = this->resourceList.items[i];
+      if (obj.id == this->selectedResourceId) {
+        this->logger.infof(
+            "Resource found in the new list, refreshing the details screen: %s",
+            obj.name);
+        this->selectResource(obj);
+        break;
+      }
+    }
+  }
+}
+
+void Application::selectResource(const API::ResourceBrief &resource) {
+  this->logger.infof("Resource selected: %s", resource.name);
+  this->resourceIsSelected = true;
+  this->selectedResourceId = resource.id;
+  this->restartResourceSelectionTimeout();
+  this->selectedResourceChanged = true;
+}
+
+void Application::requestProjectsPage(uint32_t page) {
+  if (page == 0) {
+    page = 1;
+  }
+  this->api.requestProjectsOfUser(page);
+}
+
+void Application::clearProjectSelection() {
+  this->selectedProjectId = 0;
+  this->selectedProjectName = "";
+  this->projectsCurrentPage = 1;
+  this->projectsTotalCount = 0;
+  this->projectsHasMore = false;
+  this->projectsOfUserResponse.count = 0;
+  this->projectsOfUserResponse.page = 1;
+  this->projectsOfUserResponse.total = 0;
+  this->projectsOfUserResponse.limit = API::MAX_PROJECTS_PER_PAGE;
+  this->projectsOfUserResponse.hasMore = false;
+  this->projectsOfUserResponseUpdated = true;
+  Display::resourceDetailsScreen.setSelectedProject(0, nullptr);
+}
+
+void Application::handleProjectSelection(uint32_t projectId,
+                                         const String &projectName) {
+  this->selectedProjectId = projectId;
+  this->selectedProjectName = projectName;
+  Display::resourceDetailsScreen.setSelectedProject(projectId,
+                                                    projectName.c_str());
+}
+
+void Application::handleTouch(int16_t x, int16_t y) {
+  if (this->state == APPLICATION_STATE_UNLOCKED) {
+    this->restartSessionTimeout();
+  }
+}
+
+void Application::restartSessionTimeout() {
+  uint32_t now = millis();
+  Display::resourceDetailsScreen.setSessionTimeoutTime(
+      now + this->UNLOCKED_TIMEOUT_MS);
+  this->timeOfUnlockedMs = now;
+  this->resetPauseAccounting();
+}
+
+void Application::handleResourceDetailsButtonClick(
+    ResourceDetailsScreen::ButtonClickEventData evt) {
+  this->logger.infof("Resource details button clicked: %d",
+                     evt.buttonClickType);
+
+  if (this->state != APPLICATION_STATE_UNLOCKED) {
+    return;
+  }
+
+  switch (evt.buttonClickType) {
+  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_START_SESSION:
+    Display::resourceDetailsScreen.showActionProgress("Starte Sitzung");
+    this->beginActionPause();
+    this->pendingActionType = PENDING_ACTION_START_SESSION;
+    this->pendingActionResourceId = this->selectedResourceId;
+    this->pendingActionProjectId = this->selectedProjectId;
+    this->hasPendingFormRequest = false;
+    this->api.startResourceUsageSession(this->selectedResourceId,
+                                        this->selectedProjectId);
+    break;
+  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_STOP_SESSION:
+    Display::resourceDetailsScreen.showActionProgress("Beende Sitzung");
+    this->beginActionPause();
+    this->pendingActionType = PENDING_ACTION_STOP_SESSION;
+    this->pendingActionResourceId = this->selectedResourceId;
+    this->pendingActionProjectId = 0;
+    this->hasPendingFormRequest = false;
+    this->api.stopResourceUsageSession(this->selectedResourceId);
+    break;
+  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_LOCK_DOOR:
+    Display::resourceDetailsScreen.showActionProgress("Sperre Tuer");
+    this->beginActionPause();
+    this->api.lockDoor(this->selectedResourceId);
+    break;
+  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_UNLOCK_DOOR:
+    Display::resourceDetailsScreen.showActionProgress("Entsperre Tuer");
+    this->beginActionPause();
+    this->api.unlockDoor(this->selectedResourceId);
+    break;
+  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_UNLATCH_DOOR:
+    Display::resourceDetailsScreen.showActionProgress("Oeffne Tuer-Riegel");
+    this->beginActionPause();
+    this->api.unlatchDoor(this->selectedResourceId);
+    break;
+  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_FLOW_BUTTON:
+    Display::resourceDetailsScreen.showActionProgress("Aktion Ausfuehren");
+    this->beginActionPause();
+    this->api.triggerFlowButton(this->selectedResourceId, evt.flowButtonId);
+    break;
+  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_LOGOUT:
+    if (this->resourceCount > 1) {
+      this->resourceIsSelected = false;
+    }
+    this->unlocked = false;
+    this->currentProjectsUser = "";
+    this->clearProjectSelection();
+    this->pendingActionType = PENDING_ACTION_NONE;
+    this->hasPendingFormRequest = false;
+    Display::resourceDetailsScreen.hideFormsModal();
+    break;
+  }
+}
+
+void Application::restartResourceSelectionTimeout() {
+  uint32_t now = millis();
+  this->timeOfResourceSelectionMs = now;
+}
+
+void Application::beginActionPause() {
+  this->actionInProgressCount++;
+  if (this->actionInProgressCount == 1) {
+    this->pauseStartMs = millis();
+    // Freeze the UI indicator
+    Display::resourceDetailsScreen.setSessionTimeoutPaused(true);
+  }
+}
+
+void Application::endActionPause() {
+  if (this->actionInProgressCount == 0) {
+    return;
+  }
+  this->actionInProgressCount--;
+  if (this->actionInProgressCount == 0) {
+    uint32_t now = millis();
+    uint32_t delta =
+        (now >= this->pauseStartMs) ? (now - this->pauseStartMs) : 0;
+    this->accumulatedPauseMs += delta;
+    // Extend the UI deadline by the same delta and unfreeze
+    Display::resourceDetailsScreen.extendSessionTimeoutBy(delta);
+    Display::resourceDetailsScreen.setSessionTimeoutPaused(false);
+  }
+}
+
+void Application::resetPauseAccounting() {
+  this->pauseStartMs = 0;
+  this->accumulatedPauseMs = 0;
+  this->actionInProgressCount = 0;
+  // Ensure not paused visually
+  Display::resourceDetailsScreen.setSessionTimeoutPaused(false);
+}
+
+void Application::resetSessionOnDisconnect() {
+  bool sessionActive = this->unlocked || this->resourceIsSelected ||
+                       this->pendingActionType != PENDING_ACTION_NONE ||
+                       this->hasPendingFormRequest ||
+                       this->pendingFormRequestReady ||
+                       this->currentProjectsUser.length() > 0;
+
+  if (!sessionActive) {
+    return;
+  }
+
+  this->logger.info("Connectivity lost; resetting session state");
+
+  // Ensure any in-progress UI overlays are dismissed
+  Display::resourceDetailsScreen.hideActionProgress();
+  Display::resourceDetailsScreen.hideFormsModal();
+  this->resetPauseAccounting();
+
+  this->pendingActionType = PENDING_ACTION_NONE;
+  this->pendingActionResourceId = 0;
+  this->pendingActionProjectId = 0;
+  this->hasPendingFormRequest = false;
+  this->pendingFormRequestReady = false;
+  this->pendingFormFieldsReady = false;
+  this->pendingFormPageResultReady = false;
+  this->formCursorFormIdx = 0;
+  this->formCursorOffset = 0;
+
+  this->clearProjectSelection();
+  this->currentProjectsUser = "";
+
+  this->selectedResourceId = 0;
+  this->resourceIsSelected = false;
+  this->selectedResourceChanged = false;
+
+  this->unlocked = false;
+  this->externalState = EXTERNAL_STATE_NONE;
+  this->nfc.enableCardDetection();
+}
+#endif

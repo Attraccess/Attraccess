@@ -1,4 +1,6 @@
 {
-  "unknown": "Unknown"
+  "unknown": "Unknown",
+  "startDirectMessage": "Start direct message",
+  "emailVerified": "Email verified",
+  "emailUnverified": "Email not verified"
 }
-

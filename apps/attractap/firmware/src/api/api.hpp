@@ -6,13 +6,19 @@
 #include "../logger/logger.hpp"
 #include "../websocket/websocket.hpp"
 #include "../utils.hpp"
-#include "esp_ota_ops.h"
-#include "esp_partition.h"
+#include "ota/ota_updater.hpp"
 
 class API
 {
 public:
-    API() : logger("API") {}
+    API() : logger("API"),
+            firmware(
+                logger,
+                [this](const char *type, JsonObject payload)
+                { this->sendMessage(type, payload); },
+                firmwareUpdateProgressCallback,
+                firmwareUpdateMetaCallback,
+                errorCallback) {}
 
     void setup();
     void loop();
@@ -44,6 +50,7 @@ public:
         char name[MAX_RESOURCE_NAME_LEN];
         char description[MAX_DESC_LEN];
         bool hasActiveUsage;
+        bool isUnderMaintenance;
         char activeUser[MAX_USERNAME_LEN];
         uint32_t activeStartEpoch; // seconds since epoch
         uint8_t introducerCount;
@@ -298,6 +305,14 @@ private:
     void sendAuthenticationRequest();
     void onReaderAuthenticated(JsonObject data);
     void sendFirmwareInfo();
+
+    // Persisted crash/boot diagnostics upload (ATT-474). On a successful
+    // connect the stored NVS record + (if present) the coredump blob are
+    // pushed to the server; both are cleared once the server confirms receipt.
+    void sendPendingCrashReport();
+    void onCrashReportResponse(JsonObject data);
+    bool crashReportAwaitingAck = false;
+    bool crashReportSentCoredump = false;
     void onResourceList(JsonObject data);
     void onProjectsOfUserResponse(JsonObject data);
     void onCardAuthenticationDetailsResponse(JsonObject data);
@@ -330,28 +345,5 @@ private:
     std::function<void(int)> firmwareUpdateProgressCallback;
     std::function<void(String availableVersion)> firmwareUpdateMetaCallback;
 
-    // OTA state
-    struct OtaState
-    {
-        bool inProgress = false;
-        uint32_t totalSize = 0;
-        esp_ota_handle_t otaHandle = 0;
-        const esp_partition_t *updatePartition = nullptr;
-        int lastReportedPercent = -1;
-        uint32_t bytesWritten = 0;
-    } ota;
-
-    void startFirmwareUpdate(JsonObject firmwareMeta);
-    bool readyForNextFirmwareChunk = false;
-    void requestNextFirmwareChunk();
-    void onFirmwareChunkEvent(esp_websocket_event_data_t data);
-    uint32_t lastFirmwareChunkRequestTimeMs = 0;
-    const uint32_t FIRMWARE_CHUNK_REQUEST_RESPONSE_TIMEOUT_MS = 30000;
-    uint32_t firmwareUpdateFailedTimeMs = 0;
-    void abortFirmwareUpdate(const char *reason);
-    void updateFirmwareProgress(int percent);
-
-    // Chunk reception tracking to avoid interleaving/overlap across WS fragments
-    uint32_t currentChunkExpectedBytes = 0;
-    uint32_t currentChunkReceivedBytes = 0;
+    OtaUpdater firmware;
 };

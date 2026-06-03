@@ -1,0 +1,77 @@
+import { NotFoundException, StreamableFile } from '@nestjs/common';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
+import { PluginController } from './plugin.controller';
+import { PluginService } from './plugin.service';
+import { LoadedPluginManifest } from './plugin.manifest';
+import { FileUpload } from '../common/types/file-upload.types';
+
+function frontendPlugin(name: string): LoadedPluginManifest {
+  return {
+    id: name,
+    name,
+    version: '1.0.0',
+    pluginDirectory: name,
+    permissions: [],
+    main: { frontend: { directory: join(name, 'frontend'), entryPoint: 'index.mjs' } },
+    attraccessVersion: { min: '1.0.0' },
+  } as LoadedPluginManifest;
+}
+
+describe('PluginController', () => {
+  let root: string;
+  let service: { uploadPlugin: jest.Mock; deletePlugin: jest.Mock };
+  let controller: PluginController;
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'plugin-controller-'));
+    PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
+    service = { uploadPlugin: jest.fn(), deletePlugin: jest.fn() };
+    controller = new PluginController(service as unknown as PluginService);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('returns every discovered plugin', () => {
+    const plugins = [frontendPlugin('a'), frontendPlugin('b')];
+    jest.spyOn(PluginService, 'getPlugins').mockReturnValue(plugins);
+    expect(controller.getAllPlugins()).toBe(plugins);
+  });
+
+  describe('getFrontendPluginFile', () => {
+    it('streams an existing frontend file', () => {
+      const plugin = frontendPlugin('streamed');
+      jest.spyOn(PluginService, 'getPlugins').mockReturnValue([plugin]);
+      mkdirSync(join(root, 'streamed', 'frontend'), { recursive: true });
+      writeFileSync(join(root, 'streamed', 'frontend', 'index.js'), 'console.log(1)');
+
+      expect(controller.getFrontendPluginFile('streamed', 'index.js')).toBeInstanceOf(StreamableFile);
+    });
+
+    it('throws when the plugin is unknown', () => {
+      jest.spyOn(PluginService, 'getPlugins').mockReturnValue([]);
+      expect(() => controller.getFrontendPluginFile('ghost', 'index.js')).toThrow(NotFoundException);
+    });
+
+    it('throws when the requested file is missing', () => {
+      jest.spyOn(PluginService, 'getPlugins').mockReturnValue([frontendPlugin('present')]);
+      expect(() => controller.getFrontendPluginFile('present', 'missing.js')).toThrow(NotFoundException);
+    });
+  });
+
+  it('delegates upload to the plugin service', async () => {
+    const file = { originalname: 'plugin.zip' } as FileUpload;
+    service.uploadPlugin.mockResolvedValue({ name: 'uploaded' });
+    await expect(controller.uploadPlugin(file, {})).resolves.toEqual({ name: 'uploaded' });
+    expect(service.uploadPlugin).toHaveBeenCalledWith(file);
+  });
+
+  it('delegates delete to the plugin service', () => {
+    controller.deletePlugin('plugin-id');
+    expect(service.deletePlugin).toHaveBeenCalledWith('plugin-id');
+  });
+});

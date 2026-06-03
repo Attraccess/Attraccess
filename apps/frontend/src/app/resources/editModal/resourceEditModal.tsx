@@ -30,6 +30,7 @@ import { StandardDrawer } from '../../../components/standardDrawer';
 import { SharedDataTab } from './tabs/shared';
 import { MachineTab } from './tabs/machine';
 import { DoorTab } from './tabs/door';
+import { RetrainingTab } from './tabs/retraining';
 import { ResourceMetadataEditor } from './resourceMetadataEditor';
 
 type ResourceFormData = Omit<UpdateResourceDto, 'metadata'> & {
@@ -62,6 +63,9 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
     allowTakeOver: false,
     type: ResourceType.MACHINE,
     separateUnlockAndUnlatch: false,
+    retrainingMaxAgeDays: null,
+    retrainingMaxInactivityDays: null,
+    retrainingBlocksAccess: false,
     metadata: {} as Record<string, unknown>,
   });
 
@@ -151,6 +155,9 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
       allowTakeOver: resource?.allowTakeOver || false,
       type: resource?.type || ResourceType.MACHINE,
       separateUnlockAndUnlatch: resource?.separateUnlockAndUnlatch || false,
+      retrainingMaxAgeDays: resource?.retrainingMaxAgeDays ?? null,
+      retrainingMaxInactivityDays: resource?.retrainingMaxInactivityDays ?? null,
+      retrainingBlocksAccess: resource?.retrainingBlocksAccess ?? false,
       metadata: (resource?.metadata ?? {}) as Record<string, unknown>,
     });
     setSelectedImage(null);
@@ -184,6 +191,9 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
           deleteImage,
           type: formData.type,
           separateUnlockAndUnlatch: formData.separateUnlockAndUnlatch,
+          retrainingMaxAgeDays: formData.retrainingMaxAgeDays,
+          retrainingMaxInactivityDays: formData.retrainingMaxInactivityDays,
+          retrainingBlocksAccess: formData.retrainingBlocksAccess,
           metadata: formData.metadata as Record<string, unknown>,
         },
       });
@@ -198,6 +208,9 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
         image: selectedImage ?? undefined,
         type: formData.type as ResourceType,
         separateUnlockAndUnlatch: formData.separateUnlockAndUnlatch,
+        retrainingMaxAgeDays: formData.retrainingMaxAgeDays,
+        retrainingMaxInactivityDays: formData.retrainingMaxInactivityDays,
+        retrainingBlocksAccess: formData.retrainingBlocksAccess,
         metadata: formData.metadata as Record<string, unknown>,
       },
     });
@@ -246,6 +259,11 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
                     <DoorTab t={t} formData={formData} setField={setField} />
                   </TabPanel>
                 </Tabs>
+              </div>
+
+              <div className="flex flex-col gap-2 w-full">
+                <h3 className="text-small font-semibold">{t('inputs.retraining.sectionTitle')}</h3>
+                <RetrainingTab t={t} formData={formData} setField={setField} resource={resource} />
               </div>
 
               <ResourceMetadataEditor

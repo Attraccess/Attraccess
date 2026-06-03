@@ -292,6 +292,71 @@ export class EmailService {
     await this.sendEmail(user, EmailTemplateType.RESOURCE_HEALTH_CHANGED, context);
   }
 
+  async sendUserRetrainingEmail(
+    user: User,
+    target: { id: number; name: string; isGroup: boolean },
+    info: { reason: 'age' | 'inactivity' | null; blocksAccess: boolean },
+  ) {
+    if (!user?.email) {
+      return;
+    }
+
+    const base = await this.getBaseContext(user);
+    const path = target.isGroup ? 'resource-groups' : 'resources';
+    const resourceUrl = `${base.host.frontend}/${path}/${target.id}`;
+
+    const reasonText =
+      info.reason === 'age'
+        ? 'Your training has reached its maximum age and must be renewed.'
+        : info.reason === 'inactivity'
+        ? 'You have not used this resource for the configured period and must be retrained.'
+        : 'Your training must be renewed.';
+
+    const context = {
+      ...base,
+      resource: {
+        id: target.id,
+        name: target.name,
+        url: resourceUrl,
+      },
+      retraining: {
+        reason: reasonText,
+        blocksAccess: info.blocksAccess,
+      },
+    };
+
+    await this.sendEmail(user, EmailTemplateType.USER_RETRAINING_REQUIRED, context);
+  }
+
+  async sendMaintenanceRequestedEmail(
+    recipient: User,
+    resource: Pick<Resource, 'id' | 'name'>,
+    request: { id: number; reason: string; requestedBy: string },
+  ) {
+    if (!recipient?.email) {
+      return;
+    }
+
+    const base = await this.getBaseContext(recipient);
+    const resourceUrl = `${base.host.frontend}/resources/${resource.id}`;
+
+    const context = {
+      ...base,
+      resource: {
+        id: resource.id,
+        name: resource.name,
+        url: resourceUrl,
+      },
+      request: {
+        id: request.id,
+        reason: request.reason,
+        requestedBy: request.requestedBy,
+      },
+    };
+
+    await this.sendEmail(recipient, EmailTemplateType.MAINTENANCE_REQUEST_CREATED, context);
+  }
+
   private async createTransporter(): Promise<{ transporter: ReturnType<typeof createTransport>; from: string }> {
     const smtpConfig = await this.settingsService.getSmtpConfiguration();
     if (!smtpConfig) {

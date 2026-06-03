@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { subtle, pbkdf2Sync, randomBytes } from 'crypto';
-import { NFCCard, Attractap, Resource, User } from '@attraccess/database-entities';
+import { NFCCard, Attractap, AttractapCrashReport, Resource, User } from '@attraccess/database-entities';
+import { ReaderCrashReportPayload } from './websockets/websocket.types';
 import { DeleteResult, FindManyOptions, In, Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { securelyHashToken } from './websockets/websocket.utils';
@@ -19,6 +20,8 @@ export class AttractapService {
     private readonly nfcCardRepository: Repository<NFCCard>,
     @InjectRepository(Attractap)
     private readonly readerRepository: Repository<Attractap>,
+    @InjectRepository(AttractapCrashReport)
+    private readonly crashReportRepository: Repository<AttractapCrashReport>,
     @Inject(EventEmitter2)
     private readonly eventEmitter: EventEmitter2,
     @InjectRepository(Resource)
@@ -228,6 +231,62 @@ export class AttractapService {
 
   public async getAllReaders(options?: FindManyOptions<Attractap>): Promise<Attractap[]> {
     return await this.readerRepository.find(options);
+  }
+
+  public async createCrashReport(readerId: number, payload: ReaderCrashReportPayload): Promise<AttractapCrashReport> {
+    const coredump =
+      typeof payload.coredumpBase64 === 'string' && payload.coredumpBase64.length > 0
+        ? Buffer.from(payload.coredumpBase64, 'base64')
+        : null;
+
+    const report = await this.crashReportRepository.save({
+      attractapId: readerId,
+      resetReason: payload.resetReason,
+      heapFreeBytes: this.toNullableInt(payload.heapFreeBytes),
+      largestFreeBlockBytes: this.toNullableInt(payload.largestFreeBlockBytes),
+      uptimeBeforeResetMs: this.toNullableInt(payload.uptimeBeforeResetMs),
+      wsState: payload.wsState ?? null,
+      wifiState: payload.wifiState ?? null,
+      firmwareVersion: payload.firmwareVersion ?? null,
+      coredumpSize: coredump ? coredump.length : null,
+      coredump,
+    });
+
+    report.coredump = null;
+    return report;
+  }
+
+  public async getCrashReportsForReader(readerId: number): Promise<AttractapCrashReport[]> {
+    return await this.crashReportRepository.find({
+      where: { attractapId: readerId },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  public async getCrashReportCoredump(
+    readerId: number,
+    reportId: number,
+  ): Promise<{ filename: string; coredump: Buffer } | null> {
+    const report = await this.crashReportRepository.findOne({
+      where: { id: reportId, attractapId: readerId },
+      select: { id: true, attractapId: true, coredump: true },
+    });
+
+    if (!report?.coredump) {
+      return null;
+    }
+
+    return {
+      filename: `reader-${readerId}-crash-${reportId}.coredump`,
+      coredump: report.coredump,
+    };
+  }
+
+  private toNullableInt(value: number | null | undefined): number | null {
+    if (value === null || value === undefined || !Number.isFinite(value)) {
+      return null;
+    }
+    return Math.trunc(value);
   }
 
   public uint8ArrayToHexString(uint8Array: Uint8Array) {
