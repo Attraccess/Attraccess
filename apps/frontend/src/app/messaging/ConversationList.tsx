@@ -1,7 +1,7 @@
 // Inbox list of conversations showing the other participant and last message
 // FEATURE: Messaging inbox conversation list
 import { ConversationListItemDto } from '@attraccess/react-query-client';
-import { Skeleton, cn } from '@heroui/react';
+import { Chip, Skeleton, cn } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
@@ -69,12 +69,15 @@ export function ConversationList(props: Props) {
                   {preview}
                 </p>
                 {hasUnread && (
-                  <span
+                  <Chip
+                    color="accent"
+                    variant="primary"
+                    size="sm"
+                    className="ml-auto shrink-0"
                     data-cy={`conversation-unread-badge-${conversation.id}`}
-                    className="ml-auto inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-primary px-1.5 text-tiny font-semibold text-primary-foreground"
                   >
                     {unreadCount > 99 ? '99+' : unreadCount}
-                  </span>
+                  </Chip>
                 )}
               </div>
             </div>

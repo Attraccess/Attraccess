@@ -3,6 +3,7 @@ import { X, Settings, LogOut, User, ExternalLink, Languages, Check } from 'lucid
 import { useAuth } from '../../hooks/useAuth';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
+  Badge,
   Button,
   Dropdown,
   DropdownTrigger,
@@ -38,22 +39,19 @@ interface NavLinkProps {
   'data-cy'?: string;
 }
 
-function NavBadge({ count }: { count: number }) {
-  return (
-    <span
-      data-cy="sidebar-nav-badge"
-      className="ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-tiny font-semibold text-primary-foreground"
-    >
-      {count > 99 ? '99+' : count}
-    </span>
-  );
-}
-
 function NavLink({ href, label, icon, isExternal, target, indent, badgeCount, ...rest }: NavLinkProps) {
   const resolvedTarget = target ?? (isExternal ? '_blank' : undefined);
   const paddingClass = indent ? 'pl-6 pr-2' : 'px-2';
   const className = `flex items-center ${paddingClass} py-2 rounded-md text-sm text-default-foreground no-underline hover:bg-default hover:text-default-foreground`;
-  const badge = badgeCount && badgeCount > 0 ? <NavBadge count={badgeCount} /> : null;
+  const iconNode =
+    badgeCount && badgeCount > 0 ? (
+      <Badge color="accent" size="sm" placement="top-right" data-cy="sidebar-nav-badge">
+        <Badge.Anchor>{icon}</Badge.Anchor>
+        <Badge.Label>{badgeCount > 99 ? '99+' : badgeCount}</Badge.Label>
+      </Badge>
+    ) : (
+      icon
+    );
 
   if (isExternal) {
     return (
@@ -64,7 +62,7 @@ function NavLink({ href, label, icon, isExternal, target, indent, badgeCount, ..
         rel={resolvedTarget === '_blank' ? 'noreferrer' : undefined}
         className={className}
       >
-        <span className="mr-3">{icon}</span>
+        <span className="mr-3">{iconNode}</span>
         <span className="flex-1">{label}</span>
         <ExternalLink className="ml-2 mr-2 h-4 w-4" />
       </a>
@@ -73,9 +71,8 @@ function NavLink({ href, label, icon, isExternal, target, indent, badgeCount, ..
 
   return (
     <RouterLink {...rest} to={href} target={resolvedTarget} className={className}>
-      <span className="mr-3">{icon}</span>
+      <span className="mr-3">{iconNode}</span>
       <span className="flex-1">{label}</span>
-      {badge}
     </RouterLink>
   );
 }
