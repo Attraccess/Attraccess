@@ -1,9 +1,3 @@
-## [Unreleased]
-
-### Changed
-
-- **ATT-478:** auto-generated API + react-query client libs are now gitignored and regenerated from the OpenAPI spec on every build/CI/Docker run, removing the need to manually rebase PRs to keep generated code in sync ([ATT-478](https://linear.app/attraccess/issue/ATT-478), [#1160](https://github.com/Attraccess/Attraccess/pull/1160))
-
 ## 1.6.0 (2026-05-30)
 
 ### 🚀 Features
