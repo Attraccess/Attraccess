@@ -16,6 +16,8 @@ import { MessagingService } from './messaging.service';
 import { MessagingLiveService } from './messaging-live.service';
 import { MessageCreatedEvent } from './events/message-created.event';
 import { ResourceUsageService } from '../resources/usage/resourceUsage.service';
+import { MessageRateLimitService } from './rate-limiting/message-rate-limit.service';
+import { MessageRateLimitExceededException } from './rate-limiting/message-rate-limit.exception';
 
 describe('MessagingService', () => {
   let service: MessagingService;
@@ -35,6 +37,7 @@ describe('MessagingService', () => {
   let resourceUsageService: { getActiveSession: jest.Mock };
   let eventEmitter: { emit: jest.Mock };
   let messagingLiveService: { isOnline: jest.Mock };
+  let messageRateLimitService: { assertWithinLimit: jest.Mock };
 
   const pairQuery = {
     select: jest.fn().mockReturnThis(),
@@ -75,6 +78,7 @@ describe('MessagingService', () => {
     resourceUsageService = { getActiveSession: jest.fn() };
     eventEmitter = { emit: jest.fn() };
     messagingLiveService = { isOnline: jest.fn().mockReturnValue(false) };
+    messageRateLimitService = { assertWithinLimit: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -89,6 +93,7 @@ describe('MessagingService', () => {
         { provide: ResourceUsageService, useValue: resourceUsageService },
         { provide: EventEmitter2, useValue: eventEmitter },
         { provide: MessagingLiveService, useValue: messagingLiveService },
+        { provide: MessageRateLimitService, useValue: messageRateLimitService },
       ],
     }).compile();
 
@@ -152,6 +157,38 @@ describe('MessagingService', () => {
       expect(result.referenceType).toBe(MessageReferenceType.RESOURCE);
       expect(result.referenceId).toBe(42);
       expect(eventEmitter.emit).toHaveBeenCalledWith(MessageCreatedEvent.EVENT_NAME, expect.any(MessageCreatedEvent));
+    });
+  });
+
+  describe('rate limiting', () => {
+    it('checks the send_message limit before sending', async () => {
+      participantRepository.findOne.mockResolvedValue({ id: 1 } as ConversationParticipant);
+      messageRepository.save.mockImplementation(async (data) => ({ id: 3, ...data }));
+
+      await service.sendMessage(1, 5, 'hello');
+
+      expect(messageRateLimitService.assertWithinLimit).toHaveBeenCalledWith('send_message', 5);
+    });
+
+    it('propagates the 429 and skips the send when the send limit is exceeded', async () => {
+      const error = new MessageRateLimitExceededException(30);
+      messageRateLimitService.assertWithinLimit.mockImplementation(() => {
+        throw error;
+      });
+
+      await expect(service.sendMessage(1, 5, 'hello')).rejects.toBe(error);
+      expect(participantRepository.findOne).not.toHaveBeenCalled();
+      expect(messageRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('checks the contact limit when opening a conversation', async () => {
+      messageRateLimitService.assertWithinLimit.mockImplementation(() => {
+        throw new MessageRateLimitExceededException(60);
+      });
+
+      await expect(service.getOrCreateConversation(1, 2)).rejects.toBeInstanceOf(MessageRateLimitExceededException);
+      expect(messageRateLimitService.assertWithinLimit).toHaveBeenCalledWith('contact', 1);
+      expect(userRepository.findOne).not.toHaveBeenCalled();
     });
   });
 

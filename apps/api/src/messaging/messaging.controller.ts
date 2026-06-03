@@ -51,6 +51,7 @@ export class MessagingController {
     operationId: 'messagingContactUser',
   })
   @ApiResponse({ status: 201, description: 'The existing or newly created conversation', type: ContactResponseDto })
+  @ApiResponse({ status: 429, description: 'Contact rate limit exceeded' })
   async contactUser(
     @Param('userId', ParseIntPipe) userId: number,
     @Req() req: AuthenticatedRequest,
@@ -67,6 +68,7 @@ export class MessagingController {
   })
   @ApiResponse({ status: 201, description: 'The conversation with the resource holder', type: ContactResponseDto })
   @ApiResponse({ status: 404, description: 'No active session for this resource' })
+  @ApiResponse({ status: 429, description: 'Contact rate limit exceeded' })
   async contactResourceHolder(
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Req() req: AuthenticatedRequest,
@@ -140,6 +142,7 @@ export class MessagingController {
   @ApiOperation({ summary: 'Send a message to a conversation', operationId: 'messagingSendMessage' })
   @ApiResponse({ status: 201, description: 'The created message', type: Message })
   @ApiResponse({ status: 403, description: 'You are not a participant of this conversation' })
+  @ApiResponse({ status: 429, description: 'Message send rate limit exceeded' })
   async sendMessage(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: SendMessageDto,
