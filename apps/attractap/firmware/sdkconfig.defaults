@@ -25,7 +25,10 @@ CONFIG_ESP_COREDUMP_MAX_TASKS_NUM=32
 CONFIG_ESP_COREDUMP_STACK_SIZE=1024
 # CONFIG_ESP_COREDUMP_ENABLE_TO_NONE is not set
 
-# Task Watchdog: panic + reboot if loopTask or networkTask hangs > 10s
+# Task Watchdog: watch both idle tasks and panic (coredump + backtrace) on a stall
+# so a core-0 starvation names the culprit task instead of a silent reset.
 CONFIG_ESP_TASK_WDT_INIT=y
 CONFIG_ESP_TASK_WDT_TIMEOUT_S=10
+CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU0=y
+CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU1=y
 CONFIG_ESP_TASK_WDT_PANIC=y
