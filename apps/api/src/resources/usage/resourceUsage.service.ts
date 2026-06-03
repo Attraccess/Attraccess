@@ -18,7 +18,11 @@ import { ResourceUsageImpossibleMaintenanceInProgressException } from '../../exc
 import { ResourceUnhealthyException } from '../../exceptions/resource.unhealthy.exception';
 import { ResourceHealthService } from '../health/resource-health.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { ResourceUsageEvent, ResourceUsageTakenOverEvent } from './events/resource-usage.events';
+import {
+  ResourceUsageEvent,
+  ResourceUsageTakenOverEvent,
+  ResourceUsageNoteAddedEvent,
+} from './events/resource-usage.events';
 import { ResourceIntroductionsService } from '../introductions/resouceIntroductions.service';
 import { ResourceIntroducersService } from '../introducers/resourceIntroducers.service';
 import { ResourceGroupsIntroductionsService } from '../groups/introductions/resourceGroups.introductions.service';
@@ -461,6 +465,16 @@ export class ResourceUsageService {
     this.metricsService.resourceUsageSessionsTotal.inc({ action: 'start' });
     this.metricsService.resourceUsageSessionsActive.inc();
 
+    if (dto.notes?.trim()) {
+      this.eventEmitter.emit(
+        ResourceUsageNoteAddedEvent.EVENT_NAME,
+        new ResourceUsageNoteAddedEvent(resourceId, dto.notes.trim(), 'start', {
+          id: user.id,
+          username: user.username,
+        }),
+      );
+    }
+
     return newSession;
   }
 
@@ -575,6 +589,16 @@ export class ResourceUsageService {
     if (updatedUsage?.startTime && updatedUsage?.endTime) {
       const durationSeconds = (updatedUsage.endTime.getTime() - updatedUsage.startTime.getTime()) / 1000;
       this.metricsService.resourceUsageDurationSeconds.observe(durationSeconds);
+    }
+
+    if (dto.notes?.trim()) {
+      this.eventEmitter.emit(
+        ResourceUsageNoteAddedEvent.EVENT_NAME,
+        new ResourceUsageNoteAddedEvent(resourceId, dto.notes.trim(), 'end', {
+          id: user.id,
+          username: user.username,
+        }),
+      );
     }
 
     return updatedUsage;
