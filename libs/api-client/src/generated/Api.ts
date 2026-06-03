@@ -4441,6 +4441,19 @@ export interface ConversationListItemDto {
    * @example "2025-01-18T12:30:00.000Z"
    */
   updatedAt: string;
+  /**
+   * Number of messages in this conversation the authenticated user has not read yet
+   * @example 3
+   */
+  unreadCount: number;
+}
+
+export interface UnreadCountResponseDto {
+  /**
+   * Total number of unread messages across all conversations of the authenticated user
+   * @example 5
+   */
+  total: number;
 }
 
 export interface ListMessagesResponseDto {
@@ -4463,6 +4476,22 @@ export interface SendMessageDto {
    * @example 1
    */
   referenceId?: number;
+}
+
+export interface NotificationPreferenceDto {
+  /**
+   * Whether to send an email when a direct message arrives while the user is offline
+   * @example true
+   */
+  messagesEmailOnOffline: boolean;
+}
+
+export interface UpdateNotificationPreferenceDto {
+  /**
+   * Whether to send an email when a direct message arrives while the user is offline
+   * @example true
+   */
+  messagesEmailOnOffline?: boolean;
 }
 
 export interface InfoData {
@@ -5882,6 +5911,14 @@ export type MessagingContactResourceHolderData = ContactResponseDto;
 
 export type MessagingListConversationsData = ConversationListItemDto[];
 
+export type MessagingGetUnreadCountData = UnreadCountResponseDto;
+
+export interface MessagingMarkConversationReadParams {
+  id: number;
+}
+
+export type MessagingMarkConversationReadData = UnreadCountResponseDto;
+
 export interface MessagingListMessagesParams {
   /**
    * The page number to retrieve
@@ -5903,6 +5940,11 @@ export interface MessagingSendMessageParams {
 }
 
 export type MessagingSendMessageData = Message;
+
+export type MessagingGetNotificationPreferencesData = NotificationPreferenceDto;
+
+export type MessagingUpdateNotificationPreferencesData =
+  NotificationPreferenceDto;
 
 export namespace System {
   /**
@@ -10057,6 +10099,40 @@ export namespace Messaging {
   /**
    * No description
    * @tags Messaging
+   * @name MessagingGetUnreadCount
+   * @summary Get the total number of unread messages for the authenticated user
+   * @request GET:/api/messaging/unread-count
+   * @secure
+   */
+  export namespace MessagingGetUnreadCount {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = MessagingGetUnreadCountData;
+  }
+
+  /**
+   * No description
+   * @tags Messaging
+   * @name MessagingMarkConversationRead
+   * @summary Mark a conversation as read for the authenticated user
+   * @request POST:/api/messaging/conversations/{id}/read
+   * @secure
+   */
+  export namespace MessagingMarkConversationRead {
+    export type RequestParams = {
+      id: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = MessagingMarkConversationReadData;
+  }
+
+  /**
+   * No description
+   * @tags Messaging
    * @name MessagingListMessages
    * @summary List paginated messages of a conversation
    * @request GET:/api/messaging/conversations/{id}/messages
@@ -10099,6 +10175,38 @@ export namespace Messaging {
     export type RequestBody = SendMessageDto;
     export type RequestHeaders = {};
     export type ResponseBody = MessagingSendMessageData;
+  }
+
+  /**
+   * No description
+   * @tags Messaging
+   * @name MessagingGetNotificationPreferences
+   * @summary Get the authenticated user notification preferences
+   * @request GET:/api/messaging/notification-preferences
+   * @secure
+   */
+  export namespace MessagingGetNotificationPreferences {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = MessagingGetNotificationPreferencesData;
+  }
+
+  /**
+   * No description
+   * @tags Messaging
+   * @name MessagingUpdateNotificationPreferences
+   * @summary Update the authenticated user notification preferences
+   * @request PATCH:/api/messaging/notification-preferences
+   * @secure
+   */
+  export namespace MessagingUpdateNotificationPreferences {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = UpdateNotificationPreferenceDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = MessagingUpdateNotificationPreferencesData;
   }
 }
 
@@ -14882,6 +14990,45 @@ export class Api<
      * No description
      *
      * @tags Messaging
+     * @name MessagingGetUnreadCount
+     * @summary Get the total number of unread messages for the authenticated user
+     * @request GET:/api/messaging/unread-count
+     * @secure
+     */
+    messagingGetUnreadCount: (params: RequestParams = {}) =>
+      this.request<MessagingGetUnreadCountData, void>({
+        path: `/api/messaging/unread-count`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Messaging
+     * @name MessagingMarkConversationRead
+     * @summary Mark a conversation as read for the authenticated user
+     * @request POST:/api/messaging/conversations/{id}/read
+     * @secure
+     */
+    messagingMarkConversationRead: (
+      { id }: MessagingMarkConversationReadParams,
+      params: RequestParams = {},
+    ) =>
+      this.request<MessagingMarkConversationReadData, void>({
+        path: `/api/messaging/conversations/${id}/read`,
+        method: "POST",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Messaging
      * @name MessagingListMessages
      * @summary List paginated messages of a conversation
      * @request GET:/api/messaging/conversations/{id}/messages
@@ -14917,6 +15064,47 @@ export class Api<
       this.request<MessagingSendMessageData, void>({
         path: `/api/messaging/conversations/${id}/messages`,
         method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Messaging
+     * @name MessagingGetNotificationPreferences
+     * @summary Get the authenticated user notification preferences
+     * @request GET:/api/messaging/notification-preferences
+     * @secure
+     */
+    messagingGetNotificationPreferences: (params: RequestParams = {}) =>
+      this.request<MessagingGetNotificationPreferencesData, void>({
+        path: `/api/messaging/notification-preferences`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Messaging
+     * @name MessagingUpdateNotificationPreferences
+     * @summary Update the authenticated user notification preferences
+     * @request PATCH:/api/messaging/notification-preferences
+     * @secure
+     */
+    messagingUpdateNotificationPreferences: (
+      data: UpdateNotificationPreferenceDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<MessagingUpdateNotificationPreferencesData, void>({
+        path: `/api/messaging/notification-preferences`,
+        method: "PATCH",
         body: data,
         secure: true,
         type: ContentType.Json,
