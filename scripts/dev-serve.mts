@@ -2,7 +2,7 @@
 // FEATURE: dev-server-port-isolation
 
 import { spawn } from 'node:child_process';
-import { writeFileSync, rmSync, existsSync } from 'node:fs';
+import { writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { findFreePort, isPortFree } from './lib/find-free-port.mts';
 
@@ -121,14 +121,15 @@ async function main() {
   const projects = only === 'both' ? 'api,frontend' : only;
   // Default: streamed output (agent/CI friendly). --tui: nx interactive terminal UI.
   const outputArgs = tui ? ['--tui'] : ['--outputStyle=stream'];
+  if (tui) {
+    // nx auto-detects the TUI from the terminal, but that detection fails when
+    // nx runs as a grandchild process (here: pnpm → node launcher → nx) even
+    // with an inherited TTY, so it silently downgrades to streamed output.
+    // NX_TUI=true forces it on. The terminal is still a real TTY, so it renders.
+    childEnv.NX_TUI = 'true';
+  }
   const nxArgs = ['run-many', '-t', 'serve', `--projects=${projects}`, ...outputArgs, ...passthroughArgs];
-  // Invoke the local nx binary directly. Going through `pnpm nx` adds a child
-  // process whose piped stdio makes nx think the terminal is non-interactive,
-  // so the TUI silently downgrades to streamed output. Spawning nx itself with
-  // inherited stdio preserves the TTY the TUI requires.
-  const nxBin = join(process.cwd(), 'node_modules', '.bin', 'nx');
-  const [cmd, cmdArgs] = existsSync(nxBin) ? [nxBin, nxArgs] : ['pnpm', ['nx', ...nxArgs]];
-  const child = spawn(cmd, cmdArgs, { stdio: 'inherit', env: childEnv });
+  const child = spawn('pnpm', ['nx', ...nxArgs], { stdio: 'inherit', env: childEnv });
 
   const forward = (sig: NodeJS.Signals) => {
     if (!child.killed) child.kill(sig);
