@@ -54,7 +54,7 @@ export function MessageThread(props: Props) {
     onSuccess: (created) => {
       setDraft('');
       setAttachedResourceId(undefined);
-      applyIncomingMessage(queryClient, created);
+      applyIncomingMessage(queryClient, created, currentUserId);
     },
   });
 

@@ -71,12 +71,12 @@ export function MessagesPage() {
 
   const handleLiveMessage = useCallback(
     (message: Message) => {
-      applyIncomingMessage(queryClient, message);
+      applyIncomingMessage(queryClient, message, user?.id ?? -1);
       if (message.conversationId === selectedConversationId) {
         markRead(message.conversationId);
       }
     },
-    [queryClient, selectedConversationId, markRead],
+    [queryClient, selectedConversationId, markRead, user?.id],
   );
 
   useMessagingLive({ onMessage: handleLiveMessage });
