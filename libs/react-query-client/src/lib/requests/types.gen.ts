@@ -4347,6 +4347,20 @@ export type SendMessageDto = {
     referenceId?: number;
 };
 
+export type NotificationPreferenceDto = {
+    /**
+     * Whether to send an email when a direct message arrives while the user is offline
+     */
+    messagesEmailOnOffline: boolean;
+};
+
+export type UpdateNotificationPreferenceDto = {
+    /**
+     * Whether to send an email when a direct message arrives while the user is offline
+     */
+    messagesEmailOnOffline?: boolean;
+};
+
 export type InfoResponse = {
     name?: string;
     status?: string;
@@ -6036,6 +6050,14 @@ export type MessagingSendMessageData = {
 };
 
 export type MessagingSendMessageResponse = Message;
+
+export type MessagingGetNotificationPreferencesResponse = NotificationPreferenceDto;
+
+export type MessagingUpdateNotificationPreferencesData = {
+    requestBody: UpdateNotificationPreferenceDto;
+};
+
+export type MessagingUpdateNotificationPreferencesResponse = NotificationPreferenceDto;
 
 export type $OpenApiTs = {
     '/api/info': {
@@ -9447,6 +9469,33 @@ export type $OpenApiTs = {
                  * You are not a participant of this conversation
                  */
                 403: unknown;
+            };
+        };
+    };
+    '/api/messaging/notification-preferences': {
+        get: {
+            res: {
+                /**
+                 * The notification preferences
+                 */
+                200: NotificationPreferenceDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+        patch: {
+            req: MessagingUpdateNotificationPreferencesData;
+            res: {
+                /**
+                 * The updated notification preferences
+                 */
+                200: NotificationPreferenceDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
             };
         };
     };

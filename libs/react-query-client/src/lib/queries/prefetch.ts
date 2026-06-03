@@ -967,3 +967,9 @@ export const prefetchUseMessagingServiceMessagingListMessages = (queryClient: Qu
   limit?: number | undefined;
   page?: number | undefined;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseMessagingServiceMessagingListMessagesKeyFn({ id, limit, page }), queryFn: () => MessagingService.messagingListMessages({ id, limit, page }) });
+/**
+* Get the authenticated user notification preferences
+* @returns NotificationPreferenceDto The notification preferences
+* @throws ApiError
+*/
+export const prefetchUseMessagingServiceMessagingGetNotificationPreferences = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseMessagingServiceMessagingGetNotificationPreferencesKeyFn(), queryFn: () => MessagingService.messagingGetNotificationPreferences() });

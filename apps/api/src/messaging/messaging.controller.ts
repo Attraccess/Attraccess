@@ -1,4 +1,16 @@
-import { Body, Controller, Get, NotFoundException, Param, ParseIntPipe, Post, Query, Req, Sse } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  NotFoundException,
+  Param,
+  ParseIntPipe,
+  Patch,
+  Post,
+  Query,
+  Req,
+  Sse,
+} from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { Message, MessageReferenceType } from '@attraccess/database-entities';
@@ -11,6 +23,8 @@ import { SendMessageDto } from './dtos/sendMessage.dto';
 import { ListMessagesQueryDto } from './dtos/listMessagesQuery.dto';
 import { ListMessagesResponseDto } from './dtos/listMessagesResponse.dto';
 import { ConversationListItemDto } from './dtos/conversationListItem.dto';
+import { NotificationPreferenceDto } from './dtos/notificationPreference.dto';
+import { UpdateNotificationPreferenceDto } from './dtos/updateNotificationPreference.dto';
 
 @ApiTags('Messaging')
 @Controller('messaging')
@@ -112,5 +126,30 @@ export class MessagingController {
         ? { referenceType: dto.referenceType, referenceId: dto.referenceId }
         : undefined,
     );
+  }
+
+  @Get('notification-preferences')
+  @Auth()
+  @ApiOperation({
+    summary: 'Get the authenticated user notification preferences',
+    operationId: 'messagingGetNotificationPreferences',
+  })
+  @ApiResponse({ status: 200, description: 'The notification preferences', type: NotificationPreferenceDto })
+  async getNotificationPreferences(@Req() req: AuthenticatedRequest): Promise<NotificationPreferenceDto> {
+    return this.messagingService.getNotificationPreference(req.user.id);
+  }
+
+  @Patch('notification-preferences')
+  @Auth()
+  @ApiOperation({
+    summary: 'Update the authenticated user notification preferences',
+    operationId: 'messagingUpdateNotificationPreferences',
+  })
+  @ApiResponse({ status: 200, description: 'The updated notification preferences', type: NotificationPreferenceDto })
+  async updateNotificationPreferences(
+    @Body() dto: UpdateNotificationPreferenceDto,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<NotificationPreferenceDto> {
+    return this.messagingService.updateNotificationPreference(req.user.id, dto);
   }
 }

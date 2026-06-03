@@ -3,6 +3,7 @@
   "sections": {
     "profile": "Profile",
     "security": "Security",
+    "notifications": "Notifications",
     "dangerZone": "Danger zone"
   },
   "deleteAccount": {
