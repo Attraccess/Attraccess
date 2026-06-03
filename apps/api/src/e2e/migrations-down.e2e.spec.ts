@@ -22,6 +22,7 @@ import {
   Message,
   MqttServer,
   NFCCard,
+  NotificationPreference,
   PasswordHistory,
   PasswordPolicyAudit,
   PasswordPolicyAuditEvent,
@@ -181,6 +182,7 @@ const seedDatabase = async (dataSource: DataSource) => {
   const conversationRepo = dataSource.getRepository(Conversation);
   const conversationParticipantRepo = dataSource.getRepository(ConversationParticipant);
   const messageRepo = dataSource.getRepository(Message);
+  const notificationPreferenceRepo = dataSource.getRepository(NotificationPreference);
 
   const resourceGroup = await ensureEntity(resourceGroupRepo, () => ({
     name: `Seed Group ${seedTag}`,
@@ -552,6 +554,11 @@ const seedDatabase = async (dataSource: DataSource) => {
     referenceId: null,
     referenceLabel: null,
     referenceUrl: null,
+  }));
+
+  await ensureEntity(notificationPreferenceRepo, () => ({
+    userId: primaryUser.id,
+    messagesEmailOnOffline: true,
   }));
 };
 

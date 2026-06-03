@@ -19,8 +19,14 @@ import { ResourceUsageService } from '../resources/usage/resourceUsage.service';
 describe('MessagingService', () => {
   let service: MessagingService;
   let conversationRepository: { findOne: jest.Mock; update: jest.Mock };
-  let participantRepository: { findOne: jest.Mock; find: jest.Mock; createQueryBuilder: jest.Mock };
-  let messageRepository: { findOne: jest.Mock; create: jest.Mock; save: jest.Mock; findAndCount: jest.Mock };
+  let participantRepository: { findOne: jest.Mock; find: jest.Mock; update: jest.Mock; createQueryBuilder: jest.Mock };
+  let messageRepository: {
+    findOne: jest.Mock;
+    create: jest.Mock;
+    save: jest.Mock;
+    findAndCount: jest.Mock;
+    count: jest.Mock;
+  };
   let userRepository: { findOne: jest.Mock };
   let resourceRepository: { findOne: jest.Mock };
   let notificationPreferenceRepository: { findOne: jest.Mock; create: jest.Mock; save: jest.Mock };
@@ -34,7 +40,11 @@ describe('MessagingService', () => {
     having: jest.fn().mockReturnThis(),
     andHaving: jest.fn().mockReturnThis(),
     orderBy: jest.fn().mockReturnThis(),
+    leftJoinAndSelect: jest.fn().mockReturnThis(),
+    where: jest.fn().mockReturnThis(),
+    andWhere: jest.fn().mockReturnThis(),
     getRawOne: jest.fn().mockResolvedValue(undefined),
+    getOne: jest.fn().mockResolvedValue(null),
   };
 
   beforeEach(async () => {
@@ -42,9 +52,16 @@ describe('MessagingService', () => {
     participantRepository = {
       findOne: jest.fn(),
       find: jest.fn(),
+      update: jest.fn(),
       createQueryBuilder: jest.fn().mockReturnValue(pairQuery),
     };
-    messageRepository = { findOne: jest.fn(), create: jest.fn(), save: jest.fn(), findAndCount: jest.fn() };
+    messageRepository = {
+      findOne: jest.fn(),
+      create: jest.fn(),
+      save: jest.fn(),
+      findAndCount: jest.fn(),
+      count: jest.fn(),
+    };
     userRepository = { findOne: jest.fn() };
     resourceRepository = { findOne: jest.fn() };
     notificationPreferenceRepository = {
@@ -185,6 +202,54 @@ describe('MessagingService', () => {
     it('returns null when there is no active session', async () => {
       resourceUsageService.getActiveSession.mockResolvedValue(null);
       await expect(service.resolveResourceHolder(3)).resolves.toBeNull();
+    });
+  });
+
+  describe('listConversations', () => {
+    it('includes the unread count per conversation', async () => {
+      participantRepository.find.mockResolvedValue([
+        { conversationId: 1, lastReadAt: null, conversation: { updatedAt: new Date(1000) } },
+      ]);
+      messageRepository.findOne.mockResolvedValue({ id: 5, createdAt: new Date(2000) } as Message);
+      pairQuery.getOne = jest.fn().mockResolvedValue({ user: { id: 2 } });
+      messageRepository.count.mockResolvedValue(4);
+
+      const result = await service.listConversations(7);
+
+      expect(result[0].unreadCount).toBe(4);
+    });
+  });
+
+  describe('markConversationRead', () => {
+    it('throws for non-participants', async () => {
+      participantRepository.findOne.mockResolvedValue(null);
+      await expect(service.markConversationRead(1, 5)).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('updates lastReadAt and returns the new total unread count', async () => {
+      participantRepository.findOne.mockResolvedValue({ id: 1 } as ConversationParticipant);
+      participantRepository.find.mockResolvedValue([{ conversationId: 1, lastReadAt: new Date() }]);
+      messageRepository.count.mockResolvedValue(0);
+
+      const total = await service.markConversationRead(1, 5);
+
+      expect(participantRepository.update).toHaveBeenCalledWith(
+        { conversationId: 1, userId: 5 },
+        expect.objectContaining({ lastReadAt: expect.any(Date) }),
+      );
+      expect(total).toBe(0);
+    });
+  });
+
+  describe('getTotalUnreadCount', () => {
+    it('sums unread counts across all participations', async () => {
+      participantRepository.find.mockResolvedValue([
+        { conversationId: 1, lastReadAt: null },
+        { conversationId: 2, lastReadAt: new Date() },
+      ]);
+      messageRepository.count.mockResolvedValueOnce(2).mockResolvedValueOnce(3);
+
+      await expect(service.getTotalUnreadCount(5)).resolves.toBe(5);
     });
   });
 });

@@ -5,6 +5,8 @@ import {
   ConversationListItemDto,
   ListMessagesResponseDto,
   Message,
+  UnreadCountResponseDto,
+  UseMessagingServiceMessagingGetUnreadCountKeyFn,
   UseMessagingServiceMessagingListConversationsKeyFn,
   useMessagingServiceMessagingListMessagesKey,
 } from '@attraccess/react-query-client';
@@ -35,7 +37,33 @@ export function applyIncomingMessage(queryClient: QueryClient, message: Message)
         queryClient.invalidateQueries({ queryKey: UseMessagingServiceMessagingListConversationsKeyFn() });
         return current;
       }
-      return [{ ...current[index], lastMessage: message }, ...current.slice(0, index), ...current.slice(index + 1)];
+      const updated = {
+        ...current[index],
+        lastMessage: message,
+        unreadCount: (current[index].unreadCount ?? 0) + 1,
+      };
+      return [updated, ...current.slice(0, index), ...current.slice(index + 1)];
     },
+  );
+
+  bumpTotalUnread(queryClient, 1);
+}
+
+export function markConversationReadInCache(queryClient: QueryClient, conversationId: number, total: number) {
+  queryClient.setQueryData<ConversationListItemDto[]>(
+    UseMessagingServiceMessagingListConversationsKeyFn(),
+    (current) =>
+      current?.map((conversation) =>
+        conversation.id === conversationId ? { ...conversation, unreadCount: 0 } : conversation,
+      ),
+  );
+
+  queryClient.setQueryData<UnreadCountResponseDto>(UseMessagingServiceMessagingGetUnreadCountKeyFn(), { total });
+}
+
+function bumpTotalUnread(queryClient: QueryClient, delta: number) {
+  queryClient.setQueryData<UnreadCountResponseDto>(
+    UseMessagingServiceMessagingGetUnreadCountKeyFn(),
+    (current) => ({ total: Math.max(0, (current?.total ?? 0) + delta) }),
   );
 }

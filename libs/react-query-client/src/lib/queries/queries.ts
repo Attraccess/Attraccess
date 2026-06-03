@@ -954,6 +954,12 @@ export const useMessagingServiceMessagingLive = <TData = Common.MessagingService
 */
 export const useMessagingServiceMessagingListConversations = <TData = Common.MessagingServiceMessagingListConversationsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseMessagingServiceMessagingListConversationsKeyFn(queryKey), queryFn: () => MessagingService.messagingListConversations() as TData, ...options });
 /**
+* Get the total number of unread messages for the authenticated user
+* @returns UnreadCountResponseDto The total unread message count
+* @throws ApiError
+*/
+export const useMessagingServiceMessagingGetUnreadCount = <TData = Common.MessagingServiceMessagingGetUnreadCountDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseMessagingServiceMessagingGetUnreadCountKeyFn(queryKey), queryFn: () => MessagingService.messagingGetUnreadCount() as TData, ...options });
+/**
 * List paginated messages of a conversation
 * @param data The data for the request.
 * @param data.id
@@ -1960,6 +1966,18 @@ export const useMessagingServiceMessagingContactResourceHolder = <TData = Common
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {
   resourceId: number;
 }, TContext>({ mutationFn: ({ resourceId }) => MessagingService.messagingContactResourceHolder({ resourceId }) as unknown as Promise<TData>, ...options });
+/**
+* Mark a conversation as read for the authenticated user
+* @param data The data for the request.
+* @param data.id
+* @returns UnreadCountResponseDto The updated total unread message count
+* @throws ApiError
+*/
+export const useMessagingServiceMessagingMarkConversationRead = <TData = Common.MessagingServiceMessagingMarkConversationReadMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  id: number;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  id: number;
+}, TContext>({ mutationFn: ({ id }) => MessagingService.messagingMarkConversationRead({ id }) as unknown as Promise<TData>, ...options });
 /**
 * Send a message to a conversation
 * @param data The data for the request.
