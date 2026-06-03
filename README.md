@@ -76,6 +76,12 @@ pnpm serve --only=api
 pnpm serve --only=frontend
 ```
 
+Use the nx interactive terminal UI instead of streamed output (default is streamed, which is agent/CI friendly):
+
+```bash
+pnpm serve --tui
+```
+
 Pin a specific port (fails loudly if busy):
 
 ```bash

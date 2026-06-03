@@ -34,8 +34,9 @@ function removePortsFile(): void {
   rmSync(PORTS_FILE, { force: true });
 }
 
-function parseArgs(argv: string[]): { only: Target; passthroughArgs: string[] } {
+function parseArgs(argv: string[]): { only: Target; tui: boolean; passthroughArgs: string[] } {
   let only: Target = 'both';
+  let tui = false;
   const passthroughArgs: string[] = [];
   const args = argv.slice(2);
   let sawDelimiter = false;
@@ -46,6 +47,10 @@ function parseArgs(argv: string[]): { only: Target; passthroughArgs: string[] } 
     }
     if (arg === '--') {
       sawDelimiter = true;
+      continue;
+    }
+    if (arg === '--tui') {
+      tui = true;
       continue;
     }
     const m = arg.match(/^--only=(.+)$/);
@@ -61,7 +66,7 @@ function parseArgs(argv: string[]): { only: Target; passthroughArgs: string[] } 
       passthroughArgs.push(arg);
     }
   }
-  return { only, passthroughArgs };
+  return { only, tui, passthroughArgs };
 }
 
 async function resolvePort(envName: string, defaultStart: number, label: string): Promise<number> {
@@ -91,7 +96,7 @@ function banner(r: Resolved): string {
 }
 
 async function main() {
-  const { only, passthroughArgs } = parseArgs(process.argv);
+  const { only, tui, passthroughArgs } = parseArgs(process.argv);
   const resolved: Resolved = {};
   const childEnv: NodeJS.ProcessEnv = { ...process.env };
 
@@ -114,9 +119,11 @@ async function main() {
   process.on('exit', removePortsFile);
 
   const projects = only === 'both' ? 'api,frontend' : only;
+  // Default: streamed output (agent/CI friendly). --tui: nx interactive terminal UI.
+  const outputArgs = tui ? ['--tui'] : ['--outputStyle=stream'];
   const child = spawn(
     'pnpm',
-    ['nx', 'run-many', '-t', 'serve', `--projects=${projects}`, '--outputStyle=stream', ...passthroughArgs],
+    ['nx', 'run-many', '-t', 'serve', `--projects=${projects}`, ...outputArgs, ...passthroughArgs],
     { stdio: 'inherit', env: childEnv },
   );
 
