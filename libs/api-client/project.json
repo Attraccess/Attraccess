@@ -52,6 +52,7 @@
     },
     "lint": {
       "cache": true,
+      "dependsOn": ["generate"],
       "inputs": [
         "{projectRoot}/**/*",
         "{workspaceRoot}/.eslintrc.json",
@@ -67,6 +68,7 @@
     },
     "test": {
       "cache": true,
+      "dependsOn": ["generate"],
       "inputs": [
         "{projectRoot}/**/*.spec.ts",
         "{projectRoot}/tsconfig.spec.json",

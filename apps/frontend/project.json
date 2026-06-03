@@ -42,6 +42,7 @@
       "outputs": ["{options.outputFile}"]
     },
     "test": {
+      "dependsOn": ["react-query-client:generate"],
       "options": {
         "watch": false
       },
@@ -56,6 +57,7 @@
       "outputs": ["{workspaceRoot}/coverage/apps/frontend"]
     },
     "typecheck": {
+      "dependsOn": ["react-query-client:generate"],
       "cache": true,
       "inputs": [
         "production",
@@ -64,6 +66,9 @@
           "externalDependencies": ["typescript"]
         }
       ]
+    },
+    "serve": {
+      "dependsOn": ["react-query-client:generate"]
     }
   },
   "targetDefaults": {
