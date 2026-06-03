@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, AlertContent, AlertDescription, AlertTitle, Button, Card, Chip, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow, TableScrollContainer } from '@heroui/react';
-import { ArrowRightIcon, CpuIcon, LogsIcon, PencilIcon, Trash2Icon } from 'lucide-react';
+import { ArrowRightIcon, BugIcon, CpuIcon, LogsIcon, PencilIcon, Trash2Icon } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { AlertStatusIcon } from '../../../components/AlertStatusIcon';
 import { EmptyState } from '../../../components/emptyState';
 import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -36,6 +37,7 @@ export function AttractapList() {
   });
 
   const toast = useToastMessage();
+  const navigate = useNavigate();
 
   const [openedReaderEditor, setOpenedReaderEditor] = useState<number | null>(null);
 
@@ -125,6 +127,13 @@ export function AttractapList() {
                     icon: <CpuIcon className="w-4 h-4" />,
                     onPress: onOpenHardwareSetup,
                     dataCy: 'attractap-list-open-flasher-button',
+                  },
+                  {
+                    key: 'coredump-debug',
+                    label: t('page.actions.openCoredumpDebug'),
+                    icon: <BugIcon className="w-4 h-4" />,
+                    onPress: () => navigate('/attractap/coredump-debug'),
+                    dataCy: 'attractap-list-open-coredump-debug-button',
                   },
                 ] satisfies PageAction[]}
               />

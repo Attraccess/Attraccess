@@ -15,6 +15,8 @@ import { ResourcesModule } from '../resources/resources.module';
 import { ResourceUsageModule } from '../resources/usage/resourceUsage.module';
 import { AttractapFirmwareController } from './firmware.controller';
 import { AttractapFirmwareService } from './firmware.service';
+import { AttractapCoredumpController } from './coredump.controller';
+import { AttractapCoredumpService } from './coredump.service';
 import { ResourceMaintenanceModule } from '../resources/maintenances/maintenance.module';
 import { LicenseModule } from '../license/license.module';
 import { ResourceIntroductionsModule } from '../resources/introductions/resourceIntroductions.module';
@@ -40,7 +42,19 @@ import { ResourceFormsModule } from '../resources/forms/forms.module';
     ProjectsModule,
     ResourceFormsModule,
   ],
-  providers: [AttractapService, WebsocketService, AttractapGateway, WebSocketEventService, AttractapFirmwareService],
-  controllers: [AttractapController, AttractapNfcCardsController, AttractapFirmwareController],
+  providers: [
+    AttractapService,
+    WebsocketService,
+    AttractapGateway,
+    WebSocketEventService,
+    AttractapFirmwareService,
+    AttractapCoredumpService,
+  ],
+  controllers: [
+    AttractapController,
+    AttractapNfcCardsController,
+    AttractapFirmwareController,
+    AttractapCoredumpController,
+  ],
 })
 export class AttractapModule {}

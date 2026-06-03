@@ -92,6 +92,30 @@ export class AttractapFirmwareService {
     return stats.size;
   }
 
+  public findFirmwareByBuildId(buildId: string): AttractapFirmware | undefined {
+    const normalized = buildId.trim().toLowerCase();
+    return this.firmwares.find((firmware) => firmware.buildId?.toLowerCase() === normalized);
+  }
+
+  public getElfPath(firmwareName: string, variantName: string): string {
+    const firmwareDefinition = this.getFirmwareDefinition(firmwareName, variantName);
+    if (!firmwareDefinition) {
+      throw new Error('Firmware definition not found');
+    }
+
+    if (!firmwareDefinition.elfFilename) {
+      throw new Error('Firmware definition has no ELF for symbolication');
+    }
+
+    const elfPath = join(this.firmwareAssetsDirectory, firmwareDefinition.elfFilename);
+    if (!existsSync(elfPath)) {
+      this.logger.error(`Firmware ELF file does not exist: ${elfPath}`);
+      throw new Error('Firmware ELF not found');
+    }
+
+    return elfPath;
+  }
+
   public getFirmwareDownloadUrl(firmwareName: string, variantName: string): string {
     // Return path only; devices will prepend their configured host/scheme/port
     const path = `/api/attractap/firmwares/${firmwareName}/variants/${variantName}`;

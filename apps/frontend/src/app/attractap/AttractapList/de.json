@@ -4,7 +4,8 @@
     "actions": {
       "menu": "Geräte-Einrichtung",
       "openHardwareSetup": "NFC-Leser Einrichten",
-      "openSerialConsole": "Serielle Konsole"
+      "openSerialConsole": "Serielle Konsole",
+      "openCoredumpDebug": "Coredump-Debugger"
     }
   },
   "workInProgressTitle": "In Arbeit",

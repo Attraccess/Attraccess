@@ -48,6 +48,21 @@ def hex_to_int(hex_str):
         return int(hex_str, 16)
     return hex_str
 
+def extract_elf_build_id(esptool_cmd, app_bin_path):
+    """Return the first 16 hex chars of the app ELF SHA256 (the coredump build id), or None."""
+    try:
+        result = subprocess.run(
+            [*esptool_cmd, '--chip', 'auto', 'image_info', '--version', '2', app_bin_path],
+            capture_output=True, text=True,
+        )
+        output = f"{result.stdout}\n{result.stderr}"
+        match = re.search(r'(?:ELF file SHA256|Validation Hash)[^0-9a-fA-F]*([0-9a-fA-F]{16,})', output)
+        if match:
+            return match.group(1)[:16].lower()
+    except Exception as e:
+        print(f"Warning: could not extract ELF build id: {e}")
+    return None
+
 def main():
     if not shutil.which('platformio'):
         print("Warning: platformio not found, skipping firmware build")
@@ -362,6 +377,22 @@ def main():
                 print(f"Error: Failed to copy OTA image for environment '{env}': {e}")
                 sys.exit(1)
 
+            # Export the unstripped ELF for server-side coredump symbolication
+            elf_filename = f"{current_firmware_name}_{firmware_variant}.elf"
+            elf_path = f".pio/build/{env}/firmware.elf"
+            if os.path.exists(elf_path):
+                shutil.copyfile(elf_path, os.path.join(output_dir, elf_filename))
+                print(f"ELF copied to: {os.path.join(output_dir, elf_filename)}")
+            else:
+                elf_filename = None
+                print(f"Warning: firmware.elf not found for environment '{env}'; symbolication unavailable")
+
+            # Best-effort: extract the application ELF SHA256 build id so a coredump can be
+            # matched to its exact ELF. version+variant remains the primary lookup key.
+            build_id = extract_elf_build_id(esptool_cmd, firmware_path)
+            if build_id:
+                print(f"ELF build id: {build_id}")
+
             # Determine flash parameters based on chip type and board configuration
             # Default flash parameters for each chip type
             if chip == 'esp32s3':
@@ -390,6 +421,8 @@ def main():
                 "boardFamily": board_family if board_family else board_family_auto,
                 "filename": firmware_filename,
                 "filenameOTA": ota_filename,
+                "elfFilename": elf_filename,
+                "buildId": build_id,
                 "chip": chip,
                 "flashMode": flash_mode,
                 "flashFreq": flash_freq,

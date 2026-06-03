@@ -1,0 +1,27 @@
+{
+  "page": {
+    "title": "Coredump Debugger",
+    "subtitle": "Upload a reader coredump and symbolicate it against its firmware ELF"
+  },
+  "form": {
+    "pickFile": "Choose coredump file",
+    "firmwareLabel": "Firmware",
+    "autoDetect": "Auto-detect (by build id)",
+    "symbolicate": "Symbolicate",
+    "hint": "The matching ELF must be stored on the server for this firmware version and variant."
+  },
+  "result": {
+    "unknownPanic": "Crash (no panic reason parsed)",
+    "matchedBy": "Matched by",
+    "core": "core",
+    "backtrace": "Backtrace",
+    "pc": "PC",
+    "function": "Function",
+    "location": "Location",
+    "tasks": "Tasks at crash time",
+    "raw": "Full tool output"
+  },
+  "error": {
+    "title": "Symbolication failed"
+  }
+}

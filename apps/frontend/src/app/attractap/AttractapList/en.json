@@ -4,7 +4,8 @@
     "actions": {
       "menu": "Hardware Setup",
       "openHardwareSetup": "Setup NFC-Reader",
-      "openSerialConsole": "Serial Console"
+      "openSerialConsole": "Serial Console",
+      "openCoredumpDebug": "Coredump Debugger"
     }
   },
   "workInProgressTitle": "Work in progress",

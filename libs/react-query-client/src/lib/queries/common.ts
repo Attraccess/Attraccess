@@ -612,6 +612,7 @@ export type PluginsServiceUploadPluginMutationResult = Awaited<ReturnType<typeof
 export type AttractapServiceEnrollNfcCardMutationResult = Awaited<ReturnType<typeof AttractapService.enrollNfcCard>>;
 export type AttractapServiceResetNfcCardMutationResult = Awaited<ReturnType<typeof AttractapService.resetNfcCard>>;
 export type AttractapServiceGetAppKeyByUidMutationResult = Awaited<ReturnType<typeof AttractapService.getAppKeyByUid>>;
+export type AttractapServiceSymbolicateCoredumpMutationResult = Awaited<ReturnType<typeof AttractapService.symbolicateCoredump>>;
 export type AuthenticationServiceUpdateOneSsoProviderMutationResult = Awaited<ReturnType<typeof AuthenticationService.updateOneSsoProvider>>;
 export type PasswordPolicyAdminServiceUpsertPasswordPolicyOverrideMutationResult = Awaited<ReturnType<typeof PasswordPolicyAdminService.upsertPasswordPolicyOverride>>;
 export type ResourcesServiceUpdateOneResourceMutationResult = Awaited<ReturnType<typeof ResourcesService.updateOneResource>>;

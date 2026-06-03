@@ -4022,6 +4022,14 @@ export type AttractapFirmware = {
      */
     filenameOTA: string;
     /**
+     * The filename of the unstripped ELF used for coredump symbolication
+     */
+    elfFilename?: string;
+    /**
+     * The application ELF SHA256 build id (first 16 hex chars) used to match a coredump to its ELF
+     */
+    buildId?: string;
+    /**
      * The ESP chip type (esp32, esp32s2, esp32s3, esp32c3)
      */
     chip: string;
@@ -4038,6 +4046,110 @@ export type AttractapFirmware = {
      */
     flashSize: string;
 };
+
+export type SymbolicateCoredumpDto = {
+    /**
+     * The raw ESP32 coredump blob
+     */
+    coredump: (Blob | File);
+    /**
+     * Firmware name to resolve the ELF for. Omit to auto-match by build id.
+     */
+    firmwareName?: string;
+    /**
+     * Firmware variant to resolve the ELF for. Omit to auto-match by build id.
+     */
+    variantName?: string;
+};
+
+export type CoredumpFrameDto = {
+    /**
+     * Zero-based frame index in the backtrace
+     */
+    index: number;
+    /**
+     * Program counter for the frame
+     */
+    pc: string;
+    /**
+     * Resolved function name, if available
+     */
+    function?: string;
+    /**
+     * Resolved source file, if available
+     */
+    file?: string;
+    /**
+     * Resolved source line, if available
+     */
+    line?: number;
+};
+
+export type CoredumpTaskDto = {
+    /**
+     * FreeRTOS task name
+     */
+    name: string;
+    /**
+     * Task control block address
+     */
+    tcb?: string;
+    /**
+     * Whether this task was the one that crashed
+     */
+    isCrashed: boolean;
+};
+
+export type CoredumpSymbolicationResultDto = {
+    /**
+     * Firmware name the ELF was resolved for
+     */
+    firmwareName: string;
+    /**
+     * Firmware variant the ELF was resolved for
+     */
+    variantName: string;
+    /**
+     * How the ELF was matched to the coredump
+     */
+    matchedBy: 'buildId' | 'versionVariant';
+    /**
+     * Build id read from the coredump, if present
+     */
+    buildId?: string;
+    /**
+     * Panic / abort reason line
+     */
+    panicReason?: string;
+    /**
+     * CPU core the crash occurred on
+     */
+    faultingCore?: number;
+    /**
+     * Name of the task that crashed
+     */
+    faultingTaskName?: string;
+    /**
+     * Symbolized backtrace frames
+     */
+    backtrace: Array<CoredumpFrameDto>;
+    /**
+     * Tasks present at crash time
+     */
+    tasks: Array<CoredumpTaskDto>;
+    /**
+     * Full symbolized tool output for deep inspection
+     */
+    rawText: string;
+};
+
+/**
+ * How the ELF was matched to the coredump
+ */
+export enum matchedBy {
+    BUILD_ID = 'buildId',
+    VERSION_VARIANT = 'versionVariant'
+}
 
 export type InfoResponse = {
     name?: string;
@@ -5639,6 +5751,12 @@ export type GetFirmwareBinaryData = {
 };
 
 export type GetFirmwareBinaryResponse = string;
+
+export type SymbolicateCoredumpData = {
+    formData: SymbolicateCoredumpDto;
+};
+
+export type SymbolicateCoredumpResponse = CoredumpSymbolicationResultDto;
 
 export type GetResourceUsageHoursInDateRangeData = {
     /**
@@ -8903,6 +9021,21 @@ export type $OpenApiTs = {
                  * Firmware fetched successfully
                  */
                 200: string;
+            };
+        };
+    };
+    '/api/attractap/coredumps/symbolicate': {
+        post: {
+            req: SymbolicateCoredumpData;
+            res: {
+                /**
+                 * Coredump symbolicated successfully
+                 */
+                200: CoredumpSymbolicationResultDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
             };
         };
     };

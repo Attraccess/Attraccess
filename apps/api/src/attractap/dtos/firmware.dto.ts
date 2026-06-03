@@ -50,6 +50,20 @@ export class AttractapFirmware {
   filenameOTA: string;
 
   @ApiProperty({
+    description: 'The filename of the unstripped ELF used for coredump symbolication',
+    example: 'attractap_eth.elf',
+    required: false,
+  })
+  elfFilename?: string;
+
+  @ApiProperty({
+    description: 'The application ELF SHA256 build id (first 16 hex chars) used to match a coredump to its ELF',
+    example: 'f6899cb1067e5043',
+    required: false,
+  })
+  buildId?: string;
+
+  @ApiProperty({
     description: 'The ESP chip type (esp32, esp32s2, esp32s3, esp32c3)',
     example: 'esp32s3',
   })

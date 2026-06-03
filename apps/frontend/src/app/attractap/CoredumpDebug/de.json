@@ -1,0 +1,27 @@
+{
+  "page": {
+    "title": "Coredump-Debugger",
+    "subtitle": "Lade einen Reader-Coredump hoch und symbolisiere ihn gegen das Firmware-ELF"
+  },
+  "form": {
+    "pickFile": "Coredump-Datei auswählen",
+    "firmwareLabel": "Firmware",
+    "autoDetect": "Automatisch erkennen (über Build-ID)",
+    "symbolicate": "Symbolisieren",
+    "hint": "Das passende ELF muss für diese Firmware-Version und -Variante auf dem Server hinterlegt sein."
+  },
+  "result": {
+    "unknownPanic": "Absturz (kein Panic-Grund erkannt)",
+    "matchedBy": "Zugeordnet über",
+    "core": "Core",
+    "backtrace": "Backtrace",
+    "pc": "PC",
+    "function": "Funktion",
+    "location": "Ort",
+    "tasks": "Tasks zum Absturzzeitpunkt",
+    "raw": "Vollständige Tool-Ausgabe"
+  },
+  "error": {
+    "title": "Symbolisierung fehlgeschlagen"
+  }
+}

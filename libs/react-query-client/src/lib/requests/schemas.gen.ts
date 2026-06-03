@@ -6386,6 +6386,16 @@ export const $AttractapFirmware = {
             description: 'The filename of the firmware for OTA updates (zlib compressed)',
             example: 'attractap_eth.bin.zz'
         },
+        elfFilename: {
+            type: 'string',
+            description: 'The filename of the unstripped ELF used for coredump symbolication',
+            example: 'attractap_eth.elf'
+        },
+        buildId: {
+            type: 'string',
+            description: 'The application ELF SHA256 build id (first 16 hex chars) used to match a coredump to its ELF',
+            example: 'f6899cb1067e5043'
+        },
         chip: {
             type: 'string',
             description: 'The ESP chip type (esp32, esp32s2, esp32s3, esp32c3)',
@@ -6408,4 +6418,140 @@ export const $AttractapFirmware = {
         }
     },
     required: ['name', 'friendlyName', 'variant', 'variantFriendlyName', 'version', 'boardFamily', 'filename', 'filenameOTA', 'chip', 'flashMode', 'flashFreq', 'flashSize']
+} as const;
+
+export const $SymbolicateCoredumpDto = {
+    type: 'object',
+    properties: {
+        coredump: {
+            type: 'string',
+            format: 'binary',
+            description: 'The raw ESP32 coredump blob'
+        },
+        firmwareName: {
+            type: 'string',
+            description: 'Firmware name to resolve the ELF for. Omit to auto-match by build id.',
+            example: 'attractap'
+        },
+        variantName: {
+            type: 'string',
+            description: 'Firmware variant to resolve the ELF for. Omit to auto-match by build id.',
+            example: 'eth'
+        }
+    },
+    required: ['coredump']
+} as const;
+
+export const $CoredumpFrameDto = {
+    type: 'object',
+    properties: {
+        index: {
+            type: 'number',
+            description: 'Zero-based frame index in the backtrace',
+            example: 0
+        },
+        pc: {
+            type: 'string',
+            description: 'Program counter for the frame',
+            example: '0x42066718'
+        },
+        function: {
+            type: 'string',
+            description: 'Resolved function name, if available',
+            example: 'panic_abort'
+        },
+        file: {
+            type: 'string',
+            description: 'Resolved source file, if available',
+            example: 'panic.c'
+        },
+        line: {
+            type: 'number',
+            description: 'Resolved source line, if available',
+            example: 408
+        }
+    },
+    required: ['index', 'pc']
+} as const;
+
+export const $CoredumpTaskDto = {
+    type: 'object',
+    properties: {
+        name: {
+            type: 'string',
+            description: 'FreeRTOS task name',
+            example: 'websocket_task'
+        },
+        tcb: {
+            type: 'string',
+            description: 'Task control block address',
+            example: '0x3fcf4a08'
+        },
+        isCrashed: {
+            type: 'boolean',
+            description: 'Whether this task was the one that crashed',
+            example: true
+        }
+    },
+    required: ['name', 'isCrashed']
+} as const;
+
+export const $CoredumpSymbolicationResultDto = {
+    type: 'object',
+    properties: {
+        firmwareName: {
+            type: 'string',
+            description: 'Firmware name the ELF was resolved for',
+            example: 'attractap'
+        },
+        variantName: {
+            type: 'string',
+            description: 'Firmware variant the ELF was resolved for',
+            example: 'eth'
+        },
+        matchedBy: {
+            type: 'string',
+            description: 'How the ELF was matched to the coredump',
+            enum: ['buildId', 'versionVariant']
+        },
+        buildId: {
+            type: 'string',
+            description: 'Build id read from the coredump, if present',
+            example: 'f6899cb1067e5043'
+        },
+        panicReason: {
+            type: 'string',
+            description: 'Panic / abort reason line',
+            example: 'abort() was called at PC 0x42066718 on core 0'
+        },
+        faultingCore: {
+            type: 'number',
+            description: 'CPU core the crash occurred on',
+            example: 0
+        },
+        faultingTaskName: {
+            type: 'string',
+            description: 'Name of the task that crashed',
+            example: 'websocket_task'
+        },
+        backtrace: {
+            description: 'Symbolized backtrace frames',
+            type: 'array',
+            items: {
+                '$ref': '#/components/schemas/CoredumpFrameDto'
+            }
+        },
+        tasks: {
+            description: 'Tasks present at crash time',
+            type: 'array',
+            items: {
+                '$ref': '#/components/schemas/CoredumpTaskDto'
+            }
+        },
+        rawText: {
+            type: 'string',
+            description: 'Full symbolized tool output for deep inspection'
+        }
+    },
+    required: ['firmwareName', 'variantName', 'matchedBy', 'backtrace', 'tasks', 'rawText']
 } as const;
