@@ -18,6 +18,16 @@ import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from './we
 import { MetricsService } from '../../metrics/metrics.service';
 import { MetricsToggleService } from '../../metrics/settings/metrics-toggle.service';
 import { WS_METRICS } from '../../metrics/definitions/tokens';
+import { ResourceListService } from './handlers/resource-list.service';
+import { ResourceActionGuard } from './handlers/resource-action.guard';
+import { AttractapAuthHandler } from './handlers/auth.handler';
+import { AttractapFirmwareHandler } from './handlers/firmware.handler';
+import { AttractapCrashReportHandler } from './handlers/crash-report.handler';
+import { AttractapCardHandler } from './handlers/card.handler';
+import { AttractapFormsHandler } from './handlers/forms.handler';
+import { AttractapSessionHandler } from './handlers/session.handler';
+import { AttractapBillingHandler } from './handlers/billing.handler';
+import { AttractapProjectsHandler } from './handlers/projects.handler';
 
 const mockMetricsService = {
   attractapDevicesConnected: { inc: jest.fn(), dec: jest.fn(), set: jest.fn() },
@@ -87,6 +97,16 @@ describe('AttractapGateway', () => {
         { provide: MetricsService, useValue: mockMetricsService },
         { provide: WS_METRICS, useValue: mockWsMetrics },
         { provide: MetricsToggleService, useValue: mockMetricsToggle },
+        ResourceListService,
+        ResourceActionGuard,
+        AttractapAuthHandler,
+        AttractapFirmwareHandler,
+        AttractapCrashReportHandler,
+        AttractapCardHandler,
+        AttractapFormsHandler,
+        AttractapSessionHandler,
+        AttractapBillingHandler,
+        AttractapProjectsHandler,
       ],
     }).compile();
 
