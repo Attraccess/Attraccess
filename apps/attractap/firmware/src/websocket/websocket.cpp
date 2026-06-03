@@ -113,6 +113,15 @@ void Websocket::connectWebSocket()
     websocket_cfg.buffer_size = 4096; // Increase buffer size (default is typically 1024)
     // websocket_cfg.task_prio = 5;      // Set appropriate task priority
 
+    // Disable the library auto-reconnect: our own loop() drives reconnects every
+    // RECONNECT_INTERVAL_MS, so leaving auto-reconnect on would double the reconnect churn
+    // and keep the internal websocket_task busy-spinning on core 0 (TASK_WDT reset).
+    // The library's built-in network timeout bounds a single hung connect/handshake; the
+    // ping/pong keepalive surfaces a half-open socket so it can be torn down promptly.
+    websocket_cfg.disable_auto_reconnect = true;
+    websocket_cfg.ping_interval_sec = 10;
+    websocket_cfg.pingpong_timeout_sec = 20;
+
     if (apiConfig.useSSL)
     {
         websocket_cfg.transport = WEBSOCKET_TRANSPORT_OVER_SSL;
