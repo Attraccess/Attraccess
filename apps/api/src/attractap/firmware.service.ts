@@ -92,6 +92,47 @@ export class AttractapFirmwareService {
     return stats.size;
   }
 
+  public getFirmwareByBuildId(buildId: string): AttractapFirmware | undefined {
+    const normalized = buildId.trim().toLowerCase();
+    if (!normalized) {
+      return undefined;
+    }
+    return this.firmwares.find((firmware) => {
+      const candidate = firmware.buildId?.toLowerCase();
+      return !!candidate && (candidate.startsWith(normalized) || normalized.startsWith(candidate));
+    });
+  }
+
+  public resolveElfFile(options: {
+    buildId?: string | null;
+    variant?: string | null;
+  }): { path: string; firmware: AttractapFirmware } | null {
+    let firmware: AttractapFirmware | undefined;
+
+    if (options.buildId) {
+      firmware = this.getFirmwareByBuildId(options.buildId);
+    }
+
+    if (!firmware && options.variant) {
+      firmware = this.firmwares.find((entry) => entry.variant === options.variant && !!entry.elfFilename);
+    }
+
+    if (!firmware || !firmware.elfFilename) {
+      this.logger.debug(
+        `No ELF resolved for buildId=${options.buildId ?? 'n/a'}, variant=${options.variant ?? 'n/a'}`,
+      );
+      return null;
+    }
+
+    const elfPath = join(this.firmwareAssetsDirectory, firmware.elfFilename);
+    if (!existsSync(elfPath)) {
+      this.logger.error(`ELF file does not exist: ${elfPath}`);
+      return null;
+    }
+
+    return { path: elfPath, firmware };
+  }
+
   public getFirmwareDownloadUrl(firmwareName: string, variantName: string): string {
     // Return path only; devices will prepend their configured host/scheme/port
     const path = `/api/attractap/firmwares/${firmwareName}/variants/${variantName}`;

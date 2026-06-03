@@ -89,6 +89,31 @@ export class AttractapCrashReport {
   @Exclude()
   coredump!: Buffer | null;
 
+  @Column({ type: 'text', nullable: true })
+  @ApiProperty({
+    description: 'Build id (app ELF SHA256) extracted from the coredump, used to match the ELF',
+    example: 'f6899cb1067e5043',
+    nullable: true,
+  })
+  coredumpBuildId!: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  @ApiProperty({
+    description: 'Status of server-side coredump symbolication',
+    example: 'success',
+    enum: ['pending', 'success', 'failed', 'skipped', 'unavailable'],
+    nullable: true,
+  })
+  symbolicationStatus!: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  @ApiProperty({
+    description: 'Symbolized backtrace, task list, and register dump produced from the coredump + ELF',
+    example: '#0  0x42066718 in app_loop() at main.cpp:120',
+    nullable: true,
+  })
+  symbolizedBacktrace!: string | null;
+
   @CreateDateColumn()
   @ApiProperty({
     description: 'When this crash report was received by the server',

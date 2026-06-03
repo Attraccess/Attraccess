@@ -60,8 +60,21 @@ RUN groupadd -g ${APP_GID} appuser && useradd -u ${APP_UID} -g ${APP_GID} -m -d 
 # Set working directory
 WORKDIR /app
 
-# Minimal runtime libs for native Node modules and privilege drop
-RUN apt-get update && apt-get install -y --no-install-recommends libstdc++6 gosu && rm -rf /var/lib/apt/lists/*
+# Minimal runtime libs for native Node modules and privilege drop.
+# python3 + esp-coredump are required for server-side coredump symbolication.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libstdc++6 \
+    gosu \
+    python3 \
+    python3-venv \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install esp-coredump into an isolated venv and expose it on PATH
+RUN python3 -m venv /opt/venv && \
+    /opt/venv/bin/pip install --no-cache-dir --upgrade pip && \
+    /opt/venv/bin/pip install --no-cache-dir esp-coredump
+ENV PATH="/opt/venv/bin:${PATH}"
+ENV ESP_COREDUMP_CMD=/opt/venv/bin/esp-coredump
 
 # Copy the pre-built application (these will be built in the CI pipeline)
 COPY --from=builder /app/dist dist

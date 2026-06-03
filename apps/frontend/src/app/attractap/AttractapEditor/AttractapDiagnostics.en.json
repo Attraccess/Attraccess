@@ -21,5 +21,17 @@
   "coredump": "Coredump",
   "downloadCoredump": "Download coredump",
   "noCoredump": "No coredump",
-  "downloadFailed": "Failed to download coredump"
+  "downloadFailed": "Failed to download coredump",
+  "backtrace": "Symbolized backtrace",
+  "buildId": "Build id",
+  "symbolication": {
+    "pending": "Symbolizing…",
+    "success": "Symbolized",
+    "failed": "Symbolication failed",
+    "skipped": "No coredump",
+    "unavailable": "Symbolication unavailable"
+  },
+  "symbolicationUnavailableHint": "The server toolchain or matching firmware ELF was not available, so this coredump could not be symbolized. Download the raw coredump for offline analysis.",
+  "showBacktrace": "Show backtrace",
+  "hideBacktrace": "Hide backtrace"
 }

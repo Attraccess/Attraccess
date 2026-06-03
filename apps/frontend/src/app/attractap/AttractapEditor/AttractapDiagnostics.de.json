@@ -21,5 +21,17 @@
   "coredump": "Coredump",
   "downloadCoredump": "Coredump herunterladen",
   "noCoredump": "Kein Coredump",
-  "downloadFailed": "Coredump-Download fehlgeschlagen"
+  "downloadFailed": "Coredump-Download fehlgeschlagen",
+  "backtrace": "Symbolisierter Backtrace",
+  "buildId": "Build-ID",
+  "symbolication": {
+    "pending": "Symbolisierung läuft…",
+    "success": "Symbolisiert",
+    "failed": "Symbolisierung fehlgeschlagen",
+    "skipped": "Kein Coredump",
+    "unavailable": "Symbolisierung nicht verfügbar"
+  },
+  "symbolicationUnavailableHint": "Die Server-Toolchain oder die passende Firmware-ELF war nicht verfügbar, daher konnte dieser Coredump nicht symbolisiert werden. Lade den rohen Coredump für die Offline-Analyse herunter.",
+  "showBacktrace": "Backtrace anzeigen",
+  "hideBacktrace": "Backtrace ausblenden"
 }
