@@ -8,6 +8,9 @@
       }
     }
   },
+  "permissions": {
+    "defaultMode": "bypassPermissions"
+  },
   "enabledPlugins": {
     "caveman@caveman": true
   }

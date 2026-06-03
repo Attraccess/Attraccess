@@ -890,7 +890,8 @@ export enum EmailTemplateType {
     PROJECT_INVITATION = 'project-invitation',
     DELETE_ACCOUNT_CONFIRMATION = 'delete-account-confirmation',
     RESOURCE_HEALTH_CHANGED = 'resource-health-changed',
-    USER_RETRAINING_REQUIRED = 'user-retraining-required'
+    USER_RETRAINING_REQUIRED = 'user-retraining-required',
+    MAINTENANCE_REQUEST_CREATED = 'maintenance-request-created'
 }
 
 export type EmailTemplate = {
@@ -2757,6 +2758,103 @@ export type UpdateMaintenanceScheduleDto = {
     enabled?: boolean;
 };
 
+export type CreateMaintenanceRequestDto = {
+    /**
+     * Why the user thinks the resource needs maintenance
+     */
+    reason: string;
+};
+
+/**
+ * The current status of the request
+ */
+export enum MaintenanceRequestStatus {
+    OPEN = 'open',
+    RESOLVED = 'resolved',
+    DISMISSED = 'dismissed'
+}
+
+export type ResourceMaintenanceRequest = {
+    /**
+     * The unique identifier of the maintenance request
+     */
+    id: number;
+    /**
+     * When the request was created
+     */
+    createdAt: string;
+    /**
+     * When the request was last updated
+     */
+    updatedAt: string;
+    /**
+     * The ID of the resource the request is for
+     */
+    resourceId: number;
+    /**
+     * Why the user thinks the resource needs maintenance
+     */
+    reason: string;
+    /**
+     * The current status of the request
+     */
+    status: MaintenanceRequestStatus;
+    /**
+     * The user who reported the resource as broken
+     */
+    createdByUser?: User;
+    /**
+     * The maintainer who resolved or dismissed the request
+     */
+    resolvedByUser?: User;
+    /**
+     * When the request was resolved or dismissed
+     */
+    resolvedAt?: string | null;
+    /**
+     * The maintenance created from this request (null until converted)
+     */
+    resultingMaintenance?: ResourceMaintenance;
+};
+
+export type PaginatedMaintenanceRequestResponse = {
+    /**
+     * The maintenance requests for the current page
+     */
+    data: Array<ResourceMaintenanceRequest>;
+    /**
+     * Total number of matching requests
+     */
+    total: number;
+    /**
+     * Current page number
+     */
+    page: number;
+    /**
+     * Number of items per page
+     */
+    limit: number;
+};
+
+export type ResolveMaintenanceRequestDto = {
+    /**
+     * How to resolve the request: 'convert' starts an instant maintenance from it, 'dismiss' closes it without action
+     */
+    action: 'convert' | 'dismiss';
+    /**
+     * Optional reason override for the maintenance when converting
+     */
+    reason?: string;
+};
+
+/**
+ * How to resolve the request: 'convert' starts an instant maintenance from it, 'dismiss' closes it without action
+ */
+export enum action2 {
+    CONVERT = 'convert',
+    DISMISS = 'dismiss'
+}
+
 export type BalanceDto = {
     /**
      * The balance of the user
@@ -4323,6 +4421,17 @@ export type ConversationListItemDto = {
      * When this conversation was last updated
      */
     updatedAt: string;
+    /**
+     * Number of messages in this conversation the authenticated user has not read yet
+     */
+    unreadCount: number;
+};
+
+export type UnreadCountResponseDto = {
+    /**
+     * Total number of unread messages across all conversations of the authenticated user
+     */
+    total: number;
 };
 
 export type ListMessagesResponseDto = {
@@ -4345,6 +4454,20 @@ export type SendMessageDto = {
      * Optional ID of the referenced entity, scoped by referenceType
      */
     referenceId?: number;
+};
+
+export type NotificationPreferenceDto = {
+    /**
+     * Whether to send an email when a direct message arrives while the user is offline
+     */
+    messagesEmailOnOffline: boolean;
+};
+
+export type UpdateNotificationPreferenceDto = {
+    /**
+     * Whether to send an email when a direct message arrives while the user is offline
+     */
+    messagesEmailOnOffline?: boolean;
 };
 
 export type InfoResponse = {
@@ -5415,6 +5538,51 @@ export type FinishMaintenanceData = {
 
 export type FinishMaintenanceResponse = ResourceMaintenance;
 
+export type CreateMaintenanceRequestData = {
+    requestBody: CreateMaintenanceRequestDto;
+    /**
+     * The ID of the resource
+     */
+    resourceId: number;
+};
+
+export type CreateMaintenanceRequestResponse = ResourceMaintenanceRequest;
+
+export type ListMaintenanceRequestsData = {
+    /**
+     * Number of items per page
+     */
+    limit?: number;
+    /**
+     * Page number for pagination
+     */
+    page?: number;
+    /**
+     * The ID of the resource
+     */
+    resourceId: number;
+    /**
+     * Filter by request status (defaults to open requests only)
+     */
+    status?: MaintenanceRequestStatus;
+};
+
+export type ListMaintenanceRequestsResponse = PaginatedMaintenanceRequestResponse;
+
+export type ResolveMaintenanceRequestData = {
+    requestBody: ResolveMaintenanceRequestDto;
+    /**
+     * The ID of the maintenance request
+     */
+    requestId: number;
+    /**
+     * The ID of the resource
+     */
+    resourceId: number;
+};
+
+export type ResolveMaintenanceRequestResponse = ResourceMaintenanceRequest;
+
 export type FindMaintenanceSchedulesData = {
     /**
      * Resource ID
@@ -6016,6 +6184,14 @@ export type MessagingContactResourceHolderResponse = ContactResponseDto;
 
 export type MessagingListConversationsResponse = Array<ConversationListItemDto>;
 
+export type MessagingGetUnreadCountResponse = UnreadCountResponseDto;
+
+export type MessagingMarkConversationReadData = {
+    id: number;
+};
+
+export type MessagingMarkConversationReadResponse = UnreadCountResponseDto;
+
 export type MessagingListMessagesData = {
     id: number;
     /**
@@ -6036,6 +6212,14 @@ export type MessagingSendMessageData = {
 };
 
 export type MessagingSendMessageResponse = Message;
+
+export type MessagingGetNotificationPreferencesResponse = NotificationPreferenceDto;
+
+export type MessagingUpdateNotificationPreferencesData = {
+    requestBody: UpdateNotificationPreferenceDto;
+};
+
+export type MessagingUpdateNotificationPreferencesResponse = NotificationPreferenceDto;
 
 export type $OpenApiTs = {
     '/api/info': {
@@ -8184,6 +8368,77 @@ export type $OpenApiTs = {
             };
         };
     };
+    '/api/resources/{resourceId}/maintenance-requests': {
+        post: {
+            req: CreateMaintenanceRequestData;
+            res: {
+                /**
+                 * Maintenance request created
+                 */
+                201: ResourceMaintenanceRequest;
+                /**
+                 * Bad request - invalid request data
+                 */
+                400: unknown;
+                /**
+                 * Unauthorized - User is not authenticated
+                 */
+                401: unknown;
+                /**
+                 * Resource not found
+                 */
+                404: unknown;
+            };
+        };
+        get: {
+            req: ListMaintenanceRequestsData;
+            res: {
+                /**
+                 * Requests retrieved
+                 */
+                200: PaginatedMaintenanceRequestResponse;
+                /**
+                 * Unauthorized - User is not authenticated
+                 */
+                401: unknown;
+                /**
+                 * Forbidden - User cannot manage maintenance for this resource
+                 */
+                403: unknown;
+                /**
+                 * Resource not found
+                 */
+                404: unknown;
+            };
+        };
+    };
+    '/api/resources/{resourceId}/maintenance-requests/{requestId}/resolve': {
+        post: {
+            req: ResolveMaintenanceRequestData;
+            res: {
+                /**
+                 * Request resolved
+                 */
+                200: ResourceMaintenanceRequest;
+                /**
+                 * Bad request - request already resolved
+                 */
+                400: unknown;
+                /**
+                 * Unauthorized - User is not authenticated
+                 */
+                401: unknown;
+                /**
+                 * Forbidden - User cannot manage maintenance for this resource
+                 */
+                403: unknown;
+                /**
+                 * Request not found
+                 */
+                404: unknown;
+            };
+        };
+    };
     '/api/resources/{resourceId}/maintenance-schedules': {
         get: {
             req: FindMaintenanceSchedulesData;
@@ -9414,6 +9669,39 @@ export type $OpenApiTs = {
             };
         };
     };
+    '/api/messaging/unread-count': {
+        get: {
+            res: {
+                /**
+                 * The total unread message count
+                 */
+                200: UnreadCountResponseDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/messaging/conversations/{id}/read': {
+        post: {
+            req: MessagingMarkConversationReadData;
+            res: {
+                /**
+                 * The updated total unread message count
+                 */
+                201: UnreadCountResponseDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+                /**
+                 * You are not a participant of this conversation
+                 */
+                403: unknown;
+            };
+        };
+    };
     '/api/messaging/conversations/{id}/messages': {
         get: {
             req: MessagingListMessagesData;
@@ -9447,6 +9735,33 @@ export type $OpenApiTs = {
                  * You are not a participant of this conversation
                  */
                 403: unknown;
+            };
+        };
+    };
+    '/api/messaging/notification-preferences': {
+        get: {
+            res: {
+                /**
+                 * The notification preferences
+                 */
+                200: NotificationPreferenceDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+        patch: {
+            req: MessagingUpdateNotificationPreferencesData;
+            res: {
+                /**
+                 * The updated notification preferences
+                 */
+                200: NotificationPreferenceDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
             };
         };
     };

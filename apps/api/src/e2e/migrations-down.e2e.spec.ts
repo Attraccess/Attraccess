@@ -22,6 +22,7 @@ import {
   Message,
   MqttServer,
   NFCCard,
+  NotificationPreference,
   PasswordHistory,
   PasswordPolicyAudit,
   PasswordPolicyAuditEvent,
@@ -47,6 +48,8 @@ import {
   ResourceIntroductionHistoryItem,
   ResourceIntroducer,
   ResourceMaintenance,
+  ResourceMaintenanceRequest,
+  MaintenanceRequestStatus,
   ResourceHealthSource,
   ResourceHealthState,
   ResourceHealthStatus,
@@ -181,6 +184,7 @@ const seedDatabase = async (dataSource: DataSource) => {
   const conversationRepo = dataSource.getRepository(Conversation);
   const conversationParticipantRepo = dataSource.getRepository(ConversationParticipant);
   const messageRepo = dataSource.getRepository(Message);
+  const notificationPreferenceRepo = dataSource.getRepository(NotificationPreference);
 
   const resourceGroup = await ensureEntity(resourceGroupRepo, () => ({
     name: `Seed Group ${seedTag}`,
@@ -313,6 +317,17 @@ const seedDatabase = async (dataSource: DataSource) => {
     startTime: new Date(),
     endTime: null,
     reason: 'Seed maintenance',
+  }));
+
+  const resourceMaintenanceRequestRepo = dataSource.getRepository(ResourceMaintenanceRequest);
+  await ensureEntity(resourceMaintenanceRequestRepo, () => ({
+    resourceId: resource.id,
+    reason: 'Seed maintenance request',
+    status: MaintenanceRequestStatus.OPEN,
+    createdByUser: { id: primaryUser.id },
+    resolvedByUser: null,
+    resolvedAt: null,
+    resultingMaintenance: null,
   }));
 
   const resourceHealthRepo = dataSource.getRepository(ResourceHealthState);
@@ -552,6 +567,11 @@ const seedDatabase = async (dataSource: DataSource) => {
     referenceId: null,
     referenceLabel: null,
     referenceUrl: null,
+  }));
+
+  await ensureEntity(notificationPreferenceRepo, () => ({
+    userId: primaryUser.id,
+    messagesEmailOnOffline: true,
   }));
 };
 

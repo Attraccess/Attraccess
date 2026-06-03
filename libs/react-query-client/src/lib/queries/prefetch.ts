@@ -2,7 +2,7 @@
 
 import { type QueryClient } from "@tanstack/react-query";
 import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, FlowVariablesService, LicenseService, MessagingService, MqttService, PasswordPolicyAdminService, PasswordPolicyService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceHealthService, ResourceMaintenanceSchedulesService, ResourceMaintenancesService, ResourcesService, SettingsService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
-import { EmailTemplateType, PasswordPolicyRole, PermissionFilter, ResourceIntroducerType } from "../requests/types.gen";
+import { EmailTemplateType, MaintenanceRequestStatus, PasswordPolicyRole, PermissionFilter, ResourceIntroducerType } from "../requests/types.gen";
 import * as Common from "./common";
 /**
 * Return API information
@@ -541,6 +541,23 @@ export const prefetchUseResourceMaintenancesServiceGetMaintenance = (queryClient
   resourceId: number;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseResourceMaintenancesServiceGetMaintenanceKeyFn({ maintenanceId, resourceId }), queryFn: () => ResourceMaintenancesService.getMaintenance({ maintenanceId, resourceId }) });
 /**
+* List maintenance requests for a resource
+* Retrieve paginated maintenance requests. Only maintenance users can call this.
+* @param data The data for the request.
+* @param data.resourceId The ID of the resource
+* @param data.page Page number for pagination
+* @param data.limit Number of items per page
+* @param data.status Filter by request status (defaults to open requests only)
+* @returns PaginatedMaintenanceRequestResponse Requests retrieved
+* @throws ApiError
+*/
+export const prefetchUseResourceMaintenancesServiceListMaintenanceRequests = (queryClient: QueryClient, { limit, page, resourceId, status }: {
+  limit?: number | undefined;
+  page?: number | undefined;
+  resourceId: number;
+  status?: MaintenanceRequestStatus | undefined;
+}) => queryClient.prefetchQuery({ queryKey: Common.UseResourceMaintenancesServiceListMaintenanceRequestsKeyFn({ limit, page, resourceId, status }), queryFn: () => ResourceMaintenancesService.listMaintenanceRequests({ limit, page, resourceId, status }) });
+/**
 * List maintenance schedules for a resource
 * Get all maintenance schedules for the given resource
 * @param data The data for the request.
@@ -954,6 +971,12 @@ export const prefetchUseMessagingServiceMessagingLive = (queryClient: QueryClien
 */
 export const prefetchUseMessagingServiceMessagingListConversations = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseMessagingServiceMessagingListConversationsKeyFn(), queryFn: () => MessagingService.messagingListConversations() });
 /**
+* Get the total number of unread messages for the authenticated user
+* @returns UnreadCountResponseDto The total unread message count
+* @throws ApiError
+*/
+export const prefetchUseMessagingServiceMessagingGetUnreadCount = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseMessagingServiceMessagingGetUnreadCountKeyFn(), queryFn: () => MessagingService.messagingGetUnreadCount() });
+/**
 * List paginated messages of a conversation
 * @param data The data for the request.
 * @param data.id
@@ -967,3 +990,9 @@ export const prefetchUseMessagingServiceMessagingListMessages = (queryClient: Qu
   limit?: number | undefined;
   page?: number | undefined;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseMessagingServiceMessagingListMessagesKeyFn({ id, limit, page }), queryFn: () => MessagingService.messagingListMessages({ id, limit, page }) });
+/**
+* Get the authenticated user notification preferences
+* @returns NotificationPreferenceDto The notification preferences
+* @throws ApiError
+*/
+export const prefetchUseMessagingServiceMessagingGetNotificationPreferences = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseMessagingServiceMessagingGetNotificationPreferencesKeyFn(), queryFn: () => MessagingService.messagingGetNotificationPreferences() });

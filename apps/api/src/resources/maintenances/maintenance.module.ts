@@ -8,6 +8,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import {
   ResourceMaintenance,
+  ResourceMaintenanceRequest,
   ResourceMaintenanceSchedule,
   ResourceMaintenanceScheduleUsageHoursConfig,
   ResourceMaintenanceScheduleUsageCountConfig,
@@ -15,6 +16,7 @@ import {
   Resource,
   ResourceIntroducer,
   ResourceUsage,
+  User,
 } from '@attraccess/database-entities';
 import { ResourceMaintenanceService } from './maintenance.service';
 import { ResourceMaintenanceController } from './maintenance.controller';
@@ -22,11 +24,16 @@ import { CanManageMaintenanceGuard } from './canManageMaintenance.guard';
 import { MaintenanceScheduleEvaluatorService } from './maintenance-schedule-evaluator.service';
 import { MaintenanceScheduleService } from './maintenance-schedule.service';
 import { MaintenanceScheduleController } from './maintenance-schedule.controller';
+import { MaintenanceRequestService } from './maintenance-request.service';
+import { MaintenanceRequestController } from './maintenance-request.controller';
+import { MaintenanceRequestNotificationListener } from './maintenance-request-notification.listener';
+import { EmailModule } from '../../email/email.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([
       ResourceMaintenance,
+      ResourceMaintenanceRequest,
       ResourceMaintenanceSchedule,
       ResourceMaintenanceScheduleUsageHoursConfig,
       ResourceMaintenanceScheduleUsageCountConfig,
@@ -34,15 +41,19 @@ import { MaintenanceScheduleController } from './maintenance-schedule.controller
       Resource,
       ResourceIntroducer,
       ResourceUsage,
+      User,
     ]),
+    EmailModule,
   ],
-  controllers: [ResourceMaintenanceController, MaintenanceScheduleController],
+  controllers: [ResourceMaintenanceController, MaintenanceScheduleController, MaintenanceRequestController],
   providers: [
     ResourceMaintenanceService,
     CanManageMaintenanceGuard,
     MaintenanceScheduleEvaluatorService,
     MaintenanceScheduleService,
+    MaintenanceRequestService,
+    MaintenanceRequestNotificationListener,
   ],
-  exports: [ResourceMaintenanceService, CanManageMaintenanceGuard],
+  exports: [ResourceMaintenanceService, CanManageMaintenanceGuard, MaintenanceRequestService],
 })
 export class ResourceMaintenanceModule { }

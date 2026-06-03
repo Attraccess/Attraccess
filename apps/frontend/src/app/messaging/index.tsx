@@ -3,6 +3,7 @@
 import {
   Message,
   useMessagingServiceMessagingListConversations,
+  useMessagingServiceMessagingMarkConversationRead,
 } from '@attraccess/react-query-client';
 import { Card, cn } from '@heroui/react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -18,7 +19,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { ConversationList } from './ConversationList';
 import { MessageThread } from './MessageThread';
 import { useMessagingLive } from './useMessagingLive';
-import { applyIncomingMessage } from './messageCache';
+import { applyIncomingMessage, markConversationReadInCache } from './messageCache';
 
 export function MessagesPage() {
   const { t } = useTranslations({ en, de });
@@ -48,11 +49,34 @@ export function MessagesPage() {
       ? deepLinkResourceId
       : undefined;
 
+  const { mutate: markConversationRead } = useMessagingServiceMessagingMarkConversationRead();
+
+  const markRead = useCallback(
+    (conversationId: number) => {
+      markConversationRead(
+        { id: conversationId },
+        {
+          onSuccess: ({ total }) => markConversationReadInCache(queryClient, conversationId, total),
+        },
+      );
+    },
+    [markConversationRead, queryClient],
+  );
+
+  useEffect(() => {
+    if (selectedConversationId && user) {
+      markRead(selectedConversationId);
+    }
+  }, [selectedConversationId, user, markRead]);
+
   const handleLiveMessage = useCallback(
     (message: Message) => {
       applyIncomingMessage(queryClient, message);
+      if (message.conversationId === selectedConversationId) {
+        markRead(message.conversationId);
+      }
     },
-    [queryClient],
+    [queryClient, selectedConversationId, markRead],
   );
 
   useMessagingLive({ onMessage: handleLiveMessage });

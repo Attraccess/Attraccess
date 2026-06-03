@@ -55,6 +55,8 @@ Flags:
 
 The Vite dev proxy is wired to whichever API port the launcher resolved.
 
+The resolved ports are written to `.dev-serve-ports.json` at the repo root (gitignored, removed on exit). Read it to find the current ports without parsing the startup banner — e.g. `cat .dev-serve-ports.json | jq -r '.frontend.url'`.
+
 ## Development Workflow
 
 1. Create a feature branch from `main`

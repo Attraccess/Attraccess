@@ -1,0 +1,231 @@
+import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
+import { PluginPermission } from '@attraccess/plugins-backend-sdk';
+import { zipFileUpload } from './__test__/make-zip';
+
+const mockSpawn = jest.fn(() => ({ unref: jest.fn() }));
+jest.mock('child_process', () => ({ spawn: mockSpawn }));
+
+import { PluginService } from './plugin.service';
+
+const VALID_MANIFEST = {
+  name: 'uploaded-plugin',
+  version: '1.2.3',
+  main: {
+    frontend: { directory: 'frontend', entryPoint: 'index.mjs' },
+    backend: { directory: 'dist', entryPoint: 'index.js' },
+  },
+  attraccessVersion: { min: '1.0.0' },
+  permissions: [PluginPermission.EMIT_EVENTS],
+};
+
+function newPluginDir(): string {
+  const dir = mkdtempSync(join(tmpdir(), 'plugin-service-'));
+  PluginService.configure({ PLUGIN_DIR: dir, RESTART_BY_EXIT: true });
+  return dir;
+}
+
+function writePlugin(root: string, folder: string, manifest: unknown): void {
+  const dir = join(root, folder);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'plugin.json'), JSON.stringify(manifest));
+}
+
+describe('PluginService', () => {
+  let root: string;
+  let exitSpy: jest.SpyInstance;
+  let restartSpy: jest.SpyInstance;
+  let capturedRestart: (() => void) | null;
+
+  function flushScheduledRestart(): void {
+    expect(capturedRestart).not.toBeNull();
+    (capturedRestart as () => void)();
+  }
+
+  beforeEach(() => {
+    mockSpawn.mockClear();
+    capturedRestart = null;
+    root = newPluginDir();
+    exitSpy = jest.spyOn(process, 'exit').mockImplementation((((() => {
+      throw new Error('process.exit');
+    }) as unknown) as never));
+    restartSpy = jest
+      .spyOn(PluginService.prototype as unknown as { restartApp: () => void }, 'restartApp')
+      .mockImplementation(() => undefined);
+    const realSetTimeout = global.setTimeout;
+    jest
+      .spyOn(global, 'setTimeout')
+      .mockImplementation(((fn: (...a: unknown[]) => void, delay?: number, ...args: unknown[]) => {
+        if (delay === 1000) {
+          capturedRestart = () => fn();
+          return 0 as unknown as NodeJS.Timeout;
+        }
+        return realSetTimeout(fn, delay as number, ...args);
+      }) as unknown as typeof setTimeout);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  describe('discovery', () => {
+    it('returns an empty array when the plugin folder does not exist', () => {
+      PluginService.configure({ PLUGIN_DIR: join(root, 'does-not-exist'), RESTART_BY_EXIT: true });
+      expect(PluginService.getPlugins()).toEqual([]);
+    });
+
+    it('discovers a manifest and assigns an id and prefixed backend directory', () => {
+      writePlugin(root, 'my-plugin', {
+        name: 'my-plugin',
+        version: '1.0.0',
+        main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+        attraccessVersion: { min: '1.0.0' },
+      });
+
+      const plugins = PluginService.getPlugins();
+      expect(plugins).toHaveLength(1);
+      expect(plugins[0].name).toBe('my-plugin');
+      expect(plugins[0].pluginDirectory).toBe('my-plugin');
+      expect(plugins[0].id).toEqual(expect.any(String));
+      expect(plugins[0].main.backend.directory).toBe(join('my-plugin', 'dist'));
+    });
+
+    it('caches discovery between calls and re-scans after configure', () => {
+      writePlugin(root, 'plugin-a', {
+        name: 'plugin-a',
+        version: '1.0.0',
+        main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+        attraccessVersion: { min: '1.0.0' },
+      });
+
+      const first = PluginService.getPlugins();
+      expect(PluginService.getPlugins()).toBe(first);
+
+      PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
+      expect(PluginService.getPlugins()).not.toBe(first);
+    });
+
+    it('skips folders without a manifest', () => {
+      mkdirSync(join(root, 'not-a-plugin'), { recursive: true });
+      expect(PluginService.getPlugins()).toEqual([]);
+    });
+
+    it('excludes a plugin whose declared permissions are invalid', () => {
+      writePlugin(root, 'bad-perms', {
+        name: 'bad-perms',
+        version: '1.0.0',
+        main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+        attraccessVersion: { min: '1.0.0' },
+        permissions: ['NOT_A_REAL_PERMISSION'],
+      });
+
+      expect(PluginService.getPlugins()).toEqual([]);
+    });
+  });
+
+  describe('getManifestById / toManifestInfo', () => {
+    it('finds a discovered plugin by id and returns undefined for unknown ids', () => {
+      writePlugin(root, 'find-me', {
+        name: 'find-me',
+        version: '1.0.0',
+        main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+        attraccessVersion: { min: '1.0.0' },
+      });
+
+      const [plugin] = PluginService.getPlugins();
+      expect(PluginService.getManifestById(plugin.id)).toBe(plugin);
+      expect(PluginService.getManifestById('missing')).toBeUndefined();
+    });
+
+    it('projects a manifest down to its public info shape', () => {
+      const info = PluginService.toManifestInfo({
+        id: 'abc',
+        name: 'n',
+        version: '2.0.0',
+        pluginDirectory: 'dir',
+        permissions: [],
+      } as never);
+      expect(info).toEqual({ id: 'abc', name: 'n', version: '2.0.0', pluginDirectory: 'dir' });
+    });
+  });
+
+  describe('uploadPlugin', () => {
+    it('rejects a non-zip upload', async () => {
+      const service = new PluginService();
+      const file = zipFileUpload({ 'plugin.json': '{}' }, { mimetype: 'text/plain' });
+      await expect(service.uploadPlugin(file)).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('unpacks a valid plugin, moves it into place and schedules a restart', async () => {
+      const service = new PluginService();
+      const file = zipFileUpload({ 'plugin.json': JSON.stringify(VALID_MANIFEST) });
+
+      const manifest = await service.uploadPlugin(file);
+
+      expect(manifest.name).toBe('uploaded-plugin');
+      expect(existsSync(join(root, 'uploaded-plugin', 'plugin.json'))).toBe(true);
+      expect(restartSpy).not.toHaveBeenCalled();
+      flushScheduledRestart();
+      expect(restartSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('rejects a manifest that fails schema validation', async () => {
+      const service = new PluginService();
+      const file = zipFileUpload({ 'plugin.json': JSON.stringify({ name: 'x' }) });
+      await expect(service.uploadPlugin(file)).rejects.toBeDefined();
+    });
+
+    it('rejects when a plugin with the same name already exists', async () => {
+      const service = new PluginService();
+      await service.uploadPlugin(zipFileUpload({ 'plugin.json': JSON.stringify(VALID_MANIFEST) }));
+
+      const again = zipFileUpload({ 'plugin.json': JSON.stringify(VALID_MANIFEST) });
+      await expect(service.uploadPlugin(again)).rejects.toThrow(/already exists/);
+    });
+  });
+
+  describe('deletePlugin', () => {
+    it('throws when the plugin id is unknown', async () => {
+      const service = new PluginService();
+      await expect(service.deletePlugin('nope')).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('removes the plugin folder and schedules a restart', async () => {
+      writePlugin(root, 'delete-me', {
+        name: 'delete-me',
+        version: '1.0.0',
+        main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+        attraccessVersion: { min: '1.0.0' },
+      });
+      const [plugin] = PluginService.getPlugins();
+      const service = new PluginService();
+
+      await service.deletePlugin(plugin.id);
+
+      expect(existsSync(join(root, 'delete-me'))).toBe(false);
+      flushScheduledRestart();
+      expect(restartSpy).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('restartApp', () => {
+    it('restarts by exiting when RESTART_BY_EXIT is set', () => {
+      restartSpy.mockRestore();
+      PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
+      expect(() => (new PluginService() as unknown as { restartApp: () => void }).restartApp()).toThrow('process.exit');
+      expect(exitSpy).toHaveBeenCalled();
+      expect(mockSpawn).not.toHaveBeenCalled();
+    });
+
+    it('respawns a detached process when RESTART_BY_EXIT is not set', () => {
+      restartSpy.mockRestore();
+      PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: false });
+      expect(() => (new PluginService() as unknown as { restartApp: () => void }).restartApp()).toThrow('process.exit');
+      expect(mockSpawn).toHaveBeenCalledWith(process.argv[0], process.argv.slice(1), expect.objectContaining({ detached: true }));
+      expect(exitSpy).toHaveBeenCalled();
+    });
+  });
+});

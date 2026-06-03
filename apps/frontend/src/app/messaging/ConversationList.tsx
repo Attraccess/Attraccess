@@ -1,7 +1,7 @@
 // Inbox list of conversations showing the other participant and last message
 // FEATURE: Messaging inbox conversation list
 import { ConversationListItemDto } from '@attraccess/react-query-client';
-import { Skeleton, cn } from '@heroui/react';
+import { Chip, Skeleton, cn } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
@@ -38,6 +38,8 @@ export function ConversationList(props: Props) {
       {conversations.map((conversation) => {
         const username = conversation.otherParticipant?.username ?? t('conversations.unknownUser');
         const preview = conversation.lastMessage?.content ?? t('conversations.noMessages');
+        const unreadCount = conversation.unreadCount ?? 0;
+        const hasUnread = unreadCount > 0;
 
         return (
           <button
@@ -62,7 +64,22 @@ export function ConversationList(props: Props) {
                   </span>
                 )}
               </div>
-              <p className="truncate text-small text-zinc-500">{preview}</p>
+              <div className="flex items-center justify-between gap-2">
+                <p className={cn('truncate text-small', hasUnread ? 'font-medium text-foreground' : 'text-zinc-500')}>
+                  {preview}
+                </p>
+                {hasUnread && (
+                  <Chip
+                    color="accent"
+                    variant="primary"
+                    size="sm"
+                    className="ml-auto shrink-0"
+                    data-cy={`conversation-unread-badge-${conversation.id}`}
+                  >
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </Chip>
+                )}
+              </div>
             </div>
           </button>
         );

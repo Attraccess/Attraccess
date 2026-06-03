@@ -323,7 +323,7 @@ importers:
         version: 11.1.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       recharts:
         specifier: ^3.8.1
-        version: 3.8.1(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react-is@19.2.6)(react@19.2.6)(redux@5.0.1)
+        version: 3.8.1(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react-is@19.2.7)(react@19.2.6)(redux@5.0.1)
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2
@@ -349,8 +349,8 @@ importers:
         specifier: ^5.1.7
         version: 5.1.7
       swagger-typescript-api:
-        specifier: ^13.10.0
-        version: 13.10.0(encoding@0.1.13)(magicast@0.3.5)(react@19.2.6)
+        specifier: ^13.12.0
+        version: 13.12.0(encoding@0.1.13)(magicast@0.3.5)(react@19.2.6)
       tailwind-merge:
         specifier: ^3.5.0
         version: 3.6.0
@@ -2047,8 +2047,8 @@ packages:
       '@biomejs/wasm-web':
         optional: true
 
-  '@biomejs/wasm-nodejs@2.4.15':
-    resolution: {integrity: sha512-5mfoUf66sFwBkR9T82KRxapviesSadJH+qH4+w06gge87sYwjLKTXw4rxGOiJkUTCRtxCuMSUT9VO6VAqhsmkg==}
+  '@biomejs/wasm-nodejs@2.4.16':
+    resolution: {integrity: sha512-3BSGXHJ25Is+9gRgV+Gwz7YdMktrMOBP+Vw3RwXy3Y/CHqXbbNSyhaMt6VFk1J/WAGutdYfBy+NzhlvOftwd+g==}
 
   '@borewit/text-codec@0.2.2':
     resolution: {integrity: sha512-DDaRehssg1aNrH4+2hnj1B7vnUGEjU6OIlyRdkMd0aUdIUvKXrJfXsy8LVtXAy7DRvYVluWbMspsRhz2lcW0mQ==}
@@ -6817,11 +6817,11 @@ packages:
   '@volar/typescript@2.4.28':
     resolution: {integrity: sha512-Ja6yvWrbis2QtN4ClAKreeUZPVYMARDYZl9LMEv1iQ1QdepB6wn0jTRxA9MftYmYa4DQ4k/DaSZpFPUfxl8giw==}
 
-  '@vue/compiler-core@3.5.34':
-    resolution: {integrity: sha512-s9cLyK5mLcvZ4Agva5QgRsQyLKvts9WbU9DB6NqiZkkGEdwmcEiylj5Jbwkp680drF/NNCV8OlAJSe+yMLxaJw==}
+  '@vue/compiler-core@3.5.35':
+    resolution: {integrity: sha512-BUmHaR1J+O+CKZ9uJucdVTEr1LHsdyvv7vG3eNRhK3CczEHeMd/LtsHAuD7PbrxvI2envCY2v7HI1vC1aBRzKw==}
 
-  '@vue/compiler-dom@3.5.34':
-    resolution: {integrity: sha512-EbF/T++k0e2MMZlJsBhzK8Sgwt0HcIPOhzn1CTB/lv6sQcyk+OWf8YeiLxZp3ro7MbbLcAfAJ6sEvjFWuNgUCw==}
+  '@vue/compiler-dom@3.5.35':
+    resolution: {integrity: sha512-k+bprkXxuqhVajgTx5mUHuir7TwQzUKOWR40ng1ncAqQRPnrLngGGgqVEEhOnTMlc8btHYVKmrP8s5Qyg0hvYA==}
 
   '@vue/language-core@1.8.27':
     resolution: {integrity: sha512-L8Kc27VdQserNaCUNiSFdDl9LWT24ly8Hpwf1ECy3aFb9m6bDhBGQYOujDm21N7EW3moKIOKEanQwe1q5BK+mA==}
@@ -6831,8 +6831,8 @@ packages:
       typescript:
         optional: true
 
-  '@vue/shared@3.5.34':
-    resolution: {integrity: sha512-24uqU4OIiX29ryC3MeWid/Xf2fa2EFRUVLb77nRhk+UrTVrh/XiGtFAFmJBAtBRbjwNdsPRP+jj/OL27Eg1NDA==}
+  '@vue/shared@3.5.35':
+    resolution: {integrity: sha512-zSbjL7gRXwks2ZQLRGCajBtBXEOXW9Ddhn/HvSdrGkE2dqGnumzW8XtusRrxrE9LvqtiqDXQ+A60Hp6mvdYxfA==}
 
   '@webassemblyjs/ast@1.14.1':
     resolution: {integrity: sha512-nuBEDgQfm1ccRp/8bCQrx1frohyufl4JlbMMZ4P1wpeOfDhF6FQkxZJ1b/e+PLwr6X1Nhw6OLme5usuBWYBvuQ==}
@@ -7290,8 +7290,8 @@ packages:
   ast-v8-to-istanbul@1.0.0:
     resolution: {integrity: sha512-1fSfIwuDICFA4LKkCzRPO7F0hzFf0B7+Xqrl27ynQaa+Rh0e1Es0v6kWHPott3lU10AyAr7oKHa65OppjLn3Rg==}
 
-  ast-v8-to-istanbul@1.0.2:
-    resolution: {integrity: sha512-dKmJxJsGItLmc5CYZKuEjuG6GnBs6PG4gohMhyFOWKaNQoYCuRZJDECaBlHmcG0lv2wc2E0uU8lESmBEumC3DQ==}
+  ast-v8-to-istanbul@1.0.3:
+    resolution: {integrity: sha512-jCMQ6ZylLPudp0CDfBmQBZUsrh1/8psbmu9ibeVWKuHWD0YrH9YABwlKu5kVEFoT0GCQQW9Z/SxfuEbbkGQCRg==}
 
   async-function@1.0.0:
     resolution: {integrity: sha512-hsU18Ae8CDTR6Kgu9DYf0EbCr/a5iGL0rytQDobUcdpYOKokk8LEjVphnXkDkgpi0wYVsqrXuP0bZxJaTqdgoA==}
@@ -7509,8 +7509,16 @@ packages:
       bare-abort-controller:
         optional: true
 
-  bare-fs@4.7.1:
-    resolution: {integrity: sha512-WDRsyVN52eAx/lBamKD6uyw8H4228h/x0sGGGegOamM2cd7Pag88GfMQalobXI+HaEUxpCkbKQUDOQqt9wawRw==}
+  bare-events@2.9.1:
+    resolution: {integrity: sha512-Z0oHEHAFDZkffN8Qc39zNZjQlMDkPJRyyyZieU1VH7u8c5S+qHZ2S8ixdKIAxEjfHO7FJxXmJWgteOghVanIsg==}
+    peerDependencies:
+      bare-abort-controller: '*'
+    peerDependenciesMeta:
+      bare-abort-controller:
+        optional: true
+
+  bare-fs@4.7.2:
+    resolution: {integrity: sha512-aTvMFUWkBmjzKtEQMDGGDNF8bkfpD5N1b/FCwt7A3wrU4t1o/e/85Wzkluh6JlODCjqVESYCkQCdTXqZ9G7VFg==}
     engines: {bare: '>=1.16.0'}
     peerDependencies:
       bare-buffer: '*'
@@ -7522,8 +7530,8 @@ packages:
     resolution: {integrity: sha512-6M5XjcnsygQNPMCMPXSK379xrJFiZ/AEMNBmFEmQW8d/789VQATvriyi5r0HYTL9TkQ26rn3kgdTG3aisbrXkQ==}
     engines: {bare: '>=1.14.0'}
 
-  bare-path@3.0.0:
-    resolution: {integrity: sha512-tyfW2cQcB5NN8Saijrhqn0Zh7AnFNsnczRcuWODH0eYAXBsJ5gVxAUuNr7tsHSC6IZ77cA0SitzT+s47kot8Mw==}
+  bare-path@3.0.1:
+    resolution: {integrity: sha512-ghj2DSK/2e99a1anTVPCV4m4YIYtrbXhfM7V3D7XZLOTsybnYyaJloymGqssQc8l/or0UoDyRtNQkmkEF/ysgQ==}
 
   bare-stream@2.13.1:
     resolution: {integrity: sha512-Vp0cnjYyrEC4whYTymQ+YZi6pBpfiICZO3cfRG8sy67ZNWe951urv1x4eW1BKNngw3U+3fPYb5JQvHbCtxH7Ow==}
@@ -8682,6 +8690,9 @@ packages:
   dayjs@1.11.20:
     resolution: {integrity: sha512-YbwwqR/uYpeoP4pu043q+LTDLFBLApUP6VxRihdfNTqu4ubqMlGDLd6ErXhEgsyvY0K6nCs7nggYumAN+9uEuQ==}
 
+  dayjs@1.11.21:
+    resolution: {integrity: sha512-98IT+HOahAisibz/yjKbzuOBwYcjJ7BCLPzARyHiyEBmRz4fatF+KPJszEHXsGYjUG234aH/cOjW1wwTbKUZlA==}
+
   de-indent@1.0.2:
     resolution: {integrity: sha512-e/1zu3xH5MQryN2zdVaF0OrdNLUbvWxzMbi+iNA6Bky7l1RoP8a2fIbRocyHclXt/arDrrR6lL3TqFD9pMQTsg==}
 
@@ -8964,8 +8975,8 @@ packages:
     resolution: {integrity: sha512-cgwlv/1iFQiFnU96XXgROh8xTeetsnJiDsTc7TYCLFd9+/WNkIqPTxiM/8pSd8VIrhXGTf1Ny1q1hquVqDJB5w==}
     engines: {node: '>= 4'}
 
-  dompurify@3.4.2:
-    resolution: {integrity: sha512-lHeS9SA/IKeIFFyYciHBr2n0v1VMPlSj843HdLOwjb2OxNwdq9Xykxqhk+FE42MzAdHvInbAolSE4mhahPpjXA==}
+  dompurify@3.4.7:
+    resolution: {integrity: sha512-2jBxDJY4RR06tQNy4w5FlFH7kfxsQZlufd0sbv+chfHCxeJwrFw2baUDsSwvBISD4K4RDbd0PTfy3uNXsR6siA==}
 
   domutils@2.8.0:
     resolution: {integrity: sha512-w96Cjofp72M5IIhpjgobBimYEfoPjx1Vx0BSX9P30WBdZW2WIKU0T1Bd0kz2eNZ9ikjKgHbEyKx8BB6H1L3h3A==}
@@ -9224,6 +9235,9 @@ packages:
 
   es-toolkit@1.46.1:
     resolution: {integrity: sha512-5eNtXOs3tbfxXOj04tjjseeWkRWaoCjdEI+96DgwzZoe6c9juL49pXlzAFTI72aWC9Y8p7168g6XIKjh7k6pyQ==}
+
+  es-toolkit@1.47.0:
+    resolution: {integrity: sha512-n1GuoD0WEQZMBk5tttoZSqwgyLx01oqa5XsBmCHwPyNe1S9jPBEmtR2pSgp2kJuWE3ciFZ6yRHmY4pM4C3OOkw==}
 
   es5-ext@0.10.64:
     resolution: {integrity: sha512-p2snDhiLaXe6dahss1LddxqEm+SkuDvV8dnIQG0MWjyHpcMNfXKPE+/Cc0y+PhxJX3A4xGNeFCj5oc0BUh6deg==}
@@ -11173,6 +11187,10 @@ packages:
     resolution: {integrity: sha512-qQKT4zQxXl8lLwBtHMWwaTcGfFOZviOJet3Oy/xmGk2gZH677CJM9EvtfdSkgWcATZhj/55JZ0rmy3myCT5lsA==}
     hasBin: true
 
+  js-yaml@4.2.0:
+    resolution: {integrity: sha512-ePWsvanv0DWuDRsW8dnt+R4jQ31SCRCQ7hhNcPXZPsoBZiemuZNYGf7adZdqX2D86j6rvKp3RpCxVTSb8WQlOw==}
+    hasBin: true
+
   jsbn@0.1.1:
     resolution: {integrity: sha512-UVU9dibq2JcFWxQPA6KCqj5O42VOmAY3zQUfEKxU0KpTGXwNoCjkX1e13eHNvw/xPynt6pU0rZ1htjWTNTSXsg==}
 
@@ -12321,6 +12339,11 @@ packages:
   nanoid@3.3.12:
     resolution: {integrity: sha512-ZB9RH/39qpq5Vu6Y+NmUaFhQR6pp+M2Xt76XBnEwDaGcVAqhlvxrl3B2bKS5D3NH3QR76v3aSrKaF/Kiy7lEtQ==}
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
+    hasBin: true
+
+  nanoid@5.1.11:
+    resolution: {integrity: sha512-v+KEsUv2ps74PaSKv0gHTxTCgMXOIfBEbaqa6w6ISIGC7ZsvHN4N9oJ8d4cmf0n5oTzQz2SLmThbQWhjd/8eKg==}
+    engines: {node: ^18 || >=20}
     hasBin: true
 
   nanoid@5.1.9:
@@ -13704,8 +13727,8 @@ packages:
   react-is@18.3.1:
     resolution: {integrity: sha512-/LLMVyas0ljjAtoYiPqYiL8VWXzUUdThrmU5+n20DZv+a+ClRoevUzw5JxU+Ieh5/c87ytoTBV9G1FiKfNJdmg==}
 
-  react-is@19.2.6:
-    resolution: {integrity: sha512-XjBR15BhXuylgWGuslhDKqlSayuqvqBX91BP8pauG8kd1zY8kotkNWbXksTCNRarse4kuGbe2kIY05ARtwNIvw==}
+  react-is@19.2.7:
+    resolution: {integrity: sha512-kZFnouyVv7eP/Phmrlo9FK+zcAdriZJvzxXHF1Sl1P377WSGe2G/JxVolhTrB/jeV47lKImhNUsijjHAAbcl/A==}
 
   react-markdown@10.1.0:
     resolution: {integrity: sha512-qKxVopLT/TyA6BX3Ue5NwabOsAzm0Q7kAPwq6L+wWDwisYs7R8vZ0nRXqq6rkueboxpkjvLGU9fWifiX/ZZFxQ==}
@@ -14989,8 +15012,8 @@ packages:
   swagger-schema-official@2.0.0-bab6bed:
     resolution: {integrity: sha512-rCC0NWGKr/IJhtRuPq/t37qvZHI/mH4I4sxflVM+qgVe5Z2uOCivzWaVbuioJaB61kvm5UvB7b49E+oBY0M8jA==}
 
-  swagger-typescript-api@13.10.0:
-    resolution: {integrity: sha512-E45a1DLPfJQnM14+lAl6SiWs6EQ0Xj6XRDaygzu68aBT7swcRI1j5xyEfbYvduzZGr+DdYTaMMoq6+YynK2PEg==}
+  swagger-typescript-api@13.12.0:
+    resolution: {integrity: sha512-tE9bHjN3luZeVJEitha7R7PSgYRjPa7+G1491MMVZxkmnUaOZspHg/G9+++OsY3+S6pz4v1aiLPt4mwsyRjZgg==}
     engines: {node: '>=20'}
     hasBin: true
 
@@ -15222,6 +15245,10 @@ packages:
 
   tinyglobby@0.2.16:
     resolution: {integrity: sha512-pn99VhoACYR8nFHhxqix+uvsbXineAasWm5ojXoN8xEwK5Kd3/TrhNn1wByuD52UxWRLy8pu+kRMniEi6Eq9Zg==}
+    engines: {node: '>=12.0.0'}
+
+  tinyglobby@0.2.17:
+    resolution: {integrity: sha512-wXR/dYpcqKmfWpEdZjiKJOwCNFndD0DMnrW/cYjVGttEkBfVgcLFHoNrlj47mjOVic9yyNu65alsgF4NQyTa2g==}
     engines: {node: '>=12.0.0'}
 
   tinyrainbow@3.1.0:
@@ -15476,6 +15503,10 @@ packages:
 
   type-fest@5.6.0:
     resolution: {integrity: sha512-8ZiHFm91orbSAe2PSAiSVBVko18pbhbiB3U9GglSzF/zCGkR+rxpHx6sEMCUm4kxY4LjDIUGgCfUMtwfZfjfUA==}
+    engines: {node: '>=20'}
+
+  type-fest@5.7.0:
+    resolution: {integrity: sha512-1URUxUqfHFM1c+zfSPsa3gnkO7Aq21qyH75SIduNYz4SzY964rn1X2vCMQaHSHhktiw+0kPa2iyb6PUpXqB6Vg==}
     engines: {node: '>=20'}
 
   type-is@1.6.18:
@@ -16759,12 +16790,12 @@ snapshots:
     dependencies:
       '@jsdevtools/ono': 7.1.3
       '@types/json-schema': 7.0.15
-      js-yaml: 4.1.1
+      js-yaml: 4.2.0
 
   '@apidevtools/json-schema-ref-parser@14.0.1':
     dependencies:
       '@types/json-schema': 7.0.15
-      js-yaml: 4.1.1
+      js-yaml: 4.2.0
 
   '@apidevtools/openapi-schemas@2.1.0': {}
 
@@ -18317,11 +18348,11 @@ snapshots:
   '@biomejs/cli-win32-x64@2.4.15':
     optional: true
 
-  '@biomejs/js-api@4.0.0(@biomejs/wasm-nodejs@2.4.15)':
+  '@biomejs/js-api@4.0.0(@biomejs/wasm-nodejs@2.4.16)':
     optionalDependencies:
-      '@biomejs/wasm-nodejs': 2.4.15
+      '@biomejs/wasm-nodejs': 2.4.16
 
-  '@biomejs/wasm-nodejs@2.4.15': {}
+  '@biomejs/wasm-nodejs@2.4.16': {}
 
   '@borewit/text-codec@0.2.2': {}
 
@@ -18884,7 +18915,7 @@ snapshots:
 
   '@eslint/eslintrc@3.3.5':
     dependencies:
-      ajv: 6.14.0
+      ajv: 6.15.0
       debug: 4.4.3
       espree: 10.4.0
       globals: 14.0.0
@@ -19679,7 +19710,7 @@ snapshots:
       cli-high: 0.4.3
       diff: 5.2.2
       effect: 3.21.2
-      nanoid: 5.1.9
+      nanoid: 5.1.11
       recast: 0.23.11
       xycolors: 0.1.2
 
@@ -22855,7 +22886,7 @@ snapshots:
       circuit-json-to-connectivity-map: 0.0.23(typescript@6.0.3)
       css-select: 5.1.0
       format-si-unit: 0.0.3(typescript@6.0.3)
-      nanoid: 5.1.9
+      nanoid: 5.1.11
       performance-now: 2.1.0
       react-reconciler: 0.32.0(react@19.2.6)
       schematic-symbols: 0.0.208(typescript@6.0.3)
@@ -23778,7 +23809,7 @@ snapshots:
     dependencies:
       '@bcoe/v8-coverage': 1.0.2
       '@vitest/utils': 4.1.5
-      ast-v8-to-istanbul: 1.0.2
+      ast-v8-to-istanbul: 1.0.3
       istanbul-lib-coverage: 3.2.2
       istanbul-lib-report: 3.0.1
       istanbul-reports: 3.2.0
@@ -23880,7 +23911,7 @@ snapshots:
       flatted: 3.4.2
       pathe: 2.0.3
       sirv: 3.0.2
-      tinyglobby: 0.2.16
+      tinyglobby: 0.2.17
       tinyrainbow: 3.1.0
       vitest: 4.1.5(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/coverage-v8@4.1.5)(@vitest/ui@4.1.5)(happy-dom@20.9.0)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.13(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(less@4.5.1)(sass-embedded@1.100.0)(sass@1.100.0)(stylus@0.64.0)(terser@5.48.0)(tsx@4.22.3)(yaml@2.9.0))
     optional: true
@@ -23936,27 +23967,27 @@ snapshots:
       path-browserify: 1.0.1
       vscode-uri: 3.1.0
 
-  '@vue/compiler-core@3.5.34':
+  '@vue/compiler-core@3.5.35':
     dependencies:
       '@babel/parser': 7.29.7
-      '@vue/shared': 3.5.34
+      '@vue/shared': 3.5.35
       entities: 7.0.1
       estree-walker: 2.0.2
       source-map-js: 1.2.1
     optional: true
 
-  '@vue/compiler-dom@3.5.34':
+  '@vue/compiler-dom@3.5.35':
     dependencies:
-      '@vue/compiler-core': 3.5.34
-      '@vue/shared': 3.5.34
+      '@vue/compiler-core': 3.5.35
+      '@vue/shared': 3.5.35
     optional: true
 
   '@vue/language-core@1.8.27(typescript@6.0.3)':
     dependencies:
       '@volar/language-core': 1.11.1
       '@volar/source-map': 1.11.1
-      '@vue/compiler-dom': 3.5.34
-      '@vue/shared': 3.5.34
+      '@vue/compiler-dom': 3.5.35
+      '@vue/shared': 3.5.35
       computeds: 0.0.1
       minimatch: 9.0.9
       muggle-string: 0.3.1
@@ -23966,7 +23997,7 @@ snapshots:
       typescript: 6.0.3
     optional: true
 
-  '@vue/shared@3.5.34':
+  '@vue/shared@3.5.35':
     optional: true
 
   '@webassemblyjs/ast@1.14.1':
@@ -24546,7 +24577,7 @@ snapshots:
       estree-walker: 3.0.3
       js-tokens: 10.0.0
 
-  ast-v8-to-istanbul@1.0.2:
+  ast-v8-to-istanbul@1.0.3:
     dependencies:
       '@jridgewell/trace-mapping': 0.3.31
       estree-walker: 3.0.3
@@ -24829,7 +24860,7 @@ snapshots:
 
   balena-settings-client@6.0.3:
     dependencies:
-      es-toolkit: 1.46.1
+      es-toolkit: 1.47.0
       hidepath: 1.0.1
       home-or-tmp: 2.0.0
       js-yaml: 3.14.2
@@ -24848,11 +24879,13 @@ snapshots:
 
   bare-events@2.8.3: {}
 
-  bare-fs@4.7.1:
+  bare-events@2.9.1: {}
+
+  bare-fs@4.7.2:
     dependencies:
-      bare-events: 2.8.3
-      bare-path: 3.0.0
-      bare-stream: 2.13.1(bare-events@2.8.3)
+      bare-events: 2.9.1
+      bare-path: 3.0.1
+      bare-stream: 2.13.1(bare-events@2.9.1)
       bare-url: 2.4.3
       fast-fifo: 1.3.2
     transitivePeerDependencies:
@@ -24861,22 +24894,22 @@ snapshots:
 
   bare-os@3.9.1: {}
 
-  bare-path@3.0.0:
+  bare-path@3.0.1:
     dependencies:
       bare-os: 3.9.1
 
-  bare-stream@2.13.1(bare-events@2.8.3):
+  bare-stream@2.13.1(bare-events@2.9.1):
     dependencies:
       streamx: 2.26.0
       teex: 1.0.1
     optionalDependencies:
-      bare-events: 2.8.3
+      bare-events: 2.9.1
     transitivePeerDependencies:
       - react-native-b4a
 
   bare-url@2.4.3:
     dependencies:
-      bare-path: 3.0.0
+      bare-path: 3.0.1
 
   base-x@3.0.11:
     dependencies:
@@ -25860,7 +25893,7 @@ snapshots:
   cosmiconfig@8.3.6(typescript@6.0.3):
     dependencies:
       import-fresh: 3.3.1
-      js-yaml: 4.1.1
+      js-yaml: 4.2.0
       parse-json: 5.2.0
       path-type: 4.0.0
     optionalDependencies:
@@ -25870,7 +25903,7 @@ snapshots:
     dependencies:
       env-paths: 2.2.1
       import-fresh: 3.3.1
-      js-yaml: 4.1.1
+      js-yaml: 4.2.0
       parse-json: 5.2.0
     optionalDependencies:
       typescript: 6.0.3
@@ -26161,6 +26194,8 @@ snapshots:
 
   dayjs@1.11.20: {}
 
+  dayjs@1.11.21: {}
+
   de-indent@1.0.2:
     optional: true
 
@@ -26436,7 +26471,7 @@ snapshots:
     dependencies:
       domelementtype: 2.3.0
 
-  dompurify@3.4.2:
+  dompurify@3.4.7:
     optionalDependencies:
       '@types/trusted-types': 2.0.7
 
@@ -26467,7 +26502,7 @@ snapshots:
 
   dotenv-expand@12.0.3:
     dependencies:
-      dotenv: 16.4.7
+      dotenv: 16.6.1
 
   dotenv@16.4.7: {}
 
@@ -26809,6 +26844,8 @@ snapshots:
   es-toolkit@1.46.0: {}
 
   es-toolkit@1.46.1: {}
+
+  es-toolkit@1.47.0: {}
 
   es5-ext@0.10.64:
     dependencies:
@@ -29255,6 +29292,10 @@ snapshots:
     dependencies:
       argparse: 2.0.1
 
+  js-yaml@4.2.0:
+    dependencies:
+      argparse: 2.0.1
+
   jsbn@0.1.1: {}
 
   jscad-electronics@0.0.129(@jscad/modeling@2.13.0)(@tscircuit/alphabet@0.0.25(typescript@6.0.3))(@tscircuit/footprinter@0.0.357(circuit-json@0.0.425)(typescript@6.0.3))(circuit-json@0.0.425)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(three@0.179.1):
@@ -31050,6 +31091,8 @@ snapshots:
 
   nanoid@3.3.12: {}
 
+  nanoid@5.1.11: {}
+
   nanoid@5.1.9: {}
 
   napi-build-utils@2.0.0: {}
@@ -32347,7 +32390,7 @@ snapshots:
       '@jest/schemas': 30.4.1
       ansi-styles: 5.2.0
       react-is-18: react-is@18.3.1
-      react-is-19: react-is@19.2.6
+      react-is-19: react-is@19.2.7
 
   pretty-ms@8.0.0:
     dependencies:
@@ -32673,7 +32716,7 @@ snapshots:
 
   react-is@18.3.1: {}
 
-  react-is@19.2.6: {}
+  react-is@19.2.7: {}
 
   react-markdown@10.1.0(@types/react@19.2.15)(react@19.2.6):
     dependencies:
@@ -32858,7 +32901,7 @@ snapshots:
       tiny-invariant: 1.3.3
       tslib: 2.8.1
 
-  recharts@3.8.1(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react-is@19.2.6)(react@19.2.6)(redux@5.0.1):
+  recharts@3.8.1(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react-is@19.2.7)(react@19.2.6)(redux@5.0.1):
     dependencies:
       '@reduxjs/toolkit': 2.11.2(react-redux@9.2.0(@types/react@19.2.15)(react@19.2.6)(redux@5.0.1))(react@19.2.6)
       clsx: 2.1.1
@@ -32868,7 +32911,7 @@ snapshots:
       immer: 10.2.0
       react: 19.2.6
       react-dom: 19.2.6(react@19.2.6)
-      react-is: 19.2.6
+      react-is: 19.2.7
       react-redux: 9.2.0(@types/react@19.2.15)(react@19.2.6)(redux@5.0.1)
       reselect: 5.1.1
       tiny-invariant: 1.3.3
@@ -34236,22 +34279,22 @@ snapshots:
 
   swagger-schema-official@2.0.0-bab6bed: {}
 
-  swagger-typescript-api@13.10.0(encoding@0.1.13)(magicast@0.3.5)(react@19.2.6):
+  swagger-typescript-api@13.12.0(encoding@0.1.13)(magicast@0.3.5)(react@19.2.6):
     dependencies:
       '@apidevtools/swagger-parser': 12.1.0(openapi-types@12.1.3)
-      '@biomejs/js-api': 4.0.0(@biomejs/wasm-nodejs@2.4.15)
-      '@biomejs/wasm-nodejs': 2.4.15
+      '@biomejs/js-api': 4.0.0(@biomejs/wasm-nodejs@2.4.16)
+      '@biomejs/wasm-nodejs': 2.4.16
       '@types/swagger-schema-official': 2.0.25
       c12: 3.3.4(magicast@0.3.5)
       citty: 0.2.2
       consola: 3.4.2
-      es-toolkit: 1.46.1
+      es-toolkit: 1.47.0
       eta: 3.5.0
-      nanoid: 5.1.9
+      nanoid: 5.1.11
       openapi-types: 12.1.3
       swagger-schema-official: 2.0.0-bab6bed
       swagger2openapi: 7.0.8(encoding@0.1.13)
-      type-fest: 5.6.0
+      type-fest: 5.7.0
       typescript: 6.0.3
       yaml: 2.9.0
       yummies: 7.19.4(react@19.2.6)
@@ -34333,8 +34376,8 @@ snapshots:
       pump: 3.0.4
       tar-stream: 3.2.0
     optionalDependencies:
-      bare-fs: 4.7.1
-      bare-path: 3.0.0
+      bare-fs: 4.7.2
+      bare-path: 3.0.1
     transitivePeerDependencies:
       - bare-abort-controller
       - bare-buffer
@@ -34370,7 +34413,7 @@ snapshots:
   tar-stream@3.2.0:
     dependencies:
       b4a: 1.8.1
-      bare-fs: 4.7.1
+      bare-fs: 4.7.2
       fast-fifo: 1.3.2
       streamx: 2.26.0
     transitivePeerDependencies:
@@ -34514,6 +34557,12 @@ snapshots:
     dependencies:
       fdir: 6.5.0(picomatch@4.0.4)
       picomatch: 4.0.4
+
+  tinyglobby@0.2.17:
+    dependencies:
+      fdir: 6.5.0(picomatch@4.0.4)
+      picomatch: 4.0.4
+    optional: true
 
   tinyrainbow@3.1.0: {}
 
@@ -34817,6 +34866,10 @@ snapshots:
   type-fest@4.41.0: {}
 
   type-fest@5.6.0:
+    dependencies:
+      tagged-tag: 1.0.0
+
+  type-fest@5.7.0:
     dependencies:
       tagged-tag: 1.0.0
 
@@ -36119,9 +36172,9 @@ snapshots:
     dependencies:
       class-variance-authority: 0.7.1
       clsx: 2.1.1
-      dayjs: 1.11.20
-      dompurify: 3.4.2
-      nanoid: 5.1.9
+      dayjs: 1.11.21
+      dompurify: 3.4.7
+      nanoid: 5.1.11
       tailwind-merge: 3.6.0
     optionalDependencies:
       react: 19.2.6
@@ -36154,4 +36207,4 @@ snapshots:
   zxing-wasm@2.2.4(@types/emscripten@1.40.1):
     dependencies:
       '@types/emscripten': 1.40.1
-      type-fest: 5.6.0
+      type-fest: 5.7.0

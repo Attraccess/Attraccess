@@ -1,18 +1,21 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, MoreThan, Not, Repository } from 'typeorm';
 import {
   Conversation,
   ConversationParticipant,
   Message,
   MessageReferenceType,
+  NotificationPreference,
   Resource,
   User,
 } from '@attraccess/database-entities';
 import { ResourceUsageService } from '../resources/usage/resourceUsage.service';
 import { MessageCreatedEvent } from './events/message-created.event';
 import { ConversationListItemDto } from './dtos/conversationListItem.dto';
+import { NotificationPreferenceDto } from './dtos/notificationPreference.dto';
+import { UpdateNotificationPreferenceDto } from './dtos/updateNotificationPreference.dto';
 
 export interface MessageReference {
   referenceType: MessageReferenceType;
@@ -32,6 +35,8 @@ export class MessagingService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(Resource)
     private readonly resourceRepository: Repository<Resource>,
+    @InjectRepository(NotificationPreference)
+    private readonly notificationPreferenceRepository: Repository<NotificationPreference>,
     private readonly dataSource: DataSource,
     private readonly resourceUsageService: ResourceUsageService,
     private readonly eventEmitter: EventEmitter2,
@@ -148,6 +153,7 @@ export class MessagingService {
           otherParticipant: await this.resolveOtherParticipant(participation.conversationId, userId),
           lastMessage,
           updatedAt: participation.conversation.updatedAt,
+          unreadCount: await this.countUnread(participation.conversationId, userId, participation.lastReadAt),
         };
       }),
     );
@@ -156,6 +162,32 @@ export class MessagingService {
       const aTime = a.lastMessage?.createdAt?.getTime() ?? a.updatedAt.getTime();
       const bTime = b.lastMessage?.createdAt?.getTime() ?? b.updatedAt.getTime();
       return bTime - aTime;
+    });
+  }
+
+  public async markConversationRead(conversationId: number, userId: number): Promise<number> {
+    await this.assertParticipant(conversationId, userId);
+    await this.participantRepository.update({ conversationId, userId }, { lastReadAt: new Date() });
+    return this.getTotalUnreadCount(userId);
+  }
+
+  public async getTotalUnreadCount(userId: number): Promise<number> {
+    const participations = await this.participantRepository.find({ where: { userId } });
+    const counts = await Promise.all(
+      participations.map((participation) =>
+        this.countUnread(participation.conversationId, userId, participation.lastReadAt),
+      ),
+    );
+    return counts.reduce((total, count) => total + count, 0);
+  }
+
+  private async countUnread(conversationId: number, userId: number, lastReadAt: Date | null): Promise<number> {
+    return this.messageRepository.count({
+      where: {
+        conversationId,
+        senderId: Not(userId),
+        ...(lastReadAt ? { createdAt: MoreThan(lastReadAt) } : {}),
+      },
     });
   }
 
@@ -193,5 +225,30 @@ export class MessagingService {
     if (!participant) {
       throw new ForbiddenException('You are not a participant of this conversation');
     }
+  }
+
+  public async getNotificationPreference(userId: number): Promise<NotificationPreferenceDto> {
+    const preference = await this.notificationPreferenceRepository.findOne({ where: { userId } });
+    return { messagesEmailOnOffline: preference?.messagesEmailOnOffline ?? true };
+  }
+
+  public async updateNotificationPreference(
+    userId: number,
+    dto: UpdateNotificationPreferenceDto,
+  ): Promise<NotificationPreferenceDto> {
+    const existing = await this.notificationPreferenceRepository.findOne({ where: { userId } });
+    const preference =
+      existing ?? this.notificationPreferenceRepository.create({ userId, messagesEmailOnOffline: true });
+
+    if (dto.messagesEmailOnOffline !== undefined) {
+      preference.messagesEmailOnOffline = dto.messagesEmailOnOffline;
+    }
+
+    const saved = await this.notificationPreferenceRepository.save(preference);
+    return { messagesEmailOnOffline: saved.messagesEmailOnOffline };
+  }
+
+  public async shouldEmailMessageOnOffline(userId: number): Promise<boolean> {
+    return (await this.getNotificationPreference(userId)).messagesEmailOnOffline;
   }
 }

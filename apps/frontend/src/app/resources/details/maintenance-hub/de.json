@@ -39,6 +39,13 @@
     "actions": {
       "create": "Neue Wartung"
     },
+    "requests": {
+      "label": "Wartungsanfragen",
+      "reportedBy": "Gemeldet von {{name}}",
+      "someone": "einem Nutzer",
+      "convert": "Wartung starten",
+      "dismiss": "Ablehnen"
+    },
     "live": {
       "label": "Läuft gerade",
       "count": "{{count}} laufend",

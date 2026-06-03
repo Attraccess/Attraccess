@@ -21,7 +21,10 @@ import newGithubIssueUrl from 'new-github-issue-url';
 import { useAuth } from '../../hooks/useAuth';
 import { getBaseUrl } from '../../api';
 import { useNow } from '../../hooks/useNow';
-import { useLicenseServiceGetLicenseInformation } from '@attraccess/react-query-client';
+import {
+  useLicenseServiceGetLicenseInformation,
+  useMessagingServiceMessagingGetUnreadCount,
+} from '@attraccess/react-query-client';
 import { useMemo } from 'react';
 import de from './sidebarItems.de.json';
 import en from './sidebarItems.en.json';
@@ -35,6 +38,7 @@ export type SidebarItem = {
   isExternal?: boolean;
   isGroup?: false;
   licenseModule?: string;
+  badgeCount?: number;
 };
 
 export type SidebarItemGroup = {
@@ -47,6 +51,7 @@ export type SidebarItemGroup = {
 
 export function useSidebarItems(): (SidebarItem | SidebarItemGroup)[] {
   const { data: license } = useLicenseServiceGetLicenseInformation();
+  const { data: unread } = useMessagingServiceMessagingGetUnreadCount();
 
   const allItems = useMemo(() => {
     // Resources group
@@ -65,6 +70,7 @@ export function useSidebarItems(): (SidebarItem | SidebarItemGroup)[] {
         translationKey: 'messages',
         path: '/messages',
         icon: MessageSquareIcon,
+        badgeCount: unread?.total,
       },
     ];
 
@@ -132,7 +138,7 @@ export function useSidebarItems(): (SidebarItem | SidebarItemGroup)[] {
     items.push(systemGroup);
 
     return items;
-  }, []);
+  }, [unread?.total]);
 
   return useMemo(() => {
     if (!license) {

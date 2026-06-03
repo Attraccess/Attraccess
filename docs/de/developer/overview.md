@@ -55,6 +55,8 @@ Flags:
 
 Der Vite-Dev-Proxy wird automatisch auf den vom Launcher gewählten API-Port konfiguriert.
 
+Die ermittelten Ports werden außerdem in `.dev-serve-ports.json` im Repo-Stammverzeichnis geschrieben (gitignored, beim Beenden entfernt). Lies diese Datei, um die aktuellen Ports zu finden, ohne das Start-Banner zu parsen — z. B. `cat .dev-serve-ports.json | jq -r '.frontend.url'`.
+
 ## Entwicklungsablauf
 
 1. Erstellen Sie einen Feature-Branch von `main`

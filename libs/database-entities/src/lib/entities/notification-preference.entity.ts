@@ -1,0 +1,29 @@
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, Index } from 'typeorm';
+import { ApiProperty } from '@nestjs/swagger';
+import { User } from './user.entity';
+
+@Entity()
+@Index(['userId'], { unique: true })
+export class NotificationPreference {
+  @PrimaryGeneratedColumn()
+  @ApiProperty({ description: 'The unique identifier of the notification preference entry', example: 1 })
+  id!: number;
+
+  @Column({ type: 'integer' })
+  @ApiProperty({ description: 'The ID of the user these preferences belong to', example: 1 })
+  userId!: number;
+
+  @Column({ type: 'boolean', default: true })
+  @ApiProperty({
+    description:
+      'Whether to send an email fallback when a direct message arrives while the user is offline. Defaults to true (opt-out).',
+    example: true,
+    default: true,
+  })
+  messagesEmailOnOffline!: boolean;
+
+  @ManyToOne(() => User, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'userId' })
+  @ApiProperty({ description: 'The user these preferences belong to', type: () => User })
+  user!: User;
+}
