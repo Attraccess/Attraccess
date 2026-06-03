@@ -85,6 +85,13 @@ VITE_PORT=4250 pnpm serve         # Frontend on 4250
 
 The frontend dev proxy automatically targets whichever port the API resolved to (via `VITE_API_PROXY_TARGET`).
 
+The resolved ports are also written to `.dev-serve-ports.json` at the repo root (gitignored, deleted on exit), so you can look them up without reading the banner:
+
+```bash
+cat .dev-serve-ports.json
+# { "pid": 12345, "api": {...}, "frontend": {...}, "preview": {...} }
+```
+
 ## API Documentation
 
 Swagger documentation is available at `/api` when the server is running.

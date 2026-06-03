@@ -2,6 +2,8 @@
 // FEATURE: dev-server-port-isolation
 
 import { spawn } from 'node:child_process';
+import { writeFileSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
 import { findFreePort, isPortFree } from './lib/find-free-port.mts';
 
 type Target = 'api' | 'frontend' | 'both';
@@ -10,6 +12,26 @@ interface Resolved {
   apiPort?: number;
   frontendPort?: number;
   previewPort?: number;
+}
+
+const PORTS_FILE = join(process.cwd(), '.dev-serve-ports.json');
+
+function url(port: number): string {
+  return `http://localhost:${port}`;
+}
+
+function writePortsFile(r: Resolved): void {
+  const payload = {
+    pid: process.pid,
+    api: r.apiPort !== undefined ? { port: r.apiPort, url: url(r.apiPort) } : undefined,
+    frontend: r.frontendPort !== undefined ? { port: r.frontendPort, url: url(r.frontendPort) } : undefined,
+    preview: r.previewPort !== undefined ? { port: r.previewPort, url: url(r.previewPort) } : undefined,
+  };
+  writeFileSync(PORTS_FILE, `${JSON.stringify(payload, null, 2)}\n`);
+}
+
+function removePortsFile(): void {
+  rmSync(PORTS_FILE, { force: true });
 }
 
 function parseArgs(argv: string[]): { only: Target; passthroughArgs: string[] } {
@@ -88,6 +110,8 @@ async function main() {
   }
 
   console.log(banner(resolved));
+  writePortsFile(resolved);
+  process.on('exit', removePortsFile);
 
   const projects = only === 'both' ? 'api,frontend' : only;
   const child = spawn(
@@ -104,6 +128,7 @@ async function main() {
 
   child.on('exit', (code, signal) => {
     if (signal) {
+      removePortsFile();
       process.removeAllListeners('SIGINT');
       process.removeAllListeners('SIGTERM');
       process.kill(process.pid, signal);
