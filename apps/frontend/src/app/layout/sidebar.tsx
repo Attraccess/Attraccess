@@ -3,8 +3,8 @@ import { X, Settings, LogOut, User, ExternalLink, Languages, Check } from 'lucid
 import { useAuth } from '../../hooks/useAuth';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
-  Badge,
   Button,
+  Chip,
   Dropdown,
   DropdownTrigger,
   DropdownMenu,
@@ -43,15 +43,12 @@ function NavLink({ href, label, icon, isExternal, target, indent, badgeCount, ..
   const resolvedTarget = target ?? (isExternal ? '_blank' : undefined);
   const paddingClass = indent ? 'pl-6 pr-2' : 'px-2';
   const className = `flex items-center ${paddingClass} py-2 rounded-md text-sm text-default-foreground no-underline hover:bg-default hover:text-default-foreground`;
-  const iconNode =
+  const badge =
     badgeCount && badgeCount > 0 ? (
-      <Badge color="accent" size="sm" placement="top-right" data-cy="sidebar-nav-badge">
-        <Badge.Anchor>{icon}</Badge.Anchor>
-        <Badge.Label>{badgeCount > 99 ? '99+' : badgeCount}</Badge.Label>
-      </Badge>
-    ) : (
-      icon
-    );
+      <Chip color="accent" variant="primary" size="sm" className="ml-2 shrink-0" data-cy="sidebar-nav-badge">
+        {badgeCount > 99 ? '99+' : badgeCount}
+      </Chip>
+    ) : null;
 
   if (isExternal) {
     return (
@@ -62,7 +59,7 @@ function NavLink({ href, label, icon, isExternal, target, indent, badgeCount, ..
         rel={resolvedTarget === '_blank' ? 'noreferrer' : undefined}
         className={className}
       >
-        <span className="mr-3">{iconNode}</span>
+        <span className="mr-3">{icon}</span>
         <span className="flex-1">{label}</span>
         <ExternalLink className="ml-2 mr-2 h-4 w-4" />
       </a>
@@ -71,8 +68,9 @@ function NavLink({ href, label, icon, isExternal, target, indent, badgeCount, ..
 
   return (
     <RouterLink {...rest} to={href} target={resolvedTarget} className={className}>
-      <span className="mr-3">{iconNode}</span>
+      <span className="mr-3">{icon}</span>
       <span className="flex-1">{label}</span>
+      {badge}
     </RouterLink>
   );
 }
