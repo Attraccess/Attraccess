@@ -1,0 +1,19 @@
+{
+  "trigger": "Report a problem",
+  "modal": {
+    "title": "Request maintenance",
+    "description": "Noticed something wrong with this resource? Let the maintainers know. They will be notified and decide whether to put it into maintenance.",
+    "reasonLabel": "What's wrong?",
+    "reasonPlaceholder": "e.g. The emergency stop button is stuck",
+    "cancel": "Cancel",
+    "submit": "Send request",
+    "close": "Close"
+  },
+  "success": {
+    "title": "Thanks for the heads-up",
+    "description": "The maintainers have been notified about this resource."
+  },
+  "error": {
+    "title": "Couldn't send request"
+  }
+}

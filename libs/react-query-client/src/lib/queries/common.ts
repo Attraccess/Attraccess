@@ -2,7 +2,7 @@
 
 import { UseQueryResult } from "@tanstack/react-query";
 import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, FlowVariablesService, LicenseService, MessagingService, MqttService, PasswordPolicyAdminService, PasswordPolicyService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceHealthService, ResourceMaintenanceSchedulesService, ResourceMaintenancesService, ResourcesService, SettingsService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
-import { EmailTemplateType, PasswordPolicyRole, PermissionFilter, ResourceIntroducerType } from "../requests/types.gen";
+import { EmailTemplateType, MaintenanceRequestStatus, PasswordPolicyRole, PermissionFilter, ResourceIntroducerType } from "../requests/types.gen";
 export type SystemServiceInfoDefaultResponse = Awaited<ReturnType<typeof SystemService.info>>;
 export type SystemServiceInfoQueryResult<TData = SystemServiceInfoDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useSystemServiceInfoKey = "SystemServiceInfo";
@@ -322,6 +322,15 @@ export const UseResourceMaintenancesServiceGetMaintenanceKeyFn = ({ maintenanceI
   maintenanceId: number;
   resourceId: number;
 }, queryKey?: Array<unknown>) => [useResourceMaintenancesServiceGetMaintenanceKey, ...(queryKey ?? [{ maintenanceId, resourceId }])];
+export type ResourceMaintenancesServiceListMaintenanceRequestsDefaultResponse = Awaited<ReturnType<typeof ResourceMaintenancesService.listMaintenanceRequests>>;
+export type ResourceMaintenancesServiceListMaintenanceRequestsQueryResult<TData = ResourceMaintenancesServiceListMaintenanceRequestsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useResourceMaintenancesServiceListMaintenanceRequestsKey = "ResourceMaintenancesServiceListMaintenanceRequests";
+export const UseResourceMaintenancesServiceListMaintenanceRequestsKeyFn = ({ limit, page, resourceId, status }: {
+  limit?: number | undefined;
+  page?: number | undefined;
+  resourceId: number;
+  status?: MaintenanceRequestStatus | undefined;
+}, queryKey?: Array<unknown>) => [useResourceMaintenancesServiceListMaintenanceRequestsKey, ...(queryKey ?? [{ limit, page, resourceId, status }])];
 export type ResourceMaintenanceSchedulesServiceFindMaintenanceSchedulesDefaultResponse = Awaited<ReturnType<typeof ResourceMaintenanceSchedulesService.findMaintenanceSchedules>>;
 export type ResourceMaintenanceSchedulesServiceFindMaintenanceSchedulesQueryResult<TData = ResourceMaintenanceSchedulesServiceFindMaintenanceSchedulesDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useResourceMaintenanceSchedulesServiceFindMaintenanceSchedulesKey = "ResourceMaintenanceSchedulesServiceFindMaintenanceSchedules";
@@ -633,6 +642,8 @@ export type AccessControlServiceResourceIntroducersGrantMutationResult = Awaited
 export type AccessControlServiceResourceIntroductionsGrantMutationResult = Awaited<ReturnType<typeof AccessControlService.resourceIntroductionsGrant>>;
 export type ResourceMaintenancesServiceCreateMaintenanceMutationResult = Awaited<ReturnType<typeof ResourceMaintenancesService.createMaintenance>>;
 export type ResourceMaintenancesServiceFinishMaintenanceMutationResult = Awaited<ReturnType<typeof ResourceMaintenancesService.finishMaintenance>>;
+export type ResourceMaintenancesServiceCreateMaintenanceRequestMutationResult = Awaited<ReturnType<typeof ResourceMaintenancesService.createMaintenanceRequest>>;
+export type ResourceMaintenancesServiceResolveMaintenanceRequestMutationResult = Awaited<ReturnType<typeof ResourceMaintenancesService.resolveMaintenanceRequest>>;
 export type ResourceMaintenanceSchedulesServiceCreateMaintenanceScheduleMutationResult = Awaited<ReturnType<typeof ResourceMaintenanceSchedulesService.createMaintenanceSchedule>>;
 export type BillingServiceCreateManualTransactionMutationResult = Awaited<ReturnType<typeof BillingService.createManualTransaction>>;
 export type BillingServiceUpdateResourceBillingConfigurationMutationResult = Awaited<ReturnType<typeof BillingService.updateResourceBillingConfiguration>>;

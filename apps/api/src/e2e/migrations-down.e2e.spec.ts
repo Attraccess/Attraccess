@@ -48,6 +48,8 @@ import {
   ResourceIntroductionHistoryItem,
   ResourceIntroducer,
   ResourceMaintenance,
+  ResourceMaintenanceRequest,
+  MaintenanceRequestStatus,
   ResourceHealthSource,
   ResourceHealthState,
   ResourceHealthStatus,
@@ -315,6 +317,17 @@ const seedDatabase = async (dataSource: DataSource) => {
     startTime: new Date(),
     endTime: null,
     reason: 'Seed maintenance',
+  }));
+
+  const resourceMaintenanceRequestRepo = dataSource.getRepository(ResourceMaintenanceRequest);
+  await ensureEntity(resourceMaintenanceRequestRepo, () => ({
+    resourceId: resource.id,
+    reason: 'Seed maintenance request',
+    status: MaintenanceRequestStatus.OPEN,
+    createdByUser: { id: primaryUser.id },
+    resolvedByUser: null,
+    resolvedAt: null,
+    resultingMaintenance: null,
   }));
 
   const resourceHealthRepo = dataSource.getRepository(ResourceHealthState);

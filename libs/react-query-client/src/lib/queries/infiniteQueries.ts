@@ -2,7 +2,7 @@
 
 import { InfiniteData, useInfiniteQuery, UseInfiniteQueryOptions } from "@tanstack/react-query";
 import { BillingService, MessagingService, ProjectsService, ResourceFlowsService, ResourceMaintenancesService, ResourcesService, UsersService } from "../requests/services.gen";
-import { PermissionFilter } from "../requests/types.gen";
+import { MaintenanceRequestStatus, PermissionFilter } from "../requests/types.gen";
 import * as Common from "./common";
 /**
 * Get a paginated list of users
@@ -105,6 +105,26 @@ export const useResourceMaintenancesServiceFindMaintenancesInfinite = <TData = I
   resourceId: number;
 }, queryKey?: TQueryKey, options?: Omit<UseInfiniteQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useInfiniteQuery({
   queryKey: Common.UseResourceMaintenancesServiceFindMaintenancesKeyFn({ includeActive, includePast, includeUpcoming, limit, resourceId }, queryKey), queryFn: ({ pageParam }) => ResourceMaintenancesService.findMaintenances({ includeActive, includePast, includeUpcoming, limit, page: pageParam as number, resourceId }) as TData, initialPageParam: 1, getNextPageParam: response => (response as {
+    nextPage: number;
+  }).nextPage, ...options
+});
+/**
+* List maintenance requests for a resource
+* Retrieve paginated maintenance requests. Only maintenance users can call this.
+* @param data The data for the request.
+* @param data.resourceId The ID of the resource
+* @param data.page Page number for pagination
+* @param data.limit Number of items per page
+* @param data.status Filter by request status (defaults to open requests only)
+* @returns PaginatedMaintenanceRequestResponse Requests retrieved
+* @throws ApiError
+*/
+export const useResourceMaintenancesServiceListMaintenanceRequestsInfinite = <TData = InfiniteData<Common.ResourceMaintenancesServiceListMaintenanceRequestsDefaultResponse>, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ limit, resourceId, status }: {
+  limit?: number | undefined;
+  resourceId: number;
+  status?: MaintenanceRequestStatus | undefined;
+}, queryKey?: TQueryKey, options?: Omit<UseInfiniteQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useInfiniteQuery({
+  queryKey: Common.UseResourceMaintenancesServiceListMaintenanceRequestsKeyFn({ limit, resourceId, status }, queryKey), queryFn: ({ pageParam }) => ResourceMaintenancesService.listMaintenanceRequests({ limit, page: pageParam as number, resourceId, status }) as TData, initialPageParam: 1, getNextPageParam: response => (response as {
     nextPage: number;
   }).nextPage, ...options
 });

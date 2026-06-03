@@ -1,0 +1,14 @@
+{
+  "trigger": "Instant maintenance",
+  "modal": {
+    "title": "Start instant maintenance",
+    "description": "This puts the resource into maintenance immediately and blocks usage for everyone except maintainers until it is marked done.",
+    "reasonLabel": "Reason (optional)",
+    "reasonPlaceholder": "e.g. Spindle making grinding noise",
+    "cancel": "Cancel",
+    "confirm": "Start now"
+  },
+  "error": {
+    "title": "Couldn't start maintenance"
+  }
+}
