@@ -1,0 +1,25 @@
+{
+  "name": "@attraccess-example/plugin-hello-world",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Working example plugin: backend controller + injected repository + event handler, and a frontend route. Build it, ZIP it, and upload it through the Plugins admin page.",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "peerDependencies": {
+    "@nestjs/common": "^11.0.0",
+    "@nestjs/event-emitter": "^3.0.0",
+    "typeorm": "^0.3.0"
+  },
+  "devDependencies": {
+    "@attraccess/plugins-backend-sdk": "^1.0.0",
+    "@attraccess/plugins-frontend-sdk": "^1.0.0",
+    "@originjs/vite-plugin-federation": "^1.3.0",
+    "@vitejs/plugin-react": "^4.0.0",
+    "esbuild": "^0.28.0",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0",
+    "vite": "^5.0.0"
+  }
+}

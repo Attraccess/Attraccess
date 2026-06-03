@@ -1,0 +1,18 @@
+{
+  "name": "plugin-hello-world",
+  "version": "1.0.0",
+  "main": {
+    "backend": {
+      "directory": "dist",
+      "entryPoint": "index.js"
+    },
+    "frontend": {
+      "directory": "frontend",
+      "entryPoint": "remoteEntry.js"
+    }
+  },
+  "attraccessVersion": {
+    "min": "1.0.0"
+  },
+  "permissions": ["READ_USERS", "LISTEN_EVENTS"]
+}

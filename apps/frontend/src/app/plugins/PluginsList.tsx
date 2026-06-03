@@ -1,9 +1,28 @@
 import { usePluginsServiceDeletePlugin, usePluginsServiceGetPlugins } from '@attraccess/react-query-client';
 import { useState } from 'react';
-import { Alert, AlertContent, AlertDescription, AlertTitle, Card, Chip, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow, Tooltip, TooltipContent } from '@heroui/react';
+import {
+  Card,
+  Chip,
+  Modal,
+  ModalBackdrop,
+  ModalBody,
+  ModalContainer,
+  ModalDialog,
+  ModalFooter,
+  ModalHeader,
+  ModalHeading,
+  Table,
+  TableBody,
+  TableCell,
+  TableColumn,
+  TableContent,
+  TableHeader,
+  TableRow,
+  Tooltip,
+  TooltipContent,
+} from '@heroui/react';
 import { Button } from '../../components/button';
-import { Trash2, Upload } from 'lucide-react';
-import { AlertStatusIcon } from '../../components/AlertStatusIcon';
+import { BookOpen, Trash2, Upload } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { UploadPluginModal } from './UploadPluginModal';
 import { useToastMessage } from '../../components/toastProvider';
@@ -61,17 +80,21 @@ export function PluginsList() {
   };
 
   return (
-    <>
-      <Alert status="danger" className="mb-4" data-cy="plugins-list-work-in-progress-alert">
-        <AlertStatusIcon status="danger" />
-        <AlertContent>
-          <AlertTitle>{t('workInProgressTitle')}</AlertTitle>
-          <AlertDescription>{t('workInProgress')}</AlertDescription>
-        </AlertContent>
-      </Alert>
-      <Card className="w-full" data-cy="plugins-list-card">
-        <Card.Header className="flex justify-between items-center">
-          <h1 className="text-xl font-bold">{t('title')}</h1>
+    <Card className="w-full" data-cy="plugins-list-card">
+      <Card.Header className="flex justify-between items-center">
+        <h1 className="text-xl font-bold">{t('title')}</h1>
+        <div className="flex items-center gap-2">
+          <a
+            href="https://docs.attraccess.org/#/plugins/developing-plugins"
+            target="_blank"
+            rel="noreferrer"
+            data-cy="plugins-list-docs-link"
+          >
+            <Button variant="secondary">
+              <BookOpen size={18} />
+              {t('docsButton')}
+            </Button>
+          </a>
           <Button
             variant="primary"
             onPress={() => setUploadModalOpen(true)}
@@ -80,10 +103,11 @@ export function PluginsList() {
             <Upload size={18} />
             {t('uploadButton')}
           </Button>
-        </Card.Header>
-        <Card.Content>
-          <Table data-cy="plugins-list-table">
-            <TableContent aria-label="Plugins table">
+        </div>
+      </Card.Header>
+      <Card.Content>
+        <Table data-cy="plugins-list-table">
+          <TableContent aria-label="Plugins table">
             <TableHeader>
               <TableColumn isRowHeader>{t('columns.name')}</TableColumn>
               <TableColumn>{t('columns.version')}</TableColumn>
@@ -130,55 +154,54 @@ export function PluginsList() {
                 </TableRow>
               )}
             </TableBody>
-            </TableContent>
-          </Table>
-        </Card.Content>
+          </TableContent>
+        </Table>
+      </Card.Content>
 
-        <Modal
-          isOpen={deleteModalOpen}
-          onOpenChange={setDeleteModalOpen}
-          data-cy="plugins-list-delete-confirmation-modal"
-        >
-          <ModalBackdrop>
-            <ModalContainer size="sm">
-              <ModalDialog>
-                {({ close }) => (
-                  <>
-                    <ModalHeader>
-                      <ModalHeading>{t('deleteConfirmation.title')}</ModalHeading>
-                    </ModalHeader>
-                    <ModalBody>
-                      {t('deleteConfirmation.message', {
-                        pluginName: plugins?.find((plugin) => plugin.id === pluginToDelete)?.name,
-                      })}
-                    </ModalBody>
-                    <ModalFooter>
-                      <Button
-                        variant="secondary"
-                        onPress={close}
-                        isDisabled={isDeleting}
-                        data-cy="plugins-list-delete-confirmation-cancel-button"
-                      >
-                        {t('deleteConfirmation.cancel')}
-                      </Button>
-                      <Button
-                        variant="danger"
-                        onPress={handleDeleteConfirm}
-                        isPending={isDeleting}
-                        data-cy="plugins-list-delete-confirmation-delete-button"
-                      >
-                        {t('deleteConfirmation.delete')}
-                      </Button>
-                    </ModalFooter>
-                  </>
-                )}
-              </ModalDialog>
-            </ModalContainer>
-          </ModalBackdrop>
-        </Modal>
+      <Modal
+        isOpen={deleteModalOpen}
+        onOpenChange={setDeleteModalOpen}
+        data-cy="plugins-list-delete-confirmation-modal"
+      >
+        <ModalBackdrop>
+          <ModalContainer size="sm">
+            <ModalDialog>
+              {({ close }) => (
+                <>
+                  <ModalHeader>
+                    <ModalHeading>{t('deleteConfirmation.title')}</ModalHeading>
+                  </ModalHeader>
+                  <ModalBody>
+                    {t('deleteConfirmation.message', {
+                      pluginName: plugins?.find((plugin) => plugin.id === pluginToDelete)?.name,
+                    })}
+                  </ModalBody>
+                  <ModalFooter>
+                    <Button
+                      variant="secondary"
+                      onPress={close}
+                      isDisabled={isDeleting}
+                      data-cy="plugins-list-delete-confirmation-cancel-button"
+                    >
+                      {t('deleteConfirmation.cancel')}
+                    </Button>
+                    <Button
+                      variant="danger"
+                      onPress={handleDeleteConfirm}
+                      isPending={isDeleting}
+                      data-cy="plugins-list-delete-confirmation-delete-button"
+                    >
+                      {t('deleteConfirmation.delete')}
+                    </Button>
+                  </ModalFooter>
+                </>
+              )}
+            </ModalDialog>
+          </ModalContainer>
+        </ModalBackdrop>
+      </Modal>
 
-        <UploadPluginModal isOpen={uploadModalOpen} onClose={() => setUploadModalOpen(false)} />
-      </Card>
-    </>
+      <UploadPluginModal isOpen={uploadModalOpen} onClose={() => setUploadModalOpen(false)} />
+    </Card>
   );
 }
