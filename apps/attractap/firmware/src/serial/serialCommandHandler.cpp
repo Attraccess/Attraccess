@@ -4,6 +4,10 @@
 #include <lwip/inet.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#ifdef BENCH_FREEZE_REPRO
+#include <cstdlib>
+#include "esp_heap_caps.h"
+#endif
 
 #include "../settings/settings.hpp"
 #include "../network/wifi/wifi.hpp"
@@ -11,6 +15,20 @@
 
 String SerialCommandHandler::inputBuffer = "";
 Logger SerialCommandHandler::logger("SerialCmd");
+
+#ifdef BENCH_FREEZE_REPRO
+std::function<void()> SerialCommandHandler::dropWebsocketHook = nullptr;
+
+static volatile uint32_t benchStackSink = 0;
+
+static uint32_t benchRecurse(uint32_t depth)
+{
+    volatile uint8_t frame[256];
+    frame[0] = static_cast<uint8_t>(depth);
+    benchStackSink += frame[0];
+    return benchRecurse(depth + 1) + frame[0];
+}
+#endif
 
 void SerialCommandHandler::setup()
 {
@@ -176,6 +194,13 @@ const char *SerialCommandHandler::encryptionTypeToString(wifi_auth_mode_t mode)
 
 void SerialCommandHandler::handleCommand(const String &topic, const String &payload)
 {
+#ifdef BENCH_FREEZE_REPRO
+    if (handleBenchFaultCommand(topic))
+    {
+        return;
+    }
+#endif
+
     bool hasPin = pinIsSet();
 
     StaticJsonDocument<512> payloadDoc;
@@ -401,3 +426,92 @@ void SerialCommandHandler::sendErrorResponse(const String &topic, const char *er
     serializeJson(resp, json);
     sendJsonResponse(topic, json);
 }
+
+#ifdef BENCH_FREEZE_REPRO
+void SerialCommandHandler::setDropWebsocketHook(std::function<void()> hook)
+{
+    dropWebsocketHook = hook;
+}
+
+bool SerialCommandHandler::handleBenchFaultCommand(const String &topic)
+{
+    if (topic != "crash_heap" && topic != "crash_null" && topic != "crash_abort" &&
+        topic != "crash_stack" && topic != "hang_loop" && topic != "hang_wdt" &&
+        topic != "drop_ws")
+    {
+        return false;
+    }
+
+    logger.errorf("BENCH fault injection requested: %s", topic.c_str());
+    DynamicJsonDocument resp(96);
+    resp["fault"] = topic;
+    resp["triggered"] = true;
+    String json;
+    serializeJson(resp, json);
+    sendJsonResponse(topic, json);
+    Serial.flush();
+
+    if (topic == "drop_ws")
+    {
+        if (dropWebsocketHook)
+        {
+            dropWebsocketHook();
+        }
+        else
+        {
+            logger.error("drop_ws: no websocket hook registered");
+        }
+        return true;
+    }
+
+    if (topic == "crash_heap")
+    {
+        volatile uint8_t *buf = static_cast<uint8_t *>(malloc(16));
+        if (buf)
+        {
+            for (size_t i = 0; i < 64; i++)
+            {
+                buf[i] = 0xAB;
+            }
+            heap_caps_check_integrity_all(true);
+        }
+        return true;
+    }
+
+    if (topic == "crash_null")
+    {
+        volatile uint32_t *p = nullptr;
+        *p = 0xDEADBEEF;
+        return true;
+    }
+
+    if (topic == "crash_abort")
+    {
+        abort();
+    }
+
+    if (topic == "crash_stack")
+    {
+        benchStackSink += benchRecurse(0);
+        return true;
+    }
+
+    if (topic == "hang_loop")
+    {
+        while (true)
+        {
+            delay(1000);
+        }
+    }
+
+    if (topic == "hang_wdt")
+    {
+        portDISABLE_INTERRUPTS();
+        while (true)
+        {
+        }
+    }
+
+    return true;
+}
+#endif

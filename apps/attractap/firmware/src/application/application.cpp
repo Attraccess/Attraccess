@@ -61,6 +61,10 @@ void Application::setup() {
 
   this->api.setup();
 
+#ifdef BENCH_FREEZE_REPRO
+  SerialCommandHandler::setDropWebsocketHook([this]() { this->api.dropWebsocket(); });
+#endif
+
 #ifdef HAS_LVGL_DISPLAY
   this->api.onDeviceName(
       [this](String deviceName) { Display::setDeviceName(deviceName); });

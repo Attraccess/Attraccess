@@ -1,5 +1,8 @@
 #include <Arduino.h>
 #include "esp_err.h"
+#ifdef BENCH_FREEZE_REPRO
+#include "esp_heap_caps.h"
+#endif
 #include "logger/logger.hpp"
 #include <Wire.h>
 #include "freertos/FreeRTOS.h"
@@ -25,6 +28,21 @@ void logLoopStackUsage()
     Logger logger("Stack");
     logger.debugf("loopTask high watermark: %u words (~%u bytes)",
                   watermarkWords, watermarkWords * sizeof(StackType_t));
+}
+#endif
+
+#ifdef BENCH_FREEZE_REPRO
+void checkHeapIntegrity()
+{
+    static uint32_t lastCheck = 0;
+    if (millis() - lastCheck < 1000)
+        return;
+    lastCheck = millis();
+
+    if (!heap_caps_check_integrity_all(true))
+    {
+        Logger("HeapCheck").error("heap integrity check FAILED");
+    }
 }
 #endif
 
@@ -89,6 +107,10 @@ void loop()
 {
 #ifdef LOG_MEMORY_DEBUG
     logLoopStackUsage();
+#endif
+
+#ifdef BENCH_FREEZE_REPRO
+    checkHeapIntegrity();
 #endif
 
     application.loop();

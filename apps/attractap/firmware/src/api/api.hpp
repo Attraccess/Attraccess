@@ -17,6 +17,9 @@ public:
     void setup();
     void loop();
     void processIncomingMessage(const char *buf, size_t len);
+#ifdef BENCH_FREEZE_REPRO
+    void dropWebsocket();
+#endif
     static constexpr size_t MAX_RESOURCES = 10;
     static constexpr size_t MAX_RESOURCE_NAME_LEN = 64;
     static constexpr size_t MAX_DESC_LEN = 128;

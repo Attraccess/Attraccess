@@ -1,0 +1,31 @@
+CONFIG_SPIRAM_SUPPORT=y
+CONFIG_SPIRAM_USE_MALLOC=y
+CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y
+CONFIG_MBEDTLS_SSL_IN_CONTENT_LEN=4096
+CONFIG_MBEDTLS_SSL_OUT_CONTENT_LEN=4096
+
+CONFIG_MBEDTLS_TLS_ENABLED=y
+CONFIG_MBEDTLS_SSL_PROTO_TLS1_2=y
+CONFIG_MBEDTLS_KEY_EXCHANGE_ECDHE_RSA_ENABLED=y
+CONFIG_MBEDTLS_KEY_EXCHANGE_ECDHE_ECDSA_ENABLED=y
+CONFIG_MBEDTLS_PEM_PARSE_C=y
+CONFIG_MBEDTLS_PEM_WRITE_C=y
+
+# Disable legacy/unused ones
+# CONFIG_MBEDTLS_KEY_EXCHANGE_RSA_ENABLED is not set
+# CONFIG_MBEDTLS_KEY_EXCHANGE_DHE_RSA_ENABLED is not set
+
+# --- Bench freeze-repro options (ATT-476). Compiled into the bench env only. ---
+# Comprehensive heap poisoning: head/tail canaries + freed-block fill, so heap
+# corruption (crash_heap) is caught by the next heap_caps_check_integrity_all().
+CONFIG_HEAP_POISONING_COMPREHENSIVE=y
+
+# Dump the core dump as base64 over UART on panic so the bench operator gets the
+# backtrace + registers on the serial console without a flash coredump partition.
+CONFIG_ESP_COREDUMP_ENABLE_TO_UART=y
+CONFIG_ESP_COREDUMP_DATA_FORMAT_ELF=y
+CONFIG_ESP_COREDUMP_CHECKSUM_CRC32=y
+
+# Task watchdog with panic so hang_wdt produces a real reset + backtrace.
+CONFIG_ESP_TASK_WDT_EN=y
+CONFIG_ESP_TASK_WDT_PANIC=y
