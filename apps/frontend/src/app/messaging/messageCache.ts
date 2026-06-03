@@ -11,7 +11,10 @@ import {
   useMessagingServiceMessagingListMessagesKey,
 } from '@attraccess/react-query-client';
 
-export function applyIncomingMessage(queryClient: QueryClient, message: Message) {
+export function applyIncomingMessage(queryClient: QueryClient, message: Message, currentUserId: number) {
+  // Own messages never count as unread for the sender — only stitch them into the thread/list.
+  const isOwnMessage = message.senderId === currentUserId;
+
   queryClient.setQueriesData<ListMessagesResponseDto>(
     {
       predicate: (query) =>
@@ -40,13 +43,15 @@ export function applyIncomingMessage(queryClient: QueryClient, message: Message)
       const updated = {
         ...current[index],
         lastMessage: message,
-        unreadCount: (current[index].unreadCount ?? 0) + 1,
+        unreadCount: (current[index].unreadCount ?? 0) + (isOwnMessage ? 0 : 1),
       };
       return [updated, ...current.slice(0, index), ...current.slice(index + 1)];
     },
   );
 
-  bumpTotalUnread(queryClient, 1);
+  if (!isOwnMessage) {
+    bumpTotalUnread(queryClient, 1);
+  }
 }
 
 export function markConversationReadInCache(queryClient: QueryClient, conversationId: number, total: number) {
