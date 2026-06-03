@@ -5,6 +5,10 @@ import {
   PluginContext,
   PluginPermission,
   PluginPermissionError,
+  SystemEvent,
+  SystemEventHandler,
+  SystemEventPayload,
+  SystemEventSubscription,
 } from '@attraccess/plugins-backend-sdk';
 import type { EntityTarget, ObjectLiteral } from 'typeorm';
 
@@ -129,6 +133,14 @@ export class PluginSandboxService {
       get<T>(token: Type<T> | string | symbol): T {
         require(PluginPermission.RESOLVE_HOST_PROVIDERS, `get(${String(token)})`);
         return base.get<T>(token);
+      },
+      onEvent<E extends SystemEvent>(event: E, handler: SystemEventHandler<E>): SystemEventSubscription {
+        require(PluginPermission.LISTEN_EVENTS, `onEvent(${event})`);
+        return base.onEvent(event, handler);
+      },
+      emitEvent<E extends SystemEvent>(event: E, payload: SystemEventPayload[E]): void {
+        require(PluginPermission.EMIT_EVENTS, `emitEvent(${event})`);
+        base.emitEvent(event, payload);
       },
     };
   }

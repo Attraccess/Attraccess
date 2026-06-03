@@ -1,6 +1,6 @@
 // Standalone example backend plugin built OUTSIDE the api app to prove ATT-454
 // real-world dynamic loading: separate package, own bundler, externalized peers.
-import type { PluginBackendModule, PluginContext } from '@attraccess/plugins-backend-sdk';
+import type { PluginBackendModule, PluginContext, SystemEvent } from '@attraccess/plugins-backend-sdk';
 import { DynamicModule, Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource } from 'typeorm';
@@ -15,6 +15,14 @@ const PLUGIN_CONTEXT = Symbol.for('attraccess.plugin.context');
 
 export const POC_PING_EVENT = 'poc.host.ping';
 export const POC_PONG_EVENT = 'poc.plugin.pong';
+
+/**
+ * Typed host SystemEvent this plugin subscribes to. SystemEvent is imported as a
+ * TYPE only (erased at build time) so the artifact keeps zero runtime dependency
+ * on the SDK; the enum value is supplied as a string literal cast. Subscribing
+ * requires the LISTEN_EVENTS permission in plugin.json.
+ */
+const RESOURCE_USAGE_STARTED = 'RESOURCE_USAGE_STARTED' as SystemEvent;
 
 /**
  * Payload the plugin emits back to the host. The *InstanceMatch flags are the
@@ -35,6 +43,13 @@ class PocPluginService implements OnModuleInit {
 
   onModuleInit(): void {
     this.context.events.on(POC_PING_EVENT, (message: string) => void this.handlePing(message));
+
+    // Typed plugin event API: payload is type-checked against the SystemEvent.
+    this.context.onEvent(RESOURCE_USAGE_STARTED, (payload) => {
+      this.context.logger.log(
+        `Resource ${payload.resource.id} usage started by user ${payload.user.id}`
+      );
+    });
   }
 
   private async handlePing(message: string): Promise<void> {

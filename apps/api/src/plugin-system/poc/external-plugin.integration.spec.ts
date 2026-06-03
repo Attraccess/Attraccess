@@ -4,7 +4,8 @@ import { EventEmitter2, EventEmitterModule } from '@nestjs/event-emitter';
 import { ModuleRef } from '@nestjs/core';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Column, DataSource, Entity, EntityTarget, ObjectLiteral, PrimaryGeneratedColumn, Repository } from 'typeorm';
-import { PluginContext } from '@attraccess/plugins-backend-sdk';
+import { PluginContext, SystemEvent, SystemEventHandler, SystemEventPayload } from '@attraccess/plugins-backend-sdk';
+import { PluginEventsService } from '../plugin-events.service';
 import { build } from 'esbuild';
 import { createRequire } from 'module';
 import { existsSync, mkdirSync, rmSync } from 'fs';
@@ -76,6 +77,7 @@ async function bootAndPing(artifactPath: string): Promise<PocPongPayload> {
   const events = new EventEmitter2();
   const moduleRefHolder: { ref: ModuleRef | null } = { ref: null };
 
+  const pluginEvents = new PluginEventsService(events);
   const context: PluginContext = {
     manifest: { id: 'poc', name: 'poc-backend-plugin', version: '1.0.0', pluginDirectory: 'poc-backend-plugin' },
     events,
@@ -85,6 +87,12 @@ async function bootAndPing(artifactPath: string): Promise<PocPongPayload> {
     get: <T>(token: import('@nestjs/common').Type<T> | string | symbol): T => {
       if (!moduleRefHolder.ref) throw new Error('host ModuleRef not ready');
       return moduleRefHolder.ref.get(token, { strict: false });
+    },
+    onEvent<E extends SystemEvent>(event: E, handler: SystemEventHandler<E>) {
+      return pluginEvents.onEvent(event, handler);
+    },
+    emitEvent<E extends SystemEvent>(event: E, payload: SystemEventPayload[E]) {
+      pluginEvents.emit(event, payload);
     },
   };
 

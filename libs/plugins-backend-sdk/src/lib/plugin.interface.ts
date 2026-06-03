@@ -16,6 +16,23 @@ export type SystemEventResponse = {
 };
 
 /**
+ * Typed handler a plugin registers for a given SystemEvent. It receives the
+ * event's payload and may return the matching response (sync or async). Thrown
+ * errors are isolated by the host and never propagate into the core flow.
+ */
+export type SystemEventHandler<E extends SystemEvent> = (
+  payload: SystemEventPayload[E]
+) => SystemEventResponse[E] | void | Promise<SystemEventResponse[E] | void>;
+
+/**
+ * Handle returned by PluginContext.onEvent. Calling off() detaches the handler
+ * from the shared bus. Detaching twice is a no-op.
+ */
+export interface SystemEventSubscription {
+  off(): void;
+}
+
+/**
  * Discrete host capabilities a plugin may request in its manifest. A plugin can
  * only use a capability whose permission it declared; the sandbox throws on any
  * undeclared access. Each value gates exactly one seam of the PluginContext.

@@ -9,6 +9,7 @@ import { PluginPermission, PluginPermissionError } from '@attraccess/plugins-bac
 import { PluginModule } from './plugin.module';
 import { PluginService } from './plugin.service';
 import { PluginSandboxService } from './plugin-sandbox.service';
+import { PluginEventsService } from './plugin-events.service';
 import { PluginController } from './plugin.controller';
 import { LoadedPluginManifest } from './plugin.manifest';
 
@@ -48,7 +49,8 @@ describe('PluginModule', () => {
     it('exposes only the host providers and controller when plugins are disabled', () => {
       PluginModule.configure({ DISABLE_PLUGINS: true });
       const module = PluginModule.forRoot();
-      expect(module.providers).toEqual([PluginService, PluginSandboxService]);
+      expect(module.providers).toEqual([PluginService, PluginSandboxService, PluginEventsService]);
+      expect(module.exports).toEqual([PluginEventsService]);
       expect(module.controllers).toEqual([PluginController]);
       expect(module.imports).toBeUndefined();
     });

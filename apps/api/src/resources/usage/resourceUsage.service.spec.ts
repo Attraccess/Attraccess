@@ -33,6 +33,13 @@ import { ResourceFlowsExecutorService } from '../flows/resource-flows-executor.s
 import { ProjectsService } from '../../projects/projects.service';
 import { ResourceFormsService } from '../forms/forms.service';
 import { MetricsService } from '../../metrics/metrics.service';
+import { PluginEventsService } from '../../plugin-system/plugin-events.service';
+
+const mockPluginEventsService = {
+  emit: jest.fn(),
+  emitAsync: jest.fn(),
+  onEvent: jest.fn(),
+};
 
 const mockMetricsService = {
   resourceUsageSessionsTotal: { inc: jest.fn() },
@@ -242,6 +249,10 @@ describe('ResourceUsageService', () => {
         {
           provide: require('../health/resource-health.service').ResourceHealthService,
           useValue: mockResourceHealthService,
+        },
+        {
+          provide: PluginEventsService,
+          useValue: mockPluginEventsService,
         },
       ],
     }).compile();

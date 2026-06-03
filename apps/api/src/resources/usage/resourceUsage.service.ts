@@ -32,6 +32,8 @@ import { ProjectsService } from '../../projects/projects.service';
 import { ResourceFormsService } from '../forms/forms.service';
 import { ResourceFormAction } from '@attraccess/database-entities';
 import { MetricsService } from '../../metrics/metrics.service';
+import { SystemEvent } from '@attraccess/plugins-backend-sdk';
+import { PluginEventsService } from '../../plugin-system/plugin-events.service';
 
 @Injectable()
 export class ResourceUsageService {
@@ -78,7 +80,23 @@ export class ResourceUsageService {
     private readonly resourceFormsService: ResourceFormsService,
     private readonly metricsService: MetricsService,
     private readonly resourceHealthService: ResourceHealthService,
+    private readonly pluginEvents: PluginEventsService,
   ) {}
+
+  private emitSystemUsageEvent(
+    event: SystemEvent.RESOURCE_USAGE_STARTED | SystemEvent.RESOURCE_USAGE_ENDED,
+    resource: Resource | undefined,
+    user: User | undefined,
+  ): void {
+    if (!resource || !user) {
+      return;
+    }
+    try {
+      this.pluginEvents.emit(event, { resource, user });
+    } catch (error) {
+      this.logger.error(`Failed to emit plugin SystemEvent ${event}`, (error as Error).stack);
+    }
+  }
 
   public async canControllResource(
     resourceId: number,
@@ -262,6 +280,7 @@ export class ResourceUsageService {
     // Defer event emission until after the transaction commits to avoid stale reads in listeners
     let endedUsageIdToEmit: number | null = null;
     let startedUsageIdToEmit: number | null = null;
+    let takeoverEndedUser: User | null = null;
 
     const newSession = await this.resourceUsageRepository.manager.transaction(async (transactionalEntityManager) => {
       const resource = await this.getResource(
@@ -313,6 +332,7 @@ export class ResourceUsageService {
 
           // Defer event for the ended session until after commit
           endedUsageIdToEmit = updatedSession.id;
+          takeoverEndedUser = existingActiveSession.user;
         } else if (dto.forceTakeOver && !resource.allowTakeOver) {
           this.logger.warn(`Takeover attempted for resource ${resourceId} but not allowed`);
           throw new BadRequestException('This resource does not allow overtaking');
@@ -433,6 +453,11 @@ export class ResourceUsageService {
       this.logger.error(`Failed to emit usage events after startSession commit`, (error as Error).stack);
     }
 
+    if (takeoverEndedUser) {
+      this.emitSystemUsageEvent(SystemEvent.RESOURCE_USAGE_ENDED, newSession?.resource, takeoverEndedUser);
+    }
+    this.emitSystemUsageEvent(SystemEvent.RESOURCE_USAGE_STARTED, newSession?.resource, newSession?.user);
+
     this.metricsService.resourceUsageSessionsTotal.inc({ action: 'start' });
     this.metricsService.resourceUsageSessionsActive.inc();
 
@@ -542,6 +567,8 @@ export class ResourceUsageService {
     } catch (error) {
       this.logger.error(`Failed to emit usage event after endSession commit`, (error as Error).stack);
     }
+
+    this.emitSystemUsageEvent(SystemEvent.RESOURCE_USAGE_ENDED, updatedUsage?.resource, updatedUsage?.user);
 
     this.metricsService.resourceUsageSessionsTotal.inc({ action: 'end' });
     this.metricsService.resourceUsageSessionsActive.dec();

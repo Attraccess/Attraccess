@@ -34,6 +34,16 @@ Bundling any of the externalized packages breaks token identity even though the
 code still *looks* correct — see the negative case in
 `apps/api/src/plugin-system/poc/external-plugin.integration.spec.ts`.
 
+## Typed system events
+
+Besides the raw `context.events` bus (used here for the ping/pong PoC), the
+plugin also demonstrates the **typed** event API:
+`context.onEvent(SystemEvent.RESOURCE_USAGE_STARTED, ...)` with a
+compile-time-checked payload. `SystemEvent` is imported as a **type only** so the
+artifact keeps zero runtime dependency on the SDK; the enum value is supplied as
+a string-literal cast. The subscription requires the `LISTEN_EVENTS` permission
+declared in `plugin.json`.
+
 ## Build
 
 ```bash
