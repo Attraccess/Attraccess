@@ -105,8 +105,8 @@ nennt.
 | `ACCESS_RESOURCES` | `context.getRepository(Resource)` -- Ressourcen lesen und schreiben. |
 | `READ_SETTINGS` | `context.getRepository(Setting)` -- Anwendungseinstellungen lesen. |
 | `DATABASE_ACCESS` | `context.dataSource` und `context.getRepository(...)` für jede andere Entität. |
-| `EMIT_EVENTS` | `context.events.emit(...)` / `emitAsync(...)` -- auf dem geteilten Event-Bus senden. |
-| `LISTEN_EVENTS` | `context.events.on(...)` / `once(...)` / ... -- den geteilten Event-Bus abonnieren. |
+| `EMIT_EVENTS` | `context.emitEvent(...)` und `context.events.emit(...)` / `emitAsync(...)` -- auf dem geteilten Event-Bus senden. |
+| `LISTEN_EVENTS` | `context.onEvent(...)` und `context.events.on(...)` / `once(...)` / ... -- den geteilten Event-Bus abonnieren. |
 | `RESOLVE_HOST_PROVIDERS` | `context.get(token)` -- beliebige Host-Dienste per Injection-Token auflösen. |
 
 `context.manifest` und `context.logger` sind immer verfügbar und benötigen
@@ -131,6 +131,36 @@ Einige Hinweise zur Grenze:
 > Fordern Sie nur die minimal nötigen Berechtigungen an. Administratoren sehen
 > auf der Plugins-Seite jede angeforderte Berechtigung, bevor sie einem Plugin
 > vertrauen.
+
+## Typisierte System-Events
+
+Neben dem rohen `context.events`-Bus stellt der Kontext eine **typisierte**
+Event-Schnittstelle für die `SystemEvent`s des Hosts bereit. Nutzen Sie sie,
+wenn Sie zur Kompilierzeit geprüfte Payloads statt String-basierter Bus-Namen
+möchten:
+
+- `context.onEvent(event, handler)` -- ein `SystemEvent` abonnieren. Der Handler
+  erhält die typisierte Payload und gibt eine `SystemEventSubscription` zurück,
+  deren `off()` ihn wieder abmeldet. Benötigt `LISTEN_EVENTS`.
+- `context.emitEvent(event, payload)` -- ein `SystemEvent` senden; die Payload
+  wird gegen das Event typgeprüft. Benötigt `EMIT_EVENTS`.
+
+```ts
+import { SystemEvent } from '@attraccess/plugins-backend-sdk';
+
+const subscription = context.onEvent(SystemEvent.RESOURCE_USAGE_STARTED, ({ resource, user }) => {
+  context.logger.log(`Ressource ${resource.id} Nutzung gestartet von Benutzer ${user.id}`);
+});
+
+// später, um das Abonnement zu beenden:
+subscription.off();
+```
+
+Der Host sendet mindestens `SystemEvent.RESOURCE_USAGE_STARTED` und
+`SystemEvent.RESOURCE_USAGE_ENDED`, wenn Nutzungssitzungen beginnen und enden.
+Ein Handler, der eine Ausnahme wirft, wird vom Host **isoliert** — sein Fehler
+wird protokolliert und unterbricht niemals den Kernablauf, der das Event
+gesendet hat.
 
 ## Kombinierte Plugins
 

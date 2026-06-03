@@ -9,5 +9,6 @@
   },
   "attraccessVersion": {
     "min": "1.0.0"
-  }
+  },
+  "permissions": ["LISTEN_EVENTS"]
 }

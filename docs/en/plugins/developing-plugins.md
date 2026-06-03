@@ -104,8 +104,8 @@ permission.
 | `ACCESS_RESOURCES` | `context.getRepository(Resource)` -- read and write resources. |
 | `READ_SETTINGS` | `context.getRepository(Setting)` -- read application settings. |
 | `DATABASE_ACCESS` | `context.dataSource` and `context.getRepository(...)` for any other entity. |
-| `EMIT_EVENTS` | `context.events.emit(...)` / `emitAsync(...)` -- publish on the shared event bus. |
-| `LISTEN_EVENTS` | `context.events.on(...)` / `once(...)` / ... -- subscribe to the shared event bus. |
+| `EMIT_EVENTS` | `context.emitEvent(...)` and `context.events.emit(...)` / `emitAsync(...)` -- publish on the shared event bus. |
+| `LISTEN_EVENTS` | `context.onEvent(...)` and `context.events.on(...)` / `once(...)` / ... -- subscribe to the shared event bus. |
 | `RESOLVE_HOST_PROVIDERS` | `context.get(token)` -- resolve arbitrary host services by injection token. |
 
 `context.manifest` and `context.logger` are always available and require no
@@ -127,6 +127,34 @@ A few notes on the boundary:
 > [!WARNING]
 > Request the minimum set of permissions your plugin needs. Administrators can
 > see every permission a plugin requests on the Plugins page before trusting it.
+
+## Typed System Events
+
+Alongside the raw `context.events` bus, the context exposes a **typed** event
+seam for the host's `SystemEvent`s. Use it when you want compile-time-checked
+payloads instead of stringly-typed bus names:
+
+- `context.onEvent(event, handler)` -- subscribe to a `SystemEvent`. The handler
+  receives the event's typed payload and returns a `SystemEventSubscription`
+  whose `off()` detaches it. Requires `LISTEN_EVENTS`.
+- `context.emitEvent(event, payload)` -- emit a `SystemEvent`; the payload is
+  type-checked against the event. Requires `EMIT_EVENTS`.
+
+```ts
+import { SystemEvent } from '@attraccess/plugins-backend-sdk';
+
+const subscription = context.onEvent(SystemEvent.RESOURCE_USAGE_STARTED, ({ resource, user }) => {
+  context.logger.log(`Resource ${resource.id} usage started by user ${user.id}`);
+});
+
+// later, to stop listening:
+subscription.off();
+```
+
+The host emits at least `SystemEvent.RESOURCE_USAGE_STARTED` and
+`SystemEvent.RESOURCE_USAGE_ENDED` when usage sessions begin and end. A handler
+that throws is **isolated** by the host — its error is logged and never breaks
+the core flow that emitted the event.
 
 ## Combined Plugins
 
