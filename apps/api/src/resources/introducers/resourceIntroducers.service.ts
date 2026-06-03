@@ -15,10 +15,35 @@ export class ResourceIntroducersService {
   ) {}
 
   public async getMany(resourceId: number, type?: ResourceIntroducerType): Promise<ResourceIntroducer[]> {
-    return await this.resourceIntroducerRepository.find({
+    const directIntroducers = await this.resourceIntroducerRepository.find({
       where: { resourceId, ...(type ? { type } : {}) },
       relations: ['user'],
     });
+
+    // Introducers granted at the group level apply to every resource in the group,
+    // so they must be listed alongside the resource's own introducers.
+    const groupQuery = this.resourceIntroducerRepository
+      .createQueryBuilder('introducer')
+      .leftJoinAndSelect('introducer.user', 'user')
+      .innerJoin('introducer.resourceGroup', 'group')
+      .innerJoin('group.resources', 'resource')
+      .where('resource.id = :resourceId', { resourceId });
+
+    if (type) {
+      groupQuery.andWhere('introducer.type = :type', { type });
+    }
+
+    const groupIntroducers = await groupQuery.getMany();
+
+    // A user can be both a direct and a group introducer; show them once.
+    const byUserId = new Map<number, ResourceIntroducer>();
+    for (const introducer of [...directIntroducers, ...groupIntroducers]) {
+      if (!byUserId.has(introducer.userId)) {
+        byUserId.set(introducer.userId, introducer);
+      }
+    }
+
+    return Array.from(byUserId.values());
   }
 
   public async getByResourceIdAndUserId(
