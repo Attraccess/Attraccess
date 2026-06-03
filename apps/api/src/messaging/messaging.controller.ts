@@ -41,7 +41,7 @@ export class MessagingController {
   @ApiOperation({ summary: 'Subscribe to live new messages for the authenticated user', operationId: 'messagingLive' })
   streamMessages(@Req() req: AuthenticatedRequest): Observable<{ data: Message }> {
     const subject = this.messagingLiveService.getUserMessageSubject(req.user.id);
-    return this.sse.wrap('messaging', subject.asObservable());
+    return this.messagingLiveService.trackPresence(req.user.id, this.sse.wrap('messaging', subject.asObservable()));
   }
 
   @Post('users/:userId/contact')

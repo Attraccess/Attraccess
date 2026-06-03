@@ -52,8 +52,17 @@ export function ConversationList(props: Props) {
               selectedConversationId === conversation.id && 'bg-zinc-100 dark:bg-zinc-800',
             )}
           >
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-200 text-small font-medium uppercase text-zinc-600 dark:bg-zinc-700 dark:text-zinc-200">
-              {username.charAt(0)}
+            <div className="relative shrink-0">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-200 text-small font-medium uppercase text-zinc-600 dark:bg-zinc-700 dark:text-zinc-200">
+                {username.charAt(0)}
+              </div>
+              {conversation.otherParticipantOnline && (
+                <span
+                  data-cy={`conversation-online-${conversation.id}`}
+                  className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white bg-green-500 dark:border-zinc-900"
+                  aria-label={t('conversations.online')}
+                />
+              )}
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between gap-2">

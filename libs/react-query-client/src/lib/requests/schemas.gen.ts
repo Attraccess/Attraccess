@@ -6953,6 +6953,11 @@ export const $ConversationListItemDto = {
                 }
             ]
         },
+        otherParticipantOnline: {
+            type: 'boolean',
+            description: 'Whether the other participant currently has an open live messaging stream',
+            example: true
+        },
         lastMessage: {
             description: 'The most recent message in the conversation',
             nullable: true,
@@ -6975,7 +6980,7 @@ export const $ConversationListItemDto = {
             example: 3
         }
     },
-    required: ['id', 'otherParticipant', 'lastMessage', 'updatedAt', 'unreadCount']
+    required: ['id', 'otherParticipant', 'otherParticipantOnline', 'lastMessage', 'updatedAt', 'unreadCount']
 } as const;
 
 export const $UnreadCountResponseDto = {
