@@ -1,6 +1,6 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { Chip, Spinner } from '@heroui/react';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { OpenAPI, useAttractapServiceGetReaderCrashReports } from '@attraccess/react-query-client';
 import { Button } from '../../../components/button';
 import { useToastMessage } from '../../../components/toastProvider';
@@ -32,9 +32,27 @@ function formatUptime(ms: number | null | undefined, fallback: string): string {
   return [hours ? `${hours}h` : null, minutes ? `${minutes}m` : null, `${seconds}s`].filter(Boolean).join(' ');
 }
 
+function symbolicationChipColor(status: string | null | undefined): 'success' | 'danger' | 'warning' | 'default' {
+  switch (status) {
+    case 'success':
+      return 'success';
+    case 'failed':
+      return 'danger';
+    case 'unavailable':
+      return 'warning';
+    default:
+      return 'default';
+  }
+}
+
 export function AttractapDiagnostics(props: Readonly<Props>) {
   const { t } = useTranslations({ de, en });
   const toast = useToastMessage();
+  const [expandedReports, setExpandedReports] = useState<Record<number, boolean>>({});
+
+  const toggleBacktrace = useCallback((reportId: number) => {
+    setExpandedReports((prev) => ({ ...prev, [reportId]: !prev[reportId] }));
+  }, []);
 
   const {
     data: reports,
@@ -146,9 +164,21 @@ export function AttractapDiagnostics(props: Readonly<Props>) {
               data-cy="attractap-diagnostics-report"
             >
               <div className="flex items-center justify-between gap-2 flex-wrap">
-                <Chip color="warning" variant="soft" size="sm">
-                  {report.resetReason}
-                </Chip>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Chip color="warning" variant="soft" size="sm">
+                    {report.resetReason}
+                  </Chip>
+                  {report.symbolicationStatus && (
+                    <Chip
+                      color={symbolicationChipColor(report.symbolicationStatus)}
+                      variant="soft"
+                      size="sm"
+                      data-cy="attractap-diagnostics-symbolication-status"
+                    >
+                      {t(`symbolication.${report.symbolicationStatus}`)}
+                    </Chip>
+                  )}
+                </div>
                 <span className="text-xs text-default-400">{new Date(report.createdAt).toLocaleString()}</span>
               </div>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-3">
@@ -171,6 +201,43 @@ export function AttractapDiagnostics(props: Readonly<Props>) {
                   {t('fields.firmware')}: {report.firmwareVersion ?? fallback}
                 </span>
               </div>
+              {report.symbolizedBacktrace && (
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <span className="text-sm font-medium">
+                      {t('backtrace')}
+                      {report.coredumpBuildId ? (
+                        <span className="ml-2 font-mono text-xs text-default-400">
+                          {t('buildId')}: {report.coredumpBuildId}
+                        </span>
+                      ) : null}
+                    </span>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onPress={() => toggleBacktrace(report.id)}
+                      data-cy="attractap-diagnostics-toggle-backtrace"
+                    >
+                      {expandedReports[report.id] ? t('hideBacktrace') : t('showBacktrace')}
+                    </Button>
+                  </div>
+                  {expandedReports[report.id] && (
+                    <pre
+                      className="max-h-96 overflow-auto rounded-medium bg-default-100 p-3 text-xs font-mono whitespace-pre-wrap break-words"
+                      data-cy="attractap-diagnostics-backtrace"
+                    >
+                      {report.symbolizedBacktrace}
+                    </pre>
+                  )}
+                </div>
+              )}
+
+              {report.symbolicationStatus === 'unavailable' && (
+                <p className="text-xs text-warning" data-cy="attractap-diagnostics-symbolication-hint">
+                  {t('symbolicationUnavailableHint')}
+                </p>
+              )}
+
               <div>
                 {report.coredumpSize ? (
                   <Button

@@ -10,6 +10,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AttractapFirmwareVersion } from '@attraccess/database-entities';
 import { EncryptionService } from '../encryption/encryption.service';
 import { MetricsService } from '../metrics/metrics.service';
+import { CoredumpSymbolicationService } from './coredump-symbolication.service';
 
 @Injectable()
 export class AttractapService {
@@ -30,6 +31,7 @@ export class AttractapService {
     private readonly userRepository: Repository<User>,
     private readonly encryptionService: EncryptionService,
     private readonly metricsService: MetricsService,
+    private readonly coredumpSymbolicationService: CoredumpSymbolicationService,
   ) { }
 
   public async getNFCCardByID(id: number): Promise<NFCCard | undefined> {
@@ -250,10 +252,45 @@ export class AttractapService {
       firmwareVersion: payload.firmwareVersion ?? null,
       coredumpSize: coredump ? coredump.length : null,
       coredump,
+      symbolicationStatus: coredump ? 'pending' : null,
     });
+
+    if (coredump) {
+      await this.symbolicateCrashReport(report, readerId, coredump);
+    }
 
     report.coredump = null;
     return report;
+  }
+
+  private async symbolicateCrashReport(
+    report: AttractapCrashReport,
+    readerId: number,
+    coredump: Buffer,
+  ): Promise<void> {
+    try {
+      const reader = await this.readerRepository.findOne({ where: { id: readerId } });
+      const result = await this.coredumpSymbolicationService.symbolicate(coredump, {
+        variant: reader?.firmware?.variant ?? null,
+        buildId: null,
+      });
+      await this.crashReportRepository.update(report.id, {
+        coredumpBuildId: result.buildId,
+        symbolicationStatus: result.status,
+        symbolizedBacktrace: result.backtrace,
+      });
+      report.coredumpBuildId = result.buildId;
+      report.symbolicationStatus = result.status;
+      report.symbolizedBacktrace = result.backtrace;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to symbolicate coredump for report ${report.id}: ${message}`);
+      await this.crashReportRepository
+        .update(report.id, { symbolicationStatus: 'failed', symbolizedBacktrace: message })
+        .catch(() => undefined);
+      report.symbolicationStatus = 'failed';
+      report.symbolizedBacktrace = message;
+    }
   }
 
   public async getCrashReportsForReader(readerId: number): Promise<AttractapCrashReport[]> {

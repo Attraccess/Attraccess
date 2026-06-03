@@ -48,6 +48,22 @@ def hex_to_int(hex_str):
         return int(hex_str, 16)
     return hex_str
 
+def extract_build_id(firmware_bin_path, esptool_cmd, chip):
+    """Best-effort: read app_elf_sha256 from the app image so the server can
+    match the exact ELF to a coredump's build id. Returns lowercase hex or None."""
+    if not os.path.exists(firmware_bin_path):
+        return None
+    try:
+        info_cmd = [*esptool_cmd, '--chip', chip, 'image_info', firmware_bin_path]
+        result = subprocess.run(info_cmd, capture_output=True, text=True)
+        output = (result.stdout or '') + '\n' + (result.stderr or '')
+        match = re.search(r'(?:ELF file SHA256|app_elf_sha256)[^0-9a-fA-F]*([0-9a-fA-F]{64})', output)
+        if match:
+            return match.group(1).lower()
+    except Exception as e:
+        print(f"Warning: Could not extract build id from {firmware_bin_path}: {e}")
+    return None
+
 def main():
     if not shutil.which('platformio'):
         print("Warning: platformio not found, skipping firmware build")
@@ -352,6 +368,23 @@ def main():
                 print(f"Error: Failed to create merged firmware for environment '{env}': {e}")
                 sys.exit(1)
 
+            # Also export the unstripped ELF so the server can symbolicate coredumps
+            elf_path = f".pio/build/{env}/firmware.elf"
+            elf_filename = f"{current_firmware_name}_{firmware_variant}.elf"
+            build_id = None
+            if os.path.exists(elf_path):
+                try:
+                    shutil.copyfile(elf_path, os.path.join(output_dir, elf_filename))
+                    print(f"ELF copied to: {os.path.join(output_dir, elf_filename)}")
+                    build_id = extract_build_id(firmware_path, esptool_cmd, chip)
+                    print(f"  Build id: {build_id}")
+                except Exception as e:
+                    print(f"Error: Failed to copy ELF for environment '{env}': {e}")
+                    sys.exit(1)
+            else:
+                elf_filename = None
+                print(f"Warning: ELF not found at {elf_path}; symbolication will be unavailable for {env}")
+
             # Also export the app-only OTA image (do not merge bootloader/partitions)
             ota_filename = f"{current_firmware_name}_{firmware_variant}_ota.bin"
             ota_bin_path = os.path.join(output_dir, ota_filename)
@@ -390,6 +423,8 @@ def main():
                 "boardFamily": board_family if board_family else board_family_auto,
                 "filename": firmware_filename,
                 "filenameOTA": ota_filename,
+                "elfFilename": elf_filename,
+                "buildId": build_id,
                 "chip": chip,
                 "flashMode": flash_mode,
                 "flashFreq": flash_freq,
