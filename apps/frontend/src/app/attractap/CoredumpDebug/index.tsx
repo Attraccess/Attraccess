@@ -74,8 +74,10 @@ export function CoredumpDebug() {
       },
       {
         onSuccess: (data) => setResult(data),
-        onError: (error) =>
-          toast.error({ title: t('error.title'), description: (error as Error).message }),
+        onError: (error) => {
+          const body = (error as { body?: { message?: string } }).body;
+          toast.error({ title: t('error.title'), description: body?.message ?? (error as Error).message });
+        },
       },
     );
   };
@@ -89,7 +91,7 @@ export function CoredumpDebug() {
           <input
             ref={fileInputRef}
             type="file"
-            className="hidden"
+            className="sr-only"
             data-cy="coredump-file-input"
             onChange={(event) => {
               setFile(event.target.files?.[0] ?? null);

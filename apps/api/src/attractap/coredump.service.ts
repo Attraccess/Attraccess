@@ -118,10 +118,11 @@ export class AttractapCoredumpService {
   }
 
   private async runEspCoredump(coredumpPath: string, elfPath: string): Promise<string> {
-    const args = ['info_corefile', '--core', coredumpPath, '--core-format', 'elf', elfPath];
+    const args = ['info_corefile', '--core', coredumpPath, '--core-format', 'auto', elfPath];
+    let output: string;
     try {
       const { stdout, stderr } = await execFileAsync(this.coredumpBin, args, { maxBuffer: 16 * 1024 * 1024 });
-      return `${stdout}\n${stderr}`.trim();
+      output = `${stdout}\n${stderr}`.trim();
     } catch (error) {
       const err = error as NodeJS.ErrnoException & { stdout?: string; stderr?: string };
       if (err.code === 'ENOENT') {
@@ -130,10 +131,17 @@ export class AttractapCoredumpService {
           `Coredump tool '${this.coredumpBin}' is not installed on the server (set ESP_COREDUMP_BIN).`,
         );
       }
-      if (err.stdout || err.stderr) {
-        return `${err.stdout || ''}\n${err.stderr || ''}`.trim();
+      if (!err.stdout && !err.stderr) {
+        throw new BadRequestException(`Failed to symbolicate coredump: ${err.message}`);
       }
-      throw new BadRequestException(`Failed to symbolicate coredump: ${err.message}`);
+      output = `${err.stdout || ''}\n${err.stderr || ''}`.trim();
     }
+
+    const loadFailure = /(Failed to load core dump|Invalid application image)[^\n]*/.exec(output);
+    if (loadFailure) {
+      throw new BadRequestException(loadFailure[0].trim());
+    }
+
+    return output;
   }
 }

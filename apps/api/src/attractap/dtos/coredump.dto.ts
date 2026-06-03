@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { IsOptional, IsString } from 'class-validator';
 
 export class SymbolicateCoredumpDto {
   @ApiProperty({ type: 'string', format: 'binary', description: 'The raw ESP32 coredump blob' })
@@ -9,6 +10,8 @@ export class SymbolicateCoredumpDto {
     required: false,
     example: 'attractap',
   })
+  @IsOptional()
+  @IsString()
   firmwareName?: string;
 
   @ApiProperty({
@@ -16,6 +19,8 @@ export class SymbolicateCoredumpDto {
     required: false,
     example: 'eth',
   })
+  @IsOptional()
+  @IsString()
   variantName?: string;
 }
 
