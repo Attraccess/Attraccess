@@ -26,6 +26,15 @@ export class ConversationParticipant {
   })
   lastReadAt!: Date | null;
 
+  @Column({ type: 'datetime', nullable: true })
+  @ApiProperty({
+    description:
+      'When this participant was last sent an offline email notification for this conversation. Used to debounce email fallback to once per unread burst.',
+    example: '2025-01-18T12:30:00.000Z',
+    nullable: true,
+  })
+  lastNotifiedAt!: Date | null;
+
   @ManyToOne(() => Conversation, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'conversationId' })
   @ApiProperty({ description: 'The conversation this participant belongs to', type: () => Conversation })
