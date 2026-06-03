@@ -1,12 +1,9 @@
 // Inbox page combining conversation list, thread view and live SSE updates
 // FEATURE: Messaging inbox page
-import {
-  Message,
-  useMessagingServiceMessagingListConversations,
-} from '@attraccess/react-query-client';
+import { useMessagingServiceMessagingListConversations } from '@attraccess/react-query-client';
 import { Card, cn } from '@heroui/react';
-import { useQueryClient } from '@tanstack/react-query';
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { MailIcon, ArrowLeftIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
@@ -16,29 +13,38 @@ import { Button } from '../../components/button';
 import { useAuth } from '../../hooks/useAuth';
 import { ConversationList } from './ConversationList';
 import { MessageThread } from './MessageThread';
-import { useMessagingLive } from './useMessagingLive';
-import { applyIncomingMessage } from './messageCache';
 
 export function MessagesPage() {
   const { t } = useTranslations({ en, de });
   const { user } = useAuth();
-  const queryClient = useQueryClient();
 
-  const [selectedConversationId, setSelectedConversationId] = useState<number | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const conversationParam = searchParams.get('conversation');
+  const selectedConversationId =
+    conversationParam && Number.isFinite(Number(conversationParam)) ? Number(conversationParam) : null;
+
+  const selectConversation = useCallback(
+    (conversationId: number | null) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (conversationId === null) {
+            next.delete('conversation');
+          } else {
+            next.set('conversation', String(conversationId));
+          }
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
 
   const { data: conversations, isLoading } = useMessagingServiceMessagingListConversations();
 
   const selectedConversation = conversations?.find((conversation) => conversation.id === selectedConversationId);
   const partnerName = selectedConversation?.otherParticipant?.username ?? t('conversations.unknownUser');
-
-  const handleLiveMessage = useCallback(
-    (message: Message) => {
-      applyIncomingMessage(queryClient, message);
-    },
-    [queryClient],
-  );
-
-  useMessagingLive({ onMessage: handleLiveMessage });
 
   return (
     <div>
@@ -56,7 +62,7 @@ export function MessagesPage() {
               conversations={conversations}
               isLoading={isLoading}
               selectedConversationId={selectedConversationId}
-              onSelect={setSelectedConversationId}
+              onSelect={selectConversation}
             />
           </div>
 
@@ -69,7 +75,7 @@ export function MessagesPage() {
                     size="sm"
                     isIconOnly
                     className="lg:hidden"
-                    onPress={() => setSelectedConversationId(null)}
+                    onPress={() => selectConversation(null)}
                     aria-label={t('thread.back')}
                     data-cy="thread-back-button"
                   >

@@ -17,5 +17,10 @@
   "composer": {
     "placeholder": "Nachricht schreiben…",
     "send": "Senden"
+  },
+  "toast": {
+    "title": "Neue Nachricht von {{sender}}",
+    "unknownSender": "jemandem",
+    "view": "Anzeigen"
   }
 }

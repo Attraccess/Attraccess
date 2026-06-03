@@ -17,5 +17,10 @@
   "composer": {
     "placeholder": "Write a message…",
     "send": "Send"
+  },
+  "toast": {
+    "title": "New message from {{sender}}",
+    "unknownSender": "someone",
+    "view": "View"
   }
 }
