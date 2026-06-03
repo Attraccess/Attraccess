@@ -10,6 +10,8 @@ import { UpdateMetricsSettingsDto } from './dto/update-metrics-settings.dto';
 import { GenerateMetricsApiKeyResponseDto } from './dto/generate-metrics-api-key-response.dto';
 import { AuthRateLimitSettingsDto } from './dto/auth-rate-limit-settings.dto';
 import { UpdateAuthRateLimitSettingsDto } from './dto/update-auth-rate-limit-settings.dto';
+import { MessagingRateLimitSettingsDto } from './dto/messaging-rate-limit-settings.dto';
+import { UpdateMessagingRateLimitSettingsDto } from './dto/update-messaging-rate-limit-settings.dto';
 
 @ApiTags('Settings')
 @Controller('settings')
@@ -109,6 +111,24 @@ export class SettingsController {
     @Body() body: UpdateAuthRateLimitSettingsDto,
   ): Promise<AuthRateLimitSettingsDto> {
     return this.settingsService.updateAuthRateLimitSettings(body);
+  }
+
+  @Get('messaging/rate-limit')
+  @Auth('canManageSystemConfiguration')
+  @ApiOperation({ summary: 'Get messaging rate-limit settings', operationId: 'getMessagingRateLimitSettings' })
+  @ApiResponse({ status: 200, description: 'Current messaging rate-limit settings.', type: MessagingRateLimitSettingsDto })
+  async getMessagingRateLimitSettings(): Promise<MessagingRateLimitSettingsDto> {
+    return this.settingsService.getMessagingRateLimitSettings();
+  }
+
+  @Patch('messaging/rate-limit')
+  @Auth('canManageSystemConfiguration')
+  @ApiOperation({ summary: 'Update messaging rate-limit settings', operationId: 'updateMessagingRateLimitSettings' })
+  @ApiResponse({ status: 200, description: 'Messaging rate-limit settings updated.', type: MessagingRateLimitSettingsDto })
+  async updateMessagingRateLimitSettings(
+    @Body() body: UpdateMessagingRateLimitSettingsDto,
+  ): Promise<MessagingRateLimitSettingsDto> {
+    return this.settingsService.updateMessagingRateLimitSettings(body);
   }
 
   @Post('first-time-setup')

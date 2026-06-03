@@ -1,0 +1,31 @@
+{
+  "loading": "Loading rate-limit settings…",
+  "description": "Throttle how many messages each user may send and how many conversations they may open within a time window, to prevent abuse.",
+  "fields": {
+    "sendMaxPerWindow": {
+      "label": "Max messages",
+      "description": "Messages a single user may send within the send window before being throttled."
+    },
+    "sendWindowSeconds": {
+      "label": "Send window (seconds)",
+      "description": "Time window during which sent messages are counted."
+    },
+    "contactMaxPerWindow": {
+      "label": "Max new conversations",
+      "description": "Conversations a single user may open within the contact window before being throttled."
+    },
+    "contactWindowSeconds": {
+      "label": "Contact window (seconds)",
+      "description": "Time window during which opened conversations are counted."
+    }
+  },
+  "saveButton": "Save",
+  "saved": {
+    "title": "Rate-limit settings saved",
+    "description": "New thresholds take effect immediately."
+  },
+  "error": {
+    "title": "Could not save",
+    "description": "Check the values and try again."
+  }
+}

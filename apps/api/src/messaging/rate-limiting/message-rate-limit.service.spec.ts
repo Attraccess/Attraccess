@@ -1,40 +1,50 @@
 import { MessageRateLimitService } from './message-rate-limit.service';
 import { MessageRateLimitExceededException } from './message-rate-limit.exception';
+import { MessagingRateLimitPolicy } from '../../settings/constants';
+import { SettingsService } from '../../settings/settings.service';
 
 describe('MessageRateLimitService', () => {
   let service: MessageRateLimitService;
   let now: number;
+  // Small limits for the test: 3 sends / window, 2 contacts / window.
+  const policy: MessagingRateLimitPolicy = {
+    sendMaxPerWindow: 3,
+    sendWindowSeconds: 60,
+    contactMaxPerWindow: 2,
+    contactWindowSeconds: 60,
+  };
 
   beforeEach(() => {
-    service = new MessageRateLimitService();
+    const settingsService = {
+      getMessagingRateLimitPolicy: jest.fn().mockResolvedValue(policy),
+    } as unknown as SettingsService;
+    service = new MessageRateLimitService(settingsService);
     now = 1_000_000;
-    // Deterministic clock and small limits for the test.
+    // Deterministic clock.
     (service as unknown as { nowFn: () => number }).nowFn = () => now;
-    (service as unknown as { limits: Record<string, { maxActions: number; windowSeconds: number }> }).limits = {
-      send_message: { maxActions: 3, windowSeconds: 60 },
-      contact: { maxActions: 2, windowSeconds: 60 },
-    };
   });
 
-  it('allows actions up to the configured limit', () => {
-    expect(() => service.assertWithinLimit('send_message', 1)).not.toThrow();
-    expect(() => service.assertWithinLimit('send_message', 1)).not.toThrow();
-    expect(() => service.assertWithinLimit('send_message', 1)).not.toThrow();
+  it('allows actions up to the configured limit', async () => {
+    await expect(service.assertWithinLimit('send_message', 1)).resolves.toBeUndefined();
+    await expect(service.assertWithinLimit('send_message', 1)).resolves.toBeUndefined();
+    await expect(service.assertWithinLimit('send_message', 1)).resolves.toBeUndefined();
   });
 
-  it('throws a 429 once the limit is exceeded within the window', () => {
+  it('throws a 429 once the limit is exceeded within the window', async () => {
     for (let i = 0; i < 3; i += 1) {
-      service.assertWithinLimit('send_message', 1);
+      await service.assertWithinLimit('send_message', 1);
     }
-    expect(() => service.assertWithinLimit('send_message', 1)).toThrow(MessageRateLimitExceededException);
+    await expect(service.assertWithinLimit('send_message', 1)).rejects.toBeInstanceOf(
+      MessageRateLimitExceededException,
+    );
   });
 
-  it('exposes a positive retryAfterSeconds on the exception', () => {
+  it('exposes a positive retryAfterSeconds on the exception', async () => {
     for (let i = 0; i < 3; i += 1) {
-      service.assertWithinLimit('send_message', 1);
+      await service.assertWithinLimit('send_message', 1);
     }
     try {
-      service.assertWithinLimit('send_message', 1);
+      await service.assertWithinLimit('send_message', 1);
       fail('expected throw');
     } catch (error) {
       expect(error).toBeInstanceOf(MessageRateLimitExceededException);
@@ -42,30 +52,36 @@ describe('MessageRateLimitService', () => {
     }
   });
 
-  it('resets after the window elapses', () => {
+  it('resets after the window elapses', async () => {
     for (let i = 0; i < 3; i += 1) {
-      service.assertWithinLimit('send_message', 1);
+      await service.assertWithinLimit('send_message', 1);
     }
-    expect(() => service.assertWithinLimit('send_message', 1)).toThrow(MessageRateLimitExceededException);
+    await expect(service.assertWithinLimit('send_message', 1)).rejects.toBeInstanceOf(
+      MessageRateLimitExceededException,
+    );
 
     now += 60_000; // advance past the window
-    expect(() => service.assertWithinLimit('send_message', 1)).not.toThrow();
+    await expect(service.assertWithinLimit('send_message', 1)).resolves.toBeUndefined();
   });
 
-  it('tracks limits independently per user', () => {
+  it('tracks limits independently per user', async () => {
     for (let i = 0; i < 3; i += 1) {
-      service.assertWithinLimit('send_message', 1);
+      await service.assertWithinLimit('send_message', 1);
     }
-    expect(() => service.assertWithinLimit('send_message', 1)).toThrow(MessageRateLimitExceededException);
+    await expect(service.assertWithinLimit('send_message', 1)).rejects.toBeInstanceOf(
+      MessageRateLimitExceededException,
+    );
     // A different user is unaffected.
-    expect(() => service.assertWithinLimit('send_message', 2)).not.toThrow();
+    await expect(service.assertWithinLimit('send_message', 2)).resolves.toBeUndefined();
   });
 
-  it('tracks limits independently per scope', () => {
-    service.assertWithinLimit('contact', 1);
-    service.assertWithinLimit('contact', 1);
-    expect(() => service.assertWithinLimit('contact', 1)).toThrow(MessageRateLimitExceededException);
+  it('tracks limits independently per scope', async () => {
+    await service.assertWithinLimit('contact', 1);
+    await service.assertWithinLimit('contact', 1);
+    await expect(service.assertWithinLimit('contact', 1)).rejects.toBeInstanceOf(
+      MessageRateLimitExceededException,
+    );
     // The send_message scope for the same user still has budget.
-    expect(() => service.assertWithinLimit('send_message', 1)).not.toThrow();
+    await expect(service.assertWithinLimit('send_message', 1)).resolves.toBeUndefined();
   });
 });

@@ -7,6 +7,7 @@ import { AppSettingsCard } from './cards/AppSettingsCard';
 import { SmtpSettingsCard } from './cards/SmtpSettingsCard';
 import { MetricsSettingsCard } from './cards/MetricsSettingsCard';
 import { AuthRateLimitCard } from './cards/AuthRateLimitCard';
+import { MessagingRateLimitCard } from './cards/MessagingRateLimitCard';
 import { PasswordPolicyCard } from './cards/PasswordPolicyCard';
 
 export function SystemSettingsPage() {
@@ -20,6 +21,7 @@ export function SystemSettingsPage() {
         <SmtpSettingsCard variant="standalone" />
         <MetricsSettingsCard />
         <AuthRateLimitCard />
+        <MessagingRateLimitCard />
         <PasswordPolicyCard />
       </div>
     </div>

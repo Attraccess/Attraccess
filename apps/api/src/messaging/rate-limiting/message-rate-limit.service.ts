@@ -1,10 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import {
-  MAX_MESSAGE_RATE_COUNTERS,
-  MessageRateLimit,
-  MessageRateLimitScope,
-  resolveMessageRateLimits,
-} from './message-rate-limit.constants';
+import { SettingsService } from '../../settings/settings.service';
+import { MAX_MESSAGE_RATE_COUNTERS, MessageRateLimit, MessageRateLimitScope } from './message-rate-limit.constants';
 import { MessageRateLimitExceededException } from './message-rate-limit.exception';
 
 interface WindowEntry {
@@ -15,22 +11,25 @@ interface WindowEntry {
 /**
  * Lightweight in-memory, per-user rate limiter for messaging actions.
  *
- * Keyed by `scope:userId` with a fixed window. No external dependency
- * (Redis/DB) — sufficient for abuse prevention on a single API instance and
- * mirrors the existing auth brute-force protection pattern.
+ * Keyed by `scope:userId` with a fixed window. Counters live in-process (no
+ * Redis/DB) — sufficient for abuse prevention on a single API instance and
+ * mirrors the existing auth brute-force protection pattern. The limits
+ * themselves are read from the database-backed system settings on each check,
+ * so admins can tune them through the settings UI with no restart.
  */
 @Injectable()
 export class MessageRateLimitService {
   private readonly counters = new Map<string, WindowEntry>();
-  private readonly limits: Record<MessageRateLimitScope, MessageRateLimit> = resolveMessageRateLimits();
   private readonly nowFn: () => number = () => Date.now();
+
+  constructor(private readonly settingsService: SettingsService) {}
 
   /**
    * Records one action for the user within the scope and throws a 429 when the
    * configured limit is exceeded. Call this BEFORE performing the work.
    */
-  public assertWithinLimit(scope: MessageRateLimitScope, userId: number): void {
-    const limit = this.limits[scope];
+  public async assertWithinLimit(scope: MessageRateLimitScope, userId: number): Promise<void> {
+    const limit = await this.resolveLimit(scope);
     const windowMs = limit.windowSeconds * 1000;
     const now = this.nowFn();
     const key = `${scope}:${userId}`;
@@ -49,6 +48,14 @@ export class MessageRateLimitService {
     }
 
     entry.count += 1;
+  }
+
+  private async resolveLimit(scope: MessageRateLimitScope): Promise<MessageRateLimit> {
+    const policy = await this.settingsService.getMessagingRateLimitPolicy();
+    if (scope === 'send_message') {
+      return { maxActions: policy.sendMaxPerWindow, windowSeconds: policy.sendWindowSeconds };
+    }
+    return { maxActions: policy.contactMaxPerWindow, windowSeconds: policy.contactWindowSeconds };
   }
 
   private evictStale(now: number, windowMs: number): void {

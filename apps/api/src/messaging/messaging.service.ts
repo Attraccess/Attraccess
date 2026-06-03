@@ -47,7 +47,7 @@ export class MessagingService {
   ) {}
 
   public async getOrCreateConversation(currentUserId: number, targetUserId: number): Promise<Conversation> {
-    this.messageRateLimitService.assertWithinLimit('contact', currentUserId);
+    await this.messageRateLimitService.assertWithinLimit('contact', currentUserId);
 
     if (currentUserId === targetUserId) {
       throw new BadRequestException('Cannot start a conversation with yourself');
@@ -98,7 +98,7 @@ export class MessagingService {
     content: string,
     reference?: MessageReference,
   ): Promise<Message> {
-    this.messageRateLimitService.assertWithinLimit('send_message', senderId);
+    await this.messageRateLimitService.assertWithinLimit('send_message', senderId);
 
     await this.assertParticipant(conversationId, senderId);
 

@@ -22,11 +22,17 @@ import {
   METRICS_TOGGLE_DEFAULTS,
   METRICS_TOGGLE_KEYS,
   MetricsSubsystem,
+  MESSAGING_KEYS,
+  MESSAGING_PARENT,
+  MESSAGING_RATE_LIMIT_DEFAULTS,
+  MessagingRateLimitPolicy,
   RATE_LIMIT_DEFAULTS,
   RateLimitPolicy,
 } from './constants';
 import { AuthRateLimitSettingsDto } from './dto/auth-rate-limit-settings.dto';
 import { UpdateAuthRateLimitSettingsDto } from './dto/update-auth-rate-limit-settings.dto';
+import { MessagingRateLimitSettingsDto } from './dto/messaging-rate-limit-settings.dto';
+import { UpdateMessagingRateLimitSettingsDto } from './dto/update-messaging-rate-limit-settings.dto';
 import { SettingsStoreService } from './settings-store.service';
 import {
   FirstTimeSetupStatusDto,
@@ -269,6 +275,70 @@ export class SettingsService {
       ),
       exponentialBackoff: exponentialBackoff === 'true',
       backoffMultiplier: parsePositiveFloat(backoffMultiplier, RATE_LIMIT_DEFAULTS.backoffMultiplier),
+    };
+  }
+
+  async getMessagingRateLimitSettings(): Promise<MessagingRateLimitSettingsDto> {
+    return this.resolveMessagingRateLimitPolicy();
+  }
+
+  async getMessagingRateLimitPolicy(): Promise<MessagingRateLimitPolicy> {
+    return this.resolveMessagingRateLimitPolicy();
+  }
+
+  async updateMessagingRateLimitSettings(
+    update: UpdateMessagingRateLimitSettingsDto,
+  ): Promise<MessagingRateLimitSettingsDto> {
+    const writes: Array<Promise<void>> = [];
+    if (update.sendMaxPerWindow !== undefined) {
+      writes.push(
+        this.settingsStore.setPlainSetting(MESSAGING_PARENT, MESSAGING_KEYS.sendRateLimitMax, String(update.sendMaxPerWindow)),
+      );
+    }
+    if (update.sendWindowSeconds !== undefined) {
+      writes.push(
+        this.settingsStore.setPlainSetting(
+          MESSAGING_PARENT,
+          MESSAGING_KEYS.sendRateLimitWindowSeconds,
+          String(update.sendWindowSeconds),
+        ),
+      );
+    }
+    if (update.contactMaxPerWindow !== undefined) {
+      writes.push(
+        this.settingsStore.setPlainSetting(
+          MESSAGING_PARENT,
+          MESSAGING_KEYS.contactRateLimitMax,
+          String(update.contactMaxPerWindow),
+        ),
+      );
+    }
+    if (update.contactWindowSeconds !== undefined) {
+      writes.push(
+        this.settingsStore.setPlainSetting(
+          MESSAGING_PARENT,
+          MESSAGING_KEYS.contactRateLimitWindowSeconds,
+          String(update.contactWindowSeconds),
+        ),
+      );
+    }
+    await Promise.all(writes);
+    return this.resolveMessagingRateLimitPolicy();
+  }
+
+  private async resolveMessagingRateLimitPolicy(): Promise<MessagingRateLimitPolicy> {
+    const [sendMax, sendWindow, contactMax, contactWindow] = await Promise.all([
+      this.settingsStore.getPlainSetting(MESSAGING_PARENT, MESSAGING_KEYS.sendRateLimitMax),
+      this.settingsStore.getPlainSetting(MESSAGING_PARENT, MESSAGING_KEYS.sendRateLimitWindowSeconds),
+      this.settingsStore.getPlainSetting(MESSAGING_PARENT, MESSAGING_KEYS.contactRateLimitMax),
+      this.settingsStore.getPlainSetting(MESSAGING_PARENT, MESSAGING_KEYS.contactRateLimitWindowSeconds),
+    ]);
+
+    return {
+      sendMaxPerWindow: parsePositiveInt(sendMax, MESSAGING_RATE_LIMIT_DEFAULTS.sendMaxPerWindow),
+      sendWindowSeconds: parsePositiveInt(sendWindow, MESSAGING_RATE_LIMIT_DEFAULTS.sendWindowSeconds),
+      contactMaxPerWindow: parsePositiveInt(contactMax, MESSAGING_RATE_LIMIT_DEFAULTS.contactMaxPerWindow),
+      contactWindowSeconds: parsePositiveInt(contactWindow, MESSAGING_RATE_LIMIT_DEFAULTS.contactWindowSeconds),
     };
   }
 
