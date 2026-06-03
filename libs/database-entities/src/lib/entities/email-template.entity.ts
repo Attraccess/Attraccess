@@ -14,6 +14,7 @@ export enum EmailTemplateType {
   RESOURCE_HEALTH_CHANGED = 'resource-health-changed',
   USER_RETRAINING_REQUIRED = 'user-retraining-required',
   MAINTENANCE_REQUEST_CREATED = 'maintenance-request-created',
+  MESSAGE_RECEIVED = 'message-received',
 }
 
 @Entity('email_templates')

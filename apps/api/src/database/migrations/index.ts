@@ -119,3 +119,4 @@ export * from './1779500000000-attractap-crash-report';
 export * from './1780000000000-user-retraining-requirement';
 export * from './1780100000000-notification-preferences';
 export * from './1781000000000-maintenance-requests';
+export * from './1781100000000-message-email-fallback';

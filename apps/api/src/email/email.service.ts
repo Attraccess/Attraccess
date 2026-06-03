@@ -357,6 +357,31 @@ export class EmailService {
     await this.sendEmail(recipient, EmailTemplateType.MAINTENANCE_REQUEST_CREATED, context);
   }
 
+  async sendNewMessageEmail(
+    recipient: User,
+    message: { conversationId: number; senderName: string; preview: string },
+  ) {
+    if (!recipient?.email) {
+      return;
+    }
+
+    const base = await this.getBaseContext(recipient);
+    const conversationUrl = `${base.host.frontend}/messages?conversation=${message.conversationId}`;
+    const preview =
+      message.preview.length > 200 ? `${message.preview.slice(0, 200).trimEnd()}…` : message.preview;
+
+    const context = {
+      ...base,
+      message: {
+        senderName: message.senderName,
+        preview,
+        conversationUrl,
+      },
+    };
+
+    await this.sendEmail(recipient, EmailTemplateType.MESSAGE_RECEIVED, context);
+  }
+
   private async createTransporter(): Promise<{ transporter: ReturnType<typeof createTransport>; from: string }> {
     const smtpConfig = await this.settingsService.getSmtpConfiguration();
     if (!smtpConfig) {
