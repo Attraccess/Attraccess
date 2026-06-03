@@ -4316,6 +4316,10 @@ export type ConversationListItemDto = {
      */
     otherParticipant: (User) | null;
     /**
+     * Whether the other participant currently has an open live messaging stream
+     */
+    otherParticipantOnline: boolean;
+    /**
      * The most recent message in the conversation
      */
     lastMessage: (Message) | null;

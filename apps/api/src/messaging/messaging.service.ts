@@ -14,6 +14,7 @@ import {
 import { ResourceUsageService } from '../resources/usage/resourceUsage.service';
 import { MessageCreatedEvent } from './events/message-created.event';
 import { ConversationListItemDto } from './dtos/conversationListItem.dto';
+import { MessagingLiveService } from './messaging-live.service';
 import { NotificationPreferenceDto } from './dtos/notificationPreference.dto';
 import { UpdateNotificationPreferenceDto } from './dtos/updateNotificationPreference.dto';
 
@@ -40,6 +41,7 @@ export class MessagingService {
     private readonly dataSource: DataSource,
     private readonly resourceUsageService: ResourceUsageService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly messagingLiveService: MessagingLiveService,
   ) {}
 
   public async getOrCreateConversation(currentUserId: number, targetUserId: number): Promise<Conversation> {
@@ -148,9 +150,12 @@ export class MessagingService {
           order: { createdAt: 'DESC' },
         });
 
+        const otherParticipant = await this.resolveOtherParticipant(participation.conversationId, userId);
+
         return {
           id: participation.conversationId,
-          otherParticipant: await this.resolveOtherParticipant(participation.conversationId, userId),
+          otherParticipant,
+          otherParticipantOnline: otherParticipant ? this.messagingLiveService.isOnline(otherParticipant.id) : false,
           lastMessage,
           updatedAt: participation.conversation.updatedAt,
           unreadCount: await this.countUnread(participation.conversationId, userId, participation.lastReadAt),

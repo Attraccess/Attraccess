@@ -13,6 +13,7 @@ import {
   User,
 } from '@attraccess/database-entities';
 import { MessagingService } from './messaging.service';
+import { MessagingLiveService } from './messaging-live.service';
 import { MessageCreatedEvent } from './events/message-created.event';
 import { ResourceUsageService } from '../resources/usage/resourceUsage.service';
 
@@ -33,6 +34,7 @@ describe('MessagingService', () => {
   let dataSource: { transaction: jest.Mock };
   let resourceUsageService: { getActiveSession: jest.Mock };
   let eventEmitter: { emit: jest.Mock };
+  let messagingLiveService: { isOnline: jest.Mock };
 
   const pairQuery = {
     select: jest.fn().mockReturnThis(),
@@ -72,6 +74,7 @@ describe('MessagingService', () => {
     dataSource = { transaction: jest.fn() };
     resourceUsageService = { getActiveSession: jest.fn() };
     eventEmitter = { emit: jest.fn() };
+    messagingLiveService = { isOnline: jest.fn().mockReturnValue(false) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -85,6 +88,7 @@ describe('MessagingService', () => {
         { provide: DataSource, useValue: dataSource },
         { provide: ResourceUsageService, useValue: resourceUsageService },
         { provide: EventEmitter2, useValue: eventEmitter },
+        { provide: MessagingLiveService, useValue: messagingLiveService },
       ],
     }).compile();
 
@@ -217,6 +221,21 @@ describe('MessagingService', () => {
       const result = await service.listConversations(7);
 
       expect(result[0].unreadCount).toBe(4);
+    });
+
+    it('reflects the other participant online state from MessagingLiveService', async () => {
+      participantRepository.find.mockResolvedValue([
+        { conversationId: 1, lastReadAt: null, conversation: { updatedAt: new Date(1000) } },
+      ]);
+      messageRepository.findOne.mockResolvedValue({ id: 5, createdAt: new Date(2000) } as Message);
+      pairQuery.getOne = jest.fn().mockResolvedValue({ user: { id: 2 } });
+      messageRepository.count.mockResolvedValue(0);
+      messagingLiveService.isOnline.mockReturnValue(true);
+
+      const result = await service.listConversations(7);
+
+      expect(result[0].otherParticipantOnline).toBe(true);
+      expect(messagingLiveService.isOnline).toHaveBeenCalledWith(2);
     });
   });
 

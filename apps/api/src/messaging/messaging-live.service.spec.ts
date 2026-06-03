@@ -28,6 +28,20 @@ describe('MessagingLiveService', () => {
     expect(first).toBe(second);
   });
 
+  it('reports a user online while a tracked stream is subscribed and offline after teardown', () => {
+    expect(service.isOnline(1)).toBe(false);
+
+    const subscription = service.trackPresence(1, service.getUserMessageSubject(1).asObservable()).subscribe();
+    expect(service.isOnline(1)).toBe(true);
+
+    const second = service.trackPresence(1, service.getUserMessageSubject(1).asObservable()).subscribe();
+    subscription.unsubscribe();
+    expect(service.isOnline(1)).toBe(true);
+
+    second.unsubscribe();
+    expect(service.isOnline(1)).toBe(false);
+  });
+
   it('pushes the new message to every recipient except the sender', async () => {
     participantRepository.find.mockResolvedValue([
       { userId: 5 } as ConversationParticipant,

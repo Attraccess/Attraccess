@@ -5,7 +5,8 @@
     "title": "Posteingang",
     "empty": "Du hast noch keine Unterhaltungen.",
     "unknownUser": "Unbekannter Nutzer",
-    "noMessages": "Noch keine Nachrichten"
+    "noMessages": "Noch keine Nachrichten",
+    "online": "Online"
   },
   "thread": {
     "selectPrompt": "Wähle eine Unterhaltung, um Nachrichten anzuzeigen.",

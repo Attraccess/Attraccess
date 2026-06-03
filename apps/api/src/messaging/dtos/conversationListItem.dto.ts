@@ -16,6 +16,12 @@ export class ConversationListItemDto {
   otherParticipant!: User | null;
 
   @ApiProperty({
+    description: 'Whether the other participant currently has an open live messaging stream',
+    example: true,
+  })
+  otherParticipantOnline!: boolean;
+
+  @ApiProperty({
     description: 'The most recent message in the conversation',
     type: () => Message,
     nullable: true,

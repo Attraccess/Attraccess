@@ -5,7 +5,8 @@
     "title": "Inbox",
     "empty": "You have no conversations yet.",
     "unknownUser": "Unknown user",
-    "noMessages": "No messages yet"
+    "noMessages": "No messages yet",
+    "online": "Online"
   },
   "thread": {
     "selectPrompt": "Select a conversation to view messages.",
