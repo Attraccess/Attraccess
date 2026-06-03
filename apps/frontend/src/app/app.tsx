@@ -23,6 +23,7 @@ import { AccessDenied } from './unauthorized/accessDenied';
 import { getBaseUrl } from '../api';
 import { AcceptInvitation } from './accept-invitation';
 import { TwoFactorGate } from './two-factor-gate';
+import { MessagingLiveNotifications } from './messaging/MessagingLiveNotifications';
 
 function useRoutesWithAuthElements(routes: RouteConfig[]) {
   const { user } = useAuth();
@@ -116,6 +117,7 @@ function AppLayout(props: PropsWithChildren) {
       <RouterProvider navigate={navigate}>
         <I18nProvider locale={language}>
           <ToastProvider>
+            <MessagingLiveNotifications />
             <ReactFlowProvider>
               <Layout noLayout={!isAuthenticated}>
                 {props.children}

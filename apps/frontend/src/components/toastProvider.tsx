@@ -5,11 +5,17 @@ import { getTranslationKeyForApiError, Props as ApiErrorToastProps } from '../ut
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
+interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
+
 interface ToastOptions {
   title: string;
   description?: string;
   type?: ToastType;
   duration?: number;
+  action?: ToastAction;
 }
 
 const toastIcons = {
@@ -33,7 +39,7 @@ export function ToastProvider({ children }: ToastProviderProps) {
 }
 
 export function useToastMessage() {
-  const showToast = useCallback(({ title, description, type = 'info', duration = 5000 }: ToastOptions) => {
+  const showToast = useCallback(({ title, description, type = 'info', duration = 5000, action }: ToastOptions) => {
     const toastFn =
       type === 'error'
         ? toast.error
@@ -47,6 +53,7 @@ export function useToastMessage() {
       description,
       icon: toastIcons[type],
       duration,
+      action: action ? { label: action.label, onClick: action.onClick } : undefined,
     });
   }, []);
 
