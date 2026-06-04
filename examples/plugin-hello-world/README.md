@@ -11,7 +11,8 @@ guide and exercises every core capability:
 | Event handler | [`backend/plugin.ts`](backend/plugin.ts) | Subscribes to `RESOURCE_USAGE_STARTED` via `context.onEvent` (needs `LISTEN_EVENTS`). |
 | Frontend routes | [`frontend/src/plugin.tsx`](frontend/src/plugin.tsx) | Registers the `/hello-world` and `/hello-world/capabilities` pages through `getRoutes()`. |
 | Sidebar entry | [`frontend/src/plugin.tsx`](frontend/src/plugin.tsx) | Adds a "Hello World" navigation item through `getSidebarItems()`. |
-| Shared router | [`frontend/vite.config.ts`](frontend/vite.config.ts) | Reuses the host's `react-router-dom` so in-plugin `<Link>`s navigate without a reload. |
+| Host-native UI | [`frontend/src/plugin.tsx`](frontend/src/plugin.tsx) | Builds pages from the host's shared `@heroui/react` components and `lucide-react` icons, so they look native and inherit the host theme. |
+| Shared libraries | [`frontend/vite.config.ts`](frontend/vite.config.ts) | Reuses the host's `react-router-dom`, `@heroui/react` and `lucide-react` so `<Link>`s navigate without a reload and the UI uses a single, themed copy. |
 
 ## Layout
 
@@ -70,10 +71,14 @@ Open the admin **Plugins** page, click **Upload Plugin**, and select
 
 ## Notes
 
-- The frontend `shared` list (`frontend/vite.config.ts`) is trimmed to `react` +
-  `react-dom` because this example only renders plain React. Add `@heroui/react`,
-  `@tanstack/react-query`, `react-router-dom` or `react-pluggable` there if your
-  plugin imports them, so it reuses the host's copy instead of bundling its own.
+- **Recommended approach:** the frontend builds its UI from the host's own
+  libraries — `@heroui/react` (components) and `lucide-react` (icons) — so it
+  looks native and inherits light/dark theming for free. Both are listed in the
+  frontend `shared` list (`frontend/vite.config.ts`) alongside `react`,
+  `react-dom` and `react-router-dom`, so the host serves its single copy at
+  runtime and the plugin bundle only carries its own code. Add
+  `@tanstack/react-query` or `react-pluggable` there too if your plugin imports
+  them.
 - The example targets a standard Vite + `@originjs/vite-plugin-federation`
   toolchain (see `package.json` devDependencies); it is built in isolation from
   the host, exactly like a third-party plugin.

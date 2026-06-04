@@ -6,6 +6,30 @@
 //   - calls `getRoutes()` to merge the plugin's pages into the app router, and
 //   - calls `getSidebarItems()` to add navigation entries to the app sidebar.
 // See ../vite.config.ts for the build.
+//
+// RECOMMENDED: build your UI with the host's own libraries so plugins look
+// native and inherit light/dark theming for free. The host shares `@heroui/react`
+// (its component kit) and we share `lucide-react` (its icon set) through module
+// federation — see ../vite.config.ts. Importing them here means the host serves
+// the single copy it already ships, so the plugin bundle stays tiny and every
+// HeroUI component picks up the host's active theme automatically.
+import {
+  Alert,
+  AlertContent,
+  AlertDescription,
+  Button,
+  Card,
+  Chip,
+  Spinner,
+} from '@heroui/react';
+import {
+  BellIcon,
+  DatabaseIcon,
+  HandIcon,
+  PanelLeftIcon,
+  RouteIcon,
+  ServerIcon,
+} from 'lucide-react';
 import type {
   AttraccessFrontendPlugin,
   AttraccessFrontendPluginAuthData,
@@ -13,42 +37,37 @@ import type {
   RouteConfig,
 } from '@attraccess/plugins-frontend-sdk';
 import type { IPluginStore } from 'react-pluggable';
+import type { ComponentType } from 'react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 // The endpoint the example backend plugin adds to the host API.
 const GREETINGS_ENDPOINT = '/api/hello-world/greetings';
 
-// A tiny inline icon so the plugin keeps zero extra runtime dependencies — the
-// host renders whatever ReactNode the sidebar item provides.
-function WaveIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M7 11V7a2 2 0 0 1 4 0v3" />
-      <path d="M11 9V5a2 2 0 0 1 4 0v5" />
-      <path d="M15 10V6a2 2 0 0 1 4 0v8a7 7 0 0 1-7 7h-1a7 7 0 0 1-6-3.5L2 16a2 2 0 0 1 3.4-2L7 16" />
-    </svg>
-  );
-}
-
-const card: React.CSSProperties = {
-  border: '1px solid rgba(127,127,127,0.25)',
-  borderRadius: 12,
-  padding: '1rem 1.25rem',
-  background: 'rgba(127,127,127,0.06)',
-};
-
-// Shared shell so both pages get the title, intro and cross-links.
+// Shared shell so both pages get the title, intro and cross-links. Tailwind
+// utility classes (`text-default-*`, `border-default-*`, …) resolve against the
+// host's compiled stylesheet because the plugin renders inside the host DOM, so
+// spacing and colours match the rest of the app in both light and dark mode.
 function PluginShell({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div style={{ padding: '2rem', maxWidth: 880 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '0.25rem' }}>
-        <WaveIcon />
-        <h1 style={{ margin: 0 }}>{title}</h1>
+    <div className="flex flex-col gap-6 p-6 max-w-4xl mx-auto">
+      <div className="flex items-center gap-3">
+        <HandIcon className="w-6 h-6 text-primary" />
+        <h1 className="text-2xl font-semibold text-default-800">{title}</h1>
       </div>
-      <nav style={{ display: 'flex', gap: '1rem', margin: '0.75rem 0 1.5rem' }}>
-        <Link to="/hello-world" data-cy="hello-world-nav-greetings">Greetings</Link>
-        <Link to="/hello-world/capabilities" data-cy="hello-world-nav-capabilities">Capabilities</Link>
+      <nav className="flex gap-2">
+        <Button as={Link} to="/hello-world" variant="ghost" size="sm" data-cy="hello-world-nav-greetings">
+          Greetings
+        </Button>
+        <Button
+          as={Link}
+          to="/hello-world/capabilities"
+          variant="ghost"
+          size="sm"
+          data-cy="hello-world-nav-capabilities"
+        >
+          Capabilities
+        </Button>
       </nav>
       {children}
     </div>
@@ -72,47 +91,82 @@ function HelloWorldPage() {
 
   return (
     <PluginShell title="Hello World">
-      <div data-cy="hello-world-plugin-page" style={card}>
-        <h2 style={{ marginTop: 0 }}>Greetings from the backend</h2>
-        <p style={{ marginTop: 0, opacity: 0.8 }}>
-          Served by the plugin's NestJS controller at <code>GET /hello-world/greetings</code>, which reads
-          host users through an injected repository (needs the <code>READ_USERS</code> permission).
-        </p>
-        {loading && <p>Loading…</p>}
-        {error && <p style={{ color: '#e5484d' }}>Failed to load greetings: {error}</p>}
-        {!loading && !error && (
-          <ul data-cy="hello-world-greetings" style={{ marginBottom: 0 }}>
-            {greetings.map((greeting) => (
-              <li key={greeting}>{greeting}</li>
-            ))}
-          </ul>
-        )}
-      </div>
+      <Card data-cy="hello-world-plugin-page" className="border border-default-200 dark:border-default-100">
+        <Card.Header className="flex flex-col items-start gap-1">
+          <p className="text-base font-semibold text-default-700">Greetings from the backend</p>
+          <p className="text-sm text-default-500">
+            Served by the plugin's NestJS controller at <code>GET /hello-world/greetings</code>, which reads host
+            users through an injected repository (needs the <code>READ_USERS</code> permission).
+          </p>
+        </Card.Header>
+        <Card.Content>
+          {loading && (
+            <div className="flex items-center gap-2 text-default-500">
+              <Spinner size="sm" /> Loading…
+            </div>
+          )}
+          {error && (
+            <Alert status="danger">
+              <AlertContent>
+                <AlertDescription>Failed to load greetings: {error}</AlertDescription>
+              </AlertContent>
+            </Alert>
+          )}
+          {!loading && !error && (
+            <ul data-cy="hello-world-greetings" className="flex flex-col gap-2">
+              {greetings.map((greeting) => (
+                <li key={greeting}>
+                  <Chip color="accent" variant="soft">
+                    {greeting}
+                  </Chip>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card.Content>
+      </Card>
     </PluginShell>
   );
 }
 
 // Page 2: a static showcase of the capabilities the example exercises.
 function CapabilitiesPage() {
-  const items = [
-    { title: 'Backend controller', body: 'Adds GET /hello-world/greetings to the host API.' },
-    { title: 'Injected repository', body: "Reads users via context.getRepository('User') (needs READ_USERS)." },
-    { title: 'Typed event handler', body: 'Subscribes to RESOURCE_USAGE_STARTED via context.onEvent (needs LISTEN_EVENTS).' },
-    { title: 'Frontend route', body: 'Registers the /hello-world pages through getRoutes().' },
-    { title: 'Sidebar entry', body: 'Contributes this navigation item through getSidebarItems().' },
+  const items: { title: string; body: string; icon: ComponentType<{ className?: string }> }[] = [
+    { title: 'Backend controller', body: 'Adds GET /hello-world/greetings to the host API.', icon: ServerIcon },
+    {
+      title: 'Injected repository',
+      body: "Reads users via context.getRepository('User') (needs READ_USERS).",
+      icon: DatabaseIcon,
+    },
+    {
+      title: 'Typed event handler',
+      body: 'Subscribes to RESOURCE_USAGE_STARTED via context.onEvent (needs LISTEN_EVENTS).',
+      icon: BellIcon,
+    },
+    { title: 'Frontend route', body: 'Registers the /hello-world pages through getRoutes().', icon: RouteIcon },
+    {
+      title: 'Sidebar entry',
+      body: 'Contributes this navigation item through getSidebarItems().',
+      icon: PanelLeftIcon,
+    },
   ];
 
   return (
     <PluginShell title="Hello World — Capabilities">
       <div
         data-cy="hello-world-capabilities-page"
-        style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '1rem' }}
+        className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
       >
         {items.map((item) => (
-          <div key={item.title} style={card}>
-            <h3 style={{ margin: '0 0 0.4rem' }}>{item.title}</h3>
-            <p style={{ margin: 0, opacity: 0.8, fontSize: 14 }}>{item.body}</p>
-          </div>
+          <Card key={item.title} className="border border-default-200 dark:border-default-100">
+            <Card.Header className="flex flex-row items-center gap-2">
+              <item.icon className="w-5 h-5 text-primary" />
+              <p className="text-base font-semibold text-default-700">{item.title}</p>
+            </Card.Header>
+            <Card.Content>
+              <p className="text-sm text-default-500">{item.body}</p>
+            </Card.Content>
+          </Card>
         ))}
       </div>
     </PluginShell>
@@ -170,13 +224,14 @@ export default class HelloWorldPlugin implements AttraccessFrontendPlugin {
 
   // Contribute a sidebar entry that links to the plugin's landing page. The
   // host gates it behind the target route's auth, so it only shows when the
-  // user can actually open it.
+  // user can actually open it. The icon is a lucide-react glyph — the same set
+  // the host sidebar uses — so it lines up visually with the built-in entries.
   getSidebarItems(): PluginSidebarItem[] {
     return [
       {
         label: 'Hello World',
         path: '/hello-world',
-        icon: <WaveIcon />,
+        icon: <HandIcon className="w-5 h-5" />,
       },
     ];
   }

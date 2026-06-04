@@ -55,6 +55,7 @@ export default defineConfig(({ command }) => {
         'react-router-dom': { requiredVersion: '*' },
         'react-pluggable': { requiredVersion: '*' },
         '@heroui/react': { requiredVersion: '*' },
+        'lucide-react': { requiredVersion: '*' },
         '@tanstack/react-query': { requiredVersion: '*' },
       },
     }),

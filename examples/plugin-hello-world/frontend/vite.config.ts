@@ -8,11 +8,14 @@ import federation from '@originjs/vite-plugin-federation';
 // `shared` must list every host singleton the plugin *imports at runtime* so the
 // plugin reuses the host's copy instead of bundling its own. The host shares
 // (see apps/frontend/vite.config.ts): react, react-dom, react-router-dom,
-// react-pluggable, @heroui/react, @tanstack/react-query. This example renders
-// plain React and uses the host's router for in-plugin links, so it shares
-// react + react-dom + react-router-dom. Add the others here if your plugin
-// imports them (e.g. @heroui/react for host-styled components). Sharing the
-// router is what lets the plugin's <Link>s reuse the host navigation context.
+// react-pluggable, @heroui/react, lucide-react, @tanstack/react-query.
+//
+// This example follows the recommended approach: it builds its UI from the
+// host's own libraries — `@heroui/react` (components, themed) and `lucide-react`
+// (icons) — so it looks native and inherits light/dark mode for free. Every
+// shared package listed here is served from the host's single copy at runtime,
+// so the plugin bundle only carries its own code. Sharing the router is what
+// lets the plugin's <Link>s reuse the host navigation context.
 export default defineConfig({
   plugins: [
     react(),
@@ -31,6 +34,8 @@ export default defineConfig({
         react: { singleton: true, requiredVersion: '*' },
         'react-dom': { singleton: true, requiredVersion: '*' },
         'react-router-dom': { singleton: true, requiredVersion: '*' },
+        '@heroui/react': { singleton: true, requiredVersion: '*' },
+        'lucide-react': { singleton: true, requiredVersion: '*' },
       },
     }),
   ],

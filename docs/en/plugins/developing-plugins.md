@@ -256,7 +256,22 @@ A frontend plugin is an ES module that **default-exports a class** implementing
 *remote* (exposing `./plugin`), instantiates the class, and calls `getRoutes()`
 to merge your pages into the app router.
 
+> [!TIP]
+> **Recommended: build your UI with the host's own libraries.** The host shares
+> its component kit [`@heroui/react`](https://www.heroui.com/) and its icon set
+> [`lucide-react`](https://lucide.dev/) over module federation (see
+> [Packaging the frontend](#packaging-the-frontend)). Import them instead of
+> hand-rolling styles and your pages look native, stay consistent, and inherit
+> the host's **light/dark theme automatically** — HeroUI components read the
+> active theme from the host, and Tailwind utility classes (`text-default-500`,
+> `border-default-200`, …) resolve against the host's stylesheet because your
+> page renders inside the host DOM. Because these packages are *shared*, the
+> host serves its single copy at runtime, so your plugin bundle only carries its
+> own code.
+
 ```tsx
+import { Card, Chip, Spinner } from '@heroui/react';
+import { HandIcon } from 'lucide-react';
 import type {
   AttraccessFrontendPlugin,
   AttraccessFrontendPluginAuthData,
@@ -267,17 +282,36 @@ import { useEffect, useState } from 'react';
 
 function HelloWorldPage() {
   const [greetings, setGreetings] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetch('/api/hello-world/greetings', { credentials: 'include' })
       .then((res) => res.json())
-      .then((data: { greetings: string[] }) => setGreetings(data.greetings));
+      .then((data: { greetings: string[] }) => setGreetings(data.greetings))
+      .finally(() => setLoading(false));
   }, []);
 
   return (
-    <div style={{ padding: '2rem' }}>
-      <h1>Hello World Plugin</h1>
-      <ul>{greetings.map((g) => <li key={g}>{g}</li>)}</ul>
+    <div className="flex flex-col gap-6 p-6 max-w-4xl mx-auto">
+      <div className="flex items-center gap-3">
+        <HandIcon className="w-6 h-6 text-primary" />
+        <h1 className="text-2xl font-semibold text-default-800">Hello World Plugin</h1>
+      </div>
+      <Card className="border border-default-200 dark:border-default-100">
+        <Card.Content>
+          {loading ? (
+            <Spinner size="sm" />
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {greetings.map((g) => (
+                <li key={g}>
+                  <Chip color="accent" variant="soft">{g}</Chip>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card.Content>
+      </Card>
     </div>
   );
 }
@@ -323,7 +357,13 @@ Build the frontend as a module federation remote exposing `./plugin`. Its
 `shared` list must include every host singleton your plugin **imports at
 runtime**, so it reuses the host's copy instead of bundling its own. The host
 shares: `react`, `react-dom`, `react-router-dom`, `react-pluggable`,
-`@heroui/react`, `@tanstack/react-query`.
+`@heroui/react`, `lucide-react`, `@tanstack/react-query`.
+
+> [!TIP]
+> List `@heroui/react` and `lucide-react` here when you follow the recommended
+> approach above. They are large libraries — sharing them keeps your plugin
+> bundle small (the host serves its copy) and guarantees a single, themed
+> instance of the component kit.
 
 ```ts
 // frontend/vite.config.ts
@@ -338,8 +378,9 @@ export default defineConfig({
       name: 'plugin-hello-world',
       filename: 'remoteEntry.js',
       exposes: { './plugin': './src/plugin.tsx' },
-      // Only what the plugin imports. Add @heroui/react etc. if you use them.
-      shared: ['react', 'react-dom'],
+      // Every host singleton the plugin imports at runtime. @heroui/react and
+      // lucide-react are listed here because the recommended UI uses them.
+      shared: ['react', 'react-dom', 'react-router-dom', '@heroui/react', 'lucide-react'],
     }),
   ],
   // Emit remoteEntry.js at the output root so the manifest entryPoint resolves.
