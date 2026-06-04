@@ -42,8 +42,17 @@ private:
     void updateInfoFromAppState();
     void connectWebSocket();
     bool shouldReconnect();
-    uint32_t lastReconnectAttemptTime;
-    const uint32_t RECONNECT_INTERVAL_MS = 10000;
+    uint32_t lastReconnectAttemptTime = 0;
+
+    const uint32_t RECONNECT_BACKOFF_BASE_MS = 10000;
+    const uint32_t RECONNECT_BACKOFF_MAX_MS = 60000;
+    uint32_t reconnectBackoffMs = 10000;
+    void growReconnectBackoff();
+    void resetReconnectBackoff();
+
+    uint32_t lastHeapLogTime = 0;
+    const uint32_t HEAP_LOG_INTERVAL_MS = 30000;
+    void logHeapStats();
 
     uint32_t lastInboundFrameTime = 0;
     const uint32_t INBOUND_LIVENESS_TIMEOUT_MS = 20000;
@@ -52,6 +61,7 @@ private:
     bool network_is_connected = false;
 
     AttraccessApiConfig _lastApiConfig;
+    int _clientCertIndex = -1;
 
     ConnectionState _state = INIT;
     void setState(ConnectionState state);

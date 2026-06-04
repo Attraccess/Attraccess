@@ -1,4 +1,5 @@
 #include "websocket.hpp"
+#include "esp_heap_caps.h"
 
 void Websocket::setup()
 {
@@ -28,6 +29,13 @@ void Websocket::unlockWsClient()
 
 void Websocket::loop()
 {
+    uint32_t nowMs = millis();
+    if (nowMs - this->lastHeapLogTime >= this->HEAP_LOG_INTERVAL_MS)
+    {
+        this->lastHeapLogTime = nowMs;
+        this->logHeapStats();
+    }
+
     if (!connectionAttemptsEnabled)
     {
         return;
@@ -83,6 +91,7 @@ void Websocket::connectWebSocket()
         return;
     }
     lastReconnectAttemptTime = millis();
+    growReconnectBackoff();
 
     logger.info("connectWebSocket");
 
@@ -90,25 +99,10 @@ void Websocket::connectWebSocket()
     {
         logger.info("connectWebSocket: network is not connected");
         setState(INIT);
-
-        // TODO: replace with a logic that compares a timestamp to now
-        // vTaskDelay(RECONNECT_INTERVAL_MS / portTICK_PERIOD_MS);
         return;
     }
 
     AttraccessApiConfig apiConfig = Settings::getAttraccessApiConfig();
-    _lastApiConfig = apiConfig;
-    setState(CONNECTING);
-
-    lockWsClient();
-    esp_websocket_client_handle_t oldClient = ws_client;
-    ws_client = nullptr;
-    unlockWsClient();
-    if (oldClient)
-    {
-        esp_websocket_client_destroy(oldClient);
-    }
-
     String serverHostname = apiConfig.hostname;
     uint16_t serverPort = apiConfig.port;
 
@@ -120,14 +114,59 @@ void Websocket::connectWebSocket()
         return;
     }
 
+    const char *certPem = nullptr;
+    int certIndex = -1;
     if (apiConfig.useSSL)
     {
         logger.info("connectWebSocket: using SSL");
+        if (!this->_certManager.getCertificate(&certPem))
+        {
+            logger.error("Failed to get certificate");
+            setState(INIT);
+            return;
+        }
+        certIndex = this->_certManager.getCurrentCertIndex();
     }
     else
     {
         logger.info("connectWebSocket: non secure (no SSL)");
     }
+
+    bool configMatchesClient =
+        _lastApiConfig.hostname == apiConfig.hostname &&
+        _lastApiConfig.port == apiConfig.port &&
+        _lastApiConfig.useSSL == apiConfig.useSSL &&
+        _clientCertIndex == certIndex;
+
+    _lastApiConfig = apiConfig;
+    setState(CONNECTING);
+
+    lockWsClient();
+    esp_websocket_client_handle_t existingClient = ws_client;
+    unlockWsClient();
+
+    if (existingClient && configMatchesClient)
+    {
+        logger.info("connectWebSocket: reusing existing client (stop+start)");
+        esp_websocket_client_stop(existingClient);
+        esp_err_t restartRet = esp_websocket_client_start(existingClient);
+        if (restartRet == ESP_OK)
+        {
+            logger.info("connectWebSocket: WebSocket restarted");
+            return;
+        }
+        logger.error((String("Failed to restart WebSocket client: ") + esp_err_to_name(restartRet)).c_str());
+    }
+
+    lockWsClient();
+    esp_websocket_client_handle_t oldClient = ws_client;
+    ws_client = nullptr;
+    unlockWsClient();
+    if (oldClient)
+    {
+        esp_websocket_client_destroy(oldClient);
+    }
+
     String protocol = (apiConfig.useSSL) ? "wss" : "ws";
     String wsUrl = protocol + "://" + serverHostname + ":" + String(serverPort) + "/api/attractap/websocket";
     logger.info(("Connecting to WebSocket: " + wsUrl).c_str());
@@ -145,6 +184,8 @@ void Websocket::connectWebSocket()
     websocket_cfg.pingpong_timeout_sec = PINGPONG_TIMEOUT_SEC;
     websocket_cfg.disable_pingpong_discon = false;
 
+    websocket_cfg.disable_auto_reconnect = true;
+
     websocket_cfg.keep_alive_enable = true;
     websocket_cfg.keep_alive_idle = 5;
     websocket_cfg.keep_alive_interval = 5;
@@ -153,14 +194,10 @@ void Websocket::connectWebSocket()
     if (apiConfig.useSSL)
     {
         websocket_cfg.transport = WEBSOCKET_TRANSPORT_OVER_SSL;
-
-        if (!this->_certManager.getCertificate(&websocket_cfg.cert_pem))
-        {
-            logger.error("Failed to get certificate");
-            setState(INIT);
-            return;
-        }
+        websocket_cfg.cert_pem = certPem;
     }
+
+    _clientCertIndex = certIndex;
 
     esp_websocket_client_handle_t newClient = esp_websocket_client_init(&websocket_cfg);
     if (!newClient)
@@ -194,7 +231,25 @@ void Websocket::connectWebSocket()
 
 bool Websocket::shouldReconnect()
 {
-    return millis() - this->lastReconnectAttemptTime >= this->RECONNECT_INTERVAL_MS;
+    return millis() - this->lastReconnectAttemptTime >= this->reconnectBackoffMs;
+}
+
+void Websocket::growReconnectBackoff()
+{
+    uint32_t next = this->reconnectBackoffMs * 2;
+    this->reconnectBackoffMs = (next > this->RECONNECT_BACKOFF_MAX_MS) ? this->RECONNECT_BACKOFF_MAX_MS : next;
+}
+
+void Websocket::resetReconnectBackoff()
+{
+    this->reconnectBackoffMs = this->RECONNECT_BACKOFF_BASE_MS;
+}
+
+void Websocket::logHeapStats()
+{
+    this->logger.infof("Heap internal: free=%u largest=%u",
+                       (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+                       (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
 }
 
 void Websocket::websocket_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
@@ -218,6 +273,7 @@ void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, v
         {
             this->_certManager.markSuccess();
         }
+        resetReconnectBackoff();
         setState(CONNECTED);
         break;
 
