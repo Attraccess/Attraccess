@@ -87,6 +87,12 @@ void API::processIncomingMessage(const char *buf, size_t len)
         return;
     }
 
+    const char *topLevelEvent = inboundDoc["event"].as<const char *>();
+    if (topLevelEvent && strcmp(topLevelEvent, "HEARTBEAT") == 0)
+    {
+        return;
+    }
+
     const char *eventType = inboundDoc["data"]["type"].as<const char *>();
     if (!eventType)
     {

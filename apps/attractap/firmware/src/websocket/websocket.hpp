@@ -45,6 +45,10 @@ private:
     uint32_t lastReconnectAttemptTime;
     const uint32_t RECONNECT_INTERVAL_MS = 10000;
 
+    uint32_t lastInboundFrameTime = 0;
+    const uint32_t INBOUND_LIVENESS_TIMEOUT_MS = 20000;
+    const int PINGPONG_TIMEOUT_SEC = 10;
+
     bool network_is_connected = false;
 
     AttraccessApiConfig _lastApiConfig;
