@@ -25,7 +25,11 @@ import { ResourceRetrainingService } from '../retraining/resourceRetraining.serv
 import { ResourceMaintenanceService } from '../maintenances/maintenance.service';
 import { ResourceNotFoundException } from '../../exceptions/resource.notFound.exception';
 import { ResourceUsageImpossibleMaintenanceInProgressException } from '../../exceptions/resource.maintenance.inUse.exception';
-import { ResourceUsageEvent, ResourceUsageTakenOverEvent } from './events/resource-usage.events';
+import {
+  ResourceUsageEvent,
+  ResourceUsageTakenOverEvent,
+  ResourceUsageNoteAddedEvent,
+} from './events/resource-usage.events';
 import { BillingService } from '../../billing/billing.service';
 import { InsufficientBalanceError } from '../../billing/errors/insufficient-balance.error';
 import { ResourceInUseError } from './errors/resource-in-use.error';
@@ -949,6 +953,46 @@ describe('ResourceUsageService', () => {
       const eventPayload = emitted?.[1] as ResourceUsageEvent;
       expect(eventPayload).toBeInstanceOf(ResourceUsageEvent);
       expect(eventPayload.usage).toMatchObject({ id: 1, userId: 1, endNotes: 'Session completed' });
+    });
+
+    const setupEndSession = () => {
+      const mockActiveSession = {
+        id: 1,
+        resourceId: 1,
+        userId: 1,
+        startTime: new Date(),
+        user: { id: 1, username: 'owner' } as User,
+      } as ResourceUsage;
+      const mockUpdatedSession = { ...mockActiveSession, endTime: new Date(), endNotes: 'note text' };
+      resourceUsageRepository.findOne
+        .mockResolvedValueOnce(mockActiveSession)
+        .mockResolvedValueOnce(mockUpdatedSession)
+        .mockResolvedValueOnce(mockUpdatedSession);
+      const mockUpdateQueryBuilder = createMockQueryBuilder(null);
+      (mockUpdateQueryBuilder.update as jest.Mock).mockReturnValue(mockUpdateQueryBuilder);
+      resourceUsageRepository.createQueryBuilder.mockReturnValue(
+        mockUpdateQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>,
+      );
+    };
+
+    it('emits ResourceUsageNoteAddedEvent when a user note is present', async () => {
+      setupEndSession();
+
+      await service.endSession(1, mockUser, { notes: 'note text' });
+
+      const noteEmit = eventEmitter.emit.mock.calls.find((c) => c[0] === ResourceUsageNoteAddedEvent.EVENT_NAME);
+      expect(noteEmit).toBeDefined();
+      const payload = noteEmit?.[1] as ResourceUsageNoteAddedEvent;
+      expect(payload).toMatchObject({ resourceId: 1, note: 'note text', phase: 'end' });
+    });
+
+    it('does not emit the note event when skipNoteNotification is set (flow-ended session)', async () => {
+      setupEndSession();
+
+      await service.endSession(1, mockUser, { notes: 'auto note' }, { skipNoteNotification: true });
+
+      const noteEmit = eventEmitter.emit.mock.calls.find((c) => c[0] === ResourceUsageNoteAddedEvent.EVENT_NAME);
+      expect(noteEmit).toBeUndefined();
     });
 
     it('should throw error when no active session exists', async () => {

@@ -18,7 +18,11 @@ import { ResourceUsageImpossibleMaintenanceInProgressException } from '../../exc
 import { ResourceUnhealthyException } from '../../exceptions/resource.unhealthy.exception';
 import { ResourceHealthService } from '../health/resource-health.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { ResourceUsageEvent, ResourceUsageTakenOverEvent } from './events/resource-usage.events';
+import {
+  ResourceUsageEvent,
+  ResourceUsageTakenOverEvent,
+  ResourceUsageNoteAddedEvent,
+} from './events/resource-usage.events';
 import { ResourceIntroductionsService } from '../introductions/resouceIntroductions.service';
 import { ResourceIntroducersService } from '../introducers/resourceIntroducers.service';
 import { ResourceGroupsIntroductionsService } from '../groups/introductions/resourceGroups.introductions.service';
@@ -34,6 +38,13 @@ import { ResourceFormAction } from '@attraccess/database-entities';
 import { MetricsService } from '../../metrics/metrics.service';
 import { SystemEvent } from '@attraccess/plugins-backend-sdk';
 import { PluginEventsService } from '../../plugin-system/plugin-events.service';
+
+export interface EndSessionOptions {
+  /** Skip persisting required END-action form submissions (used by automated/flow paths). */
+  skipFormSubmissions?: boolean;
+  /** Skip emitting ResourceUsageNoteAddedEvent (used when the note is auto-generated, e.g. flow-ended). */
+  skipNoteNotification?: boolean;
+}
 
 @Injectable()
 export class ResourceUsageService {
@@ -461,6 +472,16 @@ export class ResourceUsageService {
     this.metricsService.resourceUsageSessionsTotal.inc({ action: 'start' });
     this.metricsService.resourceUsageSessionsActive.inc();
 
+    if (dto.notes?.trim()) {
+      this.eventEmitter.emit(
+        ResourceUsageNoteAddedEvent.EVENT_NAME,
+        new ResourceUsageNoteAddedEvent(resourceId, dto.notes.trim(), 'start', {
+          id: user.id,
+          username: user.username,
+        }),
+      );
+    }
+
     return newSession;
   }
 
@@ -468,8 +489,11 @@ export class ResourceUsageService {
     resourceId: number,
     user: User,
     dto: EndUsageSessionDto,
-    skipFormSubmissions = false,
+    options: EndSessionOptions = {},
   ): Promise<ResourceUsage> {
+    // skipNoteNotification: flow-ended sessions carry an auto-generated note, not a human one — skip personnel notification.
+    const { skipFormSubmissions = false, skipNoteNotification = false } = options;
+
     this.logger.debug(`Ending session for resource ${resourceId} by user ${user.id}`, { dto });
 
     // Find active session
@@ -575,6 +599,16 @@ export class ResourceUsageService {
     if (updatedUsage?.startTime && updatedUsage?.endTime) {
       const durationSeconds = (updatedUsage.endTime.getTime() - updatedUsage.startTime.getTime()) / 1000;
       this.metricsService.resourceUsageDurationSeconds.observe(durationSeconds);
+    }
+
+    if (!skipNoteNotification && dto.notes?.trim()) {
+      this.eventEmitter.emit(
+        ResourceUsageNoteAddedEvent.EVENT_NAME,
+        new ResourceUsageNoteAddedEvent(resourceId, dto.notes.trim(), 'end', {
+          id: user.id,
+          username: user.username,
+        }),
+      );
     }
 
     return updatedUsage;
