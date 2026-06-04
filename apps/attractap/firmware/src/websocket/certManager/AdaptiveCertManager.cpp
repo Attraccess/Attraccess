@@ -209,6 +209,16 @@ int AdaptiveCertManager::getCurrentCertIndex() const
     return currentCertIndex;
 }
 
+int AdaptiveCertManager::getCertCount() const
+{
+    return CA_CERT_COUNT;
+}
+
+int AdaptiveCertManager::getRememberedFailureCount() const
+{
+    return rememberedCertFailureCount;
+}
+
 void AdaptiveCertManager::loadSuccessfulCertIndexFromPreferences()
 {
     if (!initialized)
