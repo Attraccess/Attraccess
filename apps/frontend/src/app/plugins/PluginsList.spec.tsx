@@ -2,7 +2,10 @@ import '@testing-library/jest-dom/vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
 import { PluginsList } from './PluginsList';
+
+const renderPage = () => render(<PluginsList />, { wrapper: MemoryRouter });
 
 interface DeleteOptions {
   onSuccess?: () => void;
@@ -59,10 +62,9 @@ afterEach(() => {
 });
 
 describe('PluginsList', () => {
-  it('renders the work-in-progress alert, title, upload button and table headers', () => {
-    render(<PluginsList />);
+  it('renders the title, upload button and table headers', () => {
+    renderPage();
 
-    expect(screen.getByText('Work in progress')).toBeInTheDocument();
     expect(screen.getByText('Installed Plugins')).toBeInTheDocument();
     expect(screen.getByText('Upload Plugin')).toBeInTheDocument();
     expect(screen.getByText('Name')).toBeInTheDocument();
@@ -72,13 +74,13 @@ describe('PluginsList', () => {
   });
 
   it('shows the empty state when no plugins are installed', () => {
-    render(<PluginsList />);
+    renderPage();
     expect(screen.getByText('No entries found')).toBeInTheDocument();
   });
 
   it('renders a row per plugin with name, version, directory and permission chips', () => {
     hoisted.plugins = [makePlugin()];
-    render(<PluginsList />);
+    renderPage();
 
     expect(screen.getByText('Cool Plugin')).toBeInTheDocument();
     expect(screen.getByText('1.2.3')).toBeInTheDocument();
@@ -89,7 +91,7 @@ describe('PluginsList', () => {
 
   it('falls back to a dash for a missing directory and "None requested" for no permissions', () => {
     hoisted.plugins = [makePlugin({ pluginDirectory: '', permissions: [] })];
-    render(<PluginsList />);
+    renderPage();
 
     expect(screen.getByText('-')).toBeInTheDocument();
     expect(screen.getByText('None requested')).toBeInTheDocument();
@@ -97,7 +99,7 @@ describe('PluginsList', () => {
 
   it('opens the upload drawer when the upload button is pressed', async () => {
     const user = userEvent.setup();
-    render(<PluginsList />);
+    renderPage();
 
     expect(document.querySelector('[data-cy="upload-plugin-modal"]')).not.toBeInTheDocument();
 
@@ -111,7 +113,7 @@ describe('PluginsList', () => {
   it('opens the delete confirmation modal when a delete button is pressed', async () => {
     hoisted.plugins = [makePlugin()];
     const user = userEvent.setup();
-    render(<PluginsList />);
+    renderPage();
 
     await user.click(
       document.querySelector('[data-cy="plugins-list-delete-plugin-button-plugin-1"]') as Element
@@ -127,7 +129,7 @@ describe('PluginsList', () => {
   it('calls deletePlugin with the plugin id when deletion is confirmed', async () => {
     hoisted.plugins = [makePlugin()];
     const user = userEvent.setup();
-    render(<PluginsList />);
+    renderPage();
 
     await user.click(
       document.querySelector('[data-cy="plugins-list-delete-plugin-button-plugin-1"]') as Element
@@ -143,7 +145,7 @@ describe('PluginsList', () => {
   it('shows a success toast after a successful delete', () => {
     vi.useFakeTimers();
     hoisted.plugins = [makePlugin()];
-    render(<PluginsList />);
+    renderPage();
 
     hoisted.deleteOptions?.onSuccess?.();
 
@@ -156,7 +158,7 @@ describe('PluginsList', () => {
   it('shows an error toast when the delete fails', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     hoisted.plugins = [makePlugin()];
-    render(<PluginsList />);
+    renderPage();
 
     hoisted.deleteOptions?.onError?.(new Error('boom'));
 
@@ -167,7 +169,7 @@ describe('PluginsList', () => {
   it('cancels the delete without calling the mutation', async () => {
     hoisted.plugins = [makePlugin()];
     const user = userEvent.setup();
-    render(<PluginsList />);
+    renderPage();
 
     await user.click(
       document.querySelector('[data-cy="plugins-list-delete-plugin-button-plugin-1"]') as Element
@@ -182,7 +184,7 @@ describe('PluginsList', () => {
 
   it('renders permission chips scoped to the plugin row', () => {
     hoisted.plugins = [makePlugin({ id: 'p-perms', permissions: ['admin'] })];
-    render(<PluginsList />);
+    renderPage();
 
     const container = document.querySelector('[data-cy="plugins-list-permissions-p-perms"]') as HTMLElement;
     expect(container).toBeInTheDocument();

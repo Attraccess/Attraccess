@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo } from 'react';
-import { X, Settings, LogOut, User, ExternalLink, Languages, Check } from 'lucide-react';
+import { X, Settings, LogOut, User, ExternalLink, Languages, Check, PackageIcon } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
@@ -27,6 +27,8 @@ import en from './sidebar.en.json';
 import { Logo } from '../../components/logo';
 import { SidebarItem, SidebarItemGroup, useSidebarItems, useSidebarEndItems } from './sidebarItems';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import usePluginState from '../plugins/plugin.state';
+import type { PluginSidebarItem } from '@attraccess/plugins-frontend-sdk';
 
 interface NavLinkProps {
   href: string;
@@ -90,6 +92,24 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
 
   const routes = useAllRoutes();
   const sidebarItems = useSidebarItems();
+  const { plugins } = usePluginState();
+
+  // Sidebar entries contributed by installed frontend plugins. Each plugin's
+  // getSidebarItems() is optional and isolated so a throwing plugin can't break
+  // the shell. Visibility is still gated by the target route's auth below.
+  const pluginNavItems: PluginSidebarItem[] = useMemo(() => {
+    return plugins.flatMap((manifest) => {
+      try {
+        return manifest.plugin.getSidebarItems?.() ?? [];
+      } catch (error) {
+        console.error(
+          `Attraccess Plugin System: getSidebarItems() of plugin "${manifest.plugin.getPluginName()}" threw`,
+          error,
+        );
+        return [];
+      }
+    });
+  }, [plugins]);
 
   const showNavItem = useCallback(
     (item: SidebarItem) => {
@@ -149,6 +169,10 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
   const defaultGroupItems = useMemo(() => {
     return navigationGroups.find((group) => group.translationKey === '##default##')?.items;
   }, [navigationGroups]);
+
+  const visiblePluginNavItems = useMemo(() => {
+    return pluginNavItems.filter((item) => showNavItem({ path: item.path } as SidebarItem));
+  }, [pluginNavItems, showNavItem]);
 
   const otherGroups = useMemo(() => {
     return navigationGroups.filter((group) => group.translationKey !== '##default##');
@@ -218,6 +242,15 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
                 label={t('groups.##default##.items.' + item.translationKey)}
                 data-cy={`sidebar-nav-${item.path?.replace('/', '')}`}
                 badgeCount={item.badgeCount}
+              />
+            ))}
+            {visiblePluginNavItems.map((item) => (
+              <NavLink
+                key={item.path}
+                href={item.path}
+                icon={item.icon ?? <PackageIcon size={16} />}
+                label={item.label}
+                data-cy={`sidebar-plugin-nav-${item.path?.replace(/\//g, '-')}`}
               />
             ))}
             <Accordion>
