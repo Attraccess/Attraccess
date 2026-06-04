@@ -1,12 +1,11 @@
 import { NestFactory, HttpAdapterHost } from '@nestjs/core';
-import { AppModule } from './app/app.module';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
-import { ValidationPipe, ClassSerializerInterceptor, Logger, LogLevel } from '@nestjs/common';
+import { ValidationPipe, ClassSerializerInterceptor, Logger, LogLevel, Module } from '@nestjs/common';
 import { WsAdapter } from '@nestjs/platform-ws';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import session from 'express-session';
-import { ConfigService } from '@nestjs/config';
-import { AppConfigType } from './config/app.config';
+import { ConfigModule as NestConfigModule, ConfigService } from '@nestjs/config';
+import appConfiguration, { AppConfigType } from './config/app.config';
 import { DataSource } from 'typeorm';
 import { PluginService } from './plugin-system/plugin.service';
 import { PluginModule } from './plugin-system/plugin.module';
@@ -40,6 +39,17 @@ async function generateSelfSignedCertificates(storageDir: string, domain: string
   await writeFile(join(storageDir, `${domain}.key`), cert.key, { mode: 0o644 });
 }
 
+// Minimal module used to read AppConfig (and load the .env file) WITHOUT importing
+// AppModule. The plugin system must be configured before AppModule is imported,
+// because PluginModule.forRoot() — evaluated at AppModule import time — imports each
+// plugin's backend module from PLUGIN_DIR. If AppModule were imported first to read
+// config, forRoot() would already have run with an unconfigured path and no plugin
+// backend would ever load.
+@Module({
+  imports: [NestConfigModule.forRoot({ load: [appConfiguration], isGlobal: true })],
+})
+class PluginBootstrapConfigModule {}
+
 export async function bootstrap() {
   const bootstrapLogger = new Logger('Bootstrap');
   bootstrapLogger.log('Starting bootstrap process...');
@@ -47,6 +57,34 @@ export async function bootstrap() {
   const initialLogLevels = (process.env.LOG_LEVELS || 'error,warn,log')
     .split(',')
     .filter((level): level is LogLevel => ['error', 'warn', 'log', 'debug', 'verbose'].includes(level));
+
+  // Resolve plugin config and configure the plugin system BEFORE importing AppModule
+  // (see PluginBootstrapConfigModule above for why ordering matters).
+  const configContext = await NestFactory.createApplicationContext(PluginBootstrapConfigModule, {
+    logger: initialLogLevels,
+  });
+  const earlyConfig = configContext.get(ConfigService).get<AppConfigType>('app');
+  await configContext.close();
+
+  if (!earlyConfig) {
+    bootstrapLogger.error("Application configuration ('app') not loaded. Exiting.");
+    process.exit(1);
+  }
+  if (!earlyConfig.PLUGIN_DIR) {
+    bootstrapLogger.warn('PLUGIN_DIR is not set — plugin backends will not be loaded.');
+  }
+  bootstrapLogger.log('Configuring PluginSystem...');
+  PluginService.configure({
+    PLUGIN_DIR: earlyConfig.PLUGIN_DIR,
+    RESTART_BY_EXIT: earlyConfig.RESTART_BY_EXIT,
+  });
+  PluginModule.configure({
+    DISABLE_PLUGINS: earlyConfig.DISABLE_PLUGINS,
+  });
+  bootstrapLogger.log('PluginSystem configured.');
+
+  // Import AppModule only now, so PluginModule.forRoot() sees the configured PLUGIN_DIR.
+  const { AppModule } = await import('./app/app.module');
 
   const appForConfig = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger: initialLogLevels,
@@ -133,21 +171,6 @@ export async function bootstrap() {
     allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key'],
     credentials: true, // Allow cookies to be sent
   });
-
-  if (!appConfig) {
-    bootstrapLogger.error("Application configuration ('app') not loaded. Exiting.");
-    process.exit(1);
-  }
-  // Configure Plugin System
-  bootstrapLogger.log('Configuring PluginSystem...');
-  PluginService.configure({
-    PLUGIN_DIR: appConfig.PLUGIN_DIR,
-    RESTART_BY_EXIT: appConfig.RESTART_BY_EXIT,
-  });
-  PluginModule.configure({
-    DISABLE_PLUGINS: appConfig.DISABLE_PLUGINS,
-  });
-  bootstrapLogger.log('PluginSystem configured.');
 
   // Run migrations before the app fully starts
   try {

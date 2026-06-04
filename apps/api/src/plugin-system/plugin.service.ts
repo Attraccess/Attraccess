@@ -18,12 +18,7 @@ export class PluginService {
   private static loadedPlugins: Set<string> = new Set();
   private static pluginLoadErrors: Map<string, Error> = new Map();
   private static logger = new Logger(PluginService.name);
-  // Seeded from the PLUGIN_DIR env var so it is already set when AppModule is
-  // imported. PluginModule.forRoot() — which imports each plugin's backend
-  // module — runs at that import, before bootstrap() calls configure(); without
-  // this seed the path is undefined at forRoot time and no plugin backends load.
-  // configure() still overrides it from AppConfig for completeness.
-  public static PLUGIN_PATH: string = process.env.PLUGIN_DIR as string;
+  public static PLUGIN_PATH: string;
   private static RESTART_BY_EXIT_FLAG: boolean;
 
   public static configure(config: { PLUGIN_DIR: string, RESTART_BY_EXIT: boolean }): void {
