@@ -7,6 +7,14 @@ void Websocket::setup()
     {
         ws_client_mutex = xSemaphoreCreateMutex();
     }
+    if (!tx_queue)
+    {
+        tx_queue = xQueueCreate(TX_QUEUE_DEPTH, sizeof(TxMessage));
+    }
+    if (!tx_task && tx_queue)
+    {
+        xTaskCreate(txTaskEntry, "ws_tx", TX_TASK_STACK, this, TX_TASK_PRIORITY, &tx_task);
+    }
     this->_certManager.begin();
 }
 
@@ -270,37 +278,82 @@ void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, v
 void Websocket::sendMessage(const String &message)
 {
     this->logger.debug(("sendMessage: " + message).c_str());
-
-    lockWsClient();
-    if (!ws_client)
-    {
-        unlockWsClient();
-        logger.error("sendMessage: ws_client not initialized");
-        return;
-    }
-    int ret = esp_websocket_client_send_text(ws_client, message.c_str(), message.length(), pdMS_TO_TICKS(5000));
-    unlockWsClient();
-
-    if (ret == -1)
-    {
-        logger.error("sendMessage: failed");
-    }
+    enqueueMessage(message.c_str(), message.length());
 }
 
 void Websocket::sendMessage(const char *message, size_t length)
 {
-    lockWsClient();
-    if (!ws_client)
+    enqueueMessage(message, length);
+}
+
+void Websocket::enqueueMessage(const char *data, size_t length)
+{
+    if (!tx_queue)
     {
-        unlockWsClient();
-        logger.error("sendMessage(raw): ws_client not initialized");
+        logger.error("enqueueMessage: tx_queue not initialized");
         return;
     }
-    int ret = esp_websocket_client_send_text(ws_client, message, static_cast<int>(length), pdMS_TO_TICKS(5000));
-    unlockWsClient();
-    if (ret == -1)
+
+    char *copy = (char *)malloc(length);
+    if (!copy)
     {
-        logger.error("sendMessage(raw): failed");
+        logger.error("enqueueMessage: allocation failed");
+        return;
+    }
+    memcpy(copy, data, length);
+
+    TxMessage msg{copy, length};
+    if (xQueueSend(tx_queue, &msg, 0) != pdTRUE)
+    {
+        logger.error("enqueueMessage: tx queue full, dropping message");
+        free(copy);
+    }
+}
+
+void Websocket::txTaskEntry(void *arg)
+{
+    static_cast<Websocket *>(arg)->txTaskLoop();
+}
+
+void Websocket::txTaskLoop()
+{
+    TxMessage msg;
+    while (true)
+    {
+        if (xQueueReceive(tx_queue, &msg, portMAX_DELAY) != pdTRUE)
+        {
+            continue;
+        }
+
+        lockWsClient();
+        if (!ws_client)
+        {
+            unlockWsClient();
+            logger.error("ws tx: ws_client not initialized, dropping message");
+            free(msg.data);
+            continue;
+        }
+        int ret = esp_websocket_client_send_text(ws_client, msg.data, static_cast<int>(msg.length), SEND_TIMEOUT_TICKS);
+        unlockWsClient();
+
+        if (ret == -1)
+        {
+            logger.error("ws tx: send failed");
+        }
+        free(msg.data);
+    }
+}
+
+void Websocket::drainTxQueue()
+{
+    if (!tx_queue)
+    {
+        return;
+    }
+    TxMessage msg;
+    while (xQueueReceive(tx_queue, &msg, 0) == pdTRUE)
+    {
+        free(msg.data);
     }
 }
 
@@ -338,6 +391,8 @@ void Websocket::disableConnectionAttempts()
     {
         esp_websocket_client_destroy(oldClient);
     }
+
+    drainTxQueue();
 
     setState(INIT);
 }
