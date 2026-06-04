@@ -1,0 +1,235 @@
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { WebsocketService } from '../websocket.service';
+import { AttractapService } from '../../attractap.service';
+import { UsersService } from '../../../users-and-auth/users/users.service';
+import { ResourceUsageService } from '../../../resources/usage/resourceUsage.service';
+import { ResourceIntroducersService } from '../../../resources/introducers/resourceIntroducers.service';
+import { MetricsService } from '../../../metrics/metrics.service';
+import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from '../websocket.types';
+
+@Injectable()
+export class AttractapCardHandler {
+  private readonly logger = new Logger(AttractapCardHandler.name);
+
+  @Inject(WebsocketService)
+  private websocketService: WebsocketService;
+
+  @Inject(AttractapService)
+  private attractapService: AttractapService;
+
+  @Inject(UsersService)
+  private usersService: UsersService;
+
+  @Inject(ResourceUsageService)
+  private resourceUsageService: ResourceUsageService;
+
+  @Inject(ResourceIntroducersService)
+  private resourceIntroducersService: ResourceIntroducersService;
+
+  @Inject(MetricsService)
+  private metricsService: MetricsService;
+
+  public async startEnrollOfNewNfcCard(data: { readerId: number; userId: number }) {
+    const reader = await this.attractapService.findReaderById(data.readerId);
+
+    if (!reader) {
+      throw new Error(`Reader not found: ${data.readerId}`);
+    }
+
+    if (!reader.firmware.capabilities.cardEnrollment) {
+      throw new Error(`Reader does not support card enrollment: ${data.readerId}`);
+    }
+
+    const user = await this.usersService.findOne({ id: data.userId });
+
+    if (!user) {
+      throw new Error(`User not found: ${data.userId}`);
+    }
+
+    const sockets = Array.from(this.websocketService.sockets.values()).filter(
+      (socket) => socket.readerId === data.readerId,
+    );
+
+    if (sockets.length === 0) {
+      throw new Error(`Reader not connected: ${data.readerId}`);
+    }
+
+    // Send to all active sockets for this reader to avoid targeting a stale/disconnecting socket
+    const tasks = sockets.map(async (socket) => {
+      socket.state.lastAuthenticatedUserId = user.id;
+      try {
+        await socket.sendMessage(
+          new AttractapEvent(AttractapEventType.ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO, {
+            username: user.username,
+          }),
+        );
+      } catch (error) {
+        // Log and continue; other sockets may still deliver the event
+        this.logger.debug(
+          `Failed to send ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO to client ${socket.id}: ${String(error)}`,
+        );
+      }
+    });
+
+    await Promise.allSettled(tasks);
+  }
+
+  public async onEnrollNewCardRequestNFCKey(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
+    const { uid, keyNo } = data.payload as { uid: string; keyNo: number };
+
+    if (!socket.state.lastAuthenticatedUserId) {
+      await socket.sendMessage(
+        new AttractapEvent(AttractapEventType.ENROLL_NEW_CARD_REQUEST_NFC_KEY, { error: 'USER_NOT_SET' }),
+      );
+      return;
+    }
+
+    if (!uid || typeof uid !== 'string' || !keyNo || typeof keyNo !== 'number') {
+      await socket.sendMessage(
+        new AttractapEvent(AttractapEventType.ENROLL_NEW_CARD_REQUEST_NFC_KEY, { error: 'INVALID_PARAMS' }),
+      );
+      return;
+    }
+
+    const existingCard = await this.attractapService.getNFCCardByUID(uid);
+    if (existingCard) {
+      await socket.sendMessage(
+        new AttractapEvent(AttractapEventType.ENROLL_NEW_CARD_REQUEST_NFC_KEY, { error: 'CARD_ALREADY_ENROLLED' }),
+      );
+      return;
+    }
+
+    const key = await this.attractapService.generateNTAG424Key({
+      userId: socket.state.lastAuthenticatedUserId,
+      keyNo,
+      cardUID: uid,
+    });
+
+    const keyString = this.attractapService.uint8ArrayToHexString(key);
+
+    socket.state.enrollNewCardData = {
+      keyNo,
+      key: keyString,
+      cardUID: uid,
+    };
+    await socket.sendMessage(new AttractapEvent(AttractapEventType.ENROLL_NEW_CARD, { key: keyString, keyNo }));
+  }
+
+  public async onEnrollNewCard(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
+    if (!socket.state.enrollNewCardData) {
+      await socket.sendMessage(
+        new AttractapEvent(AttractapEventType.ENROLL_NEW_CARD, { error: 'ENROLL_NEW_CARD_DATA_NOT_SET' }),
+      );
+      return;
+    }
+
+    const { success } = data.payload as { success: boolean };
+    if (!success) {
+      this.logger.error('Enroll new card failed');
+      return;
+    }
+
+    const { key, keyNo, cardUID } = socket.state.enrollNewCardData;
+
+    if (!key || typeof key !== 'string' || !keyNo || typeof keyNo !== 'number') {
+      await socket.sendMessage(new AttractapEvent(AttractapEventType.ENROLL_NEW_CARD, { error: 'KEY_NOT_SET' }));
+      return;
+    }
+
+    const user = await this.usersService.findOne({ id: socket.state.lastAuthenticatedUserId });
+    if (!user) {
+      await socket.sendMessage(new AttractapEvent(AttractapEventType.ENROLL_NEW_CARD, { error: 'USER_NOT_FOUND' }));
+      return;
+    }
+
+    await this.attractapService.createNFCCard(user, {
+      key,
+      keyNo,
+      uid: cardUID,
+    });
+
+    socket.state.enrollNewCardData = null;
+    socket.state.lastAuthenticatedUserId = null;
+    socket.sendMessage(new AttractapEvent(AttractapEventType.ENROLL_NEW_CARD, { success: true }));
+  }
+
+  public async startResetOfNfcCard(data: { readerId: number; userId: number; cardId: number }) {
+    const reader = await this.attractapService.findReaderById(data.readerId);
+
+    if (!reader) {
+      throw new Error(`Reader not found: ${data.readerId}`);
+    }
+
+    const user = await this.usersService.findOne({ id: data.userId });
+
+    if (!user) {
+      throw new Error(`User not found: ${data.userId}`);
+    }
+
+    const socket = Array.from(this.websocketService.sockets.values()).find(
+      (socket) => socket.readerId === data.readerId,
+    );
+
+    if (!socket) {
+      throw new Error(`Reader not connected: ${data.readerId}`);
+    }
+
+    const nfcCard = await this.attractapService.getNFCCardByID(data.cardId);
+
+    if (!nfcCard) {
+      throw new Error(`NFC card not found: ${data.cardId}`);
+    }
+
+    // TODO: implement this
+  }
+
+  public async handleCardAuthenticationRequest(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
+    this.metricsService.attractapNfcTapsTotal.inc();
+    const { uid, resourceId } = data.payload as { uid: string; resourceId: number };
+
+    if (!uid || typeof uid !== 'string') {
+      await socket.sendMessage(
+        new AttractapEvent(AttractapEventType.CARD_AUTHENTICATION_DATA, {
+          error: 'INVALID_UID',
+        }),
+      );
+      return;
+    }
+
+    const nfcCard = await this.attractapService.getNFCCardByUID(uid);
+
+    if (!nfcCard) {
+      await socket.sendMessage(
+        new AttractapEvent(AttractapEventType.CARD_AUTHENTICATION_DATA, {
+          error: 'CARD_NOT_FOUND',
+        }),
+      );
+      return;
+    }
+
+    if (!nfcCard.isActive) {
+      await socket.sendMessage(
+        new AttractapEvent(AttractapEventType.CARD_AUTHENTICATION_DATA, {
+          error: 'CARD_NOT_ACTIVE',
+        }),
+      );
+      return;
+    }
+
+    socket.state.lastAuthenticatedUserId = nfcCard.user.id;
+
+    const hasIntroduction = await this.resourceUsageService.canControllResource(resourceId, nfcCard.user);
+    const isIntroducer = await this.resourceIntroducersService.isIntroducer(resourceId, nfcCard.user.id, true);
+
+    await socket.sendMessage(
+      new AttractapEvent(AttractapEventType.CARD_AUTHENTICATION_DATA, {
+        keyNo: nfcCard.keyNo,
+        key: nfcCard.key,
+        username: nfcCard.user.username,
+        canManageResource: nfcCard.user.systemPermissions.canManageResources,
+        hasIntroduction,
+        isIntroducer,
+      }),
+    );
+  }
+}

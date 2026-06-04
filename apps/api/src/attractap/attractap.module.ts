@@ -8,6 +8,16 @@ import { AttractapNfcCardsController } from './card.controller';
 import 'sqlite3';
 import '@nestjs/common';
 import { WebSocketEventService } from './websockets/websocket-event.service';
+import { ResourceListService } from './websockets/handlers/resource-list.service';
+import { ResourceActionGuard } from './websockets/handlers/resource-action.guard';
+import { AttractapAuthHandler } from './websockets/handlers/auth.handler';
+import { AttractapFirmwareHandler } from './websockets/handlers/firmware.handler';
+import { AttractapCrashReportHandler } from './websockets/handlers/crash-report.handler';
+import { AttractapCardHandler } from './websockets/handlers/card.handler';
+import { AttractapFormsHandler } from './websockets/handlers/forms.handler';
+import { AttractapSessionHandler } from './websockets/handlers/session.handler';
+import { AttractapBillingHandler } from './websockets/handlers/billing.handler';
+import { AttractapProjectsHandler } from './websockets/handlers/projects.handler';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { Attractap, AttractapCrashReport, NFCCard, Resource, User } from '@attraccess/database-entities';
 import { UsersAndAuthModule } from '../users-and-auth/users-and-auth.module';
@@ -48,6 +58,16 @@ import { ResourceFormsModule } from '../resources/forms/forms.module';
     WebSocketEventService,
     AttractapFirmwareService,
     CoredumpSymbolicationService,
+    ResourceListService,
+    ResourceActionGuard,
+    AttractapAuthHandler,
+    AttractapFirmwareHandler,
+    AttractapCrashReportHandler,
+    AttractapCardHandler,
+    AttractapFormsHandler,
+    AttractapSessionHandler,
+    AttractapBillingHandler,
+    AttractapProjectsHandler,
   ],
   controllers: [AttractapController, AttractapNfcCardsController, AttractapFirmwareController],
 })

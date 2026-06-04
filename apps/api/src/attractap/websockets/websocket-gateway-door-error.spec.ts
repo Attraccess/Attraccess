@@ -1,11 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { AttractapGateway } from './websocket.gateway';
+import { AttractapSessionHandler } from './handlers/session.handler';
+import { ResourceActionGuard } from './handlers/resource-action.guard';
 import { AttractapEventType, AttractapEvent } from './websocket.types';
 import { FlowExecutionError } from '../../resources/flows/errors/flow-execution.error';
 import { BadRequestException } from '@nestjs/common';
 
-describe('AttractapGateway – door action error propagation', () => {
-  let gateway: AttractapGateway;
+describe('AttractapSessionHandler – door action error propagation', () => {
+  let handler: AttractapSessionHandler;
   let mockSocket: {
     readerId: number;
     state: { lastAuthenticatedUserId: number; readerId: number };
@@ -23,8 +24,8 @@ describe('AttractapGateway – door action error propagation', () => {
   const mockReader = { id: 42, resources: [{ id: 10 }] };
 
   beforeEach(() => {
-    gateway = Object.create(AttractapGateway.prototype);
-    (gateway as any).logger = {
+    handler = Object.create(AttractapSessionHandler.prototype);
+    (handler as any).logger = {
       log: jest.fn(),
       error: jest.fn(),
       warn: jest.fn(),
@@ -52,16 +53,23 @@ describe('AttractapGateway – door action error propagation', () => {
       getResourcesForReader: jest.fn().mockResolvedValue([{ id: 10 }]),
     };
 
-    (gateway as any).resourceUsageService = mockResourceUsageService;
-    (gateway as any).usersService = mockUsersService;
-    (gateway as any).attractapService = mockAttractapService;
+    // ResourceActionGuard runs the real validation logic against the mocks so the
+    // door handlers proceed exactly as they did when validateResourceAction lived
+    // on the gateway.
+    const guard: ResourceActionGuard = Object.create(ResourceActionGuard.prototype);
+    (guard as any).attractapService = mockAttractapService;
+    (guard as any).usersService = mockUsersService;
+
+    (handler as any).resourceUsageService = mockResourceUsageService;
+    (handler as any).usersService = mockUsersService;
+    (handler as any).resourceActionGuard = guard;
   });
 
   describe('handleLockDoor', () => {
     const eventData = { payload: { resourceId: 10 } } as AttractapEvent['data'];
 
     it('should send success on successful lock', async () => {
-      await (gateway as any).handleLockDoor(mockSocket, eventData);
+      await (handler as any).handleLockDoor(mockSocket, eventData);
 
       expect(mockResourceUsageService.lockDoor).toHaveBeenCalledWith(10, mockUser);
       expect(mockSocket.sendMessage).toHaveBeenCalledWith(
@@ -79,7 +87,7 @@ describe('AttractapGateway – door action error propagation', () => {
         new FlowExecutionError('Access denied for this user'),
       );
 
-      await (gateway as any).handleLockDoor(mockSocket, eventData);
+      await (handler as any).handleLockDoor(mockSocket, eventData);
 
       expect(mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -96,7 +104,7 @@ describe('AttractapGateway – door action error propagation', () => {
         new BadRequestException('Resource is not a door'),
       );
 
-      await (gateway as any).handleLockDoor(mockSocket, eventData);
+      await (handler as any).handleLockDoor(mockSocket, eventData);
 
       expect(mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -113,9 +121,9 @@ describe('AttractapGateway – door action error propagation', () => {
         new FlowExecutionError('Some error'),
       );
 
-      await (gateway as any).handleLockDoor(mockSocket, eventData);
+      await (handler as any).handleLockDoor(mockSocket, eventData);
 
-      expect((gateway as any).logger.error).toHaveBeenCalledWith(
+      expect((handler as any).logger.error).toHaveBeenCalledWith(
         expect.stringContaining('Failed to lock door'),
       );
     });
@@ -125,9 +133,9 @@ describe('AttractapGateway – door action error propagation', () => {
         new FlowExecutionError('Custom flow error'),
       );
 
-      await (gateway as any).handleLockDoor(mockSocket, eventData);
+      await (handler as any).handleLockDoor(mockSocket, eventData);
 
-      const logCall = (gateway as any).logger.error.mock.calls[0][0] as string;
+      const logCall = (handler as any).logger.error.mock.calls[0][0] as string;
       expect(logCall).not.toContain('FLOW_EXECUTION_ERROR');
       expect(logCall).toContain('Custom flow error');
     });
@@ -137,7 +145,7 @@ describe('AttractapGateway – door action error propagation', () => {
     const eventData = { payload: { resourceId: 10 } } as AttractapEvent['data'];
 
     it('should send success on successful unlock', async () => {
-      await (gateway as any).handleUnlockDoor(mockSocket, eventData);
+      await (handler as any).handleUnlockDoor(mockSocket, eventData);
 
       expect(mockResourceUsageService.unlockDoor).toHaveBeenCalledWith(10, mockUser);
       expect(mockSocket.sendMessage).toHaveBeenCalledWith(
@@ -155,7 +163,7 @@ describe('AttractapGateway – door action error propagation', () => {
         new FlowExecutionError('Unlock not permitted'),
       );
 
-      await (gateway as any).handleUnlockDoor(mockSocket, eventData);
+      await (handler as any).handleUnlockDoor(mockSocket, eventData);
 
       expect(mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -170,7 +178,7 @@ describe('AttractapGateway – door action error propagation', () => {
     it('should send raw error message for non-FlowExecutionError', async () => {
       mockResourceUsageService.unlockDoor.mockRejectedValueOnce(new Error('DB timeout'));
 
-      await (gateway as any).handleUnlockDoor(mockSocket, eventData);
+      await (handler as any).handleUnlockDoor(mockSocket, eventData);
 
       expect(mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -187,9 +195,9 @@ describe('AttractapGateway – door action error propagation', () => {
         new FlowExecutionError('Unlock denied'),
       );
 
-      await (gateway as any).handleUnlockDoor(mockSocket, eventData);
+      await (handler as any).handleUnlockDoor(mockSocket, eventData);
 
-      const logCall = (gateway as any).logger.error.mock.calls[0][0] as string;
+      const logCall = (handler as any).logger.error.mock.calls[0][0] as string;
       expect(logCall).toContain('Unlock denied');
       expect(logCall).not.toContain('FLOW_EXECUTION_ERROR');
     });
@@ -199,7 +207,7 @@ describe('AttractapGateway – door action error propagation', () => {
     const eventData = { payload: { resourceId: 10 } } as AttractapEvent['data'];
 
     it('should send success on successful unlatch', async () => {
-      await (gateway as any).handleUnlatchDoor(mockSocket, eventData);
+      await (handler as any).handleUnlatchDoor(mockSocket, eventData);
 
       expect(mockResourceUsageService.unlatchDoor).toHaveBeenCalledWith(10, mockUser);
       expect(mockSocket.sendMessage).toHaveBeenCalledWith(
@@ -217,7 +225,7 @@ describe('AttractapGateway – door action error propagation', () => {
         new FlowExecutionError('Unlatch blocked by flow'),
       );
 
-      await (gateway as any).handleUnlatchDoor(mockSocket, eventData);
+      await (handler as any).handleUnlatchDoor(mockSocket, eventData);
 
       expect(mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -234,7 +242,7 @@ describe('AttractapGateway – door action error propagation', () => {
         new BadRequestException('Door does not support unlatching'),
       );
 
-      await (gateway as any).handleUnlatchDoor(mockSocket, eventData);
+      await (handler as any).handleUnlatchDoor(mockSocket, eventData);
 
       expect(mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -250,35 +258,35 @@ describe('AttractapGateway – door action error propagation', () => {
   describe('extractUserFacingError', () => {
     it('should strip FLOW_EXECUTION_ERROR prefix from FlowExecutionError', () => {
       const error = new FlowExecutionError('User not allowed');
-      const result = (gateway as any).extractUserFacingError(error);
+      const result = (handler as any).extractUserFacingError(error);
       expect(result).toBe('User not allowed');
     });
 
     it('should return raw message for regular Error', () => {
       const error = new Error('Something went wrong');
-      const result = (gateway as any).extractUserFacingError(error);
+      const result = (handler as any).extractUserFacingError(error);
       expect(result).toBe('Something went wrong');
     });
 
     it('should return raw message for BadRequestException', () => {
       const error = new BadRequestException('Resource is not a door');
-      const result = (gateway as any).extractUserFacingError(error);
+      const result = (handler as any).extractUserFacingError(error);
       expect(result).toBe('Resource is not a door');
     });
 
     it('should stringify non-Error values', () => {
-      const result = (gateway as any).extractUserFacingError('string error');
+      const result = (handler as any).extractUserFacingError('string error');
       expect(result).toBe('string error');
     });
 
     it('should stringify non-Error object values', () => {
-      const result = (gateway as any).extractUserFacingError(42);
+      const result = (handler as any).extractUserFacingError(42);
       expect(result).toBe('42');
     });
 
     it('should handle FlowExecutionError with empty message', () => {
       const error = new FlowExecutionError('');
-      const result = (gateway as any).extractUserFacingError(error);
+      const result = (handler as any).extractUserFacingError(error);
       expect(result).toBe('');
     });
   });
