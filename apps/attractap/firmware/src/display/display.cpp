@@ -1,5 +1,8 @@
 #include "display.hpp"
 
+#include <Wire.h>
+#include "../utils.hpp"
+
 #ifdef HAS_IO_EXPANDER
 #include "../ioexpander/ioexpander.hpp"
 #endif
@@ -143,13 +146,38 @@ void Display::setup()
     Display::driver = nullptr;
 #endif
 
-    if (!Display::driver || !Display::driver->begin())
+    // Bounded retry: a transient I2C glitch at boot (the GT911/RGB panel shares the
+    // I2C bus with the PN532/IO-expander) can make begin() fail. Recover the bus and
+    // retry a few times; if it still fails, reboot rather than hang forever.
+    const uint8_t MAX_DISPLAY_INIT_ATTEMPTS = 5;
+    bool driverReady = false;
+    for (uint8_t attempt = 1; attempt <= MAX_DISPLAY_INIT_ATTEMPTS; attempt++)
     {
-        Display::logger.error("Display driver init failed");
-        while (1)
+        if (Display::driver && Display::driver->begin())
         {
-            delay(1000);
+            driverReady = true;
+            break;
         }
+
+        Display::logger.errorf("Display driver init failed (attempt %u/%u)", attempt, MAX_DISPLAY_INIT_ATTEMPTS);
+
+        if (attempt < MAX_DISPLAY_INIT_ATTEMPTS)
+        {
+#if defined(DISPLAY_DRIVER_GT911) && defined(PIN_TOUCH_I2C_SDA) && defined(PIN_TOUCH_I2C_SCL)
+            // Free any I2C slave stuck mid-transaction before the next attempt.
+            recoverI2CBus(PIN_TOUCH_I2C_SDA, PIN_TOUCH_I2C_SCL);
+            Wire.begin(PIN_TOUCH_I2C_SDA, PIN_TOUCH_I2C_SCL);
+            Wire.setTimeOut(50);
+#endif
+            delay(200);
+        }
+    }
+
+    if (!driverReady)
+    {
+        Display::logger.error("Display driver init exhausted retries; restarting");
+        delay(100); // let the serial buffer flush before reset
+        esp_restart();
     }
 
     Display::screenWidth = Display::driver->width();
