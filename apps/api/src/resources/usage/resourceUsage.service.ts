@@ -39,6 +39,13 @@ import { MetricsService } from '../../metrics/metrics.service';
 import { SystemEvent } from '@attraccess/plugins-backend-sdk';
 import { PluginEventsService } from '../../plugin-system/plugin-events.service';
 
+export interface EndSessionOptions {
+  /** Skip persisting required END-action form submissions (used by automated/flow paths). */
+  skipFormSubmissions?: boolean;
+  /** Skip emitting ResourceUsageNoteAddedEvent (used when the note is auto-generated, e.g. flow-ended). */
+  skipNoteNotification?: boolean;
+}
+
 @Injectable()
 export class ResourceUsageService {
   private readonly logger = new Logger(ResourceUsageService.name);
@@ -482,10 +489,11 @@ export class ResourceUsageService {
     resourceId: number,
     user: User,
     dto: EndUsageSessionDto,
-    skipFormSubmissions = false,
-    // Flow-ended sessions carry an auto-generated note, not a human one — skip personnel notification.
-    skipNoteNotification = false,
+    options: EndSessionOptions = {},
   ): Promise<ResourceUsage> {
+    // skipNoteNotification: flow-ended sessions carry an auto-generated note, not a human one — skip personnel notification.
+    const { skipFormSubmissions = false, skipNoteNotification = false } = options;
+
     this.logger.debug(`Ending session for resource ${resourceId} by user ${user.id}`, { dto });
 
     // Find active session

@@ -989,7 +989,7 @@ describe('ResourceUsageService', () => {
     it('does not emit the note event when skipNoteNotification is set (flow-ended session)', async () => {
       setupEndSession();
 
-      await service.endSession(1, mockUser, { notes: 'auto note' }, false, true);
+      await service.endSession(1, mockUser, { notes: 'auto note' }, { skipNoteNotification: true });
 
       const noteEmit = eventEmitter.emit.mock.calls.find((c) => c[0] === ResourceUsageNoteAddedEvent.EVENT_NAME);
       expect(noteEmit).toBeUndefined();
