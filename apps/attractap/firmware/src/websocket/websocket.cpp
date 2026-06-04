@@ -56,6 +56,11 @@ void Websocket::loop()
     case CONNECTING:
         break;
     case CONNECTED:
+        if (millis() - this->lastInboundFrameTime > this->INBOUND_LIVENESS_TIMEOUT_MS)
+        {
+            logger.error("No inbound frames within liveness timeout, forcing reconnect");
+            setState(INIT);
+        }
         break;
     }
 }
@@ -136,6 +141,15 @@ void Websocket::connectWebSocket()
     websocket_cfg.buffer_size = 4096; // Increase buffer size (default is typically 1024)
     // websocket_cfg.task_prio = 5;      // Set appropriate task priority
 
+    websocket_cfg.ping_interval_sec = 5;
+    websocket_cfg.pingpong_timeout_sec = PINGPONG_TIMEOUT_SEC;
+    websocket_cfg.disable_pingpong_discon = false;
+
+    websocket_cfg.keep_alive_enable = true;
+    websocket_cfg.keep_alive_idle = 5;
+    websocket_cfg.keep_alive_interval = 5;
+    websocket_cfg.keep_alive_count = 3;
+
     if (apiConfig.useSSL)
     {
         websocket_cfg.transport = WEBSOCKET_TRANSPORT_OVER_SSL;
@@ -194,6 +208,8 @@ void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, v
     esp_websocket_event_data_t *data = (esp_websocket_event_data_t *)event_data;
 
     AttraccessApiConfig apiConfig = Settings::getAttraccessApiConfig();
+
+    this->lastInboundFrameTime = millis();
 
     switch (event_id)
     {

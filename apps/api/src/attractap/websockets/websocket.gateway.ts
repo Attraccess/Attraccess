@@ -373,6 +373,12 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   public async onHeartbeat(@ConnectedSocket() socket: AuthenticatedWebSocket) {
     this.logger.debug(`Heartbeat from client ${socket.id}.`);
 
+    try {
+      (socket as unknown as { send: (data: string) => void }).send(JSON.stringify({ event: 'HEARTBEAT' }));
+    } catch (error) {
+      this.logger.error(`Failed to send heartbeat ack to client ${socket.id}: ${(error as Error).message}`);
+    }
+
     await this.clientWasActive(socket);
   }
 

@@ -191,6 +191,14 @@ describe('AttractapGateway', () => {
 
       expect(attractapService.updateLastReaderConnection).not.toHaveBeenCalled();
     });
+
+    it('sends a heartbeat ack back so idle links stay live', async () => {
+      const socket = createMockSocket({ id: 'hb-3', readerId: 7 });
+
+      await gateway.onHeartbeat(socket);
+
+      expect((socket as unknown as { send: jest.Mock }).send).toHaveBeenCalledWith(JSON.stringify({ event: 'HEARTBEAT' }));
+    });
   });
 
   describe('onClientEvent', () => {
