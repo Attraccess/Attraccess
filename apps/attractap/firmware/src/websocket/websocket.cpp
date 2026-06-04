@@ -14,6 +14,7 @@ void Websocket::loop()
     }
 
     this->updateInfoFromAppState();
+    this->publishConnectionStatus();
 
     if (!network_is_connected)
     {
@@ -44,6 +45,43 @@ void Websocket::updateInfoFromAppState()
 {
     auto networkState = State::getNetworkState();
     this->network_is_connected = networkState.wifi_connected || networkState.ethernet_connected;
+}
+
+// Mirror the live connection / cert-sweep progress into State so the connecting
+// screen can surface where the device is (and where it is stuck). Cheap enough
+// to run every loop tick.
+void Websocket::publishConnectionStatus()
+{
+    AttraccessApiConfig apiConfig = Settings::getAttraccessApiConfig();
+
+    // Keep the configured server target fresh even before the first connect attempt.
+    State::setWebsocketState(_state == CONNECTED, apiConfig.hostname, apiConfig.port, apiConfig.useSSL);
+
+    // Cert sweep progress is only meaningful for SSL connections.
+    if (apiConfig.useSSL)
+    {
+        State::setWebsocketCertProgress(
+            String(this->_certManager.getCurrentCertName()),
+            this->_certManager.getCurrentCertIndex(),
+            this->_certManager.getCertCount(),
+            this->_certManager.getRememberedFailureCount());
+    }
+    else
+    {
+        State::setWebsocketCertProgress("", 0, 0, 0);
+    }
+
+    // Seconds until the next reconnect attempt (0 while connected or due now).
+    int secondsUntilNext = 0;
+    if (_state != CONNECTED && network_is_connected)
+    {
+        uint32_t elapsed = millis() - lastReconnectAttemptTime;
+        if (elapsed < RECONNECT_INTERVAL_MS)
+        {
+            secondsUntilNext = (int)((RECONNECT_INTERVAL_MS - elapsed + 999) / 1000);
+        }
+    }
+    State::setWebsocketNextAttemptSeconds(secondsUntilNext);
 }
 
 void Websocket::connectWebSocket()
@@ -260,6 +298,22 @@ void Websocket::sendMessage(const char *message, size_t length)
 void Websocket::setState(ConnectionState state)
 {
     _state = state;
+
+    State::WebsocketPhase phase = State::WS_INIT;
+    switch (state)
+    {
+    case CONNECTING:
+        phase = State::WS_CONNECTING;
+        break;
+    case CONNECTED:
+        phase = State::WS_CONNECTED;
+        break;
+    case INIT:
+    default:
+        phase = State::WS_INIT;
+        break;
+    }
+    State::setWebsocketPhase(phase);
 
     State::setWebsocketState(state == CONNECTED, this->_lastApiConfig.hostname, this->_lastApiConfig.port, this->_lastApiConfig.useSSL);
 }

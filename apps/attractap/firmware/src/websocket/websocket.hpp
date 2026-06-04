@@ -38,6 +38,7 @@ private:
     bool connectionAttemptsEnabled = true;
 
     void updateInfoFromAppState();
+    void publishConnectionStatus();
     void connectWebSocket();
     bool shouldReconnect();
     uint32_t lastReconnectAttemptTime;

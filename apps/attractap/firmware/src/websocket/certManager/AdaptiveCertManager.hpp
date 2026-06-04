@@ -31,6 +31,10 @@ public:
     // Get current certificate info
     const char *getCurrentCertName() const;
     int getCurrentCertIndex() const;
+    // Total number of available CA certificates.
+    int getCertCount() const;
+    // How many times the remembered certificate has failed in a row (0-5).
+    int getRememberedFailureCount() const;
 
 private:
     Preferences preferences;
