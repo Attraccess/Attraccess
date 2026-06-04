@@ -445,7 +445,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       {
         notes: 'Ended by bob',
       },
-      true,
+      { skipFormSubmissions: true, skipNoteNotification: true },
     );
   });
 

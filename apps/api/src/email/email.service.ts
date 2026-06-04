@@ -357,6 +357,37 @@ export class EmailService {
     await this.sendEmail(recipient, EmailTemplateType.MAINTENANCE_REQUEST_CREATED, context);
   }
 
+  async sendResourceUsageNoteEmail(
+    recipient: User,
+    resource: Pick<Resource, 'id' | 'name'>,
+    note: { content: string; phase: 'start' | 'end'; authorName: string },
+  ) {
+    if (!recipient?.email) {
+      return;
+    }
+
+    const base = await this.getBaseContext(recipient);
+    const resourceUrl = `${base.host.frontend}/resources/${resource.id}`;
+    const phaseAction = note.phase === 'start' ? 'starting' : 'finishing';
+
+    const context = {
+      ...base,
+      resource: {
+        id: resource.id,
+        name: resource.name,
+        url: resourceUrl,
+      },
+      note: {
+        content: note.content,
+        phase: note.phase,
+        phaseAction,
+        authorName: note.authorName,
+      },
+    };
+
+    await this.sendEmail(recipient, EmailTemplateType.RESOURCE_USAGE_NOTE_ADDED, context);
+  }
+
   async sendNewMessageEmail(
     recipient: User,
     message: { conversationId: number; senderName: string; preview: string },
