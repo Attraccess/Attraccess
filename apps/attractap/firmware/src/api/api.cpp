@@ -74,7 +74,7 @@ void API::processIncomingMessage(const char *buf, size_t len)
     const char *eventType = inboundDoc["data"]["type"].as<const char *>();
     if (!eventType)
     {
-        logger.error("Missing event type");
+        logger.error((String("Missing event type, payload: ") + String(buf, len)).c_str());
         return;
     }
 
