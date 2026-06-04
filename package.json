@@ -18,7 +18,7 @@
     "@golevelup/ts-jest": "^3.0.0",
     "@heroui/react": "^3.0.4",
     "@heroui/styles": "^3.0.4",
-    "@hookform/resolvers": "^5.2.2",
+    "@hookform/resolvers": "^5.4.0",
     "@icons-pack/react-simple-icons": "^13.13.0",
     "@internationalized/date": "3.12.1",
     "@khmyznikov/pwa-install": "^0.6.3",
