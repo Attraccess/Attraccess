@@ -3,6 +3,8 @@
 #include <esp_netif.h>
 #include <Arduino.h>
 #include <ArduinoJson.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 
 class State
 {
@@ -39,6 +41,8 @@ public:
 
 private:
     State() = delete;
+
+    static SemaphoreHandle_t state_mutex;
 
     static esp_ip4_addr_t wifi_ip;
     static bool wifi_connected;

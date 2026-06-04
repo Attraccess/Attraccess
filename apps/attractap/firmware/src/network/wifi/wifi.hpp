@@ -57,7 +57,9 @@ private:
     static bool is_scanning;
     static uint8_t current_reconnect_attempts_count;
     static uint32_t last_reconnect_attempt_time_ms;
+    static uint32_t waiting_for_ip_since_ms;
     static const uint32_t RECONNECT_INTERVAL_MS;
+    static const uint32_t WAITING_FOR_IP_TIMEOUT_MS;
     static void tryAutoConnect();
     static bool hasSavedCredentials();
     static WifiNetwork knownWifiNetworks[MAX_KNOWN_WIFI_NETWORKS];

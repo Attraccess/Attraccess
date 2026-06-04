@@ -1,5 +1,29 @@
 #include "utils.hpp"
 
+void recoverI2CBus(int sda, int scl)
+{
+    pinMode(scl, OUTPUT);
+    pinMode(sda, INPUT_PULLUP); // sense SDA without driving it
+    for (int i = 0; i < 9; i++)
+    {
+        digitalWrite(scl, LOW);
+        delayMicroseconds(10);
+        digitalWrite(scl, HIGH);
+        delayMicroseconds(10);
+        if (digitalRead(sda))
+            break; // slave released SDA — bus is free
+    }
+    // STOP condition: SDA LOW → SCL HIGH → SDA HIGH
+    pinMode(sda, OUTPUT);
+    digitalWrite(sda, LOW);
+    delayMicroseconds(10);
+    digitalWrite(scl, HIGH);
+    delayMicroseconds(10);
+    digitalWrite(sda, HIGH);
+    delayMicroseconds(10);
+    // Pins will be reclaimed by Wire.begin() immediately after
+}
+
 static inline int8_t hexCharToNibble(char c)
 {
     if (c >= '0' && c <= '9')

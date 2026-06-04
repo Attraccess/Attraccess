@@ -9,7 +9,9 @@ String Wifi::_lastSSID;
 
 uint8_t Wifi::current_reconnect_attempts_count = 0;
 uint32_t Wifi::last_reconnect_attempt_time_ms = 0;
+uint32_t Wifi::waiting_for_ip_since_ms = 0;
 const uint32_t Wifi::RECONNECT_INTERVAL_MS = 10000;
+const uint32_t Wifi::WAITING_FOR_IP_TIMEOUT_MS = 15000;
 
 bool Wifi::is_scanning = false;
 Wifi::WifiNetwork Wifi::knownWifiNetworks[MAX_KNOWN_WIFI_NETWORKS];
@@ -243,6 +245,10 @@ void Wifi::setState(WifiState state)
 {
     WifiState previous = _state;
     _state = state;
+    if (state == WIFI_STATE_CONNECTED_WAITING_FOR_IP && previous != WIFI_STATE_CONNECTED_WAITING_FOR_IP)
+    {
+        waiting_for_ip_since_ms = millis();
+    }
     State::setWifiState(state == WIFI_STATE_CONNECTED, Wifi::getIPAddress(), _lastSSID);
     if (previous != state)
     {
@@ -533,6 +539,17 @@ void Wifi::handleScanComplete()
 
 void Wifi::handleTimeout()
 {
+    if (_state == WIFI_STATE_CONNECTED_WAITING_FOR_IP)
+    {
+        if (millis() - waiting_for_ip_since_ms > WAITING_FOR_IP_TIMEOUT_MS)
+        {
+            logger.info("DHCP timeout - no IP acquired, forcing reconnect");
+            esp_wifi_disconnect();
+            setState(WIFI_STATE_CONNECT_FAILED);
+        }
+        return;
+    }
+
     if (isConnected())
     {
         return;
