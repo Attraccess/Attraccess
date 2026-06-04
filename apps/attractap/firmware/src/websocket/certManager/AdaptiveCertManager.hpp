@@ -22,8 +22,9 @@ public:
     // Mark current certificate as successful
     void markSuccess();
 
-    // Mark current certificate as failed and try next
-    void markFailure();
+    // Mark current certificate as failed and try next.
+    // Returns true when the full certificate list was exhausted (a complete sweep failed).
+    bool markFailure();
 
     // Reset to start from first certificate
     void reset();
