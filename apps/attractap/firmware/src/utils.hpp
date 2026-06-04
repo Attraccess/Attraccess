@@ -6,6 +6,18 @@ String hexToString(uint8_t *uid, uint8_t uidLength);
 bool stringToHexArray(String hexString, uint8_t *array, uint8_t arrayLength);
 
 /**
+ * @brief Recover a stuck I2C bus by bit-banging 9 SCL clock pulses then a STOP.
+ *
+ * Releases any I2C slave that is holding SDA low mid-transaction (common after a
+ * firmware flash or crash resets the ESP32 master without power-cycling slaves).
+ * Pins are left ready for Wire.begin() to reclaim immediately after.
+ *
+ * @param sda SDA GPIO number
+ * @param scl SCL GPIO number
+ */
+void recoverI2CBus(int sda, int scl);
+
+/**
  * @brief Convert milliseconds to a time string in the format "HH:MM:SS"
  * @param millis The milliseconds to convert
  * @return The time string

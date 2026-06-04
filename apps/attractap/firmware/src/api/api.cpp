@@ -65,10 +65,16 @@ void API::processIncomingMessage(const char *buf, size_t len)
         return;
     }
 
+    const char *topLevelEvent = inboundDoc["event"].as<const char *>();
+    if (topLevelEvent && strcmp(topLevelEvent, "HEARTBEAT") == 0)
+    {
+        return;
+    }
+
     const char *eventType = inboundDoc["data"]["type"].as<const char *>();
     if (!eventType)
     {
-        logger.error("Missing event type");
+        logger.error((String("Missing event type, payload: ") + String(buf, len)).c_str());
         return;
     }
 
