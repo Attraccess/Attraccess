@@ -1,25 +1,22 @@
 import { Injectable } from '@nestjs/common';
 import { SettingsService } from '../../settings/settings.service';
+import { FixedWindowCounterStore, WindowCounterEntry } from '../../common/rate-limiting/fixed-window-counter';
 import { MAX_MESSAGE_RATE_COUNTERS, MessageRateLimit, MessageRateLimitScope } from './message-rate-limit.constants';
 import { MessageRateLimitExceededException } from './message-rate-limit.exception';
-
-interface WindowEntry {
-  count: number;
-  firstAt: number;
-}
 
 /**
  * Lightweight in-memory, per-user rate limiter for messaging actions.
  *
  * Keyed by `scope:userId` with a fixed window. Counters live in-process (no
- * Redis/DB) — sufficient for abuse prevention on a single API instance and
- * mirrors the existing auth brute-force protection pattern. The limits
- * themselves are read from the database-backed system settings on each check,
- * so admins can tune them through the settings UI with no restart.
+ * Redis/DB) via the shared {@link FixedWindowCounterStore} that also backs the
+ * auth brute-force protection — sufficient for abuse prevention on a single API
+ * instance. The limits themselves are read from the database-backed system
+ * settings on each check, so admins can tune them through the settings UI with
+ * no restart.
  */
 @Injectable()
 export class MessageRateLimitService {
-  private readonly counters = new Map<string, WindowEntry>();
+  private readonly counters = new FixedWindowCounterStore<string, WindowCounterEntry>(MAX_MESSAGE_RATE_COUNTERS);
   private readonly nowFn: () => number = () => Date.now();
 
   constructor(private readonly settingsService: SettingsService) {}
@@ -34,7 +31,7 @@ export class MessageRateLimitService {
     const now = this.nowFn();
     const key = `${scope}:${userId}`;
 
-    this.evictStale(now, windowMs);
+    this.counters.evict((entry) => now - entry.firstAt >= windowMs);
 
     const entry = this.counters.get(key);
     if (!entry || now - entry.firstAt >= windowMs) {
@@ -56,20 +53,5 @@ export class MessageRateLimitService {
       return { maxActions: policy.sendMaxPerWindow, windowSeconds: policy.sendWindowSeconds };
     }
     return { maxActions: policy.contactMaxPerWindow, windowSeconds: policy.contactWindowSeconds };
-  }
-
-  private evictStale(now: number, windowMs: number): void {
-    for (const [key, entry] of this.counters) {
-      if (now - entry.firstAt >= windowMs) {
-        this.counters.delete(key);
-      }
-    }
-    if (this.counters.size > MAX_MESSAGE_RATE_COUNTERS) {
-      const overflow = this.counters.size - MAX_MESSAGE_RATE_COUNTERS;
-      const oldest = [...this.counters.entries()].sort(([, a], [, b]) => a.firstAt - b.firstAt);
-      for (let i = 0; i < overflow && i < oldest.length; i += 1) {
-        this.counters.delete(oldest[i][0]);
-      }
-    }
   }
 }
