@@ -84,11 +84,13 @@ void State::setWebsocketState(bool connected, String hostname, uint16_t port, bo
 
 void State::setWebsocketPhase(WebsocketPhase phase)
 {
+    StateLock lock(state_mutex);
     websocket_phase = phase;
 }
 
 void State::setWebsocketCertProgress(String certName, int certIndex, int certCount, int rememberedRetryCount)
 {
+    StateLock lock(state_mutex);
     websocket_cert_name = certName;
     websocket_cert_index = certIndex;
     websocket_cert_count = certCount;
@@ -97,6 +99,7 @@ void State::setWebsocketCertProgress(String certName, int certIndex, int certCou
 
 void State::setWebsocketNextAttemptSeconds(int seconds)
 {
+    StateLock lock(state_mutex);
     websocket_next_attempt_seconds = seconds;
 }
 

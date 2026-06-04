@@ -117,9 +117,9 @@ void Websocket::publishConnectionStatus()
     if (_state != CONNECTED && network_is_connected)
     {
         uint32_t elapsed = millis() - lastReconnectAttemptTime;
-        if (elapsed < RECONNECT_INTERVAL_MS)
+        if (elapsed < this->nextRetryDelayMs)
         {
-            secondsUntilNext = (int)((RECONNECT_INTERVAL_MS - elapsed + 999) / 1000);
+            secondsUntilNext = (int)((this->nextRetryDelayMs - elapsed + 999) / 1000);
         }
     }
     State::setWebsocketNextAttemptSeconds(secondsUntilNext);
