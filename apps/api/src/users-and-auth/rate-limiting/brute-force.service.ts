@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '@attraccess/database-entities';
 import { SettingsService } from '../../settings/settings.service';
+import { FixedWindowCounterStore, WindowCounterEntry } from '../../common/rate-limiting/fixed-window-counter';
 import { AccountLockedException, TooManyAuthAttemptsException } from './exceptions';
 
 export type RateLimitScope =
@@ -11,9 +12,7 @@ export type RateLimitScope =
   | 'password_reset_request'
   | 'password_reset_complete';
 
-interface CounterEntry {
-  count: number;
-  firstAt: number;
+interface CounterEntry extends WindowCounterEntry {
   lockoutUntil: number;
   lockoutCount: number;
 }
@@ -22,8 +21,8 @@ const MAX_COUNTER_ENTRIES = 10_000;
 
 @Injectable()
 export class BruteForceProtectionService {
-  private readonly ipCounters = new Map<string, CounterEntry>();
-  private readonly accountCounters = new Map<number, CounterEntry>();
+  private readonly ipCounters = new FixedWindowCounterStore<string, CounterEntry>(MAX_COUNTER_ENTRIES);
+  private readonly accountCounters = new FixedWindowCounterStore<number, CounterEntry>(MAX_COUNTER_ENTRIES);
   private readonly nowFn: () => number = () => Date.now();
 
   constructor(
@@ -130,7 +129,12 @@ export class BruteForceProtectionService {
     );
   }
 
-  private upsertCounter<K>(store: Map<K, CounterEntry>, key: K, now: number, windowMs: number): CounterEntry {
+  private upsertCounter<K>(
+    store: FixedWindowCounterStore<K, CounterEntry>,
+    key: K,
+    now: number,
+    windowMs: number,
+  ): CounterEntry {
     const existing = store.get(key);
     if (!existing) {
       const entry: CounterEntry = { count: 1, firstAt: now, lockoutUntil: 0, lockoutCount: 0 };
@@ -160,35 +164,14 @@ export class BruteForceProtectionService {
   }
 
   private evictStale(now: number, windowMs: number): void {
-    for (const [key, entry] of this.ipCounters) {
-      if (isStale(entry, now, windowMs)) {
-        this.ipCounters.delete(key);
-      }
-    }
-    for (const [key, entry] of this.accountCounters) {
-      if (isStale(entry, now, windowMs)) {
-        this.accountCounters.delete(key);
-      }
-    }
-    if (this.ipCounters.size > MAX_COUNTER_ENTRIES) {
-      dropOldest(this.ipCounters, this.ipCounters.size - MAX_COUNTER_ENTRIES);
-    }
-    if (this.accountCounters.size > MAX_COUNTER_ENTRIES) {
-      dropOldest(this.accountCounters, this.accountCounters.size - MAX_COUNTER_ENTRIES);
-    }
+    this.ipCounters.evict((entry) => isStale(entry, now, windowMs));
+    this.accountCounters.evict((entry) => isStale(entry, now, windowMs));
   }
 }
 
 function isStale(entry: CounterEntry, now: number, windowMs: number): boolean {
   if (entry.lockoutUntil > now) return false;
   return now - entry.firstAt > windowMs;
-}
-
-function dropOldest<K>(store: Map<K, CounterEntry>, count: number): void {
-  const sorted = [...store.entries()].sort(([, a], [, b]) => a.firstAt - b.firstAt);
-  for (let i = 0; i < count && i < sorted.length; i += 1) {
-    store.delete(sorted[i][0]);
-  }
 }
 
 function ipKey(scope: RateLimitScope, ip: string): string {

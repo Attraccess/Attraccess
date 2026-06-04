@@ -76,3 +76,31 @@ export const RATE_LIMIT_DEFAULTS: RateLimitPolicy = {
   exponentialBackoff: false,
   backoffMultiplier: 2,
 };
+
+export const MESSAGING_PARENT = 'messaging';
+
+export const MESSAGING_KEYS = {
+  sendRateLimitMax: 'send_rate_limit_max',
+  sendRateLimitWindowSeconds: 'send_rate_limit_window_seconds',
+  contactRateLimitMax: 'contact_rate_limit_max',
+  contactRateLimitWindowSeconds: 'contact_rate_limit_window_seconds',
+} as const;
+
+export interface MessagingRateLimitPolicy {
+  /** Max messages a user may send per window. */
+  sendMaxPerWindow: number;
+  /** Length of the send window in seconds. */
+  sendWindowSeconds: number;
+  /** Max conversations a user may open per window. */
+  contactMaxPerWindow: number;
+  /** Length of the contact window in seconds. */
+  contactWindowSeconds: number;
+}
+
+/** Defaults tuned to be invisible during normal interactive usage while blocking automated abuse. */
+export const MESSAGING_RATE_LIMIT_DEFAULTS: MessagingRateLimitPolicy = {
+  sendMaxPerWindow: 30,
+  sendWindowSeconds: 60,
+  contactMaxPerWindow: 10,
+  contactWindowSeconds: 60,
+};

@@ -17,6 +17,7 @@ import { ConversationListItemDto } from './dtos/conversationListItem.dto';
 import { MessagingLiveService } from './messaging-live.service';
 import { NotificationPreferenceDto } from './dtos/notificationPreference.dto';
 import { UpdateNotificationPreferenceDto } from './dtos/updateNotificationPreference.dto';
+import { MessageRateLimitService } from './rate-limiting/message-rate-limit.service';
 
 export interface MessageReference {
   referenceType: MessageReferenceType;
@@ -42,9 +43,12 @@ export class MessagingService {
     private readonly resourceUsageService: ResourceUsageService,
     private readonly eventEmitter: EventEmitter2,
     private readonly messagingLiveService: MessagingLiveService,
+    private readonly messageRateLimitService: MessageRateLimitService,
   ) {}
 
   public async getOrCreateConversation(currentUserId: number, targetUserId: number): Promise<Conversation> {
+    await this.messageRateLimitService.assertWithinLimit('contact', currentUserId);
+
     if (currentUserId === targetUserId) {
       throw new BadRequestException('Cannot start a conversation with yourself');
     }
@@ -94,6 +98,8 @@ export class MessagingService {
     content: string,
     reference?: MessageReference,
   ): Promise<Message> {
+    await this.messageRateLimitService.assertWithinLimit('send_message', senderId);
+
     await this.assertParticipant(conversationId, senderId);
 
     const decoration = await this.resolveReferenceDecoration(reference);

@@ -12,17 +12,20 @@ import { MessagingService } from './messaging.service';
 import { MessagingLiveService } from './messaging-live.service';
 import { MessagingController } from './messaging.controller';
 import { MessageNotificationListener } from './message-notification.listener';
+import { MessageRateLimitService } from './rate-limiting/message-rate-limit.service';
 import { ResourceUsageModule } from '../resources/usage/resourceUsage.module';
 import { EmailModule } from '../email/email.module';
+import { SettingsModule } from '../settings/settings.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Conversation, ConversationParticipant, Message, NotificationPreference, Resource, User]),
     ResourceUsageModule,
     EmailModule,
+    SettingsModule,
   ],
   controllers: [MessagingController],
-  providers: [MessagingService, MessagingLiveService, MessageNotificationListener],
+  providers: [MessagingService, MessagingLiveService, MessageNotificationListener, MessageRateLimitService],
   exports: [MessagingService],
 })
 export class MessagingModule {}
