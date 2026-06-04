@@ -91,7 +91,6 @@ void Websocket::connectWebSocket()
         return;
     }
     lastReconnectAttemptTime = millis();
-    growReconnectBackoff();
 
     logger.info("connectWebSocket");
 
@@ -231,7 +230,7 @@ void Websocket::connectWebSocket()
 
 bool Websocket::shouldReconnect()
 {
-    return millis() - this->lastReconnectAttemptTime >= this->reconnectBackoffMs;
+    return millis() - this->lastReconnectAttemptTime >= this->nextRetryDelayMs;
 }
 
 void Websocket::growReconnectBackoff()
@@ -243,6 +242,7 @@ void Websocket::growReconnectBackoff()
 void Websocket::resetReconnectBackoff()
 {
     this->reconnectBackoffMs = this->RECONNECT_BACKOFF_BASE_MS;
+    this->nextRetryDelayMs = this->RECONNECT_BACKOFF_BASE_MS;
 }
 
 void Websocket::logHeapStats()
@@ -285,9 +285,18 @@ void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, v
     case WEBSOCKET_EVENT_DISCONNECTED:
     {
         logger.info("WebSocket disconnected");
-        if (apiConfig.useSSL)
+        if (apiConfig.useSSL && !this->_certManager.markFailure())
         {
-            this->_certManager.markFailure();
+            // Still iterating the certificate list: retry fast so a working cert near
+            // the end of the list is reached within minutes, not hours.
+            this->nextRetryDelayMs = this->CERT_ITERATION_INTERVAL_MS;
+        }
+        else
+        {
+            // A full certificate sweep failed (or non-SSL connect failed): the server
+            // is likely unreachable, so back off exponentially to curb reconnect churn.
+            growReconnectBackoff();
+            this->nextRetryDelayMs = this->reconnectBackoffMs;
         }
         setState(INIT);
         break;

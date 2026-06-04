@@ -44,9 +44,11 @@ private:
     bool shouldReconnect();
     uint32_t lastReconnectAttemptTime = 0;
 
+    const uint32_t CERT_ITERATION_INTERVAL_MS = 10000;
     const uint32_t RECONNECT_BACKOFF_BASE_MS = 10000;
     const uint32_t RECONNECT_BACKOFF_MAX_MS = 60000;
     uint32_t reconnectBackoffMs = 10000;
+    uint32_t nextRetryDelayMs = 10000;
     void growReconnectBackoff();
     void resetReconnectBackoff();
 
