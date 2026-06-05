@@ -1,3 +1,69 @@
+## 1.7.0 (2026-06-05)
+
+### 🚀 Features
+
+- add resend verification email flow (ATT-266) ([#596](https://github.com/Attraccess/Attraccess/pull/596))
+- **ATT-106:** user retraining requirement ([#1125](https://github.com/Attraccess/Attraccess/pull/1125))
+- **ATT-174:** notify introducers/maintainers about usage notes ([#1201](https://github.com/Attraccess/Attraccess/pull/1201))
+- **ATT-249:** differentiate introducers from maintainers ([#1123](https://github.com/Attraccess/Attraccess/pull/1123))
+- **ATT-252:** show allowed users on maintenance and not-introduced views ([376d09a5](https://github.com/Attraccess/Attraccess/commit/376d09a5))
+- **ATT-252:** surface maintenance state on Attractap readers ([#1121](https://github.com/Attraccess/Attraccess/pull/1121))
+- **ATT-440:** add Conversation, ConversationParticipant, and Message entities with migration ([#1122](https://github.com/Attraccess/Attraccess/pull/1122))
+- **ATT-441:** add messaging module with people-to-people conversations ([#1128](https://github.com/Attraccess/Attraccess/pull/1128))
+- **ATT-442:** per-user SSE realtime delivery for new messages ([#1152](https://github.com/Attraccess/Attraccess/pull/1152))
+- **ATT-443:** messaging inbox page, thread UI, and live SSE updates ([#1153](https://github.com/Attraccess/Attraccess/pull/1153))
+- **ATT-444:** "Contact current user" entry point on the resource page ([#1161](https://github.com/Attraccess/Attraccess/pull/1161))
+- **ATT-445:** messaging presence detection via SSE connection tracking ([#1177](https://github.com/Attraccess/Attraccess/pull/1177))
+- **ATT-446:** per-user notification preferences entity + settings ([#1167](https://github.com/Attraccess/Attraccess/pull/1167))
+- **ATT-447:** email fallback for offline recipients with unread messages ([#1182](https://github.com/Attraccess/Attraccess/pull/1182))
+- **ATT-448:** per-user message send rate limiting ([#1188](https://github.com/Attraccess/Attraccess/pull/1188))
+- **ATT-452:** AttraccessUser popover with Start direct message action ([#1158](https://github.com/Attraccess/Attraccess/pull/1158))
+- **ATT-455:** backend PluginContext runtime host-access API ([#1165](https://github.com/Attraccess/Attraccess/pull/1165))
+- **ATT-456:** typed plugin event system — emit/subscribe + wire RESOURCE_USAGE events ([#1170](https://github.com/Attraccess/Attraccess/pull/1170))
+- **ATT-457:** mount frontend plugin routes via getRoutes() with crash isolation ([#1155](https://github.com/Attraccess/Attraccess/pull/1155))
+- **ATT-458:** plugin permissions + sandbox enforcement ([#1156](https://github.com/Attraccess/Attraccess/pull/1156))
+- **ATT-461:** plugin docs + working example plugin; drop WIP flag ([#1189](https://github.com/Attraccess/Attraccess/pull/1189))
+- **ATT-473:** persist boot/crash record to NVS with periodic heap snapshot ([#1151](https://github.com/Attraccess/Attraccess/pull/1151))
+- **ATT-475:** receive + display per-reader crash reports ([#1154](https://github.com/Attraccess/Attraccess/pull/1154))
+- **ATT-480:** manual maintenance mode — instant trigger + user requests ([#1169](https://github.com/Attraccess/Attraccess/pull/1169))
+- **ATT-482:** messaging unread counts and badges ([#1174](https://github.com/Attraccess/Attraccess/pull/1174))
+- **ATT-484:** server-side coredump symbolication ([#1181](https://github.com/Attraccess/Attraccess/pull/1181))
+- **ATT-494:** show connection/cert-detection progress on connecting screen ([#1212](https://github.com/Attraccess/Attraccess/pull/1212))
+- **attractap:** enable ESP-IDF core dump to flash (ATT-472) ([#1150](https://github.com/Attraccess/Attraccess/pull/1150))
+- **attractap:** upload persisted crash record + coredump on next connect (ATT-474) ([#1159](https://github.com/Attraccess/Attraccess/pull/1159))
+- **attractap:** display resource health state on readers ([#1227](https://github.com/Attraccess/Attraccess/pull/1227))
+- **attractap:** hidden pull-down drawer for settings and reboot (ATT-507) ([#1232](https://github.com/Attraccess/Attraccess/pull/1232))
+- **dev:** add --tui flag to pnpm serve for nx interactive terminal UI ([559415f2](https://github.com/Attraccess/Attraccess/commit/559415f2))
+
+### 🩹 Fixes
+
+- **ATT-218:** use table for MQTT server list, remove custom styling ([#1094](https://github.com/Attraccess/Attraccess/pull/1094))
+- **ATT-272:** include group-inherited introducers in resource introducer list ([#1200](https://github.com/Attraccess/Attraccess/pull/1200))
+- **ATT-273:** add trainers/trainees in one click via search-to-add ([1bf5cd1f](https://github.com/Attraccess/Attraccess/commit/1bf5cd1f))
+- **ATT-462:** land Attractap freeze fixes on main ([#1213](https://github.com/Attraccess/Attraccess/pull/1213))
+- **ATT-479:** use danger variant for terminate other-user session button ([#1163](https://github.com/Attraccess/Attraccess/pull/1163))
+- **ATT-485:** don't count sender's own message as unread ([#1184](https://github.com/Attraccess/Attraccess/pull/1184))
+- **attractap:** enable Task Watchdog on loopTask + networkTask (ATT-463) ([#1144](https://github.com/Attraccess/Attraccess/pull/1144))
+- **attractap:** harden websocket reconnect + watchdog core-0 tasks (ATT-483) ([#1179](https://github.com/Attraccess/Attraccess/pull/1179))
+- **attractap:** overhaul web serial config UI and fix apply-server bug (ATT-495) ([#1223](https://github.com/Attraccess/Attraccess/pull/1223))
+- **attractap:** recover from fragmented-heap websocket reconnect lockup (ATT-508) ([#1233](https://github.com/Attraccess/Attraccess/pull/1233))
+- **attractap:** reliable NFC card enrollment + redesigned screen (ATT-503) ([#1228](https://github.com/Attraccess/Attraccess/pull/1228))
+- **attractap:** authenticate on first tap instead of requiring double tap (ATT-509) ([#1235](https://github.com/Attraccess/Attraccess/pull/1235))
+- **attractap:** implement NFC card reset/deletion + align screen with enrollment (ATT-506) ([#1236](https://github.com/Attraccess/Attraccess/pull/1236))
+- **ci:** regenerate client libs before typecheck ([#1214](https://github.com/Attraccess/Attraccess/pull/1214))
+- **ci:** short-form depends_on so balena push accepts compose ([#1237](https://github.com/Attraccess/Attraccess/pull/1237))
+- **ci:** strip fail2ban from compose before balena push ([#1238](https://github.com/Attraccess/Attraccess/pull/1238))
+- **dev:** spawn nx directly so --tui terminal UI works ([cebab02a](https://github.com/Attraccess/Attraccess/commit/cebab02a))
+- **dev:** force NX_TUI=true so --tui renders the nx terminal UI ([081e7d5f](https://github.com/Attraccess/Attraccess/commit/081e7d5f))
+
+### ❤️ Thank You
+
+- Claude Opus 4.6
+- Claude Opus 4.7 (1M context)
+- Claude Opus 4.8
+- Claude Opus 4.8 (1M context)
+- Jan Jaap @jappyjan
+
 ## 1.6.0 (2026-05-30)
 
 ### 🚀 Features
