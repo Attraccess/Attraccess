@@ -178,8 +178,7 @@ services:
       - grafana-dashboards:/var/lib/grafana/dashboards:ro
       - grafana-data:/var/lib/grafana
     depends_on:
-      monitoring-init:
-        condition: service_completed_successfully
+      - monitoring-init
 
   # fail2ban is opt-in via the `fail2ban` Compose profile to keep developers
   # from getting their own IP banned during local testing. Enable with:
