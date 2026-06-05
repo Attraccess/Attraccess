@@ -93,6 +93,11 @@ void API::onResourceList(JsonObject data)
 
         dst.isUnderMaintenance = resource["isUnderMaintenance"].is<bool>() ? resource["isUnderMaintenance"].as<bool>() : false;
 
+        // Health state: default to healthy when the field is absent (backwards compatible)
+        dst.isHealthy = resource["isHealthy"].is<bool>() ? resource["isHealthy"].as<bool>() : true;
+        const char *healthReason = resource["healthReason"].as<const char *>();
+        strlcpy(dst.healthReason, healthReason ? healthReason : "", sizeof(dst.healthReason));
+
         JsonObject aus = resource["activeUsageSession"].as<JsonObject>();
         if (!aus.isNull() && aus["user"]["username"].is<const char *>() && aus["startTime"].is<const char *>())
         {

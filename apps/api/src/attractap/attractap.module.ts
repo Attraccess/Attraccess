@@ -27,6 +27,7 @@ import { AttractapFirmwareController } from './firmware.controller';
 import { AttractapFirmwareService } from './firmware.service';
 import { CoredumpSymbolicationService } from './coredump-symbolication.service';
 import { ResourceMaintenanceModule } from '../resources/maintenances/maintenance.module';
+import { ResourceHealthModule } from '../resources/health/resource-health.module';
 import { LicenseModule } from '../license/license.module';
 import { ResourceIntroductionsModule } from '../resources/introductions/resourceIntroductions.module';
 import { ResourceIntroducersModule } from '../resources/introducers/resourceIntroducers.module';
@@ -43,6 +44,7 @@ import { ResourceFormsModule } from '../resources/forms/forms.module';
     ResourcesModule,
     ResourceUsageModule,
     ResourceMaintenanceModule,
+    ResourceHealthModule,
     LicenseModule,
     ResourceIntroductionsModule,
     ResourceIntroducersModule,
