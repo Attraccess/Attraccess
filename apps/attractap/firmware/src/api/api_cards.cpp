@@ -98,6 +98,33 @@ void API::sendEnrollNewCard(bool success)
     this->sendMessage("ENROLL_NEW_CARD", payload);
 }
 
+void API::sendEnrollNewCardCancel()
+{
+    JsonDocument doc;
+    JsonObject payload = doc.to<JsonObject>();
+    this->sendMessage("ENROLL_NEW_CARD_CANCEL", payload);
+}
+
+void API::setEnrollNewCardErrorCallback(std::function<void(String error)> callback)
+{
+    this->enrollNewCardErrorCallback = callback;
+}
+
+void API::onEnrollNewCardRequestNFCKeyError(JsonObject data)
+{
+    JsonObject payload = data["payload"].as<JsonObject>();
+    String error = payload["error"].is<String>() ? payload["error"].as<String>() : String("");
+    if (error.length() == 0)
+    {
+        return;
+    }
+    this->logger.error(("Enroll new card request key error from server: " + error).c_str());
+    if (this->enrollNewCardErrorCallback != nullptr)
+    {
+        this->enrollNewCardErrorCallback(error);
+    }
+}
+
 void API::onEnrollNewCardGetAvailableKeyNo(JsonObject data)
 {
     this->logger.info("Received enroll new card available key no");

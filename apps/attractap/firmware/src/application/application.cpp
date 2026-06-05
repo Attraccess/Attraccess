@@ -333,14 +333,30 @@ void Application::setup() {
     uint8_t keyBytes[16] = {0};
     stringToHexArray(key, keyBytes, 16);
 
-    this->apiEnrollNewCardData = {
-        .keyNo = keyNo,
-        .keyBytes = {0},
-    };
+    this->apiEnrollNewCardData.keyNo = keyNo;
+    memset(this->apiEnrollNewCardData.keyBytes, 0, 16);
     memcpy(this->apiEnrollNewCardData.keyBytes, keyBytes, 16);
 
-    this->externalState = EXTERNAL_STATE_ENROLL_NEW_CARD;
+    // Just flag readiness; processEnrollment() performs the write on the main
+    // loop while the card is still held (no card-detection edge required).
+    this->enrollKeyMaterialReady = true;
   });
+
+  this->api.setEnrollNewCardErrorCallback([this](String error) {
+    // Runs on the websocket task. Copy into the fixed buffer, then publish via
+    // the volatile flag (set last) so the main loop reads a complete message.
+    if (error == "CARD_ALREADY_ENROLLED") {
+      strlcpy(this->enrollErrorMessage, "Karte ist bereits\nregistriert",
+              sizeof(this->enrollErrorMessage));
+    } else {
+      snprintf(this->enrollErrorMessage, sizeof(this->enrollErrorMessage),
+               "Fehler:\n%s", error.c_str());
+    }
+    this->enrollErrorPending = true;
+  });
+
+  Display::enrollmentScreen.setOnCancelCallback(
+      [this]() { this->enrollCancelRequested = true; });
 
   this->api.setProjectsOfUserResponseCallback(
       [this](const API::ProjectsOfUserResponse &projectsOfUserResponse) {
@@ -429,24 +445,8 @@ void Application::setup() {
     }
 
 #ifdef HAS_LVGL_DISPLAY
-    if (this->state == APPLICATION_STATE_ENROLLMENT) {
-
-      bool success = this->nfc.changeKey(
-          this->apiEnrollNewCardData.keyNo, this->nfc.FACTORY_KEY,
-          this->nfc.FACTORY_KEY, this->apiEnrollNewCardData.keyBytes);
-
-      if (success) {
-        this->beeper.successBeep();
-        this->externalState = EXTERNAL_STATE_NONE;
-      } else {
-        this->beeper.errorBeep();
-      }
-
-      this->api.sendEnrollNewCard(success);
-
-      this->externalState = EXTERNAL_STATE_NONE;
-      return;
-    }
+    // Enrollment runs poll-driven in processEnrollment() with card detection
+    // disabled, so this callback never fires during APPLICATION_STATE_ENROLLMENT.
 #endif
 
     if (this->state == APPLICATION_STATE_AUTHENTICATE_CARD) {

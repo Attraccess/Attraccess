@@ -438,6 +438,9 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       case AttractapEventType.ENROLL_NEW_CARD:
         await this.cardHandler.onEnrollNewCard(socket, eventData);
         break;
+      case AttractapEventType.ENROLL_NEW_CARD_CANCEL:
+        await this.cardHandler.onEnrollNewCardCancel(socket);
+        break;
 
       case AttractapEventType.PROJECTS_OF_USER:
         await this.projectsHandler.handleProjectsOfUserRequest(socket, eventData);

@@ -221,9 +221,11 @@ public:
 
     void setEnrollNewCardGetAvailableKeyNoCallback(std::function<void(String username)> callback);
     void setEnrollNewCardCallback(std::function<void(uint8_t keyNo, String key)> callback);
+    void setEnrollNewCardErrorCallback(std::function<void(String error)> callback);
 
     void sendEnrollNewCardAvailableKeyNo(uint8_t *uid, uint8_t uidLength, uint8_t keyNo);
     void sendEnrollNewCard(bool success);
+    void sendEnrollNewCardCancel();
 
     void startResourceUsageSession(uint32_t resourceId, uint32_t projectId = 0);
     void stopResourceUsageSession(uint32_t resourceId);
@@ -331,9 +333,13 @@ private:
 
     std::function<void(String username)> enrollNewCardGetAvailableKeyNoCallback;
     std::function<void(uint8_t keyNo, String key)> enrollNewCardCallback;
+    std::function<void(String error)> enrollNewCardErrorCallback;
 
     void onEnrollNewCardGetAvailableKeyNo(JsonObject data);
     void onEnrollNewCard(JsonObject data);
+    // Server reuses the ENROLL_NEW_CARD_REQUEST_NFC_KEY event to report errors
+    // back to the reader (e.g. CARD_ALREADY_ENROLLED).
+    void onEnrollNewCardRequestNFCKeyError(JsonObject data);
 
     std::function<void(const char *title, const char *message)> errorCallback;
     std::function<void(const char *type, bool success)> actionResultCallback;

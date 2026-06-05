@@ -148,6 +148,12 @@ void API::processIncomingMessage(const char *buf, size_t len)
     {
         this->onEnrollNewCard(inboundDoc["data"].as<JsonObject>());
     }
+    else if (strcmp(eventType, "ENROLL_NEW_CARD_REQUEST_NFC_KEY") == 0)
+    {
+        // The server only sends us this event to report an error; the happy
+        // path responds with ENROLL_NEW_CARD instead.
+        this->onEnrollNewCardRequestNFCKeyError(inboundDoc["data"].as<JsonObject>());
+    }
     else if (
         strcmp(eventType, "START_RESOURCE_USAGE_SESSION") == 0 ||
         strcmp(eventType, "STOP_RESOURCE_USAGE_SESSION") == 0 ||

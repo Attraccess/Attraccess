@@ -67,7 +67,6 @@ private:
         EXTERNAL_STATE_NONE,
 #ifdef HAS_LVGL_DISPLAY
         EXTERNAL_STATE_ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO,
-        EXTERNAL_STATE_ENROLL_NEW_CARD,
 #endif
         EXTERNAL_STATE_AUTHENTICATE_CARD,
         EXTERNAL_STATE_FIRMWARE_UPDATE,
@@ -89,6 +88,38 @@ private:
         uint8_t keyBytes[16];
     };
     ApiEnrollNewCardData_t apiEnrollNewCardData;
+
+    // Enrollment is a self-contained, sticky sub-flow. Once started it owns the
+    // display until it reaches a terminal state (success, cancel or timeout) so
+    // the generic screen routing can never steal the enrollment screen. The
+    // whole flow is poll-driven (card detection stays disabled), which removes
+    // the old dependency on a fresh card-detection edge for the key-write step
+    // (the "jiggle the card to get a beep" symptom).
+    enum EnrollmentPhase_t
+    {
+        ENROLL_PHASE_NONE,
+        ENROLL_PHASE_WAIT_FOR_CARD, // screen up, probing for a writable card
+        ENROLL_PHASE_REQUESTED_KEY, // asked server for key material, awaiting it
+        ENROLL_PHASE_WRITING,       // writing the key to the (still-present) card
+        ENROLL_PHASE_SUCCESS,       // success shown, dwelling before exit
+        ENROLL_PHASE_ERROR,         // error shown, dwelling before retry
+    };
+    EnrollmentPhase_t enrollPhase = ENROLL_PHASE_NONE;
+    volatile bool enrollKeyMaterialReady = false;
+    volatile bool enrollCancelRequested = false;
+    volatile bool enrollErrorPending = false;
+    // Fixed buffer, not an Arduino String: the producer runs on the websocket
+    // task and the consumer on the main loop. A String would reallocate its
+    // heap buffer on assignment, which the main loop could observe mid-update
+    // (dangling pointer / torn read). A plain char[] has no pointer to dangle.
+    char enrollErrorMessage[64] = {0};
+    uint32_t enrollPhaseChangedMs = 0;
+    static constexpr uint32_t ENROLLMENT_TIMEOUT_MS = 30000;
+    static constexpr uint32_t ENROLL_SUCCESS_DWELL_MS = 1500;
+    static constexpr uint32_t ENROLL_ERROR_DWELL_MS = 1800;
+    void beginEnrollment();
+    void processEnrollment();
+    void exitEnrollment();
 #endif
 
     API::CardAuthenticationDetailsResponse cardAuthenticationData;
