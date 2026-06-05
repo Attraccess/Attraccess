@@ -1,30 +1,24 @@
 {
-  "title": {
-    "init": "Attractap Hardware Setup",
-    "select": "Select Firmware",
-    "flash": "Install Firmware",
-    "configure": "Configure Attractap"
-  },
-  "subtitle": {
-    "init": "What do you want to do?",
-    "select": "Select the firmware that matches your Attractap",
-    "flash": "This process can take several minutes. Please wait until the process is complete.",
-    "configure": "Configure your Attractap so that it can connect to a network and the Attraccess-Server."
-  },
-  "init": {
-    "actions": {
-      "selectFirmware": "Install firmware",
-      "configure": "Configure"
-    },
-    "description": "If you have a completely new Attractap, select \"Install firmware\" to install the latest firmware on your Attractap. If you have an already configured Attractap, select \"Configure\" to configure your Attractap."
-  },
-  "actions": {
-    "back": "Go back"
+  "title": "Attractap Setup",
+  "subtitle": "Install firmware and configure your reader",
+  "connection": {
+    "connected": "Connected",
+    "disconnected": "Not connected"
   },
   "connect": {
-    "description": "Please connect your Attractap to the USB port of your computer and click \"Connect\", in the following dialog you need to select the correct serial port.",
+    "title": "Connect your Attractap",
+    "description": "Plug your Attractap into a USB port, then click connect and pick the correct serial port in the browser dialog.",
     "button": {
-      "label": "Connect"
+      "label": "Connect via USB"
     }
+  },
+  "tabs": {
+    "firmware": "Firmware",
+    "network": "Network",
+    "server": "Server",
+    "security": "PIN"
+  },
+  "firmware": {
+    "back": "Choose a different firmware"
   }
 }

@@ -50,9 +50,16 @@
   },
   "apiDataDoesNotMatchesServer": {
     "alert": {
-      "title": "API Daten stimmen nicht mit Server überein",
-      "description": "Die Daten vom Leser stimmen nicht mit den Server-Daten überein. Bitte aktualisieren Sie die Daten.",
-      "button": "Daten aktualisieren"
+      "title": "Server-Einstellungen veraltet",
+      "description": "Der Leser zeigt auf einen anderen Server als diesen ({{hostname}}:{{port}} {{protocolEmoji}}). Wende den aktuellen Server an, um das zu beheben.",
+      "button": "Aktuellen Server anwenden"
     }
+  },
+  "manual": {
+    "title": "Manuelle Server-Einstellungen",
+    "hostname": "Hostname",
+    "port": "Port",
+    "useSSL": "HTTPS (SSL) verwenden",
+    "submit": "Server-Einstellungen speichern"
   }
 }

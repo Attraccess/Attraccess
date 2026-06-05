@@ -1,30 +1,24 @@
 {
-  "title": {
-    "init": "NFC-Leser einrichten",
-    "select": "Firmware auswählen",
-    "flash": "Firmware installieren",
-    "configure": "Konfiguration vornehmen"
-  },
-  "subtitle": {
-    "init": "Was möchten Sie tun?",
-    "select": "Wählen Sie die Firmware, welche zu ihrem Attractap passt",
-    "flash": "Dieser Vorgang kann einige Minuten dauern. Bitte warten Sie, bis der Vorgang abgeschlossen ist.",
-    "configure": "Konfigurieren Sie Ihren Attractap, so dass er sich mit einem Netzwerk und dem Attraccess-Server verbinden kann."
-  },
-  "init": {
-    "actions": {
-      "selectFirmware": "Firmware installieren",
-      "configure": "Konfiguration vornehmen"
-    },
-    "description": "Haben Sie einen komplett neuen Attractap, dann wählen Sie \"Firmware installieren\" um die neuste Firmware auf Ihren Attractap zu installieren. Wenn Sie einen bereits eingerichteten Attractap haben, dann wählen Sie \"Konfiguration vornehmen\" um die Konfiguration Ihres Attractap zu ändern."
-  },
-  "actions": {
-    "back": "Zurück"
+  "title": "Attractap Einrichtung",
+  "subtitle": "Firmware installieren und Leser konfigurieren",
+  "connection": {
+    "connected": "Verbunden",
+    "disconnected": "Nicht verbunden"
   },
   "connect": {
-    "description": "Bitte schließen Sie ihren Attractap an den USB-Port Ihres Computers an und klicken auf \"Verbinden\", im folgenden Dialog müssen Sie dann den richtigen Seriellen Port auswählen.",
+    "title": "Attractap verbinden",
+    "description": "Schließe deinen Attractap an einen USB-Port an, klicke auf Verbinden und wähle im Browser-Dialog den richtigen seriellen Port aus.",
     "button": {
-      "label": "Verbinden"
+      "label": "Per USB verbinden"
     }
+  },
+  "tabs": {
+    "firmware": "Firmware",
+    "network": "Netzwerk",
+    "server": "Server",
+    "security": "PIN"
+  },
+  "firmware": {
+    "back": "Andere Firmware wählen"
   }
 }

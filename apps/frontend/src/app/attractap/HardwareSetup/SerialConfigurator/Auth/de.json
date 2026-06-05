@@ -1,6 +1,8 @@
 {
   "title": "Geräte-PIN",
   "loading": "Geräte-PIN wird geprüft...",
+  "waitingForDevice": "Warte auf Antwort des Geräts. Wenn du gerade Firmware installiert hast, gib ihm ein paar Sekunden zum Starten.",
+  "retry": "Erneut prüfen",
   "enterPin": {
     "submit": "Entsperren"
   },

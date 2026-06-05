@@ -57,13 +57,7 @@ export function AttractapSerialConfiguratorNetwork({ className }: { className?: 
         actions={[
           {
             key: 'refresh-status',
-            label: t('actions.refreshStatus'),
-            isPending: isFetchingConfiguration,
-            onPress: handleRefresh,
-          },
-          {
-            key: 'refresh-wifi',
-            label: t('actions.refreshWifi'),
+            label: t('actions.refresh'),
             isPending: isFetchingConfiguration,
             onPress: handleRefresh,
           },
