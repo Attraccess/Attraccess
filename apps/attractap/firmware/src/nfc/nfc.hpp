@@ -25,11 +25,12 @@ public:
     void setCardRemovalCallback(std::function<void(uint32_t presentationTimeMs)> callback);
     void disableCardDetection();
 
-    bool getAvailableKeyNo(uint8_t *uid, uint8_t *uidLength, uint8_t *keyNo);
+    // Forget the currently tracked card so the next enableCardDetection() cycle
+    // re-detects from a clean state (fresh readPassiveTargetID) instead of
+    // assuming the previously held card is still present.
+    void resetCardPresence();
 
-    // Release any target the PN532 still holds active from a prior crypto
-    // session, so the next detection starts from a clean state.
-    void releaseCard();
+    bool getAvailableKeyNo(uint8_t *uid, uint8_t *uidLength, uint8_t *keyNo);
 
     static uint8_t FACTORY_KEY[16];
 

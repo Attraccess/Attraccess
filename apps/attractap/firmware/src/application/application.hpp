@@ -105,6 +105,11 @@ private:
         ENROLL_PHASE_ERROR,         // error shown, dwelling before retry
     };
     EnrollmentPhase_t enrollPhase = ENROLL_PHASE_NONE;
+    // Set by the card-detection callback when a card enters the field during
+    // ENROLL_PHASE_WAIT_FOR_CARD. The enrollment state machine consumes it on
+    // the main loop. Lets WAIT_FOR_CARD ride the proven handleCardDetection
+    // loop (reliable re-arm across removals) instead of blind PN532 polling.
+    volatile bool enrollCardDetected = false;
     volatile bool enrollKeyMaterialReady = false;
     volatile bool enrollCancelRequested = false;
     volatile bool enrollErrorPending = false;

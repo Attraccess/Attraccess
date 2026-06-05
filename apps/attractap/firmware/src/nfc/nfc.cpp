@@ -47,6 +47,11 @@ void NFC::disableCardDetection()
     this->cardDetectionEnabled = false;
 }
 
+void NFC::resetCardPresence()
+{
+    this->foundCard = false;
+}
+
 void NFC::loop()
 {
     this->checkHardware();
@@ -199,20 +204,9 @@ void NFC::checkHardware(bool logHardwareInfo)
     this->logger.info(("Firmware ver. " + String((versiondata >> 16) & 0xFF) + "." + String((versiondata >> 8) & 0xFF)).c_str());
 }
 
-void NFC::releaseCard()
-{
-    this->pn532.inRelease(0);
-}
-
 bool NFC::getAvailableKeyNo(uint8_t *uid, uint8_t *uidLength, uint8_t *keyNo)
 {
     this->logger.info("getAvailableKeyNo started");
-
-    // A prior poll may have authenticated a card and left it activated. While a
-    // target stays inlisted, InListPassiveTarget (below) cannot enumerate a
-    // newly presented card and the reader appears dead until re-init. Release
-    // first so every poll starts from a clean detection state.
-    this->releaseCard();
 
     bool foundCard = this->pn532.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, uidLength, 50);
     if (!foundCard)

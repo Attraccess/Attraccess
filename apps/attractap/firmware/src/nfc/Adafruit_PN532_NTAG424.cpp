@@ -713,37 +713,6 @@ bool Adafruit_PN532::readDetectedPassiveTargetID(uint8_t *uid,
 
 /**************************************************************************/
 /*!
-    @brief   Releases a previously activated/inlisted target.
-
-    After an APDU/crypto session (e.g. NTAG424 authenticate) the target stays
-    activated and the PN532 keeps it inlisted. While it is held, a subsequent
-    InListPassiveTarget (REQA) will not enumerate a newly presented card, so the
-    reader appears dead until it is re-initialised. Releasing the target returns
-    the PN532 to a clean detection state.
-
-    @param   relevantTarget  Target number to release, or 0 for all targets.
-    @return  true on success, false otherwise.
-*/
-/**************************************************************************/
-bool Adafruit_PN532::inRelease(uint8_t relevantTarget)
-{
-  pn532_packetbuffer[0] = PN532_COMMAND_INRELEASE;
-  pn532_packetbuffer[1] = relevantTarget; // 0x00 releases all targets
-
-  if (!sendCommandCheckAck(pn532_packetbuffer, 2))
-  {
-    return false;
-  }
-
-  // Drain the response frame (D5 53 <status>) so it does not desync the next
-  // command. We do not gate detection on the status byte.
-  readdata(pn532_packetbuffer, 9);
-  _inListedTag = 0;
-  return true;
-}
-
-/**************************************************************************/
-/*!
     @brief   Exchanges an APDU with the currently inlisted peer
 
     @param   send            Pointer to data to send

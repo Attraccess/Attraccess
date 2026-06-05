@@ -445,8 +445,14 @@ void Application::setup() {
     }
 
 #ifdef HAS_LVGL_DISPLAY
-    // Enrollment runs poll-driven in processEnrollment() with card detection
-    // disabled, so this callback never fires during APPLICATION_STATE_ENROLLMENT.
+    if (this->state == APPLICATION_STATE_ENROLLMENT) {
+      // A card entered the field while waiting to enroll. Flag it; the
+      // enrollment state machine picks the writable key on the main loop. We
+      // ride the normal detection loop here precisely because it re-arms the
+      // reader reliably across removals/re-presentations (ATT-503).
+      this->enrollCardDetected = true;
+      return;
+    }
 #endif
 
     if (this->state == APPLICATION_STATE_AUTHENTICATE_CARD) {

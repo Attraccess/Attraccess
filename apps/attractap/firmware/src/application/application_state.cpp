@@ -352,9 +352,14 @@ void Application::processState() {
 
 #ifdef HAS_LVGL_DISPLAY
 void Application::beginEnrollment() {
-  // Card detection stays disabled for the whole flow; we drive the PN532
-  // directly from processEnrollment() so a continuously-held card works.
-  this->nfc.disableCardDetection();
+  // WAIT_FOR_CARD rides the normal card-detection loop, which re-arms the
+  // reader reliably across removals/re-presentations. (The earlier poll-only
+  // approach wedged the PN532 after the auth performed for an already-enrolled
+  // card, so a freshly presented card was never seen until timeout — ATT-503.)
+  // Detection is disabled again only for the auth/write once a card is picked.
+  this->enrollCardDetected = false;
+  this->nfc.resetCardPresence();
+  this->nfc.enableCardDetection();
   this->enrollPhase = ENROLL_PHASE_WAIT_FOR_CARD;
   this->enrollKeyMaterialReady = false;
   this->enrollCancelRequested = false;
@@ -419,6 +424,17 @@ void Application::processEnrollment() {
 
   switch (this->enrollPhase) {
   case ENROLL_PHASE_WAIT_FOR_CARD: {
+    // The detection loop flags a card via the card-detection callback; until
+    // then there is nothing to do but keep the screen up.
+    if (!this->enrollCardDetected) {
+      break;
+    }
+    this->enrollCardDetected = false;
+
+    // Take exclusive control of the PN532 for the authenticate + write that
+    // follow, so the detection loop doesn't probe the card underneath us.
+    this->nfc.disableCardDetection();
+
     uint8_t uid[7] = {0};
     uint8_t uidLength = 0;
     uint8_t keyNo = 0;
@@ -426,6 +442,11 @@ void Application::processEnrollment() {
       this->api.sendEnrollNewCardAvailableKeyNo(uid, uidLength, keyNo);
       this->enrollPhase = ENROLL_PHASE_REQUESTED_KEY;
       this->enrollPhaseChangedMs = now;
+    } else {
+      // Card slipped away or has no writable key — re-arm the detection loop
+      // and keep waiting.
+      this->nfc.resetCardPresence();
+      this->nfc.enableCardDetection();
     }
     break;
   }
@@ -471,10 +492,14 @@ void Application::processEnrollment() {
 
   case ENROLL_PHASE_ERROR: {
     // Per ATT-503 the screen must not disappear on error. Show it briefly,
-    // then drop back to waiting so the user can re-present the card.
+    // then drop back to waiting so the user can re-present the card. Re-arm the
+    // detection loop so the next (possibly different) card is picked up cleanly.
     if (now - this->enrollPhaseChangedMs > ENROLL_ERROR_DWELL_MS) {
       Display::enrollmentScreen.setStatus(EnrollmentScreen::STATUS_WAITING);
       this->enrollPhase = ENROLL_PHASE_WAIT_FOR_CARD;
+      this->enrollCardDetected = false;
+      this->nfc.resetCardPresence();
+      this->nfc.enableCardDetection();
     }
     break;
   }

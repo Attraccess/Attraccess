@@ -196,10 +196,6 @@ public:
       uint16_t timeout = 0); // timeout 0 means no timeout - will block forever.
   bool startPassiveTargetIDDetection(uint8_t cardbaudrate);
   bool readDetectedPassiveTargetID(uint8_t *uid, uint8_t *uidLength);
-  // Release a previously inlisted/activated target so the reader returns to a
-  // clean state and can enumerate a freshly presented card. relevantTarget 0
-  // releases all targets.
-  bool inRelease(uint8_t relevantTarget = 0);
   bool inDataExchange(uint8_t *send, uint8_t sendLength, uint8_t *response,
                       uint8_t *responseLength);
   bool inListPassiveTarget();
