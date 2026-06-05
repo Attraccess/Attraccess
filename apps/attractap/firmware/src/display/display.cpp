@@ -52,6 +52,14 @@ std::function<void(int16_t, int16_t)> Display::touchCallback = nullptr;
 lv_obj_t *Display::activePopup = nullptr;
 lv_timer_t *Display::popupAutoCloseTimer = nullptr;
 
+lv_obj_t *Display::drawerBackdrop = nullptr;
+lv_obj_t *Display::drawerPanel = nullptr;
+bool Display::drawerOpen = false;
+std::function<void()> Display::onOpenSettingsCallback = nullptr;
+bool Display::gestureCandidate = false;
+bool Display::gesturePrevPressed = false;
+int16_t Display::gestureStartY = 0;
+
 // Set during setup() if touch hardware was not found; popup is shown on the first loop() tick
 // to ensure LVGL is fully running before creating overlay objects.
 static bool s_touchWarningPending = false;
@@ -210,6 +218,7 @@ void Display::setup()
     lv_display_set_theme(disp, base_theme);
 
     Display::initDeviceOverlay();
+    Display::initDrawer();
 
     Display::transitionToScreen(&Display::bootScreen);
 

@@ -305,6 +305,15 @@ void Application::setup() {
     Display::transitionToScreen(&Display::connectionConfigurationScreen);
   });
 
+  // Hidden maintenance drawer (pull down from the top edge) reuses the same
+  // settings entry as the init screen, including the PIN lock.
+  Display::setOnOpenSettingsCallback([this]() {
+    this->state = APPLICATION_STATE_CONFIGURATION_REQUIRED;
+    this->api.disableConnectionAttempts();
+    Display::connectionConfigurationScreen.enablePinLock();
+    Display::transitionToScreen(&Display::connectionConfigurationScreen);
+  });
+
   Display::resourceListScreen.setResourceSelectionCallback(
       [this](const API::ResourceBrief &resource) {
         this->selectResource(resource);
