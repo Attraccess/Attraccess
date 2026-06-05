@@ -155,10 +155,8 @@ services:
       - prometheus-config:/etc/prometheus:ro
       - prometheus-data:/prometheus
     depends_on:
-      config-ui:
-        condition: service_started
-      monitoring-init:
-        condition: service_completed_successfully
+      - config-ui
+      - monitoring-init
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.retention.time=30d'
