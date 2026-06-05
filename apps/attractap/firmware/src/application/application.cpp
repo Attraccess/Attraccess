@@ -358,6 +358,23 @@ void Application::setup() {
   Display::enrollmentScreen.setOnCancelCallback(
       [this]() { this->enrollCancelRequested = true; });
 
+  this->api.setResetNfcCardCallback(
+      [this](String username, uint8_t keyNo, String key) {
+        uint8_t keyBytes[16] = {0};
+        stringToHexArray(key, keyBytes, 16);
+
+        this->apiResetNfcCardData.username = username;
+        this->apiResetNfcCardData.keyNo = keyNo;
+        memset(this->apiResetNfcCardData.keyBytes, 0, 16);
+        memcpy(this->apiResetNfcCardData.keyBytes, keyBytes, 16);
+
+        // The reset state machine takes over on the main loop (beginReset()).
+        this->externalState = EXTERNAL_STATE_RESET_NFC_CARD;
+      });
+
+  Display::resetScreen.setOnCancelCallback(
+      [this]() { this->resetCancelRequested = true; });
+
   this->api.setProjectsOfUserResponseCallback(
       [this](const API::ProjectsOfUserResponse &projectsOfUserResponse) {
         this->projectsOfUserResponse = projectsOfUserResponse;
@@ -451,6 +468,14 @@ void Application::setup() {
       // ride the normal detection loop here precisely because it re-arms the
       // reader reliably across removals/re-presentations (ATT-503).
       this->enrollCardDetected = true;
+      return;
+    }
+
+    if (this->state == APPLICATION_STATE_RESET) {
+      // A card entered the field while waiting to reset. Same rationale as
+      // enrollment: flag it and let the reset state machine authenticate + write
+      // the factory key back on the main loop.
+      this->resetCardDetected = true;
       return;
     }
 #endif

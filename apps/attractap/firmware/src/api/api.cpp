@@ -161,6 +161,10 @@ void API::processIncomingMessage(const char *buf, size_t len)
         // path responds with ENROLL_NEW_CARD instead.
         this->onEnrollNewCardRequestNFCKeyError(inboundDoc["data"].as<JsonObject>());
     }
+    else if (strcmp(eventType, "RESET_NFC_CARD") == 0)
+    {
+        this->onResetNfcCard(inboundDoc["data"].as<JsonObject>());
+    }
     else if (
         strcmp(eventType, "START_RESOURCE_USAGE_SESSION") == 0 ||
         strcmp(eventType, "STOP_RESOURCE_USAGE_SESSION") == 0 ||

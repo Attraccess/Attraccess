@@ -229,6 +229,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       state: {
         lastAuthenticatedUserId: null,
         enrollNewCardData: null,
+        resetNfcCardData: null,
         ota: null,
       },
     });
@@ -440,6 +441,13 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
         break;
       case AttractapEventType.ENROLL_NEW_CARD_CANCEL:
         await this.cardHandler.onEnrollNewCardCancel(socket);
+        break;
+
+      case AttractapEventType.RESET_NFC_CARD:
+        await this.cardHandler.onResetNfcCard(socket, eventData);
+        break;
+      case AttractapEventType.RESET_NFC_CARD_CANCEL:
+        await this.cardHandler.onResetNfcCardCancel(socket);
         break;
 
       case AttractapEventType.PROJECTS_OF_USER:

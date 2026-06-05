@@ -67,6 +67,7 @@ private:
         EXTERNAL_STATE_NONE,
 #ifdef HAS_LVGL_DISPLAY
         EXTERNAL_STATE_ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO,
+        EXTERNAL_STATE_RESET_NFC_CARD,
 #endif
         EXTERNAL_STATE_AUTHENTICATE_CARD,
         EXTERNAL_STATE_FIRMWARE_UPDATE,
@@ -125,6 +126,42 @@ private:
     void beginEnrollment();
     void processEnrollment();
     void exitEnrollment();
+
+    // Card reset/deletion. Mirrors the sticky, poll-driven enrollment sub-flow:
+    // once started it owns the display until success, cancel or timeout. Unlike
+    // enrollment there is no key round-trip — the server hands over the stored
+    // key + slot up front, so the reader can authenticate the card and write the
+    // factory key back as soon as a card is presented.
+    struct ApiResetNfcCardData_t
+    {
+        String username;
+        uint8_t keyNo;
+        uint8_t keyBytes[16];
+    };
+    ApiResetNfcCardData_t apiResetNfcCardData;
+
+    enum ResetPhase_t
+    {
+        RESET_PHASE_NONE,
+        RESET_PHASE_WAIT_FOR_CARD, // screen up, waiting for a card to reset
+        RESET_PHASE_WRITING,       // authenticating + writing the factory key back
+        RESET_PHASE_SUCCESS,       // success shown, dwelling before exit
+        RESET_PHASE_ERROR,         // error shown, dwelling before retry
+    };
+    ResetPhase_t resetPhase = RESET_PHASE_NONE;
+    // Set by the card-detection callback when a card enters the field during
+    // RESET_PHASE_WAIT_FOR_CARD; consumed on the main loop. Rides the proven
+    // handleCardDetection loop for reliable re-arm across removals (like ATT-503).
+    volatile bool resetCardDetected = false;
+    volatile bool resetCancelRequested = false;
+    uint32_t resetStartTimeMs = 0;
+    uint32_t resetPhaseChangedMs = 0;
+    static constexpr uint32_t RESET_TIMEOUT_MS = 30000;
+    static constexpr uint32_t RESET_SUCCESS_DWELL_MS = 1500;
+    static constexpr uint32_t RESET_ERROR_DWELL_MS = 1800;
+    void beginReset();
+    void processReset();
+    void exitReset();
 #endif
 
     API::CardAuthenticationDetailsResponse cardAuthenticationData;
@@ -272,6 +309,7 @@ private:
         APPLICATION_STATE_RESOURCE_LIST,
         APPLICATION_STATE_UNLOCKED,
         APPLICATION_STATE_ENROLLMENT,
+        APPLICATION_STATE_RESET,
 #else
         APPLICATION_STATE_WAIT_FOR_CARD,
 #endif

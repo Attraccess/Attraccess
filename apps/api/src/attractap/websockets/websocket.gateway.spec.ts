@@ -56,6 +56,7 @@ function createMockSocket(overrides: Partial<AuthenticatedWebSocket> = {}): Auth
     state: {
       lastAuthenticatedUserId: null,
       enrollNewCardData: null,
+      resetNfcCardData: null,
       ota: null,
     },
     ...overrides,
@@ -189,6 +190,7 @@ describe('AttractapGateway', () => {
         state: {
           lastAuthenticatedUserId: null,
           enrollNewCardData: null,
+          resetNfcCardData: null,
           ota: { path: '/tmp/test', size: 1024, fd: 999 },
         },
       });
