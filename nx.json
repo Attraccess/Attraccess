@@ -133,6 +133,7 @@
     },
     "typecheck": {
       "cache": true,
+      "dependsOn": ["generate", "^generate"],
       "inputs": [
         "production",
         "^production",
