@@ -7,8 +7,7 @@
     "label": "Passwort"
   },
   "actions": {
-    "refreshStatus": "Status aktualisieren",
-    "refreshWifi": "WLAN-Liste aktualisieren"
+    "refresh": "Aktualisieren"
   },
   "wifi": {
     "connected": {

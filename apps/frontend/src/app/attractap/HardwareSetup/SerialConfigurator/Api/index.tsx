@@ -1,8 +1,9 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Alert, AlertContent, AlertTitle, cn } from '@heroui/react';
+import { Alert, AlertContent, AlertTitle, Input, Label, TextField, cn } from '@heroui/react';
 import { Button } from '../../../../../components/button';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getBaseUrl } from '../../../../../api';
+import { LabeledSwitch } from '../../../../../components/labeledSwitch';
 import { PageHeader } from '../../../../../components/pageHeader';
 import { useAttractapSerialComm } from '../Auth';
 
@@ -22,6 +23,7 @@ export function AttractapSerialConfiguratorApi({
   });
   const { configuration, fetchConfiguration, isFetchingConfiguration, sendAuthedCommand } = useAttractapSerialComm();
   const [isUpdatingApi, setIsUpdatingApi] = useState(false);
+  const [showManual, setShowManual] = useState(false);
 
   const status = configuration?.apiStatus ?? null;
 
@@ -41,6 +43,20 @@ export function AttractapSerialConfiguratorApi({
       useSSL: url.protocol === 'https:',
     };
   }, []);
+
+  const [manualHostname, setManualHostname] = useState(apiConnectionData.hostname);
+  const [manualPort, setManualPort] = useState(String(apiConnectionData.port));
+  const [manualUseSSL, setManualUseSSL] = useState(apiConnectionData.useSSL);
+
+  // Seed the manual form with the reader's current values once they are known.
+  useEffect(() => {
+    if (!status) {
+      return;
+    }
+    setManualHostname(status.hostname);
+    setManualPort(String(status.port));
+    setManualUseSSL(status.useSSL);
+  }, [status]);
 
   const apiDataMatchesServer = useMemo(() => {
     if (!status) {
@@ -96,10 +112,10 @@ export function AttractapSerialConfiguratorApi({
   }, [status]);
 
   const updateApiData = useCallback(
-    async (data?: { hostname: string; port: number; useSSL: boolean }) => {
+    async (data: { hostname: string; port: number; useSSL: boolean }) => {
       setIsUpdatingApi(true);
       try {
-        await sendAuthedCommand('api.configuration.set', data ?? {});
+        await sendAuthedCommand('api.configuration.set', data);
         await fetchConfiguration();
       } finally {
         setIsUpdatingApi(false);
@@ -108,25 +124,17 @@ export function AttractapSerialConfiguratorApi({
     [fetchConfiguration, sendAuthedCommand],
   );
 
-  const manualUpdateApiData = useCallback(() => {
-    const hostname = prompt('Hostname');
-    if (!hostname) {
-      console.debug('API-Status: no hostname provided', typeof hostname, hostname);
+  const handleApplyCurrentServer = useCallback(() => {
+    updateApiData(apiConnectionData);
+  }, [updateApiData, apiConnectionData]);
+
+  const handleManualSubmit = useCallback(() => {
+    const port = Number(manualPort);
+    if (!manualHostname.trim() || !Number.isFinite(port) || port <= 0) {
       return;
     }
-    const port = prompt('Port');
-
-    if (!port) {
-      console.debug('API-Status: no port provided', typeof port, port);
-      return;
-    }
-
-    const useSSL = window.confirm('Use SSL?');
-
-    const payload = { hostname, port: Number(port), useSSL };
-    console.debug('API-Status: updating api data manually', payload);
-    updateApiData(payload);
-  }, [updateApiData]);
+    updateApiData({ hostname: manualHostname.trim(), port, useSSL: manualUseSSL });
+  }, [manualHostname, manualPort, manualUseSSL, updateApiData]);
 
   const handleRefresh = async () => {
     await fetchConfiguration();
@@ -136,7 +144,7 @@ export function AttractapSerialConfiguratorApi({
     <div className={cn('flex flex-col gap-4', className)}>
       <PageHeader
         noMargin
-        title={<span onDoubleClick={manualUpdateApiData}>{t('title')}</span>}
+        title={t('title')}
         actions={[
           {
             key: 'refresh-status',
@@ -164,14 +172,61 @@ export function AttractapSerialConfiguratorApi({
           <AlertContent>
             <AlertTitle>{t('apiDataDoesNotMatchesServer.alert.title')}</AlertTitle>
           </AlertContent>
-          <div className="flex flex-row flex-wrap gap-4">
-            <div>{t('apiDataDoesNotMatchesServer.alert.description')}</div>
-            <Button variant="primary" onPress={() => updateApiData()} isPending={isUpdatingApi}>
+          <div className="flex flex-col gap-3">
+            <div>
+              {t('apiDataDoesNotMatchesServer.alert.description', {
+                hostname: apiConnectionData.hostname,
+                port: apiConnectionData.port,
+                protocolEmoji: apiConnectionData.useSSL ? '🔒' : '🔓',
+              })}
+            </div>
+            <Button
+              variant="primary"
+              onPress={handleApplyCurrentServer}
+              isPending={isUpdatingApi}
+              data-cy="attractap-api-apply-current-server-button"
+            >
               {t('apiDataDoesNotMatchesServer.alert.button')}
             </Button>
           </div>
         </Alert>
       )}
+
+      <div className="flex flex-col gap-3 rounded-lg border border-default-200 p-4">
+        <button
+          type="button"
+          className="flex w-full items-center justify-between text-left text-sm font-medium"
+          onClick={() => setShowManual((prev) => !prev)}
+          data-cy="attractap-api-manual-toggle"
+        >
+          {t('manual.title')}
+          <span className="text-muted">{showManual ? '−' : '+'}</span>
+        </button>
+
+        {showManual && (
+          <div className="flex flex-col gap-3">
+            <TextField value={manualHostname} onChange={setManualHostname}>
+              <Label>{t('manual.hostname')}</Label>
+              <Input data-cy="attractap-api-manual-hostname" />
+            </TextField>
+            <TextField value={manualPort} onChange={setManualPort}>
+              <Label>{t('manual.port')}</Label>
+              <Input inputMode="numeric" data-cy="attractap-api-manual-port" />
+            </TextField>
+            <LabeledSwitch isSelected={manualUseSSL} onChange={setManualUseSSL} data-cy="attractap-api-manual-ssl">
+              {t('manual.useSSL')}
+            </LabeledSwitch>
+            <Button
+              variant="secondary"
+              onPress={handleManualSubmit}
+              isPending={isUpdatingApi}
+              data-cy="attractap-api-manual-submit"
+            >
+              {t('manual.submit')}
+            </Button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

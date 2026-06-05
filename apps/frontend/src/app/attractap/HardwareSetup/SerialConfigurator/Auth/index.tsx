@@ -199,7 +199,7 @@ export function useAttractapSerialComm(): AttractapSerialCommContextValue {
 
 export function AttractapSerialCommGate({ children }: PropsWithChildren) {
   const { t } = useTranslations({ de, en });
-  const { pinIsSet, isAuthenticated, setAuthCode, sendAuthedCommand } = useAttractapSerialComm();
+  const { pinIsSet, isAuthenticated, setAuthCode, sendAuthedCommand, refreshPinStatus } = useAttractapSerialComm();
 
   const [pinInput, setPinInput] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -233,13 +233,20 @@ export function AttractapSerialCommGate({ children }: PropsWithChildren) {
 
   if (pinIsSet === null) {
     return (
-      <div className="w-full flex flex-col items-center justify-center">
+      <div className="w-full flex flex-col items-center justify-center gap-4 py-8">
         <ProgressCircle isIndeterminate aria-label={t('loading')}>
-        <ProgressCircleTrack>
-          <ProgressCircleTrackCircle />
-          <ProgressCircleFillCircle />
-        </ProgressCircleTrack>
-      </ProgressCircle>
+          <ProgressCircleTrack>
+            <ProgressCircleTrackCircle />
+            <ProgressCircleFillCircle />
+          </ProgressCircleTrack>
+        </ProgressCircle>
+        <p className="text-sm text-muted text-center">{t('waitingForDevice')}</p>
+        <Button
+          variant="secondary"
+          onPress={() => refreshPinStatus().catch((err) => console.error('Failed to refresh PIN status', err))}
+        >
+          {t('retry')}
+        </Button>
       </div>
     );
   }

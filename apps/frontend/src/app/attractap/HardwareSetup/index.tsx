@@ -1,123 +1,68 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import {
-  Alert,
-  AlertContent,
-  AlertDescription,
-  Button,
-  Modal,
-  ModalBackdrop,
-  ModalBody,
-  ModalContainer,
-  ModalDialog,
-  ModalHeader,
-  ModalHeading,
-  useOverlayState,
-} from '@heroui/react';
-import { ArrowLeft } from 'lucide-react';
-import { FirmwareSelector } from './FirmwareSelector';
-import { FirmwareFlasher } from './FirmwareFlasher';
+import { Chip, DrawerBody, DrawerHeader, useOverlayState } from '@heroui/react';
+import { UsbIcon } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AttractapFirmware } from '@attraccess/react-query-client';
-import { AttractapSerialConfigurator } from './SerialConfigurator';
+import { Button } from '../../../components/button';
+import { StandardDrawer } from '../../../components/standardDrawer';
 import { ConnectionStateEvent, ESPTools } from '../../../utils/esp-tools';
+import { SetupTabs } from './SetupTabs';
 
 import de from './de.json';
 import en from './en.json';
 
-type State = 'init' | 'select' | 'flash' | 'configure';
+function ConnectScreen() {
+  const { t } = useTranslations({ de, en });
+  const espTools = useRef(ESPTools.getInstance());
+  const [isConnecting, setIsConnecting] = useState(false);
 
-interface ContentProps {
-  state: State;
-  setState: (state: State) => void;
-  onClose: () => void;
-  openDeviceSettings: (deviceId: string) => void;
+  const connect = useCallback(async () => {
+    setIsConnecting(true);
+    try {
+      await espTools.current.connectToDevice();
+    } catch (err) {
+      console.error('Failed to connect to device', err);
+    } finally {
+      setIsConnecting(false);
+    }
+  }, []);
+
+  return (
+    <div className="flex flex-col items-center gap-6 py-10 text-center">
+      <div className="rounded-full bg-primary-100 p-4 dark:bg-primary-900/40">
+        <UsbIcon className="w-8 h-8 text-primary-600 dark:text-primary-300" />
+      </div>
+      <div className="flex flex-col gap-2">
+        <h3 className="text-lg font-semibold">{t('connect.title')}</h3>
+        <p className="max-w-md text-sm text-muted">{t('connect.description')}</p>
+      </div>
+      <Button variant="primary" onPress={connect} isPending={isConnecting} className="w-full max-w-xs">
+        {t('connect.button.label')}
+      </Button>
+    </div>
+  );
 }
 
-function Content(props: ContentProps) {
-  const { state, setState, openDeviceSettings } = props;
+interface SetupContentProps {
+  openDeviceSettings: (deviceId: string) => void;
+  onClose: () => void;
+}
 
-  const { t } = useTranslations({
-    de,
-    en,
-  });
-
+function SetupContent({ openDeviceSettings, onClose }: SetupContentProps) {
   const espTools = useRef(ESPTools.getInstance());
   const [isConnected, setIsConnected] = useState(espTools.current.isConnected);
 
   useEffect(() => {
-    const onConnectionState = (event: ConnectionStateEvent) => {
-      setIsConnected(event.connected);
-    };
-
     const tools = espTools.current;
-
+    const onConnectionState = (event: ConnectionStateEvent) => setIsConnected(event.connected);
     tools.on('connectionState', onConnectionState);
-
-    return () => {
-      if (!tools) {
-        return;
-      }
-
-      tools.off('connectionState', onConnectionState);
-    };
+    return () => tools.off('connectionState', onConnectionState);
   }, []);
 
-  const [selectedFirmware, setSelectedFirmware] = useState<AttractapFirmware | null>(null);
-
   if (!isConnected) {
-    return (
-      <div className="flex flex-col gap-4">
-        <Alert status="default">
-          <AlertContent>
-            <AlertDescription>{t('connect.description')}</AlertDescription>
-          </AlertContent>
-        </Alert>
-
-        <Button variant="primary" onPress={() => espTools.current.connectToDevice()} className="w-full">
-          {t('connect.button.label')}
-        </Button>
-      </div>
-    );
+    return <ConnectScreen />;
   }
 
-  if (state === 'init') {
-    return (
-      <>
-        <Alert status="default">
-          <AlertContent>
-            <AlertDescription>{t('init.description')}</AlertDescription>
-          </AlertContent>
-        </Alert>
-
-        <Button onPress={() => setState('select')}>{t('init.actions.selectFirmware')}</Button>
-
-        <Button onPress={() => setState('configure')}>{t('init.actions.configure')}</Button>
-      </>
-    );
-  }
-
-  if (state === 'select') {
-    return (
-      <FirmwareSelector
-        onSelect={(firmware) => {
-          setSelectedFirmware(firmware);
-          setState('flash');
-        }}
-      />
-    );
-  }
-
-  if (state === 'flash') {
-    return (
-      <FirmwareFlasher firmware={selectedFirmware as AttractapFirmware} onCompleted={() => setState('configure')} />
-    );
-  }
-
-  if (state === 'configure') {
-    return <AttractapSerialConfigurator openDeviceSettings={openDeviceSettings} />;
-  }
-
-  return null;
+  return <SetupTabs openDeviceSettings={openDeviceSettings} onClose={onClose} />;
 }
 
 interface Props {
@@ -128,77 +73,46 @@ interface Props {
 export function AttractapHardwareSetup(props: Props) {
   const { children, openDeviceSettings } = props;
 
-  const { t } = useTranslations({
-    de,
-    en,
-  });
+  const { t } = useTranslations({ de, en });
+  const { isOpen, open, setOpen, close } = useOverlayState();
 
-  const { isOpen, open, setOpen, close, toggle } = useOverlayState();
-  const [state, setState] = useState<State>('init');
+  const espTools = useRef(ESPTools.getInstance());
+  const [isConnected, setIsConnected] = useState(espTools.current.isConnected);
 
-  const onBack = useCallback(() => {
-    switch (state) {
-      case 'init':
-        toggle();
-        break;
-
-      case 'select':
-        setState('init');
-        break;
-      case 'flash':
-        setState('select');
-        break;
-
-      case 'configure':
-        setState('init');
-        break;
-
-      default: {
-        const exhaustiveCheck: never = state;
-        throw new Error(`Unknown state: ${exhaustiveCheck}`);
-      }
-    }
-  }, [state, toggle]);
+  useEffect(() => {
+    const tools = espTools.current;
+    const onConnectionState = (event: ConnectionStateEvent) => setIsConnected(event.connected);
+    tools.on('connectionState', onConnectionState);
+    return () => tools.off('connectionState', onConnectionState);
+  }, []);
 
   return (
     <>
       {children(open)}
 
-      <Modal isOpen={isOpen} onOpenChange={setOpen}>
-        <ModalBackdrop>
-          <ModalContainer size={state === 'configure' ? 'lg' : 'md'}>
-            <ModalDialog>
-              {() => (
-                <>
-                  <ModalHeader>
-                    <div className="flex w-full items-center gap-2">
-                      <Button variant="ghost" isIconOnly aria-label={t('actions.back')} onPress={onBack}>
-                        <ArrowLeft className="w-5 h-5" />
-                      </Button>
-                      <div className="flex-1">
-                        <ModalHeading>{t('title.' + state)}</ModalHeading>
-                        <p className="text-sm text-muted">{t('subtitle.' + state)}</p>
-                      </div>
-                    </div>
-                  </ModalHeader>
+      <StandardDrawer isOpen={isOpen} onOpenChange={setOpen}>
+        <DrawerHeader>
+          <div className="flex w-full items-center justify-between gap-3">
+            <div className="flex flex-col">
+              <h2 className="text-lg font-semibold">{t('title')}</h2>
+              <p className="text-sm text-muted">{t('subtitle')}</p>
+            </div>
+            <Chip color={isConnected ? 'success' : 'default'}>
+              {isConnected ? t('connection.connected') : t('connection.disconnected')}
+            </Chip>
+          </div>
+        </DrawerHeader>
 
-                  <ModalBody className="mb-4">
-                    <Content
-                      state={state}
-                      setState={setState}
-                      onClose={close}
-                      openDeviceSettings={(deviceId) => {
-                        close();
-                        openDeviceSettings(deviceId);
-                      }}
-                    />
-                  </ModalBody>
-                </>
-              )}
-            </ModalDialog>
-          </ModalContainer>
-        </ModalBackdrop>
-      </Modal>
+        <DrawerBody className="pb-6">
+          <SetupContent
+            openDeviceSettings={(deviceId) => {
+              close();
+              openDeviceSettings(deviceId);
+            }}
+            onClose={close}
+          />
+        </DrawerBody>
+      </StandardDrawer>
     </>
   );
 }

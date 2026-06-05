@@ -46,9 +46,16 @@
   },
   "apiDataDoesNotMatchesServer": {
     "alert": {
-      "title": "API data does not match server",
-      "description": "The data from the reader does not match the server data. Please update the data.",
-      "button": "Update data"
+      "title": "Server settings out of date",
+      "description": "The reader points at a different server than this one ({{hostname}}:{{port}} {{protocolEmoji}}). Apply the current server to fix it.",
+      "button": "Apply current server"
     }
+  },
+  "manual": {
+    "title": "Manual server settings",
+    "hostname": "Hostname",
+    "port": "Port",
+    "useSSL": "Use HTTPS (SSL)",
+    "submit": "Save server settings"
   }
 }
