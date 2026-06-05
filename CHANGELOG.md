@@ -1,3 +1,9 @@
+## [Unreleased]
+
+### 🚀 Features
+
+- **ATT-505:** show resource health state on Attractap readers — unhealthy resources display a banner with the reason and the start button is only shown to users who may use it during downtime (introducers/maintainers) ([ATT-505](https://linear.app/attraccess/issue/ATT-505/attractap-display-device-health-state))
+
 ## 1.6.0 (2026-05-30)
 
 ### 🚀 Features

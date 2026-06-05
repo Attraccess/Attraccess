@@ -416,6 +416,34 @@ void ResourceDetailsScreen::init()
    lv_obj_set_align(this->maintenanceIntroducersLabel, LV_ALIGN_CENTER);
    lv_label_set_text(this->maintenanceIntroducersLabel, "???");
 
+   this->healthPanel = lv_obj_create(this->screen);
+   lv_obj_set_width(this->healthPanel, lv_pct(100));
+   lv_obj_set_height(this->healthPanel, LV_SIZE_CONTENT);
+   lv_obj_set_align(this->healthPanel, LV_ALIGN_CENTER);
+   lv_obj_set_flex_flow(this->healthPanel, LV_FLEX_FLOW_COLUMN);
+   lv_obj_set_flex_align(this->healthPanel, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+   lv_obj_remove_flag(this->healthPanel, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_set_style_bg_color(this->healthPanel, lv_color_hex(0xC20E4D), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_bg_opa(this->healthPanel, 200, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_add_flag(this->healthPanel, LV_OBJ_FLAG_HIDDEN);
+
+   lv_obj_t *healthInfoLabel = lv_label_create(this->healthPanel);
+   lv_obj_set_width(healthInfoLabel, lv_pct(100));
+   lv_obj_set_height(healthInfoLabel, LV_SIZE_CONTENT);
+   lv_obj_set_align(healthInfoLabel, LV_ALIGN_CENTER);
+   lv_label_set_text(healthInfoLabel, "Diese Ressource ist derzeit nicht betriebsbereit und kann nicht verwendet werden.");
+   lv_obj_set_style_text_color(healthInfoLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_opa(healthInfoLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   this->healthReasonLabel = lv_label_create(this->healthPanel);
+   lv_obj_set_width(this->healthReasonLabel, lv_pct(100));
+   lv_obj_set_height(this->healthReasonLabel, LV_SIZE_CONTENT);
+   lv_obj_set_align(this->healthReasonLabel, LV_ALIGN_CENTER);
+   lv_label_set_long_mode(this->healthReasonLabel, LV_LABEL_LONG_WRAP);
+   lv_label_set_text(this->healthReasonLabel, "");
+   lv_obj_set_style_text_color(this->healthReasonLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_opa(this->healthReasonLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+
    // action overlay is created lazily on lv_layer_top() when needed
    this->actionOverlay = nullptr;
    this->actionOverlayLabel = nullptr;
@@ -443,6 +471,13 @@ void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief 
    if (this->maintenanceIntroducersLabel)
    {
       lv_label_set_text(this->maintenanceIntroducersLabel, introducersText.c_str());
+   }
+
+   // Update health banner reason text
+   if (this->healthReasonLabel)
+   {
+      const char *reason = (resource.healthReason[0] != '\0') ? resource.healthReason : "Kein Grund angegeben.";
+      lv_label_set_text(this->healthReasonLabel, reason);
    }
 
    // Toggle sections based on type and usage
@@ -535,10 +570,16 @@ String ResourceDetailsScreen::buildIntroducersText(const API::ResourceBrief &res
 void ResourceDetailsScreen::refreshAccessState()
 {
    bool underMaintenance = this->resourceCacheValid && this->resourceCache.isUnderMaintenance;
+   bool isUnhealthy = this->resourceCacheValid && !this->resourceCache.isHealthy;
 
    if (this->maintenancePanel)
    {
       lv_obj_set_flag(this->maintenancePanel, LV_OBJ_FLAG_HIDDEN, !underMaintenance);
+   }
+
+   if (this->healthPanel)
+   {
+      lv_obj_set_flag(this->healthPanel, LV_OBJ_FLAG_HIDDEN, !isUnhealthy);
    }
 
    if (!this->userDetailsInitialized)
@@ -549,16 +590,19 @@ void ResourceDetailsScreen::refreshAccessState()
    const UserDetails &user = this->userDetailsCache;
    bool isMaintainer = user.isIntroducer || user.canManageResource;
 
+   // Resource is blocked when it is under maintenance or reporting an unhealthy state.
+   bool blocked = underMaintenance || isUnhealthy;
+
    // No-introduction panel is shown only when the user is missing an introduction
-   // and the resource is not blocked by maintenance (maintenance panel takes priority).
+   // and the resource is not blocked (maintenance/health panels take priority).
    if (this->noIntroductionPanel)
    {
-      lv_obj_set_flag(this->noIntroductionPanel, LV_OBJ_FLAG_HIDDEN, user.hasIntroduction || underMaintenance);
+      lv_obj_set_flag(this->noIntroductionPanel, LV_OBJ_FLAG_HIDDEN, user.hasIntroduction || blocked);
    }
 
-   // Session controls require access; during maintenance only maintainers may use the resource.
+   // Session controls require access; while blocked only maintainers may use the resource.
    bool canUse = user.hasIntroduction || user.isIntroducer || user.canManageResource;
-   if (underMaintenance)
+   if (blocked)
    {
       canUse = isMaintainer;
    }
@@ -620,6 +664,8 @@ void ResourceDetailsScreen::destroy()
    this->introducersListLabel = nullptr;
    this->maintenancePanel = nullptr;
    this->maintenanceIntroducersLabel = nullptr;
+   this->healthPanel = nullptr;
+   this->healthReasonLabel = nullptr;
    this->actionOverlayLabel = nullptr;
    this->successToast = nullptr;
    this->formsModalMeta = nullptr;

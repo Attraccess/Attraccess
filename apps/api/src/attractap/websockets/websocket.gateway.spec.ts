@@ -11,6 +11,7 @@ import { ResourceMaintenanceService } from '../../resources/maintenances/mainten
 import { ResourceIntroductionsService } from '../../resources/introductions/resouceIntroductions.service';
 import { ResourceIntroducersService } from '../../resources/introducers/resourceIntroducers.service';
 import { ResourceFlowsService } from '../../resources/flows/resource-flows.service';
+import { ResourceHealthService } from '../../resources/health/resource-health.service';
 import { ResourceFlowsExecutorService } from '../../resources/flows/resource-flows-executor.service';
 import { ProjectsService } from '../../projects/projects.service';
 import { ResourceFormsService } from '../../resources/forms/forms.service';
@@ -88,6 +89,7 @@ describe('AttractapGateway', () => {
         { provide: LicenseService, useValue: licenseService },
         { provide: ResourceUsageService, useValue: {} },
         { provide: ResourceMaintenanceService, useValue: { hasActiveMaintenance: jest.fn().mockResolvedValue(false) } },
+        { provide: ResourceHealthService, useValue: { listForResource: jest.fn().mockResolvedValue([]) } },
         { provide: ResourceIntroductionsService, useValue: {} },
         { provide: ResourceIntroducersService, useValue: {} },
         { provide: ResourceFlowsService, useValue: {} },

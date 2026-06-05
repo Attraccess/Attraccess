@@ -202,6 +202,8 @@ private:
     lv_obj_t *introducersListLabel;
     lv_obj_t *maintenancePanel = nullptr;
     lv_obj_t *maintenanceIntroducersLabel = nullptr;
+    lv_obj_t *healthPanel = nullptr;
+    lv_obj_t *healthReasonLabel = nullptr;
     String buildIntroducersText(const API::ResourceBrief &resource);
     void refreshAccessState();
 

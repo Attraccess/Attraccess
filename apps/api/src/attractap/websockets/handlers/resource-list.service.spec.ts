@@ -9,6 +9,7 @@ describe('ResourceListService', () => {
   let attractapService: { findReaderById: jest.Mock };
   let resourceUsageService: { getActiveSession: jest.Mock };
   let resourceMaintenanceService: { hasActiveMaintenance: jest.Mock };
+  let resourceHealthService: { listForResource: jest.Mock };
   let resourceFlowsService: { getNodes: jest.Mock };
 
   function createMockSocket(overrides: Partial<any> = {}): any {
@@ -56,12 +57,14 @@ describe('ResourceListService', () => {
     attractapService = { findReaderById: jest.fn() };
     resourceUsageService = { getActiveSession: jest.fn().mockResolvedValue(null) };
     resourceMaintenanceService = { hasActiveMaintenance: jest.fn().mockResolvedValue(false) };
+    resourceHealthService = { listForResource: jest.fn().mockResolvedValue([]) };
     resourceFlowsService = { getNodes: jest.fn().mockResolvedValue([]) };
 
     (service as any).websocketService = websocketService;
     (service as any).attractapService = attractapService;
     (service as any).resourceUsageService = resourceUsageService;
     (service as any).resourceMaintenanceService = resourceMaintenanceService;
+    (service as any).resourceHealthService = resourceHealthService;
     (service as any).resourceFlowsService = resourceFlowsService;
   });
 
@@ -190,6 +193,8 @@ describe('ResourceListService', () => {
                   allowTakeOver: false,
                   introducers: ['introducer-a'],
                   isUnderMaintenance: true,
+                  isHealthy: true,
+                  healthReason: '',
                   activeUsageSession: {
                     user: { username: 'active-user' },
                     startTime: startTime.toISOString(),
@@ -201,6 +206,39 @@ describe('ResourceListService', () => {
           }),
         }),
       );
+    });
+
+    it('reports isHealthy=false with a combined reason when there are unhealthy entries', async () => {
+      attractapService.findReaderById.mockResolvedValue(createReaderFixture());
+      resourceHealthService.listForResource.mockResolvedValue([
+        { identifier: 'temp', status: 'unhealthy', reason: 'overheating' },
+        { identifier: '', status: 'unhealthy', reason: 'not connected' },
+        { identifier: 'idle', status: 'healthy', reason: null },
+      ]);
+
+      const socket = createMockSocket();
+
+      await service.sendResourceListToSocket(socket);
+
+      expect(resourceHealthService.listForResource).toHaveBeenCalledWith(10);
+      const sent = (socket.sendMessage as jest.Mock).mock.calls[0][0] as AttractapEvent;
+      const resource = (sent.data.payload as any).resources[0];
+      expect(resource.isHealthy).toBe(false);
+      expect(resource.healthReason).toBe('temp: overheating\nnot connected');
+    });
+
+    it('reports isHealthy=true with an empty reason when all entries are healthy', async () => {
+      attractapService.findReaderById.mockResolvedValue(createReaderFixture());
+      resourceHealthService.listForResource.mockResolvedValue([{ identifier: '', status: 'healthy', reason: null }]);
+
+      const socket = createMockSocket();
+
+      await service.sendResourceListToSocket(socket);
+
+      const sent = (socket.sendMessage as jest.Mock).mock.calls[0][0] as AttractapEvent;
+      const resource = (sent.data.payload as any).resources[0];
+      expect(resource.isHealthy).toBe(true);
+      expect(resource.healthReason).toBe('');
     });
 
     it('emits activeUsageSession=null when there is no active session', async () => {

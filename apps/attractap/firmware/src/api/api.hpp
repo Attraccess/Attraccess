@@ -27,6 +27,7 @@ public:
     static constexpr size_t MAX_RESOURCE_NAME_LEN = 64;
     static constexpr size_t MAX_DESC_LEN = 128;
     static constexpr size_t MAX_USERNAME_LEN = 32;
+    static constexpr size_t MAX_HEALTH_REASON_LEN = 160;
     static constexpr size_t MAX_INTRODUCERS = 8;
     static constexpr size_t MAX_FLOW_BUTTONS = 7;
     static constexpr size_t MAX_FLOW_BUTTON_LABEL_LEN = 32;
@@ -51,6 +52,8 @@ public:
         char description[MAX_DESC_LEN];
         bool hasActiveUsage;
         bool isUnderMaintenance;
+        bool isHealthy;
+        char healthReason[MAX_HEALTH_REASON_LEN];
         char activeUser[MAX_USERNAME_LEN];
         uint32_t activeStartEpoch; // seconds since epoch
         uint8_t introducerCount;
