@@ -1,6 +1,7 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Alert, AlertContent, AlertTitle, Input, Label, TextField, cn } from '@heroui/react';
+import { Alert, AlertContent, AlertDescription, AlertTitle, Input, Label, TextField, cn } from '@heroui/react';
 import { Button } from '../../../../../components/button';
+import { AlertStatusIcon } from '../../../../../components/AlertStatusIcon';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getBaseUrl } from '../../../../../api';
 import { LabeledSwitch } from '../../../../../components/labeledSwitch';
@@ -168,27 +169,29 @@ export function AttractapSerialConfiguratorApi({
       </Alert>
 
       {apiDataMatchesServer === false && (
-        <Alert status="default">
-          <AlertContent>
-            <AlertTitle>{t('apiDataDoesNotMatchesServer.alert.title')}</AlertTitle>
-          </AlertContent>
-          <div className="flex flex-col gap-3">
-            <div>
-              {t('apiDataDoesNotMatchesServer.alert.description', {
-                hostname: apiConnectionData.hostname,
-                port: apiConnectionData.port,
-                protocolEmoji: apiConnectionData.useSSL ? '🔒' : '🔓',
-              })}
+        <Alert status="warning">
+          <AlertStatusIcon status="warning" />
+          <AlertContent className="flex flex-col gap-3">
+            <div className="flex flex-col gap-1">
+              <AlertTitle>{t('apiDataDoesNotMatchesServer.alert.title')}</AlertTitle>
+              <AlertDescription>
+                {t('apiDataDoesNotMatchesServer.alert.description', {
+                  hostname: apiConnectionData.hostname,
+                  port: apiConnectionData.port,
+                  protocolEmoji: apiConnectionData.useSSL ? '🔒' : '🔓',
+                })}
+              </AlertDescription>
             </div>
             <Button
               variant="primary"
               onPress={handleApplyCurrentServer}
               isPending={isUpdatingApi}
+              className="self-start"
               data-cy="attractap-api-apply-current-server-button"
             >
               {t('apiDataDoesNotMatchesServer.alert.button')}
             </Button>
-          </div>
+          </AlertContent>
         </Alert>
       )}
 
