@@ -1,6 +1,13 @@
 #include "websocket.hpp"
 #include "esp_heap_caps.h"
 #include "esp_system.h"
+#include <Preferences.h>
+
+// Deliberate-reboot reason handed to the crash reporter across the SW reset (see
+// api_diag.cpp). Lives in the same NVS namespace as the boot diagnostics record
+// so the API layer can pick it up and attach it to the uploaded crash report.
+#define BOOT_DIAG_NAMESPACE "bootdiag"
+#define BOOT_DIAG_REBOOT_REASON_KEY "rebootreason"
 
 void Websocket::setup()
 {
@@ -293,6 +300,17 @@ void Websocket::handleConnectFailure(const char *reason)
     if (this->consecutiveConnectFailures >= MAX_CONSECUTIVE_CONNECT_FAILURES)
     {
         this->logger.error("WebSocket client could not be started repeatedly (heap likely fragmented); rebooting to recover");
+
+        // Record why we are rebooting so the next boot's crash report carries the
+        // real cause instead of a bare "SW" reset reason. The API layer reads and
+        // clears this key once the report is acknowledged (see api_diag.cpp).
+        Preferences prefs;
+        if (prefs.begin(BOOT_DIAG_NAMESPACE, false))
+        {
+            prefs.putString(BOOT_DIAG_REBOOT_REASON_KEY, "WEBSOCKET_RECONNECT_HEAP_EXHAUSTION");
+            prefs.end();
+        }
+
         delay(200);
         esp_restart();
     }

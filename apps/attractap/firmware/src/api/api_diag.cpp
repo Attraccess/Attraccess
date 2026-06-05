@@ -28,6 +28,7 @@ struct CrashBootRecord
 
 #define BOOT_DIAG_NAMESPACE "bootdiag"
 #define BOOT_DIAG_PENDING_KEY "pending"
+#define BOOT_DIAG_REBOOT_REASON_KEY "rebootreason"
 #define BOOT_DIAG_MAGIC 0x41545431
 
 // Cap the coredump we are willing to base64-encode and hold in RAM at once.
@@ -149,26 +150,44 @@ void API::sendPendingCrashReport()
     // live reset reason is the correct label to pair with the pre-freeze snapshot.
     const char *resetStr = crashResetReasonToString((uint8_t)esp_reset_reason());
 
+    // Optional deliberate-reboot reason left behind by the firmware before it
+    // rebooted itself (e.g. the websocket reconnect heap-recovery reboot). Absent
+    // for ordinary/unexpected resets, in which case the field is omitted.
+    char rebootReason[64] = {0};
+    {
+        Preferences reasonPrefs;
+        reasonPrefs.begin(BOOT_DIAG_NAMESPACE, true);
+        reasonPrefs.getString(BOOT_DIAG_REBOOT_REASON_KEY, rebootReason, sizeof(rebootReason));
+        reasonPrefs.end();
+    }
+
     size_t b64Len = 0;
     std::unique_ptr<char[]> coredump = readCoredumpBase64(this->logger, b64Len);
     this->crashReportSentCoredump = (bool)coredump;
 
-    this->logger.infof("Uploading crash report: reset=%s uptime=%ums heap=%u coredump=%s",
-                       resetStr, rec.uptimeMs, rec.freeInternalHeap, coredump ? "yes" : "no");
+    this->logger.infof("Uploading crash report: reset=%s rebootReason=%s uptime=%ums heap=%u coredump=%s",
+                       resetStr, rebootReason[0] ? rebootReason : "(none)", rec.uptimeMs,
+                       rec.freeInternalHeap, coredump ? "yes" : "no");
 
     // Build the event manually into a single heap buffer: an oversized coredump
     // base64 string would otherwise be copied several times through ArduinoJson.
     const char *ws = rec.websocketConnected ? "CONNECTED" : "DISCONNECTED";
     const char *wifi = rec.wifiConnected ? "CONNECTED" : "DISCONNECTED";
 
-    char head[320];
+    char rebootReasonField[96] = {0};
+    if (rebootReason[0] != '\0')
+    {
+        snprintf(rebootReasonField, sizeof(rebootReasonField), ",\"rebootReason\":\"%s\"", rebootReason);
+    }
+
+    char head[416];
     int headLen = snprintf(
         head, sizeof(head),
         "{\"event\":\"EVENT\",\"data\":{\"type\":\"READER_CRASH_REPORT\",\"payload\":{"
         "\"resetReason\":\"%s\",\"heapFreeBytes\":%u,\"largestFreeBlockBytes\":%u,"
-        "\"uptimeBeforeResetMs\":%u,\"wsState\":\"%s\",\"wifiState\":\"%s\",\"firmwareVersion\":\"%s\"",
+        "\"uptimeBeforeResetMs\":%u,\"wsState\":\"%s\",\"wifiState\":\"%s\",\"firmwareVersion\":\"%s\"%s",
         resetStr, (unsigned)rec.freeInternalHeap, (unsigned)rec.largestFreeBlock,
-        (unsigned)rec.uptimeMs, ws, wifi, FIRMWARE_VERSION);
+        (unsigned)rec.uptimeMs, ws, wifi, FIRMWARE_VERSION, rebootReasonField);
     if (headLen <= 0 || headLen >= (int)sizeof(head))
     {
         this->logger.error("Failed to format crash report header");
@@ -234,6 +253,7 @@ void API::onCrashReportResponse(JsonObject data)
     Preferences prefs;
     prefs.begin(BOOT_DIAG_NAMESPACE, false);
     prefs.remove(BOOT_DIAG_PENDING_KEY);
+    prefs.remove(BOOT_DIAG_REBOOT_REASON_KEY);
     prefs.end();
 
     if (this->crashReportSentCoredump)

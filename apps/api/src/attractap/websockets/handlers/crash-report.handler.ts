@@ -33,6 +33,7 @@ export class AttractapCrashReportHandler {
       const report = await this.attractapService.createCrashReport(socket.readerId, payload);
       this.logger.warn(
         `Stored crash report ${report.id} for reader ${socket.readerId}: reason=${report.resetReason} ` +
+          `rebootReason=${report.rebootReason ?? 'n/a'} ` +
           `heapFree=${report.heapFreeBytes ?? 'n/a'} largestBlock=${report.largestFreeBlockBytes ?? 'n/a'} ` +
           `uptimeMs=${report.uptimeBeforeResetMs ?? 'n/a'} ws=${report.wsState ?? 'n/a'} wifi=${report.wifiState ?? 'n/a'}`,
       );

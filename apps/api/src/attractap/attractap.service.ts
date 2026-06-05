@@ -244,6 +244,7 @@ export class AttractapService {
     const report = await this.crashReportRepository.save({
       attractapId: readerId,
       resetReason: payload.resetReason,
+      rebootReason: payload.rebootReason || null,
       heapFreeBytes: this.toNullableInt(payload.heapFreeBytes),
       largestFreeBlockBytes: this.toNullableInt(payload.largestFreeBlockBytes),
       uptimeBeforeResetMs: this.toNullableInt(payload.uptimeBeforeResetMs),
