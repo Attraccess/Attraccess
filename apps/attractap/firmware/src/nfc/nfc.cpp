@@ -249,6 +249,11 @@ bool NFC::isCardDetectionEnabled()
     return this->cardDetectionEnabled;
 }
 
+bool NFC::isCardPresent()
+{
+    return this->foundCard;
+}
+
 void NFC::setCardRemovalCallback(std::function<void(uint32_t presentationTimeMs)> callback)
 {
     this->cardRemovalCallback = callback;
