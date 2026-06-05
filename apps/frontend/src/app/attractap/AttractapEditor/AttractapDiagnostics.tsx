@@ -168,6 +168,11 @@ export function AttractapDiagnostics(props: Readonly<Props>) {
                   <Chip color="warning" variant="soft" size="sm">
                     {report.resetReason}
                   </Chip>
+                  {report.rebootReason && (
+                    <Chip color="danger" variant="soft" size="sm" data-cy="attractap-diagnostics-reboot-reason">
+                      {report.rebootReason}
+                    </Chip>
+                  )}
                   {report.symbolicationStatus && (
                     <Chip
                       color={symbolicationChipColor(report.symbolicationStatus)}

@@ -42,6 +42,7 @@ export enum AttractapEventType {
 
 export interface ReaderCrashReportPayload {
   resetReason: string;
+  rebootReason?: string | null;
   heapFreeBytes?: number | null;
   largestFreeBlockBytes?: number | null;
   uptimeBeforeResetMs?: number | null;

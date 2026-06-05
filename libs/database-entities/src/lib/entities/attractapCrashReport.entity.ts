@@ -29,6 +29,15 @@ export class AttractapCrashReport {
   })
   resetReason!: string;
 
+  @Column({ type: 'text', nullable: true })
+  @ApiProperty({
+    description:
+      'Deliberate reboot reason set by the firmware before a self-triggered restart (e.g. websocket reconnect heap recovery). Null for ordinary/unexpected resets.',
+    example: 'WEBSOCKET_RECONNECT_HEAP_EXHAUSTION',
+    nullable: true,
+  })
+  rebootReason!: string | null;
+
   @Column({ type: 'integer', nullable: true })
   @ApiProperty({
     description: 'Free heap in bytes captured before the freeze/reset',

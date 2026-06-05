@@ -1,5 +1,13 @@
 #include "websocket.hpp"
 #include "esp_heap_caps.h"
+#include "esp_system.h"
+#include <Preferences.h>
+
+// Deliberate-reboot reason handed to the crash reporter across the SW reset (see
+// api_diag.cpp). Lives in the same NVS namespace as the boot diagnostics record
+// so the API layer can pick it up and attach it to the uploaded crash report.
+#define BOOT_DIAG_NAMESPACE "bootdiag"
+#define BOOT_DIAG_REBOOT_REASON_KEY "rebootreason"
 
 void Websocket::setup()
 {
@@ -198,6 +206,7 @@ void Websocket::connectWebSocket()
         if (restartRet == ESP_OK)
         {
             logger.info("connectWebSocket: WebSocket restarted");
+            this->consecutiveConnectFailures = 0;
             return;
         }
         logger.error((String("Failed to restart WebSocket client: ") + esp_err_to_name(restartRet)).c_str());
@@ -247,9 +256,7 @@ void Websocket::connectWebSocket()
     esp_websocket_client_handle_t newClient = esp_websocket_client_init(&websocket_cfg);
     if (!newClient)
     {
-        logger.error("Failed to initialize WebSocket client");
-        setState(INIT);
-
+        handleConnectFailure("esp_websocket_client_init returned null");
         return;
     }
 
@@ -260,10 +267,8 @@ void Websocket::connectWebSocket()
     esp_err_t ret = esp_websocket_client_start(newClient);
     if (ret != ESP_OK)
     {
-        logger.error((String("Failed to start WebSocket client: ") + esp_err_to_name(ret)).c_str());
         esp_websocket_client_destroy(newClient);
-        setState(INIT);
-
+        handleConnectFailure((String("esp_websocket_client_start: ") + esp_err_to_name(ret)).c_str());
         return;
     }
 
@@ -271,7 +276,44 @@ void Websocket::connectWebSocket()
     ws_client = newClient;
     unlockWsClient();
 
+    this->consecutiveConnectFailures = 0;
     logger.info("connectWebSocket: WebSocket started");
+}
+
+// A failed (re)connect that gets this far means the websocket client could not be
+// created/started at all -- almost always because the internal heap is too
+// fragmented to allocate the client task's stack ("Error create websocket task" /
+// ESP_FAIL from the IDF). That state does not heal on its own: every subsequent
+// attempt fails the same way and the device sits forever on the connecting screen.
+// Reboot after a few consecutive failures so the heap is defragmented and the
+// device reconnects cleanly once the server is reachable again.
+void Websocket::handleConnectFailure(const char *reason)
+{
+    this->consecutiveConnectFailures++;
+    this->logger.errorf("Failed to start WebSocket client (%s); consecutive=%u heap_free=%u heap_largest=%u",
+                        reason,
+                        (unsigned)this->consecutiveConnectFailures,
+                        (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+                        (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
+    setState(INIT);
+
+    if (this->consecutiveConnectFailures >= MAX_CONSECUTIVE_CONNECT_FAILURES)
+    {
+        this->logger.error("WebSocket client could not be started repeatedly (heap likely fragmented); rebooting to recover");
+
+        // Record why we are rebooting so the next boot's crash report carries the
+        // real cause instead of a bare "SW" reset reason. The API layer reads and
+        // clears this key once the report is acknowledged (see api_diag.cpp).
+        Preferences prefs;
+        if (prefs.begin(BOOT_DIAG_NAMESPACE, false))
+        {
+            prefs.putString(BOOT_DIAG_REBOOT_REASON_KEY, "WEBSOCKET_RECONNECT_HEAP_EXHAUSTION");
+            prefs.end();
+        }
+
+        delay(200);
+        esp_restart();
+    }
 }
 
 bool Websocket::shouldReconnect()
@@ -316,6 +358,7 @@ void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, v
     {
     case WEBSOCKET_EVENT_CONNECTED:
         logger.info("WebSocket connected");
+        this->consecutiveConnectFailures = 0;
         {
             this->_certManager.markSuccess();
         }
