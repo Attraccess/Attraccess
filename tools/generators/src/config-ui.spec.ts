@@ -137,7 +137,7 @@ describe('config-ui', () => {
 
     it('should define a prometheus service that depends_on config-ui', () => {
       const section = extractServiceBlock(content, 'prometheus');
-      expect(section).toMatch(/depends_on:[\s\S]*?config-ui:/);
+      expect(section).toMatch(/depends_on:[\s\S]*?-\s*config-ui\b/);
       expect(section).toContain('prometheus-config:/etc/prometheus:ro');
     });
 
