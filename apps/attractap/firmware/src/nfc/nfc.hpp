@@ -27,6 +27,10 @@ public:
 
     bool getAvailableKeyNo(uint8_t *uid, uint8_t *uidLength, uint8_t *keyNo);
 
+    // Release any target the PN532 still holds active from a prior crypto
+    // session, so the next detection starts from a clean state.
+    void releaseCard();
+
     static uint8_t FACTORY_KEY[16];
 
     bool isCardDetectionEnabled();
