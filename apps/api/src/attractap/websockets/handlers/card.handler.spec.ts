@@ -12,6 +12,7 @@ describe('AttractapCardHandler', () => {
     generateNTAG424Key: jest.Mock;
     uint8ArrayToHexString: jest.Mock;
     createNFCCard: jest.Mock;
+    deleteNFCCard: jest.Mock;
   };
   let usersService: { findOne: jest.Mock };
   let resourceUsageService: { canControllResource: jest.Mock };
@@ -31,6 +32,7 @@ describe('AttractapCardHandler', () => {
       state: {
         lastAuthenticatedUserId: null,
         enrollNewCardData: null,
+        resetNfcCardData: null,
         ...(overrides.state || {}),
       },
       sendMessage: jest.fn().mockResolvedValue(undefined),
@@ -52,10 +54,13 @@ describe('AttractapCardHandler', () => {
     attractapService = {
       findReaderById: jest.fn().mockResolvedValue(mockReaderWithEnrollment),
       getNFCCardByUID: jest.fn().mockResolvedValue(null),
-      getNFCCardByID: jest.fn().mockResolvedValue({ id: 7 }),
+      getNFCCardByID: jest
+        .fn()
+        .mockResolvedValue({ id: 7, key: 'aabbccddeeff00112233445566778899', keyNo: 1, user: mockUser }),
       generateNTAG424Key: jest.fn().mockResolvedValue(new Uint8Array([1, 2, 3])),
       uint8ArrayToHexString: jest.fn().mockReturnValue('deadbeef'),
       createNFCCard: jest.fn().mockResolvedValue(undefined),
+      deleteNFCCard: jest.fn().mockResolvedValue({ affected: 1 }),
     };
     usersService = { findOne: jest.fn().mockResolvedValue(mockUser) };
     resourceUsageService = { canControllResource: jest.fn().mockResolvedValue(true) };
@@ -135,6 +140,63 @@ describe('AttractapCardHandler', () => {
       expect((handler as any).logger.debug).toHaveBeenCalledWith(
         expect.stringContaining('Failed to send ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO to client socket-1'),
       );
+    });
+  });
+
+  describe('onResetNfcCard', () => {
+    it('sends RESET_NFC_CARD_DATA_NOT_SET when no reset state', async () => {
+      const socket = createMockSocket();
+      const data = { payload: { success: true } } as AttractapEvent['data'];
+
+      await handler.onResetNfcCard(socket, data);
+
+      expect(socket.sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            type: AttractapEventType.RESET_NFC_CARD,
+            payload: { error: 'RESET_NFC_CARD_DATA_NOT_SET' },
+          }),
+        }),
+      );
+      expect(attractapService.deleteNFCCard).not.toHaveBeenCalled();
+    });
+
+    it('does not delete and keeps state when the reader reports failure', async () => {
+      const socket = createMockSocket({ state: { resetNfcCardData: { cardId: 7, key: 'x', keyNo: 1 } } });
+      const data = { payload: { success: false } } as AttractapEvent['data'];
+
+      await handler.onResetNfcCard(socket, data);
+
+      expect(attractapService.deleteNFCCard).not.toHaveBeenCalled();
+      expect(socket.state.resetNfcCardData).toEqual({ cardId: 7, key: 'x', keyNo: 1 });
+    });
+
+    it('deletes the card and clears state on success', async () => {
+      const socket = createMockSocket({ state: { resetNfcCardData: { cardId: 7, key: 'x', keyNo: 1 } } });
+      const data = { payload: { success: true } } as AttractapEvent['data'];
+
+      await handler.onResetNfcCard(socket, data);
+
+      expect(attractapService.deleteNFCCard).toHaveBeenCalledWith(7);
+      expect(socket.state.resetNfcCardData).toBeNull();
+      expect(socket.sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            type: AttractapEventType.RESET_NFC_CARD,
+            payload: { success: true },
+          }),
+        }),
+      );
+    });
+  });
+
+  describe('onResetNfcCardCancel', () => {
+    it('clears reset state', async () => {
+      const socket = createMockSocket({ state: { resetNfcCardData: { cardId: 7, key: 'x', keyNo: 1 } } });
+
+      await handler.onResetNfcCardCancel(socket);
+
+      expect(socket.state.resetNfcCardData).toBeNull();
     });
   });
 
@@ -393,7 +455,7 @@ describe('AttractapCardHandler', () => {
       ).rejects.toThrow('NFC card not found: 7');
     });
 
-    it('resolves and performs all lookups on the happy path', async () => {
+    it('stores reset state and sends RESET_NFC_CARD with the stored key material on the happy path', async () => {
       const socket = createMockSocket();
       websocketService.sockets.set('socket-1', socket);
 
@@ -404,6 +466,19 @@ describe('AttractapCardHandler', () => {
       expect(attractapService.findReaderById).toHaveBeenCalledWith(42);
       expect(usersService.findOne).toHaveBeenCalledWith({ id: 1 });
       expect(attractapService.getNFCCardByID).toHaveBeenCalledWith(7);
+      expect(socket.state.resetNfcCardData).toEqual({
+        cardId: 7,
+        key: 'aabbccddeeff00112233445566778899',
+        keyNo: 1,
+      });
+      expect(socket.sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            type: AttractapEventType.RESET_NFC_CARD,
+            payload: { username: mockUser.username, keyNo: 1, key: 'aabbccddeeff00112233445566778899' },
+          }),
+        }),
+      );
     });
   });
 

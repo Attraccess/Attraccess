@@ -227,6 +227,13 @@ public:
     void sendEnrollNewCard(bool success);
     void sendEnrollNewCardCancel();
 
+    // Card reset/deletion. The server already knows the card's stored key + slot
+    // (it is being deleted from the DB), so it hands them to the reader in a
+    // single RESET_NFC_CARD event — no key round-trip like enrollment.
+    void setResetNfcCardCallback(std::function<void(String username, uint8_t keyNo, String key)> callback);
+    void sendResetNfcCard(bool success);
+    void sendResetNfcCardCancel();
+
     void startResourceUsageSession(uint32_t resourceId, uint32_t projectId = 0);
     void stopResourceUsageSession(uint32_t resourceId);
     void requestFormFields(uint32_t resourceId, ResourceUsageFormActionType action, uint32_t formId, uint32_t offset, uint32_t limit);
@@ -340,6 +347,9 @@ private:
     // Server reuses the ENROLL_NEW_CARD_REQUEST_NFC_KEY event to report errors
     // back to the reader (e.g. CARD_ALREADY_ENROLLED).
     void onEnrollNewCardRequestNFCKeyError(JsonObject data);
+
+    std::function<void(String username, uint8_t keyNo, String key)> resetNfcCardCallback;
+    void onResetNfcCard(JsonObject data);
 
     std::function<void(const char *title, const char *message)> errorCallback;
     std::function<void(const char *type, bool success)> actionResultCallback;
