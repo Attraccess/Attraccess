@@ -415,6 +415,7 @@ void Application::processEnrollment() {
   // ERROR dwell loop retries within the remaining time.
   if (this->enrollErrorPending) {
     this->enrollErrorPending = false;
+    this->beeper.errorBeep();
     Display::enrollmentScreen.setStatus(EnrollmentScreen::STATUS_ERROR);
     Display::enrollmentScreen.setStatusMessage(String(this->enrollErrorMessage));
     this->enrollPhase = ENROLL_PHASE_ERROR;
