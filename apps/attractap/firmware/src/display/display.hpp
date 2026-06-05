@@ -59,6 +59,11 @@ public:
     static void showInsufficientBalancePopup(std::function<void(uint32_t amountCents)> onStart, std::function<void()> onCancel);
     static void hidePopup();
 
+    // Hidden maintenance drawer: pulled down from the top edge, exposes
+    // "Open Settings" and "Reboot" actions. The settings action is wired by the
+    // application; reboot is handled internally (esp_restart after a confirm).
+    static void setOnOpenSettingsCallback(std::function<void()> callback);
+
 private:
     static std::function<void(int16_t, int16_t)> touchCallback;
     static const int TRANSITION_DURATION = 500;
@@ -88,4 +93,21 @@ private:
 
     static lv_obj_t *activePopup;
     static lv_timer_t *popupAutoCloseTimer;
+
+    // Maintenance drawer (display_drawer.cpp)
+    static void initDrawer();
+    static void openDrawer();
+    static void closeDrawer();
+    static void showRebootConfirm();
+    // Fed every touch sample from touchpad_read to detect the top-edge pull-down
+    // gesture without intercepting touches destined for the active screen.
+    static void handleGestureSample(int16_t x, int16_t y, bool pressed);
+
+    static lv_obj_t *drawerBackdrop;
+    static lv_obj_t *drawerPanel;
+    static bool drawerOpen;
+    static std::function<void()> onOpenSettingsCallback;
+    static bool gestureCandidate;
+    static bool gesturePrevPressed;
+    static int16_t gestureStartY;
 };
