@@ -36,6 +36,9 @@ public:
 
     bool isCardDetectionEnabled();
 
+    // True while a card is physically on the reader (tracked by handleCardDetection).
+    bool isCardPresent();
+
 private:
     Logger logger;
     Adafruit_PN532 pn532;

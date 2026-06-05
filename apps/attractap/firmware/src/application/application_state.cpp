@@ -154,6 +154,15 @@ void Application::processState() {
     this->processCardAuthenticationData();
 #else
     this->nfc.enableCardDetection();
+    // The card that triggered the auth-data request is still on the reader.
+    // handleCardDetection() only emits a detection event on an absent->present
+    // transition, so it will not re-fire while the card stays put. Authenticate
+    // immediately instead of forcing the user to remove and re-present the card
+    // (the double-tap bug). If the card was already lifted, fall back to the
+    // detection callback on the next presentation.
+    if (this->nfc.isCardPresent()) {
+      this->processCardAuthenticationData();
+    }
 #endif
     return;
   }
