@@ -59,6 +59,19 @@ private:
     const uint32_t HEAP_LOG_INTERVAL_MS = 30000;
     void logHeapStats();
 
+    // Recovery from a fragmented internal heap: once esp_websocket_client_start()
+    // can no longer carve out a contiguous block for its ~10 KB task stack it logs
+    // "Error create websocket task" and returns ESP_FAIL on every attempt, leaving
+    // the device permanently stuck on the connecting screen even after the server
+    // returns. Repeated stop/start cycles during an outage are what fragments the
+    // heap in the first place, and a reboot is the only reliable way to defragment
+    // it. We count consecutive start failures (which only happen when the client
+    // truly cannot be created, never during a normal refused connection) and reboot
+    // once the threshold is hit to force a clean reconnect.
+    uint8_t consecutiveConnectFailures = 0;
+    static constexpr uint8_t MAX_CONSECUTIVE_CONNECT_FAILURES = 5;
+    void handleConnectFailure(const char *reason);
+
     uint32_t lastInboundFrameTime = 0;
     const uint32_t INBOUND_LIVENESS_TIMEOUT_MS = 20000;
     const int PINGPONG_TIMEOUT_SEC = 10;
