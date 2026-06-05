@@ -82,8 +82,15 @@ void API::processIncomingMessage(const char *buf, size_t len)
     // that must not surface as a user-facing error dialog; route them to the handler.
     bool isCrashReportEvent = strcmp(eventType, "READER_CRASH_REPORT") == 0;
 
+    // Enrollment key-request errors (e.g. CARD_ALREADY_ENROLLED) must reach the
+    // enrollment handler so it can show the in-screen message and re-arm card
+    // detection. The generic interceptor would otherwise pop a generic dialog
+    // and return before recovery runs, wedging the reader with detection off
+    // until enrollment times out (ATT-503).
+    bool isEnrollKeyRequestEvent = strcmp(eventType, "ENROLL_NEW_CARD_REQUEST_NFC_KEY") == 0;
+
     // Early error handling: if payload.error is present and non-empty, raise error callback and stop
-    if (!isCrashReportEvent && inboundDoc["data"]["payload"].is<JsonObject>())
+    if (!isCrashReportEvent && !isEnrollKeyRequestEvent && inboundDoc["data"]["payload"].is<JsonObject>())
     {
         JsonObject payload = inboundDoc["data"]["payload"].as<JsonObject>();
         if (payload["error"].is<String>())
@@ -147,6 +154,12 @@ void API::processIncomingMessage(const char *buf, size_t len)
     else if (strcmp(eventType, "ENROLL_NEW_CARD") == 0)
     {
         this->onEnrollNewCard(inboundDoc["data"].as<JsonObject>());
+    }
+    else if (strcmp(eventType, "ENROLL_NEW_CARD_REQUEST_NFC_KEY") == 0)
+    {
+        // The server only sends us this event to report an error; the happy
+        // path responds with ENROLL_NEW_CARD instead.
+        this->onEnrollNewCardRequestNFCKeyError(inboundDoc["data"].as<JsonObject>());
     }
     else if (
         strcmp(eventType, "START_RESOURCE_USAGE_SESSION") == 0 ||

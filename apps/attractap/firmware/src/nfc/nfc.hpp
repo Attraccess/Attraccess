@@ -25,6 +25,11 @@ public:
     void setCardRemovalCallback(std::function<void(uint32_t presentationTimeMs)> callback);
     void disableCardDetection();
 
+    // Forget the currently tracked card so the next enableCardDetection() cycle
+    // re-detects from a clean state (fresh readPassiveTargetID) instead of
+    // assuming the previously held card is still present.
+    void resetCardPresence();
+
     bool getAvailableKeyNo(uint8_t *uid, uint8_t *uidLength, uint8_t *keyNo);
 
     static uint8_t FACTORY_KEY[16];

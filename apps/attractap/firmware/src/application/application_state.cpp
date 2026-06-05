@@ -67,6 +67,16 @@ void Application::processState() {
       !websocketState.connected) {
 #ifdef HAS_LVGL_DISPLAY
     this->resetSessionOnDisconnect();
+    // Drop any pending/active enrollment. The trigger is set asynchronously by
+    // the websocket task; if a disconnect races it, a stale trigger would
+    // relaunch a dead enrollment screen on reconnect (server session is gone),
+    // looping USER_NOT_SET errors until timeout. Clear it here, before the
+    // INIT early-return below.
+    if (this->externalState == EXTERNAL_STATE_ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO ||
+        this->enrollPhase != ENROLL_PHASE_NONE) {
+      this->externalState = EXTERNAL_STATE_NONE;
+      this->enrollPhase = ENROLL_PHASE_NONE;
+    }
 #endif
         if (this->state == APPLICATION_STATE_INIT)
         {
@@ -91,53 +101,18 @@ void Application::processState() {
   }
 
 #ifdef HAS_LVGL_DISPLAY
+  // Enrollment is a sticky, self-contained sub-flow. Once started it owns the
+  // screen until success, cancel or timeout — the generic routing below must
+  // never run while enrolling, otherwise the enrollment screen gets stolen.
   if (this->externalState ==
-      EXTERNAL_STATE_ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO) {
-    if (this->state == APPLICATION_STATE_ENROLLMENT) {
-      uint32_t now = millis();
-      if (now - this->apiEnrollNewCardGetAvailableKeyNoStartTimeMs > 30000) {
-        this->logger.error(
-            "Enroll new card get available key number timeout reached");
-        this->externalState = EXTERNAL_STATE_NONE;
-        return;
-      }
-
-      uint8_t uid[7] = {0};
-      uint8_t uidLength = 0;
-      uint8_t keyNo = 0;
-      bool success = this->nfc.getAvailableKeyNo(uid, &uidLength, &keyNo);
-
-      if (success) {
-        this->api.sendEnrollNewCardAvailableKeyNo(uid, uidLength, keyNo);
-        this->externalState = EXTERNAL_STATE_NONE;
-      }
-      return;
-    }
-
-    this->nfc.disableCardDetection();
-#ifdef HAS_LVGL_DISPLAY
-    Display::enrollmentScreen.setUserName(
-        this->apiEnrollNewCardGetAvailableKeyNoData.username);
-#endif
-    this->apiEnrollNewCardGetAvailableKeyNoStartTimeMs = millis();
-#ifdef HAS_LVGL_DISPLAY
-    Display::enrollmentScreen.setEnrollmentTimeoutTime(
-        this->apiEnrollNewCardGetAvailableKeyNoStartTimeMs + 30000);
-    Display::transitionToScreen(&Display::enrollmentScreen);
-#endif
-
-    this->state = APPLICATION_STATE_ENROLLMENT;
-
+          EXTERNAL_STATE_ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO &&
+      this->state != APPLICATION_STATE_ENROLLMENT) {
+    this->beginEnrollment();
     return;
   }
 
-  if (this->externalState == EXTERNAL_STATE_ENROLL_NEW_CARD) {
-    if (this->state == APPLICATION_STATE_ENROLLMENT) {
-      return;
-    }
-
-    this->nfc.enableCardDetection();
-    this->state = APPLICATION_STATE_ENROLLMENT;
+  if (this->state == APPLICATION_STATE_ENROLLMENT) {
+    this->processEnrollment();
     return;
   }
 #endif
@@ -374,6 +349,167 @@ void Application::processState() {
   }
 #endif
 }
+
+#ifdef HAS_LVGL_DISPLAY
+void Application::beginEnrollment() {
+  // WAIT_FOR_CARD rides the normal card-detection loop, which re-arms the
+  // reader reliably across removals/re-presentations. (The earlier poll-only
+  // approach wedged the PN532 after the auth performed for an already-enrolled
+  // card, so a freshly presented card was never seen until timeout — ATT-503.)
+  // Detection is disabled again only for the auth/write once a card is picked.
+  this->enrollCardDetected = false;
+  this->nfc.resetCardPresence();
+  this->nfc.enableCardDetection();
+  this->enrollPhase = ENROLL_PHASE_WAIT_FOR_CARD;
+  this->enrollKeyMaterialReady = false;
+  this->enrollCancelRequested = false;
+  this->enrollErrorPending = false;
+  this->enrollErrorMessage[0] = '\0';
+  this->apiEnrollNewCardGetAvailableKeyNoStartTimeMs = millis();
+  this->enrollPhaseChangedMs = this->apiEnrollNewCardGetAvailableKeyNoStartTimeMs;
+
+  Display::enrollmentScreen.setUserName(
+      this->apiEnrollNewCardGetAvailableKeyNoData.username);
+  Display::enrollmentScreen.setEnrollmentTimeoutTime(
+      this->apiEnrollNewCardGetAvailableKeyNoStartTimeMs + ENROLLMENT_TIMEOUT_MS);
+  Display::enrollmentScreen.setStatus(EnrollmentScreen::STATUS_WAITING);
+  Display::transitionToScreen(&Display::enrollmentScreen);
+
+  this->state = APPLICATION_STATE_ENROLLMENT;
+  this->externalState = EXTERNAL_STATE_NONE;
+}
+
+void Application::exitEnrollment() {
+  this->enrollPhase = ENROLL_PHASE_NONE;
+  this->externalState = EXTERNAL_STATE_NONE;
+  this->unlocked = false;
+  // Hand back to the generic screen routing; next processState() iteration
+  // re-evaluates and transitions to the correct idle screen (lock / list /
+  // no-resources), re-enabling card detection on the way.
+  this->state = APPLICATION_STATE_INIT;
+}
+
+void Application::processEnrollment() {
+  uint32_t now = millis();
+
+  // Explicit cancel (device touch button) wins over everything else.
+  if (this->enrollCancelRequested) {
+    this->enrollCancelRequested = false;
+    this->logger.debug("Enrollment cancelled by user");
+    this->api.sendEnrollNewCardCancel();
+    this->exitEnrollment();
+    return;
+  }
+
+  // Overall timeout — but never interrupt the brief success confirmation.
+  if (this->enrollPhase != ENROLL_PHASE_SUCCESS &&
+      now - this->apiEnrollNewCardGetAvailableKeyNoStartTimeMs >
+          ENROLLMENT_TIMEOUT_MS) {
+    this->logger.error("Enrollment timeout reached");
+    this->api.sendEnrollNewCardCancel();
+    this->exitEnrollment();
+    return;
+  }
+
+  // Server-reported error (e.g. card already enrolled). Surface it, then the
+  // ERROR dwell loop retries within the remaining time.
+  if (this->enrollErrorPending) {
+    this->enrollErrorPending = false;
+    this->beeper.errorBeep();
+    Display::enrollmentScreen.setStatus(EnrollmentScreen::STATUS_ERROR);
+    Display::enrollmentScreen.setStatusMessage(String(this->enrollErrorMessage));
+    this->enrollPhase = ENROLL_PHASE_ERROR;
+    this->enrollPhaseChangedMs = now;
+    return;
+  }
+
+  switch (this->enrollPhase) {
+  case ENROLL_PHASE_WAIT_FOR_CARD: {
+    // The detection loop flags a card via the card-detection callback; until
+    // then there is nothing to do but keep the screen up.
+    if (!this->enrollCardDetected) {
+      break;
+    }
+    this->enrollCardDetected = false;
+
+    // Take exclusive control of the PN532 for the authenticate + write that
+    // follow, so the detection loop doesn't probe the card underneath us.
+    this->nfc.disableCardDetection();
+
+    uint8_t uid[7] = {0};
+    uint8_t uidLength = 0;
+    uint8_t keyNo = 0;
+    if (this->nfc.getAvailableKeyNo(uid, &uidLength, &keyNo)) {
+      this->api.sendEnrollNewCardAvailableKeyNo(uid, uidLength, keyNo);
+      this->enrollPhase = ENROLL_PHASE_REQUESTED_KEY;
+      this->enrollPhaseChangedMs = now;
+    } else {
+      // Card slipped away or has no writable key — re-arm the detection loop
+      // and keep waiting.
+      this->nfc.resetCardPresence();
+      this->nfc.enableCardDetection();
+    }
+    break;
+  }
+
+  case ENROLL_PHASE_REQUESTED_KEY: {
+    // Key material arrives asynchronously via the API callback, which only
+    // sets a flag — the actual write happens here on the main loop.
+    if (this->enrollKeyMaterialReady) {
+      this->enrollKeyMaterialReady = false;
+      Display::enrollmentScreen.setStatus(EnrollmentScreen::STATUS_WRITING);
+      this->enrollPhase = ENROLL_PHASE_WRITING;
+      this->enrollPhaseChangedMs = now;
+    }
+    break;
+  }
+
+  case ENROLL_PHASE_WRITING: {
+    bool ok = this->nfc.changeKey(
+        this->apiEnrollNewCardData.keyNo, this->nfc.FACTORY_KEY,
+        this->nfc.FACTORY_KEY, this->apiEnrollNewCardData.keyBytes);
+    this->api.sendEnrollNewCard(ok);
+    if (ok) {
+      this->beeper.successBeep();
+      Display::enrollmentScreen.setStatus(EnrollmentScreen::STATUS_SUCCESS);
+      this->enrollPhase = ENROLL_PHASE_SUCCESS;
+    } else {
+      this->beeper.errorBeep();
+      Display::enrollmentScreen.setStatus(EnrollmentScreen::STATUS_ERROR);
+      Display::enrollmentScreen.setStatusMessage(
+          "Karte konnte nicht\ngeschrieben werden");
+      this->enrollPhase = ENROLL_PHASE_ERROR;
+    }
+    this->enrollPhaseChangedMs = now;
+    break;
+  }
+
+  case ENROLL_PHASE_SUCCESS: {
+    if (now - this->enrollPhaseChangedMs > ENROLL_SUCCESS_DWELL_MS) {
+      this->exitEnrollment();
+    }
+    break;
+  }
+
+  case ENROLL_PHASE_ERROR: {
+    // Per ATT-503 the screen must not disappear on error. Show it briefly,
+    // then drop back to waiting so the user can re-present the card. Re-arm the
+    // detection loop so the next (possibly different) card is picked up cleanly.
+    if (now - this->enrollPhaseChangedMs > ENROLL_ERROR_DWELL_MS) {
+      Display::enrollmentScreen.setStatus(EnrollmentScreen::STATUS_WAITING);
+      this->enrollPhase = ENROLL_PHASE_WAIT_FOR_CARD;
+      this->enrollCardDetected = false;
+      this->nfc.resetCardPresence();
+      this->nfc.enableCardDetection();
+    }
+    break;
+  }
+
+  default:
+    break;
+  }
+}
+#endif
 
 #ifdef HAS_WS2812_LED
 void Application::updateLedState() {

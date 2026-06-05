@@ -125,7 +125,11 @@ export class AttractapCardHandler {
 
     const { success } = data.payload as { success: boolean };
     if (!success) {
+      // The card write failed on the reader. Drop the stale key material so a
+      // retry requests a fresh key, but keep lastAuthenticatedUserId so the
+      // reader can re-attempt within the same enrollment session.
       this.logger.error('Enroll new card failed');
+      socket.state.enrollNewCardData = null;
       return;
     }
 
@@ -151,6 +155,14 @@ export class AttractapCardHandler {
     socket.state.enrollNewCardData = null;
     socket.state.lastAuthenticatedUserId = null;
     socket.sendMessage(new AttractapEvent(AttractapEventType.ENROLL_NEW_CARD, { success: true }));
+  }
+
+  // Reader actively cancelled (user pressed cancel) or the enrollment timed out.
+  // Clear all enrollment state so a stale key/user can't leak into a later flow.
+  public async onEnrollNewCardCancel(socket: AuthenticatedWebSocket) {
+    this.logger.log('Enroll new card cancelled by reader');
+    socket.state.enrollNewCardData = null;
+    socket.state.lastAuthenticatedUserId = null;
   }
 
   public async startResetOfNfcCard(data: { readerId: number; userId: number; cardId: number }) {
