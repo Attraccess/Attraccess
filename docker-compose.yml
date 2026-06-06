@@ -135,11 +135,14 @@ services:
       context: ./tools/config-ui
       dockerfile: Dockerfile
     restart: unless-stopped
-    ports:
-      - '53:53/udp'
-      - '53:53/tcp'
+    # host networking + DNS_LISTEN_ADDRESS/bind-interfaces avoids the balenaOS host
+    # dnsmasq port 53 conflict (127.0.0.2:53 / 10.114.102.1:53). Do NOT use `ports: 53:53`
+    # in bridge mode — docker-proxy binds 0.0.0.0:53 and collides with host dnsmasq.
+    network_mode: host
     expose:
-      - '5380'
+      - 5380 # admin UI
+      - 53/udp # DNS
+      - 53/tcp # DNS
     volumes:
       - config-ui-data:/data
       - prometheus-config:/etc/prometheus
