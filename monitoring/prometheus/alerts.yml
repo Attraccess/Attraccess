@@ -38,13 +38,13 @@ groups:
           description: "Prometheus has been unable to scrape the Attraccess metrics endpoint for 5 minutes."
 
       - alert: HighFailedLoginRate
-        expr: sum(rate(attraccess_auth_login_total{job="attraccess", status="fail"}[5m])) > 1
-        for: 5m
+        expr: sum(increase(attraccess_auth_login_total{job="attraccess", status="fail"}[5m])) > 10
+        for: 2m
         labels:
           severity: warning
         annotations:
-          summary: "High rate of failed login attempts"
-          description: "More than 1 failed login attempt per second over the last 5 minutes."
+          summary: "High number of failed login attempts"
+          description: "More than 10 failed login attempts in the last 5 minutes — possible brute-force or credential-stuffing attack."
 
       - alert: OverdueMaintenance
         expr: attraccess_resource_maintenance_overdue{job="attraccess"} > 0

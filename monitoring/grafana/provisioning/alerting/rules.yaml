@@ -213,14 +213,14 @@ groups:
       - uid: high-failed-login-rate
         title: HighFailedLoginRate
         condition: C
-        for: 5m
+        for: 2m
         noDataState: NoData
         execErrState: Error
         labels:
           severity: warning
         annotations:
-          summary: "High rate of failed login attempts"
-          description: "More than 1 failed login attempt per second over the last 5 minutes."
+          summary: "High number of failed login attempts"
+          description: "More than 10 failed login attempts in the last 5 minutes — possible brute-force or credential-stuffing attack."
         data:
           - refId: A
             relativeTimeRange:
@@ -229,7 +229,7 @@ groups:
             datasourceUid: attraccess-prometheus
             model:
               refId: A
-              expr: 'sum(rate(attraccess_auth_login_total{job="attraccess", status="fail"}[5m]))'
+              expr: 'sum(increase(attraccess_auth_login_total{job="attraccess", status="fail"}[5m]))'
               instant: true
               range: false
               datasource:
@@ -251,7 +251,7 @@ groups:
                 - type: query
                   evaluator:
                     type: gt
-                    params: [1]
+                    params: [10]
                   operator:
                     type: and
                   query:

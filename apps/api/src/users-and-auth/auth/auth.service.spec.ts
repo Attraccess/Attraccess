@@ -173,6 +173,9 @@ describe('AuthService', () => {
     });
 
     expect(isAuthenticated).toBeNull();
+    // A login attempt for an unknown username is the dominant brute-force vector
+    // and must be counted as a failed login so the HighFailedLoginRate alert fires.
+    expect(mockMetricsService.authLoginTotal.inc).toHaveBeenCalledWith({ method: 'local', status: 'fail' });
   });
 
   describe('findSSOAuthenticationDetail', () => {

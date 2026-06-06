@@ -36,7 +36,7 @@ rate(http_requests_total{status_code=~"5.."}[5m])
 
 | Metrik | Typ | Labels | Beschreibung |
 |--------|-----|--------|--------------|
-| `attraccess_auth_login_total` | Counter | `method`, `status` | Anmeldeversuche. `method`: `local` oder `sso`. `status`: `success` oder `failure` |
+| `attraccess_auth_login_total` | Counter | `method`, `status` | Anmeldeversuche (inkl. Versuche mit unbekanntem Benutzernamen). `method`: `local` oder `sso`. `status`: `success` oder `fail` |
 | `attraccess_auth_active_sessions` | Gauge | -- | Anzahl aktiver authentifizierter Sitzungen |
 | `attraccess_auth_sso_login_total` | Counter | `provider_type` | SSO-Anmeldeversuche. `provider_type`: `oidc` oder `saml` |
 | `attraccess_auth_2fa_usage_total` | Counter | `action` | Zwei-Faktor-Authentifizierungsaktionen |
@@ -44,8 +44,8 @@ rate(http_requests_total{status_code=~"5.."}[5m])
 ### Beispiel-PromQL-Abfragen
 
 ```promql
-# Fehlgeschlagene Anmelderate
-rate(attraccess_auth_login_total{status="failure"}[5m])
+# Fehlgeschlagene Anmeldungen in den letzten 5 Minuten
+sum(increase(attraccess_auth_login_total{status="fail"}[5m]))
 
 # Vergleich SSO vs. lokale Anmeldung
 sum by (method) (rate(attraccess_auth_login_total{status="success"}[1h]))
