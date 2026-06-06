@@ -10,7 +10,8 @@ import {
   Setting,
 } from '@attraccess/database-entities';
 import { DataSource } from 'typeorm';
-import { UsersController } from '../users/users.controller';
+import { UserRegistrationService } from '../users/user-registration.service';
+import { SignupDomainService } from '../users/signup-domain.service';
 import { UsersService } from '../users/users.service';
 import { AuthService } from '../auth/auth.service';
 import { EmailService } from '../../email/email.service';
@@ -44,7 +45,7 @@ const policyRow = (overrides: Partial<PasswordPolicy> = {}): PasswordPolicy => (
 });
 
 describe('Register flow + password policy (integration)', () => {
-  let controller: UsersController;
+  let service: UserRegistrationService;
   let createOne: jest.Mock;
   let addAuthenticationDetails: jest.Mock;
   let generateEmailVerificationToken: jest.Mock;
@@ -60,8 +61,9 @@ describe('Register flow + password policy (integration)', () => {
     hibpCheck = jest.fn(async () => ({ pwned: false, count: 0, available: true }));
 
     const module: TestingModule = await Test.createTestingModule({
-      controllers: [UsersController],
       providers: [
+        UserRegistrationService,
+        SignupDomainService,
         PasswordPolicyService,
         { provide: HibpClient, useValue: { check: hibpCheck } },
         {
@@ -131,13 +133,13 @@ describe('Register flow + password policy (integration)', () => {
         { provide: AuthAuditLogger, useValue: { log: jest.fn() } },
       ],
     }).compile();
-    controller = module.get(UsersController);
+    service = module.get(UserRegistrationService);
   });
 
   it('rejects a weak password with structured policy errors', async () => {
     zxcvbnScore = 1;
     await expect(
-      controller.createOne({
+      service.createOne({
         username: 'newuser',
         email: 'newuser@example.com',
         password: 'password',
@@ -149,7 +151,7 @@ describe('Register flow + password policy (integration)', () => {
 
   it('accepts a strong password and creates the user', async () => {
     zxcvbnScore = 4;
-    const result = await controller.createOne({
+    const result = await service.createOne({
       username: 'newuser2',
       email: 'newuser2@example.com',
       password: 'Tr0ub4dor-Hummingbird-9!plate',
@@ -165,8 +167,9 @@ describe('Register flow + password policy (integration)', () => {
     zxcvbnScore = 4;
     hibpCheck = jest.fn(async () => ({ pwned: true, count: 7, available: true }));
     const moduleRef: TestingModule = await Test.createTestingModule({
-      controllers: [UsersController],
       providers: [
+        UserRegistrationService,
+        SignupDomainService,
         PasswordPolicyService,
         { provide: HibpClient, useValue: { check: hibpCheck } },
         {
@@ -211,7 +214,7 @@ describe('Register flow + password policy (integration)', () => {
         { provide: AuthAuditLogger, useValue: { log: jest.fn() } },
       ],
     }).compile();
-    const ctrl = moduleRef.get(UsersController);
+    const ctrl = moduleRef.get(UserRegistrationService);
 
     await expect(
       ctrl.createOne({

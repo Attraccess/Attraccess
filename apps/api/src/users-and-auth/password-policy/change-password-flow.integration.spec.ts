@@ -11,7 +11,9 @@ import {
   Setting,
 } from '@attraccess/database-entities';
 import { DataSource } from 'typeorm';
-import { UsersController } from '../users/users.controller';
+import { UserPasswordService } from '../users/user-password.service';
+import { UserRegistrationService } from '../users/user-registration.service';
+import { SignupDomainService } from '../users/signup-domain.service';
 import { UsersService } from '../users/users.service';
 import { AuthService } from '../auth/auth.service';
 import { EmailService } from '../../email/email.service';
@@ -101,8 +103,10 @@ async function buildController(opts: BuildOpts = {}) {
   };
 
   const module: TestingModule = await Test.createTestingModule({
-    controllers: [UsersController],
     providers: [
+      UserPasswordService,
+      UserRegistrationService,
+      SignupDomainService,
       PasswordPolicyService,
       { provide: HibpClient, useValue: { check: jest.fn(async () => ({ pwned: !!opts.hibpPwned, count: opts.hibpPwned ? 5 : 0, available: true })) } },
       {
@@ -195,9 +199,11 @@ async function buildController(opts: BuildOpts = {}) {
     ],
   }).compile();
 
-  const controller = module.get(UsersController);
+  const passwordService = module.get(UserPasswordService);
+  const registrationService = module.get(UserRegistrationService);
   return {
-    controller,
+    passwordService,
+    registrationService,
     changePassword,
     addAuthenticationDetails,
     usersUpdateOne,
@@ -211,40 +217,39 @@ async function buildController(opts: BuildOpts = {}) {
 describe('Password policy on remaining endpoints (integration)', () => {
   describe('POST /users/:id/password (setUserPassword)', () => {
     it('rejects a weak password with structured policy errors', async () => {
-      const { controller, changePassword } = await buildController({ zxcvbnScore: 0 });
+      const { passwordService, changePassword } = await buildController({ zxcvbnScore: 0 });
       await expect(
-        controller.setUserPassword(
+        passwordService.setUserPassword(
           42,
           { password: WEAK_PASSWORD },
-          { user: { id: 42, systemPermissions: { canManageUsers: false } } } as never,
+          { id: 42, systemPermissions: { canManageUsers: false } } as never,
         ),
       ).rejects.toBeInstanceOf(PasswordPolicyViolationException);
       expect(changePassword).not.toHaveBeenCalled();
     });
 
     it('accepts a strong password and changes it', async () => {
-      const { controller, changePassword } = await buildController({ zxcvbnScore: 4 });
-      const result = await controller.setUserPassword(
+      const { passwordService, changePassword } = await buildController({ zxcvbnScore: 4 });
+      await passwordService.setUserPassword(
         42,
         { password: STRONG_PASSWORD },
-        { user: { id: 42, systemPermissions: { canManageUsers: false } } } as never,
+        { id: 42, systemPermissions: { canManageUsers: false } } as never,
       );
-      expect(result).toEqual({ message: 'Password updated successfully' });
       expect(changePassword).toHaveBeenCalledWith(expect.objectContaining({ id: 42 }), STRONG_PASSWORD);
     });
 
     it('blocks reuse when historySize > 0 and password matches current hash', async () => {
       const currentHash = await bcrypt.hash(STRONG_PASSWORD, 4);
-      const { controller, changePassword } = await buildController({
+      const { passwordService, changePassword } = await buildController({
         policy: { historySize: 3 },
         zxcvbnScore: 4,
         currentPasswordHash: currentHash,
       });
       await expect(
-        controller.setUserPassword(
+        passwordService.setUserPassword(
           42,
           { password: STRONG_PASSWORD },
-          { user: { id: 42, systemPermissions: { canManageUsers: false } } } as never,
+          { id: 42, systemPermissions: { canManageUsers: false } } as never,
         ),
       ).rejects.toMatchObject({
         policyErrors: expect.arrayContaining([{ code: 'PASSWORD_REUSED', params: { historySize: 3 } }]),
@@ -254,15 +259,15 @@ describe('Password policy on remaining endpoints (integration)', () => {
 
     it('archives current hash to history before changing when historySize > 0', async () => {
       const currentHash = await bcrypt.hash('Previous-Tr0ub4dor-9!Hum', 4);
-      const { controller, historyRepo, changePassword } = await buildController({
+      const { passwordService, historyRepo, changePassword } = await buildController({
         policy: { historySize: 2 },
         zxcvbnScore: 4,
         currentPasswordHash: currentHash,
       });
-      await controller.setUserPassword(
+      await passwordService.setUserPassword(
         42,
         { password: STRONG_PASSWORD },
-        { user: { id: 42, systemPermissions: { canManageUsers: false } } } as never,
+        { id: 42, systemPermissions: { canManageUsers: false } } as never,
       );
       expect(historyRepo.save).toHaveBeenCalledWith(
         expect.objectContaining({ userId: 42, passwordHash: currentHash }),
@@ -273,31 +278,30 @@ describe('Password policy on remaining endpoints (integration)', () => {
 
   describe('POST /users/:userId/change-password-by-token', () => {
     it('rejects a weak password and does not change it', async () => {
-      const { controller, changePassword } = await buildController({ zxcvbnScore: 0 });
+      const { passwordService, changePassword } = await buildController({ zxcvbnScore: 0 });
       await expect(
-        controller.changePasswordViaResetToken(42, { password: WEAK_PASSWORD, token: 'reset-token-123' }),
+        passwordService.changePasswordViaResetToken(42, { password: WEAK_PASSWORD, token: 'reset-token-123' }),
       ).rejects.toBeInstanceOf(PasswordPolicyViolationException);
       expect(changePassword).not.toHaveBeenCalled();
     });
 
     it('accepts a strong password and clears the reset token', async () => {
-      const { controller, changePassword, usersUpdateOne } = await buildController({ zxcvbnScore: 4 });
-      const result = await controller.changePasswordViaResetToken(42, { password: STRONG_PASSWORD, token: 'reset-token-123' });
-      expect(result).toEqual({ message: 'OK' });
+      const { passwordService, changePassword, usersUpdateOne } = await buildController({ zxcvbnScore: 4 });
+      await passwordService.changePasswordViaResetToken(42, { password: STRONG_PASSWORD, token: 'reset-token-123' });
       expect(changePassword).toHaveBeenCalledWith(expect.objectContaining({ id: 42 }), STRONG_PASSWORD);
       expect(usersUpdateOne).toHaveBeenCalledWith(42, expect.objectContaining({ passwordResetToken: null }));
     });
 
     it('blocks reuse when candidate matches a prior history entry', async () => {
       const priorHash = await bcrypt.hash(ANOTHER_STRONG_PASSWORD, 4);
-      const { controller, changePassword } = await buildController({
+      const { passwordService, changePassword } = await buildController({
         policy: { historySize: 5 },
         zxcvbnScore: 4,
         currentPasswordHash: null,
         history: [{ id: 1, passwordHash: priorHash, userId: 42, createdAt: new Date() }],
       });
       await expect(
-        controller.changePasswordViaResetToken(42, { password: ANOTHER_STRONG_PASSWORD, token: 'reset-token-123' }),
+        passwordService.changePasswordViaResetToken(42, { password: ANOTHER_STRONG_PASSWORD, token: 'reset-token-123' }),
       ).rejects.toMatchObject({
         policyErrors: expect.arrayContaining([{ code: 'PASSWORD_REUSED', params: { historySize: 5 } }]),
       });
@@ -307,17 +311,17 @@ describe('Password policy on remaining endpoints (integration)', () => {
 
   describe('POST /users/accept-invitation', () => {
     it('rejects a weak password and never adds auth details', async () => {
-      const { controller, addAuthenticationDetails, verifyEmail } = await buildController({ zxcvbnScore: 0 });
+      const { registrationService, addAuthenticationDetails, verifyEmail } = await buildController({ zxcvbnScore: 0 });
       await expect(
-        controller.acceptInvitation({ token: 'inv-token-123', email: 'jane@example.com', password: WEAK_PASSWORD }),
+        registrationService.acceptInvitation({ token: 'inv-token-123', email: 'jane@example.com', password: WEAK_PASSWORD }),
       ).rejects.toBeInstanceOf(PasswordPolicyViolationException);
       expect(addAuthenticationDetails).not.toHaveBeenCalled();
       expect(verifyEmail).toHaveBeenCalled();
     });
 
     it('accepts a strong password and adds local auth details', async () => {
-      const { controller, addAuthenticationDetails } = await buildController({ zxcvbnScore: 4 });
-      const result = await controller.acceptInvitation({
+      const { registrationService, addAuthenticationDetails } = await buildController({ zxcvbnScore: 4 });
+      const result = await registrationService.acceptInvitation({
         token: 'inv-token-123',
         email: 'jane@example.com',
         password: STRONG_PASSWORD,
@@ -334,12 +338,12 @@ describe('Password policy on remaining endpoints (integration)', () => {
       const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
       const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
 
-      const { controller } = await buildController({ zxcvbnScore: 0 });
+      const { passwordService } = await buildController({ zxcvbnScore: 0 });
       await expect(
-        controller.setUserPassword(
+        passwordService.setUserPassword(
           42,
           { password: 'SuperSecretLeakable123!' },
-          { user: { id: 42, systemPermissions: { canManageUsers: false } } } as never,
+          { id: 42, systemPermissions: { canManageUsers: false } } as never,
         ),
       ).rejects.toBeInstanceOf(PasswordPolicyViolationException);
 
