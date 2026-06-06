@@ -11,6 +11,7 @@ import {
   TableContent,
   TableHeader,
   TableRow,
+  TableScrollContainer,
 } from '@heroui/react';
 import { Button } from '../../../../components/button';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -302,28 +303,30 @@ export function CsvInvite({ onSuccess, onError }: Props) {
       ))}
 
       <Table data-cy="csv-invite-table">
-        <TableContent aria-label="csv-invite-table">
-        <TableHeader>
-          <TableColumn isRowHeader>{t('preview.columns.index')}</TableColumn>
-          <TableColumn>{t('preview.columns.username')}</TableColumn>
-          <TableColumn>{t('preview.columns.email')}</TableColumn>
-          <TableColumn>{t('preview.columns.permissions.label')}</TableColumn>
-        </TableHeader>
-        <TableBody items={previewUsers} renderEmptyState={() => <EmptyState />}>
-          {(user) => (
-            <TableRow key={user.index} id={user.index}>
-              <TableCell>#{user.index}</TableCell>
-              <TableCell className="w-full">{user.username}</TableCell>
-              <TableCell>{user.email}</TableCell>
-              <TableCell className="flex-row flex gap-2 flex-wrap">
-                {user.permissions.map((permission) => (
-                  <Chip key={permission}>{t('preview.columns.permissions.values.' + permission)}</Chip>
-                ))}
-              </TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-        </TableContent>
+        <TableScrollContainer>
+          <TableContent aria-label="csv-invite-table">
+            <TableHeader>
+              <TableColumn isRowHeader>{t('preview.columns.index')}</TableColumn>
+              <TableColumn>{t('preview.columns.username')}</TableColumn>
+              <TableColumn>{t('preview.columns.email')}</TableColumn>
+              <TableColumn>{t('preview.columns.permissions.label')}</TableColumn>
+            </TableHeader>
+            <TableBody items={previewUsers} renderEmptyState={() => <EmptyState />}>
+              {(user) => (
+                <TableRow key={user.index} id={user.index}>
+                  <TableCell>#{user.index}</TableCell>
+                  <TableCell className="w-full">{user.username}</TableCell>
+                  <TableCell>{user.email}</TableCell>
+                  <TableCell className="flex-row flex gap-2 flex-wrap">
+                    {user.permissions.map((permission) => (
+                      <Chip key={permission}>{t('preview.columns.permissions.values.' + permission)}</Chip>
+                    ))}
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </TableContent>
+        </TableScrollContainer>
       </Table>
 
       {rowErrors.length > 0 && (
@@ -338,24 +341,26 @@ export function CsvInvite({ onSuccess, onError }: Props) {
           </div>
 
           <Table>
-            <TableContent aria-label="csv-invite-errors">
-            <TableHeader>
-              <TableColumn isRowHeader>{t('errors.columns.row')}</TableColumn>
-              <TableColumn>{t('errors.columns.field')}</TableColumn>
-              <TableColumn>{t('errors.columns.message')}</TableColumn>
-              <TableColumn>{t('errors.columns.value')}</TableColumn>
-            </TableHeader>
-            <TableBody items={rowErrors}>
-              {(error) => (
-                <TableRow key={`${error.row}-${error.field ?? 'general'}`}>
-                  <TableCell>#{error.row}</TableCell>
-                  <TableCell>{error.field ?? '-'}</TableCell>
-                  <TableCell>{error.message}</TableCell>
-                  <TableCell>{error.value ?? '-'}</TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-            </TableContent>
+            <TableScrollContainer>
+              <TableContent aria-label="csv-invite-errors">
+                <TableHeader>
+                  <TableColumn isRowHeader>{t('errors.columns.row')}</TableColumn>
+                  <TableColumn>{t('errors.columns.field')}</TableColumn>
+                  <TableColumn>{t('errors.columns.message')}</TableColumn>
+                  <TableColumn>{t('errors.columns.value')}</TableColumn>
+                </TableHeader>
+                <TableBody items={rowErrors}>
+                  {(error) => (
+                    <TableRow key={`${error.row}-${error.field ?? 'general'}`}>
+                      <TableCell>#{error.row}</TableCell>
+                      <TableCell>{error.field ?? '-'}</TableCell>
+                      <TableCell>{error.message}</TableCell>
+                      <TableCell>{error.value ?? '-'}</TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </TableContent>
+            </TableScrollContainer>
           </Table>
         </div>
       )}

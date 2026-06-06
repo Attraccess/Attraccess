@@ -10,6 +10,7 @@ import {
   TableHeader,
   TableProps,
   TableRow,
+  TableScrollContainer,
 } from '@heroui/react';
 import { Button } from '../button';
 import { ReactNode, useCallback, useMemo, useState } from 'react';
@@ -107,66 +108,68 @@ export function UserSelectionList<TUser extends User = User>(props: Readonly<Pro
         autocompleteProps={{ size: 'sm' }}
         afterSelection={
           userSearchSelection && (
-            <Button variant="primary"
-              onPress={onAddUser}
-              isPending={addToSelectionIsLoading}
-              isIconOnly
-            ><PlusIcon className="w-4 h-4" /></Button>
+            <Button variant="primary" onPress={onAddUser} isPending={addToSelectionIsLoading} isIconOnly>
+              <PlusIcon className="w-4 h-4" />
+            </Button>
           )
         }
       />
 
       <Table {...tableProps}>
-        <TableContent aria-label={t('table.ariaLabel')}>
-        <TableHeader>
-          <TableColumn isRowHeader>{t('selectedUsers.columns.user')}</TableColumn>
-          {
-            (additionalColumns ?? []).map((col) => (
-              <TableColumn className={col.headerClassName} key={col.key} id={col.key}>
-                {col.label}
-              </TableColumn>
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            )) as any
-          }
-          <TableColumn>{t('selectedUsers.columns.actions')}</TableColumn>
-        </TableHeader>
-        <TableBody
-          items={currentPage}
-          renderEmptyState={() => <EmptyState />}
-        >
-          {(user) => (
-            <TableRow key={user.id} id={user.id} className={typeof rowClassName === 'function' ? rowClassName(user) : rowClassName}>
-              <TableCell className="w-full">
-                <AttraccessUser user={user} />
-              </TableCell>
-
+        <TableScrollContainer>
+          <TableContent aria-label={t('table.ariaLabel')}>
+            <TableHeader>
+              <TableColumn isRowHeader>{t('selectedUsers.columns.user')}</TableColumn>
               {
                 (additionalColumns ?? []).map((col) => (
-                  <TableCell className={col.cellClassName} key={col.key}>
-                    {typeof col.value === 'function' ? col.value(user) : col.value}
-                  </TableCell>
+                  <TableColumn className={col.headerClassName} key={col.key} id={col.key}>
+                    {col.label}
+                  </TableColumn>
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 )) as any
               }
+              <TableColumn>{t('selectedUsers.columns.actions')}</TableColumn>
+            </TableHeader>
+            <TableBody items={currentPage} renderEmptyState={() => <EmptyState />}>
+              {(user) => (
+                <TableRow
+                  key={user.id}
+                  id={user.id}
+                  className={typeof rowClassName === 'function' ? rowClassName(user) : rowClassName}
+                >
+                  <TableCell className="w-full">
+                    <AttraccessUser user={user} />
+                  </TableCell>
 
-              <TableCell>
-                <div className="flex gap-4 flex-row flex-wrap md:flex-nowrap">
-                  {parseActions(user).map((action) => (
-                    <Button
-                      {...{ ...action, label: undefined, onClick: undefined, startContent: undefined }}
-                      key={action.key}
-                      onPress={() => action.onClick(user)}
-                      className="flex"
-                    >
-                      {action.startContent}{action.label}
-                    </Button>
-                  ))}
-                </div>
-              </TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-        </TableContent>
+                  {
+                    (additionalColumns ?? []).map((col) => (
+                      <TableCell className={col.cellClassName} key={col.key}>
+                        {typeof col.value === 'function' ? col.value(user) : col.value}
+                      </TableCell>
+                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    )) as any
+                  }
+
+                  <TableCell>
+                    <div className="flex gap-4 flex-row flex-wrap md:flex-nowrap">
+                      {parseActions(user).map((action) => (
+                        <Button
+                          {...{ ...action, label: undefined, onClick: undefined, startContent: undefined }}
+                          key={action.key}
+                          onPress={() => action.onClick(user)}
+                          className="flex"
+                        >
+                          {action.startContent}
+                          {action.label}
+                        </Button>
+                      ))}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </TableContent>
+        </TableScrollContainer>
       </Table>
       {selectedUsers && totalPages > 1 && (
         <SimplePagination

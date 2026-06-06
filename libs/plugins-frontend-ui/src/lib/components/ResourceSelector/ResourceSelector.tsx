@@ -2,7 +2,21 @@
 // FEATURE: Resource selection for plugins using HeroUI v3 Table compound
 import { useTranslations } from '../../i18n';
 import { useResourcesServiceGetAllResources } from '@attraccess/react-query-client';
-import { Checkbox, TextField, Label, InputGroup, Spinner, TableRoot, TableContent, TableBody, TableCell, TableColumn, TableHeader, TableRow } from '@heroui/react';
+import {
+  Checkbox,
+  TextField,
+  Label,
+  InputGroup,
+  Spinner,
+  TableRoot,
+  TableScrollContainer,
+  TableContent,
+  TableBody,
+  TableCell,
+  TableColumn,
+  TableHeader,
+  TableRow,
+} from '@heroui/react';
 import { SearchIcon } from 'lucide-react';
 import { useState, PropsWithChildren } from 'react';
 import de from './ResourceSelector.de.json';
@@ -56,46 +70,48 @@ export function ResourceSelector(props: Readonly<Props>) {
         className={listClassName}
         style={{ maxHeight: LIST_HEADER_HEIGHT_PX + MAX_VISIBLE_ROWS * LIST_ROW_HEIGHT_PX, overflowY: 'auto' }}
       >
-        <TableContent
-          selectionMode={multiple ? 'multiple' : 'single'}
-          selectedKeys={new Set(selection.map(String))}
-          onSelectionChange={(keys) => {
-            if (keys === 'all') {
-              onSelectionChange((resourceSearchResults?.data ?? []).map((r) => r.id));
-              return;
-            }
-            onSelectionChange(Array.from(keys).map((k) => Number(k)));
-          }}
-        >
-          <TableHeader>
-            <TableColumn className="pr-0 w-0">
-              {multiple ? (
-                <Checkbox aria-label={t('table.ariaLabel')} slot="selection">
-                  <Checkbox.Control>
-                    <Checkbox.Indicator />
-                  </Checkbox.Control>
-                </Checkbox>
-              ) : null}
-            </TableColumn>
-            <TableColumn className="w-full" isRowHeader>
-              {t('table.columns.name.header')}
-            </TableColumn>
-          </TableHeader>
-          <TableBody items={resourceSearchResults?.data ?? []}>
-            {(resource) => (
-              <TableRow key={resource.id} id={String(resource.id)}>
-                <TableCell className="pr-0">
-                  <Checkbox aria-label={resource.name} slot="selection" variant="secondary">
+        <TableScrollContainer>
+          <TableContent
+            selectionMode={multiple ? 'multiple' : 'single'}
+            selectedKeys={new Set(selection.map(String))}
+            onSelectionChange={(keys) => {
+              if (keys === 'all') {
+                onSelectionChange((resourceSearchResults?.data ?? []).map((r) => r.id));
+                return;
+              }
+              onSelectionChange(Array.from(keys).map((k) => Number(k)));
+            }}
+          >
+            <TableHeader>
+              <TableColumn className="pr-0 w-0">
+                {multiple ? (
+                  <Checkbox aria-label={t('table.ariaLabel')} slot="selection">
                     <Checkbox.Control>
                       <Checkbox.Indicator />
                     </Checkbox.Control>
                   </Checkbox>
-                </TableCell>
-                <TableCell>{resource.name}</TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </TableContent>
+                ) : null}
+              </TableColumn>
+              <TableColumn className="w-full" isRowHeader>
+                {t('table.columns.name.header')}
+              </TableColumn>
+            </TableHeader>
+            <TableBody items={resourceSearchResults?.data ?? []}>
+              {(resource) => (
+                <TableRow key={resource.id} id={String(resource.id)}>
+                  <TableCell className="pr-0">
+                    <Checkbox aria-label={resource.name} slot="selection" variant="secondary">
+                      <Checkbox.Control>
+                        <Checkbox.Indicator />
+                      </Checkbox.Control>
+                    </Checkbox>
+                  </TableCell>
+                  <TableCell>{resource.name}</TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </TableContent>
+        </TableScrollContainer>
       </TableRoot>
     </div>
   );

@@ -13,6 +13,7 @@ import {
   TableContent,
   TableHeader,
   TableRow,
+  TableScrollContainer,
 } from '@heroui/react';
 import { Button } from '../../../components/button';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -49,26 +50,28 @@ export function ConfirmDiffModal({ isOpen, diff, isConfirming, onClose, onConfir
                 <p className="text-sm text-default-500">{t('diff.noChanges')}</p>
               ) : (
                 <Table aria-label="changes" data-testid="policy-diff-table">
-                  <TableContent>
-                    <TableHeader>
-                      <TableColumn isRowHeader>{t('diff.field')}</TableColumn>
-                      <TableColumn>{t('diff.before')}</TableColumn>
-                      <TableColumn>{t('diff.after')}</TableColumn>
-                    </TableHeader>
-                    <TableBody>
-                      {diff.map((row) => (
-                        <TableRow key={row.field}>
-                          <TableCell className="font-medium">{row.field}</TableCell>
-                          <TableCell>
-                            <code>{row.before}</code>
-                          </TableCell>
-                          <TableCell>
-                            <code className="text-success-600">{row.after}</code>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </TableContent>
+                  <TableScrollContainer>
+                    <TableContent>
+                      <TableHeader>
+                        <TableColumn isRowHeader>{t('diff.field')}</TableColumn>
+                        <TableColumn>{t('diff.before')}</TableColumn>
+                        <TableColumn>{t('diff.after')}</TableColumn>
+                      </TableHeader>
+                      <TableBody>
+                        {diff.map((row) => (
+                          <TableRow key={row.field}>
+                            <TableCell className="font-medium">{row.field}</TableCell>
+                            <TableCell>
+                              <code>{row.before}</code>
+                            </TableCell>
+                            <TableCell>
+                              <code className="text-success-600">{row.after}</code>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </TableContent>
+                  </TableScrollContainer>
                 </Table>
               )}
             </ModalBody>
