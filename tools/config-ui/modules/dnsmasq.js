@@ -127,7 +127,10 @@ let dnsmasqProcess = null;
 function startDnsmasq() {
   if (dnsmasqProcess) return;
   try {
-    dnsmasqProcess = spawn('dnsmasq', ['--no-daemon', '--conf-dir=/etc/dnsmasq.d'], {
+    // ,*.conf restricts conf-dir to *.conf files so the addn-hosts file
+    // (/etc/dnsmasq.d/custom-hosts) is NOT parsed as a config file. Without it
+    // dnsmasq dies with "bad option at line 1 of .../custom-hosts".
+    dnsmasqProcess = spawn('dnsmasq', ['--no-daemon', '--conf-dir=/etc/dnsmasq.d/,*.conf'], {
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     dnsmasqProcess.stdout.on('data', (data) => log(`${data.toString().trim()}`));
