@@ -134,36 +134,39 @@ describe('Monitoring configuration consistency', () => {
     });
   });
 
-  describe('issue #13: alerting rules exist', () => {
-    it('alerts.yml file exists and contains alerting rules', () => {
-      const alerts = loadYaml('prometheus/alerts.yml');
-      expect(alerts).toContain('groups:');
-      expect(alerts).toContain('alert:');
+  describe('issue #13: alerting rules exist (Grafana-managed)', () => {
+    // Alerting is provisioned via Grafana, not Prometheus rule_files. The legacy
+    // monitoring/prometheus/alerts.yml was removed to avoid duplicate rules.
+    const RULES = 'grafana/provisioning/alerting/rules.yaml';
+
+    it('Prometheus alerts.yml no longer exists', () => {
+      expect(() => loadYaml('prometheus/alerts.yml')).toThrow();
+    });
+
+    it('Grafana rules file exists and contains alert rules', () => {
+      const rules = loadYaml(RULES);
+      expect(rules).toContain('groups:');
+      expect(rules).toContain('title:');
     });
 
     it('includes a service-down alert', () => {
-      const alerts = loadYaml('prometheus/alerts.yml');
-      expect(alerts).toContain('AttractapServiceDown');
+      expect(loadYaml(RULES)).toContain('AttractapServiceDown');
     });
 
     it('includes a high-error-rate alert', () => {
-      const alerts = loadYaml('prometheus/alerts.yml');
-      expect(alerts).toContain('HighHttpErrorRate');
+      expect(loadYaml(RULES)).toContain('HighHttpErrorRate');
     });
 
     it('includes a high-latency alert', () => {
-      const alerts = loadYaml('prometheus/alerts.yml');
-      expect(alerts).toContain('HighRequestLatency');
+      expect(loadYaml(RULES)).toContain('HighRequestLatency');
     });
 
     it('includes a failed-login alert', () => {
-      const alerts = loadYaml('prometheus/alerts.yml');
-      expect(alerts).toContain('HighFailedLoginRate');
+      expect(loadYaml(RULES)).toContain('HighFailedLoginRate');
     });
 
     it('includes an overdue-maintenance alert', () => {
-      const alerts = loadYaml('prometheus/alerts.yml');
-      expect(alerts).toContain('OverdueMaintenance');
+      expect(loadYaml(RULES)).toContain('OverdueMaintenance');
     });
   });
 
