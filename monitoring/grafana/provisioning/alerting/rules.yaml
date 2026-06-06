@@ -1,0 +1,311 @@
+apiVersion: 1
+
+# Grafana-managed alert rules that query the Prometheus datasource and route to
+# Pushover via the notification policy. These mirror monitoring/prometheus/alerts.yml.
+# The PromQL comparison is moved into a Grafana threshold expression (refId C) so
+# the query (refId A) returns the raw value Grafana can evaluate.
+groups:
+  - orgId: 1
+    name: attraccess
+    folder: Attraccess Alerts
+    interval: 1m
+    rules:
+      - uid: attractap-service-down
+        title: AttractapServiceDown
+        condition: C
+        for: 2m
+        noDataState: NoData
+        execErrState: Error
+        labels:
+          severity: critical
+        annotations:
+          summary: "Attraccess service is down"
+          description: "The Attraccess API has been unreachable for more than 2 minutes."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: attraccess-prometheus
+            model:
+              refId: A
+              expr: 'up{job="attraccess"}'
+              instant: true
+              range: false
+              datasource:
+                type: prometheus
+                uid: attraccess-prometheus
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - type: query
+                  evaluator:
+                    type: lt
+                    params: [1]
+                  operator:
+                    type: and
+                  query:
+                    params: []
+                  reducer:
+                    type: last
+                    params: []
+
+      - uid: high-http-error-rate
+        title: HighHttpErrorRate
+        condition: C
+        for: 5m
+        noDataState: NoData
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: "High HTTP 5xx error rate"
+          description: "More than 5% of HTTP requests are returning 5xx errors over the last 5 minutes."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: attraccess-prometheus
+            model:
+              refId: A
+              expr: 'sum(rate(attraccess_http_requests_total{job="attraccess", status_code=~"5.."}[5m])) / sum(rate(attraccess_http_requests_total{job="attraccess"}[5m]))'
+              instant: true
+              range: false
+              datasource:
+                type: prometheus
+                uid: attraccess-prometheus
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - type: query
+                  evaluator:
+                    type: gt
+                    params: [0.05]
+                  operator:
+                    type: and
+                  query:
+                    params: []
+                  reducer:
+                    type: last
+                    params: []
+
+      - uid: high-request-latency
+        title: HighRequestLatency
+        condition: C
+        for: 5m
+        noDataState: NoData
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: "High request latency (p95 > 2s)"
+          description: "The 95th percentile request latency has exceeded 2 seconds for the last 5 minutes."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: attraccess-prometheus
+            model:
+              refId: A
+              expr: 'histogram_quantile(0.95, sum(rate(attraccess_http_request_duration_seconds_bucket{job="attraccess"}[5m])) by (le))'
+              instant: true
+              range: false
+              datasource:
+                type: prometheus
+                uid: attraccess-prometheus
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - type: query
+                  evaluator:
+                    type: gt
+                    params: [2]
+                  operator:
+                    type: and
+                  query:
+                    params: []
+                  reducer:
+                    type: last
+                    params: []
+
+      - uid: scrape-failures
+        title: ScrapeFailures
+        condition: C
+        for: 5m
+        noDataState: NoData
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: "Prometheus scrape failures"
+          description: "Prometheus has been unable to scrape the Attraccess metrics endpoint for 5 minutes."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: attraccess-prometheus
+            model:
+              refId: A
+              expr: 'up{job="attraccess"}'
+              instant: true
+              range: false
+              datasource:
+                type: prometheus
+                uid: attraccess-prometheus
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - type: query
+                  evaluator:
+                    type: lt
+                    params: [1]
+                  operator:
+                    type: and
+                  query:
+                    params: []
+                  reducer:
+                    type: last
+                    params: []
+
+      - uid: high-failed-login-rate
+        title: HighFailedLoginRate
+        condition: C
+        for: 5m
+        noDataState: NoData
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: "High rate of failed login attempts"
+          description: "More than 1 failed login attempt per second over the last 5 minutes."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: attraccess-prometheus
+            model:
+              refId: A
+              expr: 'sum(rate(attraccess_auth_login_total{job="attraccess", status="fail"}[5m]))'
+              instant: true
+              range: false
+              datasource:
+                type: prometheus
+                uid: attraccess-prometheus
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - type: query
+                  evaluator:
+                    type: gt
+                    params: [1]
+                  operator:
+                    type: and
+                  query:
+                    params: []
+                  reducer:
+                    type: last
+                    params: []
+
+      - uid: overdue-maintenance
+        title: OverdueMaintenance
+        condition: C
+        for: 1h
+        noDataState: NoData
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: "Resources with overdue maintenance"
+          description: "{{ $values.A.Value }} resources have overdue maintenance."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: attraccess-prometheus
+            model:
+              refId: A
+              expr: 'attraccess_resource_maintenance_overdue{job="attraccess"}'
+              instant: true
+              range: false
+              datasource:
+                type: prometheus
+                uid: attraccess-prometheus
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - type: query
+                  evaluator:
+                    type: gt
+                    params: [0]
+                  operator:
+                    type: and
+                  query:
+                    params: []
+                  reducer:
+                    type: last
+                    params: []
