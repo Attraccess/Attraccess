@@ -487,7 +487,7 @@ void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief 
    {
       // Persist the session start time so periodic updates can compute elapsed time correctly
       this->sessionStartTime = (time_t)resource.activeStartEpoch;
-      lv_label_set_text(this->sessionStartTimeLabel, timeToTimeString(this->sessionStartTime).c_str());
+      lv_label_set_text(this->sessionStartTimeLabel, timeToTimeString(this->sessionStartTime, resource.activeStartUtcOffsetMinutes).c_str());
       lv_label_set_text(this->currentUser, resource.activeUser);
    }
 

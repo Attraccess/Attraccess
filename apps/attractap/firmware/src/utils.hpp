@@ -25,11 +25,12 @@ void recoverI2CBus(int sda, int scl);
 String millisToTimeString(double millis);
 
 /**
- * @brief Convert a time_t to a time string in the format "DD.MM. HH:MM"
- * @param time The time_t to convert
+ * @brief Convert a UTC time_t to a time string in the format "DD.MM. HH:MM"
+ * @param time The time_t (UTC) to convert
+ * @param utcOffsetMinutes Minutes east of UTC to apply before formatting (0 = render UTC)
  * @return The time string
  */
-String timeToTimeString(time_t time);
+String timeToTimeString(time_t time, int utcOffsetMinutes = 0);
 
 /**
  * @brief Parse an ISO8601 datetime string (e.g. "2025-10-16T12:34:56Z" or with offset) to time_t (UTC)

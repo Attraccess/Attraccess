@@ -111,6 +111,10 @@ export class ResourceListService {
               username: resource.activeUsageSession.user.username,
             },
             startTime: resource.activeUsageSession.startTime.toISOString(),
+            // Offset (minutes east of UTC) of the API's effective timezone for this
+            // specific instant, so the reader can render local wall-clock time without
+            // a tz database. Computed per-timestamp, so it stays DST-correct.
+            startTimeUtcOffsetMinutes: -resource.activeUsageSession.startTime.getTimezoneOffset(),
           }
           : null,
         flowButtons: resource.flowButtons,

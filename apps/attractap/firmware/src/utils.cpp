@@ -113,9 +113,14 @@ String millisToTimeString(double millis)
     return hoursString + ":" + minutesString + ":" + secondsString;
 }
 
-String timeToTimeString(time_t time)
+String timeToTimeString(time_t time, int utcOffsetMinutes)
 {
-    struct tm *tm = localtime(&time);
+    // `time` is UTC. Shift by the server-provided offset, then render with gmtime so the
+    // result is independent of the device's own (unset) timezone. Offset 0 -> UTC.
+    time_t shifted = time + (time_t)utcOffsetMinutes * 60;
+    struct tm tmInfo;
+    gmtime_r(&shifted, &tmInfo);
+    struct tm *tm = &tmInfo;
     int month = tm->tm_mon + 1;
     int day = tm->tm_mday;
     int hours = tm->tm_hour;

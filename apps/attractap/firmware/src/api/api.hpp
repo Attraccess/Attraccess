@@ -55,7 +55,8 @@ public:
         bool isHealthy;
         char healthReason[MAX_HEALTH_REASON_LEN];
         char activeUser[MAX_USERNAME_LEN];
-        uint32_t activeStartEpoch; // seconds since epoch
+        uint32_t activeStartEpoch;          // seconds since epoch (UTC)
+        int16_t activeStartUtcOffsetMinutes; // server tz offset (minutes east of UTC) for that instant
         uint8_t introducerCount;
         char introducers[MAX_INTRODUCERS][MAX_USERNAME_LEN];
         uint8_t flowButtonCount;
