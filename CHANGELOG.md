@@ -1,3 +1,9 @@
+## [Unreleased]
+
+### Changed
+
+- **ATT-430:** refactor SSOProvidersList god component into focused subcomponents (table, OIDC/SAML config forms, permission mappings, setup instructions, form drawer) and hooks (form state, setup URLs); no UI or behavior change ([ATT-430](https://linear.app/attraccess/issue/ATT-430/refactor-ssoproviderslist-god-component-frontend-1191-lines))
+
 ## 1.7.0 (2026-06-05)
 
 ### 🚀 Features
