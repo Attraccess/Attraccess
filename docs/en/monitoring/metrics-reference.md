@@ -36,7 +36,7 @@ rate(http_requests_total{status_code=~"5.."}[5m])
 
 | Metric | Type | Labels | Description |
 |--------|------|--------|-------------|
-| `attraccess_auth_login_total` | Counter | `method`, `status` | Login attempts. `method`: `local` or `sso`. `status`: `success` or `failure` |
+| `attraccess_auth_login_total` | Counter | `method`, `status` | Login attempts (includes unknown-username attempts). `method`: `local` or `sso`. `status`: `success` or `fail` |
 | `attraccess_auth_active_sessions` | Gauge | -- | Number of active authenticated sessions |
 | `attraccess_auth_sso_login_total` | Counter | `provider_type` | SSO login attempts. `provider_type`: `oidc` or `saml` |
 | `attraccess_auth_2fa_usage_total` | Counter | `action` | Two-factor authentication actions |
@@ -44,8 +44,8 @@ rate(http_requests_total{status_code=~"5.."}[5m])
 ### Example PromQL Queries
 
 ```promql
-# Failed login rate
-rate(attraccess_auth_login_total{status="failure"}[5m])
+# Failed logins in the last 5 minutes
+sum(increase(attraccess_auth_login_total{status="fail"}[5m]))
 
 # SSO vs local login comparison
 sum by (method) (rate(attraccess_auth_login_total{status="success"}[1h]))

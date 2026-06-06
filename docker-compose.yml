@@ -42,7 +42,6 @@ services:
     command:
       - >
         set -e &&
-        cp -f /app/share/monitoring/prometheus/alerts.yml /prometheus-config/alerts.yml &&
         cp -rT /app/share/monitoring/grafana/provisioning /grafana-provisioning &&
         cp -rT /app/share/monitoring/grafana/dashboards /grafana-dashboards
     volumes:
