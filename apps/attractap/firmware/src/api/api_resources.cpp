@@ -106,12 +106,15 @@ void API::onResourceList(JsonObject data)
             strlcpy(dst.activeUser, username ? username : "", sizeof(dst.activeUser));
             const char *startIso = aus["startTime"].as<const char *>();
             dst.activeStartEpoch = parseIso8601ToTimeT(startIso);
+            // Offset is optional for backwards compatibility; absent -> 0 (render UTC as before)
+            dst.activeStartUtcOffsetMinutes = aus["startTimeUtcOffsetMinutes"].is<int>() ? (int16_t)aus["startTimeUtcOffsetMinutes"].as<int>() : 0;
         }
         else
         {
             dst.hasActiveUsage = false;
             dst.activeUser[0] = '\0';
             dst.activeStartEpoch = 0;
+            dst.activeStartUtcOffsetMinutes = 0;
         }
 
         // Parse introducers: array of strings (usernames)
