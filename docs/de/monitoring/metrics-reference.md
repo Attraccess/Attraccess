@@ -14,8 +14,8 @@ Diese Seite listet alle Metriken auf, die Attraccess am `/api/metrics`-Endpunkt 
 
 | Metrik | Typ | Labels | Beschreibung |
 |--------|-----|--------|--------------|
-| `http_request_duration_seconds` | Histogram | `method`, `route`, `status_code` | Dauer von HTTP-Anfragen in Sekunden |
-| `http_requests_total` | Counter | `method`, `route`, `status_code` | Gesamtanzahl der HTTP-Anfragen |
+| `attraccess_http_request_duration_seconds` | Histogram | `method`, `route`, `status_code` | Dauer von HTTP-Anfragen in Sekunden |
+| `attraccess_http_requests_total` | Counter | `method`, `route`, `status_code` | Gesamtanzahl der HTTP-Anfragen |
 
 **Histogram-Buckets:** 5ms, 10ms, 25ms, 50ms, 100ms, 250ms, 500ms, 1s, 2.5s, 5s, 10s
 
@@ -23,13 +23,13 @@ Diese Seite listet alle Metriken auf, die Attraccess am `/api/metrics`-Endpunkt 
 
 ```promql
 # Anfragerate pro Sekunde (letzte 5 Minuten)
-rate(http_requests_total[5m])
+rate(attraccess_http_requests_total[5m])
 
 # 95. Perzentil Latenz
-histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))
+histogram_quantile(0.95, rate(attraccess_http_request_duration_seconds_bucket[5m]))
 
 # Fehlerrate (5xx-Antworten)
-rate(http_requests_total{status_code=~"5.."}[5m])
+rate(attraccess_http_requests_total{status_code=~"5.."}[5m])
 ```
 
 ## Authentifizierungs-Metriken
@@ -64,7 +64,7 @@ sum by (method) (rate(attraccess_auth_login_total{status="success"}[1h]))
 |--------|-----|--------|--------------|
 | `attraccess_resources_total` | Gauge | -- | Gesamtanzahl der Ressourcen |
 | `attraccess_resource_usage_sessions_active` | Gauge | -- | Aktuell aktive Nutzungssitzungen |
-| `attraccess_resource_usage_sessions_total` | Counter | `action` | Gestartete oder beendete Nutzungssitzungen. `action`: `started` oder `ended` |
+| `attraccess_resource_usage_sessions_total` | Counter | `action` | Gestartete oder beendete Nutzungssitzungen. `action`: `start` oder `end` |
 | `attraccess_resource_usage_duration_seconds` | Histogram | -- | Dauer abgeschlossener Nutzungssitzungen |
 | `attraccess_resource_groups_total` | Gauge | -- | Gesamtanzahl der Ressourcengruppen |
 | `attraccess_resource_introductions_total` | Counter | -- | Abgeschlossene Ressourceneinweisungen |
@@ -93,6 +93,18 @@ attraccess_resource_maintenance_overdue > 0
 | `attraccess_attractap_devices_connected` | Gauge | -- | Anzahl verbundener Attractap-NFC-Leser |
 | `attraccess_attractap_nfc_taps_total` | Counter | -- | Gesamtanzahl der NFC-Tap-Ereignisse |
 | `attraccess_attractap_firmware_updates_total` | Counter | -- | Gesamtanzahl der Firmware-Update-Ereignisse |
+| `attraccess_attractap_crash_reports_total` | Counter | `reset_reason` | Von Lesegeräten empfangene Crash-Berichte. `reset_reason` ist eine normalisierte Reset-Ursache (z. B. `PANIC`, `INT_WDT`, `BROWNOUT`, `unknown`) |
+
+### Beispiel-PromQL-Abfragen
+
+```promql
+# Lesegerät-Abstürze der letzten Stunde, nach Reset-Ursache
+sum by (reset_reason) (increase(attraccess_attractap_crash_reports_total[1h]))
+
+# Alarmsignal: alle Lesegeräte offline (waren aber kürzlich verbunden)
+attraccess_attractap_devices_connected == 0
+  and max_over_time(attraccess_attractap_devices_connected[1h]) > 0
+```
 
 ## Abrechnungs-Metriken
 

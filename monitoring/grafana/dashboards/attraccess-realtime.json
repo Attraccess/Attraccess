@@ -22,7 +22,7 @@
   ],
   "panels": [
     {
-      "title": "CPU Usage",
+      "title": "WS Message Rate by event",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -36,368 +36,15 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "percentunit",
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "lineWidth": 1
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "mean",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      },
-      "targets": [
-        {
-          "expr": "rate(process_cpu_user_seconds_total{job=\"attraccess\"}[1m])",
-          "refId": "A",
-          "legendFormat": "user"
-        },
-        {
-          "expr": "rate(process_cpu_system_seconds_total{job=\"attraccess\"}[1m])",
-          "refId": "B",
-          "legendFormat": "system"
-        }
-      ]
-    },
-    {
-      "title": "Memory",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 0
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "attraccess-prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "bytes",
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "lineWidth": 1
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "mean",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      },
-      "targets": [
-        {
-          "expr": "nodejs_heap_size_used_bytes{job=\"attraccess\"}",
-          "refId": "A",
-          "legendFormat": "heap used"
-        },
-        {
-          "expr": "nodejs_heap_size_total_bytes{job=\"attraccess\"}",
-          "refId": "B",
-          "legendFormat": "heap total"
-        },
-        {
-          "expr": "process_resident_memory_bytes{job=\"attraccess\"}",
-          "refId": "C",
-          "legendFormat": "rss"
-        },
-        {
-          "expr": "nodejs_external_memory_bytes{job=\"attraccess\"}",
-          "refId": "D",
-          "legendFormat": "external"
-        }
-      ]
-    },
-    {
-      "title": "Heap Used %",
-      "type": "gauge",
-      "gridPos": {
-        "h": 8,
-        "w": 6,
-        "x": 0,
-        "y": 8
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "attraccess-prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percent",
-          "min": 0,
-          "max": 100,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "yellow",
-                "value": 75
-              },
-              {
-                "color": "red",
-                "value": 90
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true
-      },
-      "targets": [
-        {
-          "expr": "100 * nodejs_heap_size_used_bytes{job=\"attraccess\"} / nodejs_heap_size_total_bytes{job=\"attraccess\"}",
-          "refId": "A",
-          "legendFormat": "heap used %"
-        }
-      ]
-    },
-    {
-      "title": "Uptime",
-      "type": "stat",
-      "gridPos": {
-        "h": 8,
-        "w": 6,
-        "x": 6,
-        "y": 8
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "attraccess-prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "blue",
-                "value": 0
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "expr": "time() - process_start_time_seconds{job=\"attraccess\"}",
-          "refId": "A",
-          "legendFormat": "uptime"
-        }
-      ]
-    },
-    {
-      "title": "Event Loop Lag",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 8
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "attraccess-prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "lineWidth": 1
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "mean",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      },
-      "targets": [
-        {
-          "expr": "nodejs_eventloop_lag_seconds{job=\"attraccess\"}",
-          "refId": "A",
-          "legendFormat": "mean lag"
-        },
-        {
-          "expr": "nodejs_eventloop_lag_p99_seconds{job=\"attraccess\"}",
-          "refId": "B",
-          "legendFormat": "p99 lag"
-        }
-      ]
-    },
-    {
-      "title": "Active Handles & Requests",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 16
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "attraccess-prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "lineWidth": 1
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "mean",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      },
-      "targets": [
-        {
-          "expr": "nodejs_active_handles_total{job=\"attraccess\"}",
-          "refId": "A",
-          "legendFormat": "active handles"
-        },
-        {
-          "expr": "nodejs_active_requests_total{job=\"attraccess\"}",
-          "refId": "B",
-          "legendFormat": "active requests"
-        }
-      ]
-    },
-    {
-      "title": "GC Duration",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 16
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "attraccess-prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "custom": {
-            "drawStyle": "bars",
-            "fillOpacity": 60,
-            "lineWidth": 1
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "mean",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      },
-      "targets": [
-        {
-          "expr": "rate(nodejs_gc_duration_seconds_sum{job=\"attraccess\"}[5m])",
-          "refId": "A",
-          "legendFormat": "{{kind}}"
-        }
-      ]
-    },
-    {
-      "title": "Heap Space Usage",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 24
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "attraccess-prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "bytes",
+          "unit": "reqps",
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "drawStyle": "line",
             "fillOpacity": 10,
             "lineWidth": 1,
-            "stacking": {
-              "mode": "normal",
-              "group": "A"
-            }
+            "showPoints": "never"
           }
         },
         "overrides": []
@@ -412,25 +59,181 @@
           ]
         },
         "tooltip": {
-          "mode": "multi"
+          "mode": "multi",
+          "sort": "desc"
         }
       },
       "targets": [
         {
-          "expr": "nodejs_heap_space_size_used_bytes{job=\"attraccess\"}",
           "refId": "A",
-          "legendFormat": "{{space}}"
+          "expr": "sum by(event)(rate(attraccess_ws_messages_total{job=\"attraccess\"}[5m]))",
+          "legendFormat": "{{event}}"
         }
       ]
     },
     {
-      "title": "Open File Descriptors",
+      "title": "WS Error Rate by event",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 24
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "attraccess-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(event)(rate(attraccess_ws_messages_total{job=\"attraccess\",status=\"error\"}[5m]))",
+          "legendFormat": "{{event}}"
+        }
+      ]
+    },
+    {
+      "title": "WS Message p95 by event",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "attraccess-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by(event,le)(rate(attraccess_ws_message_duration_seconds_bucket{job=\"attraccess\"}[5m])))",
+          "legendFormat": "{{event}}"
+        }
+      ]
+    },
+    {
+      "title": "WS Connection Duration p50/p95 by gateway",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "attraccess-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.50, sum by(gateway,le)(rate(attraccess_ws_connection_duration_seconds_bucket{job=\"attraccess\"}[5m])))",
+          "legendFormat": "p50 {{gateway}}"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.95, sum by(gateway,le)(rate(attraccess_ws_connection_duration_seconds_bucket{job=\"attraccess\"}[5m])))",
+          "legendFormat": "p95 {{gateway}}"
+        }
+      ]
+    },
+    {
+      "title": "SSE Active Connections by stream",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
       },
       "datasource": {
         "type": "prometheus",
@@ -439,10 +242,14 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "drawStyle": "line",
             "fillOpacity": 10,
-            "lineWidth": 1
+            "lineWidth": 1,
+            "showPoints": "never"
           }
         },
         "overrides": []
@@ -457,19 +264,115 @@
           ]
         },
         "tooltip": {
-          "mode": "multi"
+          "mode": "multi",
+          "sort": "desc"
         }
       },
       "targets": [
         {
-          "expr": "process_open_fds{job=\"attraccess\"}",
           "refId": "A",
-          "legendFormat": "open fds"
+          "expr": "sum by(stream)(attraccess_sse_active_connections{job=\"attraccess\"})",
+          "legendFormat": "{{stream}}"
+        }
+      ]
+    },
+    {
+      "title": "SSE Messages Rate by stream",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "attraccess-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "never"
+          }
         },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
         {
-          "expr": "process_max_fds{job=\"attraccess\"}",
-          "refId": "B",
-          "legendFormat": "max fds"
+          "refId": "A",
+          "expr": "sum by(stream)(rate(attraccess_sse_messages_sent_total{job=\"attraccess\"}[5m]))",
+          "legendFormat": "{{stream}}"
+        }
+      ]
+    },
+    {
+      "title": "SSE Connection Duration p95 by stream",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "attraccess-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by(stream,le)(rate(attraccess_sse_connection_duration_seconds_bucket{job=\"attraccess\"}[5m])))",
+          "legendFormat": "{{stream}}"
         }
       ]
     }
@@ -477,19 +380,19 @@
   "schemaVersion": 39,
   "tags": [
     "attraccess",
-    "nodejs"
+    "realtime"
   ],
   "templating": {
     "list": []
   },
   "time": {
-    "from": "now-1h",
+    "from": "now-6h",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
-  "title": "Attraccess — Node.js Runtime",
-  "uid": "attraccess-node-runtime",
+  "title": "Attraccess — Realtime (WebSocket & SSE)",
+  "uid": "attraccess-realtime",
   "version": 1,
-  "description": "Node.js process internals: CPU, memory, event-loop lag, GC, file descriptors and uptime."
+  "description": "WebSocket and Server-Sent-Events throughput, latency, errors and connection lifetimes."
 }
