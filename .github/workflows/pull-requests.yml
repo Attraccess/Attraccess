@@ -56,9 +56,9 @@ jobs:
           fetch-depth: 0
       - uses: ./.github/actions/setup
       - name: Lint affected projects
-        run: pnpm nx affected --target=lint --parallel=5 --base=origin/${{ github.event.pull_request.base.ref }} --exclude=tag:scope:hardware
+        run: pnpm nx affected --target=lint --parallel=5 --base=origin/${{ github.event.pull_request.base.ref }} --exclude=tag:scope:hardware,tag:type:plugin
       - name: Typecheck affected projects
-        run: pnpm nx affected --target=typecheck --parallel=5 --base=origin/${{ github.event.pull_request.base.ref }} --exclude=tag:scope:hardware
+        run: pnpm nx affected --target=typecheck --parallel=5 --base=origin/${{ github.event.pull_request.base.ref }} --exclude=tag:scope:hardware,tag:type:plugin
 
   test:
     runs-on: ubuntu-latest
@@ -69,7 +69,67 @@ jobs:
           fetch-depth: 0
       - uses: ./.github/actions/setup
       - name: Test affected projects
-        run: pnpm nx affected --target=test,e2e --parallel=5 --base=origin/${{ github.event.pull_request.base.ref }} --exclude=tag:scope:hardware
+        run: pnpm nx affected --target=test,e2e --parallel=5 --base=origin/${{ github.event.pull_request.base.ref }} --exclude=tag:scope:hardware,tag:type:plugin
+
+  plugins:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+      - name: Lint plugin apps
+        run: pnpm nx run-many --target=lint --parallel=3 --projects=tag:type:plugin
+      - name: Build + zip plugin apps
+        run: pnpm nx run-many --target=package --parallel=3 --projects=tag:type:plugin
+
+      - name: Upload plugin ZIPs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: plugins-${{ github.event.pull_request.number }}-${{ github.run_attempt }}
+          path: apps/plugins/**/dist/*.zip
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Build PR comment body
+        id: comment-body
+        if: always()
+        run: |
+          set -euo pipefail
+          shopt -s nullglob globstar
+          out="$(mktemp)"
+          {
+            echo "## Plugin artifacts"
+            echo ""
+            echo "Commit \`${{ github.event.pull_request.head.sha }}\` · workflow run [\`${{ github.run_id }}\`](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+            echo ""
+            found=false
+            for zip in apps/plugins/**/dist/*.zip; do
+              found=true
+              size="$(du -h "$zip" | cut -f1)"
+              echo "- \`$(basename "$zip")\` (${size})"
+            done
+            if [ "$found" = false ]; then
+              echo "_No plugin ZIPs were produced for this PR._"
+            else
+              echo ""
+              echo "Download the ZIPs from the [workflow artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})."
+            fi
+          } > "$out"
+          {
+            echo 'body<<EOF_BODY'
+            cat "$out"
+            echo 'EOF_BODY'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Post sticky PR comment with plugin artifacts
+        if: always()
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: plugin-artifacts
+          message: ${{ steps.comment-body.outputs.body }}
 
   fail2ban-smoke:
     runs-on: ubuntu-latest
