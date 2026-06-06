@@ -50,9 +50,9 @@ time_t parseIso8601ToTimeT(const String &iso8601);
  * German message for display on the reader (ATT-144).
  *
  * Known keys map to fixed German strings; unknown values (including free-form
- * server messages) fall back to a generic message so raw keys never surface in
- * the UI. Strings avoid umlauts (ae/oe/ue/ss) so they render with the reader's
- * bitmap fonts on every screen.
+ * server messages) are returned unchanged so the raw error is still surfaced.
+ * Strings avoid umlauts (ae/oe/ue/ss) so they render with the reader's bitmap
+ * fonts on every screen.
  *
  * @param errorKey The error key/string received from the server
  * @return Human-readable German error message

@@ -309,6 +309,7 @@ String translateReaderError(const String &errorKey)
     if (errorKey == "SUMUP_TOPUP_FAILED")
         return "Aufladung fehlgeschlagen";
 
-    // Unknown key or free-form server message: never surface the raw value.
-    return "Ein Fehler ist aufgetreten";
+    // Unknown key or free-form server message: surface the raw value so the
+    // information is not lost (e.g. door errors sent as free-form text).
+    return errorKey;
 }
