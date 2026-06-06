@@ -1,6 +1,7 @@
 {
   "sections": {
-    "details": "Details"
+    "details": "Details",
+    "visibility": "Visibility"
   },
   "form": {
     "title": "Details",
@@ -13,6 +14,10 @@
       "description": {
         "label": "Description",
         "placeholder": "Enter group description (optional)"
+      },
+      "isHidden": {
+        "label": "Hide from users who are not part of this group",
+        "description": "Use this for organizational groups that are not relevant to everyone."
       }
     },
     "buttons": {

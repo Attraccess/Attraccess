@@ -123,3 +123,4 @@ export * from './1781100000000-message-email-fallback';
 export * from './1780200000000-attractap-crash-report-symbolication';
 export * from './1781200000000-resource-usage-note-email-template';
 export * from './1781300000000-attractap-crash-report-reboot-reason';
+export * from './1781400000000-resource-group-is-hidden';

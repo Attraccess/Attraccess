@@ -1,6 +1,7 @@
 {
   "sections": {
-    "details": "Details"
+    "details": "Details",
+    "visibility": "Sichtbarkeit"
   },
   "form": {
     "title": "Details",
@@ -13,6 +14,10 @@
       "description": {
         "label": "Beschreibung",
         "placeholder": "Gruppenbeschreibung eingeben (optional)"
+      },
+      "isHidden": {
+        "label": "Vor Benutzern verbergen, die nicht Teil dieser Gruppe sind",
+        "description": "Verwende dies für organisatorische Gruppen, die nicht für alle relevant sind."
       }
     },
     "buttons": {
