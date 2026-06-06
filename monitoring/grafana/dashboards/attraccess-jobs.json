@@ -22,7 +22,7 @@
   ],
   "panels": [
     {
-      "title": "CPU Usage",
+      "title": "Cron Run Rate by job/status",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -36,11 +36,11 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "percentunit",
+          "unit": "reqps",
           "custom": {
             "drawStyle": "line",
             "fillOpacity": 10,
-            "lineWidth": 1
+            "showPoints": "never"
           }
         },
         "overrides": []
@@ -51,7 +51,7 @@
           "placement": "bottom",
           "calcs": [
             "mean",
-            "max"
+            "lastNotNull"
           ]
         },
         "tooltip": {
@@ -60,20 +60,15 @@
       },
       "targets": [
         {
-          "expr": "rate(process_cpu_user_seconds_total{job=\"attraccess\"}[1m])",
+          "expr": "sum by(job_name,status)(rate(attraccess_cron_job_runs_total{job=\"attraccess\"}[15m]))",
           "refId": "A",
-          "legendFormat": "user"
-        },
-        {
-          "expr": "rate(process_cpu_system_seconds_total{job=\"attraccess\"}[1m])",
-          "refId": "B",
-          "legendFormat": "system"
+          "legendFormat": "{{job_name}} / {{status}}"
         }
       ]
     },
     {
-      "title": "Memory",
-      "type": "timeseries",
+      "title": "Cron Failures (15m) by job",
+      "type": "bargauge",
       "gridPos": {
         "h": 8,
         "w": 12,
@@ -86,11 +81,62 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "bytes",
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by(job_name)(increase(attraccess_cron_job_runs_total{job=\"attraccess\",status=\"failure\"}[15m]))",
+          "refId": "A",
+          "legendFormat": "{{job_name}}"
+        }
+      ]
+    },
+    {
+      "title": "Cron Duration p95 by job",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "attraccess-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
           "custom": {
             "drawStyle": "line",
             "fillOpacity": 10,
-            "lineWidth": 1
+            "showPoints": "never"
           }
         },
         "overrides": []
@@ -110,34 +156,19 @@
       },
       "targets": [
         {
-          "expr": "nodejs_heap_size_used_bytes{job=\"attraccess\"}",
+          "expr": "histogram_quantile(0.95, sum by(job_name,le)(rate(attraccess_cron_job_duration_seconds_bucket{job=\"attraccess\"}[15m])))",
           "refId": "A",
-          "legendFormat": "heap used"
-        },
-        {
-          "expr": "nodejs_heap_size_total_bytes{job=\"attraccess\"}",
-          "refId": "B",
-          "legendFormat": "heap total"
-        },
-        {
-          "expr": "process_resident_memory_bytes{job=\"attraccess\"}",
-          "refId": "C",
-          "legendFormat": "rss"
-        },
-        {
-          "expr": "nodejs_external_memory_bytes{job=\"attraccess\"}",
-          "refId": "D",
-          "legendFormat": "external"
+          "legendFormat": "{{job_name}}"
         }
       ]
     },
     {
-      "title": "Heap Used %",
-      "type": "gauge",
+      "title": "Time Since Last Success by job",
+      "type": "bargauge",
       "gridPos": {
         "h": 8,
-        "w": 6,
-        "x": 0,
+        "w": 12,
+        "x": 12,
         "y": 8
       },
       "datasource": {
@@ -146,9 +177,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "percent",
-          "min": 0,
-          "max": 100,
+          "unit": "s",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -158,11 +187,11 @@
               },
               {
                 "color": "yellow",
-                "value": 75
+                "value": 3600
               },
               {
                 "color": "red",
-                "value": 90
+                "value": 86400
               }
             ]
           }
@@ -170,117 +199,26 @@
         "overrides": []
       },
       "options": {
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true
-      },
-      "targets": [
-        {
-          "expr": "100 * nodejs_heap_size_used_bytes{job=\"attraccess\"} / nodejs_heap_size_total_bytes{job=\"attraccess\"}",
-          "refId": "A",
-          "legendFormat": "heap used %"
-        }
-      ]
-    },
-    {
-      "title": "Uptime",
-      "type": "stat",
-      "gridPos": {
-        "h": 8,
-        "w": 6,
-        "x": 6,
-        "y": 8
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "attraccess-prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "blue",
-                "value": 0
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
+        "displayMode": "gradient",
+        "orientation": "horizontal",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
           ],
           "fields": "",
           "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "expr": "time() - process_start_time_seconds{job=\"attraccess\"}",
-          "refId": "A",
-          "legendFormat": "uptime"
-        }
-      ]
-    },
-    {
-      "title": "Event Loop Lag",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 8
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "attraccess-prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "lineWidth": 1
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "mean",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi"
         }
       },
       "targets": [
         {
-          "expr": "nodejs_eventloop_lag_seconds{job=\"attraccess\"}",
+          "expr": "time() - attraccess_cron_job_last_success_timestamp_seconds{job=\"attraccess\"}",
           "refId": "A",
-          "legendFormat": "mean lag"
-        },
-        {
-          "expr": "nodejs_eventloop_lag_p99_seconds{job=\"attraccess\"}",
-          "refId": "B",
-          "legendFormat": "p99 lag"
+          "legendFormat": "{{job_name}}"
         }
       ]
     },
     {
-      "title": "Active Handles & Requests",
+      "title": "Flow Execution Rate by trigger/status",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -294,11 +232,11 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
+          "unit": "reqps",
           "custom": {
             "drawStyle": "line",
             "fillOpacity": 10,
-            "lineWidth": 1
+            "showPoints": "never"
           }
         },
         "overrides": []
@@ -309,7 +247,7 @@
           "placement": "bottom",
           "calcs": [
             "mean",
-            "max"
+            "lastNotNull"
           ]
         },
         "tooltip": {
@@ -318,19 +256,14 @@
       },
       "targets": [
         {
-          "expr": "nodejs_active_handles_total{job=\"attraccess\"}",
+          "expr": "sum by(trigger_type,status)(rate(attraccess_flow_executions_total{job=\"attraccess\"}[5m]))",
           "refId": "A",
-          "legendFormat": "active handles"
-        },
-        {
-          "expr": "nodejs_active_requests_total{job=\"attraccess\"}",
-          "refId": "B",
-          "legendFormat": "active requests"
+          "legendFormat": "{{trigger_type}} / {{status}}"
         }
       ]
     },
     {
-      "title": "GC Duration",
+      "title": "Flow Failure Rate by trigger",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -344,11 +277,11 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "s",
+          "unit": "reqps",
           "custom": {
-            "drawStyle": "bars",
-            "fillOpacity": 60,
-            "lineWidth": 1
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "showPoints": "never"
           }
         },
         "overrides": []
@@ -359,7 +292,7 @@
           "placement": "bottom",
           "calcs": [
             "mean",
-            "max"
+            "lastNotNull"
           ]
         },
         "tooltip": {
@@ -368,14 +301,14 @@
       },
       "targets": [
         {
-          "expr": "rate(nodejs_gc_duration_seconds_sum{job=\"attraccess\"}[5m])",
+          "expr": "sum by(trigger_type)(rate(attraccess_flow_executions_total{job=\"attraccess\",status=\"failure\"}[5m]))",
           "refId": "A",
-          "legendFormat": "{{kind}}"
+          "legendFormat": "{{trigger_type}}"
         }
       ]
     },
     {
-      "title": "Heap Space Usage",
+      "title": "Flow Execution p95 by trigger",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -389,15 +322,11 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "bytes",
+          "unit": "s",
           "custom": {
             "drawStyle": "line",
             "fillOpacity": 10,
-            "lineWidth": 1,
-            "stacking": {
-              "mode": "normal",
-              "group": "A"
-            }
+            "showPoints": "never"
           }
         },
         "overrides": []
@@ -417,14 +346,14 @@
       },
       "targets": [
         {
-          "expr": "nodejs_heap_space_size_used_bytes{job=\"attraccess\"}",
+          "expr": "histogram_quantile(0.95, sum by(trigger_type,le)(rate(attraccess_flow_execution_duration_seconds_bucket{job=\"attraccess\"}[5m])))",
           "refId": "A",
-          "legendFormat": "{{space}}"
+          "legendFormat": "{{trigger_type}}"
         }
       ]
     },
     {
-      "title": "Open File Descriptors",
+      "title": "Flow Node p95 by node_type",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -438,11 +367,11 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
+          "unit": "s",
           "custom": {
             "drawStyle": "line",
             "fillOpacity": 10,
-            "lineWidth": 1
+            "showPoints": "never"
           }
         },
         "overrides": []
@@ -462,14 +391,9 @@
       },
       "targets": [
         {
-          "expr": "process_open_fds{job=\"attraccess\"}",
+          "expr": "histogram_quantile(0.95, sum by(node_type,le)(rate(attraccess_flow_node_duration_seconds_bucket{job=\"attraccess\"}[5m])))",
           "refId": "A",
-          "legendFormat": "open fds"
-        },
-        {
-          "expr": "process_max_fds{job=\"attraccess\"}",
-          "refId": "B",
-          "legendFormat": "max fds"
+          "legendFormat": "{{node_type}}"
         }
       ]
     }
@@ -477,19 +401,19 @@
   "schemaVersion": 39,
   "tags": [
     "attraccess",
-    "nodejs"
+    "jobs"
   ],
   "templating": {
     "list": []
   },
   "time": {
-    "from": "now-1h",
+    "from": "now-6h",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
-  "title": "Attraccess — Node.js Runtime",
-  "uid": "attraccess-node-runtime",
+  "title": "Attraccess — Background Jobs & Flows",
+  "uid": "attraccess-jobs",
   "version": 1,
-  "description": "Node.js process internals: CPU, memory, event-loop lag, GC, file descriptors and uptime."
+  "description": "Cron jobs and resource flows: run/failure rates, durations and staleness."
 }

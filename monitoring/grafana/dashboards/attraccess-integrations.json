@@ -22,7 +22,7 @@
   ],
   "panels": [
     {
-      "title": "CPU Usage",
+      "title": "External Call p95 by target",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -36,11 +36,12 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "percentunit",
+          "unit": "s",
           "custom": {
             "drawStyle": "line",
+            "lineWidth": 1,
             "fillOpacity": 10,
-            "lineWidth": 1
+            "showPoints": "never"
           }
         },
         "overrides": []
@@ -50,29 +51,25 @@
           "displayMode": "table",
           "placement": "bottom",
           "calcs": [
-            "mean",
+            "last",
             "max"
           ]
         },
         "tooltip": {
-          "mode": "multi"
+          "mode": "multi",
+          "sort": "desc"
         }
       },
       "targets": [
         {
-          "expr": "rate(process_cpu_user_seconds_total{job=\"attraccess\"}[1m])",
           "refId": "A",
-          "legendFormat": "user"
-        },
-        {
-          "expr": "rate(process_cpu_system_seconds_total{job=\"attraccess\"}[1m])",
-          "refId": "B",
-          "legendFormat": "system"
+          "expr": "histogram_quantile(0.95, sum by(target,le)(rate(attraccess_external_call_duration_seconds_bucket{job=\"attraccess\"}[5m])))",
+          "legendFormat": "{{target}}"
         }
       ]
     },
     {
-      "title": "Memory",
+      "title": "External Call Error Rate by target",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -86,11 +83,12 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "bytes",
+          "unit": "reqps",
           "custom": {
             "drawStyle": "line",
+            "lineWidth": 1,
             "fillOpacity": 10,
-            "lineWidth": 1
+            "showPoints": "never"
           }
         },
         "overrides": []
@@ -100,43 +98,29 @@
           "displayMode": "table",
           "placement": "bottom",
           "calcs": [
-            "mean",
+            "last",
             "max"
           ]
         },
         "tooltip": {
-          "mode": "multi"
+          "mode": "multi",
+          "sort": "desc"
         }
       },
       "targets": [
         {
-          "expr": "nodejs_heap_size_used_bytes{job=\"attraccess\"}",
           "refId": "A",
-          "legendFormat": "heap used"
-        },
-        {
-          "expr": "nodejs_heap_size_total_bytes{job=\"attraccess\"}",
-          "refId": "B",
-          "legendFormat": "heap total"
-        },
-        {
-          "expr": "process_resident_memory_bytes{job=\"attraccess\"}",
-          "refId": "C",
-          "legendFormat": "rss"
-        },
-        {
-          "expr": "nodejs_external_memory_bytes{job=\"attraccess\"}",
-          "refId": "D",
-          "legendFormat": "external"
+          "expr": "sum by(target)(rate(attraccess_external_call_errors_total{job=\"attraccess\"}[5m]))",
+          "legendFormat": "{{target}}"
         }
       ]
     },
     {
-      "title": "Heap Used %",
-      "type": "gauge",
+      "title": "MQTT Servers Total vs Healthy",
+      "type": "timeseries",
       "gridPos": {
         "h": 8,
-        "w": 6,
+        "w": 12,
         "x": 0,
         "y": 8
       },
@@ -146,19 +130,311 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "percent",
-          "min": 0,
-          "max": 100,
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "last"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "attraccess_mqtt_servers_total{job=\"attraccess\"}",
+          "legendFormat": "total"
+        },
+        {
+          "refId": "B",
+          "expr": "attraccess_mqtt_servers_healthy{job=\"attraccess\"}",
+          "legendFormat": "healthy"
+        }
+      ]
+    },
+    {
+      "title": "Email Send Rate by status",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "attraccess-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "last",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(status)(rate(attraccess_email_sent_total{job=\"attraccess\"}[15m]))",
+          "legendFormat": "{{status}}"
+        }
+      ]
+    },
+    {
+      "title": "Email Failure Rate",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "attraccess-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 15,
+            "showPoints": "never"
+          },
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "red"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": []
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(attraccess_email_sent_total{job=\"attraccess\",status=\"fail\"}[15m]))",
+          "legendFormat": "email failures"
+        }
+      ]
+    },
+    {
+      "title": "DB Query p95 by entity/method (if enabled)",
+      "type": "timeseries",
+      "description": "DB metrics disabled by default — this panel may show \"No data\" unless DB query instrumentation is explicitly enabled.",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "attraccess-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "last",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by(entity,method,le)(rate(attraccess_db_query_duration_seconds_bucket{job=\"attraccess\"}[5m])))",
+          "legendFormat": "{{entity}} / {{method}}"
+        }
+      ]
+    },
+    {
+      "title": "DB Errors Rate",
+      "type": "timeseries",
+      "description": "DB metrics disabled by default — may show \"No data\".",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "attraccess-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "last",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(entity,method)(rate(attraccess_db_query_errors_total{job=\"attraccess\"}[5m]))",
+          "legendFormat": "{{entity}} / {{method}}"
+        }
+      ]
+    },
+    {
+      "title": "DB Slow Queries Rate",
+      "type": "timeseries",
+      "description": "DB metrics disabled by default — may show \"No data\".",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 24
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "attraccess-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "last",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(entity,method)(rate(attraccess_db_slow_queries_total{job=\"attraccess\"}[5m]))",
+          "legendFormat": "{{entity}} / {{method}}"
+        }
+      ]
+    },
+    {
+      "title": "DB Pool Size",
+      "type": "stat",
+      "description": "DB metrics disabled by default — may show \"No data\".",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 32
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "attraccess-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
                 "color": "green",
-                "value": 0
+                "value": null
               },
               {
                 "color": "yellow",
-                "value": 75
+                "value": 50
               },
               {
                 "color": "red",
@@ -170,48 +446,10 @@
         "overrides": []
       },
       "options": {
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true
-      },
-      "targets": [
-        {
-          "expr": "100 * nodejs_heap_size_used_bytes{job=\"attraccess\"} / nodejs_heap_size_total_bytes{job=\"attraccess\"}",
-          "refId": "A",
-          "legendFormat": "heap used %"
-        }
-      ]
-    },
-    {
-      "title": "Uptime",
-      "type": "stat",
-      "gridPos": {
-        "h": 8,
-        "w": 6,
-        "x": 6,
-        "y": 8
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "attraccess-prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "blue",
-                "value": 0
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
         "colorMode": "value",
-        "graphMode": "none",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -223,253 +461,9 @@
       },
       "targets": [
         {
-          "expr": "time() - process_start_time_seconds{job=\"attraccess\"}",
           "refId": "A",
-          "legendFormat": "uptime"
-        }
-      ]
-    },
-    {
-      "title": "Event Loop Lag",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 8
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "attraccess-prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "lineWidth": 1
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "mean",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      },
-      "targets": [
-        {
-          "expr": "nodejs_eventloop_lag_seconds{job=\"attraccess\"}",
-          "refId": "A",
-          "legendFormat": "mean lag"
-        },
-        {
-          "expr": "nodejs_eventloop_lag_p99_seconds{job=\"attraccess\"}",
-          "refId": "B",
-          "legendFormat": "p99 lag"
-        }
-      ]
-    },
-    {
-      "title": "Active Handles & Requests",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 16
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "attraccess-prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "lineWidth": 1
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "mean",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      },
-      "targets": [
-        {
-          "expr": "nodejs_active_handles_total{job=\"attraccess\"}",
-          "refId": "A",
-          "legendFormat": "active handles"
-        },
-        {
-          "expr": "nodejs_active_requests_total{job=\"attraccess\"}",
-          "refId": "B",
-          "legendFormat": "active requests"
-        }
-      ]
-    },
-    {
-      "title": "GC Duration",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 16
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "attraccess-prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "custom": {
-            "drawStyle": "bars",
-            "fillOpacity": 60,
-            "lineWidth": 1
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "mean",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      },
-      "targets": [
-        {
-          "expr": "rate(nodejs_gc_duration_seconds_sum{job=\"attraccess\"}[5m])",
-          "refId": "A",
-          "legendFormat": "{{kind}}"
-        }
-      ]
-    },
-    {
-      "title": "Heap Space Usage",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 24
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "attraccess-prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "bytes",
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "lineWidth": 1,
-            "stacking": {
-              "mode": "normal",
-              "group": "A"
-            }
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "mean",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      },
-      "targets": [
-        {
-          "expr": "nodejs_heap_space_size_used_bytes{job=\"attraccess\"}",
-          "refId": "A",
-          "legendFormat": "{{space}}"
-        }
-      ]
-    },
-    {
-      "title": "Open File Descriptors",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 24
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "attraccess-prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "lineWidth": 1
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "mean",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      },
-      "targets": [
-        {
-          "expr": "process_open_fds{job=\"attraccess\"}",
-          "refId": "A",
-          "legendFormat": "open fds"
-        },
-        {
-          "expr": "process_max_fds{job=\"attraccess\"}",
-          "refId": "B",
-          "legendFormat": "max fds"
+          "expr": "attraccess_db_pool_size{job=\"attraccess\"}",
+          "legendFormat": "pool size"
         }
       ]
     }
@@ -477,19 +471,19 @@
   "schemaVersion": 39,
   "tags": [
     "attraccess",
-    "nodejs"
+    "integrations"
   ],
   "templating": {
     "list": []
   },
   "time": {
-    "from": "now-1h",
+    "from": "now-6h",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
-  "title": "Attraccess — Node.js Runtime",
-  "uid": "attraccess-node-runtime",
+  "title": "Attraccess — Data & Integrations",
+  "uid": "attraccess-integrations",
   "version": 1,
-  "description": "Node.js process internals: CPU, memory, event-loop lag, GC, file descriptors and uptime."
+  "description": "Database queries, outbound external calls (SumUp/SMTP/MQTT/GitHub), MQTT health and email delivery."
 }
