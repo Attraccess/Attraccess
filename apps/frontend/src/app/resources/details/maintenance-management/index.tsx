@@ -1,4 +1,16 @@
-import { Button, Card, cn, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow } from '@heroui/react';
+import {
+  Button,
+  Card,
+  cn,
+  Table,
+  TableBody,
+  TableCell,
+  TableColumn,
+  TableContent,
+  TableHeader,
+  TableRow,
+  TableScrollContainer,
+} from '@heroui/react';
 import { PageAction, PageHeader } from '../../../../components/pageHeader';
 import { MaintenanceReasonDisplay } from '../../../../components/MaintenanceReasonDisplay';
 import { LabeledSwitch } from '../../../../components/labeledSwitch';
@@ -33,14 +45,18 @@ export function MaintenanceManagement(props: Props) {
 
   const [includePast, setIncludePast] = useState(false);
 
-  const { data: maintenances } = useResourceMaintenancesServiceFindMaintenances({
-    resourceId,
-    includePast,
-    includeActive: true,
-    includeUpcoming: true,
-  }, undefined, {
-    refetchInterval: 10000,
-  });
+  const { data: maintenances } = useResourceMaintenancesServiceFindMaintenances(
+    {
+      resourceId,
+      includePast,
+      includeActive: true,
+      includeUpcoming: true,
+    },
+    undefined,
+    {
+      refetchInterval: 10000,
+    },
+  );
 
   const now = useNow();
 
@@ -98,13 +114,7 @@ export function MaintenanceManagement(props: Props) {
       </LabeledSwitch>
       <ResourceMaintenanceUpsertModal resourceId={resourceId}>
         {(open) => (
-          <Button
-            variant="primary"
-            size="sm"
-            isIconOnly
-            onPress={open}
-            aria-label={t('actions.create.label')}
-          >
+          <Button variant="primary" size="sm" isIconOnly onPress={open} aria-label={t('actions.create.label')}>
             <PlusIcon className="w-4 h-4" />
           </Button>
         )}
@@ -122,7 +132,8 @@ export function MaintenanceManagement(props: Props) {
 
   const tableContent = (
     <Table>
-          <TableContent aria-label={t('table.ariaLabel')}>
+      <TableScrollContainer>
+        <TableContent aria-label={t('table.ariaLabel')}>
           <TableHeader>
             <TableColumn isRowHeader>{t('table.columns.start')}</TableColumn>
             <TableColumn>{t('table.columns.end')}</TableColumn>
@@ -158,21 +169,15 @@ export function MaintenanceManagement(props: Props) {
                   {(maintenance.completedByUser as { username?: string } | undefined)?.username ?? '—'}
                 </TableCell>
                 <TableCell>
-                  {maintenance.completedAt ? (
-                    <DateTimeDisplay date={maintenance.completedAt} />
-                  ) : (
-                    '—'
-                  )}
+                  {maintenance.completedAt ? <DateTimeDisplay date={maintenance.completedAt} /> : '—'}
                 </TableCell>
                 <TableCell>
                   {maintenance.isActive && (
                     <MarkDoneModal resourceId={resourceId} maintenanceId={maintenance.id}>
                       {(openMarkDone: () => void) => (
-                        <Button variant="tertiary"
-                          isIconOnly
-                         
-                          onPress={openMarkDone}
-                        ><CheckCircleIcon className="w-4 h-4" /></Button>
+                        <Button variant="tertiary" isIconOnly onPress={openMarkDone}>
+                          <CheckCircleIcon className="w-4 h-4" />
+                        </Button>
                       )}
                     </MarkDoneModal>
                   )}
@@ -180,8 +185,9 @@ export function MaintenanceManagement(props: Props) {
               </TableRow>
             )}
           </TableBody>
-          </TableContent>
-        </Table>
+        </TableContent>
+      </TableScrollContainer>
+    </Table>
   );
 
   if (variant === 'flat') {
@@ -240,12 +246,7 @@ export function MaintenanceManagement(props: Props) {
   return (
     <Card className={className} {...htmlProps}>
       <Card.Header>
-        <PageHeader
-          title={t('title')}
-          icon={<ConstructionIcon />}
-          noMargin
-          actions={cardActions}
-        />
+        <PageHeader title={t('title')} icon={<ConstructionIcon />} noMargin actions={cardActions} />
       </Card.Header>
 
       <Card.Content>

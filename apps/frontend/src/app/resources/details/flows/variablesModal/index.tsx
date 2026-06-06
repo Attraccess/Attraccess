@@ -15,6 +15,7 @@ import {
   TableContent,
   TableHeader,
   TableRow,
+  TableScrollContainer,
   Tooltip,
   TooltipContent,
   TooltipTrigger,
@@ -210,8 +211,8 @@ export function VariablesModal(props: Props) {
                       </Button>
                     </div>
 
-                    <div className="overflow-x-auto">
-                      <Table aria-label={t('title')}>
+                    <Table aria-label={t('title')}>
+                      <TableScrollContainer>
                         <TableContent>
                           <TableHeader>
                             <TableColumn isRowHeader>{t('table.key')}</TableColumn>
@@ -263,10 +264,7 @@ export function VariablesModal(props: Props) {
                                       </Button>
                                       {pendingDeleteKey === rowKey(row) ? (
                                         <>
-                                          <Button
-                                            variant="ghost"
-                                            onPress={() => setPendingDeleteKey(null)}
-                                          >
+                                          <Button variant="ghost" onPress={() => setPendingDeleteKey(null)}>
                                             {t('actions.confirmDeleteNo')}
                                           </Button>
                                           <Button
@@ -294,8 +292,8 @@ export function VariablesModal(props: Props) {
                             )}
                           </TableBody>
                         </TableContent>
-                      </Table>
-                    </div>
+                      </TableScrollContainer>
+                    </Table>
                   </div>
                 )}
               </ModalBody>

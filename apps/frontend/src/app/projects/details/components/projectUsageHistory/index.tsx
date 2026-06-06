@@ -1,5 +1,15 @@
 import { useState, useCallback } from 'react';
-import { Card, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow } from '@heroui/react';
+import {
+  Card,
+  Table,
+  TableBody,
+  TableCell,
+  TableColumn,
+  TableContent,
+  TableHeader,
+  TableRow,
+  TableScrollContainer,
+} from '@heroui/react';
 import { DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useProjectsServiceGetProjectUsageHistory, ResourceUsage } from '@attraccess/react-query-client';
 import en from './en.json';
@@ -53,43 +63,46 @@ export function ProjectUsageHistory({ projectId }: ProjectUsageHistoryProps) {
         </Card.Header>
         <Card.Content>
           <Table data-cy="project-usage-history-table">
-            <TableContent aria-label={t('history.title')}>
-            <TableHeader>
-              <TableColumn isRowHeader>{t('history.columns.resource')}</TableColumn>
-              <TableColumn>{t('history.columns.user')}</TableColumn>
-              <TableColumn>{t('history.columns.start')}</TableColumn>
-              <TableColumn>{t('history.columns.end')}</TableColumn>
-              <TableColumn>{t('history.columns.duration')}</TableColumn>
-            </TableHeader>
-            <TableBody
-              items={data?.data ?? []}
-              renderEmptyState={() => <EmptyState message={t('history.empty')} />}
-            >
-              {(session: ResourceUsage) => (
-                <TableRow
-                  key={session.id} id={session.id}
-                  className="cursor-pointer hover:bg-primary-50 transition-bg duration-300"
-                  onClick={() => handleRowAction(session)}
+            <TableScrollContainer>
+              <TableContent aria-label={t('history.title')}>
+                <TableHeader>
+                  <TableColumn isRowHeader>{t('history.columns.resource')}</TableColumn>
+                  <TableColumn>{t('history.columns.user')}</TableColumn>
+                  <TableColumn>{t('history.columns.start')}</TableColumn>
+                  <TableColumn>{t('history.columns.end')}</TableColumn>
+                  <TableColumn>{t('history.columns.duration')}</TableColumn>
+                </TableHeader>
+                <TableBody
+                  items={data?.data ?? []}
+                  renderEmptyState={() => <EmptyState message={t('history.empty')} />}
                 >
-                  <TableCell>{session.resource?.name ?? '—'}</TableCell>
-                  <TableCell>
-                    <AttraccessUser user={session.user} />
-                  </TableCell>
-                  <TableCell>
-                    <DateTimeDisplay date={session.startTime} />
-                  </TableCell>
-                  <TableCell>
-                    {session.endTime ? <DateTimeDisplay date={session.endTime} /> : t('history.inProgress')}
-                  </TableCell>
-                  <TableCell>
-                    {session.usageInMinutes >= 0
-                      ? t('history.minutes', { count: Math.round(session.usageInMinutes) })
-                      : t('history.inProgress')}
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-            </TableContent>
+                  {(session: ResourceUsage) => (
+                    <TableRow
+                      key={session.id}
+                      id={session.id}
+                      className="cursor-pointer hover:bg-primary-50 transition-bg duration-300"
+                      onClick={() => handleRowAction(session)}
+                    >
+                      <TableCell>{session.resource?.name ?? '—'}</TableCell>
+                      <TableCell>
+                        <AttraccessUser user={session.user} />
+                      </TableCell>
+                      <TableCell>
+                        <DateTimeDisplay date={session.startTime} />
+                      </TableCell>
+                      <TableCell>
+                        {session.endTime ? <DateTimeDisplay date={session.endTime} /> : t('history.inProgress')}
+                      </TableCell>
+                      <TableCell>
+                        {session.usageInMinutes >= 0
+                          ? t('history.minutes', { count: Math.round(session.usageInMinutes) })
+                          : t('history.inProgress')}
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </TableContent>
+            </TableScrollContainer>
           </Table>
         </Card.Content>
       </Card>

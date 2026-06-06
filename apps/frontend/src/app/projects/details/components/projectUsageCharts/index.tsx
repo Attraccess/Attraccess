@@ -1,4 +1,15 @@
-import { Card, Skeleton, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow } from '@heroui/react';
+import {
+  Card,
+  Skeleton,
+  Table,
+  TableBody,
+  TableCell,
+  TableColumn,
+  TableContent,
+  TableHeader,
+  TableRow,
+  TableScrollContainer,
+} from '@heroui/react';
 import { useMemo, useCallback, useEffect, useState } from 'react';
 import { useTranslations, useNumberFormatter, useDateTimeFormatter } from '@attraccess/plugins-frontend-ui';
 import { useProjectsServiceGetProjectUsageStats } from '@attraccess/react-query-client';
@@ -224,13 +235,11 @@ export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
                         dataKey="sessions"
                         fill={BAR_COLORS.sessions.base}
                         name={t('tooltip.sessions')}
-
                         activeBar={
                           <Rectangle
                             fill={BAR_COLORS.sessions.active}
                             stroke={BAR_COLORS.sessions.base}
                             strokeWidth={2}
-
                           />
                         }
                       />
@@ -238,13 +247,11 @@ export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
                         dataKey="minutes"
                         fill={BAR_COLORS.minutes.base}
                         name={t('tooltip.minutes')}
-
                         activeBar={
                           <Rectangle
                             fill={BAR_COLORS.minutes.active}
                             stroke={BAR_COLORS.minutes.base}
                             strokeWidth={2}
-
                           />
                         }
                       />
@@ -255,30 +262,32 @@ export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
                 )}
               </div>
               <Table>
-                <TableContent aria-label={t('charts.topResources.table.ariaLabel')}>
-                <TableHeader>
-                  <TableColumn isRowHeader>{t('charts.topResources.columns.resource')}</TableColumn>
-                  <TableColumn>{t('charts.topResources.columns.sessions')}</TableColumn>
-                  <TableColumn>{t('charts.topResources.columns.minutes')}</TableColumn>
-                  <TableColumn>{t('charts.topResources.columns.spend')}</TableColumn>
-                </TableHeader>
-                <TableBody>
-                  {topResources.map((resource) => (
-                    <TableRow key={resource.resourceId} id={resource.resourceId}>
-                      <TableCell>{resource.resourceName}</TableCell>
-                      <TableCell>{formatNumber(resource.sessions)}</TableCell>
-                      <TableCell>{formatNumber(resource.minutes)}</TableCell>
-                      <TableCell>
-                        {data
-                          ? `${data.summary.currency} ${formatNumber(
-                              dbCurrencyToUserCurrency(resource.spend, data.summary.minorUnit),
-                            )}`
-                          : formatNumber(resource.spend)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-                </TableContent>
+                <TableScrollContainer>
+                  <TableContent aria-label={t('charts.topResources.table.ariaLabel')}>
+                    <TableHeader>
+                      <TableColumn isRowHeader>{t('charts.topResources.columns.resource')}</TableColumn>
+                      <TableColumn>{t('charts.topResources.columns.sessions')}</TableColumn>
+                      <TableColumn>{t('charts.topResources.columns.minutes')}</TableColumn>
+                      <TableColumn>{t('charts.topResources.columns.spend')}</TableColumn>
+                    </TableHeader>
+                    <TableBody>
+                      {topResources.map((resource) => (
+                        <TableRow key={resource.resourceId} id={resource.resourceId}>
+                          <TableCell>{resource.resourceName}</TableCell>
+                          <TableCell>{formatNumber(resource.sessions)}</TableCell>
+                          <TableCell>{formatNumber(resource.minutes)}</TableCell>
+                          <TableCell>
+                            {data
+                              ? `${data.summary.currency} ${formatNumber(
+                                  dbCurrencyToUserCurrency(resource.spend, data.summary.minorUnit),
+                                )}`
+                              : formatNumber(resource.spend)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </TableContent>
+                </TableScrollContainer>
               </Table>
             </>
           )}

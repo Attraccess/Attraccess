@@ -3,7 +3,20 @@ import {
   useResourcesServiceGetAllResources,
   useResourcesServiceResourceGroupsGetOne,
 } from '@attraccess/react-query-client';
-import { Button, Card, CardProps, Skeleton, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow } from '@heroui/react';
+import {
+  Button,
+  Card,
+  CardProps,
+  Skeleton,
+  Table,
+  TableBody,
+  TableCell,
+  TableColumn,
+  TableContent,
+  TableHeader,
+  TableRow,
+  TableScrollContainer,
+} from '@heroui/react';
 import { EmptyState } from '../../../components/emptyState';
 import { PageHeader } from '../../../components/pageHeader';
 import { useMemo, useState } from 'react';
@@ -134,53 +147,57 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
 
       <Card.Content>
         <Table>
-          <TableContent aria-label={tableAriaLabel}>
-          <TableHeader>
-            <TableColumn width="0">{t('columns.image')}</TableColumn>
-            <TableColumn isRowHeader>{t('columns.name')}</TableColumn>
-            <TableColumn width="0" className="text-left">
-              {t('columns.status')}
-            </TableColumn>
-            <TableColumn width="0">{''}</TableColumn>
-          </TableHeader>
-          <TableBody
-            items={resources?.data ?? []}
-            renderEmptyState={() => <EmptyState />}
-          >
-            {(resource) => (
-              <TableRow key={resource.id} id={resource.id} className="cursor-pointer hover:bg-primary-50 transition-bg duration-300" onAction={() => navigate(`/resources/${resource.id}`)}>
-                <TableCell>
-                  {resource.imageFilename ? (
-                    <img
-                      height={48}
-                      width={48}
-                      src={filenameToUrl(resource.imageFilename)}
-                      alt=""
-                      aria-hidden="true"
-                      className="object-contain"
-                      style={{ height: 48, width: 48 }}
-                    />
-                  ) : (
-                    <div
-                      className="flex items-center justify-center text-default-400"
-                      style={{ height: 48, width: 48 }}
-                      aria-hidden="true"
-                    >
-                      <ShapesIcon className="w-6 h-6" />
-                    </div>
-                  )}
-                </TableCell>
-                <TableCell>{resource.name}</TableCell>
-                <TableCell className="text-right">
-                  <StatusChip resourceId={resource.id} />
-                </TableCell>
-                <TableCell>
-                  <ChevronRightIcon />
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-          </TableContent>
+          <TableScrollContainer>
+            <TableContent aria-label={tableAriaLabel}>
+              <TableHeader>
+                <TableColumn width="0">{t('columns.image')}</TableColumn>
+                <TableColumn isRowHeader>{t('columns.name')}</TableColumn>
+                <TableColumn width="0" className="text-left">
+                  {t('columns.status')}
+                </TableColumn>
+                <TableColumn width="0">{''}</TableColumn>
+              </TableHeader>
+              <TableBody items={resources?.data ?? []} renderEmptyState={() => <EmptyState />}>
+                {(resource) => (
+                  <TableRow
+                    key={resource.id}
+                    id={resource.id}
+                    className="cursor-pointer hover:bg-primary-50 transition-bg duration-300"
+                    onAction={() => navigate(`/resources/${resource.id}`)}
+                  >
+                    <TableCell>
+                      {resource.imageFilename ? (
+                        <img
+                          height={48}
+                          width={48}
+                          src={filenameToUrl(resource.imageFilename)}
+                          alt=""
+                          aria-hidden="true"
+                          className="object-contain"
+                          style={{ height: 48, width: 48 }}
+                        />
+                      ) : (
+                        <div
+                          className="flex items-center justify-center text-default-400"
+                          style={{ height: 48, width: 48 }}
+                          aria-hidden="true"
+                        >
+                          <ShapesIcon className="w-6 h-6" />
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell>{resource.name}</TableCell>
+                    <TableCell className="text-right">
+                      <StatusChip resourceId={resource.id} />
+                    </TableCell>
+                    <TableCell>
+                      <ChevronRightIcon />
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </TableContent>
+          </TableScrollContainer>
         </Table>
       </Card.Content>
 
