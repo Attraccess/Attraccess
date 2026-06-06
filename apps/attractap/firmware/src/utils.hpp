@@ -44,3 +44,17 @@ String timeToTimeString(time_t time, int utcOffsetMinutes = 0);
  * Returns (time_t)-1 on parse failure.
  */
 time_t parseIso8601ToTimeT(const String &iso8601);
+
+/**
+ * @brief Translate a machine error key from the server into a human-readable
+ * German message for display on the reader (ATT-144).
+ *
+ * Known keys map to fixed German strings; unknown values (including free-form
+ * server messages) fall back to a generic message so raw keys never surface in
+ * the UI. Strings avoid umlauts (ae/oe/ue/ss) so they render with the reader's
+ * bitmap fonts on every screen.
+ *
+ * @param errorKey The error key/string received from the server
+ * @return Human-readable German error message
+ */
+String translateReaderError(const String &errorKey);
