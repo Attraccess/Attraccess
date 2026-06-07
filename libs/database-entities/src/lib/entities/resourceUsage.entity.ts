@@ -148,4 +148,22 @@ export class ResourceUsage {
   @Column({ type: 'boolean', default: false })
   @ApiProperty({ description: 'Whether the resource usage is finalized' })
   isFinalized!: boolean;
+
+  @Column({ nullable: true, type: 'integer' })
+  @ApiProperty({
+    description: 'The ID of the supervisor who supervised this session (null if unsupervised or supervisor deleted)',
+    example: 1,
+    required: false,
+    nullable: true,
+  })
+  supervisorUserId!: number | null;
+
+  @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'supervisorUserId' })
+  @ApiProperty({
+    description: 'The supervisor who supervised this session',
+    required: false,
+    type: () => User,
+  })
+  supervisorUser!: User | null;
 }

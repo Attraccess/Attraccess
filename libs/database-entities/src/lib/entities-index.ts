@@ -13,6 +13,7 @@ import {
 } from './entities/resourceIntroductionHistoryItem.entity';
 import { ResourceIntroducer, ResourceIntroducerType } from './entities/resourceIntroducer.entity';
 import { ResourceUsage } from './entities/resourceUsage.entity';
+import { SupervisionMode, AutoIntroductionTarget } from './entities/resource.supervision';
 import { SSOProvider, SSOProviderType } from './entities/ssoProvider.entity';
 import { SSOProviderOIDCConfiguration } from './entities/ssoProvider.oidc';
 import { SSOProviderSAMLConfiguration } from './entities/ssoProvider.saml';
@@ -140,6 +141,8 @@ export {
   ResourceMaintenanceScheduleUsageCountConfig,
   ResourceMaintenanceScheduleTimeIntervalConfig,
   ResourceType,
+  SupervisionMode,
+  AutoIntroductionTarget,
   ResourceUsageAction,
   ButtonNodeDataSchema,
   IfNodeDataSchema,

@@ -1,4 +1,4 @@
-import { Resource, ResourceType } from '@attraccess/react-query-client';
+import { Resource, ResourceType, SupervisionMode } from '@attraccess/react-query-client';
 
 /**
  * Creates a mock resource with the given overrides
@@ -15,6 +15,7 @@ export function createMockResource(overrides?: Partial<Resource>): Resource {
     retrainingMaxAgeDays: null,
     retrainingMaxInactivityDays: null,
     retrainingBlocksAccess: false,
+    supervisionMode: SupervisionMode.INTRODUCTION_REQUIRED,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     groups: [],
