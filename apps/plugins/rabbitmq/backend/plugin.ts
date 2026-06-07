@@ -6,6 +6,7 @@
 // module with a single status endpoint so the artifact is a valid, loadable
 // plugin end to end.
 import type { PluginBackendModule, PluginContext } from '@attraccess/plugins-backend-sdk';
+import { Auth } from '@attraccess/plugins-backend-sdk';
 import { Controller, DynamicModule, Get, Inject, Injectable, OnModuleInit } from '@nestjs/common';
 
 // The host hands each plugin its PluginContext under this token. Recreate it
@@ -27,7 +28,9 @@ class RabbitmqService implements OnModuleInit {
   }
 }
 
-// Mounts `GET /rabbitmq/status` into the host API.
+// Mounts `GET /rabbitmq/status` into the host API. Same access level as the
+// host MQTT servers controller.
+@Auth('canManageResources')
 @Controller('rabbitmq')
 class RabbitmqController {
   // esbuild does not emit decorator metadata, so Nest cannot infer constructor

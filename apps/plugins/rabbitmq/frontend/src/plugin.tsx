@@ -61,7 +61,8 @@ export default class RabbitmqPlugin implements AttraccessFrontendPlugin {
   }
 
   getRoutes(): RouteConfig[] {
-    return [{ path: '/rabbitmq', authRequired: true, element: <RabbitmqPage /> }];
+    // Same access level as the host MQTT servers settings page.
+    return [{ path: '/rabbitmq', authRequired: 'canManageResources', element: <RabbitmqPage /> }];
   }
 
   getSidebarItems(): PluginSidebarItem[] {
