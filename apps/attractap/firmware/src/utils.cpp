@@ -1,5 +1,29 @@
 #include "utils.hpp"
 
+void recoverI2CBus(int sda, int scl)
+{
+    pinMode(scl, OUTPUT);
+    pinMode(sda, INPUT_PULLUP); // sense SDA without driving it
+    for (int i = 0; i < 9; i++)
+    {
+        digitalWrite(scl, LOW);
+        delayMicroseconds(10);
+        digitalWrite(scl, HIGH);
+        delayMicroseconds(10);
+        if (digitalRead(sda))
+            break; // slave released SDA — bus is free
+    }
+    // STOP condition: SDA LOW → SCL HIGH → SDA HIGH
+    pinMode(sda, OUTPUT);
+    digitalWrite(sda, LOW);
+    delayMicroseconds(10);
+    digitalWrite(scl, HIGH);
+    delayMicroseconds(10);
+    digitalWrite(sda, HIGH);
+    delayMicroseconds(10);
+    // Pins will be reclaimed by Wire.begin() immediately after
+}
+
 static inline int8_t hexCharToNibble(char c)
 {
     if (c >= '0' && c <= '9')
@@ -89,9 +113,14 @@ String millisToTimeString(double millis)
     return hoursString + ":" + minutesString + ":" + secondsString;
 }
 
-String timeToTimeString(time_t time)
+String timeToTimeString(time_t time, int utcOffsetMinutes)
 {
-    struct tm *tm = localtime(&time);
+    // `time` is UTC. Shift by the server-provided offset, then render with gmtime so the
+    // result is independent of the device's own (unset) timezone. Offset 0 -> UTC.
+    time_t shifted = time + (time_t)utcOffsetMinutes * 60;
+    struct tm tmInfo;
+    gmtime_r(&shifted, &tmInfo);
+    struct tm *tm = &tmInfo;
     int month = tm->tm_mon + 1;
     int day = tm->tm_mday;
     int hours = tm->tm_hour;
@@ -232,4 +261,55 @@ time_t parseIso8601ToTimeT(const String &iso8610)
     }
 
     return t;
+}
+
+String translateReaderError(const String &errorKey)
+{
+    // Card / enrollment errors
+    if (errorKey == "USER_NOT_SET")
+        return "Kein Benutzer ausgewaehlt";
+    if (errorKey == "INVALID_PARAMS")
+        return "Ungueltige Anfrage";
+    if (errorKey == "CARD_ALREADY_ENROLLED")
+        return "Karte ist bereits registriert";
+    if (errorKey == "ENROLL_NEW_CARD_DATA_NOT_SET")
+        return "Registrierungsdaten fehlen";
+    if (errorKey == "KEY_NOT_SET")
+        return "Schluessel fehlt";
+    if (errorKey == "USER_NOT_FOUND")
+        return "Benutzer nicht gefunden";
+    if (errorKey == "RESET_NFC_CARD_DATA_NOT_SET")
+        return "Daten zum Zuruecksetzen fehlen";
+    if (errorKey == "INVALID_UID")
+        return "Ungueltige Karten-UID";
+    if (errorKey == "CARD_NOT_FOUND")
+        return "Karte nicht gefunden";
+    if (errorKey == "CARD_NOT_ACTIVE")
+        return "Karte ist nicht aktiv";
+
+    // Resource usage / session errors
+    if (errorKey == "INVALID_RESOURCE_ID")
+        return "Ungueltige Ressource";
+    if (errorKey == "READER_NOT_FOUND")
+        return "Leser nicht gefunden";
+    if (errorKey == "RESOURCE_NOT_ASSOCIATED_WITH_READER")
+        return "Ressource ist diesem Leser nicht zugeordnet";
+    if (errorKey == "USER_NOT_AUTHENTICATED")
+        return "Nicht angemeldet";
+    if (errorKey == "INSUFFICIENT_BALANCE")
+        return "Guthaben reicht nicht aus";
+
+    // Billing / top-up errors
+    if (errorKey == "SUMUP_NOT_ENABLED")
+        return "Bezahlung nicht aktiviert";
+    if (errorKey == "INVALID_AMOUNT")
+        return "Ungueltiger Betrag";
+    if (errorKey == "NO_SUMUP_TERMINALS_AVAILABLE")
+        return "Kein Zahlungsterminal verfuegbar";
+    if (errorKey == "SUMUP_TOPUP_FAILED")
+        return "Aufladung fehlgeschlagen";
+
+    // Unknown key or free-form server message: surface the raw value so the
+    // information is not lost (e.g. door errors sent as free-form text).
+    return errorKey;
 }

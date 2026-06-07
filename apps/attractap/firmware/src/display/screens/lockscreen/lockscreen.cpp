@@ -125,7 +125,7 @@ void Lockscreen::updateUsageInfo()
     else
     {
         lv_label_set_text(this->usageInfoLabel, "Verfuegbar");
-        lv_obj_set_style_text_color(this->usageInfoLabel, lv_color_hex(0xffffff), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_color(this->usageInfoLabel, lv_color_hex(0x00FF00), LV_PART_MAIN | LV_STATE_DEFAULT);
     }
 }
 

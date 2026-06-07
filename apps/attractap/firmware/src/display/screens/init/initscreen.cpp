@@ -22,6 +22,20 @@ void InitScreen::markStateAsError(lv_obj_t *spinner, lv_obj_t *label)
    this->finalizeState(spinner, label, lv_color_hex(0xFF0000));
 }
 
+void InitScreen::markStateAsWarning(lv_obj_t *spinner, lv_obj_t *label)
+{
+   // Amber: stage is actively working/retrying (e.g. sweeping CA certs) rather
+   // than cleanly succeeded or hard-failed.
+   this->finalizeState(spinner, label, lv_color_hex(0xFFA500));
+}
+
+String InitScreen::formatIp(esp_ip4_addr_t ip)
+{
+   char buf[16];
+   snprintf(buf, sizeof(buf), IPSTR, IP2STR(&ip));
+   return String(buf);
+}
+
 void InitScreen::resetState(lv_obj_t *spinner, lv_obj_t *label)
 {
    lv_obj_set_style_arc_color(spinner, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -189,6 +203,42 @@ void InitScreen::init()
 
    this->resetState(this->apiAuthenticationSpinner, this->apiAuthenticationLabel);
 
+   // Connection / cert-detection progress detail block. Smaller font, left aligned,
+   // so users can see the configured target, which CA is being tried, the live
+   // connection phase and the countdown to the next attempt.
+   lv_obj_t *detailsContainer = lv_obj_create(statesContainer);
+   lv_obj_remove_style_all(detailsContainer);
+   lv_obj_set_width(detailsContainer, lv_pct(100));
+   lv_obj_set_height(detailsContainer, LV_SIZE_CONTENT);
+   lv_obj_set_align(detailsContainer, LV_ALIGN_CENTER);
+   lv_obj_set_flex_flow(detailsContainer, LV_FLEX_FLOW_COLUMN);
+   lv_obj_set_flex_align(detailsContainer, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+   lv_obj_remove_flag(detailsContainer, LV_OBJ_FLAG_CLICKABLE);
+   lv_obj_remove_flag(detailsContainer, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_set_style_pad_row(detailsContainer, 6, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   this->serverTargetLabel = lv_label_create(detailsContainer);
+   lv_obj_set_width(this->serverTargetLabel, lv_pct(100));
+   lv_obj_set_height(this->serverTargetLabel, LV_SIZE_CONTENT);
+   lv_label_set_text(this->serverTargetLabel, "");
+   lv_obj_set_style_text_font(this->serverTargetLabel, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(this->serverTargetLabel, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   this->certLabel = lv_label_create(detailsContainer);
+   lv_obj_set_width(this->certLabel, lv_pct(100));
+   lv_obj_set_height(this->certLabel, LV_SIZE_CONTENT);
+   lv_label_set_long_mode(this->certLabel, LV_LABEL_LONG_DOT);
+   lv_label_set_text(this->certLabel, "");
+   lv_obj_set_style_text_font(this->certLabel, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(this->certLabel, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   this->connectionStateLabel = lv_label_create(detailsContainer);
+   lv_obj_set_width(this->connectionStateLabel, lv_pct(100));
+   lv_obj_set_height(this->connectionStateLabel, LV_SIZE_CONTENT);
+   lv_label_set_text(this->connectionStateLabel, "");
+   lv_obj_set_style_text_font(this->connectionStateLabel, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(this->connectionStateLabel, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
+
    lv_obj_t *openSettingsButton = lv_btn_create(statesContainer);
    lv_obj_set_width(openSettingsButton, LV_SIZE_CONTENT);
    lv_obj_set_height(openSettingsButton, LV_SIZE_CONTENT);
@@ -227,29 +277,43 @@ void InitScreen::loop()
    // TODO: extend network state and network interface classes to be more descriptive (in progress, success, error and maybe error reason)
    if (networkState.wifi_connected)
    {
+      lv_label_set_text(this->wifiLabel, ("WLAN  " + this->formatIp(networkState.wifi_ip)).c_str());
       this->markStateAsSuccess(this->wifiSpinner, this->wifiLabel);
    }
    else
    {
+      lv_label_set_text(this->wifiLabel, "verbinde WLAN");
       this->resetState(this->wifiSpinner, this->wifiLabel);
    }
 
    if (networkState.ethernet_connected)
    {
+      lv_label_set_text(this->ethernetLabel, ("Ethernet  " + this->formatIp(networkState.ethernet_ip)).c_str());
       this->markStateAsSuccess(this->ethernetSpinner, this->ethernetLabel);
    }
    else
    {
+      lv_label_set_text(this->ethernetLabel, "verbinde Ethernet");
       this->resetState(this->ethernetSpinner, this->ethernetLabel);
    }
 
    State::WebsocketState websocketState = State::getWebsocketState();
+   bool networkUp = networkState.wifi_connected || networkState.ethernet_connected;
+   // A repeating cert sweep or remembered-cert retry is the "stuck" signal.
+   bool sweeping = websocketState.useSSL && (websocketState.certIndex > 0 || websocketState.rememberedRetryCount > 0);
    if (websocketState.connected)
    {
+      lv_label_set_text(this->apiConnectionLabel, "API verbunden");
       this->markStateAsSuccess(this->apiConnectionSpinner, this->apiConnectionLabel);
+   }
+   else if (networkUp && sweeping)
+   {
+      lv_label_set_text(this->apiConnectionLabel, "suche Zertifikat");
+      this->markStateAsWarning(this->apiConnectionSpinner, this->apiConnectionLabel);
    }
    else
    {
+      lv_label_set_text(this->apiConnectionLabel, "verbinde API");
       this->resetState(this->apiConnectionSpinner, this->apiConnectionLabel);
    }
 
@@ -262,6 +326,61 @@ void InitScreen::loop()
    {
       this->resetState(this->apiAuthenticationSpinner, this->apiAuthenticationLabel);
    }
+
+   // Server target line
+   if (websocketState.hostname.isEmpty() || websocketState.port == 0)
+   {
+      lv_label_set_text(this->serverTargetLabel, "Server: nicht konfiguriert");
+   }
+   else
+   {
+      String target = "Server: " + websocketState.hostname + ":" + String(websocketState.port) +
+                      (websocketState.useSSL ? "  (SSL)" : "  (kein SSL)");
+      lv_label_set_text(this->serverTargetLabel, target.c_str());
+   }
+
+   // Cert evaluation line (only relevant while connecting over SSL)
+   if (websocketState.useSSL && !websocketState.connected && websocketState.certCount > 0)
+   {
+      String cert = "CA: " + websocketState.certName + "  (" +
+                    String(websocketState.certIndex + 1) + "/" + String(websocketState.certCount) + ")";
+      if (websocketState.rememberedRetryCount > 0)
+      {
+         cert += "  Wdh " + String(websocketState.rememberedRetryCount) + "/5";
+      }
+      lv_label_set_text(this->certLabel, cert.c_str());
+      lv_obj_remove_flag(this->certLabel, LV_OBJ_FLAG_HIDDEN);
+   }
+   else
+   {
+      lv_obj_add_flag(this->certLabel, LV_OBJ_FLAG_HIDDEN);
+   }
+
+   // Connection state + countdown line
+   const char *phaseText = "INIT";
+   switch (websocketState.phase)
+   {
+   case State::WS_CONNECTING:
+      phaseText = "CONNECTING";
+      break;
+   case State::WS_CONNECTED:
+      phaseText = "CONNECTED";
+      break;
+   case State::WS_INIT:
+   default:
+      phaseText = "INIT";
+      break;
+   }
+   String stateLine = String("Status: ") + phaseText;
+   if (!networkUp)
+   {
+      stateLine += "  warte auf Netzwerk";
+   }
+   else if (!websocketState.connected && websocketState.secondsUntilNextAttempt > 0)
+   {
+      stateLine += "  naechster Versuch in " + String(websocketState.secondsUntilNextAttempt) + "s";
+   }
+   lv_label_set_text(this->connectionStateLabel, stateLine.c_str());
 }
 
 void InitScreen::setOnOpenSettingsCallback(std::function<void()> onOpenSettingsCallback)
@@ -298,4 +417,7 @@ void InitScreen::destroy()
    this->apiConnectionLabel = nullptr;
    this->apiAuthenticationSpinner = nullptr;
    this->apiAuthenticationLabel = nullptr;
+   this->serverTargetLabel = nullptr;
+   this->certLabel = nullptr;
+   this->connectionStateLabel = nullptr;
 }

@@ -47,6 +47,11 @@ void NFC::disableCardDetection()
     this->cardDetectionEnabled = false;
 }
 
+void NFC::resetCardPresence()
+{
+    this->foundCard = false;
+}
+
 void NFC::loop()
 {
     this->checkHardware();
@@ -203,14 +208,23 @@ bool NFC::getAvailableKeyNo(uint8_t *uid, uint8_t *uidLength, uint8_t *keyNo)
 {
     this->logger.info("getAvailableKeyNo started");
 
-    bool foundCard = this->pn532.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, uidLength, 50);
-    if (!foundCard)
+    // The card was just selected by handleCardDetection's readPassiveTargetID.
+    // Re-running readPassiveTargetID here would fire a second back-to-back
+    // InListPassiveTarget on the still-selected card, which the PN532 fails to
+    // re-enumerate — leaving the reader looking dead during enrollment
+    // (ATT-503: no beep, no screen change). Mirror the proven tap flow
+    // (processCardAuthenticationData), which authenticates the already-selected
+    // card directly without re-reading it. Reuse the UID captured at detection.
+    if (!this->foundCard)
     {
-        this->logger.error("getAvailableKeyNo failed, no card detected");
+        this->logger.error("getAvailableKeyNo failed, no detected card");
         return false;
     }
 
-    this->logger.debug("getAvailableKeyNo, card detected");
+    memcpy(uid, this->cardDetectedUid, this->cardDetectedUidLength);
+    *uidLength = this->cardDetectedUidLength;
+
+    this->logger.debug("getAvailableKeyNo, using already-detected card");
 
     // check key 1 to 5, the first one that we can authenticate using factory key is an available key
     for (uint8_t i = 1; i <= 5; i++)
@@ -233,6 +247,11 @@ bool NFC::getAvailableKeyNo(uint8_t *uid, uint8_t *uidLength, uint8_t *keyNo)
 bool NFC::isCardDetectionEnabled()
 {
     return this->cardDetectionEnabled;
+}
+
+bool NFC::isCardPresent()
+{
+    return this->foundCard;
 }
 
 void NFC::setCardRemovalCallback(std::function<void(uint32_t presentationTimeMs)> callback)

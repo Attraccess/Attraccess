@@ -22,8 +22,9 @@ public:
     // Mark current certificate as successful
     void markSuccess();
 
-    // Mark current certificate as failed and try next
-    void markFailure();
+    // Mark current certificate as failed and try next.
+    // Returns true when the full certificate list was exhausted (a complete sweep failed).
+    bool markFailure();
 
     // Reset to start from first certificate
     void reset();
@@ -31,6 +32,10 @@ public:
     // Get current certificate info
     const char *getCurrentCertName() const;
     int getCurrentCertIndex() const;
+    // Total number of available CA certificates.
+    int getCertCount() const;
+    // How many times the remembered certificate has failed in a row (0-5).
+    int getRememberedFailureCount() const;
 
 private:
     Preferences preferences;

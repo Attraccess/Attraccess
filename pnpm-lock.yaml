@@ -52,8 +52,8 @@ importers:
         specifier: ^3.0.4
         version: 3.0.5(tailwind-merge@3.6.0)(tailwindcss@4.3.0)
       '@hookform/resolvers':
-        specifier: ^5.2.2
-        version: 5.2.2(react-hook-form@7.56.4(react@19.2.6))
+        specifier: ^5.4.0
+        version: 5.4.0(react-hook-form@7.56.4(react@19.2.6))
       '@icons-pack/react-simple-icons':
         specifier: ^13.13.0
         version: 13.13.0(react@19.2.6)
@@ -154,8 +154,8 @@ importers:
         specifier: ^11.0.0
         version: 11.0.0
       '@xyflow/react':
-        specifier: ^12.10.2
-        version: 12.10.2(@types/react@19.2.15)(immer@11.1.4)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+        specifier: ^12.11.0
+        version: 12.11.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(immer@11.1.4)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       '@yudiel/react-qr-scanner':
         specifier: ^2.5.1
         version: 2.5.1(@types/emscripten@1.40.1)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
@@ -205,8 +205,8 @@ importers:
         specifier: ^6.2.1
         version: 6.2.1
       date-fns:
-        specifier: ^4.1.0
-        version: 4.1.0
+        specifier: ^4.4.0
+        version: 4.4.0
       decompress:
         specifier: ^4.2.1
         version: 4.2.1
@@ -644,8 +644,8 @@ importers:
         specifier: 29.4.9
         version: 29.4.9(@babel/core@7.29.7)(@jest/transform@30.4.1)(@jest/types@30.4.1)(babel-jest@30.4.1(@babel/core@7.29.7))(esbuild@0.28.0)(jest-util@30.4.1)(jest@30.4.2(@types/node@25.9.1)(babel-plugin-macros@3.1.0)(ts-node@10.9.2(@swc/core@1.15.40(@swc/helpers@0.5.22))(@types/node@25.9.1)(typescript@6.0.3)))(typescript@6.0.3)
       ts-loader:
-        specifier: ^9.5.7
-        version: 9.5.7(typescript@6.0.3)(webpack@5.107.2)
+        specifier: ^9.6.0
+        version: 9.6.0(loader-utils@2.0.4)(typescript@6.0.3)(webpack@5.107.2)
       ts-morph:
         specifier: ^28.0.0
         version: 28.0.0
@@ -2799,8 +2799,8 @@ packages:
     peerDependencies:
       hono: ^4
 
-  '@hookform/resolvers@5.2.2':
-    resolution: {integrity: sha512-A/IxlMLShx3KjV/HeTcTfaMxdwy690+L/ZADoeaTltLx+CVuzkeVIPuybK3jrRfw7YZnmdKsVVHAlEPIAEUNlA==}
+  '@hookform/resolvers@5.4.0':
+    resolution: {integrity: sha512-EIsqr/t/qbinPIhGjMdtvutIN1Kk4uwbROE9/UQ93CAVGR7GkA7Y92+fX80OzXi/OB67jVFYwKGO1WzkxmkFZw==}
     peerDependencies:
       react-hook-form: ^7.55.0
 
@@ -6937,14 +6937,21 @@ packages:
   '@xtuc/long@4.2.2':
     resolution: {integrity: sha512-NuHqBY1PB/D8xU6s/thBgOAiAP7HOYDQ32+BFZILJ8ivkUkAHQnWfn6WhL79Owj1qmUnoN/YPhktdIoucipkAQ==}
 
-  '@xyflow/react@12.10.2':
-    resolution: {integrity: sha512-CgIi6HwlcHXwlkTpr0fxLv/0sRVNZ8IdwKLzzeCscaYBwpvfcH1QFOCeaTCuEn1FQEs/B8CjnTSjhs8udgmBgQ==}
+  '@xyflow/react@12.11.0':
+    resolution: {integrity: sha512-na4IO33FSs2OS72hASgZDmTYwFAkef7Z74uBUVrong3ARmQQHfnRUVaCFn1kTt5LbS6pK03TbYjCPGLjLFfziA==}
     peerDependencies:
+      '@types/react': '>=17'
+      '@types/react-dom': '>=17'
       react: 19.2.6
       react-dom: 19.2.6
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
+      '@types/react-dom':
+        optional: true
 
-  '@xyflow/system@0.0.76':
-    resolution: {integrity: sha512-hvwvnRS1B3REwVDlWexsq7YQaPZeG3/mKo1jv38UmnpWmxihp14bW6VtEOuHEwJX2FvzFw8k77LyKSk/wiZVNA==}
+  '@xyflow/system@0.0.77':
+    resolution: {integrity: sha512-qCDCMCQAAgUu8yHnhloHG9F5mwPX5E+Wl8McpYIOPSSXfzFJJoZcwOcsDiAjitVKIg2de1WmJbCHfpcvxprsgg==}
 
   '@yarnpkg/lockfile@1.1.0':
     resolution: {integrity: sha512-GpSwvyXOcOOlV70vbnzjj4fW5xW/FdUF6nQEt1ENy7m4ZCczi1+/buVUPAqmGfqznsORNFzUMjctTIp8a9tuCQ==}
@@ -8681,8 +8688,8 @@ packages:
     resolution: {integrity: sha512-BS8PfmtDGnrgYdOonGZQdLZslWIeCGFP9tpan0hi1Co2Zr2NKADsvGYA8XxuG/4UWgJ6Cjtv+YJnB6MM69QGlQ==}
     engines: {node: '>= 0.4'}
 
-  date-fns@4.1.0:
-    resolution: {integrity: sha512-Ukq0owbQXxa/U3EGtsdVBkR1w7KOQ5gIBqdH2hkvknzZPYvBxb/aa6E8L7tmjFtkwZBu3UXBbjIgPo/Ez4xaNg==}
+  date-fns@4.4.0:
+    resolution: {integrity: sha512-+1UMbeh68lH1SegH83CGWwpb6OHHbpSgr3+s5Eww5M4CAgswBpoWS0AjTOfEJ33HiYKz1hdj/KTFprzXHmq/6w==}
 
   dayjs@1.11.18:
     resolution: {integrity: sha512-zFBQ7WFRvVRhKcWoUh+ZA1g2HVgUbsZm9sbddh8EC5iv93sui8DVVz1Npvz+r6meo9VKfa8NyLWBsQK1VvIKPA==}
@@ -9122,16 +9129,8 @@ packages:
     resolution: {integrity: sha512-ZCkIjSYNDyGn0R6ewHDtXgns/Zre/NT6Agvq1/WobF7JXgFff4SeDroKiCO3fNJreU9YG429Sc81o4w5ok/W5g==}
     engines: {node: '>=10.2.0'}
 
-  enhanced-resolve@5.20.1:
-    resolution: {integrity: sha512-Qohcme7V1inbAfvjItgw0EaxVX5q2rdVEZHRBrEQdRZTssLDGsL8Lwrznl8oQ/6kuTJONLaDcGjkNP247XEhcA==}
-    engines: {node: '>=10.13.0'}
-
-  enhanced-resolve@5.21.2:
-    resolution: {integrity: sha512-xe9vQb5kReirPUxgQrXA3ihgbCqssmTiM7cOZ+Gzu+VeGWgpV98lLZvp0dl4yriyAePcewxGUs9UpKD8PET9KQ==}
-    engines: {node: '>=10.13.0'}
-
-  enhanced-resolve@5.22.0:
-    resolution: {integrity: sha512-xYcDWrpELkFzz9SpZ3PlI6Eu6eD93Yf0WLDRxikGhWJ3MAir2SNZTIVCVZqZ/NUyx8AdMc2gT9C0gPiw18kG+A==}
+  enhanced-resolve@5.22.1:
+    resolution: {integrity: sha512-6QEuw3zoX1SJQc7b87aBXke/no+mG2bTBgw29gWMQonLmpEkWoCAVkl+M49e48AZlWzxiDzDZzYdp6kobcyLww==}
     engines: {node: '>=10.13.0'}
 
   enquirer@2.3.6:
@@ -15066,10 +15065,6 @@ packages:
     resolution: {integrity: sha512-g9ljZiwki/LfxmQADO3dEY1CbpmXT5Hm2fJ+QaGKwSXUylMybePR7/67YW7jOrrvjEgL1Fmz5kzyAjWVWLlucg==}
     engines: {node: '>=6'}
 
-  tapable@2.3.2:
-    resolution: {integrity: sha512-1MOpMXuhGzGL5TTCZFItxCc0AARf1EZFQkGqMm7ERKj8+Hgr5oLvJOVFcC+lRmR8hCe2S3jC4T5D7Vg/d7/fhA==}
-    engines: {node: '>=6'}
-
   tapable@2.3.3:
     resolution: {integrity: sha512-uxc/zpqFg6x7C8vOE7lh6Lbda8eEL9zmVm/PLeTPBRhh1xCgdWaQ+J1CUieGpIfm2HdtsUpRv+HshiasBMcc6A==}
     engines: {node: '>=6'}
@@ -15398,12 +15393,16 @@ packages:
       jest-util:
         optional: true
 
-  ts-loader@9.5.7:
-    resolution: {integrity: sha512-/ZNrKgA3K3PtpMYOC71EeMWIloGw3IYEa5/t1cyz2r5/PyUwTXGzYJvcD3kfUvmhlfpz1rhV8B2O6IVTQ0avsg==}
+  ts-loader@9.6.0:
+    resolution: {integrity: sha512-dsJO0S+T7grTDWTc4a0nTygXGjKncVUpx8Y+af8EvI/D5WgTJby5UEk5eoMCB9EcLQmnvitqh99MqtjtHgAwFQ==}
     engines: {node: '>=12.0.0'}
     peerDependencies:
+      loader-utils: '*'
       typescript: '*'
-      webpack: ^5.0.0
+      webpack: ^4.0.0 || ^5.0.0
+    peerDependenciesMeta:
+      loader-utils:
+        optional: true
 
   ts-morph@28.0.0:
     resolution: {integrity: sha512-Wp3tnZ2bzwxyTZMtgWVzXDfm7lB1Drz+y9DmmYH/L702PQhPyVrp3pkou3yIz4qjS14GY9kcpmLiOOMvl8oG1g==}
@@ -18459,7 +18458,7 @@ snapshots:
   '@commitlint/is-ignored@19.8.1':
     dependencies:
       '@commitlint/types': 19.8.1
-      semver: 7.8.0
+      semver: 7.8.1
 
   '@commitlint/lint@19.8.1':
     dependencies:
@@ -19054,7 +19053,7 @@ snapshots:
     dependencies:
       hono: 4.12.21
 
-  '@hookform/resolvers@5.2.2(react-hook-form@7.56.4(react@19.2.6))':
+  '@hookform/resolvers@5.4.0(react-hook-form@7.56.4(react@19.2.6))':
     dependencies:
       '@standard-schema/utils': 0.3.0
       react-hook-form: 7.56.4(react@19.2.6)
@@ -20318,12 +20317,12 @@ snapshots:
   '@npmcli/fs@1.1.1':
     dependencies:
       '@gar/promisify': 1.1.3
-      semver: 7.8.0
+      semver: 7.8.1
     optional: true
 
   '@npmcli/fs@5.0.0':
     dependencies:
-      semver: 7.8.1
+      semver: 7.8.0
 
   '@npmcli/git@7.0.2':
     dependencies:
@@ -20333,7 +20332,7 @@ snapshots:
       lru-cache: 11.5.0
       npm-pick-manifest: 11.0.3
       proc-log: 6.1.0
-      semver: 7.8.0
+      semver: 7.8.1
       which: 6.0.1
 
   '@npmcli/map-workspaces@5.0.3':
@@ -20358,7 +20357,7 @@ snapshots:
       hosted-git-info: 9.0.3
       json-parse-even-better-errors: 5.0.0
       proc-log: 6.1.0
-      semver: 7.8.1
+      semver: 7.8.0
       spdx-expression-parse: 4.0.0
 
   '@npmcli/promise-spawn@9.0.1':
@@ -20796,7 +20795,7 @@ snapshots:
       '@nx/devkit': 22.7.4(nx@22.7.4(@swc-node/register@1.11.1(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(@swc/core@1.15.40(@swc/helpers@0.5.22))(@swc/types@0.1.26)(typescript@6.0.3))(@swc/core@1.15.40(@swc/helpers@0.5.22)))
       '@nx/js': 22.7.4(@babel/traverse@7.29.7)(@swc-node/register@1.11.1(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(@swc/core@1.15.40(@swc/helpers@0.5.22))(@swc/types@0.1.26)(typescript@6.0.3))(@swc/core@1.15.40(@swc/helpers@0.5.22))(nx@22.7.4(@swc-node/register@1.11.1(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(@swc/core@1.15.40(@swc/helpers@0.5.22))(@swc/types@0.1.26)(typescript@6.0.3))(@swc/core@1.15.40(@swc/helpers@0.5.22)))(verdaccio@6.7.2(encoding@0.1.13)(typanion@3.14.0))
       '@phenomnomnominal/tsquery': 6.2.0(typescript@6.0.3)
-      semver: 7.8.0
+      semver: 7.8.1
       tslib: 2.8.1
     optionalDependencies:
       '@nx/eslint': 22.7.4(fe70fc71096618ce8f17bee056c0f494)
@@ -20865,7 +20864,7 @@ snapshots:
       source-map-loader: 5.0.0(webpack@5.107.2)
       style-loader: 3.3.4(webpack@5.107.2)
       terser-webpack-plugin: 5.6.0(@swc/core@1.15.40(@swc/helpers@0.5.22))(cssnano@7.1.9(postcss@8.5.15))(esbuild@0.28.0)(postcss@8.5.15)(webpack@5.107.2)
-      ts-loader: 9.5.7(typescript@6.0.3)(webpack@5.107.2)
+      ts-loader: 9.6.0(loader-utils@2.0.4)(typescript@6.0.3)(webpack@5.107.2)
       tsconfig-paths-webpack-plugin: 4.2.0
       tslib: 2.8.1
       webpack: 5.107.2(@swc/core@1.15.40(@swc/helpers@0.5.22))(cssnano@7.1.9(postcss@8.5.15))(esbuild@0.28.0)(postcss@8.5.15)(webpack-cli@7.0.2(webpack-dev-server@5.2.4)(webpack@5.107.2))
@@ -21120,7 +21119,7 @@ snapshots:
       json5: 2.2.3
       msgpackr: 1.11.10
       nullthrows: 1.1.1
-      semver: 7.8.0
+      semver: 7.8.1
     transitivePeerDependencies:
       - '@swc/helpers'
       - napi-wasm
@@ -21179,7 +21178,7 @@ snapshots:
       '@parcel/rust': 2.16.4
       '@parcel/utils': 2.16.4
       nullthrows: 1.1.1
-      semver: 7.8.0
+      semver: 7.8.1
     transitivePeerDependencies:
       - '@parcel/core'
       - napi-wasm
@@ -21250,7 +21249,7 @@ snapshots:
       '@parcel/utils': 2.16.4
       '@parcel/workers': 2.16.4(@parcel/core@2.16.4(@swc/helpers@0.5.22))
       '@swc/core': 1.15.40(@swc/helpers@0.5.22)
-      semver: 7.8.0
+      semver: 7.8.1
     transitivePeerDependencies:
       - '@swc/helpers'
       - napi-wasm
@@ -21453,7 +21452,7 @@ snapshots:
       browserslist: 4.28.2
       json5: 2.2.3
       nullthrows: 1.1.1
-      semver: 7.8.0
+      semver: 7.8.1
     transitivePeerDependencies:
       - '@parcel/core'
       - napi-wasm
@@ -21503,7 +21502,7 @@ snapshots:
       browserslist: 4.28.2
       nullthrows: 1.1.1
       regenerator-runtime: 0.14.1
-      semver: 7.8.0
+      semver: 7.8.1
     transitivePeerDependencies:
       - napi-wasm
 
@@ -21531,7 +21530,7 @@ snapshots:
       clone: 2.1.2
       nullthrows: 1.1.1
       postcss-value-parser: 4.2.0
-      semver: 7.8.0
+      semver: 7.8.1
     transitivePeerDependencies:
       - '@parcel/core'
       - napi-wasm
@@ -22693,7 +22692,7 @@ snapshots:
   '@tailwindcss/node@4.3.0':
     dependencies:
       '@jridgewell/remapping': 2.3.5
-      enhanced-resolve: 5.21.2
+      enhanced-resolve: 5.22.1
       jiti: 2.7.0
       lightningcss: 1.32.0
       magic-string: 0.30.21
@@ -23539,7 +23538,7 @@ snapshots:
       '@typescript-eslint/visitor-keys': 8.60.0
       debug: 4.4.3
       minimatch: 10.2.5
-      semver: 7.8.0
+      semver: 7.8.1
       tinyglobby: 0.2.16
       ts-api-utils: 2.5.0(typescript@6.0.3)
       typescript: 6.0.3
@@ -24180,18 +24179,20 @@ snapshots:
 
   '@xtuc/long@4.2.2': {}
 
-  '@xyflow/react@12.10.2(@types/react@19.2.15)(immer@11.1.4)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)':
+  '@xyflow/react@12.11.0(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(immer@11.1.4)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)':
     dependencies:
-      '@xyflow/system': 0.0.76
+      '@xyflow/system': 0.0.77
       classcat: 5.0.5
       react: 19.2.6
       react-dom: 19.2.6(react@19.2.6)
       zustand: 4.5.7(@types/react@19.2.15)(immer@11.1.4)(react@19.2.6)
+    optionalDependencies:
+      '@types/react': 19.2.15
+      '@types/react-dom': 19.2.3(@types/react@19.2.15)
     transitivePeerDependencies:
-      - '@types/react'
       - immer
 
-  '@xyflow/system@0.0.76':
+  '@xyflow/system@0.0.77':
     dependencies:
       '@types/d3-drag': 3.0.7
       '@types/d3-interpolate': 3.0.4
@@ -24856,7 +24857,7 @@ snapshots:
       '@types/memoizee': 0.4.12
       '@types/semver': 7.7.1
       memoizee: 0.4.17
-      semver: 7.8.0
+      semver: 7.8.1
 
   balena-settings-client@6.0.3:
     dependencies:
@@ -24962,7 +24963,7 @@ snapshots:
   binary-version-check@6.1.0:
     dependencies:
       binary-version: 7.1.0
-      semver: 7.8.0
+      semver: 7.8.1
       semver-truncate: 3.0.0
 
   binary-version@7.1.0:
@@ -25947,7 +25948,7 @@ snapshots:
       postcss-modules-scope: 3.2.1(postcss@8.5.15)
       postcss-modules-values: 4.0.0(postcss@8.5.15)
       postcss-value-parser: 4.2.0
-      semver: 7.8.0
+      semver: 7.8.1
     optionalDependencies:
       '@rspack/core': 1.6.8(@swc/helpers@0.5.22)
       webpack: 5.107.2(@swc/core@1.15.40(@swc/helpers@0.5.22))(cssnano@7.1.9(postcss@8.5.15))(esbuild@0.28.0)(postcss@8.5.15)(webpack-cli@7.0.2(webpack-dev-server@5.2.4)(webpack@5.107.2))
@@ -26188,7 +26189,7 @@ snapshots:
       es-errors: 1.3.0
       is-data-view: 1.0.2
 
-  date-fns@4.1.0: {}
+  date-fns@4.4.0: {}
 
   dayjs@1.11.18: {}
 
@@ -26545,7 +26546,7 @@ snapshots:
       '@one-ini/wasm': 0.1.1
       commander: 10.0.1
       minimatch: 9.0.9
-      semver: 7.8.0
+      semver: 7.8.1
 
   edn-data@1.1.2: {}
 
@@ -26629,17 +26630,7 @@ snapshots:
       - supports-color
       - utf-8-validate
 
-  enhanced-resolve@5.20.1:
-    dependencies:
-      graceful-fs: 4.2.11
-      tapable: 2.3.2
-
-  enhanced-resolve@5.21.2:
-    dependencies:
-      graceful-fs: 4.2.11
-      tapable: 2.3.3
-
-  enhanced-resolve@5.22.0:
+  enhanced-resolve@5.22.1:
     dependencies:
       graceful-fs: 4.2.11
       tapable: 2.3.3
@@ -27633,7 +27624,7 @@ snapshots:
       minimatch: 3.1.5
       node-abort-controller: 3.1.1
       schema-utils: 3.3.0
-      semver: 7.8.0
+      semver: 7.8.1
       tapable: 2.3.3
       typescript: 6.0.3
       webpack: 5.107.2(@swc/core@1.15.40(@swc/helpers@0.5.22))(cssnano@7.1.9(postcss@8.5.15))(esbuild@0.28.0)(postcss@8.5.15)(webpack-cli@7.0.2(webpack-dev-server@5.2.4)(webpack@5.107.2))
@@ -28826,7 +28817,7 @@ snapshots:
       '@babel/parser': 7.29.7
       '@istanbuljs/schema': 0.1.6
       istanbul-lib-coverage: 3.2.2
-      semver: 7.8.0
+      semver: 7.8.1
     transitivePeerDependencies:
       - supports-color
 
@@ -29177,7 +29168,7 @@ snapshots:
       jest-message-util: 30.4.1
       jest-util: 30.4.1
       pretty-format: 30.4.1
-      semver: 7.8.0
+      semver: 7.8.1
       synckit: 0.11.11
     transitivePeerDependencies:
       - supports-color
@@ -29444,7 +29435,7 @@ snapshots:
       lodash.isstring: 4.0.1
       lodash.once: 4.1.1
       ms: 2.1.3
-      semver: 7.8.0
+      semver: 7.8.1
 
   jsprim@2.0.2:
     dependencies:
@@ -29945,7 +29936,7 @@ snapshots:
 
   make-dir@4.0.0:
     dependencies:
-      semver: 7.8.0
+      semver: 7.8.1
 
   make-error@1.3.6: {}
 
@@ -31157,7 +31148,7 @@ snapshots:
 
   node-abi@3.75.0:
     dependencies:
-      semver: 7.8.0
+      semver: 7.8.1
 
   node-abort-controller@3.1.1: {}
 
@@ -31207,7 +31198,7 @@ snapshots:
       nopt: 5.0.0
       npmlog: 6.0.2
       rimraf: 3.0.2
-      semver: 7.8.0
+      semver: 7.8.1
       tar: 6.2.1
       which: 2.0.2
     transitivePeerDependencies:
@@ -31255,7 +31246,7 @@ snapshots:
 
   npm-install-checks@8.0.0:
     dependencies:
-      semver: 7.8.0
+      semver: 7.8.1
 
   npm-normalize-package-bin@5.0.0: {}
 
@@ -31263,7 +31254,7 @@ snapshots:
     dependencies:
       hosted-git-info: 9.0.3
       proc-log: 6.1.0
-      semver: 7.8.1
+      semver: 7.8.0
       validate-npm-package-name: 7.0.2
 
   npm-pick-manifest@11.0.3:
@@ -31271,7 +31262,7 @@ snapshots:
       npm-install-checks: 8.0.0
       npm-normalize-package-bin: 5.0.0
       npm-package-arg: 13.0.2
-      semver: 7.8.0
+      semver: 7.8.1
 
   npm-run-path@4.0.1:
     dependencies:
@@ -32143,7 +32134,7 @@ snapshots:
       cosmiconfig: 9.0.1(typescript@6.0.3)
       jiti: 2.7.0
       postcss: 8.5.15
-      semver: 7.8.0
+      semver: 7.8.1
     optionalDependencies:
       '@rspack/core': 1.6.8(@swc/helpers@0.5.22)
       webpack: 5.107.2(@swc/core@1.15.40(@swc/helpers@0.5.22))(cssnano@7.1.9(postcss@8.5.15))(esbuild@0.28.0)(postcss@8.5.15)(webpack-cli@7.0.2(webpack-dev-server@5.2.4)(webpack@5.107.2))
@@ -33158,7 +33149,7 @@ snapshots:
       find-cache-dir: 3.3.2
       fs-extra: 10.1.0
       rollup: 4.60.3
-      semver: 7.8.0
+      semver: 7.8.1
       tslib: 2.8.1
       typescript: 6.0.3
 
@@ -33469,7 +33460,7 @@ snapshots:
 
   semver-truncate@3.0.0:
     dependencies:
-      semver: 7.8.0
+      semver: 7.8.1
 
   semver@5.7.2:
     optional: true
@@ -34360,8 +34351,6 @@ snapshots:
 
   tapable@2.3.0: {}
 
-  tapable@2.3.2: {}
-
   tapable@2.3.3: {}
 
   tar-fs@2.1.4:
@@ -34681,15 +34670,17 @@ snapshots:
       esbuild: 0.28.0
       jest-util: 30.4.1
 
-  ts-loader@9.5.7(typescript@6.0.3)(webpack@5.107.2):
+  ts-loader@9.6.0(loader-utils@2.0.4)(typescript@6.0.3)(webpack@5.107.2):
     dependencies:
       chalk: 4.1.2
-      enhanced-resolve: 5.20.1
+      enhanced-resolve: 5.22.1
       micromatch: 4.0.8
-      semver: 7.8.0
+      semver: 7.8.1
       source-map: 0.7.6
       typescript: 6.0.3
       webpack: 5.107.2(@swc/core@1.15.40(@swc/helpers@0.5.22))(cssnano@7.1.9(postcss@8.5.15))(esbuild@0.28.0)(postcss@8.5.15)(webpack-cli@7.0.2(webpack-dev-server@5.2.4)(webpack@5.107.2))
+    optionalDependencies:
+      loader-utils: 2.0.4
 
   ts-morph@28.0.0:
     dependencies:
@@ -34804,7 +34795,7 @@ snapshots:
   tsconfig-paths-webpack-plugin@4.2.0:
     dependencies:
       chalk: 4.1.2
-      enhanced-resolve: 5.22.0
+      enhanced-resolve: 5.22.1
       tapable: 2.3.3
       tsconfig-paths: 4.2.0
 
@@ -35175,7 +35166,7 @@ snapshots:
       pupa: 2.1.1
       registry-auth-token: 5.1.0
       registry-url: 5.1.0
-      semver: 7.8.0
+      semver: 7.8.1
       semver-diff: 3.1.1
       xdg-basedir: 4.0.0
     transitivePeerDependencies:
@@ -35626,7 +35617,7 @@ snapshots:
       acorn-import-phases: 1.0.4(acorn@8.16.0)
       browserslist: 4.28.2
       chrome-trace-event: 1.0.4
-      enhanced-resolve: 5.22.0
+      enhanced-resolve: 5.22.1
       es-module-lexer: 2.1.0
       eslint-scope: 5.1.1
       events: 3.3.0

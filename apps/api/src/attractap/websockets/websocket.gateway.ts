@@ -229,6 +229,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       state: {
         lastAuthenticatedUserId: null,
         enrollNewCardData: null,
+        resetNfcCardData: null,
         ota: null,
       },
     });
@@ -358,6 +359,12 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   public async onHeartbeat(@ConnectedSocket() socket: AuthenticatedWebSocket) {
     this.logger.debug(`Heartbeat from client ${socket.id}.`);
 
+    try {
+      (socket as unknown as { send: (data: string) => void }).send(JSON.stringify({ event: 'HEARTBEAT' }));
+    } catch (error) {
+      this.logger.error(`Failed to send heartbeat ack to client ${socket.id}: ${(error as Error).message}`);
+    }
+
     await this.clientWasActive(socket);
   }
 
@@ -431,6 +438,16 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
       case AttractapEventType.ENROLL_NEW_CARD:
         await this.cardHandler.onEnrollNewCard(socket, eventData);
+        break;
+      case AttractapEventType.ENROLL_NEW_CARD_CANCEL:
+        await this.cardHandler.onEnrollNewCardCancel(socket);
+        break;
+
+      case AttractapEventType.RESET_NFC_CARD:
+        await this.cardHandler.onResetNfcCard(socket, eventData);
+        break;
+      case AttractapEventType.RESET_NFC_CARD_CANCEL:
+        await this.cardHandler.onResetNfcCardCancel(socket);
         break;
 
       case AttractapEventType.PROJECTS_OF_USER:

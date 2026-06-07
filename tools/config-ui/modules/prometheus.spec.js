@@ -147,10 +147,10 @@ describe('generatePrometheusConfig (via init/writePrometheusConfig)', () => {
   });
 
   describe('config structure', () => {
-    it('includes rule_files referencing alerts.yml', () => {
+    it('does not emit Prometheus rule_files (alerting is Grafana-managed)', () => {
       const config = getGeneratedConfig();
-      expect(config).toContain('rule_files:');
-      expect(config).toContain('alerts.yml');
+      expect(config).not.toContain('rule_files:');
+      expect(config).not.toContain('alerts.yml');
     });
 
     it('includes bearer_token when metricsApiKey is set via env', () => {

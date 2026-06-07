@@ -27,6 +27,7 @@ public:
     static constexpr size_t MAX_RESOURCE_NAME_LEN = 64;
     static constexpr size_t MAX_DESC_LEN = 128;
     static constexpr size_t MAX_USERNAME_LEN = 32;
+    static constexpr size_t MAX_HEALTH_REASON_LEN = 160;
     static constexpr size_t MAX_INTRODUCERS = 8;
     static constexpr size_t MAX_FLOW_BUTTONS = 7;
     static constexpr size_t MAX_FLOW_BUTTON_LABEL_LEN = 32;
@@ -51,8 +52,11 @@ public:
         char description[MAX_DESC_LEN];
         bool hasActiveUsage;
         bool isUnderMaintenance;
+        bool isHealthy;
+        char healthReason[MAX_HEALTH_REASON_LEN];
         char activeUser[MAX_USERNAME_LEN];
-        uint32_t activeStartEpoch; // seconds since epoch
+        uint32_t activeStartEpoch;          // seconds since epoch (UTC)
+        int16_t activeStartUtcOffsetMinutes; // server tz offset (minutes east of UTC) for that instant
         uint8_t introducerCount;
         char introducers[MAX_INTRODUCERS][MAX_USERNAME_LEN];
         uint8_t flowButtonCount;
@@ -218,9 +222,18 @@ public:
 
     void setEnrollNewCardGetAvailableKeyNoCallback(std::function<void(String username)> callback);
     void setEnrollNewCardCallback(std::function<void(uint8_t keyNo, String key)> callback);
+    void setEnrollNewCardErrorCallback(std::function<void(String error)> callback);
 
     void sendEnrollNewCardAvailableKeyNo(uint8_t *uid, uint8_t uidLength, uint8_t keyNo);
     void sendEnrollNewCard(bool success);
+    void sendEnrollNewCardCancel();
+
+    // Card reset/deletion. The server already knows the card's stored key + slot
+    // (it is being deleted from the DB), so it hands them to the reader in a
+    // single RESET_NFC_CARD event — no key round-trip like enrollment.
+    void setResetNfcCardCallback(std::function<void(String username, uint8_t keyNo, String key)> callback);
+    void sendResetNfcCard(bool success);
+    void sendResetNfcCardCancel();
 
     void startResourceUsageSession(uint32_t resourceId, uint32_t projectId = 0);
     void stopResourceUsageSession(uint32_t resourceId);
@@ -328,9 +341,16 @@ private:
 
     std::function<void(String username)> enrollNewCardGetAvailableKeyNoCallback;
     std::function<void(uint8_t keyNo, String key)> enrollNewCardCallback;
+    std::function<void(String error)> enrollNewCardErrorCallback;
 
     void onEnrollNewCardGetAvailableKeyNo(JsonObject data);
     void onEnrollNewCard(JsonObject data);
+    // Server reuses the ENROLL_NEW_CARD_REQUEST_NFC_KEY event to report errors
+    // back to the reader (e.g. CARD_ALREADY_ENROLLED).
+    void onEnrollNewCardRequestNFCKeyError(JsonObject data);
+
+    std::function<void(String username, uint8_t keyNo, String key)> resetNfcCardCallback;
+    void onResetNfcCard(JsonObject data);
 
     std::function<void(const char *title, const char *message)> errorCallback;
     std::function<void(const char *type, bool success)> actionResultCallback;

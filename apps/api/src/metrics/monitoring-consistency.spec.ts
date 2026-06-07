@@ -3,12 +3,24 @@ import { join } from 'path';
 
 const MONITORING_ROOT = join(__dirname, '..', '..', '..', '..', 'monitoring');
 const METRICS_ROOT = join(__dirname);
+const DASHBOARDS_DIR = join(MONITORING_ROOT, 'grafana', 'dashboards');
+const PROMETHEUS_DATASOURCE_UID = 'attraccess-prometheus';
 
-function loadJson(relativePath: string) {
-  return JSON.parse(readFileSync(join(MONITORING_ROOT, relativePath), 'utf-8'));
-}
+// The new admin-focused dashboard set (ATT-517): one System Health landing board
+// plus focused drill-downs, all linked together via the "Attraccess Dashboards"
+// dropdown. The old chaotic per-subsystem boards were removed.
+const DASHBOARD_FILES = [
+  'attraccess-system-health.json',
+  'attraccess-api.json',
+  'attraccess-devices.json',
+  'attraccess-realtime.json',
+  'attraccess-jobs.json',
+  'attraccess-integrations.json',
+  'attraccess-usage.json',
+  'node-runtime.json',
+];
 
-function loadYaml(relativePath: string) {
+function loadYaml(relativePath: string): string {
   return readFileSync(join(MONITORING_ROOT, relativePath), 'utf-8');
 }
 
@@ -46,10 +58,14 @@ function stripHistogramSuffix(name: string): string {
 
 interface DashboardTarget {
   expr?: string;
+  refId?: string;
 }
 
 interface DashboardPanel {
+  title?: string;
+  type?: string;
   datasource?: { uid?: string };
+  gridPos?: { h?: number; w?: number; x?: number; y?: number };
   targets?: DashboardTarget[];
 }
 
@@ -58,7 +74,13 @@ interface Dashboard {
   uid?: string;
   description?: string;
   tags?: string[];
+  links?: unknown[];
+  schemaVersion?: number;
   panels?: DashboardPanel[];
+}
+
+function loadDashboard(file: string): Dashboard {
+  return JSON.parse(readFileSync(join(DASHBOARDS_DIR, file), 'utf-8'));
 }
 
 function collectPanelExprs(dashboard: Dashboard): string[] {
@@ -72,170 +94,77 @@ function collectPanelExprs(dashboard: Dashboard): string[] {
 }
 
 describe('Monitoring configuration consistency', () => {
-  describe('issue #9: all dashboard queries use attraccess_ prefixed metric names', () => {
-    const overviewDashboard = loadJson('grafana/dashboards/attraccess-overview.json');
+  const dashboards = DASHBOARD_FILES.map((file) => ({ file, json: loadDashboard(file) }));
+  const knownMetrics = collectMetricNames();
 
-    it('no panels reference unprefixed http_requests_total', () => {
-      const json = JSON.stringify(overviewDashboard);
-      const matches = json.match(/[^_]http_requests_total/g);
-      expect(matches).toBeNull();
-    });
-
-    it('no panels reference unprefixed http_request_duration_seconds', () => {
-      const json = JSON.stringify(overviewDashboard);
-      const matches = json.match(/[^_]http_request_duration_seconds/g);
-      expect(matches).toBeNull();
-    });
-
-    it('all custom metric references use attraccess_ prefix', () => {
-      const allExprs: string[] = [];
-      for (const panel of overviewDashboard.panels) {
-        for (const target of panel.targets || []) {
-          if (target.expr) allExprs.push(target.expr);
-        }
-      }
-
-      for (const expr of allExprs) {
-        const metricNames = expr.match(/\b[a-z][a-z0-9_]*(?:_total|_seconds|_bucket|_active|_connected|_overdue|_loaded|_healthy)\b/g) || [];
-        for (const name of metricNames) {
-          if (name.startsWith('le') || name.startsWith('job')) continue;
-          expect(name).toMatch(/^attraccess_/);
-        }
-      }
-    });
-  });
-
-  describe('issue #15: Grafana datasource UID consistency', () => {
-    const datasourceConfig = loadYaml('grafana/provisioning/datasources/prometheus.yml');
-    const overviewDashboard = loadJson('grafana/dashboards/attraccess-overview.json');
-    const runtimeDashboard = loadJson('grafana/dashboards/node-runtime.json');
-
-    it('datasource provisioning has a stable UID', () => {
-      expect(datasourceConfig).toContain('uid: attraccess-prometheus');
-    });
-
-    it('overview dashboard panels reference the correct datasource UID', () => {
-      for (const panel of overviewDashboard.panels) {
-        expect(panel.datasource.uid).toBe('attraccess-prometheus');
-      }
-    });
-
-    it('node runtime dashboard panels reference the correct datasource UID', () => {
-      for (const panel of runtimeDashboard.panels) {
-        expect(panel.datasource.uid).toBe('attraccess-prometheus');
-      }
-    });
-
-    it('no panels have empty datasource UID', () => {
-      const allPanels = [...overviewDashboard.panels, ...runtimeDashboard.panels];
-      for (const panel of allPanels) {
-        expect(panel.datasource.uid).not.toBe('');
-      }
-    });
-  });
-
-  describe('issue #13: alerting rules exist', () => {
-    it('alerts.yml file exists and contains alerting rules', () => {
-      const alerts = loadYaml('prometheus/alerts.yml');
-      expect(alerts).toContain('groups:');
-      expect(alerts).toContain('alert:');
-    });
-
-    it('includes a service-down alert', () => {
-      const alerts = loadYaml('prometheus/alerts.yml');
-      expect(alerts).toContain('AttractapServiceDown');
-    });
-
-    it('includes a high-error-rate alert', () => {
-      const alerts = loadYaml('prometheus/alerts.yml');
-      expect(alerts).toContain('HighHttpErrorRate');
-    });
-
-    it('includes a high-latency alert', () => {
-      const alerts = loadYaml('prometheus/alerts.yml');
-      expect(alerts).toContain('HighRequestLatency');
-    });
-
-    it('includes a failed-login alert', () => {
-      const alerts = loadYaml('prometheus/alerts.yml');
-      expect(alerts).toContain('HighFailedLoginRate');
-    });
-
-    it('includes an overdue-maintenance alert', () => {
-      const alerts = loadYaml('prometheus/alerts.yml');
-      expect(alerts).toContain('OverdueMaintenance');
-    });
-  });
-
-  describe('issue #12: prometheus.yml references rule_files', () => {
-    it('static prometheus.yml mentions config-ui generates the actual config', () => {
-      const config = loadYaml('prometheus/prometheus.yml');
-      expect(config).toContain('config-ui');
-    });
-  });
-
-  describe('ATT-276: per-subsystem performance dashboards', () => {
-    const dashboardFiles = [
-      'grafana/dashboards/attraccess-performance-overview.json',
-      'grafana/dashboards/attraccess-http.json',
-      'grafana/dashboards/attraccess-websocket.json',
-      'grafana/dashboards/attraccess-cron.json',
-      'grafana/dashboards/attraccess-database.json',
-      'grafana/dashboards/attraccess-flow.json',
-    ];
-
-    const dashboards = dashboardFiles.map((path) => ({ path, json: loadJson(path) }));
-    const knownMetrics = collectMetricNames();
-
-    it('every dashboard parses as valid JSON with required top-level fields', () => {
-      for (const { path, json } of dashboards) {
-        expect(json).toBeDefined();
+  describe('dashboard set structure (ATT-517)', () => {
+    it('every dashboard parses as valid JSON with the required top-level fields', () => {
+      for (const { file, json } of dashboards) {
         expect(typeof json.title).toBe('string');
+        expect((json.title ?? '').length).toBeGreaterThan(0);
         expect(typeof json.uid).toBe('string');
-        expect(json.uid.length).toBeGreaterThan(0);
+        expect((json.uid ?? '').length).toBeGreaterThan(0);
+        expect(typeof json.description).toBe('string');
+        expect((json.description ?? '').length).toBeGreaterThan(0);
         expect(Array.isArray(json.tags)).toBe(true);
         expect(json.tags).toContain('attraccess');
         expect(Array.isArray(json.panels)).toBe(true);
-        expect(json.panels.length).toBeGreaterThan(0);
-        expect(typeof json.description).toBe('string');
-        expect(json.description.length).toBeGreaterThan(0);
-        expect(path).toBeDefined();
+        expect((json.panels ?? []).length).toBeGreaterThan(0);
+        expect(json.schemaVersion).toBeGreaterThan(0);
+        expect(file).toBeDefined();
       }
     });
 
     it('every dashboard uses a unique UID', () => {
       const uids = dashboards.map((d) => d.json.uid);
-      const unique = new Set(uids);
-      expect(unique.size).toBe(uids.length);
+      expect(new Set(uids).size).toBe(uids.length);
     });
 
-    it('every dashboard uid is also unique against the existing dashboards', () => {
-      const existing = [
-        loadJson('grafana/dashboards/attraccess-overview.json').uid,
-        loadJson('grafana/dashboards/node-runtime.json').uid,
-      ];
-      for (const { json } of dashboards) {
-        expect(existing).not.toContain(json.uid);
+    it('every dashboard links to the other Attraccess dashboards (cross-navigation)', () => {
+      for (const { file, json } of dashboards) {
+        const linksText = JSON.stringify(json.links ?? []);
+        expect(linksText).toContain('attraccess');
+        expect(file).toBeDefined();
       }
+    });
+  });
+
+  describe('Grafana datasource UID consistency', () => {
+    it('datasource provisioning has the stable UID', () => {
+      const datasourceConfig = loadYaml('grafana/provisioning/datasources/prometheus.yml');
+      expect(datasourceConfig).toContain(`uid: ${PROMETHEUS_DATASOURCE_UID}`);
     });
 
     it('every panel references the prometheus datasource UID', () => {
-      for (const { json } of dashboards) {
-        for (const panel of json.panels) {
+      for (const { file, json } of dashboards) {
+        for (const panel of json.panels ?? []) {
+          if (panel.type === 'row') continue;
           expect(panel.datasource).toBeDefined();
-          expect(panel.datasource.uid).toBe('attraccess-prometheus');
+          expect(panel.datasource?.uid).toBe(PROMETHEUS_DATASOURCE_UID);
+          expect(file).toBeDefined();
         }
+      }
+    });
+  });
+
+  describe('dashboard query correctness', () => {
+    it('no panel references an unprefixed http_requests_total / http_request_duration_seconds', () => {
+      for (const { file, json } of dashboards) {
+        const text = JSON.stringify(json);
+        expect(text.match(/[^_]http_requests_total/g)).toBeNull();
+        expect(text.match(/[^_]http_request_duration_seconds/g)).toBeNull();
+        expect(file).toBeDefined();
       }
     });
 
     it('every metric referenced in a panel target exists in the metrics module', () => {
       const unknown: string[] = [];
-      for (const { path, json } of dashboards) {
+      for (const { file, json } of dashboards) {
         for (const expr of collectPanelExprs(json)) {
           for (const ref of extractMetricRefs(expr)) {
             const base = stripHistogramSuffix(ref);
             if (!knownMetrics.has(base)) {
-              unknown.push(`${path}: ${ref} (base ${base})`);
+              unknown.push(`${file}: ${ref} (base ${base})`);
             }
           }
         }
@@ -243,36 +172,99 @@ describe('Monitoring configuration consistency', () => {
       expect(unknown).toEqual([]);
     });
 
-    it('every panel target has at least one metric reference', () => {
-      for (const { path, json } of dashboards) {
-        for (const panel of json.panels) {
+    it('every panel target has a non-empty expr', () => {
+      for (const { file, json } of dashboards) {
+        for (const panel of json.panels ?? []) {
           for (const target of panel.targets ?? []) {
-            if (!target.expr) continue;
-            const refs = extractMetricRefs(target.expr);
-            expect(refs.length).toBeGreaterThan(0);
-            expect(path).toBeDefined();
+            expect(typeof target.expr).toBe('string');
+            expect((target.expr ?? '').trim().length).toBeGreaterThan(0);
+            expect(file).toBeDefined();
           }
         }
       }
     });
+  });
 
-    it('performance overview includes panels for each subsystem', () => {
-      const found = dashboards.find((d) => d.path.endsWith('attraccess-performance-overview.json'));
-      expect(found).toBeDefined();
-      const overview = found?.json as Dashboard;
-      const allText = JSON.stringify(overview);
-      const subsystemFamilies = [
+  describe('System Health landing dashboard', () => {
+    const health = dashboards.find((d) => d.file === 'attraccess-system-health.json');
+
+    it('exists and surfaces the core health signals', () => {
+      expect(health).toBeDefined();
+      const text = collectPanelExprs(health?.json ?? {}).join('\n');
+      const signals = [
+        'up{job=',
+        'attraccess_http_requests_total',
+        'attraccess_http_request_duration_seconds',
+        'attraccess_attractap_devices_connected',
+        'attraccess_cron_job_runs_total',
+        'attraccess_resource_maintenance_overdue',
+        'nodejs_eventloop_lag_seconds',
+      ];
+      for (const signal of signals) {
+        expect(text).toContain(signal);
+      }
+    });
+  });
+
+  describe('per-subsystem drill-down coverage', () => {
+    it('exposes a dashboard for every major subsystem metric family', () => {
+      const allText = JSON.stringify(dashboards.map((d) => d.json));
+      const families = [
         'attraccess_http_request_duration_seconds',
         'attraccess_ws_message_duration_seconds',
+        'attraccess_sse_active_connections',
         'attraccess_cron_job_duration_seconds',
+        'attraccess_flow_execution_duration_seconds',
         'attraccess_db_query_duration_seconds',
         'attraccess_external_call_duration_seconds',
-        'attraccess_sse_',
-        'attraccess_flow_execution_duration_seconds',
+        'attraccess_attractap_crash_reports_total',
+        'attraccess_billing_transactions_total',
       ];
-      for (const family of subsystemFamilies) {
+      for (const family of families) {
         expect(allText).toContain(family);
       }
+    });
+  });
+
+  describe('alerting rules', () => {
+    // Alerting is provisioned via Grafana, not Prometheus rule_files. The legacy
+    // monitoring/prometheus/alerts.yml was removed (ATT-527) to avoid duplicate rules.
+    const grafanaRules = loadYaml('grafana/provisioning/alerting/rules.yaml');
+
+    const requiredAlerts = [
+      // pre-existing
+      'AttractapServiceDown',
+      'HighHttpErrorRate',
+      'HighRequestLatency',
+      'HighFailedLoginRate',
+      'OverdueMaintenance',
+      // ATT-517 device + system health additions
+      'AttractapAllReadersOffline',
+      'AttractapReaderCrashes',
+      'CronJobFailing',
+      'CronJobStale',
+      'FlowExecutionFailures',
+      'ExternalCallErrors',
+      'MqttServersUnhealthy',
+      'EmailDeliveryFailures',
+      'HighEventLoopLag',
+      'HighMemoryUsage',
+    ];
+
+    it('legacy prometheus alerts.yml no longer exists', () => {
+      expect(() => loadYaml('prometheus/alerts.yml')).toThrow();
+    });
+
+    it('Grafana provisioned rules define all required alerts', () => {
+      expect(grafanaRules).toContain('groups:');
+      for (const alert of requiredAlerts) {
+        expect(grafanaRules).toContain(alert);
+      }
+    });
+
+    it('prometheus.yml is generated by config-ui', () => {
+      const config = loadYaml('prometheus/prometheus.yml');
+      expect(config).toContain('config-ui');
     });
   });
 });

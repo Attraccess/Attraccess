@@ -98,10 +98,13 @@ describe('config-ui', () => {
       expect(section).toContain('restart: unless-stopped');
     });
 
-    it('should publish DNS ports 53 UDP and TCP', () => {
+    it('should use host networking to avoid the balenaOS dnsmasq port 53 conflict', () => {
       const section = extractServiceBlock(content, 'config-ui');
-      expect(section).toContain('53:53/udp');
-      expect(section).toContain('53:53/tcp');
+      expect(section).toContain('network_mode: host');
+      // must NOT bridge-publish 53 — docker-proxy would collide with the
+      // balenaOS host dnsmasq on 127.0.0.2:53 / 10.114.102.1:53
+      expect(section).not.toContain('53:53/udp');
+      expect(section).not.toContain('53:53/tcp');
     });
 
     it('should expose admin UI port 5380', () => {
@@ -137,7 +140,7 @@ describe('config-ui', () => {
 
     it('should define a prometheus service that depends_on config-ui', () => {
       const section = extractServiceBlock(content, 'prometheus');
-      expect(section).toMatch(/depends_on:[\s\S]*?config-ui:/);
+      expect(section).toMatch(/depends_on:[\s\S]*?-\s*config-ui\b/);
       expect(section).toContain('prometheus-config:/etc/prometheus:ro');
     });
 

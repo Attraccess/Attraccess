@@ -26,12 +26,15 @@ void Display::touchpad_read(lv_indev_t *indev_driver, lv_indev_data_t *data)
     if (!Display::driver->readTouch(point) || !point.pressed)
     {
         data->state = LV_INDEV_STATE_RELEASED;
+        Display::handleGestureSample(0, 0, false);
         return;
     }
 
     data->state = LV_INDEV_STATE_PRESSED;
     data->point.x = point.x;
     data->point.y = point.y;
+
+    Display::handleGestureSample(point.x, point.y, true);
 
     if (Display::touchCallback)
     {

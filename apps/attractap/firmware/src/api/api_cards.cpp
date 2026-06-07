@@ -98,6 +98,84 @@ void API::sendEnrollNewCard(bool success)
     this->sendMessage("ENROLL_NEW_CARD", payload);
 }
 
+void API::sendEnrollNewCardCancel()
+{
+    JsonDocument doc;
+    JsonObject payload = doc.to<JsonObject>();
+    this->sendMessage("ENROLL_NEW_CARD_CANCEL", payload);
+}
+
+void API::setEnrollNewCardErrorCallback(std::function<void(String error)> callback)
+{
+    this->enrollNewCardErrorCallback = callback;
+}
+
+void API::setResetNfcCardCallback(std::function<void(String username, uint8_t keyNo, String key)> callback)
+{
+    this->resetNfcCardCallback = callback;
+}
+
+void API::sendResetNfcCard(bool success)
+{
+    JsonDocument doc;
+    JsonObject payload = doc.to<JsonObject>();
+    payload["success"] = success;
+    this->sendMessage("RESET_NFC_CARD", payload);
+}
+
+void API::sendResetNfcCardCancel()
+{
+    JsonDocument doc;
+    JsonObject payload = doc.to<JsonObject>();
+    this->sendMessage("RESET_NFC_CARD_CANCEL", payload);
+}
+
+void API::onResetNfcCard(JsonObject data)
+{
+    this->logger.info("Received reset nfc card");
+    if (this->resetNfcCardCallback == nullptr)
+    {
+        this->logger.error("Reset nfc card callback is not set");
+        return;
+    }
+
+    JsonObject payload = data["payload"].as<JsonObject>();
+    if (payload["error"].is<String>() && payload["error"].as<String>().length() > 0)
+    {
+        this->logger.error(("Reset nfc card error from server: " + payload["error"].as<String>()).c_str());
+        return;
+    }
+
+    // The server hands over the card's stored key material so the reader can
+    // authenticate the card and write the factory key back.
+    if (!(payload["key"].is<String>() && payload["key"].as<String>().length() == 32 && payload["keyNo"].is<uint8_t>()))
+    {
+        this->logger.info("Reset nfc card payload does not contain key material; ignoring.");
+        return;
+    }
+
+    String username = payload["username"].is<String>() ? payload["username"].as<String>() : String("");
+    uint8_t keyNo = payload["keyNo"].as<uint8_t>();
+    String key = payload["key"].as<String>();
+
+    this->resetNfcCardCallback(username, keyNo, key);
+}
+
+void API::onEnrollNewCardRequestNFCKeyError(JsonObject data)
+{
+    JsonObject payload = data["payload"].as<JsonObject>();
+    String error = payload["error"].is<String>() ? payload["error"].as<String>() : String("");
+    if (error.length() == 0)
+    {
+        return;
+    }
+    this->logger.error(("Enroll new card request key error from server: " + error).c_str());
+    if (this->enrollNewCardErrorCallback != nullptr)
+    {
+        this->enrollNewCardErrorCallback(error);
+    }
+}
+
 void API::onEnrollNewCardGetAvailableKeyNo(JsonObject data)
 {
     this->logger.info("Received enroll new card available key no");

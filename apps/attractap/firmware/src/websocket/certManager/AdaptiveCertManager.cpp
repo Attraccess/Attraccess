@@ -129,12 +129,12 @@ void AdaptiveCertManager::markSuccess()
     saveSuccessfulCertIndexToPreferences(currentCertIndex);
 }
 
-void AdaptiveCertManager::markFailure()
+bool AdaptiveCertManager::markFailure()
 {
     if (!initialized)
     {
         logger.error("Not initialized, cannot try next certificate");
-        return;
+        return false;
     }
 
     const char *failedCertName = getCurrentCertName();
@@ -151,7 +151,7 @@ void AdaptiveCertManager::markFailure()
         {
             logger.infof("Will retry remembered certificate (attempt %d/5)",
                          rememberedCertFailureCount + 1);
-            return; // Don't increment currentCertIndex, retry same cert
+            return false; // Don't increment currentCertIndex, retry same cert
         }
         else
         {
@@ -171,16 +171,20 @@ void AdaptiveCertManager::markFailure()
     // Move to next certificate in iteration
     currentCertIndex++;
 
+    bool exhausted = false;
     if (!isValidCertIndex(currentCertIndex))
     {
         logger.errorf("No more certificates to try (reached index %d, max %d)",
                       currentCertIndex, CA_CERT_COUNT - 1);
         this->reset();
+        exhausted = true;
     }
 
     const char *nextCertName = getCurrentCertName();
     logger.infof("Trying next certificate: %s (index %d/%d)",
                  nextCertName, currentCertIndex, CA_CERT_COUNT - 1);
+
+    return exhausted;
 }
 
 void AdaptiveCertManager::reset()
@@ -207,6 +211,16 @@ const char *AdaptiveCertManager::getCurrentCertName() const
 int AdaptiveCertManager::getCurrentCertIndex() const
 {
     return currentCertIndex;
+}
+
+int AdaptiveCertManager::getCertCount() const
+{
+    return CA_CERT_COUNT;
+}
+
+int AdaptiveCertManager::getRememberedFailureCount() const
+{
+    return rememberedCertFailureCount;
 }
 
 void AdaptiveCertManager::loadSuccessfulCertIndexFromPreferences()

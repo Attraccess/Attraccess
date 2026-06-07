@@ -210,6 +210,21 @@ describe('dnsmasq init generates config + hosts files with sane defaults', () =>
     expect(content).toContain('addn-hosts=/etc/dnsmasq.d/custom-hosts');
   });
 
+  it('starts dnsmasq with conf-dir limited to *.conf so custom-hosts is not parsed as config', () => {
+    const { mod, restore } = loadModule({ DNS_SERVER_ENABLED: 'true' });
+    mod.init();
+    restore();
+
+    // custom-hosts lives inside the conf-dir; without the ,*.conf filter dnsmasq
+    // reads it as a config file and dies with "bad option at line 1".
+    const { spawn } = require('child_process');
+    expect(spawn).toHaveBeenCalledWith(
+      'dnsmasq',
+      expect.arrayContaining(['--conf-dir=/etc/dnsmasq.d/,*.conf']),
+      expect.anything()
+    );
+  });
+
   it('emits listen-address when DNS_LISTEN_ADDRESS is set', () => {
     const { mod, writes, restore } = loadModule({
       DNS_SERVER_ENABLED: 'true',

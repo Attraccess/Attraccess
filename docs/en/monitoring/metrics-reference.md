@@ -14,8 +14,8 @@ This page lists all metrics exposed by Attraccess at the `/api/metrics` endpoint
 
 | Metric | Type | Labels | Description |
 |--------|------|--------|-------------|
-| `http_request_duration_seconds` | Histogram | `method`, `route`, `status_code` | Duration of HTTP requests in seconds |
-| `http_requests_total` | Counter | `method`, `route`, `status_code` | Total number of HTTP requests |
+| `attraccess_http_request_duration_seconds` | Histogram | `method`, `route`, `status_code` | Duration of HTTP requests in seconds |
+| `attraccess_http_requests_total` | Counter | `method`, `route`, `status_code` | Total number of HTTP requests |
 
 **Histogram buckets:** 5ms, 10ms, 25ms, 50ms, 100ms, 250ms, 500ms, 1s, 2.5s, 5s, 10s
 
@@ -23,20 +23,20 @@ This page lists all metrics exposed by Attraccess at the `/api/metrics` endpoint
 
 ```promql
 # Request rate per second (last 5 minutes)
-rate(http_requests_total[5m])
+rate(attraccess_http_requests_total[5m])
 
 # 95th percentile latency
-histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))
+histogram_quantile(0.95, rate(attraccess_http_request_duration_seconds_bucket[5m]))
 
 # Error rate (5xx responses)
-rate(http_requests_total{status_code=~"5.."}[5m])
+rate(attraccess_http_requests_total{status_code=~"5.."}[5m])
 ```
 
 ## Authentication Metrics
 
 | Metric | Type | Labels | Description |
 |--------|------|--------|-------------|
-| `attraccess_auth_login_total` | Counter | `method`, `status` | Login attempts. `method`: `local` or `sso`. `status`: `success` or `failure` |
+| `attraccess_auth_login_total` | Counter | `method`, `status` | Login attempts (includes unknown-username attempts). `method`: `local` or `sso`. `status`: `success` or `fail` |
 | `attraccess_auth_active_sessions` | Gauge | -- | Number of active authenticated sessions |
 | `attraccess_auth_sso_login_total` | Counter | `provider_type` | SSO login attempts. `provider_type`: `oidc` or `saml` |
 | `attraccess_auth_2fa_usage_total` | Counter | `action` | Two-factor authentication actions |
@@ -44,8 +44,8 @@ rate(http_requests_total{status_code=~"5.."}[5m])
 ### Example PromQL Queries
 
 ```promql
-# Failed login rate
-rate(attraccess_auth_login_total{status="failure"}[5m])
+# Failed logins in the last 5 minutes
+sum(increase(attraccess_auth_login_total{status="fail"}[5m]))
 
 # SSO vs local login comparison
 sum by (method) (rate(attraccess_auth_login_total{status="success"}[1h]))
@@ -64,7 +64,7 @@ sum by (method) (rate(attraccess_auth_login_total{status="success"}[1h]))
 |--------|------|--------|-------------|
 | `attraccess_resources_total` | Gauge | -- | Total number of resources |
 | `attraccess_resource_usage_sessions_active` | Gauge | -- | Currently active usage sessions |
-| `attraccess_resource_usage_sessions_total` | Counter | `action` | Usage sessions started or ended. `action`: `started` or `ended` |
+| `attraccess_resource_usage_sessions_total` | Counter | `action` | Usage sessions started or ended. `action`: `start` or `end` |
 | `attraccess_resource_usage_duration_seconds` | Histogram | -- | Duration of completed usage sessions |
 | `attraccess_resource_groups_total` | Gauge | -- | Total number of resource groups |
 | `attraccess_resource_introductions_total` | Counter | -- | Completed resource introductions (safety briefings) |
@@ -93,6 +93,18 @@ attraccess_resource_maintenance_overdue > 0
 | `attraccess_attractap_devices_connected` | Gauge | -- | Number of connected Attractap NFC readers |
 | `attraccess_attractap_nfc_taps_total` | Counter | -- | Total NFC tap events |
 | `attraccess_attractap_firmware_updates_total` | Counter | -- | Total firmware update events |
+| `attraccess_attractap_crash_reports_total` | Counter | `reset_reason` | Crash reports received from readers. `reset_reason` is a normalized reset cause (e.g. `PANIC`, `INT_WDT`, `BROWNOUT`, `unknown`) |
+
+### Example PromQL Queries
+
+```promql
+# Reader crashes in the last hour, broken down by reset cause
+sum by (reset_reason) (increase(attraccess_attractap_crash_reports_total[1h]))
+
+# Alert signal: all readers offline (but some were connected recently)
+attraccess_attractap_devices_connected == 0
+  and max_over_time(attraccess_attractap_devices_connected[1h]) > 0
+```
 
 ## Billing Metrics
 

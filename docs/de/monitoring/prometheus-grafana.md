@@ -10,11 +10,11 @@ Konfigurationen werden im `attraccess`-Image ausgeliefert:
 /app/share/monitoring/
   prometheus/
     prometheus.yml      # Scrape-Konfiguration für den attraccess-Job
-    alerts.yml          # Alarmregeln
   grafana/
     provisioning/
       datasources/
         prometheus.yml  # Verbindet Grafana mit Prometheus
+      alerting/         # Grafana-verwaltete Alarmregeln + Pushover-Routing
       dashboards/
         dashboards.yml  # Dashboard-Provider-Konfiguration
     dashboards/
@@ -140,9 +140,6 @@ global:
   scrape_interval: 15s
   evaluation_interval: 15s
 
-rule_files:
-  - '/etc/prometheus/alerts.yml'
-
 scrape_configs:
   - job_name: 'attraccess'
     metrics_path: '/api/metrics'
@@ -151,6 +148,9 @@ scrape_configs:
     scrape_interval: 10s
     # bearer_token: '<Ihr-Metriken-API-Schlüssel>'
 ```
+
+> [!NOTE]
+> Das Alerting wird vollständig von Grafana verwaltet (siehe `grafana/provisioning/alerting`), daher lädt Prometheus keine `rule_files`.
 
 | Einstellung | Standard | Beschreibung |
 |-------------|----------|--------------|

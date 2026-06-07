@@ -21,6 +21,7 @@ import {
   TableContent,
   TableHeader,
   TableRow,
+  TableScrollContainer,
   cn,
 } from '@heroui/react';
 import { StandardDrawer } from '../../../components/standardDrawer';
@@ -152,7 +153,8 @@ const NfcCardTableCell = (props: NfcCardTableCellProps) => {
                 variant="tertiary"
                 onPress={onOpen}
                 data-cy={`nfc-card-table-cell-deactivate-button-${props.card.id}`}
-              ><CheckIcon />
+              >
+                <CheckIcon />
                 <XIcon />
                 {t('nfcCardsTable.actions.deactivate')}
               </Button>
@@ -165,7 +167,8 @@ const NfcCardTableCell = (props: NfcCardTableCellProps) => {
                 variant="tertiary"
                 onPress={onOpen}
                 data-cy={`nfc-card-table-cell-activate-button-${props.card.id}`}
-              ><XIcon />
+              >
+                <XIcon />
                 <CheckIcon />
                 {t('nfcCardsTable.actions.activate')}
               </Button>
@@ -307,27 +310,27 @@ export function NfcCardList() {
     <>
       <PageHeader
         title={t('nfcCards')}
-        actions={[
-          {
-            key: 'enroll',
-            label: t('enroll'),
-            icon: <PlusIcon />,
-            variant: 'primary',
-            dataCy: 'enroll-nfc-card-button-trigger',
-            renderTrigger: (triggerProps) => (
-              <EnrollNfcCard>
-                {(onOpen) => <Button {...triggerProps} onPress={onOpen} />}
-              </EnrollNfcCard>
-            ),
-          },
-          {
-            key: 'readers',
-            label: t('readers'),
-            icon: <ServerIcon />,
-            isHidden: !hasPermission('canManageResources'),
-            onPress: () => navigate('/attractap/readers'),
-          },
-        ] satisfies PageAction[]}
+        actions={
+          [
+            {
+              key: 'enroll',
+              label: t('enroll'),
+              icon: <PlusIcon />,
+              variant: 'primary',
+              dataCy: 'enroll-nfc-card-button-trigger',
+              renderTrigger: (triggerProps) => (
+                <EnrollNfcCard>{(onOpen) => <Button {...triggerProps} onPress={onOpen} />}</EnrollNfcCard>
+              ),
+            },
+            {
+              key: 'readers',
+              label: t('readers'),
+              icon: <ServerIcon />,
+              isHidden: !hasPermission('canManageResources'),
+              onPress: () => navigate('/attractap/readers'),
+            },
+          ] satisfies PageAction[]
+        }
       />
 
       <Alert status="warning" className="mb-4">
@@ -345,30 +348,32 @@ export function NfcCardList() {
       />
 
       <Table data-cy="nfc-card-list-table">
-        <TableContent aria-label={t('nfcCards')}>
-        <TableHeader>
-          {headers.map((header, idx) => (
-            <TableColumn key={header} id={header} isRowHeader={idx === 0}>
-              {t('nfcCardsTable.headers.' + header)}
-            </TableColumn>
-          ))}
-        </TableHeader>
-        <TableBody items={cards ?? []} renderEmptyState={() => <EmptyState />}>
-          {(card) => (
-            <TableRow
-              key={card.id}
-              id={card.id}
-              className={cn('border-l-4', card.isActive ? 'border-l-success' : 'border-l-warning')}
-            >
-              {headers.map((header) => (
-                <TableCell key={header}>
-                  <NfcCardTableCell header={header} card={card} onDeleteClick={() => setCardToDeleteId(card.id)} />
-                </TableCell>
+        <TableScrollContainer>
+          <TableContent aria-label={t('nfcCards')}>
+            <TableHeader>
+              {headers.map((header, idx) => (
+                <TableColumn key={header} id={header} isRowHeader={idx === 0}>
+                  {t('nfcCardsTable.headers.' + header)}
+                </TableColumn>
               ))}
-            </TableRow>
-          )}
-        </TableBody>
-        </TableContent>
+            </TableHeader>
+            <TableBody items={cards ?? []} renderEmptyState={() => <EmptyState />}>
+              {(card) => (
+                <TableRow
+                  key={card.id}
+                  id={card.id}
+                  className={cn('border-l-4', card.isActive ? 'border-l-success' : 'border-l-warning')}
+                >
+                  {headers.map((header) => (
+                    <TableCell key={header}>
+                      <NfcCardTableCell header={header} card={card} onDeleteClick={() => setCardToDeleteId(card.id)} />
+                    </TableCell>
+                  ))}
+                </TableRow>
+              )}
+            </TableBody>
+          </TableContent>
+        </TableScrollContainer>
       </Table>
     </>
   );

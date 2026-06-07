@@ -93,6 +93,11 @@ void API::onResourceList(JsonObject data)
 
         dst.isUnderMaintenance = resource["isUnderMaintenance"].is<bool>() ? resource["isUnderMaintenance"].as<bool>() : false;
 
+        // Health state: default to healthy when the field is absent (backwards compatible)
+        dst.isHealthy = resource["isHealthy"].is<bool>() ? resource["isHealthy"].as<bool>() : true;
+        const char *healthReason = resource["healthReason"].as<const char *>();
+        strlcpy(dst.healthReason, healthReason ? healthReason : "", sizeof(dst.healthReason));
+
         JsonObject aus = resource["activeUsageSession"].as<JsonObject>();
         if (!aus.isNull() && aus["user"]["username"].is<const char *>() && aus["startTime"].is<const char *>())
         {
@@ -101,12 +106,15 @@ void API::onResourceList(JsonObject data)
             strlcpy(dst.activeUser, username ? username : "", sizeof(dst.activeUser));
             const char *startIso = aus["startTime"].as<const char *>();
             dst.activeStartEpoch = parseIso8601ToTimeT(startIso);
+            // Offset is optional for backwards compatibility; absent -> 0 (render UTC as before)
+            dst.activeStartUtcOffsetMinutes = aus["startTimeUtcOffsetMinutes"].is<int>() ? (int16_t)aus["startTimeUtcOffsetMinutes"].as<int>() : 0;
         }
         else
         {
             dst.hasActiveUsage = false;
             dst.activeUser[0] = '\0';
             dst.activeStartEpoch = 0;
+            dst.activeStartUtcOffsetMinutes = 0;
         }
 
         // Parse introducers: array of strings (usernames)

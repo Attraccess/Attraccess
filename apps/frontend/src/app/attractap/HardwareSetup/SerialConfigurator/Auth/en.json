@@ -1,6 +1,8 @@
 {
   "title": "Device PIN",
   "loading": "Checking device PIN...",
+  "waitingForDevice": "Waiting for the device to respond. If you just installed firmware, give it a few seconds to boot.",
+  "retry": "Check again",
   "enterPin": {
     "submit": "Unlock"
   },

@@ -11,6 +11,7 @@ import { ResourceMaintenanceService } from '../../resources/maintenances/mainten
 import { ResourceIntroductionsService } from '../../resources/introductions/resouceIntroductions.service';
 import { ResourceIntroducersService } from '../../resources/introducers/resourceIntroducers.service';
 import { ResourceFlowsService } from '../../resources/flows/resource-flows.service';
+import { ResourceHealthService } from '../../resources/health/resource-health.service';
 import { ResourceFlowsExecutorService } from '../../resources/flows/resource-flows-executor.service';
 import { ProjectsService } from '../../projects/projects.service';
 import { ResourceFormsService } from '../../resources/forms/forms.service';
@@ -55,6 +56,7 @@ function createMockSocket(overrides: Partial<AuthenticatedWebSocket> = {}): Auth
     state: {
       lastAuthenticatedUserId: null,
       enrollNewCardData: null,
+      resetNfcCardData: null,
       ota: null,
     },
     ...overrides,
@@ -88,6 +90,7 @@ describe('AttractapGateway', () => {
         { provide: LicenseService, useValue: licenseService },
         { provide: ResourceUsageService, useValue: {} },
         { provide: ResourceMaintenanceService, useValue: { hasActiveMaintenance: jest.fn().mockResolvedValue(false) } },
+        { provide: ResourceHealthService, useValue: { listForResource: jest.fn().mockResolvedValue([]) } },
         { provide: ResourceIntroductionsService, useValue: {} },
         { provide: ResourceIntroducersService, useValue: {} },
         { provide: ResourceFlowsService, useValue: {} },
@@ -187,6 +190,7 @@ describe('AttractapGateway', () => {
         state: {
           lastAuthenticatedUserId: null,
           enrollNewCardData: null,
+          resetNfcCardData: null,
           ota: { path: '/tmp/test', size: 1024, fd: 999 },
         },
       });
@@ -212,6 +216,14 @@ describe('AttractapGateway', () => {
       await gateway.onHeartbeat(socket);
 
       expect(attractapService.updateLastReaderConnection).not.toHaveBeenCalled();
+    });
+
+    it('sends a heartbeat ack back so idle links stay live', async () => {
+      const socket = createMockSocket({ id: 'hb-3', readerId: 7 });
+
+      await gateway.onHeartbeat(socket);
+
+      expect((socket as unknown as { send: jest.Mock }).send).toHaveBeenCalledWith(JSON.stringify({ event: 'HEARTBEAT' }));
     });
   });
 

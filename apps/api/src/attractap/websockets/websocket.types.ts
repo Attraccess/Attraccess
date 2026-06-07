@@ -30,6 +30,9 @@ export enum AttractapEventType {
   ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO = 'ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO',
   ENROLL_NEW_CARD_REQUEST_NFC_KEY = 'ENROLL_NEW_CARD_REQUEST_NFC_KEY',
   ENROLL_NEW_CARD = 'ENROLL_NEW_CARD',
+  ENROLL_NEW_CARD_CANCEL = 'ENROLL_NEW_CARD_CANCEL',
+  RESET_NFC_CARD = 'RESET_NFC_CARD',
+  RESET_NFC_CARD_CANCEL = 'RESET_NFC_CARD_CANCEL',
   TRIGGER_FLOW_BUTTON = 'TRIGGER_FLOW_BUTTON',
   BILLING_REQUEST_TOPUP = 'BILLING_REQUEST_TOPUP',
   PROJECTS_OF_USER = 'PROJECTS_OF_USER',
@@ -42,6 +45,7 @@ export enum AttractapEventType {
 
 export interface ReaderCrashReportPayload {
   resetReason: string;
+  rebootReason?: string | null;
   heapFreeBytes?: number | null;
   largestFreeBlockBytes?: number | null;
   uptimeBeforeResetMs?: number | null;
@@ -90,6 +94,11 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
       key: string;
       keyNo: number;
       cardUID: string;
+    } | null;
+    resetNfcCardData: {
+      cardId: number;
+      key: string;
+      keyNo: number;
     } | null;
     ota?: {
       path: string;

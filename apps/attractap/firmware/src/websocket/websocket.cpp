@@ -1,19 +1,64 @@
 #include "websocket.hpp"
+#include "esp_heap_caps.h"
+#include "esp_system.h"
+#include <Preferences.h>
+
+// Deliberate-reboot reason handed to the crash reporter across the SW reset (see
+// api_diag.cpp). Lives in the same NVS namespace as the boot diagnostics record
+// so the API layer can pick it up and attach it to the uploaded crash report.
+#define BOOT_DIAG_NAMESPACE "bootdiag"
+#define BOOT_DIAG_REBOOT_REASON_KEY "rebootreason"
 
 void Websocket::setup()
 {
     logger.info("Websocket setup");
+    if (!ws_client_mutex)
+    {
+        ws_client_mutex = xSemaphoreCreateMutex();
+    }
+    if (!tx_queue)
+    {
+        tx_queue = xQueueCreate(TX_QUEUE_DEPTH, sizeof(TxMessage));
+    }
+    if (!tx_task && tx_queue)
+    {
+        xTaskCreate(txTaskEntry, "ws_tx", TX_TASK_STACK, this, TX_TASK_PRIORITY, &tx_task);
+    }
     this->_certManager.begin();
+}
+
+void Websocket::lockWsClient()
+{
+    if (ws_client_mutex)
+    {
+        xSemaphoreTake(ws_client_mutex, portMAX_DELAY);
+    }
+}
+
+void Websocket::unlockWsClient()
+{
+    if (ws_client_mutex)
+    {
+        xSemaphoreGive(ws_client_mutex);
+    }
 }
 
 void Websocket::loop()
 {
+    uint32_t nowMs = millis();
+    if (nowMs - this->lastHeapLogTime >= this->HEAP_LOG_INTERVAL_MS)
+    {
+        this->lastHeapLogTime = nowMs;
+        this->logHeapStats();
+    }
+
     if (!connectionAttemptsEnabled)
     {
         return;
     }
 
     this->updateInfoFromAppState();
+    this->publishConnectionStatus();
 
     if (!network_is_connected)
     {
@@ -36,6 +81,11 @@ void Websocket::loop()
     case CONNECTING:
         break;
     case CONNECTED:
+        if (millis() - this->lastInboundFrameTime > this->INBOUND_LIVENESS_TIMEOUT_MS)
+        {
+            logger.error("No inbound frames within liveness timeout, forcing reconnect");
+            setState(INIT);
+        }
         break;
     }
 }
@@ -44,6 +94,43 @@ void Websocket::updateInfoFromAppState()
 {
     auto networkState = State::getNetworkState();
     this->network_is_connected = networkState.wifi_connected || networkState.ethernet_connected;
+}
+
+// Mirror the live connection / cert-sweep progress into State so the connecting
+// screen can surface where the device is (and where it is stuck). Cheap enough
+// to run every loop tick.
+void Websocket::publishConnectionStatus()
+{
+    AttraccessApiConfig apiConfig = Settings::getAttraccessApiConfig();
+
+    // Keep the configured server target fresh even before the first connect attempt.
+    State::setWebsocketState(_state == CONNECTED, apiConfig.hostname, apiConfig.port, apiConfig.useSSL);
+
+    // Cert sweep progress is only meaningful for SSL connections.
+    if (apiConfig.useSSL)
+    {
+        State::setWebsocketCertProgress(
+            String(this->_certManager.getCurrentCertName()),
+            this->_certManager.getCurrentCertIndex(),
+            this->_certManager.getCertCount(),
+            this->_certManager.getRememberedFailureCount());
+    }
+    else
+    {
+        State::setWebsocketCertProgress("", 0, 0, 0);
+    }
+
+    // Seconds until the next reconnect attempt (0 while connected or due now).
+    int secondsUntilNext = 0;
+    if (_state != CONNECTED && network_is_connected)
+    {
+        uint32_t elapsed = millis() - lastReconnectAttemptTime;
+        if (elapsed < this->nextRetryDelayMs)
+        {
+            secondsUntilNext = (int)((this->nextRetryDelayMs - elapsed + 999) / 1000);
+        }
+    }
+    State::setWebsocketNextAttemptSeconds(secondsUntilNext);
 }
 
 void Websocket::connectWebSocket()
@@ -65,22 +152,10 @@ void Websocket::connectWebSocket()
     {
         logger.info("connectWebSocket: network is not connected");
         setState(INIT);
-
-        // TODO: replace with a logic that compares a timestamp to now
-        // vTaskDelay(RECONNECT_INTERVAL_MS / portTICK_PERIOD_MS);
         return;
     }
 
     AttraccessApiConfig apiConfig = Settings::getAttraccessApiConfig();
-    _lastApiConfig = apiConfig;
-    setState(CONNECTING);
-
-    if (ws_client)
-    {
-        esp_websocket_client_destroy(ws_client);
-        ws_client = nullptr;
-    }
-
     String serverHostname = apiConfig.hostname;
     uint16_t serverPort = apiConfig.port;
 
@@ -92,14 +167,60 @@ void Websocket::connectWebSocket()
         return;
     }
 
+    const char *certPem = nullptr;
+    int certIndex = -1;
     if (apiConfig.useSSL)
     {
         logger.info("connectWebSocket: using SSL");
+        if (!this->_certManager.getCertificate(&certPem))
+        {
+            logger.error("Failed to get certificate");
+            setState(INIT);
+            return;
+        }
+        certIndex = this->_certManager.getCurrentCertIndex();
     }
     else
     {
         logger.info("connectWebSocket: non secure (no SSL)");
     }
+
+    bool configMatchesClient =
+        _lastApiConfig.hostname == apiConfig.hostname &&
+        _lastApiConfig.port == apiConfig.port &&
+        _lastApiConfig.useSSL == apiConfig.useSSL &&
+        _clientCertIndex == certIndex;
+
+    _lastApiConfig = apiConfig;
+    setState(CONNECTING);
+
+    lockWsClient();
+    esp_websocket_client_handle_t existingClient = ws_client;
+    unlockWsClient();
+
+    if (existingClient && configMatchesClient)
+    {
+        logger.info("connectWebSocket: reusing existing client (stop+start)");
+        esp_websocket_client_stop(existingClient);
+        esp_err_t restartRet = esp_websocket_client_start(existingClient);
+        if (restartRet == ESP_OK)
+        {
+            logger.info("connectWebSocket: WebSocket restarted");
+            this->consecutiveConnectFailures = 0;
+            return;
+        }
+        logger.error((String("Failed to restart WebSocket client: ") + esp_err_to_name(restartRet)).c_str());
+    }
+
+    lockWsClient();
+    esp_websocket_client_handle_t oldClient = ws_client;
+    ws_client = nullptr;
+    unlockWsClient();
+    if (oldClient)
+    {
+        esp_websocket_client_destroy(oldClient);
+    }
+
     String protocol = (apiConfig.useSSL) ? "wss" : "ws";
     String wsUrl = protocol + "://" + serverHostname + ":" + String(serverPort) + "/api/attractap/websocket";
     logger.info(("Connecting to WebSocket: " + wsUrl).c_str());
@@ -113,55 +234,110 @@ void Websocket::connectWebSocket()
     websocket_cfg.buffer_size = 4096; // Increase buffer size (default is typically 1024)
     // websocket_cfg.task_prio = 5;      // Set appropriate task priority
 
-    // Disable the library auto-reconnect: our own loop() drives reconnects every
-    // RECONNECT_INTERVAL_MS, so leaving auto-reconnect on would double the reconnect churn
-    // and keep the internal websocket_task busy-spinning on core 0 (TASK_WDT reset).
-    // The library's built-in network timeout bounds a single hung connect/handshake; the
-    // ping/pong keepalive surfaces a half-open socket so it can be torn down promptly.
+    websocket_cfg.ping_interval_sec = 5;
+    websocket_cfg.pingpong_timeout_sec = PINGPONG_TIMEOUT_SEC;
+    websocket_cfg.disable_pingpong_discon = false;
+
     websocket_cfg.disable_auto_reconnect = true;
-    websocket_cfg.ping_interval_sec = 10;
-    websocket_cfg.pingpong_timeout_sec = 20;
+
+    websocket_cfg.keep_alive_enable = true;
+    websocket_cfg.keep_alive_idle = 5;
+    websocket_cfg.keep_alive_interval = 5;
+    websocket_cfg.keep_alive_count = 3;
 
     if (apiConfig.useSSL)
     {
         websocket_cfg.transport = WEBSOCKET_TRANSPORT_OVER_SSL;
-
-        if (!this->_certManager.getCertificate(&websocket_cfg.cert_pem))
-        {
-            logger.error("Failed to get certificate");
-            setState(INIT);
-            return;
-        }
+        websocket_cfg.cert_pem = certPem;
     }
 
-    ws_client = esp_websocket_client_init(&websocket_cfg);
-    if (!ws_client)
-    {
-        logger.error("Failed to initialize WebSocket client");
-        setState(INIT);
+    _clientCertIndex = certIndex;
 
+    esp_websocket_client_handle_t newClient = esp_websocket_client_init(&websocket_cfg);
+    if (!newClient)
+    {
+        handleConnectFailure("esp_websocket_client_init returned null");
         return;
     }
 
     // Register event handler
-    esp_websocket_register_events(ws_client, WEBSOCKET_EVENT_ANY, websocket_event_handler, this);
+    esp_websocket_register_events(newClient, WEBSOCKET_EVENT_ANY, websocket_event_handler, this);
 
     // Start connection
-    esp_err_t ret = esp_websocket_client_start(ws_client);
+    esp_err_t ret = esp_websocket_client_start(newClient);
     if (ret != ESP_OK)
     {
-        logger.error((String("Failed to start WebSocket client: ") + esp_err_to_name(ret)).c_str());
-        setState(INIT);
-
+        esp_websocket_client_destroy(newClient);
+        handleConnectFailure((String("esp_websocket_client_start: ") + esp_err_to_name(ret)).c_str());
         return;
     }
 
+    lockWsClient();
+    ws_client = newClient;
+    unlockWsClient();
+
+    this->consecutiveConnectFailures = 0;
     logger.info("connectWebSocket: WebSocket started");
+}
+
+// A failed (re)connect that gets this far means the websocket client could not be
+// created/started at all -- almost always because the internal heap is too
+// fragmented to allocate the client task's stack ("Error create websocket task" /
+// ESP_FAIL from the IDF). That state does not heal on its own: every subsequent
+// attempt fails the same way and the device sits forever on the connecting screen.
+// Reboot after a few consecutive failures so the heap is defragmented and the
+// device reconnects cleanly once the server is reachable again.
+void Websocket::handleConnectFailure(const char *reason)
+{
+    this->consecutiveConnectFailures++;
+    this->logger.errorf("Failed to start WebSocket client (%s); consecutive=%u heap_free=%u heap_largest=%u",
+                        reason,
+                        (unsigned)this->consecutiveConnectFailures,
+                        (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+                        (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
+    setState(INIT);
+
+    if (this->consecutiveConnectFailures >= MAX_CONSECUTIVE_CONNECT_FAILURES)
+    {
+        this->logger.error("WebSocket client could not be started repeatedly (heap likely fragmented); rebooting to recover");
+
+        // Record why we are rebooting so the next boot's crash report carries the
+        // real cause instead of a bare "SW" reset reason. The API layer reads and
+        // clears this key once the report is acknowledged (see api_diag.cpp).
+        Preferences prefs;
+        if (prefs.begin(BOOT_DIAG_NAMESPACE, false))
+        {
+            prefs.putString(BOOT_DIAG_REBOOT_REASON_KEY, "WEBSOCKET_RECONNECT_HEAP_EXHAUSTION");
+            prefs.end();
+        }
+
+        delay(200);
+        esp_restart();
+    }
 }
 
 bool Websocket::shouldReconnect()
 {
-    return millis() - this->lastReconnectAttemptTime >= this->RECONNECT_INTERVAL_MS;
+    return millis() - this->lastReconnectAttemptTime >= this->nextRetryDelayMs;
+}
+
+void Websocket::growReconnectBackoff()
+{
+    uint32_t next = this->reconnectBackoffMs * 2;
+    this->reconnectBackoffMs = (next > this->RECONNECT_BACKOFF_MAX_MS) ? this->RECONNECT_BACKOFF_MAX_MS : next;
+}
+
+void Websocket::resetReconnectBackoff()
+{
+    this->reconnectBackoffMs = this->RECONNECT_BACKOFF_BASE_MS;
+    this->nextRetryDelayMs = this->RECONNECT_BACKOFF_BASE_MS;
+}
+
+void Websocket::logHeapStats()
+{
+    this->logger.infof("Heap internal: free=%u largest=%u",
+                       (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+                       (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
 }
 
 void Websocket::websocket_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
@@ -176,13 +352,17 @@ void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, v
 
     AttraccessApiConfig apiConfig = Settings::getAttraccessApiConfig();
 
+    this->lastInboundFrameTime = millis();
+
     switch (event_id)
     {
     case WEBSOCKET_EVENT_CONNECTED:
         logger.info("WebSocket connected");
+        this->consecutiveConnectFailures = 0;
         {
             this->_certManager.markSuccess();
         }
+        resetReconnectBackoff();
         setState(CONNECTED);
         break;
 
@@ -194,9 +374,18 @@ void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, v
     case WEBSOCKET_EVENT_DISCONNECTED:
     {
         logger.info("WebSocket disconnected");
-        if (apiConfig.useSSL)
+        if (apiConfig.useSSL && !this->_certManager.markFailure())
         {
-            this->_certManager.markFailure();
+            // Still iterating the certificate list: retry fast so a working cert near
+            // the end of the list is reached within minutes, not hours.
+            this->nextRetryDelayMs = this->CERT_ITERATION_INTERVAL_MS;
+        }
+        else
+        {
+            // A full certificate sweep failed (or non-SSL connect failed): the server
+            // is likely unreachable, so back off exponentially to curb reconnect churn.
+            growReconnectBackoff();
+            this->nextRetryDelayMs = this->reconnectBackoffMs;
         }
         setState(INIT);
         break;
@@ -235,31 +424,104 @@ void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, v
 void Websocket::sendMessage(const String &message)
 {
     this->logger.debug(("sendMessage: " + message).c_str());
-    int ret = esp_websocket_client_send_text(ws_client, message.c_str(), message.length(), pdMS_TO_TICKS(5000));
-
-    if (ret == -1)
-    {
-        logger.error("sendMessage: failed");
-    }
+    enqueueMessage(message.c_str(), message.length());
 }
 
 void Websocket::sendMessage(const char *message, size_t length)
 {
-    if (!ws_client)
+    enqueueMessage(message, length);
+}
+
+void Websocket::enqueueMessage(const char *data, size_t length)
+{
+    if (!tx_queue)
     {
-        logger.error("sendMessage(raw): ws_client not initialized");
+        logger.error("enqueueMessage: tx_queue not initialized");
         return;
     }
-    int ret = esp_websocket_client_send_text(ws_client, message, static_cast<int>(length), pdMS_TO_TICKS(5000));
-    if (ret == -1)
+
+    char *copy = (char *)malloc(length);
+    if (!copy)
     {
-        logger.error("sendMessage(raw): failed");
+        logger.error("enqueueMessage: allocation failed");
+        return;
+    }
+    memcpy(copy, data, length);
+
+    TxMessage msg{copy, length};
+    if (xQueueSend(tx_queue, &msg, 0) != pdTRUE)
+    {
+        logger.error("enqueueMessage: tx queue full, dropping message");
+        free(copy);
+    }
+}
+
+void Websocket::txTaskEntry(void *arg)
+{
+    static_cast<Websocket *>(arg)->txTaskLoop();
+}
+
+void Websocket::txTaskLoop()
+{
+    TxMessage msg;
+    while (true)
+    {
+        if (xQueueReceive(tx_queue, &msg, portMAX_DELAY) != pdTRUE)
+        {
+            continue;
+        }
+
+        lockWsClient();
+        if (!ws_client)
+        {
+            unlockWsClient();
+            logger.error("ws tx: ws_client not initialized, dropping message");
+            free(msg.data);
+            continue;
+        }
+        int ret = esp_websocket_client_send_text(ws_client, msg.data, static_cast<int>(msg.length), SEND_TIMEOUT_TICKS);
+        unlockWsClient();
+
+        if (ret == -1)
+        {
+            logger.error("ws tx: send failed");
+        }
+        free(msg.data);
+    }
+}
+
+void Websocket::drainTxQueue()
+{
+    if (!tx_queue)
+    {
+        return;
+    }
+    TxMessage msg;
+    while (xQueueReceive(tx_queue, &msg, 0) == pdTRUE)
+    {
+        free(msg.data);
     }
 }
 
 void Websocket::setState(ConnectionState state)
 {
     _state = state;
+
+    State::WebsocketPhase phase = State::WS_INIT;
+    switch (state)
+    {
+    case CONNECTING:
+        phase = State::WS_CONNECTING;
+        break;
+    case CONNECTED:
+        phase = State::WS_CONNECTED;
+        break;
+    case INIT:
+    default:
+        phase = State::WS_INIT;
+        break;
+    }
+    State::setWebsocketPhase(phase);
 
     State::setWebsocketState(state == CONNECTED, this->_lastApiConfig.hostname, this->_lastApiConfig.port, this->_lastApiConfig.useSSL);
 }
@@ -283,11 +545,16 @@ void Websocket::disableConnectionAttempts()
 {
     this->connectionAttemptsEnabled = false;
 
-    if (ws_client)
+    lockWsClient();
+    esp_websocket_client_handle_t oldClient = ws_client;
+    ws_client = nullptr;
+    unlockWsClient();
+    if (oldClient)
     {
-        esp_websocket_client_destroy(ws_client);
-        ws_client = nullptr;
+        esp_websocket_client_destroy(oldClient);
     }
+
+    drainTxQueue();
 
     setState(INIT);
 }

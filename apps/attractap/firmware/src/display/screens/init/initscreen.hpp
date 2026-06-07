@@ -25,9 +25,12 @@ private:
     void finalizeState(lv_obj_t *spinner, lv_obj_t *label, lv_color_t color);
     void markStateAsSuccess(lv_obj_t *spinner, lv_obj_t *label);
     void markStateAsError(lv_obj_t *spinner, lv_obj_t *label);
+    void markStateAsWarning(lv_obj_t *spinner, lv_obj_t *label);
     void resetState(lv_obj_t *spinner, lv_obj_t *label);
 
     static void onOpenSettingsButtonEvent(lv_event_t *e);
+
+    static String formatIp(esp_ip4_addr_t ip);
 
     lv_obj_t *wifiSpinner = nullptr;
     lv_obj_t *wifiLabel = nullptr;
@@ -40,4 +43,9 @@ private:
 
     lv_obj_t *apiAuthenticationSpinner = nullptr;
     lv_obj_t *apiAuthenticationLabel = nullptr;
+
+    // Connection / cert-detection progress detail lines.
+    lv_obj_t *serverTargetLabel = nullptr;
+    lv_obj_t *certLabel = nullptr;
+    lv_obj_t *connectionStateLabel = nullptr;
 };

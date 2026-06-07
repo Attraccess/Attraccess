@@ -33,10 +33,13 @@ export class AttractapCrashReportHandler {
       const report = await this.attractapService.createCrashReport(socket.readerId, payload);
       this.logger.warn(
         `Stored crash report ${report.id} for reader ${socket.readerId}: reason=${report.resetReason} ` +
+          `rebootReason=${report.rebootReason ?? 'n/a'} ` +
           `heapFree=${report.heapFreeBytes ?? 'n/a'} largestBlock=${report.largestFreeBlockBytes ?? 'n/a'} ` +
           `uptimeMs=${report.uptimeBeforeResetMs ?? 'n/a'} ws=${report.wsState ?? 'n/a'} wifi=${report.wifiState ?? 'n/a'}`,
       );
-      this.metricsService.attractapCrashReportsTotal.inc();
+      this.metricsService.attractapCrashReportsTotal.inc({
+        reset_reason: this.normalizeResetReason(report.resetReason),
+      });
       await socket.sendMessage(
         new AttractapEvent(AttractapEventType.READER_CRASH_REPORT, { received: true, id: report.id }),
       );
@@ -46,5 +49,24 @@ export class AttractapCrashReportHandler {
         new AttractapEvent(AttractapEventType.READER_CRASH_REPORT, { error: 'CRASH_REPORT_STORE_FAILED' }),
       );
     }
+  }
+
+  /**
+   * Normalize a reader-supplied reset reason into a bounded, low-cardinality
+   * label value (uppercase, alphanumeric/underscore only, length-capped).
+   * Readers send a fixed enum in practice, but the field is a free string on
+   * the wire, so we sanitize defensively to protect Prometheus cardinality.
+   */
+  private normalizeResetReason(resetReason?: string | null): string {
+    if (!resetReason || typeof resetReason !== 'string') {
+      return 'unknown';
+    }
+    const normalized = resetReason
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .slice(0, 40);
+    return normalized || 'unknown';
   }
 }

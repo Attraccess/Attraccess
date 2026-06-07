@@ -67,7 +67,7 @@ private:
         EXTERNAL_STATE_NONE,
 #ifdef HAS_LVGL_DISPLAY
         EXTERNAL_STATE_ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO,
-        EXTERNAL_STATE_ENROLL_NEW_CARD,
+        EXTERNAL_STATE_RESET_NFC_CARD,
 #endif
         EXTERNAL_STATE_AUTHENTICATE_CARD,
         EXTERNAL_STATE_FIRMWARE_UPDATE,
@@ -89,6 +89,79 @@ private:
         uint8_t keyBytes[16];
     };
     ApiEnrollNewCardData_t apiEnrollNewCardData;
+
+    // Enrollment is a self-contained, sticky sub-flow. Once started it owns the
+    // display until it reaches a terminal state (success, cancel or timeout) so
+    // the generic screen routing can never steal the enrollment screen. The
+    // whole flow is poll-driven (card detection stays disabled), which removes
+    // the old dependency on a fresh card-detection edge for the key-write step
+    // (the "jiggle the card to get a beep" symptom).
+    enum EnrollmentPhase_t
+    {
+        ENROLL_PHASE_NONE,
+        ENROLL_PHASE_WAIT_FOR_CARD, // screen up, probing for a writable card
+        ENROLL_PHASE_REQUESTED_KEY, // asked server for key material, awaiting it
+        ENROLL_PHASE_WRITING,       // writing the key to the (still-present) card
+        ENROLL_PHASE_SUCCESS,       // success shown, dwelling before exit
+        ENROLL_PHASE_ERROR,         // error shown, dwelling before retry
+    };
+    EnrollmentPhase_t enrollPhase = ENROLL_PHASE_NONE;
+    // Set by the card-detection callback when a card enters the field during
+    // ENROLL_PHASE_WAIT_FOR_CARD. The enrollment state machine consumes it on
+    // the main loop. Lets WAIT_FOR_CARD ride the proven handleCardDetection
+    // loop (reliable re-arm across removals) instead of blind PN532 polling.
+    volatile bool enrollCardDetected = false;
+    volatile bool enrollKeyMaterialReady = false;
+    volatile bool enrollCancelRequested = false;
+    volatile bool enrollErrorPending = false;
+    // Fixed buffer, not an Arduino String: the producer runs on the websocket
+    // task and the consumer on the main loop. A String would reallocate its
+    // heap buffer on assignment, which the main loop could observe mid-update
+    // (dangling pointer / torn read). A plain char[] has no pointer to dangle.
+    char enrollErrorMessage[64] = {0};
+    uint32_t enrollPhaseChangedMs = 0;
+    static constexpr uint32_t ENROLLMENT_TIMEOUT_MS = 30000;
+    static constexpr uint32_t ENROLL_SUCCESS_DWELL_MS = 1500;
+    static constexpr uint32_t ENROLL_ERROR_DWELL_MS = 1800;
+    void beginEnrollment();
+    void processEnrollment();
+    void exitEnrollment();
+
+    // Card reset/deletion. Mirrors the sticky, poll-driven enrollment sub-flow:
+    // once started it owns the display until success, cancel or timeout. Unlike
+    // enrollment there is no key round-trip — the server hands over the stored
+    // key + slot up front, so the reader can authenticate the card and write the
+    // factory key back as soon as a card is presented.
+    struct ApiResetNfcCardData_t
+    {
+        String username;
+        uint8_t keyNo;
+        uint8_t keyBytes[16];
+    };
+    ApiResetNfcCardData_t apiResetNfcCardData;
+
+    enum ResetPhase_t
+    {
+        RESET_PHASE_NONE,
+        RESET_PHASE_WAIT_FOR_CARD, // screen up, waiting for a card to reset
+        RESET_PHASE_WRITING,       // authenticating + writing the factory key back
+        RESET_PHASE_SUCCESS,       // success shown, dwelling before exit
+        RESET_PHASE_ERROR,         // error shown, dwelling before retry
+    };
+    ResetPhase_t resetPhase = RESET_PHASE_NONE;
+    // Set by the card-detection callback when a card enters the field during
+    // RESET_PHASE_WAIT_FOR_CARD; consumed on the main loop. Rides the proven
+    // handleCardDetection loop for reliable re-arm across removals (like ATT-503).
+    volatile bool resetCardDetected = false;
+    volatile bool resetCancelRequested = false;
+    uint32_t resetStartTimeMs = 0;
+    uint32_t resetPhaseChangedMs = 0;
+    static constexpr uint32_t RESET_TIMEOUT_MS = 30000;
+    static constexpr uint32_t RESET_SUCCESS_DWELL_MS = 1500;
+    static constexpr uint32_t RESET_ERROR_DWELL_MS = 1800;
+    void beginReset();
+    void processReset();
+    void exitReset();
 #endif
 
     API::CardAuthenticationDetailsResponse cardAuthenticationData;
@@ -236,6 +309,7 @@ private:
         APPLICATION_STATE_RESOURCE_LIST,
         APPLICATION_STATE_UNLOCKED,
         APPLICATION_STATE_ENROLLMENT,
+        APPLICATION_STATE_RESET,
 #else
         APPLICATION_STATE_WAIT_FOR_CARD,
 #endif
