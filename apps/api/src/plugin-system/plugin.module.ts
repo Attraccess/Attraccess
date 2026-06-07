@@ -10,13 +10,13 @@ import {
   SystemEventPayload,
   SystemEventSubscription,
 } from '@attraccess/plugins-backend-sdk';
-import { createRequire } from 'module';
+import { createRequire, Module as NodeModuleClass } from 'module';
 import { LoadedPluginManifest } from './plugin.manifest';
 import { PluginService } from './plugin.service';
 import { PluginSandboxService } from './plugin-sandbox.service';
 import { PluginEventsService } from './plugin-events.service';
 import { PluginController } from './plugin.controller';
-import { join } from 'path';
+import { dirname, join } from 'path';
 
 @Global()
 @Module({})
@@ -89,8 +89,7 @@ export class PluginModule {
       return null;
     }
 
-    const pluginRequire = createRequire(__filename);
-    const importedModule = pluginRequire(
+    const importedModule = PluginModule.loadPluginExports(
       join(PluginService.PLUGIN_PATH, manifest.main.backend.directory, manifest.main.backend.entryPoint)
     );
 
@@ -107,6 +106,37 @@ export class PluginModule {
 
     const context = PluginModule.createPluginContext(manifest);
     return (exported as PluginBackendModule).register(context);
+  }
+
+  // Loads a plugin's CommonJS backend entry so that its *externalized*
+  // host-shared packages (@nestjs/common, typeorm, …) resolve to the host's
+  // single copy. Plugins deliberately do not bundle those packages — a bundled
+  // copy is a different type and breaks DI token identity (see
+  // docs/en/plugins/developing-plugins.md "Packaging the backend"). The shipped
+  // index.js therefore does a bare `require('@nestjs/common')` at runtime, which
+  // Node resolves relative to the plugin's own directory. In a production image
+  // the plugin lives under STORAGE_ROOT/plugins/… while the host installs its
+  // node_modules under dist/apps/api/, so that bare require finds nothing and the
+  // plugin crashes with "Cannot find module '@nestjs/common'". We load the entry
+  // through a Module whose resolution paths also include the host's node_modules,
+  // so those bare requires hit (and reuse, via require.cache) the host's copy.
+  private static loadPluginExports(entryFile: string): { default?: unknown } {
+    const NodeModule = NodeModuleClass as unknown as {
+      _nodeModulePaths(from: string): string[];
+      new (id: string, parent?: unknown): { filename: string; paths: string[]; exports: { default?: unknown }; load(filename: string): void };
+    };
+
+    const hostRequire = createRequire(__filename);
+    const hostModulePaths = NodeModule._nodeModulePaths(dirname(hostRequire.resolve('@nestjs/common')));
+
+    const pluginModule = new NodeModule(entryFile);
+    pluginModule.filename = entryFile;
+    // The plugin's own directory first (for any deps it does bundle/ship), then
+    // the host's node_modules so externalized host-shared packages resolve.
+    pluginModule.paths = [...NodeModule._nodeModulePaths(dirname(entryFile)), ...hostModulePaths];
+    pluginModule.load(entryFile);
+
+    return pluginModule.exports;
   }
 
   private static createPluginContext(manifest: LoadedPluginManifest): PluginContext {

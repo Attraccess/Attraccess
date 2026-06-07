@@ -36,10 +36,10 @@ describe('PluginController', () => {
     rmSync(root, { recursive: true, force: true });
   });
 
-  it('returns every discovered plugin', () => {
+  it('returns every discovered plugin enriched with load status', () => {
     const plugins = [frontendPlugin('a'), frontendPlugin('b')];
     jest.spyOn(PluginService, 'getPlugins').mockReturnValue(plugins);
-    expect(controller.getAllPlugins()).toBe(plugins);
+    expect(controller.getAllPlugins()).toEqual(plugins.map((plugin) => ({ ...plugin, status: 'unknown', error: null })));
   });
 
   describe('getFrontendPluginFile', () => {

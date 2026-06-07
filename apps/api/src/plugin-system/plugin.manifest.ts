@@ -114,6 +114,22 @@ export class LoadedPluginManifest extends PluginManifest {
     example: '123e4567-e89b-12d3-a456-426614174000',
   })
   id: string;
+
+  @ApiProperty({
+    description:
+      'Backend load status: "loaded" if the plugin backend was imported successfully, "error" if it failed to load, "unknown" if it has no backend or plugins are disabled.',
+    enum: ['loaded', 'error', 'unknown'],
+    example: 'loaded',
+  })
+  status: 'loaded' | 'error' | 'unknown';
+
+  @ApiProperty({
+    description: 'The error message if the plugin backend failed to load, otherwise null.',
+    nullable: true,
+    type: String,
+    example: "Cannot find module '@nestjs/common'",
+  })
+  error: string | null;
 }
 
 const mainSchema = z.object({

@@ -45,6 +45,25 @@ export class PluginService {
     return PluginService.getPlugins().find((plugin) => plugin.id === id);
   }
 
+  // Returns the discovered plugins enriched with their backend load status so the
+  // admin UI can surface plugins that failed to load (e.g. a missing dependency)
+  // instead of silently showing them as if everything were fine.
+  public static getPluginsWithLoadStatus(): LoadedPluginManifest[] {
+    return PluginService.getPlugins().map((manifest) => {
+      const key = `${manifest.name}@${manifest.version}`;
+      const error = PluginService.pluginLoadErrors.get(key);
+
+      let status: LoadedPluginManifest['status'] = 'unknown';
+      if (error) {
+        status = 'error';
+      } else if (PluginService.loadedPlugins.has(key)) {
+        status = 'loaded';
+      }
+
+      return { ...manifest, status, error: error ? error.message : null };
+    });
+  }
+
   public static toManifestInfo(manifest: LoadedPluginManifest): PluginManifestInfo {
     return {
       id: manifest.id,

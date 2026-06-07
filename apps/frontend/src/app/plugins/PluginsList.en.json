@@ -8,7 +8,14 @@
     "version": "0.0.16",
     "directory": "Directory",
     "permissions": "Permissions",
+    "status": "Status",
     "actions": "Actions"
+  },
+  "status": {
+    "loaded": "Loaded",
+    "error": "Failed to load",
+    "unknown": "Frontend only",
+    "errorTooltip": "This plugin failed to load on the server: {{message}}"
   },
   "noPermissions": "None requested",
   "deleteTooltip": "Remove plugin",

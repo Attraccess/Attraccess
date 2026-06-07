@@ -21,7 +21,7 @@ import {
   TooltipContent,
 } from '@heroui/react';
 import { Button } from '../../components/button';
-import { BookOpen, Trash2, Upload } from 'lucide-react';
+import { AlertTriangle, BookOpen, CheckCircle2, Trash2, Upload } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { UploadPluginModal } from './UploadPluginModal';
 import { useToastMessage } from '../../components/toastProvider';
@@ -117,6 +117,7 @@ export function PluginsList() {
             <TableColumn>{t('columns.version')}</TableColumn>
             <TableColumn>{t('columns.directory')}</TableColumn>
             <TableColumn>{t('columns.permissions')}</TableColumn>
+            <TableColumn>{t('columns.status')}</TableColumn>
             <TableColumn>{t('columns.actions')}</TableColumn>
           </TableHeader>
           <TableBody items={plugins} renderEmptyState={() => <EmptyState />}>
@@ -140,6 +141,32 @@ export function PluginsList() {
                     </div>
                   ) : (
                     <span className="text-default-400">{t('noPermissions')}</span>
+                  )}
+                </TableCell>
+                <TableCell>
+                  {plugin.status === 'error' ? (
+                    <Tooltip>
+                      <Chip variant="soft" color="danger" data-cy={`plugins-list-status-${plugin.id}`}>
+                        <span className="inline-flex items-center gap-1">
+                          <AlertTriangle size={14} />
+                          {t('status.error')}
+                        </span>
+                      </Chip>
+                      <TooltipContent>
+                        {t('status.errorTooltip', { message: plugin.error ?? '' })}
+                      </TooltipContent>
+                    </Tooltip>
+                  ) : plugin.status === 'loaded' ? (
+                    <Chip variant="soft" color="success" data-cy={`plugins-list-status-${plugin.id}`}>
+                      <span className="inline-flex items-center gap-1">
+                        <CheckCircle2 size={14} />
+                        {t('status.loaded')}
+                      </span>
+                    </Chip>
+                  ) : (
+                    <Chip variant="soft" color="default" data-cy={`plugins-list-status-${plugin.id}`}>
+                      {t('status.unknown')}
+                    </Chip>
                   )}
                 </TableCell>
                 <TableCell>

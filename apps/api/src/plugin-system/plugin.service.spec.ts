@@ -93,6 +93,31 @@ describe('PluginService', () => {
       expect(plugins[0].main.backend.directory).toBe(join('my-plugin', 'dist'));
     });
 
+    it('reports per-plugin backend load status (loaded / error / unknown)', () => {
+      writePlugin(root, 'plugin-ok', {
+        name: 'plugin-ok',
+        version: '1.0.0',
+        main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+        attraccessVersion: { min: '1.0.0' },
+      });
+      writePlugin(root, 'plugin-bad', {
+        name: 'plugin-bad',
+        version: '2.0.0',
+        main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+        attraccessVersion: { min: '1.0.0' },
+      });
+
+      PluginService.getPlugins();
+      PluginService.markPluginAsLoaded('plugin-ok@1.0.0');
+      PluginService.setPluginLoadError('plugin-bad@2.0.0', new Error("Cannot find module '@nestjs/common'"));
+
+      const byName = Object.fromEntries(PluginService.getPluginsWithLoadStatus().map((p) => [p.name, p]));
+      expect(byName['plugin-ok'].status).toBe('loaded');
+      expect(byName['plugin-ok'].error).toBeNull();
+      expect(byName['plugin-bad'].status).toBe('error');
+      expect(byName['plugin-bad'].error).toBe("Cannot find module '@nestjs/common'");
+    });
+
     it('caches discovery between calls and re-scans after configure', () => {
       writePlugin(root, 'plugin-a', {
         name: 'plugin-a',

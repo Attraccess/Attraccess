@@ -36,7 +36,7 @@ export class PluginController {
     type: [LoadedPluginManifest],
   })
   getAllPlugins() {
-    return PluginService.getPlugins();
+    return PluginService.getPluginsWithLoadStatus();
   }
 
   // Also add support for loading the index.js file
