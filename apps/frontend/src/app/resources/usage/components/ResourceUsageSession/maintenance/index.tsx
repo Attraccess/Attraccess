@@ -6,7 +6,9 @@ import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-front
 import { MaintenanceReasonDisplay } from '../../../../../../components/MaintenanceReasonDisplay';
 import { ResourceIntroducersList } from '../../../../../../components/ResourceIntroducersList';
 import { StartSessionControls } from '../../StartSessionControls';
-import { Alert, AlertContent, AlertDescription, AlertTitle } from '@heroui/react';
+import { MarkDoneModal } from '../../../../details/maintenance-management/mark-done';
+import { Alert, AlertContent, AlertDescription, AlertTitle, Button } from '@heroui/react';
+import { CheckCircleIcon } from 'lucide-react';
 
 import de from './de.json';
 import en from './en.json';
@@ -57,6 +59,18 @@ export function MaintenanceInProgressDisplay(props: Props) {
                 <MaintenanceReasonDisplay reason={maintenance.reason} fallback={t('alert.reason.noReason')} />
               </p>
             </div>
+            {permissions?.canManage && (
+              <div className="mt-4">
+                <MarkDoneModal resourceId={resourceId} maintenanceId={maintenance.id}>
+                  {(open) => (
+                    <Button variant="primary" onPress={open} className="w-full sm:w-auto">
+                      <CheckCircleIcon className="w-4 h-4" />
+                      {t('alert.markDone')}
+                    </Button>
+                  )}
+                </MarkDoneModal>
+              </div>
+            )}
           </AlertContent>
         </Alert>
       ))}

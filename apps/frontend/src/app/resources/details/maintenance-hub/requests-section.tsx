@@ -11,6 +11,7 @@ import {
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { MaintenanceReasonDisplay } from '../../../../components/MaintenanceReasonDisplay';
+import { SectionCard } from './section-card';
 import de from './de.json';
 import en from './en.json';
 
@@ -40,14 +41,12 @@ export function RequestsSection(props: Props) {
   if (open.length === 0) return null;
 
   return (
-    <section>
-      <div className="flex items-center gap-2 mb-3">
-        <MessageSquareWarningIcon className="w-4 h-4 text-warning" />
-        <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
-          {t('activity.requests.label')} · {open.length}
-        </h3>
-      </div>
-
+    <SectionCard
+      icon={<MessageSquareWarningIcon className="w-4 h-4 text-warning" />}
+      title={t('activity.requests.label')}
+      count={open.length}
+      accent="warning"
+    >
       <div className="flex flex-col gap-3">
         {open.map((request) => (
           <div
@@ -88,6 +87,6 @@ export function RequestsSection(props: Props) {
           </div>
         ))}
       </div>
-    </section>
+    </SectionCard>
   );
 }
