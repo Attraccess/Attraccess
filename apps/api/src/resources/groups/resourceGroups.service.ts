@@ -36,7 +36,11 @@ export class ResourceGroupsService {
   ) {}
 
   /**
-   * Whether the user is "part of" the group: an introducer/maintainer of it, or has been introduced to it.
+   * Whether the user is "part of" the group: an introducer/maintainer of it, or has a currently
+   * valid introduction to it.
+   *
+   * An introduction counts only if its latest history item is a GRANT — revoked introductions keep
+   * their row (and a REVOKE history item) in the database but must not grant visibility.
    */
   public async userIsPartOfGroup(groupId: number, userId: number): Promise<boolean> {
     const introducerCount = await this.resourceIntroducerRepository.count({
@@ -46,11 +50,36 @@ export class ResourceGroupsService {
       return true;
     }
 
-    const introductionCount = await this.resourceIntroductionRepository.count({
-      where: { resourceGroupId: groupId, receiverUserId: userId },
-    });
-    return introductionCount > 0;
+    const activeIntroductions = await this.resourceIntroductionRepository.query(
+      `SELECT 1 FROM "resource_introduction" "rin"
+       WHERE "rin"."resourceGroupId" = ? AND "rin"."receiverUserId" = ?
+       AND (
+         SELECT "h"."action" FROM "resource_introduction_history_item" "h"
+         WHERE "h"."introductionId" = "rin"."id"
+         ORDER BY "h"."createdAt" DESC, "h"."id" DESC
+         LIMIT 1
+       ) = 'grant'
+       LIMIT 1`,
+      [groupId, userId],
+    );
+    return activeIntroductions.length > 0;
   }
+
+  /**
+   * SQL fragment (for use against the `group` query-builder alias) that is true when the user has a
+   * currently valid (latest history item = GRANT) introduction to the group. Uses the `:userId`
+   * named parameter.
+   */
+  private static readonly ACTIVE_INTRODUCTION_EXISTS_SQL = `EXISTS (
+    SELECT 1 FROM "resource_introduction" "rin"
+    WHERE "rin"."resourceGroupId" = group.id AND "rin"."receiverUserId" = :userId
+    AND (
+      SELECT "h"."action" FROM "resource_introduction_history_item" "h"
+      WHERE "h"."introductionId" = "rin"."id"
+      ORDER BY "h"."createdAt" DESC, "h"."id" DESC
+      LIMIT 1
+    ) = 'grant'
+  )`;
 
   public async createOne(dto: CreateResourceGroupDto): Promise<ResourceGroup> {
     const resourceGroup = this.resourceGroupRepository.create({
@@ -83,10 +112,7 @@ export class ResourceGroupsService {
         `EXISTS (SELECT 1 FROM "resource_introducer" "ri" WHERE "ri"."resourceGroupId" = group.id AND "ri"."userId" = :userId)`,
         { userId: visibility.userId },
       )
-      .orWhere(
-        `EXISTS (SELECT 1 FROM "resource_introduction" "rin" WHERE "rin"."resourceGroupId" = group.id AND "rin"."receiverUserId" = :userId)`,
-        { userId: visibility.userId },
-      )
+      .orWhere(ResourceGroupsService.ACTIVE_INTRODUCTION_EXISTS_SQL, { userId: visibility.userId })
       .getMany();
   }
 
