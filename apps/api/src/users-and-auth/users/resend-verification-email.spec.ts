@@ -1,121 +1,62 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { UsersController } from './users.controller';
+import { UserRegistrationService } from './user-registration.service';
 import { UsersService } from './users.service';
 import { AuthService } from '../auth/auth.service';
 import { EmailService } from '../../email/email.service';
-import { SSOService } from '../auth/sso/sso.service';
-import { TokenHashService } from '../../encryption/token-hash.service';
+import { SignupDomainService } from './signup-domain.service';
 import { PasswordPolicyService } from '../password-policy/password-policy.service';
-import { BruteForceProtectionService } from '../rate-limiting/brute-force.service';
-import { AuthAuditLogger } from '../rate-limiting/auth-audit.logger';
 import { ServiceUnavailableException } from '@nestjs/common';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { Setting, User } from '@attraccess/database-entities';
+import { User } from '@attraccess/database-entities';
 
-describe('UsersController – resendVerificationEmail', () => {
-  let controller: UsersController;
+describe('UserRegistrationService – resendVerificationEmail', () => {
+  let service: UserRegistrationService;
 
   const usersService = {
     findOne: jest.fn(),
-    createOne: jest.fn(),
-    updateOne: jest.fn(),
-    deleteOne: jest.fn(),
-    findMany: jest.fn(),
-    getTotalCount: jest.fn(),
-    isSSOUser: jest.fn(),
-    findOneById: jest.fn(),
-    requestDeleteAccount: jest.fn(),
-    confirmDeleteAccount: jest.fn(),
   };
 
   const authService = {
     generateEmailVerificationToken: jest.fn(),
-    verifyEmail: jest.fn(),
-    addAuthenticationDetails: jest.fn(),
-    removeAuthenticationDetails: jest.fn(),
-    generatePasswordResetToken: jest.fn(),
-    changePassword: jest.fn(),
-    validateAuthenticationDetails: jest.fn(),
-    getUserByUsernameAndAuthenticationDetails: jest.fn(),
-    userHasSSOAuthentication: jest.fn(),
-    findSSOAuthenticationDetail: jest.fn(),
-    updateSSOSubject: jest.fn(),
-    removeLocalPasswordAuthentication: jest.fn(),
   };
 
   const emailService = {
     sendVerificationEmail: jest.fn(),
-    sendUserInvitationEmail: jest.fn(),
-    sendPasswordResetEmail: jest.fn(),
-    sendPasswordChangedEmail: jest.fn(),
-    sendUsernameChangedEmail: jest.fn(),
-    sendDeleteAccountConfirmationEmail: jest.fn(),
-  };
-
-  const ssoService = {
-    findAll: jest.fn(),
-    findOneById: jest.fn(),
-  };
-
-  const settingRepository = {
-    findOne: jest.fn(),
-  };
-
-  const tokenHashService = {
-    hashToken: jest.fn(),
   };
 
   beforeEach(async () => {
     jest.resetAllMocks();
 
     const module: TestingModule = await Test.createTestingModule({
-      controllers: [UsersController],
       providers: [
+        UserRegistrationService,
         { provide: UsersService, useValue: usersService },
         { provide: AuthService, useValue: authService },
         { provide: EmailService, useValue: emailService },
-        { provide: SSOService, useValue: ssoService },
-        { provide: getRepositoryToken(Setting), useValue: settingRepository },
-        { provide: TokenHashService, useValue: tokenHashService },
+        { provide: SignupDomainService, useValue: { assertEmailDomainAllowed: jest.fn() } },
         {
           provide: PasswordPolicyService,
           useValue: {
             validate: jest.fn(async () => ({ ok: true, errors: [], zxcvbn: { score: 4, required: 3 } })),
-            getPolicy: jest.fn(),
-            getPublicPolicy: jest.fn(),
+            resolveRole: jest.fn(),
           },
-        },
-        {
-          provide: BruteForceProtectionService,
-          useValue: {
-            assertIpAllowed: jest.fn().mockResolvedValue(undefined),
-            assertAccountAllowed: jest.fn().mockResolvedValue(undefined),
-            recordFailure: jest.fn().mockResolvedValue(undefined),
-            recordSuccess: jest.fn().mockResolvedValue(undefined),
-          },
-        },
-        {
-          provide: AuthAuditLogger,
-          useValue: { log: jest.fn() },
         },
       ],
     }).compile();
 
-    controller = module.get<UsersController>(UsersController);
+    service = module.get<UserRegistrationService>(UserRegistrationService);
   });
 
-  it('should return OK when no user exists with the given email', async () => {
+  it('should resolve when no user exists with the given email', async () => {
     usersService.findOne.mockResolvedValue(null);
 
-    const result = await controller.resendVerificationEmail({ email: 'nonexistent@example.com' });
+    await expect(service.resendVerificationEmail('nonexistent@example.com')).resolves.toBeUndefined();
 
-    expect(result).toEqual({ message: 'OK' });
     expect(usersService.findOne).toHaveBeenCalledWith({ email: 'nonexistent@example.com' });
     expect(authService.generateEmailVerificationToken).not.toHaveBeenCalled();
     expect(emailService.sendVerificationEmail).not.toHaveBeenCalled();
   });
 
-  it('should return OK when user email is already verified (no email sent)', async () => {
+  it('should resolve when user email is already verified (no email sent)', async () => {
     const verifiedUser: Partial<User> = {
       id: 1,
       email: 'verified@example.com',
@@ -123,9 +64,8 @@ describe('UsersController – resendVerificationEmail', () => {
     };
     usersService.findOne.mockResolvedValue(verifiedUser);
 
-    const result = await controller.resendVerificationEmail({ email: 'verified@example.com' });
+    await expect(service.resendVerificationEmail('verified@example.com')).resolves.toBeUndefined();
 
-    expect(result).toEqual({ message: 'OK' });
     expect(authService.generateEmailVerificationToken).not.toHaveBeenCalled();
     expect(emailService.sendVerificationEmail).not.toHaveBeenCalled();
   });
@@ -140,9 +80,8 @@ describe('UsersController – resendVerificationEmail', () => {
     authService.generateEmailVerificationToken.mockResolvedValue('new-token-123');
     emailService.sendVerificationEmail.mockResolvedValue(undefined);
 
-    const result = await controller.resendVerificationEmail({ email: 'unverified@example.com' });
+    await service.resendVerificationEmail('unverified@example.com');
 
-    expect(result).toEqual({ message: 'OK' });
     expect(usersService.findOne).toHaveBeenCalledWith({ email: 'unverified@example.com' });
     expect(authService.generateEmailVerificationToken).toHaveBeenCalledWith(unverifiedUser);
     expect(emailService.sendVerificationEmail).toHaveBeenCalledWith(unverifiedUser, 'new-token-123');
@@ -158,9 +97,7 @@ describe('UsersController – resendVerificationEmail', () => {
     authService.generateEmailVerificationToken.mockResolvedValue('token');
     emailService.sendVerificationEmail.mockRejectedValue({ code: 'ECONNREFUSED' });
 
-    await expect(controller.resendVerificationEmail({ email: 'smtp-fail@example.com' })).rejects.toThrow(
-      ServiceUnavailableException,
-    );
+    await expect(service.resendVerificationEmail('smtp-fail@example.com')).rejects.toThrow(ServiceUnavailableException);
   });
 
   it('should throw ServiceUnavailableException when SMTP connection times out', async () => {
@@ -173,9 +110,7 @@ describe('UsersController – resendVerificationEmail', () => {
     authService.generateEmailVerificationToken.mockResolvedValue('token');
     emailService.sendVerificationEmail.mockRejectedValue({ code: 'ETIMEDOUT' });
 
-    await expect(controller.resendVerificationEmail({ email: 'timeout@example.com' })).rejects.toThrow(
-      ServiceUnavailableException,
-    );
+    await expect(service.resendVerificationEmail('timeout@example.com')).rejects.toThrow(ServiceUnavailableException);
   });
 
   it('should throw ServiceUnavailableException when SMTP connection resets', async () => {
@@ -188,9 +123,7 @@ describe('UsersController – resendVerificationEmail', () => {
     authService.generateEmailVerificationToken.mockResolvedValue('token');
     emailService.sendVerificationEmail.mockRejectedValue({ code: 'ECONNRESET' });
 
-    await expect(controller.resendVerificationEmail({ email: 'reset@example.com' })).rejects.toThrow(
-      ServiceUnavailableException,
-    );
+    await expect(service.resendVerificationEmail('reset@example.com')).rejects.toThrow(ServiceUnavailableException);
   });
 
   it('should re-throw unexpected errors from email service', async () => {
@@ -204,7 +137,7 @@ describe('UsersController – resendVerificationEmail', () => {
     const unexpectedError = new Error('Unexpected template error');
     emailService.sendVerificationEmail.mockRejectedValue(unexpectedError);
 
-    await expect(controller.resendVerificationEmail({ email: 'other-error@example.com' })).rejects.toThrow(
+    await expect(service.resendVerificationEmail('other-error@example.com')).rejects.toThrow(
       'Unexpected template error',
     );
   });
@@ -219,33 +152,14 @@ describe('UsersController – resendVerificationEmail', () => {
     const tokenError = new Error('Token generation failed');
     authService.generateEmailVerificationToken.mockRejectedValue(tokenError);
 
-    await expect(controller.resendVerificationEmail({ email: 'token-error@example.com' })).rejects.toThrow(
-      'Token generation failed',
-    );
+    await expect(service.resendVerificationEmail('token-error@example.com')).rejects.toThrow('Token generation failed');
     expect(emailService.sendVerificationEmail).not.toHaveBeenCalled();
   });
 
-  it('should not reveal whether the email exists (same response for all cases)', async () => {
-    usersService.findOne.mockResolvedValue(null);
-    const noUserResult = await controller.resendVerificationEmail({ email: 'no@example.com' });
-
-    usersService.findOne.mockResolvedValue({ id: 1, email: 'yes@example.com', isEmailVerified: true });
-    const verifiedResult = await controller.resendVerificationEmail({ email: 'yes@example.com' });
-
-    usersService.findOne.mockResolvedValue({ id: 2, email: 'new@example.com', isEmailVerified: false });
-    authService.generateEmailVerificationToken.mockResolvedValue('t');
-    emailService.sendVerificationEmail.mockResolvedValue(undefined);
-    const unverifiedResult = await controller.resendVerificationEmail({ email: 'new@example.com' });
-
-    expect(noUserResult).toEqual({ message: 'OK' });
-    expect(verifiedResult).toEqual({ message: 'OK' });
-    expect(unverifiedResult).toEqual({ message: 'OK' });
-  });
-
-  it('should call findOne with the exact email from the DTO', async () => {
+  it('should call findOne with the exact email passed in', async () => {
     usersService.findOne.mockResolvedValue(null);
 
-    await controller.resendVerificationEmail({ email: 'UPPER@CASE.COM' });
+    await service.resendVerificationEmail('UPPER@CASE.COM');
 
     expect(usersService.findOne).toHaveBeenCalledWith({ email: 'UPPER@CASE.COM' });
   });
