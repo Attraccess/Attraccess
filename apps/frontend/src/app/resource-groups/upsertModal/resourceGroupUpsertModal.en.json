@@ -27,5 +27,12 @@
     "blocksAccess": {
       "label": "Block access until retrained"
     }
+  },
+  "visibility": {
+    "sectionTitle": "Visibility",
+    "description": "Use this for organizational groups that are not relevant to everyone.",
+    "hidden": {
+      "label": "Hide from users who are not part of this group"
+    }
   }
 }

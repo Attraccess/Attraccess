@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, HTMLAttributes } from 'react';
 import { Form, Input, Label, Spinner, TextArea, TextField } from '@heroui/react';
 import { Button } from '../../../components/button';
+import { LabeledSwitch } from '../../../components/labeledSwitch';
 import { Save, Edit3, Trash2Icon } from 'lucide-react';
 import {
   useResourcesServiceResourceGroupsGetOne,
@@ -29,6 +30,7 @@ export function GroupDetailsForm(props: Readonly<GroupDetailsFormProps & Omit<HT
   const queryClient = useQueryClient();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [isHidden, setIsHidden] = useState(false);
   const navigate = useNavigate();
 
   const { data: group, isLoading, error } = useResourcesServiceResourceGroupsGetOne({ id: groupId });
@@ -55,6 +57,7 @@ export function GroupDetailsForm(props: Readonly<GroupDetailsFormProps & Omit<HT
     if (group) {
       setName(group.name);
       setDescription(group.description || '');
+      setIsHidden(group.isHidden ?? false);
     }
   }, [group]);
 
@@ -64,7 +67,7 @@ export function GroupDetailsForm(props: Readonly<GroupDetailsFormProps & Omit<HT
 
     await updateGroup({
       id: groupId,
-      requestBody: { name: name.trim(), description: description.trim() || undefined },
+      requestBody: { name: name.trim(), description: description.trim() || undefined, isHidden },
     });
   };
 
@@ -140,6 +143,21 @@ export function GroupDetailsForm(props: Readonly<GroupDetailsFormProps & Omit<HT
             onChange={(e) => setDescription(e.target.value)}
             data-cy="group-details-form-description-input"
           />
+        </section>
+
+        <section className="w-full flex flex-col gap-2">
+          <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
+            {t('sections.visibility')}
+          </h3>
+
+          <LabeledSwitch
+            isSelected={isHidden}
+            onChange={setIsHidden}
+            data-cy="group-details-form-is-hidden-switch"
+          >
+            <span className="text-small">{t('form.fields.isHidden.label')}</span>
+          </LabeledSwitch>
+          <span className="text-tiny text-default-400">{t('form.fields.isHidden.description')}</span>
         </section>
 
         <div className="flex flex-col gap-2 w-full">

@@ -55,4 +55,16 @@ export class CreateResourceGroupDto {
   @IsBoolean()
   @IsOptional()
   retrainingBlocksAccess?: boolean;
+
+  @ApiProperty({
+    description:
+      'Whether to hide this group from users who are not part of it (introducer, maintainer or introduced). Users with the canManageResources permission always see hidden groups.',
+    required: false,
+    default: false,
+    example: false,
+    type: Boolean,
+  })
+  @IsBoolean()
+  @IsOptional()
+  isHidden?: boolean;
 }
