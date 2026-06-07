@@ -112,6 +112,16 @@ export function ResourceUsageExport(props: ExportProps) {
         key: 'endNotes',
         getter: (item) => item.endNotes ?? '',
       },
+      {
+        label: t('columns.supervisorId'),
+        key: 'supervisorId',
+        getter: (item) => item.supervisorUserId ?? '',
+      },
+      {
+        label: t('columns.supervisorUsername'),
+        key: 'supervisorUsername',
+        getter: (item) => item.supervisorUser?.username ?? '',
+      },
     ] as ColumnDefinition<ResourceUsage>[];
   }, [formatUsageDuration, formatDateTimeFull, t]);
 

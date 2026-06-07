@@ -13,5 +13,6 @@
       "description": "End the session and provide notes."
     }
   },
-  "project": "Project"
+  "project": "Project",
+  "supervisedBy": "Supervised by"
 }

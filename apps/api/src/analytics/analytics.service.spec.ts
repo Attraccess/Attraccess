@@ -77,7 +77,7 @@ describe('AnalyticsService', () => {
           userId: 'DESC',
           startTime: 'DESC',
         },
-        relations: ['user', 'resource'],
+        relations: ['user', 'resource', 'supervisorUser'],
       });
 
       expect(result).toEqual(expectedResourceUsage);
@@ -102,7 +102,7 @@ describe('AnalyticsService', () => {
           userId: 'DESC',
           startTime: 'DESC',
         },
-        relations: ['user', 'resource'],
+        relations: ['user', 'resource', 'supervisorUser'],
       });
 
       expect(result).toEqual([]);

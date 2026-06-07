@@ -751,7 +751,7 @@ export class ResourceUsageService {
         endTime: IsNull(),
         isFinalized: onlyFinalized ? true : undefined,
       },
-      relations: ['user', 'resource', 'billingTransaction', 'project'],
+      relations: ['user', 'resource', 'billingTransaction', 'project', 'supervisorUser'],
     });
   }
 
@@ -774,7 +774,7 @@ export class ResourceUsageService {
       skip: (page - 1) * limit,
       take: limit,
       order: { startTime: 'DESC' },
-      relations: ['user', 'project', 'formSubmissions', 'formSubmissions.form', 'formSubmissions.user'],
+      relations: ['user', 'project', 'supervisorUser', 'formSubmissions', 'formSubmissions.form', 'formSubmissions.user'],
     });
 
     this.logger.debug(`Found ${data.length} usage records out of ${total} total for resource ${resourceId}`);
