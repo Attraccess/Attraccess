@@ -1,14 +1,6 @@
 import { usePluginsServiceUploadPlugin } from '@attraccess/react-query-client';
 import { useState, useRef } from 'react';
-import {
-  DrawerBody,
-  DrawerFooter,
-  DrawerHeader,
-  TextField,
-  FieldError,
-  Input,
-  Description,
-} from '@heroui/react';
+import { DrawerBody, DrawerFooter, DrawerHeader } from '@heroui/react';
 import { Button } from '../../components/button';
 import { Upload } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -55,7 +47,9 @@ export function UploadPluginModal({ isOpen, onClose }: UploadPluginModalProps) {
     setSelectedFile(file);
 
     if (file) {
-      setIsFileInvalid(!file.name.endsWith('.zip'));
+      const zipMimeTypes = ['application/zip', 'application/x-zip-compressed'];
+      const isZip = file.name.toLowerCase().endsWith('.zip') || zipMimeTypes.includes(file.type);
+      setIsFileInvalid(!isZip);
     }
   };
 
@@ -92,17 +86,20 @@ export function UploadPluginModal({ isOpen, onClose }: UploadPluginModalProps) {
           <div className="space-y-4">
             <p>{t('description')}</p>
 
-            <TextField isInvalid={isFileInvalid}>
-              <Input
+            <div className="space-y-1">
+              <input
                 type="file"
                 ref={fileInputRef}
-                accept=".zip"
+                accept=".zip,application/zip,application/x-zip-compressed"
                 onChange={handleFileChange}
                 data-cy="upload-plugin-modal-file-input"
+                className={`block w-full text-sm text-gray-700 dark:text-gray-300 file:mr-4 file:rounded-md file:border-0 file:bg-gray-100 dark:file:bg-gray-800 file:px-4 file:py-2 file:text-sm file:font-medium file:text-gray-700 dark:file:text-gray-300 hover:file:bg-gray-200 dark:hover:file:bg-gray-700 cursor-pointer rounded-md border ${
+                  isFileInvalid ? 'border-danger' : 'border-gray-300 dark:border-gray-700'
+                } px-3 py-2`}
               />
-              <Description>{t('fileInputDescription')}</Description>
-              {isFileInvalid && <FieldError>{t('errors.invalidFile')}</FieldError>}
-            </TextField>
+              <p className="text-xs text-gray-500 dark:text-gray-400">{t('fileInputDescription')}</p>
+              {isFileInvalid && <p className="text-xs text-danger">{t('errors.invalidFile')}</p>}
+            </div>
 
             {selectedFile && (
               <div className="py-2 px-4 bg-gray-100 dark:bg-gray-800 rounded-md">

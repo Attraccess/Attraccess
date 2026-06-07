@@ -80,6 +80,36 @@ describe('PluginModule', () => {
       expect(module.imports).toEqual([]);
       expect(PluginService.getManifestById(discovered[0].id)).toBeDefined();
     });
+
+    it('loads a plugin whose externalized host-shared requires resolve to the host copy', () => {
+      // The plugin dir lives under a tmp root outside the host node_modules tree
+      // (mirroring production, where plugins sit under STORAGE_ROOT and the host
+      // installs node_modules under dist/apps/api). Its index.js does a bare
+      // require('@nestjs/common') — exactly what an externalized backend ships.
+      // Without host-aware resolution this throws "Cannot find module".
+      mkdirSync(join(root, 'needs-host-dep', 'dist'), { recursive: true });
+      writeFileSync(
+        join(root, 'needs-host-dep', 'plugin.json'),
+        JSON.stringify({
+          name: 'needs-host-dep',
+          version: '1.0.0',
+          main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+          attraccessVersion: { min: '1.0.0' },
+        })
+      );
+      writeFileSync(
+        join(root, 'needs-host-dep', 'dist', 'index.js'),
+        [
+          "const nest = require('@nestjs/common');",
+          'if (typeof nest.Module !== "function") { throw new Error("host @nestjs/common not resolved"); }',
+          'class NeedsHostDepModule {}',
+          'module.exports = { default: { register: () => ({ module: NeedsHostDepModule }) } };',
+        ].join('\n')
+      );
+
+      const module = PluginModule.forRoot();
+      expect(module.imports).toHaveLength(1);
+    });
   });
 
   describe('createPluginContext', () => {
