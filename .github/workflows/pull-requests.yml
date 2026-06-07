@@ -84,12 +84,22 @@ jobs:
       - name: Build + zip plugin apps
         run: pnpm nx run-many --target=package --parallel=3 --projects=tag:type:plugin
 
+      - name: Collect plugin ZIPs into a flat directory
+        if: always()
+        run: |
+          set -euo pipefail
+          shopt -s nullglob globstar
+          mkdir -p dist/plugin-zips
+          for zip in apps/plugins/**/dist/*.zip; do
+            cp "$zip" dist/plugin-zips/
+          done
+
       - name: Upload plugin ZIPs
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: plugins-${{ github.event.pull_request.number }}-${{ github.run_attempt }}
-          path: apps/plugins/**/dist/*.zip
+          path: dist/plugin-zips/*.zip
           if-no-files-found: warn
           retention-days: 30
 
@@ -106,7 +116,7 @@ jobs:
             echo "Commit \`${{ github.event.pull_request.head.sha }}\` · workflow run [\`${{ github.run_id }}\`](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
             echo ""
             found=false
-            for zip in apps/plugins/**/dist/*.zip; do
+            for zip in dist/plugin-zips/*.zip; do
               found=true
               size="$(du -h "$zip" | cut -f1)"
               echo "- \`$(basename "$zip")\` (${size})"

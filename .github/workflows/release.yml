@@ -74,12 +74,21 @@ jobs:
           NODE_ENV: production
         run: pnpm nx run-many --target=package --parallel=3 --projects=tag:type:plugin
 
+      - name: Collect plugin ZIPs into a flat directory
+        run: |
+          set -euo pipefail
+          shopt -s nullglob globstar
+          mkdir -p dist/plugin-zips
+          for zip in apps/plugins/**/dist/*.zip; do
+            cp "$zip" dist/plugin-zips/
+          done
+
       - name: Attach plugin ZIPs to release
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           tag_name: ${{ env.RELEASE_VERSION }}
-          files: apps/plugins/**/dist/*.zip
+          files: dist/plugin-zips/*.zip
           fail_on_unmatched_files: true
 
   containerize:
