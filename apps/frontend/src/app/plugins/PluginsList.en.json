@@ -5,7 +5,7 @@
   "noPlugins": "No plugins installed",
   "columns": {
     "name": "Name",
-    "version": "0.0.16",
+    "version": "Version",
     "directory": "Directory",
     "permissions": "Permissions",
     "status": "Status",
