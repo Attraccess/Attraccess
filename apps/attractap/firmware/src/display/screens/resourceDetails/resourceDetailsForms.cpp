@@ -28,6 +28,10 @@ void ResourceDetailsScreen::resetFormsModalState()
    this->formsBackButton = nullptr;
    this->formsNextButton = nullptr;
    this->formsNextLabel = nullptr;
+   this->formsCancelButton = nullptr;
+   this->formsBusyOverlay = nullptr;
+   this->formsBusyLabel = nullptr;
+   this->formsBusy = false;
    this->formsModalMeta = nullptr;
    this->formsModalPage = nullptr;
    this->formsCanGoBack = false;
@@ -79,6 +83,8 @@ void ResourceDetailsScreen::showFormsModal(const API::ResourceUsageFormRequest &
       lv_obj_clear_flag(this->formsModalOverlay, LV_OBJ_FLAG_HIDDEN);
    }
    this->updateFormsModalLayoutForKeyboard(false);
+   // Block input while the first field is being fetched from the server.
+   this->setFormsBusy(true, "Laden...");
 }
 void ResourceDetailsScreen::renderFormField(const API::ResourceUsageFormFieldsPage &page, bool canGoBack, bool isLast, uint32_t fieldNumber, uint32_t totalFields)
 {
@@ -86,6 +92,9 @@ void ResourceDetailsScreen::renderFormField(const API::ResourceUsageFormFieldsPa
    this->formsCanGoBack = canGoBack;
    this->formsIsLastField = isLast;
    this->ensureFormsModal();
+
+   // Field arrived from the server: release the input block.
+   this->setFormsBusy(false);
 
    if (this->formsModalProgressLabel)
    {
@@ -120,6 +129,8 @@ void ResourceDetailsScreen::renderFormField(const API::ResourceUsageFormFieldsPa
 }
 void ResourceDetailsScreen::showFormPageErrors(const API::ResourceUsageFormPageResult &result)
 {
+   // Server rejected the page: release the block so the user can correct input.
+   this->setFormsBusy(false);
    this->clearFormFieldErrors();
    bool shown = false;
    for (uint8_t i = 0; i < result.errorCount; ++i)
@@ -234,6 +245,7 @@ void ResourceDetailsScreen::ensureFormsModal()
    lv_obj_add_event_cb(backBtn, &ResourceDetailsScreen::onFormsBack, LV_EVENT_CLICKED, this);
 
    lv_obj_t *cancelBtn = lv_button_create(footer);
+   this->formsCancelButton = cancelBtn;
    lv_obj_set_width(cancelBtn, LV_SIZE_CONTENT);
    lv_obj_set_height(cancelBtn, LV_SIZE_CONTENT);
    lv_obj_set_style_pad_all(cancelBtn, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -258,6 +270,77 @@ void ResourceDetailsScreen::ensureFormsModal()
    lv_obj_set_width(this->formsKeyboard, lv_pct(100));
    lv_obj_add_flag(this->formsKeyboard, LV_OBJ_FLAG_HIDDEN);
    lv_obj_add_event_cb(this->formsKeyboard, &ResourceDetailsScreen::onFormsKeyboardEvent, LV_EVENT_ALL, this);
+
+   // Busy overlay: created last so it floats above the panel + keyboard. While
+   // visible it blocks all input behind it (CLICKABLE) until the server responds.
+   lv_obj_t *busy = lv_obj_create(overlay);
+   this->formsBusyOverlay = busy;
+   lv_obj_remove_style_all(busy);
+   lv_obj_add_flag(busy, LV_OBJ_FLAG_IGNORE_LAYOUT);
+   lv_obj_add_flag(busy, LV_OBJ_FLAG_CLICKABLE);
+   lv_obj_add_flag(busy, LV_OBJ_FLAG_HIDDEN);
+   lv_obj_remove_flag(busy, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_set_size(busy, lv_pct(100), lv_pct(100));
+   lv_obj_set_align(busy, LV_ALIGN_CENTER);
+   lv_obj_set_style_bg_color(busy, lv_color_black(), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_bg_opa(busy, 160, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_flex_flow(busy, LV_FLEX_FLOW_COLUMN);
+   lv_obj_set_flex_align(busy, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+   lv_obj_set_style_pad_row(busy, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   lv_obj_t *busySpinner = lv_spinner_create(busy);
+   lv_obj_set_size(busySpinner, 48, 48);
+   lv_obj_remove_flag(busySpinner, LV_OBJ_FLAG_CLICKABLE);
+
+   this->formsBusyLabel = lv_label_create(busy);
+   lv_label_set_text(this->formsBusyLabel, "Bitte warten");
+   lv_obj_set_style_text_color(this->formsBusyLabel, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
+}
+void ResourceDetailsScreen::setFormsBusy(bool busy, const char *text)
+{
+   this->formsBusy = busy;
+   if (busy)
+   {
+      this->hideFormsKeyboard();
+   }
+   if (this->formsBusyLabel && text)
+   {
+      lv_label_set_text(this->formsBusyLabel, text);
+   }
+   // Disable footer buttons as well so they read as inactive behind the overlay.
+   lv_obj_t *const buttons[] = {this->formsNextButton, this->formsBackButton, this->formsCancelButton};
+   for (lv_obj_t *button : buttons)
+   {
+      if (!button)
+      {
+         continue;
+      }
+      if (busy)
+      {
+         lv_obj_add_state(button, LV_STATE_DISABLED);
+      }
+      else
+      {
+         lv_obj_clear_state(button, LV_STATE_DISABLED);
+      }
+   }
+   // Back button stays disabled on the first field even when not busy.
+   if (!busy && this->formsBackButton && !this->formsCanGoBack)
+   {
+      lv_obj_add_state(this->formsBackButton, LV_STATE_DISABLED);
+   }
+   if (this->formsBusyOverlay)
+   {
+      if (busy)
+      {
+         lv_obj_clear_flag(this->formsBusyOverlay, LV_OBJ_FLAG_HIDDEN);
+         lv_obj_move_foreground(this->formsBusyOverlay);
+      }
+      else
+      {
+         lv_obj_add_flag(this->formsBusyOverlay, LV_OBJ_FLAG_HIDDEN);
+      }
+   }
 }
 void ResourceDetailsScreen::buildCurrentFormField()
 {
@@ -720,11 +803,17 @@ void ResourceDetailsScreen::onFormsNext(lv_event_t *e)
    {
       return;
    }
+   if (self->formsBusy)
+   {
+      return;
+   }
    API::FormPageSubmission &page = self->formPageScratch;
    if (!self->collectCurrentField(page))
    {
       return;
    }
+   // Block further input until the server confirms or rejects this page.
+   self->setFormsBusy(true, "Bitte warten");
    if (self->formPageNextCallback)
    {
       self->formPageNextCallback(page);
@@ -741,10 +830,16 @@ void ResourceDetailsScreen::onFormsBack(lv_event_t *e)
    {
       return;
    }
+   if (self->formsBusy)
+   {
+      return;
+   }
    if (!self->formsCanGoBack)
    {
       return;
    }
+   // Block further input until the previous field arrives from the server.
+   self->setFormsBusy(true, "Bitte warten");
    if (self->formPageBackCallback)
    {
       self->formPageBackCallback();
