@@ -66,6 +66,47 @@
         "label": "Zugriff bis zur Nachschulung sperren",
         "description": "Wenn aktiviert, verlieren Benutzer den Zugriff, sobald die Nachschulung fällig ist, bis ein Einweiser sie nachschult."
       }
+    },
+    "supervision": {
+      "sectionTitle": "Beaufsichtigung",
+      "description": "Legen Sie fest, wer eine Nutzungssitzung an dieser Ressource starten darf.",
+      "mode": {
+        "label": "Beaufsichtigungsmodus",
+        "options": {
+          "introduction_required": {
+            "label": "Einweisung erforderlich",
+            "description": "Nur eingewiesene Benutzer dürfen eine Sitzung starten. Dies ist das Standardverhalten."
+          },
+          "supervision_allowed": {
+            "label": "Beaufsichtigung erlaubt",
+            "description": "Eingewiesene Benutzer dürfen selbst starten; nicht eingewiesene Benutzer nur, wenn eine Aufsicht anwesend ist."
+          },
+          "supervision_required": {
+            "label": "Beaufsichtigung erforderlich",
+            "description": "Jede Sitzung erfordert eine anwesende Aufsicht, auch für eingewiesene Benutzer."
+          }
+        }
+      },
+      "autoPromotion": {
+        "sectionTitle": "Automatische Einweisung",
+        "description": "Erteilt automatisch eine Einweisung, sobald ein Benutzer genügend beaufsichtigte Sitzungen absolviert hat.",
+        "disabledPlaceholder": "Deaktiviert",
+        "threshold": {
+          "label": "Beaufsichtigte Sitzungen bis zur Einweisung",
+          "description": "Nach so vielen beaufsichtigten Sitzungen wird der Benutzer automatisch eingewiesen. Leer lassen, um die automatische Einweisung zu deaktivieren."
+        },
+        "target": {
+          "label": "Einweisung erteilen für",
+          "options": {
+            "resource": "Diese Ressource",
+            "group": "Eine Ressourcengruppe"
+          }
+        },
+        "group": {
+          "label": "Ressourcengruppe",
+          "placeholder": "Gruppe auswählen"
+        }
+      }
     }
   },
   "create": {

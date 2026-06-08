@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, Logger, ForbiddenException, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, Brackets } from 'typeorm';
-import { Resource } from '@attraccess/database-entities';
+import { Resource, SupervisionMode } from '@attraccess/database-entities';
 import { CreateResourceDto } from './dtos/createResource.dto';
 import { UpdateResourceDto } from './dtos/updateResource.dto';
 import { PaginatedResponse } from '../types/response';
@@ -57,6 +57,10 @@ export class ResourcesService {
       retrainingMaxAgeDays: dto.retrainingMaxAgeDays ?? null,
       retrainingMaxInactivityDays: dto.retrainingMaxInactivityDays ?? null,
       retrainingBlocksAccess: dto.retrainingBlocksAccess ?? false,
+      supervisionMode: dto.supervisionMode ?? SupervisionMode.INTRODUCTION_REQUIRED,
+      supervisedUsagesUntilIntroduction: dto.supervisedUsagesUntilIntroduction ?? null,
+      autoIntroductionTarget: dto.autoIntroductionTarget ?? null,
+      autoIntroductionGroupId: dto.autoIntroductionGroupId ?? null,
     });
 
     // Save the resource first to get an ID
@@ -124,6 +128,13 @@ export class ResourcesService {
     if (dto.retrainingMaxInactivityDays !== undefined)
       resource.retrainingMaxInactivityDays = dto.retrainingMaxInactivityDays;
     if (dto.retrainingBlocksAccess !== undefined) resource.retrainingBlocksAccess = dto.retrainingBlocksAccess;
+
+    // Supervision + auto-promotion settings
+    if (dto.supervisionMode !== undefined) resource.supervisionMode = dto.supervisionMode;
+    if (dto.supervisedUsagesUntilIntroduction !== undefined)
+      resource.supervisedUsagesUntilIntroduction = dto.supervisedUsagesUntilIntroduction;
+    if (dto.autoIntroductionTarget !== undefined) resource.autoIntroductionTarget = dto.autoIntroductionTarget;
+    if (dto.autoIntroductionGroupId !== undefined) resource.autoIntroductionGroupId = dto.autoIntroductionGroupId;
 
     if (image && dto.deleteImage) {
       throw new BadRequestException('Image and deleteImage cannot be used together');
