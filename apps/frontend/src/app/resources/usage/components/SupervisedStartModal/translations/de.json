@@ -1,0 +1,23 @@
+{
+  "title": "Aufsicht erforderlich",
+  "select": {
+    "description": "Du bist noch nicht in diese Ressource eingewiesen. Wähle eine Aufsichtsperson, um die Freigabe für diese Sitzung anzufordern.",
+    "empty": "Derzeit sind keine berechtigten Aufsichtspersonen verfügbar.",
+    "role": {
+      "introducer": "Einweiser",
+      "maintainer": "Betreuer"
+    }
+  },
+  "waiting": {
+    "description": "Warte auf die Freigabe durch die Aufsichtsperson…",
+    "countdown": "{{seconds}}s"
+  },
+  "timeout": {
+    "description": "Die Aufsichtsperson hat nicht rechtzeitig reagiert. Bitte versuche es erneut oder wähle eine andere Aufsichtsperson."
+  },
+  "rejected": {
+    "description": "Deine Anfrage wurde abgelehnt. Bitte versuche es erneut oder wähle eine andere Aufsichtsperson."
+  },
+  "retry": "Erneut versuchen",
+  "cancel": "Abbrechen"
+}
