@@ -1,14 +1,12 @@
 import React, { useCallback, useState } from 'react';
-import { useOverlayState } from '@heroui/react';
+import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   CreateOIDCConfigurationDto,
   CreateSSOProviderDto,
-  SSOProvider,
   SSOProviderType,
   UpdateSSOProviderDto,
   useAuthenticationServiceCreateOneSsoProvider,
-  useAuthenticationServiceDeleteOneSsoProvider,
   useAuthenticationServiceGetOneSsoProviderById,
   useAuthenticationServiceUpdateOneSsoProvider,
   useAuthenticationServiceGetAllSsoProvidersKey,
@@ -32,10 +30,12 @@ import {
 import en from './en.json';
 import de from './de.json';
 
-export const useSSOProviderForm = () => {
+export const SSO_PROVIDERS_PATH = '/sso/providers';
+
+export const useSSOProviderForm = (providerId?: number) => {
   const { t } = useTranslations({ en, de });
-  const { isOpen, open, close: closeProviderModal, setOpen } = useOverlayState();
-  const [editingProvider, setEditingProvider] = useState<SSOProvider | null>(null);
+  const navigate = useNavigate();
+  const isEditing = providerId !== undefined;
   const [formValues, setFormValues] = useState<CreateSSOProviderDto>(defaultProviderValues);
   const [showClientSecret, setShowClientSecret] = useState(false);
   const [showSamlProvisioningSecret, setShowSamlProvisioningSecret] = useState(false);
@@ -67,18 +67,11 @@ export const useSSOProviderForm = () => {
       });
     },
   });
-  const deleteSSOProvider = useAuthenticationServiceDeleteOneSsoProvider({
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: [useAuthenticationServiceGetAllSsoProvidersKey],
-      });
-    },
-  });
-  const { data: providerDetails } = useAuthenticationServiceGetOneSsoProviderById(
-    { id: editingProvider?.id as number },
+  const { data: providerDetails, isLoading: isLoadingProvider } = useAuthenticationServiceGetOneSsoProviderById(
+    { id: providerId as number },
     undefined,
     {
-      enabled: !!editingProvider,
+      enabled: isEditing,
     },
   );
 
@@ -111,131 +104,92 @@ export const useSSOProviderForm = () => {
     }));
   }, []);
 
-  // Set form values when provider details are loaded
+  // Populate form values when editing and the provider details are loaded
   React.useEffect(() => {
-    if (providerDetails && editingProvider) {
-      const extendedProvider = providerDetails;
-      const updatedFormValues: CreateSSOProviderDto = {
-        name: extendedProvider.name,
-        type: extendedProvider.type as SSOProviderType,
-        oidcConfiguration: getDefaultOidcConfiguration(),
-        samlConfiguration: getDefaultSamlConfiguration(),
+    if (!providerDetails) {
+      return;
+    }
+
+    const extendedProvider = providerDetails;
+    const updatedFormValues: CreateSSOProviderDto = {
+      name: extendedProvider.name,
+      type: extendedProvider.type as SSOProviderType,
+      oidcConfiguration: getDefaultOidcConfiguration(),
+      samlConfiguration: getDefaultSamlConfiguration(),
+    };
+
+    if (extendedProvider.type === SSOProviderType.OIDC && extendedProvider.oidcConfiguration) {
+      updatedFormValues.oidcConfiguration = {
+        issuer: extendedProvider.oidcConfiguration.issuer ?? '',
+        authorizationURL: extendedProvider.oidcConfiguration.authorizationURL ?? '',
+        tokenURL: extendedProvider.oidcConfiguration.tokenURL ?? '',
+        userInfoURL: extendedProvider.oidcConfiguration.userInfoURL ?? '',
+        clientId: extendedProvider.oidcConfiguration.clientId ?? '',
+        clientSecret: extendedProvider.oidcConfiguration.clientSecret ?? '',
       };
 
-      if (extendedProvider.type === SSOProviderType.OIDC && extendedProvider.oidcConfiguration) {
-        updatedFormValues.oidcConfiguration = {
-          issuer: extendedProvider.oidcConfiguration.issuer ?? '',
-          authorizationURL: extendedProvider.oidcConfiguration.authorizationURL ?? '',
-          tokenURL: extendedProvider.oidcConfiguration.tokenURL ?? '',
-          userInfoURL: extendedProvider.oidcConfiguration.userInfoURL ?? '',
-          clientId: extendedProvider.oidcConfiguration.clientId ?? '',
-          clientSecret: extendedProvider.oidcConfiguration.clientSecret ?? '',
-        };
-
-        setScopesInput(
-          Array.isArray(extendedProvider.oidcConfiguration.scopes)
-            ? extendedProvider.oidcConfiguration.scopes.join(', ')
-            : '',
-        );
-        setUsernameClaimPathsInput(
-          Array.isArray(extendedProvider.oidcConfiguration.usernameClaimPaths)
-            ? extendedProvider.oidcConfiguration.usernameClaimPaths.join(', ')
-            : '',
-        );
-        setEmailClaimPathsInput(
-          Array.isArray(extendedProvider.oidcConfiguration.emailClaimPaths)
-            ? extendedProvider.oidcConfiguration.emailClaimPaths.join(', ')
-            : '',
-        );
-        setOidcPermissionMappingsInput(
-          buildPermissionMappingInputs(
-            (extendedProvider.oidcConfiguration.permissionMappings ?? undefined) as
-              | Partial<Record<PermissionKey, string[]>>
-              | undefined,
-          ),
-        );
-      } else {
-        setScopesInput('');
-        setUsernameClaimPathsInput('');
-        setEmailClaimPathsInput('');
-        setOidcPermissionMappingsInput(emptyPermissionMappingsInput);
-      }
-
-      if (extendedProvider.type === SSOProviderType.SAML && extendedProvider.samlConfiguration) {
-        updatedFormValues.samlConfiguration = {
-          entryPoint: extendedProvider.samlConfiguration.entryPoint ?? '',
-          issuer: extendedProvider.samlConfiguration.issuer ?? '',
-          certificate: extendedProvider.samlConfiguration.certificate ?? '',
-          audience: extendedProvider.samlConfiguration.audience ?? '',
-          signRequest: extendedProvider.samlConfiguration.signRequest ?? false,
-          wantAssertionsSigned: extendedProvider.samlConfiguration.wantAssertionsSigned ?? false,
-          wantAuthnResponseSigned: extendedProvider.samlConfiguration.wantAuthnResponseSigned ?? true,
-          forceAuthn: extendedProvider.samlConfiguration.forceAuthn ?? false,
-          provisioningSecret: '',
-          spSigningCertificate: extendedProvider.samlConfiguration.spSigningCertificate ?? '',
-          spSigningPrivateKey: '',
-        };
-        setEmailAttributeKeysInput(
-          Array.isArray(extendedProvider.samlConfiguration.emailAttributeKeys)
-            ? extendedProvider.samlConfiguration.emailAttributeKeys.join(', ')
-            : '',
-        );
-        setSamlPermissionMappingsInput(
-          buildPermissionMappingInputs(
-            (extendedProvider.samlConfiguration.permissionMappings ?? undefined) as
-              | Partial<Record<PermissionKey, string[]>>
-              | undefined,
-          ),
-        );
-      } else {
-        setEmailAttributeKeysInput('');
-        setSamlPermissionMappingsInput(emptyPermissionMappingsInput);
-      }
-
-      setFormValues(updatedFormValues);
+      setScopesInput(
+        Array.isArray(extendedProvider.oidcConfiguration.scopes)
+          ? extendedProvider.oidcConfiguration.scopes.join(', ')
+          : '',
+      );
+      setUsernameClaimPathsInput(
+        Array.isArray(extendedProvider.oidcConfiguration.usernameClaimPaths)
+          ? extendedProvider.oidcConfiguration.usernameClaimPaths.join(', ')
+          : '',
+      );
+      setEmailClaimPathsInput(
+        Array.isArray(extendedProvider.oidcConfiguration.emailClaimPaths)
+          ? extendedProvider.oidcConfiguration.emailClaimPaths.join(', ')
+          : '',
+      );
+      setOidcPermissionMappingsInput(
+        buildPermissionMappingInputs(
+          (extendedProvider.oidcConfiguration.permissionMappings ?? undefined) as
+            | Partial<Record<PermissionKey, string[]>>
+            | undefined,
+        ),
+      );
+    } else {
+      setScopesInput('');
+      setUsernameClaimPathsInput('');
+      setEmailClaimPathsInput('');
+      setOidcPermissionMappingsInput(emptyPermissionMappingsInput);
     }
-  }, [providerDetails, editingProvider]);
 
-  const handleAddNew = useCallback(() => {
-    setEditingProvider(null);
-    setFormValues(defaultProviderValues);
-    setScopesInput('');
-    setUsernameClaimPathsInput('');
-    setEmailClaimPathsInput('');
-    setEmailAttributeKeysInput('');
-    setOidcPermissionMappingsInput(emptyPermissionMappingsInput);
-    setSamlPermissionMappingsInput(emptyPermissionMappingsInput);
-    setShowSamlProvisioningSecret(false);
-    open();
-  }, [open]);
+    if (extendedProvider.type === SSOProviderType.SAML && extendedProvider.samlConfiguration) {
+      updatedFormValues.samlConfiguration = {
+        entryPoint: extendedProvider.samlConfiguration.entryPoint ?? '',
+        issuer: extendedProvider.samlConfiguration.issuer ?? '',
+        certificate: extendedProvider.samlConfiguration.certificate ?? '',
+        audience: extendedProvider.samlConfiguration.audience ?? '',
+        signRequest: extendedProvider.samlConfiguration.signRequest ?? false,
+        wantAssertionsSigned: extendedProvider.samlConfiguration.wantAssertionsSigned ?? false,
+        wantAuthnResponseSigned: extendedProvider.samlConfiguration.wantAuthnResponseSigned ?? true,
+        forceAuthn: extendedProvider.samlConfiguration.forceAuthn ?? false,
+        provisioningSecret: '',
+        spSigningCertificate: extendedProvider.samlConfiguration.spSigningCertificate ?? '',
+        spSigningPrivateKey: '',
+      };
+      setEmailAttributeKeysInput(
+        Array.isArray(extendedProvider.samlConfiguration.emailAttributeKeys)
+          ? extendedProvider.samlConfiguration.emailAttributeKeys.join(', ')
+          : '',
+      );
+      setSamlPermissionMappingsInput(
+        buildPermissionMappingInputs(
+          (extendedProvider.samlConfiguration.permissionMappings ?? undefined) as
+            | Partial<Record<PermissionKey, string[]>>
+            | undefined,
+        ),
+      );
+    } else {
+      setEmailAttributeKeysInput('');
+      setSamlPermissionMappingsInput(emptyPermissionMappingsInput);
+    }
 
-  const handleEdit = useCallback(
-    (provider: SSOProvider) => {
-      setEditingProvider(provider);
-      open();
-    },
-    [open],
-  );
-
-  const handleDelete = useCallback(
-    async (id: number) => {
-      if (window.confirm(t('deleteConfirmation'))) {
-        try {
-          await deleteSSOProvider.mutateAsync({ id: id as number });
-          success({
-            title: t('providerDeleted'),
-            description: t('providerDeletedDesc'),
-          });
-        } catch (err) {
-          showError({
-            title: t('errorGeneric'),
-            description: err instanceof Error ? err.message : t('failedToDelete'),
-          });
-        }
-      }
-    },
-    [deleteSSOProvider, showError, success, t],
-  );
+    setFormValues(updatedFormValues);
+  }, [providerDetails]);
 
   const setOidc = useCallback((field: keyof NonNullable<CreateSSOProviderDto['oidcConfiguration']>, value: string) => {
     setFormValues((prev) => ({
@@ -303,6 +257,10 @@ export const useSSOProviderForm = () => {
         value === SSOProviderType.SAML ? ensureSamlConfiguration(prev.samlConfiguration) : prev.samlConfiguration,
     }));
   }, []);
+
+  const handleCancel = useCallback(() => {
+    navigate(SSO_PROVIDERS_PATH);
+  }, [navigate]);
 
   const handleSubmit = useCallback(async () => {
     try {
@@ -394,7 +352,7 @@ export const useSSOProviderForm = () => {
         return payload;
       };
 
-      if (editingProvider) {
+      if (isEditing && providerId !== undefined) {
         const requestBody: UpdateSSOProviderDto = {
           name: formValues.name,
         };
@@ -408,7 +366,7 @@ export const useSSOProviderForm = () => {
         }
 
         await updateSSOProvider.mutateAsync({
-          id: editingProvider.id,
+          id: providerId,
           requestBody: requestBody,
         });
         success({
@@ -435,22 +393,23 @@ export const useSSOProviderForm = () => {
           description: t('providerCreatedDesc'),
         });
       }
-      closeProviderModal();
+      navigate(SSO_PROVIDERS_PATH);
     } catch (err) {
-      const errorDescription = editingProvider ? t('failedToUpdate') : t('failedToCreate');
+      const errorDescription = isEditing ? t('failedToUpdate') : t('failedToCreate');
       showError({
         title: t('errorGeneric'),
         description: err instanceof Error ? err.message : errorDescription,
       });
     }
   }, [
-    closeProviderModal,
     createSSOProvider,
-    editingProvider,
     emailAttributeKeysInput,
     emailClaimPathsInput,
     formValues,
+    isEditing,
+    navigate,
     oidcPermissionMappingsInput,
+    providerId,
     samlPermissionMappingsInput,
     samlSigningMaterialsReady,
     scopesInput,
@@ -462,11 +421,10 @@ export const useSSOProviderForm = () => {
   ]);
 
   return {
-    // overlay
-    isOpen,
-    setOpen,
+    // mode
+    isEditing,
+    isLoadingProvider,
     // data
-    editingProvider,
     providerDetails,
     // form state
     formValues,
@@ -493,14 +451,12 @@ export const useSSOProviderForm = () => {
     isSaveDisabled,
     // handlers
     onAutoDiscovery,
-    handleAddNew,
-    handleEdit,
-    handleDelete,
     setOidc,
     setSaml,
     copyValue,
     handleSamlToggleChange,
     handleSelectChange,
+    handleCancel,
     handleSubmit,
   };
 };

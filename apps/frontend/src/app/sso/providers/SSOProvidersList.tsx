@@ -1,37 +1,65 @@
-import React, { forwardRef, useImperativeHandle } from 'react';
+import { useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { useAuthenticationServiceGetAllSsoProviders } from '@attraccess/react-query-client';
+import {
+  SSOProvider,
+  useAuthenticationServiceDeleteOneSsoProvider,
+  useAuthenticationServiceGetAllSsoProviders,
+  useAuthenticationServiceGetAllSsoProvidersKey,
+} from '@attraccess/react-query-client';
+import { useQueryClient } from '@tanstack/react-query';
 import { SSOProvidersTable } from './SSOProvidersTable';
-import { SSOProviderFormDrawer } from './SSOProviderFormDrawer';
-import { useSSOProviderForm } from './useSSOProviderForm';
-import { useSSOProviderSetupUrls } from './useSSOProviderSetupUrls';
+import { useToastMessage } from '../../../components/toastProvider';
+import { SSO_PROVIDERS_PATH } from './useSSOProviderForm';
 import en from './en.json';
 import de from './de.json';
 
-export interface SSOProvidersListRef {
-  handleAddNew: () => void;
-}
-
-export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentPropsWithoutRef<'div'>>((_props, ref) => {
+export const SSOProvidersList = () => {
   const { t } = useTranslations({ en, de });
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { success, error: showError } = useToastMessage();
   const { data: providers, error } = useAuthenticationServiceGetAllSsoProviders();
 
-  const form = useSSOProviderForm();
-  const setupUrls = useSSOProviderSetupUrls(form.providerDetails?.id);
+  const deleteSSOProvider = useAuthenticationServiceDeleteOneSsoProvider({
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: [useAuthenticationServiceGetAllSsoProvidersKey],
+      });
+    },
+  });
 
-  // Expose methods to parent component via ref
-  useImperativeHandle(ref, () => ({
-    handleAddNew: form.handleAddNew,
-  }));
+  const handleEdit = useCallback(
+    (provider: SSOProvider) => {
+      navigate(`${SSO_PROVIDERS_PATH}/${provider.id}`);
+    },
+    [navigate],
+  );
+
+  const handleDelete = useCallback(
+    async (id: number) => {
+      if (!window.confirm(t('deleteConfirmation'))) {
+        return;
+      }
+      try {
+        await deleteSSOProvider.mutateAsync({ id });
+        success({
+          title: t('providerDeleted'),
+          description: t('providerDeletedDesc'),
+        });
+      } catch (err) {
+        showError({
+          title: t('errorGeneric'),
+          description: err instanceof Error ? err.message : t('failedToDelete'),
+        });
+      }
+    },
+    [deleteSSOProvider, showError, success, t],
+  );
 
   if (error) {
     return <div className="text-red-500 p-4">{t('errorLoading')}</div>;
   }
 
-  return (
-    <>
-      <SSOProvidersTable providers={providers ?? []} onEdit={form.handleEdit} onDelete={form.handleDelete} />
-      <SSOProviderFormDrawer form={form} setupUrls={setupUrls} />
-    </>
-  );
-});
+  return <SSOProvidersTable providers={providers ?? []} onEdit={handleEdit} onDelete={handleDelete} />;
+};

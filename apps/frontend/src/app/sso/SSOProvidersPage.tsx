@@ -1,10 +1,10 @@
 import React from 'react';
-import { PageHeader } from '../../components/pageHeader';
-import { SSOProvidersList, SSOProvidersListRef } from './providers/SSOProvidersList';
-import { useAuth } from '../../hooks/useAuth';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { PageHeader } from '../../components/pageHeader';
+import { SSOProvidersList } from './providers/SSOProvidersList';
+import { useAuth } from '../../hooks/useAuth';
 import en from './en.json';
 import de from './de.json';
 
@@ -12,20 +12,12 @@ export const SSOProvidersPage: React.FC = () => {
   const { hasPermission } = useAuth();
   const canManageSSO = hasPermission('canManageSystemConfiguration');
   const { t } = useTranslations({ en, de });
-
-  // Reference to the SSOProvidersList component
-  const providerListRef = React.useRef<SSOProvidersListRef>(null);
+  const navigate = useNavigate();
 
   // Redirect if user doesn't have permission
   if (!canManageSSO) {
     return <Navigate to="/" />;
   }
-
-  const handleAddNewProvider = () => {
-    if (providerListRef.current) {
-      providerListRef.current.handleAddNew();
-    }
-  };
 
   return (
     <div>
@@ -39,14 +31,14 @@ export const SSOProvidersPage: React.FC = () => {
             label: t('actions.addNew'),
             icon: <Plus size={16} />,
             variant: 'primary',
-            onPress: handleAddNewProvider,
+            onPress: () => navigate('/sso/providers/new'),
             dataCy: 'sso-providers-page-header-add-new-provider-button',
           },
         ]}
       />
 
       <div className="mt-6">
-        <SSOProvidersList ref={providerListRef} />
+        <SSOProvidersList />
       </div>
     </div>
   );
