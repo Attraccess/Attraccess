@@ -79,13 +79,30 @@ jobs:
         with:
           fetch-depth: 0
       - uses: ./.github/actions/setup
-      - name: Lint plugin apps
-        run: pnpm nx run-many --target=lint --parallel=3 --projects=tag:type:plugin
-      - name: Build + zip plugin apps
-        run: pnpm nx run-many --target=package --parallel=3 --projects=tag:type:plugin
+
+      - name: Determine affected plugins
+        id: affected
+        run: |
+          set -euo pipefail
+          PROJECTS="$(pnpm nx show projects --affected --base=origin/${{ github.event.pull_request.base.ref }} --projects=tag:type:plugin --withTarget=package --json 2>/dev/null | jq -r 'join(",")')"
+          if [[ -z "$PROJECTS" ]]; then
+            echo "has_plugins=false" >> "$GITHUB_OUTPUT"
+            echo "No plugin projects affected by this PR."
+          else
+            echo "has_plugins=true" >> "$GITHUB_OUTPUT"
+            echo "projects=$PROJECTS" >> "$GITHUB_OUTPUT"
+            echo "Affected plugins: $PROJECTS"
+          fi
+
+      - name: Lint affected plugin apps
+        if: steps.affected.outputs.has_plugins == 'true'
+        run: pnpm nx run-many --target=lint --parallel=3 --projects=${{ steps.affected.outputs.projects }}
+      - name: Build + zip affected plugin apps
+        if: steps.affected.outputs.has_plugins == 'true'
+        run: pnpm nx run-many --target=package --parallel=3 --projects=${{ steps.affected.outputs.projects }}
 
       - name: Collect plugin ZIPs into a flat directory
-        if: always()
+        if: always() && steps.affected.outputs.has_plugins == 'true'
         run: |
           set -euo pipefail
           shopt -s nullglob globstar
@@ -96,7 +113,7 @@ jobs:
 
       - name: Upload plugin ZIPs
         uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && steps.affected.outputs.has_plugins == 'true'
         with:
           name: plugins-${{ github.event.pull_request.number }}-${{ github.run_attempt }}
           path: dist/plugin-zips/*.zip
@@ -115,17 +132,21 @@ jobs:
             echo ""
             echo "Commit \`${{ github.event.pull_request.head.sha }}\` · workflow run [\`${{ github.run_id }}\`](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
             echo ""
-            found=false
-            for zip in dist/plugin-zips/*.zip; do
-              found=true
-              size="$(du -h "$zip" | cut -f1)"
-              echo "- \`$(basename "$zip")\` (${size})"
-            done
-            if [ "$found" = false ]; then
-              echo "_No plugin ZIPs were produced for this PR._"
+            if [[ "${{ steps.affected.outputs.has_plugins }}" != "true" ]]; then
+              echo "_No plugin changes detected in this PR — skipped plugin build._"
             else
-              echo ""
-              echo "Download the ZIPs from the [workflow artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})."
+              found=false
+              for zip in dist/plugin-zips/*.zip; do
+                found=true
+                size="$(du -h "$zip" | cut -f1)"
+                echo "- \`$(basename "$zip")\` (${size})"
+              done
+              if [ "$found" = false ]; then
+                echo "_No plugin ZIPs were produced for this PR._"
+              else
+                echo ""
+                echo "Download the ZIPs from the [workflow artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})."
+              fi
             fi
           } > "$out"
           {
