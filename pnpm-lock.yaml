@@ -49,8 +49,8 @@ importers:
         specifier: ^3.0.4
         version: 3.0.5(@react-spectrum/provider@3.11.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(tailwindcss@4.3.0)
       '@heroui/styles':
-        specifier: ^3.0.4
-        version: 3.0.5(tailwind-merge@3.6.0)(tailwindcss@4.3.0)
+        specifier: ^3.1.0
+        version: 3.1.0(tailwind-merge@3.6.0)(tailwindcss@4.3.0)
       '@hookform/resolvers':
         specifier: ^5.4.0
         version: 5.4.0(react-hook-form@7.56.4(react@19.2.6))
@@ -2784,6 +2784,11 @@ packages:
 
   '@heroui/styles@3.0.5':
     resolution: {integrity: sha512-5DI5sa7GGe1Uw8PCBhooAIGoqZbcR0ilamPjzgv94qVgolGs9+FqbeNp2bcbyoHJn9+HLKQMYiIa44LwH0VLww==}
+    peerDependencies:
+      tailwindcss: '>=4.0.0'
+
+  '@heroui/styles@3.1.0':
+    resolution: {integrity: sha512-euZtlV5hk9qOWhkSbTaJIrdnm0bGxvu1FEN6nnLGt7PM7AdL40z4C3ZYQ+cW+ObSsqsWHzQRsuhmLHVt1uTS4w==}
     peerDependencies:
       tailwindcss: '>=4.0.0'
 
@@ -19116,7 +19121,7 @@ snapshots:
     transitivePeerDependencies:
       - tailwind-merge
 
-  '@heroui/styles@3.0.5(tailwind-merge@3.6.0)(tailwindcss@4.3.0)':
+  '@heroui/styles@3.1.0(tailwind-merge@3.6.0)(tailwindcss@4.3.0)':
     dependencies:
       tailwind-variants: 3.2.2(tailwind-merge@3.6.0)(tailwindcss@4.3.0)
       tailwindcss: 4.3.0
