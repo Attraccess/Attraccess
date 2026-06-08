@@ -903,7 +903,7 @@ describe('ResourceUsageService', () => {
           endTime: IsNull(),
           isFinalized: true,
         },
-        relations: ['user', 'resource', 'billingTransaction', 'project'],
+        relations: ['user', 'resource', 'billingTransaction', 'project', 'supervisorUser'],
       });
     });
 

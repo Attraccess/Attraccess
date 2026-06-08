@@ -10,7 +10,7 @@ import {
 import { Button } from '../../../../../components/button';
 import { buttonVariants } from '@heroui/styles';
 import { StopCircle, ChevronDownIcon } from 'lucide-react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useTranslations, AttraccessUser } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../../../components/toastProvider';
 import { SessionTimer } from '../SessionTimer';
 import { SessionNotesModal, SessionModalMode } from '../SessionNotesModal';
@@ -130,6 +130,12 @@ export function ActiveSessionDisplay({ resourceId, startTime }: ActiveSessionDis
             <p className="font-medium text-gray-900 dark:text-white whitespace-nowrap">
               {activeSession.usage.project.name}
             </p>
+          </div>
+        )}
+        {activeSession?.usage?.supervisorUser && (
+          <div>
+            <p className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">{t('supervisedBy')}:</p>
+            <AttraccessUser user={activeSession.usage.supervisorUser} />
           </div>
         )}
         <SessionTimer startTime={startTime} />

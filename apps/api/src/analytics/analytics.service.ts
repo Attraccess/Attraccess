@@ -23,7 +23,7 @@ export class AnalyticsService {
         id: 'DESC',
         userId: 'DESC',
       },
-      relations: ['user', 'resource'],
+      relations: ['user', 'resource', 'supervisorUser'],
     };
 
     return await this.resourceUsageRepository.find(findOptions);

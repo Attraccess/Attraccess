@@ -56,6 +56,13 @@ export function generateRowCells(
       <TableCell key={`project-${session.id}`} className="hidden 2xl:table-cell">
         {projectCellRenderer ? projectCellRenderer(session) : session.project?.name}
       </TableCell>,
+      <TableCell key={`supervisor-${session.id}`} className="hidden xl:table-cell">
+        {session.supervisorUser ? (
+          <AttraccessUser user={session.supervisorUser} />
+        ) : (
+          <span className="text-gray-400 dark:text-gray-500">—</span>
+        )}
+      </TableCell>,
     );
   } else if (resource.type === 'door') {
     cells.push(

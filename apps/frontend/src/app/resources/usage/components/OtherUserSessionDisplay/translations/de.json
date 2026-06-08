@@ -2,6 +2,7 @@
   "resourceInUseBy": "Ressource wird derzeit verwendet von:",
   "unknownUser": "Unbekannter Benutzer",
   "sessionStarted": "Sitzung gestartet",
+  "supervisedBy": "Beaufsichtigt von",
   "contact": {
     "button": "Aktuellen Nutzer kontaktieren",
     "error": "Kontaktaufnahme fehlgeschlagen",
