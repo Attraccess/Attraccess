@@ -38,7 +38,7 @@
     "@nestjs/schematics": "11.1.0",
     "@nestjs/serve-static": "^5.0.5",
     "@nestjs/swagger": "^11.4.4",
-    "@nestjs/testing": "^11.1.24",
+    "@nestjs/testing": "^11.1.25",
     "@nestjs/typeorm": "^11.0.1",
     "@nestjs/websockets": "^11.1.24",
     "@node-saml/passport-saml": "^5.1.0",
