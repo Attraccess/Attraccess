@@ -118,11 +118,6 @@ public:
         } number;
         struct
         {
-            String trueLabel;
-            String falseLabel;
-        } boolean;
-        struct
-        {
             uint8_t count = 0;
             String values[MAX_SELECT_OPTIONS];
         } select;

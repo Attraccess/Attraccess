@@ -400,18 +400,6 @@ void ResourceDetailsScreen::buildCurrentFormField()
             {
                lv_obj_add_state(sw, LV_STATE_CHECKED);
             }
-            if (field.options.boolean.trueLabel.length() > 0 || field.options.boolean.falseLabel.length() > 0)
-            {
-               String boolLabels = field.options.boolean.trueLabel.length() ? field.options.boolean.trueLabel : "An";
-               boolLabels += " / ";
-               boolLabels += field.options.boolean.falseLabel.length() ? field.options.boolean.falseLabel : "Aus";
-               lv_obj_t *info = lv_label_create(fieldContainer);
-               lv_label_set_text(info, boolLabels.c_str());
-               lv_obj_set_style_text_color(info, lv_color_hex(0x9CA3AF), LV_PART_MAIN | LV_STATE_DEFAULT);
-               lv_obj_set_style_text_font(info, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
-               lv_obj_set_style_width(info, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
-               lv_label_set_long_mode(info, LV_LABEL_LONG_WRAP);
-            }
          }
          else if (field.type == API::ResourceUsageFormFieldType::SELECT)
          {
