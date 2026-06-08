@@ -2,6 +2,7 @@ import { Injectable, Logger, Type } from '@nestjs/common';
 import { Resource, Setting, User } from '@attraccess/database-entities';
 import {
   isPluginPermission,
+  MqttServerConnectionConfig,
   PluginContext,
   PluginPermission,
   PluginPermissionError,
@@ -141,6 +142,10 @@ export class PluginSandboxService {
       emitEvent<E extends SystemEvent>(event: E, payload: SystemEventPayload[E]): void {
         require(PluginPermission.EMIT_EVENTS, `emitEvent(${event})`);
         base.emitEvent(event, payload);
+      },
+      getMqttServerConfig(serverId: number): Promise<MqttServerConnectionConfig | null> {
+        require(PluginPermission.ACCESS_MQTT_SERVERS, `getMqttServerConfig(${serverId})`);
+        return base.getMqttServerConfig(serverId);
       },
     };
   }

@@ -9,6 +9,9 @@ import {
   SystemEventHandler,
   SystemEventPayload,
   SystemEventSubscription,
+  MQTT_SERVER_HOST_PROVIDER,
+  MqttServerConnectionConfig,
+  MqttServerHostProvider,
 } from '@attraccess/plugins-backend-sdk';
 import { createRequire, Module as NodeModuleClass } from 'module';
 import { readFileSync } from 'fs';
@@ -193,6 +196,13 @@ export class PluginModule {
       },
       emitEvent<E extends SystemEvent>(event: E, payload: SystemEventPayload[E]): void {
         PluginModule.pluginEvents().emit(event, payload);
+      },
+      getMqttServerConfig(serverId: number): Promise<MqttServerConnectionConfig | null> {
+        const provider = PluginModule.requireRef(PluginModule.moduleRef, 'ModuleRef').get<MqttServerHostProvider>(
+          MQTT_SERVER_HOST_PROVIDER,
+          { strict: false }
+        );
+        return provider.getServerConfig(serverId);
       },
     };
 
