@@ -49,3 +49,5 @@ bom.json
 .claude/scheduled_tasks.lock
 
 docs/superpowers/
+# test coverage output
+coverage/
