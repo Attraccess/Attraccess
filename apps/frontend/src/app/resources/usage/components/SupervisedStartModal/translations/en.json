@@ -1,0 +1,23 @@
+{
+  "title": "Supervisor required",
+  "select": {
+    "description": "You are not yet introduced to this resource. Choose a supervisor to request approval for this session.",
+    "empty": "No authorized supervisors are currently available.",
+    "role": {
+      "introducer": "Introducer",
+      "maintainer": "Maintainer"
+    }
+  },
+  "waiting": {
+    "description": "Waiting for the supervisor to approve your request…",
+    "countdown": "{{seconds}}s"
+  },
+  "timeout": {
+    "description": "The supervisor did not respond in time. Please try again or pick another supervisor."
+  },
+  "rejected": {
+    "description": "Your request was declined. Please try again or pick another supervisor."
+  },
+  "retry": "Try again",
+  "cancel": "Cancel"
+}

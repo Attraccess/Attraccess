@@ -24,6 +24,7 @@ import { getBaseUrl } from '../api';
 import { AcceptInvitation } from './accept-invitation';
 import { TwoFactorGate } from './two-factor-gate';
 import { AttraccessUserActionsBridge } from '../components/attraccessUserActionsBridge';
+import { SupervisorApprovalListener } from '../components/supervisorApproval/SupervisorApprovalListener';
 
 function useRoutesWithAuthElements(routes: RouteConfig[]) {
   const { user } = useAuth();
@@ -122,6 +123,7 @@ function AppLayout(props: PropsWithChildren) {
                 <Layout noLayout={!isAuthenticated}>
                   {props.children}
                 </Layout>
+                {isAuthenticated && <SupervisorApprovalListener />}
               </AttraccessUserActionsBridge>
             </ReactFlowProvider>
           </ToastProvider>

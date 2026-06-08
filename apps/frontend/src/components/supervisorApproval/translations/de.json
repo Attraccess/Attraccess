@@ -1,0 +1,19 @@
+{
+  "title": "Aufsichtsanfrage",
+  "description": "Ein Nutzer möchte eine beaufsichtigte Sitzung an {{resource}} starten.",
+  "requesterRole": "Anfragender Nutzer",
+  "notesLabel": "Notizen",
+  "countdown": "Läuft ab in {{seconds}}s",
+  "approve": "Genehmigen",
+  "reject": "Ablehnen",
+  "toast": {
+    "approved": {
+      "title": "Sitzung genehmigt",
+      "description": "Die beaufsichtigte Sitzung wurde gestartet."
+    },
+    "error": {
+      "title": "Genehmigung fehlgeschlagen",
+      "description": "Die Anfrage ist möglicherweise abgelaufen. Bitte versuche es erneut."
+    }
+  }
+}
