@@ -1,20 +1,38 @@
-// Shelly device registry UI: an add-by-IP form plus the persisted device list.
-// Built from the host's shared HeroUI kit so it inherits the app's theme.
+// Shelly device registry UI. Laid out like the host's other management pages
+// (e.g. MQTT servers): a page header with a primary action that opens an add
+// form in a modal, and the devices rendered in a Table — not nested cards.
+// Built from the host's shared HeroUI kit so it inherits the app theme.
 import {
   Alert,
   AlertContent,
   AlertDescription,
   Button,
-  Card,
   Chip,
   Form,
   Input,
   Label,
+  Modal,
+  ModalBackdrop,
+  ModalBody,
+  ModalContainer,
+  ModalDialog,
+  ModalFooter,
+  ModalHeader,
+  ModalHeading,
   Spinner,
+  Table,
+  TableBody,
   TextField,
+  TableCell,
+  TableColumn,
+  TableContent,
+  TableHeader,
+  TableRow,
+  TableScrollContainer,
+  useOverlayState,
 } from '@heroui/react';
-import { PlusIcon, RefreshCwIcon, Trash2Icon, WifiIcon } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { MehIcon, PlusIcon, RefreshCwIcon, Trash2Icon, WifiIcon } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
 import { addDevice, deleteDevice, listDevices, reprobeDevice, type AuthState, type ShellyDevice } from './api';
 
 function generationLabel(generation: number | null): string {
@@ -22,75 +40,132 @@ function generationLabel(generation: number | null): string {
   return generation === 1 ? 'Gen 1' : `Gen ${generation}+`;
 }
 
-function authChipColor(state: AuthState): 'success' | 'warning' | 'default' {
-  if (state === 'none') return 'success';
-  if (state === 'required') return 'warning';
-  return 'default';
+function AuthChip({ state }: { state: AuthState }) {
+  const map = {
+    none: { color: 'success' as const, label: 'No auth' },
+    required: { color: 'warning' as const, label: 'Auth required' },
+    unknown: { color: 'default' as const, label: 'Unknown' },
+  };
+  const { color, label } = map[state];
+  return (
+    <Chip variant="soft" color={color}>
+      {label}
+    </Chip>
+  );
 }
 
-function authLabel(state: AuthState): string {
-  if (state === 'none') return 'No auth';
-  if (state === 'required') return 'Auth required';
-  return 'Auth unknown';
+function EmptyDevices() {
+  return (
+    <div className="flex flex-col items-center justify-center gap-2 px-4 py-10">
+      <MehIcon size={36} className="text-default-300" />
+      <p className="text-sm text-default-500">No devices yet. Add one by IP to get started.</p>
+    </div>
+  );
 }
 
-function DeviceRow({
-  device,
-  busy,
-  onReprobe,
-  onDelete,
+function AddDeviceModal({
+  isOpen,
+  onOpenChange,
+  onAdded,
 }: {
-  device: ShellyDevice;
-  busy: boolean;
-  onReprobe: (id: number) => void;
-  onDelete: (id: number) => void;
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  onAdded: () => void;
+}) {
+  const [ipAddress, setIpAddress] = useState('');
+  const [name, setName] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = useCallback(
+    async (close: () => void) => {
+      const ip = ipAddress.trim();
+      if (!ip) {
+        setError('IP address is required.');
+        return;
+      }
+      setSubmitting(true);
+      setError(null);
+      try {
+        await addDevice({ ipAddress: ip, name: name.trim() || undefined });
+        setIpAddress('');
+        setName('');
+        onAdded();
+        close();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [ipAddress, name, onAdded]
+  );
+
+  return (
+    <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
+      <ModalBackdrop>
+        <ModalContainer size="md">
+          <ModalDialog>
+            {({ close }) => (
+              <>
+                <ModalHeader>
+                  <ModalHeading>Add a device</ModalHeading>
+                  <p className="text-sm text-default-500">
+                    Enter the device's IP address. We probe <code>GET /shelly</code> to detect its generation and
+                    model.
+                  </p>
+                </ModalHeader>
+                <ModalBody>
+                  <Form onSubmit={() => submit(close)} className="flex flex-col gap-4">
+                    <TextFieldRow label="IP address" value={ipAddress} onChange={setIpAddress} placeholder="192.168.1.42" required dataCy="shelly-add-ip" />
+                    <TextFieldRow label="Name (optional)" value={name} onChange={setName} placeholder="Workshop light" dataCy="shelly-add-name" />
+                    <input type="submit" hidden />
+                  </Form>
+                  {error && (
+                    <Alert status="danger" className="mt-4">
+                      <AlertContent>
+                        <AlertDescription data-cy="shelly-add-error">{error}</AlertDescription>
+                      </AlertContent>
+                    </Alert>
+                  )}
+                </ModalBody>
+                <ModalFooter>
+                  <Button variant="secondary" onPress={close}>
+                    Cancel
+                  </Button>
+                  <Button variant="primary" isPending={submitting} onPress={() => submit(close)} data-cy="shelly-add-submit">
+                    <PlusIcon className="h-4 w-4" /> Add device
+                  </Button>
+                </ModalFooter>
+              </>
+            )}
+          </ModalDialog>
+        </ModalContainer>
+      </ModalBackdrop>
+    </Modal>
+  );
+}
+
+function TextFieldRow({
+  label,
+  value,
+  onChange,
+  placeholder,
+  required,
+  dataCy,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  required?: boolean;
+  dataCy?: string;
 }) {
   return (
-    <div
-      data-cy={`shelly-device-row-${device.id}`}
-      className="flex flex-col gap-3 border-b border-default-200 py-4 last:border-b-0 sm:flex-row sm:items-center sm:justify-between"
-    >
-      <div className="flex flex-col gap-1">
-        <span className="font-medium text-default-800">{device.name}</span>
-        <span className="text-sm text-default-500">{device.ipAddress}</span>
-        {device.lastProbeError && (
-          <span className="text-xs text-danger" data-cy="shelly-device-probe-error">
-            Last probe failed: {device.lastProbeError}
-          </span>
-        )}
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <Chip variant="soft" color="default">
-          {generationLabel(device.generation)}
-        </Chip>
-        {device.model && (
-          <Chip variant="soft" color="accent">
-            {device.model}
-          </Chip>
-        )}
-        <Chip variant="soft" color={authChipColor(device.authState)}>
-          {authLabel(device.authState)}
-        </Chip>
-        <Button
-          size="sm"
-          variant="secondary"
-          isDisabled={busy}
-          onPress={() => onReprobe(device.id)}
-          data-cy={`shelly-device-reprobe-${device.id}`}
-        >
-          <RefreshCwIcon className="h-4 w-4" /> Re-probe
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          isDisabled={busy}
-          onPress={() => onDelete(device.id)}
-          data-cy={`shelly-device-delete-${device.id}`}
-        >
-          <Trash2Icon className="h-4 w-4" /> Delete
-        </Button>
-      </div>
-    </div>
+    <TextField value={value} onChange={onChange} isRequired={required}>
+      <Label>{label}</Label>
+      <Input placeholder={placeholder} autoComplete="off" data-cy={dataCy} />
+    </TextField>
   );
 }
 
@@ -98,13 +173,8 @@ export function DevicesPage() {
   const [devices, setDevices] = useState<ShellyDevice[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-
-  const [ipAddress, setIpAddress] = useState('');
-  const [name, setName] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
   const [rowBusyId, setRowBusyId] = useState<number | null>(null);
-  const formRef = useRef<HTMLFormElement>(null);
+  const { isOpen, open, setOpen } = useOverlayState();
 
   const refresh = useCallback(async () => {
     try {
@@ -121,46 +191,11 @@ export function DevicesPage() {
     void refresh();
   }, [refresh]);
 
-  const onAdd = useCallback(async () => {
-    const ip = ipAddress.trim();
-    if (!ip) {
-      setFormError('IP address is required.');
-      return;
-    }
-    setSubmitting(true);
-    setFormError(null);
-    try {
-      await addDevice({ ipAddress: ip, name: name.trim() || undefined });
-      setIpAddress('');
-      setName('');
-      await refresh();
-    } catch (err) {
-      setFormError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setSubmitting(false);
-    }
-  }, [ipAddress, name, refresh]);
-
-  const onReprobe = useCallback(
-    async (id: number) => {
+  const withRowBusy = useCallback(
+    async (id: number, action: () => Promise<unknown>) => {
       setRowBusyId(id);
       try {
-        await reprobeDevice(id);
-        await refresh();
-      } catch (err) {
-        setLoadError(err instanceof Error ? err.message : String(err));
-      } finally {
-        setRowBusyId(null);
-      }
-    },
-    [refresh]
-  );
-
-  const onDelete = useCallback(
-    async (id: number) => {
-      setRowBusyId(id);
-      try {
-        await deleteDevice(id);
+        await action();
         await refresh();
       } catch (err) {
         setLoadError(err instanceof Error ? err.message : String(err));
@@ -172,86 +207,90 @@ export function DevicesPage() {
   );
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-6 p-6">
-      <div className="flex items-center gap-3">
-        <WifiIcon className="h-6 w-6 text-primary" />
-        <h1 className="text-2xl font-semibold text-default-800">Shelly Devices</h1>
+    <div className="mx-auto flex max-w-5xl flex-col gap-6 p-6">
+      <div className="mb-2 flex w-full flex-wrap items-center justify-between gap-y-4">
+        <div className="flex items-center gap-3">
+          <WifiIcon className="h-6 w-6 text-primary" />
+          <div>
+            <h1 className="text-2xl font-bold">Shelly Devices</h1>
+            <p className="mt-1 text-sm text-foreground-500">Discovered and manually added Shelly devices.</p>
+          </div>
+        </div>
+        <Button variant="primary" onPress={open} data-cy="shelly-add-open">
+          <PlusIcon className="h-4 w-4" /> Add device
+        </Button>
       </div>
 
-      <Card className="border border-default-200 dark:border-default-100">
-        <Card.Header className="flex flex-col items-start gap-1">
-          <p className="text-base font-semibold text-default-700">Add a device</p>
-          <p className="text-sm text-default-500">
-            Enter the device's IP address. We probe <code>GET /shelly</code> to detect its generation and model.
-          </p>
-        </Card.Header>
-        <Card.Content>
-          <Form ref={formRef} onSubmit={onAdd} className="flex flex-col gap-4 sm:flex-row sm:items-end">
-            <TextField value={ipAddress} onChange={setIpAddress} isRequired className="flex-1">
-              <Label>IP address</Label>
-              <Input placeholder="192.168.1.42" autoComplete="off" data-cy="shelly-add-ip" />
-            </TextField>
-            <TextField value={name} onChange={setName} className="flex-1">
-              <Label>Name (optional)</Label>
-              <Input placeholder="Workshop light" autoComplete="off" data-cy="shelly-add-name" />
-            </TextField>
-            <Button
-              type="submit"
-              variant="primary"
-              isDisabled={submitting}
-              onPress={onAdd}
-              data-cy="shelly-add-submit"
-            >
-              <PlusIcon className="h-4 w-4" /> {submitting ? 'Adding…' : 'Add device'}
-            </Button>
-          </Form>
-          {formError && (
-            <Alert status="danger" className="mt-4">
-              <AlertContent>
-                <AlertDescription data-cy="shelly-add-error">{formError}</AlertDescription>
-              </AlertContent>
-            </Alert>
-          )}
-        </Card.Content>
-      </Card>
+      {loadError && (
+        <Alert status="danger">
+          <AlertContent>
+            <AlertDescription>Failed to load devices: {loadError}</AlertDescription>
+          </AlertContent>
+        </Alert>
+      )}
 
-      <Card className="border border-default-200 dark:border-default-100">
-        <Card.Header>
-          <p className="text-base font-semibold text-default-700">Devices</p>
-        </Card.Header>
-        <Card.Content>
-          {loading && (
-            <div className="flex items-center gap-2 text-default-500">
-              <Spinner size="sm" /> Loading…
-            </div>
-          )}
-          {!loading && loadError && (
-            <Alert status="danger">
-              <AlertContent>
-                <AlertDescription>Failed to load devices: {loadError}</AlertDescription>
-              </AlertContent>
-            </Alert>
-          )}
-          {!loading && !loadError && devices.length === 0 && (
-            <p className="text-sm text-default-500" data-cy="shelly-empty">
-              No devices yet. Add one by IP above.
-            </p>
-          )}
-          {!loading && !loadError && devices.length > 0 && (
-            <div data-cy="shelly-device-list" className="flex flex-col">
-              {devices.map((device) => (
-                <DeviceRow
-                  key={device.id}
-                  device={device}
-                  busy={rowBusyId === device.id}
-                  onReprobe={onReprobe}
-                  onDelete={onDelete}
-                />
-              ))}
-            </div>
-          )}
-        </Card.Content>
-      </Card>
+      {loading ? (
+        <div className="flex items-center justify-center p-6">
+          <Spinner color="accent" />
+        </div>
+      ) : (
+        <Table data-cy="shelly-device-table">
+          <TableScrollContainer>
+            <TableContent aria-label="Shelly devices">
+              <TableHeader>
+                <TableColumn isRowHeader>Name</TableColumn>
+                <TableColumn>Address</TableColumn>
+                <TableColumn>Generation</TableColumn>
+                <TableColumn>Model</TableColumn>
+                <TableColumn>Auth</TableColumn>
+                <TableColumn>Actions</TableColumn>
+              </TableHeader>
+              <TableBody items={devices} renderEmptyState={() => <EmptyDevices />}>
+                {(device) => (
+                  <TableRow key={device.id} id={device.id} data-cy={`shelly-device-row-${device.id}`}>
+                    <TableCell>
+                      <div className="font-medium text-default-800">{device.name}</div>
+                      {device.lastProbeError && (
+                        <div className="text-xs text-danger" data-cy="shelly-device-probe-error">
+                          Probe failed: {device.lastProbeError}
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">{device.ipAddress}</TableCell>
+                    <TableCell>{generationLabel(device.generation)}</TableCell>
+                    <TableCell>{device.model ?? '—'}</TableCell>
+                    <TableCell>
+                      <AuthChip state={device.authState} />
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-row gap-2">
+                        <Button
+                          variant="ghost"
+                          isDisabled={rowBusyId === device.id}
+                          onPress={() => withRowBusy(device.id, () => reprobeDevice(device.id))}
+                          data-cy={`shelly-device-reprobe-${device.id}`}
+                        >
+                          <RefreshCwIcon className="h-4 w-4" /> Re-probe
+                        </Button>
+                        <Button
+                          variant="danger-soft"
+                          isDisabled={rowBusyId === device.id}
+                          onPress={() => withRowBusy(device.id, () => deleteDevice(device.id))}
+                          data-cy={`shelly-device-delete-${device.id}`}
+                        >
+                          <Trash2Icon className="h-4 w-4" /> Delete
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </TableContent>
+          </TableScrollContainer>
+        </Table>
+      )}
+
+      <AddDeviceModal isOpen={isOpen} onOpenChange={setOpen} onAdded={refresh} />
     </div>
   );
 }
