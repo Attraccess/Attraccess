@@ -52,6 +52,8 @@ export enum PluginPermission {
   LISTEN_EVENTS = 'LISTEN_EVENTS',
   /** Resolve arbitrary host providers by token via context.get(). */
   RESOLVE_HOST_PROVIDERS = 'RESOLVE_HOST_PROVIDERS',
+  /** Read an MQTT server's connection config + resolved credentials via getMqttServerConfig(). */
+  ACCESS_MQTT_SERVERS = 'ACCESS_MQTT_SERVERS',
 }
 
 /**
@@ -66,6 +68,7 @@ export const PLUGIN_PERMISSION_DESCRIPTIONS: Record<PluginPermission, string> = 
   [PluginPermission.EMIT_EVENTS]: 'Publish events on the shared application event bus.',
   [PluginPermission.LISTEN_EVENTS]: 'Subscribe to events on the shared application event bus.',
   [PluginPermission.RESOLVE_HOST_PROVIDERS]: 'Resolve arbitrary host services by injection token.',
+  [PluginPermission.ACCESS_MQTT_SERVERS]: "Read an MQTT server's connection configuration and resolved credentials.",
 };
 
 /**

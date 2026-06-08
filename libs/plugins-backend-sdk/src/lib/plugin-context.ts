@@ -21,6 +21,40 @@ export interface PluginManifestInfo {
 }
 
 /**
+ * DI token under which the host registers its MqttServerHostProvider
+ * implementation. The plugin context resolves the provider through this token;
+ * plugins never reference it directly — they call getMqttServerConfig instead.
+ */
+export const MQTT_SERVER_HOST_PROVIDER = Symbol.for('attraccess.plugin.mqttServerHostProvider');
+
+/**
+ * Connection configuration for a single MQTT server, including its resolved
+ * (decrypted) credentials. A generic, broker-agnostic shape carrying only the
+ * fields a plugin needs to open a connection or call a server's management API.
+ */
+export interface MqttServerConnectionConfig {
+  readonly id: number;
+  readonly name: string;
+  readonly host: string;
+  readonly port: number;
+  readonly useTls: boolean;
+  readonly username: string | null;
+  /** Resolved (decrypted) password. Only ever provided to permitted plugins. */
+  readonly password: string | null;
+  readonly clientId: string | null;
+}
+
+/**
+ * Host-side provider that resolves an MQTT server's connection config. The core
+ * application implements this — all credential decryption stays core-side — and
+ * registers it under MQTT_SERVER_HOST_PROVIDER. Plugins reach it only through
+ * PluginContext.getMqttServerConfig, gated by the ACCESS_MQTT_SERVERS permission.
+ */
+export interface MqttServerHostProvider {
+  getServerConfig(serverId: number): Promise<MqttServerConnectionConfig | null>;
+}
+
+/**
  * Curated facade handed to a backend plugin at load time. It is the single,
  * versioned seam between plugin code and the host application. Adding a field is
  * a minor SDK bump; removing/changing one is a major bump.
@@ -59,6 +93,15 @@ export interface PluginContext {
    * EMIT_EVENTS permission. The payload is type-checked against the event.
    */
   emitEvent<E extends SystemEvent>(event: E, payload: SystemEventPayload[E]): void;
+
+  /**
+   * Resolve an MQTT server's connection configuration, including its resolved
+   * (decrypted) credentials. Requires the ACCESS_MQTT_SERVERS permission.
+   * Returns null when no server with the given id exists. The host performs all
+   * credential decryption; the plugin only ever receives the mapped config — it
+   * stays broker-agnostic (no RabbitMQ awareness).
+   */
+  getMqttServerConfig(serverId: number): Promise<MqttServerConnectionConfig | null>;
 }
 
 /**
