@@ -4,6 +4,9 @@ import { AttractapGateway } from './websocket.gateway';
 import { ReaderDeletedEvent, ReaderUpdatedEvent } from '../events';
 import { ResourceUsageEvent, ResourceUsageTakenOverEvent } from '../../resources/usage/events/resource-usage.events';
 import { ResourceChangedEvent } from '../../resources/events/resource-changed.event';
+import { ResourceMaintenanceChangedEvent } from '../../resources/maintenances/events/resource-maintenance-changed.event';
+import { ResourceHealthChangedEvent } from '../../resources/health/events/resource-health-changed.event';
+import { ResourceHealthStatus } from '@attraccess/database-entities';
 
 describe('WebSocketEventService', () => {
   let service: WebSocketEventService;
@@ -70,6 +73,28 @@ describe('WebSocketEventService', () => {
       const event = new ResourceChangedEvent(30);
       await service.onResourceChanged(event);
       expect(gateway.sendResourceListToReadersWithResource).toHaveBeenCalledWith(30);
+    });
+  });
+
+  describe('onResourceMaintenanceChanged', () => {
+    it('calls sendResourceListToReadersWithResource with the resource id', async () => {
+      const event = { resourceId: 40 } as ResourceMaintenanceChangedEvent;
+      await service.onResourceMaintenanceChanged(event);
+      expect(gateway.sendResourceListToReadersWithResource).toHaveBeenCalledWith(40);
+    });
+  });
+
+  describe('onResourceHealthChanged', () => {
+    it('calls sendResourceListToReadersWithResource with the resource id', async () => {
+      const event = new ResourceHealthChangedEvent(
+        50,
+        '',
+        ResourceHealthStatus.HEALTHY,
+        null,
+        ResourceHealthStatus.UNHEALTHY,
+      );
+      await service.onResourceHealthChanged(event);
+      expect(gateway.sendResourceListToReadersWithResource).toHaveBeenCalledWith(50);
     });
   });
 });
