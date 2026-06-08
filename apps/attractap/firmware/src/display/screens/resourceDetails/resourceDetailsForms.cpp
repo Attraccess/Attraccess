@@ -410,6 +410,13 @@ void ResourceDetailsScreen::buildCurrentFormField()
    lv_obj_set_style_width(resourceNameLabel, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_label_set_long_mode(resourceNameLabel, LV_LABEL_LONG_WRAP);
 
+   lv_obj_t *formTitle = lv_label_create(this->formsModalList);
+   lv_label_set_text(formTitle, formName.c_str());
+   lv_obj_set_style_text_font(formTitle, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(formTitle, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_label_set_long_mode(formTitle, LV_LABEL_LONG_WRAP);
+   lv_obj_set_style_width(formTitle, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
+
    {
       lv_obj_t *formCard = lv_obj_create(this->formsModalList);
       lv_obj_remove_style_all(formCard);
@@ -423,13 +430,6 @@ void ResourceDetailsScreen::buildCurrentFormField()
       lv_obj_set_style_pad_row(formCard, 6, LV_PART_MAIN | LV_STATE_DEFAULT);
       lv_obj_set_flex_flow(formCard, LV_FLEX_FLOW_COLUMN);
       lv_obj_set_flex_align(formCard, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-
-      lv_obj_t *formTitle = lv_label_create(formCard);
-      lv_label_set_text(formTitle, formName.c_str());
-      lv_obj_set_style_text_font(formTitle, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
-      lv_obj_set_style_text_color(formTitle, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
-      lv_label_set_long_mode(formTitle, LV_LABEL_LONG_WRAP);
-      lv_obj_set_style_width(formTitle, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
 
       {
          const API::ResourceUsageFormField &field = this->formsModalPage->fields[0];
