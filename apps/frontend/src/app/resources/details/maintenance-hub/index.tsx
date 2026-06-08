@@ -1,9 +1,10 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { useState } from 'react';
-import { Button, Tabs, TabList, Tab, TabPanel, Spinner, Card } from '@heroui/react';
-import { PlusIcon, ArrowLeft } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Button, Spinner } from '@heroui/react';
+import { PlusIcon, ArrowLeft, CalendarClockIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
+  ResourceMaintenance,
   useResourceMaintenancesServiceCanManageMaintenance,
   useResourceMaintenanceSchedulesServiceFindMaintenanceSchedules,
   useResourceMaintenancesServiceFindMaintenances,
@@ -12,8 +13,12 @@ import {
 import { useNow } from '../../../../hooks/useNow';
 import { StatStrip } from './stat-strip';
 import { SchedulesTab } from './schedules-tab';
-import { ActivityTab } from './activity-tab';
+import { RequestsSection } from './requests-section';
+import { LiveSection } from './live-section';
+import { UpcomingSection } from './upcoming-section';
+import { HistorySection } from './history-section';
 import { ScheduleFormDrawer } from './schedule-form-drawer';
+import { ResourceMaintenanceUpsertModal } from '../maintenance-management/upsert';
 import de from './de.json';
 import en from './en.json';
 
@@ -41,13 +46,28 @@ export function MaintenanceHubPage() {
       { refetchInterval: 10_000 },
     );
 
-  const [tab, setTab] = useState<'schedules' | 'activity'>('schedules');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerScheduleId, setDrawerScheduleId] = useState<number | undefined>(undefined);
 
   const openCreateDrawer = () => { setDrawerScheduleId(undefined); setDrawerOpen(true); };
   const openEditDrawer = (id: number) => { setDrawerScheduleId(id); setDrawerOpen(true); };
   const closeDrawer = () => setDrawerOpen(false);
+
+  const partitioned = useMemo(() => {
+    const live: ResourceMaintenance[] = [];
+    const upcoming: ResourceMaintenance[] = [];
+    const past: ResourceMaintenance[] = [];
+    for (const m of maintenancesEnvelope?.data ?? []) {
+      const start = new Date(m.startTime);
+      const end = m.endTime ? new Date(m.endTime) : null;
+      if (start <= now && (!end || end > now)) live.push(m);
+      else if (start > now) upcoming.push(m);
+      else past.push(m);
+    }
+    upcoming.sort((a, b) => +new Date(a.startTime) - +new Date(b.startTime));
+    past.sort((a, b) => +new Date(b.startTime) - +new Date(a.startTime));
+    return { live, upcoming, past };
+  }, [maintenancesEnvelope, now]);
 
   if (isLoadingResource || isLoadingPerms) {
     return <div className="flex justify-center py-16"><Spinner /></div>;
@@ -78,50 +98,41 @@ export function MaintenanceHubPage() {
   }
 
   return (
-    <div>
-      <div className="flex justify-end mb-4">
-        <Button variant="primary" onPress={openCreateDrawer}>
-          <PlusIcon className="w-4 h-4" />
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:justify-end gap-2">
+        <ResourceMaintenanceUpsertModal resourceId={resourceId}>
+          {(open) => (
+            <Button variant="primary" onPress={open} className="w-full sm:w-auto">
+              <PlusIcon className="w-4 h-4" />
+              {t('activity.actions.create')}
+            </Button>
+          )}
+        </ResourceMaintenanceUpsertModal>
+        <Button variant="ghost" onPress={openCreateDrawer} className="w-full sm:w-auto">
+          <CalendarClockIcon className="w-4 h-4" />
           {t('actions.newSchedule')}
         </Button>
       </div>
 
-      <div className="space-y-6 mb-6">
-        <StatStrip
-          schedules={schedules ?? []}
-          maintenances={maintenancesEnvelope?.data ?? []}
-          now={now}
-        />
+      <StatStrip
+        schedules={schedules ?? []}
+        maintenances={maintenancesEnvelope?.data ?? []}
+        now={now}
+      />
 
-        <Card>
-          <Tabs selectedKey={tab} onSelectionChange={(k) => setTab(k as 'schedules' | 'activity')}>
-            <TabList>
-              <Tab id="schedules">{t('tabs.schedules')}</Tab>
-              <Tab id="activity">{t('tabs.activity')}</Tab>
-            </TabList>
-            <TabPanel id="schedules">
-              <div className="p-4">
-                <SchedulesTab
-                  resourceId={resourceId}
-                  schedules={schedules ?? []}
-                  isLoading={isLoadingSchedules}
-                  onCreate={openCreateDrawer}
-                  onEdit={openEditDrawer}
-                />
-              </div>
-            </TabPanel>
-            <TabPanel id="activity">
-              <div className="p-4">
-                <ActivityTab
-                  resourceId={resourceId}
-                  maintenances={maintenancesEnvelope?.data ?? []}
-                  isLoading={isLoadingMaintenances}
-                />
-              </div>
-            </TabPanel>
-          </Tabs>
-        </Card>
-      </div>
+      {isLoadingMaintenances ? null : (
+        <LiveSection resourceId={resourceId} liveMaintenances={partitioned.live} />
+      )}
+      <RequestsSection resourceId={resourceId} />
+      <UpcomingSection upcomingMaintenances={partitioned.upcoming} />
+      <SchedulesTab
+        resourceId={resourceId}
+        schedules={schedules ?? []}
+        isLoading={isLoadingSchedules}
+        onCreate={openCreateDrawer}
+        onEdit={openEditDrawer}
+      />
+      <HistorySection pastMaintenances={partitioned.past} />
 
       <ScheduleFormDrawer
         resourceId={resourceId}

@@ -6,7 +6,8 @@
       "label": "Reason",
       "noReason": "No reason"
     },
-    "noDate": "Date not known"
+    "noDate": "Date not known",
+    "markDone": "Mark maintenance as done"
   },
   "maintainers": "Users allowed to perform maintenance"
 }
