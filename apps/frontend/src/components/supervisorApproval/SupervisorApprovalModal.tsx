@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
+  Card,
+  Description,
   Modal,
   ModalBackdrop,
   ModalBody,
@@ -73,9 +75,7 @@ export function SupervisorApprovalModal({
 
                 <ModalBody>
                   <div className="space-y-4">
-                    <p className="text-sm text-gray-700 dark:text-gray-300">
-                      {t('description', { resource: resource?.name ?? '' })}
-                    </p>
+                    <Description>{t('description', { resource: resource?.name ?? '' })}</Description>
 
                     <AttraccessUser
                       user={
@@ -88,15 +88,17 @@ export function SupervisorApprovalModal({
                     />
 
                     {request.notes ? (
-                      <div className="rounded-md bg-gray-50 dark:bg-gray-800 p-2">
-                        <p className="text-xs font-medium text-gray-500 dark:text-gray-400">{t('notesLabel')}</p>
-                        <p className="text-sm text-gray-800 dark:text-gray-200">{request.notes}</p>
-                      </div>
+                      <Card>
+                        <Card.Content className="gap-1">
+                          <Description>{t('notesLabel')}</Description>
+                          <p className="text-sm">{request.notes}</p>
+                        </Card.Content>
+                      </Card>
                     ) : null}
 
-                    <div className="flex items-center justify-center gap-2 text-gray-500 dark:text-gray-400">
+                    <div className="flex items-center justify-center gap-2">
                       <Spinner color="accent" size="sm" />
-                      <span className="tabular-nums">{t('countdown', { seconds: secondsLeft })}</span>
+                      <Description className="tabular-nums">{t('countdown', { seconds: secondsLeft })}</Description>
                     </div>
                   </div>
                 </ModalBody>

@@ -3,6 +3,7 @@ import {
   Alert,
   AlertContent,
   AlertDescription,
+  Description,
   Modal,
   ModalBackdrop,
   ModalBody,
@@ -118,10 +119,8 @@ export function SupervisedStartModal({
       return (
         <div className="flex flex-col items-center gap-4 py-4 text-center">
           <Spinner color="accent" />
-          <p className="text-gray-700 dark:text-gray-300">{t('waiting.description')}</p>
-          <p className="text-3xl font-semibold tabular-nums text-gray-900 dark:text-white">
-            {t('waiting.countdown', { seconds: secondsLeft })}
-          </p>
+          <Description>{t('waiting.description')}</Description>
+          <p className="text-3xl font-semibold tabular-nums">{t('waiting.countdown', { seconds: secondsLeft })}</p>
         </div>
       );
     }
@@ -150,19 +149,19 @@ export function SupervisedStartModal({
     }
 
     if (supervisors.length === 0) {
-      return <p className="text-gray-500 dark:text-gray-400 italic">{t('select.empty')}</p>;
+      return <Description>{t('select.empty')}</Description>;
     }
 
     return (
       <div className="space-y-3">
-        <p className="text-sm text-gray-700 dark:text-gray-300">{t('select.description')}</p>
+        <Description>{t('select.description')}</Description>
         <div className="space-y-2">
           {supervisors.map((supervisor) => (
-            <button
+            <Button
               key={supervisor.id}
-              type="button"
-              onClick={() => handleSelectSupervisor(supervisor.userId)}
-              className="w-full rounded-md border border-gray-200 dark:border-gray-700 p-2 text-left transition-colors hover:border-accent-500 hover:bg-gray-50 dark:hover:bg-gray-800"
+              variant="outline"
+              className="h-auto w-full justify-start py-2"
+              onPress={() => handleSelectSupervisor(supervisor.userId)}
             >
               <AttraccessUser
                 user={supervisor.user}
@@ -172,7 +171,7 @@ export function SupervisedStartModal({
                     : t('select.role.maintainer')
                 }
               />
-            </button>
+            </Button>
           ))}
         </div>
       </div>
