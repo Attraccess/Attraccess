@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { isValidEmail } from '../../utils/email';
 import { ArrowRight, LogInIcon } from 'lucide-react';
-import { Accordion, AccordionItem, AccordionHeading, AccordionTrigger, AccordionPanel, AccordionBody, AlertContent, AlertDescription, AlertTitle, Description, Input, Label, Skeleton, TextField } from '@heroui/react';
+import { Accordion, AccordionItem, AccordionHeading, AccordionTrigger, AccordionPanel, AccordionBody, AlertContent, AlertDescription, AlertTitle, Input, Label, Skeleton, TextField } from '@heroui/react';
 import { Button } from '../../components/button';
+import { OneTimeCodeInput } from '../../components/OneTimeCodeInput';
 import { Alert } from '@heroui/react';
 import { TExists, TFunction, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PasswordInput } from '../../components/PasswordInput';
@@ -89,6 +90,7 @@ function LoginFormContent(props: LoginFormProps & { t: TFunction; tExists: TExis
   const { onForgotPassword, t, tExists } = props;
 
   const { mutate: login, isPending, error } = useLogin();
+  const [twoFactorCode, setTwoFactorCode] = useState('');
   const [resendEmail, setResendEmail] = useState('');
   const [resendSuccess, setResendSuccess] = useState(false);
   const [resendError, setResendError] = useState<{ title: string; description: string } | null>(null);
@@ -157,7 +159,6 @@ function LoginFormContent(props: LoginFormProps & { t: TFunction; tExists: TExis
       const formData = new FormData(event.currentTarget as HTMLFormElement);
       const username = formData.get('username');
       const password = formData.get('password');
-      const twoFactorCode = formData.get('twoFactorCode');
 
       if (typeof username !== 'string' || typeof password !== 'string') {
         return;
@@ -169,11 +170,11 @@ function LoginFormContent(props: LoginFormProps & { t: TFunction; tExists: TExis
       login({
         username,
         password,
-        twoFactorCode: typeof twoFactorCode === 'string' ? twoFactorCode.trim() || undefined : undefined,
+        twoFactorCode: twoFactorCode.trim() || undefined,
         tokenLocation: 'cookie',
       });
     },
-    [login],
+    [login, twoFactorCode],
   );
 
   const arrowRight = <ArrowRight className="group-hover:translate-x-1 transition-transform" />;
@@ -193,11 +194,16 @@ function LoginFormContent(props: LoginFormProps & { t: TFunction; tExists: TExis
         data-cy="login-form-password-input"
         autoComplete="current-password"
       />
-      <TextField isDisabled={isPending}>
-        <Label>{t('twoFactorCode')}</Label>
-        <Input id="twoFactorCode" name="twoFactorCode" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} data-cy="login-form-two-factor-input" />
-        <Description>{t('twoFactorHelper')}</Description>
-      </TextField>
+      <OneTimeCodeInput
+        id="twoFactorCode"
+        name="twoFactorCode"
+        label={t('twoFactorCode')}
+        description={t('twoFactorHelper')}
+        value={twoFactorCode}
+        onChange={setTwoFactorCode}
+        isDisabled={isPending}
+        data-cy="login-form-two-factor-input"
+      />
       <div className="flex items-center justify-between">
         <Button variant="secondary"
           onPress={onForgotPassword}
