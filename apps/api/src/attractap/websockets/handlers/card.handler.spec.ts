@@ -18,6 +18,7 @@ describe('AttractapCardHandler', () => {
   let resourceUsageService: { canControllResource: jest.Mock };
   let resourceIntroducersService: { isIntroducer: jest.Mock };
   let metricsService: { attractapNfcTapsTotal: { inc: jest.Mock } };
+  let resourceRepository: { findOne: jest.Mock };
 
   const mockUser = { id: 1, username: 'testuser' };
   const mockReaderWithEnrollment = {
@@ -66,6 +67,8 @@ describe('AttractapCardHandler', () => {
     resourceUsageService = { canControllResource: jest.fn().mockResolvedValue(true) };
     resourceIntroducersService = { isIntroducer: jest.fn().mockResolvedValue(false) };
     metricsService = { attractapNfcTapsTotal: { inc: jest.fn() } };
+    // Default: a resource that does not support supervision (introduction_required).
+    resourceRepository = { findOne: jest.fn().mockResolvedValue({ id: 10, supervisionMode: 'introduction_required' }) };
 
     (handler as any).websocketService = websocketService;
     (handler as any).attractapService = attractapService;
@@ -73,6 +76,7 @@ describe('AttractapCardHandler', () => {
     (handler as any).resourceUsageService = resourceUsageService;
     (handler as any).resourceIntroducersService = resourceIntroducersService;
     (handler as any).metricsService = metricsService;
+    (handler as any).resourceRepository = resourceRepository;
   });
 
   describe('startEnrollOfNewNfcCard', () => {
@@ -578,7 +582,49 @@ describe('AttractapCardHandler', () => {
               canManageResource: true,
               hasIntroduction: true,
               isIntroducer: true,
+              supervisionMode: 'introduction_required',
+              requiresSupervisor: false,
             },
+          }),
+        }),
+      );
+    });
+
+    it('flags requiresSupervisor for a SUPERVISION_REQUIRED resource even when introduced', async () => {
+      const socket = createMockSocket();
+      attractapService.getNFCCardByUID.mockResolvedValueOnce(activeCard);
+      resourceUsageService.canControllResource.mockResolvedValueOnce(true);
+      resourceIntroducersService.isIntroducer.mockResolvedValueOnce(false);
+      resourceRepository.findOne.mockResolvedValueOnce({ id: 10, supervisionMode: 'supervision_required' });
+      const data = { payload: { uid: 'abc', resourceId: 10 } } as AttractapEvent['data'];
+
+      await handler.handleCardAuthenticationRequest(socket, data);
+
+      expect(socket.sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            type: AttractapEventType.CARD_AUTHENTICATION_DATA,
+            payload: expect.objectContaining({ supervisionMode: 'supervision_required', requiresSupervisor: true }),
+          }),
+        }),
+      );
+    });
+
+    it('flags requiresSupervisor for SUPERVISION_ALLOWED only when the user has no introduction', async () => {
+      const socket = createMockSocket();
+      attractapService.getNFCCardByUID.mockResolvedValueOnce(activeCard);
+      resourceUsageService.canControllResource.mockResolvedValueOnce(false);
+      resourceIntroducersService.isIntroducer.mockResolvedValueOnce(false);
+      resourceRepository.findOne.mockResolvedValueOnce({ id: 10, supervisionMode: 'supervision_allowed' });
+      const data = { payload: { uid: 'abc', resourceId: 10 } } as AttractapEvent['data'];
+
+      await handler.handleCardAuthenticationRequest(socket, data);
+
+      expect(socket.sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            type: AttractapEventType.CARD_AUTHENTICATION_DATA,
+            payload: expect.objectContaining({ supervisionMode: 'supervision_allowed', requiresSupervisor: true }),
           }),
         }),
       );

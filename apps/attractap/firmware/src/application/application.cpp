@@ -375,6 +375,73 @@ void Application::setup() {
   Display::resetScreen.setOnCancelCallback(
       [this]() { this->resetCancelRequested = true; });
 
+  // --- Two-card supervision (ATT-493) ---------------------------------------
+  Display::supervisionScreen.setOnCancelCallback(
+      [this]() { this->supervisionCancelRequested = true; });
+
+  this->api.setSupervisionRequestResultCallback(
+      [this](API::SupervisionRequestResult result) {
+        if (!result.success) {
+          // No eligible supervisor / resource doesn't support supervision: abort the flow.
+          strlcpy(this->supervisionErrorMessage,
+                  result.error == "NO_SUPERVISORS_AVAILABLE"
+                      ? "Kein Tutor verfuegbar"
+                      : translateReaderError(result.error).c_str(),
+                  sizeof(this->supervisionErrorMessage));
+          this->supervisionFailed = true;
+          return;
+        }
+
+        // Build the secondary hint: who may approve + the web fallback note. Runs on the websocket
+        // task, so write the fixed buffer and publish via the volatile flag (set last).
+        String hint = "Tutor-Karte auflegen oder per\nApp/Web bestaetigen";
+        if (result.supervisorCount > 0) {
+          hint += "\n";
+          for (uint8_t i = 0; i < result.supervisorCount; i++) {
+            if (i > 0) {
+              hint += ", ";
+            }
+            hint += result.supervisorNames[i];
+          }
+        }
+        strlcpy(this->supervisionHintMessage, hint.c_str(),
+                sizeof(this->supervisionHintMessage));
+        this->supervisionHintReady = true;
+      });
+
+  this->api.setSupervisorCardAuthenticationResponseCallback(
+      [this](API::SupervisorCardAuthenticationResponse response) {
+        if (response.error.length() > 0 || response.keyLen != 16) {
+          strlcpy(this->supervisionErrorMessage,
+                  response.error == "SUPERVISOR_NOT_AUTHORIZED"
+                      ? "Karte nicht als Tutor\nberechtigt"
+                      : translateReaderError(response.error).c_str(),
+                  sizeof(this->supervisionErrorMessage));
+          this->supervisionCardRejected = true;
+          return;
+        }
+
+        this->apiSupervisorCardData.keyNo = response.keyNo;
+        memset(this->apiSupervisorCardData.keyBytes, 0, 16);
+        memcpy(this->apiSupervisorCardData.keyBytes, response.keyBytes, 16);
+        // Flag readiness; processSupervision() performs the on-card crypto auth on the main loop.
+        this->supervisionKeyReady = true;
+      });
+
+  this->api.setSupervisionResolvedCallback(
+      [this](API::SupervisionResolvedResult result) {
+        if (result.success) {
+          // The supervisor approved from the web; the session is already started server-side.
+          this->supervisionResolvedByWeb = true;
+        } else {
+          strlcpy(this->supervisionErrorMessage,
+                  result.error.length() > 0 ? translateReaderError(result.error).c_str()
+                                            : "Aufsicht abgelehnt",
+                  sizeof(this->supervisionErrorMessage));
+          this->supervisionFailed = true;
+        }
+      });
+
   this->api.setProjectsOfUserResponseCallback(
       [this](const API::ProjectsOfUserResponse &projectsOfUserResponse) {
         this->projectsOfUserResponse = projectsOfUserResponse;
@@ -476,6 +543,18 @@ void Application::setup() {
       // enrollment: flag it and let the reset state machine authenticate + write
       // the factory key back on the main loop.
       this->resetCardDetected = true;
+      return;
+    }
+
+    if (this->state == APPLICATION_STATE_SUPERVISION) {
+      // A supervisor card entered the field. Capture its UID and flag it; the
+      // supervision state machine validates + authenticates it on the main loop.
+      uint8_t copyLen = uidLength > sizeof(this->supervisionCardUid)
+                            ? sizeof(this->supervisionCardUid)
+                            : uidLength;
+      memcpy(this->supervisionCardUid, uid, copyLen);
+      this->supervisionCardUidLength = copyLen;
+      this->supervisionCardDetected = true;
       return;
     }
 #endif

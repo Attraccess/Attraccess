@@ -21,6 +21,7 @@ describe('AttractapSessionHandler – session + flow button', () => {
   let mockResourceActionGuard: { validateResourceAction: jest.Mock };
   let mockResourceListService: { sendResourceListToSocket: jest.Mock };
   let mockFormsHandler: { ensureFormsSatisfied: jest.Mock; clearFormDraft: jest.Mock };
+  let mockSupervisionService: { settleByCard: jest.Mock };
 
   const mockUser = { id: 1, username: 'testuser' };
 
@@ -71,6 +72,10 @@ describe('AttractapSessionHandler – session + flow button', () => {
       clearFormDraft: jest.fn(),
     };
 
+    mockSupervisionService = {
+      settleByCard: jest.fn(),
+    };
+
     (handler as any).usersService = mockUsersService;
     (handler as any).resourceUsageService = mockResourceUsageService;
     (handler as any).resourceFlowsExecutorService = mockResourceFlowsExecutorService;
@@ -78,6 +83,7 @@ describe('AttractapSessionHandler – session + flow button', () => {
     (handler as any).resourceActionGuard = mockResourceActionGuard;
     (handler as any).resourceListService = mockResourceListService;
     (handler as any).formsHandler = mockFormsHandler;
+    (handler as any).supervisionService = mockSupervisionService;
   });
 
   describe('handleStartResourceUsageSession', () => {
@@ -136,11 +142,41 @@ describe('AttractapSessionHandler – session + flow button', () => {
 
       await (handler as any).handleStartResourceUsageSession(mockSocket, eventData);
 
-      expect(mockResourceUsageService.startSession).toHaveBeenCalledWith(10, mockUser, {
-        projectId: 7,
-        formSubmissions,
-      });
+      expect(mockResourceUsageService.startSession).toHaveBeenCalledWith(
+        10,
+        mockUser,
+        { projectId: 7, formSubmissions },
+        {},
+      );
       expect(mockFormsHandler.clearFormDraft).toHaveBeenCalledWith(mockSocket, 10, ResourceFormAction.START);
+      expect(mockSocket.sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            type: AttractapEventType.START_RESOURCE_USAGE_SESSION,
+            payload: { success: true },
+          }),
+        }),
+      );
+    });
+
+    it('attaches the supervisor and settles the web request for a two-card supervised start', async () => {
+      (mockSocket.state as any).supervisionFlow = {
+        resourceId: 10,
+        requesterUserId: 1,
+        requestId: 'req-1',
+        approvedSupervisorUserId: 2,
+      };
+
+      await (handler as any).handleStartResourceUsageSession(mockSocket, eventData);
+
+      expect(mockResourceUsageService.startSession).toHaveBeenCalledWith(
+        10,
+        mockUser,
+        { projectId: 7, formSubmissions: [] },
+        { supervisorUserId: 2 },
+      );
+      expect(mockSupervisionService.settleByCard).toHaveBeenCalledWith('req-1');
+      expect((mockSocket.state as any).supervisionFlow).toBeNull();
       expect(mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({

@@ -90,8 +90,16 @@ void API::processIncomingMessage(const char *buf, size_t len)
     // until enrollment times out (ATT-503).
     bool isEnrollKeyRequestEvent = strcmp(eventType, "ENROLL_NEW_CARD_REQUEST_NFC_KEY") == 0;
 
+    // Two-card supervision errors (e.g. SUPERVISOR_NOT_AUTHORIZED, NO_SUPERVISORS_AVAILABLE) are
+    // recoverable in-flow: the supervision screen surfaces them and either keeps waiting or aborts
+    // cleanly. Route them to the dedicated handlers instead of the generic error dialog (ATT-493).
+    bool isSupervisionEvent = strcmp(eventType, "SUPERVISION_REQUEST") == 0 ||
+                              strcmp(eventType, "SUPERVISOR_CARD_AUTHENTICATION_DATA") == 0 ||
+                              strcmp(eventType, "SUPERVISION_RESOLVED") == 0;
+
     // Early error handling: if payload.error is present and non-empty, raise error callback and stop
-    if (!isCrashReportEvent && !isEnrollKeyRequestEvent && inboundDoc["data"]["payload"].is<JsonObject>())
+    if (!isCrashReportEvent && !isEnrollKeyRequestEvent && !isSupervisionEvent &&
+        inboundDoc["data"]["payload"].is<JsonObject>())
     {
         JsonObject payload = inboundDoc["data"]["payload"].as<JsonObject>();
         if (payload["error"].is<String>())
@@ -147,6 +155,18 @@ void API::processIncomingMessage(const char *buf, size_t len)
     else if (strcmp(eventType, "CARD_AUTHENTICATION_DATA") == 0)
     {
         this->onCardAuthenticationDetailsResponse(inboundDoc["data"].as<JsonObject>());
+    }
+    else if (strcmp(eventType, "SUPERVISION_REQUEST") == 0)
+    {
+        this->onSupervisionRequestResult(inboundDoc["data"].as<JsonObject>());
+    }
+    else if (strcmp(eventType, "SUPERVISOR_CARD_AUTHENTICATION_DATA") == 0)
+    {
+        this->onSupervisorCardAuthenticationData(inboundDoc["data"].as<JsonObject>());
+    }
+    else if (strcmp(eventType, "SUPERVISION_RESOLVED") == 0)
+    {
+        this->onSupervisionResolved(inboundDoc["data"].as<JsonObject>());
     }
     else if (strcmp(eventType, "ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO") == 0)
     {
