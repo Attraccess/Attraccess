@@ -1,4 +1,5 @@
 #include "display.hpp"
+#include "../utils.hpp"
 
 // Input dispatch and frame flushing: bridges the display driver to LVGL's
 // flush/indev callbacks and forwards touch points to an optional consumer.
@@ -22,8 +23,16 @@ void Display::touchpad_read(lv_indev_t *indev_driver, lv_indev_data_t *data)
         return;
     }
 
+    // The GT911 shares the I2C bus with the PN532; serialize the hardware read
+    // against NFC polling on the app loop task (ATT-548). Scope the lock to the
+    // bus transaction only — gesture/callback dispatch runs unlocked.
     TouchPoint point;
-    if (!Display::driver->readTouch(point) || !point.pressed)
+    bool gotTouch;
+    {
+        I2CBusGuard _i2c;
+        gotTouch = Display::driver->readTouch(point);
+    }
+    if (!gotTouch || !point.pressed)
     {
         data->state = LV_INDEV_STATE_RELEASED;
         Display::handleGestureSample(0, 0, false);

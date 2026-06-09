@@ -4,6 +4,7 @@ uint8_t NFC::FACTORY_KEY[16] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
 
 void NFC::setup()
 {
+    I2CBusGuard _i2c; // serialize shared I2C bus vs touch reads (ATT-548)
     this->logger.info("Initializing PN532");
     this->pn532.begin();
 
@@ -54,6 +55,10 @@ void NFC::resetCardPresence()
 
 void NFC::loop()
 {
+    // One bus lock for the whole poll iteration. handleCardDetection() holds it
+    // for the duration of readPassiveTargetID (now a short 20 ms timeout), so a
+    // touch read on the render task waits at most that long for the bus.
+    I2CBusGuard _i2c; // (ATT-548)
     this->checkHardware();
     this->handleCardDetection();
 }
@@ -88,7 +93,13 @@ void NFC::handleCardDetection()
         return;
     }
 
-    bool foundCardUpdate = this->pn532.readPassiveTargetID(PN532_MIFARE_ISO14443A, cardDetectedUid, &cardDetectedUidLength, 100);
+    // Short poll timeout (ATT-548): readPassiveTargetID spins delay(10) internally
+    // up to the timeout while holding the I2C bus. At the old 100 ms a touch read
+    // on the render task could stall ~100 ms waiting for the bus — exactly the lag
+    // we are fixing. 20 ms keeps the worst-case touch wait small; the loop re-polls
+    // repeatedly so detection stays reliable (verify present/remove/re-present —
+    // ATT-503). Tunable down to ~10 ms if more headroom is needed.
+    bool foundCardUpdate = this->pn532.readPassiveTargetID(PN532_MIFARE_ISO14443A, cardDetectedUid, &cardDetectedUidLength, 20);
 
     if (foundCardUpdate)
     {
@@ -105,6 +116,7 @@ void NFC::handleCardDetection()
 
 bool NFC::waitForCard(uint32_t timeoutMs)
 {
+    I2CBusGuard _i2c; // (ATT-548)
     uint8_t uid[] = {0, 0, 0, 0, 0, 0, 0}; // Buffer to store the returned UID
     uint8_t uidLength;                     // Length of the UID (4 or 7 bytes depending on ISO14443A
                                            // card type)
@@ -126,6 +138,7 @@ bool NFC::waitForCard(uint32_t timeoutMs)
 
 bool NFC::changeKey(uint8_t keyNumber, uint8_t *masterKey, uint8_t *oldKey, uint8_t *newKey)
 {
+    I2CBusGuard _i2c; // (ATT-548)
     this->logger.info("changeKey started");
 
     // Step 1: Authenticate with master key
@@ -158,6 +171,7 @@ bool NFC::changeKey(uint8_t keyNumber, uint8_t *masterKey, uint8_t *oldKey, uint
 
 bool NFC::authenticate(uint8_t keyNumber, uint8_t *key)
 {
+    I2CBusGuard _i2c; // (ATT-548)
     this->logger.info("authenticate started");
 
     // Step 1: Authenticate with key
@@ -174,6 +188,7 @@ bool NFC::authenticate(uint8_t keyNumber, uint8_t *key)
 
 void NFC::checkHardware(bool logHardwareInfo)
 {
+    I2CBusGuard _i2c; // (ATT-548)
     uint32_t now = millis();
     if (now - this->lastHardwareCheckMs < NFC::hardwareCheckIntervalMs)
     {
@@ -206,6 +221,7 @@ void NFC::checkHardware(bool logHardwareInfo)
 
 bool NFC::getAvailableKeyNo(uint8_t *uid, uint8_t *uidLength, uint8_t *keyNo)
 {
+    I2CBusGuard _i2c; // (ATT-548)
     this->logger.info("getAvailableKeyNo started");
 
     // The card was just selected by handleCardDetection's readPassiveTargetID.

@@ -2,6 +2,34 @@
 
 #include <Arduino.h>
 
+/**
+ * @brief Shared I2C bus serialization (ATT-548).
+ *
+ * The GT911 touch controller and the PN532 NFC reader sit on the same physical
+ * I2C bus. Touch is now read from a dedicated LVGL render task while NFC polling
+ * runs on the app loop task, so concurrent bus transactions must be serialized.
+ * The mutex is recursive: a single task may re-enter (e.g. NFC::loop ->
+ * checkHardware, or changeKey -> authenticate) without deadlocking.
+ *
+ * Lock ordering rule: whenever both the LVGL lock and the I2C lock are held by
+ * the same task, the LVGL lock is always taken first (lv_lock -> i2cBusLock).
+ *
+ * i2cBusInit() must be called once after Wire.begin(); the lock/unlock helpers
+ * are no-ops until then (safe during single-threaded boot).
+ */
+void i2cBusInit();
+void i2cBusLock();
+void i2cBusUnlock();
+
+/** RAII helper: holds the shared I2C bus lock for the enclosing scope. */
+struct I2CBusGuard
+{
+    I2CBusGuard() { i2cBusLock(); }
+    ~I2CBusGuard() { i2cBusUnlock(); }
+    I2CBusGuard(const I2CBusGuard &) = delete;
+    I2CBusGuard &operator=(const I2CBusGuard &) = delete;
+};
+
 String hexToString(uint8_t *uid, uint8_t uidLength);
 bool stringToHexArray(String hexString, uint8_t *array, uint8_t arrayLength);
 

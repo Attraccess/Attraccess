@@ -232,7 +232,14 @@ void Websocket::connectWebSocket()
     // Configure buffer sizes to prevent ENOBUFS errors
     websocket_cfg.task_stack = 9830;  // Increase task stack size for stability
     websocket_cfg.buffer_size = 4096; // Increase buffer size (default is typically 1024)
-    // websocket_cfg.task_prio = 5;      // Set appropriate task priority
+    // The esp_websocket_client task is unpinned (tskNO_AFFINITY) and was running
+    // at the IDF default priority 5, so it could land on the render core and
+    // preempt the LVGL task — the "settings screen lags only when a network is
+    // configured" symptom (ATT-548). Pin its priority below the render task
+    // (Application::LVGL_TASK_PRIORITY = 3) so it can no longer starve rendering.
+    // (esp_websocket_client_config_t exposes no core-affinity field in this IDF
+    // version; priority is the available lever.)
+    websocket_cfg.task_prio = 2;
 
     websocket_cfg.ping_interval_sec = 5;
     websocket_cfg.pingpong_timeout_sec = PINGPONG_TIMEOUT_SEC;

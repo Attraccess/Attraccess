@@ -53,6 +53,10 @@ void setup()
     // Prevent potential I2C stalls on touch controller reads
     Wire.setTimeOut(50);
 
+    // Serialize shared-bus access (GT911 touch vs PN532 NFC) now that touch is
+    // read from the dedicated LVGL task while NFC polls on the app loop (ATT-548).
+    i2cBusInit();
+
     mainLogger.info("Attractap starting...");
     application.setup();
 }

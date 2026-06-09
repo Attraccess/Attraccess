@@ -29,6 +29,15 @@
 /*Swap the 2 bytes of RGB565 color. Useful if the display has an 8-bit interface (e.g. SPI)*/
 #define LV_COLOR_16_SWAP 0
 
+/*====================
+   OS / THREADING (ATT-548)
+ *====================*/
+
+/*Run the OS abstraction layer on FreeRTOS so lv_lock()/lv_unlock() and the
+ *async/timer subsystem are thread-safe. Required now that lv_timer_handler()
+ *renders on a dedicated task while the app loop mutates the widget tree.*/
+#define LV_USE_OS LV_OS_FREERTOS
+
 /*Enable features to draw on transparent background.
  *It's required if opa, and transform_* style properties are used.
  *Can be also used if the UI is above another layer, e.g. an OSD menu or video player.*/
@@ -285,7 +294,13 @@
  *-----------*/
 
 /*1: Show CPU usage and FPS count*/
+/*ATT-548: gated on a build flag so on-hardware FPS/touch-latency measurement can
+ *be toggled with `-D ATTRACTAP_PERF_MONITOR=1` without editing this file.*/
+#ifdef ATTRACTAP_PERF_MONITOR
+#define LV_USE_PERF_MONITOR 1
+#else
 #define LV_USE_PERF_MONITOR 0
+#endif
 #if LV_USE_PERF_MONITOR
     #define LV_USE_PERF_MONITOR_POS LV_ALIGN_BOTTOM_RIGHT
 #endif

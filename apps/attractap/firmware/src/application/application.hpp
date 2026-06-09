@@ -177,6 +177,16 @@ private:
     static void ledTask(void *parameter);
 #endif
 
+#ifdef HAS_LVGL_DISPLAY
+    // Dedicated LVGL render/input task (ATT-548). Pinned to a core at a priority
+    // that is not starved by NFC polling, websocket lifecycle or the app state
+    // machine, so render/touch cadence stays independent of that work.
+    static void lvglTask(void *parameter);
+    static const uint32_t LVGL_TASK_STACK = 12288;
+    static const UBaseType_t LVGL_TASK_PRIORITY = 3;
+    static const BaseType_t LVGL_TASK_CORE = 1;
+#endif
+
     void processState();
 
     // Persistent boot/crash diagnostics stored in NVS. The record describes the

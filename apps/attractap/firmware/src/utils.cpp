@@ -1,5 +1,37 @@
 #include "utils.hpp"
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
+
+// Shared I2C bus mutex (ATT-548). Recursive so a single task can re-enter
+// nested PN532 calls. Null until i2cBusInit(); helpers no-op before then so the
+// single-threaded boot sequence works unchanged.
+static SemaphoreHandle_t s_i2cBusMutex = nullptr;
+
+void i2cBusInit()
+{
+    if (!s_i2cBusMutex)
+    {
+        s_i2cBusMutex = xSemaphoreCreateRecursiveMutex();
+    }
+}
+
+void i2cBusLock()
+{
+    if (s_i2cBusMutex)
+    {
+        xSemaphoreTakeRecursive(s_i2cBusMutex, portMAX_DELAY);
+    }
+}
+
+void i2cBusUnlock()
+{
+    if (s_i2cBusMutex)
+    {
+        xSemaphoreGiveRecursive(s_i2cBusMutex);
+    }
+}
+
 void recoverI2CBus(int sda, int scl)
 {
     pinMode(scl, OUTPUT);

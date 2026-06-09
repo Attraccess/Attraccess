@@ -33,6 +33,25 @@ void Application::ledTask(void *parameter) {
 }
 #endif
 
+#ifdef HAS_LVGL_DISPLAY
+// Dedicated render/input task (ATT-548). Display::loop() takes the LVGL lock
+// internally and returns quickly (it renders only the dirty regions), so the
+// short delay below yields the core to the lower-priority app loop between
+// frames while keeping touch sampling at a steady cadence.
+void Application::lvglTask(void *parameter) {
+#ifdef ESP_PLATFORM
+  esp_task_wdt_add(NULL);
+#endif
+  while (true) {
+#ifdef ESP_PLATFORM
+    esp_task_wdt_reset();
+#endif
+    Display::loop();
+    vTaskDelay(pdMS_TO_TICKS(5));
+  }
+}
+#endif
+
 void Application::setup() {
   // Confirm OTA image on first boot after update to avoid rollback
   const esp_partition_t *running = esp_ota_get_running_partition();
@@ -504,6 +523,14 @@ void Application::setup() {
   xTaskCreate(Application::networkTask, "NetworkTask", 4096, nullptr,
               tskIDLE_PRIORITY, nullptr);
 
+#ifdef HAS_LVGL_DISPLAY
+  // Render/input on its own pinned, higher-priority task so it is no longer
+  // serialized behind NFC polling, websocket lifecycle and the state machine on
+  // the Arduino loop task (ATT-548).
+  xTaskCreatePinnedToCore(Application::lvglTask, "LvglTask", LVGL_TASK_STACK,
+                          this, LVGL_TASK_PRIORITY, nullptr, LVGL_TASK_CORE);
+#endif
+
 #ifdef ESP_PLATFORM
   esp_task_wdt_add(NULL);
 #endif
@@ -524,15 +551,25 @@ void Application::loop() {
 
   SerialCommandHandler::loop();
 
-#ifdef HAS_LVGL_DISPLAY
-  Display::loop();
-#endif
+  // Display::loop() no longer runs here — it owns the dedicated lvglTask now
+  // (ATT-548). The app loop task is left to NFC, API/websocket and the state
+  // machine; rendering is no longer blocked behind them.
 
     nfc.loop();
 
     this->api.loop();
 
+#ifdef HAS_LVGL_DISPLAY
+  // processState() mutates the LVGL widget tree (screen transitions, per-screen
+  // setters). Hold the LVGL lock so those updates are mutually exclusive with
+  // the render task. NFC enroll/reset writes happen inside here while a card is
+  // held and the UI is non-interactive, so briefly pausing render is acceptable.
+  lv_lock();
   this->processState();
+  lv_unlock();
+#else
+  this->processState();
+#endif
 
 #ifdef ESP_PLATFORM
   vTaskDelay(pdMS_TO_TICKS(1));

@@ -239,6 +239,13 @@ bool Display::hasTouchInput()
 
 void Display::loop()
 {
+    // Runs on the dedicated LVGL task (ATT-548). Hold the LVGL lock for the whole
+    // tick so widget-tree access here is mutually exclusive with the app loop
+    // task, which mutates screens from processState() under the same lock.
+    // lv_lock() is recursive, so async callbacks dispatched inside
+    // lv_timer_handler() may re-enter safely.
+    lv_lock();
+
     if (s_touchWarningPending)
     {
         s_touchWarningPending = false;
@@ -277,4 +284,6 @@ void Display::loop()
             }
         }
     }
+
+    lv_unlock();
 }
