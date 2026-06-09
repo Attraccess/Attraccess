@@ -1,0 +1,35 @@
+apiVersion: 1
+
+# Human-readable notification templates for the Pushover contact point
+# (contactpoints.yaml references these by name). Pushover renders messages as
+# HTML (Grafana sends html=1), so <b>/<a> tags below are formatted, not literal.
+# Without these, Grafana's built-in default template produces a single dense
+# line ("Value: A=0.96... Labels: - alertname = ... Annotations: - ...") that is
+# hard to read on a phone.
+templates:
+  - orgId: 1
+    name: attraccess.pushover.title
+    template: |-
+      {{ define "attraccess.pushover.title" -}}
+      {{ if eq .Status "firing" }}🔥 FIRING{{ if gt (len .Alerts.Firing) 1 }} ({{ len .Alerts.Firing }}){{ end }}{{ else }}✅ RESOLVED{{ end }}: {{ if .CommonLabels.alertname }}{{ .CommonLabels.alertname }}{{ else }}{{ .CommonLabels.grafana_folder }}{{ end }}
+      {{- end }}
+
+  - orgId: 1
+    name: attraccess.pushover.message
+    template: |-
+      {{ define "attraccess.pushover.message" -}}
+      {{ range .Alerts -}}
+      {{ if eq .Status "firing" }}🔥 <b>FIRING</b>{{ else }}✅ <b>RESOLVED</b>{{ end }}
+      <b>{{ if .Annotations.summary }}{{ .Annotations.summary }}{{ else }}{{ .Labels.alertname }}{{ end }}</b>
+      {{ if .Annotations.description }}{{ .Annotations.description }}
+      {{ end }}
+      {{- if .Labels.severity }}Severity: {{ .Labels.severity }}
+      {{ end -}}
+      {{ if .Labels.instance }}Instance: {{ .Labels.instance }}
+      {{ end -}}
+      Since: {{ .StartsAt.Format "15:04 02 Jan 2006 MST" }}
+      {{ if .Annotations.runbook_url }}<a href="{{ .Annotations.runbook_url }}">Runbook</a> · {{ end -}}
+      {{ if .SilenceURL }}<a href="{{ .SilenceURL }}">Silence</a>{{ end -}}
+      {{ if .PanelURL }} · <a href="{{ .PanelURL }}">View</a>{{ else if .DashboardURL }} · <a href="{{ .DashboardURL }}">View</a>{{ else if .GeneratorURL }} · <a href="{{ .GeneratorURL }}">View</a>{{ end }}
+      {{ end -}}
+      {{ end }}
