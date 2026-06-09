@@ -1,6 +1,6 @@
 // Column picker for CSV export modal — search, bulk select, multi-select list
 // FEATURE: CSV export — modal left pane for choosing which columns to include
-import { Button, Checkbox, Input, InputGroup, Label, TextField } from '@heroui/react';
+import { Button, Checkbox, InputGroup, Label, TextField } from '@heroui/react';
 import { SearchIcon } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
@@ -55,8 +55,10 @@ export function ColumnPicker(props: Props) {
       <TextField value={search} onChange={setSearch} className="w-full" data-cy="csv-export-column-search">
         <Label className="text-sm font-medium">{searchLabel}</Label>
         <InputGroup>
-          <SearchIcon className="size-4 ml-2 text-muted" />
-          <Input placeholder={searchPlaceholder} />
+          <InputGroup.Prefix>
+            <SearchIcon size={16} />
+          </InputGroup.Prefix>
+          <InputGroup.Input placeholder={searchPlaceholder} />
         </InputGroup>
       </TextField>
 

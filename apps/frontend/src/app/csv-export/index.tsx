@@ -83,8 +83,8 @@ export function CsvExport() {
         data-cy="csv-export-modal"
       >
         <ModalBackdrop>
-          <ModalContainer size="full" className="max-w-5xl mx-auto">
-            <ModalDialog>
+          <ModalContainer size="full" className="max-w-5xl mx-auto my-auto">
+            <ModalDialog className="h-auto min-h-0 max-h-[85vh]">
               {() => (
                 <>
                   <ModalHeader className="flex items-start justify-between gap-3">
