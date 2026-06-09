@@ -267,7 +267,13 @@ void Display::loop()
             {
                 for (IScreen *scr : Display::pendingDestroyScreens)
                 {
-                    if (scr)
+                    // Never tear down the screen that is currently active: a
+                    // re-transition during the destroy window can make a queued
+                    // screen active again, and freeing its LVGL tree would null
+                    // its widget pointers (-> lv_obj_get_screen(NULL) assert ->
+                    // loopTask hang -> task watchdog). transitionToScreen already
+                    // dequeues reused screens; this is a final safety net.
+                    if (scr && scr != Display::activeScreen)
                     {
                         Display::logger.debugf("Destroying screen: %s", scr->getName().c_str());
                         scr->destroy();
