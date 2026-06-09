@@ -1,13 +1,16 @@
-// RabbitMQ management plugin — backend half (scaffold).
+// RabbitMQ management plugin — backend half.
 //
-// This is the foundation bootstrap (ATT-526): it proves the nx build/zip/publish
-// pipeline produces a loadable plugin. It deliberately contains NO RabbitMQ
-// business logic yet — that lands in ATT-521+. For now it registers a minimal
-// module with a single status endpoint so the artifact is a valid, loadable
-// plugin end to end.
+// ATT-526 bootstrapped this as a loadable, do-nothing artifact. ATT-521 adds the
+// first business logic: detect whether a configured MQTT server is a RabbitMQ
+// broker by probing its management HTTP API, and expose that verdict to the
+// frontend slots. All RabbitMQ knowledge lives here in the plugin — the core
+// only hands us a generic MQTT server config through the ACCESS_MQTT_SERVERS
+// hook (see RabbitmqDetectionService).
 import type { PluginBackendModule, PluginContext } from '@attraccess/plugins-backend-sdk';
 import { Auth } from '@attraccess/plugins-backend-sdk';
 import { Controller, DynamicModule, Get, Inject, Injectable, OnModuleInit } from '@nestjs/common';
+import { RabbitmqDetectionController } from './rabbitmq-detection.controller';
+import { RabbitmqDetectionService } from './rabbitmq-detection.service';
 
 // The host hands each plugin its PluginContext under this token. Recreate it
 // locally (do not import the value) so the artifact has no runtime dependency on
@@ -20,7 +23,7 @@ class RabbitmqService implements OnModuleInit {
   constructor(@Inject(PLUGIN_CONTEXT) private readonly context: PluginContext) {}
 
   onModuleInit(): void {
-    this.context.logger.log('RabbitMQ plugin loaded (scaffold — no management logic yet).');
+    this.context.logger.log('RabbitMQ plugin loaded — MQTT-server RabbitMQ detection active.');
   }
 
   getStatus(): { plugin: string; status: string } {
@@ -49,8 +52,12 @@ const plugin: PluginBackendModule = {
   register(context: PluginContext): DynamicModule {
     return {
       module: RabbitmqPluginModule,
-      controllers: [RabbitmqController],
-      providers: [{ provide: PLUGIN_CONTEXT, useValue: context }, RabbitmqService],
+      controllers: [RabbitmqController, RabbitmqDetectionController],
+      providers: [
+        { provide: PLUGIN_CONTEXT, useValue: context },
+        RabbitmqService,
+        RabbitmqDetectionService,
+      ],
     };
   },
 };
