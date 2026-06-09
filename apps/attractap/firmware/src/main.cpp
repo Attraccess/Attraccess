@@ -54,6 +54,10 @@ void setup()
     Wire.setTimeOut(50);
     Wire.setClock(ATTRACTAP_I2C_CLOCK_HZ);
 
+    // Serialize all shared-bus I2C traffic (PN532 / GT911 / IO expander) across
+    // tasks — must exist before application.setup() spawns any task (ATT-554).
+    I2CBusLock::init();
+
     mainLogger.info("Attractap starting...");
     application.setup();
 }

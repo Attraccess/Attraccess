@@ -26,17 +26,28 @@ void NFC::setup()
     }
 
     this->logger.info("Initializing PN532");
-    this->pn532.begin();
-    // Adafruit BusIO's I2CDevice::begin() (called inside pn532.begin()) re-invokes
-    // Wire.begin(), which can reset the bus clock to the 100 kHz default. Restore
-    // 400 kHz Fast Mode (same pitfall as the SensorLib restore in rgb_gt911_driver).
-    Wire.setClock(ATTRACTAP_I2C_CLOCK_HZ);
+    {
+        // The LVGL task is already polling GT911 touch on the shared bus at this
+        // point — keep the whole PN532 bring-up atomic on the bus (ATT-554).
+        I2CBusGuard busGuard;
+        this->pn532.begin();
+        // Adafruit BusIO's I2CDevice::begin() (called inside pn532.begin()) re-invokes
+        // Wire.begin(), which can reset the bus clock to the 100 kHz default and the
+        // bus timeout to the framework default. Restore 400 kHz Fast Mode and the
+        // 50 ms timeout (same pitfall as the SensorLib restore in rgb_gt911_driver).
+        Wire.setClock(ATTRACTAP_I2C_CLOCK_HZ);
+        Wire.setTimeOut(50);
+    }
 
     this->logger.info("Checking hardware");
     this->checkHardware(true);
 
     // configure board to read RFID tags
-    bool samConfigSuccess = this->pn532.SAMConfig();
+    bool samConfigSuccess = false;
+    {
+        I2CBusGuard busGuard;
+        samConfigSuccess = this->pn532.SAMConfig();
+    }
     if (!samConfigSuccess)
     {
         this->logger.error("SAMConfig failed");
@@ -103,7 +114,13 @@ void NFC::handleCardDetection()
         this->lastPresenceCheckMs = now;
 
         // just try to comminucate with card in any way to check if it is still present
-        bool authSuccess = this->pn532.ntag424_Authenticate(NFC::FACTORY_KEY, 0, 0x71);
+        bool authSuccess = false;
+        {
+            // Keep the full AES handshake atomic on the shared bus; the removal
+            // callback below must run WITHOUT the bus lock held (leaf-lock rule).
+            I2CBusGuard busGuard;
+            authSuccess = this->pn532.ntag424_Authenticate(NFC::FACTORY_KEY, 0, 0x71);
+        }
         if (!authSuccess)
         {
             // card removed, call callback
@@ -131,7 +148,12 @@ void NFC::handleCardDetection()
     }
     this->lastDetectionPollMs = now;
 
-    bool foundCardUpdate = this->pn532.readPassiveTargetID(PN532_MIFARE_ISO14443A, cardDetectedUid, &cardDetectedUidLength, NFC::detectionPollTimeoutMs);
+    bool foundCardUpdate = false;
+    {
+        // Atomic detection poll; the detection callback below runs lock-free.
+        I2CBusGuard busGuard;
+        foundCardUpdate = this->pn532.readPassiveTargetID(PN532_MIFARE_ISO14443A, cardDetectedUid, &cardDetectedUidLength, NFC::detectionPollTimeoutMs);
+    }
 
     if (foundCardUpdate)
     {
@@ -153,6 +175,7 @@ bool NFC::waitForCard(uint32_t timeoutMs)
                                            // card type)
 
     LockGuard guard(*this);
+    I2CBusGuard busGuard;
 
     // Wait for an NTAG242 card.  When one is found 'uid' will be populated with
     // the UID, and uidLength will indicate the size of the UUID (normally 7)
@@ -174,6 +197,9 @@ bool NFC::changeKey(uint8_t keyNumber, uint8_t *masterKey, uint8_t *oldKey, uint
     this->logger.info("changeKey started");
 
     LockGuard guard(*this);
+    // The whole key-change is one multi-command card conversation — keep it
+    // atomic on the shared bus (no callbacks fire inside).
+    I2CBusGuard busGuard;
 
     // Step 1: Authenticate with master key
     bool authenticateOldKeySuccess = this->pn532.ntag424_Authenticate(masterKey, 0, 0x71);
@@ -208,6 +234,7 @@ bool NFC::authenticate(uint8_t keyNumber, uint8_t *key)
     this->logger.info("authenticate started");
 
     LockGuard guard(*this);
+    I2CBusGuard busGuard;
 
     // Step 1: Authenticate with key
     bool authenticateSuccess = this->pn532.ntag424_Authenticate(key, keyNumber, 0x71);
@@ -230,7 +257,11 @@ void NFC::checkHardware(bool logHardwareInfo)
     }
     this->lastHardwareCheckMs = now;
 
-    uint32_t versiondata = this->pn532.getFirmwareVersion();
+    uint32_t versiondata = 0;
+    {
+        I2CBusGuard busGuard;
+        versiondata = this->pn532.getFirmwareVersion();
+    }
     if (!versiondata)
     {
         this->logger.error("Didn't find PN53x board");

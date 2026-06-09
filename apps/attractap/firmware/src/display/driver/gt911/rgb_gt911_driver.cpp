@@ -160,20 +160,25 @@ bool RgbGt911Driver::begin()
     touch.setPins(-1, 16);
 
     logger.infof("Probing GT911 at 0x%02X (SDA=%d, SCL=%d)...", GT911_SLAVE_ADDRESS_H, PIN_TOUCH_I2C_SDA, PIN_TOUCH_I2C_SCL);
-    bool touchFound = touch.begin(Wire, GT911_SLAVE_ADDRESS_H, PIN_TOUCH_I2C_SDA, PIN_TOUCH_I2C_SCL);
-    if (!touchFound)
+    bool touchFound = false;
     {
-        logger.infof("GT911 not found at 0x%02X, trying 0x%02X...", GT911_SLAVE_ADDRESS_H, GT911_SLAVE_ADDRESS_L);
-        touchFound = touch.begin(Wire, GT911_SLAVE_ADDRESS_L, PIN_TOUCH_I2C_SDA, PIN_TOUCH_I2C_SCL);
+        // Keep the whole GT911 probe/init atomic on the shared bus (ATT-554).
+        I2CBusGuard busGuard;
+        touchFound = touch.begin(Wire, GT911_SLAVE_ADDRESS_H, PIN_TOUCH_I2C_SDA, PIN_TOUCH_I2C_SCL);
+        if (!touchFound)
+        {
+            logger.infof("GT911 not found at 0x%02X, trying 0x%02X...", GT911_SLAVE_ADDRESS_H, GT911_SLAVE_ADDRESS_L);
+            touchFound = touch.begin(Wire, GT911_SLAVE_ADDRESS_L, PIN_TOUCH_I2C_SDA, PIN_TOUCH_I2C_SCL);
+        }
+        // SensorCommon::begin() (called inside touch.begin()) re-invokes Wire.begin() on ESP32,
+        // which resets Wire.setTimeOut() back to the framework default (no timeout) and can
+        // reset the bus clock back to the 100 kHz default.
+        // Restore the 50 ms timeout so that subsequent I2C operations (IO expander fullRefresh,
+        // NFC) do not stall indefinitely on a busy or stuck bus, and restore the 400 kHz
+        // Fast Mode clock so every bus hold stays short.
+        Wire.setTimeOut(50);
+        Wire.setClock(ATTRACTAP_I2C_CLOCK_HZ);
     }
-    // SensorCommon::begin() (called inside touch.begin()) re-invokes Wire.begin() on ESP32,
-    // which resets Wire.setTimeOut() back to the framework default (no timeout) and can
-    // reset the bus clock back to the 100 kHz default.
-    // Restore the 50 ms timeout so that subsequent I2C operations (IO expander fullRefresh,
-    // NFC) do not stall indefinitely on a busy or stuck bus, and restore the 400 kHz
-    // Fast Mode clock so every bus hold stays short.
-    Wire.setTimeOut(50);
-    Wire.setClock(ATTRACTAP_I2C_CLOCK_HZ);
 
     if (touchFound)
     {
@@ -247,7 +252,16 @@ bool RgbGt911Driver::readTouch(TouchPoint &point)
         return false;
     }
 
-    uint8_t touched = touch.getPoint(x, y, touch.getSupportTouchPoint());
+    uint8_t touched = 0;
+    {
+        // One GT911 point read = one atomic conversation on the shared bus, so
+        // it can never interleave with a PN532 exchange on the NFC task
+        // (ATT-554 crash: interleaved transactions wedged the I2C driver).
+        // NOTE: we already hold lv_lock here (LVGL indev read) — I2CBusGuard is
+        // a leaf lock, NFC code never takes lv_lock while holding it.
+        I2CBusGuard busGuard;
+        touched = touch.getPoint(x, y, touch.getSupportTouchPoint());
+    }
 
     if (touched <= 0)
     {

@@ -1,4 +1,5 @@
 #include "ioexpander.hpp"
+#include "../utils.hpp"
 
 void IOExpander::setup()
 {
@@ -158,6 +159,9 @@ void IOExpander::dumpRegisters()
 
 bool IOExpander::writeRegister(uint8_t reg, uint8_t value)
 {
+    // One register access = one atomic conversation on the shared I2C bus —
+    // never interleaved with PN532/GT911 traffic from other tasks (ATT-554).
+    I2CBusGuard busGuard;
     Wire.beginTransmission(i2cAddress);
     Wire.write(reg);
     Wire.write(value);
@@ -172,6 +176,7 @@ bool IOExpander::writeRegister(uint8_t reg, uint8_t value)
 
 bool IOExpander::readRegister(uint8_t reg, uint8_t &value)
 {
+    I2CBusGuard busGuard;
     Wire.beginTransmission(i2cAddress);
     Wire.write(reg);
     if (Wire.endTransmission(false) != 0)
