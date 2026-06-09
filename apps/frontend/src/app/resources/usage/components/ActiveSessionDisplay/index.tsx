@@ -1,15 +1,13 @@
 import { useState, useCallback } from 'react';
 import {
   ButtonGroup,
-  Card,
-  CardContent,
-  Chip,
   Dropdown,
   DropdownTrigger,
   DropdownMenu,
   DropdownItem,
   DropdownPopover,
 } from '@heroui/react';
+import { SessionStatusCard } from '../SessionStatusCard';
 import { Button } from '../../../../../components/button';
 import { buttonVariants } from '@heroui/styles';
 import { StopCircle, ChevronDownIcon } from 'lucide-react';
@@ -126,20 +124,13 @@ export function ActiveSessionDisplay({ resourceId, startTime }: ActiveSessionDis
 
   return (
     <>
-      <Card
-        className="border-l-4 border-l-success bg-success/5"
+      <SessionStatusCard
+        accent="success"
+        statusLabel={t('live')}
+        pulse
         data-cy="active-session-card"
+        chipDataCy="active-session-live-chip"
       >
-        <CardContent className="p-4 space-y-4">
-          <div className="flex items-center justify-between gap-2">
-            <Chip color="success" data-cy="active-session-live-chip">
-              <span className="flex items-center gap-1.5">
-                <span className="inline-block h-1.5 w-1.5 rounded-full bg-current animate-pulse" />
-                {t('live')}
-              </span>
-            </Chip>
-          </div>
-
           <SessionTimer startTime={startTime} variant="hero" />
 
           {(activeSession?.usage?.project || activeSession?.usage?.supervisorUser) && (
@@ -185,8 +176,7 @@ export function ActiveSessionDisplay({ resourceId, startTime }: ActiveSessionDis
               </DropdownPopover>
             </Dropdown>
           </ButtonGroup>
-        </CardContent>
-      </Card>
+      </SessionStatusCard>
 
       <SessionNotesModal
         isOpen={isNotesModalOpen}

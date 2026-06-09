@@ -1,15 +1,6 @@
 import { useState, useCallback, useMemo } from 'react';
-import {
-  ButtonGroup,
-  Card,
-  CardContent,
-  Chip,
-  Dropdown,
-  DropdownTrigger,
-  DropdownMenu,
-  DropdownItem,
-  DropdownPopover,
-} from '@heroui/react';
+import { ButtonGroup, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, DropdownPopover } from '@heroui/react';
+import { SessionStatusCard } from '../SessionStatusCard';
 import { Button } from '../../../../../components/button';
 import { buttonVariants } from '@heroui/styles';
 import { UserX, ChevronDownIcon, MessageCircle } from 'lucide-react';
@@ -214,13 +205,14 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
 
   return (
     <>
-      <Card className="border-l-4 border-l-warning bg-warning/5" data-cy="other-user-session-card">
-        <CardContent className="p-4 space-y-4 text-center">
-        <div className="flex justify-center">
-          <Chip color="warning" data-cy="other-user-in-use-chip">
-            {t('inUse')}
-          </Chip>
-        </div>
+      <SessionStatusCard
+        accent="warning"
+        statusLabel={t('inUse')}
+        centerStatus
+        bodyClassName="text-center"
+        data-cy="other-user-session-card"
+        chipDataCy="other-user-in-use-chip"
+      >
         <p className="text-sm text-gray-500 dark:text-gray-400">{t('resourceInUseBy')}</p>
         <div className="flex justify-center">
           {activeSession.user ? (
@@ -312,8 +304,7 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
             </ButtonGroup>
           </div>
         )}
-        </CardContent>
-      </Card>
+      </SessionStatusCard>
 
       <SessionNotesModal
         isOpen={isTakeoverNotesModalOpen}
