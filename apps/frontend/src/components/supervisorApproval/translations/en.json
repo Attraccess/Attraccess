@@ -1,7 +1,8 @@
 {
   "title": "Supervision request",
-  "description": "A user wants to start a supervised session on {{resource}}.",
-  "requesterRole": "Requesting user",
+  "description": "A user wants to start a supervised session.",
+  "resourceLabel": "Resource",
+  "requesterLabel": "Requesting user",
   "notesLabel": "Notes",
   "countdown": "Expires in {{seconds}}s",
   "approve": "Approve",

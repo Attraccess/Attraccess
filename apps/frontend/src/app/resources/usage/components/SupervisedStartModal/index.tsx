@@ -4,17 +4,13 @@ import {
   AlertContent,
   AlertDescription,
   Description,
-  Modal,
-  ModalBackdrop,
-  ModalBody,
-  ModalContainer,
-  ModalDialog,
-  ModalFooter,
-  ModalHeader,
-  ModalHeading,
+  DrawerBody,
+  DrawerFooter,
+  DrawerHeader,
   Spinner,
 } from '@heroui/react';
 import { AttraccessUser, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { X } from 'lucide-react';
 import {
   ApiError,
   RequestSupervisedSessionDto,
@@ -25,6 +21,7 @@ import {
 } from '@attraccess/react-query-client';
 import { Button } from '../../../../../components/button';
 import { AlertStatusIcon } from '../../../../../components/AlertStatusIcon';
+import { StandardDrawer } from '../../../../../components/standardDrawer';
 import { useAuth } from '../../../../../hooks/useAuth';
 import en from './translations/en.json';
 import de from './translations/de.json';
@@ -155,7 +152,7 @@ export function SupervisedStartModal({
     return (
       <div className="space-y-3">
         <Description>{t('select.description')}</Description>
-        <div className="space-y-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {supervisors.map((supervisor) => (
             <Button
               key={supervisor.id}
@@ -179,38 +176,39 @@ export function SupervisedStartModal({
   };
 
   return (
-    <Modal
+    <StandardDrawer
       isOpen={isOpen}
       onOpenChange={(open) => {
         if (!open) onClose();
       }}
     >
-      <ModalBackdrop>
-        <ModalContainer size="md">
-          <ModalDialog>
-            {({ close }) => (
-              <>
-                <ModalHeader>
-                  <ModalHeading>{t('title')}</ModalHeading>
-                </ModalHeader>
+      <DrawerHeader>
+        <div className="flex w-full items-start justify-between gap-3">
+          <h2 className="text-lg font-semibold">{t('title')}</h2>
+          <Button
+            isIconOnly
+            variant="ghost"
+            aria-label={t('cancel')}
+            onPress={onClose}
+            isDisabled={phase === 'waiting'}
+          >
+            <X size={16} />
+          </Button>
+        </div>
+      </DrawerHeader>
 
-                <ModalBody>{renderBody()}</ModalBody>
+      <DrawerBody>{renderBody()}</DrawerBody>
 
-                <ModalFooter>
-                  {(phase === 'timeout' || phase === 'rejected') && (
-                    <Button variant="primary" onPress={() => setPhase('select')}>
-                      {t('retry')}
-                    </Button>
-                  )}
-                  <Button variant="ghost" onPress={close} isDisabled={phase === 'waiting'}>
-                    {t('cancel')}
-                  </Button>
-                </ModalFooter>
-              </>
-            )}
-          </ModalDialog>
-        </ModalContainer>
-      </ModalBackdrop>
-    </Modal>
+      <DrawerFooter>
+        {(phase === 'timeout' || phase === 'rejected') && (
+          <Button variant="primary" onPress={() => setPhase('select')}>
+            {t('retry')}
+          </Button>
+        )}
+        <Button variant="ghost" onPress={onClose} isDisabled={phase === 'waiting'}>
+          {t('cancel')}
+        </Button>
+      </DrawerFooter>
+    </StandardDrawer>
   );
 }
