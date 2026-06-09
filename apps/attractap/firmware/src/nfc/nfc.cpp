@@ -2,8 +2,29 @@
 
 uint8_t NFC::FACTORY_KEY[16] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
+void NFC::lock()
+{
+    if (this->opMutex)
+    {
+        xSemaphoreTakeRecursive(this->opMutex, portMAX_DELAY);
+    }
+}
+
+void NFC::unlock()
+{
+    if (this->opMutex)
+    {
+        xSemaphoreGiveRecursive(this->opMutex);
+    }
+}
+
 void NFC::setup()
 {
+    if (!this->opMutex)
+    {
+        this->opMutex = xSemaphoreCreateRecursiveMutex();
+    }
+
     this->logger.info("Initializing PN532");
     this->pn532.begin();
     // Adafruit BusIO's I2CDevice::begin() (called inside pn532.begin()) re-invokes
@@ -28,15 +49,13 @@ void NFC::setup()
 void NFC::enableCardDetection()
 {
     this->logger.info("Enabling card detection");
-    this->checkHardware();
-    /*pinMode(PIN_PN532_IRQ, INPUT_PULLUP);
-    auto irqHandler = [this]
     {
-        this->onCardDetectedInterruptHandler();
-    };
-    attachInterrupt(digitalPinToInterrupt(PIN_PN532_IRQ), irqHandler, FALLING);
-    this->pn532.startPassiveTargetIDDetection(PN532_MIFARE_ISO14443A);
-    this->timeOfCardDetectionEnabledMs = millis();*/
+        LockGuard guard(*this);
+        this->checkHardware();
+    }
+    // NOTE: IRQ-driven detection is impossible on this hardware - the PN532 IRQ
+    // line is not physically wired (despite the PIN_PN532_IRQ define). Detection
+    // stays polled on the NFC task (ATT-554).
     this->cardDetectionEnabled = true;
 }
 
@@ -58,6 +77,7 @@ void NFC::resetCardPresence()
 
 void NFC::loop()
 {
+    LockGuard guard(*this);
     this->checkHardware();
     this->handleCardDetection();
 }
@@ -69,8 +89,19 @@ void NFC::handleCardDetection()
         return;
     }
 
+    uint32_t now = millis();
+
     if (this->foundCard)
     {
+        // Rate-limit the presence check: a full AES handshake per loop pass kept
+        // the shared I2C bus continuously occupied while a card rested on the
+        // reader (ATT-554 item 6).
+        if (now - this->lastPresenceCheckMs < NFC::presenceCheckIntervalMs)
+        {
+            return;
+        }
+        this->lastPresenceCheckMs = now;
+
         // just try to comminucate with card in any way to check if it is still present
         bool authSuccess = this->pn532.ntag424_Authenticate(NFC::FACTORY_KEY, 0, 0x71);
         if (!authSuccess)
@@ -92,7 +123,15 @@ void NFC::handleCardDetection()
         return;
     }
 
-    bool foundCardUpdate = this->pn532.readPassiveTargetID(PN532_MIFARE_ISO14443A, cardDetectedUid, &cardDetectedUidLength, 100);
+    // Rate-limit the detection poll and keep its timeout short so each bus hold
+    // stays small; the cadence (not the timeout) defines detection latency.
+    if (now - this->lastDetectionPollMs < NFC::detectionPollIntervalMs)
+    {
+        return;
+    }
+    this->lastDetectionPollMs = now;
+
+    bool foundCardUpdate = this->pn532.readPassiveTargetID(PN532_MIFARE_ISO14443A, cardDetectedUid, &cardDetectedUidLength, NFC::detectionPollTimeoutMs);
 
     if (foundCardUpdate)
     {
@@ -113,6 +152,8 @@ bool NFC::waitForCard(uint32_t timeoutMs)
     uint8_t uidLength;                     // Length of the UID (4 or 7 bytes depending on ISO14443A
                                            // card type)
 
+    LockGuard guard(*this);
+
     // Wait for an NTAG242 card.  When one is found 'uid' will be populated with
     // the UID, and uidLength will indicate the size of the UUID (normally 7)
     uint8_t uidDetected = this->pn532.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLength, timeoutMs);
@@ -131,6 +172,8 @@ bool NFC::waitForCard(uint32_t timeoutMs)
 bool NFC::changeKey(uint8_t keyNumber, uint8_t *masterKey, uint8_t *oldKey, uint8_t *newKey)
 {
     this->logger.info("changeKey started");
+
+    LockGuard guard(*this);
 
     // Step 1: Authenticate with master key
     bool authenticateOldKeySuccess = this->pn532.ntag424_Authenticate(masterKey, 0, 0x71);
@@ -163,6 +206,8 @@ bool NFC::changeKey(uint8_t keyNumber, uint8_t *masterKey, uint8_t *oldKey, uint
 bool NFC::authenticate(uint8_t keyNumber, uint8_t *key)
 {
     this->logger.info("authenticate started");
+
+    LockGuard guard(*this);
 
     // Step 1: Authenticate with key
     bool authenticateSuccess = this->pn532.ntag424_Authenticate(key, keyNumber, 0x71);
@@ -211,6 +256,8 @@ void NFC::checkHardware(bool logHardwareInfo)
 bool NFC::getAvailableKeyNo(uint8_t *uid, uint8_t *uidLength, uint8_t *keyNo)
 {
     this->logger.info("getAvailableKeyNo started");
+
+    LockGuard guard(*this);
 
     // The card was just selected by handleCardDetection's readPassiveTargetID.
     // Re-running readPassiveTargetID here would fire a second back-to-back

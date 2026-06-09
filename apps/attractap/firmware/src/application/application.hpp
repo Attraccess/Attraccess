@@ -173,6 +173,10 @@ private:
     static void
     networkTask(void *parameter);
 
+    // Dedicated task for NFC polling: PN532 transactions block the shared I2C
+    // bus, so they must not run on the UI-driving main loop (ATT-554 item 6).
+    static void nfcTask(void *parameter);
+
 #ifdef HAS_WS2812_LED
     static void ledTask(void *parameter);
 #endif

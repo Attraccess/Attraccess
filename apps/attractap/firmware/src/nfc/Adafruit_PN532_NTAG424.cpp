@@ -3720,12 +3720,16 @@ bool Adafruit_PN532::isready()
 /**************************************************************************/
 bool Adafruit_PN532::waitready(uint16_t timeout)
 {
+  // Poll at 2 ms granularity (was 10 ms) so the calling task yields finely and
+  // short timeouts (e.g. the ~25 ms detection poll) are honored with little
+  // overshoot. vTaskDelay keeps the NFC task off the CPU between probes
+  // (ATT-554 item 6).
   uint16_t timer = 0;
   while (!isready())
   {
     if (timeout != 0)
     {
-      timer += 10;
+      timer += 2;
       if (timer > timeout)
       {
 #ifdef PN532DEBUG
@@ -3734,7 +3738,7 @@ bool Adafruit_PN532::waitready(uint16_t timeout)
         return false;
       }
     }
-    delay(10);
+    vTaskDelay(pdMS_TO_TICKS(2));
   }
   return true;
 }
