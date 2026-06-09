@@ -128,11 +128,13 @@ private:
     lv_obj_t *formsModalList = nullptr;
     lv_obj_t *formsModalErrorLabel = nullptr;
     lv_obj_t *formsModalProgressLabel = nullptr;
+    lv_obj_t *formsProgressBar = nullptr;
+    lv_obj_t *formsBreadcrumbLabel = nullptr;
+    lv_obj_t *formsCancelButton = nullptr;
     lv_obj_t *formsKeyboard = nullptr;
     lv_obj_t *formsBackButton = nullptr;
     lv_obj_t *formsNextButton = nullptr;
     lv_obj_t *formsNextLabel = nullptr;
-    lv_obj_t *formsCancelButton = nullptr;
     lv_obj_t *formsBusyOverlay = nullptr;
     lv_obj_t *formsBusyLabel = nullptr;
     bool formsBusy = false;

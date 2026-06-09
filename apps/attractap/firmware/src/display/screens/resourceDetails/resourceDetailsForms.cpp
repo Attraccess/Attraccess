@@ -24,11 +24,13 @@ void ResourceDetailsScreen::resetFormsModalState()
    this->formsModalList = nullptr;
    this->formsModalErrorLabel = nullptr;
    this->formsModalProgressLabel = nullptr;
+   this->formsProgressBar = nullptr;
+   this->formsBreadcrumbLabel = nullptr;
+   this->formsCancelButton = nullptr;
    this->formsKeyboard = nullptr;
    this->formsBackButton = nullptr;
    this->formsNextButton = nullptr;
    this->formsNextLabel = nullptr;
-   this->formsCancelButton = nullptr;
    this->formsBusyOverlay = nullptr;
    this->formsBusyLabel = nullptr;
    this->formsBusy = false;
@@ -98,8 +100,14 @@ void ResourceDetailsScreen::renderFormField(const API::ResourceUsageFormFieldsPa
 
    if (this->formsModalProgressLabel)
    {
-      String progress = "Feld " + String(fieldNumber) + " / " + String(totalFields);
+      String progress = String(fieldNumber) + " / " + String(totalFields);
       lv_label_set_text(this->formsModalProgressLabel, progress.c_str());
+   }
+
+   if (this->formsProgressBar && totalFields > 0)
+   {
+      int32_t pct = static_cast<int32_t>((static_cast<uint64_t>(fieldNumber) * 100) / totalFields);
+      lv_bar_set_value(this->formsProgressBar, pct, LV_ANIM_ON);
    }
 
    this->buildCurrentFormField();
@@ -189,23 +197,67 @@ void ResourceDetailsScreen::ensureFormsModal()
    lv_obj_remove_flag(panel, LV_OBJ_FLAG_SCROLLABLE);
    lv_obj_set_flex_grow(panel, 1);
 
+   // Header: step counter (left) + dismiss button (right).
+   lv_obj_t *header = lv_obj_create(panel);
+   lv_obj_remove_style_all(header);
+   lv_obj_remove_flag(header, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_set_width(header, lv_pct(100));
+   lv_obj_set_height(header, LV_SIZE_CONTENT);
+   lv_obj_set_flex_flow(header, LV_FLEX_FLOW_ROW);
+   lv_obj_set_flex_align(header, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+
+   this->formsModalProgressLabel = lv_label_create(header);
+   lv_label_set_text(this->formsModalProgressLabel, "");
+   lv_obj_set_style_text_color(this->formsModalProgressLabel, lv_color_hex(0x9CA3AF), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_font(this->formsModalProgressLabel, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   lv_obj_t *cancelBtn = lv_button_create(header);
+   this->formsCancelButton = cancelBtn;
+   lv_obj_remove_style_all(cancelBtn);
+   lv_obj_set_size(cancelBtn, 34, 34);
+   lv_obj_set_style_radius(cancelBtn, LV_RADIUS_CIRCLE, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_bg_color(cancelBtn, lv_color_hex(0x1F2937), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_bg_opa(cancelBtn, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_t *cancelLabel = lv_label_create(cancelBtn);
+   lv_label_set_text(cancelLabel, LV_SYMBOL_CLOSE);
+   lv_obj_set_style_text_color(cancelLabel, lv_color_hex(0x9CA3AF), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_center(cancelLabel);
+   lv_obj_add_event_cb(cancelBtn, &ResourceDetailsScreen::onFormsCancel, LV_EVENT_CLICKED, this);
+
+   // Slim progress bar tracking field N of total.
+   this->formsProgressBar = lv_bar_create(panel);
+   lv_obj_set_width(this->formsProgressBar, lv_pct(100));
+   lv_obj_set_height(this->formsProgressBar, 6);
+   lv_obj_set_style_margin_top(this->formsProgressBar, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_margin_bottom(this->formsProgressBar, 6, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_radius(this->formsProgressBar, 3, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_bg_color(this->formsProgressBar, lv_color_hex(0x374151), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_bg_opa(this->formsProgressBar, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_radius(this->formsProgressBar, 3, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+   lv_obj_set_style_bg_color(this->formsProgressBar, lv_color_hex(0x10B981), LV_PART_INDICATOR | LV_STATE_DEFAULT);
+   lv_obj_set_style_bg_opa(this->formsProgressBar, 255, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+   lv_bar_set_range(this->formsProgressBar, 0, 100);
+   lv_bar_set_value(this->formsProgressBar, 0, LV_ANIM_OFF);
+
+   // Scrollable body: breadcrumb + the single focused field, filling the panel.
    lv_obj_t *content = lv_obj_create(panel);
    this->formsModalContent = content;
    lv_obj_remove_style_all(content);
-   // the content container is the dedicated scroll root
    lv_obj_set_width(content, lv_pct(100));
    lv_obj_set_flex_flow(content, LV_FLEX_FLOW_COLUMN);
    lv_obj_set_flex_align(content, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-   lv_obj_set_style_pad_row(content, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_row(content, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_pad_column(content, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_add_flag(content, LV_OBJ_FLAG_SCROLLABLE);
    lv_obj_set_scroll_dir(content, LV_DIR_VER);
    lv_obj_set_flex_grow(content, 1);
 
-   this->formsModalProgressLabel = lv_label_create(content);
-   lv_label_set_text(this->formsModalProgressLabel, "");
-   lv_obj_set_style_text_color(this->formsModalProgressLabel, lv_color_hex(0x9CA3AF), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_font(this->formsModalProgressLabel, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+   this->formsBreadcrumbLabel = lv_label_create(content);
+   lv_label_set_text(this->formsBreadcrumbLabel, "");
+   lv_obj_set_style_text_color(this->formsBreadcrumbLabel, lv_color_hex(0x9CA3AF), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_font(this->formsBreadcrumbLabel, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_width(this->formsBreadcrumbLabel, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_label_set_long_mode(this->formsBreadcrumbLabel, LV_LABEL_LONG_WRAP);
 
    this->formsModalErrorLabel = lv_label_create(content);
    lv_label_set_text(this->formsModalErrorLabel, "");
@@ -220,45 +272,38 @@ void ResourceDetailsScreen::ensureFormsModal()
    lv_obj_set_height(list, LV_SIZE_CONTENT);
    lv_obj_set_flex_flow(list, LV_FLEX_FLOW_COLUMN);
    lv_obj_set_flex_align(list, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-   lv_obj_set_style_pad_row(list, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_pad_column(list, 6, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_row(list, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_column(list, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_top(list, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-   lv_obj_t *footer = lv_obj_create(content);
+   // Footer pinned below the body: secondary back + primary next/submit.
+   lv_obj_t *footer = lv_obj_create(panel);
    lv_obj_remove_style_all(footer);
    lv_obj_remove_flag(footer, LV_OBJ_FLAG_SCROLLABLE);
    lv_obj_set_width(footer, lv_pct(100));
    lv_obj_set_height(footer, LV_SIZE_CONTENT);
-   lv_obj_set_flex_flow(footer, LV_FLEX_FLOW_ROW_WRAP);
+   lv_obj_set_flex_flow(footer, LV_FLEX_FLOW_ROW);
    lv_obj_set_flex_align(footer, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-   lv_obj_set_style_pad_top(footer, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_top(footer, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_pad_column(footer, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_pad_row(footer, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    lv_obj_t *backBtn = lv_button_create(footer);
    this->formsBackButton = backBtn;
-   lv_obj_set_width(backBtn, LV_SIZE_CONTENT);
+   lv_obj_set_flex_grow(backBtn, 1);
    lv_obj_set_height(backBtn, LV_SIZE_CONTENT);
-   lv_obj_set_style_pad_all(backBtn, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_all(backBtn, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_bg_color(backBtn, lv_color_hex(0x1F2937), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_bg_opa(backBtn, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_t *backLabel = lv_label_create(backBtn);
    lv_label_set_text(backLabel, "Zurueck");
    lv_obj_set_align(backLabel, LV_ALIGN_CENTER);
    lv_obj_add_event_cb(backBtn, &ResourceDetailsScreen::onFormsBack, LV_EVENT_CLICKED, this);
 
-   lv_obj_t *cancelBtn = lv_button_create(footer);
-   this->formsCancelButton = cancelBtn;
-   lv_obj_set_width(cancelBtn, LV_SIZE_CONTENT);
-   lv_obj_set_height(cancelBtn, LV_SIZE_CONTENT);
-   lv_obj_set_style_pad_all(cancelBtn, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_t *cancelLabel = lv_label_create(cancelBtn);
-   lv_label_set_text(cancelLabel, "Abbrechen");
-   lv_obj_set_align(cancelLabel, LV_ALIGN_CENTER);
-   lv_obj_add_event_cb(cancelBtn, &ResourceDetailsScreen::onFormsCancel, LV_EVENT_CLICKED, this);
-
    lv_obj_t *nextBtn = lv_button_create(footer);
    this->formsNextButton = nextBtn;
-   lv_obj_set_width(nextBtn, LV_SIZE_CONTENT);
+   lv_obj_set_flex_grow(nextBtn, 2);
    lv_obj_set_height(nextBtn, LV_SIZE_CONTENT);
-   lv_obj_set_style_pad_all(nextBtn, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_all(nextBtn, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_bg_color(nextBtn, lv_color_hex(0x10B981), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_bg_opa(nextBtn, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
    this->formsNextLabel = lv_label_create(nextBtn);
@@ -399,48 +444,38 @@ void ResourceDetailsScreen::buildCurrentFormField()
       }
    }
 
-   lv_obj_t *pageTitleLabel = lv_label_create(this->formsModalList);
-   lv_label_set_text(pageTitleLabel, pageTitle.c_str());
-   lv_obj_set_style_text_color(pageTitleLabel, lv_color_hex(0xE5E7EB), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_width(pageTitleLabel, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
-
-   lv_obj_t *resourceNameLabel = lv_label_create(this->formsModalList);
-   lv_label_set_text(resourceNameLabel, resourceName.c_str());
-   lv_obj_set_style_text_color(resourceNameLabel, lv_color_hex(0xE5E7EB), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_width(resourceNameLabel, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_label_set_long_mode(resourceNameLabel, LV_LABEL_LONG_WRAP);
-
-   lv_obj_t *formTitle = lv_label_create(this->formsModalList);
-   lv_label_set_text(formTitle, formName.c_str());
-   lv_obj_set_style_text_font(formTitle, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_color(formTitle, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_label_set_long_mode(formTitle, LV_LABEL_LONG_WRAP);
-   lv_obj_set_style_width(formTitle, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
+   // Compact breadcrumb instead of three stacked headers: action context on the
+   // first line, resource + form scope on the second.
+   if (this->formsBreadcrumbLabel)
+   {
+      String breadcrumb = pageTitle;
+      String scope = resourceName;
+      if (formName.length() > 0)
+      {
+         if (scope.length() > 0)
+         {
+            scope += " - ";
+         }
+         scope += formName;
+      }
+      if (scope.length() > 0)
+      {
+         breadcrumb += "\n" + scope;
+      }
+      lv_label_set_text(this->formsBreadcrumbLabel, breadcrumb.c_str());
+   }
 
    {
-      lv_obj_t *formCard = lv_obj_create(this->formsModalList);
-      lv_obj_remove_style_all(formCard);
-      lv_obj_remove_flag(formCard, LV_OBJ_FLAG_SCROLLABLE);
-      lv_obj_set_width(formCard, lv_pct(100));
-      lv_obj_set_height(formCard, LV_SIZE_CONTENT);
-      lv_obj_set_style_bg_color(formCard, lv_color_hex(0x1F2937), LV_PART_MAIN | LV_STATE_DEFAULT);
-      lv_obj_set_style_bg_opa(formCard, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-      lv_obj_set_style_radius(formCard, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
-      lv_obj_set_style_pad_all(formCard, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
-      lv_obj_set_style_pad_row(formCard, 6, LV_PART_MAIN | LV_STATE_DEFAULT);
-      lv_obj_set_flex_flow(formCard, LV_FLEX_FLOW_COLUMN);
-      lv_obj_set_flex_align(formCard, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-
       {
          const API::ResourceUsageFormField &field = this->formsModalPage->fields[0];
-         lv_obj_t *fieldContainer = lv_obj_create(formCard);
+         lv_obj_t *fieldContainer = lv_obj_create(this->formsModalList);
          lv_obj_remove_style_all(fieldContainer);
          lv_obj_remove_flag(fieldContainer, LV_OBJ_FLAG_SCROLLABLE);
          lv_obj_set_width(fieldContainer, lv_pct(100));
          lv_obj_set_height(fieldContainer, LV_SIZE_CONTENT);
          lv_obj_set_flex_flow(fieldContainer, LV_FLEX_FLOW_COLUMN);
          lv_obj_set_flex_align(fieldContainer, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-         lv_obj_set_style_pad_row(fieldContainer, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
+         lv_obj_set_style_pad_row(fieldContainer, 6, LV_PART_MAIN | LV_STATE_DEFAULT);
 
          String fieldTitle = field.name;
          if (field.isRequired)
@@ -449,7 +484,8 @@ void ResourceDetailsScreen::buildCurrentFormField()
          }
          lv_obj_t *fieldLabel = lv_label_create(fieldContainer);
          lv_label_set_text(fieldLabel, fieldTitle.c_str());
-         lv_obj_set_style_text_color(fieldLabel, lv_color_hex(0xE5E5E5), LV_PART_MAIN | LV_STATE_DEFAULT);
+         lv_obj_set_style_text_font(fieldLabel, &lv_font_montserrat_24, LV_PART_MAIN | LV_STATE_DEFAULT);
+         lv_obj_set_style_text_color(fieldLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
          lv_obj_set_style_width(fieldLabel, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
          lv_label_set_long_mode(fieldLabel, LV_LABEL_LONG_WRAP);
 
@@ -479,6 +515,8 @@ void ResourceDetailsScreen::buildCurrentFormField()
          {
             lv_obj_t *sw = lv_switch_create(fieldContainer);
             widget.input = sw;
+            lv_obj_set_size(sw, 64, 32);
+            lv_obj_set_style_bg_color(sw, lv_color_hex(0x10B981), LV_PART_INDICATOR | LV_STATE_CHECKED);
             if (field.hasValue && field.value == "true")
             {
                lv_obj_add_state(sw, LV_STATE_CHECKED);
