@@ -30,10 +30,21 @@ export interface DeviceProbeFields {
 
 @Injectable()
 export class DeviceRegistryService {
-  private readonly devices: Repository<ShellyDevice>;
+  private repository: Repository<ShellyDevice> | null = null;
 
-  constructor(@Inject(PLUGIN_CONTEXT) context: PluginContext) {
-    this.devices = context.getRepository(ShellyDevice);
+  constructor(@Inject(PLUGIN_CONTEXT) private readonly context: PluginContext) {}
+
+  // Resolve the repository lazily, not in the constructor: plugin providers are
+  // instantiated during the host's DI pass, before the host DataSource ref is
+  // wired up (PluginContext.getRepository throws "Host DataSource is not
+  // available yet" until bootstrap completes). The first query happens on an
+  // HTTP request, well after bootstrap, so resolving on demand is safe; cache it
+  // once resolved.
+  private get devices(): Repository<ShellyDevice> {
+    if (this.repository === null) {
+      this.repository = this.context.getRepository(ShellyDevice);
+    }
+    return this.repository;
   }
 
   list(): Promise<ShellyDevice[]> {
