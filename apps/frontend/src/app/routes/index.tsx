@@ -8,6 +8,7 @@ import { lazy, Suspense, useMemo } from 'react';
 import { Spinner } from '@heroui/react';
 import { MqttServersPage, EditMqttServerPage } from '../mqtt';
 import { SSOProvidersPage } from '../sso/SSOProvidersPage';
+import { SSOProviderFormPage } from '../sso/providers/SSOProviderFormPage';
 import { UserManagementPage } from '../user-management';
 import { RouteConfig } from '@attraccess/plugins-frontend-sdk';
 import { PluginRouteBoundary } from '../../components/pluginRouteBoundary';
@@ -175,6 +176,16 @@ const coreRoutes: RouteConfig[] = [
   {
     path: '/sso/providers',
     element: <SSOProvidersPage />,
+    authRequired: 'canManageSystemConfiguration',
+  },
+  {
+    path: '/sso/providers/new',
+    element: <SSOProviderFormPage />,
+    authRequired: 'canManageSystemConfiguration',
+  },
+  {
+    path: '/sso/providers/:providerId',
+    element: <SSOProviderFormPage />,
     authRequired: 'canManageSystemConfiguration',
   },
   {
