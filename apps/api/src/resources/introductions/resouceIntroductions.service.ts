@@ -120,6 +120,8 @@ export class ResourceIntroductionsService {
       resourceIntroduction = await this.createOne(resourceId, userId, tutorUserId);
     } else if (tutorUserId != null && resourceIntroduction.tutorUserId !== tutorUserId) {
       await this.resourceIntroductionRepository.update(resourceIntroduction.id, { tutorUserId });
+      // Keep the in-memory entity in sync so subsequent history/logging sees the updated tutor.
+      resourceIntroduction.tutorUserId = tutorUserId;
     }
 
     this.logger.debug(`Creating new history item with action: ${nextStatus}`);

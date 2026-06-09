@@ -70,6 +70,8 @@ export class ResourceGroupsIntroductionsService {
       existingIntroduction = await this.createOne(groupId, userId, tutorUserId);
     } else if (tutorUserId != null && existingIntroduction.tutorUserId !== tutorUserId) {
       await this.resourceIntroductionRepository.update(existingIntroduction.id, { tutorUserId });
+      // Keep the in-memory entity in sync so subsequent history/logging sees the updated tutor.
+      existingIntroduction.tutorUserId = tutorUserId;
     }
 
     const historyItem = this.resourceIntroductionHistoryItemRepository.create({
