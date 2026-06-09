@@ -206,6 +206,7 @@ void Application::setup() {
           if (pl && pl->self) {
             pl->self->pendingActionType = PENDING_ACTION_NONE;
             pl->self->hasPendingFormRequest = false;
+            pl->self->formFlowSubmitted = false;
             Display::resourceDetailsScreen.hideFormsModal();
           }
           delete pl;

@@ -119,6 +119,7 @@ void Application::handleResourceDetailsButtonClick(
     this->pendingActionResourceId = this->selectedResourceId;
     this->pendingActionProjectId = this->selectedProjectId;
     this->hasPendingFormRequest = false;
+    this->formFlowSubmitted = false;
     this->api.startResourceUsageSession(this->selectedResourceId,
                                         this->selectedProjectId);
     break;
@@ -129,6 +130,7 @@ void Application::handleResourceDetailsButtonClick(
     this->pendingActionResourceId = this->selectedResourceId;
     this->pendingActionProjectId = 0;
     this->hasPendingFormRequest = false;
+    this->formFlowSubmitted = false;
     this->api.stopResourceUsageSession(this->selectedResourceId);
     break;
   case ResourceDetailsScreen::BUTTON_CLICK_TYPE_LOCK_DOOR:
@@ -160,6 +162,7 @@ void Application::handleResourceDetailsButtonClick(
     this->clearProjectSelection();
     this->pendingActionType = PENDING_ACTION_NONE;
     this->hasPendingFormRequest = false;
+    this->formFlowSubmitted = false;
     Display::resourceDetailsScreen.hideFormsModal();
     break;
   }
