@@ -1,5 +1,5 @@
-// Preview table for CSV export modal — first N rows with selected columns
-// FEATURE: CSV export — modal right pane showing data sample before download
+// Preview table for CSV export drawer — first N rows with selected columns
+// FEATURE: CSV export — data sample shown before download
 import {
   Button,
   Spinner,

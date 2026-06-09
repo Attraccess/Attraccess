@@ -4,7 +4,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { useDateTimeFormatter, useNumberFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import de from './de.json';
 import en from './en.json';
-import { BaseCsvExportModal, ColumnDefinition } from '../base-modal';
+import { CsvExportDrawerContent, ColumnDefinition } from '../export-drawer';
 
 export function ResourceUsageExport(props: ExportProps) {
   const { t } = useTranslations({
@@ -128,7 +128,7 @@ export function ResourceUsageExport(props: ExportProps) {
   // TODO: handle grouping by user and resource
 
   return (
-    <BaseCsvExportModal
+    <CsvExportDrawerContent
       columns={columns as ColumnDefinition<ResourceUsage>[]}
       items={(resourceUsageExport ?? []) as ResourceUsage[]}
       refetch={refetch}

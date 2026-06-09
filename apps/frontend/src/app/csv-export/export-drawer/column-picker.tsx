@@ -1,7 +1,6 @@
-// Column picker for CSV export modal — search, bulk select, multi-select list
-// FEATURE: CSV export — modal left pane for choosing which columns to include
-import { Button, Checkbox, InputGroup, Label, TextField } from '@heroui/react';
-import { SearchIcon } from 'lucide-react';
+// Column picker for CSV export drawer — search, bulk select, checkbox group
+// FEATURE: CSV export — choose which columns to include in the export
+import { Button, ButtonGroup, Checkbox, CheckboxGroup, Label, SearchField } from '@heroui/react';
 import { useMemo, useState } from 'react';
 
 interface ColumnLite {
@@ -51,64 +50,49 @@ export function ColumnPicker(props: Props) {
   }, [columns, search]);
 
   return (
-    <div className="flex flex-col gap-3 min-w-0">
-      <TextField value={search} onChange={setSearch} className="w-full" data-cy="csv-export-column-search">
+    <section className="flex min-w-0 flex-col gap-3">
+      <SearchField value={search} onChange={setSearch} fullWidth data-cy="csv-export-column-search">
         <Label className="text-sm font-medium">{searchLabel}</Label>
-        <InputGroup>
-          <InputGroup.Prefix>
-            <SearchIcon size={16} />
-          </InputGroup.Prefix>
-          <InputGroup.Input placeholder={searchPlaceholder} />
-        </InputGroup>
-      </TextField>
+        <SearchField.Group>
+          <SearchField.SearchIcon />
+          <SearchField.Input placeholder={searchPlaceholder} />
+          <SearchField.ClearButton />
+        </SearchField.Group>
+      </SearchField>
 
       <div className="flex items-center justify-between gap-2">
-        <div className="flex gap-1">
-          <Button
-            size="sm"
-            variant="outline"
-            onPress={() => onSelectionChange(columns.map((c) => c.key))}
-            data-cy="csv-export-select-all"
-          >
+        <ButtonGroup size="sm" variant="outline">
+          <Button onPress={() => onSelectionChange(columns.map((c) => c.key))} data-cy="csv-export-select-all">
             {selectAllLabel}
           </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onPress={() => onSelectionChange([])}
-            data-cy="csv-export-select-none"
-          >
+          <Button onPress={() => onSelectionChange([])} data-cy="csv-export-select-none">
             {selectNoneLabel}
           </Button>
-        </div>
+        </ButtonGroup>
         <span className="text-xs text-muted">
           {selectedCountLabel({ selected: selectedKeys.length, total: columns.length })}
         </span>
       </div>
 
-      <div className="flex flex-col gap-2" data-cy="resource-usage-export-columns-listbox">
-        {filtered.map((column) => {
-          const isChecked = selectedKeys.includes(column.key);
-          return (
-            <Checkbox
-              key={column.key}
-              isSelected={isChecked}
-              onChange={(next) => {
-                if (next) onSelectionChange([...selectedKeys, column.key]);
-                else onSelectionChange(selectedKeys.filter((k) => k !== column.key));
-              }}
-            >
-              <Checkbox.Control>
-                <Checkbox.Indicator />
-              </Checkbox.Control>
-              <Checkbox.Content>{column.label}</Checkbox.Content>
-            </Checkbox>
-          );
-        })}
-      </div>
+      <CheckboxGroup
+        aria-label={searchLabel}
+        value={selectedKeys}
+        onChange={onSelectionChange}
+        className="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2"
+        data-cy="resource-usage-export-columns-listbox"
+      >
+        {filtered.map((column) => (
+          <Checkbox key={column.key} value={column.key}>
+            <Checkbox.Control>
+              <Checkbox.Indicator />
+            </Checkbox.Control>
+            <Checkbox.Content>{column.label}</Checkbox.Content>
+          </Checkbox>
+        ))}
+      </CheckboxGroup>
 
       {(options ?? []).length > 0 && (
-        <div className="flex flex-col gap-2 pt-2 border-t border-border">
+        <div className="flex flex-col gap-2 border-t border-border pt-3">
           {(options ?? []).map((option) => (
             <Checkbox
               key={option.key}
@@ -124,6 +108,6 @@ export function ColumnPicker(props: Props) {
           ))}
         </div>
       )}
-    </div>
+    </section>
   );
 }
