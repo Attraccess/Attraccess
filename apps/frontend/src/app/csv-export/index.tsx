@@ -9,6 +9,7 @@ import {
   ModalContainer,
   ModalDialog,
   ModalHeader,
+  ModalHeading,
   RangeValue,
 } from '@heroui/react';
 import { useCallback, useMemo, useRef, useState } from 'react';
@@ -20,7 +21,6 @@ import { ResourceUsageExport } from './resource-usage';
 import { BillingTransactionsExport } from './billing-transactions';
 import de from './de.json';
 import en from './en.json';
-import { XIcon } from 'lucide-react';
 
 const DEFAULT_PRESET: Preset = 'last30d';
 
@@ -83,15 +83,13 @@ export function CsvExport() {
         data-cy="csv-export-modal"
       >
         <ModalBackdrop>
-          <ModalContainer size="full" className="max-w-5xl mx-auto my-auto">
-            <ModalDialog className="h-auto min-h-0 max-h-[85vh]">
+          <ModalContainer size="full" scroll="inside">
+            <ModalDialog>
               {() => (
                 <>
-                  <ModalHeader className="flex items-start justify-between gap-3">
-                    <div className="flex flex-col gap-2 min-w-0">
-                      <span className="text-lg font-semibold">
-                        {activeExportKey && t(`exports.${activeExportKey}.title`)}
-                      </span>
+                  <ModalHeader>
+                    <ModalHeading>{activeExportKey && t(`exports.${activeExportKey}.title`)}</ModalHeading>
+                    <div>
                       <SelectedRangePill
                         range={dateRange}
                         emptyLabel={t('range.empty')}
@@ -99,10 +97,8 @@ export function CsvExport() {
                         dataCy="csv-export-modal-range-pill"
                       />
                     </div>
-                    <ModalCloseTrigger aria-label="close">
-                      <XIcon className="size-4" />
-                    </ModalCloseTrigger>
                   </ModalHeader>
+                  <ModalCloseTrigger />
 
                   {ExportComponent && <ExportComponent start={startDate} end={endDate} />}
                 </>

@@ -86,10 +86,7 @@ export function ColumnPicker(props: Props) {
         </span>
       </div>
 
-      <div
-        className="flex flex-col gap-1 max-h-72 overflow-y-auto border border-border rounded-md p-2"
-        data-cy="resource-usage-export-columns-listbox"
-      >
+      <div className="flex flex-col gap-2" data-cy="resource-usage-export-columns-listbox">
         {filtered.map((column) => {
           const isChecked = selectedKeys.includes(column.key);
           return (
@@ -100,12 +97,11 @@ export function ColumnPicker(props: Props) {
                 if (next) onSelectionChange([...selectedKeys, column.key]);
                 else onSelectionChange(selectedKeys.filter((k) => k !== column.key));
               }}
-              className="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-surface-secondary"
             >
               <Checkbox.Control>
                 <Checkbox.Indicator />
               </Checkbox.Control>
-              <Checkbox.Content className="text-sm">{column.label}</Checkbox.Content>
+              <Checkbox.Content>{column.label}</Checkbox.Content>
             </Checkbox>
           );
         })}
@@ -118,13 +114,12 @@ export function ColumnPicker(props: Props) {
               key={option.key}
               isSelected={option.value}
               onChange={(nextValue) => onOptionChange?.(option.key, nextValue)}
-              className="flex items-center gap-2 cursor-pointer"
               data-cy="resource-usage-export-grouping-checkbox"
             >
               <Checkbox.Control>
                 <Checkbox.Indicator />
               </Checkbox.Control>
-              <Checkbox.Content className="text-sm">{option.label}</Checkbox.Content>
+              <Checkbox.Content>{option.label}</Checkbox.Content>
             </Checkbox>
           ))}
         </div>
