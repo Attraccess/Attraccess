@@ -5,6 +5,7 @@ import { MessageNotificationListener } from './message-notification.listener';
 import { MessagingLiveService } from './messaging-live.service';
 import { MessagingService } from './messaging.service';
 import { EmailService } from '../email/email.service';
+import { PushService } from '../push/push.service';
 import { MessageCreatedEvent } from './events/message-created.event';
 
 describe('MessageNotificationListener', () => {
@@ -12,8 +13,9 @@ describe('MessageNotificationListener', () => {
   let participantRepository: { find: jest.Mock; update: jest.Mock };
   let userRepository: { findOne: jest.Mock };
   let liveService: { isOnline: jest.Mock };
-  let messagingService: { shouldEmailMessageOnOffline: jest.Mock };
+  let messagingService: { shouldEmailMessageOnOffline: jest.Mock; shouldPushMessageOnOffline: jest.Mock };
   let emailService: { sendNewMessageEmail: jest.Mock };
+  let pushService: { isEnabled: boolean; sendToUser: jest.Mock };
 
   const SENDER_ID = 1;
   const RECIPIENT_ID = 2;
@@ -43,8 +45,12 @@ describe('MessageNotificationListener', () => {
     participantRepository = { find: jest.fn(), update: jest.fn().mockResolvedValue(undefined) };
     userRepository = { findOne: jest.fn().mockResolvedValue({ id: SENDER_ID, username: 'alice' } as User) };
     liveService = { isOnline: jest.fn().mockReturnValue(false) };
-    messagingService = { shouldEmailMessageOnOffline: jest.fn().mockResolvedValue(true) };
+    messagingService = {
+      shouldEmailMessageOnOffline: jest.fn().mockResolvedValue(true),
+      shouldPushMessageOnOffline: jest.fn().mockResolvedValue(true),
+    };
     emailService = { sendNewMessageEmail: jest.fn().mockResolvedValue(undefined) };
+    pushService = { isEnabled: true, sendToUser: jest.fn().mockResolvedValue(undefined) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -54,6 +60,7 @@ describe('MessageNotificationListener', () => {
         { provide: MessagingLiveService, useValue: liveService },
         { provide: MessagingService, useValue: messagingService },
         { provide: EmailService, useValue: emailService },
+        { provide: PushService, useValue: pushService },
       ],
     }).compile();
 
@@ -174,6 +181,81 @@ describe('MessageNotificationListener', () => {
     expect(emailService.sendNewMessageEmail).toHaveBeenCalledTimes(2);
     expect(participantRepository.update).toHaveBeenCalledTimes(1);
     expect(participantRepository.update).toHaveBeenCalledWith({ id: 52 }, expect.any(Object));
+  });
+
+  describe('push notifications', () => {
+    it('pushes to an offline recipient with sender name, preview and conversation URL', async () => {
+      participantRepository.find.mockResolvedValue([buildParticipant()]);
+
+      await listener.handleMessageCreated(new MessageCreatedEvent(buildMessage()));
+
+      expect(pushService.sendToUser).toHaveBeenCalledTimes(1);
+      expect(pushService.sendToUser).toHaveBeenCalledWith(RECIPIENT_ID, {
+        title: 'alice',
+        body: 'Hello there',
+        url: '/messages?conversation=10',
+        tag: 'message-conversation-10',
+      });
+    });
+
+    it('truncates long message previews', async () => {
+      participantRepository.find.mockResolvedValue([buildParticipant()]);
+
+      await listener.handleMessageCreated(new MessageCreatedEvent(buildMessage({ content: 'x'.repeat(200) })));
+
+      expect(pushService.sendToUser).toHaveBeenCalledWith(
+        RECIPIENT_ID,
+        expect.objectContaining({ body: `${'x'.repeat(140)}…` }),
+      );
+    });
+
+    it('pushes per message even within the same email burst (no debounce)', async () => {
+      participantRepository.find.mockResolvedValue([
+        buildParticipant({ lastNotifiedAt: new Date('2025-01-18T11:00:00.000Z'), lastReadAt: null }),
+      ]);
+
+      await listener.handleMessageCreated(new MessageCreatedEvent(buildMessage()));
+
+      expect(emailService.sendNewMessageEmail).not.toHaveBeenCalled();
+      expect(pushService.sendToUser).toHaveBeenCalledTimes(1);
+    });
+
+    it('never pushes to an online recipient', async () => {
+      liveService.isOnline.mockReturnValue(true);
+      participantRepository.find.mockResolvedValue([buildParticipant()]);
+
+      await listener.handleMessageCreated(new MessageCreatedEvent(buildMessage()));
+
+      expect(pushService.sendToUser).not.toHaveBeenCalled();
+    });
+
+    it('never pushes to an opted-out recipient', async () => {
+      messagingService.shouldPushMessageOnOffline.mockResolvedValue(false);
+      participantRepository.find.mockResolvedValue([buildParticipant()]);
+
+      await listener.handleMessageCreated(new MessageCreatedEvent(buildMessage()));
+
+      expect(pushService.sendToUser).not.toHaveBeenCalled();
+    });
+
+    it('does not push when the push service is disabled', async () => {
+      pushService.isEnabled = false;
+      participantRepository.find.mockResolvedValue([buildParticipant()]);
+
+      await listener.handleMessageCreated(new MessageCreatedEvent(buildMessage()));
+
+      expect(pushService.sendToUser).not.toHaveBeenCalled();
+    });
+
+    it('still pushes when the recipient opted out of email', async () => {
+      messagingService.shouldEmailMessageOnOffline.mockResolvedValue(false);
+      participantRepository.find.mockResolvedValue([buildParticipant()]);
+
+      await listener.handleMessageCreated(new MessageCreatedEvent(buildMessage()));
+
+      expect(emailService.sendNewMessageEmail).not.toHaveBeenCalled();
+      expect(pushService.sendToUser).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('falls back to a generic sender name when the sender is missing', async () => {

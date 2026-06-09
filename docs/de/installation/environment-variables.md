@@ -64,6 +64,17 @@ Alle Konfigurationsoptionen für Attraccess, die über Umgebungsvariablen gesetz
 | `AUTH_SESSION_SECRET` | – | **Pflicht.** Geheimer Schlüssel für Sitzungsverschlüsselung |
 | `SESSION_COOKIE_MAX_AGE` | `604800000` | Maximale Sitzungsdauer in Millisekunden (Standard: 7 Tage) |
 
+## Push-Benachrichtigungen (Web Push)
+
+| Variable | Standard | Beschreibung |
+|----------|----------|-------------|
+| `VAPID_PUBLIC_KEY` | – | Öffentlicher VAPID-Schlüssel für Browser-Push-Benachrichtigungen |
+| `VAPID_PRIVATE_KEY` | – | Privater VAPID-Schlüssel für Browser-Push-Benachrichtigungen |
+| `VAPID_SUBJECT` | – | Kontakt für Push-Dienste, z. B. `mailto:admin@deine-domain.de` |
+
+> [!NOTE]
+> Alle drei Variablen müssen gesetzt sein, um Browser-Push-Benachrichtigungen zu aktivieren (z. B. für Direktnachrichten). Ohne diese Variablen sind Push-Benachrichtigungen deaktiviert und Attraccess funktioniert normal weiter. Erzeuge das Schlüsselpaar einmalig mit `npx web-push generate-vapid-keys` und behalte es bei – ein Schlüsselwechsel macht alle bestehenden Push-Abonnements ungültig.
+
 ## Plugins
 
 | Variable | Standard | Beschreibung |
