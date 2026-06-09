@@ -4,6 +4,7 @@ import { ResourceUsageService } from './resourceUsage.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Resource, ResourceIntroducer, ResourceUsage, User } from '@attraccess/database-entities';
 import { ResourceUsageNoteNotificationListener } from './resource-usage-note-notification.listener';
+import { SupervisedUsageAutoPromotionListener } from './supervised-usage-auto-promotion.listener';
 import { EmailModule } from '../../email/email.module';
 import { ResourceIntroducersModule } from '../introducers/resourceIntroducers.module';
 import { ResourceIntroductionsModule } from '../introductions/resourceIntroductions.module';
@@ -32,7 +33,7 @@ import { ResourceRetrainingModule } from '../retraining/resourceRetraining.modul
     ResourceHealthModule,
   ],
   controllers: [ResourceUsageController],
-  providers: [ResourceUsageService, ResourceUsageNoteNotificationListener],
+  providers: [ResourceUsageService, ResourceUsageNoteNotificationListener, SupervisedUsageAutoPromotionListener],
   exports: [ResourceUsageService],
 })
 export class ResourceUsageModule {}

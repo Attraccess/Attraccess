@@ -51,3 +51,19 @@ export class SupervisedUsageStartedEvent {
     public readonly usageId: number
   ) {}
 }
+
+/**
+ * Emitted whenever a supervised usage session ends successfully. Consumed by the supervised-usage
+ * auto-promotion listener (ATT-488), which counts the user's completed supervised sessions and
+ * auto-creates an introduction once the configured threshold is reached.
+ */
+export class SupervisedUsageEndedEvent {
+  public static readonly EVENT_NAME = 'resource.usage.supervised_ended';
+
+  constructor(
+    public readonly resourceId: number,
+    public readonly userId: number,
+    public readonly supervisorUserId: number,
+    public readonly usageId: number
+  ) {}
+}
