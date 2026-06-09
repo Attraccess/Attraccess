@@ -1,4 +1,5 @@
 {
+  "inUse": "In use",
   "resourceInUseBy": "Resource currently in use by:",
   "unknownUser": "Unknown User",
   "sessionStarted": "Session Started",

@@ -1,5 +1,15 @@
 import { useState, useCallback, useMemo } from 'react';
-import { ButtonGroup, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, DropdownPopover } from '@heroui/react';
+import {
+  ButtonGroup,
+  Card,
+  CardContent,
+  Chip,
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownItem,
+  DropdownPopover,
+} from '@heroui/react';
 import { Button } from '../../../../../components/button';
 import { buttonVariants } from '@heroui/styles';
 import { UserX, ChevronDownIcon, MessageCircle } from 'lucide-react';
@@ -204,20 +214,28 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
 
   return (
     <>
-      <div className="space-y-4 text-center">
+      <Card className="border-l-4 border-l-warning bg-warning/5" data-cy="other-user-session-card">
+        <CardContent className="p-4 space-y-4 text-center">
+        <div className="flex justify-center">
+          <Chip color="warning" data-cy="other-user-in-use-chip">
+            {t('inUse')}
+          </Chip>
+        </div>
         <p className="text-sm text-gray-500 dark:text-gray-400">{t('resourceInUseBy')}</p>
-        {activeSession.user ? (
-          <AttraccessUser user={activeSession.user} />
-        ) : (
-          <p className="text-sm font-medium text-gray-900 dark:text-white">{t('unknownUser')}</p>
-        )}
+        <div className="flex justify-center">
+          {activeSession.user ? (
+            <AttraccessUser user={activeSession.user} />
+          ) : (
+            <p className="text-sm font-medium text-gray-900 dark:text-white">{t('unknownUser')}</p>
+          )}
+        </div>
 
         <p className="text-xs text-gray-400 dark:text-gray-500">
           ({t('sessionStarted')} <DateTimeDisplay date={activeSession.startTime} />)
         </p>
 
         {activeSession.supervisorUser && (
-          <div className="space-y-1">
+          <div className="space-y-1 flex flex-col items-center">
             <p className="text-sm text-gray-500 dark:text-gray-400">{t('supervisedBy')}:</p>
             <AttraccessUser user={activeSession.supervisorUser} />
           </div>
@@ -294,7 +312,8 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
             </ButtonGroup>
           </div>
         )}
-      </div>
+        </CardContent>
+      </Card>
 
       <SessionNotesModal
         isOpen={isTakeoverNotesModalOpen}
