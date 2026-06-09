@@ -3,6 +3,7 @@ import { join } from 'path';
 import type { PluginManifestInfo } from '@attraccess/plugins-backend-sdk';
 import { PluginManifest, PluginManifestSchema, LoadedPluginManifest } from './plugin.manifest';
 import { PluginSandboxService } from './plugin-sandbox.service';
+import { PluginMigrationService } from './plugin-migration.service';
 import { existsSync, readdirSync, readFileSync } from 'fs';
 import { FileUpload } from '../common/types/file-upload.types';
 import { rename, rm } from 'fs/promises';
@@ -43,6 +44,25 @@ export class PluginService {
 
   public static getManifestById(id: string): LoadedPluginManifest | undefined {
     return PluginService.getPlugins().find((plugin) => plugin.id === id);
+  }
+
+  // Returns the discovered plugins enriched with their backend load status so the
+  // admin UI can surface plugins that failed to load (e.g. a missing dependency)
+  // instead of silently showing them as if everything were fine.
+  public static getPluginsWithLoadStatus(): LoadedPluginManifest[] {
+    return PluginService.getPlugins().map((manifest) => {
+      const key = `${manifest.name}@${manifest.version}`;
+      const error = PluginService.pluginLoadErrors.get(key);
+
+      let status: LoadedPluginManifest['status'] = 'unknown';
+      if (error) {
+        status = 'error';
+      } else if (PluginService.loadedPlugins.has(key)) {
+        status = 'loaded';
+      }
+
+      return { ...manifest, status, error: error ? error.message : null };
+    });
   }
 
   public static toManifestInfo(manifest: LoadedPluginManifest): PluginManifestInfo {
@@ -115,6 +135,10 @@ export class PluginService {
 
     if (manifest.main.frontend?.directory) {
       manifest.main.frontend.directory = join(pluginFolder, manifest.main.frontend.directory);
+    }
+
+    if (manifest.main.migrations?.directory) {
+      manifest.main.migrations.directory = join(pluginFolder, manifest.main.migrations.directory);
     }
 
     return manifest;
@@ -195,6 +219,21 @@ export class PluginService {
     if (!existsSync(pluginFolder)) {
       PluginService.logger.error(`Plugin folder ${pluginFolder} of plugin ${plugin.name} not found`);
       throw new NotFoundException('Plugin not found');
+    }
+
+    // Revert the plugin's database migrations (drops its tables/data) BEFORE the
+    // files are removed — the migration classes live in the plugin bundle and
+    // must still be on disk to run. A failure here is logged but never blocks the
+    // uninstall: the admin asked for the plugin to be gone.
+    if (PluginMigrationService.hasMigrations(plugin)) {
+      try {
+        await PluginMigrationService.runDownMigrations(plugin);
+      } catch (error) {
+        PluginService.logger.error(
+          `Failed to revert migrations for plugin ${plugin.name}; removing files anyway. Its tables may be orphaned.`,
+          error as Error
+        );
+      }
     }
 
     // delete folder

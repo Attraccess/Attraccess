@@ -70,7 +70,22 @@ describe('PluginsList', () => {
     expect(screen.getByText('Name')).toBeInTheDocument();
     expect(screen.getByText('Directory')).toBeInTheDocument();
     expect(screen.getByText('Permissions')).toBeInTheDocument();
+    expect(screen.getByText('Status')).toBeInTheDocument();
     expect(screen.getByText('Actions')).toBeInTheDocument();
+  });
+
+  it('flags a plugin whose backend failed to load', () => {
+    hoisted.plugins = [makePlugin({ status: 'error', error: "Cannot find module '@nestjs/common'" })];
+    renderPage();
+
+    expect(screen.getByText('Failed to load')).toBeInTheDocument();
+  });
+
+  it('marks a successfully loaded plugin', () => {
+    hoisted.plugins = [makePlugin({ status: 'loaded', error: null })];
+    renderPage();
+
+    expect(screen.getByText('Loaded')).toBeInTheDocument();
   });
 
   it('shows the empty state when no plugins are installed', () => {

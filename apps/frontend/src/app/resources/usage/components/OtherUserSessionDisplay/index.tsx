@@ -216,6 +216,13 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
           ({t('sessionStarted')} <DateTimeDisplay date={activeSession.startTime} />)
         </p>
 
+        {activeSession.supervisorUser && (
+          <div className="space-y-1">
+            <p className="text-sm text-gray-500 dark:text-gray-400">{t('supervisedBy')}:</p>
+            <AttraccessUser user={activeSession.supervisorUser} />
+          </div>
+        )}
+
         <div>
           <Button
             variant="ghost"

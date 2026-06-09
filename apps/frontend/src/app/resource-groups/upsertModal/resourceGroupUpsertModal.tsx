@@ -60,6 +60,7 @@ export function ResourceGroupUpsertModal(props: Readonly<Props>) {
     retrainingMaxAgeDays: null,
     retrainingMaxInactivityDays: null,
     retrainingBlocksAccess: false,
+    isHidden: false,
   });
   const [apiErrors, setApiErrors] = useState<{ [key: string]: string[] | undefined }>({});
 
@@ -135,6 +136,7 @@ export function ResourceGroupUpsertModal(props: Readonly<Props>) {
           retrainingMaxAgeDays: props.resourceGroup.retrainingMaxAgeDays ?? null,
           retrainingMaxInactivityDays: props.resourceGroup.retrainingMaxInactivityDays ?? null,
           retrainingBlocksAccess: props.resourceGroup.retrainingBlocksAccess ?? false,
+          isHidden: props.resourceGroup.isHidden ?? false,
         });
       } else {
         // Reset form for create mode or when no resource group is provided
@@ -144,6 +146,7 @@ export function ResourceGroupUpsertModal(props: Readonly<Props>) {
           retrainingMaxAgeDays: null,
           retrainingMaxInactivityDays: null,
           retrainingBlocksAccess: false,
+          isHidden: false,
         });
       }
       setApiErrors({}); // Clear errors when modal opens
@@ -168,6 +171,7 @@ export function ResourceGroupUpsertModal(props: Readonly<Props>) {
         retrainingMaxAgeDays: formData.retrainingMaxAgeDays,
         retrainingMaxInactivityDays: formData.retrainingMaxInactivityDays,
         retrainingBlocksAccess: formData.retrainingBlocksAccess,
+        isHidden: formData.isHidden,
       };
 
       if (isEditMode && props.resourceGroup) {
@@ -267,6 +271,19 @@ export function ResourceGroupUpsertModal(props: Readonly<Props>) {
                 data-cy="resource-group-retraining-blocks-access-switch"
               >
                 <span className="text-small">{t('retraining.blocksAccess.label')}</span>
+              </LabeledSwitch>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <h3 className="text-small font-semibold">{t('visibility.sectionTitle')}</h3>
+              <span className="text-tiny text-default-400">{t('visibility.description')}</span>
+
+              <LabeledSwitch
+                isSelected={formData.isHidden ?? false}
+                onChange={(value) => setFormData({ ...formData, isHidden: value })}
+                data-cy="resource-group-is-hidden-switch"
+              >
+                <span className="text-small">{t('visibility.hidden.label')}</span>
               </LabeledSwitch>
             </div>
           </DrawerBody>

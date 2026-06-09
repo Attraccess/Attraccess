@@ -8,6 +8,7 @@ import {
   ResourceType,
   ResourceUsage,
   ResourceUsageAction,
+  SupervisionMode,
   User,
 } from '@attraccess/database-entities';
 import { StartUsageSessionDto } from './dtos/startUsageSession.dto';
@@ -22,6 +23,7 @@ import {
   ResourceUsageEvent,
   ResourceUsageTakenOverEvent,
   ResourceUsageNoteAddedEvent,
+  SupervisedUsageStartedEvent,
 } from './events/resource-usage.events';
 import { ResourceIntroductionsService } from '../introductions/resouceIntroductions.service';
 import { ResourceIntroducersService } from '../introducers/resourceIntroducers.service';
@@ -44,6 +46,14 @@ export interface EndSessionOptions {
   skipFormSubmissions?: boolean;
   /** Skip emitting ResourceUsageNoteAddedEvent (used when the note is auto-generated, e.g. flow-ended). */
   skipNoteNotification?: boolean;
+}
+
+export interface StartSessionOptions {
+  /**
+   * When set, the session is started as a supervised session attributed to this supervisor.
+   * The supervisor is validated against the resource (introducer/maintainer or canManageResources).
+   */
+  supervisorUserId?: number;
 }
 
 @Injectable()
@@ -77,6 +87,8 @@ export class ResourceUsageService {
     private readonly resourceRepository: Repository<Resource>,
     @InjectRepository(ResourceUsage)
     private readonly resourceUsageRepository: Repository<ResourceUsage>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
     private readonly resourceIntroductionService: ResourceIntroductionsService,
     private readonly resourceIntroducersService: ResourceIntroducersService,
     private readonly resourceGroupsIntroductionsService: ResourceGroupsIntroductionsService,
@@ -154,6 +166,67 @@ export class ResourceUsageService {
 
     this.logger.debug(`User ${user.id} cannot control resource ${resourceId}`);
     return false;
+  }
+
+  /**
+   * Validates that a supervised start is permissible for the given resource and supervisor.
+   *
+   * Throws when:
+   * - the resource does not allow supervision (supervisionMode is INTRODUCTION_REQUIRED),
+   * - the requester selected themselves as supervisor,
+   * - the supervisor does not exist,
+   * - the supervisor is neither an introducer/maintainer for the resource nor a global resource manager.
+   *
+   * Does NOT check the requester's own introduction status: a supervised start exists precisely to
+   * let a non-introduced user start under a qualified supervisor.
+   */
+  public async validateSupervisedStart(
+    resourceId: number,
+    requester: User,
+    supervisorUserId: number,
+    transactionalEntityManager?: EntityManager,
+    preloadedResource?: Resource,
+  ): Promise<void> {
+    const resourceRepository = transactionalEntityManager
+      ? transactionalEntityManager.getRepository(Resource)
+      : this.resourceRepository;
+
+    const resource = preloadedResource ?? (await resourceRepository.findOne({ where: { id: resourceId } }));
+    if (!resource) {
+      throw new ResourceNotFoundException(resourceId);
+    }
+
+    if (
+      resource.supervisionMode !== SupervisionMode.SUPERVISION_ALLOWED &&
+      resource.supervisionMode !== SupervisionMode.SUPERVISION_REQUIRED
+    ) {
+      throw new BadRequestException('This resource does not support supervised sessions');
+    }
+
+    if (supervisorUserId === requester.id) {
+      throw new BadRequestException('You cannot supervise your own session');
+    }
+
+    const userRepository = transactionalEntityManager
+      ? transactionalEntityManager.getRepository(User)
+      : this.userRepository;
+
+    const supervisor = await userRepository.findOne({ where: { id: supervisorUserId } });
+    if (!supervisor) {
+      throw new NotFoundException(`Supervisor with ID ${supervisorUserId} not found`);
+    }
+
+    const supervisorCanManage = supervisor.systemPermissions?.canManageResources === true;
+    const supervisorCanMaintain = await this.resourceIntroducersService.canMaintain(
+      resourceId,
+      supervisorUserId,
+      true,
+      transactionalEntityManager,
+    );
+
+    if (!supervisorCanManage && !supervisorCanMaintain) {
+      throw new ForbiddenException('The selected supervisor is not authorized to supervise this resource');
+    }
   }
 
   private async getResource(
@@ -285,8 +358,15 @@ export class ResourceUsageService {
     return flowPayload;
   }
 
-  async startSession(resourceId: number, user: User, dto: StartUsageSessionDto): Promise<ResourceUsage> {
-    this.logger.debug(`Starting session for resource ${resourceId} by user ${user.id}`, { dto });
+  async startSession(
+    resourceId: number,
+    user: User,
+    dto: StartUsageSessionDto,
+    options: StartSessionOptions = {},
+  ): Promise<ResourceUsage> {
+    this.logger.debug(`Starting session for resource ${resourceId} by user ${user.id}`, { dto, options });
+
+    const supervisorUserId = options.supervisorUserId ?? null;
 
     // Defer event emission until after the transaction commits to avoid stale reads in listeners
     let endedUsageIdToEmit: number | null = null;
@@ -294,15 +374,34 @@ export class ResourceUsageService {
     let takeoverEndedUser: User | null = null;
 
     const newSession = await this.resourceUsageRepository.manager.transaction(async (transactionalEntityManager) => {
+      // Maintenance/health are enforced here; the control gate is applied below so the supervised
+      // path can bypass the introduction requirement when a qualified supervisor is present.
       const resource = await this.getResource(
         resourceId,
         user,
         {
           checkMaintenance: true,
-          checkControlPermission: true,
+          checkControlPermission: false,
         },
         transactionalEntityManager,
       );
+
+      // Gate: the solo path stays identical to today's behavior. Only when the user cannot start
+      // solo (or the resource mandates supervision) does the supervised path apply.
+      if (supervisorUserId === null) {
+        const userCanControl = await this.canControllResource(resourceId, user, transactionalEntityManager);
+        if (!userCanControl) {
+          this.logger.warn(`User ${user.id} cannot control resource ${resourceId} - missing introduction`);
+          throw new BadRequestException('You must complete the resource introduction before using it');
+        }
+        if (resource.supervisionMode === SupervisionMode.SUPERVISION_REQUIRED) {
+          throw new BadRequestException(
+            'This resource requires a supervisor; request a supervised session instead',
+          );
+        }
+      } else {
+        await this.validateSupervisedStart(resourceId, user, supervisorUserId, transactionalEntityManager, resource);
+      }
 
       if (resource.type !== ResourceType.Machine) {
         throw new BadRequestException('Resource is not a machine');
@@ -363,6 +462,10 @@ export class ResourceUsageService {
         endNotes: null,
         isFinalized: false,
       };
+
+      if (supervisorUserId !== null) {
+        usageData.supervisorUserId = supervisorUserId;
+      }
 
       if (dto.projectId !== undefined) {
         const project = await this.projectsService.findOneById(user.id, dto.projectId);
@@ -469,6 +572,15 @@ export class ResourceUsageService {
     }
     this.emitSystemUsageEvent(SystemEvent.RESOURCE_USAGE_STARTED, newSession?.resource, newSession?.user);
 
+    // Counter signal for the supervised-usage auto-promotion follow-up (ATT-486): every supervised
+    // session start is counted there to decide when to auto-create an introduction for the user.
+    if (supervisorUserId !== null && newSession?.id) {
+      this.eventEmitter.emit(
+        SupervisedUsageStartedEvent.EVENT_NAME,
+        new SupervisedUsageStartedEvent(resourceId, user.id, supervisorUserId, newSession.id),
+      );
+    }
+
     this.metricsService.resourceUsageSessionsTotal.inc({ action: 'start' });
     this.metricsService.resourceUsageSessionsActive.inc();
 
@@ -505,8 +617,10 @@ export class ResourceUsageService {
     // Check if the user is authorized to end the session
     const canManageResources = user.systemPermissions?.canManageResources || false;
     const isSessionOwner = activeSession.user.id === user.id;
+    // The supervisor of a supervised session may end it as well.
+    const isSupervisor = activeSession.supervisorUserId != null && activeSession.supervisorUserId === user.id;
 
-    if (!isSessionOwner && !canManageResources) {
+    if (!isSessionOwner && !isSupervisor && !canManageResources) {
       const canMaintain = await this.resourceIntroducersService.canMaintain(activeSession.resourceId, user.id, true);
       if (!canMaintain) {
         this.logger.warn(
@@ -751,7 +865,7 @@ export class ResourceUsageService {
         endTime: IsNull(),
         isFinalized: onlyFinalized ? true : undefined,
       },
-      relations: ['user', 'resource', 'billingTransaction', 'project'],
+      relations: ['user', 'resource', 'billingTransaction', 'project', 'supervisorUser'],
     });
   }
 
@@ -774,7 +888,7 @@ export class ResourceUsageService {
       skip: (page - 1) * limit,
       take: limit,
       order: { startTime: 'DESC' },
-      relations: ['user', 'project', 'formSubmissions', 'formSubmissions.form', 'formSubmissions.user'],
+      relations: ['user', 'project', 'supervisorUser', 'formSubmissions', 'formSubmissions.form', 'formSubmissions.user'],
     });
 
     this.logger.debug(`Found ${data.length} usage records out of ${total} total for resource ${resourceId}`);

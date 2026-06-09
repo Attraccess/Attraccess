@@ -6,6 +6,8 @@ import {
   UpdateDateColumn,
   OneToMany,
   ManyToMany,
+  ManyToOne,
+  JoinColumn,
   JoinTable,
   DeleteDateColumn,
 } from 'typeorm';
@@ -23,6 +25,7 @@ import { Attractap } from './attractap.entity';
 import { ResourceMaintenance } from './resource.maintenance';
 import { ResourceMaintenanceSchedule } from './resource-maintenance-schedule.entity';
 import { ResourceType } from './resource.type';
+import { SupervisionMode, AutoIntroductionTarget } from './resource.supervision';
 import { ResourceBillingConfiguration } from './resource-billing-configuration.entity';
 import { Form } from './form';
 
@@ -136,6 +139,60 @@ export class Resource {
     default: false,
   })
   retrainingBlocksAccess!: boolean;
+
+  @Column({
+    type: 'simple-enum',
+    enum: SupervisionMode,
+    default: SupervisionMode.INTRODUCTION_REQUIRED,
+  })
+  @ApiProperty({
+    description: 'Controls who may start a usage session on this resource',
+    enum: SupervisionMode,
+    enumName: 'SupervisionMode',
+    example: SupervisionMode.INTRODUCTION_REQUIRED,
+    default: SupervisionMode.INTRODUCTION_REQUIRED,
+  })
+  supervisionMode!: SupervisionMode;
+
+  @Column({ type: 'integer', nullable: true })
+  @ApiProperty({
+    description:
+      'Automatically create an introduction after this many supervised sessions. Null disables auto-promotion.',
+    example: 3,
+    required: false,
+    nullable: true,
+  })
+  supervisedUsagesUntilIntroduction!: number | null;
+
+  @Column({ type: 'simple-enum', enum: AutoIntroductionTarget, nullable: true })
+  @ApiProperty({
+    description: 'Target of the auto-created introduction once the supervised-usage threshold is reached',
+    enum: AutoIntroductionTarget,
+    enumName: 'AutoIntroductionTarget',
+    example: AutoIntroductionTarget.RESOURCE,
+    required: false,
+    nullable: true,
+  })
+  autoIntroductionTarget!: AutoIntroductionTarget | null;
+
+  @Column({ type: 'integer', nullable: true })
+  @ApiProperty({
+    description: 'The group the auto-introduction targets when autoIntroductionTarget is GROUP',
+    example: 1,
+    required: false,
+    nullable: true,
+  })
+  autoIntroductionGroupId!: number | null;
+
+  @ManyToOne(() => ResourceGroup, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'autoIntroductionGroupId' })
+  @ApiProperty({
+    description: 'The group the auto-introduction targets when autoIntroductionTarget is GROUP',
+    type: () => ResourceGroup,
+    required: false,
+    nullable: true,
+  })
+  autoIntroductionGroup!: ResourceGroup | null;
 
   @Column({ type: 'json', nullable: true })
   @ApiProperty({

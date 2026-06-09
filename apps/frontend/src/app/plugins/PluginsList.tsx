@@ -17,11 +17,12 @@ import {
   TableContent,
   TableHeader,
   TableRow,
+  TableScrollContainer,
   Tooltip,
   TooltipContent,
 } from '@heroui/react';
 import { Button } from '../../components/button';
-import { BookOpen, Trash2, Upload } from 'lucide-react';
+import { AlertTriangle, BookOpen, CheckCircle2, Trash2, Upload } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { UploadPluginModal } from './UploadPluginModal';
 import { useToastMessage } from '../../components/toastProvider';
@@ -111,54 +112,83 @@ export function PluginsList() {
         ]}
       />
       <Table data-cy="plugins-list-table">
-        <TableContent aria-label="Plugins table">
-          <TableHeader>
-            <TableColumn isRowHeader>{t('columns.name')}</TableColumn>
-            <TableColumn>{t('columns.version')}</TableColumn>
-            <TableColumn>{t('columns.directory')}</TableColumn>
-            <TableColumn>{t('columns.permissions')}</TableColumn>
-            <TableColumn>{t('columns.actions')}</TableColumn>
-          </TableHeader>
-          <TableBody items={plugins} renderEmptyState={() => <EmptyState />}>
-            {(plugin) => (
-              <TableRow key={plugin.name} id={plugin.name}>
-                <TableCell>{plugin.name}</TableCell>
-                <TableCell>
-                  <Chip variant="soft" color="accent">
-                    {plugin.version}
-                  </Chip>
-                </TableCell>
-                <TableCell>{plugin.pluginDirectory || '-'}</TableCell>
-                <TableCell>
-                  {plugin.permissions && plugin.permissions.length > 0 ? (
-                    <div className="flex flex-wrap gap-1" data-cy={`plugins-list-permissions-${plugin.id}`}>
-                      {plugin.permissions.map((permission) => (
-                        <Chip key={permission} variant="soft" color="warning">
-                          {permission}
+        <TableScrollContainer>
+          <TableContent aria-label="Plugins table">
+            <TableHeader>
+              <TableColumn isRowHeader>{t('columns.name')}</TableColumn>
+              <TableColumn>{t('columns.version')}</TableColumn>
+              <TableColumn>{t('columns.directory')}</TableColumn>
+              <TableColumn>{t('columns.permissions')}</TableColumn>
+              <TableColumn>{t('columns.status')}</TableColumn>
+              <TableColumn>{t('columns.actions')}</TableColumn>
+            </TableHeader>
+            <TableBody items={plugins} renderEmptyState={() => <EmptyState />}>
+              {(plugin) => (
+                <TableRow key={plugin.name} id={plugin.name}>
+                  <TableCell>{plugin.name}</TableCell>
+                  <TableCell>
+                    <Chip variant="soft" color="accent">
+                      {plugin.version}
+                    </Chip>
+                  </TableCell>
+                  <TableCell>{plugin.pluginDirectory || '-'}</TableCell>
+                  <TableCell>
+                    {plugin.permissions && plugin.permissions.length > 0 ? (
+                      <div className="flex flex-wrap gap-1" data-cy={`plugins-list-permissions-${plugin.id}`}>
+                        {plugin.permissions.map((permission) => (
+                          <Chip key={permission} variant="soft" color="warning">
+                            {permission}
+                          </Chip>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-default-400">{t('noPermissions')}</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {plugin.status === 'error' ? (
+                      <Tooltip>
+                        <Chip variant="soft" color="danger" data-cy={`plugins-list-status-${plugin.id}`}>
+                          <span className="inline-flex items-center gap-1">
+                            <AlertTriangle size={14} />
+                            {t('status.error')}
+                          </span>
                         </Chip>
-                      ))}
-                    </div>
-                  ) : (
-                    <span className="text-default-400">{t('noPermissions')}</span>
-                  )}
-                </TableCell>
-                <TableCell>
-                  <Tooltip>
-                    <Button
-                      variant="danger-soft"
-                      isIconOnly
-                      onPress={() => handleDeleteClick(plugin.id)}
-                      data-cy={`plugins-list-delete-plugin-button-${plugin.id}`}
-                    >
-                      <Trash2 size={18} />
-                    </Button>
-                    <TooltipContent>{t('deleteTooltip')}</TooltipContent>
-                  </Tooltip>
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </TableContent>
+                        <TooltipContent>
+                          {t('status.errorTooltip', { message: plugin.error ?? '' })}
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : plugin.status === 'loaded' ? (
+                      <Chip variant="soft" color="success" data-cy={`plugins-list-status-${plugin.id}`}>
+                        <span className="inline-flex items-center gap-1">
+                          <CheckCircle2 size={14} />
+                          {t('status.loaded')}
+                        </span>
+                      </Chip>
+                    ) : (
+                      <Chip variant="soft" color="default" data-cy={`plugins-list-status-${plugin.id}`}>
+                        {t('status.unknown')}
+                      </Chip>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <Tooltip>
+                      <Button
+                        variant="danger-soft"
+                        isIconOnly
+                        onPress={() => handleDeleteClick(plugin.id)}
+                        data-cy={`plugins-list-delete-plugin-button-${plugin.id}`}
+                      >
+                        <Trash2 size={18} />
+                      </Button>
+                      <TooltipContent>{t('deleteTooltip')}</TooltipContent>
+                    </Tooltip>
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </TableContent>
+        </TableScrollContainer>
       </Table>
 
       <Modal

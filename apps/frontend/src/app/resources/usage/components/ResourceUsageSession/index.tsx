@@ -14,6 +14,7 @@ import {
   Resource,
   useResourcesServiceResourceUsageCanControl,
   useResourceMaintenancesServiceFindMaintenances,
+  SupervisionMode,
 } from '@attraccess/react-query-client';
 import en from './translations/en.json';
 import de from './translations/de.json';
@@ -68,6 +69,11 @@ export function ResourceUsageSession({
 
   const canStartSession = canManageResources || access?.canControl || isIntroducer;
 
+  // A not-introduced user may still start via a supervisor when the resource allows it.
+  const supervisionEnabled =
+    resource.supervisionMode === SupervisionMode.SUPERVISION_ALLOWED ||
+    resource.supervisionMode === SupervisionMode.SUPERVISION_REQUIRED;
+
   const { data: activeMaintenances } = useResourceMaintenancesServiceFindMaintenances({
     resourceId,
     includeActive: true,
@@ -90,7 +96,7 @@ export function ResourceUsageSession({
       }
     }
 
-    if (!canStartSession) {
+    if (!canStartSession && !supervisionEnabled) {
       return <IntroductionRequiredDisplay resourceId={resourceId} />;
     }
 
@@ -102,6 +108,7 @@ export function ResourceUsageSession({
       <StartSessionControls
         resourceId={resourceId}
         insufficientBalanceDesiredAmount={insufficientBalanceDesiredAmount}
+        requiresSupervision={!canStartSession}
       />
     );
   };

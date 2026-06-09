@@ -158,7 +158,7 @@ void Application::setup() {
                 },
                 []() {});
           } else {
-            Display::showErrorPopup("Fehler", "INSUFFICIENT_BALANCE");
+            Display::showErrorPopup("Fehler", translateReaderError("INSUFFICIENT_BALANCE"));
           }
           delete p;
         },
@@ -349,8 +349,8 @@ void Application::setup() {
       strlcpy(this->enrollErrorMessage, "Karte ist bereits\nregistriert",
               sizeof(this->enrollErrorMessage));
     } else {
-      snprintf(this->enrollErrorMessage, sizeof(this->enrollErrorMessage),
-               "Fehler:\n%s", error.c_str());
+      strlcpy(this->enrollErrorMessage, translateReaderError(error).c_str(),
+              sizeof(this->enrollErrorMessage));
     }
     this->enrollErrorPending = true;
   });

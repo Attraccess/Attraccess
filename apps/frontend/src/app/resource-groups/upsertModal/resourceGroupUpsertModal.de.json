@@ -27,5 +27,12 @@
     "blocksAccess": {
       "label": "Zugriff bis zur Nachschulung sperren"
     }
+  },
+  "visibility": {
+    "sectionTitle": "Sichtbarkeit",
+    "description": "Verwende dies für organisatorische Gruppen, die nicht für alle relevant sind.",
+    "hidden": {
+      "label": "Vor Benutzern verbergen, die nicht Teil dieser Gruppe sind"
+    }
   }
 }

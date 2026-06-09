@@ -1,15 +1,22 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Put } from '@nestjs/common';
-import { ResourceGroupsService } from './resourceGroups.service';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Put, Req } from '@nestjs/common';
+import { ResourceGroupsService, GroupVisibilityContext } from './resourceGroups.service';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ResourceGroup } from '@attraccess/database-entities';
 import { CreateResourceGroupDto } from './dto/createGroup.dto';
 import { UpdateResourceGroupDto } from './dto/updateGroup.dto';
-import { Auth } from '@attraccess/plugins-backend-sdk';
+import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 
 @ApiTags('Resources')
 @Controller('resource-groups')
 export class ResourceGroupsController {
   constructor(private readonly resourceGroupsService: ResourceGroupsService) {}
+
+  private getVisibilityContext(req: AuthenticatedRequest): GroupVisibilityContext {
+    return {
+      userId: req.user.id,
+      canManageResources: req.user.systemPermissions.canManageResources === true,
+    };
+  }
 
   @Post()
   @ApiOperation({ summary: 'Create a new resource group', operationId: 'resourceGroupsCreateOne' })
@@ -24,17 +31,19 @@ export class ResourceGroupsController {
   }
 
   @Get()
+  @Auth()
   @ApiOperation({ summary: 'Get many resource groups', operationId: 'resourceGroupsGetMany' })
   @ApiResponse({
     status: 200,
     description: 'The resource groups have been successfully retrieved.',
     type: [ResourceGroup],
   })
-  async getAll(): Promise<ResourceGroup[]> {
-    return await this.resourceGroupsService.getMany();
+  async getAll(@Req() req: AuthenticatedRequest): Promise<ResourceGroup[]> {
+    return await this.resourceGroupsService.getMany(this.getVisibilityContext(req));
   }
 
   @Get(':id')
+  @Auth()
   @ApiOperation({ summary: 'Get a resource group by ID', operationId: 'resourceGroupsGetOne' })
   @ApiParam({ name: 'id', description: 'The ID of the resource group', type: Number })
   @ApiResponse({
@@ -46,8 +55,8 @@ export class ResourceGroupsController {
     description: 'The resource group has been successfully retrieved.',
     type: ResourceGroup,
   })
-  async getOne(@Param('id', ParseIntPipe) id: number): Promise<ResourceGroup> {
-    return await this.resourceGroupsService.getOne({ id });
+  async getOne(@Param('id', ParseIntPipe) id: number, @Req() req: AuthenticatedRequest): Promise<ResourceGroup> {
+    return await this.resourceGroupsService.getOne({ id }, undefined, this.getVisibilityContext(req));
   }
 
   @Put(':id')

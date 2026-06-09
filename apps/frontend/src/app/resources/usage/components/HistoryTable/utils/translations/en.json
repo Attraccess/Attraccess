@@ -8,7 +8,8 @@
       "startTime": "Start Time",
       "endTime": "End Time",
       "duration": "Duration",
-      "project": "Project"
+      "project": "Project",
+      "supervisor": "Supervisor"
     },
     "door": {
       "time": "Time",

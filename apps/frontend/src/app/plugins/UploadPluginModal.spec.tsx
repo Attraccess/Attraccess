@@ -71,6 +71,28 @@ describe('UploadPluginModal', () => {
     expect(uploadButton()).toBeDisabled();
   });
 
+  // Regression: a React Aria TextField forces a controlled value="" onto the
+  // inner input, which resets a file input's selection on every render and
+  // breaks file selection on mobile browsers. The file input must be a plain,
+  // native, uncontrolled <input type="file"> so the browser keeps the choice.
+  it('renders a native, uncontrolled file input (no forced controlled value)', () => {
+    render(<UploadPluginModal isOpen onClose={vi.fn()} />);
+
+    const input = fileInput();
+    expect(input.tagName).toBe('INPUT');
+    expect(input.type).toBe('file');
+    expect(input).not.toHaveAttribute('value');
+  });
+
+  it('accepts a zip file reported with a zip mime type but no .zip name', async () => {
+    render(<UploadPluginModal isOpen onClose={vi.fn()} />);
+
+    const file = new File(['content'], 'plugin', { type: 'application/zip' });
+    fireEvent.change(fileInput(), { target: { files: [file] } });
+
+    await waitFor(() => expect(uploadButton()).not.toBeDisabled());
+  });
+
   it('enables upload and shows the file name after selecting a .zip file', async () => {
     const user = userEvent.setup();
     render(<UploadPluginModal isOpen onClose={vi.fn()} />);

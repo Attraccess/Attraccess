@@ -64,6 +64,15 @@ export class ResourceGroup {
   })
   retrainingBlocksAccess!: boolean;
 
+  @Column({ type: 'boolean', default: false })
+  @ApiProperty({
+    description:
+      'Whether to hide this group from users who are not part of it (introducer, maintainer or introduced). Users with the canManageResources permission always see hidden groups.',
+    example: false,
+    default: false,
+  })
+  isHidden!: boolean;
+
   @CreateDateColumn()
   @ApiProperty({
     description: 'When the resource was created',

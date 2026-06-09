@@ -20,26 +20,12 @@ import {
   ResourceUsageAction,
   ResourceUsage,
   BillingTransactionItem,
-  BillingTransactionItemCreateSchema,
-  BillingTransaction,
-  IfNodeDataSchema,
-  WaitNodeDataSchema,
-  HttpRequestNodeDataSchema,
-  MqttSendMessageNodeDataSchema,
-  SetPayloadNodeDataSchema,
   MqttMessageReceivedNodeDataSchema,
   MqttWaitForMessageNodeDataSchema,
-  ResourceUsageEndSessionNodeDataSchema,
-  ErrorNodeDataSchema,
   InputResourceActivityNoActivityNodeDataSchema,
   ResourceHealthHeartbeatNodeDataSchema,
-  ResourceHealthSetNodeDataSchema,
   ResourceHealthSource,
   ResourceHealthStatus,
-  HealthStateOptionEnum,
-  SetVariablesNodeDataSchema,
-  GetVariablesNodeDataSchema,
-  ResourceFlowVariableScope,
 } from '@attraccess/database-entities';
 import { ResourceFlowVariablesService } from './resource-flow-variables.service';
 import { OnEvent } from '@nestjs/event-emitter';
@@ -50,18 +36,37 @@ import { FlowConfigType } from './flow.config';
 import { Subject } from 'rxjs';
 import { randomBytes } from 'crypto';
 import { MqttClientService } from '../../mqtt/mqtt-client.service';
-import axios from 'axios';
 import Handlebars from 'handlebars';
-import { get, set as lodashSet } from 'lodash-es';
 import { ResourceUsageService } from '../usage/resourceUsage.service';
 import z from 'zod';
-import { NoUsageSessionError } from './errors/no-usage-session.error';
 import { MqttMessageEvent as MqttMessageReceivedEvent } from '../../mqtt/mqtt-message.event';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { FlowExecutionError } from './errors/flow-execution.error';
 import { ResourceHealthService } from '../health/resource-health.service';
 import { CronTimer } from '../../metrics/instrumentation/cron/cron.helper';
 import { FlowTimer } from '../../metrics/instrumentation/flow/flow.helper';
+import {
+  ActivityTrackExecutor,
+  BillingSetAdditionalItemsExecutor,
+  EndUsageSessionExecutor,
+  ErrorExecutor,
+  GetVariablesExecutor,
+  HealthHeartbeatExecutor,
+  HealthSetExecutor,
+  HttpSendRequestExecutor,
+  IfExecutor,
+  MqttSendMessageExecutor,
+  MqttWaitForMessageExecutor,
+  NodeExecutionContext,
+  NodeExecutor,
+  NodeProcessingResult,
+  PassthroughExecutor,
+  SetPayloadExecutor,
+  SetVariablesExecutor,
+  TemplateVariables,
+  WaitExecutor,
+  heartbeatKey,
+  topicMatches,
+} from './node-executors';
 
 // Handlebars helpers
 Handlebars.registerHelper('json', (value: unknown) => {
@@ -73,11 +78,6 @@ Handlebars.registerHelper('json', (value: unknown) => {
 });
 
 export type ResourceFlowLogEvent = { data: ResourceFlowLog | { keepalive: true } };
-
-interface NodeProcessingResult {
-  payload: object;
-  outputHandle?: string;
-}
 
 interface UsageEventData {
   resource: {
@@ -122,10 +122,14 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
 
   public readonly resourceFlowLogSubjects: Map<Resource['id'], Subject<ResourceFlowLogEvent>> = new Map();
 
-  private readonly templateVariables = new WeakMap<
-    object,
-    { resource: Record<string, unknown>; global: Record<string, unknown> }
-  >();
+  private readonly templateVariables = new WeakMap<object, TemplateVariables>();
+
+  /**
+   * Registry mapping every flow node type to its executor strategy. Declaring it
+   * as a `Record` keyed by the enum keeps node-type coverage exhaustive at
+   * compile time (a missing type is a type error).
+   */
+  private readonly nodeExecutors: Record<ResourceFlowNodeType, NodeExecutor>;
 
   constructor(
     @InjectRepository(ResourceFlowNode)
@@ -150,6 +154,55 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
   ) {
     const flowConfig = this.configService.get<FlowConfigType>('flow');
     this.logTTLDays = flowConfig.FLOW_LOG_TTL_DAYS;
+
+    this.nodeExecutors = this.buildNodeExecutorRegistry();
+  }
+
+  /**
+   * Instantiates one executor per node type. Trigger/input nodes share a single
+   * passthrough executor; the rest receive only the collaborators they need.
+   * Executors are plain (non-DI) objects so the service keeps its DI signature.
+   */
+  private buildNodeExecutorRegistry(): Record<ResourceFlowNodeType, NodeExecutor> {
+    const passthrough = new PassthroughExecutor();
+
+    return {
+      [ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED]: passthrough,
+      [ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED]: passthrough,
+      [ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER]: passthrough,
+      [ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLOCKED]: passthrough,
+      [ResourceFlowNodeType.INPUT_RESOURCE_DOOR_LOCKED]: passthrough,
+      [ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLATCHED]: passthrough,
+      [ResourceFlowNodeType.INPUT_BUTTON]: passthrough,
+      [ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED]: passthrough,
+      [ResourceFlowNodeType.INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY]: passthrough,
+      [ResourceFlowNodeType.INPUT_VARIABLE_CHANGED]: passthrough,
+
+      [ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT]: new HealthHeartbeatExecutor(
+        this.resourceHealthService,
+        this.heartbeatLastSeen,
+      ),
+      [ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_SET]: new HealthSetExecutor(this.resourceHealthService),
+      [ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS]: new BillingSetAdditionalItemsExecutor(
+        this.resourceUsageService,
+        this.billingTransactionItemRepository,
+      ),
+      [ResourceFlowNodeType.OUTPUT_HTTP_SEND_REQUEST]: new HttpSendRequestExecutor(),
+      [ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE]: new MqttSendMessageExecutor(this.mqttClientService),
+      [ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION]: new EndUsageSessionExecutor(this.resourceUsageService),
+      [ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_TRACK_ACTIVITY]: new ActivityTrackExecutor(this.resourceActivity),
+
+      [ResourceFlowNodeType.PROCESSING_WAIT]: new WaitExecutor(),
+      [ResourceFlowNodeType.PROCESSING_IF]: new IfExecutor(),
+      [ResourceFlowNodeType.PROCESSING_SET_PAYLOAD]: new SetPayloadExecutor(),
+      [ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE]: new MqttWaitForMessageExecutor(
+        this.mqttClientService,
+        this.eventEmitter,
+      ),
+      [ResourceFlowNodeType.PROCESSING_ERROR]: new ErrorExecutor(),
+      [ResourceFlowNodeType.PROCESSING_SET_VARIABLES]: new SetVariablesExecutor(this.variablesService),
+      [ResourceFlowNodeType.PROCESSING_GET_VARIABLES]: new GetVariablesExecutor(this.variablesService),
+    };
   }
 
   async onModuleInit() {
@@ -206,21 +259,6 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
         this.logger.error(`Failed to subscribe to topic ${topic} for server ID ${serverId}`, error.stack);
       });
     }
-  }
-
-  private topicMatches(filter: string, topic: string): boolean {
-    const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const parts = filter.split('/').map((segment, index, arr) => {
-      if (segment === '+') {
-        return '[^/]+';
-      }
-      if (segment === '#' && index === arr.length - 1) {
-        return '.*';
-      }
-      return escapeRegex(segment);
-    });
-    const pattern = '^' + parts.join('/') + '$';
-    return new RegExp(pattern).test(topic);
   }
 
   private async createFlowLog(
@@ -390,7 +428,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
 
     const filteredMessageReceivedNodes = messageReceivedNodes.filter((node) => {
       const { serverId: nodeServerId, topic: nodeTopic } = MqttMessageReceivedNodeDataSchema.parse(node.data);
-      return nodeServerId === serverId && (this.topicMatches(nodeTopic, topic) || this.topicMatches(topic, nodeTopic));
+      return nodeServerId === serverId && (topicMatches(nodeTopic, topic) || topicMatches(topic, nodeTopic));
     });
 
     if (filteredMessageReceivedNodes.length === 0) {
@@ -537,71 +575,27 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     });
   }
 
+  /**
+   * Builds the per-execution context handed to node executors. Exposes the
+   * template helpers backed by the service-owned WeakMap so executors stay free
+   * of Handlebars/variable plumbing.
+   */
+  private buildExecutionContext(transactionManager?: EntityManager): NodeExecutionContext {
+    return {
+      transactionManager,
+      compileTemplate: (template, data) => this.compileTemplate(template, data),
+      getTemplateVariables: (data) => this.templateVariables.get(data),
+      setTemplateVariables: (data, variables) => this.templateVariables.set(data, variables),
+    };
+  }
+
   private async dispatchNode(
     node: ResourceFlowNode,
     input: object,
     transactionManager?: EntityManager,
   ): Promise<NodeProcessingResult> {
-    switch (node.type) {
-      case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED:
-      case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED:
-      case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER:
-      case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLOCKED:
-      case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_LOCKED:
-      case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLATCHED:
-      case ResourceFlowNodeType.INPUT_BUTTON:
-      case ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED:
-      case ResourceFlowNodeType.INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY:
-      case ResourceFlowNodeType.INPUT_VARIABLE_CHANGED:
-        return { payload: input };
-
-      case ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT:
-        return this.processHeartbeatNode(node, input);
-
-      case ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_SET:
-        return this.processHealthSetNode(node, input);
-
-      case ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS:
-        return this.processBillingSetAdditionalItemsNode(node, input, transactionManager);
-
-      case ResourceFlowNodeType.PROCESSING_WAIT:
-        return this.processWaitNode(node, input, transactionManager);
-
-      case ResourceFlowNodeType.OUTPUT_HTTP_SEND_REQUEST:
-        return this.processHttpSendRequestNode(node, input, transactionManager);
-
-      case ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE:
-        return this.processMqttSendMessageNode(node, input, transactionManager);
-
-      case ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION:
-        return this.processEndUsageSessionNode(node, input, transactionManager);
-
-      case ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_TRACK_ACTIVITY:
-        return this.processActivityTrackActivityNode(node, input);
-
-      case ResourceFlowNodeType.PROCESSING_IF:
-        return this.processIfNode(node, input, transactionManager);
-
-      case ResourceFlowNodeType.PROCESSING_SET_PAYLOAD:
-        return this.processSetPayloadNode(node, input, transactionManager);
-
-      case ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE:
-        return this.processMqttWaitForMessageNode(node, input, transactionManager);
-
-      case ResourceFlowNodeType.PROCESSING_ERROR:
-        return this.processErrorNode(node, input, transactionManager);
-
-      case ResourceFlowNodeType.PROCESSING_SET_VARIABLES:
-        return this.processSetVariablesNode(node, input);
-
-      case ResourceFlowNodeType.PROCESSING_GET_VARIABLES:
-        return this.processGetVariablesNode(node, input);
-
-      default: {
-        const exhaustiveCheck: never = node.type;
-        throw new Error(`Unknown node type: ${exhaustiveCheck}`);
-      }
-    }
+    const executor = this.nodeExecutors[node.type];
+    return executor.execute(node, input, this.buildExecutionContext(transactionManager));
   }
 
   private async processNode(
@@ -734,315 +728,12 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     return results.flat();
   }
 
-  private async processWaitNode(
-    node: ResourceFlowNode,
-    input: object,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    _transactionManager?: EntityManager,
-  ): Promise<NodeProcessingResult> {
-    const { duration, unit } = node.data as z.infer<typeof WaitNodeDataSchema>;
-
-    let waitDurationMs = duration * 1000;
-    if (unit === 'minutes') {
-      waitDurationMs *= 60;
-    } else if (unit === 'hours') {
-      waitDurationMs *= 60 * 60;
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, waitDurationMs));
-
-    return { payload: input };
-  }
-
-  private async processIfNode(
-    node: ResourceFlowNode,
-    input: object,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    _transactionManager?: EntityManager,
-  ): Promise<NodeProcessingResult> {
-    const {
-      path,
-      comparisonOperator,
-      comparisonValue: comparisonValueTemplate,
-      comparisonValueIsPath,
-    } = node.data as z.infer<typeof IfNodeDataSchema>;
-
-    const sourceValue = get(input, path, '');
-    let comparisonValue = comparisonValueTemplate;
-
-    if (comparisonValueIsPath) {
-      comparisonValue = get(input, comparisonValue, '');
-    }
-
-    let result = false;
-    switch (comparisonOperator) {
-      case '=':
-        result = String(comparisonValue) === String(sourceValue);
-        break;
-      case '!=':
-        result = String(comparisonValue) !== String(sourceValue);
-        break;
-      case '>':
-        result = Number(comparisonValue) > Number(sourceValue);
-        break;
-      case '<':
-        result = Number(comparisonValue) < Number(sourceValue);
-        break;
-      case '>=':
-        result = Number(comparisonValue) >= Number(sourceValue);
-        break;
-      case '<=':
-        result = Number(comparisonValue) <= Number(sourceValue);
-        break;
-      default: {
-        const exhaustiveCheck: never = comparisonOperator;
-        throw new FlowExecutionError(`Unknown comparison operator: ${exhaustiveCheck}`);
-      }
-    }
-
-    return {
-      payload: input,
-      outputHandle: result ? 'output-true' : 'output-false',
-    };
-  }
-
-  private async processSetPayloadNode(
-    node: ResourceFlowNode,
-    input: object,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    _transactionManager?: EntityManager,
-  ): Promise<NodeProcessingResult> {
-    const { entries } = node.data as z.infer<typeof SetPayloadNodeDataSchema>;
-
-    const newPayload: Record<string, unknown> = JSON.parse(JSON.stringify(input ?? {}));
-
-    for (const entry of entries ?? []) {
-      const compiledValue = this.compileTemplate(entry.value ?? '', input);
-      lodashSet(newPayload, entry.key, compiledValue);
-    }
-
-    return { payload: newPayload };
-  }
-
-  private async processHttpSendRequestNode(
-    node: ResourceFlowNode,
-    input: object,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    _transactionManager?: EntityManager,
-  ): Promise<NodeProcessingResult> {
-    const data = node.data as z.infer<typeof HttpRequestNodeDataSchema>;
-
-    const url = this.compileTemplate(data.url ?? '', input);
-    const method = this.compileTemplate(data.method ?? '', input);
-    const headers = Object.fromEntries(
-      Object.entries(data.headers ?? {}).map(([key, value]) => [key, this.compileTemplate(value, input)]),
-    );
-    const body = this.compileTemplate(data.body ?? '', input);
-
-    const response = await axios.request({
-      url,
-      method,
-      headers,
-      data: body,
-    });
-
-    return {
-      payload: response.data,
-    };
-  }
-
-  private async processMqttWaitForMessageNode(
-    node: ResourceFlowNode,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    _input: object,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    _transactionManager?: EntityManager,
-  ): Promise<NodeProcessingResult> {
-    const { serverId, topic, timeoutSeconds, subscribeQos } = node.data as z.infer<
-      typeof MqttWaitForMessageNodeDataSchema
-    >;
-
-    // Ensure subscription exists (wildcards allowed)
-    await this.mqttClientService.subscribe(serverId, topic, subscribeQos as unknown as 0 | 1 | 2).catch((error) => {
-      this.logger.error(`Failed to subscribe for wait node to topic ${topic} on server ${serverId}`, error.stack);
-      throw error;
-    });
-
-    this.logger.debug(
-      `Waiting for MQTT message (serverId=${serverId}, topicFilter=${topic}, timeout=${timeoutSeconds}s)`,
-    );
-
-    const result = await new Promise<{ topic: string; payload: unknown }>((resolve, reject) => {
-      const onMessage = (event: MqttMessageReceivedEvent) => {
-        if (event.serverId !== serverId) {
-          return;
-        }
-        if (!this.topicMatches(topic, event.topic)) {
-          return;
-        }
-        cleanup();
-        resolve({ topic: event.topic, payload: event.payload });
-      };
-
-      const onTimeout = () => {
-        cleanup();
-        reject(new Error(`Timeout waiting for MQTT message on topic '${topic}' (server ${serverId})`));
-      };
-
-      const cleanup = () => {
-        clearTimeout(timeoutHandle);
-        this.eventEmitter.off(MqttMessageReceivedEvent.EVENT_NAME, onMessage as unknown as () => void);
-      };
-
-      const timeoutHandle = setTimeout(onTimeout, timeoutSeconds * 1000);
-      this.eventEmitter.on(MqttMessageReceivedEvent.EVENT_NAME, onMessage as unknown as () => void);
-    });
-
-    return { payload: { topic: result.topic, payload: result.payload } };
-  }
-
-  private async processErrorNode(
-    node: ResourceFlowNode,
-    input: object,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    _transactionManager?: EntityManager,
-  ): Promise<NodeProcessingResult> {
-    const { message: messageTemplate } = node.data as z.infer<typeof ErrorNodeDataSchema>;
-
-    const message = this.compileTemplate(messageTemplate, input);
-
-    throw new FlowExecutionError(message);
-  }
-
-  private async processMqttSendMessageNode(
-    node: ResourceFlowNode,
-    input: object,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    _transactionManager?: EntityManager,
-  ): Promise<NodeProcessingResult> {
-    const { serverId, ...data } = node.data as z.infer<typeof MqttSendMessageNodeDataSchema>;
-
-    const topic = this.compileTemplate(data.topic ?? '', input);
-    const payload = this.compileTemplate(data.payload ?? '', input);
-
-    this.logger.debug(
-      `Publishing MQTT message to server ID: ${serverId} with topic: ${topic} and payload: "${payload}"`,
-    );
-
-    await this.mqttClientService.publish(serverId, topic, payload, {
-      qos: data.qos as 0 | 1 | 2,
-      retain: data.retain as boolean,
-    });
-
-    return {
-      payload: input,
-    };
-  }
-
-  private async processEndUsageSessionNode(
-    node: ResourceFlowNode,
-    input: object,
-    transactionManager?: EntityManager,
-  ): Promise<NodeProcessingResult> {
-    const activeUsage = await this.resourceUsageService.getActiveSession(node.resourceId, false, transactionManager);
-
-    if (!activeUsage) {
-      throw new NoUsageSessionError();
-    }
-
-    if (!activeUsage.user) {
-      throw new FlowExecutionError('Active session has no owner user; cannot end');
-    }
-
-    const { notes } = ResourceUsageEndSessionNodeDataSchema.parse(node.data ?? {});
-
-    let finalNotes = '';
-    if (typeof notes === 'string' && notes.length > 0) {
-      const compiled = this.compileTemplate(notes, input);
-      finalNotes = compiled && compiled.trim().length > 0 ? compiled : notes;
-    }
-
-    await this.resourceUsageService.endSession(node.resourceId, activeUsage.user, { notes: finalNotes }, {
-      skipFormSubmissions: true,
-      skipNoteNotification: true,
-    });
-
-    return { payload: input };
-  }
-
   public trackResourceActivity(resourceId: number) {
     this.resourceActivity.set(resourceId, new Date());
   }
 
-  private heartbeatKey(resourceId: number, identifier: string): string {
-    return `${resourceId}::${identifier}`;
-  }
-
   public getHeartbeatLastSeen(resourceId: number, identifier: string): Date | undefined {
-    return this.heartbeatLastSeen.get(this.heartbeatKey(resourceId, identifier));
-  }
-
-  private async processHeartbeatNode(node: ResourceFlowNode, input: object): Promise<NodeProcessingResult> {
-    const parsed = ResourceHealthHeartbeatNodeDataSchema.safeParse(node.data ?? {});
-    if (!parsed.success) {
-      this.logger.warn(`Heartbeat node ${node.id} has invalid data: ${parsed.error.message}`);
-      return { payload: input };
-    }
-    const normalizedIdentifier = (parsed.data.identifier ?? '').trim();
-    const now = new Date();
-
-    this.heartbeatLastSeen.set(this.heartbeatKey(node.resourceId, normalizedIdentifier), now);
-
-    await this.resourceHealthService.reportHealth({
-      resourceId: node.resourceId,
-      identifier: normalizedIdentifier,
-      status: ResourceHealthStatus.HEALTHY,
-      reason: null,
-      source: ResourceHealthSource.HEARTBEAT,
-      reportedAt: now,
-    });
-
-    return { payload: input };
-  }
-
-  private async processHealthSetNode(node: ResourceFlowNode, input: object): Promise<NodeProcessingResult> {
-    const parsed = ResourceHealthSetNodeDataSchema.safeParse(node.data ?? {});
-    if (!parsed.success) {
-      throw new FlowExecutionError(`Invalid health-set node data: ${parsed.error.message}`);
-    }
-
-    const identifierFromPayload = get(input, 'health.identifier') as unknown;
-    const identifierOverride =
-      typeof identifierFromPayload === 'string' && identifierFromPayload.length > 0 ? identifierFromPayload : null;
-    const identifier = identifierOverride ?? this.compileTemplate(parsed.data.identifier ?? '', input);
-
-    const statusFromPayload = get(input, 'health.status') as unknown;
-    const statusOverride =
-      typeof statusFromPayload === 'string' && statusFromPayload.length > 0 ? statusFromPayload : null;
-    const statusCandidate = statusOverride ?? parsed.data.status;
-    const statusEnum = HealthStateOptionEnum.safeParse(statusCandidate);
-    if (!statusEnum.success) {
-      throw new FlowExecutionError(
-        `Invalid health-set status "${String(statusCandidate)}"; expected "healthy" or "unhealthy"`,
-      );
-    }
-    const status =
-      statusEnum.data === 'healthy' ? ResourceHealthStatus.HEALTHY : ResourceHealthStatus.UNHEALTHY;
-
-    const reasonFromPayload = get(input, 'health.reason') as unknown;
-    const reasonOverride =
-      typeof reasonFromPayload === 'string' && reasonFromPayload.length > 0 ? reasonFromPayload : null;
-    const reasonCandidate = reasonOverride ?? this.compileTemplate(parsed.data.reason ?? '', input);
-
-    await this.resourceHealthService.reportHealth({
-      resourceId: node.resourceId,
-      identifier,
-      status,
-      reason: status === ResourceHealthStatus.UNHEALTHY ? reasonCandidate : null,
-      source: statusOverride !== null ? ResourceHealthSource.PAYLOAD : ResourceHealthSource.MANUAL,
-    });
-
-    return { payload: input };
+    return this.heartbeatLastSeen.get(heartbeatKey(resourceId, identifier));
   }
 
   @Cron(CronExpression.EVERY_MINUTE)
@@ -1057,7 +748,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
       if (!parsed.success) {
         continue;
       }
-      validKeys.add(this.heartbeatKey(node.resourceId, (parsed.data.identifier ?? '').trim()));
+      validKeys.add(heartbeatKey(node.resourceId, (parsed.data.identifier ?? '').trim()));
     }
 
     for (const key of this.heartbeatLastSeen.keys()) {
@@ -1082,10 +773,10 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
 
         const identifier = (parsed.data.identifier ?? '').trim();
         const timeoutMs = parsed.data.timeoutSeconds * 1000;
-        const lastSeen = this.heartbeatLastSeen.get(this.heartbeatKey(node.resourceId, identifier));
+        const lastSeen = this.heartbeatLastSeen.get(heartbeatKey(node.resourceId, identifier));
 
         if (!lastSeen) {
-          this.heartbeatLastSeen.set(this.heartbeatKey(node.resourceId, identifier), now);
+          this.heartbeatLastSeen.set(heartbeatKey(node.resourceId, identifier), now);
           return;
         }
 
@@ -1107,14 +798,6 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
         });
       }),
     );
-  }
-
-  private async processActivityTrackActivityNode(node: ResourceFlowNode, input: object): Promise<NodeProcessingResult> {
-    const { resourceId } = node;
-
-    this.resourceActivity.set(resourceId, new Date());
-
-    return { payload: input };
   }
 
   @Cron(CronExpression.EVERY_MINUTE)
@@ -1177,44 +860,6 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     return compiledTemplate(dataWithVariables);
   }
 
-  private async processSetVariablesNode(node: ResourceFlowNode, input: object): Promise<NodeProcessingResult> {
-    const data = SetVariablesNodeDataSchema.parse(node.data);
-    for (const item of data.variables) {
-      const renderedKey = this.compileTemplate(item.key, input);
-      const renderedValue = this.compileTemplate(item.value, input);
-      let parsed: unknown = renderedValue;
-      try {
-        parsed = JSON.parse(renderedValue);
-      } catch {
-        // leave as raw string
-      }
-      const scope = item.scope as ResourceFlowVariableScope;
-      const ownerId = scope === ResourceFlowVariableScope.RESOURCE ? node.resourceId : null;
-      await this.variablesService.set(scope, ownerId, renderedKey, parsed, node.resourceId);
-    }
-    return { payload: input };
-  }
-
-  private async processGetVariablesNode(node: ResourceFlowNode, input: object): Promise<NodeProcessingResult> {
-    const data = GetVariablesNodeDataSchema.parse(node.data);
-    const payload = JSON.parse(JSON.stringify(input)) as Record<string, unknown>;
-    for (const item of data.variables) {
-      const renderedKey = this.compileTemplate(item.key, input);
-      const scope = item.scope as ResourceFlowVariableScope;
-      const ownerId = scope === ResourceFlowVariableScope.RESOURCE ? node.resourceId : null;
-      const value = await this.variablesService.get(scope, ownerId, renderedKey);
-      if (value === undefined) {
-        this.logger.warn(`GET variable miss: ${item.scope}:${renderedKey}`);
-      }
-      lodashSet(payload, item.payloadPath, value);
-    }
-    const variables = this.templateVariables.get(input);
-    if (variables) {
-      this.templateVariables.set(payload, variables);
-    }
-    return { payload };
-  }
-
   public async pressButton(resourceId: number, buttonId: string, executingUserId: number) {
     const activeResourceUsage = await this.resourceUsageService.getActiveSession(resourceId, false);
 
@@ -1240,87 +885,5 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     }
 
     await this.startFlow(button, { payload: {} });
-  }
-
-  private async processBillingSetAdditionalItemsNode(
-    node: ResourceFlowNode,
-    input: object,
-    transactionManager?: EntityManager,
-  ): Promise<NodeProcessingResult> {
-    const activeUsageSession = await this.resourceUsageService.getActiveSession(
-      node.resourceId,
-      false,
-      transactionManager,
-    );
-
-    if (!activeUsageSession) {
-      throw new NoUsageSessionError();
-    }
-
-    const data = BillingTransactionItemCreateSchema.parse(node.data);
-
-    this.logger.debug(
-      `Processing billing set additional items node with data: ${JSON.stringify({ data, input }, null, 2)}`,
-    );
-
-    let externalReference = data.externalReference;
-    if ('externalReference' in input && typeof input.externalReference === 'string') {
-      externalReference = input.externalReference;
-      if (data.externalReference) {
-        this.logger.debug(`Compiling external reference template: ${data.externalReference}`);
-        externalReference = this.compileTemplate(
-          BillingTransactionItemCreateSchema.shape.externalReference.parse(data.externalReference),
-          input,
-        );
-      }
-    }
-
-    let quantity = data.quantity;
-    if ('quantity' in input) {
-      this.logger.debug(`Compiling quantity template: ${input.quantity}`);
-      const numberQuantity = BillingTransactionItemCreateSchema.shape.quantity.parse(input.quantity);
-      quantity = numberQuantity;
-    }
-
-    const manager = transactionManager ?? this.billingTransactionItemRepository.manager;
-
-    const billingTransaction = await manager.findOne(BillingTransaction, {
-      where: {
-        resourceUsageId: activeUsageSession.id,
-      },
-    });
-
-    const dedupData = {
-      billingTransactionId: billingTransaction.id,
-      name: data.name,
-      description: data.description,
-      externalReference,
-      unitPrice: data.unitPrice,
-    };
-
-    const existingItem = await manager.findOne(BillingTransactionItem, {
-      where: dedupData,
-    });
-
-    if (existingItem) {
-      await manager.update(BillingTransactionItem, existingItem.id, {
-        quantity: existingItem.quantity + quantity,
-      });
-    } else {
-      await manager.save(BillingTransactionItem, {
-        ...dedupData,
-        quantity,
-      });
-    }
-
-    return {
-      payload: {
-        name: data.name,
-        description: data.description,
-        externalReference,
-        unitPrice: data.unitPrice,
-        quantity,
-      } as Omit<BillingTransactionItem, 'id' | 'billingTransactionId' | 'billingTransaction'>,
-    };
   }
 }

@@ -35,3 +35,19 @@ export class ResourceUsageNoteAddedEvent {
     public readonly author: Pick<User, 'id' | 'username'>
   ) {}
 }
+
+/**
+ * Emitted whenever a supervised usage session starts. Acts as the counter signal consumed by the
+ * supervised-usage auto-promotion follow-up (ATT-486), which decides when to auto-create an
+ * introduction for the supervised user.
+ */
+export class SupervisedUsageStartedEvent {
+  public static readonly EVENT_NAME = 'resource.usage.supervised_started';
+
+  constructor(
+    public readonly resourceId: number,
+    public readonly userId: number,
+    public readonly supervisorUserId: number,
+    public readonly usageId: number
+  ) {}
+}

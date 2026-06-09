@@ -5,10 +5,17 @@
   "noPlugins": "Keine Plugins installiert",
   "columns": {
     "name": "Name",
-    "version": "0.0.16",
+    "version": "Version",
     "directory": "Verzeichnis",
     "permissions": "Berechtigungen",
+    "status": "Status",
     "actions": "Aktionen"
+  },
+  "status": {
+    "loaded": "Geladen",
+    "error": "Laden fehlgeschlagen",
+    "unknown": "Nur Frontend",
+    "errorTooltip": "Dieses Plugin konnte auf dem Server nicht geladen werden: {{message}}"
   },
   "noPermissions": "Keine angefordert",
   "deleteTooltip": "Plugin entfernen",

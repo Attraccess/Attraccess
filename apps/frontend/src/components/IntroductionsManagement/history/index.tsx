@@ -14,6 +14,7 @@ import {
   TableColumn,
   TableContent,
   TableHeader,
+  TableScrollContainer,
   TableRow,
 } from '@heroui/react';
 import { useMemo, useState } from 'react';
@@ -68,28 +69,30 @@ export function IntroductionHistoryModal(props: Readonly<Props>) {
                 <ModalHeader>{t('modal.title')}</ModalHeader>
                 <ModalBody>
                   <Table>
-                    <TableContent aria-label={t('table.ariaLabel')}>
-                    <TableHeader>
-                      <TableColumn isRowHeader>{t('table.columns.date')}</TableColumn>
-                      <TableColumn>{t('table.columns.action')}</TableColumn>
-                      <TableColumn>{t('table.columns.comment')}</TableColumn>
-                    </TableHeader>
-                    <TableBody items={currentPage} renderEmptyState={() => <EmptyState />}>
-                      {(item) => (
-                        <TableRow key={item.id} id={item.id}>
-                          <TableCell>
-                            <DateTimeDisplay date={item.createdAt} />
-                          </TableCell>
-                          <TableCell>
-                            <IntroductionStatusChip isValid={item.action === 'grant'} />
-                          </TableCell>
-                          <TableCell>
-                            <blockquote className="text-sm whitespace-pre-wrap">{item.comment}</blockquote>
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                    </TableContent>
+                    <TableScrollContainer>
+                      <TableContent aria-label={t('table.ariaLabel')}>
+                        <TableHeader>
+                          <TableColumn isRowHeader>{t('table.columns.date')}</TableColumn>
+                          <TableColumn>{t('table.columns.action')}</TableColumn>
+                          <TableColumn>{t('table.columns.comment')}</TableColumn>
+                        </TableHeader>
+                        <TableBody items={currentPage} renderEmptyState={() => <EmptyState />}>
+                          {(item) => (
+                            <TableRow key={item.id} id={item.id}>
+                              <TableCell>
+                                <DateTimeDisplay date={item.createdAt} />
+                              </TableCell>
+                              <TableCell>
+                                <IntroductionStatusChip isValid={item.action === 'grant'} />
+                              </TableCell>
+                              <TableCell>
+                                <blockquote className="text-sm whitespace-pre-wrap">{item.comment}</blockquote>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </TableBody>
+                      </TableContent>
+                    </TableScrollContainer>
                   </Table>
                 </ModalBody>
                 <ModalFooter>

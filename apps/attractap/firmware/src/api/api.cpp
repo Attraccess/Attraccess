@@ -2,6 +2,7 @@
 // FEATURE: api-core
 
 #include "api.hpp"
+#include "../utils.hpp"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include <memory>
@@ -111,7 +112,7 @@ void API::processIncomingMessage(const char *buf, size_t len)
                 {
                     if (this->errorCallback)
                     {
-                        this->errorCallback("Fehler", err.c_str());
+                        this->errorCallback("Fehler", translateReaderError(err).c_str());
                     }
                 }
                 // Do not process further

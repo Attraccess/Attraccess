@@ -10,6 +10,7 @@ import {
   TableContent,
   TableHeader,
   TableRow,
+  TableScrollContainer,
 } from '@heroui/react';
 import { QueryStatus } from '@tanstack/react-query';
 import { RotateCwIcon } from 'lucide-react';
@@ -38,8 +39,7 @@ interface Props {
 }
 
 export function PreviewTable(props: Props) {
-  const { columns, rows, totalCount, previewLimit, ariaLabel, titleLabel, rowCountLabel, refetch, queryStatus } =
-    props;
+  const { columns, rows, totalCount, previewLimit, ariaLabel, titleLabel, rowCountLabel, refetch, queryStatus } = props;
 
   const limited = rows.slice(0, previewLimit);
 
@@ -64,33 +64,35 @@ export function PreviewTable(props: Props) {
         </div>
       </div>
 
-      <div className="overflow-x-auto border border-default-100 rounded-md">
+      <div className="border border-default-100 rounded-md">
         {queryStatus === 'pending' ? (
           <div className="flex items-center justify-center py-12">
             <Spinner />
           </div>
         ) : (
           <Table data-cy="resource-usage-export-table">
-            <TableContent aria-label={ariaLabel}>
-              <TableHeader columns={columns}>
-                {(column) => (
-                  <TableColumn key={column.key} id={column.key} isRowHeader={column.key === columns[0]?.key}>
-                    {column.label}
-                  </TableColumn>
-                )}
-              </TableHeader>
-              <TableBody items={limited} renderEmptyState={() => <EmptyState />}>
-                {(row) => (
-                  <TableRow key={row.key} id={row.key}>
-                    {row.columns.map((column) => (
-                      <TableCell style={{ whiteSpace: 'nowrap' }} key={column.key}>
-                        {column.value}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                )}
-              </TableBody>
-            </TableContent>
+            <TableScrollContainer>
+              <TableContent aria-label={ariaLabel}>
+                <TableHeader columns={columns}>
+                  {(column) => (
+                    <TableColumn key={column.key} id={column.key} isRowHeader={column.key === columns[0]?.key}>
+                      {column.label}
+                    </TableColumn>
+                  )}
+                </TableHeader>
+                <TableBody items={limited} renderEmptyState={() => <EmptyState />}>
+                  {(row) => (
+                    <TableRow key={row.key} id={row.key}>
+                      {row.columns.map((column) => (
+                        <TableCell style={{ whiteSpace: 'nowrap' }} key={column.key}>
+                          {column.value}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  )}
+                </TableBody>
+              </TableContent>
+            </TableScrollContainer>
           </Table>
         )}
       </div>

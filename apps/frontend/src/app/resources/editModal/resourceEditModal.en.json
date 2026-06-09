@@ -65,6 +65,47 @@
         "label": "Block access until retrained",
         "description": "If enabled, users lose access once retraining is due until an introducer retrains them."
       }
+    },
+    "supervision": {
+      "sectionTitle": "Supervision",
+      "description": "Control who may start a usage session on this resource.",
+      "mode": {
+        "label": "Supervision mode",
+        "options": {
+          "introduction_required": {
+            "label": "Introduction required",
+            "description": "Only introduced users may start a session. This is the default behavior."
+          },
+          "supervision_allowed": {
+            "label": "Supervision allowed",
+            "description": "Introduced users may start a session on their own; users without an introduction may start one while a supervisor is present."
+          },
+          "supervision_required": {
+            "label": "Supervision required",
+            "description": "Every session requires a present supervisor, even for introduced users."
+          }
+        }
+      },
+      "autoPromotion": {
+        "sectionTitle": "Auto-promotion to introduction",
+        "description": "Automatically grant an introduction after a user has completed enough supervised sessions.",
+        "disabledPlaceholder": "Disabled",
+        "threshold": {
+          "label": "Supervised sessions until introduction",
+          "description": "After this many supervised sessions the user is auto-introduced. Leave empty to disable auto-promotion."
+        },
+        "target": {
+          "label": "Grant introduction for",
+          "options": {
+            "resource": "This resource",
+            "group": "A resource group"
+          }
+        },
+        "group": {
+          "label": "Resource group",
+          "placeholder": "Select a group"
+        }
+      }
     }
   },
   "create": {

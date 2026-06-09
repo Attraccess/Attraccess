@@ -22,6 +22,7 @@ import {
   TableContent,
   TableHeader,
   TableRow,
+  TableScrollContainer,
 } from '@heroui/react';
 import { Button } from '../../../components/button';
 import { LabeledSwitch } from '../../../components/labeledSwitch';
@@ -147,59 +148,58 @@ export function OverridesSection({ globalPolicy }: Props) {
           <Spinner size="sm" />
         ) : (
           <Table aria-label="overrides" data-testid="policy-overrides-table">
-            <TableContent>
-              <TableHeader>
-                <TableColumn isRowHeader>{t('overrides.role')}</TableColumn>
-                <TableColumn>{t('overrides.status')}</TableColumn>
-                <TableColumn>{t('overrides.actions')}</TableColumn>
-              </TableHeader>
-              <TableBody>
-                {ROLES.map((role) => {
-                  const row = overridesByRole.get(role);
-                  const count = countOverridden(row);
-                  return (
-                    <TableRow key={role} data-testid={`policy-override-row-${role}`}>
-                      <TableCell>{t(`overrides.roles.${role}`)}</TableCell>
-                      <TableCell>
-                        {count === 0 ? (
-                          <Chip variant="soft">{t('overrides.statusInherits')}</Chip>
-                        ) : (
-                          <Chip color="warning" variant="soft">
-                            {t('overrides.statusCustom', { count })}
-                          </Chip>
-                        )}
-                      </TableCell>
-                      <TableCell className="flex justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          onPress={() => setEditingRole(role)}
-                          data-testid={`policy-override-edit-${role}`}
-                        >
-                          {t('overrides.edit')}
-                        </Button>
-                        {row && (
+            <TableScrollContainer>
+              <TableContent>
+                <TableHeader>
+                  <TableColumn isRowHeader>{t('overrides.role')}</TableColumn>
+                  <TableColumn>{t('overrides.status')}</TableColumn>
+                  <TableColumn>{t('overrides.actions')}</TableColumn>
+                </TableHeader>
+                <TableBody>
+                  {ROLES.map((role) => {
+                    const row = overridesByRole.get(role);
+                    const count = countOverridden(row);
+                    return (
+                      <TableRow key={role} data-testid={`policy-override-row-${role}`}>
+                        <TableCell>{t(`overrides.roles.${role}`)}</TableCell>
+                        <TableCell>
+                          {count === 0 ? (
+                            <Chip variant="soft">{t('overrides.statusInherits')}</Chip>
+                          ) : (
+                            <Chip color="warning" variant="soft">
+                              {t('overrides.statusCustom', { count })}
+                            </Chip>
+                          )}
+                        </TableCell>
+                        <TableCell className="flex justify-end gap-2">
                           <Button
-                            variant="danger-soft"
-                            onPress={() => remove({ role })}
-                            data-testid={`policy-override-remove-${role}`}
+                            variant="ghost"
+                            onPress={() => setEditingRole(role)}
+                            data-testid={`policy-override-edit-${role}`}
                           >
-                            {t('overrides.remove')}
+                            {t('overrides.edit')}
                           </Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </TableContent>
+                          {row && (
+                            <Button
+                              variant="danger-soft"
+                              onPress={() => remove({ role })}
+                              data-testid={`policy-override-remove-${role}`}
+                            >
+                              {t('overrides.remove')}
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </TableContent>
+            </TableScrollContainer>
           </Table>
         )}
       </Card.Content>
 
-      <Modal
-        isOpen={editingRole !== null}
-        onOpenChange={(open) => !open && setEditingRole(null)}
-      >
+      <Modal isOpen={editingRole !== null} onOpenChange={(open) => !open && setEditingRole(null)}>
         <ModalBackdrop>
           <ModalContainer size="lg">
             <ModalDialog>
@@ -284,12 +284,7 @@ export function OverridesSection({ globalPolicy }: Props) {
                 <Button variant="ghost" onPress={() => setEditingRole(null)} isDisabled={isSaving}>
                   {t('overrides.cancel')}
                 </Button>
-                <Button
-                  variant="primary"
-                  onPress={handleSave}
-                  isPending={isSaving}
-                  data-testid="policy-override-save"
-                >
+                <Button variant="primary" onPress={handleSave} isPending={isSaving} data-testid="policy-override-save">
                   {t('overrides.save')}
                 </Button>
               </ModalFooter>

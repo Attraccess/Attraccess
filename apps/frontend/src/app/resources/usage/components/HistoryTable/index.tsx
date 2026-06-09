@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Table, TableContent, TableHeader, TableBody, TableRow } from '@heroui/react';
+import { Table, TableScrollContainer, TableContent, TableHeader, TableBody, TableRow } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { generateHeaderColumns } from './utils/tableHeaders';
 import { generateRowCells } from './utils/tableRows';
@@ -85,10 +85,7 @@ export const HistoryTable = ({
     setPage(newPage);
   }, []);
 
-  const {
-    data: usageHistory,
-    error,
-  } = useResourcesServiceResourceUsageGetHistory(
+  const { data: usageHistory, error } = useResourcesServiceResourceUsageGetHistory(
     {
       resourceId,
       page,
@@ -147,37 +144,38 @@ export const HistoryTable = ({
 
   return (
     <>
-    <Table data-cy="resource-usage-history-table">
-      <TableContent aria-label={t('table.ariaLabel')}>
-      <TableHeader>{headerColumns}</TableHeader>
-      <TableBody
-        renderEmptyState={() => <EmptyState />}
-      >
-        {filteredHistory.map((session: ResourceUsage) => (
-          <TableRow
-            key={session.id} id={session.id}
-            className="cursor-pointer hover:bg-primary-50 transition-bg duration-300"
-            onAction={() => onSessionClick(session)}
-          >
-            {resource
-              ? generateRowCells(session, t, resource, showAllUsers, canManageResources, (sessionToRender) => (
-                <ProjectAssignmentCell
-                  session={sessionToRender}
-                  canEdit={Boolean(sessionToRender.endTime) && sessionToRender.userId === user?.id}
-                  projectId={resolveProjectId(sessionToRender)}
-                  isUpdating={Boolean(updatingSessionIds[sessionToRender.id])}
-                  placeholder={projectPlaceholder}
-                  unassignedLabel={projectPlaceholder}
-                  onChange={(projectId) => onProjectChange(sessionToRender, projectId)}
-                />
-              ))
-              : []}
-          </TableRow>
-        ))}
-      </TableBody>
-      </TableContent>
-    </Table>
-    <SimplePagination total={totalPages} page={page} onChange={handlePageChange} />
+      <Table data-cy="resource-usage-history-table">
+        <TableScrollContainer>
+          <TableContent aria-label={t('table.ariaLabel')}>
+            <TableHeader>{headerColumns}</TableHeader>
+            <TableBody renderEmptyState={() => <EmptyState />}>
+              {filteredHistory.map((session: ResourceUsage) => (
+                <TableRow
+                  key={session.id}
+                  id={session.id}
+                  className="cursor-pointer hover:bg-primary-50 transition-bg duration-300"
+                  onAction={() => onSessionClick(session)}
+                >
+                  {resource
+                    ? generateRowCells(session, t, resource, showAllUsers, canManageResources, (sessionToRender) => (
+                        <ProjectAssignmentCell
+                          session={sessionToRender}
+                          canEdit={Boolean(sessionToRender.endTime) && sessionToRender.userId === user?.id}
+                          projectId={resolveProjectId(sessionToRender)}
+                          isUpdating={Boolean(updatingSessionIds[sessionToRender.id])}
+                          placeholder={projectPlaceholder}
+                          unassignedLabel={projectPlaceholder}
+                          onChange={(projectId) => onProjectChange(sessionToRender, projectId)}
+                        />
+                      ))
+                    : []}
+                </TableRow>
+              ))}
+            </TableBody>
+          </TableContent>
+        </TableScrollContainer>
+      </Table>
+      <SimplePagination total={totalPages} page={page} onChange={handlePageChange} />
     </>
   );
 };

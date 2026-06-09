@@ -40,6 +40,9 @@ apps/attractap/hardware/**/dist/
 apps/attractap/hardware/**/.tscircuit/
 apps/attractap/hardware/**/index.circuit.json
 
+# Plugin build staging dir (zip output lives in dist/, covered above)
+apps/plugins/**/package/
+
 bom.json
 .autopilot.json
 .mcp_data/
@@ -49,3 +52,5 @@ bom.json
 .claude/scheduled_tasks.lock
 
 docs/superpowers/
+# test coverage output
+coverage/

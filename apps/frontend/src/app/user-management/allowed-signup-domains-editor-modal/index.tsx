@@ -20,6 +20,7 @@ import {
   TableContent,
   TableHeader,
   TableRow,
+  TableScrollContainer,
   TextField,
   useOverlayState,
 } from '@heroui/react';
@@ -154,28 +155,30 @@ export function AllowedSignupDomainsEditorModal(props: Props) {
           </TextField>
 
           <Table>
-            <TableContent aria-label={t('table.ariaLabel')}>
-              <TableHeader>
-                <TableColumn isRowHeader>{t('table.columns.domain')}</TableColumn>
-                <TableColumn>{t('table.columns.actions')}</TableColumn>
-              </TableHeader>
-              <TableBody
-                items={(editedDomains ?? []).map((domain) => ({ value: domain }))}
-                renderEmptyState={() => <EmptyState />}
-              >
-                {(domain) => (
-                  <TableRow key={domain.value} id={domain.value}>
-                    <TableCell className="w-full">{domain.value}</TableCell>
-                    <TableCell className="flex-row flex">
-                      <Button variant="danger-soft" onPress={() => onRemoveDomain(domain.value)}>
-                        <Trash2Icon className="w-4 h-4" />
-                        {t('table.actions.removeDomain')}
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </TableContent>
+            <TableScrollContainer>
+              <TableContent aria-label={t('table.ariaLabel')}>
+                <TableHeader>
+                  <TableColumn isRowHeader>{t('table.columns.domain')}</TableColumn>
+                  <TableColumn>{t('table.columns.actions')}</TableColumn>
+                </TableHeader>
+                <TableBody
+                  items={(editedDomains ?? []).map((domain) => ({ value: domain }))}
+                  renderEmptyState={() => <EmptyState />}
+                >
+                  {(domain) => (
+                    <TableRow key={domain.value} id={domain.value}>
+                      <TableCell className="w-full">{domain.value}</TableCell>
+                      <TableCell className="flex-row flex">
+                        <Button variant="danger-soft" onPress={() => onRemoveDomain(domain.value)}>
+                          <Trash2Icon className="w-4 h-4" />
+                          {t('table.actions.removeDomain')}
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </TableContent>
+            </TableScrollContainer>
           </Table>
         </DrawerBody>
 

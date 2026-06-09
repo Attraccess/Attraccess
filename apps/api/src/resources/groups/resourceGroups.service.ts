@@ -1,6 +1,6 @@
 import { InjectRepository } from '@nestjs/typeorm';
 import { Inject, Injectable } from '@nestjs/common';
-import { Resource, ResourceGroup } from '@attraccess/database-entities';
+import { Resource, ResourceGroup, ResourceIntroducer, ResourceIntroduction } from '@attraccess/database-entities';
 import { EntityManager, Repository } from 'typeorm';
 import { CreateResourceGroupDto } from './dto/createGroup.dto';
 import { UpdateResourceGroupDto } from './dto/updateGroup.dto';
@@ -14,6 +14,11 @@ interface GetOneSearchOptions {
   id: number;
 }
 
+export interface GroupVisibilityContext {
+  userId: number;
+  canManageResources: boolean;
+}
+
 @Injectable()
 export class ResourceGroupsService {
   constructor(
@@ -21,10 +26,60 @@ export class ResourceGroupsService {
     private readonly resourceGroupRepository: Repository<ResourceGroup>,
     @InjectRepository(Resource)
     private readonly resourceRepository: Repository<Resource>,
+    @InjectRepository(ResourceIntroducer)
+    private readonly resourceIntroducerRepository: Repository<ResourceIntroducer>,
+    @InjectRepository(ResourceIntroduction)
+    private readonly resourceIntroductionRepository: Repository<ResourceIntroduction>,
     @Inject(EventEmitter2)
     private readonly eventEmitter: EventEmitter2,
     private readonly metricsService: MetricsService,
   ) {}
+
+  /**
+   * Whether the user is "part of" the group: an introducer/maintainer of it, or has a currently
+   * valid introduction to it.
+   *
+   * An introduction counts only if its latest history item is a GRANT — revoked introductions keep
+   * their row (and a REVOKE history item) in the database but must not grant visibility.
+   */
+  public async userIsPartOfGroup(groupId: number, userId: number): Promise<boolean> {
+    const introducerCount = await this.resourceIntroducerRepository.count({
+      where: { resourceGroupId: groupId, userId },
+    });
+    if (introducerCount > 0) {
+      return true;
+    }
+
+    const activeIntroductions = await this.resourceIntroductionRepository.query(
+      `SELECT 1 FROM "resource_introduction" "rin"
+       WHERE "rin"."resourceGroupId" = ? AND "rin"."receiverUserId" = ?
+       AND (
+         SELECT "h"."action" FROM "resource_introduction_history_item" "h"
+         WHERE "h"."introductionId" = "rin"."id"
+         ORDER BY "h"."createdAt" DESC, "h"."id" DESC
+         LIMIT 1
+       ) = 'grant'
+       LIMIT 1`,
+      [groupId, userId],
+    );
+    return activeIntroductions.length > 0;
+  }
+
+  /**
+   * SQL fragment (for use against the `group` query-builder alias) that is true when the user has a
+   * currently valid (latest history item = GRANT) introduction to the group. Uses the `:userId`
+   * named parameter.
+   */
+  private static readonly ACTIVE_INTRODUCTION_EXISTS_SQL = `EXISTS (
+    SELECT 1 FROM "resource_introduction" "rin"
+    WHERE "rin"."resourceGroupId" = group.id AND "rin"."receiverUserId" = :userId
+    AND (
+      SELECT "h"."action" FROM "resource_introduction_history_item" "h"
+      WHERE "h"."introductionId" = "rin"."id"
+      ORDER BY "h"."createdAt" DESC, "h"."id" DESC
+      LIMIT 1
+    ) = 'grant'
+  )`;
 
   public async createOne(dto: CreateResourceGroupDto): Promise<ResourceGroup> {
     const resourceGroup = this.resourceGroupRepository.create({
@@ -33,6 +88,7 @@ export class ResourceGroupsService {
       retrainingMaxAgeDays: dto.retrainingMaxAgeDays ?? null,
       retrainingMaxInactivityDays: dto.retrainingMaxInactivityDays ?? null,
       retrainingBlocksAccess: dto.retrainingBlocksAccess ?? false,
+      isHidden: dto.isHidden ?? false,
     });
     const savedResourceGroup = await this.resourceGroupRepository.save(resourceGroup);
     this.eventEmitter.emit(
@@ -43,11 +99,28 @@ export class ResourceGroupsService {
     return savedResourceGroup;
   }
 
-  public async getMany(): Promise<ResourceGroup[]> {
-    return await this.resourceGroupRepository.find();
+  public async getMany(visibility?: GroupVisibilityContext): Promise<ResourceGroup[]> {
+    // Users that can manage resources (and any caller without a visibility context) see every group.
+    if (!visibility || visibility.canManageResources) {
+      return await this.resourceGroupRepository.find();
+    }
+
+    return await this.resourceGroupRepository
+      .createQueryBuilder('group')
+      .where('group.isHidden = :notHidden', { notHidden: false })
+      .orWhere(
+        `EXISTS (SELECT 1 FROM "resource_introducer" "ri" WHERE "ri"."resourceGroupId" = group.id AND "ri"."userId" = :userId)`,
+        { userId: visibility.userId },
+      )
+      .orWhere(ResourceGroupsService.ACTIVE_INTRODUCTION_EXISTS_SQL, { userId: visibility.userId })
+      .getMany();
   }
 
-  public async getOne(searchOptions: GetOneSearchOptions, relations?: string[]): Promise<ResourceGroup> {
+  public async getOne(
+    searchOptions: GetOneSearchOptions,
+    relations?: string[],
+    visibility?: GroupVisibilityContext,
+  ): Promise<ResourceGroup> {
     const group = await this.resourceGroupRepository.findOne({
       where: {
         id: searchOptions.id,
@@ -58,6 +131,14 @@ export class ResourceGroupsService {
 
     if (!group) {
       throw new ResourceGroupNotFoundException({ id: searchOptions.id });
+    }
+
+    // Hidden groups are only visible to managers and users that are part of the group.
+    if (group.isHidden && visibility && !visibility.canManageResources) {
+      const isPartOfGroup = await this.userIsPartOfGroup(group.id, visibility.userId);
+      if (!isPartOfGroup) {
+        throw new ResourceGroupNotFoundException({ id: searchOptions.id });
+      }
     }
 
     return group;
@@ -80,6 +161,7 @@ export class ResourceGroupsService {
         updateDto.retrainingBlocksAccess !== undefined
           ? updateDto.retrainingBlocksAccess
           : resourceGroup.retrainingBlocksAccess,
+      isHidden: updateDto.isHidden !== undefined ? updateDto.isHidden : resourceGroup.isHidden,
     });
     this.eventEmitter.emit(
       ResourceGroupIntroductionChangedEvent.EVENT_NAME,

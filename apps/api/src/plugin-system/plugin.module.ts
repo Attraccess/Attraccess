@@ -9,13 +9,16 @@ import {
   SystemEventHandler,
   SystemEventPayload,
   SystemEventSubscription,
+  MQTT_SERVER_HOST_PROVIDER,
+  MqttServerConnectionConfig,
+  MqttServerHostProvider,
 } from '@attraccess/plugins-backend-sdk';
-import { createRequire } from 'module';
 import { LoadedPluginManifest } from './plugin.manifest';
 import { PluginService } from './plugin.service';
 import { PluginSandboxService } from './plugin-sandbox.service';
 import { PluginEventsService } from './plugin-events.service';
 import { PluginController } from './plugin.controller';
+import { loadPluginEntryExports } from './plugin-loader';
 import { join } from 'path';
 
 @Global()
@@ -89,8 +92,7 @@ export class PluginModule {
       return null;
     }
 
-    const pluginRequire = createRequire(__filename);
-    const importedModule = pluginRequire(
+    const importedModule = loadPluginEntryExports(
       join(PluginService.PLUGIN_PATH, manifest.main.backend.directory, manifest.main.backend.entryPoint)
     );
 
@@ -130,6 +132,13 @@ export class PluginModule {
       },
       emitEvent<E extends SystemEvent>(event: E, payload: SystemEventPayload[E]): void {
         PluginModule.pluginEvents().emit(event, payload);
+      },
+      getMqttServerConfig(serverId: number): Promise<MqttServerConnectionConfig | null> {
+        const provider = PluginModule.requireRef(PluginModule.moduleRef, 'ModuleRef').get<MqttServerHostProvider>(
+          MQTT_SERVER_HOST_PROVIDER,
+          { strict: false }
+        );
+        return provider.getServerConfig(serverId);
       },
     };
 

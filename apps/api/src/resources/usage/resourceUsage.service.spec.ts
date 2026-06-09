@@ -9,10 +9,11 @@ import {
   User,
   ResourceBillingConfiguration,
   ResourceFlowNodeType,
+  SupervisionMode,
 } from '@attraccess/database-entities';
 import { Repository, IsNull, SelectQueryBuilder } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { StartUsageSessionDto } from './dtos/startUsageSession.dto';
 import { EndUsageSessionDto } from './dtos/endUsageSession.dto';
 import { ResourcesService } from '../resources.service';
@@ -29,6 +30,7 @@ import {
   ResourceUsageEvent,
   ResourceUsageTakenOverEvent,
   ResourceUsageNoteAddedEvent,
+  SupervisedUsageStartedEvent,
 } from './events/resource-usage.events';
 import { BillingService } from '../../billing/billing.service';
 import { InsufficientBalanceError } from '../../billing/errors/insufficient-balance.error';
@@ -55,6 +57,7 @@ describe('ResourceUsageService', () => {
   let service: ResourceUsageService;
   let resourceUsageRepository: jest.Mocked<Repository<ResourceUsage>>;
   let resourceRepository: jest.Mocked<Repository<Resource>>;
+  let userRepository: jest.Mocked<Repository<User>>;
   let resourceIntroductionService: jest.Mocked<ResourceIntroductionsService>;
   let resourceIntroducersService: jest.Mocked<ResourceIntroducersService>;
   let resourceGroupsIntroductionsService: jest.Mocked<ResourceGroupsIntroductionsService>;
@@ -192,6 +195,10 @@ describe('ResourceUsageService', () => {
           useFactory: mockRepository,
         },
         {
+          provide: getRepositoryToken(User),
+          useFactory: mockRepository,
+        },
+        {
           provide: ResourcesService,
           useValue: mockResourcesService,
         },
@@ -264,6 +271,7 @@ describe('ResourceUsageService', () => {
     service = module.get<ResourceUsageService>(ResourceUsageService);
     resourceRepository = module.get(getRepositoryToken(Resource));
     resourceUsageRepository = module.get(getRepositoryToken(ResourceUsage));
+    userRepository = module.get(getRepositoryToken(User));
     resourceIntroductionService = module.get(ResourceIntroductionsService);
     resourceIntroducersService = module.get(ResourceIntroducersService);
     resourceGroupsIntroductionsService = module.get(ResourceGroupsIntroductionsService);
@@ -297,6 +305,9 @@ describe('ResourceUsageService', () => {
         }
         if (entity === ResourceUsage) {
           return { findOne: resourceUsageRepository.findOne } as unknown as Repository<ResourceUsage>;
+        }
+        if (entity === User) {
+          return { findOne: userRepository.findOne } as unknown as Repository<User>;
         }
         return { findOne: jest.fn() } as unknown as Repository<unknown>;
       }),
@@ -889,6 +900,148 @@ describe('ResourceUsageService', () => {
     });
   });
 
+  describe('supervised start', () => {
+    const requester: User = { id: 1, username: 'requester' } as User;
+    const supervisor: User = { id: 2, username: 'supervisor' } as User;
+
+    const supervisedResource = (mode: SupervisionMode): Resource =>
+      ({
+        id: 1,
+        name: 'Supervised Resource',
+        allowTakeOver: false,
+        type: ResourceType.Machine,
+        supervisionMode: mode,
+      }) as Resource;
+
+    const mockSuccessfulSessionCreation = (supervisorUserId: number) => {
+      const createdSession = {
+        id: 1,
+        resourceId: 1,
+        userId: 1,
+        usageAction: ResourceUsageAction.Usage,
+        startTime: new Date(),
+        endTime: null,
+        isFinalized: false,
+        supervisorUserId,
+        user: { id: 1 } as User,
+        resource: { id: 1 } as Resource,
+      } as ResourceUsage;
+      const finalizedSession = { ...createdSession, isFinalized: true };
+
+      resourceUsageRepository.findOne
+        .mockResolvedValueOnce(null) // getActiveSession
+        .mockResolvedValueOnce(createdSession) // newly created session
+        .mockResolvedValueOnce(finalizedSession) // finalized session for return
+        .mockResolvedValueOnce(finalizedSession); // emitUsageEvent fetch
+
+      const mockQueryBuilder = createMockQueryBuilder(null);
+      (transactionalEntityManager.createQueryBuilder as jest.Mock).mockReturnValue(
+        mockQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>,
+      );
+      return { finalizedSession, mockQueryBuilder };
+    };
+
+    it('starts a supervised session, sets supervisorUserId, and emits the auto-promotion counter event', async () => {
+      const dto: StartUsageSessionDto = { notes: 'Supervised run' };
+      resourceRepository.findOne.mockResolvedValue(supervisedResource(SupervisionMode.SUPERVISION_ALLOWED));
+      resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(false);
+      userRepository.findOne.mockResolvedValue(supervisor);
+      resourceIntroducersService.canMaintain.mockResolvedValue(true);
+
+      const { finalizedSession, mockQueryBuilder } = mockSuccessfulSessionCreation(2);
+
+      const result = await service.startSession(1, requester, dto, { supervisorUserId: 2 });
+
+      expect(result).toEqual(finalizedSession);
+      expect(mockQueryBuilder.values).toHaveBeenCalledWith(expect.objectContaining({ supervisorUserId: 2 }));
+
+      const counterEmit = eventEmitter.emit.mock.calls.find((c) => c[0] === SupervisedUsageStartedEvent.EVENT_NAME);
+      expect(counterEmit).toBeDefined();
+      const payload = counterEmit?.[1] as SupervisedUsageStartedEvent;
+      expect(payload).toBeInstanceOf(SupervisedUsageStartedEvent);
+      expect(payload).toMatchObject({ resourceId: 1, userId: 1, supervisorUserId: 2 });
+    });
+
+    it('accepts a supervisor authorized via canManageResources even without an introducer role', async () => {
+      const dto: StartUsageSessionDto = {};
+      const adminSupervisor = { id: 2, username: 'admin', systemPermissions: { canManageResources: true } } as User;
+      resourceRepository.findOne.mockResolvedValue(supervisedResource(SupervisionMode.SUPERVISION_ALLOWED));
+      resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(false);
+      userRepository.findOne.mockResolvedValue(adminSupervisor);
+      resourceIntroducersService.canMaintain.mockResolvedValue(false);
+
+      mockSuccessfulSessionCreation(2);
+
+      await expect(service.startSession(1, requester, dto, { supervisorUserId: 2 })).resolves.toMatchObject({
+        supervisorUserId: 2,
+      });
+    });
+
+    it('allows a supervised start on SUPERVISION_REQUIRED even for an introduced user', async () => {
+      const dto: StartUsageSessionDto = {};
+      resourceRepository.findOne.mockResolvedValue(supervisedResource(SupervisionMode.SUPERVISION_REQUIRED));
+      resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(false);
+      userRepository.findOne.mockResolvedValue(supervisor);
+      resourceIntroducersService.canMaintain.mockResolvedValue(true);
+
+      mockSuccessfulSessionCreation(2);
+
+      await expect(service.startSession(1, requester, dto, { supervisorUserId: 2 })).resolves.toMatchObject({
+        supervisorUserId: 2,
+      });
+    });
+
+    it('rejects self-supervision', async () => {
+      resourceRepository.findOne.mockResolvedValue(supervisedResource(SupervisionMode.SUPERVISION_ALLOWED));
+      resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(false);
+
+      await expect(service.startSession(1, requester, {}, { supervisorUserId: requester.id })).rejects.toThrow(
+        new BadRequestException('You cannot supervise your own session'),
+      );
+    });
+
+    it('rejects a supervisor that is neither introducer/maintainer nor resource manager', async () => {
+      resourceRepository.findOne.mockResolvedValue(supervisedResource(SupervisionMode.SUPERVISION_ALLOWED));
+      resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(false);
+      userRepository.findOne.mockResolvedValue(supervisor);
+      resourceIntroducersService.canMaintain.mockResolvedValue(false);
+
+      await expect(service.startSession(1, requester, {}, { supervisorUserId: 2 })).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+    });
+
+    it('rejects a supervised start when the resource does not allow supervision', async () => {
+      resourceRepository.findOne.mockResolvedValue(supervisedResource(SupervisionMode.INTRODUCTION_REQUIRED));
+      resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(false);
+      userRepository.findOne.mockResolvedValue(supervisor);
+
+      await expect(service.startSession(1, requester, {}, { supervisorUserId: 2 })).rejects.toThrow(
+        new BadRequestException('This resource does not support supervised sessions'),
+      );
+    });
+
+    it('rejects an unknown supervisor', async () => {
+      resourceRepository.findOne.mockResolvedValue(supervisedResource(SupervisionMode.SUPERVISION_ALLOWED));
+      resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(false);
+      userRepository.findOne.mockResolvedValue(null);
+
+      await expect(service.startSession(1, requester, {}, { supervisorUserId: 999 })).rejects.toThrow(
+        new NotFoundException('Supervisor with ID 999 not found'),
+      );
+    });
+
+    it('blocks a solo start on SUPERVISION_REQUIRED even for an introduced user', async () => {
+      resourceRepository.findOne.mockResolvedValue(supervisedResource(SupervisionMode.SUPERVISION_REQUIRED));
+      resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(false);
+      resourceIntroductionService.hasValidIntroduction.mockResolvedValue(true);
+
+      await expect(service.startSession(1, requester, {})).rejects.toThrow(
+        new BadRequestException('This resource requires a supervisor; request a supervised session instead'),
+      );
+    });
+  });
+
   describe('getActiveSession', () => {
     it('should return active session when it exists', async () => {
       const mockActiveSession = { id: 1, resourceId: 1, userId: 1, user: { id: 1 } as User } as ResourceUsage;
@@ -903,7 +1056,7 @@ describe('ResourceUsageService', () => {
           endTime: IsNull(),
           isFinalized: true,
         },
-        relations: ['user', 'resource', 'billingTransaction', 'project'],
+        relations: ['user', 'resource', 'billingTransaction', 'project', 'supervisorUser'],
       });
     });
 
@@ -1139,6 +1292,44 @@ describe('ResourceUsageService', () => {
         true,
       );
       await expect(resourceIntroducersService.canMaintain.mock.results.at(-1)?.value).resolves.toBe(true);
+      expect(flowExecutorService.runFlow).toHaveBeenCalledWith(
+        mockActiveSession.resourceId,
+        ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
+        expect.objectContaining({ endNotes: prefixedNotes }),
+        expect.anything(),
+      );
+    });
+
+    it('allows the supervisor of a supervised session to end it without an introducer role', async () => {
+      const dto: EndUsageSessionDto = { notes: 'Supervisor stop' };
+      const sessionOwner = { id: 60, username: 'student' } as User;
+      const supervisorUser = { id: 61, username: 'supervisor' } as User;
+      const mockActiveSession = {
+        id: 9,
+        resourceId: 40,
+        userId: sessionOwner.id,
+        supervisorUserId: supervisorUser.id,
+        startTime: new Date(),
+        user: sessionOwner,
+      } as ResourceUsage;
+      const prefixedNotes = `[By #${supervisorUser.id} - ${supervisorUser.username}] ${dto.notes}`;
+      const mockUpdatedSession = { ...mockActiveSession, endTime: new Date(), endNotes: prefixedNotes };
+
+      resourceUsageRepository.findOne
+        .mockResolvedValueOnce(mockActiveSession)
+        .mockResolvedValueOnce(mockUpdatedSession)
+        .mockResolvedValueOnce(mockUpdatedSession);
+
+      const mockUpdateQueryBuilder = createMockQueryBuilder(null);
+      (transactionalEntityManager.createQueryBuilder as jest.Mock).mockReturnValue(
+        mockUpdateQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>,
+      );
+
+      const result = await service.endSession(mockActiveSession.resourceId, supervisorUser, dto);
+
+      expect(result).toBe(mockUpdatedSession);
+      // The supervisor short-circuits the authorization check; no introducer lookup needed.
+      expect(resourceIntroducersService.canMaintain).not.toHaveBeenCalled();
       expect(flowExecutorService.runFlow).toHaveBeenCalledWith(
         mockActiveSession.resourceId,
         ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,

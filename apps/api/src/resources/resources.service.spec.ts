@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ResourcesService } from './resources.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Resource, DocumentationType, ResourceType } from '@attraccess/database-entities';
+import { Resource, DocumentationType, ResourceType, SupervisionMode } from '@attraccess/database-entities';
 import { Repository, SelectQueryBuilder, Brackets } from 'typeorm';
 import { CreateResourceDto } from './dtos/createResource.dto';
 import { UpdateResourceDto } from './dtos/updateResource.dto';
@@ -535,6 +535,10 @@ describe('ResourcesService', () => {
         retrainingMaxAgeDays: createDto.retrainingMaxAgeDays ?? null,
         retrainingMaxInactivityDays: createDto.retrainingMaxInactivityDays ?? null,
         retrainingBlocksAccess: createDto.retrainingBlocksAccess ?? false,
+        supervisionMode: SupervisionMode.INTRODUCTION_REQUIRED,
+        supervisedUsagesUntilIntroduction: null,
+        autoIntroductionTarget: null,
+        autoIntroductionGroupId: null,
       });
       expect(resourceRepository.save).toHaveBeenCalled();
     });

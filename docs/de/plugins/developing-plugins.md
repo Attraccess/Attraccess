@@ -108,6 +108,7 @@ nennt.
 | `EMIT_EVENTS` | `context.emitEvent(...)` und `context.events.emit(...)` / `emitAsync(...)` -- auf dem geteilten Event-Bus senden. |
 | `LISTEN_EVENTS` | `context.onEvent(...)` und `context.events.on(...)` / `once(...)` / ... -- den geteilten Event-Bus abonnieren. |
 | `RESOLVE_HOST_PROVIDERS` | `context.get(token)` -- beliebige Host-Dienste per Injection-Token auflösen. |
+| `ACCESS_MQTT_SERVERS` | `context.getMqttServerConfig(serverId)` -- Verbindungskonfiguration und aufgelöste (entschlüsselte) Zugangsdaten eines MQTT-Servers lesen. |
 
 `context.manifest` und `context.logger` sind immer verfügbar und benötigen
 keine Berechtigung. Eine unbekannte Berechtigung führt dazu, dass das Plugin
@@ -168,6 +169,32 @@ Sie können ein Plugin erstellen, das sowohl Frontend- als auch Backend-Funktion
 
 > [!NOTE]
 > Für eine allgemeine Einführung in die Attraccess-Architektur und Entwicklungsumgebung siehe den [Entwicklerhandbuch](developer/overview.md).
+
+## Erstanbieter-Plugins (nx-Apps in diesem Repo)
+
+Plugins, die **innerhalb dieses Monorepos** gepflegt werden, sind vollwertige
+**nx-Apps** und teilen sich so Toolchain, Caching und CI des Workspaces.
+
+**Konvention:**
+
+- **Ablageort:** ein Verzeichnis pro Plugin unter `apps/plugins/<name>/`.
+- **nx-Tag:** jede Plugin-App ist in ihrer `project.json` mit **`type:plugin`**
+  getaggt. CI baut und zippt die Menge mit `--projects=tag:type:plugin`; die
+  generischen Lint/Typecheck/Test/Build-Jobs schließen sie über
+  `--exclude=...,tag:type:plugin` aus — analog zu `scope:hardware`.
+- **Build-Rezept:** die esbuild/Vite/zip-Schritte sind über
+  `apps/plugins/scripts/` geteilt und in nx-Targets verdrahtet
+  (`build-backend`, `build-frontend`, `build`, `package`).
+
+```bash
+# Eine Plugin-App bauen und zippen:
+pnpm nx package plugin-rabbitmq
+# Alle Plugin-Apps auflisten:
+pnpm nx show projects --projects=tag:type:plugin
+```
+
+PR-Builds laden die ZIPs als Artefakte hoch (mit Sticky-PR-Kommentar); Releases
+hängen sie als Release-Assets an.
 
 ## Siehe auch
 

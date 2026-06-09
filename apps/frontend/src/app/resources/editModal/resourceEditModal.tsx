@@ -23,6 +23,7 @@ import {
   useResourcesServiceCreateOneResource,
   ResourceType,
   useResourcesServiceGetAllResourcesKey,
+  SupervisionMode,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToastMessage } from '../../../components/toastProvider';
@@ -31,6 +32,7 @@ import { SharedDataTab } from './tabs/shared';
 import { MachineTab } from './tabs/machine';
 import { DoorTab } from './tabs/door';
 import { RetrainingTab } from './tabs/retraining';
+import { SupervisionTab } from './tabs/supervision';
 import { ResourceMetadataEditor } from './resourceMetadataEditor';
 
 type ResourceFormData = Omit<UpdateResourceDto, 'metadata'> & {
@@ -66,6 +68,10 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
     retrainingMaxAgeDays: null,
     retrainingMaxInactivityDays: null,
     retrainingBlocksAccess: false,
+    supervisionMode: SupervisionMode.INTRODUCTION_REQUIRED,
+    supervisedUsagesUntilIntroduction: null,
+    autoIntroductionTarget: null,
+    autoIntroductionGroupId: null,
     metadata: {} as Record<string, unknown>,
   });
 
@@ -158,6 +164,10 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
       retrainingMaxAgeDays: resource?.retrainingMaxAgeDays ?? null,
       retrainingMaxInactivityDays: resource?.retrainingMaxInactivityDays ?? null,
       retrainingBlocksAccess: resource?.retrainingBlocksAccess ?? false,
+      supervisionMode: resource?.supervisionMode ?? SupervisionMode.INTRODUCTION_REQUIRED,
+      supervisedUsagesUntilIntroduction: resource?.supervisedUsagesUntilIntroduction ?? null,
+      autoIntroductionTarget: resource?.autoIntroductionTarget ?? null,
+      autoIntroductionGroupId: resource?.autoIntroductionGroupId ?? null,
       metadata: (resource?.metadata ?? {}) as Record<string, unknown>,
     });
     setSelectedImage(null);
@@ -194,6 +204,10 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
           retrainingMaxAgeDays: formData.retrainingMaxAgeDays,
           retrainingMaxInactivityDays: formData.retrainingMaxInactivityDays,
           retrainingBlocksAccess: formData.retrainingBlocksAccess,
+          supervisionMode: formData.supervisionMode,
+          supervisedUsagesUntilIntroduction: formData.supervisedUsagesUntilIntroduction,
+          autoIntroductionTarget: formData.autoIntroductionTarget,
+          autoIntroductionGroupId: formData.autoIntroductionGroupId,
           metadata: formData.metadata as Record<string, unknown>,
         },
       });
@@ -211,6 +225,10 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
         retrainingMaxAgeDays: formData.retrainingMaxAgeDays,
         retrainingMaxInactivityDays: formData.retrainingMaxInactivityDays,
         retrainingBlocksAccess: formData.retrainingBlocksAccess,
+        supervisionMode: formData.supervisionMode,
+        supervisedUsagesUntilIntroduction: formData.supervisedUsagesUntilIntroduction,
+        autoIntroductionTarget: formData.autoIntroductionTarget,
+        autoIntroductionGroupId: formData.autoIntroductionGroupId,
         metadata: formData.metadata as Record<string, unknown>,
       },
     });
@@ -264,6 +282,11 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
               <div className="flex flex-col gap-2 w-full">
                 <h3 className="text-small font-semibold">{t('inputs.retraining.sectionTitle')}</h3>
                 <RetrainingTab t={t} formData={formData} setField={setField} resource={resource} />
+              </div>
+
+              <div className="flex flex-col gap-2 w-full">
+                <h3 className="text-small font-semibold">{t('inputs.supervision.sectionTitle')}</h3>
+                <SupervisionTab t={t} formData={formData} setField={setField} resource={resource} />
               </div>
 
               <ResourceMetadataEditor

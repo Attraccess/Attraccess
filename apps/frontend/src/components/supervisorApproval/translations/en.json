@@ -1,0 +1,19 @@
+{
+  "title": "Supervision request",
+  "description": "A user wants to start a supervised session on {{resource}}.",
+  "requesterRole": "Requesting user",
+  "notesLabel": "Notes",
+  "countdown": "Expires in {{seconds}}s",
+  "approve": "Approve",
+  "reject": "Reject",
+  "toast": {
+    "approved": {
+      "title": "Session approved",
+      "description": "The supervised session has been started."
+    },
+    "error": {
+      "title": "Could not approve",
+      "description": "The request may have expired. Please try again."
+    }
+  }
+}

@@ -31,6 +31,17 @@ function buildBaseContext(events: EventEmitter2): PluginContext {
     get: (token) => ({ token } as never),
     onEvent: () => ({ off: () => undefined }),
     emitEvent: () => undefined,
+    getMqttServerConfig: (serverId) =>
+      Promise.resolve({
+        id: serverId,
+        name: 'srv',
+        host: 'mqtt.example.com',
+        port: 1883,
+        useTls: false,
+        username: 'u',
+        password: 'secret',
+        clientId: null,
+      }),
   };
 }
 
@@ -194,6 +205,31 @@ describe('PluginSandboxService', () => {
         PluginPermission.RESOLVE_HOST_PROVIDERS,
       ]);
       expect(() => granted.get('SOME_TOKEN')).not.toThrow();
+    });
+
+    it('gates getMqttServerConfig() behind ACCESS_MQTT_SERVERS', async () => {
+      const denied = PluginSandboxService.createGuardedContext(buildBaseContext(events), []);
+      expect(() => denied.getMqttServerConfig(1)).toThrow(PluginPermissionError);
+      expect(() => denied.getMqttServerConfig(1)).toThrow(/ACCESS_MQTT_SERVERS/);
+    });
+
+    it('returns the resolved MQTT config with ACCESS_MQTT_SERVERS', async () => {
+      const granted = PluginSandboxService.createGuardedContext(buildBaseContext(events), [
+        PluginPermission.ACCESS_MQTT_SERVERS,
+      ]);
+      await expect(granted.getMqttServerConfig(7)).resolves.toMatchObject({
+        id: 7,
+        host: 'mqtt.example.com',
+        port: 1883,
+        password: 'secret',
+      });
+    });
+
+    it('does not unlock getMqttServerConfig via RESOLVE_HOST_PROVIDERS', () => {
+      const ctx = PluginSandboxService.createGuardedContext(buildBaseContext(events), [
+        PluginPermission.RESOLVE_HOST_PROVIDERS,
+      ]);
+      expect(() => ctx.getMqttServerConfig(1)).toThrow(/ACCESS_MQTT_SERVERS/);
     });
   });
 });

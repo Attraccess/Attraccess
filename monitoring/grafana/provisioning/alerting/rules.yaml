@@ -1,7 +1,8 @@
 apiVersion: 1
 
 # Grafana-managed alert rules that query the Prometheus datasource and route to
-# Pushover via the notification policy. These mirror monitoring/prometheus/alerts.yml.
+# Pushover via the notification policy. These are the single source of truth for
+# alerting (Prometheus rule_files are not used).
 # The PromQL comparison is moved into a Grafana threshold expression (refId C) so
 # the query (refId A) returns the raw value Grafana can evaluate.
 groups:
@@ -213,14 +214,14 @@ groups:
       - uid: high-failed-login-rate
         title: HighFailedLoginRate
         condition: C
-        for: 5m
+        for: 2m
         noDataState: NoData
         execErrState: Error
         labels:
           severity: warning
         annotations:
-          summary: "High rate of failed login attempts"
-          description: "More than 1 failed login attempt per second over the last 5 minutes."
+          summary: "High number of failed login attempts"
+          description: "More than 10 failed login attempts in the last 5 minutes — possible brute-force or credential-stuffing attack."
         data:
           - refId: A
             relativeTimeRange:
@@ -229,7 +230,7 @@ groups:
             datasourceUid: attraccess-prometheus
             model:
               refId: A
-              expr: 'sum(rate(attraccess_auth_login_total{job="attraccess", status="fail"}[5m]))'
+              expr: 'sum(increase(attraccess_auth_login_total{job="attraccess", status="fail"}[5m]))'
               instant: true
               range: false
               datasource:
@@ -251,7 +252,7 @@ groups:
                 - type: query
                   evaluator:
                     type: gt
-                    params: [1]
+                    params: [10]
                   operator:
                     type: and
                   query:
@@ -302,6 +303,506 @@ groups:
                   evaluator:
                     type: gt
                     params: [0]
+                  operator:
+                    type: and
+                  query:
+                    params: []
+                  reducer:
+                    type: last
+                    params: []
+
+      - uid: attractap-all-readers-offline
+        title: AttractapAllReadersOffline
+        condition: C
+        for: 5m
+        noDataState: NoData
+        execErrState: Error
+        labels:
+          severity: critical
+        annotations:
+          summary: "All Attractap readers offline"
+          description: "No Attractap readers have been connected for 5 minutes, but at least one was connected within the last hour. Check reader power/network."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: attraccess-prometheus
+            model:
+              refId: A
+              expr: 'attraccess_attractap_devices_connected{job="attraccess"} == 0 and max_over_time(attraccess_attractap_devices_connected{job="attraccess"}[1h]) > 0'
+              instant: true
+              range: false
+              datasource:
+                type: prometheus
+                uid: attraccess-prometheus
+          - refId: C
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - type: query
+                  evaluator:
+                    type: lt
+                    params: [1]
+                  operator:
+                    type: and
+                  query:
+                    params: []
+                  reducer:
+                    type: last
+                    params: []
+
+      - uid: attractap-reader-crashes
+        title: AttractapReaderCrashes
+        condition: C
+        for: 5m
+        noDataState: NoData
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: "Attractap readers crashing"
+          description: "More than 3 reader crash reports were received in the last hour."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: attraccess-prometheus
+            model:
+              refId: A
+              expr: 'sum(increase(attraccess_attractap_crash_reports_total{job="attraccess"}[1h]))'
+              instant: true
+              range: false
+              datasource:
+                type: prometheus
+                uid: attraccess-prometheus
+          - refId: C
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - type: query
+                  evaluator:
+                    type: gt
+                    params: [3]
+                  operator:
+                    type: and
+                  query:
+                    params: []
+                  reducer:
+                    type: last
+                    params: []
+
+      - uid: cron-job-failing
+        title: CronJobFailing
+        condition: C
+        for: 5m
+        noDataState: NoData
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: "Cron job failing"
+          description: "Cron job {{ $labels.job_name }} has recorded failures in the last 15 minutes."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 900
+              to: 0
+            datasourceUid: attraccess-prometheus
+            model:
+              refId: A
+              expr: 'sum by (job_name) (increase(attraccess_cron_job_runs_total{job="attraccess", status="failure"}[15m]))'
+              instant: true
+              range: false
+              datasource:
+                type: prometheus
+                uid: attraccess-prometheus
+          - refId: C
+            relativeTimeRange:
+              from: 900
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - type: query
+                  evaluator:
+                    type: gt
+                    params: [0]
+                  operator:
+                    type: and
+                  query:
+                    params: []
+                  reducer:
+                    type: last
+                    params: []
+
+      - uid: cron-job-stale
+        title: CronJobStale
+        condition: C
+        for: 10m
+        noDataState: NoData
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: "Cron job has not succeeded recently"
+          description: "Cron job {{ $labels.job_name }} has not completed successfully in over 25 hours."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: attraccess-prometheus
+            model:
+              refId: A
+              expr: 'time() - attraccess_cron_job_last_success_timestamp_seconds{job="attraccess"}'
+              instant: true
+              range: false
+              datasource:
+                type: prometheus
+                uid: attraccess-prometheus
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - type: query
+                  evaluator:
+                    type: gt
+                    params: [90000]
+                  operator:
+                    type: and
+                  query:
+                    params: []
+                  reducer:
+                    type: last
+                    params: []
+
+      - uid: flow-execution-failures
+        title: FlowExecutionFailures
+        condition: C
+        for: 10m
+        noDataState: NoData
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: "Resource flow executions failing"
+          description: "Flow trigger {{ $labels.trigger_type }} is failing at more than 0.1/s over the last 15 minutes."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 900
+              to: 0
+            datasourceUid: attraccess-prometheus
+            model:
+              refId: A
+              expr: 'sum by (trigger_type) (rate(attraccess_flow_executions_total{job="attraccess", status="failure"}[15m]))'
+              instant: true
+              range: false
+              datasource:
+                type: prometheus
+                uid: attraccess-prometheus
+          - refId: C
+            relativeTimeRange:
+              from: 900
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - type: query
+                  evaluator:
+                    type: gt
+                    params: [0.1]
+                  operator:
+                    type: and
+                  query:
+                    params: []
+                  reducer:
+                    type: last
+                    params: []
+
+      - uid: external-call-errors
+        title: ExternalCallErrors
+        condition: C
+        for: 10m
+        noDataState: NoData
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: "External service call errors"
+          description: "Outbound calls to {{ $labels.target }} are erroring at more than 0.2/s over the last 5 minutes."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: attraccess-prometheus
+            model:
+              refId: A
+              expr: 'sum by (target) (rate(attraccess_external_call_errors_total{job="attraccess"}[5m]))'
+              instant: true
+              range: false
+              datasource:
+                type: prometheus
+                uid: attraccess-prometheus
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - type: query
+                  evaluator:
+                    type: gt
+                    params: [0.2]
+                  operator:
+                    type: and
+                  query:
+                    params: []
+                  reducer:
+                    type: last
+                    params: []
+
+      - uid: mqtt-servers-unhealthy
+        title: MqttServersUnhealthy
+        condition: C
+        for: 10m
+        noDataState: NoData
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: "MQTT servers unhealthy"
+          description: "One or more configured MQTT servers are not healthy."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: attraccess-prometheus
+            model:
+              refId: A
+              expr: '(attraccess_mqtt_servers_total{job="attraccess"} - attraccess_mqtt_servers_healthy{job="attraccess"})'
+              instant: true
+              range: false
+              datasource:
+                type: prometheus
+                uid: attraccess-prometheus
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - type: query
+                  evaluator:
+                    type: gt
+                    params: [0]
+                  operator:
+                    type: and
+                  query:
+                    params: []
+                  reducer:
+                    type: last
+                    params: []
+
+      - uid: email-delivery-failures
+        title: EmailDeliveryFailures
+        condition: C
+        for: 15m
+        noDataState: NoData
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: "Email delivery failing"
+          description: "Email sending is failing at more than 0.1/s over the last 15 minutes."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 900
+              to: 0
+            datasourceUid: attraccess-prometheus
+            model:
+              refId: A
+              expr: 'sum(rate(attraccess_email_sent_total{job="attraccess", status="fail"}[15m]))'
+              instant: true
+              range: false
+              datasource:
+                type: prometheus
+                uid: attraccess-prometheus
+          - refId: C
+            relativeTimeRange:
+              from: 900
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - type: query
+                  evaluator:
+                    type: gt
+                    params: [0.1]
+                  operator:
+                    type: and
+                  query:
+                    params: []
+                  reducer:
+                    type: last
+                    params: []
+
+      - uid: high-event-loop-lag
+        title: HighEventLoopLag
+        condition: C
+        for: 5m
+        noDataState: NoData
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: "High Node.js event loop lag"
+          description: "The Node.js event loop lag has exceeded 0.5s for 5 minutes — the API may be CPU-saturated."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: attraccess-prometheus
+            model:
+              refId: A
+              expr: 'nodejs_eventloop_lag_seconds{job="attraccess"}'
+              instant: true
+              range: false
+              datasource:
+                type: prometheus
+                uid: attraccess-prometheus
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - type: query
+                  evaluator:
+                    type: gt
+                    params: [0.5]
+                  operator:
+                    type: and
+                  query:
+                    params: []
+                  reducer:
+                    type: last
+                    params: []
+
+      - uid: high-memory-usage
+        title: HighMemoryUsage
+        condition: C
+        for: 10m
+        noDataState: NoData
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: "High heap memory usage"
+          description: "V8 heap usage has been above 90% for 10 minutes."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: attraccess-prometheus
+            model:
+              refId: A
+              expr: 'nodejs_heap_size_used_bytes{job="attraccess"} / nodejs_heap_size_total_bytes{job="attraccess"}'
+              instant: true
+              range: false
+              datasource:
+                type: prometheus
+                uid: attraccess-prometheus
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - type: query
+                  evaluator:
+                    type: gt
+                    params: [0.9]
                   operator:
                     type: and
                   query:

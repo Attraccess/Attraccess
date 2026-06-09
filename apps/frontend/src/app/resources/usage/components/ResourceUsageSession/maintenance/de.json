@@ -6,7 +6,8 @@
       "label": "Begründung",
       "noReason": "Keine Begründung"
     },
-    "noDate": "Datum nicht bekannt"
+    "noDate": "Datum nicht bekannt",
+    "markDone": "Wartung als erledigt markieren"
   },
   "maintainers": "Benutzer, die Wartungsarbeiten durchführen dürfen"
 }

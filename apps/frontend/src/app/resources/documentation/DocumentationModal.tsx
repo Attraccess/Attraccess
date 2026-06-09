@@ -114,16 +114,22 @@ function DocumentationModalComponent({ resourceId, children }: Readonly<Document
     return <p className="text-center text-default-400 p-4">{t('noDocumentation')}</p>;
   }, [isLoading, isFetching, isError, error, resource, refetch, t]);
 
-  const modalSize = isFullscreen ? 'full' : 'lg';
-
   return (
     <>
       {children(open)}
 
       <Modal isOpen={isOpen} onOpenChange={setOpen} data-cy="documentation-modal">
         <ModalBackdrop>
-          <ModalContainer size={modalSize}>
-            <ModalDialog>
+          <ModalContainer size={isFullscreen ? 'full' : 'lg'}>
+            {/*
+              The "lg" size only caps max-width; a documentation URL renders in an
+              iframe that has no intrinsic width, so the dialog would otherwise
+              collapse to a narrow column. Force a wide, viewport-bounded width
+              (overriding the size's max-width) so websites are actually readable.
+              On phones the dialog fills the available width; from `sm` up it grows
+              to a fixed wide size (the modal container is only width-fit there).
+            */}
+            <ModalDialog className={isFullscreen ? undefined : 'w-full max-w-[95vw] sm:w-[72rem]'}>
               {({ close }) => (
                 <>
                   <ModalHeader className="flex justify-between items-center">

@@ -180,6 +180,7 @@ export class MetricsService implements OnModuleInit {
     this.attractapCrashReportsTotal = new Counter({
       name: 'attraccess_attractap_crash_reports_total',
       help: 'Total number of crash reports received from Attractap readers',
+      labelNames: ['reset_reason'],
       registers: [this.registry],
     });
 

@@ -1,7 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsString, IsOptional, IsEnum, IsUrl, ValidateIf, IsBoolean, IsObject, IsInt, Min } from 'class-validator';
 import { FileUpload } from '../../common/types/file-upload.types';
-import { DocumentationType, ResourceType } from '@attraccess/database-entities';
+import {
+  AutoIntroductionTarget,
+  DocumentationType,
+  ResourceType,
+  SupervisionMode,
+} from '@attraccess/database-entities';
 import { ToBoolean, ToJson, ToNumber } from '../../common/request-transformers';
 
 export class UpdateResourceDto {
@@ -160,4 +165,56 @@ export class UpdateResourceDto {
   @ToBoolean()
   @IsOptional()
   retrainingBlocksAccess?: boolean;
+
+  @ApiProperty({
+    description: 'Controls who may start a usage session on this resource',
+    required: false,
+    enum: SupervisionMode,
+    enumName: 'SupervisionMode',
+    example: SupervisionMode.INTRODUCTION_REQUIRED,
+  })
+  @IsEnum(SupervisionMode)
+  @IsOptional()
+  supervisionMode?: SupervisionMode;
+
+  @ApiProperty({
+    description:
+      'Automatically create an introduction after this many supervised sessions. Null disables auto-promotion.',
+    required: false,
+    nullable: true,
+    example: 3,
+    type: Number,
+  })
+  @ToNumber()
+  @ValidateIf((o) => o.supervisedUsagesUntilIntroduction !== null && o.supervisedUsagesUntilIntroduction !== undefined)
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  supervisedUsagesUntilIntroduction?: number | null;
+
+  @ApiProperty({
+    description: 'Target of the auto-created introduction once the supervised-usage threshold is reached',
+    required: false,
+    nullable: true,
+    enum: AutoIntroductionTarget,
+    enumName: 'AutoIntroductionTarget',
+    example: AutoIntroductionTarget.RESOURCE,
+  })
+  @IsEnum(AutoIntroductionTarget)
+  @IsOptional()
+  autoIntroductionTarget?: AutoIntroductionTarget | null;
+
+  @ApiProperty({
+    description: 'The group the auto-introduction targets when autoIntroductionTarget is GROUP',
+    required: false,
+    nullable: true,
+    example: 1,
+    type: Number,
+  })
+  @ToNumber()
+  @ValidateIf((o) => o.autoIntroductionGroupId !== null && o.autoIntroductionGroupId !== undefined)
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  autoIntroductionGroupId?: number | null;
 }

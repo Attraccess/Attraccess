@@ -4,7 +4,16 @@ import { PassportModule } from '@nestjs/passport';
 
 // Services and Controllers
 import { UsersService } from './users/users.service';
-import { UsersController } from './users/users.controller';
+import { UsersRegistrationController } from './users/users-registration.controller';
+import { UserInvitationsController } from './users/user-invitations.controller';
+import { UserProfileController } from './users/user-profile.controller';
+import { UsersAdminController } from './users/users-admin.controller';
+import { UserPermissionsController } from './users/user-permissions.controller';
+import { SignupDomainService } from './users/signup-domain.service';
+import { UserRegistrationService } from './users/user-registration.service';
+import { UserPasswordService } from './users/user-password.service';
+import { UserInvitationService } from './users/user-invitation.service';
+import { UserPermissionsService } from './users/user-permissions.service';
 import { AuthService } from './auth/auth.service';
 import { AuthController } from './auth/auth.controller';
 import { TwoFactorController } from './auth/two-factor.controller';
@@ -70,6 +79,11 @@ import { PasswordPolicyModule } from './password-policy/password-policy.module';
   ],
   providers: [
     UsersService,
+    SignupDomainService,
+    UserRegistrationService,
+    UserPasswordService,
+    UserInvitationService,
+    UserPermissionsService,
     AuthService,
     SessionService,
     TwoFactorService,
@@ -110,7 +124,22 @@ import { PasswordPolicyModule } from './password-policy/password-policy.module';
       inject: [ModuleRef, SettingsService, OidcCookieStateStore],
     },
   ],
-  controllers: [UsersController, AuthController, TwoFactorController, SSOController],
+  // Controller order is load-bearing: NestJS registers routes per-controller in
+  // array order, and Express matches first-registered-wins. Controllers holding
+  // static GET/PATCH routes (me, local-signup-*) MUST precede the ones holding
+  // ':id'/':id/*' routes so those static paths are not shadowed by ':id'.
+  // UserPermissionsController is intentionally kept last so GET 'with-permission'
+  // stays shadowed by GET ':id' — preserving the existing (pre-refactor) behavior.
+  controllers: [
+    UsersRegistrationController,
+    UserInvitationsController,
+    UserProfileController,
+    UsersAdminController,
+    UserPermissionsController,
+    AuthController,
+    TwoFactorController,
+    SSOController,
+  ],
   exports: [UsersService, AuthService, SessionService, BruteForceProtectionService, AuthAuditLogger],
 })
 export class UsersAndAuthModule {}

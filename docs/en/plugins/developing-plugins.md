@@ -60,6 +60,7 @@ versions it supports, and the permissions it needs:
 | `name` | yes | Unique identifier; also the on-disk folder name. |
 | `version` | yes | Your plugin's semantic version. |
 | `main.backend` / `main.frontend` | at least one | `directory` + `entryPoint`, relative to the ZIP root. |
+| `main.migrations` | no | `directory` + `entryPoint` of a module exporting TypeORM migration classes. See [Database Migrations](plugins/database-migrations.md). |
 | `attraccessVersion` | yes | Compatibility range — at least one of `min`, `max`, `exact`. |
 | `permissions` | no | Backend capabilities you need (see [Permissions](#backend-plugin-permissions)). Defaults to `[]`. |
 
@@ -150,6 +151,7 @@ export default plugin;
 | `context.emitEvent(event, payload)` | Emit a typed `SystemEvent`. | `EMIT_EVENTS` |
 | `context.events` | The raw shared event bus (restricted surface). | per-method |
 | `context.get(token)` | Resolve an arbitrary host provider by token. | `RESOLVE_HOST_PROVIDERS` |
+| `context.getMqttServerConfig(serverId)` | Resolve an MQTT server's connection config + resolved (decrypted) credentials. | `ACCESS_MQTT_SERVERS` |
 
 > [!IMPORTANT]
 > Resolve services and repositories through `context`, never by re-initialising
@@ -173,6 +175,7 @@ naming the missing permission.
 | `EMIT_EVENTS` | `context.emitEvent(...)` and `context.events.emit(...)` / `emitAsync(...)`. |
 | `LISTEN_EVENTS` | `context.onEvent(...)` and `context.events.on(...)` / `once(...)` / ... |
 | `RESOLVE_HOST_PROVIDERS` | `context.get(token)` — resolve arbitrary host services by token. |
+| `ACCESS_MQTT_SERVERS` | `context.getMqttServerConfig(serverId)` — read an MQTT server's connection config and resolved credentials. |
 
 A few notes on the boundary:
 
@@ -421,6 +424,51 @@ Then upload it:
 
 See [Installing Plugins](plugins/installing-plugins.md) for managing and removing
 plugins.
+
+## First-party plugins (nx apps in this repo)
+
+Third-party plugins are standalone packages built with their own `build.mjs`
+(see [`examples/plugin-hello-world`](https://github.com/Attraccess/Attraccess/tree/main/examples/plugin-hello-world)).
+Plugins maintained **inside this monorepo** are instead first-class **nx apps**,
+so they share the workspace toolchain, caching and CI.
+
+**Convention:**
+
+- **Location:** one directory per plugin under `apps/plugins/<name>/`, with the
+  same anatomy as any plugin (`plugin.json`, `backend/plugin.ts`,
+  `frontend/src/plugin.tsx`, …).
+- **nx tag:** every plugin app is tagged **`type:plugin`** in its `project.json`.
+  CI targets the set with `--projects=tag:type:plugin` (build + zip the plugins)
+  and the generic lint/typecheck/test/build jobs exclude it with
+  `--exclude=...,tag:type:plugin`, exactly mirroring how `scope:hardware` is
+  handled. List the plugin apps any time with:
+
+  ```bash
+  pnpm nx show projects --projects=tag:type:plugin
+  ```
+
+- **Build recipe:** the esbuild/Vite/zip recipe described above is shared across
+  plugin apps via `apps/plugins/scripts/` (`esbuild-backend.mjs`,
+  `vite-federation.config.mjs`, `zip-plugin.mjs`). Each plugin's `project.json`
+  wires them into nx targets:
+
+  | Target | Produces |
+  |--------|----------|
+  | `build-backend` | `package/dist/index.js` (esbuild, CommonJS, host packages externalized) |
+  | `build-frontend` | `package/frontend/remoteEntry.js` (Vite federation remote) |
+  | `build` | copies `plugin.json` into `package/` (depends on the two builds) |
+  | `package` | `dist/plugin-<name>.zip` — the uploadable artifact (depends on `build`) |
+
+  ```bash
+  # Build and zip a single plugin app:
+  pnpm nx package plugin-rabbitmq
+  # …or every plugin app at once:
+  pnpm nx run-many --target=package --projects=tag:type:plugin
+  ```
+
+- **CI:** pull-request builds zip all `tag:type:plugin` apps, upload the ZIPs as
+  workflow artifacts, and post a sticky PR comment listing them. Releases attach
+  the same ZIPs as release assets.
 
 ## See Also
 

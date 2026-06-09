@@ -1,4 +1,4 @@
-import { DocumentationType, Resource, ResourceType } from '@attraccess/database-entities';
+import { DocumentationType, Resource, ResourceType, SupervisionMode } from '@attraccess/database-entities';
 
 export function createMockResource(overrides: Partial<Resource> = {}): Resource {
   const now = new Date();
@@ -16,6 +16,11 @@ export function createMockResource(overrides: Partial<Resource> = {}): Resource 
     retrainingMaxAgeDays: null,
     retrainingMaxInactivityDays: null,
     retrainingBlocksAccess: false,
+    supervisionMode: SupervisionMode.INTRODUCTION_REQUIRED,
+    supervisedUsagesUntilIntroduction: null,
+    autoIntroductionTarget: null,
+    autoIntroductionGroupId: null,
+    autoIntroductionGroup: null,
     metadata: null,
     createdAt: now,
     updatedAt: now,

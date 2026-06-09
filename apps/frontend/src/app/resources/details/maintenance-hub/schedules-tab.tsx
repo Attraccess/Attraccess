@@ -11,6 +11,7 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { ScheduleAccordionItem } from './schedule-accordion-item';
 import { DeleteConfirmationModal } from '../../../../components/deleteConfirmationModal';
+import { SectionCard } from './section-card';
 import de from './de.json';
 import en from './en.json';
 
@@ -39,31 +40,31 @@ export function SchedulesTab(props: Props) {
       },
     });
 
-  if (isLoading) {
-    return (
-      <div className="flex flex-col gap-2">
-        <Skeleton className="h-12 rounded-md" />
-        <Skeleton className="h-12 rounded-md" />
-        <Skeleton className="h-12 rounded-md" />
-      </div>
-    );
-  }
+  const renderBody = () => {
+    if (isLoading) {
+      return (
+        <div className="flex flex-col gap-2">
+          <Skeleton className="h-12 rounded-md" />
+          <Skeleton className="h-12 rounded-md" />
+          <Skeleton className="h-12 rounded-md" />
+        </div>
+      );
+    }
 
-  if (schedules.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12 gap-4">
-        <CalendarClockIcon className="w-12 h-12 text-default-400" />
-        <p className="text-default-600">{t('schedules.empty')}</p>
-        <Button variant="primary" onPress={onCreate}>
-          <PlusIcon className="w-4 h-4" />
-          {t('schedules.addFirst')}
-        </Button>
-      </div>
-    );
-  }
+    if (schedules.length === 0) {
+      return (
+        <div className="flex flex-col items-center justify-center py-8 gap-4 text-center">
+          <CalendarClockIcon className="w-12 h-12 text-default-400" />
+          <p className="text-default-600">{t('schedules.empty')}</p>
+          <Button variant="primary" onPress={onCreate}>
+            <PlusIcon className="w-4 h-4" />
+            {t('schedules.addFirst')}
+          </Button>
+        </div>
+      );
+    }
 
-  return (
-    <>
+    return (
       <Accordion>
         {schedules.map((schedule) => (
           <ScheduleAccordionItem
@@ -75,6 +76,16 @@ export function SchedulesTab(props: Props) {
           />
         ))}
       </Accordion>
+    );
+  };
+
+  return (
+    <SectionCard
+      icon={<CalendarClockIcon className="w-4 h-4 text-default-500" />}
+      title={t('tabs.schedules')}
+      count={schedules.length}
+    >
+      {renderBody()}
 
       <DeleteConfirmationModal
         isOpen={deleteTarget != null}
@@ -87,6 +98,6 @@ export function SchedulesTab(props: Props) {
         itemName={deleteTarget?.name ?? ''}
         isDeleting={isDeleting}
       />
-    </>
+    </SectionCard>
   );
 }

@@ -13,5 +13,6 @@
       "description": "Beenden Sie die Sitzung und geben Sie Notizen an."
     }
   },
-  "project": "Projekt"
+  "project": "Projekt",
+  "supervisedBy": "Beaufsichtigt von"
 }
