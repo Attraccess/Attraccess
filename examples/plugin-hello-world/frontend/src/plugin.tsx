@@ -181,10 +181,19 @@ function CapabilitiesPage() {
 }
 
 // Host slot ids exposed by the MQTT UI. These are documented host strings (the
-// SDK is vendor-agnostic and does not export them); a plugin targets them the
-// same way it targets a route `path`. Both slots receive `{ mqttServerId }`.
+// SDK is vendor-agnostic and does not export them, and the host owns them in
+// apps/frontend, which a plugin cannot import — so a plugin restates them, the
+// same way it restates a route `path` it links to). Both slots receive
+// `{ mqttServerId }`, declared here so each `render` is typed end-to-end with
+// no runtime casting.
 const MQTT_SERVER_DETAIL_SLOT = 'mqtt.server.detail';
 const MQTT_SERVER_LIST_ROW_SLOT = 'mqtt.server.list.row';
+
+// The context shape the host documents for both MQTT slots.
+interface MqttServerSlotContext {
+  mqttServerId: number;
+  [key: string]: unknown;
+}
 
 // Embedded into the MQTT server detail view through the generic slot mechanism.
 // Reads the host-supplied context to scope itself to the selected server.
@@ -291,17 +300,22 @@ export default class HelloWorldPlugin implements AttraccessFrontendPlugin {
   // The host stays unaware of what we render — this is the RabbitMQ-agnostic
   // extension point a real MQTT-broker plugin would build its UI on.
   getSlotContributions(): PluginSlotContribution[] {
-    return [
+    // Each contribution types its render against the slot's documented context
+    // (MqttServerSlotContext), so `context.mqttServerId` is a number with no
+    // cast. A differently-typed contribution still fits the array's element
+    // type (PluginSlotContribution<PluginSlotContext>).
+    const contributions: PluginSlotContribution<MqttServerSlotContext>[] = [
       {
         slotId: MQTT_SERVER_DETAIL_SLOT,
         key: 'hello-world-mqtt-detail',
-        render: (context) => <MqttServerDetailExtension mqttServerId={Number(context.mqttServerId)} />,
+        render: (context) => <MqttServerDetailExtension mqttServerId={context.mqttServerId} />,
       },
       {
         slotId: MQTT_SERVER_LIST_ROW_SLOT,
         key: 'hello-world-mqtt-list-row',
-        render: (context) => <MqttServerListBadge mqttServerId={Number(context.mqttServerId)} />,
+        render: (context) => <MqttServerListBadge mqttServerId={context.mqttServerId} />,
       },
     ];
+    return contributions;
   }
 }

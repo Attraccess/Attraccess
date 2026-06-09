@@ -21,12 +21,20 @@ export type PluginSlotId = string;
 // host documents the keys it provides per slot; plugins narrow as needed.
 export type PluginSlotContext = Record<string, unknown>;
 
-export interface PluginSlotContribution {
+// A single contribution into a host slot. `Context` lets a plugin type its
+// `render` against the exact shape the host documents for that slot (e.g. the
+// MQTT slots' `{ mqttServerId: number }`), so no runtime casting is needed. It
+// defaults to the opaque `PluginSlotContext`, and a contribution typed to a
+// narrower context is still assignable to `PluginSlotContribution[]` (the
+// return type of `getSlotContributions`), so a plugin can mix differently-typed
+// contributions in one array while keeping each `render` strongly typed.
+export interface PluginSlotContribution<Context extends PluginSlotContext = PluginSlotContext> {
   // The slot this contribution targets (must match a host slot id).
   slotId: PluginSlotId;
-  // Optional stable React key, useful when a plugin contributes to a slot that
-  // the host mounts many times (e.g. once per list row).
+  // Optional stable key. Useful both as a React key when a plugin contributes
+  // to a slot the host mounts many times (e.g. once per list row) and as a
+  // stable identifier for the contribution in host error logs.
   key?: string;
   // Render the contributed UI for one mount of the slot, given its context.
-  render(context: PluginSlotContext): ReactNode;
+  render(context: Context): ReactNode;
 }

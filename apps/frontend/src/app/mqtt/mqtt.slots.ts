@@ -14,7 +14,10 @@ export const MQTT_SERVER_DETAIL_SLOT = 'mqtt.server.detail';
 // Per-row action / badge area in the MQTT server list.
 export const MQTT_SERVER_LIST_ROW_SLOT = 'mqtt.server.list.row';
 
-// Context shape passed to both MQTT server slots.
+// Context shape passed to both MQTT server slots. The index signature keeps it
+// assignable to the SDK's generic `PluginSlotContext` (Record<string, unknown>)
+// so it can parameterize `PluginSlot<MqttServerSlotContext>`.
 export interface MqttServerSlotContext {
   mqttServerId: number;
+  [key: string]: unknown;
 }

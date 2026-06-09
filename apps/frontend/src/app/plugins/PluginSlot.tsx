@@ -9,6 +9,9 @@ import usePluginState from './plugin.state';
 interface PluginSlotBoundaryProps extends PropsWithChildren {
   pluginName?: string;
   slotId: string;
+  // Stable identifier of the specific contribution (its `key`), so a crash maps
+  // to one contribution even when a plugin mounts several into the same slot.
+  contributionKey?: string;
 }
 
 class PluginSlotBoundary extends Component<PluginSlotBoundaryProps, { hasError: boolean }> {
@@ -23,9 +26,9 @@ class PluginSlotBoundary extends Component<PluginSlotBoundaryProps, { hasError: 
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error(
-      `Attraccess Plugin System: slot "${this.props.slotId}" contribution from plugin "${
-        this.props.pluginName ?? 'unknown'
-      }" crashed`,
+      `Attraccess Plugin System: slot "${this.props.slotId}" contribution "${
+        this.props.contributionKey ?? 'unknown'
+      }" from plugin "${this.props.pluginName ?? 'unknown'}" crashed`,
       error,
       info
     );
@@ -51,19 +54,23 @@ function SlotContribution({
   return <>{contribution.render(context)}</>;
 }
 
-export interface PluginSlotProps {
+export interface PluginSlotProps<Context extends PluginSlotContext = PluginSlotContext> {
   // Host extension-point id. Plugins target this via getSlotContributions().
   slotId: string;
   // Context handed to each contribution (e.g. the selected entity id). The host
-  // owns this shape per slot; it stays a plain object so the SDK keeps no
-  // domain knowledge.
-  context?: PluginSlotContext;
+  // types this per slot (e.g. `{ mqttServerId: number }`); it stays a plain
+  // object so the SDK keeps no domain knowledge.
+  context?: Context;
 }
 
 // Generic extension point: renders every plugin contribution registered for
 // `slotId`, each wrapped in an error boundary. Renders nothing (no wrapper DOM)
 // when no plugin contributes, so the host UI is unchanged without plugins.
-export function PluginSlot({ slotId, context }: PluginSlotProps) {
+// `Context` lets the host type the context it passes per slot at the call site.
+export function PluginSlot<Context extends PluginSlotContext = PluginSlotContext>({
+  slotId,
+  context,
+}: PluginSlotProps<Context>) {
   const { plugins } = usePluginState();
 
   const contributions = useMemo(() => {
@@ -88,7 +95,7 @@ export function PluginSlot({ slotId, context }: PluginSlotProps) {
     return null;
   }
 
-  const slotContext: PluginSlotContext = context ?? {};
+  const slotContext: Context = context ?? ({} as Context);
 
   return (
     <>
@@ -97,6 +104,7 @@ export function PluginSlot({ slotId, context }: PluginSlotProps) {
           key={contribution.key ?? `${pluginName}-${index}`}
           pluginName={pluginName}
           slotId={slotId}
+          contributionKey={contribution.key}
         >
           <SlotContribution contribution={contribution} context={slotContext} />
         </PluginSlotBoundary>

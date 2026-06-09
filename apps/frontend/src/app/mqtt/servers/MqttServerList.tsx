@@ -38,7 +38,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { AlertStatusIcon } from '../../../components/AlertStatusIcon';
 import { EmptyState } from '../../../components/emptyState';
 import { PluginSlot } from '../../plugins/PluginSlot';
-import { MQTT_SERVER_LIST_ROW_SLOT } from '../mqtt.slots';
+import { MQTT_SERVER_LIST_ROW_SLOT, MqttServerSlotContext } from '../mqtt.slots';
 
 export function MqttServerList() {
   const { t } = useTranslations({ en, de });
@@ -141,7 +141,7 @@ export function MqttServerList() {
                         <Trash2Icon className="w-4 h-4" />
                         {t('deleteServer')}
                       </Button>
-                      <PluginSlot
+                      <PluginSlot<MqttServerSlotContext>
                         slotId={MQTT_SERVER_LIST_ROW_SLOT}
                         context={{ mqttServerId: server.id }}
                       />
