@@ -18,7 +18,7 @@ public:
     void destroy() override;
 
     void setResourceName(const char *resourceName);
-    void setUsageInfo(bool hasActiveUsage, const char *username);
+    void setUsageInfo(bool hasActiveUsage, const char *username, bool isUnderMaintenance);
 
 private:
     lv_obj_t *screen = nullptr;
@@ -29,6 +29,7 @@ private:
     char resourceName[API::MAX_RESOURCE_NAME_LEN];
     char username[API::MAX_USERNAME_LEN];
     bool hasActiveUsage;
+    bool isUnderMaintenance;
 
     void updateUsageInfo();
 };

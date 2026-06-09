@@ -1,6 +1,7 @@
 {
   "status": {
     "inUse": "In Use",
-    "available": "Available"
+    "available": "Available",
+    "maintenance": "In Maintenance"
   }
 }

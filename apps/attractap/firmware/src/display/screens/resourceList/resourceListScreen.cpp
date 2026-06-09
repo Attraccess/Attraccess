@@ -80,9 +80,14 @@ void ResourceListScreen::addResourceListItem(const API::ResourceBrief &resource)
    lv_obj_set_style_border_opa(resourceButton, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_border_width(resourceButton, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_border_side(resourceButton, LV_BORDER_SIDE_RIGHT, LV_PART_MAIN | LV_STATE_DEFAULT);
+   // Status priority mirrors the web resource list: in use > maintenance > available.
    if (resource.hasActiveUsage)
    {
       lv_obj_set_style_border_color(resourceButton, lv_color_hex(0xF31260), LV_PART_MAIN | LV_STATE_DEFAULT);
+   }
+   else if (resource.isUnderMaintenance)
+   {
+      lv_obj_set_style_border_color(resourceButton, lv_color_hex(0xF5A524), LV_PART_MAIN | LV_STATE_DEFAULT);
    }
    else
    {

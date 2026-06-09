@@ -258,7 +258,8 @@ void Application::processState() {
 
         Display::lockscreen.setResourceName(resource.name);
         Display::lockscreen.setUsageInfo(resource.hasActiveUsage,
-                                         resource.activeUser);
+                                         resource.activeUser,
+                                         resource.isUnderMaintenance);
 
         // Directly pass the native struct to the screen so it can avoid String
         // conversions

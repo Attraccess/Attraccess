@@ -95,7 +95,7 @@ void Lockscreen::setResourceName(const char *resourceName)
     this->updateUsageInfo();
 }
 
-void Lockscreen::setUsageInfo(bool hasActiveUsage, const char *username)
+void Lockscreen::setUsageInfo(bool hasActiveUsage, const char *username, bool isUnderMaintenance)
 {
     if (hasActiveUsage)
     {
@@ -103,6 +103,7 @@ void Lockscreen::setUsageInfo(bool hasActiveUsage, const char *username)
         this->username[API::MAX_USERNAME_LEN - 1] = '\0';
     }
     this->hasActiveUsage = hasActiveUsage;
+    this->isUnderMaintenance = isUnderMaintenance;
 
     this->updateUsageInfo();
 }
@@ -116,11 +117,17 @@ void Lockscreen::updateUsageInfo()
 
     lv_label_set_text(this->resourceNameLabel, this->resourceName);
 
+    // Status priority mirrors the web resource list: in use > maintenance > available.
     if (this->hasActiveUsage)
     {
         String usageText = "In Verwendung: " + String(this->username);
         lv_label_set_text(this->usageInfoLabel, usageText.c_str());
         lv_obj_set_style_text_color(this->usageInfoLabel, lv_color_hex(0xF31260), LV_PART_MAIN | LV_STATE_DEFAULT);
+    }
+    else if (this->isUnderMaintenance)
+    {
+        lv_label_set_text(this->usageInfoLabel, "In Wartung");
+        lv_obj_set_style_text_color(this->usageInfoLabel, lv_color_hex(0xF5A524), LV_PART_MAIN | LV_STATE_DEFAULT);
     }
     else
     {
