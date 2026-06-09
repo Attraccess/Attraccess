@@ -2,12 +2,14 @@ import { User } from '@attraccess/database-entities';
 import { ReactNode } from 'react';
 import { IPlugin } from 'react-pluggable';
 import { RouteConfig } from './frontend.routing';
+import { PluginSlotContribution } from './frontend.slots';
 
 export enum FrontendLocation {}
 
 export enum FRONTEND_FUNCTION {
   GET_ROUTES = 'GET_ROUTES',
   GET_SIDEBAR_ITEMS = 'GET_SIDEBAR_ITEMS',
+  GET_SLOT_CONTRIBUTIONS = 'GET_SLOT_CONTRIBUTIONS',
 }
 
 // A navigation entry a plugin contributes to the app sidebar. The host renders
@@ -36,4 +38,7 @@ export interface AttraccessFrontendPlugin extends IPlugin {
   getRoutes?(): RouteConfig[];
   // Optional. Return the sidebar navigation entries this plugin contributes.
   getSidebarItems?(): PluginSidebarItem[];
+  // Optional. Return the contributions this plugin renders into host slots
+  // (generic embedded extension points). See frontend.slots.ts.
+  getSlotContributions?(): PluginSlotContribution[];
 }
