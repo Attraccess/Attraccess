@@ -60,6 +60,7 @@ versions it supports, and the permissions it needs:
 | `name` | yes | Unique identifier; also the on-disk folder name. |
 | `version` | yes | Your plugin's semantic version. |
 | `main.backend` / `main.frontend` | at least one | `directory` + `entryPoint`, relative to the ZIP root. |
+| `main.migrations` | no | `directory` + `entryPoint` of a module exporting TypeORM migration classes. See [Database Migrations](plugins/database-migrations.md). |
 | `attraccessVersion` | yes | Compatibility range — at least one of `min`, `max`, `exact`. |
 | `permissions` | no | Backend capabilities you need (see [Permissions](#backend-plugin-permissions)). Defaults to `[]`. |
 
