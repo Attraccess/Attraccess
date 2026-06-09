@@ -56,8 +56,8 @@ void NFC::resetCardPresence()
 void NFC::loop()
 {
     // One bus lock for the whole poll iteration. handleCardDetection() holds it
-    // for the duration of readPassiveTargetID (now a short 20 ms timeout), so a
-    // touch read on the render task waits at most that long for the bus.
+    // for the duration of readPassiveTargetID (100 ms read window, unchanged), so
+    // a touch read on the render task waits for the bus until the poll releases it.
     I2CBusGuard _i2c; // (ATT-548)
     this->checkHardware();
     this->handleCardDetection();
@@ -93,13 +93,10 @@ void NFC::handleCardDetection()
         return;
     }
 
-    // Short poll timeout (ATT-548): readPassiveTargetID spins delay(10) internally
-    // up to the timeout while holding the I2C bus. At the old 100 ms a touch read
-    // on the render task could stall ~100 ms waiting for the bus — exactly the lag
-    // we are fixing. 20 ms keeps the worst-case touch wait small; the loop re-polls
-    // repeatedly so detection stays reliable (verify present/remove/re-present —
-    // ATT-503). Tunable down to ~10 ms if more headroom is needed.
-    bool foundCardUpdate = this->pn532.readPassiveTargetID(PN532_MIFARE_ISO14443A, cardDetectedUid, &cardDetectedUidLength, 20);
+    // NFC read window stays at 100 ms (required — do not change). UI lag is fixed
+    // by isolating LVGL render/input onto a dedicated task and serializing the
+    // shared I2C bus via I2CBusGuard, not by shortening this read timeout.
+    bool foundCardUpdate = this->pn532.readPassiveTargetID(PN532_MIFARE_ISO14443A, cardDetectedUid, &cardDetectedUidLength, 100);
 
     if (foundCardUpdate)
     {
