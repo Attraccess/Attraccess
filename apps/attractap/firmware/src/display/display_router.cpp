@@ -1,5 +1,7 @@
 #include "display.hpp"
 
+#include <algorithm>
+
 // Screen routing: transition between IScreen instances with a fade animation.
 // Unloading of the previous screen is deferred until the transition completes
 // (handled in Display::loop via pendingDestroyScreens).
@@ -31,6 +33,17 @@ void Display::transitionToScreen(IScreen *screen, std::function<void()> onTransi
         return;
     }
 
+    // The incoming screen is being (re)activated, so it must never be torn down
+    // by the deferred-destroy queue. A previous transition may have queued it for
+    // unload (e.g. InitScreen <-> Lockscreen churn during websocket reconnect);
+    // if it stayed queued the later destroy would free the LVGL tree of the now
+    // active screen, leaving widget pointers NULL -> lv_obj_get_screen(NULL)
+    // assert -> loopTask hang -> task watchdog reboot. Dequeue it here.
+    Display::pendingDestroyScreens.erase(
+        std::remove(Display::pendingDestroyScreens.begin(),
+                    Display::pendingDestroyScreens.end(), screen),
+        Display::pendingDestroyScreens.end());
+
     IScreen *previousScreen = Display::activeScreen;
     if (Display::activeScreen)
     {
@@ -54,7 +67,14 @@ void Display::transitionToScreen(IScreen *screen, std::function<void()> onTransi
 
     if (previousScreen && previousScreen != screen && previousScreen->shouldAutoUnload())
     {
-        Display::logger.debugf("Queued screen %s for unload", previousScreen->getName().c_str());
-        Display::pendingDestroyScreens.push_back(previousScreen);
+        bool alreadyQueued =
+            std::find(Display::pendingDestroyScreens.begin(),
+                      Display::pendingDestroyScreens.end(),
+                      previousScreen) != Display::pendingDestroyScreens.end();
+        if (!alreadyQueued)
+        {
+            Display::logger.debugf("Queued screen %s for unload", previousScreen->getName().c_str());
+            Display::pendingDestroyScreens.push_back(previousScreen);
+        }
     }
 }
