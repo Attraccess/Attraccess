@@ -77,7 +77,12 @@ void Application::clearProjectSelection() {
   this->projectsOfUserResponse.limit = API::MAX_PROJECTS_PER_PAGE;
   this->projectsOfUserResponse.hasMore = false;
   this->projectsOfUserResponseUpdated = true;
+  // Reached from the websocket task (card auth response) as well as from LVGL
+  // event callbacks; rendering runs on its own task now, so guard the LVGL
+  // mutation explicitly (lv_lock is recursive).
+  lv_lock();
   Display::resourceDetailsScreen.setSelectedProject(0, nullptr);
+  lv_unlock();
 }
 
 void Application::handleProjectSelection(uint32_t projectId,
