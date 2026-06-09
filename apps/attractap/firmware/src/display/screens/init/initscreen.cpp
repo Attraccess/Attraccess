@@ -254,6 +254,14 @@ void InitScreen::init()
    lv_obj_set_style_text_font(openSettingsButtonLabel, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    lv_obj_add_event_cb(openSettingsButton, &InitScreen::onOpenSettingsButtonEvent, LV_EVENT_CLICKED, this);
+
+   // init() applied resetState (= PENDING visuals) to every row above; keep the
+   // change-detection caches in sync so loop() only re-styles on real transitions.
+   this->wifiStage = StageState::PENDING;
+   this->ethernetStage = StageState::PENDING;
+   this->apiConnectionStage = StageState::PENDING;
+   this->apiAuthenticationStage = StageState::PENDING;
+   this->lastLoopRefreshMs = 0;
 }
 
 void InitScreen::onOpenSettingsButtonEvent(lv_event_t *e)
@@ -271,30 +279,62 @@ lv_obj_t *InitScreen::getScreen()
    return this->screen;
 }
 
+void InitScreen::applyStage(lv_obj_t *spinner, lv_obj_t *label, StageState newState, StageState &cached)
+{
+   if (newState == cached)
+   {
+      return;
+   }
+   cached = newState;
+
+   switch (newState)
+   {
+   case StageState::SUCCESS:
+      this->markStateAsSuccess(spinner, label);
+      break;
+   case StageState::WARNING:
+      this->markStateAsWarning(spinner, label);
+      break;
+   case StageState::PENDING:
+   default:
+      this->resetState(spinner, label);
+      break;
+   }
+}
+
 void InitScreen::loop()
 {
+   // Throttle: this screen redraws while WiFi/TLS work runs; updating LVGL (and
+   // building Strings) every tick caused a permanent redraw storm (ATT-554 item 5).
+   uint32_t now = millis();
+   if (now - this->lastLoopRefreshMs < LOOP_REFRESH_INTERVAL_MS)
+   {
+      return;
+   }
+   this->lastLoopRefreshMs = now;
+
    State::NetworkState networkState = State::getNetworkState();
    // TODO: extend network state and network interface classes to be more descriptive (in progress, success, error and maybe error reason)
    if (networkState.wifi_connected)
    {
-      lv_label_set_text(this->wifiLabel, ("WLAN  " + this->formatIp(networkState.wifi_ip)).c_str());
-      this->markStateAsSuccess(this->wifiSpinner, this->wifiLabel);
+      setLabelTextIfChanged(this->wifiLabel, ("WLAN  " + this->formatIp(networkState.wifi_ip)).c_str());
+      this->applyStage(this->wifiSpinner, this->wifiLabel, StageState::SUCCESS, this->wifiStage);
    }
    else
    {
-      lv_label_set_text(this->wifiLabel, "verbinde WLAN");
-      this->resetState(this->wifiSpinner, this->wifiLabel);
+      setLabelTextIfChanged(this->wifiLabel, "verbinde WLAN");
+      this->applyStage(this->wifiSpinner, this->wifiLabel, StageState::PENDING, this->wifiStage);
    }
 
    if (networkState.ethernet_connected)
    {
-      lv_label_set_text(this->ethernetLabel, ("Ethernet  " + this->formatIp(networkState.ethernet_ip)).c_str());
-      this->markStateAsSuccess(this->ethernetSpinner, this->ethernetLabel);
+      setLabelTextIfChanged(this->ethernetLabel, ("Ethernet  " + this->formatIp(networkState.ethernet_ip)).c_str());
+      this->applyStage(this->ethernetSpinner, this->ethernetLabel, StageState::SUCCESS, this->ethernetStage);
    }
    else
    {
-      lv_label_set_text(this->ethernetLabel, "verbinde Ethernet");
-      this->resetState(this->ethernetSpinner, this->ethernetLabel);
+      setLabelTextIfChanged(this->ethernetLabel, "verbinde Ethernet");
+      this->applyStage(this->ethernetSpinner, this->ethernetLabel, StageState::PENDING, this->ethernetStage);
    }
 
    State::WebsocketState websocketState = State::getWebsocketState();
@@ -303,40 +343,35 @@ void InitScreen::loop()
    bool sweeping = websocketState.useSSL && (websocketState.certIndex > 0 || websocketState.rememberedRetryCount > 0);
    if (websocketState.connected)
    {
-      lv_label_set_text(this->apiConnectionLabel, "API verbunden");
-      this->markStateAsSuccess(this->apiConnectionSpinner, this->apiConnectionLabel);
+      setLabelTextIfChanged(this->apiConnectionLabel, "API verbunden");
+      this->applyStage(this->apiConnectionSpinner, this->apiConnectionLabel, StageState::SUCCESS, this->apiConnectionStage);
    }
    else if (networkUp && sweeping)
    {
-      lv_label_set_text(this->apiConnectionLabel, "suche Zertifikat");
-      this->markStateAsWarning(this->apiConnectionSpinner, this->apiConnectionLabel);
+      setLabelTextIfChanged(this->apiConnectionLabel, "suche Zertifikat");
+      this->applyStage(this->apiConnectionSpinner, this->apiConnectionLabel, StageState::WARNING, this->apiConnectionStage);
    }
    else
    {
-      lv_label_set_text(this->apiConnectionLabel, "verbinde API");
-      this->resetState(this->apiConnectionSpinner, this->apiConnectionLabel);
+      setLabelTextIfChanged(this->apiConnectionLabel, "verbinde API");
+      this->applyStage(this->apiConnectionSpinner, this->apiConnectionLabel, StageState::PENDING, this->apiConnectionStage);
    }
 
    State::ApiState apiState = State::getApiState();
-   if (apiState.authenticated)
-   {
-      this->markStateAsSuccess(this->apiAuthenticationSpinner, this->apiAuthenticationLabel);
-   }
-   else
-   {
-      this->resetState(this->apiAuthenticationSpinner, this->apiAuthenticationLabel);
-   }
+   this->applyStage(this->apiAuthenticationSpinner, this->apiAuthenticationLabel,
+                    apiState.authenticated ? StageState::SUCCESS : StageState::PENDING,
+                    this->apiAuthenticationStage);
 
    // Server target line
    if (websocketState.hostname.isEmpty() || websocketState.port == 0)
    {
-      lv_label_set_text(this->serverTargetLabel, "Server: nicht konfiguriert");
+      setLabelTextIfChanged(this->serverTargetLabel, "Server: nicht konfiguriert");
    }
    else
    {
       String target = "Server: " + websocketState.hostname + ":" + String(websocketState.port) +
                       (websocketState.useSSL ? "  (SSL)" : "  (kein SSL)");
-      lv_label_set_text(this->serverTargetLabel, target.c_str());
+      setLabelTextIfChanged(this->serverTargetLabel, target.c_str());
    }
 
    // Cert evaluation line (only relevant while connecting over SSL)
@@ -348,10 +383,13 @@ void InitScreen::loop()
       {
          cert += "  Wdh " + String(websocketState.rememberedRetryCount) + "/5";
       }
-      lv_label_set_text(this->certLabel, cert.c_str());
-      lv_obj_remove_flag(this->certLabel, LV_OBJ_FLAG_HIDDEN);
+      setLabelTextIfChanged(this->certLabel, cert.c_str());
+      if (lv_obj_has_flag(this->certLabel, LV_OBJ_FLAG_HIDDEN))
+      {
+         lv_obj_remove_flag(this->certLabel, LV_OBJ_FLAG_HIDDEN);
+      }
    }
-   else
+   else if (!lv_obj_has_flag(this->certLabel, LV_OBJ_FLAG_HIDDEN))
    {
       lv_obj_add_flag(this->certLabel, LV_OBJ_FLAG_HIDDEN);
    }
@@ -380,7 +418,7 @@ void InitScreen::loop()
    {
       stateLine += "  naechster Versuch in " + String(websocketState.secondsUntilNextAttempt) + "s";
    }
-   lv_label_set_text(this->connectionStateLabel, stateLine.c_str());
+   setLabelTextIfChanged(this->connectionStateLabel, stateLine.c_str());
 }
 
 void InitScreen::setOnOpenSettingsCallback(std::function<void()> onOpenSettingsCallback)
@@ -399,6 +437,10 @@ void InitScreen::onScreenLeave()
    this->resetState(this->ethernetSpinner, this->ethernetLabel);
    this->resetState(this->apiConnectionSpinner, this->apiConnectionLabel);
    this->resetState(this->apiAuthenticationSpinner, this->apiAuthenticationLabel);
+   this->wifiStage = StageState::PENDING;
+   this->ethernetStage = StageState::PENDING;
+   this->apiConnectionStage = StageState::PENDING;
+   this->apiAuthenticationStage = StageState::PENDING;
 }
 
 void InitScreen::destroy()
