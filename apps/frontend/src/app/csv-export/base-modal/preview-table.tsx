@@ -48,7 +48,7 @@ export function PreviewTable(props: Props) {
       <div className="flex items-center justify-between gap-2">
         <span className="text-sm font-medium">{titleLabel({ n: previewLimit })}</span>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">{rowCountLabel({ count: totalCount })}</span>
+          <span className="text-xs text-muted">{rowCountLabel({ count: totalCount })}</span>
           {refetch && (
             <Button
               size="sm"
@@ -64,7 +64,7 @@ export function PreviewTable(props: Props) {
         </div>
       </div>
 
-      <div className="border border-default-100 rounded-md">
+      <div className="border border-border rounded-md">
         {queryStatus === 'pending' ? (
           <div className="flex items-center justify-center py-12">
             <Spinner />

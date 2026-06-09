@@ -55,7 +55,7 @@ export function ColumnPicker(props: Props) {
       <TextField value={search} onChange={setSearch} className="w-full" data-cy="csv-export-column-search">
         <Label className="text-sm font-medium">{searchLabel}</Label>
         <InputGroup>
-          <SearchIcon className="size-4 ml-2 text-muted-foreground" />
+          <SearchIcon className="size-4 ml-2 text-muted" />
           <Input placeholder={searchPlaceholder} />
         </InputGroup>
       </TextField>
@@ -79,13 +79,13 @@ export function ColumnPicker(props: Props) {
             {selectNoneLabel}
           </Button>
         </div>
-        <span className="text-xs text-muted-foreground">
+        <span className="text-xs text-muted">
           {selectedCountLabel({ selected: selectedKeys.length, total: columns.length })}
         </span>
       </div>
 
       <div
-        className="flex flex-col gap-1 max-h-72 overflow-y-auto border border-default-100 rounded-md p-2"
+        className="flex flex-col gap-1 max-h-72 overflow-y-auto border border-border rounded-md p-2"
         data-cy="resource-usage-export-columns-listbox"
       >
         {filtered.map((column) => {
@@ -98,7 +98,7 @@ export function ColumnPicker(props: Props) {
                 if (next) onSelectionChange([...selectedKeys, column.key]);
                 else onSelectionChange(selectedKeys.filter((k) => k !== column.key));
               }}
-              className="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-default-100"
+              className="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-surface-secondary"
             >
               <Checkbox.Control>
                 <Checkbox.Indicator />
@@ -110,7 +110,7 @@ export function ColumnPicker(props: Props) {
       </div>
 
       {(options ?? []).length > 0 && (
-        <div className="flex flex-col gap-2 pt-2 border-t border-default-100">
+        <div className="flex flex-col gap-2 pt-2 border-t border-border">
           {(options ?? []).map((option) => (
             <Checkbox
               key={option.key}

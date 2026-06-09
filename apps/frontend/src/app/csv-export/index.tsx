@@ -62,7 +62,7 @@ export function CsvExport() {
     <div className="mx-auto w-full max-w-5xl px-4 md:px-6 lg:px-8 py-6 flex flex-col gap-6">
       <header className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold">{t('title')}</h1>
-        <p className="text-sm text-muted-foreground">{t('subtitle')}</p>
+        <p className="text-sm text-muted">{t('subtitle')}</p>
       </header>
 
       <DateRangeSection
