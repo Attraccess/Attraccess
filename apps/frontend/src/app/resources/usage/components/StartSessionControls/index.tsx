@@ -26,16 +26,22 @@ import { useResourceFormsSubmission } from '../../../forms/hooks/useResourceForm
 import { ResourceFormAction } from '../../../details/forms/types';
 import { DoorControls } from './DoorControls';
 import { MachineStartControls } from './MachineStartControls';
+import { SupervisedStartModal } from '../SupervisedStartModal';
 
 interface StartSessionControlsProps {
   resourceId: number;
   insufficientBalanceDesiredAmount?: number;
+  /**
+   * When true the user is not introduced but the resource allows supervision:
+   * starting opens the supervisor-selection popup instead of starting directly.
+   */
+  requiresSupervision?: boolean;
 }
 
 export function StartSessionControls(
   props: Readonly<StartSessionControlsProps> & React.HTMLAttributes<HTMLDivElement>,
 ) {
-  const { resourceId, insufficientBalanceDesiredAmount, ...divProps } = props;
+  const { resourceId, insufficientBalanceDesiredAmount, requiresSupervision, ...divProps } = props;
 
   const { data: resource } = useResourcesServiceGetOneResourceById({ id: resourceId });
 
@@ -54,6 +60,7 @@ export function StartSessionControls(
 
   const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
   const [isInsufficientBalance, setIsInsufficientBalance] = useState(false);
+  const [supervisedRequestBody, setSupervisedRequestBody] = useState<StartUsageSessionDto | null>(null);
 
   const onStartSuccess = useCallback(() => {
     setIsNotesModalOpen(false);
@@ -230,13 +237,23 @@ export function StartSessionControls(
         return;
       }
 
-      submitStartSessionWithRetry(action, {
+      const requestBody: StartUsageSessionDto = {
         ...(opts ?? {}),
         projectId: selectedProjectId,
         formSubmissions,
-      });
+      };
+
+      // Not introduced but supervision is allowed: defer to supervisor approval
+      // instead of starting directly. The user-facing start flow is unchanged.
+      if (requiresSupervision) {
+        setIsNotesModalOpen(false);
+        setSupervisedRequestBody(requestBody);
+        return;
+      }
+
+      submitStartSessionWithRetry(action, requestBody);
     },
-    [gatherFormSubmissions, selectedProjectId, submitStartSessionWithRetry],
+    [gatherFormSubmissions, requiresSupervision, selectedProjectId, submitStartSessionWithRetry],
   );
 
   const handleOpenStartSessionModal = () => {
@@ -287,6 +304,19 @@ export function StartSessionControls(
         onClose={() => setIsInsufficientBalance(false)}
         desiredAmount={insufficientBalanceDesiredAmount}
       />
+
+      {supervisedRequestBody && (
+        <SupervisedStartModal
+          isOpen={true}
+          onClose={() => setSupervisedRequestBody(null)}
+          resourceId={resourceId}
+          requestBody={supervisedRequestBody}
+          onApproved={() => {
+            setSupervisedRequestBody(null);
+            onStartSuccess();
+          }}
+        />
+      )}
       {formsModal}
     </div>
   );

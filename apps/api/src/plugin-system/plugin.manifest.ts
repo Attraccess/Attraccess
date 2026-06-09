@@ -30,6 +30,21 @@ export class PluginMainBackend {
   entryPoint: string;
 }
 
+export class PluginMainMigrations {
+  @ApiProperty({
+    description: "The directory holding the plugin's bundled database migrations",
+    example: 'dist',
+  })
+  directory: string;
+
+  @ApiProperty({
+    description:
+      'The entry point exporting the migration classes, relative to the migrations directory. The module exports TypeORM migration classes (named exports or a default-exported array).',
+    example: 'migrations.js',
+  })
+  entryPoint: string;
+}
+
 export class PluginMain {
   @ApiProperty({
     description: 'The frontend files of the plugin',
@@ -48,6 +63,14 @@ export class PluginMain {
     },
   })
   backend?: PluginMainBackend;
+
+  @ApiProperty({
+    description:
+      "The plugin's database migrations entry. When present, the host runs the exported up-migrations on load (boot) and the down-migrations on uninstall, tracked in a plugin-scoped migrations table.",
+    type: PluginMainMigrations,
+    required: false,
+  })
+  migrations?: PluginMainMigrations;
 }
 
 export class PluginAttraccessVersion {
@@ -142,6 +165,7 @@ export const PluginManifestSchema = z.object({
   main: z.object({
     frontend: mainSchema,
     backend: mainSchema,
+    migrations: mainSchema.optional(),
   }),
   version: z.string(),
   attraccessVersion: z

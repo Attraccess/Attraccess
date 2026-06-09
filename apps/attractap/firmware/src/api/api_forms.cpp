@@ -381,14 +381,7 @@ void API::parseFormFieldOptions(ResourceUsageFormField &field, JsonVariantConst 
         }
         break;
     case ResourceUsageFormFieldType::BOOLEAN:
-        if (options["trueLabel"].is<const char *>())
-        {
-            field.options.boolean.trueLabel = options["trueLabel"].as<const char *>();
-        }
-        if (options["falseLabel"].is<const char *>())
-        {
-            field.options.boolean.falseLabel = options["falseLabel"].as<const char *>();
-        }
+        // Boolean fields use a plain yes/no switch and carry no options.
         break;
     default:
         break;

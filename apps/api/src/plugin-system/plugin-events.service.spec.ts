@@ -75,6 +75,7 @@ function baseContext(events: EventEmitter2, name: string): PluginContext {
     get: (() => ({})) as never,
     onEvent: () => ({ off: () => undefined }),
     emitEvent: () => undefined,
+    getMqttServerConfig: () => Promise.resolve(null),
   };
 }
 

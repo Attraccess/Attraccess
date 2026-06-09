@@ -18,6 +18,7 @@ import { SSEModule } from './sse/sse.module';
 import { ResourceGroupsModule } from './groups/resourceGroups.module';
 import { ResourcesService } from './resources.service';
 import { ResourceUsageModule } from './usage/resourceUsage.module';
+import { SupervisionModule } from './supervision/supervision.module';
 import { ResourceImageService } from './resourceImage.service';
 import { ResourceIntroductionsModule } from './introductions/resourceIntroductions.module';
 import { ResourceIntroducersModule } from './introducers/resourceIntroducers.module';
@@ -49,6 +50,7 @@ import { LicenseModule } from '../license/license.module';
     ResourceIntroductionsModule,
     ResourceIntroducersModule,
     ResourceUsageModule,
+    SupervisionModule,
     ResourceFlowsModule,
     ResourceMaintenanceModule,
     ResourceFormsModule,

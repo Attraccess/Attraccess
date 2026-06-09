@@ -94,6 +94,7 @@ async function bootAndPing(artifactPath: string): Promise<PocPongPayload> {
     emitEvent<E extends SystemEvent>(event: E, payload: SystemEventPayload[E]) {
       pluginEvents.emit(event, payload);
     },
+    getMqttServerConfig: () => Promise.resolve(null),
   };
 
   const plugin = loadDefaultExport(artifactPath);

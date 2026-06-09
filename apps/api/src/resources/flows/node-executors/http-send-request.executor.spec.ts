@@ -1,0 +1,118 @@
+import { Logger } from '@nestjs/common';
+import { ResourceFlowNode } from '@attraccess/database-entities';
+import axios from 'axios';
+import { HttpSendRequestExecutor } from './http-send-request.executor';
+import { NodeExecutionContext } from './node-executor.interface';
+
+jest.mock('axios');
+
+describe('HttpSendRequestExecutor', () => {
+  let executor: HttpSendRequestExecutor;
+  let ctx: NodeExecutionContext;
+
+  const makeNode = (data: object): ResourceFlowNode =>
+    ({ id: 'n1', type: 'OUTPUT_HTTP_SEND_REQUEST', resourceId: 1, data } as unknown as ResourceFlowNode);
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
+    jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+    jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+
+    executor = new HttpSendRequestExecutor();
+
+    ctx = {
+      transactionManager: undefined,
+      // Templating proof: replace "{{x}}" tokens with the input's matching value.
+      compileTemplate: jest.fn((tpl: string, data: object) =>
+        tpl.replace(/\{\{(\w+)\}\}/g, (_m, key) => String((data as Record<string, unknown>)[key] ?? '')),
+      ),
+      getTemplateVariables: jest.fn(),
+      setTemplateVariables: jest.fn(),
+    } as unknown as NodeExecutionContext;
+  });
+
+  it('compiles url/method/headers/body and calls axios.request with compiled values', async () => {
+    (axios.request as jest.Mock).mockResolvedValue({ data: { ok: true, id: 42 } });
+
+    const node = makeNode({
+      url: 'https://example.com/api/{{path}}',
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer {{token}}',
+        'X-Static': 'static-value',
+      },
+      body: 'hello {{name}}',
+    });
+    const input = { path: 'users', token: 'abc123', name: 'world' };
+
+    const result = await executor.execute(node, input, ctx);
+
+    expect(axios.request).toHaveBeenCalledTimes(1);
+    expect(axios.request).toHaveBeenCalledWith({
+      url: 'https://example.com/api/users',
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer abc123',
+        'X-Static': 'static-value',
+      },
+      data: 'hello world',
+    });
+
+    // compileTemplate invoked for url, method, each header value, and body.
+    expect(ctx.compileTemplate).toHaveBeenCalledWith('https://example.com/api/{{path}}', input);
+    expect(ctx.compileTemplate).toHaveBeenCalledWith('POST', input);
+    expect(ctx.compileTemplate).toHaveBeenCalledWith('Bearer {{token}}', input);
+    expect(ctx.compileTemplate).toHaveBeenCalledWith('static-value', input);
+    expect(ctx.compileTemplate).toHaveBeenCalledWith('hello {{name}}', input);
+    // url + method + 2 headers + body = 5 calls.
+    expect((ctx.compileTemplate as jest.Mock).mock.calls).toHaveLength(5);
+
+    expect(result).toEqual({ payload: { ok: true, id: 42 } });
+  });
+
+  it('defaults headers to {} and body to "" when omitted', async () => {
+    (axios.request as jest.Mock).mockResolvedValue({ data: 'response-body' });
+
+    const node = makeNode({ url: 'https://example.com', method: 'GET' });
+
+    const result = await executor.execute(node, {}, ctx);
+
+    expect(axios.request).toHaveBeenCalledWith({
+      url: 'https://example.com',
+      method: 'GET',
+      headers: {},
+      data: '',
+    });
+    // Only url, method, and the defaulted empty body get compiled (no headers).
+    expect((ctx.compileTemplate as jest.Mock).mock.calls).toHaveLength(3);
+    expect(ctx.compileTemplate).toHaveBeenCalledWith('', {});
+    expect(result).toEqual({ payload: 'response-body' });
+  });
+
+  it('defaults url and method to "" when missing on data', async () => {
+    (axios.request as jest.Mock).mockResolvedValue({ data: null });
+
+    const node = makeNode({});
+
+    const result = await executor.execute(node, {}, ctx);
+
+    expect(axios.request).toHaveBeenCalledWith({
+      url: '',
+      method: '',
+      headers: {},
+      data: '',
+    });
+    expect(result).toEqual({ payload: null });
+  });
+
+  it('propagates axios.request rejection', async () => {
+    const err = new Error('network down');
+    (axios.request as jest.Mock).mockRejectedValue(err);
+
+    const node = makeNode({ url: 'https://example.com', method: 'GET' });
+
+    await expect(executor.execute(node, {}, ctx)).rejects.toThrow('network down');
+  });
+});

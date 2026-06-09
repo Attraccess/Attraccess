@@ -60,6 +60,7 @@ versions it supports, and the permissions it needs:
 | `name` | yes | Unique identifier; also the on-disk folder name. |
 | `version` | yes | Your plugin's semantic version. |
 | `main.backend` / `main.frontend` | at least one | `directory` + `entryPoint`, relative to the ZIP root. |
+| `main.migrations` | no | `directory` + `entryPoint` of a module exporting TypeORM migration classes. See [Database Migrations](plugins/database-migrations.md). |
 | `attraccessVersion` | yes | Compatibility range — at least one of `min`, `max`, `exact`. |
 | `permissions` | no | Backend capabilities you need (see [Permissions](#backend-plugin-permissions)). Defaults to `[]`. |
 
@@ -150,6 +151,7 @@ export default plugin;
 | `context.emitEvent(event, payload)` | Emit a typed `SystemEvent`. | `EMIT_EVENTS` |
 | `context.events` | The raw shared event bus (restricted surface). | per-method |
 | `context.get(token)` | Resolve an arbitrary host provider by token. | `RESOLVE_HOST_PROVIDERS` |
+| `context.getMqttServerConfig(serverId)` | Resolve an MQTT server's connection config + resolved (decrypted) credentials. | `ACCESS_MQTT_SERVERS` |
 
 > [!IMPORTANT]
 > Resolve services and repositories through `context`, never by re-initialising
@@ -173,6 +175,7 @@ naming the missing permission.
 | `EMIT_EVENTS` | `context.emitEvent(...)` and `context.events.emit(...)` / `emitAsync(...)`. |
 | `LISTEN_EVENTS` | `context.onEvent(...)` and `context.events.on(...)` / `once(...)` / ... |
 | `RESOLVE_HOST_PROVIDERS` | `context.get(token)` — resolve arbitrary host services by token. |
+| `ACCESS_MQTT_SERVERS` | `context.getMqttServerConfig(serverId)` — read an MQTT server's connection config and resolved credentials. |
 
 A few notes on the boundary:
 
