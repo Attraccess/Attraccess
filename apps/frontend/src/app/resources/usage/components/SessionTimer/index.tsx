@@ -6,10 +6,10 @@ import de from './translations/de.json';
 
 interface SessionTimerProps {
   startTime: string;
+  variant?: 'default' | 'hero';
 }
 
-export function SessionTimer({ startTime }: SessionTimerProps) {
-  const { t } = useTranslations({ en, de });
+function useElapsedTime(startTime: string) {
   const [elapsedTime, setElapsedTime] = useState<string>('00:00:00');
 
   useEffect(() => {
@@ -37,6 +37,27 @@ export function SessionTimer({ startTime }: SessionTimerProps) {
 
     return () => clearInterval(interval);
   }, [startTime]);
+
+  return elapsedTime;
+}
+
+export function SessionTimer({ startTime, variant = 'default' }: SessionTimerProps) {
+  const { t } = useTranslations({ en, de });
+  const elapsedTime = useElapsedTime(startTime);
+
+  if (variant === 'hero') {
+    return (
+      <div className="flex flex-col items-center gap-1 text-center">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-success-600 dark:text-success-400">
+          {t('elapsedTime')}
+        </span>
+        <span className="font-mono text-5xl font-bold leading-none tabular-nums text-foreground">{elapsedTime}</span>
+        <span className="text-xs text-default-500">
+          {t('sessionStarted')}: <DateTimeDisplay date={startTime} />
+        </span>
+      </div>
+    );
+  }
 
   return (
     <div className="flex items-center justify-between">
