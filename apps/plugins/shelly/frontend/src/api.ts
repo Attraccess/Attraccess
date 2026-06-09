@@ -21,43 +21,55 @@ export interface ShellyDevice {
 
 const BASE = '/api/shelly';
 
-async function parse<T>(res: Response): Promise<T> {
+interface RequestOptions {
+  method?: 'GET' | 'POST' | 'DELETE' | 'PATCH' | 'PUT';
+  /** JSON body — serialised and Content-Type set automatically. */
+  body?: unknown;
+}
+
+/**
+ * Single seam for every plugin API call. Handles the things that are the same
+ * on every request — base URL, cookie credentials, JSON headers/serialisation,
+ * and error parsing — so callers only pass what differs (path, method, body).
+ */
+async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const { method = 'GET', body } = options;
+
+  const res = await fetch(`${BASE}${path}`, {
+    method,
+    credentials: 'include',
+    headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+
   if (!res.ok) {
     let message = `HTTP ${res.status}`;
     try {
-      const body = (await res.json()) as { message?: string | string[] };
-      if (body?.message) {
-        message = Array.isArray(body.message) ? body.message.join(', ') : body.message;
+      const errorBody = (await res.json()) as { message?: string | string[] };
+      if (errorBody?.message) {
+        message = Array.isArray(errorBody.message) ? errorBody.message.join(', ') : errorBody.message;
       }
     } catch {
       // Non-JSON error body — keep the status-based message.
     }
     throw new Error(message);
   }
+
   return (await res.json()) as T;
 }
 
 export function listDevices(): Promise<ShellyDevice[]> {
-  return fetch(`${BASE}/devices`, { credentials: 'include' }).then((r) => parse<ShellyDevice[]>(r));
+  return request<ShellyDevice[]>('/devices');
 }
 
 export function addDevice(input: { ipAddress: string; name?: string }): Promise<ShellyDevice> {
-  return fetch(`${BASE}/devices`, {
-    method: 'POST',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(input),
-  }).then((r) => parse<ShellyDevice>(r));
+  return request<ShellyDevice>('/devices', { method: 'POST', body: input });
 }
 
 export function reprobeDevice(id: number): Promise<ShellyDevice> {
-  return fetch(`${BASE}/devices/${id}/probe`, { method: 'POST', credentials: 'include' }).then((r) =>
-    parse<ShellyDevice>(r)
-  );
+  return request<ShellyDevice>(`/devices/${id}/probe`, { method: 'POST' });
 }
 
 export function deleteDevice(id: number): Promise<{ deleted: boolean }> {
-  return fetch(`${BASE}/devices/${id}`, { method: 'DELETE', credentials: 'include' }).then((r) =>
-    parse<{ deleted: boolean }>(r)
-  );
+  return request<{ deleted: boolean }>(`/devices/${id}`, { method: 'DELETE' });
 }
