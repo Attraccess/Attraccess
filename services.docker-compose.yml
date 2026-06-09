@@ -185,7 +185,8 @@ services:
     command:
       - >
         set -e &&
-        cp -r /src/provisioning/. /grafana-provisioning/ &&
+        rm -rf /grafana-provisioning/* /grafana-provisioning/.[!.]* 2>/dev/null || true &&
+        cp -rT /src/provisioning /grafana-provisioning &&
         sh /src/prepare-provisioning.sh /grafana-provisioning
     volumes:
       - ./monitoring/grafana:/src:ro

@@ -78,6 +78,15 @@ echo 'groups: []' >"$TMP/alerting/rules.yaml"
 assert_present "$TMP/alerting/rules.yaml" "rules.yaml kept when pushover files absent"
 rm -rf "$TMP"
 
+echo "case: missing provisioning dir -> fail fast"
+TMP="$(mktemp -d)"; rmdir "$TMP"
+if "$SCRIPT" "$TMP" 2>/dev/null; then fail "expected non-zero exit for missing provisioning dir"; else pass "exits non-zero for missing provisioning dir"; fi
+
+echo "case: missing alerting dir -> fail fast"
+TMP="$(mktemp -d)"
+if "$SCRIPT" "$TMP" 2>/dev/null; then fail "expected non-zero exit for missing alerting dir"; else pass "exits non-zero for missing alerting dir"; fi
+rm -rf "$TMP"
+
 if [ "$failures" -gt 0 ]; then
   echo "✗ $failures assertion(s) failed"
   exit 1

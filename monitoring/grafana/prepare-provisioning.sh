@@ -19,6 +19,16 @@ set -eu
 PROVISIONING_DIR="${1:-/etc/grafana/provisioning}"
 ALERTING_DIR="$PROVISIONING_DIR/alerting"
 
+# Fail fast on a misconfigured mount/path instead of silently no-op'ing the rm.
+if [ ! -d "$PROVISIONING_DIR" ]; then
+  echo "[grafana-prepare] ERROR: provisioning dir not found: $PROVISIONING_DIR" >&2
+  exit 1
+fi
+if [ ! -d "$ALERTING_DIR" ]; then
+  echo "[grafana-prepare] ERROR: alerting dir not found: $ALERTING_DIR" >&2
+  exit 1
+fi
+
 if [ -n "${PUSHOVER_API_TOKEN:-}" ] && [ -n "${PUSHOVER_USER_KEY:-}" ]; then
   echo "[grafana-prepare] PUSHOVER_API_TOKEN and PUSHOVER_USER_KEY set — provisioning Pushover alerting"
 else
