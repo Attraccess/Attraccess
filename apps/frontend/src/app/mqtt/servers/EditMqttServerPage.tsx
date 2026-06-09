@@ -111,7 +111,7 @@ export function EditMqttServerPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8" data-cy="edit-mqtt-server-page">
+    <div className="max-w-7xl mx-auto px-4 py-8 flex flex-col gap-8" data-cy="edit-mqtt-server-page">
       <PageHeader title={t('editMqttServer')} onBack={handleCancel} />
 
       <Form onSubmit={handleSubmit} className="gap-8" data-cy="edit-mqtt-server-form">
