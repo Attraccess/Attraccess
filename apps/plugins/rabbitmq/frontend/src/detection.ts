@@ -40,39 +40,101 @@ export interface UseDetectionState {
   refresh: () => void;
 }
 
-// Loads detection for one MQTT server and re-loads on demand. Both MQTT slots
-// (per-row badge + detail panel) share this so each renders from the same
-// verdict the backend caches.
+// Module-level, per-server detection store shared across every mounted
+// component. Both MQTT slots (per-row badge + detail panel) render the same
+// server, so without this they would each fire their own request; sharing one
+// entry per id dedupes the in-flight fetch and keeps a short client cache.
+// State lives outside React, so a fetch resolving after a component unmounts
+// just updates the store and notifies whatever is still subscribed — there is
+// no setState-on-unmounted-component path.
+interface Entry {
+  result: RabbitmqDetectionResult | null;
+  loading: boolean;
+  error: string | null;
+  inFlight: Promise<void> | null;
+  expiresAt: number;
+}
+
+// Mirrors the backend's detection cache window so the frontend doesn't re-probe
+// more eagerly than the server refreshes.
+const CACHE_TTL_MS = 60_000;
+
+const EMPTY_ENTRY: Entry = { result: null, loading: true, error: null, inFlight: null, expiresAt: 0 };
+
+const store = new Map<number, Entry>();
+const subscribers = new Map<number, Set<() => void>>();
+
+function now(): number {
+  return Date.now();
+}
+
+function notify(mqttServerId: number): void {
+  subscribers.get(mqttServerId)?.forEach((fn) => fn());
+}
+
+// Kicks off a load for one server unless a fresh result or an in-flight request
+// already covers it. `refresh` bypasses the client cache (the backend probe
+// honours `?refresh=true`).
+function ensureLoaded(mqttServerId: number, refresh: boolean): void {
+  const current = store.get(mqttServerId);
+  if (current?.inFlight) {
+    return;
+  }
+  if (!refresh && current?.result && current.expiresAt > now()) {
+    return;
+  }
+
+  const entry: Entry = {
+    result: current?.result ?? null,
+    loading: true,
+    error: null,
+    inFlight: null,
+    expiresAt: current?.expiresAt ?? 0,
+  };
+  entry.inFlight = fetchDetection(mqttServerId, refresh)
+    .then((data) => {
+      entry.result = data;
+      entry.error = null;
+      entry.expiresAt = now() + CACHE_TTL_MS;
+    })
+    .catch((err: Error) => {
+      entry.error = err.message;
+    })
+    .finally(() => {
+      entry.loading = false;
+      entry.inFlight = null;
+      notify(mqttServerId);
+    });
+  store.set(mqttServerId, entry);
+  notify(mqttServerId);
+}
+
+// Subscribes to the shared store for one server and triggers the initial load.
+// Returns the current entry's view plus a `refresh` that bypasses the cache.
 export function useDetection(mqttServerId: number): UseDetectionState {
-  const [result, setResult] = useState<RabbitmqDetectionResult | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [, forceRender] = useState(0);
 
-  const load = useCallback(
-    (refresh: boolean) => {
-      let cancelled = false;
-      setLoading(true);
-      setError(null);
-      fetchDetection(mqttServerId, refresh)
-        .then((data) => {
-          if (!cancelled) setResult(data);
-        })
-        .catch((err: Error) => {
-          if (!cancelled) setError(err.message);
-        })
-        .finally(() => {
-          if (!cancelled) setLoading(false);
-        });
-      return () => {
-        cancelled = true;
-      };
-    },
-    [mqttServerId]
-  );
+  useEffect(() => {
+    const rerender = () => forceRender((n) => n + 1);
+    let set = subscribers.get(mqttServerId);
+    if (!set) {
+      set = new Set();
+      subscribers.set(mqttServerId, set);
+    }
+    set.add(rerender);
 
-  useEffect(() => load(false), [load]);
+    ensureLoaded(mqttServerId, false);
 
-  const refresh = useCallback(() => load(true), [load]);
+    return () => {
+      set?.delete(rerender);
+      if (set && set.size === 0) {
+        subscribers.delete(mqttServerId);
+      }
+    };
+  }, [mqttServerId]);
 
-  return { result, loading, error, refresh };
+  const refresh = useCallback(() => ensureLoaded(mqttServerId, true), [mqttServerId]);
+
+  const entry = store.get(mqttServerId) ?? EMPTY_ENTRY;
+  return { result: entry.result, loading: entry.loading, error: entry.error, refresh };
 }
