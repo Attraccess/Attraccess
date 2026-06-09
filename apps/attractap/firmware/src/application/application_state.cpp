@@ -298,10 +298,20 @@ void Application::processState() {
   }
 
   if (this->state == APPLICATION_STATE_UNLOCKED) {
-    // Subtract any accumulated pause time while actions were in-progress
+    // Subtract any accumulated pause time while actions were in-progress.
+    // accumulatedPauseMs only gets the elapsed delta added once an action
+    // finishes (endActionPause). While an action is still running -- most
+    // notably while the user fills out a resource usage form -- include the
+    // in-progress pause here too, so the logout timeout stays frozen for the
+    // whole duration instead of expiring mid-form.
+    uint32_t effectivePause = this->accumulatedPauseMs;
+    if (this->actionInProgressCount > 0) {
+      effectivePause +=
+          (now >= this->pauseStartMs) ? (now - this->pauseStartMs) : 0;
+    }
     uint32_t effectiveElapsed = now - this->timeOfUnlockedMs;
-    if (effectiveElapsed > this->accumulatedPauseMs) {
-      effectiveElapsed -= this->accumulatedPauseMs;
+    if (effectiveElapsed > effectivePause) {
+      effectiveElapsed -= effectivePause;
     } else {
       effectiveElapsed = 0;
     }
