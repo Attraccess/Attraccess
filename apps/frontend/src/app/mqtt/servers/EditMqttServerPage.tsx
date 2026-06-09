@@ -17,6 +17,8 @@ import {
   useMqttServiceMqttServersGetAllKey,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
+import { PluginSlot } from '../../plugins/PluginSlot';
+import { MQTT_SERVER_DETAIL_SLOT } from '../mqtt.slots';
 
 export function EditMqttServerPage() {
   const { serverId } = useParams<{ serverId: string }>();
@@ -274,6 +276,8 @@ export function EditMqttServerPage() {
           </Button>
         </div>
       </Form>
+
+      <PluginSlot slotId={MQTT_SERVER_DETAIL_SLOT} context={{ mqttServerId: server.id }} />
     </div>
   );
 }

@@ -27,6 +27,7 @@ import {
   DatabaseIcon,
   HandIcon,
   PanelLeftIcon,
+  PlugIcon,
   RouteIcon,
   ServerIcon,
 } from 'lucide-react';
@@ -34,6 +35,7 @@ import type {
   AttraccessFrontendPlugin,
   AttraccessFrontendPluginAuthData,
   PluginSidebarItem,
+  PluginSlotContribution,
   RouteConfig,
 } from '@attraccess/plugins-frontend-sdk';
 import type { IPluginStore } from 'react-pluggable';
@@ -149,6 +151,11 @@ function CapabilitiesPage() {
       body: 'Contributes this navigation item through getSidebarItems().',
       icon: PanelLeftIcon,
     },
+    {
+      title: 'Embedded slots',
+      body: 'Injects UI into the MQTT detail + list views via getSlotContributions().',
+      icon: PlugIcon,
+    },
   ];
 
   return (
@@ -170,6 +177,48 @@ function CapabilitiesPage() {
         ))}
       </div>
     </PluginShell>
+  );
+}
+
+// Host slot ids exposed by the MQTT UI. These are documented host strings (the
+// SDK is vendor-agnostic and does not export them); a plugin targets them the
+// same way it targets a route `path`. Both slots receive `{ mqttServerId }`.
+const MQTT_SERVER_DETAIL_SLOT = 'mqtt.server.detail';
+const MQTT_SERVER_LIST_ROW_SLOT = 'mqtt.server.list.row';
+
+// Embedded into the MQTT server detail view through the generic slot mechanism.
+// Reads the host-supplied context to scope itself to the selected server.
+function MqttServerDetailExtension({ mqttServerId }: { mqttServerId: number }) {
+  return (
+    <Card
+      data-cy="hello-world-mqtt-detail-slot"
+      className="w-full border border-default-200 dark:border-default-100"
+    >
+      <Card.Header className="flex flex-row items-center gap-2">
+        <PlugIcon className="w-5 h-5 text-primary" />
+        <p className="text-base font-semibold text-default-700">Hello World plugin extension</p>
+      </Card.Header>
+      <Card.Content>
+        <p className="text-sm text-default-500">
+          This card is injected into the MQTT server detail slot via{' '}
+          <code>getSlotContributions()</code> — no core code knows about it. It is scoped to server{' '}
+          <Chip color="accent" variant="soft">
+            #{mqttServerId}
+          </Chip>
+          , passed in through the slot context.
+        </p>
+      </Card.Content>
+    </Card>
+  );
+}
+
+// Embedded into each MQTT server list row through the per-row slot.
+function MqttServerListBadge({ mqttServerId }: { mqttServerId: number }) {
+  return (
+    <Chip data-cy={`hello-world-mqtt-list-slot-${mqttServerId}`} color="accent" variant="soft">
+      <PlugIcon className="w-3.5 h-3.5" />
+      plugin
+    </Chip>
   );
 }
 
@@ -232,6 +281,26 @@ export default class HelloWorldPlugin implements AttraccessFrontendPlugin {
         label: 'Hello World',
         path: '/hello-world',
         icon: <HandIcon className="w-5 h-5" />,
+      },
+    ];
+  }
+
+  // Contribute UI into the host's generic MQTT slots. The host renders each
+  // contribution where it exposes the matching slot id and hands us a context
+  // object (here `{ mqttServerId }`) so we can render conditionally / scoped.
+  // The host stays unaware of what we render — this is the RabbitMQ-agnostic
+  // extension point a real MQTT-broker plugin would build its UI on.
+  getSlotContributions(): PluginSlotContribution[] {
+    return [
+      {
+        slotId: MQTT_SERVER_DETAIL_SLOT,
+        key: 'hello-world-mqtt-detail',
+        render: (context) => <MqttServerDetailExtension mqttServerId={Number(context.mqttServerId)} />,
+      },
+      {
+        slotId: MQTT_SERVER_LIST_ROW_SLOT,
+        key: 'hello-world-mqtt-list-row',
+        render: (context) => <MqttServerListBadge mqttServerId={Number(context.mqttServerId)} />,
       },
     ];
   }
