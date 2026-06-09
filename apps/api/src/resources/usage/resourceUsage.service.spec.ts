@@ -31,6 +31,7 @@ import {
   ResourceUsageTakenOverEvent,
   ResourceUsageNoteAddedEvent,
   SupervisedUsageStartedEvent,
+  SupervisedUsageEndedEvent,
 } from './events/resource-usage.events';
 import { BillingService } from '../../billing/billing.service';
 import { InsufficientBalanceError } from '../../billing/errors/insufficient-balance.error';
@@ -1336,6 +1337,66 @@ describe('ResourceUsageService', () => {
         expect.objectContaining({ endNotes: prefixedNotes }),
         expect.anything(),
       );
+    });
+
+    it('emits the auto-promotion counter event when a supervised session ends', async () => {
+      const dto: EndUsageSessionDto = {};
+      const sessionOwner = { id: 60, username: 'student' } as User;
+      const supervisorUser = { id: 61, username: 'supervisor' } as User;
+      const mockActiveSession = {
+        id: 9,
+        resourceId: 40,
+        userId: sessionOwner.id,
+        supervisorUserId: supervisorUser.id,
+        startTime: new Date(),
+        user: sessionOwner,
+      } as ResourceUsage;
+      const mockUpdatedSession = { ...mockActiveSession, endTime: new Date() };
+
+      resourceUsageRepository.findOne
+        .mockResolvedValueOnce(mockActiveSession)
+        .mockResolvedValueOnce(mockUpdatedSession)
+        .mockResolvedValueOnce(mockUpdatedSession);
+
+      (transactionalEntityManager.createQueryBuilder as jest.Mock).mockReturnValue(
+        createMockQueryBuilder(null) as unknown as SelectQueryBuilder<ResourceUsage>,
+      );
+
+      await service.endSession(mockActiveSession.resourceId, supervisorUser, dto);
+
+      const endedEmit = eventEmitter.emit.mock.calls.find((c) => c[0] === SupervisedUsageEndedEvent.EVENT_NAME);
+      expect(endedEmit).toBeDefined();
+      const payload = endedEmit?.[1] as SupervisedUsageEndedEvent;
+      expect(payload).toBeInstanceOf(SupervisedUsageEndedEvent);
+      expect(payload).toMatchObject({ resourceId: 40, userId: 60, supervisorUserId: 61, usageId: 9 });
+    });
+
+    it('does not emit the auto-promotion counter event for an unsupervised session end', async () => {
+      const dto: EndUsageSessionDto = {};
+      const sessionOwner = { id: 60, username: 'student' } as User;
+      const mockActiveSession = {
+        id: 9,
+        resourceId: 40,
+        userId: sessionOwner.id,
+        supervisorUserId: null,
+        startTime: new Date(),
+        user: sessionOwner,
+      } as ResourceUsage;
+      const mockUpdatedSession = { ...mockActiveSession, endTime: new Date() };
+
+      resourceUsageRepository.findOne
+        .mockResolvedValueOnce(mockActiveSession)
+        .mockResolvedValueOnce(mockUpdatedSession)
+        .mockResolvedValueOnce(mockUpdatedSession);
+
+      (transactionalEntityManager.createQueryBuilder as jest.Mock).mockReturnValue(
+        createMockQueryBuilder(null) as unknown as SelectQueryBuilder<ResourceUsage>,
+      );
+
+      await service.endSession(mockActiveSession.resourceId, sessionOwner, dto);
+
+      const endedEmit = eventEmitter.emit.mock.calls.find((c) => c[0] === SupervisedUsageEndedEvent.EVENT_NAME);
+      expect(endedEmit).toBeUndefined();
     });
   });
 

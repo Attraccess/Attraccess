@@ -91,11 +91,12 @@ export class ResourceIntroductionsService {
     return historyItem;
   }
 
-  private async createOne(resourceId: number, userId: number): Promise<ResourceIntroduction> {
+  private async createOne(resourceId: number, userId: number, tutorUserId?: number): Promise<ResourceIntroduction> {
     this.logger.debug(`Creating new introduction for resourceId: ${resourceId}, userId: ${userId}`);
     const introduction = this.resourceIntroductionRepository.create({
       resource: { id: resourceId },
       receiverUser: { id: userId },
+      ...(tutorUserId != null ? { tutorUser: { id: tutorUserId } } : {}),
     });
 
     const savedIntroduction = await this.resourceIntroductionRepository.save(introduction);
@@ -109,13 +110,18 @@ export class ResourceIntroductionsService {
     userId: number,
     nextStatus: IntroductionHistoryAction,
     data?: UpdateResourceIntroductionDto,
+    tutorUserId?: number,
   ) {
     this.logger.debug(`Updating introduction status to ${nextStatus} for resourceId: ${resourceId}, userId: ${userId}`);
     let resourceIntroduction = await this.getIntroductionOfUser(resourceId, userId);
 
     if (!resourceIntroduction) {
       this.logger.debug('No existing introduction found, creating new one');
-      resourceIntroduction = await this.createOne(resourceId, userId);
+      resourceIntroduction = await this.createOne(resourceId, userId, tutorUserId);
+    } else if (tutorUserId != null && resourceIntroduction.tutorUserId !== tutorUserId) {
+      await this.resourceIntroductionRepository.update(resourceIntroduction.id, { tutorUserId });
+      // Keep the in-memory entity in sync so subsequent history/logging sees the updated tutor.
+      resourceIntroduction.tutorUserId = tutorUserId;
     }
 
     this.logger.debug(`Creating new history item with action: ${nextStatus}`);
@@ -166,9 +172,16 @@ export class ResourceIntroductionsService {
     resourceId: number,
     userId: number,
     data?: UpdateResourceIntroductionDto,
+    options?: { tutorUserId?: number },
   ): Promise<ResourceIntroductionHistoryItem> {
     this.logger.debug(`Granting introduction for resourceId: ${resourceId}, userId: ${userId}`);
-    const result = await this.updateIntroductionStatus(resourceId, userId, IntroductionHistoryAction.GRANT, data);
+    const result = await this.updateIntroductionStatus(
+      resourceId,
+      userId,
+      IntroductionHistoryAction.GRANT,
+      data,
+      options?.tutorUserId,
+    );
     this.metricsService.resourceIntroductionsTotal.inc();
     this.logger.debug(`Grant operation completed for resourceId: ${resourceId}, userId: ${userId}`);
     return result;
