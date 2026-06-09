@@ -13,6 +13,9 @@ void i2cBusInit()
     if (!s_i2cBusMutex)
     {
         s_i2cBusMutex = xSemaphoreCreateRecursiveMutex();
+        // Required once multitasking starts; without it lock/unlock silently
+        // no-op and the shared bus runs unprotected. Fail loud instead.
+        configASSERT(s_i2cBusMutex != nullptr);
     }
 }
 
