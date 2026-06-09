@@ -8,17 +8,14 @@ import {
   AlertDescription,
   Button,
   Chip,
+  DrawerBackdrop,
+  DrawerBody,
+  DrawerContent,
+  DrawerDialog,
+  DrawerHeader,
   Form,
   Input,
   Label,
-  Modal,
-  ModalBackdrop,
-  ModalBody,
-  ModalContainer,
-  ModalDialog,
-  ModalFooter,
-  ModalHeader,
-  ModalHeading,
   Spinner,
   Table,
   TableBody,
@@ -31,8 +28,8 @@ import {
   TableScrollContainer,
   useOverlayState,
 } from '@heroui/react';
-import { MehIcon, PlusIcon, RefreshCwIcon, Trash2Icon, WifiIcon } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { MehIcon, PlusIcon, RefreshCwIcon, Trash2Icon, WifiIcon, XIcon } from 'lucide-react';
+import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { addDevice, deleteDevice, listDevices, reprobeDevice, type AuthState, type ShellyDevice } from './api';
 
 function generationLabel(generation: number | null): string {
@@ -63,7 +60,36 @@ function EmptyDevices() {
   );
 }
 
-function AddDeviceModal({
+// Mirror of the host's StandardDrawer (apps/frontend/src/components/standardDrawer.tsx),
+// replicated here because host components aren't shared with plugins over module
+// federation — only @heroui/react primitives are.
+const DRAWER_DIALOG_CLASSNAME = 'md:max-w-2xl md:mx-auto bg-surface-secondary';
+const FIELD_CONTRAST_STYLE: CSSProperties = {
+  ['--field-border' as never]: 'var(--border-secondary)',
+  ['--border-width-field' as never]: '1px',
+};
+
+function StandardDrawer({
+  isOpen,
+  onOpenChange,
+  children,
+}: {
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  children: ReactNode;
+}) {
+  return (
+    <DrawerBackdrop isOpen={isOpen} onOpenChange={onOpenChange}>
+      <DrawerContent>
+        <DrawerDialog className={DRAWER_DIALOG_CLASSNAME} style={FIELD_CONTRAST_STYLE}>
+          {children}
+        </DrawerDialog>
+      </DrawerContent>
+    </DrawerBackdrop>
+  );
+}
+
+function AddDeviceDrawer({
   isOpen,
   onOpenChange,
   onAdded,
@@ -77,72 +103,67 @@ function AddDeviceModal({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const submit = useCallback(
-    async (close: () => void) => {
-      const ip = ipAddress.trim();
-      if (!ip) {
-        setError('IP address is required.');
-        return;
-      }
-      setSubmitting(true);
-      setError(null);
-      try {
-        await addDevice({ ipAddress: ip, name: name.trim() || undefined });
-        setIpAddress('');
-        setName('');
-        onAdded();
-        close();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : String(err));
-      } finally {
-        setSubmitting(false);
-      }
-    },
-    [ipAddress, name, onAdded]
-  );
+  const close = useCallback(() => onOpenChange(false), [onOpenChange]);
+
+  const submit = useCallback(async () => {
+    const ip = ipAddress.trim();
+    if (!ip) {
+      setError('IP address is required.');
+      return;
+    }
+    setSubmitting(true);
+    setError(null);
+    try {
+      await addDevice({ ipAddress: ip, name: name.trim() || undefined });
+      setIpAddress('');
+      setName('');
+      onAdded();
+      close();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSubmitting(false);
+    }
+  }, [ipAddress, name, onAdded, close]);
 
   return (
-    <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
-      <ModalBackdrop>
-        <ModalContainer size="md">
-          <ModalDialog>
-            {({ close }) => (
-              <>
-                <ModalHeader>
-                  <ModalHeading>Add a device</ModalHeading>
-                  <p className="text-sm text-default-500">
-                    Enter the device's IP address. We probe <code>GET /shelly</code> to detect its generation and
-                    model.
-                  </p>
-                </ModalHeader>
-                <ModalBody>
-                  <Form onSubmit={() => submit(close)} className="flex flex-col gap-4">
-                    <TextFieldRow label="IP address" value={ipAddress} onChange={setIpAddress} placeholder="192.168.1.42" required dataCy="shelly-add-ip" />
-                    <TextFieldRow label="Name (optional)" value={name} onChange={setName} placeholder="Workshop light" dataCy="shelly-add-name" />
-                    <input type="submit" hidden />
-                  </Form>
-                  {error && (
-                    <Alert status="danger" className="mt-4">
-                      <AlertContent>
-                        <AlertDescription data-cy="shelly-add-error">{error}</AlertDescription>
-                      </AlertContent>
-                    </Alert>
-                  )}
-                </ModalBody>
-                <ModalFooter>
-                  <Button variant="secondary" onPress={close}>
-                    Cancel
-                  </Button>
-                  <Button variant="primary" isPending={submitting} onPress={() => submit(close)} data-cy="shelly-add-submit">
-                    <PlusIcon className="h-4 w-4" /> Add device
-                  </Button>
-                </ModalFooter>
-              </>
-            )}
-          </ModalDialog>
-        </ModalContainer>
-      </ModalBackdrop>
-    </Modal>
+    <StandardDrawer isOpen={isOpen} onOpenChange={onOpenChange}>
+      <DrawerHeader>
+        <div className="flex w-full items-start justify-between gap-3">
+          <div className="flex flex-col gap-1">
+            <h2 className="text-lg font-semibold">Add a device</h2>
+            <p className="text-sm text-default-500">
+              Enter the device's IP address. We probe <code>GET /shelly</code> to detect its generation and model.
+            </p>
+          </div>
+          <Button isIconOnly variant="ghost" aria-label="Close" onPress={close}>
+            <XIcon size={16} />
+          </Button>
+        </div>
+      </DrawerHeader>
+      <DrawerBody>
+        <Form onSubmit={submit} className="flex flex-col gap-4">
+          <TextFieldRow label="IP address" value={ipAddress} onChange={setIpAddress} placeholder="192.168.1.42" required dataCy="shelly-add-ip" />
+          <TextFieldRow label="Name (optional)" value={name} onChange={setName} placeholder="Workshop light" dataCy="shelly-add-name" />
+          {error && (
+            <Alert status="danger">
+              <AlertContent>
+                <AlertDescription data-cy="shelly-add-error">{error}</AlertDescription>
+              </AlertContent>
+            </Alert>
+          )}
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="secondary" onPress={close}>
+              Cancel
+            </Button>
+            <Button variant="primary" type="submit" isPending={submitting} onPress={submit} data-cy="shelly-add-submit">
+              <PlusIcon className="h-4 w-4" /> Add device
+            </Button>
+          </div>
+          <input type="submit" hidden />
+        </Form>
+      </DrawerBody>
+    </StandardDrawer>
   );
 }
 
@@ -290,7 +311,7 @@ export function DevicesPage() {
         </Table>
       )}
 
-      <AddDeviceModal isOpen={isOpen} onOpenChange={setOpen} onAdded={refresh} />
+      <AddDeviceDrawer isOpen={isOpen} onOpenChange={setOpen} onAdded={refresh} />
     </div>
   );
 }
