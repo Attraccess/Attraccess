@@ -75,6 +75,7 @@
   - [Overview](plugins/overview.md)
   - [Installing Plugins](plugins/installing-plugins.md)
   - [Developing Plugins](plugins/developing-plugins.md)
+  - [Database Migrations](plugins/database-migrations.md)
 
 - **Monitoring & Metrics**
   - [Overview](monitoring/overview.md)

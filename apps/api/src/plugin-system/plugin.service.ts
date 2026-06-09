@@ -3,6 +3,7 @@ import { join } from 'path';
 import type { PluginManifestInfo } from '@attraccess/plugins-backend-sdk';
 import { PluginManifest, PluginManifestSchema, LoadedPluginManifest } from './plugin.manifest';
 import { PluginSandboxService } from './plugin-sandbox.service';
+import { PluginMigrationService } from './plugin-migration.service';
 import { existsSync, readdirSync, readFileSync } from 'fs';
 import { FileUpload } from '../common/types/file-upload.types';
 import { rename, rm } from 'fs/promises';
@@ -136,6 +137,10 @@ export class PluginService {
       manifest.main.frontend.directory = join(pluginFolder, manifest.main.frontend.directory);
     }
 
+    if (manifest.main.migrations?.directory) {
+      manifest.main.migrations.directory = join(pluginFolder, manifest.main.migrations.directory);
+    }
+
     return manifest;
   }
 
@@ -214,6 +219,21 @@ export class PluginService {
     if (!existsSync(pluginFolder)) {
       PluginService.logger.error(`Plugin folder ${pluginFolder} of plugin ${plugin.name} not found`);
       throw new NotFoundException('Plugin not found');
+    }
+
+    // Revert the plugin's database migrations (drops its tables/data) BEFORE the
+    // files are removed — the migration classes live in the plugin bundle and
+    // must still be on disk to run. A failure here is logged but never blocks the
+    // uninstall: the admin asked for the plugin to be gone.
+    if (PluginMigrationService.hasMigrations(plugin)) {
+      try {
+        await PluginMigrationService.runDownMigrations(plugin);
+      } catch (error) {
+        PluginService.logger.error(
+          `Failed to revert migrations for plugin ${plugin.name}; removing files anyway. Its tables may be orphaned.`,
+          error as Error
+        );
+      }
     }
 
     // delete folder

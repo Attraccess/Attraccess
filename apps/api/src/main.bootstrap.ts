@@ -9,6 +9,7 @@ import appConfiguration, { AppConfigType } from './config/app.config';
 import { DataSource } from 'typeorm';
 import { PluginService } from './plugin-system/plugin.service';
 import { PluginModule } from './plugin-system/plugin.module';
+import { PluginMigrationService } from './plugin-system/plugin-migration.service';
 import { HttpsOptions } from '@nestjs/common/interfaces/external/https-options.interface';
 import { readFile, writeFile } from 'fs/promises';
 import { existsSync } from 'fs';
@@ -82,6 +83,16 @@ export async function bootstrap() {
     DISABLE_PLUGINS: earlyConfig.DISABLE_PLUGINS,
   });
   bootstrapLogger.log('PluginSystem configured.');
+
+  // Run plugin-shipped up-migrations BEFORE AppModule is imported, so every
+  // plugin's tables exist before any plugin code (its onModuleInit) runs. This
+  // uses a standalone DataSource per plugin against the same DB, so it does not
+  // interfere with the host DataSource (which opens later, inside AppModule).
+  // Per-plugin failures are isolated inside the service and never abort boot.
+  if (!earlyConfig.DISABLE_PLUGINS) {
+    bootstrapLogger.log('Running plugin database migrations...');
+    await PluginMigrationService.runPendingUpMigrationsForAllPlugins();
+  }
 
   // Import AppModule only now, so PluginModule.forRoot() sees the configured PLUGIN_DIR.
   const { AppModule } = await import('./app/app.module');
