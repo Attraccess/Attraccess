@@ -7,11 +7,7 @@ import {
   DrawerBody,
   DrawerFooter,
   DrawerHeader,
-  Modal,
-  ModalBackdrop,
   ModalBody,
-  ModalContainer,
-  ModalDialog,
   ModalFooter,
   ModalHeader,
   Table,
@@ -25,6 +21,7 @@ import {
   cn,
 } from '@heroui/react';
 import { StandardDrawer } from '../../../components/standardDrawer';
+import { StandardModal } from '../../../components/standardModal';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AttraccessUser, DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
@@ -73,45 +70,40 @@ const NfcCardDeleteModal = (props: DeleteModalProps) => {
   }, [props.cardId, resetNfcCard, readerId]);
 
   return (
-    <Modal
+    <StandardModal
       isOpen={props.show}
       onOpenChange={(open) => {
         if (!open) props.close();
       }}
       data-cy="nfc-card-delete-modal"
+      size="md"
     >
-      <ModalBackdrop>
-        <ModalContainer size="md">
-          <ModalDialog>
-            {({ close }) => (
-              <>
-                <ModalHeader>
-                  <h1>{t('nfcCardsTable.deleteModal.title')}</h1>
-                </ModalHeader>
-                <ModalBody>
-                  <p>{t('nfcCardsTable.deleteModal.description', { id: props.cardId })}</p>
-                  <AttractapSelect
-                    label={t('nfcCardsTable.deleteModal.readerLabel')}
-                    placeholder={t('nfcCardsTable.deleteModal.readerPlaceholder')}
-                    selection={readerId}
-                    onSelectionChange={(readerId) => setReaderId(readerId ?? null)}
-                    data-cy="nfc-card-delete-modal-reader-select"
-                  />
-                </ModalBody>
-                <ModalFooter>
-                  <Button onPress={close} data-cy="nfc-card-delete-modal-cancel-button">
-                    {t('nfcCardsTable.deleteModal.cancel')}
-                  </Button>
-                  <Button isDisabled={!readerId} onPress={deleteCard} data-cy="nfc-card-delete-modal-delete-button">
-                    {t('nfcCardsTable.deleteModal.delete')} ID: {!readerId ? 'null' : readerId}
-                  </Button>
-                </ModalFooter>
-              </>
-            )}
-          </ModalDialog>
-        </ModalContainer>
-      </ModalBackdrop>
-    </Modal>
+      {({ close }) => (
+        <>
+          <ModalHeader>
+            <h1>{t('nfcCardsTable.deleteModal.title')}</h1>
+          </ModalHeader>
+          <ModalBody>
+            <p>{t('nfcCardsTable.deleteModal.description', { id: props.cardId })}</p>
+            <AttractapSelect
+              label={t('nfcCardsTable.deleteModal.readerLabel')}
+              placeholder={t('nfcCardsTable.deleteModal.readerPlaceholder')}
+              selection={readerId}
+              onSelectionChange={(readerId) => setReaderId(readerId ?? null)}
+              data-cy="nfc-card-delete-modal-reader-select"
+            />
+          </ModalBody>
+          <ModalFooter>
+            <Button onPress={close} data-cy="nfc-card-delete-modal-cancel-button">
+              {t('nfcCardsTable.deleteModal.cancel')}
+            </Button>
+            <Button isDisabled={!readerId} onPress={deleteCard} data-cy="nfc-card-delete-modal-delete-button">
+              {t('nfcCardsTable.deleteModal.delete')} ID: {!readerId ? 'null' : readerId}
+            </Button>
+          </ModalFooter>
+        </>
+      )}
+    </StandardModal>
   );
 };
 

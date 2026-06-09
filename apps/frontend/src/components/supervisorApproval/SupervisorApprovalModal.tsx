@@ -1,20 +1,9 @@
 import { useEffect, useState } from 'react';
-import {
-  Card,
-  Description,
-  Modal,
-  ModalBackdrop,
-  ModalBody,
-  ModalContainer,
-  ModalDialog,
-  ModalFooter,
-  ModalHeader,
-  ModalHeading,
-  Spinner,
-} from '@heroui/react';
+import { Card, Description, ModalBody, ModalFooter, ModalHeader, ModalHeading, Spinner } from '@heroui/react';
 import { AttraccessUser, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { SupervisionRequestDto, User, useResourcesServiceGetOneResourceById } from '@attraccess/react-query-client';
 import { Button } from '../button';
+import { StandardModal } from '../standardModal';
 import en from './translations/en.json';
 import de from './translations/de.json';
 
@@ -63,59 +52,53 @@ export function SupervisorApprovalModal({
   const isBusy = isApproving || isRejecting;
 
   return (
-    <Modal isOpen={true}>
-      <ModalBackdrop>
-        <ModalContainer size="md">
-          <ModalDialog>
-            {() => (
-              <>
-                <ModalHeader>
-                  <ModalHeading>{t('title')}</ModalHeading>
-                </ModalHeader>
+    <StandardModal isOpen={true} size="md">
+      {() => (
+        <>
+          <ModalHeader>
+            <ModalHeading>{t('title')}</ModalHeading>
+          </ModalHeader>
 
-                <ModalBody>
-                  <div className="space-y-4">
-                    <Description>{t('description', { resource: resource?.name ?? '' })}</Description>
+          <ModalBody>
+            <div className="space-y-4">
+              <Description>{t('description', { resource: resource?.name ?? '' })}</Description>
 
-                    <AttraccessUser
-                      user={
-                        {
-                          id: request.requesterUserId,
-                          username: request.requesterUsername,
-                        } as unknown as User
-                      }
-                      description={t('requesterRole')}
-                    />
+              <AttraccessUser
+                user={
+                  {
+                    id: request.requesterUserId,
+                    username: request.requesterUsername,
+                  } as unknown as User
+                }
+                description={t('requesterRole')}
+              />
 
-                    {request.notes ? (
-                      <Card>
-                        <Card.Content className="gap-1">
-                          <Description>{t('notesLabel')}</Description>
-                          <p className="text-sm">{request.notes}</p>
-                        </Card.Content>
-                      </Card>
-                    ) : null}
+              {request.notes ? (
+                <Card>
+                  <Card.Content className="gap-1">
+                    <Description>{t('notesLabel')}</Description>
+                    <p className="text-sm">{request.notes}</p>
+                  </Card.Content>
+                </Card>
+              ) : null}
 
-                    <div className="flex items-center justify-center gap-2">
-                      <Spinner color="accent" size="sm" />
-                      <Description className="tabular-nums">{t('countdown', { seconds: secondsLeft })}</Description>
-                    </div>
-                  </div>
-                </ModalBody>
+              <div className="flex items-center justify-center gap-2">
+                <Spinner color="accent" size="sm" />
+                <Description className="tabular-nums">{t('countdown', { seconds: secondsLeft })}</Description>
+              </div>
+            </div>
+          </ModalBody>
 
-                <ModalFooter>
-                  <Button variant="danger" onPress={onReject} isPending={isRejecting} isDisabled={isBusy}>
-                    {t('reject')}
-                  </Button>
-                  <Button variant="primary" onPress={onApprove} isPending={isApproving} isDisabled={isBusy}>
-                    {t('approve')}
-                  </Button>
-                </ModalFooter>
-              </>
-            )}
-          </ModalDialog>
-        </ModalContainer>
-      </ModalBackdrop>
-    </Modal>
+          <ModalFooter>
+            <Button variant="danger" onPress={onReject} isPending={isRejecting} isDisabled={isBusy}>
+              {t('reject')}
+            </Button>
+            <Button variant="primary" onPress={onApprove} isPending={isApproving} isDisabled={isBusy}>
+              {t('approve')}
+            </Button>
+          </ModalFooter>
+        </>
+      )}
+    </StandardModal>
   );
 }

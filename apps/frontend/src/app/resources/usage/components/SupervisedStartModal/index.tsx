@@ -4,16 +4,13 @@ import {
   AlertContent,
   AlertDescription,
   Description,
-  Modal,
-  ModalBackdrop,
   ModalBody,
-  ModalContainer,
-  ModalDialog,
   ModalFooter,
   ModalHeader,
   ModalHeading,
   Spinner,
 } from '@heroui/react';
+import { StandardModal } from '../../../../../components/standardModal';
 import { AttraccessUser, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   ApiError,
@@ -179,38 +176,33 @@ export function SupervisedStartModal({
   };
 
   return (
-    <Modal
+    <StandardModal
       isOpen={isOpen}
       onOpenChange={(open) => {
         if (!open) onClose();
       }}
+      size="md"
     >
-      <ModalBackdrop>
-        <ModalContainer size="md">
-          <ModalDialog>
-            {({ close }) => (
-              <>
-                <ModalHeader>
-                  <ModalHeading>{t('title')}</ModalHeading>
-                </ModalHeader>
+      {({ close }) => (
+        <>
+          <ModalHeader>
+            <ModalHeading>{t('title')}</ModalHeading>
+          </ModalHeader>
 
-                <ModalBody>{renderBody()}</ModalBody>
+          <ModalBody>{renderBody()}</ModalBody>
 
-                <ModalFooter>
-                  {(phase === 'timeout' || phase === 'rejected') && (
-                    <Button variant="primary" onPress={() => setPhase('select')}>
-                      {t('retry')}
-                    </Button>
-                  )}
-                  <Button variant="ghost" onPress={close} isDisabled={phase === 'waiting'}>
-                    {t('cancel')}
-                  </Button>
-                </ModalFooter>
-              </>
+          <ModalFooter>
+            {(phase === 'timeout' || phase === 'rejected') && (
+              <Button variant="primary" onPress={() => setPhase('select')}>
+                {t('retry')}
+              </Button>
             )}
-          </ModalDialog>
-        </ModalContainer>
-      </ModalBackdrop>
-    </Modal>
+            <Button variant="ghost" onPress={close} isDisabled={phase === 'waiting'}>
+              {t('cancel')}
+            </Button>
+          </ModalFooter>
+        </>
+      )}
+    </StandardModal>
   );
 }
