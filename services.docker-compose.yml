@@ -170,6 +170,28 @@ services:
       - '--storage.tsdb.retention.time=30d'
       - '--web.enable-lifecycle'
 
+  # Copies provisioning into a writable volume and strips the opt-in Pushover
+  # alerting files when the PUSHOVER_* secrets are unset, so Grafana starts even
+  # without Pushover configured (ATT-539). Dashboards stay bind-mounted for live
+  # editing; only provisioning is snapshotted here.
+  grafana-provisioning-init:
+    image: grafana/grafana:13.0.1
+    restart: 'no'
+    user: root
+    entrypoint: ['/bin/sh', '-c']
+    environment:
+      - PUSHOVER_API_TOKEN=${PUSHOVER_API_TOKEN:-}
+      - PUSHOVER_USER_KEY=${PUSHOVER_USER_KEY:-}
+    command:
+      - >
+        set -e &&
+        rm -rf /grafana-provisioning/* /grafana-provisioning/.[!.]* 2>/dev/null || true &&
+        cp -rT /src/provisioning /grafana-provisioning &&
+        sh /src/prepare-provisioning.sh /grafana-provisioning
+    volumes:
+      - ./monitoring/grafana:/src:ro
+      - grafana-provisioning:/grafana-provisioning
+
   grafana:
     image: grafana/grafana:13.0.1
     ports:
@@ -178,8 +200,14 @@ services:
       - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-attraccess}
       - GF_SERVER_HTTP_PORT=3001
+      # Read by $__env{} interpolation in the provisioned Pushover contact point.
+      - PUSHOVER_API_TOKEN=${PUSHOVER_API_TOKEN:-}
+      - PUSHOVER_USER_KEY=${PUSHOVER_USER_KEY:-}
+    depends_on:
+      grafana-provisioning-init:
+        condition: service_completed_successfully
     volumes:
-      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana-provisioning:/etc/grafana/provisioning:ro
       - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
       - grafana-data:/var/lib/grafana
 
@@ -209,4 +237,6 @@ volumes:
   prometheus-data:
     driver: local
   grafana-data:
+    driver: local
+  grafana-provisioning:
     driver: local
