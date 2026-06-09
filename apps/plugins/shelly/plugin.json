@@ -6,6 +6,10 @@
       "directory": "dist",
       "entryPoint": "index.js"
     },
+    "migrations": {
+      "directory": "dist",
+      "entryPoint": "migrations.js"
+    },
     "frontend": {
       "directory": "frontend",
       "entryPoint": "remoteEntry.js"

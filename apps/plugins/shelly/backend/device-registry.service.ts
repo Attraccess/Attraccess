@@ -1,13 +1,20 @@
 // Persisted Shelly device registry.
 //
-// A first-party plugin cannot rely on a TypeORM entity for its own table: the
-// host DataSource is initialised with a fixed entity set and `synchronize:false`,
-// so `getRepository('ShellyDevice')` would throw "No metadata found" in
-// production. Instead we own a single namespaced table and drive it with raw SQL
-// over the shared connection — created idempotently on module init. Requires the
+// The `plugin_shelly_devices` table is owned by a plugin migration
+// (backend/migrations/*-create-shelly-devices.ts), which the host runs on boot
+// before this service initialises and reverts on uninstall — so we no longer
+// create the table from `onModuleInit`.
+//
+// We still drive it with raw SQL over the shared connection rather than a
+// TypeORM entity/repository: the host DataSource is initialised with a fixed
+// entity set (`@attraccess/database-entities`) and `synchronize:false`, and the
+// plugin-migration runner uses a throwaway DataSource with `entities: []`.
+// Neither registers a plugin's own entity, so `context.getRepository(ShellyDevice)`
+// would throw "No metadata found" in production. Raw SQL keeps the plugin schema
+// self-contained, matching the plugin sandbox boundary. Requires the
 // `DATABASE_ACCESS` permission (declared in plugin.json) to reach
 // `context.dataSource`.
-import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import type { AuthState, ShellyDevice } from './types';
 
@@ -43,26 +50,8 @@ export interface DeviceProbeFields {
 }
 
 @Injectable()
-export class DeviceRegistryService implements OnModuleInit {
+export class DeviceRegistryService {
   constructor(@Inject(PLUGIN_CONTEXT) private readonly context: PluginContext) {}
-
-  async onModuleInit(): Promise<void> {
-    await this.run(
-      `CREATE TABLE IF NOT EXISTS ${TABLE} (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        ip_address TEXT NOT NULL UNIQUE,
-        generation INTEGER,
-        model TEXT,
-        auth_state TEXT NOT NULL DEFAULT 'unknown',
-        last_probe_at TEXT,
-        last_probe_error TEXT,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-      )`
-    );
-    this.context.logger.log(`Shelly device registry ready (table "${TABLE}").`);
-  }
 
   async list(): Promise<ShellyDevice[]> {
     const rows = await this.run<DeviceRow[]>(`SELECT * FROM ${TABLE} ORDER BY created_at ASC, id ASC`);

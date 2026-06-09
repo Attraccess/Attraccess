@@ -29,7 +29,7 @@
       "outputs": ["{projectRoot}/package/dist"],
       "options": {
         "cwd": "apps/plugins/shelly",
-        "command": "node ../scripts/esbuild-backend.mjs --entry backend/plugin.ts --outfile package/dist/index.js"
+        "command": "node ../scripts/esbuild-backend.mjs --entry backend/plugin.ts --outfile package/dist/index.js --entry backend/migrations.ts --outfile package/dist/migrations.js"
       }
     },
     "build-frontend": {
