@@ -7,6 +7,7 @@ import {
   DropdownItem,
   DropdownPopover,
 } from '@heroui/react';
+import { SessionStatusCard } from '../SessionStatusCard';
 import { Button } from '../../../../../components/button';
 import { buttonVariants } from '@heroui/styles';
 import { StopCircle, ChevronDownIcon } from 'lucide-react';
@@ -123,50 +124,59 @@ export function ActiveSessionDisplay({ resourceId, startTime }: ActiveSessionDis
 
   return (
     <>
-      <div className="space-y-4">
-        {activeSession?.usage?.project && (
-          <div>
-            <p className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">{t('project')}:</p>
-            <p className="font-medium text-gray-900 dark:text-white whitespace-nowrap">
-              {activeSession.usage.project.name}
-            </p>
-          </div>
-        )}
-        {activeSession?.usage?.supervisorUser && (
-          <div>
-            <p className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">{t('supervisedBy')}:</p>
-            <AttraccessUser user={activeSession.usage.supervisorUser} />
-          </div>
-        )}
-        <SessionTimer startTime={startTime} />
+      <SessionStatusCard
+        accent="success"
+        statusLabel={t('live')}
+        pulse
+        data-cy="active-session-card"
+        chipDataCy="active-session-live-chip"
+      >
+          <SessionTimer startTime={startTime} variant="hero" />
 
-        <FlowButtons resourceId={resourceId} />
+          {(activeSession?.usage?.project || activeSession?.usage?.supervisorUser) && (
+            <div className="border-t border-divider pt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {activeSession?.usage?.project && (
+                <div className="min-w-0">
+                  <p className="text-xs uppercase tracking-wide text-default-500">{t('project')}</p>
+                  <p className="font-medium text-foreground truncate">{activeSession.usage.project.name}</p>
+                </div>
+              )}
+              {activeSession?.usage?.supervisorUser && (
+                <div className="min-w-0">
+                  <p className="text-xs uppercase tracking-wide text-default-500 mb-1">{t('supervisedBy')}</p>
+                  <AttraccessUser user={activeSession.usage.supervisorUser} />
+                </div>
+              )}
+            </div>
+          )}
 
-        <ButtonGroup className="w-full">
-          <Button
-            variant="danger"
-            isPending={endSession.isPending}
-            onPress={immediatelyEndSession}
-          ><StopCircle className="w-4 h-4" />
-            {t('endSession')}
-          </Button>
-          <Dropdown>
-            <DropdownTrigger className={buttonVariants({ isIconOnly: true, variant: 'danger' })}>
-              <ChevronDownIcon />
-            </DropdownTrigger>
-            <DropdownPopover>
-              <DropdownMenu aria-label={t('alternativeEndSessionOptionsMenu.label')}>
-                <DropdownItem
-                  key="endWithNotes" id="endWithNotes"
-                  onPress={handleOpenEndSessionModal}
-                >
-                  {t('alternativeEndSessionOptionsMenu.endWithNotes.label')}
-                </DropdownItem>
-              </DropdownMenu>
-            </DropdownPopover>
-          </Dropdown>
-        </ButtonGroup>
-      </div>
+          <FlowButtons resourceId={resourceId} />
+
+          <ButtonGroup className="w-full">
+            <Button
+              variant="danger"
+              isPending={endSession.isPending}
+              onPress={immediatelyEndSession}
+            ><StopCircle className="w-4 h-4" />
+              {t('endSession')}
+            </Button>
+            <Dropdown>
+              <DropdownTrigger className={buttonVariants({ isIconOnly: true, variant: 'danger' })}>
+                <ChevronDownIcon />
+              </DropdownTrigger>
+              <DropdownPopover>
+                <DropdownMenu aria-label={t('alternativeEndSessionOptionsMenu.label')}>
+                  <DropdownItem
+                    key="endWithNotes" id="endWithNotes"
+                    onPress={handleOpenEndSessionModal}
+                  >
+                    {t('alternativeEndSessionOptionsMenu.endWithNotes.label')}
+                  </DropdownItem>
+                </DropdownMenu>
+              </DropdownPopover>
+            </Dropdown>
+          </ButtonGroup>
+      </SessionStatusCard>
 
       <SessionNotesModal
         isOpen={isNotesModalOpen}
