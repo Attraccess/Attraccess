@@ -194,9 +194,8 @@ function LoginFormContent(props: LoginFormProps & { t: TFunction; tExists: TExis
         data-cy="login-form-password-input"
         autoComplete="current-password"
       />
+      {/* Value sourced purely from React state (twoFactorCode), not FormData. */}
       <OneTimeCodeInput
-        id="twoFactorCode"
-        name="twoFactorCode"
         label={t('twoFactorCode')}
         description={t('twoFactorHelper')}
         value={twoFactorCode}

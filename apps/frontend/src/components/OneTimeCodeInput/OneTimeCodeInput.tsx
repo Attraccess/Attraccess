@@ -1,4 +1,4 @@
-import React, { useId } from 'react';
+import React, { useId, useMemo } from 'react';
 import { Description, InputOTP, Label, REGEXP_ONLY_DIGITS } from '@heroui/react';
 
 export interface OneTimeCodeInputProps {
@@ -34,7 +34,7 @@ export const OneTimeCodeInput: React.FC<OneTimeCodeInputProps> = ({
 }) => {
   const generatedId = useId();
   const inputId = id ?? generatedId;
-  const slots = Array.from({ length }, (_, index) => index);
+  const slots = useMemo(() => Array.from({ length }, (_, index) => index), [length]);
 
   return (
     <div className="flex flex-col gap-1.5">
@@ -42,7 +42,8 @@ export const OneTimeCodeInput: React.FC<OneTimeCodeInputProps> = ({
       <InputOTP
         id={inputId}
         name={name}
-        value={value}
+        // Normalize to keep InputOTP consistently controlled (never undefined).
+        value={value ?? ''}
         onChange={onChange}
         maxLength={length}
         pattern={REGEXP_ONLY_DIGITS}
