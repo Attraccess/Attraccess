@@ -2,6 +2,7 @@ import { DynamicModule, LoggerService, Type } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource, EntityTarget, ObjectLiteral, Repository } from 'typeorm';
 import { SystemEvent, SystemEventHandler, SystemEventPayload, SystemEventSubscription } from './plugin.interface';
+import type { PluginEntityClass } from './entity';
 
 /**
  * DI token under which a plugin's own services can inject the PluginContext.
@@ -110,4 +111,14 @@ export interface PluginContext {
  */
 export interface PluginBackendModule {
   register(context: PluginContext): DynamicModule;
+
+  /**
+   * Optional TypeORM entity classes this plugin owns. The host registers their
+   * metadata into the shared DataSource at load time so the plugin can query
+   * them through {@link PluginContext.getRepository}. The schema itself is owned
+   * by the plugin's migrations (the host runs with `synchronize: false`), so an
+   * entity here describes an existing table rather than creating one. Requires
+   * the DATABASE_ACCESS permission. See `docs/en/plugins/database-migrations.md`.
+   */
+  entities?: PluginEntityClass[];
 }

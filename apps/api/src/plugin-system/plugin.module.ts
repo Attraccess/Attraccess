@@ -5,6 +5,8 @@ import { DataSource, EntityTarget, ObjectLiteral, Repository } from 'typeorm';
 import {
   PluginContext,
   PluginBackendModule,
+  PluginEntityClass,
+  PluginPermission,
   SystemEvent,
   SystemEventHandler,
   SystemEventPayload,
@@ -13,6 +15,7 @@ import {
   MqttServerConnectionConfig,
   MqttServerHostProvider,
 } from '@attraccess/plugins-backend-sdk';
+import { dataSourceConfig } from '../database/datasource';
 import { LoadedPluginManifest } from './plugin.manifest';
 import { PluginService } from './plugin.service';
 import { PluginSandboxService } from './plugin-sandbox.service';
@@ -100,6 +103,12 @@ export class PluginModule {
 
     const exported = importedModule.default as PluginBackendModule | DynamicModule;
 
+    // Register any entities the plugin owns into the shared DataSource BEFORE it
+    // initialises (which happens later, at NestFactory.create). The schema is
+    // owned by the plugin's migrations — this only makes the entity metadata
+    // resolvable so the plugin can use context.getRepository(Entity).
+    PluginModule.registerPluginEntities(manifest, (exported as PluginBackendModule)?.entities);
+
     if (typeof (exported as PluginBackendModule)?.register !== 'function') {
       this.logger.warn(
         `Plugin ${manifest.name} does not export a register(context) factory; loading its default export as a static module.`
@@ -109,6 +118,49 @@ export class PluginModule {
 
     const context = PluginModule.createPluginContext(manifest);
     return (exported as PluginBackendModule).register(context);
+  }
+
+  /**
+   * Adds a plugin's declared entities to the host DataSource's entity set so
+   * `context.getRepository(Entity)` resolves their metadata. The host runs with
+   * `synchronize: false`, so this never alters the schema — the table is owned
+   * by the plugin's migration. Gated on DATABASE_ACCESS (the same permission
+   * getRepository requires); a plugin without it could not use the entity anyway.
+   *
+   * Mutates the shared `dataSourceConfig.entities` array in place: this runs at
+   * AppModule import time (when `@Module` evaluates its `imports`), before the
+   * TypeORM DataSource is constructed at NestFactory.create — so the additions
+   * are picked up. Deduped because AppModule is imported once but instantiated
+   * more than once during bootstrap.
+   */
+  private static registerPluginEntities(
+    manifest: LoadedPluginManifest,
+    entities: PluginEntityClass[] | undefined
+  ): void {
+    if (!entities || entities.length === 0) {
+      return;
+    }
+
+    if (!(manifest.permissions ?? []).includes(PluginPermission.DATABASE_ACCESS)) {
+      this.logger.warn(
+        `Plugin ${manifest.name} declares ${entities.length} entit(y/ies) but lacks the DATABASE_ACCESS ` +
+          `permission; skipping entity registration (getRepository would be denied anyway).`
+      );
+      return;
+    }
+
+    const registry = dataSourceConfig.entities as unknown[];
+    let added = 0;
+    for (const entity of entities) {
+      if (!registry.includes(entity)) {
+        registry.push(entity);
+        added++;
+      }
+    }
+
+    if (added > 0) {
+      this.logger.log(`Registered ${added} entit(y/ies) from plugin ${manifest.name} into the host DataSource.`);
+    }
   }
 
   private static createPluginContext(manifest: LoadedPluginManifest): PluginContext {

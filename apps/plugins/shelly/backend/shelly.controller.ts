@@ -17,7 +17,8 @@ import {
 import { Auth } from '@attraccess/plugins-backend-sdk';
 import { DeviceRegistryService } from './device-registry.service';
 import { ShellyProbeService } from './shelly-probe.service';
-import type { ProbeResult, ShellyDevice } from './types';
+import { ShellyDevice } from './shelly-device.entity';
+import type { ProbeResult } from './types';
 
 interface AddDeviceBody {
   ipAddress?: string;

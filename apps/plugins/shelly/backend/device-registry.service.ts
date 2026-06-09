@@ -2,43 +2,22 @@
 //
 // The `plugin_shelly_devices` table is owned by a plugin migration
 // (backend/migrations/*-create-shelly-devices.ts), which the host runs on boot
-// before this service initialises and reverts on uninstall — so we no longer
-// create the table from `onModuleInit`.
+// before this service initialises and reverts on uninstall.
 //
-// We still drive it with raw SQL over the shared connection rather than a
-// TypeORM entity/repository: the host DataSource is initialised with a fixed
-// entity set (`@attraccess/database-entities`) and `synchronize:false`, and the
-// plugin-migration runner uses a throwaway DataSource with `entities: []`.
-// Neither registers a plugin's own entity, so `context.getRepository(ShellyDevice)`
-// would throw "No metadata found" in production. Raw SQL keeps the plugin schema
-// self-contained, matching the plugin sandbox boundary. Requires the
-// `DATABASE_ACCESS` permission (declared in plugin.json) to reach
-// `context.dataSource`.
+// CRUD goes through a real TypeORM repository over the shared connection. The
+// host registers the `ShellyDevice` entity (declared via the `entities` export
+// in plugin.ts) into its DataSource at load time, so `context.getRepository`
+// resolves the entity's metadata — no hand-written SQL or snake_case row mapping.
+// Requires the `DATABASE_ACCESS` permission (declared in plugin.json).
 import { Inject, Injectable } from '@nestjs/common';
-import type { PluginContext } from '@attraccess/plugins-backend-sdk';
-import type { AuthState, ShellyDevice } from './types';
+import type { PluginContext, Repository } from '@attraccess/plugins-backend-sdk';
+import { ShellyDevice } from './shelly-device.entity';
+import type { AuthState } from './types';
 
 // The host hands each plugin its PluginContext under this token. Recreate it
 // locally (do not import the value) so the artifact has no runtime dependency on
 // the SDK: Symbol.for() resolves against the process-global registry.
 const PLUGIN_CONTEXT = Symbol.for('attraccess.plugin.context');
-
-// Namespaced so the plugin's table never collides with a host table.
-const TABLE = 'plugin_shelly_devices';
-
-/** Raw snake_case row as returned by sqlite. */
-interface DeviceRow {
-  id: number;
-  name: string;
-  ip_address: string;
-  generation: number | null;
-  model: string | null;
-  auth_state: string;
-  last_probe_at: string | null;
-  last_probe_error: string | null;
-  created_at: string;
-  updated_at: string;
-}
 
 /** Fields written by a probe (on add or re-probe). */
 export interface DeviceProbeFields {
@@ -51,77 +30,52 @@ export interface DeviceProbeFields {
 
 @Injectable()
 export class DeviceRegistryService {
-  constructor(@Inject(PLUGIN_CONTEXT) private readonly context: PluginContext) {}
+  private readonly devices: Repository<ShellyDevice>;
 
-  async list(): Promise<ShellyDevice[]> {
-    const rows = await this.run<DeviceRow[]>(`SELECT * FROM ${TABLE} ORDER BY created_at ASC, id ASC`);
-    return rows.map(mapRow);
+  constructor(@Inject(PLUGIN_CONTEXT) context: PluginContext) {
+    this.devices = context.getRepository(ShellyDevice);
   }
 
-  async findById(id: number): Promise<ShellyDevice | null> {
-    const rows = await this.run<DeviceRow[]>(`SELECT * FROM ${TABLE} WHERE id = ? LIMIT 1`, [id]);
-    return rows.length ? mapRow(rows[0]) : null;
+  list(): Promise<ShellyDevice[]> {
+    return this.devices.find({ order: { createdAt: 'ASC', id: 'ASC' } });
   }
 
-  async findByIp(ipAddress: string): Promise<ShellyDevice | null> {
-    const rows = await this.run<DeviceRow[]>(`SELECT * FROM ${TABLE} WHERE ip_address = ? LIMIT 1`, [ipAddress]);
-    return rows.length ? mapRow(rows[0]) : null;
+  findById(id: number): Promise<ShellyDevice | null> {
+    return this.devices.findOne({ where: { id } });
   }
 
-  async create(input: { name: string; ipAddress: string } & DeviceProbeFields): Promise<ShellyDevice> {
+  findByIp(ipAddress: string): Promise<ShellyDevice | null> {
+    return this.devices.findOne({ where: { ipAddress } });
+  }
+
+  create(input: { name: string; ipAddress: string } & DeviceProbeFields): Promise<ShellyDevice> {
     const now = new Date().toISOString();
-    await this.run(
-      `INSERT INTO ${TABLE}
-        (name, ip_address, generation, model, auth_state, last_probe_at, last_probe_error, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        input.name,
-        input.ipAddress,
-        input.generation,
-        input.model,
-        input.authState,
-        input.lastProbeAt,
-        input.lastProbeError,
-        now,
-        now,
-      ]
-    );
-    const created = await this.findByIp(input.ipAddress);
-    if (!created) {
-      throw new Error(`failed to load device after insert (ip ${input.ipAddress})`);
-    }
-    return created;
+    const device = this.devices.create({
+      name: input.name,
+      ipAddress: input.ipAddress,
+      generation: input.generation,
+      model: input.model,
+      authState: input.authState,
+      lastProbeAt: input.lastProbeAt,
+      lastProbeError: input.lastProbeError,
+      createdAt: now,
+      updatedAt: now,
+    });
+    return this.devices.save(device);
   }
 
   async updateProbe(id: number, patch: DeviceProbeFields): Promise<void> {
-    await this.run(
-      `UPDATE ${TABLE}
-         SET generation = ?, model = ?, auth_state = ?, last_probe_at = ?, last_probe_error = ?, updated_at = ?
-       WHERE id = ?`,
-      [patch.generation, patch.model, patch.authState, patch.lastProbeAt, patch.lastProbeError, new Date().toISOString(), id]
-    );
+    await this.devices.update(id, {
+      generation: patch.generation,
+      model: patch.model,
+      authState: patch.authState,
+      lastProbeAt: patch.lastProbeAt,
+      lastProbeError: patch.lastProbeError,
+      updatedAt: new Date().toISOString(),
+    });
   }
 
   async delete(id: number): Promise<void> {
-    await this.run(`DELETE FROM ${TABLE} WHERE id = ?`, [id]);
+    await this.devices.delete(id);
   }
-
-  private run<T = unknown>(sql: string, params: unknown[] = []): Promise<T> {
-    return this.context.dataSource.query(sql, params) as Promise<T>;
-  }
-}
-
-function mapRow(row: DeviceRow): ShellyDevice {
-  return {
-    id: row.id,
-    name: row.name,
-    ipAddress: row.ip_address,
-    generation: row.generation,
-    model: row.model,
-    authState: row.auth_state as AuthState,
-    lastProbeAt: row.last_probe_at,
-    lastProbeError: row.last_probe_error,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
 }
