@@ -52,6 +52,7 @@ void setup()
 
     // Prevent potential I2C stalls on touch controller reads
     Wire.setTimeOut(50);
+    Wire.setClock(ATTRACTAP_I2C_CLOCK_HZ);
 
     mainLogger.info("Attractap starting...");
     application.setup();

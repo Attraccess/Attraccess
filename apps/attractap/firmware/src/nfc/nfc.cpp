@@ -6,6 +6,10 @@ void NFC::setup()
 {
     this->logger.info("Initializing PN532");
     this->pn532.begin();
+    // Adafruit BusIO's I2CDevice::begin() (called inside pn532.begin()) re-invokes
+    // Wire.begin(), which can reset the bus clock to the 100 kHz default. Restore
+    // 400 kHz Fast Mode (same pitfall as the SensorLib restore in rgb_gt911_driver).
+    Wire.setClock(ATTRACTAP_I2C_CLOCK_HZ);
 
     this->logger.info("Checking hardware");
     this->checkHardware(true);

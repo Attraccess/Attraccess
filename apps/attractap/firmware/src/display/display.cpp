@@ -149,6 +149,7 @@ void Display::setup()
             recoverI2CBus(PIN_TOUCH_I2C_SDA, PIN_TOUCH_I2C_SCL);
             Wire.begin(PIN_TOUCH_I2C_SDA, PIN_TOUCH_I2C_SCL);
             Wire.setTimeOut(50);
+            Wire.setClock(ATTRACTAP_I2C_CLOCK_HZ);
 #endif
             delay(200);
         }
