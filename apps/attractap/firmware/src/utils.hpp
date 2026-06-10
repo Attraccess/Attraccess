@@ -11,7 +11,7 @@
  * library begin() calls (SensorLib, Adafruit BusIO) re-invoke Wire.begin() and
  * can reset the clock - same pitfall as the Wire.setTimeOut(50) restores.
  */
-static constexpr uint32_t ATTRACTAP_I2C_CLOCK_HZ = 100000;
+static constexpr uint32_t ATTRACTAP_I2C_CLOCK_HZ = 400000;
 
 String hexToString(uint8_t *uid, uint8_t uidLength);
 bool stringToHexArray(String hexString, uint8_t *array, uint8_t arrayLength);
