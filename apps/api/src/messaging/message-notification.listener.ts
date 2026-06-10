@@ -119,10 +119,6 @@ export class MessageNotificationListener {
     message: Message,
     senderName: string,
   ): Promise<void> {
-    if (!this.pushService.isEnabled) {
-      return;
-    }
-
     // Respect the opt-out preference (separate toggle from email).
     if (!(await this.messagingService.shouldPushMessageOnOffline(participant.userId))) {
       return;

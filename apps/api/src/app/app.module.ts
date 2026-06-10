@@ -18,7 +18,6 @@ import { AttractapModule } from '../attractap/attractap.module';
 import { AnalyticsModule } from '../analytics/analytics.module';
 import { EmailTemplateModule } from '../email-template/email-template.module';
 import sessionConfig from '../config/session.config';
-import pushConfig from '../config/push.config';
 import { LicenseModule } from '../license/license.module';
 import { LicenseService } from '../license/license.service';
 import { BillingModule } from '../billing/billing.module';
@@ -34,7 +33,7 @@ import { PushModule } from '../push/push.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
-      load: [appConfiguration, storageConfigObject, sessionConfig, pushConfig],
+      load: [appConfiguration, storageConfigObject, sessionConfig],
       isGlobal: true,
     }),
 

@@ -15,7 +15,7 @@ describe('MessageNotificationListener', () => {
   let liveService: { isOnline: jest.Mock };
   let messagingService: { shouldEmailMessageOnOffline: jest.Mock; shouldPushMessageOnOffline: jest.Mock };
   let emailService: { sendNewMessageEmail: jest.Mock };
-  let pushService: { isEnabled: boolean; sendToUser: jest.Mock };
+  let pushService: { sendToUser: jest.Mock };
 
   const SENDER_ID = 1;
   const RECIPIENT_ID = 2;
@@ -50,7 +50,7 @@ describe('MessageNotificationListener', () => {
       shouldPushMessageOnOffline: jest.fn().mockResolvedValue(true),
     };
     emailService = { sendNewMessageEmail: jest.fn().mockResolvedValue(undefined) };
-    pushService = { isEnabled: true, sendToUser: jest.fn().mockResolvedValue(undefined) };
+    pushService = { sendToUser: jest.fn().mockResolvedValue(undefined) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -231,15 +231,6 @@ describe('MessageNotificationListener', () => {
 
     it('never pushes to an opted-out recipient', async () => {
       messagingService.shouldPushMessageOnOffline.mockResolvedValue(false);
-      participantRepository.find.mockResolvedValue([buildParticipant()]);
-
-      await listener.handleMessageCreated(new MessageCreatedEvent(buildMessage()));
-
-      expect(pushService.sendToUser).not.toHaveBeenCalled();
-    });
-
-    it('does not push when the push service is disabled', async () => {
-      pushService.isEnabled = false;
       participantRepository.find.mockResolvedValue([buildParticipant()]);
 
       await listener.handleMessageCreated(new MessageCreatedEvent(buildMessage()));

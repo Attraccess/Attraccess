@@ -66,14 +66,12 @@ export function NotificationPreferencesForm() {
     [mutate, push, showError, t],
   );
 
-  const pushUnavailable = !push.isSupported || !push.isPushConfigured;
+  const pushUnavailable = !push.isSupported;
   const pushBlocked = push.isSupported && push.permission === 'denied';
 
   let pushDescription = t('messagesPush.description');
   if (!push.isSupported) {
     pushDescription = t('messagesPush.unsupported');
-  } else if (!push.isPushConfigured && !push.isLoadingKey) {
-    pushDescription = t('messagesPush.notConfigured');
   } else if (pushBlocked) {
     pushDescription = t('messagesPush.permissionDenied');
   }

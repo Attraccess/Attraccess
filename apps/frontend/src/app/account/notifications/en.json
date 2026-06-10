@@ -7,7 +7,6 @@
     "label": "Push notifications for messages",
     "description": "When you receive a direct message while you are not online, this device shows a push notification.",
     "unsupported": "Your browser does not support push notifications.",
-    "notConfigured": "Push notifications are not configured on this server.",
     "permissionDenied": "Notifications are blocked for this site. Allow them in your browser settings to enable push notifications.",
     "errors": {
       "subscribeFailed": "Could not enable push notifications. Please check your browser notification permissions."

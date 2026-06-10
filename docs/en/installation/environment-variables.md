@@ -64,17 +64,6 @@ All configuration options for Attraccess that can be set via environment variabl
 | `AUTH_SESSION_SECRET` | – | **Required.** Secret key for session encryption |
 | `SESSION_COOKIE_MAX_AGE` | `604800000` | Maximum session duration in milliseconds (default: 7 days) |
 
-## Push Notifications (Web Push)
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `VAPID_PUBLIC_KEY` | – | VAPID public key for browser push notifications |
-| `VAPID_PRIVATE_KEY` | – | VAPID private key for browser push notifications |
-| `VAPID_SUBJECT` | – | Contact for push services, e.g. `mailto:admin@your-domain.com` |
-
-> [!NOTE]
-> All three variables must be set to enable browser push notifications (e.g. for direct messages). When unset, push notifications are disabled and Attraccess works normally without them. Generate a key pair once with `npx web-push generate-vapid-keys` and keep it stable — changing the keys invalidates all existing push subscriptions.
-
 ## Plugins
 
 | Variable | Default | Description |

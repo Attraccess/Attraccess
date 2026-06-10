@@ -42,7 +42,6 @@ export function usePushNotifications() {
 
   const { data: vapidResponse, isLoading: isLoadingKey } = usePushServicePushGetVapidPublicKey();
   const publicKey = vapidResponse?.publicKey ?? null;
-  const isPushConfigured = Boolean(publicKey);
 
   const { mutateAsync: upsertSubscription } = usePushServicePushUpsertSubscription();
   const { mutateAsync: deleteSubscription } = usePushServicePushDeleteSubscription();
@@ -133,8 +132,8 @@ export function usePushNotifications() {
 
   return {
     isSupported,
-    isPushConfigured,
     isLoadingKey,
+    publicKey,
     permission,
     isSubscribed,
     isBusy,

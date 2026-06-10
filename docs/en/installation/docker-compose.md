@@ -38,12 +38,6 @@ LICENSE_KEY=your-license-key
 # Optional
 LOG_LEVELS=error,warn,log
 TZ=Europe/Berlin
-
-# Optional: browser push notifications (e.g. for direct messages).
-# Generate a key pair once with: npx web-push generate-vapid-keys
-#VAPID_PUBLIC_KEY=your-vapid-public-key
-#VAPID_PRIVATE_KEY=your-vapid-private-key
-#VAPID_SUBJECT=mailto:admin@your-domain.com
 ```
 
 > [!TIP]
