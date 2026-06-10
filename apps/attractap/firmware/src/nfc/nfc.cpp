@@ -100,19 +100,8 @@ void NFC::handleCardDetection()
         return;
     }
 
-    uint32_t now = millis();
-
     if (this->foundCard)
     {
-        // Rate-limit the presence check: a full AES handshake per loop pass kept
-        // the shared I2C bus continuously occupied while a card rested on the
-        // reader (ATT-554 item 6).
-        if (now - this->lastPresenceCheckMs < NFC::presenceCheckIntervalMs)
-        {
-            return;
-        }
-        this->lastPresenceCheckMs = now;
-
         // just try to comminucate with card in any way to check if it is still present
         bool authSuccess = false;
         {
@@ -139,14 +128,6 @@ void NFC::handleCardDetection()
         // card still present, wait till removed
         return;
     }
-
-    // Rate-limit the detection poll and keep its timeout short so each bus hold
-    // stays small; the cadence (not the timeout) defines detection latency.
-    if (now - this->lastDetectionPollMs < NFC::detectionPollIntervalMs)
-    {
-        return;
-    }
-    this->lastDetectionPollMs = now;
 
     bool foundCardUpdate = false;
     {

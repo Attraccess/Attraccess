@@ -23,17 +23,6 @@ void Application::networkTask(void *parameter) {
   }
 }
 
-void Application::nfcTask(void *parameter) {
-  Application *app = static_cast<Application *>(parameter);
-  while (true) {
-    // NFC::loop() rate-limits its own PN532 polls (detection ~125 ms, presence
-    // check ~250 ms); this short delay just keeps the task cooperative between
-    // checks without adding meaningful detection latency.
-    app->nfc.loop();
-    vTaskDelay(pdMS_TO_TICKS(10));
-  }
-}
-
 #ifdef HAS_WS2812_LED
 void Application::ledTask(void *parameter) {
   Application *app = static_cast<Application *>(parameter);
@@ -515,13 +504,6 @@ void Application::setup() {
   xTaskCreate(Application::networkTask, "NetworkTask", 4096, nullptr,
               tskIDLE_PRIORITY, nullptr);
 
-  // NFC polling on its own task (like NetworkTask/LedTask): blocking PN532 I2C
-  // time no longer costs the UI anything. 8 KB stack: the detection callback can
-  // run the full NTAG424 AES handshake (mbedtls CMAC) on this task. Priority 1:
-  // above the idle-priority app/network tasks so polls run on schedule, below
-  // the websocket/render tasks.
-  xTaskCreate(Application::nfcTask, "NfcTask", 8192, this, 1, nullptr);
-
 #ifdef ESP_PLATFORM
   esp_task_wdt_add(NULL);
 #endif
@@ -546,9 +528,13 @@ void Application::loop() {
   Display::loop();
 #endif
 
-    // nfc.loop() runs on NfcTask (ATT-554 item 6)
+  // NFC polling back on the main loop (ATT-554 item 6 reverted for isolation:
+  // the dedicated NFC task + concurrent bus use is the prime suspect for the
+  // field I2C wedge). Blocking PN532 time costs only this loop — rendering and
+  // touch live on LvglTask.
+  this->nfc.loop();
 
-    this->api.loop();
+  this->api.loop();
 
 #ifdef HAS_LVGL_DISPLAY
   // processState mutates LVGL (screen transitions, popups, screen setters);

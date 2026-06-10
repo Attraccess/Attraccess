@@ -20,11 +20,12 @@ public:
     void setup();
 
     /**
-     * Runs on a dedicated FreeRTOS task (Application::nfcTask), NOT the main
-     * loop: PN532 polling blocks the shared I2C bus and used to stall the UI
-     * (ATT-554 item 6). All public card operations are serialized with an
-     * internal recursive mutex so the main-loop enrollment/reset state machines
-     * can keep calling changeKey()/authenticate()/getAvailableKeyNo() safely.
+     * Runs on the main application loop (the dedicated NFC task from ATT-554
+     * item 6 is reverted while the field I2C wedge is isolated). Blocking PN532
+     * time costs only the main loop — rendering and touch live on LvglTask.
+     * Public card operations stay serialized with an internal recursive mutex,
+     * and every PN532 conversation holds the shared I2CBusGuard against the
+     * touch reads on LvglTask.
      */
     void loop();
 
@@ -95,14 +96,8 @@ private:
         NFC &nfc;
     };
 
-    // Polling cadence (ATT-554 item 6): keep every bus hold short and rare.
-    // - When no card is present: probe every ~125 ms with a ~25 ms timeout
-    //   (instead of a blocking 100 ms timeout on every single loop pass).
-    // - When a card rests on the reader: verify presence via AES handshake only
-    //   every ~250 ms (instead of a full handshake per loop pass).
-    uint32_t lastDetectionPollMs = 0;
-    uint32_t lastPresenceCheckMs = 0;
-    static const uint32_t detectionPollIntervalMs = 125;
-    static const uint16_t detectionPollTimeoutMs = 25;
-    static const uint32_t presenceCheckIntervalMs = 250;
+    // Pre-ATT-554 polling semantics (rate limits reverted for isolation):
+    // blocking 100 ms detection poll and a presence handshake on every loop
+    // pass, exactly like the firmware that was known to run stable.
+    static const uint16_t detectionPollTimeoutMs = 100;
 };

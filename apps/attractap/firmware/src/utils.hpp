@@ -4,14 +4,14 @@
 
 /**
  * Shared I2C bus clock (Hz). GT911 touch, PN532 NFC and the PCA9555 IO expander
- * all support 400 kHz Fast Mode; running the single shared bus at 400 kHz cuts
- * every bus hold (touch reads, NFC frames, expander access) 4x vs the Arduino
- * default 100 kHz. Must be re-applied after every Wire.begin(), because library
- * begin() calls (SensorLib, Adafruit BusIO) re-invoke Wire.begin() and can reset
- * the clock - same pitfall as the Wire.setTimeOut(50) restores.
- * Fall back to 200000-300000 here if hardware signal integrity requires it.
+ * all support 400 kHz Fast Mode, but field testing on reader-21 showed the bus
+ * wedging once NFC traffic starts (ATT-554 crash + follow-up reports), so the
+ * 400 kHz change (item 3) is reverted to the proven 100 kHz while the I2C
+ * problems are isolated. Must be re-applied after every Wire.begin(), because
+ * library begin() calls (SensorLib, Adafruit BusIO) re-invoke Wire.begin() and
+ * can reset the clock - same pitfall as the Wire.setTimeOut(50) restores.
  */
-static constexpr uint32_t ATTRACTAP_I2C_CLOCK_HZ = 400000;
+static constexpr uint32_t ATTRACTAP_I2C_CLOCK_HZ = 100000;
 
 String hexToString(uint8_t *uid, uint8_t uidLength);
 bool stringToHexArray(String hexString, uint8_t *array, uint8_t arrayLength);
