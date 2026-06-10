@@ -6,16 +6,13 @@ import {
   TextField,
   Label,
   Input,
-  Modal,
-  ModalBackdrop,
   ModalBody,
-  ModalContainer,
-  ModalDialog,
   ModalFooter,
   ModalHeader,
   ModalHeading,
   useOverlayState,
 } from '@heroui/react';
+import { StandardModal } from '../../../../../../components/standardModal';
 import { Button } from '../../../../../../components/button';
 import { PasswordInput } from '../../../../../../components/PasswordInput';
 import { useCallback, useRef, useState } from 'react';
@@ -85,51 +82,45 @@ export function SumUpReadersPairing(props: Props) {
     <>
       {children(open)}
 
-      <Modal isOpen={isOpen} onOpenChange={setOpen}>
-        <ModalBackdrop>
-          <ModalContainer size="md">
-            <ModalDialog>
-              {({ close }) => (
-                <>
-                  <ModalHeader>
-                    <ModalHeading>{t('title')}</ModalHeading>
-                    <p className="text-sm text-muted">{t('subtitle')}</p>
-                  </ModalHeader>
-                  <ModalBody>
-                    <Form onSubmit={onSubmit} ref={formRef} className="flex flex-col gap-4">
-                      <PasswordInput
-                        label={t('inputs.pairingCode')}
-                        value={pairingCode}
-                        onChange={setPairingCode}
-                        autoComplete="off"
-                        isRequired
-                        minLength={8}
-                        maxLength={9}
-                      />
+      <StandardModal isOpen={isOpen} onOpenChange={setOpen} size="md">
+        {({ close }) => (
+          <>
+            <ModalHeader>
+              <ModalHeading>{t('title')}</ModalHeading>
+              <p className="text-sm text-muted">{t('subtitle')}</p>
+            </ModalHeader>
+            <ModalBody>
+              <Form onSubmit={onSubmit} ref={formRef} className="flex flex-col gap-4">
+                <PasswordInput
+                  label={t('inputs.pairingCode')}
+                  value={pairingCode}
+                  onChange={setPairingCode}
+                  autoComplete="off"
+                  isRequired
+                  minLength={8}
+                  maxLength={9}
+                />
 
-                      <TextField value={name} onChange={setName} isRequired>
-                        <Label>{t('inputs.name')}</Label>
-                        <Input autoComplete="off" />
-                      </TextField>
+                <TextField value={name} onChange={setName} isRequired>
+                  <Label>{t('inputs.name')}</Label>
+                  <Input autoComplete="off" />
+                </TextField>
 
-                      <input type="submit" hidden />
-                    </Form>
-                  </ModalBody>
+                <input type="submit" hidden />
+              </Form>
+            </ModalBody>
 
-                  <ModalFooter>
-                    <Button variant="secondary" onPress={close}>
-                      {t('actions.cancel')}
-                    </Button>
-                    <Button variant="primary" onPress={onSubmit} isPending={isPairingReader}>
-                      {t('actions.pair')}
-                    </Button>
-                  </ModalFooter>
-                </>
-              )}
-            </ModalDialog>
-          </ModalContainer>
-        </ModalBackdrop>
-      </Modal>
+            <ModalFooter>
+              <Button variant="secondary" onPress={close}>
+                {t('actions.cancel')}
+              </Button>
+              <Button variant="primary" onPress={onSubmit} isPending={isPairingReader}>
+                {t('actions.pair')}
+              </Button>
+            </ModalFooter>
+          </>
+        )}
+      </StandardModal>
     </>
   );
 }
