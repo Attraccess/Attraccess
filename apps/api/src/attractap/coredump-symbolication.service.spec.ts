@@ -150,6 +150,28 @@ describe('CoredumpSymbolicationService', () => {
     expect(result.buildId).toBeNull();
   });
 
+  it('does not report the fallback ELF metadata build id when symbolication fails', async () => {
+    const binDir = tempDir();
+    const fakeTool = join(binDir, 'fake-esp-coredump');
+    // Produces no output, so runTool rejects and symbolication is reported as failed
+    writeFileSync(fakeTool, '#!/bin/sh\nexit 1\n');
+    chmodSync(fakeTool, 0o755);
+    process.env.ESP_COREDUMP_CMD = fakeTool;
+
+    const elfPath = join(binDir, 'fw.elf');
+    writeFileSync(elfPath, 'elf');
+    const service = makeService({
+      resolveElfFile: jest
+        .fn()
+        .mockReturnValue({ path: elfPath, firmware: { chip: 'esp32s3', buildId: 'f6899cb1067e5043' } }),
+    });
+
+    // No extractable build id → variant fallback → tool failure must not surface the ELF's build id
+    const result = await service.symbolicate(Buffer.from('no marker here'), { variant: 'eth' });
+    expect(result.status).toBe('failed');
+    expect(result.buildId).toBeNull();
+  });
+
   it('prefers an explicitly provided build id over extraction', async () => {
     const resolveElfFile = jest.fn().mockReturnValue(null);
     const service = makeService({ resolveElfFile });

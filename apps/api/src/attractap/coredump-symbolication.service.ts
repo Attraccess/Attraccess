@@ -82,6 +82,8 @@ export class CoredumpSymbolicationService {
       return {
         status: 'success',
         backtrace: output,
+        // esp-coredump verified the ELF's SHA against the dump, so the ELF's (full) build id
+        // is the coredump's build id — even when the ELF was resolved via variant fallback.
         buildId: elf.firmware.buildId ?? buildId ?? null,
       };
     } catch (error) {
@@ -91,7 +93,9 @@ export class CoredumpSymbolicationService {
         return { status: 'unavailable', backtrace: null, buildId: buildId ?? null };
       }
       this.logger.error(`Coredump symbolication failed: ${message}`);
-      return { status: 'failed', backtrace: message, buildId: elf.firmware.buildId ?? buildId ?? null };
+      // Unverified: only report a build id that actually came from the coredump, not the
+      // metadata of an ELF that esp-coredump may have just rejected.
+      return { status: 'failed', backtrace: message, buildId: buildId ?? null };
     } finally {
       await rm(workingDir, { recursive: true, force: true }).catch(() => undefined);
     }
