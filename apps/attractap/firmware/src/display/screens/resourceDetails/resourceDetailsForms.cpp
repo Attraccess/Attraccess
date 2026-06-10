@@ -27,12 +27,17 @@ void ResourceDetailsScreen::resetFormsModalState()
    this->formsProgressBar = nullptr;
    this->formsBreadcrumbLabel = nullptr;
    this->formsCancelButton = nullptr;
-   this->formsKeyboard = nullptr;
    this->formsBackButton = nullptr;
    this->formsNextButton = nullptr;
    this->formsNextLabel = nullptr;
    this->formsBusyOverlay = nullptr;
    this->formsBusyLabel = nullptr;
+   this->formsEditorOverlay = nullptr;
+   this->formsEditorTitleLabel = nullptr;
+   this->formsEditorTextarea = nullptr;
+   this->formsEditorSpacer = nullptr;
+   this->formsEditorKeyboard = nullptr;
+   this->formsEditorWidgetIndex = 0;
    this->formsBusy = false;
    this->formsModalMeta = nullptr;
    this->formsModalPage = nullptr;
@@ -79,12 +84,11 @@ void ResourceDetailsScreen::showFormsModal(const API::ResourceUsageFormRequest &
       lv_obj_add_state(this->formsBackButton, LV_STATE_DISABLED);
    }
 
-   this->hideFormsKeyboard();
+   this->closeFormsEditor(false);
    if (this->formsModalOverlay)
    {
       lv_obj_clear_flag(this->formsModalOverlay, LV_OBJ_FLAG_HIDDEN);
    }
-   this->updateFormsModalLayoutForKeyboard(false);
    // Block input while the first field is being fetched from the server.
    this->setFormsBusy(true, "Laden...");
 }
@@ -128,12 +132,7 @@ void ResourceDetailsScreen::renderFormField(const API::ResourceUsageFormFieldsPa
       lv_label_set_text(this->formsNextLabel, isLast ? "Absenden" : "Weiter");
    }
 
-   if (this->formsModalContent)
-   {
-      lv_obj_scroll_to_y(this->formsModalContent, 0, LV_ANIM_OFF);
-   }
-   this->hideFormsKeyboard();
-   this->updateFormsModalLayoutForKeyboard(false);
+   this->closeFormsEditor(false);
 }
 void ResourceDetailsScreen::showFormPageErrors(const API::ResourceUsageFormPageResult &result)
 {
@@ -161,7 +160,7 @@ void ResourceDetailsScreen::hideFormsModal()
    {
       lv_obj_add_flag(this->formsModalOverlay, LV_OBJ_FLAG_HIDDEN);
    }
-   this->hideFormsKeyboard();
+   this->closeFormsEditor(false);
 }
 void ResourceDetailsScreen::ensureFormsModal()
 {
@@ -239,7 +238,9 @@ void ResourceDetailsScreen::ensureFormsModal()
    lv_bar_set_range(this->formsProgressBar, 0, 100);
    lv_bar_set_value(this->formsProgressBar, 0, LV_ANIM_OFF);
 
-   // Scrollable body: breadcrumb + the single focused field, filling the panel.
+   // Body: breadcrumb + the single focused field, filling the panel. Never
+   // scrolls — text fields are tap-to-edit previews, editing happens in the
+   // fullscreen editor overlay, so everything always fits the screen.
    lv_obj_t *content = lv_obj_create(panel);
    this->formsModalContent = content;
    lv_obj_remove_style_all(content);
@@ -248,8 +249,7 @@ void ResourceDetailsScreen::ensureFormsModal()
    lv_obj_set_flex_align(content, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
    lv_obj_set_style_pad_row(content, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_pad_column(content, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_add_flag(content, LV_OBJ_FLAG_SCROLLABLE);
-   lv_obj_set_scroll_dir(content, LV_DIR_VER);
+   lv_obj_remove_flag(content, LV_OBJ_FLAG_SCROLLABLE);
    lv_obj_set_flex_grow(content, 1);
 
    this->formsBreadcrumbLabel = lv_label_create(content);
@@ -311,10 +311,80 @@ void ResourceDetailsScreen::ensureFormsModal()
    lv_obj_set_align(this->formsNextLabel, LV_ALIGN_CENTER);
    lv_obj_add_event_cb(nextBtn, &ResourceDetailsScreen::onFormsNext, LV_EVENT_CLICKED, this);
 
-   this->formsKeyboard = lv_keyboard_create(overlay);
-   lv_obj_set_width(this->formsKeyboard, lv_pct(100));
-   lv_obj_add_flag(this->formsKeyboard, LV_OBJ_FLAG_HIDDEN);
-   lv_obj_add_event_cb(this->formsKeyboard, &ResourceDetailsScreen::onFormsKeyboardEvent, LV_EVENT_ALL, this);
+   // Fullscreen text editor overlay: opened when a text/number preview box is
+   // tapped. Solid background, textarea filling everything above the pinned
+   // keyboard — the page itself never scrolls; only the text inside the
+   // textarea scrolls when it grows beyond the visible area.
+   lv_obj_t *editor = lv_obj_create(overlay);
+   this->formsEditorOverlay = editor;
+   lv_obj_remove_style_all(editor);
+   lv_obj_add_flag(editor, LV_OBJ_FLAG_IGNORE_LAYOUT);
+   lv_obj_add_flag(editor, LV_OBJ_FLAG_CLICKABLE);
+   lv_obj_add_flag(editor, LV_OBJ_FLAG_HIDDEN);
+   lv_obj_remove_flag(editor, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_set_size(editor, lv_pct(100), lv_pct(100));
+   lv_obj_set_align(editor, LV_ALIGN_CENTER);
+   lv_obj_set_style_bg_color(editor, lv_color_hex(0x111827), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_bg_opa(editor, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_top(editor, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_left(editor, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_right(editor, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_bottom(editor, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_row(editor, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_flex_flow(editor, LV_FLEX_FLOW_COLUMN);
+   lv_obj_set_flex_align(editor, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+
+   // Editor header: field name (left) + cancel button (right).
+   lv_obj_t *editorHeader = lv_obj_create(editor);
+   lv_obj_remove_style_all(editorHeader);
+   lv_obj_remove_flag(editorHeader, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_set_width(editorHeader, lv_pct(100));
+   lv_obj_set_height(editorHeader, LV_SIZE_CONTENT);
+   lv_obj_set_flex_flow(editorHeader, LV_FLEX_FLOW_ROW);
+   lv_obj_set_flex_align(editorHeader, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+   lv_obj_set_style_pad_column(editorHeader, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   this->formsEditorTitleLabel = lv_label_create(editorHeader);
+   lv_label_set_text(this->formsEditorTitleLabel, "");
+   lv_obj_set_flex_grow(this->formsEditorTitleLabel, 1);
+   lv_label_set_long_mode(this->formsEditorTitleLabel, LV_LABEL_LONG_DOT);
+   lv_obj_set_style_text_color(this->formsEditorTitleLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_font(this->formsEditorTitleLabel, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   lv_obj_t *editorCancelBtn = lv_button_create(editorHeader);
+   lv_obj_remove_style_all(editorCancelBtn);
+   lv_obj_set_size(editorCancelBtn, 34, 34);
+   lv_obj_set_style_radius(editorCancelBtn, LV_RADIUS_CIRCLE, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_bg_color(editorCancelBtn, lv_color_hex(0x1F2937), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_bg_opa(editorCancelBtn, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_t *editorCancelLabel = lv_label_create(editorCancelBtn);
+   lv_label_set_text(editorCancelLabel, LV_SYMBOL_CLOSE);
+   lv_obj_set_style_text_color(editorCancelLabel, lv_color_hex(0x9CA3AF), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_center(editorCancelLabel);
+   lv_obj_add_event_cb(editorCancelBtn, &ResourceDetailsScreen::onFormsEditorCancel, LV_EVENT_CLICKED, this);
+
+   // Textarea fills all space between header and keyboard.
+   lv_obj_t *editorTa = lv_textarea_create(editor);
+   this->formsEditorTextarea = editorTa;
+   lv_obj_set_width(editorTa, lv_pct(100));
+   lv_obj_set_flex_grow(editorTa, 1);
+   lv_obj_set_style_bg_color(editorTa, lv_color_hex(0x374151), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(editorTa, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   // Spacer keeps the keyboard pinned to the bottom when the textarea is
+   // one-line (multiline textareas grow instead, see openFormsEditor).
+   lv_obj_t *editorSpacer = lv_obj_create(editor);
+   this->formsEditorSpacer = editorSpacer;
+   lv_obj_remove_style_all(editorSpacer);
+   lv_obj_remove_flag(editorSpacer, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_remove_flag(editorSpacer, LV_OBJ_FLAG_CLICKABLE);
+   lv_obj_set_width(editorSpacer, lv_pct(100));
+   lv_obj_set_flex_grow(editorSpacer, 1);
+
+   this->formsEditorKeyboard = lv_keyboard_create(editor);
+   lv_obj_set_width(this->formsEditorKeyboard, lv_pct(100));
+   lv_obj_set_height(this->formsEditorKeyboard, lv_pct(45));
+   lv_obj_add_event_cb(this->formsEditorKeyboard, &ResourceDetailsScreen::onFormsEditorKeyboardEvent, LV_EVENT_ALL, this);
 
    // Busy overlay: created last so it floats above the panel + keyboard. While
    // visible it blocks all input behind it (CLICKABLE) until the server responds.
@@ -346,7 +416,7 @@ void ResourceDetailsScreen::setFormsBusy(bool busy, const char *text)
    this->formsBusy = busy;
    if (busy)
    {
-      this->hideFormsKeyboard();
+      this->closeFormsEditor(false);
    }
    if (this->formsBusyLabel && text)
    {
@@ -506,6 +576,8 @@ void ResourceDetailsScreen::buildCurrentFormField()
          widget.type = field.type;
          widget.isRequired = field.isRequired;
          widget.input = nullptr;
+         widget.previewLabel = nullptr;
+         widget.textValue = "";
          widget.errorLabel = nullptr;
          widget.definition = &field;
          widget.owner = this;
@@ -597,30 +669,40 @@ void ResourceDetailsScreen::buildCurrentFormField()
          }
          else
          {
-            lv_obj_t *ta = lv_textarea_create(fieldContainer);
-            widget.input = ta;
-            if (field.hasValue && field.value.length() > 0)
-            {
-               lv_textarea_set_text(ta, field.value.c_str());
-            }
-            lv_obj_set_width(ta, lv_pct(100));
-            lv_obj_set_style_bg_color(ta, lv_color_hex(0x374151), LV_PART_MAIN | LV_STATE_DEFAULT);
-            lv_obj_set_style_text_color(ta, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
-            lv_obj_set_style_pad_left(ta, 6, LV_PART_MAIN | LV_STATE_DEFAULT);
-            lv_obj_set_style_pad_right(ta, 6, LV_PART_MAIN | LV_STATE_DEFAULT);
+            // Text/number fields are not edited inline: a tap-to-edit preview
+            // box opens the fullscreen editor overlay (textarea + keyboard),
+            // so the form page itself never has to scroll.
             bool multiline = field.type == API::ResourceUsageFormFieldType::TEXT && field.options.text.multiline;
-            lv_textarea_set_one_line(ta, !multiline);
-            if (field.type == API::ResourceUsageFormFieldType::TEXT && field.options.text.hasPlaceholder)
-            {
-               lv_textarea_set_placeholder_text(ta, field.options.text.placeholder.c_str());
-            }
-            if (field.type == API::ResourceUsageFormFieldType::NUMBER)
-            {
-               lv_textarea_set_accepted_chars(ta, "0123456789-.");
-               lv_textarea_set_one_line(ta, true);
-            }
-            lv_obj_add_event_cb(ta, &ResourceDetailsScreen::onFormFieldFocus, LV_EVENT_CLICKED, this);
-            lv_obj_add_event_cb(ta, &ResourceDetailsScreen::onFormFieldFocus, LV_EVENT_FOCUSED, this);
+
+            lv_obj_t *preview = lv_obj_create(fieldContainer);
+            widget.input = preview;
+            widget.textValue = field.hasValue ? field.value : String("");
+            lv_obj_remove_style_all(preview);
+            lv_obj_add_flag(preview, LV_OBJ_FLAG_CLICKABLE);
+            lv_obj_remove_flag(preview, LV_OBJ_FLAG_SCROLLABLE);
+            lv_obj_set_width(preview, lv_pct(100));
+            lv_obj_set_height(preview, multiline ? 96 : 52);
+            lv_obj_set_style_bg_color(preview, lv_color_hex(0x374151), LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_bg_opa(preview, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_radius(preview, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_pad_all(preview, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_pad_column(preview, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_flex_flow(preview, LV_FLEX_FLOW_ROW);
+            lv_obj_set_flex_align(preview, LV_FLEX_ALIGN_SPACE_BETWEEN,
+                                  multiline ? LV_FLEX_ALIGN_START : LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START);
+
+            lv_obj_t *valueLabel = lv_label_create(preview);
+            widget.previewLabel = valueLabel;
+            lv_obj_set_flex_grow(valueLabel, 1);
+            // Multiline: wrap and clip at the fixed preview height. Single line: ellipsis.
+            lv_label_set_long_mode(valueLabel, multiline ? LV_LABEL_LONG_WRAP : LV_LABEL_LONG_DOT);
+
+            lv_obj_t *editIcon = lv_label_create(preview);
+            lv_label_set_text(editIcon, LV_SYMBOL_EDIT);
+            lv_obj_set_style_text_color(editIcon, lv_color_hex(0x9CA3AF), LV_PART_MAIN | LV_STATE_DEFAULT);
+
+            lv_obj_add_event_cb(preview, &ResourceDetailsScreen::onFieldPreviewClick, LV_EVENT_CLICKED, this);
+            this->updateFieldPreview(widget);
          }
 
          widget.errorLabel = lv_label_create(fieldContainer);
@@ -699,8 +781,8 @@ bool ResourceDetailsScreen::collectCurrentField(API::FormPageSubmission &outPage
          continue;
       }
 
-      const char *rawText = widget.input ? lv_textarea_get_text(widget.input) : "";
-      String value = rawText ? String(rawText) : "";
+      // Text/number values live in widget.textValue (committed by the fullscreen editor).
+      String value = widget.textValue;
       value.trim();
 
       if (value.length() == 0)
@@ -779,44 +861,113 @@ void ResourceDetailsScreen::clearFormFieldErrors()
       lv_label_set_text(this->formsModalErrorLabel, "");
    }
 }
-void ResourceDetailsScreen::hideFormsKeyboard()
+void ResourceDetailsScreen::updateFieldPreview(FormFieldWidget &widget)
 {
-   if (!this->formsKeyboard)
+   if (!widget.previewLabel)
    {
       return;
    }
-   lv_obj_add_flag(this->formsKeyboard, LV_OBJ_FLAG_HIDDEN);
-   lv_keyboard_set_textarea(this->formsKeyboard, nullptr);
-   this->updateFormsModalLayoutForKeyboard(false);
+   String trimmed = widget.textValue;
+   trimmed.trim();
+   if (trimmed.length() == 0)
+   {
+      // Empty: show the field placeholder (or a generic hint) in muted gray.
+      const char *hint = "Antippen zum Eingeben";
+      if (widget.definition && widget.type == API::ResourceUsageFormFieldType::TEXT &&
+          widget.definition->options.text.hasPlaceholder && widget.definition->options.text.placeholder.length() > 0)
+      {
+         hint = widget.definition->options.text.placeholder.c_str();
+      }
+      lv_label_set_text(widget.previewLabel, hint);
+      lv_obj_set_style_text_color(widget.previewLabel, lv_color_hex(0x9CA3AF), LV_PART_MAIN | LV_STATE_DEFAULT);
+   }
+   else
+   {
+      lv_label_set_text(widget.previewLabel, widget.textValue.c_str());
+      lv_obj_set_style_text_color(widget.previewLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+   }
 }
-void ResourceDetailsScreen::updateFormsModalLayoutForKeyboard(bool keyboardVisible)
+void ResourceDetailsScreen::openFormsEditor(uint16_t widgetIndex)
 {
-   (void)keyboardVisible;
-   if (!this->formsModalOverlay)
+   if (!this->formsEditorOverlay || !this->formsEditorTextarea || !this->formsEditorKeyboard)
    {
       return;
    }
-   lv_obj_mark_layout_as_dirty(this->formsModalOverlay);
-   lv_obj_update_layout(this->formsModalOverlay);
+   if (widgetIndex >= this->formFieldWidgetCount)
+   {
+      return;
+   }
+   FormFieldWidget &widget = this->formFieldWidgets[widgetIndex];
+   this->formsEditorWidgetIndex = widgetIndex;
+
+   if (this->formsEditorTitleLabel)
+   {
+      String title = widget.definition ? widget.definition->name : String("");
+      if (widget.isRequired)
+      {
+         title += " *";
+      }
+      lv_label_set_text(this->formsEditorTitleLabel, title.c_str());
+   }
+
+   bool multiline = widget.definition && widget.type == API::ResourceUsageFormFieldType::TEXT &&
+                    widget.definition->options.text.multiline;
+   lv_textarea_set_one_line(this->formsEditorTextarea, !multiline);
+   // Multiline: textarea fills the space above the keyboard. One-line: textarea
+   // stays compact under the header, spacer pushes the keyboard to the bottom.
+   lv_obj_set_flex_grow(this->formsEditorTextarea, multiline ? 1 : 0);
+   if (this->formsEditorSpacer)
+   {
+      lv_obj_set_flex_grow(this->formsEditorSpacer, multiline ? 0 : 1);
+      lv_obj_set_height(this->formsEditorSpacer, multiline ? 0 : LV_SIZE_CONTENT);
+   }
+   lv_textarea_set_accepted_chars(this->formsEditorTextarea,
+                                  widget.type == API::ResourceUsageFormFieldType::NUMBER ? "0123456789-." : nullptr);
+   const char *placeholder = "";
+   if (widget.definition && widget.type == API::ResourceUsageFormFieldType::TEXT &&
+       widget.definition->options.text.hasPlaceholder)
+   {
+      placeholder = widget.definition->options.text.placeholder.c_str();
+   }
+   lv_textarea_set_placeholder_text(this->formsEditorTextarea, placeholder);
+   lv_textarea_set_text(this->formsEditorTextarea, widget.textValue.c_str());
+   lv_textarea_set_cursor_pos(this->formsEditorTextarea, LV_TEXTAREA_CURSOR_LAST);
+
+   lv_keyboard_set_mode(this->formsEditorKeyboard,
+                        widget.type == API::ResourceUsageFormFieldType::NUMBER ? LV_KEYBOARD_MODE_NUMBER
+                                                                               : LV_KEYBOARD_MODE_TEXT_LOWER);
+   lv_keyboard_set_textarea(this->formsEditorKeyboard, this->formsEditorTextarea);
+
+   lv_obj_clear_flag(this->formsEditorOverlay, LV_OBJ_FLAG_HIDDEN);
+   lv_obj_move_foreground(this->formsEditorOverlay);
+   // Busy overlay must stay above everything when it shows up later.
+   if (this->formsBusyOverlay)
+   {
+      lv_obj_move_foreground(this->formsBusyOverlay);
+   }
 }
-void ResourceDetailsScreen::showKeyboardForWidget(FormFieldWidget &widget, lv_obj_t *target)
+void ResourceDetailsScreen::closeFormsEditor(bool commit)
 {
-   if (!this->formsKeyboard)
+   if (!this->formsEditorOverlay)
    {
       return;
    }
-   lv_keyboard_set_textarea(this->formsKeyboard, target);
-   lv_keyboard_mode_t mode = LV_KEYBOARD_MODE_TEXT_LOWER;
-   if (widget.type == API::ResourceUsageFormFieldType::NUMBER)
+   if (commit && this->formsEditorTextarea && this->formsEditorWidgetIndex < this->formFieldWidgetCount)
    {
-      mode = LV_KEYBOARD_MODE_NUMBER;
+      FormFieldWidget &widget = this->formFieldWidgets[this->formsEditorWidgetIndex];
+      if (widget.type != API::ResourceUsageFormFieldType::BOOLEAN &&
+          widget.type != API::ResourceUsageFormFieldType::SELECT)
+      {
+         const char *text = lv_textarea_get_text(this->formsEditorTextarea);
+         widget.textValue = text ? String(text) : String("");
+         this->updateFieldPreview(widget);
+      }
    }
-   lv_keyboard_set_mode(this->formsKeyboard, mode);
-   lv_obj_clear_flag(this->formsKeyboard, LV_OBJ_FLAG_HIDDEN);
-   // Use recursive scroll to ensure nested containers (form cards inside the modal list)
-   // adjust even when the keyboard shrinks the available viewport.
-   lv_obj_scroll_to_view_recursive(target, LV_ANIM_OFF);
-   this->updateFormsModalLayoutForKeyboard(true);
+   if (this->formsEditorKeyboard)
+   {
+      lv_keyboard_set_textarea(this->formsEditorKeyboard, nullptr);
+   }
+   lv_obj_add_flag(this->formsEditorOverlay, LV_OBJ_FLAG_HIDDEN);
 }
 void ResourceDetailsScreen::onFormsNext(lv_event_t *e)
 {
@@ -888,10 +1039,9 @@ void ResourceDetailsScreen::onFormsCancel(lv_event_t *e)
       self->formsCancelCallback();
    }
 }
-void ResourceDetailsScreen::onFormFieldFocus(lv_event_t *e)
+void ResourceDetailsScreen::onFieldPreviewClick(lv_event_t *e)
 {
-   auto code = lv_event_get_code(e);
-   if (code != LV_EVENT_CLICKED && code != LV_EVENT_FOCUSED)
+   if (lv_event_get_code(e) != LV_EVENT_CLICKED)
    {
       return;
    }
@@ -900,21 +1050,23 @@ void ResourceDetailsScreen::onFormFieldFocus(lv_event_t *e)
    {
       return;
    }
-   lv_obj_t *target = static_cast<lv_obj_t *>(lv_event_get_target(e));
+   if (self->formsBusy)
+   {
+      return;
+   }
+   lv_obj_t *target = static_cast<lv_obj_t *>(lv_event_get_current_target(e));
    FormFieldWidget *widget = self->findFieldWidgetByObject(target);
    if (!widget)
    {
-      self->hideFormsKeyboard();
       return;
    }
    if (widget->type == API::ResourceUsageFormFieldType::BOOLEAN || widget->type == API::ResourceUsageFormFieldType::SELECT)
    {
-      self->hideFormsKeyboard();
       return;
    }
-   self->showKeyboardForWidget(*widget, target);
+   self->openFormsEditor(widget->widgetIndex);
 }
-void ResourceDetailsScreen::onFormsKeyboardEvent(lv_event_t *e)
+void ResourceDetailsScreen::onFormsEditorKeyboardEvent(lv_event_t *e)
 {
    auto code = lv_event_get_code(e);
    if (code != LV_EVENT_READY && code != LV_EVENT_CANCEL)
@@ -926,7 +1078,21 @@ void ResourceDetailsScreen::onFormsKeyboardEvent(lv_event_t *e)
    {
       return;
    }
-   self->hideFormsKeyboard();
+   // Checkmark commits the text, keyboard-hide discards it.
+   self->closeFormsEditor(code == LV_EVENT_READY);
+}
+void ResourceDetailsScreen::onFormsEditorCancel(lv_event_t *e)
+{
+   if (lv_event_get_code(e) != LV_EVENT_CLICKED)
+   {
+      return;
+   }
+   auto *self = static_cast<ResourceDetailsScreen *>(lv_event_get_user_data(e));
+   if (!self)
+   {
+      return;
+   }
+   self->closeFormsEditor(false);
 }
 void ResourceDetailsScreen::onSelectOptionClick(lv_event_t *e)
 {

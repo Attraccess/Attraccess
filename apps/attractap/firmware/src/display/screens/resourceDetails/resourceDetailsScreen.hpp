@@ -131,12 +131,18 @@ private:
     lv_obj_t *formsProgressBar = nullptr;
     lv_obj_t *formsBreadcrumbLabel = nullptr;
     lv_obj_t *formsCancelButton = nullptr;
-    lv_obj_t *formsKeyboard = nullptr;
     lv_obj_t *formsBackButton = nullptr;
     lv_obj_t *formsNextButton = nullptr;
     lv_obj_t *formsNextLabel = nullptr;
     lv_obj_t *formsBusyOverlay = nullptr;
     lv_obj_t *formsBusyLabel = nullptr;
+    // Fullscreen text editor overlay: textarea on top, keyboard pinned below.
+    lv_obj_t *formsEditorOverlay = nullptr;
+    lv_obj_t *formsEditorTitleLabel = nullptr;
+    lv_obj_t *formsEditorTextarea = nullptr;
+    lv_obj_t *formsEditorSpacer = nullptr; // pushes keyboard to the bottom for one-line fields
+    lv_obj_t *formsEditorKeyboard = nullptr;
+    uint16_t formsEditorWidgetIndex = 0;
     bool formsBusy = false;
     const API::ResourceUsageFormRequest *formsModalMeta = nullptr;
     const API::ResourceUsageFormFieldsPage *formsModalPage = nullptr;
@@ -156,6 +162,8 @@ private:
         API::ResourceUsageFormFieldType type;
         bool isRequired;
         lv_obj_t *input = nullptr;
+        lv_obj_t *previewLabel = nullptr; // value preview inside the tap-to-edit box (text/number fields)
+        String textValue;                 // committed value for text/number fields (edited via the fullscreen editor)
         lv_obj_t *errorLabel = nullptr;
         const API::ResourceUsageFormField *definition = nullptr;
         uint8_t selectedOptionIndex = 0; // For SELECT: 0 = no selection, 1+ = option index
@@ -197,8 +205,9 @@ private:
     static void onFormsNext(lv_event_t *e);
     static void onFormsBack(lv_event_t *e);
     static void onFormsCancel(lv_event_t *e);
-    static void onFormFieldFocus(lv_event_t *e);
-    static void onFormsKeyboardEvent(lv_event_t *e);
+    static void onFieldPreviewClick(lv_event_t *e);
+    static void onFormsEditorKeyboardEvent(lv_event_t *e);
+    static void onFormsEditorCancel(lv_event_t *e);
     static void onSelectOptionClick(lv_event_t *e);
     static void onSelectContainerSizeChanged(lv_event_t *e);
     void updateSelectButtonStyles(FormFieldWidget &widget);
@@ -241,9 +250,9 @@ private:
     FormFieldWidget *findFieldWidgetByObject(lv_obj_t *object);
     void clearFormFieldErrors();
     void setFormsBusy(bool busy, const char *text = nullptr);
-    void hideFormsKeyboard();
-    void updateFormsModalLayoutForKeyboard(bool keyboardVisible);
-    void showKeyboardForWidget(FormFieldWidget &widget, lv_obj_t *target);
+    void openFormsEditor(uint16_t widgetIndex);
+    void closeFormsEditor(bool commit);
+    void updateFieldPreview(FormFieldWidget &widget);
     void applyCachedState();
     void disposeProjectsModal();
     void disposeFormsModal();
