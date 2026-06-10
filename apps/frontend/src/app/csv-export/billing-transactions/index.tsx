@@ -7,7 +7,7 @@ import {
   useAnalyticsServiceGetBillingTransactionsInDateRange,
   useBillingServiceGetBillingConfiguration,
 } from '@attraccess/react-query-client';
-import { BaseCsvExportModal, ColumnDefinition } from '../base-modal';
+import { CsvExportDrawerContent, ColumnDefinition } from '../export-drawer';
 import { useMemo } from 'react';
 import { dbCurrencyToUserCurrency } from '@attraccess/shared';
 
@@ -78,7 +78,7 @@ export function BillingTransactionsExport(props: ExporterProps) {
   }, [t, billingConfiguration, formatDateTimeFull]);
 
   return (
-    <BaseCsvExportModal
+    <CsvExportDrawerContent
       queryStatus={billingConfigurationFetchStatus === 'success' ? fetchStatus : billingConfigurationFetchStatus}
       items={(billingTransactions ?? []) as BillingTransaction[]}
       columns={columns}

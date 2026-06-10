@@ -20,10 +20,10 @@ export function ExportTypeSection(props: Props) {
     <Card>
       <Card.Header className="flex flex-col gap-1">
         <Card.Title className="flex items-center gap-2 text-base">
-          <span className="flex items-center justify-center size-7 rounded-full bg-accent-100 text-accent-700 text-xs font-semibold">
+          <span className="flex items-center justify-center size-7 rounded-full bg-accent-soft text-accent-soft-foreground text-xs font-semibold">
             2
           </span>
-          <FileSpreadsheetIcon className="size-4 text-muted-foreground" />
+          <FileSpreadsheetIcon className="size-4 text-muted" />
           {t('steps.type.title')}
         </Card.Title>
         <Card.Description>{t('steps.type.description')}</Card.Description>

@@ -52,12 +52,18 @@ export function SupervisorApprovalListener() {
     if (!pending) {
       return;
     }
+    // The server's pending list is authoritative: drop locally tracked requests
+    // it no longer reports (e.g. ones that missed an EXPIRED/RESOLVED/REJECTED
+    // SSE event), while keeping the existing order and any newer entries.
     setRequests((prev) => {
-      const byId = new Map(prev.map((request) => [request.id, request]));
-      for (const request of pending as SupervisionRequestDto[]) {
-        byId.set(request.id, request);
-      }
-      return Array.from(byId.values());
+      const pendingList = pending as SupervisionRequestDto[];
+      const pendingById = new Map(pendingList.map((request) => [request.id, request]));
+      const kept = prev
+        .filter((request) => pendingById.has(request.id))
+        .map((request) => pendingById.get(request.id) as SupervisionRequestDto);
+      const keptIds = new Set(kept.map((request) => request.id));
+      const added = pendingList.filter((request) => !keptIds.has(request.id));
+      return [...kept, ...added];
     });
   }, [pending]);
 

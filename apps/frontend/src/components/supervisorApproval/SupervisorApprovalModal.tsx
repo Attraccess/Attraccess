@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Card, Description, ModalBody, ModalFooter, ModalHeader, ModalHeading, Spinner } from '@heroui/react';
+import { StandardModal } from '../standardModal';
 import { AttraccessUser, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { SupervisionRequestDto, User, useResourcesServiceGetOneResourceById } from '@attraccess/react-query-client';
 import { Button } from '../button';
-import { StandardModal } from '../standardModal';
 import en from './translations/en.json';
 import de from './translations/de.json';
 
@@ -61,17 +61,24 @@ export function SupervisorApprovalModal({
 
           <ModalBody>
             <div className="space-y-4">
-              <Description>{t('description', { resource: resource?.name ?? '' })}</Description>
+              <Description>{t('description')}</Description>
 
-              <AttraccessUser
-                user={
-                  {
-                    id: request.requesterUserId,
-                    username: request.requesterUsername,
-                  } as unknown as User
-                }
-                description={t('requesterRole')}
-              />
+              <div className="space-y-1">
+                <Description>{t('resourceLabel')}</Description>
+                <p className="text-base font-semibold">{resource?.name ?? ''}</p>
+              </div>
+
+              <div className="space-y-1">
+                <Description>{t('requesterLabel')}</Description>
+                <AttraccessUser
+                  user={
+                    {
+                      id: request.requesterUserId,
+                      username: request.requesterUsername,
+                    } as unknown as User
+                  }
+                />
+              </div>
 
               {request.notes ? (
                 <Card>

@@ -53,12 +53,22 @@ await esbuild({
 });
 
 // 2. Frontend — Vite module federation remote exposing `./plugin`.
-await viteBuild({
-  root: join(HERE, 'frontend'),
-  configFile: join(HERE, 'frontend/vite.config.ts'),
-  build: { outDir: join(PACKAGE, 'frontend'), emptyOutDir: true },
-  logLevel: 'info',
-});
+// `@originjs/vite-plugin-federation` resolves the `exposes` paths relative to
+// process.cwd(), not the Vite `root`, so building from anywhere but frontend/
+// fails to find `./src/plugin.tsx`. chdir into frontend/ around the build so the
+// documented `npm run build` works regardless of where it is invoked from.
+const cwdBeforeBuild = process.cwd();
+process.chdir(join(HERE, 'frontend'));
+try {
+  await viteBuild({
+    root: join(HERE, 'frontend'),
+    configFile: join(HERE, 'frontend/vite.config.ts'),
+    build: { outDir: join(PACKAGE, 'frontend'), emptyOutDir: true },
+    logLevel: 'info',
+  });
+} finally {
+  process.chdir(cwdBeforeBuild);
+}
 
 // 3. Manifest at the package root.
 cpSync(join(HERE, 'plugin.json'), join(PACKAGE, 'plugin.json'));

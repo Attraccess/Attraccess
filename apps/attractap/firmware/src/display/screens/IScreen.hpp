@@ -3,6 +3,28 @@
 #include <lvgl.h>
 #include <Arduino.h>
 
+/**
+ * Set a label's text only when it actually changed.
+ *
+ * lv_label_set_text() invalidates the label unconditionally, so calling it from
+ * a screen's loop() every tick re-renders the label every refresh cycle forever
+ * (ATT-554 item 5). Compare against the current text first; screen loop()
+ * implementations must use this instead of raw lv_label_set_text().
+ */
+static inline void setLabelTextIfChanged(lv_obj_t *label, const char *text)
+{
+    if (label == nullptr || text == nullptr)
+    {
+        return;
+    }
+    const char *current = lv_label_get_text(label);
+    if (current != nullptr && strcmp(current, text) == 0)
+    {
+        return;
+    }
+    lv_label_set_text(label, text);
+}
+
 class IScreen
 {
 public:

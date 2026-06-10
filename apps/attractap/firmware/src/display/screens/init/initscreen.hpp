@@ -28,6 +28,29 @@ private:
     void markStateAsWarning(lv_obj_t *spinner, lv_obj_t *label);
     void resetState(lv_obj_t *spinner, lv_obj_t *label);
 
+    // Per-row visual state, cached so loop() only touches LVGL styles on a real
+    // transition. Re-applying the same spinner/label styles every tick forces a
+    // style refresh + invalidation each refresh cycle (ATT-554 item 5).
+    enum class StageState
+    {
+        UNSET,
+        PENDING,
+        SUCCESS,
+        WARNING,
+    };
+    void applyStage(lv_obj_t *spinner, lv_obj_t *label, StageState newState, StageState &cached);
+
+    StageState wifiStage = StageState::UNSET;
+    StageState ethernetStage = StageState::UNSET;
+    StageState apiConnectionStage = StageState::UNSET;
+    StageState apiAuthenticationStage = StageState::UNSET;
+
+    // The connecting screen is up exactly while WiFi/TLS work runs; rebuilding
+    // its Strings every loop tick is wasted heap churn. 4 Hz is plenty for a
+    // status screen with a 1 Hz countdown.
+    uint32_t lastLoopRefreshMs = 0;
+    static constexpr uint32_t LOOP_REFRESH_INTERVAL_MS = 250;
+
     static void onOpenSettingsButtonEvent(lv_event_t *e);
 
     static String formatIp(esp_ip4_addr_t ip);

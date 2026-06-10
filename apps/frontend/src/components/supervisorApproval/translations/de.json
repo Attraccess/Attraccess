@@ -1,7 +1,8 @@
 {
   "title": "Aufsichtsanfrage",
-  "description": "Ein Nutzer möchte eine beaufsichtigte Sitzung an {{resource}} starten.",
-  "requesterRole": "Anfragender Nutzer",
+  "description": "Ein Nutzer möchte eine beaufsichtigte Sitzung starten.",
+  "resourceLabel": "Ressource",
+  "requesterLabel": "Anfragender Nutzer",
   "notesLabel": "Notizen",
   "countdown": "Läuft ab in {{seconds}}s",
   "approve": "Genehmigen",

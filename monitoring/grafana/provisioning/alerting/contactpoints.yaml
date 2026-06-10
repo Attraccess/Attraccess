@@ -14,4 +14,7 @@ contactPoints:
         settings:
           apiToken: $__env{PUSHOVER_API_TOKEN}
           userKey: $__env{PUSHOVER_USER_KEY}
+          # Human-readable formatting (templates defined in templates.yaml).
+          title: '{{ template "attraccess.pushover.title" . }}'
+          message: '{{ template "attraccess.pushover.message" . }}'
         disableResolveMessage: false

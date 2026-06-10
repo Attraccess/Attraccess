@@ -1,4 +1,5 @@
 #include "qualia_ft_cst_driver.hpp"
+#include "../../../utils.hpp"
 
 #ifndef I2C_TOUCH_ADDR
 #define I2C_TOUCH_ADDR 0x48
@@ -118,6 +119,10 @@ bool QualiaFtCstDriver::readTouch(TouchPoint &point)
     {
         return false;
     }
+
+    // Serialize the touch read against PN532 traffic on the shared bus
+    // (ATT-554) — same rationale as RgbGt911Driver::readTouch.
+    I2CBusGuard busGuard;
 
     if (isFocalTouch)
     {

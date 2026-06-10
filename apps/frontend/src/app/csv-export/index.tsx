@@ -1,9 +1,9 @@
-// CSV export page composition — date range picker, type cards, configure modal
+// CSV export page composition — date range picker, type cards, configure drawer
 // FEATURE: CSV export — top level page for /csv-export route
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { DateValue, ModalCloseTrigger, ModalHeader, RangeValue } from '@heroui/react';
-import { StandardModal } from '../../components/standardModal';
+import { DateValue, DrawerHeader, RangeValue } from '@heroui/react';
 import { useCallback, useMemo, useRef, useState } from 'react';
+import { StandardDrawer } from '../../components/standardDrawer';
 import { DateRangeSection } from './date-range-section';
 import { computeRange, Preset, rangeToDateBounds } from './date-range-section/compute-range';
 import { SelectedRangePill } from './date-range-section/selected-range-pill';
@@ -12,7 +12,6 @@ import { ResourceUsageExport } from './resource-usage';
 import { BillingTransactionsExport } from './billing-transactions';
 import de from './de.json';
 import en from './en.json';
-import { XIcon } from 'lucide-react';
 
 const DEFAULT_PRESET: Preset = 'last30d';
 
@@ -54,7 +53,7 @@ export function CsvExport() {
     <div className="mx-auto w-full max-w-5xl px-4 md:px-6 lg:px-8 py-6 flex flex-col gap-6">
       <header className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold">{t('title')}</h1>
-        <p className="text-sm text-muted-foreground">{t('subtitle')}</p>
+        <p className="text-sm text-muted">{t('subtitle')}</p>
       </header>
 
       <DateRangeSection
@@ -67,38 +66,26 @@ export function CsvExport() {
 
       <ExportTypeSection range={dateRange} onOpen={openExport} t={t} />
 
-      <StandardModal
+      <StandardDrawer
         isOpen={showExport}
         onOpenChange={(open) => {
           if (!open) setShowExport(false);
         }}
-        data-cy="csv-export-modal"
-        size="full"
-        containerProps={{ className: 'max-w-5xl mx-auto' }}
       >
-        {() => (
-          <>
-            <ModalHeader className="flex items-start justify-between gap-3">
-              <div className="flex flex-col gap-2 min-w-0">
-                <span className="text-lg font-semibold">
-                  {activeExportKey && t(`exports.${activeExportKey}.title`)}
-                </span>
-                <SelectedRangePill
-                  range={dateRange}
-                  emptyLabel={t('range.empty')}
-                  summaryLabel={({ start, end, days }) => t('range.summary', { start, end, days })}
-                  dataCy="csv-export-modal-range-pill"
-                />
-              </div>
-              <ModalCloseTrigger aria-label="close">
-                <XIcon className="size-4" />
-              </ModalCloseTrigger>
-            </ModalHeader>
+        <div data-cy="csv-export-modal" className="contents">
+          <DrawerHeader className="flex w-full flex-col items-start gap-2">
+            <h2 className="text-lg font-semibold">{activeExportKey && t(`exports.${activeExportKey}.title`)}</h2>
+            <SelectedRangePill
+              range={dateRange}
+              emptyLabel={t('range.empty')}
+              summaryLabel={({ start, end, days }) => t('range.summary', { start, end, days })}
+              dataCy="csv-export-modal-range-pill"
+            />
+          </DrawerHeader>
 
-            {ExportComponent && <ExportComponent start={startDate} end={endDate} />}
-          </>
-        )}
-      </StandardModal>
+          {ExportComponent && <ExportComponent start={startDate} end={endDate} />}
+        </div>
+      </StandardDrawer>
     </div>
   );
 }

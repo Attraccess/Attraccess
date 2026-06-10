@@ -24,6 +24,7 @@ import {
   ResourceUsageTakenOverEvent,
   ResourceUsageNoteAddedEvent,
   SupervisedUsageStartedEvent,
+  SupervisedUsageEndedEvent,
 } from './events/resource-usage.events';
 import { ResourceIntroductionsService } from '../introductions/resouceIntroductions.service';
 import { ResourceIntroducersService } from '../introducers/resourceIntroducers.service';
@@ -707,6 +708,20 @@ export class ResourceUsageService {
     }
 
     this.emitSystemUsageEvent(SystemEvent.RESOURCE_USAGE_ENDED, updatedUsage?.resource, updatedUsage?.user);
+
+    // Counter signal for supervised-usage auto-promotion (ATT-488): every completed supervised session
+    // is counted by the listener to decide when to auto-create an introduction for the supervised user.
+    if (activeSession.supervisorUserId != null && activeSession.user?.id != null) {
+      this.eventEmitter.emit(
+        SupervisedUsageEndedEvent.EVENT_NAME,
+        new SupervisedUsageEndedEvent(
+          resourceId,
+          activeSession.user.id,
+          activeSession.supervisorUserId,
+          activeSession.id,
+        ),
+      );
+    }
 
     this.metricsService.resourceUsageSessionsTotal.inc({ action: 'end' });
     this.metricsService.resourceUsageSessionsActive.dec();
