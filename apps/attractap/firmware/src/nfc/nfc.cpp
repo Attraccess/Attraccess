@@ -407,13 +407,28 @@ bool NFC::getAvailableKeyNo(uint8_t *uid, uint8_t *uidLength, uint8_t *keyNo)
     if (this->detectedCardType == CARD_TYPE_DESFIRE)
     {
         // Enrollment entry point: make sure the Attraccess application exists
-        // before scanning its key slots (factory cards get it created here).
+        // before choosing a data key slot (factory cards get it created here).
         I2CBusGuard busGuard;
         if (!this->desfireSelectAttraccessApp(true))
         {
             this->logger.error("getAvailableKeyNo failed, DESFire application unavailable");
             return false;
         }
+
+        // DESFire application keys are managed through the application master
+        // key. A freshly created Attraccess app should have the factory master
+        // key, and changeKey() will authenticate key 0 before writing key 1.
+        // Do not probe key 1 directly here: some DESFire cards reject auth on
+        // untouched non-master keys even though key 0 can change them.
+        if (!this->pn532.ntag424_AuthenticateEV2First(NFC::FACTORY_KEY, 0, 0x71))
+        {
+            this->logger.error("getAvailableKeyNo failed, DESFire app master key is not factory");
+            return false;
+        }
+
+        *keyNo = 1;
+        this->logger.info("getAvailableKeyNo, DESFire using key 1");
+        return true;
     }
 
     // check key 1 to 5, the first one that we can authenticate using factory key is an available key
