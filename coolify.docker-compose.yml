@@ -25,6 +25,12 @@ services:
       - AUTH_SESSION_SECRET=$SERVICE_BASE64_64_AUTHSESSION
       - TZ=${TZ:-UTC}
       - LOG_LEVELS=${LOG_LEVELS:-error,warn,log}
+      # Web Push notifications (optional). All three must be set to enable push;
+      # when unset, push is disabled and Attraccess works normally.
+      # Generate a key pair once with: npx web-push generate-vapid-keys
+      - VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY:-}
+      - VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY:-}
+      - VAPID_SUBJECT=${VAPID_SUBJECT:-}
     volumes:
       - attraccess-storage:/app/storage
     healthcheck:
