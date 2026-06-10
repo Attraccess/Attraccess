@@ -8,6 +8,12 @@ void Application::handleFormsRequest(
     const API::ResourceUsageFormRequest &request) {
   // 'request' aliases this->pendingFormRequest (filled by the callback).
   (void)request;
+  // The server retries un-acked messages (RETRY_COUNT in the gateway). A duplicate
+  // RESOURCE_USAGE_FORM_REQUEST must not reset an in-progress form, nor reopen one
+  // that was already submitted while the START/STOP result is in flight (ATT-545).
+  if (this->hasPendingFormRequest || this->formFlowSubmitted) {
+    return;
+  }
   this->hasPendingFormRequest = true;
   this->formCursorFormIdx = 0;
   this->formCursorOffset = 0;
@@ -176,6 +182,7 @@ void Application::handleFormPageBack() {
 
 void Application::finishFormFlow() {
   this->hasPendingFormRequest = false;
+  this->formFlowSubmitted = true;
   Display::resourceDetailsScreen.hideFormsModal();
   Display::resourceDetailsScreen.showActionProgress("Sende Formular");
 
@@ -194,6 +201,7 @@ void Application::handleFormsCancel() {
     return;
   }
   this->hasPendingFormRequest = false;
+  this->formFlowSubmitted = false;
   this->pendingActionType = PENDING_ACTION_NONE;
   this->formCursorFormIdx = 0;
   this->formCursorOffset = 0;
@@ -209,6 +217,7 @@ void Application::onActionResult(const String &eventType) {
       eventType == "STOP_RESOURCE_USAGE_SESSION") {
     this->pendingActionType = PENDING_ACTION_NONE;
     this->hasPendingFormRequest = false;
+    this->formFlowSubmitted = false;
     Display::resourceDetailsScreen.hideFormsModal();
   }
 }
