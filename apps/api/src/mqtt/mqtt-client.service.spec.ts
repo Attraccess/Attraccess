@@ -220,6 +220,72 @@ describe('MqttClientService', () => {
     });
   });
 
+  describe('connection state tracking', () => {
+    type WithEnsureClient = { ensureClient: (serverId: number) => Promise<mqtt.MqttClient & { emit: (...args: unknown[]) => void; connected: boolean }> };
+
+    it('reports unknown state for servers without a client', () => {
+      expect(service.getConnectionState(99)).toEqual({
+        status: 'unknown',
+        lastConnectedAt: null,
+        lastDisconnectedAt: null,
+        lastError: null,
+      });
+    });
+
+    it('tracks connect/disconnect transitions and emits connection-changed events', async () => {
+      const client = await (service as unknown as WithEnsureClient).ensureClient(1);
+      // let the mocked client emit its async 'connect'
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(service.getConnectionState(1).status).toBe('connected');
+      expect(service.getConnectionState(1).lastConnectedAt).toBeInstanceOf(Date);
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+        'mqtt.server.connection.changed',
+        expect.objectContaining({ serverId: 1, connected: true }),
+      );
+
+      (mockEventEmitter.emit as jest.Mock).mockClear();
+      client.connected = false;
+      client.emit('error', new Error('boom'));
+      client.emit('close');
+
+      const state = service.getConnectionState(1);
+      expect(state.status).toBe('disconnected');
+      expect(state.lastError).toBe('boom');
+      expect(state.lastDisconnectedAt).toBeInstanceOf(Date);
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+        'mqtt.server.connection.changed',
+        expect.objectContaining({ serverId: 1, connected: false, error: 'boom' }),
+      );
+
+      // repeated close events do not re-emit
+      (mockEventEmitter.emit as jest.Mock).mockClear();
+      client.emit('close');
+      expect(mockEventEmitter.emit).not.toHaveBeenCalledWith(
+        'mqtt.server.connection.changed',
+        expect.anything(),
+      );
+    });
+
+    it('reuses the existing client instead of creating a duplicate', async () => {
+      const first = await (service as unknown as WithEnsureClient).ensureClient(1);
+      await new Promise((resolve) => setImmediate(resolve));
+      const second = await (service as unknown as WithEnsureClient).ensureClient(1);
+
+      expect(second).toBe(first);
+    });
+
+    it('drops client and state on disconnectServer', async () => {
+      const client = await (service as unknown as WithEnsureClient).ensureClient(1);
+      await new Promise((resolve) => setImmediate(resolve));
+
+      service.disconnectServer(1);
+
+      expect(client.end).toHaveBeenCalled();
+      expect(service.getConnectionState(1).status).toBe('unknown');
+    });
+  });
+
   describe('onModuleDestroy', () => {
     it('should disconnect all clients', async () => {
       // Arrange - mock the clients map to have a client

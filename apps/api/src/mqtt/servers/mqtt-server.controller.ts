@@ -2,7 +2,7 @@ import { Controller, Get, Post, Put, Delete, Body, Param, ParseIntPipe } from '@
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { MqttServer } from '@attraccess/database-entities';
 import { MqttServerService } from './mqtt-server.service';
-import { CreateMqttServerDto, UpdateMqttServerDto } from './dtos/mqtt-server.dto';
+import { CreateMqttServerDto, UpdateMqttServerDto, MqttServerConnectionStateDto } from './dtos/mqtt-server.dto';
 import { Auth } from '@attraccess/plugins-backend-sdk';
 
 @ApiTags('MQTT')
@@ -20,6 +20,20 @@ export class MqttServerController {
   })
   async getAll(): Promise<MqttServer[]> {
     return this.mqttServerService.findAll();
+  }
+
+  @Get('status')
+  @ApiOperation({
+    summary: 'Get the live connection status of all MQTT servers',
+    operationId: 'mqttServersGetStatusOfAll',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns the connection state of every configured MQTT server',
+    type: [MqttServerConnectionStateDto],
+  })
+  async getStatusOfAll(): Promise<MqttServerConnectionStateDto[]> {
+    return this.mqttServerService.getConnectionStates();
   }
 
   @Get(':id')

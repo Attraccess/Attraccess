@@ -21,6 +21,7 @@ export enum ResourceHealthSource {
   PAYLOAD = 'payload',
   HEARTBEAT = 'heartbeat',
   MANUAL = 'manual',
+  SYSTEM = 'system',
 }
 
 @Entity()
