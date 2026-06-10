@@ -68,7 +68,19 @@ public:
     // application; reboot is handled internally (esp_restart after a confirm).
     static void setOnOpenSettingsCallback(std::function<void()> callback);
 
+    /**
+     * Thread-safe lv_async_call: takes lv_lock() around the timer-list
+     * manipulation. Use this instead of raw lv_async_call from any task other
+     * than the LVGL render task (e.g. websocket callbacks) - rendering runs on
+     * its own task now (ATT-554 item 7).
+     */
+    static void asyncCall(lv_async_cb_t cb, void *user_data);
+
 private:
+    // Dedicated LVGL task (ATT-554 item 7): runs lv_timer_handler (rendering +
+    // indev/touch reads; self-locking via lv_lock) so UI refresh no longer
+    // shares the main application loop with blocking work.
+    static void renderTask(void *parameter);
     static std::function<void(int16_t, int16_t)> touchCallback;
     static const int TRANSITION_DURATION = 500;
     // static const int TRANSITION_DURATION = 50;

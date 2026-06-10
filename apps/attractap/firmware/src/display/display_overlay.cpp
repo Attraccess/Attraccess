@@ -64,7 +64,7 @@ void Display::setDeviceName(String deviceName)
         return;
     }
     strcpy(text, deviceName.c_str());
-    lv_async_call(
+    Display::asyncCall(
         [](void *p)
         {
             if (Display::deviceNameLabel)

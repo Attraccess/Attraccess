@@ -41,13 +41,13 @@ export function ExportTypeCard(props: Props) {
         'transition-all flex flex-col h-full ' +
         (isDisabled
           ? 'opacity-60 pointer-events-none'
-          : 'hover:border-accent-400 hover:-translate-y-0.5 hover:shadow-lg cursor-pointer')
+          : 'hover:border-accent hover:-translate-y-0.5 hover:shadow-lg cursor-pointer')
       }
       data-cy={dataCy + '-card'}
     >
       <Card.Header>
         <div className="flex items-start gap-3">
-          <span className="flex items-center justify-center size-10 rounded-lg bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 shrink-0">
+          <span className="flex items-center justify-center size-10 rounded-lg bg-accent-soft text-accent-soft-foreground shrink-0">
             <Icon className="size-5" />
           </span>
           <div className="flex flex-col gap-0.5 min-w-0">

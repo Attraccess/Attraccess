@@ -141,7 +141,7 @@ void Application::setup() {
     Payload *pl = new Payload{this, sumUpEnabled};
     if (!pl)
       return;
-    lv_async_call(
+    Display::asyncCall(
         [](void *u) {
           auto *p = (Payload *)u;
           if (!p || !p->self) {
@@ -192,7 +192,7 @@ void Application::setup() {
     p->self = this;
     p->t = String(title);
     p->m = String(message);
-    lv_async_call(
+    Display::asyncCall(
         [](void *u) {
           auto *pl = (ErrPayload *)u;
           if (!pl || !pl->self) {
@@ -231,7 +231,7 @@ void Application::setup() {
     if (type) {
       p->eventType = String(type);
     }
-    lv_async_call(
+    Display::asyncCall(
         [](void *u) {
           ActionResultPayload *pl = static_cast<ActionResultPayload *>(u);
           if (pl && pl->self) {
@@ -459,7 +459,7 @@ void Application::setup() {
         (void)request; // The data is in api.getFormRequestScratch()
         this->pendingFormRequestReady = true;
         // Schedule the copy + UI update on LVGL thread
-        lv_async_call(
+        Display::asyncCall(
             [](void *u) {
               auto *self = static_cast<Application *>(u);
               if (self && self->pendingFormRequestReady) {
@@ -477,7 +477,7 @@ void Application::setup() {
       [this](const API::ResourceUsageFormFieldsPage &page) {
         (void)page; // The data is in api.getFormFieldsScratch()
         this->pendingFormFieldsReady = true;
-        lv_async_call(
+        Display::asyncCall(
             [](void *u) {
               auto *self = static_cast<Application *>(u);
               if (self && self->pendingFormFieldsReady) {
@@ -493,7 +493,7 @@ void Application::setup() {
       [this](const API::ResourceUsageFormPageResult &result) {
         (void)result; // The data is in api.getFormPageResultScratch()
         this->pendingFormPageResultReady = true;
-        lv_async_call(
+        Display::asyncCall(
             [](void *u) {
               auto *self = static_cast<Application *>(u);
               if (self && self->pendingFormPageResultReady) {
@@ -607,11 +607,23 @@ void Application::loop() {
   Display::loop();
 #endif
 
-    nfc.loop();
+  // NFC polling back on the main loop (ATT-554 item 6 reverted for isolation:
+  // the dedicated NFC task + concurrent bus use is the prime suspect for the
+  // field I2C wedge). Blocking PN532 time costs only this loop — rendering and
+  // touch live on LvglTask.
+  this->nfc.loop();
 
-    this->api.loop();
+  this->api.loop();
 
+#ifdef HAS_LVGL_DISPLAY
+  // processState mutates LVGL (screen transitions, popups, screen setters);
+  // rendering runs on LvglTask, so serialize with lv_lock (recursive).
+  lv_lock();
   this->processState();
+  lv_unlock();
+#else
+  this->processState();
+#endif
 
 #ifdef ESP_PLATFORM
   vTaskDelay(pdMS_TO_TICKS(1));
