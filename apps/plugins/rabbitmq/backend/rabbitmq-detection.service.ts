@@ -5,25 +5,16 @@
 // port, resolved credentials) through the sanctioned ACCESS_MQTT_SERVERS hook.
 // We turn that into a probe of the RabbitMQ management HTTP API and cache the
 // verdict so repeated UI reads (badge + status panel, per row) don't re-probe.
-import type { MqttServerConnectionConfig, PluginContext } from '@attraccess/plugins-backend-sdk';
+import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { Inject, Injectable } from '@nestjs/common';
+import { describeManagementApiError, fetchManagementApi, managementApiBase } from './rabbitmq-management-api';
 import type { RabbitmqDetectionResult } from './rabbitmq-detection.types';
 
 const PLUGIN_CONTEXT = Symbol.for('attraccess.plugin.context');
 
-// Default RabbitMQ management API ports. The management API is independent of
-// the MQTT listener, so we cannot reuse the MQTT port — RabbitMQ serves
-// management over 15672 (HTTP) / 15671 (HTTPS) by convention.
-const MGMT_PORT_HTTP = 15672;
-const MGMT_PORT_HTTPS = 15671;
-
 // How long a verdict stays fresh. Short enough to reflect a server that just
 // came online, long enough that a list of rows probes each broker once.
 const CACHE_TTL_MS = 60_000;
-
-// Probe timeout — a broker that doesn't answer quickly is treated as
-// unreachable rather than blocking the request.
-const PROBE_TIMEOUT_MS = 5_000;
 
 interface CacheEntry {
   result: RabbitmqDetectionResult;
@@ -80,11 +71,11 @@ export class RabbitmqDetectionService {
       };
     }
 
-    const managementApi = this.managementApiBase(config);
+    const managementApi = managementApiBase(config);
 
     let response: Response;
     try {
-      response = await this.fetchOverview(managementApi, config);
+      response = await fetchManagementApi(config, '/api/overview');
     } catch (error) {
       // Connection refused / DNS / TLS / timeout — not reachable.
       return {
@@ -96,7 +87,7 @@ export class RabbitmqDetectionService {
         managementVersion: null,
         managementApi,
         checkedAt,
-        error: this.describeError(error),
+        error: describeManagementApiError(error),
       };
     }
 
@@ -149,58 +140,12 @@ export class RabbitmqDetectionService {
     };
   }
 
-  // Builds the management API base URL from the generic MQTT config. The
-  // management API runs on its own port, so we substitute the conventional
-  // management port for the MQTT one and pick the scheme from useTls.
-  private managementApiBase(config: MqttServerConnectionConfig): string {
-    const scheme = config.useTls ? 'https' : 'http';
-    const port = config.useTls ? MGMT_PORT_HTTPS : MGMT_PORT_HTTP;
-    return `${scheme}://${config.host}:${port}`;
-  }
-
-  private async fetchOverview(managementApi: string, config: MqttServerConnectionConfig): Promise<Response> {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
-    try {
-      return await fetch(`${managementApi}/api/overview`, {
-        headers: {
-          accept: 'application/json',
-          ...this.authHeader(config),
-        },
-        signal: controller.signal,
-      });
-    } finally {
-      clearTimeout(timeout);
-    }
-  }
-
-  private authHeader(config: MqttServerConnectionConfig): Record<string, string> {
-    if (config.username === null) {
-      return {};
-    }
-    const credentials = `${config.username}:${config.password ?? ''}`;
-    // btoa is available in the host Node runtime (>=16); encode the basic-auth
-    // pair as base64.
-    const encoded = Buffer.from(credentials, 'utf8').toString('base64');
-    return { authorization: `Basic ${encoded}` };
-  }
-
   private async parseOverview(response: Response): Promise<RabbitmqOverview | null> {
     try {
       return (await response.json()) as RabbitmqOverview;
     } catch {
       return null;
     }
-  }
-
-  private describeError(error: unknown): string {
-    if (error instanceof Error) {
-      if (error.name === 'AbortError') {
-        return `Management API did not respond within ${PROBE_TIMEOUT_MS}ms.`;
-      }
-      return error.message;
-    }
-    return 'Failed to reach the RabbitMQ management API.';
   }
 
   private now(): number {

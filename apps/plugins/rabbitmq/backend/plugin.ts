@@ -9,6 +9,8 @@
 import type { PluginBackendModule, PluginContext } from '@attraccess/plugins-backend-sdk';
 import { Auth } from '@attraccess/plugins-backend-sdk';
 import { Controller, DynamicModule, Get, Inject, Injectable, OnModuleInit } from '@nestjs/common';
+import { RabbitmqConnectionsController } from './rabbitmq-connections.controller';
+import { RabbitmqConnectionsService } from './rabbitmq-connections.service';
 import { RabbitmqDetectionController } from './rabbitmq-detection.controller';
 import { RabbitmqDetectionService } from './rabbitmq-detection.service';
 import { RabbitmqManagementClient } from './rabbitmq-management-client';
@@ -55,13 +57,19 @@ const plugin: PluginBackendModule = {
   register(context: PluginContext): DynamicModule {
     return {
       module: RabbitmqPluginModule,
-      controllers: [RabbitmqController, RabbitmqDetectionController, RabbitmqUsersController],
+      controllers: [
+        RabbitmqController,
+        RabbitmqDetectionController,
+        RabbitmqUsersController,
+        RabbitmqConnectionsController,
+      ],
       providers: [
         { provide: PLUGIN_CONTEXT, useValue: context },
         RabbitmqService,
         RabbitmqDetectionService,
         RabbitmqManagementClient,
         RabbitmqUsersService,
+        RabbitmqConnectionsService,
       ],
     };
   },
