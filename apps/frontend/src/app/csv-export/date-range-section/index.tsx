@@ -33,10 +33,10 @@ export function DateRangeSection(props: Props) {
     <Card>
       <Card.Header className="flex flex-col gap-1">
         <Card.Title className="flex items-center gap-2 text-base">
-          <span className="flex items-center justify-center size-7 rounded-full bg-accent-100 text-accent-700 text-xs font-semibold">
+          <span className="flex items-center justify-center size-7 rounded-full bg-accent-soft text-accent-soft-foreground text-xs font-semibold">
             1
           </span>
-          <CalendarRangeIcon className="size-4 text-muted-foreground" />
+          <CalendarRangeIcon className="size-4 text-muted" />
           {t('steps.range.title')}
         </Card.Title>
         <Card.Description>{t('steps.range.description')}</Card.Description>
@@ -52,7 +52,7 @@ export function DateRangeSection(props: Props) {
         </div>
 
         {preset === 'custom' && (
-          <div className="border-t border-default-100 pt-4">
+          <div className="border-t border-border pt-4">
             <RangeCalendar
               value={range ?? null}
               onChange={(value) => onRangeChange(value)}

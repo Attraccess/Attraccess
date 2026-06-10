@@ -1,7 +1,8 @@
-// Modernized CSV export modal — two pane layout with column picker and preview
-// FEATURE: CSV export — modal body and footer used by every export type
-import { Button, ModalBody, ModalFooter } from '@heroui/react';
+// Shared CSV export drawer content — column picker, preview table, download footer
+// FEATURE: CSV export — drawer body and footer used by every export type
+import { Button, DrawerBody, DrawerFooter } from '@heroui/react';
 import { QueryStatus } from '@tanstack/react-query';
+import { DownloadIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { ColumnPicker } from './column-picker';
@@ -44,7 +45,7 @@ interface ItemRow {
   columns: Array<{ key: string; value: string }>;
 }
 
-export function BaseCsvExportModal<TData extends Row>(props: Props<TData>) {
+export function CsvExportDrawerContent<TData extends Row>(props: Props<TData>) {
   const { columns, items, refetch, options, setOption, filename, queryStatus } = props;
 
   const { t } = useTranslations({ de, en });
@@ -90,7 +91,7 @@ export function BaseCsvExportModal<TData extends Row>(props: Props<TData>) {
 
   return (
     <>
-      <ModalBody className="grid grid-cols-1 md:grid-cols-[minmax(0,18rem)_minmax(0,1fr)] gap-6">
+      <DrawerBody className="flex w-full flex-col gap-6">
         <ColumnPicker
           columns={columnsLite}
           selectedKeys={selectedColumnKeys}
@@ -115,17 +116,22 @@ export function BaseCsvExportModal<TData extends Row>(props: Props<TData>) {
           refetch={refetch}
           queryStatus={queryStatus}
         />
-      </ModalBody>
-      <ModalFooter className="justify-end">
+      </DrawerBody>
+      <DrawerFooter className="flex w-full flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-end">
+        <Button slot="close" variant="outline" className="w-full sm:w-auto" data-cy="csv-export-drawer-cancel-button">
+          {t('actions.cancel')}
+        </Button>
         <Button
           variant="primary"
+          className="w-full sm:w-auto"
           onPress={() => downloadCsv()}
           isDisabled={selectedColumns.length === 0 || items.length === 0}
           data-cy="resource-usage-export-download-csv-button"
         >
+          <DownloadIcon className="size-4" />
           {t('actions.downloadCsv')}
         </Button>
-      </ModalFooter>
+      </DrawerFooter>
     </>
   );
 }
