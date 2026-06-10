@@ -271,9 +271,10 @@ export class AttractapService {
   ): Promise<void> {
     try {
       const reader = await this.readerRepository.findOne({ where: { id: readerId } });
+      // No explicit buildId: the symbolication service extracts the truncated app ELF
+      // SHA256 from the coredump itself and matches it against published firmware ELFs.
       const result = await this.coredumpSymbolicationService.symbolicate(coredump, {
         variant: reader?.firmware?.variant ?? null,
-        buildId: null,
       });
       await this.crashReportRepository.update(report.id, {
         coredumpBuildId: result.buildId,
