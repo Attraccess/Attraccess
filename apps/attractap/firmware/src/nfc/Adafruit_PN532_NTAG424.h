@@ -101,6 +101,18 @@
 
 #define NTAG424_RESPONE_GETVERSION_HWTYPE_NTAG424 \
   (0x04) ///< Response value HWType NTAG 424
+#define NTAG424_RESPONE_GETVERSION_HWTYPE_DESFIRE \
+  (0x01) ///< Response value HWType MIFARE DESFire
+
+// MIFARE DESFire native commands (ISO7816-wrapped, CLA 0x90).
+// DESFire EV2/EV3 share the NTAG424 EV2 secure messaging (AuthenticateEV2First
+// 0x71, SV1/SV2 session keys, ChangeKey 0xC4), so the ntag424_* helpers are
+// reused; only application selection/creation is DESFire specific.
+#define DESFIRE_CMD_SELECT_APPLICATION (0x5A) ///< SelectApplication
+#define DESFIRE_CMD_CREATE_APPLICATION (0xCA) ///< CreateApplication
+
+// DESFire GetVersion HWMajorVersion values (EV1 lacks AuthenticateEV2First).
+#define DESFIRE_HWMAJOR_EV2 (0x12) ///< HWMajorVersion of DESFire EV2
 
 #define NTAG424_COM_ISOCLA (0x00)          ///< ISO prefix
 #define NTAG424_CMD_ISOSELECTFILE (0xA4)   ///< ISOSelectFile
@@ -254,6 +266,8 @@ public:
   uint8_t ntag424_ReadData(uint8_t *buffer, int fileno, int offset, int size);
   uint8_t ntag424_WriteData(const uint8_t *data, int fileno, int offset, int size, uint8_t keyNo);
   uint8_t ntag424_Authenticate(uint8_t *key, uint8_t keyno, uint8_t cmd);
+  uint8_t ntag424_AuthenticateEV2First(uint8_t *key, uint8_t keyno,
+                                       uint8_t cmd);
   uint8_t ntag424_ChangeKey(uint8_t *oldkey, uint8_t *newkey,
                             uint8_t keynumber);
   uint8_t ntag424_ReadSig(uint8_t *buffer);
@@ -271,6 +285,11 @@ public:
   bool ntag424_ISOSelectFileByDFN(uint8_t *dfn);
   uint8_t ntag424_isNTAG424();
   uint8_t ntag424_GetVersion();
+
+  // MIFARE DESFire functions (EV2/EV3; reuse the EV2 secure messaging above)
+  bool desfire_SelectApplication(const uint8_t *aid);
+  bool desfire_CreateApplication(const uint8_t *aid, uint8_t keySettings1,
+                                 uint8_t keySettings2);
 
 // NTAG424 authresponse data
 #define NTAG424_AUTHRESPONSE_ENC_SIZE 32    ///< Size of encoded Auth-Response

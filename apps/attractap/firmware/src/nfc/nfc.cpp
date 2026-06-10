@@ -2,6 +2,10 @@
 
 uint8_t NFC::FACTORY_KEY[16] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
+// AID 0xACCE55 ("access"), transmitted LSB first per DESFire native protocol.
+const uint8_t NFC::DESFIRE_AID_ATTRACCESS[3] = {0x55, 0xCE, 0xAC};
+const uint8_t NFC::DESFIRE_AID_MASTER[3] = {0x00, 0x00, 0x00};
+
 void NFC::lock()
 {
     if (this->opMutex)
@@ -84,6 +88,56 @@ void NFC::disableCardDetection()
 void NFC::resetCardPresence()
 {
     this->foundCard = false;
+    this->detectedCardType = CARD_TYPE_UNKNOWN;
+}
+
+NFC::CardType NFC::getDetectedCardType()
+{
+    return this->detectedCardType;
+}
+
+void NFC::detectCardType()
+{
+    // GetVersion (native 0x60, ISO7816-wrapped) answers unauthenticated on
+    // both chip families and reports the hardware type. Cards that do not
+    // speak wrapped native commands leave garbage/zeroes in the version info,
+    // which fails the NXP vendor check below and lands on UNKNOWN.
+    memset(&this->pn532.ntag424_VersionInfo, 0, sizeof(this->pn532.ntag424_VersionInfo));
+    this->pn532.ntag424_GetVersion();
+
+    if (this->pn532.ntag424_VersionInfo.VendorID != 0x04)
+    {
+        this->detectedCardType = CARD_TYPE_UNKNOWN;
+        this->logger.debug("Card type: unknown (no NXP GetVersion response)");
+        return;
+    }
+
+    switch (this->pn532.ntag424_VersionInfo.HWType)
+    {
+    case NTAG424_RESPONE_GETVERSION_HWTYPE_NTAG424:
+        this->detectedCardType = CARD_TYPE_NTAG424;
+        this->logger.debug("Card type: NTAG424");
+        break;
+
+    case NTAG424_RESPONE_GETVERSION_HWTYPE_DESFIRE:
+        this->detectedCardType = CARD_TYPE_DESFIRE;
+        this->logger.debugf("Card type: MIFARE DESFire (HW version %02X.%02X)",
+                            this->pn532.ntag424_VersionInfo.HWMajorVersion,
+                            this->pn532.ntag424_VersionInfo.HWMinorVersion);
+        if (this->pn532.ntag424_VersionInfo.HWMajorVersion < DESFIRE_HWMAJOR_EV2)
+        {
+            // EV1 lacks AuthenticateEV2First (0x71); authentication and
+            // enrollment will fail. Surface why instead of failing silently.
+            this->logger.error("DESFire EV1 is not supported (requires EV2 or EV3)");
+        }
+        break;
+
+    default:
+        this->detectedCardType = CARD_TYPE_UNKNOWN;
+        this->logger.debugf("Card type: unknown (HWType 0x%02X)",
+                            this->pn532.ntag424_VersionInfo.HWType);
+        break;
+    }
 }
 
 void NFC::loop()
@@ -108,7 +162,16 @@ void NFC::handleCardDetection()
             // Keep the full AES handshake atomic on the shared bus; the removal
             // callback below must run WITHOUT the bus lock held (leaf-lock rule).
             I2CBusGuard busGuard;
-            authSuccess = this->pn532.ntag424_Authenticate(NFC::FACTORY_KEY, 0, 0x71);
+            if (this->detectedCardType == CARD_TYPE_DESFIRE)
+            {
+                // Key-independent presence probe: selecting the PICC master
+                // application answers regardless of the key configuration.
+                authSuccess = this->pn532.desfire_SelectApplication(NFC::DESFIRE_AID_MASTER);
+            }
+            else
+            {
+                authSuccess = this->pn532.ntag424_Authenticate(NFC::FACTORY_KEY, 0, 0x71);
+            }
         }
         if (!authSuccess)
         {
@@ -134,6 +197,12 @@ void NFC::handleCardDetection()
         // Atomic detection poll; the detection callback below runs lock-free.
         I2CBusGuard busGuard;
         foundCardUpdate = this->pn532.readPassiveTargetID(PN532_MIFARE_ISO14443A, cardDetectedUid, &cardDetectedUidLength, NFC::detectionPollTimeoutMs);
+        if (foundCardUpdate)
+        {
+            // Classify the card (NTAG424 vs. DESFire) while we still hold the
+            // bus; the routing of all later card operations depends on it.
+            this->detectCardType();
+        }
     }
 
     if (foundCardUpdate)
@@ -173,6 +242,51 @@ bool NFC::waitForCard(uint32_t timeoutMs)
     return true;
 }
 
+bool NFC::desfireSelectAttraccessApp(bool createIfMissing)
+{
+    if (this->pn532.desfire_SelectApplication(NFC::DESFIRE_AID_ATTRACCESS))
+    {
+        return true;
+    }
+
+    if (!createIfMissing)
+    {
+        this->logger.error("DESFire Attraccess application not selectable");
+        return false;
+    }
+
+    // Factory cards: the application does not exist yet. The default PICC
+    // master key settings (0x0F) allow CreateApplication without prior
+    // authentication; cards with hardened PICC settings fail here.
+    this->logger.info("DESFire Attraccess application missing, creating it");
+    if (!this->pn532.desfire_CreateApplication(NFC::DESFIRE_AID_ATTRACCESS,
+                                               NFC::DESFIRE_APP_KEY_SETTINGS_1,
+                                               NFC::DESFIRE_APP_KEY_SETTINGS_2))
+    {
+        this->logger.error("DESFire CreateApplication failed (PICC may require master key authentication)");
+        return false;
+    }
+
+    return this->pn532.desfire_SelectApplication(NFC::DESFIRE_AID_ATTRACCESS);
+}
+
+bool NFC::authenticateInternal(uint8_t keyNumber, uint8_t *key)
+{
+    if (this->detectedCardType == CARD_TYPE_DESFIRE)
+    {
+        // DESFire EV2/EV3: same EV2First handshake as the NTAG424, but inside
+        // the Attraccess application instead of the NTAG NDEF application.
+        if (!this->desfireSelectAttraccessApp(false))
+        {
+            return false;
+        }
+        return this->pn532.ntag424_AuthenticateEV2First(key, keyNumber, 0x71);
+    }
+
+    // NTAG424 and unknown cards: proven legacy path (ISOSelectFile + EV2First).
+    return this->pn532.ntag424_Authenticate(key, keyNumber, 0x71);
+}
+
 bool NFC::changeKey(uint8_t keyNumber, uint8_t *masterKey, uint8_t *oldKey, uint8_t *newKey)
 {
     this->logger.info("changeKey started");
@@ -183,14 +297,15 @@ bool NFC::changeKey(uint8_t keyNumber, uint8_t *masterKey, uint8_t *oldKey, uint
     I2CBusGuard busGuard;
 
     // Step 1: Authenticate with master key
-    bool authenticateOldKeySuccess = this->pn532.ntag424_Authenticate(masterKey, 0, 0x71);
+    bool authenticateOldKeySuccess = this->authenticateInternal(0, masterKey);
     if (!authenticateOldKeySuccess)
     {
         this->logger.error("changeKey failed, authenticate old key failed");
         return false;
     }
 
-    // Step 2: Change key
+    // Step 2: Change key (ChangeKey 0xC4 shares the EV2 secure messaging
+    // between NTAG424 and DESFire EV2/EV3)
     bool changeKeySuccess = this->pn532.ntag424_ChangeKey(oldKey, newKey, keyNumber);
     if (!changeKeySuccess)
     {
@@ -199,7 +314,7 @@ bool NFC::changeKey(uint8_t keyNumber, uint8_t *masterKey, uint8_t *oldKey, uint
     }
 
     // Step 3: Validate by authenticating with new key
-    bool authenticateNewKeySuccess = this->pn532.ntag424_Authenticate(newKey, keyNumber, 0x71);
+    bool authenticateNewKeySuccess = this->authenticateInternal(keyNumber, newKey);
     if (!authenticateNewKeySuccess)
     {
         this->logger.error("changeKey failed, authenticate new key failed");
@@ -218,7 +333,7 @@ bool NFC::authenticate(uint8_t keyNumber, uint8_t *key)
     I2CBusGuard busGuard;
 
     // Step 1: Authenticate with key
-    bool authenticateSuccess = this->pn532.ntag424_Authenticate(key, keyNumber, 0x71);
+    bool authenticateSuccess = this->authenticateInternal(keyNumber, key);
     if (!authenticateSuccess)
     {
         this->logger.error("authenticate failed, authenticate procedure failed");
@@ -288,6 +403,18 @@ bool NFC::getAvailableKeyNo(uint8_t *uid, uint8_t *uidLength, uint8_t *keyNo)
     *uidLength = this->cardDetectedUidLength;
 
     this->logger.debug("getAvailableKeyNo, using already-detected card");
+
+    if (this->detectedCardType == CARD_TYPE_DESFIRE)
+    {
+        // Enrollment entry point: make sure the Attraccess application exists
+        // before scanning its key slots (factory cards get it created here).
+        I2CBusGuard busGuard;
+        if (!this->desfireSelectAttraccessApp(true))
+        {
+            this->logger.error("getAvailableKeyNo failed, DESFire application unavailable");
+            return false;
+        }
+    }
 
     // check key 1 to 5, the first one that we can authenticate using factory key is an available key
     for (uint8_t i = 1; i <= 5; i++)
