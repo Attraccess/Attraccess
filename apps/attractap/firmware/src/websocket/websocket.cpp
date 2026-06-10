@@ -16,6 +16,10 @@ void Websocket::setup()
     {
         ws_client_mutex = xSemaphoreCreateMutex();
     }
+    if (!connect_lifecycle_mutex)
+    {
+        connect_lifecycle_mutex = xSemaphoreCreateMutex();
+    }
     if (!tx_queue)
     {
         tx_queue = xQueueCreate(TX_QUEUE_DEPTH, sizeof(TxMessage));
@@ -24,7 +28,34 @@ void Websocket::setup()
     {
         xTaskCreate(txTaskEntry, "ws_tx", TX_TASK_STACK, this, TX_TASK_PRIORITY, &tx_task);
     }
+    if (!connect_task)
+    {
+        xTaskCreate(connectTaskEntry, "ws_conn", CONNECT_TASK_STACK, this, CONNECT_TASK_PRIORITY, &connect_task);
+    }
     this->_certManager.begin();
+}
+
+void Websocket::connectTaskEntry(void *arg)
+{
+    static_cast<Websocket *>(arg)->connectTaskLoop();
+}
+
+void Websocket::connectTaskLoop()
+{
+    while (true)
+    {
+        // Block until loop() requests a (re)connect; multiple requests coalesce.
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        this->connectWebSocket();
+    }
+}
+
+void Websocket::requestConnect()
+{
+    if (connect_task)
+    {
+        xTaskNotifyGive(connect_task);
+    }
 }
 
 void Websocket::lockWsClient()
@@ -69,14 +100,14 @@ void Websocket::loop()
     bool apiConfigChanged = _lastApiConfig.hostname != apiConfig.hostname || _lastApiConfig.port != apiConfig.port || _lastApiConfig.useSSL != apiConfig.useSSL;
     if (apiConfigChanged)
     {
-        connectWebSocket();
+        requestConnect();
         return;
     }
 
     switch (_state)
     {
     case INIT:
-        connectWebSocket();
+        requestConnect();
         break;
     case CONNECTING:
         break;
@@ -134,6 +165,22 @@ void Websocket::publishConnectionStatus()
 }
 
 void Websocket::connectWebSocket()
+{
+    // Runs on the ws_conn task only. Hold the lifecycle mutex for the whole
+    // attempt so disableConnectionAttempts() cannot destroy the client handle
+    // mid-connect.
+    if (connect_lifecycle_mutex)
+    {
+        xSemaphoreTake(connect_lifecycle_mutex, portMAX_DELAY);
+    }
+    this->connectWebSocketLocked();
+    if (connect_lifecycle_mutex)
+    {
+        xSemaphoreGive(connect_lifecycle_mutex);
+    }
+}
+
+void Websocket::connectWebSocketLocked()
 {
     if (!connectionAttemptsEnabled)
     {
@@ -232,7 +279,9 @@ void Websocket::connectWebSocket()
     // Configure buffer sizes to prevent ENOBUFS errors
     websocket_cfg.task_stack = 9830;  // Increase task stack size for stability
     websocket_cfg.buffer_size = 4096; // Increase buffer size (default is typically 1024)
-    // websocket_cfg.task_prio = 5;      // Set appropriate task priority
+    // Below the LVGL render task (prio 4): TLS work must not preempt UI refresh
+    // (default was 5, unpinned) - ATT-554 item 7.
+    websocket_cfg.task_prio = 3;
 
     websocket_cfg.ping_interval_sec = 5;
     websocket_cfg.pingpong_timeout_sec = PINGPONG_TIMEOUT_SEC;
@@ -545,6 +594,14 @@ void Websocket::disableConnectionAttempts()
 {
     this->connectionAttemptsEnabled = false;
 
+    // Wait for any in-flight connect attempt on the ws_conn task to finish
+    // before tearing the client down (it re-checks connectionAttemptsEnabled
+    // under this mutex, so no new attempt can start).
+    if (connect_lifecycle_mutex)
+    {
+        xSemaphoreTake(connect_lifecycle_mutex, portMAX_DELAY);
+    }
+
     lockWsClient();
     esp_websocket_client_handle_t oldClient = ws_client;
     ws_client = nullptr;
@@ -552,6 +609,11 @@ void Websocket::disableConnectionAttempts()
     if (oldClient)
     {
         esp_websocket_client_destroy(oldClient);
+    }
+
+    if (connect_lifecycle_mutex)
+    {
+        xSemaphoreGive(connect_lifecycle_mutex);
     }
 
     drainTxQueue();

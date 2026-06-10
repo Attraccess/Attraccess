@@ -123,6 +123,11 @@ def main():
         for section in config.sections():
             if section.startswith('env:'):
                 env_name = section[4:]  # Remove 'env:' prefix
+                # '-debug' envs are local development variants (-Og + debug
+                # symbols), never shipped firmware
+                if env_name.endswith('-debug'):
+                    print(f"Skipping development environment: {env_name}")
+                    continue
                 environments.append(env_name)
         
         if not environments:
