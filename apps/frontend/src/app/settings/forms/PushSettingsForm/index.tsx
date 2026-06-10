@@ -2,11 +2,7 @@ import { useCallback, useState } from 'react';
 import {
   InputGroup,
   Label,
-  Modal,
-  ModalBackdrop,
   ModalBody,
-  ModalContainer,
-  ModalDialog,
   ModalFooter,
   ModalHeader,
   ModalHeading,
@@ -26,6 +22,7 @@ import {
   usePushServicePushReplaceVapidKeys,
 } from '@attraccess/react-query-client';
 import { Button } from '../../../../components/button';
+import { StandardModal } from '../../../../components/standardModal';
 import { useToastMessage } from '../../../../components/toastProvider';
 import en from './en.json';
 import de from './de.json';
@@ -157,7 +154,7 @@ export function PushSettingsForm() {
         </Button>
       </div>
 
-      <Modal
+      <StandardModal
         isOpen={confirmStep === 'warning'}
         onOpenChange={(open) => {
           if (!open) {
@@ -165,37 +162,32 @@ export function PushSettingsForm() {
             setPendingOverride(undefined);
           }
         }}
+        size="sm"
       >
-        <ModalBackdrop>
-          <ModalContainer size="sm">
-            <ModalDialog>
-              {({ close }) => (
-                <>
-                  <ModalHeader>
-                    <ModalHeading>{t('confirmWarning.title')}</ModalHeading>
-                  </ModalHeader>
-                  <ModalBody>
-                    <div className="flex items-start gap-2 text-warning-600 dark:text-warning-400">
-                      <AlertTriangleIcon size={18} className="mt-0.5 shrink-0" />
-                      <p>{t('confirmWarning.description', { count: subscriptionCount })}</p>
-                    </div>
-                  </ModalBody>
-                  <ModalFooter>
-                    <Button variant="ghost" onPress={close}>
-                      {t('confirmWarning.cancel')}
-                    </Button>
-                    <Button variant="tertiary" onPress={() => setConfirmStep('final')}>
-                      {t('confirmWarning.continue')}
-                    </Button>
-                  </ModalFooter>
-                </>
-              )}
-            </ModalDialog>
-          </ModalContainer>
-        </ModalBackdrop>
-      </Modal>
+        {({ close }) => (
+          <>
+            <ModalHeader>
+              <ModalHeading>{t('confirmWarning.title')}</ModalHeading>
+            </ModalHeader>
+            <ModalBody>
+              <div className="flex items-start gap-2 text-warning-600 dark:text-warning-400">
+                <AlertTriangleIcon size={18} className="mt-0.5 shrink-0" />
+                <p>{t('confirmWarning.description', { count: subscriptionCount })}</p>
+              </div>
+            </ModalBody>
+            <ModalFooter>
+              <Button variant="ghost" onPress={close}>
+                {t('confirmWarning.cancel')}
+              </Button>
+              <Button variant="tertiary" onPress={() => setConfirmStep('final')}>
+                {t('confirmWarning.continue')}
+              </Button>
+            </ModalFooter>
+          </>
+        )}
+      </StandardModal>
 
-      <Modal
+      <StandardModal
         isOpen={confirmStep === 'final'}
         onOpenChange={(open) => {
           if (!open) {
@@ -203,32 +195,27 @@ export function PushSettingsForm() {
             setPendingOverride(undefined);
           }
         }}
+        size="sm"
       >
-        <ModalBackdrop>
-          <ModalContainer size="sm">
-            <ModalDialog>
-              {({ close }) => (
-                <>
-                  <ModalHeader>
-                    <ModalHeading>{t('confirmFinal.title')}</ModalHeading>
-                  </ModalHeader>
-                  <ModalBody>
-                    <p>{t('confirmFinal.description')}</p>
-                  </ModalBody>
-                  <ModalFooter>
-                    <Button variant="ghost" onPress={() => setConfirmStep('warning')}>
-                      {t('confirmFinal.cancel')}
-                    </Button>
-                    <Button variant="danger" onPress={executeReplace} isPending={isReplacing}>
-                      {t('confirmFinal.confirm')}
-                    </Button>
-                  </ModalFooter>
-                </>
-              )}
-            </ModalDialog>
-          </ModalContainer>
-        </ModalBackdrop>
-      </Modal>
+        {() => (
+          <>
+            <ModalHeader>
+              <ModalHeading>{t('confirmFinal.title')}</ModalHeading>
+            </ModalHeader>
+            <ModalBody>
+              <p>{t('confirmFinal.description')}</p>
+            </ModalBody>
+            <ModalFooter>
+              <Button variant="ghost" onPress={() => setConfirmStep('warning')}>
+                {t('confirmFinal.cancel')}
+              </Button>
+              <Button variant="danger" onPress={executeReplace} isPending={isReplacing}>
+                {t('confirmFinal.confirm')}
+              </Button>
+            </ModalFooter>
+          </>
+        )}
+      </StandardModal>
     </div>
   );
 }
