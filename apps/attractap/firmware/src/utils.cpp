@@ -1,4 +1,32 @@
 #include "utils.hpp"
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
+
+static SemaphoreHandle_t s_i2cBusMutex = nullptr;
+
+void I2CBusLock::init()
+{
+    if (!s_i2cBusMutex)
+    {
+        s_i2cBusMutex = xSemaphoreCreateRecursiveMutex();
+    }
+}
+
+void I2CBusLock::lock()
+{
+    if (s_i2cBusMutex)
+    {
+        xSemaphoreTakeRecursive(s_i2cBusMutex, portMAX_DELAY);
+    }
+}
+
+void I2CBusLock::unlock()
+{
+    if (s_i2cBusMutex)
+    {
+        xSemaphoreGiveRecursive(s_i2cBusMutex);
+    }
+}
 
 void recoverI2CBus(int sda, int scl)
 {

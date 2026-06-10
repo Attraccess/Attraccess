@@ -6,6 +6,7 @@ import { ResourceUsageEvent, ResourceUsageTakenOverEvent } from '../../resources
 import { ResourceChangedEvent } from '../../resources/events/resource-changed.event';
 import { ResourceMaintenanceChangedEvent } from '../../resources/maintenances/events/resource-maintenance-changed.event';
 import { ResourceFlowChangedEvent } from '../../resources/flows/events/resource-flow-changed.event';
+import { ResourceHealthChangedEvent } from '../../resources/health/events/resource-health-changed.event';
 
 @Injectable()
 export class WebSocketEventService {
@@ -47,6 +48,12 @@ export class WebSocketEventService {
   @OnEvent(ResourceMaintenanceChangedEvent.EVENT_NAME)
   public async onResourceMaintenanceChanged(event: ResourceMaintenanceChangedEvent) {
     this.logger.debug({ resourceId: event.resourceId }, 'Got resource maintenance changed event');
+    this.attractapGateway.sendResourceListToReadersWithResource(event.resourceId);
+  }
+
+  @OnEvent(ResourceHealthChangedEvent.EVENT_NAME)
+  public async onResourceHealthChanged(event: ResourceHealthChangedEvent) {
+    this.logger.debug({ resourceId: event.resourceId }, 'Got resource health changed event');
     this.attractapGateway.sendResourceListToReadersWithResource(event.resourceId);
   }
 }

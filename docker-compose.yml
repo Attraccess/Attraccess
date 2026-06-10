@@ -39,11 +39,23 @@ services:
       dockerfile: Dockerfile
     restart: 'no'
     entrypoint: ['/bin/sh', '-c']
+    environment:
+      # Pushover alerting is opt-in: prepare-provisioning.sh strips the
+      # secret-requiring contact point + policy when these are unset (ATT-539).
+      # The script call below is guarded with `[ -f ... ]` because this compose
+      # file can run against an older image that predates the script; in that
+      # case the provisioning bundle also lacks the secret-requiring files, so
+      # skipping the strip is safe and init must not hard-fail (ATT-549).
+      - PUSHOVER_API_TOKEN=${PUSHOVER_API_TOKEN:-}
+      - PUSHOVER_USER_KEY=${PUSHOVER_USER_KEY:-}
     command:
       - >
         set -e &&
         cp -rT /app/share/monitoring/grafana/provisioning /grafana-provisioning &&
-        cp -rT /app/share/monitoring/grafana/dashboards /grafana-dashboards
+        cp -rT /app/share/monitoring/grafana/dashboards /grafana-dashboards &&
+        if [ -f /app/share/monitoring/grafana/prepare-provisioning.sh ]; then
+          sh /app/share/monitoring/grafana/prepare-provisioning.sh /grafana-provisioning;
+        fi
     volumes:
       - prometheus-config:/prometheus-config
       - grafana-provisioning:/grafana-provisioning
@@ -173,6 +185,9 @@ services:
       - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-attraccess}
       - GF_SERVER_HTTP_PORT=3001
+      # Read by $__env{} interpolation in the provisioned Pushover contact point.
+      - PUSHOVER_API_TOKEN=${PUSHOVER_API_TOKEN:-}
+      - PUSHOVER_USER_KEY=${PUSHOVER_USER_KEY:-}
     volumes:
       - grafana-provisioning:/etc/grafana/provisioning:ro
       - grafana-dashboards:/var/lib/grafana/dashboards:ro

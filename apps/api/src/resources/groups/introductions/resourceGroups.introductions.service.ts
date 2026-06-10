@@ -42,10 +42,11 @@ export class ResourceGroupsIntroductionsService {
     });
   }
 
-  private async createOne(groupId: number, userId: number): Promise<ResourceIntroduction> {
+  private async createOne(groupId: number, userId: number, tutorUserId?: number): Promise<ResourceIntroduction> {
     const introduction = await this.resourceIntroductionRepository.create({
       resourceGroup: { id: groupId },
       receiverUser: { id: userId },
+      ...(tutorUserId != null ? { tutorUser: { id: tutorUserId } } : {}),
     });
 
     return await this.resourceIntroductionRepository.save(introduction);
@@ -56,6 +57,7 @@ export class ResourceGroupsIntroductionsService {
     userId: number,
     nextStatus: IntroductionHistoryAction,
     data?: UpdateResourceGroupIntroductionDto,
+    tutorUserId?: number,
   ): Promise<ResourceIntroductionHistoryItem> {
     let existingIntroduction = await this.resourceIntroductionRepository.findOne({
       where: {
@@ -64,7 +66,13 @@ export class ResourceGroupsIntroductionsService {
       },
     });
 
-    existingIntroduction ??= await this.createOne(groupId, userId);
+    if (!existingIntroduction) {
+      existingIntroduction = await this.createOne(groupId, userId, tutorUserId);
+    } else if (tutorUserId != null && existingIntroduction.tutorUserId !== tutorUserId) {
+      await this.resourceIntroductionRepository.update(existingIntroduction.id, { tutorUserId });
+      // Keep the in-memory entity in sync so subsequent history/logging sees the updated tutor.
+      existingIntroduction.tutorUserId = tutorUserId;
+    }
 
     const historyItem = this.resourceIntroductionHistoryItemRepository.create({
       introduction: existingIntroduction,
@@ -95,8 +103,15 @@ export class ResourceGroupsIntroductionsService {
     groupId: number,
     userId: number,
     data?: UpdateResourceGroupIntroductionDto,
+    options?: { tutorUserId?: number },
   ): Promise<ResourceIntroductionHistoryItem> {
-    return await this.updateIntroductionStatus(groupId, userId, IntroductionHistoryAction.GRANT, data);
+    return await this.updateIntroductionStatus(
+      groupId,
+      userId,
+      IntroductionHistoryAction.GRANT,
+      data,
+      options?.tutorUserId,
+    );
   }
 
   public async revoke(

@@ -14,5 +14,6 @@
     }
   },
   "project": "Projekt",
-  "supervisedBy": "Beaufsichtigt von"
+  "supervisedBy": "Beaufsichtigt von",
+  "live": "Du nutzt diese gerade"
 }

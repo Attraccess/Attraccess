@@ -89,6 +89,15 @@ services:
     entrypoint: ['/bin/sh', '-c']
     environment:
       - PROMETHEUS_METRICS_API_KEY=${PROMETHEUS_METRICS_API_KEY:-}
+      # Pushover alerting is opt-in: prepare-provisioning.sh strips the
+      # secret-requiring contact point + policy when these are unset (ATT-539).
+      # The script call below is guarded with `[ -f ... ]` because Coolify pulls
+      # the image (ATTRACCESS_IMAGE, default :latest) independently of this
+      # compose file, so an older image may predate the script. Such an image
+      # also lacks the secret-requiring files, so skipping the strip is safe and
+      # init must not hard-fail (ATT-549).
+      - PUSHOVER_API_TOKEN=${PUSHOVER_API_TOKEN:-}
+      - PUSHOVER_USER_KEY=${PUSHOVER_USER_KEY:-}
     command:
       - >
         set -e &&
@@ -97,7 +106,10 @@ services:
           sed -i "s|# bearer_token: '<your-metrics-api-key>'|bearer_token: '$$PROMETHEUS_METRICS_API_KEY'|" /prometheus-config/prometheus.yml;
         fi &&
         cp -rT /app/share/monitoring/grafana/provisioning /grafana-provisioning &&
-        cp -rT /app/share/monitoring/grafana/dashboards /grafana-dashboards
+        cp -rT /app/share/monitoring/grafana/dashboards /grafana-dashboards &&
+        if [ -f /app/share/monitoring/grafana/prepare-provisioning.sh ]; then
+          sh /app/share/monitoring/grafana/prepare-provisioning.sh /grafana-provisioning;
+        fi
     volumes:
       - prometheus-config:/prometheus-config
       - grafana-provisioning:/grafana-provisioning
@@ -129,6 +141,9 @@ services:
       - GF_SERVER_ROOT_URL=$SERVICE_URL_GRAFANA
       - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      # Read by $__env{} interpolation in the provisioned Pushover contact point.
+      - PUSHOVER_API_TOKEN=${PUSHOVER_API_TOKEN:-}
+      - PUSHOVER_USER_KEY=${PUSHOVER_USER_KEY:-}
     volumes:
       - grafana-data:/var/lib/grafana
       - grafana-provisioning:/etc/grafana/provisioning:ro

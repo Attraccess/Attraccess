@@ -132,6 +132,10 @@ private:
     lv_obj_t *formsBackButton = nullptr;
     lv_obj_t *formsNextButton = nullptr;
     lv_obj_t *formsNextLabel = nullptr;
+    lv_obj_t *formsCancelButton = nullptr;
+    lv_obj_t *formsBusyOverlay = nullptr;
+    lv_obj_t *formsBusyLabel = nullptr;
+    bool formsBusy = false;
     const API::ResourceUsageFormRequest *formsModalMeta = nullptr;
     const API::ResourceUsageFormFieldsPage *formsModalPage = nullptr;
     bool formsCanGoBack = false;
@@ -234,6 +238,7 @@ private:
     FormFieldWidget *findFieldWidget(uint32_t formId, uint32_t fieldId);
     FormFieldWidget *findFieldWidgetByObject(lv_obj_t *object);
     void clearFormFieldErrors();
+    void setFormsBusy(bool busy, const char *text = nullptr);
     void hideFormsKeyboard();
     void updateFormsModalLayoutForKeyboard(bool keyboardVisible);
     void showKeyboardForWidget(FormFieldWidget &widget, lv_obj_t *target);

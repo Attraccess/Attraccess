@@ -14,5 +14,6 @@
     }
   },
   "project": "Project",
-  "supervisedBy": "Supervised by"
+  "supervisedBy": "Supervised by",
+  "live": "You are using this"
 }

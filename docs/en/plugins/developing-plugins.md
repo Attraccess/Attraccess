@@ -60,6 +60,7 @@ versions it supports, and the permissions it needs:
 | `name` | yes | Unique identifier; also the on-disk folder name. |
 | `version` | yes | Your plugin's semantic version. |
 | `main.backend` / `main.frontend` | at least one | `directory` + `entryPoint`, relative to the ZIP root. |
+| `main.migrations` | no | `directory` + `entryPoint` of a module exporting TypeORM migration classes. See [Database Migrations](plugins/database-migrations.md). |
 | `attraccessVersion` | yes | Compatibility range — at least one of `min`, `max`, `exact`. |
 | `permissions` | no | Backend capabilities you need (see [Permissions](#backend-plugin-permissions)). Defaults to `[]`. |
 
@@ -352,6 +353,52 @@ route props (`path`, `element`, ...) with an `authRequired` field:
 
 The host wraps each plugin route in an error boundary and merges it with the
 core routes, so a route that throws cannot take down the rest of the app.
+
+### Slots (embedded extension points)
+
+Routes give a plugin its own pages. **Slots** let a plugin inject UI *into* a
+host page at a well-known point, without the host knowing anything about the
+plugin. A slot is identified by a string id the host documents (just like a
+route `path`), and the host hands each contribution a small context object
+describing where it is mounted.
+
+Implement `getSlotContributions()` and return one entry per slot you target:
+
+```tsx
+// Type each contribution against the context the host documents for the slot,
+// so `context` is strongly typed with no runtime casting.
+interface MqttServerSlotContext { mqttServerId: number; [key: string]: unknown; }
+
+getSlotContributions(): PluginSlotContribution[] {
+  const contributions: PluginSlotContribution<MqttServerSlotContext>[] = [
+    {
+      slotId: 'mqtt.server.detail',           // host-documented id
+      key: 'my-plugin-mqtt-detail',           // stable key (optional)
+      render: (context) => <MyPanel mqttServerId={context.mqttServerId} />,
+    },
+  ];
+  return contributions;
+}
+```
+
+- `slotId` — the host extension point to render into. Unknown ids are ignored.
+- `render(context)` — returns the React node to embed. `context` is a plain
+  object whose keys the host documents per slot (e.g. the MQTT slots pass
+  `{ mqttServerId }`), so a contribution can scope itself to the right entity.
+  `PluginSlotContribution<Context>` is generic over that shape, so you type it
+  once and skip per-field casts; contributions for different slots still share
+  one `PluginSlotContribution[]` array.
+- The `key` is optional but doubles as the contribution's id in host error logs.
+- The host renders every matching contribution inside an error boundary, so a
+  throwing contribution is hidden and logged rather than breaking the host page.
+
+The slot contract is intentionally generic — the SDK carries no domain
+knowledge. Host slot ids available today:
+
+| Slot id | Where it renders | Context |
+|---------|------------------|---------|
+| `mqtt.server.detail` | MQTT server detail/edit view (extensions section) | `{ mqttServerId }` |
+| `mqtt.server.list.row` | MQTT server list, per-row action area | `{ mqttServerId }` |
 
 ### Packaging the frontend
 

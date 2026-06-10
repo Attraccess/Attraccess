@@ -44,8 +44,24 @@ private:
     void updateInfoFromAppState();
     void publishConnectionStatus();
     void connectWebSocket();
+    void connectWebSocketLocked();
     bool shouldReconnect();
     uint32_t lastReconnectAttemptTime = 0;
+
+    // (Re)connects run on a dedicated low-priority task (ATT-554 item 7):
+    // esp_websocket_client_stop()/start() block for up to the network timeout,
+    // which used to stall the UI-driving main loop on every reconnect attempt.
+    // loop() only signals the task via a task notification (coalescing).
+    static constexpr uint32_t CONNECT_TASK_STACK = 8192;
+    static constexpr UBaseType_t CONNECT_TASK_PRIORITY = 2;
+    TaskHandle_t connect_task = nullptr;
+    static void connectTaskEntry(void *arg);
+    void connectTaskLoop();
+    void requestConnect();
+    // Serializes connectWebSocket (connect task) against the client teardown in
+    // disableConnectionAttempts (main loop) so the client handle cannot be
+    // destroyed mid-connect.
+    SemaphoreHandle_t connect_lifecycle_mutex = nullptr;
 
     const uint32_t CERT_ITERATION_INTERVAL_MS = 10000;
     const uint32_t RECONNECT_BACKOFF_BASE_MS = 10000;
