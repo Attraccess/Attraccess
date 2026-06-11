@@ -2,17 +2,14 @@ import {
   TextField,
   Label,
   Input,
-  Modal,
-  ModalBackdrop,
   ModalBody,
-  ModalContainer,
-  ModalDialog,
   ModalFooter,
   ModalHeader,
   ModalHeading,
   useOverlayState,
 } from '@heroui/react';
 import { Button } from '../../../../../components/button';
+import { StandardModal } from '../../../../../components/standardModal';
 import { OpenIDConfiguration } from '../OpenIDC.data';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useCallback, useState } from 'react';
@@ -90,41 +87,36 @@ export function AuthentikDiscoveryDialog(props: Props) {
   return (
     <>
       {activator(open)}
-      <Modal
+      <StandardModal
         isOpen={isOpen}
         onOpenChange={(o) => {
           if (!o) close();
         }}
+        size="md"
       >
-        <ModalBackdrop>
-          <ModalContainer size="md">
-            <ModalDialog>
-              {({ close }) => (
-                <>
-                  <ModalHeader>
-                    <ModalHeading>{t('title')}</ModalHeading>
-                  </ModalHeader>
-                  <ModalBody className="flex flex-col gap-4">
-                    <TextField value={host} onChange={setHost}>
-                      <Label>{t('host')}</Label>
-                      <Input />
-                    </TextField>
-                    <TextField value={applicationName} onChange={setApplicationName}>
-                      <Label>{t('applicationName')}</Label>
-                      <Input />
-                    </TextField>
-                  </ModalBody>
-                  <ModalFooter>
-                    <Button variant="primary" onPress={discover} isPending={isDiscovering}>
-                      {t('discover')}
-                    </Button>
-                  </ModalFooter>
-                </>
-              )}
-            </ModalDialog>
-          </ModalContainer>
-        </ModalBackdrop>
-      </Modal>
+        {({ close }) => (
+          <>
+            <ModalHeader>
+              <ModalHeading>{t('title')}</ModalHeading>
+            </ModalHeader>
+            <ModalBody className="flex flex-col gap-4">
+              <TextField value={host} onChange={setHost}>
+                <Label>{t('host')}</Label>
+                <Input />
+              </TextField>
+              <TextField value={applicationName} onChange={setApplicationName}>
+                <Label>{t('applicationName')}</Label>
+                <Input />
+              </TextField>
+            </ModalBody>
+            <ModalFooter>
+              <Button variant="primary" onPress={discover} isPending={isDiscovering}>
+                {t('discover')}
+              </Button>
+            </ModalFooter>
+          </>
+        )}
+      </StandardModal>
     </>
   );
 }

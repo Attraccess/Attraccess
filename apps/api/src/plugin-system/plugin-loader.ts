@@ -2,6 +2,22 @@ import { createRequire, Module as NodeModuleClass } from 'module';
 import { readFileSync } from 'fs';
 import { runInThisContext } from 'vm';
 import { dirname, isAbsolute } from 'path';
+import * as pluginsBackendSdk from '@attraccess/plugins-backend-sdk';
+
+// Host-internal workspace libraries a plugin externalizes (to share the host's
+// single instance for DI-token / decorator-metadata identity) but which — unlike
+// the other externals (@nestjs/*, typeorm, reflect-metadata, …) — are bundled
+// straight INTO the host bundle (dist/apps/api/main.js) rather than installed
+// under node_modules. A shipped plugin entry therefore emits a bare
+// `require('@attraccess/plugins-backend-sdk')` that hostRequire cannot resolve on
+// disk ("Cannot find module '@attraccess/plugins-backend-sdk'"), even though the
+// host already has the exact instance compiled in. Route these specifiers to that
+// already-bundled instance — statically imported here so webpack bundles the very
+// object the rest of the host uses (preserving Auth/guard DI and TypeORM
+// decorator identity).
+const HOST_BUNDLED_MODULES: Record<string, unknown> = {
+  '@attraccess/plugins-backend-sdk': pluginsBackendSdk,
+};
 
 // Loads a plugin's CommonJS entry so that its *externalized* host-shared packages
 // (@nestjs/common, typeorm, reflect-metadata, …) resolve to the host's single
@@ -48,8 +64,12 @@ export function loadPluginEntryExports(entryFile: string): Record<string, unknow
   pluginModule.filename = entryFile;
   pluginModule.paths = NodeModule._nodeModulePaths(dirname(entryFile));
 
-  const pluginRequire = ((request: string): unknown =>
-    isBareSpecifier(request) ? hostRequire(request) : pluginModule.require(request)) as NodeJS.Require;
+  const pluginRequire = ((request: string): unknown => {
+    if (Object.prototype.hasOwnProperty.call(HOST_BUNDLED_MODULES, request)) {
+      return HOST_BUNDLED_MODULES[request];
+    }
+    return isBareSpecifier(request) ? hostRequire(request) : pluginModule.require(request);
+  }) as NodeJS.Require;
   pluginRequire.resolve = hostRequire.resolve;
 
   const compiled = runInThisContext(NodeModule.wrap(readFileSync(entryFile, 'utf8')), { filename: entryFile });

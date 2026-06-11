@@ -654,7 +654,11 @@ void ResourceDetailsScreen::destroy()
    this->formsModalList = nullptr;
    this->formsModalErrorLabel = nullptr;
    this->formsModalProgressLabel = nullptr;
-   this->formsKeyboard = nullptr;
+   this->formsEditorOverlay = nullptr;
+   this->formsEditorTitleLabel = nullptr;
+   this->formsEditorTextarea = nullptr;
+   this->formsEditorSpacer = nullptr;
+   this->formsEditorKeyboard = nullptr;
    this->formsBackButton = nullptr;
    this->formsNextButton = nullptr;
    this->formsNextLabel = nullptr;

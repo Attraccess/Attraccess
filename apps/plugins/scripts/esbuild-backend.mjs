@@ -6,7 +6,13 @@
 // as a *different* type by the host and silently fails to connect — see
 // docs/en/plugins/developing-plugins.md ("Packaging the backend").
 //
-// Usage: node ../scripts/esbuild-backend.mjs --entry backend/plugin.ts --outfile package/dist/index.js
+// One or more --entry/--outfile pairs may be passed (paired positionally), so a
+// plugin can bundle its backend and its migrations entry in a single invocation
+// without each clobbering the other's output dir. Examples:
+//   node ../scripts/esbuild-backend.mjs --entry backend/plugin.ts --outfile package/dist/index.js
+//   node ../scripts/esbuild-backend.mjs \
+//     --entry backend/plugin.ts     --outfile package/dist/index.js \
+//     --entry backend/migrations.ts --outfile package/dist/migrations.js
 import { build } from 'esbuild';
 import { dirname, resolve } from 'node:path';
 import { mkdirSync, rmSync } from 'node:fs';
@@ -24,33 +30,46 @@ const HOST_SHARED_EXTERNALS = [
 
 const { values } = parseArgs({
   options: {
-    entry: { type: 'string' },
-    outfile: { type: 'string' },
+    entry: { type: 'string', multiple: true },
+    outfile: { type: 'string', multiple: true },
   },
 });
 
-if (!values.entry || !values.outfile) {
-  console.error('usage: esbuild-backend.mjs --entry <file> --outfile <file>');
+const entries = values.entry ?? [];
+const outfiles = values.outfile ?? [];
+
+if (entries.length === 0 || entries.length !== outfiles.length) {
+  console.error('usage: esbuild-backend.mjs --entry <file> --outfile <file> [--entry <file> --outfile <file> ...]');
   process.exit(1);
 }
 
-const entry = resolve(process.cwd(), values.entry);
-const outfile = resolve(process.cwd(), values.outfile);
+const pairs = entries.map((entry, index) => ({
+  entry: resolve(process.cwd(), entry),
+  outfile: resolve(process.cwd(), outfiles[index]),
+  label: outfiles[index],
+}));
 
-// Clean only the backend output dir so a sibling frontend build is untouched.
-rmSync(dirname(outfile), { recursive: true, force: true });
-mkdirSync(dirname(outfile), { recursive: true });
+// Clean each distinct output dir once, up front, so building a later entry can
+// never wipe an earlier entry that shares the same dir (e.g. index.js +
+// migrations.js both in package/dist). A sibling frontend build is untouched.
+const outDirs = [...new Set(pairs.map(({ outfile }) => dirname(outfile)))];
+for (const dir of outDirs) {
+  rmSync(dir, { recursive: true, force: true });
+  mkdirSync(dir, { recursive: true });
+}
 
-await build({
-  entryPoints: [entry],
-  bundle: true,
-  platform: 'node',
-  format: 'cjs',
-  target: 'es2021',
-  outfile,
-  external: HOST_SHARED_EXTERNALS,
-  tsconfigRaw: { compilerOptions: { experimentalDecorators: true, emitDecoratorMetadata: true } },
-  logLevel: 'info',
-});
+for (const { entry, outfile } of pairs) {
+  await build({
+    entryPoints: [entry],
+    bundle: true,
+    platform: 'node',
+    format: 'cjs',
+    target: 'es2021',
+    outfile,
+    external: HOST_SHARED_EXTERNALS,
+    tsconfigRaw: { compilerOptions: { experimentalDecorators: true, emitDecoratorMetadata: true } },
+    logLevel: 'info',
+  });
+}
 
-console.log(`Built ${values.outfile} — host-shared packages externalized, not bundled.`);
+console.log(`Built ${pairs.map(({ label }) => label).join(', ')} — host-shared packages externalized, not bundled.`);

@@ -1,6 +1,7 @@
 export * from './lib/plugin.interface';
 export * from './lib/plugin-context';
 export * from './lib/plugin-migrations';
+export * from './lib/entity';
 export * from './lib/semver';
 
 export * from './lib/auth-decorator';

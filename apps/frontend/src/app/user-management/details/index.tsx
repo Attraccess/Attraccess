@@ -19,8 +19,9 @@ import { ChangeEmailForm } from './components/changeEmail';
 
 import en from './en.json';
 import de from './de.json';
-import { Card, Chip, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Separator, useOverlayState } from '@heroui/react';
+import { Card, Chip, ModalBody, ModalFooter, ModalHeader, Separator, useOverlayState } from '@heroui/react';
 import { Button } from '../../../components/button';
+import { StandardModal } from '../../../components/standardModal';
 import { useToastMessage } from '../../../components/toastProvider';
 import API_ERROR_TRANSLATIONS_EN from '../../../global-translations/api-errors.en.json';
 import API_ERROR_TRANSLATIONS_DE from '../../../global-translations/api-errors.de.json';
@@ -275,35 +276,29 @@ export function UserManagementDetailsPage() {
         </div>
       )}
 
-      <Modal isOpen={isOpen} onOpenChange={setOpen}>
-        <ModalBackdrop>
-          <ModalContainer size="sm">
-            <ModalDialog>
-              {({ close: modalClose }) => (
-                <>
-                  <ModalHeader>{t('delete.modal.title')}</ModalHeader>
-                  <ModalBody>
-                    <p className="text-sm text-default-500">{t('delete.modal.description')}</p>
-                  </ModalBody>
-                  <ModalFooter>
-                    <Button variant="ghost" onPress={modalClose} isDisabled={isDeleting}>
-                      {t('delete.actions.cancel')}
-                    </Button>
-                    <Button
-                      variant="danger"
-                      onPress={() => user && deleteUser({ id: user.id })}
-                      isPending={isDeleting}
-                      data-cy="admin-delete-user-confirm-button"
-                    >
-                      {t('delete.actions.confirm')}
-                    </Button>
-                  </ModalFooter>
-                </>
-              )}
-            </ModalDialog>
-          </ModalContainer>
-        </ModalBackdrop>
-      </Modal>
+      <StandardModal isOpen={isOpen} onOpenChange={setOpen} size="sm">
+        {({ close: modalClose }) => (
+          <>
+            <ModalHeader>{t('delete.modal.title')}</ModalHeader>
+            <ModalBody>
+              <p className="text-sm text-default-500">{t('delete.modal.description')}</p>
+            </ModalBody>
+            <ModalFooter>
+              <Button variant="ghost" onPress={modalClose} isDisabled={isDeleting}>
+                {t('delete.actions.cancel')}
+              </Button>
+              <Button
+                variant="danger"
+                onPress={() => user && deleteUser({ id: user.id })}
+                isPending={isDeleting}
+                data-cy="admin-delete-user-confirm-button"
+              >
+                {t('delete.actions.confirm')}
+              </Button>
+            </ModalFooter>
+          </>
+        )}
+      </StandardModal>
     </div>
   );
 }
