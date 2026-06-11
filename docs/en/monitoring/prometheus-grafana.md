@@ -224,6 +224,17 @@ The runtime dashboard includes panels for:
 | **Event Loop Lag** | Current lag and p99 percentile |
 | **Active Handles & Requests** | Open handles and pending requests |
 
+### Host and Container Metrics
+
+The bundled Coolify and Balena compose stacks also run:
+
+| Exporter | Purpose |
+|----------|---------|
+| **node-exporter** | Host RAM and filesystem usage |
+| **cAdvisor** | Docker container CPU and memory usage |
+
+Operational memory alerts use host/container memory metrics. V8 heap usage remains on the Node Runtime dashboard as an application diagnostic, but it is not used as the primary "server is running out of RAM" warning because V8 can run close to its current heap allocation while the host still has plenty of free memory.
+
 ## Customising the Bundled Configs
 
 Because the configs live inside the `attraccess` image and are copied into named volumes on every stack start, edits made directly to the volumes (other than the bearer token) are wiped on redeploy. To customise:
@@ -231,6 +242,8 @@ Because the configs live inside the `attraccess` image and are copied into named
 - **Scrape config / alert rules**: edit `monitoring/prometheus/*.yml` in your fork or PR and rebuild the image.
 - **Dashboards / datasources**: edit `monitoring/grafana/**` in your fork or PR and rebuild.
 - **Per-deploy overrides**: extend the compose with a `docker-compose.override.yml` that mounts your own files on top of the named volume mountpoint.
+
+The Grafana provisioning and dashboard volumes are treated as Attraccess-managed. On stack startup, Attraccess removes stale managed files before copying the current bundled files. When an alert rule UID existed in the previous bundled rules but no longer exists in the current bundle, startup also writes a temporary Grafana `deleteRules` provisioning file so removed Attraccess-managed alerts are deleted from Grafana.
 
 ## Exposing Prometheus Externally (Optional)
 
