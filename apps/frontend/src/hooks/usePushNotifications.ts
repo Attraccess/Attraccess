@@ -19,13 +19,18 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return outputArray;
 }
 
-async function getServiceWorkerRegistration(): Promise<ServiceWorkerRegistration | null> {
+async function getServiceWorkerRegistration(waitForReady = false): Promise<ServiceWorkerRegistration | null> {
   if (!('serviceWorker' in navigator)) {
     return null;
   }
   // The service worker is only registered in production builds; getRegistration (unlike .ready)
   // resolves immediately instead of hanging when none is registered.
-  return (await navigator.serviceWorker.getRegistration()) ?? null;
+  const registration = (await navigator.serviceWorker.getRegistration()) ?? null;
+  if (registration || !waitForReady) {
+    return registration;
+  }
+
+  return navigator.serviceWorker.ready;
 }
 
 export function usePushNotifications() {
@@ -79,7 +84,7 @@ export function usePushNotifications() {
         return false;
       }
 
-      const registration = await getServiceWorkerRegistration();
+      const registration = await getServiceWorkerRegistration(true);
       if (!registration) {
         return false;
       }
