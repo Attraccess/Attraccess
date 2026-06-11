@@ -32,7 +32,7 @@ import { useNavigate } from 'react-router-dom';
 import { useToastMessage } from '../../../components/toastProvider';
 import en from './translations/list/en.json';
 import de from './translations/list/de.json';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import {
   useMqttServiceMqttServersGetAll,
   useMqttServiceMqttServersDeleteOne,
@@ -98,10 +98,10 @@ export function MqttServerList() {
     refetchInterval: 5000,
   });
 
-  const connectionStateByServerId = useMemo(
-    () => new Map((connectionStates ?? []).map((state) => [state.serverId, state])),
-    [connectionStates],
-  );
+  const connectionStateByServerId = new Map((connectionStates ?? []).map((state) => [state.serverId, state]));
+  const connectionStateDependency = (connectionStates ?? [])
+    .map((state) => `${state.serverId}:${state.status}:${state.lastError ?? ''}`)
+    .join('|');
 
   const deleteServer = useMqttServiceMqttServersDeleteOne({
     onSuccess: () => {
@@ -169,6 +169,7 @@ export function MqttServerList() {
             </TableHeader>
             <TableBody
               items={servers}
+              dependencies={[connectionStateDependency]}
               renderEmptyState={() => <EmptyState message={t('noServersConfigured')} />}
             >
               {(server) => (
