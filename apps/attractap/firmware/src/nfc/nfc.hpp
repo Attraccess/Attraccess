@@ -41,7 +41,7 @@ public:
      */
     void loop();
 
-    bool changeKey(uint8_t keyNumber, uint8_t *masterKey, uint8_t *oldKey, uint8_t *newKey);
+    bool changeKey(uint8_t keyNumber, uint8_t *masterKey, uint8_t *oldKey, uint8_t *newKey, uint8_t keyVersion = 0x01);
     bool authenticate(uint8_t keyNumber, uint8_t *key);
     void enableCardDetection();
     void setCardDetectionCallback(std::function<void(uint8_t *, uint8_t)> callback);
@@ -71,6 +71,8 @@ public:
     // (0x80 = AES | 6 keys, mirroring the NTAG424 key slots 0-5).
     static const uint8_t DESFIRE_APP_KEY_SETTINGS_1 = 0x0F;
     static const uint8_t DESFIRE_APP_KEY_SETTINGS_2 = 0x86;
+    static const uint8_t CARD_KEY_VERSION_FREE = 0x00;
+    static const uint8_t CARD_KEY_VERSION_ENROLLED = 0x01;
 
     bool isCardDetectionEnabled();
 

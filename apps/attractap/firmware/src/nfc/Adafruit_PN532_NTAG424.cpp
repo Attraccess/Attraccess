@@ -2539,9 +2539,8 @@ uint8_t Adafruit_PN532::ntag424_ChangeFileSettings(uint8_t fileno,
 */
 /**************************************************************************/
 uint8_t Adafruit_PN532::ntag424_ChangeKey(uint8_t *oldkey, uint8_t *newkey,
-                                          uint8_t keynumber)
+                                          uint8_t keynumber, uint8_t keyversion)
 {
-  uint8_t keyversion[1] = {0x01};
   uint8_t xorkey[16];
   for (int i = 0; i < 16; ++i)
   {
@@ -2572,14 +2571,14 @@ uint8_t Adafruit_PN532::ntag424_ChangeKey(uint8_t *oldkey, uint8_t *newkey,
   if (keynumber > 0)
   {
     memcpy(keydata, xorkey, 16);
-    memcpy(keydata + 16, keyversion, 1);
+    keydata[16] = keyversion;
     memcpy(keydata + 17, crcbytes, 4);
     keydata_length = 21;
   }
   else if (keynumber == 0)
   {
     memcpy(keydata, newkey, 16);
-    memcpy(keydata + 16, keyversion, 1);
+    keydata[16] = keyversion;
     keydata_length = 17;
   }
 #ifdef NTAG424DEBUG
@@ -3136,6 +3135,55 @@ bool Adafruit_PN532::desfire_CreateApplication(const uint8_t *aid,
 #endif
     return false;
   }
+  return true;
+}
+
+/*!
+    @brief   Send a DESFire GetKeyVersion command for the selected
+   application.
+
+    @param   keynumber    Key number in the selected application
+    @param   keyversion   Output key version byte
+
+    @return  false on fail|true on success
+*/
+/**************************************************************************/
+bool Adafruit_PN532::desfire_GetKeyVersion(uint8_t keynumber,
+                                           uint8_t *keyversion)
+{
+  uint8_t cmd_get_version[9] = {PN532_COMMAND_INDATAEXCHANGE,
+                                0x01,
+                                NTAG424_COM_CLA,
+                                DESFIRE_CMD_GET_KEY_VERSION,
+                                0x00,
+                                0x00,
+                                0x01,
+                                keynumber,
+                                0x00};
+  if (!sendCommandCheckAck(cmd_get_version, sizeof(cmd_get_version)))
+  {
+#ifdef NTAG424DEBUG
+    PN532DEBUGPRINT.println(F("Failed to receive ACK for GetKeyVersion"));
+#endif
+    return false;
+  }
+
+  /* Read the response packet: D5 41 <status> <version> 91 00 */
+  readdata(pn532_packetbuffer, 13);
+#ifdef NTAG424DEBUG
+  PN532DEBUGPRINT.print(F("GetKeyVersion response: "));
+  Adafruit_PN532::PrintHexChar(pn532_packetbuffer, 13);
+#endif
+  if (pn532_packetbuffer[7] != 0x00 || pn532_packetbuffer[9] != 0x91 ||
+      pn532_packetbuffer[10] != 0x00)
+  {
+#ifdef NTAG424DEBUG
+    PN532DEBUGPRINT.println(F("GetKeyVersion ResultError"));
+#endif
+    return false;
+  }
+
+  *keyversion = pn532_packetbuffer[8];
   return true;
 }
 

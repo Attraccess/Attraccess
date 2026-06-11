@@ -110,6 +110,7 @@
 // reused; only application selection/creation is DESFire specific.
 #define DESFIRE_CMD_SELECT_APPLICATION (0x5A) ///< SelectApplication
 #define DESFIRE_CMD_CREATE_APPLICATION (0xCA) ///< CreateApplication
+#define DESFIRE_CMD_GET_KEY_VERSION (0x64)    ///< GetKeyVersion
 
 // DESFire GetVersion HWMajorVersion values (EV1 lacks AuthenticateEV2First).
 #define DESFIRE_HWMAJOR_EV2 (0x12) ///< HWMajorVersion of DESFire EV2
@@ -269,7 +270,7 @@ public:
   uint8_t ntag424_AuthenticateEV2First(uint8_t *key, uint8_t keyno,
                                        uint8_t cmd);
   uint8_t ntag424_ChangeKey(uint8_t *oldkey, uint8_t *newkey,
-                            uint8_t keynumber);
+                            uint8_t keynumber, uint8_t keyversion = 0x01);
   uint8_t ntag424_ReadSig(uint8_t *buffer);
   uint8_t ntag424_GetTTStatus(uint8_t *buffer);
   uint8_t ntag424_GetCardUID(uint8_t *buffer);
@@ -290,6 +291,7 @@ public:
   bool desfire_SelectApplication(const uint8_t *aid);
   bool desfire_CreateApplication(const uint8_t *aid, uint8_t keySettings1,
                                  uint8_t keySettings2);
+  bool desfire_GetKeyVersion(uint8_t keynumber, uint8_t *keyversion);
 
 // NTAG424 authresponse data
 #define NTAG424_AUTHRESPONSE_ENC_SIZE 32    ///< Size of encoded Auth-Response
