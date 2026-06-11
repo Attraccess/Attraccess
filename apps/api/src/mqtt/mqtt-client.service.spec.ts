@@ -12,7 +12,7 @@ import { ExternalCallTimer } from '../metrics/instrumentation/external/external.
 
 // Interface to access private members for testing
 interface MqttClientServicePrivate {
-  getOrCreateClient: (serverId: number) => Promise<mqtt.MqttClient>;
+  getOrCreateClient: (serverId: number, keepTryingToConnect?: boolean) => Promise<mqtt.MqttClient>;
   clients: Map<number, mqtt.MqttClient>;
 }
 
@@ -53,6 +53,7 @@ describe('MqttClientService', () => {
   let service: MqttClientService;
   let moduleRef: TestingModule;
   let mockRepository: Partial<Repository<MqttServer>>;
+  let mockMetricsService: { mqttServersHealthy: { set: jest.Mock } };
 
   const mockServer = {
     id: 1,
@@ -81,6 +82,10 @@ describe('MqttClientService', () => {
       emit: jest.fn(),
     };
 
+    mockMetricsService = {
+      mqttServersHealthy: { set: jest.fn() },
+    };
+
     moduleRef = await Test.createTestingModule({
       providers: [
         MqttClientService,
@@ -102,9 +107,7 @@ describe('MqttClientService', () => {
         },
         {
           provide: MetricsService,
-          useValue: {
-            mqttServersHealthy: { set: jest.fn() },
-          },
+          useValue: mockMetricsService,
         },
         {
           provide: ExternalCallTimer,
@@ -132,6 +135,24 @@ describe('MqttClientService', () => {
 
   it('should be defined', () => {
     expect(service).toBeDefined();
+  });
+
+  it('updates the healthy server metric after registering a connected client', async () => {
+    // Arrange
+    jest.restoreAllMocks();
+    jest.spyOn(Logger.prototype, 'log').mockImplementation(jest.fn());
+    jest.spyOn(Logger.prototype, 'error').mockImplementation(jest.fn());
+    jest.spyOn(Logger.prototype, 'debug').mockImplementation(jest.fn());
+    jest.spyOn(Logger.prototype, 'warn').mockImplementation(jest.fn());
+
+    const servicePrivate = service as unknown as MqttClientServicePrivate;
+
+    // Act
+    await servicePrivate.getOrCreateClient(1);
+
+    // Assert
+    expect(servicePrivate.clients.get(1)?.connected).toBe(true);
+    expect(mockMetricsService.mqttServersHealthy.set).toHaveBeenCalledWith(1);
   });
 
   describe('publish', () => {

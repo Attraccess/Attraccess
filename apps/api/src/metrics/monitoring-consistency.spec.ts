@@ -248,7 +248,9 @@ describe('Monitoring configuration consistency', () => {
       'MqttServersUnhealthy',
       'EmailDeliveryFailures',
       'HighEventLoopLag',
-      'HighMemoryUsage',
+      'HighHostMemoryUsage',
+      'HighHostDiskUsage',
+      'HighAttraccessContainerMemoryUsage',
     ];
 
     it('legacy prometheus alerts.yml no longer exists', () => {
