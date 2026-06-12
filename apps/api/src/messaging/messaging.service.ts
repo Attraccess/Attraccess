@@ -240,7 +240,10 @@ export class MessagingService {
 
   public async getNotificationPreference(userId: number): Promise<NotificationPreferenceDto> {
     const preference = await this.notificationPreferenceRepository.findOne({ where: { userId } });
-    return { messagesEmailOnOffline: preference?.messagesEmailOnOffline ?? true };
+    return {
+      messagesEmailOnOffline: preference?.messagesEmailOnOffline ?? true,
+      messagesPushEnabled: preference?.messagesPushEnabled ?? true,
+    };
   }
 
   public async updateNotificationPreference(
@@ -249,17 +252,26 @@ export class MessagingService {
   ): Promise<NotificationPreferenceDto> {
     const existing = await this.notificationPreferenceRepository.findOne({ where: { userId } });
     const preference =
-      existing ?? this.notificationPreferenceRepository.create({ userId, messagesEmailOnOffline: true });
+      existing ??
+      this.notificationPreferenceRepository.create({ userId, messagesEmailOnOffline: true, messagesPushEnabled: true });
 
     if (dto.messagesEmailOnOffline !== undefined) {
       preference.messagesEmailOnOffline = dto.messagesEmailOnOffline;
     }
 
+    if (dto.messagesPushEnabled !== undefined) {
+      preference.messagesPushEnabled = dto.messagesPushEnabled;
+    }
+
     const saved = await this.notificationPreferenceRepository.save(preference);
-    return { messagesEmailOnOffline: saved.messagesEmailOnOffline };
+    return { messagesEmailOnOffline: saved.messagesEmailOnOffline, messagesPushEnabled: saved.messagesPushEnabled };
   }
 
   public async shouldEmailMessageOnOffline(userId: number): Promise<boolean> {
     return (await this.getNotificationPreference(userId)).messagesEmailOnOffline;
+  }
+
+  public async shouldPushMessageOnOffline(userId: number): Promise<boolean> {
+    return (await this.getNotificationPreference(userId)).messagesPushEnabled;
   }
 }

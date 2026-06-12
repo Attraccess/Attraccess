@@ -209,14 +209,23 @@ describe('MessagingService', () => {
   });
 
   describe('notification preferences', () => {
-    it('defaults messagesEmailOnOffline to true when no row exists', async () => {
+    it('defaults messagesEmailOnOffline and messagesPushEnabled to true when no row exists', async () => {
       notificationPreferenceRepository.findOne.mockResolvedValue(null);
-      await expect(service.getNotificationPreference(5)).resolves.toEqual({ messagesEmailOnOffline: true });
+      await expect(service.getNotificationPreference(5)).resolves.toEqual({
+        messagesEmailOnOffline: true,
+        messagesPushEnabled: true,
+      });
     });
 
-    it('returns the stored preference value', async () => {
-      notificationPreferenceRepository.findOne.mockResolvedValue({ messagesEmailOnOffline: false });
-      await expect(service.getNotificationPreference(5)).resolves.toEqual({ messagesEmailOnOffline: false });
+    it('returns the stored preference values', async () => {
+      notificationPreferenceRepository.findOne.mockResolvedValue({
+        messagesEmailOnOffline: false,
+        messagesPushEnabled: false,
+      });
+      await expect(service.getNotificationPreference(5)).resolves.toEqual({
+        messagesEmailOnOffline: false,
+        messagesPushEnabled: false,
+      });
     });
 
     it('creates a row and applies the update when none exists', async () => {
@@ -224,13 +233,33 @@ describe('MessagingService', () => {
 
       const result = await service.updateNotificationPreference(5, { messagesEmailOnOffline: false });
 
-      expect(notificationPreferenceRepository.create).toHaveBeenCalledWith({ userId: 5, messagesEmailOnOffline: true });
-      expect(result).toEqual({ messagesEmailOnOffline: false });
+      expect(notificationPreferenceRepository.create).toHaveBeenCalledWith({
+        userId: 5,
+        messagesEmailOnOffline: true,
+        messagesPushEnabled: true,
+      });
+      expect(result).toEqual({ messagesEmailOnOffline: false, messagesPushEnabled: true });
+    });
+
+    it('updates messagesPushEnabled independently of the email preference', async () => {
+      notificationPreferenceRepository.findOne.mockResolvedValue({
+        messagesEmailOnOffline: false,
+        messagesPushEnabled: true,
+      });
+
+      const result = await service.updateNotificationPreference(5, { messagesPushEnabled: false });
+
+      expect(result).toEqual({ messagesEmailOnOffline: false, messagesPushEnabled: false });
     });
 
     it('shouldEmailMessageOnOffline reflects the stored flag', async () => {
       notificationPreferenceRepository.findOne.mockResolvedValue({ messagesEmailOnOffline: false });
       await expect(service.shouldEmailMessageOnOffline(5)).resolves.toBe(false);
+    });
+
+    it('shouldPushMessageOnOffline reflects the stored flag', async () => {
+      notificationPreferenceRepository.findOne.mockResolvedValue({ messagesPushEnabled: false });
+      await expect(service.shouldPushMessageOnOffline(5)).resolves.toBe(false);
     });
   });
 

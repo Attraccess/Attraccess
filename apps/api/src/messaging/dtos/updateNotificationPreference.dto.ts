@@ -10,4 +10,13 @@ export class UpdateNotificationPreferenceDto {
     required: false,
   })
   messagesEmailOnOffline?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  @ApiProperty({
+    description: 'Whether to send a browser push notification when a direct message arrives while the user is offline',
+    example: true,
+    required: false,
+  })
+  messagesPushEnabled?: boolean;
 }

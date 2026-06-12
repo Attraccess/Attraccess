@@ -9,6 +9,7 @@ import {
   ListBox,
   ListBoxItem,
   Label,
+  Description,
 } from '@heroui/react';
 import { ReactNode } from 'react';
 
@@ -24,6 +25,7 @@ export interface Props {
   onChange?: (key: string) => unknown;
   items: SelectItem[];
   label?: ReactNode;
+  description?: ReactNode;
   placeholder?: string;
   className?: string;
   isDisabled?: boolean;
@@ -44,6 +46,7 @@ export function Select({
   onChange,
   items,
   label,
+  description,
   placeholder,
   className,
   isDisabled,
@@ -74,6 +77,7 @@ export function Select({
       data-cy={dataCy}
     >
       {label && <Label>{label}</Label>}
+      {description && <Description>{description}</Description>}
       <SelectTrigger>
         <SelectValue />
         <SelectIndicator />

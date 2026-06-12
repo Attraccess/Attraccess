@@ -1,5 +1,5 @@
 import { ResourceFlowNodeDto, useBillingServiceGetBillingConfiguration } from '@attraccess/react-query-client';
-import { Button, Input, Label, ModalBody, ModalHeader, NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput, TextArea, TextField } from '@heroui/react';
+import { Button, Description, Input, Label, ModalBody, ModalHeader, NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput, TextArea, TextField } from '@heroui/react';
 import { StandardModal } from '../../../../../../../components/standardModal';
 import { Select } from '../../../../../../../components/select';
 import { MqttServerSelect } from '../../../../../../../components/mqttServerSelect';
@@ -169,6 +169,7 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
             aria-label={t('nodes.' + nodeType + '.config.' + name + '.label')}
             value={String(value ?? schema.default ?? '')}
             onChange={(newValue) => onChange(newValue as TValue)}
+            description={description}
             items={schema.enum.map((enumValue) => ({
               key: String(enumValue),
               label: t('nodes.' + nodeType + '.config.' + name + '.enum.' + enumValue),
@@ -192,6 +193,7 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
               defaultValue={schema.default ? String(schema.default) : undefined}
               onChange={(e) => onChange(e.target.value as TValue)}
             />
+            {description && <Description>{description}</Description>}
           </div>
         );
       }
@@ -203,6 +205,7 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
           onChange={(newValue) => onChange(newValue as TValue)}
         >
           {!hideLabel && <Label>{t('nodes.' + nodeType + '.config.' + name + '.label')}</Label>}
+          {description && <Description>{description}</Description>}
           <Input
             type="text"
             placeholder={hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined}
@@ -227,6 +230,7 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
               if (newValue == null) return;
               setValue(Number(newValue) as TValue);
             }}
+            description={description}
             items={enumValues.map((enumValue) => ({
               key: String(enumValue),
               label: t('nodes.' + nodeType + '.config.' + name + '.enum.' + enumValue),
@@ -246,6 +250,7 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
           maxValue={schema.maximum}
         >
           {!hideLabel && <Label>{t('nodes.' + nodeType + '.config.' + name + '.label')}</Label>}
+          {description && <Description>{description}</Description>}
           <NumberFieldGroup>
             <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
             <NumberFieldInput />
@@ -429,6 +434,5 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
       );
   }
 
-  console.error('Unsupported property type: ' + schema.type, schema);
   throw new Error('Unsupported property type: ' + schema.type);
 }
