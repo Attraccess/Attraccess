@@ -19,6 +19,13 @@ const hoisted = vi.hoisted(() => ({
       { category: 'resource_health', channels: { email: true, push: true, toast: false } },
     ],
   },
+  pushState: {
+    isSupported: true,
+    permission: 'granted' as NotificationPermission,
+    isSubscribed: true,
+    isBusy: false,
+    isLoadingKey: false,
+  },
 }));
 
 vi.mock('@tanstack/react-query', async (importOriginal) => {
@@ -68,11 +75,7 @@ vi.mock('../../../components/toastProvider', () => ({
 
 vi.mock('../../../hooks/usePushNotifications', () => ({
   usePushNotifications: () => ({
-    isSupported: true,
-    permission: 'granted',
-    isSubscribed: true,
-    isBusy: false,
-    isLoadingKey: false,
+    ...hoisted.pushState,
     subscribe: hoisted.subscribe,
     unsubscribe: hoisted.unsubscribe,
   }),
@@ -108,6 +111,11 @@ beforeEach(() => {
   hoisted.unsubscribe.mockReset().mockResolvedValue(true);
   hoisted.successToast.mockReset();
   hoisted.errorToast.mockReset();
+  hoisted.pushState.isSupported = true;
+  hoisted.pushState.permission = 'granted';
+  hoisted.pushState.isSubscribed = true;
+  hoisted.pushState.isBusy = false;
+  hoisted.pushState.isLoadingKey = false;
 });
 
 afterEach(() => {
@@ -148,29 +156,25 @@ describe('NotificationPreferencesForm', () => {
     });
   });
 
-  it('subscribes this device before enabling a push channel', async () => {
+  it('enables a push preference without subscribing this device', async () => {
     const user = userEvent.setup();
     renderForm();
 
     await user.click(screen.getByTestId('notifications-maintenance_requests-push'));
 
-    await waitFor(() => expect(hoisted.subscribe).toHaveBeenCalled());
+    await waitFor(() => expect(hoisted.mutate).toHaveBeenCalled());
+    expect(hoisted.subscribe).not.toHaveBeenCalled();
     expect(hoisted.mutate).toHaveBeenCalledWith({
       requestBody: { category: 'maintenance_requests', channels: { push: true } },
     });
   });
 
-  it('does not enable push when device subscription fails', async () => {
-    hoisted.subscribe.mockResolvedValue(false);
-    const user = userEvent.setup();
+  it('shows enabled push preferences even when this browser is not subscribed', () => {
+    hoisted.pushState.permission = 'default';
+    hoisted.pushState.isSubscribed = false;
+
     renderForm();
 
-    await user.click(screen.getByTestId('notifications-maintenance_requests-push'));
-
-    await waitFor(() => expect(hoisted.subscribe).toHaveBeenCalled());
-    expect(hoisted.mutate).not.toHaveBeenCalled();
-    expect(hoisted.errorToast).toHaveBeenCalledWith({
-      title: 'Could not enable push notifications. Please check your browser notification permissions.',
-    });
+    expect(screen.getByTestId('notifications-resource_health-push')).toHaveAttribute('aria-pressed', 'true');
   });
 });

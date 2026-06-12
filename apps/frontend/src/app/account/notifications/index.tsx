@@ -13,7 +13,6 @@ import { useCallback } from 'react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { LabeledSwitch } from '../../../components/labeledSwitch';
 import { useToastMessage } from '../../../components/toastProvider';
-import { usePushNotifications } from '../../../hooks/usePushNotifications';
 import en from './en.json';
 import de from './de.json';
 
@@ -45,7 +44,6 @@ export function NotificationPreferencesForm() {
   const { success: showSuccess, error: showError } = useToastMessage();
 
   const { data: preferences, isLoading } = useNotificationsServiceNotificationsGetPreferences();
-  const push = usePushNotifications();
 
   const { mutate, isPending } = useNotificationsServiceNotificationsUpdatePreferences({
     onSuccess: () => {
@@ -66,40 +64,16 @@ export function NotificationPreferencesForm() {
   });
 
   const updateChannel = useCallback(
-    async (category: NotificationCategory, channel: NotificationChannel, value: boolean) => {
-      if (channel === 'push' && value) {
-        const subscribed = await push.subscribe().catch(() => false);
-        if (!subscribed) {
-          showError({ title: t('messagesPush.errors.subscribeFailed') });
-          return;
-        }
-      }
-
-      if (channel === 'push' && !value) {
-        await push.unsubscribe().catch(() => undefined);
-      }
-
+    (category: NotificationCategory, channel: NotificationChannel, value: boolean) => {
       mutate({ requestBody: { category, channels: { [channel]: value } } });
     },
-    [mutate, push, showError, t],
+    [mutate],
   );
-
-  const pushUnavailable = !push.isSupported;
-  const pushBlocked = push.isSupported && push.permission === 'denied';
-
-  let pushDescription = t('description.push');
-  if (!push.isSupported) {
-    pushDescription = t('messagesPush.unsupported');
-  } else if (pushBlocked) {
-    pushDescription = t('messagesPush.permissionDenied');
-  }
 
   const renderChannelSwitch = (category: NotificationCategory, channel: NotificationChannel) => {
     const preference = getCategoryPreference(preferences?.categories, category);
-    const isPush = channel === 'push';
-    const isSelected = Boolean(preference?.channels[channel]);
-    const selected = isPush ? isSelected && push.isSubscribed && push.permission === 'granted' : isSelected;
-    const disabled = isLoading || isPending || (isPush && (push.isBusy || push.isLoadingKey || pushUnavailable || pushBlocked));
+    const selected = Boolean(preference?.channels[channel]);
+    const disabled = isLoading || isPending;
 
     return (
       <LabeledSwitch
@@ -153,7 +127,7 @@ export function NotificationPreferencesForm() {
         })}
       </div>
 
-      <p className="text-xs text-default-500">{pushDescription}</p>
+      <p className="text-xs text-default-500">{t('description.push')}</p>
     </div>
   );
 }
