@@ -1,7 +1,6 @@
 // Inbox page combining conversation list, thread view and live SSE updates
 // FEATURE: Messaging inbox page
 import {
-  Message,
   useMessagingServiceMessagingListConversations,
   useMessagingServiceMessagingMarkConversationRead,
 } from '@attraccess/react-query-client';
@@ -18,15 +17,14 @@ import { Button } from '../../components/button';
 import { useAuth } from '../../hooks/useAuth';
 import { ConversationList } from './ConversationList';
 import { MessageThread } from './MessageThread';
-import { useMessagingLive } from './useMessagingLive';
-import { applyIncomingMessage, markConversationReadInCache } from './messageCache';
+import { markConversationReadInCache } from './messageCache';
 
 export function MessagesPage() {
   const { t } = useTranslations({ en, de });
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const conversationParam = Number(searchParams.get('conversation'));
   const [selectedConversationId, setSelectedConversationId] = useState<number | null>(
     Number.isInteger(conversationParam) && conversationParam > 0 ? conversationParam : null,
@@ -69,17 +67,23 @@ export function MessagesPage() {
     }
   }, [selectedConversationId, user, markRead]);
 
-  const handleLiveMessage = useCallback(
-    (message: Message) => {
-      applyIncomingMessage(queryClient, message, user?.id ?? -1);
-      if (message.conversationId === selectedConversationId) {
-        markRead(message.conversationId);
-      }
+  const selectConversation = useCallback(
+    (conversationId: number | null) => {
+      setSelectedConversationId(conversationId);
+      setSearchParams((current) => {
+        const next = new URLSearchParams(current);
+        if (conversationId) {
+          next.set('conversation', String(conversationId));
+          next.delete('resourceRef');
+        } else {
+          next.delete('conversation');
+          next.delete('resourceRef');
+        }
+        return next;
+      });
     },
-    [queryClient, selectedConversationId, markRead, user?.id],
+    [setSearchParams],
   );
-
-  useMessagingLive({ onMessage: handleLiveMessage });
 
   return (
     <div>
@@ -97,7 +101,7 @@ export function MessagesPage() {
               conversations={conversations}
               isLoading={isLoading}
               selectedConversationId={selectedConversationId}
-              onSelect={setSelectedConversationId}
+              onSelect={selectConversation}
             />
           </div>
 
@@ -110,7 +114,7 @@ export function MessagesPage() {
                     size="sm"
                     isIconOnly
                     className="lg:hidden"
-                    onPress={() => setSelectedConversationId(null)}
+                    onPress={() => selectConversation(null)}
                     aria-label={t('thread.back')}
                     data-cy="thread-back-button"
                   >

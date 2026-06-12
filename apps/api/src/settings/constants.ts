@@ -77,6 +77,13 @@ export const RATE_LIMIT_DEFAULTS: RateLimitPolicy = {
   backoffMultiplier: 2,
 };
 
+export const PUSH_PARENT = 'push';
+
+export const PUSH_KEYS = {
+  vapidPublicKey: 'vapid_public_key',
+  vapidPrivateKey: 'vapid_private_key',
+} as const;
+
 export const MESSAGING_PARENT = 'messaging';
 
 export const MESSAGING_KEYS = {
