@@ -91,6 +91,19 @@ function generatePrometheusConfig(settings, apiKey) {
     lines.push(`    bearer_token: '${sanitizeYamlValue(apiKey)}'`);
   }
 
+  lines.push(
+    '',
+    "  - job_name: 'node-exporter'",
+    '    static_configs:',
+    "      - targets: ['node-exporter:9100']",
+    '    scrape_interval: 15s',
+    '',
+    "  - job_name: 'cadvisor'",
+    '    static_configs:',
+    "      - targets: ['cadvisor:8080']",
+    '    scrape_interval: 15s',
+  );
+
   return lines.join('\n') + '\n';
 }
 

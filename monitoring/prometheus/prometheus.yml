@@ -17,3 +17,13 @@ scrape_configs:
     # The metrics endpoint requires an API key configured in Attraccess settings.
     # Uncomment and set the bearer_token to the API key you configured:
     # bearer_token: '<your-metrics-api-key>'
+
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    scrape_interval: 15s
+
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+    scrape_interval: 15s

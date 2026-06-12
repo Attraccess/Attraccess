@@ -12,6 +12,7 @@ import {
   useBillingServiceGetBillingTransactionsKey,
 } from '@attraccess/react-query-client';
 import { useAuth } from '../../hooks/useAuth';
+import { GlobalMessagingLive } from '../messaging/GlobalMessagingLive';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -91,6 +92,8 @@ export function Layout({ children, noLayout }: LayoutProps) {
 
         {/* Server unavailable inline notice */}
         <ServerNotAvailable />
+
+        <GlobalMessagingLive enabled={isAuthenticated && !needsTwoFactorSetup} />
 
         {/* Page Content */}
         <main className="flex-1 overflow-auto p-4 bg-background">{children}</main>

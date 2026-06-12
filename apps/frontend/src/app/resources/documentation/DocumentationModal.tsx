@@ -1,16 +1,7 @@
 import { memo, useCallback, useState, useEffect } from 'react';
-import {
-  Modal,
-  ModalBackdrop,
-  ModalBody,
-  ModalContainer,
-  ModalDialog,
-  ModalFooter,
-  ModalHeader,
-  Spinner,
-  useOverlayState,
-} from '@heroui/react';
+import { ModalBody, ModalFooter, ModalHeader, Spinner, useOverlayState } from '@heroui/react';
 import { Button } from '../../../components/button';
+import { StandardModal } from '../../../components/standardModal';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { Edit, ExternalLink, Maximize, Minimize, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -118,80 +109,80 @@ function DocumentationModalComponent({ resourceId, children }: Readonly<Document
     <>
       {children(open)}
 
-      <Modal isOpen={isOpen} onOpenChange={setOpen} data-cy="documentation-modal">
-        <ModalBackdrop>
-          <ModalContainer size={isFullscreen ? 'full' : 'lg'}>
-            {/*
-              The "lg" size only caps max-width; a documentation URL renders in an
-              iframe that has no intrinsic width, so the dialog would otherwise
-              collapse to a narrow column. Force a wide, viewport-bounded width
-              (overriding the size's max-width) so websites are actually readable.
-              On phones the dialog fills the available width; from `sm` up it grows
-              to a fixed wide size (the modal container is only width-fit there).
-            */}
-            <ModalDialog className={isFullscreen ? undefined : 'w-full max-w-[95vw] sm:w-[72rem]'}>
-              {({ close }) => (
-                <>
-                  <ModalHeader className="flex justify-between items-center">
-                    <div>{t('title')}</div>
-                    <div className="flex gap-1">
-                      {canManageResources && (
-                        <Button
-                          variant="secondary"
-                          isIconOnly
-                          onPress={handleEditDocumentation}
-                          aria-label={t('actions.edit')}
-                          data-cy="documentation-modal-edit-button"
-                        >
-                          <Edit size={16} />
-                        </Button>
-                      )}
-                      <Button
-                        variant="secondary"
-                        isIconOnly
-                        onPress={toggleFullscreen}
-                        aria-label={isFullscreen ? t('actions.exitFullscreen') : t('actions.fullscreen')}
-                        data-cy="documentation-modal-fullscreen-button"
-                      >
-                        {isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
-                      </Button>
+      <StandardModal
+        isOpen={isOpen}
+        onOpenChange={setOpen}
+        data-cy="documentation-modal"
+        size={isFullscreen ? 'full' : 'lg'}
+        /*
+          The "lg" size only caps max-width; a documentation URL renders in an
+          iframe that has no intrinsic width, so the dialog would otherwise
+          collapse to a narrow column. Force a wide, viewport-bounded width
+          (overriding the size's max-width) so websites are actually readable.
+          On phones the dialog fills the available width; from `sm` up it grows
+          to a fixed wide size (the modal container is only width-fit there).
+        */
+        dialogProps={{ className: isFullscreen ? undefined : 'w-full max-w-[95vw] sm:w-[72rem]' }}
+      >
+        {({ close }) => (
+          <>
+            <ModalHeader className="flex justify-between items-center">
+              <div>{t('title')}</div>
+              <div className="flex gap-1">
+                {canManageResources && (
+                  <Button
+                    variant="secondary"
+                    isIconOnly
+                    onPress={handleEditDocumentation}
+                    aria-label={t('actions.edit')}
+                    data-cy="documentation-modal-edit-button"
+                  >
+                    <Edit size={16} />
+                  </Button>
+                )}
+                <Button
+                  variant="secondary"
+                  isIconOnly
+                  onPress={toggleFullscreen}
+                  aria-label={isFullscreen ? t('actions.exitFullscreen') : t('actions.fullscreen')}
+                  data-cy="documentation-modal-fullscreen-button"
+                >
+                  {isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
+                </Button>
 
-                      <Button
-                        variant="secondary"
-                        isIconOnly
-                        onPress={handleOpenInNewTab}
-                        aria-label={t('actions.openInNewTab')}
-                        data-cy="documentation-modal-open-in-new-tab-button"
-                      >
-                        <ExternalLink size={16} />
-                      </Button>
+                <Button
+                  variant="secondary"
+                  isIconOnly
+                  onPress={handleOpenInNewTab}
+                  aria-label={t('actions.openInNewTab')}
+                  data-cy="documentation-modal-open-in-new-tab-button"
+                >
+                  <ExternalLink size={16} />
+                </Button>
 
-                      {resource?.documentationType === 'url' && (
-                        <Button
-                          variant="secondary"
-                          isIconOnly
-                          onPress={() => refetch()}
-                          isPending={isFetching}
-                          aria-label={t('actions.refresh')}
-                          data-cy="documentation-modal-refresh-button"
-                        >
-                          <RefreshCw size={16} />
-                        </Button>
-                      )}
-                    </div>
-                  </ModalHeader>
-                  <ModalBody>{renderDocumentationContent()}</ModalBody>
-                  <ModalFooter>
-                    <Button variant="ghost" onPress={close} data-cy="documentation-modal-close-button">
-                      {t('actions.close')}
-                    </Button>
-                  </ModalFooter>
-                </>
-              )}
-            </ModalDialog>
-          </ModalContainer>
-        </ModalBackdrop>
-      </Modal>
+                {resource?.documentationType === 'url' && (
+                  <Button
+                    variant="secondary"
+                    isIconOnly
+                    onPress={() => refetch()}
+                    isPending={isFetching}
+                    aria-label={t('actions.refresh')}
+                    data-cy="documentation-modal-refresh-button"
+                  >
+                    <RefreshCw size={16} />
+                  </Button>
+                )}
+              </div>
+            </ModalHeader>
+            <ModalBody>{renderDocumentationContent()}</ModalBody>
+            <ModalFooter>
+              <Button variant="ghost" onPress={close} data-cy="documentation-modal-close-button">
+                {t('actions.close')}
+              </Button>
+            </ModalFooter>
+          </>
+        )}
+      </StandardModal>
     </>
   );
 }

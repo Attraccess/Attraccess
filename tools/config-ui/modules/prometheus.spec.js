@@ -132,7 +132,8 @@ describe('generatePrometheusConfig (via init/writePrometheusConfig)', () => {
 
       const lines = config.split('\n');
       const targetLines = lines.filter((l) => l.includes('targets:'));
-      expect(targetLines).toHaveLength(1);
+      expect(targetLines).toContain("      - targets: ['evil:9090]  - targets: [attacker:9090']");
+      expect(targetLines).not.toContain("  - targets: ['attacker:9090']");
     });
 
     it('sanitizes scrapeInterval — newlines stripped so no new YAML keys injected', () => {
@@ -151,6 +152,15 @@ describe('generatePrometheusConfig (via init/writePrometheusConfig)', () => {
       const config = getGeneratedConfig();
       expect(config).not.toContain('rule_files:');
       expect(config).not.toContain('alerts.yml');
+    });
+
+    it('includes host and container exporter scrape jobs', () => {
+      const config = getGeneratedConfig();
+
+      expect(config).toContain("job_name: 'node-exporter'");
+      expect(config).toContain("targets: ['node-exporter:9100']");
+      expect(config).toContain("job_name: 'cadvisor'");
+      expect(config).toContain("targets: ['cadvisor:8080']");
     });
 
     it('includes bearer_token when metricsApiKey is set via env', () => {

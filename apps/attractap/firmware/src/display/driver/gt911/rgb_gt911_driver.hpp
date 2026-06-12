@@ -42,4 +42,13 @@ private:
     uint32_t screenHeight = 0;
     bool initialized = false;
     bool touchInitialized = false;
+
+    // Ghost-release suppression (ATT-541): the GT911 scans on its own 5-15 ms
+    // cadence, so a 15 ms LVGL poll can land before a fresh sample exists.
+    // Such "stale" polls hold the last pressed state instead of reporting a
+    // release; the cap keeps a wedged controller from leaving a press stuck.
+    static constexpr uint32_t TOUCH_STALE_HOLD_MS = 100;
+    TouchPoint lastTouchPoint{};
+    bool lastTouchPressed = false;
+    uint32_t lastFreshSampleMs = 0;
 };

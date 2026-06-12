@@ -3,6 +3,15 @@
     "label": "Benachrichtige mich per E-Mail über Nachrichten, wenn ich offline bin",
     "description": "Wenn du eine Direktnachricht erhältst, während du nicht online bist, senden wir dir eine E-Mail, damit du sie nicht verpasst."
   },
+  "messagesPush": {
+    "label": "Push-Benachrichtigungen für Nachrichten",
+    "description": "Wenn du eine Direktnachricht erhältst, während du nicht online bist, zeigt dieses Gerät eine Push-Benachrichtigung an.",
+    "unsupported": "Dein Browser unterstützt keine Push-Benachrichtigungen.",
+    "permissionDenied": "Benachrichtigungen sind für diese Seite blockiert. Erlaube sie in deinen Browser-Einstellungen, um Push-Benachrichtigungen zu aktivieren.",
+    "errors": {
+      "subscribeFailed": "Push-Benachrichtigungen konnten nicht aktiviert werden. Bitte prüfe die Benachrichtigungs-Berechtigungen deines Browsers."
+    }
+  },
   "messages": {
     "updated": "Benachrichtigungseinstellungen aktualisiert"
   },

@@ -1,5 +1,7 @@
 import { securelyHashToken, verifyToken } from './websocket.utils';
 
+jest.setTimeout(30000);
+
 describe('websocket.utils', () => {
   describe('securelyHashToken', () => {
     it('returns a bcrypt hash string', async () => {

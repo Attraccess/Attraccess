@@ -2,11 +2,7 @@ import {
   Button,
   ButtonProps,
   Link,
-  Modal,
-  ModalBackdrop,
   ModalBody,
-  ModalContainer,
-  ModalDialog,
   ModalFooter,
   ModalHeader,
   ModalHeading,
@@ -17,6 +13,7 @@ import { QrCodeIcon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { QRCode } from 'react-qrcode-logo';
 import { Select } from '../../../../components/select';
+import { StandardModal } from '../../../../components/standardModal';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { QrCodeAction } from './action';
 
@@ -72,53 +69,49 @@ export function ResourceQrCode(props: Props & Omit<ButtonProps, 'children' | 'st
         </Button>
       )}
 
-      <Modal isOpen={isOpen} onOpenChange={setOpen}>
-        <ModalBackdrop>
-          <ModalContainer size="sm">
-            <ModalDialog>
-              {() => (
-                <>
-                  <ModalHeader>
-                    <ModalIcon><QrCodeIcon /></ModalIcon>
-                    <ModalHeading>{t('modal.title')}</ModalHeading>
-                    <p className="text-sm text-muted">{t('modal.subtitle')}</p>
-                  </ModalHeader>
+      <StandardModal isOpen={isOpen} onOpenChange={setOpen} size="sm">
+        {() => (
+          <>
+            <ModalHeader>
+              <ModalIcon>
+                <QrCodeIcon />
+              </ModalIcon>
+              <ModalHeading>{t('modal.title')}</ModalHeading>
+              <p className="text-sm text-muted">{t('modal.subtitle')}</p>
+            </ModalHeader>
 
-                  <ModalBody>
-                    <Select
-                      value={action}
-                      onChange={(key) => setAction(key as QrCodeAction)}
-                      label={t('modal.action.label')}
-                      items={Object.values(QrCodeAction).map((val) => ({
-                        key: val,
-                        label: t(`modal.action.${val}`),
-                      }))}
-                    />
-                    <QRCode
-                      value={qrCodeUrl}
-                      size={300}
-                      logoHeight={100}
-                      logoWidth={50}
-                      logoPadding={10}
-                      logoPaddingStyle="square"
-                      logoImage="/logo.png"
-                      qrStyle="fluid"
-                      id={id}
-                    />
-                    <Link target="_blank" href={qrCodeUrl}>
-                      {qrCodeUrl}
-                    </Link>
-                  </ModalBody>
+            <ModalBody>
+              <Select
+                value={action}
+                onChange={(key) => setAction(key as QrCodeAction)}
+                label={t('modal.action.label')}
+                items={Object.values(QrCodeAction).map((val) => ({
+                  key: val,
+                  label: t(`modal.action.${val}`),
+                }))}
+              />
+              <QRCode
+                value={qrCodeUrl}
+                size={300}
+                logoHeight={100}
+                logoWidth={50}
+                logoPadding={10}
+                logoPaddingStyle="square"
+                logoImage="/logo.png"
+                qrStyle="fluid"
+                id={id}
+              />
+              <Link target="_blank" href={qrCodeUrl}>
+                {qrCodeUrl}
+              </Link>
+            </ModalBody>
 
-                  <ModalFooter>
-                    <Button onPress={download}>{t('modal.download')}</Button>
-                  </ModalFooter>
-                </>
-              )}
-            </ModalDialog>
-          </ModalContainer>
-        </ModalBackdrop>
-      </Modal>
+            <ModalFooter>
+              <Button onPress={download}>{t('modal.download')}</Button>
+            </ModalFooter>
+          </>
+        )}
+      </StandardModal>
     </>
   );
 }

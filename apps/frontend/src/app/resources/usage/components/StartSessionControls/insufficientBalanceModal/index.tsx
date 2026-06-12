@@ -1,9 +1,9 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 
-import { Modal, ModalBackdrop, ModalContainer, ModalDialog } from '@heroui/react';
 import en from './en.json';
 import de from './de.json';
 import { BillingDashboardTopupCard } from '../../../../../billing/dashboard/topup';
+import { StandardModal } from '../../../../../../components/standardModal';
 
 interface Props {
   isOpen: boolean;
@@ -17,26 +17,21 @@ export function InsufficientBalanceModal(props: Props) {
   const { t } = useTranslations({ en, de });
 
   return (
-    <Modal
+    <StandardModal
       isOpen={isOpen}
       onOpenChange={(open) => {
         if (!open) onClose();
       }}
+      size="md"
     >
-      <ModalBackdrop>
-        <ModalContainer size="md">
-          <ModalDialog>
-            {() => (
-              <BillingDashboardTopupCard
-                title={t('title')}
-                subtitle={t('description')}
-                desiredAmount={desiredAmount}
-                onProcessingComplete={onClose}
-              />
-            )}
-          </ModalDialog>
-        </ModalContainer>
-      </ModalBackdrop>
-    </Modal>
+      {() => (
+        <BillingDashboardTopupCard
+          title={t('title')}
+          subtitle={t('description')}
+          desiredAmount={desiredAmount}
+          onProcessingComplete={onClose}
+        />
+      )}
+    </StandardModal>
   );
 }

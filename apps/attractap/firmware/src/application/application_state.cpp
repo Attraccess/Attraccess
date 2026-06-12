@@ -485,10 +485,16 @@ void Application::processEnrollment() {
       this->enrollPhase = ENROLL_PHASE_REQUESTED_KEY;
       this->enrollPhaseChangedMs = now;
     } else {
-      // Card slipped away or has no writable key — re-arm the detection loop
-      // and keep waiting.
+      // Card slipped away or has no writable key. Surface the failure instead
+      // of silently re-arming, otherwise DESFire setup/auth failures look like
+      // the reader ignored the card.
+      this->beeper.errorBeep();
+      Display::enrollmentScreen.setStatus(EnrollmentScreen::STATUS_ERROR);
+      Display::enrollmentScreen.setStatusMessage(
+          "Karte konnte nicht\nvorbereitet werden");
+      this->enrollPhase = ENROLL_PHASE_ERROR;
+      this->enrollPhaseChangedMs = now;
       this->nfc.resetCardPresence();
-      this->nfc.enableCardDetection();
     }
     break;
   }
@@ -508,7 +514,8 @@ void Application::processEnrollment() {
   case ENROLL_PHASE_WRITING: {
     bool ok = this->nfc.changeKey(
         this->apiEnrollNewCardData.keyNo, this->nfc.FACTORY_KEY,
-        this->nfc.FACTORY_KEY, this->apiEnrollNewCardData.keyBytes);
+        this->nfc.FACTORY_KEY, this->apiEnrollNewCardData.keyBytes,
+        NFC::CARD_KEY_VERSION_ENROLLED);
     this->api.sendEnrollNewCard(ok);
     if (ok) {
       this->beeper.successBeep();
@@ -626,7 +633,8 @@ void Application::processReset() {
     bool ok = this->nfc.changeKey(this->apiResetNfcCardData.keyNo,
                                   this->nfc.FACTORY_KEY,
                                   this->apiResetNfcCardData.keyBytes,
-                                  this->nfc.FACTORY_KEY);
+                                  this->nfc.FACTORY_KEY,
+                                  NFC::CARD_KEY_VERSION_FREE);
     this->api.sendResetNfcCard(ok);
     if (ok) {
       this->beeper.successBeep();
