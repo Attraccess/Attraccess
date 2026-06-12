@@ -5,18 +5,16 @@
 // connection-status panel in the MQTT server detail view, both driven by the
 // plugin's backend detection endpoint. The host stays RabbitMQ-agnostic — it
 // only exposes the generic slots and renders whatever we contribute.
-import { Card } from '@heroui/react';
 import { RabbitIcon } from 'lucide-react';
 import type {
   AttraccessFrontendPlugin,
-  AttraccessFrontendPluginAuthData,
   PluginSidebarItem,
   PluginSlotContribution,
   RouteConfig,
 } from '@attraccess/plugins-frontend-sdk';
-import type { IPluginStore } from 'react-pluggable';
 import { useDetection } from './detection';
 import { RabbitmqListBadge } from './RabbitmqListBadge';
+import { RabbitmqPage } from './RabbitmqPage';
 import { RabbitmqStatusPanel } from './RabbitmqStatusPanel';
 import { RabbitmqUserPanel } from './RabbitmqUserPanel';
 
@@ -52,26 +50,6 @@ function RabbitmqDetailSlot({ mqttServerId }: { mqttServerId: number }) {
   );
 }
 
-function RabbitmqPage() {
-  return (
-    <div className="flex flex-col gap-6 p-6 max-w-4xl mx-auto">
-      <div className="flex items-center gap-3">
-        <RabbitIcon className="w-6 h-6 text-primary" />
-        <h1 className="text-2xl font-semibold text-default-800">RabbitMQ</h1>
-      </div>
-      <Card className="border border-default-200 dark:border-default-100">
-        <Card.Content>
-          <p className="text-sm text-default-500">
-            RabbitMQ management plugin. RabbitMQ MQTT servers show a detection badge and connection-status panel in
-            the MQTT settings, and broker users can be managed (create, edit, permissions, delete) from the MQTT
-            server detail view.
-          </p>
-        </Card.Content>
-      </Card>
-    </div>
-  );
-}
-
 export default class RabbitmqPlugin implements AttraccessFrontendPlugin {
   getPluginName(): string {
     return 'rabbitmq-plugin@0.1.0';
@@ -81,7 +59,7 @@ export default class RabbitmqPlugin implements AttraccessFrontendPlugin {
     return [];
   }
 
-  init(_store: IPluginStore): void {
+  init(): void {
     // No setup needed.
   }
 
@@ -93,11 +71,11 @@ export default class RabbitmqPlugin implements AttraccessFrontendPlugin {
     // Called when the plugin is uninstalled.
   }
 
-  onApiAuthStateChange(_authData: null | AttraccessFrontendPluginAuthData): void {
+  onApiAuthStateChange(): void {
     // no-op — detection is read via relative `/api` URLs with session cookies.
   }
 
-  onApiEndpointChange(_endpoint: string): void {
+  onApiEndpointChange(): void {
     // no-op
   }
 
