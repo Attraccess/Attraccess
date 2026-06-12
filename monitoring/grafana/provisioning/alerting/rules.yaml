@@ -815,7 +815,7 @@ groups:
         title: HighHostDiskUsage
         condition: C
         for: 15m
-        noDataState: NoData
+        noDataState: OK
         execErrState: Error
         labels:
           severity: warning
