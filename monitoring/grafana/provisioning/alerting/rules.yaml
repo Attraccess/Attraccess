@@ -315,7 +315,7 @@ groups:
         title: AttractapAllReadersOffline
         condition: C
         for: 5m
-        noDataState: NoData
+        noDataState: OK
         execErrState: Error
         labels:
           severity: critical
@@ -330,7 +330,7 @@ groups:
             datasourceUid: attraccess-prometheus
             model:
               refId: A
-              expr: 'attraccess_attractap_devices_connected{job="attraccess"} == 0 and max_over_time(attraccess_attractap_devices_connected{job="attraccess"}[1h]) > 0'
+              expr: 'sum((attraccess_attractap_devices_connected{job="attraccess"} == bool 0) * (max_over_time(attraccess_attractap_devices_connected{job="attraccess"}[1h]) > bool 0)) or vector(0)'
               instant: true
               range: false
               datasource:
@@ -351,8 +351,8 @@ groups:
               conditions:
                 - type: query
                   evaluator:
-                    type: lt
-                    params: [1]
+                    type: gt
+                    params: [0]
                   operator:
                     type: and
                   query:
@@ -365,7 +365,7 @@ groups:
         title: AttractapReaderCrashes
         condition: C
         for: 5m
-        noDataState: NoData
+        noDataState: OK
         execErrState: Error
         labels:
           severity: warning
@@ -380,7 +380,7 @@ groups:
             datasourceUid: attraccess-prometheus
             model:
               refId: A
-              expr: 'sum(increase(attraccess_attractap_crash_reports_total{job="attraccess"}[1h]))'
+              expr: 'sum(increase(attraccess_attractap_crash_reports_total{job="attraccess"}[1h])) or vector(0)'
               instant: true
               range: false
               datasource:
