@@ -1,7 +1,7 @@
 import { DynamicModule, Global, Logger, Module, Type } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { DataSource, EntityTarget, ObjectLiteral, Repository } from 'typeorm';
+import { DataSource as HostDataSource } from 'typeorm';
 import {
   PluginContext,
   PluginBackendModule,
@@ -14,6 +14,9 @@ import {
   MQTT_SERVER_HOST_PROVIDER,
   MqttServerConnectionConfig,
   MqttServerHostProvider,
+  EntityTarget,
+  ObjectLiteral,
+  Repository,
 } from '@attraccess/plugins-backend-sdk';
 import { dataSourceConfig } from '../database/datasource';
 import { LoadedPluginManifest } from './plugin.manifest';
@@ -34,11 +37,11 @@ export class PluginModule {
   // Host singletons are only available once the DI container is live, which is
   // after forRoot() has already built the plugin modules. The context exposes
   // them through these holders, populated by the module constructor below.
-  private static dataSourceRef: DataSource | null = null;
+  private static dataSourceRef: HostDataSource | null = null;
   private static eventsRef: EventEmitter2 | null = null;
   private static moduleRef: ModuleRef | null = null;
 
-  constructor(dataSource: DataSource, events: EventEmitter2, moduleRef: ModuleRef) {
+  constructor(dataSource: HostDataSource, events: EventEmitter2, moduleRef: ModuleRef) {
     PluginModule.dataSourceRef = dataSource;
     PluginModule.eventsRef = events;
     PluginModule.moduleRef = moduleRef;
@@ -170,11 +173,13 @@ export class PluginModule {
       get events(): EventEmitter2 {
         return PluginModule.requireRef(PluginModule.eventsRef, 'EventEmitter2');
       },
-      get dataSource(): DataSource {
-        return PluginModule.requireRef(PluginModule.dataSourceRef, 'DataSource');
+      get dataSource(): PluginContext['dataSource'] {
+        return PluginModule.requireRef(PluginModule.dataSourceRef, 'DataSource') as unknown as PluginContext['dataSource'];
       },
       getRepository<T extends ObjectLiteral>(entity: EntityTarget<T>): Repository<T> {
-        return PluginModule.requireRef(PluginModule.dataSourceRef, 'DataSource').getRepository(entity);
+        return PluginModule.requireRef(PluginModule.dataSourceRef, 'DataSource').getRepository(
+          entity as never,
+        ) as unknown as Repository<T>;
       },
       get<T>(token: Type<T> | string | symbol): T {
         return PluginModule.requireRef(PluginModule.moduleRef, 'ModuleRef').get<T>(token, { strict: false });

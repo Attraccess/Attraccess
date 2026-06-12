@@ -18,7 +18,6 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { SSOOIDCGuard } from './oidc/oidc.guard';
-import { AuthGuard } from '@nestjs/passport';
 import { AuthenticationType, SSOProvider, SSOProviderType, SystemPermissions } from '@attraccess/database-entities';
 import { AuthenticatedRequest, Auth } from '@attraccess/plugins-backend-sdk';
 import { CreateSessionResponse } from '../auth.types';
@@ -32,6 +31,8 @@ import { Request, Response } from 'express';
 import { LinkUserToExternalAccountRequestDto } from './dto/link-user-to-external-account-request.dto';
 import { UsersService } from '../../users/users.service';
 import { AccountLinkingExceptionFilter } from './oidc/account-linking.exception-filter';
+import { SSOOIDCPassportGuard } from './oidc/oidc-passport.guard';
+import { SSOSamlPassportGuard } from './saml/saml-passport.guard';
 import { getRedirectToFromRequest } from './oidc/oidc-cookie-state-store';
 import { CookieConfigService } from '../../../common/services/cookie-config.service';
 import { ApiBadRequestResponse } from '@nestjs/swagger';
@@ -595,7 +596,7 @@ export class SSOController {
     type: 'string',
     description: 'The ID of the SSO provider',
   })
-  @UseGuards(SSOOIDCGuard, AuthGuard('sso-oidc'))
+  @UseGuards(SSOOIDCGuard, SSOOIDCPassportGuard)
   async loginWithOidc(): Promise<HttpStatus.OK> {
     return HttpStatus.OK;
   }
@@ -628,7 +629,7 @@ export class SSOController {
     name: 'code',
     required: true,
   })
-  @UseGuards(SSOOIDCGuard, AuthGuard('sso-oidc'))
+  @UseGuards(SSOOIDCGuard, SSOOIDCPassportGuard)
   @UseFilters(AccountLinkingExceptionFilter)
   async oidcLoginCallback(
     @Req() request: AuthenticatedRequest,
@@ -664,7 +665,7 @@ export class SSOController {
     type: 'string',
     description: 'The ID of the SSO provider',
   })
-  @UseGuards(SSOSamlGuard, AuthGuard('sso-saml'))
+  @UseGuards(SSOSamlGuard, SSOSamlPassportGuard)
   async loginWithSaml(): Promise<HttpStatus.OK> {
     return HttpStatus.OK;
   }
@@ -681,7 +682,7 @@ export class SSOController {
     type: 'string',
     description: 'The ID of the SSO provider',
   })
-  @UseGuards(SSOSamlGuard, AuthGuard('sso-saml'))
+  @UseGuards(SSOSamlGuard, SSOSamlPassportGuard)
   @UseFilters(AccountLinkingExceptionFilter)
   async samlLoginCallback(
     @Req() request: AuthenticatedRequest,

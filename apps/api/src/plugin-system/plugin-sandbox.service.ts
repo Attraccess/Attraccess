@@ -11,7 +11,7 @@ import {
   SystemEventPayload,
   SystemEventSubscription,
 } from '@attraccess/plugins-backend-sdk';
-import type { EntityTarget, ObjectLiteral } from 'typeorm';
+import type { EntityTarget, ObjectLiteral } from '@attraccess/plugins-backend-sdk';
 
 const EVENT_METHOD_PERMISSIONS = new Map<string, PluginPermission>([
   ['emit', PluginPermission.EMIT_EVENTS],

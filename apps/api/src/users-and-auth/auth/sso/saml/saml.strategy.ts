@@ -12,6 +12,8 @@ import { SSOProviderSAMLConfiguration, SSOProviderType, SystemPermissions, User 
 import { AccountLinkingRequiredException } from '../oidc/exceptions/account-linking-required.exception';
 import { EncryptionService } from '../../../../encryption/encryption.service';
 import { SSOSamlRequest, SSOSamlRequestOptions } from './saml.types';
+import { MetricsService } from '../../../../metrics/metrics.service';
+import { classifySsoFailureReason, markSsoFailureMetricRecorded, recordSsoLoginFailure } from '../sso-metrics';
 import {
   DEFAULT_PERMISSION_KEY_MAP,
   normalizePermissionToken,
@@ -48,6 +50,18 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
       passReqToCallback: true,
       getSamlOptions,
     } as unknown as PassportSamlConfig);
+  }
+
+  private recordFailure(error: unknown): void {
+    try {
+      const metricsService = this.moduleRef.get(MetricsService, { strict: false });
+      recordSsoLoginFailure(metricsService, SSOProviderType.SAML, classifySsoFailureReason(error), this.logger);
+      markSsoFailureMetricRecorded(error);
+    } catch (metricsError) {
+      this.logger.warn(
+        `Failed to resolve MetricsService for SSO login failure metric: ${metricsError instanceof Error ? metricsError.message : String(metricsError)}`,
+      );
+    }
   }
 
   private static toPem(cert: string): string {
@@ -175,7 +189,9 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
     const requestOptions = req?.ssoSamlOptions;
     if (!requestOptions?.samlConfiguration) {
       this.logger.error('SAML configuration missing on request');
-      throw new BadRequestException('Missing SAML configuration');
+      const error = new BadRequestException('Missing SAML configuration');
+      this.recordFailure(error);
+      throw error;
     }
 
     const config = requestOptions.samlConfiguration;
@@ -183,7 +199,9 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
     const samlUserId = typeof profile?.nameID === 'string' ? profile.nameID : undefined;
     if (!samlUserId) {
       this.logger.error('No NameID found in SAML assertion');
-      throw new BadRequestException('No NameID found in SAML assertion');
+      const error = new BadRequestException('No NameID found in SAML assertion');
+      this.recordFailure(error);
+      throw error;
     }
 
     const usersService = await this.moduleRef.get(UsersService);
@@ -191,7 +209,9 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
 
     if (!email) {
       this.logger.error('No email attribute could be resolved from the SAML assertion');
-      throw new BadRequestException('No email found in SAML assertion');
+      const error = new BadRequestException('No email found in SAML assertion');
+      this.recordFailure(error);
+      throw error;
     }
 
     let user = await usersService.findOne({ externalIdentifier: samlUserId }).catch(() => null);
@@ -206,12 +226,13 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
         return await this.syncPermissionsFromClaims(updated, profile, config, usersService);
       }
 
-      throw new AccountLinkingRequiredException({
+      const error = new AccountLinkingRequiredException({
         email,
         externalId: samlUserId,
         providerId,
         providerType: SSOProviderType.SAML,
       });
+      throw error;
     }
 
     const rawUsername = this.resolveDisplayName(profile, email);
@@ -229,7 +250,9 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
       });
 
     if (!user) {
-      throw new UnauthorizedException();
+      const error = new UnauthorizedException();
+      this.recordFailure(error);
+      throw error;
     }
 
     return await this.syncPermissionsFromClaims(user, profile, config, usersService);

@@ -237,6 +237,7 @@ describe('Monitoring configuration consistency', () => {
       'HighHttpErrorRate',
       'HighRequestLatency',
       'HighFailedLoginRate',
+      'HighSsoLoginFailureRate',
       'OverdueMaintenance',
       // ATT-517 device + system health additions
       'AttractapAllReadersOffline',
@@ -253,8 +254,10 @@ describe('Monitoring configuration consistency', () => {
       'HighAttraccessContainerMemoryUsage',
     ];
 
-    it('legacy prometheus alerts.yml no longer exists', () => {
-      expect(() => loadYaml('prometheus/alerts.yml')).toThrow();
+    it('Prometheus alerts include the SSO login failure alert', () => {
+      const prometheusAlerts = loadYaml('prometheus/alerts.yml');
+      expect(prometheusAlerts).toContain('HighSsoLoginFailureRate');
+      expect(prometheusAlerts).toContain('attraccess_auth_sso_login_failures_total');
     });
 
     it('Grafana provisioned rules define all required alerts', () => {

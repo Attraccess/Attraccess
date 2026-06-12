@@ -1,0 +1,11 @@
+groups:
+  - name: attraccess
+    rules:
+      - alert: HighSsoLoginFailureRate
+        expr: sum(increase(attraccess_auth_sso_login_failures_total{job="attraccess"}[5m])) > 10
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High number of failed SSO login attempts"
+          description: "More than 10 failed SSO login attempts in the last 5 minutes — possible SSO brute-force attack or provider misconfiguration."

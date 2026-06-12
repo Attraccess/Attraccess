@@ -261,6 +261,56 @@ groups:
                     type: last
                     params: []
 
+      - uid: high-sso-login-failure-rate
+        title: HighSsoLoginFailureRate
+        condition: C
+        for: 2m
+        noDataState: NoData
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: "High number of failed SSO login attempts"
+          description: "More than 10 failed SSO login attempts in the last 5 minutes — possible SSO brute-force attack or provider misconfiguration."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: attraccess-prometheus
+            model:
+              refId: A
+              expr: 'sum(increase(attraccess_auth_sso_login_failures_total{job="attraccess"}[5m]))'
+              instant: true
+              range: false
+              datasource:
+                type: prometheus
+                uid: attraccess-prometheus
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - type: query
+                  evaluator:
+                    type: gt
+                    params: [10]
+                  operator:
+                    type: and
+                  query:
+                    params: []
+                  reducer:
+                    type: last
+                    params: []
+
       - uid: overdue-maintenance
         title: OverdueMaintenance
         condition: C
