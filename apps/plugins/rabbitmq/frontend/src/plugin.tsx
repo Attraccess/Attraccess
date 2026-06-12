@@ -15,8 +15,10 @@ import type {
   RouteConfig,
 } from '@attraccess/plugins-frontend-sdk';
 import type { IPluginStore } from 'react-pluggable';
+import { useDetection } from './detection';
 import { RabbitmqListBadge } from './RabbitmqListBadge';
 import { RabbitmqStatusPanel } from './RabbitmqStatusPanel';
+import { RabbitmqUserPanel } from './RabbitmqUserPanel';
 
 // Host slot ids exposed by the MQTT UI. The SDK is vendor-agnostic and does not
 // export them, and the host owns them in apps/frontend (which a plugin cannot
@@ -31,6 +33,25 @@ interface MqttServerSlotContext {
   [key: string]: unknown;
 }
 
+// Everything the plugin contributes to the MQTT server detail view: the
+// connection-status panel (ATT-521) plus the user-management panel (ATT-522).
+// Returns null (no wrapper element) for non-RabbitMQ servers so the host
+// layout is unchanged unless a RabbitMQ broker is positively detected.
+function RabbitmqDetailSlot({ mqttServerId }: { mqttServerId: number }) {
+  const { result } = useDetection(mqttServerId);
+
+  if (!result?.isRabbitMQ) {
+    return null;
+  }
+
+  return (
+    <div className="flex flex-col gap-4 w-full">
+      <RabbitmqStatusPanel mqttServerId={mqttServerId} />
+      <RabbitmqUserPanel mqttServerId={mqttServerId} />
+    </div>
+  );
+}
+
 function RabbitmqPage() {
   return (
     <div className="flex flex-col gap-6 p-6 max-w-4xl mx-auto">
@@ -41,8 +62,9 @@ function RabbitmqPage() {
       <Card className="border border-default-200 dark:border-default-100">
         <Card.Content>
           <p className="text-sm text-default-500">
-            RabbitMQ management plugin. RabbitMQ MQTT servers now show a detection badge and connection-status
-            panel in the MQTT settings. Management features are coming soon.
+            RabbitMQ management plugin. RabbitMQ MQTT servers show a detection badge and connection-status panel in
+            the MQTT settings, and broker users can be managed (create, edit, permissions, delete) from the MQTT
+            server detail view.
           </p>
         </Card.Content>
       </Card>
@@ -102,7 +124,10 @@ export default class RabbitmqPlugin implements AttraccessFrontendPlugin {
       {
         slotId: MQTT_SERVER_DETAIL_SLOT,
         key: 'rabbitmq-mqtt-detail',
-        render: (context) => <RabbitmqStatusPanel mqttServerId={context.mqttServerId} />,
+        // Status first, user management below it (ATT-522). The wrapper
+        // renders nothing unless the server is detected as RabbitMQ, so the
+        // detail view keeps its layout for other brokers.
+        render: (context) => <RabbitmqDetailSlot mqttServerId={context.mqttServerId} />,
       },
       {
         slotId: MQTT_SERVER_LIST_ROW_SLOT,
