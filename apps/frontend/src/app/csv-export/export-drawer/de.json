@@ -11,6 +11,36 @@
       "selectedCount": "{{selected}} / {{total}} ausgewählt"
     }
   },
+  "columnsConfig": {
+    "title": "Spalten konfigurieren",
+    "empty": "Keine Spalten ausgewählt. Wähle oben Datenspalten oder füge eine Konstanten-Spalte hinzu.",
+    "field": "Feld",
+    "constant": "Konstante",
+    "headerLabel": "Eigene Überschrift",
+    "valueLabel": "Konstanter Wert",
+    "addConstant": "Konstanten-Spalte hinzufügen",
+    "moveUp": "Nach oben",
+    "moveDown": "Nach unten",
+    "remove": "Spalte entfernen"
+  },
+  "templates": {
+    "label": "Vorlage",
+    "none": "Keine Vorlage",
+    "unsavedChanges": "Ungespeicherte Änderungen",
+    "save": "Speichern",
+    "saveAs": "Als neue Vorlage speichern",
+    "create": "Vorlage erstellen",
+    "nameLabel": "Name der Vorlage",
+    "namePlaceholder": "z. B. Buchhaltungs-Upload",
+    "delete": "Vorlage löschen",
+    "toasts": {
+      "created": "Vorlage \"{{name}}\" erstellt",
+      "updated": "Vorlage \"{{name}}\" gespeichert",
+      "deleted": "Vorlage gelöscht",
+      "saveFailed": "Speichern der Vorlage fehlgeschlagen",
+      "deleteFailed": "Löschen der Vorlage fehlgeschlagen"
+    }
+  },
   "preview": {
     "title": "Vorschau (erste {{n}})",
     "rowCount": "{{count}} Datensätze gesamt"

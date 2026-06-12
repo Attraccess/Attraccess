@@ -1,10 +1,14 @@
-import { ResourceUsage, useAnalyticsServiceGetResourceUsageHoursInDateRange } from '@attraccess/react-query-client';
+import {
+  ResourceUsage,
+  useAnalyticsServiceGetResourceUsageHoursInDateRange,
+} from '@attraccess/react-query-client';
 import { ExportProps } from '../export-props';
 import { useCallback, useMemo, useState } from 'react';
 import { useDateTimeFormatter, useNumberFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import de from './de.json';
 import en from './en.json';
 import { CsvExportDrawerContent, ColumnDefinition } from '../export-drawer';
+import { CsvExportType } from '../export-drawer/template-api';
 
 export function ResourceUsageExport(props: ExportProps) {
   const { t } = useTranslations({
@@ -122,20 +126,74 @@ export function ResourceUsageExport(props: ExportProps) {
         key: 'supervisorUsername',
         getter: (item) => item.supervisorUser?.username ?? '',
       },
+      {
+        label: t('columns.userExternalIdentifier'),
+        key: 'userExternalIdentifier',
+        getter: (item) => item.user?.externalIdentifier ?? '',
+      },
+      {
+        label: t('columns.usageAction'),
+        key: 'usageAction',
+        getter: (item) => item.usageAction,
+      },
+      {
+        label: t('columns.projectId'),
+        key: 'projectId',
+        getter: (item) => item.projectId ?? '',
+      },
+      {
+        label: t('columns.isFinalized'),
+        key: 'isFinalized',
+        getter: (item) => String(item.isFinalized),
+      },
+      {
+        label: t('columns.resourceType'),
+        key: 'resourceType',
+        getter: (item) => item.resource?.type ?? '',
+      },
+      {
+        label: t('columns.resourceDescription'),
+        key: 'resourceDescription',
+        getter: (item) => item.resource?.description ?? '',
+      },
     ] as ColumnDefinition<ResourceUsage>[];
   }, [formatUsageDuration, formatDateTimeFull, t]);
+
+  // Dynamic columns for every custom metadata key found on the exported resources
+  const metadataColumns = useMemo(() => {
+    const keys = new Set<string>();
+    (resourceUsageExport ?? []).forEach((item) => {
+      Object.keys((item as ResourceUsage).resource?.metadata ?? {}).forEach((key) => keys.add(key));
+    });
+    return Array.from(keys)
+      .sort((a, b) => a.localeCompare(b))
+      .map(
+        (key) =>
+          ({
+            label: t('columns.resourceMetadata', { key }),
+            key: `resourceMetadata.${key}`,
+            getter: (item) => {
+              const value = item.resource?.metadata?.[key];
+              return value === undefined || value === null ? '' : String(value);
+            },
+          }) as ColumnDefinition<ResourceUsage>,
+      );
+  }, [resourceUsageExport, t]);
+
+  const allColumns = useMemo(() => [...columns, ...metadataColumns], [columns, metadataColumns]);
 
   // TODO: handle grouping by user and resource
 
   return (
     <CsvExportDrawerContent
-      columns={columns as ColumnDefinition<ResourceUsage>[]}
+      columns={allColumns}
       items={(resourceUsageExport ?? []) as ResourceUsage[]}
       refetch={refetch}
       options={options}
       setOption={setOption}
       filename="resource-usage.csv"
       queryStatus={fetchStatus}
+      exportType={CsvExportType.RESOURCE_USAGE_HOURS}
     />
   );
 }

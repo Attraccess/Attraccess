@@ -16,6 +16,13 @@
     "startNotes": "Start-Notizen",
     "endNotes": "End-Notizen",
     "supervisorId": "Aufsicht-ID",
-    "supervisorUsername": "Aufsicht-Name"
+    "supervisorUsername": "Aufsicht-Name",
+    "userExternalIdentifier": "Externe Benutzer-Kennung",
+    "usageAction": "Nutzungsart",
+    "projectId": "Projekt-ID",
+    "isFinalized": "Abgeschlossen",
+    "resourceType": "Ressourcen-Typ",
+    "resourceDescription": "Ressourcen-Beschreibung",
+    "resourceMetadata": "Ressourcen-Metadaten: {{key}}"
   }
 }

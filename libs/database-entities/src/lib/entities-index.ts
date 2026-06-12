@@ -95,6 +95,12 @@ import { Conversation } from './entities/conversation.entity';
 import { ConversationParticipant } from './entities/conversation-participant.entity';
 import { Message, MessageReferenceType } from './entities/message.entity';
 import { NotificationPreference } from './entities/notification-preference.entity';
+import {
+  CsvExportTemplate,
+  CsvExportTemplateColumn,
+  CsvExportTemplateColumnType,
+  CsvExportType,
+} from './entities/csv-export-template.entity';
 
 // Export all entities individually
 export {
@@ -195,6 +201,10 @@ export {
   Message,
   MessageReferenceType,
   NotificationPreference,
+  CsvExportTemplate,
+  CsvExportTemplateColumn,
+  CsvExportTemplateColumnType,
+  CsvExportType,
 };
 
 // Export the entities object
@@ -245,4 +255,5 @@ export const entities = {
   ConversationParticipant,
   Message,
   NotificationPreference,
+  CsvExportTemplate,
 };

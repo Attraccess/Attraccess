@@ -12,6 +12,9 @@ import {
   BillingTransactionStatus,
   Conversation,
   ConversationParticipant,
+  CsvExportTemplate,
+  CsvExportTemplateColumnType,
+  CsvExportType,
   EmailTemplate,
   EmailTemplateType,
   Form,
@@ -185,6 +188,7 @@ const seedDatabase = async (dataSource: DataSource) => {
   const conversationParticipantRepo = dataSource.getRepository(ConversationParticipant);
   const messageRepo = dataSource.getRepository(Message);
   const notificationPreferenceRepo = dataSource.getRepository(NotificationPreference);
+  const csvExportTemplateRepo = dataSource.getRepository(CsvExportTemplate);
 
   const resourceGroup = await ensureEntity(resourceGroupRepo, () => ({
     name: `Seed Group ${seedTag}`,
@@ -572,6 +576,23 @@ const seedDatabase = async (dataSource: DataSource) => {
   await ensureEntity(notificationPreferenceRepo, () => ({
     userId: primaryUser.id,
     messagesEmailOnOffline: true,
+  }));
+
+  await ensureEntity(csvExportTemplateRepo, () => ({
+    name: `Seed CSV template ${seedTag}`,
+    exportType: CsvExportType.RESOURCE_USAGE_HOURS,
+    columns: [
+      {
+        type: CsvExportTemplateColumnType.FIELD,
+        header: 'Resource',
+        fieldKey: 'resourceName',
+      },
+      {
+        type: CsvExportTemplateColumnType.CONSTANT,
+        header: 'Source',
+        value: 'migration-seed',
+      },
+    ],
   }));
 };
 

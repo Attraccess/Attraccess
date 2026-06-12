@@ -16,6 +16,13 @@
     "startNotes": "Start Notes",
     "endNotes": "End Notes",
     "supervisorId": "Supervisor ID",
-    "supervisorUsername": "Supervisor Name"
+    "supervisorUsername": "Supervisor Name",
+    "userExternalIdentifier": "User External Identifier",
+    "usageAction": "Usage Action",
+    "projectId": "Project ID",
+    "isFinalized": "Finalized",
+    "resourceType": "Resource Type",
+    "resourceDescription": "Resource Description",
+    "resourceMetadata": "Resource Metadata: {{key}}"
   }
 }

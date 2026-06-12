@@ -8,6 +8,7 @@ import {
   useBillingServiceGetBillingConfiguration,
 } from '@attraccess/react-query-client';
 import { CsvExportDrawerContent, ColumnDefinition } from '../export-drawer';
+import { CsvExportType } from '../export-drawer/template-api';
 import { useMemo } from 'react';
 import { dbCurrencyToUserCurrency } from '@attraccess/shared';
 
@@ -49,7 +50,24 @@ export function BillingTransactionsExport(props: ExporterProps) {
         getter: (item) => dbCurrencyToUserCurrency(item.amount, billingConfiguration.minorUnit),
         selectedByDefault: true,
       },
+      { label: t('columns.userId'), key: 'userId', getter: (item) => item.userId.toString() },
+      {
+        label: t('columns.createdAtISO'),
+        key: 'createdAtISO',
+        getter: (item) => item.createdAt,
+      },
+      {
+        label: t('columns.updatedAt'),
+        key: 'updatedAt',
+        getter: (item) => formatDateTimeFull(item.updatedAt),
+      },
       { label: t('columns.initiator'), key: 'initiator', getter: (item) => item.initiator?.username },
+      { label: t('columns.initiatorId'), key: 'initiatorId', getter: (item) => item.initiatorId?.toString() ?? '' },
+      {
+        label: t('columns.resourceUsageId'),
+        key: 'resourceUsageId',
+        getter: (item) => item.resourceUsageId?.toString() ?? '',
+      },
       {
         label: t('columns.resourceUsage'),
         key: 'resourceUsage',
@@ -83,6 +101,7 @@ export function BillingTransactionsExport(props: ExporterProps) {
       items={(billingTransactions ?? []) as BillingTransaction[]}
       columns={columns}
       filename="billing-transactions.csv"
+      exportType={CsvExportType.BILLING_TRANSACTIONS}
     />
   );
 }

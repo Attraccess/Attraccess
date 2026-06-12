@@ -11,6 +11,36 @@
       "selectedCount": "{{selected}} / {{total}} selected"
     }
   },
+  "columnsConfig": {
+    "title": "Configure columns",
+    "empty": "No columns selected. Pick data columns above or add a constant column.",
+    "field": "Field",
+    "constant": "Constant",
+    "headerLabel": "Custom header",
+    "valueLabel": "Constant value",
+    "addConstant": "Add constant column",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "remove": "Remove column"
+  },
+  "templates": {
+    "label": "Template",
+    "none": "No template",
+    "unsavedChanges": "Unsaved changes",
+    "save": "Save",
+    "saveAs": "Save as new",
+    "create": "Create template",
+    "nameLabel": "Template name",
+    "namePlaceholder": "e.g. Accounting upload",
+    "delete": "Delete template",
+    "toasts": {
+      "created": "Template \"{{name}}\" created",
+      "updated": "Template \"{{name}}\" saved",
+      "deleted": "Template deleted",
+      "saveFailed": "Saving the template failed",
+      "deleteFailed": "Deleting the template failed"
+    }
+  },
   "preview": {
     "title": "Preview (first {{n}})",
     "rowCount": "{{count}} total rows"
