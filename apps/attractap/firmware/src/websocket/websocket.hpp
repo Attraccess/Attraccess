@@ -51,6 +51,9 @@ private:
 
     void updateInfoFromAppState();
     void publishConnectionStatus();
+    void publishNetworkQuality();
+    void recordNetworkQualityEvent(uint32_t *events, uint8_t &nextIndex);
+    uint8_t countRecentNetworkQualityEvents(const uint32_t *events, uint32_t nowMs) const;
     void connectWebSocket();
     void connectWebSocketLocked();
     bool shouldReconnect();
@@ -107,7 +110,18 @@ private:
     void checkConnectWatchdog(const AttraccessApiConfig &apiConfig);
 
     uint32_t lastInboundFrameTime = 0;
+    const uint32_t INBOUND_DEGRADED_AFTER_MS = 12000;
     const uint32_t INBOUND_LIVENESS_TIMEOUT_MS = 20000;
+    const uint32_t QUALITY_EVENT_WINDOW_MS = 60000;
+    static constexpr size_t QUALITY_EVENT_SLOTS = 8;
+    uint32_t reconnectEventTimes[QUALITY_EVENT_SLOTS] = {};
+    uint32_t txQueueFullEventTimes[QUALITY_EVENT_SLOTS] = {};
+    uint32_t sendFailureEventTimes[QUALITY_EVENT_SLOTS] = {};
+    uint32_t livenessTimeoutEventTimes[QUALITY_EVENT_SLOTS] = {};
+    uint8_t reconnectEventNextIndex = 0;
+    uint8_t txQueueFullEventNextIndex = 0;
+    uint8_t sendFailureEventNextIndex = 0;
+    uint8_t livenessTimeoutEventNextIndex = 0;
     const int PINGPONG_TIMEOUT_SEC = 10;
 
     bool network_is_connected = false;
