@@ -126,3 +126,4 @@ export * from './1781300000000-attractap-crash-report-reboot-reason';
 export * from './1781400000000-resource-group-is-hidden';
 export * from './1781500000000-supervised-usage';
 export * from './1781600000000-push-notifications';
+export * from './1781700000000-system-notification-preferences';

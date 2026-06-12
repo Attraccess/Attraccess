@@ -31,6 +31,14 @@ export class NotificationPreference {
   })
   messagesPushEnabled!: boolean;
 
+  @Column({ type: 'text', nullable: true })
+  @ApiProperty({
+    description: 'JSON map of notification categories to enabled channels.',
+    required: false,
+    nullable: true,
+  })
+  categoryChannels!: string | null;
+
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'userId' })
   @ApiProperty({ description: 'The user these preferences belong to', type: () => User })

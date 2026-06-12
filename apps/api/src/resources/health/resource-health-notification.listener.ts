@@ -6,7 +6,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Resource, ResourceHealthStatus, ResourceIntroducer, User } from '@attraccess/database-entities';
 import { ResourceHealthChangedEvent } from './events/resource-health-changed.event';
-import { EmailService } from '../../email/email.service';
+import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
+import { NotificationCategory } from '../../notifications/notification-types';
 
 @Injectable()
 export class ResourceHealthNotificationListener {
@@ -19,7 +20,7 @@ export class ResourceHealthNotificationListener {
     private readonly resourceIntroducerRepository: Repository<ResourceIntroducer>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
-    private readonly emailService: EmailService,
+    private readonly notifications: NotificationDispatchService,
   ) {}
 
   @OnEvent(ResourceHealthChangedEvent.EVENT_NAME)
@@ -43,31 +44,25 @@ export class ResourceHealthNotificationListener {
         return;
       }
 
-      this.logger.log(
-        `Dispatching health-change emails to ${recipients.length} user(s) for resource ${resource.id} (${event.previousStatus} -> ${event.status})`,
-      );
-
-      await Promise.all(
-        recipients.map((recipient) =>
-          this.emailService
-            .sendResourceHealthChangedEmail(
-              recipient,
-              { id: resource.id, name: resource.name },
-              {
-                status: event.status,
-                previousStatus: event.previousStatus,
-                reason: event.reason,
-                identifier: event.identifier,
-              },
-            )
-            .catch((error) => {
-              this.logger.error(
-                `Failed to send health-change email to user ${recipient.id} for resource ${resource.id}: ${error.message}`,
-                error.stack,
-              );
-            }),
-        ),
-      );
+      const becameUnhealthy = event.status === ResourceHealthStatus.UNHEALTHY;
+      await this.notifications.dispatch({
+        category: NotificationCategory.RESOURCE_HEALTH,
+        recipients,
+        title: becameUnhealthy ? `Resource degraded: ${resource.name}` : `Resource recovered: ${resource.name}`,
+        body: event.reason ?? `${resource.name} changed from ${event.previousStatus ?? 'unknown'} to ${event.status}`,
+        url: `/resources/${resource.id}`,
+        severity: becameUnhealthy ? 'warning' : 'info',
+        sendEmail: (recipient) =>
+          this.notifications.sendEmailTemplate(recipient, NotificationCategory.RESOURCE_HEALTH, {
+            resource: { id: resource.id, name: resource.name },
+            health: {
+              status: event.status,
+              previousStatus: event.previousStatus,
+              reason: event.reason,
+              identifier: event.identifier,
+            },
+          }),
+      });
     } catch (error) {
       this.logger.error(
         `Failed to process health-change notification for resource ${event.resourceId}: ${error.message}`,

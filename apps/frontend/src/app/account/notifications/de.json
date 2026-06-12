@@ -1,4 +1,47 @@
 {
+  "columns": {
+    "category": "Benachrichtigung",
+    "email": "E-Mail",
+    "push": "Push",
+    "toast": "In-App"
+  },
+  "categories": {
+    "messages": {
+      "label": "Nachrichten",
+      "description": "Benachrichtigungen zu Direktnachrichten."
+    },
+    "maintenance_requests": {
+      "label": "Wartungsanfragen",
+      "description": "Neue Wartungsanfragen und Aktualisierungen."
+    },
+    "resource_usage_notes": {
+      "label": "Nutzungsnotizen",
+      "description": "Notizen zu Ressourcennutzungen."
+    },
+    "resource_health": {
+      "label": "Ressourcenzustand",
+      "description": "Änderungen am Zustand von Ressourcen."
+    },
+    "resource_takeover": {
+      "label": "Ressourcenübernahme",
+      "description": "Wenn deine aktive Ressourcennutzung übernommen wird."
+    },
+    "resource_session_ended": {
+      "label": "Ressourcennutzung beendet",
+      "description": "Wenn deine aktive Ressourcennutzung endet."
+    },
+    "project_invitations": {
+      "label": "Projekteinladungen",
+      "description": "Einladungen zu Projekten."
+    },
+    "supervision_requests": {
+      "label": "Aufsichtsfreigaben",
+      "description": "Anfragen, die eine Freigabe durch eine Aufsicht benötigen."
+    }
+  },
+  "description": {
+    "push": "Push-Benachrichtigungen werden an dieses Gerät gesendet. Beim Aktivieren eines Push-Kanals wird dieser Browser zuerst abonniert."
+  },
   "messagesEmailOnOffline": {
     "label": "Benachrichtige mich per E-Mail über Nachrichten, wenn ich offline bin",
     "description": "Wenn du eine Direktnachricht erhältst, während du nicht online bist, senden wir dir eine E-Mail, damit du sie nicht verpasst."
