@@ -13,23 +13,24 @@ import { detectAndSetLanguage } from '@attraccess/plugins-frontend-ui';
 
 detectAndSetLanguage();
 
-if (import.meta.env.PROD) {
-  const oneMinute = 60 * 1000;
-  const intervalMS = 15 * oneMinute;
+const oneMinute = 60 * 1000;
+const serviceWorkerUpdateIntervalMs = 15 * oneMinute;
 
-  const updateSW = registerSW({
-    immediate: true,
-    onRegistered(r) {
-      r &&
-        setInterval(() => {
-          r.update();
-        }, intervalMS);
-    },
-    onNeedRefresh() {
+const updateSW = registerSW({
+  immediate: true,
+  onRegistered(registration) {
+    if (import.meta.env.PROD && registration) {
+      setInterval(() => {
+        registration.update();
+      }, serviceWorkerUpdateIntervalMs);
+    }
+  },
+  onNeedRefresh() {
+    if (import.meta.env.PROD) {
       updateSW(true);
-    },
-  });
-}
+    }
+  },
+});
 
 const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
 

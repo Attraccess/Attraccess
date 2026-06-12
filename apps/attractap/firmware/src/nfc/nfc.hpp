@@ -13,6 +13,18 @@
 class NFC
 {
 public:
+    // Card technology detected at tap time (GetVersion HWType). Routing:
+    // NTAG424 keeps the proven ISOSelectFile+EV2First path; DESFire EV2/EV3
+    // run the same EV2First handshake inside the Attraccess application
+    // (selected/created via the DESFire native commands). Unknown cards fall
+    // back to the legacy NTAG424 path (pre-DESFire behavior).
+    enum CardType
+    {
+        CARD_TYPE_UNKNOWN = 0,
+        CARD_TYPE_NTAG424,
+        CARD_TYPE_DESFIRE,
+    };
+
     NFC() : logger("NFC"), pn532(PIN_PN532_IRQ, -1, &Wire)
     {
     }
@@ -29,7 +41,7 @@ public:
      */
     void loop();
 
-    bool changeKey(uint8_t keyNumber, uint8_t *masterKey, uint8_t *oldKey, uint8_t *newKey);
+    bool changeKey(uint8_t keyNumber, uint8_t *masterKey, uint8_t *oldKey, uint8_t *newKey, uint8_t keyVersion = 0x01);
     bool authenticate(uint8_t keyNumber, uint8_t *key);
     void enableCardDetection();
     void setCardDetectionCallback(std::function<void(uint8_t *, uint8_t)> callback);
@@ -43,7 +55,24 @@ public:
 
     bool getAvailableKeyNo(uint8_t *uid, uint8_t *uidLength, uint8_t *keyNo);
 
+    // Card type of the currently tracked card (valid while isCardPresent()).
+    CardType getDetectedCardType();
+
     static uint8_t FACTORY_KEY[16];
+
+    // Attraccess DESFire application (AID 0xACCE55, bytes LSB first) and the
+    // PICC-level master application (AID 0x000000).
+    static const uint8_t DESFIRE_AID_ATTRACCESS[3];
+    static const uint8_t DESFIRE_AID_MASTER[3];
+
+    // Application master key settings (0x0F = factory default: master key
+    // changeable, free directory access, free create/delete, settings
+    // changeable; ChangeKey requires app master key) and key config
+    // (0x80 = AES | 6 keys, mirroring the NTAG424 key slots 0-5).
+    static const uint8_t DESFIRE_APP_KEY_SETTINGS_1 = 0x0F;
+    static const uint8_t DESFIRE_APP_KEY_SETTINGS_2 = 0x86;
+    static const uint8_t CARD_KEY_VERSION_FREE = 0x00;
+    static const uint8_t CARD_KEY_VERSION_ENROLLED = 0x01;
 
     bool isCardDetectionEnabled();
 
@@ -57,6 +86,21 @@ private:
 
     uint8_t cardDetectedUid[7] = {0};
     uint8_t cardDetectedUidLength = 0;
+
+    // Set by detectCardType() right after a successful detection poll.
+    CardType detectedCardType = CARD_TYPE_UNKNOWN;
+
+    // Probe the freshly detected card via GetVersion (works unauthenticated on
+    // both NTAG424 and DESFire). Caller must hold the I2C bus guard.
+    void detectCardType();
+
+    // Authenticate the tracked card with the routing described at CardType.
+    // Caller must hold opMutex and the I2C bus guard.
+    bool authenticateInternal(uint8_t keyNumber, uint8_t *key);
+
+    // Select the Attraccess application on a DESFire card, optionally creating
+    // it first (enrollment of factory cards). Caller must hold the bus guard.
+    bool desfireSelectAttraccessApp(bool createIfMissing);
 
     // Written by the NFC task, read from the main loop.
     volatile bool foundCard = false;

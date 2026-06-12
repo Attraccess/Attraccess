@@ -203,12 +203,23 @@ public:
         uint8_t val = readGT911(GT911_POINT_INFO);
 
         bool haveKey = GT911_GET_HAVE_KEY(val);
-        // bool bufferStatus = GT911_GET_BUFFER_STATUS(val);
         // log_i("REG:0x%X S:0X%d K:%d\n", val,bufferStatus,haveKey);
 
         if (__homeButtonCb && haveKey) {
             __homeButtonCb(__userData);
         }
+
+        // The GT911 refreshes its coordinate buffer on its own 5-15 ms scan
+        // cadence and flags a fresh sample via the buffer-status bit. When the
+        // host polls faster than the controller scans, the bit is still clear:
+        // there is no new sample, NOT a release. Report "stale" so the caller
+        // can hold its previous state, and leave the buffer alone (the
+        // datasheet only asks for a 0-write after reading a ready sample).
+        if (!GT911_GET_BUFFER_STATUS(val)) {
+            __lastSampleStale = true;
+            return 0;
+        }
+        __lastSampleStale = false;
 
         clearBuffer();
 
@@ -221,6 +232,9 @@ public:
         uint8_t write_buffer[2] = {0x81, 0x4F};
         if (writeThenRead(write_buffer, SENSORLIB_COUNT(write_buffer),
                           buffer, 39) == DEV_WIRE_ERR) {
+            // Bus error mid-read: the sample never arrived, treat as stale
+            // rather than synthesizing an empty (released) sample.
+            __lastSampleStale = true;
             return 0;
         }
 
@@ -255,6 +269,14 @@ public:
         return touchPoint;
     }
 
+
+    // True when the last getPoint(x, y, size) call found no fresh sample
+    // (buffer-status bit clear or bus error). A return value of 0 then means
+    // "no new data since the last poll", not "finger lifted".
+    bool isLastSampleStale() const
+    {
+        return __lastSampleStale;
+    }
 
     bool isPressed()
     {
@@ -721,6 +743,7 @@ protected:
     int __irq_mode;
     uint8_t *__config = NULL;
     uint16_t __config_size = 0;
+    bool __lastSampleStale = false;
 };
 
 

@@ -10,6 +10,10 @@ interface ToastOptions {
   description?: string;
   type?: ToastType;
   duration?: number;
+  action?: {
+    label: string;
+    onClick: () => void;
+  };
 }
 
 const toastIcons = {
@@ -33,7 +37,7 @@ export function ToastProvider({ children }: ToastProviderProps) {
 }
 
 export function useToastMessage() {
-  const showToast = useCallback(({ title, description, type = 'info', duration = 5000 }: ToastOptions) => {
+  const showToast = useCallback(({ title, description, type = 'info', duration = 5000, action }: ToastOptions) => {
     const toastFn =
       type === 'error'
         ? toast.error
@@ -47,6 +51,7 @@ export function useToastMessage() {
       description,
       icon: toastIcons[type],
       duration,
+      action,
     });
   }, []);
 

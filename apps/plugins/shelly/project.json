@@ -1,0 +1,74 @@
+{
+  "name": "plugin-shelly",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "apps/plugins/shelly",
+  "tags": ["type:plugin"],
+  "targets": {
+    "lint": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "{projectRoot}/backend/**/*",
+        "{projectRoot}/frontend/src/**/*",
+        "{workspaceRoot}/eslint.config.cjs"
+      ],
+      "outputs": [],
+      "options": {
+        "cwd": "apps/plugins/shelly",
+        "command": "eslint backend frontend/src"
+      }
+    },
+    "build-backend": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "{projectRoot}/backend/**/*",
+        "{workspaceRoot}/apps/plugins/scripts/esbuild-backend.mjs"
+      ],
+      "outputs": ["{projectRoot}/package/dist"],
+      "options": {
+        "cwd": "apps/plugins/shelly",
+        "command": "node ../scripts/esbuild-backend.mjs --entry backend/plugin.ts --outfile package/dist/index.js --entry backend/migrations.ts --outfile package/dist/migrations.js"
+      }
+    },
+    "build-frontend": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "{projectRoot}/frontend/**/*",
+        "{workspaceRoot}/apps/plugins/scripts/vite-federation.config.mjs"
+      ],
+      "outputs": ["{projectRoot}/package/frontend"],
+      "options": {
+        "cwd": "apps/plugins/shelly",
+        "command": "pnpm exec vite build --config frontend/vite.config.ts"
+      }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "dependsOn": ["build-backend", "build-frontend"],
+      "inputs": ["{projectRoot}/plugin.json"],
+      "outputs": ["{projectRoot}/package"],
+      "options": {
+        "cwd": "apps/plugins/shelly",
+        "command": "node -e \"require('fs').copyFileSync('plugin.json','package/plugin.json')\""
+      }
+    },
+    "package": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "dependsOn": ["build"],
+      "inputs": [
+        "{projectRoot}/package/**/*",
+        "{workspaceRoot}/apps/plugins/scripts/zip-plugin.mjs"
+      ],
+      "outputs": ["{projectRoot}/dist"],
+      "options": {
+        "cwd": "apps/plugins/shelly",
+        "command": "node ../scripts/zip-plugin.mjs --src package --out dist/plugin-shelly.zip"
+      }
+    }
+  }
+}

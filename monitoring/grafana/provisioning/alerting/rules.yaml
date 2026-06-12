@@ -330,7 +330,7 @@ groups:
             datasourceUid: attraccess-prometheus
             model:
               refId: A
-              expr: 'attraccess_attractap_devices_connected{job="attraccess"} == 0 and max_over_time(attraccess_attractap_devices_connected{job="attraccess"}[1h]) > 0'
+              expr: 'sum((attraccess_attractap_devices_connected{job="attraccess"} == bool 0) * (max_over_time(attraccess_attractap_devices_connected{job="attraccess"}[1h]) > bool 0)) or vector(0)'
               instant: true
               range: false
               datasource:
@@ -351,8 +351,8 @@ groups:
               conditions:
                 - type: query
                   evaluator:
-                    type: lt
-                    params: [1]
+                    type: gt
+                    params: [0]
                   operator:
                     type: and
                   query:
@@ -380,7 +380,7 @@ groups:
             datasourceUid: attraccess-prometheus
             model:
               refId: A
-              expr: 'sum(increase(attraccess_attractap_crash_reports_total{job="attraccess"}[1h]))'
+              expr: 'sum(increase(attraccess_attractap_crash_reports_total{job="attraccess"}[1h])) or vector(0)'
               instant: true
               range: false
               datasource:
@@ -761,8 +761,8 @@ groups:
                     type: last
                     params: []
 
-      - uid: high-memory-usage
-        title: HighMemoryUsage
+      - uid: high-host-memory-usage
+        title: HighHostMemoryUsage
         condition: C
         for: 10m
         noDataState: OK
@@ -770,8 +770,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "High heap memory usage"
-          description: "V8 heap usage has been above 90% for 10 minutes."
+          summary: "High host memory usage"
+          description: "Host RAM usage has been above 90% for 10 minutes."
         data:
           - refId: A
             relativeTimeRange:
@@ -780,7 +780,107 @@ groups:
             datasourceUid: attraccess-prometheus
             model:
               refId: A
-              expr: 'nodejs_heap_size_used_bytes{job="attraccess"} / nodejs_heap_size_total_bytes{job="attraccess"}'
+              expr: '1 - (node_memory_MemAvailable_bytes{job="node-exporter"} / node_memory_MemTotal_bytes{job="node-exporter"})'
+              instant: true
+              range: false
+              datasource:
+                type: prometheus
+                uid: attraccess-prometheus
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - type: query
+                  evaluator:
+                    type: gt
+                    params: [0.9]
+                  operator:
+                    type: and
+                  query:
+                    params: []
+                  reducer:
+                    type: last
+                    params: []
+
+      - uid: high-host-disk-usage
+        title: HighHostDiskUsage
+        condition: C
+        for: 15m
+        noDataState: NoData
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: "High host disk usage"
+          description: "A persistent host filesystem has been above 85% usage for 15 minutes."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 900
+              to: 0
+            datasourceUid: attraccess-prometheus
+            model:
+              refId: A
+              expr: 'max by (instance, mountpoint) (1 - (node_filesystem_avail_bytes{job="node-exporter",fstype!~"tmpfs|fuse.*|overlay|squashfs",mountpoint!~"/run.*|/var/lib/docker/.+"} / node_filesystem_size_bytes{job="node-exporter",fstype!~"tmpfs|fuse.*|overlay|squashfs",mountpoint!~"/run.*|/var/lib/docker/.+"}))'
+              instant: true
+              range: false
+              datasource:
+                type: prometheus
+                uid: attraccess-prometheus
+          - refId: C
+            relativeTimeRange:
+              from: 900
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - type: query
+                  evaluator:
+                    type: gt
+                    params: [0.85]
+                  operator:
+                    type: and
+                  query:
+                    params: []
+                  reducer:
+                    type: last
+                    params: []
+
+      - uid: high-attraccess-container-memory-usage
+        title: HighAttraccessContainerMemoryUsage
+        condition: C
+        for: 10m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: "High Attraccess container memory usage"
+          description: "The Attraccess container memory working set has been above 90% of its container limit for 10 minutes."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: attraccess-prometheus
+            model:
+              refId: A
+              expr: 'max((container_memory_working_set_bytes{job="cadvisor",container_label_com_docker_compose_service="attraccess",image!=""} / (container_spec_memory_limit_bytes{job="cadvisor",container_label_com_docker_compose_service="attraccess",image!=""} > 0)) or (container_memory_working_set_bytes{job="cadvisor",container_label_io_balena_service_name="attraccess",image!=""} / (container_spec_memory_limit_bytes{job="cadvisor",container_label_io_balena_service_name="attraccess",image!=""} > 0)))'
               instant: true
               range: false
               datasource:

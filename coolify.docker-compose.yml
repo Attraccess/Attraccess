@@ -105,8 +105,13 @@ services:
         if [ -n "$$PROMETHEUS_METRICS_API_KEY" ]; then
           sed -i "s|# bearer_token: '<your-metrics-api-key>'|bearer_token: '$$PROMETHEUS_METRICS_API_KEY'|" /prometheus-config/prometheus.yml;
         fi &&
-        cp -rT /app/share/monitoring/grafana/provisioning /grafana-provisioning &&
-        cp -rT /app/share/monitoring/grafana/dashboards /grafana-dashboards &&
+        if [ -f /app/share/monitoring/grafana/sync-managed-files.sh ]; then
+          sh /app/share/monitoring/grafana/sync-managed-files.sh /app/share/monitoring/grafana/provisioning /grafana-provisioning /app/share/monitoring/grafana/dashboards /grafana-dashboards;
+        else
+          rm -rf /grafana-provisioning/* /grafana-provisioning/.[!.]* /grafana-provisioning/..?* /grafana-dashboards/* /grafana-dashboards/.[!.]* /grafana-dashboards/..?* 2>/dev/null || true;
+          cp -rT /app/share/monitoring/grafana/provisioning /grafana-provisioning;
+          cp -rT /app/share/monitoring/grafana/dashboards /grafana-dashboards;
+        fi &&
         if [ -f /app/share/monitoring/grafana/prepare-provisioning.sh ]; then
           sh /app/share/monitoring/grafana/prepare-provisioning.sh /grafana-provisioning;
         fi
@@ -132,6 +137,29 @@ services:
         condition: service_completed_successfully
       attraccess:
         condition: service_healthy
+
+  node-exporter:
+    image: prom/node-exporter:v1.9.1
+    restart: unless-stopped
+    command:
+      - '--path.rootfs=/host'
+      - '--collector.filesystem.mount-points-exclude=^/(dev|proc|sys|run/credentials/.+|var/lib/docker/.+)($$|/)'
+      - '--collector.filesystem.fs-types-exclude=^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs)$$'
+    volumes:
+      - /:/host:ro,rslave
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.52.1
+    restart: unless-stopped
+    privileged: true
+    command:
+      - '--docker_only=true'
+      - '--store_container_labels=true'
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
 
   grafana:
     image: grafana/grafana:13.0.1

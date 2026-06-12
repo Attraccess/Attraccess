@@ -2,11 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Card,
   Chip,
-  Modal,
-  ModalBackdrop,
   ModalBody,
-  ModalContainer,
-  ModalDialog,
   ModalFooter,
   ModalHeader,
   NumberField,
@@ -38,6 +34,7 @@ import {
   usePasswordPolicyAdminServiceUpsertPasswordPolicyOverride,
 } from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { StandardModal } from '../../../components/standardModal';
 import { useToastMessage } from '../../../components/toastProvider';
 import { POLICY_BOOL_FIELDS, POLICY_FIELD_KEYS, POLICY_NUMBER_FIELDS } from './policy-fields';
 import en from './en.json';
@@ -199,99 +196,95 @@ export function OverridesSection({ globalPolicy }: Props) {
         )}
       </Card.Content>
 
-      <Modal isOpen={editingRole !== null} onOpenChange={(open) => !open && setEditingRole(null)}>
-        <ModalBackdrop>
-          <ModalContainer size="lg">
-            <ModalDialog>
-              <ModalHeader className="flex flex-col gap-1">
-                <span>
-                  {t('overrides.modal.title', { role: editingRole ? t(`overrides.roles.${editingRole}`) : '' })}
-                </span>
-                <span className="text-sm font-normal text-default-500">{t('overrides.modal.subtitle')}</span>
-              </ModalHeader>
-              <ModalBody className="flex flex-col gap-4">
-                {POLICY_NUMBER_FIELDS.map(({ key, min, max }) => {
-                  const v = draft[key as keyof PasswordPolicyOverrideDto] as number | null;
-                  const overrideOn = v !== null;
-                  const fallback = globalPolicy[key as keyof PasswordPolicyDto] as number;
-                  return (
-                    <div key={String(key)} className="flex flex-col gap-2 rounded border border-default-200 p-3">
-                      <LabeledSwitch
-                        isSelected={overrideOn}
-                        onChange={(on) => setDraft({ ...draft, [key]: on ? fallback : null })}
-                        data-testid={`override-${editingRole}-${key}-toggle`}
-                      >
-                        <div className="flex flex-col gap-0.5">
-                          <span className="text-sm font-medium">{t(`fields.${key}.label`)}</span>
-                          <span className="text-xs text-default-500">{t(`fields.${key}.description`)}</span>
-                        </div>
-                      </LabeledSwitch>
-                      {overrideOn ? (
-                        <NumberField
-                          value={v ?? fallback}
-                          onChange={(next) => setDraft({ ...draft, [key]: next })}
-                          minValue={min}
-                          maxValue={max}
-                        >
-                          <NumberFieldGroup>
-                            <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
-                            <NumberFieldInput data-testid={`override-${editingRole}-${key}-value`} />
-                            <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
-                          </NumberFieldGroup>
-                        </NumberField>
-                      ) : (
-                        <span className="text-xs text-default-400">
-                          ↳ {t('overrides.inherit')}: {fallback}
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
-                {POLICY_BOOL_FIELDS.map((key) => {
-                  const v = draft[key as keyof PasswordPolicyOverrideDto] as boolean | null;
-                  const overrideOn = v !== null;
-                  const fallback = globalPolicy[key as keyof PasswordPolicyDto] as boolean;
-                  return (
-                    <div key={String(key)} className="flex flex-col gap-2 rounded border border-default-200 p-3">
-                      <LabeledSwitch
-                        isSelected={overrideOn}
-                        onChange={(on) => setDraft({ ...draft, [key]: on ? fallback : null })}
-                        data-testid={`override-${editingRole}-${key}-toggle`}
-                      >
-                        <div className="flex flex-col gap-0.5">
-                          <span className="text-sm font-medium">{t(`fields.${key}.label`)}</span>
-                          <span className="text-xs text-default-500">{t(`fields.${key}.description`)}</span>
-                        </div>
-                      </LabeledSwitch>
-                      {overrideOn ? (
-                        <LabeledSwitch
-                          isSelected={Boolean(v)}
-                          onChange={(next) => setDraft({ ...draft, [key]: next })}
-                          data-testid={`override-${editingRole}-${key}-value`}
-                        >
-                          {String(v)}
-                        </LabeledSwitch>
-                      ) : (
-                        <span className="text-xs text-default-400">
-                          ↳ {t('overrides.inherit')}: {String(fallback)}
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
-              </ModalBody>
-              <ModalFooter>
-                <Button variant="ghost" onPress={() => setEditingRole(null)} isDisabled={isSaving}>
-                  {t('overrides.cancel')}
-                </Button>
-                <Button variant="primary" onPress={handleSave} isPending={isSaving} data-testid="policy-override-save">
-                  {t('overrides.save')}
-                </Button>
-              </ModalFooter>
-            </ModalDialog>
-          </ModalContainer>
-        </ModalBackdrop>
-      </Modal>
+      <StandardModal
+        isOpen={editingRole !== null}
+        onOpenChange={(open) => !open && setEditingRole(null)}
+        size="lg"
+      >
+        <ModalHeader className="flex flex-col gap-1">
+          <span>{t('overrides.modal.title', { role: editingRole ? t(`overrides.roles.${editingRole}`) : '' })}</span>
+          <span className="text-sm font-normal text-default-500">{t('overrides.modal.subtitle')}</span>
+        </ModalHeader>
+        <ModalBody className="flex flex-col gap-4">
+          {POLICY_NUMBER_FIELDS.map(({ key, min, max }) => {
+            const v = draft[key as keyof PasswordPolicyOverrideDto] as number | null;
+            const overrideOn = v !== null;
+            const fallback = globalPolicy[key as keyof PasswordPolicyDto] as number;
+            return (
+              <div key={String(key)} className="flex flex-col gap-2 rounded border border-default-200 p-3">
+                <LabeledSwitch
+                  isSelected={overrideOn}
+                  onChange={(on) => setDraft({ ...draft, [key]: on ? fallback : null })}
+                  data-testid={`override-${editingRole}-${key}-toggle`}
+                >
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-sm font-medium">{t(`fields.${key}.label`)}</span>
+                    <span className="text-xs text-default-500">{t(`fields.${key}.description`)}</span>
+                  </div>
+                </LabeledSwitch>
+                {overrideOn ? (
+                  <NumberField
+                    value={v ?? fallback}
+                    onChange={(next) => setDraft({ ...draft, [key]: next })}
+                    minValue={min}
+                    maxValue={max}
+                  >
+                    <NumberFieldGroup>
+                      <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
+                      <NumberFieldInput data-testid={`override-${editingRole}-${key}-value`} />
+                      <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
+                    </NumberFieldGroup>
+                  </NumberField>
+                ) : (
+                  <span className="text-xs text-default-400">
+                    ↳ {t('overrides.inherit')}: {fallback}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+          {POLICY_BOOL_FIELDS.map((key) => {
+            const v = draft[key as keyof PasswordPolicyOverrideDto] as boolean | null;
+            const overrideOn = v !== null;
+            const fallback = globalPolicy[key as keyof PasswordPolicyDto] as boolean;
+            return (
+              <div key={String(key)} className="flex flex-col gap-2 rounded border border-default-200 p-3">
+                <LabeledSwitch
+                  isSelected={overrideOn}
+                  onChange={(on) => setDraft({ ...draft, [key]: on ? fallback : null })}
+                  data-testid={`override-${editingRole}-${key}-toggle`}
+                >
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-sm font-medium">{t(`fields.${key}.label`)}</span>
+                    <span className="text-xs text-default-500">{t(`fields.${key}.description`)}</span>
+                  </div>
+                </LabeledSwitch>
+                {overrideOn ? (
+                  <LabeledSwitch
+                    isSelected={Boolean(v)}
+                    onChange={(next) => setDraft({ ...draft, [key]: next })}
+                    data-testid={`override-${editingRole}-${key}-value`}
+                  >
+                    {String(v)}
+                  </LabeledSwitch>
+                ) : (
+                  <span className="text-xs text-default-400">
+                    ↳ {t('overrides.inherit')}: {String(fallback)}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </ModalBody>
+        <ModalFooter>
+          <Button variant="ghost" onPress={() => setEditingRole(null)} isDisabled={isSaving}>
+            {t('overrides.cancel')}
+          </Button>
+          <Button variant="primary" onPress={handleSave} isPending={isSaving} data-testid="policy-override-save">
+            {t('overrides.save')}
+          </Button>
+        </ModalFooter>
+      </StandardModal>
     </Card>
   );
 }

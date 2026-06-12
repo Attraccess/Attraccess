@@ -33,6 +33,7 @@ import {
   ProjectInvitationStatus,
   ProjectMember,
   ProjectMemberRole,
+  PushSubscription,
   Resource,
   ResourceBillingConfiguration,
   ResourceFlowEdge,
@@ -185,6 +186,7 @@ const seedDatabase = async (dataSource: DataSource) => {
   const conversationParticipantRepo = dataSource.getRepository(ConversationParticipant);
   const messageRepo = dataSource.getRepository(Message);
   const notificationPreferenceRepo = dataSource.getRepository(NotificationPreference);
+  const pushSubscriptionRepo = dataSource.getRepository(PushSubscription);
 
   const resourceGroup = await ensureEntity(resourceGroupRepo, () => ({
     name: `Seed Group ${seedTag}`,
@@ -572,6 +574,16 @@ const seedDatabase = async (dataSource: DataSource) => {
   await ensureEntity(notificationPreferenceRepo, () => ({
     userId: primaryUser.id,
     messagesEmailOnOffline: true,
+    messagesPushEnabled: true,
+  }));
+
+  await ensureEntity(pushSubscriptionRepo, () => ({
+    userId: primaryUser.id,
+    endpoint: `https://push.example.com/seed-${seedTag}`,
+    p256dh: 'seed-p256dh-key',
+    auth: 'seed-auth-secret',
+    userAgent: 'Seed Browser/1.0',
+    lastSeenAt: null,
   }));
 };
 

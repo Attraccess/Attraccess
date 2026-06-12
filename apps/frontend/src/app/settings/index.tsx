@@ -9,6 +9,7 @@ import { MetricsSettingsCard } from './cards/MetricsSettingsCard';
 import { AuthRateLimitCard } from './cards/AuthRateLimitCard';
 import { MessagingRateLimitCard } from './cards/MessagingRateLimitCard';
 import { PasswordPolicyCard } from './cards/PasswordPolicyCard';
+import { PushSettingsCard } from './cards/PushSettingsCard';
 
 export function SystemSettingsPage() {
   const { t } = useTranslations({ en, de });
@@ -23,6 +24,7 @@ export function SystemSettingsPage() {
         <AuthRateLimitCard />
         <MessagingRateLimitCard />
         <PasswordPolicyCard />
+        <PushSettingsCard />
       </div>
     </div>
   );

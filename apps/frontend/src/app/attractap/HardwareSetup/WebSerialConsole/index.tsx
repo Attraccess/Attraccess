@@ -3,15 +3,12 @@ import {
   AlertContent,
   AlertTitle,
   Button,
-  Modal,
-  ModalBackdrop,
   ModalBody,
-  ModalContainer,
-  ModalDialog,
   ModalHeader,
   ModalHeading,
   useOverlayState,
 } from '@heroui/react';
+import { StandardModal } from '../../../../components/standardModal';
 import { useCallback, useRef, useState } from 'react';
 import { ESPTools, ESPToolsErrorType } from '../../../../utils/esp-tools';
 import { Terminal } from '../../../../components/Terminal';
@@ -70,47 +67,41 @@ export function WebSerialConsole({ children }: Props) {
     <>
       {children(open)}
 
-      <Modal isOpen={isOpen} onOpenChange={setOpen}>
-        <ModalBackdrop>
-          <ModalContainer size="lg">
-            <ModalDialog>
-              {() => (
+      <StandardModal isOpen={isOpen} onOpenChange={setOpen} size="lg">
+        {() => (
+          <>
+            <ModalHeader>
+              <ModalHeading>{t('title')}</ModalHeading>
+            </ModalHeader>
+
+            <ModalBody>
+              {!isConnected ? (
+                <Button onPress={onConnect}>{t('actions.connect')}</Button>
+              ) : (
+                <Button onPress={onDisconnect}>{t('actions.disconnect')}</Button>
+              )}
+
+              {error && (
+                <Alert status="danger">
+                  <AlertContent>
+                    <AlertTitle>{error.type}</AlertTitle>
+                  </AlertContent>
+                  {error.details as string}
+                </Alert>
+              )}
+
+              {isConnected && (
                 <>
-                  <ModalHeader>
-                    <ModalHeading>{t('title')}</ModalHeading>
-                  </ModalHeader>
-
-                  <ModalBody>
-                    {!isConnected ? (
-                      <Button onPress={onConnect}>{t('actions.connect')}</Button>
-                    ) : (
-                      <Button onPress={onDisconnect}>{t('actions.disconnect')}</Button>
-                    )}
-
-                    {error && (
-                      <Alert status="danger">
-                        <AlertContent>
-                          <AlertTitle>{error.type}</AlertTitle>
-                        </AlertContent>
-                        {error.details as string}
-                      </Alert>
-                    )}
-
-                    {isConnected && (
-                      <>
-                        <Terminal logLines={output.split('\n')} maxHeight="30vh" />
-                        <Button variant="tertiary" onPress={onReset}>
-                          {t('actions.reset')}
-                        </Button>
-                      </>
-                    )}
-                  </ModalBody>
+                  <Terminal logLines={output.split('\n')} maxHeight="30vh" />
+                  <Button variant="tertiary" onPress={onReset}>
+                    {t('actions.reset')}
+                  </Button>
                 </>
               )}
-            </ModalDialog>
-          </ModalContainer>
-        </ModalBackdrop>
-      </Modal>
+            </ModalBody>
+          </>
+        )}
+      </StandardModal>
     </>
   );
 }

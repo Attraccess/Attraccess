@@ -13,89 +13,91 @@ export default defineConfig(({ command }) => {
   const isDev = command === 'serve';
 
   return {
-  root: __dirname,
-  cacheDir: '../../node_modules/.vite/apps/frontend',
-  server: {
-    port: Number(process.env.VITE_PORT) || 4200,
-    host: '0.0.0.0',
-    ...(isDev ? {
-      proxy: {
-        '/api': {
-          target: process.env.VITE_API_PROXY_TARGET || 'http://localhost:3000',
-          changeOrigin: true,
-          ws: true,
-        },
-        '/cdn': {
-          target: process.env.VITE_API_PROXY_TARGET || 'http://localhost:3000',
-          changeOrigin: true,
-        },
-      },
-    } : {}),
-  },
-  preview: {
-    port: Number(process.env.VITE_PREVIEW_PORT) || 4300,
-    host: '0.0.0.0',
-  },
-  plugins: [
-    tailwindcss(),
-    react(),
-    nxViteTsPaths(),
-    nxCopyAssetsPlugin([]),
-    federation({
-      name: 'attraccess',
-      remotes: {
-        // Dynamic remotes will be loaded at runtime
-        // dummy remote so that vite prepares the shared libs,
-        // otherwise the shared libs are not loaded and the dynamic remotes are not working
-        dummy: './dummy.js',
-      },
-      shared: {
-        react: { requiredVersion: '*' },
-        'react-dom': { requiredVersion: '*' },
-        'react-router-dom': { requiredVersion: '*' },
-        'react-pluggable': { requiredVersion: '*' },
-        '@heroui/react': { requiredVersion: '*' },
-        'lucide-react': { requiredVersion: '*' },
-        '@tanstack/react-query': { requiredVersion: '*' },
-      },
-    }),
-    VitePWA({
-      workbox: {
-        clientsClaim: true,
-        skipWaiting: true,
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg,jpeg,webp,bin,json}'],
-        cleanupOutdatedCaches: true,
-      },
-      includeAssets: ['**/*.{js,css,html,ico,png,svg,jpg,jpeg,webp,bin,json}'],
-      manifest: siteWebManifest,
-      registerType: 'autoUpdate',
-      srcDir: 'src',
-      filename: 'service-worker.ts',
-      strategies: 'injectManifest',
-      injectManifest: {
-        minify: process.env.NODE_ENV === 'production',
-        enableWorkboxModulesLogs: false,
-        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
-      },
-      devOptions: {
-        enabled: false,
-        type: 'module',
-      },
-    }),
-  ],
-  // Uncomment this if you are using workers.
-  // worker: {
-  //  plugins: [ nxViteTsPaths() ],
-  // },
-  build: {
-    outDir: '../../dist/apps/frontend',
-    emptyOutDir: true,
-    reportCompressedSize: true,
-    commonjsOptions: {
-      transformMixedEsModules: true,
+    root: __dirname,
+    cacheDir: '../../node_modules/.vite/apps/frontend',
+    server: {
+      port: Number(process.env.VITE_PORT) || 4200,
+      host: '0.0.0.0',
+      ...(isDev
+        ? {
+            proxy: {
+              '/api': {
+                target: process.env.VITE_API_PROXY_TARGET || 'http://localhost:3000',
+                changeOrigin: true,
+                ws: true,
+              },
+              '/cdn': {
+                target: process.env.VITE_API_PROXY_TARGET || 'http://localhost:3000',
+                changeOrigin: true,
+              },
+            },
+          }
+        : {}),
     },
-    target: 'esnext',
-    minify: 'esbuild',
-  },
+    preview: {
+      port: Number(process.env.VITE_PREVIEW_PORT) || 4300,
+      host: '0.0.0.0',
+    },
+    plugins: [
+      tailwindcss(),
+      react(),
+      nxViteTsPaths(),
+      nxCopyAssetsPlugin([]),
+      federation({
+        name: 'attraccess',
+        remotes: {
+          // Dynamic remotes will be loaded at runtime
+          // dummy remote so that vite prepares the shared libs,
+          // otherwise the shared libs are not loaded and the dynamic remotes are not working
+          dummy: './dummy.js',
+        },
+        shared: {
+          react: { requiredVersion: '*' },
+          'react-dom': { requiredVersion: '*' },
+          'react-router-dom': { requiredVersion: '*' },
+          'react-pluggable': { requiredVersion: '*' },
+          '@heroui/react': { requiredVersion: '*' },
+          'lucide-react': { requiredVersion: '*' },
+          '@tanstack/react-query': { requiredVersion: '*' },
+        },
+      }),
+      VitePWA({
+        workbox: {
+          clientsClaim: true,
+          skipWaiting: true,
+          globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg,jpeg,webp,bin,json}'],
+          cleanupOutdatedCaches: true,
+        },
+        includeAssets: ['**/*.{js,css,html,ico,png,svg,jpg,jpeg,webp,bin,json}'],
+        manifest: siteWebManifest,
+        registerType: 'autoUpdate',
+        srcDir: 'src',
+        filename: 'service-worker.ts',
+        strategies: 'injectManifest',
+        injectManifest: {
+          minify: process.env.NODE_ENV === 'production',
+          enableWorkboxModulesLogs: false,
+          maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+        },
+        devOptions: {
+          enabled: true,
+          type: 'module',
+        },
+      }),
+    ],
+    // Uncomment this if you are using workers.
+    // worker: {
+    //  plugins: [ nxViteTsPaths() ],
+    // },
+    build: {
+      outDir: '../../dist/apps/frontend',
+      emptyOutDir: true,
+      reportCompressedSize: true,
+      commonjsOptions: {
+        transformMixedEsModules: true,
+      },
+      target: 'esnext',
+      minify: 'esbuild',
+    },
   };
 });
