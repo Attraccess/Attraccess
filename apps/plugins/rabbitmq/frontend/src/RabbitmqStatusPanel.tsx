@@ -25,14 +25,33 @@ function StatusRow({ ok, label, value }: { ok: boolean; label: string; value: Re
   );
 }
 
-export function RabbitmqStatusPanel({ mqttServerId }: { mqttServerId: number }) {
-  const { result, loading, refresh } = useDetection(mqttServerId);
+export function RabbitmqStatusPanel({
+  mqttServerId,
+  hideWhenNotRabbit = true,
+}: {
+  mqttServerId: number;
+  hideWhenNotRabbit?: boolean;
+}) {
+  const { result, loading, error, refresh } = useDetection(mqttServerId);
 
   // Render nothing for non-RabbitMQ servers (and while the first probe is still
   // running / if detection failed), so the detail view is unchanged unless a
   // RabbitMQ broker is positively detected.
-  if (!result?.isRabbitMQ) {
+  if (hideWhenNotRabbit && !result?.isRabbitMQ) {
     return null;
+  }
+
+  if (!result) {
+    return (
+      <Card
+        data-cy={`rabbitmq-status-panel-${mqttServerId}`}
+        className="w-full border border-default-200 dark:border-default-100"
+      >
+        <Card.Content className="flex items-center justify-center p-6">
+          {loading ? <Spinner color="accent" /> : <span className="text-sm text-default-500">No status available.</span>}
+        </Card.Content>
+      </Card>
+    );
   }
 
   return (
@@ -44,8 +63,8 @@ export function RabbitmqStatusPanel({ mqttServerId }: { mqttServerId: number }) 
         <div className="flex items-center gap-2">
           <RabbitIcon className="w-5 h-5 text-primary" />
           <p className="text-base font-semibold text-default-700">RabbitMQ</p>
-          <Chip color="accent" variant="soft" size="sm">
-            detected
+          <Chip color={result.isRabbitMQ ? 'accent' : 'warning'} variant="soft" size="sm">
+            {result.isRabbitMQ ? 'detected' : 'not detected'}
           </Chip>
         </div>
         <Button
@@ -76,10 +95,10 @@ export function RabbitmqStatusPanel({ mqttServerId }: { mqttServerId: number }) 
           <code className="text-xs text-default-500">{result.managementApi || '—'}</code>
         </div>
 
-        {result.error && (
+        {(error || result.error) && (
           <Alert status={result.reachable ? 'warning' : 'danger'} className="mt-2">
             <AlertContent>
-              <AlertDescription>{result.error}</AlertDescription>
+              <AlertDescription>{error ?? result.error}</AlertDescription>
             </AlertContent>
           </Alert>
         )}
