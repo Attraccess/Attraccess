@@ -40,7 +40,7 @@
     }
   },
   "description": {
-    "push": "Push-Benachrichtigungen werden an dieses Gerät gesendet. Beim Aktivieren eines Push-Kanals wird dieser Browser zuerst abonniert."
+    "push": "Push-Einstellungen werden für dein Konto gespeichert. Unterstützte Browser werden automatisch abonniert, wenn du die App nutzt."
   },
   "messagesEmailOnOffline": {
     "label": "Benachrichtige mich per E-Mail über Nachrichten, wenn ich offline bin",

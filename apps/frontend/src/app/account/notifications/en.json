@@ -40,7 +40,7 @@
     }
   },
   "description": {
-    "push": "Push notifications are delivered to this device. Enabling a push channel subscribes this browser first."
+    "push": "Push preferences are saved for your account. Supported browsers are subscribed automatically when you use the app."
   },
   "messagesEmailOnOffline": {
     "label": "Email me about messages when I'm offline",
