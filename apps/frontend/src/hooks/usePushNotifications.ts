@@ -7,6 +7,8 @@ import {
   usePushServicePushDeleteSubscription,
 } from '@attraccess/react-query-client';
 
+const SERVICE_WORKER_READY_TIMEOUT_MS = 3000;
+
 // The VAPID public key arrives base64url-encoded; PushManager.subscribe expects a Uint8Array.
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -23,14 +25,19 @@ async function getServiceWorkerRegistration(waitForReady = false): Promise<Servi
   if (!('serviceWorker' in navigator)) {
     return null;
   }
-  // The service worker is only registered in production builds; getRegistration (unlike .ready)
-  // resolves immediately instead of hanging when none is registered.
+  // getRegistration (unlike .ready) resolves immediately instead of hanging when none is registered.
   const registration = (await navigator.serviceWorker.getRegistration()) ?? null;
   if (registration || !waitForReady) {
     return registration;
   }
 
-  return navigator.serviceWorker.ready;
+  return new Promise((resolve) => {
+    const timeoutId = window.setTimeout(() => resolve(null), SERVICE_WORKER_READY_TIMEOUT_MS);
+    navigator.serviceWorker.ready.then((readyRegistration) => {
+      window.clearTimeout(timeoutId);
+      resolve(readyRegistration);
+    });
+  });
 }
 
 export function usePushNotifications() {

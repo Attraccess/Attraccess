@@ -126,9 +126,7 @@ export class PushService {
   private async loadOrGenerateVapidKeys(): Promise<VapidKeys> {
     const [publicKey, privateKey] = await Promise.all([
       this.settingsStore.getPlainSetting(PUSH_PARENT, PUSH_KEYS.vapidPublicKey),
-      this.settingsStore
-        .getSecretSetting(PUSH_PARENT, PUSH_KEYS.vapidPrivateKey)
-        .then((secret) => secret.value),
+      this.settingsStore.getSecretSetting(PUSH_PARENT, PUSH_KEYS.vapidPrivateKey).then((secret) => secret.value),
     ]);
 
     if (publicKey && privateKey) {
@@ -172,14 +170,10 @@ export class PushService {
     }
   }
 
-  // The VAPID subject is contact information passed to the push service. Prefer the configured
-  // app URL so operators of push services can identify this installation.
+  // The VAPID subject is contact information passed to the push service.
   private async getVapidSubject(): Promise<string> {
-    const [publicInternetUrl, url] = await Promise.all([
-      this.settingsService.getPublicInternetUrl(),
-      this.settingsService.getUrl(),
-    ]);
-    return publicInternetUrl ?? url ?? DEFAULT_VAPID_SUBJECT;
+    const { from: mailFrom } = await this.settingsService.getSmtpConfiguration();
+    return mailFrom ? `mailto:${mailFrom}` : DEFAULT_VAPID_SUBJECT;
   }
 
   private async sendToSubscription(

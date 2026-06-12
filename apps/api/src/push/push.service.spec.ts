@@ -38,6 +38,7 @@ describe('PushService', () => {
   let settingsService: {
     getPublicInternetUrl: jest.Mock;
     getUrl: jest.Mock;
+    getSmtpConfiguration: jest.Mock;
   };
   let deleteExecute: jest.Mock;
 
@@ -97,6 +98,7 @@ describe('PushService', () => {
     settingsService = {
       getPublicInternetUrl: jest.fn().mockResolvedValue(null),
       getUrl: jest.fn().mockResolvedValue(null),
+      getSmtpConfiguration: jest.fn().mockResolvedValue({ from: 'admin@localhost' }),
     };
     mockedWebpush.generateVAPIDKeys.mockReturnValue({
       publicKey: 'generated-public',
@@ -222,7 +224,7 @@ describe('PushService', () => {
     it('sends the payload to every subscription of the user with the stored VAPID details', async () => {
       const service = await createService();
       givenStoredKeys('stored-public', 'stored-private');
-      settingsService.getPublicInternetUrl.mockResolvedValue('https://makerspace.example.com');
+      settingsService.getSmtpConfiguration.mockResolvedValue({ from: 'push@makerspace.example.com' });
       const subscriptions = [
         makeSubscription({ id: 1, endpoint: 'https://push.example.com/sub-1' }),
         makeSubscription({ id: 2, endpoint: 'https://push.example.com/sub-2' }),
@@ -242,7 +244,7 @@ describe('PushService', () => {
         JSON.stringify({ title: 'Hello', body: 'World', url: '/messages?conversation=1' }),
         {
           vapidDetails: {
-            subject: 'https://makerspace.example.com',
+            subject: 'mailto:push@makerspace.example.com',
             publicKey: 'stored-public',
             privateKey: 'stored-private',
           },
@@ -250,9 +252,10 @@ describe('PushService', () => {
       );
     });
 
-    it('falls back to a mailto subject when no app URL is configured', async () => {
+    it('falls back to a default mailto subject when no SMTP from address is configured', async () => {
       const service = await createService();
       givenStoredKeys('stored-public', 'stored-private');
+      settingsService.getSmtpConfiguration.mockResolvedValue({ from: '' });
       subscriptionRepository.find.mockResolvedValue([makeSubscription()]);
       mockedWebpush.sendNotification.mockResolvedValue({} as never);
 

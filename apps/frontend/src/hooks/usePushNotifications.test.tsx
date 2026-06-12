@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { usePushNotifications } from './usePushNotifications';
 
 const upsertSubscription = vi.fn();
@@ -19,6 +19,7 @@ function wrapper({ children }: { children: ReactNode }) {
 
 describe('usePushNotifications', () => {
   beforeEach(() => {
+    vi.useRealTimers();
     upsertSubscription.mockReset();
     upsertSubscription.mockResolvedValue({ id: 1 });
 
@@ -32,6 +33,10 @@ describe('usePushNotifications', () => {
       configurable: true,
       value: { permission: 'default', requestPermission: vi.fn().mockResolvedValue('granted') },
     });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('waits for a pending service worker registration before subscribing', async () => {
@@ -74,5 +79,26 @@ describe('usePushNotifications', () => {
         userAgent: navigator.userAgent,
       },
     });
+  });
+
+  it('returns false instead of staying busy forever when no service worker becomes ready', async () => {
+    vi.useFakeTimers();
+    Object.defineProperty(navigator, 'serviceWorker', {
+      configurable: true,
+      value: {
+        getRegistration: vi.fn().mockResolvedValue(null),
+        ready: new Promise(() => undefined),
+      },
+    });
+
+    const { result } = renderHook(() => usePushNotifications(), { wrapper });
+
+    const subscribePromise = act(async () => result.current.subscribe());
+    await vi.advanceTimersByTimeAsync(3000);
+    const subscribed = await subscribePromise;
+
+    expect(subscribed).toBe(false);
+    expect(result.current.isBusy).toBe(false);
+    expect(upsertSubscription).not.toHaveBeenCalled();
   });
 });
