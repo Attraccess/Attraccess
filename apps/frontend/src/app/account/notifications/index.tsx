@@ -2,9 +2,11 @@
 // FEATURE: Messaging notification preferences
 import {
   ApiError,
-  useMessagingServiceMessagingGetNotificationPreferences,
-  useMessagingServiceMessagingGetNotificationPreferencesKey,
-  useMessagingServiceMessagingUpdateNotificationPreferences,
+  NotificationCategory,
+  NotificationCategoryPreferenceDto,
+  UseNotificationsServiceNotificationsGetPreferencesKeyFn,
+  useNotificationsServiceNotificationsGetPreferences,
+  useNotificationsServiceNotificationsUpdatePreferences,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
@@ -15,17 +17,39 @@ import { usePushNotifications } from '../../../hooks/usePushNotifications';
 import en from './en.json';
 import de from './de.json';
 
+type NotificationChannel = 'email' | 'push' | 'toast';
+
+const categories: NotificationCategory[] = [
+  NotificationCategory.MESSAGES,
+  NotificationCategory.MAINTENANCE_REQUESTS,
+  NotificationCategory.RESOURCE_USAGE_NOTES,
+  NotificationCategory.RESOURCE_HEALTH,
+  NotificationCategory.RESOURCE_TAKEOVER,
+  NotificationCategory.RESOURCE_SESSION_ENDED,
+  NotificationCategory.PROJECT_INVITATIONS,
+  NotificationCategory.SUPERVISION_REQUESTS,
+];
+
+const channels: NotificationChannel[] = ['email', 'push', 'toast'];
+
+function getCategoryPreference(
+  preferences: NotificationCategoryPreferenceDto[] | undefined,
+  category: NotificationCategory,
+): NotificationCategoryPreferenceDto | undefined {
+  return preferences?.find((preference) => preference.category === category);
+}
+
 export function NotificationPreferencesForm() {
   const { t } = useTranslations({ en, de });
   const queryClient = useQueryClient();
   const { success: showSuccess, error: showError } = useToastMessage();
 
-  const { data: preferences, isLoading } = useMessagingServiceMessagingGetNotificationPreferences();
+  const { data: preferences, isLoading } = useNotificationsServiceNotificationsGetPreferences();
   const push = usePushNotifications();
 
-  const { mutate, isPending } = useMessagingServiceMessagingUpdateNotificationPreferences({
+  const { mutate, isPending } = useNotificationsServiceNotificationsUpdatePreferences({
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [useMessagingServiceMessagingGetNotificationPreferencesKey] });
+      queryClient.invalidateQueries({ queryKey: UseNotificationsServiceNotificationsGetPreferencesKeyFn() });
       showSuccess({ title: t('messages.updated') });
     },
     onError: (rawError) => {
@@ -41,27 +65,21 @@ export function NotificationPreferencesForm() {
     },
   });
 
-  const onEmailChange = useCallback(
-    (value: boolean) => {
-      mutate({ requestBody: { messagesEmailOnOffline: value } });
-    },
-    [mutate],
-  );
-
-  const onPushChange = useCallback(
-    async (value: boolean) => {
-      if (value) {
+  const updateChannel = useCallback(
+    async (category: NotificationCategory, channel: NotificationChannel, value: boolean) => {
+      if (channel === 'push' && value) {
         const subscribed = await push.subscribe().catch(() => false);
         if (!subscribed) {
           showError({ title: t('messagesPush.errors.subscribeFailed') });
           return;
         }
-        mutate({ requestBody: { messagesPushEnabled: true } });
-        return;
       }
 
-      await push.unsubscribe().catch(() => undefined);
-      mutate({ requestBody: { messagesPushEnabled: false } });
+      if (channel === 'push' && !value) {
+        await push.unsubscribe().catch(() => undefined);
+      }
+
+      mutate({ requestBody: { category, channels: { [channel]: value } } });
     },
     [mutate, push, showError, t],
   );
@@ -69,40 +87,73 @@ export function NotificationPreferencesForm() {
   const pushUnavailable = !push.isSupported;
   const pushBlocked = push.isSupported && push.permission === 'denied';
 
-  let pushDescription = t('messagesPush.description');
+  let pushDescription = t('description.push');
   if (!push.isSupported) {
     pushDescription = t('messagesPush.unsupported');
   } else if (pushBlocked) {
     pushDescription = t('messagesPush.permissionDenied');
   }
 
+  const renderChannelSwitch = (category: NotificationCategory, channel: NotificationChannel) => {
+    const preference = getCategoryPreference(preferences?.categories, category);
+    const isPush = channel === 'push';
+    const isSelected = Boolean(preference?.channels[channel]);
+    const selected = isPush ? isSelected && push.isSubscribed && push.permission === 'granted' : isSelected;
+    const disabled = isLoading || isPending || (isPush && (push.isBusy || push.isLoadingKey || pushUnavailable || pushBlocked));
+
+    return (
+      <LabeledSwitch
+        aria-label={`${t(`categories.${category}.label`)} ${t(`columns.${channel}`)}`}
+        isSelected={selected}
+        isDisabled={disabled}
+        onChange={(value) => updateChannel(category, channel, value)}
+        data-testid={`notifications-${category}-${channel}`}
+        data-cy={`notifications-${category}-${channel}`}
+      />
+    );
+  };
+
   return (
     <div className="flex flex-col gap-4">
-      <LabeledSwitch
-        isSelected={preferences?.messagesEmailOnOffline ?? true}
-        isDisabled={isLoading || isPending}
-        onChange={onEmailChange}
-        data-testid="notifications-messages-email-on-offline"
-        data-cy="notifications-messages-email-on-offline"
+      <div
+        data-testid="notification-preferences-desktop"
+        className="hidden grid-cols-[minmax(0,1fr)_repeat(3,minmax(4rem,6rem))] gap-3 text-xs font-medium text-default-500 lg:grid"
       >
-        <div className="flex flex-col gap-1">
-          <span className="text-sm font-medium">{t('messagesEmailOnOffline.label')}</span>
-          <span className="text-xs text-default-500">{t('messagesEmailOnOffline.description')}</span>
-        </div>
-      </LabeledSwitch>
+        <span>{t('columns.category')}</span>
+        <span className="text-center">{t('columns.email')}</span>
+        <span className="text-center">{t('columns.push')}</span>
+        <span className="text-center">{t('columns.toast')}</span>
+      </div>
 
-      <LabeledSwitch
-        isSelected={(preferences?.messagesPushEnabled ?? true) && push.isSubscribed && push.permission === 'granted'}
-        isDisabled={isLoading || isPending || push.isBusy || push.isLoadingKey || pushUnavailable || pushBlocked}
-        onChange={onPushChange}
-        data-testid="notifications-messages-push-enabled"
-        data-cy="notifications-messages-push-enabled"
+      <div
+        data-testid="notification-preferences-mobile"
+        className="flex flex-col gap-3 lg:gap-0 lg:divide-y lg:divide-default-200 lg:rounded-lg lg:border lg:border-default-200"
       >
-        <div className="flex flex-col gap-1">
-          <span className="text-sm font-medium">{t('messagesPush.label')}</span>
-          <span className="text-xs text-default-500">{pushDescription}</span>
-        </div>
-      </LabeledSwitch>
+        {categories.map((category) => {
+          return (
+            <div
+              key={category}
+              className="rounded-lg border border-default-200 p-3 lg:grid lg:grid-cols-[minmax(0,1fr)_repeat(3,minmax(4rem,6rem))] lg:gap-3 lg:rounded-none lg:border-0"
+            >
+              <div className="flex flex-col gap-1">
+                <span className="text-sm font-medium">{t(`categories.${category}.label`)}</span>
+                <span className="text-xs text-default-500">{t(`categories.${category}.description`)}</span>
+              </div>
+
+              <div className="mt-3 flex flex-col divide-y divide-default-200 lg:contents lg:divide-y-0">
+                {channels.map((channel) => (
+                  <div key={channel} className="flex min-h-11 items-center justify-between gap-4 py-2 lg:min-h-0 lg:justify-center lg:py-0">
+                    <span className="text-sm text-default-700 lg:hidden">{t(`columns.${channel}`)}</span>
+                    {renderChannelSwitch(category, channel)}
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <p className="text-xs text-default-500">{pushDescription}</p>
     </div>
   );
 }

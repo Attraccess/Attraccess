@@ -29,6 +29,7 @@ import { MetricsModule } from '../metrics/metrics.module';
 import { VersionModule } from '../version/version.module';
 import { MessagingModule } from '../messaging/messaging.module';
 import { PushModule } from '../push/push.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -122,6 +123,7 @@ import { PushModule } from '../push/push.module';
     ProjectsModule,
     MessagingModule,
     PushModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

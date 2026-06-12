@@ -13,6 +13,7 @@ import {
 } from '@attraccess/react-query-client';
 import { useAuth } from '../../hooks/useAuth';
 import { GlobalMessagingLive } from '../messaging/GlobalMessagingLive';
+import { GlobalSystemNotificationsLive } from '../notifications/GlobalSystemNotificationsLive';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -94,6 +95,7 @@ export function Layout({ children, noLayout }: LayoutProps) {
         <ServerNotAvailable />
 
         <GlobalMessagingLive enabled={isAuthenticated && !needsTwoFactorSetup} />
+        <GlobalSystemNotificationsLive enabled={isAuthenticated && !needsTwoFactorSetup} />
 
         {/* Page Content */}
         <main className="flex-1 overflow-auto p-4 bg-background">{children}</main>

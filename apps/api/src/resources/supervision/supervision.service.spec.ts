@@ -6,6 +6,8 @@ import { SupervisionLiveService } from './supervision-live.service';
 import { ResourceUsageService } from '../usage/resourceUsage.service';
 import { RequestSupervisedSessionDto } from './dtos/requestSupervisedSession.dto';
 import { SupervisionLiveEventType } from './dtos/supervisionLiveEvent.dto';
+import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
+import { NotificationCategory } from '../../notifications/notification-types';
 
 // Lets pending request promises settle/flush without depending on real timers.
 const flush = () => new Promise((resolve) => setImmediate(resolve));
@@ -14,6 +16,7 @@ describe('SupervisionService', () => {
   let service: SupervisionService;
   let resourceUsageService: { validateSupervisedStart: jest.Mock; startSession: jest.Mock };
   let live: { emitToSupervisor: jest.Mock; getSupervisorSubject: jest.Mock };
+  let notifications: { dispatch: jest.Mock };
 
   const requester: User = { id: 1, username: 'requester' } as User;
   const supervisor: User = { id: 2, username: 'supervisor' } as User;
@@ -29,12 +32,14 @@ describe('SupervisionService', () => {
       emitToSupervisor: jest.fn(),
       getSupervisorSubject: jest.fn(),
     };
+    notifications = { dispatch: jest.fn().mockResolvedValue(undefined) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SupervisionService,
         { provide: ResourceUsageService, useValue: resourceUsageService },
         { provide: SupervisionLiveService, useValue: live },
+        { provide: NotificationDispatchService, useValue: notifications },
       ],
     }).compile();
 
@@ -70,6 +75,16 @@ describe('SupervisionService', () => {
       requestId,
       request: expect.objectContaining({ resourceId: 5, requesterUserId: 1, supervisorUserId: 2, notes: 'please supervise' }),
     });
+    expect(notifications.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        category: NotificationCategory.SUPERVISION_REQUESTS,
+        recipients: [expect.objectContaining({ id: 2 })],
+        actorId: 1,
+        title: 'Supervision requested',
+        url: '/resources/5/usage',
+        severity: 'warning',
+      }),
+    );
   });
 
   it('propagates validation errors without creating a pending request', async () => {
