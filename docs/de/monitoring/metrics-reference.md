@@ -102,8 +102,11 @@ attraccess_resource_maintenance_overdue > 0
 sum by (reset_reason) (increase(attraccess_attractap_crash_reports_total[1h]))
 
 # Alarmsignal: alle Lesegeräte offline (waren aber kürzlich verbunden)
-attraccess_attractap_devices_connected == 0
-  and max_over_time(attraccess_attractap_devices_connected[1h]) > 0
+sum(
+  (attraccess_attractap_devices_connected == bool 0)
+  *
+  (max_over_time(attraccess_attractap_devices_connected[1h]) > bool 0)
+) or vector(0)
 ```
 
 ## Abrechnungs-Metriken
