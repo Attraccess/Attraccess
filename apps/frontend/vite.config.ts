@@ -1,5 +1,5 @@
 /// <reference types='vitest' />
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { nxViteTsPaths } from '@nx/vite/plugins/nx-tsconfig-paths.plugin';
 import { nxCopyAssetsPlugin } from '@nx/vite/plugins/nx-copy-assets.plugin';
@@ -8,6 +8,17 @@ import { VitePWA } from 'vite-plugin-pwa';
 // @ts-expect-error - site.webmanifest.json is not a module
 import siteWebManifest from './src/service-worker/site.webmanifest.json';
 import tailwindcss from '@tailwindcss/vite';
+
+export function normalizeFederationFsUrlsPlugin(): Plugin {
+  return {
+    name: 'attraccess:normalize-federation-fs-urls',
+    enforce: 'post',
+    transform(code, id) {
+      if (id !== '\0virtual:__federation__') return;
+      return code.replaceAll('/@fs//', '/@fs/');
+    },
+  };
+}
 
 export default defineConfig(({ command }) => {
   const isDev = command === 'serve';
@@ -59,6 +70,7 @@ export default defineConfig(({ command }) => {
         '@tanstack/react-query': { requiredVersion: '*' },
       },
     }),
+    normalizeFederationFsUrlsPlugin(),
     VitePWA({
       workbox: {
         clientsClaim: true,

@@ -86,6 +86,13 @@ export class DeviceRegistryService {
     });
   }
 
+  async updateAuthState(id: number, authState: AuthState): Promise<void> {
+    await this.devices.update(id, {
+      authState,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
   async delete(id: number): Promise<void> {
     await this.devices.delete(id);
   }

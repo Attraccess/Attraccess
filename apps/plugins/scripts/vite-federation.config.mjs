@@ -12,12 +12,12 @@ import { join } from 'node:path';
 
 // Every host singleton a plugin may import at runtime. Sharing them keeps the
 // plugin bundle small and guarantees a single, host-themed instance.
-const HOST_SHARED = {
-  react: { singleton: true, requiredVersion: '*' },
-  'react-dom': { singleton: true, requiredVersion: '*' },
-  'react-router-dom': { singleton: true, requiredVersion: '*' },
-  '@heroui/react': { singleton: true, requiredVersion: '*' },
-  'lucide-react': { singleton: true, requiredVersion: '*' },
+export const HOST_SHARED = {
+  react: { singleton: true, requiredVersion: '*', import: false, generate: false },
+  'react-dom': { singleton: true, requiredVersion: '*', import: false, generate: false },
+  'react-router-dom': { singleton: true, requiredVersion: '*', import: false, generate: false },
+  '@heroui/react': { singleton: true, requiredVersion: '*', import: false, generate: false },
+  'lucide-react': { singleton: true, requiredVersion: '*', import: false, generate: false },
 };
 
 /**

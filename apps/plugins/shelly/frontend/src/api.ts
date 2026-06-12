@@ -19,6 +19,13 @@ export interface ShellyDevice {
   updatedAt: string;
 }
 
+export interface ShellyDeviceInfo {
+  generation: number;
+  status: unknown;
+  config: unknown;
+  fetchedAt: string;
+}
+
 const BASE = '/api/shelly';
 
 interface RequestOptions {
@@ -72,4 +79,19 @@ export function reprobeDevice(id: number): Promise<ShellyDevice> {
 
 export function deleteDevice(id: number): Promise<{ deleted: boolean }> {
   return request<{ deleted: boolean }>(`/devices/${id}`, { method: 'DELETE' });
+}
+
+export function getDeviceInfo(id: number, input?: { username?: string; currentPassword?: string }): Promise<ShellyDeviceInfo> {
+  const params = new URLSearchParams();
+  if (input?.username) params.set('username', input.username);
+  if (input?.currentPassword) params.set('currentPassword', input.currentPassword);
+  const query = params.size ? `?${params.toString()}` : '';
+  return request<ShellyDeviceInfo>(`/devices/${id}/info${query}`);
+}
+
+export function setAdminPassword(
+  id: number,
+  input: { username?: string; currentPassword?: string; password: string }
+): Promise<ShellyDevice> {
+  return request<ShellyDevice>(`/devices/${id}/auth`, { method: 'POST', body: input });
 }

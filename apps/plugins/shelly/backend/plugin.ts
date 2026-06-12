@@ -16,6 +16,7 @@ import { DeviceRegistryService } from './device-registry.service';
 import { ShellyDevice } from './shelly-device.entity';
 import { ShellyProbeService } from './shelly-probe.service';
 import { ShellyController } from './shelly.controller';
+import { ShellyDeviceApiService } from './shelly-device-api.service';
 
 // The host hands each plugin its PluginContext under this token. Recreate it
 // locally (do not import the value) so the artifact has no runtime dependency on
@@ -37,6 +38,7 @@ const plugin: PluginBackendModule = {
         { provide: PLUGIN_CONTEXT, useValue: context },
         DeviceRegistryService,
         ShellyProbeService,
+        ShellyDeviceApiService,
       ],
     };
   },
