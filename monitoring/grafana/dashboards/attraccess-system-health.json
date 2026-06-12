@@ -576,7 +576,7 @@
       ]
     },
     {
-      "title": "Heap Used",
+      "title": "Host RAM Used",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -632,8 +632,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "100 * nodejs_heap_size_used_bytes{job=\"attraccess\"} / nodejs_heap_size_total_bytes{job=\"attraccess\"}",
-          "legendFormat": "Heap %"
+          "expr": "100 * (1 - (node_memory_MemAvailable_bytes{job=\"node-exporter\"} / node_memory_MemTotal_bytes{job=\"node-exporter\"}))",
+          "legendFormat": "host RAM %"
         }
       ]
     },
