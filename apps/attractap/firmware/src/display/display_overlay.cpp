@@ -51,6 +51,61 @@ void Display::initDeviceOverlay()
     lv_obj_set_style_text_color(firmwareLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(firmwareLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(firmwareLabel, &lv_font_montserrat_10, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    Display::networkQualityContainer = lv_obj_create(top);
+    lv_obj_remove_style_all(Display::networkQualityContainer);
+    lv_obj_set_size(Display::networkQualityContainer, 62, 30);
+    lv_obj_set_align(Display::networkQualityContainer, LV_ALIGN_TOP_RIGHT);
+    lv_obj_set_x(Display::networkQualityContainer, -12);
+    lv_obj_set_y(Display::networkQualityContainer, 12);
+    lv_obj_set_style_radius(Display::networkQualityContainer, 15, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_opa(Display::networkQualityContainer, 225, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_border_width(Display::networkQualityContainer, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_border_color(Display::networkQualityContainer, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_flex_flow(Display::networkQualityContainer, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(Display::networkQualityContainer, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_remove_flag(Display::networkQualityContainer, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_remove_flag(Display::networkQualityContainer, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(Display::networkQualityContainer, LV_OBJ_FLAG_HIDDEN);
+
+    Display::networkQualityLabel = lv_label_create(Display::networkQualityContainer);
+    lv_label_set_text(Display::networkQualityLabel, "! NET");
+    lv_obj_set_style_text_color(Display::networkQualityLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(Display::networkQualityLabel, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+}
+
+void Display::updateNetworkQualityOverlay()
+{
+    if (!Display::networkQualityContainer || !Display::networkQualityLabel)
+    {
+        return;
+    }
+
+    State::NetworkQualityState qualityState = State::getNetworkQualityState();
+    if (qualityState.quality == Display::networkQualityOverlayValue)
+    {
+        return;
+    }
+
+    Display::networkQualityOverlayValue = qualityState.quality;
+
+    switch (qualityState.quality)
+    {
+    case State::NETWORK_QUALITY_GOOD:
+        lv_obj_add_flag(Display::networkQualityContainer, LV_OBJ_FLAG_HIDDEN);
+        break;
+    case State::NETWORK_QUALITY_DEGRADED:
+        lv_obj_remove_flag(Display::networkQualityContainer, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_set_style_bg_color(Display::networkQualityContainer, lv_color_hex(0xD97706), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_label_set_text(Display::networkQualityLabel, "! NET");
+        break;
+    case State::NETWORK_QUALITY_OFFLINE:
+    default:
+        lv_obj_remove_flag(Display::networkQualityContainer, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_set_style_bg_color(Display::networkQualityContainer, lv_color_hex(0xDC2626), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_label_set_text(Display::networkQualityLabel, "x NET");
+        break;
+    }
 }
 
 void Display::setDeviceName(std::string deviceName)

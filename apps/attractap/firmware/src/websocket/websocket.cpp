@@ -96,6 +96,7 @@ void Websocket::loop()
 
     this->updateInfoFromAppState();
     this->publishConnectionStatus();
+    this->publishNetworkQuality();
 
     if (!network_is_connected)
     {
@@ -123,6 +124,7 @@ void Websocket::loop()
         if (millis() - this->lastInboundFrameTime > this->INBOUND_LIVENESS_TIMEOUT_MS)
         {
             logger.error("No inbound frames within liveness timeout, forcing reconnect");
+            recordNetworkQualityEvent(this->livenessTimeoutEventTimes, this->livenessTimeoutEventNextIndex);
             setState(INIT);
         }
         break;
@@ -171,6 +173,53 @@ void Websocket::publishConnectionStatus()
         }
     }
     State::setWebsocketNextAttemptSeconds(secondsUntilNext);
+}
+
+void Websocket::publishNetworkQuality()
+{
+    uint32_t nowMs = millis();
+    uint32_t inboundAgeMs = (this->lastInboundFrameTime == 0) ? 0 : nowMs - this->lastInboundFrameTime;
+    uint8_t txDepth = this->tx_queue ? (uint8_t)uxQueueMessagesWaiting(this->tx_queue) : 0;
+    uint8_t reconnects = countRecentNetworkQualityEvents(this->reconnectEventTimes, nowMs);
+    uint8_t queueFull = countRecentNetworkQualityEvents(this->txQueueFullEventTimes, nowMs);
+    uint8_t sendFailures = countRecentNetworkQualityEvents(this->sendFailureEventTimes, nowMs);
+    uint8_t livenessTimeouts = countRecentNetworkQualityEvents(this->livenessTimeoutEventTimes, nowMs);
+
+    State::NetworkQuality quality = State::NETWORK_QUALITY_GOOD;
+    if (!this->network_is_connected || this->_state != CONNECTED)
+    {
+        quality = State::NETWORK_QUALITY_OFFLINE;
+    }
+    else if ((this->lastInboundFrameTime != 0 && inboundAgeMs >= this->INBOUND_DEGRADED_AFTER_MS) ||
+             reconnects >= 2 ||
+             queueFull > 0 ||
+             sendFailures > 0 ||
+             livenessTimeouts > 0 ||
+             txDepth >= (TX_QUEUE_DEPTH / 2))
+    {
+        quality = State::NETWORK_QUALITY_DEGRADED;
+    }
+
+    State::setNetworkQualityState(quality, inboundAgeMs, reconnects, txDepth, queueFull, sendFailures, livenessTimeouts);
+}
+
+void Websocket::recordNetworkQualityEvent(uint32_t *events, uint8_t &nextIndex)
+{
+    events[nextIndex] = millis();
+    nextIndex = (uint8_t)((nextIndex + 1) % QUALITY_EVENT_SLOTS);
+}
+
+uint8_t Websocket::countRecentNetworkQualityEvents(const uint32_t *events, uint32_t nowMs) const
+{
+    uint8_t count = 0;
+    for (size_t i = 0; i < QUALITY_EVENT_SLOTS; i++)
+    {
+        if (events[i] != 0 && nowMs - events[i] <= this->QUALITY_EVENT_WINDOW_MS)
+        {
+            count++;
+        }
+    }
+    return count;
 }
 
 void Websocket::connectWebSocket()
@@ -471,12 +520,11 @@ void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, v
 
     AttraccessApiConfig apiConfig = Settings::getAttraccessApiConfig();
 
-    this->lastInboundFrameTime = millis();
-
     switch (event_id)
     {
     case WEBSOCKET_EVENT_CONNECTED:
         logger.info("WebSocket connected");
+        this->lastInboundFrameTime = millis();
         this->consecutiveConnectFailures = 0;
         // Only an SSL connect proves anything about the certificate; locking on a
         // plain connect would pin index 0 and skip the sweep after a switch to SSL.
@@ -490,12 +538,14 @@ void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, v
 
     case WEBSOCKET_EVENT_CLOSED:
         logger.info("WebSocket closed");
+        recordNetworkQualityEvent(this->reconnectEventTimes, this->reconnectEventNextIndex);
         setState(INIT);
         break;
 
     case WEBSOCKET_EVENT_DISCONNECTED:
     {
         logger.info("WebSocket disconnected");
+        recordNetworkQualityEvent(this->reconnectEventTimes, this->reconnectEventNextIndex);
         if (apiConfig.useSSL && !this->_certManager.markFailure())
         {
             // Still iterating the certificate list: retry fast so a working cert near
@@ -514,6 +564,7 @@ void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, v
     }
 
     case WEBSOCKET_EVENT_DATA:
+        this->lastInboundFrameTime = millis();
         if (data->op_code == 0x01)
         { // Text frame
             if (this->messageCallbackRaw)
@@ -534,6 +585,7 @@ void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, v
 
     case WEBSOCKET_EVENT_ERROR:
         logger.error("WebSocket error");
+        recordNetworkQualityEvent(this->reconnectEventTimes, this->reconnectEventNextIndex);
         setState(INIT);
         break;
 
@@ -583,6 +635,7 @@ bool Websocket::enqueueMessage(const char *data, size_t length)
     if (xQueueSend(tx_queue, &msg, 0) != pdTRUE)
     {
         logger.error("enqueueMessage: tx queue full, dropping message");
+        recordNetworkQualityEvent(this->txQueueFullEventTimes, this->txQueueFullEventNextIndex);
         free(copy);
         return false;
     }
@@ -618,6 +671,7 @@ void Websocket::txTaskLoop()
         if (ret == -1)
         {
             logger.error("ws tx: send failed");
+            recordNetworkQualityEvent(this->sendFailureEventTimes, this->sendFailureEventNextIndex);
         }
         free(msg.data);
     }
@@ -657,6 +711,7 @@ void Websocket::setState(ConnectionState state)
     State::setWebsocketPhase(phase);
 
     State::setWebsocketState(state == CONNECTED, this->_lastApiConfig.hostname, this->_lastApiConfig.port, this->_lastApiConfig.useSSL);
+    publishNetworkQuality();
 }
 
 void Websocket::setMessageCallbackRaw(std::function<void(const char *, size_t)> callback)

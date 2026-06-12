@@ -38,6 +38,9 @@ lv_indev_t *Display::indev = NULL;
 std::string Display::deviceNameInitValue = "Attractap";
 
 lv_obj_t *Display::deviceNameLabel = NULL;
+lv_obj_t *Display::networkQualityContainer = NULL;
+lv_obj_t *Display::networkQualityLabel = NULL;
+State::NetworkQuality Display::networkQualityOverlayValue = State::NETWORK_QUALITY_GOOD;
 BootScreen Display::bootScreen;
 SetPinScreen Display::setPinScreen;
 ConnectionConfigurationScreen Display::connectionConfigurationScreen;
@@ -343,6 +346,7 @@ void Display::loop()
                                 "Touch panel not detected.\nCheck hardware and reboot.");
     }
 
+    Display::updateNetworkQualityOverlay();
     Display::advanceScreenRouter();
 
     lv_unlock();
