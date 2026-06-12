@@ -16,15 +16,7 @@ mapfile -t changed_files < <(git diff --name-only "${BASE}...HEAD" --)
 firmware_source_changed=false
 for file in "${changed_files[@]}"; do
   case "$file" in
-    apps/attractap/firmware/src/*|\
-    apps/attractap/firmware/include/*|\
-    apps/attractap/firmware/lib/*|\
-    apps/attractap/firmware/boards/*|\
-    apps/attractap/firmware/tools/*|\
-    apps/attractap/firmware/test/*|\
-    apps/attractap/firmware/build_firmwares.py|\
-    apps/attractap/firmware/partitions.csv|\
-    apps/attractap/firmware/sdkconfig.defaults)
+    apps/attractap/firmware/*)
       firmware_source_changed=true
       break
       ;;
@@ -46,15 +38,7 @@ echo "Please bump the -D FIRMWARE_VERSION value when changing firmware source co
 echo "Changed firmware files:" >&2
 for file in "${changed_files[@]}"; do
   case "$file" in
-    apps/attractap/firmware/src/*|\
-    apps/attractap/firmware/include/*|\
-    apps/attractap/firmware/lib/*|\
-    apps/attractap/firmware/boards/*|\
-    apps/attractap/firmware/tools/*|\
-    apps/attractap/firmware/test/*|\
-    apps/attractap/firmware/build_firmwares.py|\
-    apps/attractap/firmware/partitions.csv|\
-    apps/attractap/firmware/sdkconfig.defaults)
+    apps/attractap/firmware/*)
       echo "  - $file" >&2
       ;;
   esac

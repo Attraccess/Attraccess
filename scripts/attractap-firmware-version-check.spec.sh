@@ -50,6 +50,20 @@ else
 fi
 rm -rf "$TMP"
 
+echo "case: firmware config changed without version bump -> fail"
+TMP="$(mktemp -d)"
+make_repo "$TMP"
+BASE="$(git -C "$TMP" rev-parse HEAD)"
+echo 'monitor_speed = 9600' >>"$TMP/apps/attractap/firmware/platformio.ini"
+git -C "$TMP" add .
+git -C "$TMP" commit --quiet -m 'change firmware config'
+if run_check "$TMP" "$BASE" >/dev/null 2>&1; then
+  fail "expected non-zero exit when firmware config changed without FIRMWARE_VERSION change"
+else
+  pass "fails when firmware config changed without FIRMWARE_VERSION change"
+fi
+rm -rf "$TMP"
+
 echo "case: firmware source changed with version bump -> pass"
 TMP="$(mktemp -d)"
 make_repo "$TMP"
