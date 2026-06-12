@@ -65,7 +65,7 @@ groups:
         title: HighHttpErrorRate
         condition: C
         for: 5m
-        noDataState: NoData
+        noDataState: OK
         execErrState: Error
         labels:
           severity: warning
@@ -115,7 +115,7 @@ groups:
         title: HighRequestLatency
         condition: C
         for: 5m
-        noDataState: NoData
+        noDataState: OK
         execErrState: Error
         labels:
           severity: warning
@@ -215,7 +215,7 @@ groups:
         title: HighFailedLoginRate
         condition: C
         for: 2m
-        noDataState: NoData
+        noDataState: OK
         execErrState: Error
         labels:
           severity: warning
@@ -265,7 +265,7 @@ groups:
         title: OverdueMaintenance
         condition: C
         for: 1h
-        noDataState: NoData
+        noDataState: OK
         execErrState: Error
         labels:
           severity: warning
@@ -315,7 +315,7 @@ groups:
         title: AttractapAllReadersOffline
         condition: C
         for: 5m
-        noDataState: NoData
+        noDataState: OK
         execErrState: Error
         labels:
           severity: critical
@@ -365,7 +365,7 @@ groups:
         title: AttractapReaderCrashes
         condition: C
         for: 5m
-        noDataState: NoData
+        noDataState: OK
         execErrState: Error
         labels:
           severity: warning
@@ -415,7 +415,7 @@ groups:
         title: CronJobFailing
         condition: C
         for: 5m
-        noDataState: NoData
+        noDataState: OK
         execErrState: Error
         labels:
           severity: warning
@@ -465,7 +465,7 @@ groups:
         title: CronJobStale
         condition: C
         for: 10m
-        noDataState: NoData
+        noDataState: OK
         execErrState: Error
         labels:
           severity: warning
@@ -515,7 +515,7 @@ groups:
         title: FlowExecutionFailures
         condition: C
         for: 10m
-        noDataState: NoData
+        noDataState: OK
         execErrState: Error
         labels:
           severity: warning
@@ -565,7 +565,7 @@ groups:
         title: ExternalCallErrors
         condition: C
         for: 10m
-        noDataState: NoData
+        noDataState: OK
         execErrState: Error
         labels:
           severity: warning
@@ -615,7 +615,7 @@ groups:
         title: MqttServersUnhealthy
         condition: C
         for: 10m
-        noDataState: NoData
+        noDataState: OK
         execErrState: Error
         labels:
           severity: warning
@@ -665,7 +665,7 @@ groups:
         title: EmailDeliveryFailures
         condition: C
         for: 15m
-        noDataState: NoData
+        noDataState: OK
         execErrState: Error
         labels:
           severity: warning
@@ -715,7 +715,7 @@ groups:
         title: HighEventLoopLag
         condition: C
         for: 5m
-        noDataState: NoData
+        noDataState: OK
         execErrState: Error
         labels:
           severity: warning
@@ -765,7 +765,7 @@ groups:
         title: HighMemoryUsage
         condition: C
         for: 10m
-        noDataState: NoData
+        noDataState: OK
         execErrState: Error
         labels:
           severity: warning
