@@ -20,6 +20,7 @@ import { ResourceFlowsExecutorService } from '../../../resources/flows/resource-
 import { SumUpService } from '../../../billing/sumup.service';
 import { ResourceListService } from './resource-list.service';
 import { AttractapEvent, AttractapEventType } from '../websocket.types';
+import { SupervisionService } from '../../../resources/supervision/supervision.service';
 
 // ATT-545 regression (backend half): the Attractap form reopens after the last
 // field only if the server re-sends RESOURCE_USAGE_FORM_REQUEST, i.e.
@@ -87,6 +88,7 @@ describe('ATT-545 attractap paged form session flow (server does not re-request 
         { provide: ResourceFlowsExecutorService, useValue: {} },
         { provide: SumUpService, useValue: { getIsEnabled: jest.fn().mockResolvedValue(false) } },
         { provide: ResourceListService, useValue: { sendResourceListToSocket: jest.fn() } },
+        { provide: SupervisionService, useValue: { settleByCard: jest.fn() } },
       ],
     }).compile();
 
