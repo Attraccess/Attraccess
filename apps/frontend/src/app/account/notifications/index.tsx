@@ -18,15 +18,29 @@ import de from './de.json';
 
 type NotificationChannel = 'email' | 'push' | 'toast';
 
-const categories: NotificationCategory[] = [
-  NotificationCategory.MESSAGES,
-  NotificationCategory.MAINTENANCE_REQUESTS,
-  NotificationCategory.RESOURCE_USAGE_NOTES,
-  NotificationCategory.RESOURCE_HEALTH,
-  NotificationCategory.RESOURCE_TAKEOVER,
-  NotificationCategory.RESOURCE_SESSION_ENDED,
-  NotificationCategory.PROJECT_INVITATIONS,
-  NotificationCategory.SUPERVISION_REQUESTS,
+const categoryGroups: Array<{ id: string; categories: NotificationCategory[] }> = [
+  {
+    id: 'general',
+    categories: [
+      NotificationCategory.MESSAGES,
+      NotificationCategory.RESOURCE_TAKEOVER,
+      NotificationCategory.RESOURCE_SESSION_ENDED,
+      NotificationCategory.PROJECT_INVITATIONS,
+    ],
+  },
+  {
+    id: 'resourceManagers',
+    categories: [
+      NotificationCategory.MAINTENANCE_REQUESTS,
+      NotificationCategory.RESOURCE_USAGE_NOTES,
+      NotificationCategory.RESOURCE_HEALTH,
+      NotificationCategory.SUPERVISION_REQUESTS,
+    ],
+  },
+  {
+    id: 'admins',
+    categories: [NotificationCategory.ACCESS_CHANGES],
+  },
 ];
 
 const channels: NotificationChannel[] = ['email', 'push', 'toast'];
@@ -101,28 +115,41 @@ export function NotificationPreferencesForm() {
 
       <div
         data-testid="notification-preferences-mobile"
-        className="flex flex-col gap-3 lg:gap-0 lg:divide-y lg:divide-default-200 lg:rounded-lg lg:border lg:border-default-200"
+        className="flex flex-col gap-4"
       >
-        {categories.map((category) => {
+        {categoryGroups.map((group) => {
           return (
-            <div
-              key={category}
-              className="rounded-lg border border-default-200 p-3 lg:grid lg:grid-cols-[minmax(0,1fr)_repeat(3,minmax(4rem,6rem))] lg:gap-3 lg:rounded-none lg:border-0"
-            >
+            <section key={group.id} data-testid={`notification-group-${group.id}`} className="flex flex-col gap-3">
               <div className="flex flex-col gap-1">
-                <span className="text-sm font-medium">{t(`categories.${category}.label`)}</span>
-                <span className="text-xs text-default-500">{t(`categories.${category}.description`)}</span>
+                <h3 className="text-sm font-semibold text-default-700">{t(`groups.${group.id}.label`)}</h3>
+                <p className="text-xs text-default-500">{t(`groups.${group.id}.description`)}</p>
               </div>
 
-              <div className="mt-3 flex flex-col divide-y divide-default-200 lg:contents lg:divide-y-0">
-                {channels.map((channel) => (
-                  <div key={channel} className="flex min-h-11 items-center justify-between gap-4 py-2 lg:min-h-0 lg:justify-center lg:py-0">
-                    <span className="text-sm text-default-700 lg:hidden">{t(`columns.${channel}`)}</span>
-                    {renderChannelSwitch(category, channel)}
-                  </div>
-                ))}
+              <div className="flex flex-col gap-3 lg:gap-0 lg:divide-y lg:divide-default-200 lg:rounded-lg lg:border lg:border-default-200">
+                {group.categories.map((category) => {
+                  return (
+                    <div
+                      key={category}
+                      className="rounded-lg border border-default-200 p-3 lg:grid lg:grid-cols-[minmax(0,1fr)_repeat(3,minmax(4rem,6rem))] lg:gap-3 lg:rounded-none lg:border-0"
+                    >
+                      <div className="flex flex-col gap-1">
+                        <span className="text-sm font-medium">{t(`categories.${category}.label`)}</span>
+                        <span className="text-xs text-default-500">{t(`categories.${category}.description`)}</span>
+                      </div>
+
+                      <div className="mt-3 flex flex-col divide-y divide-default-200 lg:contents lg:divide-y-0">
+                        {channels.map((channel) => (
+                          <div key={channel} className="flex min-h-11 items-center justify-between gap-4 py-2 lg:min-h-0 lg:justify-center lg:py-0">
+                            <span className="text-sm text-default-700 lg:hidden">{t(`columns.${channel}`)}</span>
+                            {renderChannelSwitch(category, channel)}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            </div>
+            </section>
           );
         })}
       </div>

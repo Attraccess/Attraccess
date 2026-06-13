@@ -2,6 +2,7 @@ import {
   IntroductionHistoryAction,
   ResourceIntroduction,
   ResourceIntroductionHistoryItem,
+  User,
 } from '@attraccess/database-entities';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -10,6 +11,8 @@ import { UpdateResourceIntroductionDto } from './dtos/update.request.dto';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResourceIntroductionChangedEvent } from './events/resource-introduction-changed.event';
 import { MetricsService } from '../../metrics/metrics.service';
+import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
+import { NotificationCategory } from '../../notifications/notification-types';
 
 @Injectable()
 export class ResourceIntroductionsService {
@@ -23,7 +26,23 @@ export class ResourceIntroductionsService {
     @Inject(EventEmitter2)
     private readonly eventEmitter: EventEmitter2,
     private readonly metricsService: MetricsService,
+    private readonly notifications: NotificationDispatchService,
   ) {}
+
+  private notifyIntroductionChange(resourceId: number, userId: number, granted: boolean): void {
+    void this.notifications.dispatch({
+      category: NotificationCategory.ACCESS_CHANGES,
+      recipients: [{ id: userId } as User],
+      title: 'Your resource access changed',
+      body: granted
+        ? `You received an introduction for resource #${resourceId}.`
+        : `Your introduction for resource #${resourceId} was revoked.`,
+      url: `/resources/${resourceId}`,
+      dedupeKey: `resource-introduction-${resourceId}-${userId}-${granted ? 'granted' : 'revoked'}`,
+    }).catch((error) => {
+      this.logger.error(`Failed to notify user ${userId} about resource introduction changes: ${(error as Error).message}`);
+    });
+  }
 
   private async getIntroductionOfUser(
     resourceId: number,
@@ -124,6 +143,8 @@ export class ResourceIntroductionsService {
       resourceIntroduction.tutorUserId = tutorUserId;
     }
 
+    const previousHistoryItem = await this.getLastHistoryItemOfIntroduction(resourceIntroduction.id);
+
     this.logger.debug(`Creating new history item with action: ${nextStatus}`);
     const historyItem = this.resourceIntroductionHistoryItemRepository.create({
       introduction: { id: resourceIntroduction.id },
@@ -139,6 +160,9 @@ export class ResourceIntroductionsService {
       ResourceIntroductionChangedEvent.EVENT_NAME,
       new ResourceIntroductionChangedEvent(resourceIntroduction.id),
     );
+    if (previousHistoryItem?.action !== nextStatus && (previousHistoryItem || nextStatus === IntroductionHistoryAction.GRANT)) {
+      this.notifyIntroductionChange(resourceId, userId, nextStatus === IntroductionHistoryAction.GRANT);
+    }
 
     return savedHistoryItem;
   }

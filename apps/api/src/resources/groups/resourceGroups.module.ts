@@ -14,6 +14,7 @@ import { ResourceGroupsIntroducersController } from './introducers/resourceGroup
 import { ResourceGroupsIntroductionsService } from './introductions/resourceGroups.introductions.service';
 import { ResourceGroupsIntroducersService } from './introducers/resourceGroups.introducers.service';
 import { IsResourceGroupIntroducerGuard } from './introductions/isIntroducerGuard';
+import { NotificationsModule } from '../../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { IsResourceGroupIntroducerGuard } from './introductions/isIntroducerGuar
       ResourceIntroductionHistoryItem,
       ResourceIntroducer,
     ]),
+    NotificationsModule,
   ],
   controllers: [ResourceGroupsController, ResourceGroupsIntroductionsController, ResourceGroupsIntroducersController],
   providers: [

@@ -7,6 +7,7 @@ export enum NotificationCategory {
   RESOURCE_SESSION_ENDED = 'resource_session_ended',
   PROJECT_INVITATIONS = 'project_invitations',
   SUPERVISION_REQUESTS = 'supervision_requests',
+  ACCESS_CHANGES = 'access_changes',
 }
 
 export enum NotificationChannel {
@@ -29,4 +30,5 @@ export const DEFAULT_NOTIFICATION_CHANNELS: NotificationCategoryPreferences = {
   [NotificationCategory.RESOURCE_SESSION_ENDED]: { email: false, push: true, toast: true },
   [NotificationCategory.PROJECT_INVITATIONS]: { email: true, push: true, toast: true },
   [NotificationCategory.SUPERVISION_REQUESTS]: { email: false, push: true, toast: true },
+  [NotificationCategory.ACCESS_CHANGES]: { email: false, push: true, toast: true },
 };

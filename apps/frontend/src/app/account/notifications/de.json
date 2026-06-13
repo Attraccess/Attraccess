@@ -5,6 +5,20 @@
     "push": "Push",
     "toast": "In-App"
   },
+  "groups": {
+    "general": {
+      "label": "Alle Nutzer",
+      "description": "Benachrichtigungen, die alle Nutzer erhalten können."
+    },
+    "resourceManagers": {
+      "label": "Einweiser und Wartende",
+      "description": "Benachrichtigungen für Nutzer, die Ressourcen verwalten oder beaufsichtigen."
+    },
+    "admins": {
+      "label": "Admins",
+      "description": "Benachrichtigungen zu systemweiten oder zugriffsbezogenen Berechtigungen."
+    }
+  },
   "categories": {
     "messages": {
       "label": "Nachrichten",
@@ -37,6 +51,10 @@
     "supervision_requests": {
       "label": "Aufsichtsfreigaben",
       "description": "Anfragen, die eine Freigabe durch eine Aufsicht benötigen."
+    },
+    "access_changes": {
+      "label": "Zugriffsänderungen",
+      "description": "Änderungen an deinen Berechtigungen, Einweisungen, Einweiser- oder Wartendenstatus."
     }
   },
   "description": {
