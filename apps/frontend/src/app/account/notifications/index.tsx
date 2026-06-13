@@ -59,7 +59,7 @@ export function NotificationPreferencesForm() {
 
   const { data: preferences, isLoading } = useNotificationsServiceNotificationsGetPreferences();
 
-  const { mutate, isPending } = useNotificationsServiceNotificationsUpdatePreferences({
+  const { mutate } = useNotificationsServiceNotificationsUpdatePreferences({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: UseNotificationsServiceNotificationsGetPreferencesKeyFn() });
       showSuccess({ title: t('messages.updated') });
@@ -87,7 +87,7 @@ export function NotificationPreferencesForm() {
   const renderChannelSwitch = (category: NotificationCategory, channel: NotificationChannel) => {
     const preference = getCategoryPreference(preferences?.categories, category);
     const selected = Boolean(preference?.channels[channel]);
-    const disabled = isLoading || isPending;
+    const disabled = isLoading;
 
     return (
       <LabeledSwitch
