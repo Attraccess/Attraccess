@@ -80,6 +80,8 @@ RUN python3 -m venv /opt/venv && \
 ENV PLATFORMIO_HOME_DIR=/opt/platformio
 ENV PATH="/opt/venv/bin:/opt/platformio/packages/tool-xtensa-esp-elf-gdb/bin:/opt/platformio/packages/tool-riscv32-esp-elf-gdb/bin:${PATH}"
 ENV ESP_COREDUMP_CMD=/opt/venv/bin/esp-coredump
+ENV ESP_COREDUMP_XTENSA_GDB=/opt/platformio/packages/tool-xtensa-esp-elf-gdb/bin/xtensa-esp32-elf-gdb
+ENV ESP_COREDUMP_RISCV_GDB=/opt/platformio/packages/tool-riscv32-esp-elf-gdb/bin/riscv32-esp-elf-gdb
 
 # Copy the pre-built application (these will be built in the CI pipeline)
 COPY --from=builder /app/dist dist
