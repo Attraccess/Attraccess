@@ -75,9 +75,10 @@ RUN python3 -m venv /opt/venv && \
     /opt/venv/bin/pip install --no-cache-dir --upgrade pip && \
     /opt/venv/bin/pip install --no-cache-dir esp-coredump platformio && \
     mkdir -p /opt/platformio && \
-    PLATFORMIO_HOME_DIR=/opt/platformio /opt/venv/bin/platformio pkg install --global --tool platformio/tool-xtensa-esp-elf-gdb && \
-    PLATFORMIO_HOME_DIR=/opt/platformio /opt/venv/bin/platformio pkg install --global --tool platformio/tool-riscv32-esp-elf-gdb
-ENV PLATFORMIO_HOME_DIR=/opt/platformio
+    PLATFORMIO_CORE_DIR=/opt/platformio PLATFORMIO_PACKAGES_DIR=/opt/platformio/packages /opt/venv/bin/platformio pkg install --global --tool platformio/tool-xtensa-esp-elf-gdb && \
+    PLATFORMIO_CORE_DIR=/opt/platformio PLATFORMIO_PACKAGES_DIR=/opt/platformio/packages /opt/venv/bin/platformio pkg install --global --tool platformio/tool-riscv32-esp-elf-gdb
+ENV PLATFORMIO_CORE_DIR=/opt/platformio
+ENV PLATFORMIO_PACKAGES_DIR=/opt/platformio/packages
 ENV PATH="/opt/venv/bin:/opt/platformio/packages/tool-xtensa-esp-elf-gdb/bin:/opt/platformio/packages/tool-riscv32-esp-elf-gdb/bin:${PATH}"
 ENV ESP_COREDUMP_CMD=/opt/venv/bin/esp-coredump
 ENV ESP_COREDUMP_XTENSA_GDB=/opt/platformio/packages/tool-xtensa-esp-elf-gdb/bin/xtensa-esp32-elf-gdb
