@@ -11,6 +11,8 @@ import { AttractapFirmwareVersion } from '@attraccess/database-entities';
 import { EncryptionService } from '../encryption/encryption.service';
 import { MetricsService } from '../metrics/metrics.service';
 import { CoredumpSymbolicationService } from './coredump-symbolication.service';
+import { AttractapFirmwareService } from './firmware.service';
+import { AttractapCrashReportDto } from './dtos/crash-report.dto';
 
 @Injectable()
 export class AttractapService {
@@ -32,7 +34,8 @@ export class AttractapService {
     private readonly encryptionService: EncryptionService,
     private readonly metricsService: MetricsService,
     private readonly coredumpSymbolicationService: CoredumpSymbolicationService,
-  ) { }
+    private readonly firmwareService: AttractapFirmwareService,
+  ) {}
 
   public async getNFCCardByID(id: number): Promise<NFCCard | undefined> {
     const card = await this.nfcCardRepository.findOne({ where: { id }, relations: ['user'] });
@@ -158,7 +161,12 @@ export class AttractapService {
 
   public async updateReader(
     id: number,
-    updateData: { name?: string; connectedResourceIds?: number[]; firmware?: AttractapFirmwareVersion; ledBrightness?: number },
+    updateData: {
+      name?: string;
+      connectedResourceIds?: number[];
+      firmware?: AttractapFirmwareVersion;
+      ledBrightness?: number;
+    },
     emitEvent = true,
   ): Promise<Attractap> {
     const reader = await this.findReaderById(id);
@@ -295,11 +303,71 @@ export class AttractapService {
     }
   }
 
-  public async getCrashReportsForReader(readerId: number): Promise<AttractapCrashReport[]> {
-    return await this.crashReportRepository.find({
-      where: { attractapId: readerId },
-      order: { createdAt: 'DESC' },
-    });
+  public async getCrashReportsForReader(readerId: number): Promise<AttractapCrashReportDto[]> {
+    const [reader, reports] = await Promise.all([
+      this.readerRepository.findOne({ where: { id: readerId } }),
+      this.crashReportRepository.find({
+        where: { attractapId: readerId },
+        order: { createdAt: 'DESC' },
+      }),
+    ]);
+
+    const currentReaderFirmwareVersion = reader?.firmware?.version ?? null;
+    const latestServerFirmwareVersion =
+      reader?.firmware?.name && reader?.firmware?.variant
+        ? (this.firmwareService.getFirmwareDefinition(reader.firmware.name, reader.firmware.variant)?.version ?? null)
+        : null;
+
+    return reports.map((report) =>
+      this.toCrashReportDto(report, currentReaderFirmwareVersion, latestServerFirmwareVersion),
+    );
+  }
+
+  private toCrashReportDto(
+    report: AttractapCrashReport,
+    currentReaderFirmwareVersion: string | null,
+    latestServerFirmwareVersion: string | null,
+  ): AttractapCrashReportDto {
+    const firmwareMatchesCurrentReader = this.compareNullableVersions(
+      report.firmwareVersion,
+      currentReaderFirmwareVersion,
+    );
+    const firmwareMatchesLatestServer = this.compareNullableVersions(
+      report.firmwareVersion,
+      latestServerFirmwareVersion,
+    );
+
+    return {
+      id: report.id,
+      attractapId: report.attractapId,
+      resetReason: report.resetReason,
+      rebootReason: report.rebootReason,
+      heapFreeBytes: report.heapFreeBytes,
+      largestFreeBlockBytes: report.largestFreeBlockBytes,
+      uptimeBeforeResetMs: report.uptimeBeforeResetMs,
+      wsState: report.wsState,
+      wifiState: report.wifiState,
+      firmwareVersion: report.firmwareVersion,
+      currentReaderFirmwareVersion,
+      latestServerFirmwareVersion,
+      firmwareMatchesCurrentReader,
+      firmwareMatchesLatestServer,
+      coredumpSize: report.coredumpSize,
+      coredumpBuildId: report.coredumpBuildId,
+      coredumpBuildIdKnown: report.coredumpBuildId
+        ? this.firmwareService.hasSymbolForBuildId(report.coredumpBuildId)
+        : null,
+      symbolicationStatus: report.symbolicationStatus,
+      symbolizedBacktrace: report.symbolizedBacktrace,
+      createdAt: report.createdAt,
+    };
+  }
+
+  private compareNullableVersions(left: string | null, right: string | null): boolean | null {
+    if (!left || !right) {
+      return null;
+    }
+    return left === right;
   }
 
   public async getCrashReportCoredump(
@@ -383,9 +451,7 @@ export class AttractapService {
       await this.userRepository.save(user);
       return token;
     }
-    return (
-      this.encryptionService.decryptIfEncrypted(user.nfcKeySeedToken) ?? user.nfcKeySeedToken
-    );
+    return this.encryptionService.decryptIfEncrypted(user.nfcKeySeedToken) ?? user.nfcKeySeedToken;
   }
 
   /**

@@ -15,6 +15,9 @@
     "wsState": "WebSocket",
     "wifiState": "WLAN",
     "firmware": "Firmware",
+    "crashFirmware": "Crash-Firmware",
+    "currentReaderFirmware": "Reader jetzt",
+    "latestServerFirmware": "Server aktuell",
     "receivedAt": "Empfangen"
   },
   "notAvailable": "n.v.",
@@ -24,6 +27,9 @@
   "downloadFailed": "Coredump-Download fehlgeschlagen",
   "backtrace": "Symbolisierter Backtrace",
   "buildId": "Build-ID",
+  "buildIdKnown": "ELF verfügbar",
+  "buildIdMissing": "ELF fehlt",
+  "firmwareMismatch": "Firmware-Abweichung",
   "symbolication": {
     "pending": "Symbolisierung läuft…",
     "success": "Symbolisiert",

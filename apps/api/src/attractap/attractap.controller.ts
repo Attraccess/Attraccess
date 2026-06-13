@@ -17,7 +17,6 @@ import {
 } from '@nestjs/common';
 import { AttractapGateway } from './websockets/websocket.gateway';
 import { AuthenticatedRequest, Auth, Attractap } from '@attraccess/plugins-backend-sdk';
-import { AttractapCrashReport } from '@attraccess/database-entities';
 import { ApiOperation, ApiResponse, ApiParam, ApiTags, ApiBody, ApiProduces } from '@nestjs/swagger';
 import { WebsocketService } from './websockets/websocket.service';
 import { AttractapService } from './attractap.service';
@@ -27,6 +26,7 @@ import { UpdateReaderResponseDto } from './dtos/update-reader-response.dto';
 import { EnrollNfcCardResponseDto } from './dtos/enroll-nfc-card-response.dto';
 import { ResetNfcCardResponseDto } from './dtos/reset-nfc-card-response.dto';
 import { UpdateReaderDto } from './dtos/update-reader.dto';
+import { AttractapCrashReportDto } from './dtos/crash-report.dto';
 
 @ApiTags('Attractap')
 @Controller('attractap/readers')
@@ -154,17 +154,18 @@ export class AttractapController {
   @ApiResponse({
     status: 200,
     description: 'The list of crash reports for the reader, newest first',
-    type: [AttractapCrashReport],
+    type: [AttractapCrashReportDto],
   })
-  async getReaderCrashReports(
-    @Param('readerId', ParseIntPipe) readerId: number,
-  ): Promise<AttractapCrashReport[]> {
+  async getReaderCrashReports(@Param('readerId', ParseIntPipe) readerId: number): Promise<AttractapCrashReportDto[]> {
     return await this.attractapService.getCrashReportsForReader(readerId);
   }
 
   @Get(':readerId/crash-reports/:reportId/coredump')
   @Auth('canManageResources')
-  @ApiOperation({ summary: 'Download the coredump blob of a crash report', operationId: 'getReaderCrashReportCoredump' })
+  @ApiOperation({
+    summary: 'Download the coredump blob of a crash report',
+    operationId: 'getReaderCrashReportCoredump',
+  })
   @ApiParam({ name: 'readerId', description: 'The ID of the reader', example: 1 })
   @ApiParam({ name: 'reportId', description: 'The ID of the crash report', example: 1 })
   @ApiProduces('application/octet-stream')

@@ -69,11 +69,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-venv \
     && rm -rf /var/lib/apt/lists/*
 
-# Install esp-coredump into an isolated venv and expose it on PATH
+# Install esp-coredump plus the ESP GDB binaries it shells out to for Xtensa
+# (ESP32/S2/S3) and RISC-V (ESP32-C3/C6/H2) coredumps.
 RUN python3 -m venv /opt/venv && \
     /opt/venv/bin/pip install --no-cache-dir --upgrade pip && \
-    /opt/venv/bin/pip install --no-cache-dir esp-coredump
-ENV PATH="/opt/venv/bin:${PATH}"
+    /opt/venv/bin/pip install --no-cache-dir esp-coredump platformio && \
+    mkdir -p /opt/platformio && \
+    PLATFORMIO_HOME_DIR=/opt/platformio /opt/venv/bin/platformio pkg install --global --tool platformio/tool-xtensa-esp-elf-gdb && \
+    PLATFORMIO_HOME_DIR=/opt/platformio /opt/venv/bin/platformio pkg install --global --tool platformio/tool-riscv32-esp-elf-gdb
+ENV PLATFORMIO_HOME_DIR=/opt/platformio
+ENV PATH="/opt/venv/bin:/opt/platformio/packages/tool-xtensa-esp-elf-gdb/bin:/opt/platformio/packages/tool-riscv32-esp-elf-gdb/bin:${PATH}"
 ENV ESP_COREDUMP_CMD=/opt/venv/bin/esp-coredump
 
 # Copy the pre-built application (these will be built in the CI pipeline)

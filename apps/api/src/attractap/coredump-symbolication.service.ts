@@ -48,9 +48,7 @@ export class CoredumpSymbolicationService {
       // different build would only produce esp-coredump's misleading SHA-mismatch failure.
       elf = this.firmwareService.resolveElfFile({ buildId });
       if (!elf) {
-        this.logger.warn(
-          `No firmware ELF matching coredump build id ${buildId} (variant=${options.variant ?? 'n/a'})`,
-        );
+        this.logger.warn(`No firmware ELF matching coredump build id ${buildId} (variant=${options.variant ?? 'n/a'})`);
         return {
           status: 'failed',
           backtrace: `No firmware ELF matching coredump build id ${buildId} was found on the server, so the coredump could not be symbolized. The reader is likely running a build that was never published with an ELF (e.g. a local development build).`,
@@ -88,7 +86,7 @@ export class CoredumpSymbolicationService {
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      if (this.isToolMissing(message)) {
+      if (this.isToolMissing(message) || this.isToolchainMissing(message)) {
         this.logger.error(`esp-coredump tool not available: ${message}`);
         return { status: 'unavailable', backtrace: null, buildId: buildId ?? null };
       }
@@ -116,9 +114,7 @@ export class CoredumpSymbolicationService {
     }
 
     const windowStart = markerIndex + ESP_CORE_DUMP_INFO_MARKER.length;
-    const window = coredump
-      .subarray(windowStart, windowStart + BUILD_ID_SCAN_WINDOW_BYTES)
-      .toString('latin1');
+    const window = coredump.subarray(windowStart, windowStart + BUILD_ID_SCAN_WINDOW_BYTES).toString('latin1');
 
     const match = window.match(BUILD_ID_PATTERN);
     return match ? match[0].toLowerCase() : null;
@@ -146,6 +142,10 @@ export class CoredumpSymbolicationService {
             reject(error);
             return;
           }
+          if (error || this.isToolchainMissing(combined)) {
+            reject(new Error(combined || error?.message || 'esp-coredump failed'));
+            return;
+          }
           if (!combined) {
             reject(error || new Error('esp-coredump produced no output'));
             return;
@@ -158,5 +158,9 @@ export class CoredumpSymbolicationService {
 
   private isToolMissing(message: string): boolean {
     return message.includes('ENOENT') || message.includes('not found');
+  }
+
+  private isToolchainMissing(message: string): boolean {
+    return message.includes('GDB executable not found') || message.includes('Please install GDB');
   }
 }
