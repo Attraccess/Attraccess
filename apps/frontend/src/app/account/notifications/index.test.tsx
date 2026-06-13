@@ -12,6 +12,7 @@ const hoisted = vi.hoisted(() => ({
   unsubscribe: vi.fn(),
   successToast: vi.fn(),
   errorToast: vi.fn(),
+  isPending: false,
   preferences: {
     categories: [
       { category: 'messages', channels: { email: true, push: false, toast: true } },
@@ -67,7 +68,7 @@ vi.mock('@attraccess/react-query-client', () => ({
   },
   UseNotificationsServiceNotificationsGetPreferencesKeyFn: () => ['NotificationsServiceNotificationsGetPreferences'],
   useNotificationsServiceNotificationsGetPreferences: () => ({ data: hoisted.preferences, isLoading: false }),
-  useNotificationsServiceNotificationsUpdatePreferences: () => ({ mutate: hoisted.mutate, isPending: false }),
+  useNotificationsServiceNotificationsUpdatePreferences: () => ({ mutate: hoisted.mutate, isPending: hoisted.isPending }),
 }));
 
 vi.mock('../../../components/toastProvider', () => ({
@@ -112,6 +113,7 @@ beforeEach(() => {
   hoisted.unsubscribe.mockReset().mockResolvedValue(true);
   hoisted.successToast.mockReset();
   hoisted.errorToast.mockReset();
+  hoisted.isPending = false;
   hoisted.pushState.isSupported = true;
   hoisted.pushState.permission = 'granted';
   hoisted.pushState.isSubscribed = true;
@@ -190,6 +192,16 @@ describe('NotificationPreferencesForm', () => {
     expect(hoisted.mutate).toHaveBeenCalledWith({
       requestBody: { category: 'maintenance_requests', channels: { push: true } },
     });
+  });
+
+  it('keeps switches enabled while a preference update is pending', () => {
+    hoisted.isPending = true;
+
+    renderForm();
+
+    expect(screen.getByTestId('notifications-maintenance_requests-email')).not.toBeDisabled();
+    expect(screen.getByTestId('notifications-maintenance_requests-push')).not.toBeDisabled();
+    expect(screen.getByTestId('notifications-maintenance_requests-toast')).not.toBeDisabled();
   });
 
   it('shows enabled push preferences even when this browser is not subscribed', () => {
