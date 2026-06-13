@@ -162,6 +162,62 @@ private:
     void beginReset();
     void processReset();
     void exitReset();
+
+    // Two-card supervision (ATT-493). A sticky, self-contained sub-flow — like enrollment/reset it
+    // owns the display until success, cancel or timeout. Started when a non-introduced user
+    // authenticates at a resource that requires supervision. The reader asks the server to broadcast
+    // a supervision request to eligible supervisors (who can approve from the web) while also waiting
+    // for a supervisor to tap their card here. Whichever channel resolves first wins.
+    struct ApiSupervisorCardData_t
+    {
+        uint8_t keyNo;
+        uint8_t keyBytes[16];
+    };
+    ApiSupervisorCardData_t apiSupervisorCardData;
+
+    enum SupervisionPhase_t
+    {
+        SUPERVISION_PHASE_NONE,
+        SUPERVISION_PHASE_WAIT_FOR_CARD,  // screen up, waiting for a supervisor card (or web approval)
+        SUPERVISION_PHASE_REQUESTED_AUTH, // sent the supervisor UID, awaiting key material
+        SUPERVISION_PHASE_STARTING,       // supervisor card verified, session start sent
+        SUPERVISION_PHASE_SUCCESS,        // approved, dwelling before handing off to the session screen
+        SUPERVISION_PHASE_ERROR,          // error shown, dwelling before retry
+    };
+    SupervisionPhase_t supervisionPhase = SUPERVISION_PHASE_NONE;
+    // Set by the card-detection callback when a (supervisor) card enters the field during
+    // SUPERVISION_PHASE_WAIT_FOR_CARD; consumed on the main loop. The UID is captured alongside it.
+    volatile bool supervisionCardDetected = false;
+    uint8_t supervisionCardUid[7] = {0};
+    uint8_t supervisionCardUidLength = 0;
+    // Set by the supervisor-card-auth API callback once key material is available; consumed on loop.
+    volatile bool supervisionKeyReady = false;
+    // Set by the SUPERVISION_RESOLVED callback when the web channel approved (session already started).
+    volatile bool supervisionResolvedByWeb = false;
+    // Set by the request-result / resolved callbacks on an unrecoverable failure (e.g. no supervisors).
+    volatile bool supervisionFailed = false;
+    // Set by the supervisor-card-auth callback when the presented card is not an authorised supervisor.
+    // Recoverable: the screen shows the error briefly, then returns to waiting for another card.
+    volatile bool supervisionCardRejected = false;
+    // True while dwelling on a terminal error (vs a recoverable card rejection); decided on the loop.
+    bool supervisionTerminalError = false;
+    volatile bool supervisionCancelRequested = false;
+    // Producer (websocket task) / consumer (main loop) — fixed buffers, not Arduino String (see the
+    // enrollment error buffer rationale).
+    char supervisionErrorMessage[64] = {0};
+    char supervisionHintMessage[160] = {0};
+    volatile bool supervisionHintReady = false;
+    uint32_t supervisionStartTimeMs = 0;
+    uint32_t supervisionPhaseChangedMs = 0;
+    static constexpr uint32_t SUPERVISION_TIMEOUT_MS = 30000;
+    static constexpr uint32_t SUPERVISION_SUCCESS_DWELL_MS = 1200;
+    static constexpr uint32_t SUPERVISION_ERROR_DWELL_MS = 1800;
+    // When set, the next entry into APPLICATION_STATE_UNLOCKED auto-starts the session (the supervisor
+    // approved by tapping their card; the web channel starts the session server-side instead).
+    bool autoStartAfterSupervision = false;
+    void beginSupervision();
+    void processSupervision();
+    void exitSupervision(bool unlockResource, bool autoStart);
 #endif
 
     API::CardAuthenticationDetailsResponse cardAuthenticationData;
@@ -338,6 +394,7 @@ private:
         APPLICATION_STATE_UNLOCKED,
         APPLICATION_STATE_ENROLLMENT,
         APPLICATION_STATE_RESET,
+        APPLICATION_STATE_SUPERVISION,
 #else
         APPLICATION_STATE_WAIT_FOR_CARD,
 #endif

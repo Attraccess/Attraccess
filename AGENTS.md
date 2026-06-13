@@ -36,11 +36,10 @@ Flags:
 - `pnpm serve --only=api` — API only
 - `pnpm serve --only=frontend` — frontend only
 - `pnpm serve` — both (default)
-- `pnpm serve --tui` — nx interactive terminal UI (default is streamed output, agent-friendly)
 
 Pin a port (strict — fails on collision):
 
 - `PORT=3010 pnpm serve`
 - `VITE_PORT=4250 pnpm serve`
 
-Solo `pnpm nx serve api` is **not** wrapped — it still hard-fails on busy 3000. Prefer `pnpm serve --only=api`.
+Solo `pnpm nx serve api` is **not** wrapped. Prefer `pnpm serve --only=api`.

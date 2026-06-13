@@ -84,6 +84,19 @@ void Application::processState() {
       this->externalState = EXTERNAL_STATE_NONE;
       this->resetPhase = RESET_PHASE_NONE;
     }
+    // Drop any in-progress supervision flow: the server-side request is gone after a disconnect, so
+    // a stale screen/phase would otherwise hang until timeout.
+    if (this->state == APPLICATION_STATE_SUPERVISION ||
+        this->supervisionPhase != SUPERVISION_PHASE_NONE) {
+      this->supervisionPhase = SUPERVISION_PHASE_NONE;
+      this->supervisionCardDetected = false;
+      this->supervisionKeyReady = false;
+      this->supervisionResolvedByWeb = false;
+      this->supervisionFailed = false;
+      this->supervisionCardRejected = false;
+      this->supervisionCancelRequested = false;
+      this->autoStartAfterSupervision = false;
+    }
 #endif
         if (this->state == APPLICATION_STATE_INIT)
         {
@@ -136,6 +149,14 @@ void Application::processState() {
     this->processReset();
     return;
   }
+
+  // Two-card supervision is a sticky, self-contained sub-flow like enrollment/reset — it owns the
+  // screen until success, cancel or timeout. beginSupervision() is entered from the card-auth path
+  // (processCardAuthenticationData) rather than via externalState.
+  if (this->state == APPLICATION_STATE_SUPERVISION) {
+    this->processSupervision();
+    return;
+  }
 #endif
 
 #ifndef HAS_LVGL_DISPLAY
@@ -164,7 +185,8 @@ void Application::processState() {
             .username = this->cardAuthenticationData.username,
             .canManageResource = this->cardAuthenticationData.canManageResource,
             .hasIntroduction = this->cardAuthenticationData.hasIntroduction,
-            .isIntroducer = this->cardAuthenticationData.isIntroducer});
+            .isIntroducer = this->cardAuthenticationData.isIntroducer,
+            .requiresSupervisor = this->cardAuthenticationData.requiresSupervisor});
 #endif
 
     this->state = APPLICATION_STATE_AUTHENTICATE_CARD;
@@ -299,6 +321,21 @@ void Application::processState() {
   }
 
   if (this->state == APPLICATION_STATE_UNLOCKED) {
+    // Auto-start the session right after a supervisor approved by tapping their card at the reader
+    // (ATT-493). The web-approval channel starts the session server-side instead, so this only fires
+    // for the on-reader card path.
+    if (this->autoStartAfterSupervision) {
+      this->autoStartAfterSupervision = false;
+      Display::resourceDetailsScreen.showActionProgress("Starte Sitzung");
+      this->beginActionPause();
+      this->pendingActionType = PENDING_ACTION_START_SESSION;
+      this->pendingActionResourceId = this->selectedResourceId;
+      this->pendingActionProjectId = this->selectedProjectId;
+      this->hasPendingFormRequest = false;
+      this->api.startResourceUsageSession(this->selectedResourceId,
+                                          this->selectedProjectId);
+    }
+
     // Subtract any accumulated pause time while actions were in-progress.
     // accumulatedPauseMs only gets the elapsed delta added once an action
     // finishes (endActionPause). While an action is still running -- most

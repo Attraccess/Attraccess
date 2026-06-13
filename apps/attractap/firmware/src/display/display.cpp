@@ -49,6 +49,7 @@ ResourceListScreen Display::resourceListScreen;
 ResourceDetailsScreen Display::resourceDetailsScreen;
 EnrollmentScreen Display::enrollmentScreen;
 ResetScreen Display::resetScreen;
+SupervisionScreen Display::supervisionScreen;
 FirmwareUpdateScreen Display::firmwareUpdateScreen;
 
 std::function<void(int16_t, int16_t)> Display::touchCallback = nullptr;

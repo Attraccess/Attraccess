@@ -29,6 +29,7 @@ function renderModal(overrides = {}) {
     request: baseRequest,
     onApprove: vi.fn(),
     onReject: vi.fn(),
+    onIgnore: vi.fn(),
     onExpire: vi.fn(),
     isApproving: false,
     isRejecting: false,
@@ -55,6 +56,16 @@ describe('SupervisorApprovalModal', () => {
     expect(props.onApprove).toHaveBeenCalled();
     await userEvent.click(screen.getByText('reject'));
     expect(props.onReject).toHaveBeenCalled();
+  });
+
+  it('allows a supervisor to ignore the request without approving or rejecting it', async () => {
+    const props = renderModal();
+
+    await userEvent.click(screen.getByText('ignore'));
+
+    expect(props.onIgnore).toHaveBeenCalled();
+    expect(props.onApprove).not.toHaveBeenCalled();
+    expect(props.onReject).not.toHaveBeenCalled();
   });
 
   it('calls onExpire once the deadline passes', () => {

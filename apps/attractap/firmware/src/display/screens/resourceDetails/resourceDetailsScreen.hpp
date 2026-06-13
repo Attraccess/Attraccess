@@ -48,6 +48,7 @@ public:
         bool canManageResource;
         bool hasIntroduction;
         bool isIntroducer;
+        bool requiresSupervisor;
     };
     void setUserDetails(UserDetails userDetails);
 

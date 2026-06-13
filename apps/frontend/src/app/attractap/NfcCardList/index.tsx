@@ -146,7 +146,6 @@ const NfcCardTableCell = (props: NfcCardTableCellProps) => {
                 onPress={onOpen}
                 data-cy={`nfc-card-table-cell-deactivate-button-${props.card.id}`}
               >
-                <CheckIcon />
                 <XIcon />
                 {t('nfcCardsTable.actions.deactivate')}
               </Button>
@@ -160,7 +159,6 @@ const NfcCardTableCell = (props: NfcCardTableCellProps) => {
                 onPress={onOpen}
                 data-cy={`nfc-card-table-cell-activate-button-${props.card.id}`}
               >
-                <XIcon />
                 <CheckIcon />
                 {t('nfcCardsTable.actions.activate')}
               </Button>
@@ -324,14 +322,6 @@ export function NfcCardList() {
           ] satisfies PageAction[]
         }
       />
-
-      <Alert status="warning" className="mb-4">
-        <AlertStatusIcon status="warning" />
-        <AlertContent>
-          <AlertTitle>{t('workInProgressTitle')}</AlertTitle>
-          <AlertDescription>{t('workInProgress')}</AlertDescription>
-        </AlertContent>
-      </Alert>
 
       <NfcCardDeleteModal
         show={cardToDeleteId !== null}

@@ -17,6 +17,7 @@
 #include "screens/resourceDetails/resourceDetailsScreen.hpp"
 #include "screens/enrollment/enrollmentScreen.hpp"
 #include "screens/reset/resetScreen.hpp"
+#include "screens/supervision/supervisionScreen.hpp"
 #include "screens/firmwareUpdate/firmwareUpdateScreen.hpp"
 #include "driver/display_driver.hpp"
 
@@ -47,6 +48,7 @@ public:
     static ResourceDetailsScreen resourceDetailsScreen;
     static EnrollmentScreen enrollmentScreen;
     static ResetScreen resetScreen;
+    static SupervisionScreen supervisionScreen;
     static FirmwareUpdateScreen firmwareUpdateScreen;
 
     static void setTouchCallback(std::function<void(int16_t, int16_t)> callback);

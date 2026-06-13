@@ -10,6 +10,7 @@ import { FlowExecutionError } from '../../../resources/flows/errors/flow-executi
 import { ResourceActionGuard } from './resource-action.guard';
 import { ResourceListService } from './resource-list.service';
 import { AttractapFormsHandler } from './forms.handler';
+import { SupervisionService } from '../../../resources/supervision/supervision.service';
 import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from '../websocket.types';
 
 @Injectable()
@@ -36,6 +37,9 @@ export class AttractapSessionHandler {
 
   @Inject(AttractapFormsHandler)
   private formsHandler: AttractapFormsHandler;
+
+  @Inject(SupervisionService)
+  private supervisionService: SupervisionService;
 
   public async handleStartResourceUsageSession(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
     const { resourceId, projectId } = data.payload as {
@@ -70,9 +74,25 @@ export class AttractapSessionHandler {
       return;
     }
 
+    // Two-card supervision (ATT-493): if a supervisor card was validated for this socket, attribute
+    // the session to that supervisor. The requester stays as `user` (lastAuthenticatedUserId).
+    const flow = socket.state.supervisionFlow;
+    const supervisorUserId =
+      flow && flow.resourceId === resourceId ? flow.approvedSupervisorUserId ?? undefined : undefined;
+
     try {
-      await this.resourceUsageService.startSession(resourceId, user, { projectId, formSubmissions });
+      await this.resourceUsageService.startSession(
+        resourceId,
+        user,
+        { projectId, formSubmissions },
+        supervisorUserId ? { supervisorUserId } : {},
+      );
       this.formsHandler.clearFormDraft(socket, resourceId, ResourceFormAction.START);
+      // The card channel won — settle the still-open web request so any supervisor popups close.
+      if (flow?.requestId) {
+        this.supervisionService.settleByCard(flow.requestId);
+      }
+      socket.state.supervisionFlow = null;
       await socket.sendMessage(new AttractapEvent(AttractapEventType.START_RESOURCE_USAGE_SESSION, { success: true }));
     } catch (error) {
       if (error instanceof ResourceInUseError) {

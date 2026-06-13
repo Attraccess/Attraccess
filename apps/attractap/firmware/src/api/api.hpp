@@ -212,8 +212,47 @@ public:
         bool canManageResource;
         bool hasIntroduction;
         bool isIntroducer;
+        // Two-card supervision (ATT-493). supervisionMode is the resource policy; requiresSupervisor
+        // is the server's verdict for this user (true => starting a session requires supervisor
+        // approval; authentication itself still unlocks the resource details screen).
+        String supervisionMode;
+        bool requiresSupervisor;
     };
     void setCardAuthenticationDetailsResponseCallback(std::function<void(CardAuthenticationDetailsResponse)> callback);
+
+    // --- Two-card supervision (ATT-493) -------------------------------------------------------
+    // After a non-introduced user authenticates, the reader asks the server to open a supervision
+    // request. The request is broadcast to eligible supervisors over the web (SSE) while the reader
+    // simultaneously waits for one of them to tap their card. Either channel resolves the request.
+    struct SupervisionRequestResult
+    {
+        bool success = false;
+        String error;
+        uint32_t timeoutMs = 0;
+        uint8_t supervisorCount = 0;
+        String supervisorNames[MAX_INTRODUCERS];
+    };
+    struct SupervisorCardAuthenticationResponse
+    {
+        uint8_t keyNo = 0;
+        uint8_t keyBytes[16] = {0};
+        uint8_t keyLen = 0;
+        String error;
+        String username;
+    };
+    struct SupervisionResolvedResult
+    {
+        bool success = false;
+        String error;
+        String supervisorUsername;
+    };
+
+    void requestSupervision(uint32_t resourceId);
+    void requestSupervisorCardAuthenticationData(uint8_t *uid, uint8_t uidLength, uint32_t resourceId);
+    void cancelSupervision();
+    void setSupervisionRequestResultCallback(std::function<void(SupervisionRequestResult)> callback);
+    void setSupervisorCardAuthenticationResponseCallback(std::function<void(SupervisorCardAuthenticationResponse)> callback);
+    void setSupervisionResolvedCallback(std::function<void(SupervisionResolvedResult)> callback);
 
     void setEnrollNewCardGetAvailableKeyNoCallback(std::function<void(String username)> callback);
     void setEnrollNewCardCallback(std::function<void(uint8_t keyNo, String key)> callback);
@@ -278,6 +317,12 @@ private:
 
     std::function<void(const ResourceList &)> resourceListUpdateCallback;
     std::function<void(CardAuthenticationDetailsResponse)> cardAuthenticationDetailsResponseCallback;
+    std::function<void(SupervisionRequestResult)> supervisionRequestResultCallback;
+    std::function<void(SupervisorCardAuthenticationResponse)> supervisorCardAuthenticationResponseCallback;
+    std::function<void(SupervisionResolvedResult)> supervisionResolvedCallback;
+    void onSupervisionRequestResult(JsonObject data);
+    void onSupervisorCardAuthenticationData(JsonObject data);
+    void onSupervisionResolved(JsonObject data);
 
     std::function<void(String)> deviceNameCallback;
     std::function<void(uint8_t)> ledBrightnessChangedCallback;

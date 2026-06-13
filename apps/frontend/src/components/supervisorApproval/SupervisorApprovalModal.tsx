@@ -11,6 +11,7 @@ export interface SupervisorApprovalModalProps {
   request: SupervisionRequestDto;
   onApprove: () => void;
   onReject: () => void;
+  onIgnore: () => void;
   /** Called when the local countdown reaches zero (in sync with the backend timeout). */
   onExpire: () => void;
   isApproving: boolean;
@@ -25,6 +26,7 @@ export function SupervisorApprovalModal({
   request,
   onApprove,
   onReject,
+  onIgnore,
   onExpire,
   isApproving,
   isRejecting,
@@ -97,6 +99,9 @@ export function SupervisorApprovalModal({
           </ModalBody>
 
           <ModalFooter>
+            <Button variant="ghost" onPress={onIgnore} isDisabled={isBusy}>
+              {t('ignore')}
+            </Button>
             <Button variant="danger" onPress={onReject} isPending={isRejecting} isDisabled={isBusy}>
               {t('reject')}
             </Button>

@@ -1,4 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Resource, SupervisionMode } from '@attraccess/database-entities';
 import { WebsocketService } from '../websocket.service';
 import { AttractapService } from '../../attractap.service';
 import { UsersService } from '../../../users-and-auth/users/users.service';
@@ -28,6 +31,9 @@ export class AttractapCardHandler {
 
   @Inject(MetricsService)
   private metricsService: MetricsService;
+
+  @InjectRepository(Resource)
+  private resourceRepository: Repository<Resource>;
 
   public async startEnrollOfNewNfcCard(data: { readerId: number; userId: number }) {
     const reader = await this.attractapService.findReaderById(data.readerId);
@@ -283,6 +289,18 @@ export class AttractapCardHandler {
     const hasIntroduction = await this.resourceUsageService.canControllResource(resourceId, nfcCard.user);
     const isIntroducer = await this.resourceIntroducersService.isIntroducer(resourceId, nfcCard.user.id, true);
 
+    const resource = await this.resourceRepository.findOne({ where: { id: resourceId } });
+    const supervisionMode = resource?.supervisionMode ?? SupervisionMode.INTRODUCTION_REQUIRED;
+
+    // Whether this tap must be authorised by a supervisor before a session can start (ATT-493):
+    // - SUPERVISION_REQUIRED: always, even for introduced users (mirrors the solo-start guard).
+    // - SUPERVISION_ALLOWED: only when the user is not (yet) introduced.
+    // INTRODUCTION_REQUIRED never allows a supervised start, so the reader falls back to its
+    // existing "no introduction" handling.
+    const requiresSupervisor =
+      supervisionMode === SupervisionMode.SUPERVISION_REQUIRED ||
+      (supervisionMode === SupervisionMode.SUPERVISION_ALLOWED && !hasIntroduction);
+
     await socket.sendMessage(
       new AttractapEvent(AttractapEventType.CARD_AUTHENTICATION_DATA, {
         keyNo: nfcCard.keyNo,
@@ -291,6 +309,8 @@ export class AttractapCardHandler {
         canManageResource: nfcCard.user.systemPermissions.canManageResources,
         hasIntroduction,
         isIntroducer,
+        supervisionMode,
+        requiresSupervisor,
       }),
     );
   }

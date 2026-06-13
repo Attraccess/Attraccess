@@ -62,7 +62,126 @@ void API::onCardAuthenticationDetailsResponse(JsonObject data)
     response.canManageResource = payload["canManageResource"].is<bool>() ? payload["canManageResource"].as<bool>() : false;
     response.hasIntroduction = payload["hasIntroduction"].is<bool>() ? payload["hasIntroduction"].as<bool>() : false;
     response.isIntroducer = payload["isIntroducer"].is<bool>() ? payload["isIntroducer"].as<bool>() : false;
+    response.supervisionMode = payload["supervisionMode"].is<String>() ? payload["supervisionMode"].as<String>() : String("");
+    response.requiresSupervisor = payload["requiresSupervisor"].is<bool>() ? payload["requiresSupervisor"].as<bool>() : false;
     this->cardAuthenticationDetailsResponseCallback(response);
+}
+
+// --- Two-card supervision (ATT-493) ----------------------------------------------------------
+
+void API::requestSupervision(uint32_t resourceId)
+{
+    this->logger.info("Requesting supervision");
+    JsonDocument doc;
+    JsonObject payload = doc.to<JsonObject>();
+    payload["resourceId"] = resourceId;
+    this->sendMessage("SUPERVISION_REQUEST", payload);
+}
+
+void API::requestSupervisorCardAuthenticationData(uint8_t *uid, uint8_t uidLength, uint32_t resourceId)
+{
+    this->logger.info("Requesting supervisor card authentication data");
+    JsonDocument doc;
+    JsonObject payload = doc.to<JsonObject>();
+    payload["uid"] = hexToString(uid, uidLength);
+    payload["resourceId"] = resourceId;
+    this->sendMessage("REQUEST_SUPERVISOR_CARD_AUTHENTICATION_DATA", payload);
+}
+
+void API::cancelSupervision()
+{
+    JsonDocument doc;
+    JsonObject payload = doc.to<JsonObject>();
+    this->sendMessage("SUPERVISION_CANCEL", payload);
+}
+
+void API::setSupervisionRequestResultCallback(std::function<void(SupervisionRequestResult)> callback)
+{
+    this->supervisionRequestResultCallback = callback;
+}
+
+void API::setSupervisorCardAuthenticationResponseCallback(std::function<void(SupervisorCardAuthenticationResponse)> callback)
+{
+    this->supervisorCardAuthenticationResponseCallback = callback;
+}
+
+void API::setSupervisionResolvedCallback(std::function<void(SupervisionResolvedResult)> callback)
+{
+    this->supervisionResolvedCallback = callback;
+}
+
+void API::onSupervisionRequestResult(JsonObject data)
+{
+    if (this->supervisionRequestResultCallback == nullptr)
+    {
+        return;
+    }
+    JsonObject payload = data["payload"].as<JsonObject>();
+    SupervisionRequestResult result;
+    result.error = payload["error"].is<String>() ? payload["error"].as<String>() : String("");
+    result.success = result.error.length() == 0 && payload["success"].is<bool>() ? payload["success"].as<bool>() : false;
+    result.timeoutMs = payload["timeoutMs"].is<uint32_t>() ? payload["timeoutMs"].as<uint32_t>() : 0;
+    if (payload["supervisorNames"].is<JsonArray>())
+    {
+        JsonArray names = payload["supervisorNames"].as<JsonArray>();
+        for (JsonVariant name : names)
+        {
+            if (result.supervisorCount >= MAX_INTRODUCERS)
+            {
+                break;
+            }
+            result.supervisorNames[result.supervisorCount++] = name.as<String>();
+        }
+    }
+    this->supervisionRequestResultCallback(result);
+}
+
+void API::onSupervisorCardAuthenticationData(JsonObject data)
+{
+    if (this->supervisorCardAuthenticationResponseCallback == nullptr)
+    {
+        return;
+    }
+    JsonObject payload = data["payload"].as<JsonObject>();
+    SupervisorCardAuthenticationResponse response;
+    response.error = payload["error"].is<String>() ? payload["error"].as<String>() : String("");
+    response.username = payload["username"].is<String>() ? payload["username"].as<String>() : String("");
+    response.keyNo = payload["keyNo"].is<uint8_t>() ? payload["keyNo"].as<uint8_t>() : 0;
+
+    String keyHex = payload["key"].is<String>() ? payload["key"].as<String>() : String("");
+    if (keyHex.length() == 32)
+    {
+        uint8_t keyBytes[16];
+        if (stringToHexArray(keyHex, keyBytes, 16))
+        {
+            memcpy(response.keyBytes, keyBytes, 16);
+            response.keyLen = 16;
+        }
+        else if (response.error.length() == 0)
+        {
+            response.error = "Invalid hex key";
+        }
+    }
+    else if (keyHex.length() > 0 && response.error.length() == 0)
+    {
+        response.error = "Invalid key length";
+    }
+
+    this->supervisorCardAuthenticationResponseCallback(response);
+}
+
+void API::onSupervisionResolved(JsonObject data)
+{
+    if (this->supervisionResolvedCallback == nullptr)
+    {
+        return;
+    }
+    JsonObject payload = data["payload"].as<JsonObject>();
+    SupervisionResolvedResult result;
+    result.success = payload["success"].is<bool>() ? payload["success"].as<bool>() : false;
+    result.error = payload["error"].is<String>() ? payload["error"].as<String>() : String("");
+    result.supervisorUsername = payload["supervisorUsername"].is<String>() ? payload["supervisorUsername"].as<String>() : String("");
+    this->supervisionResolvedCallback(result);
 }
 
 void API::setCardAuthenticationDetailsResponseCallback(std::function<void(CardAuthenticationDetailsResponse)> callback)

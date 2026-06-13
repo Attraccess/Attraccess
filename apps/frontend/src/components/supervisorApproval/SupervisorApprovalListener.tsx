@@ -160,6 +160,7 @@ export function SupervisorApprovalListener() {
       request={activeRequest}
       onApprove={handleApprove}
       onReject={handleReject}
+      onIgnore={() => removeRequest(activeRequest.id)}
       onExpire={handleExpire}
       isApproving={isApproving}
       isRejecting={isRejecting}

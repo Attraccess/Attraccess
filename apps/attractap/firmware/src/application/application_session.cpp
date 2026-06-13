@@ -118,6 +118,11 @@ void Application::handleResourceDetailsButtonClick(
 
   switch (evt.buttonClickType) {
   case ResourceDetailsScreen::BUTTON_CLICK_TYPE_START_SESSION:
+    if (this->cardAuthenticationData.requiresSupervisor) {
+      this->beginSupervision();
+      break;
+    }
+
     Display::resourceDetailsScreen.showActionProgress("Starte Sitzung");
     this->beginActionPause();
     this->pendingActionType = PENDING_ACTION_START_SESSION;

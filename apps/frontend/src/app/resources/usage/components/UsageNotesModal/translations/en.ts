@@ -11,4 +11,5 @@ export default {
   booleanYes: 'Yes',
   booleanNo: 'No',
   projectSelectLabel: 'Project',
+  supervisor: 'Supervisor',
 };
