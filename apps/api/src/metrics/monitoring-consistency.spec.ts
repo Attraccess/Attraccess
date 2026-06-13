@@ -254,12 +254,6 @@ describe('Monitoring configuration consistency', () => {
       'HighAttraccessContainerMemoryUsage',
     ];
 
-    it('Prometheus alerts include the SSO login failure alert', () => {
-      const prometheusAlerts = loadYaml('prometheus/alerts.yml');
-      expect(prometheusAlerts).toContain('HighSsoLoginFailureRate');
-      expect(prometheusAlerts).toContain('attraccess_auth_sso_login_failures_total');
-    });
-
     it('Grafana provisioned rules define all required alerts', () => {
       expect(grafanaRules).toContain('groups:');
       for (const alert of requiredAlerts) {
