@@ -265,7 +265,7 @@ groups:
         title: HighSsoLoginFailureRate
         condition: C
         for: 2m
-        noDataState: NoData
+        noDataState: OK
         execErrState: Error
         labels:
           severity: warning
