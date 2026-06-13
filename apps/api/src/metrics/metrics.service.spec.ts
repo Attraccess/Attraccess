@@ -111,6 +111,13 @@ describe('MetricsService', () => {
       expect(service.auth2faUsageTotal).toBeDefined();
     });
 
+    it('authSsoLoginFailuresTotal counter is defined with provider type and reason labels', async () => {
+      service.authSsoLoginFailuresTotal.inc({ provider_type: 'oidc', reason: 'invalid_assertion' });
+
+      const metrics = await service.getMetrics();
+      expect(metrics).toContain('attraccess_auth_sso_login_failures_total{provider_type="oidc",reason="invalid_assertion"} 1');
+    });
+
     it('attractapFirmwareUpdatesTotal counter is defined', () => {
       expect(service.attractapFirmwareUpdatesTotal).toBeDefined();
     });

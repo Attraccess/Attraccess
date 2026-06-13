@@ -16,6 +16,8 @@ import {
 } from '../errors';
 import { LicenseModuleType, LicenseService } from '../../../../license/license.service';
 import { SSOSamlRequest } from './saml.types';
+import { MetricsService } from '../../../../metrics/metrics.service';
+import { recordSsoLoginFailure } from '../sso-metrics';
 
 @Injectable()
 export class SSOSamlGuard implements CanActivate {
@@ -25,6 +27,7 @@ export class SSOSamlGuard implements CanActivate {
     private readonly ssoService: SSOService,
     private readonly settingsService: SettingsService,
     private readonly licenseService: LicenseService,
+    private readonly metricsService: MetricsService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -36,12 +39,14 @@ export class SSOSamlGuard implements CanActivate {
     } catch (error) {
       const reason = error instanceof Error ? error.message : 'SSO not permitted by license';
       this.logger.warn(`Blocking SSO request due to license: ${reason}`);
+      recordSsoLoginFailure(this.metricsService, SSOProviderType.SAML, 'guard_rejected', this.logger);
       throw new ForbiddenException('SSO is not permitted by the current license');
     }
 
     const url = await this.settingsService.getUrl();
     if (!url) {
       this.logger.error('Application URL not configured. Cannot construct URLs.');
+      recordSsoLoginFailure(this.metricsService, SSOProviderType.SAML, 'guard_rejected', this.logger);
       return false;
     }
 
@@ -51,15 +56,18 @@ export class SSOSamlGuard implements CanActivate {
     const providerId = parseInt(providerIdString, 10);
 
     if (isNaN(providerId)) {
+      recordSsoLoginFailure(this.metricsService, SSOProviderType.SAML, 'guard_rejected', this.logger);
       throw new InvalidSSOProviderIdException();
     }
 
     if (ssoType !== SSOProviderType.SAML) {
+      recordSsoLoginFailure(this.metricsService, SSOProviderType.SAML, 'guard_rejected', this.logger);
       throw new InvalidSSOProviderTypeException();
     }
 
     const provider = await this.ssoService.getProviderByTypeAndIdWithConfiguration(ssoType, providerId);
     if (!provider || !provider.samlConfiguration) {
+      recordSsoLoginFailure(this.metricsService, SSOProviderType.SAML, 'guard_rejected', this.logger);
       throw new SSOProviderNotFoundException();
     }
 
@@ -72,6 +80,7 @@ export class SSOSamlGuard implements CanActivate {
         : url;
     } catch {
       this.logger.warn(`Invalid redirectTo provided: ${rawRedirect ?? 'undefined'}`);
+      recordSsoLoginFailure(this.metricsService, SSOProviderType.SAML, 'guard_rejected', this.logger);
       throw new BadRequestException('Invalid redirectTo parameter');
     }
 

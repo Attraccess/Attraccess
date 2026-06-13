@@ -19,6 +19,8 @@ import {
   resolvePermissionsFromRoles,
 } from '../permission-mapping';
 import { OidcCookieStateStore, OIDCAppState } from './oidc-cookie-state-store';
+import { MetricsService } from '../../../../metrics/metrics.service';
+import { classifySsoFailureReason, markSsoFailureMetricRecorded, recordSsoLoginFailure } from '../sso-metrics';
 
 /** Request key set by SSOOIDCGuard so the strategy uses the per-request callback URL (current settings, no restart needed). */
 export const SSO_OIDC_CALLBACK_URL_REQUEST_KEY = '_ssoOidcCallbackUrl';
@@ -99,6 +101,18 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', true
     return undefined;
   }
 
+  private recordFailure(error: unknown): void {
+    try {
+      const metricsService = this.moduleRef.get(MetricsService, { strict: false });
+      recordSsoLoginFailure(metricsService, SSOProviderType.OIDC, classifySsoFailureReason(error), this.logger);
+      markSsoFailureMetricRecorded(error);
+    } catch (metricsError) {
+      this.logger.warn(
+        `Failed to resolve MetricsService for SSO login failure metric: ${metricsError instanceof Error ? metricsError.message : String(metricsError)}`,
+      );
+    }
+  }
+
   private parseIdTokenClaims(idToken?: string): Record<string, unknown> | undefined {
     if (!idToken) {
       return undefined;
@@ -128,7 +142,9 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', true
 
     if (!oidcUserId) {
       this.logger.error('No user ID found in SSO profile');
-      throw new BadRequestException('No user ID found in SSO profile');
+      const error = new BadRequestException('No user ID found in SSO profile');
+      this.recordFailure(error);
+      throw error;
     }
 
     const usersService = await this.moduleRef.get(UsersService, { strict: false });
@@ -153,7 +169,9 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', true
     }
     if (!email) {
       this.logger.error('No email could be resolved from SSO profile');
-      throw new BadRequestException('No email found in SSO profile');
+      const error = new BadRequestException('No email found in SSO profile');
+      this.recordFailure(error);
+      throw error;
     }
 
     // Step 1: Check if user exists by SSO auth detail
@@ -177,12 +195,13 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', true
     if (user) {
       // Step 3: User exists with email but no SSO binding - require linking flow
       this.logger.log(`Found user with email ${email} but no SSO binding. Account linking required.`);
-      throw new AccountLinkingRequiredException({
+      const error = new AccountLinkingRequiredException({
         email,
         externalId: oidcUserId,
         providerId: this.config.ssoProviderId,
         providerType: SSOProviderType.OIDC,
       });
+      throw error;
     }
 
     // Step 4: No user exists, create new user with external ID
@@ -204,7 +223,9 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', true
 
     if (!user) {
       this.logger.error('Failed to create user after SSO authentication');
-      throw new UnauthorizedException();
+      const error = new UnauthorizedException();
+      this.recordFailure(error);
+      throw error;
     }
 
     await authService.addAuthenticationDetails(user.id, {

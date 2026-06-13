@@ -19,6 +19,7 @@ export class MetricsService implements OnModuleInit {
   public readonly authLoginTotal: Counter;
   public readonly authActiveSessions: Gauge;
   public readonly authSsoLoginTotal: Counter;
+  public readonly authSsoLoginFailuresTotal: Counter;
   public readonly auth2faUsageTotal: Counter;
 
   public readonly usersTotal: Gauge;
@@ -84,8 +85,15 @@ export class MetricsService implements OnModuleInit {
 
     this.authSsoLoginTotal = new Counter({
       name: 'attraccess_auth_sso_login_total',
-      help: 'Total number of SSO login attempts',
+      help: 'Total number of successful SSO login attempts',
       labelNames: ['provider_type'],
+      registers: [this.registry],
+    });
+
+    this.authSsoLoginFailuresTotal = new Counter({
+      name: 'attraccess_auth_sso_login_failures_total',
+      help: 'Total number of failed SSO login attempts',
+      labelNames: ['provider_type', 'reason'],
       registers: [this.registry],
     });
 

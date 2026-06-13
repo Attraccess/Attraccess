@@ -43,8 +43,10 @@ import { SSOController } from './auth/sso/sso.controller';
 import { CookieConfigService } from '../common/services/cookie-config.service';
 import { LicenseModule } from '../license/license.module';
 import { SSOOIDCGuard } from './auth/sso/oidc/oidc.guard';
+import { SSOOIDCPassportGuard } from './auth/sso/oidc/oidc-passport.guard';
 import { OidcCookieStateStore } from './auth/sso/oidc/oidc-cookie-state-store';
 import { SSOSamlGuard } from './auth/sso/saml/saml.guard';
+import { SSOSamlPassportGuard } from './auth/sso/saml/saml-passport.guard';
 import { SSOSamlStrategy } from './auth/sso/saml/saml.strategy';
 import { EncryptionModule } from '../encryption/encryption.module';
 import { SSOLinkTokenService } from './auth/sso/link-token.service';
@@ -93,7 +95,9 @@ import { PasswordPolicyModule } from './password-policy/password-policy.module';
     CookieConfigService,
     OidcCookieStateStore,
     SSOOIDCGuard,
+    SSOOIDCPassportGuard,
     SSOSamlGuard,
+    SSOSamlPassportGuard,
     SSOSamlStrategy,
     SSOLinkTokenService,
     AccountLinkingExceptionFilter,

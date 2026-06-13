@@ -22,6 +22,7 @@ import { MetricsService } from '../../../metrics/metrics.service';
 
 const mockMetricsService = {
   authSsoLoginTotal: { inc: jest.fn() },
+  authSsoLoginFailuresTotal: { inc: jest.fn() },
 };
 
 describe('SsoController', () => {

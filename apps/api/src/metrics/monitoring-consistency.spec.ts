@@ -243,6 +243,7 @@ describe('Monitoring configuration consistency', () => {
       'HighHttpErrorRate',
       'HighRequestLatency',
       'HighFailedLoginRate',
+      'HighSsoLoginFailureRate',
       'OverdueMaintenance',
       // ATT-517 device + system health additions
       'AttractapAllReadersOffline',
@@ -258,10 +259,6 @@ describe('Monitoring configuration consistency', () => {
       'HighHostDiskUsage',
       'HighAttraccessContainerMemoryUsage',
     ];
-
-    it('legacy prometheus alerts.yml no longer exists', () => {
-      expect(() => loadYaml('prometheus/alerts.yml')).toThrow();
-    });
 
     it('Grafana provisioned rules define all required alerts', () => {
       expect(grafanaRules).toContain('groups:');

@@ -38,7 +38,8 @@ rate(attraccess_http_requests_total{status_code=~"5.."}[5m])
 |--------|-----|--------|--------------|
 | `attraccess_auth_login_total` | Counter | `method`, `status` | Anmeldeversuche (inkl. Versuche mit unbekanntem Benutzernamen). `method`: `local` oder `sso`. `status`: `success` oder `fail` |
 | `attraccess_auth_active_sessions` | Gauge | -- | Anzahl aktiver authentifizierter Sitzungen |
-| `attraccess_auth_sso_login_total` | Counter | `provider_type` | SSO-Anmeldeversuche. `provider_type`: `oidc` oder `saml` |
+| `attraccess_auth_sso_login_total` | Counter | `provider_type` | Erfolgreiche SSO-Anmeldeversuche. `provider_type`: `oidc` oder `saml` |
+| `attraccess_auth_sso_login_failures_total` | Counter | `provider_type`, `reason` | Fehlgeschlagene SSO-Anmeldeversuche. `provider_type`: `oidc` oder `saml`; `reason`: `guard_rejected`, `invalid_assertion`, `linking_failed` oder `provider_error` |
 | `attraccess_auth_2fa_usage_total` | Counter | `action` | Zwei-Faktor-Authentifizierungsaktionen |
 
 ### Beispiel-PromQL-Abfragen
@@ -49,6 +50,9 @@ sum(increase(attraccess_auth_login_total{status="fail"}[5m]))
 
 # Vergleich SSO vs. lokale Anmeldung
 sum by (method) (rate(attraccess_auth_login_total{status="success"}[1h]))
+
+# Fehlgeschlagene SSO-Anmeldungen in den letzten 5 Minuten nach Anbieter-Typ und Grund
+sum by (provider_type, reason) (increase(attraccess_auth_sso_login_failures_total[5m]))
 ```
 
 ## Benutzer-Metriken
