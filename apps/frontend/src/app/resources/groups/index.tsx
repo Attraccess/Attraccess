@@ -1,6 +1,5 @@
 import { HTMLAttributes, useCallback, useMemo, useState } from 'react';
 import {
-  Link,
   Table,
   TableBody,
   TableCell,
@@ -10,7 +9,6 @@ import {
   TableRow,
   TableScrollContainer,
 } from '@heroui/react';
-import { Button } from '../../../components/button';
 import {
   Resource,
   ResourceGroup,
@@ -32,6 +30,8 @@ import { useToastMessage } from '../../../components/toastProvider';
 import { ResourceGroupUpsertModal } from '../../resource-groups/upsertModal/resourceGroupUpsertModal';
 import { GroupsToolbar } from './GroupsToolbar';
 import { filterAndSortGroups, GroupFilter } from './groupsFilter';
+import { TableRowActions } from '../../../components/tableRowActions';
+import { useNavigate } from 'react-router-dom';
 
 type ManageResourceGroupsProps = Omit<HTMLAttributes<HTMLElement>, 'children'> & {
   resourceId: number;
@@ -46,6 +46,7 @@ export function ManageResourceGroups({
   const { t } = useTranslations({ de, en });
   const queryClient = useQueryClient();
   const toast = useToastMessage();
+  const navigate = useNavigate();
 
   const { data: resource } = useResourcesServiceGetOneResourceById({ id: resourceId });
   const { data: groups } = useResourcesServiceResourceGroupsGetMany();
@@ -139,8 +140,6 @@ export function ManageResourceGroups({
     return { assigned, available: allGroups.length - assigned };
   }, [allGroups, assignedIds]);
 
-  const resourceName = resource?.name ?? '';
-
   const emptyMessage = allGroups.length === 0 ? t('empty.noGroups') : t('empty.noMatch');
 
   const renderTable = () => (
@@ -161,10 +160,6 @@ export function ManageResourceGroups({
               const isAssigned = assignedIds.has(group.id);
               const dotClass = isAssigned ? 'bg-success' : 'bg-default-300';
               const ringClass = isAssigned ? 'ring-success/30' : 'ring-default-300/30';
-              const actionLabel = t(isAssigned ? 'row.toggleOff' : 'row.toggleOn', {
-                resource: resourceName,
-                group: group.name,
-              });
               const buttonLabel = t(isAssigned ? 'row.remove' : 'row.add');
               const isPending = pendingGroupIds.has(group.id);
               return (
@@ -193,29 +188,34 @@ export function ManageResourceGroups({
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Button
-                      size="sm"
-                      variant={isAssigned ? 'danger-soft' : 'primary'}
-                      isDisabled={isPending}
-                      isPending={isPending}
-                      onPress={() => handleToggle(group)}
-                      aria-label={actionLabel}
-                      data-cy={`resource-group-row-${group.id}-toggle`}
-                    >
-                      {isPending ? null : isAssigned ? <MinusIcon size={14} /> : <PlusIcon size={14} />}
-                      {buttonLabel}
-                    </Button>
+                    <span className={isAssigned ? 'text-success' : 'text-default-400'}>
+                      {isAssigned ? t('filter.assigned') : t('filter.available')}
+                    </span>
                   </TableCell>
                   <TableCell>
-                    <Link
-                      href={`/resource-groups/${group.id}`}
-                      className="text-xs inline-flex items-center gap-0.5"
-                      data-cy={`resource-group-row-${group.id}-open`}
-                      aria-label={`${t('row.openGroup')}: ${group.name}`}
-                    >
-                      {t('row.openGroup')}
-                      <ChevronRightIcon size={14} />
-                    </Link>
+                    <TableRowActions
+                      ariaLabel={t('columns.actions')}
+                      triggerDataCy={`resource-group-row-${group.id}-actions`}
+                      actions={[
+                        {
+                          key: 'toggle',
+                          label: buttonLabel,
+                          icon: isAssigned ? <MinusIcon size={14} /> : <PlusIcon size={14} />,
+                          variant: isAssigned ? 'destructive' : 'default',
+                          isDisabled: isPending,
+                          isPending,
+                          onPress: () => handleToggle(group),
+                          dataCy: `resource-group-row-${group.id}-toggle`,
+                        },
+                        {
+                          key: 'open',
+                          label: `${t('row.openGroup')}: ${group.name}`,
+                          icon: <ChevronRightIcon size={14} />,
+                          onPress: () => navigate(`/resource-groups/${group.id}`),
+                          dataCy: `resource-group-row-${group.id}-open`,
+                        },
+                      ]}
+                    />
                   </TableCell>
                 </TableRow>
               );

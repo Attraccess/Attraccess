@@ -17,6 +17,7 @@ import { ReactNode, useCallback, useMemo, useState } from 'react';
 import { SimplePagination } from '../simplePagination';
 import { PlusIcon } from 'lucide-react';
 import { EmptyState } from '../emptyState';
+import { TableRowActions } from '../tableRowActions';
 
 import de from './de.json';
 import en from './en.json';
@@ -151,19 +152,23 @@ export function UserSelectionList<TUser extends User = User>(props: Readonly<Pro
                   }
 
                   <TableCell>
-                    <div className="flex gap-4 flex-row flex-wrap md:flex-nowrap">
-                      {parseActions(user).map((action) => (
-                        <Button
-                          {...{ ...action, label: undefined, onClick: undefined, startContent: undefined }}
-                          key={action.key}
-                          onPress={() => action.onClick(user)}
-                          className="flex"
-                        >
-                          {action.startContent}
-                          {action.label}
-                        </Button>
-                      ))}
-                    </div>
+                    <TableRowActions
+                      ariaLabel={t('selectedUsers.columns.actions')}
+                      actions={parseActions(user).map((action) => {
+                        const actionProps = action as Action<TUser> & { 'aria-label'?: string; 'data-cy'?: string };
+
+                        return {
+                          key: action.key,
+                          label: action.label ?? actionProps['aria-label'] ?? action.key,
+                          icon: action.startContent,
+                          variant: action.variant === 'danger' || action.variant === 'danger-soft' ? 'destructive' : 'default',
+                          isDisabled: action.isDisabled,
+                          isPending: action.isPending,
+                          dataCy: actionProps['data-cy'],
+                          onPress: () => action.onClick(user),
+                        };
+                      })}
+                    />
                   </TableCell>
                 </TableRow>
               )}

@@ -1,6 +1,5 @@
 import { DateTimeDisplay, useNumberFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
-  Button,
   Chip,
   cn,
   Skeleton,
@@ -31,6 +30,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { dbCurrencyToUserCurrency } from '@attraccess/shared';
 import { TransactionDetailsModal } from './transactionDetailsModal';
 import { RefundModal } from './transactionDetailsModal/refund';
+import { TableRowActions } from '../../../../components/tableRowActions';
 
 interface Props {
   className?: string;
@@ -210,14 +210,18 @@ export function SummaryCard(props: Props) {
                   <TableCell>
                     <RefundModal transactionId={transaction.id}>
                       {(onOpen) => (
-                        <Button
-                          isIconOnly
-                          variant="danger-soft"
-                          aria-label={t('transactions.table.actions.refund') as string}
-                          onPress={onOpen}
-                        >
-                          <RotateCcwIcon />
-                        </Button>
+                        <TableRowActions
+                          ariaLabel={t('transactions.table.columns.actions')}
+                          actions={[
+                            {
+                              key: 'refund',
+                              label: t('transactions.table.actions.refund'),
+                              icon: <RotateCcwIcon className="w-4 h-4" />,
+                              variant: 'destructive',
+                              onPress: onOpen,
+                            },
+                          ]}
+                        />
                       )}
                     </RefundModal>
                   </TableCell>

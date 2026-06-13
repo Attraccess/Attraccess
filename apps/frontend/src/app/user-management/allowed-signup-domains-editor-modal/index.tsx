@@ -35,6 +35,7 @@ import de from './de.json';
 import { useToastMessage } from '../../../components/toastProvider';
 import API_ERROR_TRANSLATIONS_DE from '../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../global-translations/api-errors.en.json';
+import { TableRowActions } from '../../../components/tableRowActions';
 
 interface Props {
   children: (onOpen: () => void) => React.ReactNode;
@@ -168,11 +169,19 @@ export function AllowedSignupDomainsEditorModal(props: Props) {
                   {(domain) => (
                     <TableRow key={domain.value} id={domain.value}>
                       <TableCell className="w-full">{domain.value}</TableCell>
-                      <TableCell className="flex-row flex">
-                        <Button variant="danger-soft" onPress={() => onRemoveDomain(domain.value)}>
-                          <Trash2Icon className="w-4 h-4" />
-                          {t('table.actions.removeDomain')}
-                        </Button>
+                      <TableCell>
+                        <TableRowActions
+                          ariaLabel={t('table.columns.actions')}
+                          actions={[
+                            {
+                              key: 'remove',
+                              label: t('table.actions.removeDomain'),
+                              icon: <Trash2Icon className="w-4 h-4" />,
+                              variant: 'destructive',
+                              onPress: () => onRemoveDomain(domain.value),
+                            },
+                          ]}
+                        />
                       </TableCell>
                     </TableRow>
                   )}

@@ -39,6 +39,7 @@ import { useToastMessage } from '../../../components/toastProvider';
 import { POLICY_BOOL_FIELDS, POLICY_FIELD_KEYS, POLICY_NUMBER_FIELDS } from './policy-fields';
 import en from './en.json';
 import de from './de.json';
+import { TableRowActions } from '../../../components/tableRowActions';
 
 const ROLES: PasswordPolicyRole[] = [PasswordPolicyRole.ADMIN];
 
@@ -168,23 +169,25 @@ export function OverridesSection({ globalPolicy }: Props) {
                             </Chip>
                           )}
                         </TableCell>
-                        <TableCell className="flex justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            onPress={() => setEditingRole(role)}
-                            data-testid={`policy-override-edit-${role}`}
-                          >
-                            {t('overrides.edit')}
-                          </Button>
-                          {row && (
-                            <Button
-                              variant="danger-soft"
-                              onPress={() => remove({ role })}
-                              data-testid={`policy-override-remove-${role}`}
-                            >
-                              {t('overrides.remove')}
-                            </Button>
-                          )}
+                        <TableCell>
+                          <TableRowActions
+                            ariaLabel={t('overrides.actions')}
+                            actions={[
+                              {
+                                key: 'edit',
+                                label: t('overrides.edit'),
+                                onPress: () => setEditingRole(role),
+                                testId: `policy-override-edit-${role}`,
+                              },
+                              row && {
+                                key: 'remove',
+                                label: t('overrides.remove'),
+                                variant: 'destructive',
+                                onPress: () => remove({ role }),
+                                testId: `policy-override-remove-${role}`,
+                              },
+                            ]}
+                          />
                         </TableCell>
                       </TableRow>
                     );

@@ -1,8 +1,4 @@
 import {
-  Alert,
-  AlertContent,
-  AlertDescription,
-  AlertTitle,
   Button,
   DrawerBody,
   DrawerFooter,
@@ -40,10 +36,10 @@ import en from './en.json';
 import { NfcCardDeactivateModal } from './deactivate';
 import { NfcCardActivateModal } from './activate';
 import { CheckIcon, PlusIcon, ServerIcon, Trash2Icon, XIcon } from 'lucide-react';
-import { AlertStatusIcon } from '../../../components/AlertStatusIcon';
 import { PageAction, PageHeader } from '../../../components/pageHeader';
 import { useAuth } from '../../../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
+import { TableRowActions } from '../../../components/tableRowActions';
 
 interface DeleteModalProps {
   show: boolean;
@@ -129,43 +125,59 @@ const NfcCardTableCell = (props: NfcCardTableCellProps) => {
 
   if (props.header === 'actions') {
     return (
-      <div className="flex gap-2 flex-row flex-wrap">
-        <Button
-          variant="danger-soft"
-          onPress={() => props.onDeleteClick()}
-          data-cy={`nfc-card-table-cell-delete-button-${props.card.id}`}
-        >
-          <Trash2Icon />
-          {t('nfcCardsTable.actions.delete')}
-        </Button>
-        {props.card.isActive ? (
-          <NfcCardDeactivateModal cardId={props.card.id}>
-            {(onOpen) => (
-              <Button
-                variant="tertiary"
-                onPress={onOpen}
-                data-cy={`nfc-card-table-cell-deactivate-button-${props.card.id}`}
-              >
-                <XIcon />
-                {t('nfcCardsTable.actions.deactivate')}
-              </Button>
-            )}
-          </NfcCardDeactivateModal>
-        ) : (
-          <NfcCardActivateModal cardId={props.card.id}>
-            {(onOpen) => (
-              <Button
-                variant="tertiary"
-                onPress={onOpen}
-                data-cy={`nfc-card-table-cell-activate-button-${props.card.id}`}
-              >
-                <CheckIcon />
-                {t('nfcCardsTable.actions.activate')}
-              </Button>
-            )}
-          </NfcCardActivateModal>
-        )}
-      </div>
+      props.card.isActive ? (
+        <NfcCardDeactivateModal cardId={props.card.id}>
+          {(onOpen) => (
+            <TableRowActions
+              ariaLabel={t('nfcCardsTable.headers.actions')}
+              triggerDataCy={`nfc-card-table-cell-actions-button-${props.card.id}`}
+              actions={[
+                {
+                  key: 'deactivate',
+                  label: t('nfcCardsTable.actions.deactivate'),
+                  icon: <XIcon className="w-4 h-4" />,
+                  onPress: onOpen,
+                  dataCy: `nfc-card-table-cell-deactivate-button-${props.card.id}`,
+                },
+                {
+                  key: 'delete',
+                  label: t('nfcCardsTable.actions.delete'),
+                  icon: <Trash2Icon className="w-4 h-4" />,
+                  variant: 'destructive',
+                  onPress: props.onDeleteClick,
+                  dataCy: `nfc-card-table-cell-delete-button-${props.card.id}`,
+                },
+              ]}
+            />
+          )}
+        </NfcCardDeactivateModal>
+      ) : (
+        <NfcCardActivateModal cardId={props.card.id}>
+          {(onOpen) => (
+            <TableRowActions
+              ariaLabel={t('nfcCardsTable.headers.actions')}
+              triggerDataCy={`nfc-card-table-cell-actions-button-${props.card.id}`}
+              actions={[
+                {
+                  key: 'activate',
+                  label: t('nfcCardsTable.actions.activate'),
+                  icon: <CheckIcon className="w-4 h-4" />,
+                  onPress: onOpen,
+                  dataCy: `nfc-card-table-cell-activate-button-${props.card.id}`,
+                },
+                {
+                  key: 'delete',
+                  label: t('nfcCardsTable.actions.delete'),
+                  icon: <Trash2Icon className="w-4 h-4" />,
+                  variant: 'destructive',
+                  onPress: props.onDeleteClick,
+                  dataCy: `nfc-card-table-cell-delete-button-${props.card.id}`,
+                },
+              ]}
+            />
+          )}
+        </NfcCardActivateModal>
+      )
     );
   }
 

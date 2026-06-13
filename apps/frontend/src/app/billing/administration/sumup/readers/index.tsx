@@ -23,6 +23,7 @@ import {
 import { EmptyState } from '../../../../../components/emptyState';
 import { SumUpReadersPairing } from './pairing';
 import { SumUpReaderDeleteModal } from './remove';
+import { TableRowActions } from '../../../../../components/tableRowActions';
 
 export function SumUpReadersCard(props: Omit<CardProps, 'children'>) {
   const { t, language } = useTranslations({ en, de });
@@ -82,10 +83,18 @@ export function SumUpReadersCard(props: Omit<CardProps, 'children'>) {
                     <TableCell>
                       <SumUpReaderDeleteModal readerId={reader.id} readerName={reader.name}>
                         {(onOpen) => (
-                          <Button variant="danger-soft" onPress={onOpen}>
-                            <Trash2Icon className="w-4 h-4" />
-                            {t('table.actions.deleteReader')}
-                          </Button>
+                          <TableRowActions
+                            ariaLabel={t('table.columns.actions')}
+                            actions={[
+                              {
+                                key: 'delete',
+                                label: t('table.actions.deleteReader'),
+                                icon: <Trash2Icon className="w-4 h-4" />,
+                                variant: 'destructive',
+                                onPress: onOpen,
+                              },
+                            ]}
+                          />
                         )}
                       </SumUpReaderDeleteModal>
                     </TableCell>

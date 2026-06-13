@@ -4,7 +4,8 @@
   "columns": {
     "image": "Image",
     "name": "Name",
-    "status": "Status"
+    "status": "Status",
+    "actions": "Actions"
   },
   "actions": {
     "openGroupSettings": "Open group settings"

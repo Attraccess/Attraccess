@@ -7,16 +7,14 @@ import {
   TableHeader,
   TableRow,
   TableScrollContainer,
-  Tooltip,
-  TooltipContent,
 } from '@heroui/react';
 import { Key, Pencil, Trash } from 'lucide-react';
 import { SSOProvider } from '@attraccess/react-query-client';
-import { Button } from '../../../components/button';
 import { EmptyState } from '../../../components/emptyState';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
+import { TableRowActions } from '../../../components/tableRowActions';
 
 interface SSOProvidersTableProps {
   providers: SSOProvider[];
@@ -59,30 +57,27 @@ export const SSOProvidersTable = ({ providers, onEdit, onDelete }: SSOProvidersT
                 </TableCell>
                 <TableCell>{provider.type}</TableCell>
                 <TableCell>
-                  <div className="flex items-center gap-2">
-                    <Tooltip>
-                      <Button
-                        variant="ghost"
-                        isIconOnly
-                        onPress={() => onEdit(provider)}
-                        data-cy={`sso-provider-edit-button-${provider.id}`}
-                      >
-                        <Pencil size={16} />
-                      </Button>
-                      <TooltipContent>{t('edit')}</TooltipContent>
-                    </Tooltip>
-                    <Tooltip>
-                      <Button
-                        variant="danger-soft"
-                        isIconOnly
-                        onPress={() => onDelete(provider.id)}
-                        data-cy={`sso-provider-delete-button-${provider.id}`}
-                      >
-                        <Trash size={16} />
-                      </Button>
-                      <TooltipContent>{t('deleteText')}</TooltipContent>
-                    </Tooltip>
-                  </div>
+                  <TableRowActions
+                    ariaLabel={t('actions')}
+                    triggerDataCy={`sso-provider-actions-button-${provider.id}`}
+                    actions={[
+                      {
+                        key: 'edit',
+                        label: t('edit'),
+                        icon: <Pencil size={16} />,
+                        onPress: () => onEdit(provider),
+                        dataCy: `sso-provider-edit-button-${provider.id}`,
+                      },
+                      {
+                        key: 'delete',
+                        label: t('deleteText'),
+                        icon: <Trash size={16} />,
+                        variant: 'destructive',
+                        onPress: () => onDelete(provider.id),
+                        dataCy: `sso-provider-delete-button-${provider.id}`,
+                      },
+                    ]}
+                  />
                 </TableCell>
               </TableRow>
             )}

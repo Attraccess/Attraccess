@@ -36,6 +36,7 @@ import { AlertStatusIcon } from '../../../components/AlertStatusIcon';
 import { EmptyState } from '../../../components/emptyState';
 import { PluginSlot } from '../../plugins/PluginSlot';
 import { MQTT_SERVER_LIST_ROW_SLOT, MqttServerSlotContext } from '../mqtt.slots';
+import { TableRowActions } from '../../../components/tableRowActions';
 
 export function MqttServerList() {
   const { t } = useTranslations({ en, de });
@@ -121,23 +122,28 @@ export function MqttServerList() {
                     {server.host}:{server.port}
                   </TableCell>
                   <TableCell>
-                    <div className="flex flex-row gap-2">
-                      <Button
-                        variant="ghost"
-                        onPress={() => handleEditServer(server.id)}
-                        data-cy={`mqtt-server-list-item-edit-button-${server.id}`}
-                      >
-                        <PencilIcon className="w-4 h-4" />
-                        {t('editServer')}
-                      </Button>
-                      <Button
-                        variant="danger-soft"
-                        onPress={() => handleDeleteServer(server.id)}
-                        data-cy={`mqtt-server-list-item-delete-button-${server.id}`}
-                      >
-                        <Trash2Icon className="w-4 h-4" />
-                        {t('deleteServer')}
-                      </Button>
+                    <div className="flex items-center gap-2">
+                      <TableRowActions
+                        ariaLabel={t('columnActions')}
+                        triggerDataCy={`mqtt-server-list-item-actions-button-${server.id}`}
+                        actions={[
+                          {
+                            key: 'edit',
+                            label: t('editServer'),
+                            icon: <PencilIcon className="w-4 h-4" />,
+                            onPress: () => handleEditServer(server.id),
+                            dataCy: `mqtt-server-list-item-edit-button-${server.id}`,
+                          },
+                          {
+                            key: 'delete',
+                            label: t('deleteServer'),
+                            icon: <Trash2Icon className="w-4 h-4" />,
+                            variant: 'destructive',
+                            onPress: () => handleDeleteServer(server.id),
+                            dataCy: `mqtt-server-list-item-delete-button-${server.id}`,
+                          },
+                        ]}
+                      />
                       <PluginSlot<MqttServerSlotContext>
                         slotId={MQTT_SERVER_LIST_ROW_SLOT}
                         context={{ mqttServerId: server.id }}

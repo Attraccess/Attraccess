@@ -20,7 +20,7 @@ import {
 import { Button } from '../../../../../components/button';
 import { useCallback, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { CheckIcon, Pencil, Plus, Trash2, XIcon } from 'lucide-react';
 import { useTranslations, useDateTimeFormatter } from '@attraccess/plugins-frontend-ui';
 import {
   ApiError,
@@ -38,6 +38,7 @@ import { EditorMode, VariableEditor, VariableFormValues, ValueType } from './edi
 import { StandardModal } from '../../../../../components/standardModal';
 import de from './de.json';
 import en from './en.json';
+import { TableRowActions } from '../../../../../components/tableRowActions';
 
 interface Props {
   resourceId: number;
@@ -247,39 +248,39 @@ export function VariablesModal(props: Props) {
                               {formatDateTime(row.updatedAt)}
                             </TableCell>
                             <TableCell>
-                              <div className="flex flex-row justify-end gap-1">
-                                <Button
-                                  isIconOnly
-                                  variant="ghost"
-                                  aria-label={t('actions.edit')}
-                                  onPress={() => handleEdit(row)}
-                                >
-                                  <Pencil className="h-4 w-4" />
-                                </Button>
-                                {pendingDeleteKey === rowKey(row) ? (
-                                  <>
-                                    <Button variant="ghost" onPress={() => setPendingDeleteKey(null)}>
-                                      {t('actions.confirmDeleteNo')}
-                                    </Button>
-                                    <Button
-                                      variant="danger"
-                                      isPending={remove.isPending}
-                                      onPress={() => handleDelete(row)}
-                                    >
-                                      {t('actions.confirmDeleteYes')}
-                                    </Button>
-                                  </>
-                                ) : (
-                                  <Button
-                                    isIconOnly
-                                    variant="danger-soft"
-                                    aria-label={t('actions.delete')}
-                                    onPress={() => setPendingDeleteKey(rowKey(row))}
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                )}
-                              </div>
+                              <TableRowActions
+                                ariaLabel={t('table.actions')}
+                                actions={[
+                                  {
+                                    key: 'edit',
+                                    label: t('actions.edit'),
+                                    icon: <Pencil className="h-4 w-4" />,
+                                    onPress: () => handleEdit(row),
+                                  },
+                                  pendingDeleteKey === rowKey(row)
+                                    ? {
+                                        key: 'cancel-delete',
+                                        label: t('actions.confirmDeleteNo'),
+                                        icon: <XIcon className="h-4 w-4" />,
+                                        onPress: () => setPendingDeleteKey(null),
+                                      }
+                                    : {
+                                        key: 'delete',
+                                        label: t('actions.delete'),
+                                        icon: <Trash2 className="h-4 w-4" />,
+                                        variant: 'destructive',
+                                        onPress: () => setPendingDeleteKey(rowKey(row)),
+                                      },
+                                  pendingDeleteKey === rowKey(row) && {
+                                    key: 'confirm-delete',
+                                    label: t('actions.confirmDeleteYes'),
+                                    icon: <CheckIcon className="h-4 w-4" />,
+                                    variant: 'destructive',
+                                    isPending: remove.isPending,
+                                    onPress: () => handleDelete(row),
+                                  },
+                                ]}
+                              />
                             </TableCell>
                           </TableRow>
                         ))
