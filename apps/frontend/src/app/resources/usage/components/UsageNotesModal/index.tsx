@@ -7,7 +7,7 @@ import {
   TextArea,
 } from '@heroui/react';
 import { FormFieldType, ResourceUsage, ResourceUsageAction } from '@attraccess/react-query-client';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { AttraccessUser, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './translations/en';
 import de from './translations/de';
 import { DateTimeDisplay } from '@attraccess/plugins-frontend-ui';
@@ -102,6 +102,13 @@ export const UsageNotesModal = memo(
                       <p className="text-sm text-default-500">{session.project?.name ?? projectPlaceholder}</p>
                     </>
                   )}
+                </section>
+              )}
+
+              {session.supervisorUser && (
+                <section className="space-y-2 border-t border-divider pt-4">
+                  <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">{t('supervisor')}</p>
+                  <AttraccessUser user={session.supervisorUser} />
                 </section>
               )}
 

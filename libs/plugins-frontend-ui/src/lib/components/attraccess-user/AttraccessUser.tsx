@@ -15,9 +15,16 @@ interface AttraccessUserProps {
   description?: ReactNode;
   className?: string;
   onStartDirectMessage?: (user: User) => void;
+  variant?: 'full' | 'mini';
 }
 
-export function AttraccessUser({ user, description, className, onStartDirectMessage }: Readonly<AttraccessUserProps>) {
+export function AttraccessUser({
+  user,
+  description,
+  className,
+  onStartDirectMessage,
+  variant = 'full',
+}: Readonly<AttraccessUserProps>) {
   const { t } = useTranslations({ en, de });
   const actions = useAttraccessUserActions();
 
@@ -34,10 +41,21 @@ export function AttraccessUser({ user, description, className, onStartDirectMess
   const startDirectMessage = onStartDirectMessage ?? actions.onStartDirectMessage;
   const isInteractive = !!user && !!startDirectMessage;
 
+  if (variant === 'mini') {
+    return (
+      <Avatar size="sm" className={className} aria-label={name} title={name}>
+        {avatarIcon ? <AvatarImage src={avatarIcon} alt={name} /> : null}
+        <AvatarFallback color={isDeleted ? 'warning' : undefined}>
+          {isDeleted ? <AlertTriangleIcon className="w-4 h-4" /> : name.slice(0, 2).toUpperCase()}
+        </AvatarFallback>
+      </Avatar>
+    );
+  }
+
   const body = (
     <div className={`flex items-center gap-2 ${className ?? ''}`}>
       <Avatar>
-        {avatarIcon ? <AvatarImage src={avatarIcon} /> : null}
+        {avatarIcon ? <AvatarImage src={avatarIcon} alt={name} /> : null}
         <AvatarFallback color={isDeleted ? 'warning' : undefined}>
           {isDeleted ? <AlertTriangleIcon className="w-4 h-4" /> : name.slice(0, 2).toUpperCase()}
         </AvatarFallback>
@@ -64,7 +82,7 @@ export function AttraccessUser({ user, description, className, onStartDirectMess
         <Popover.Dialog className="flex w-64 flex-col gap-3 p-4">
           <div className="flex items-center gap-3">
             <Avatar className="h-12 w-12">
-              {avatarIcon ? <AvatarImage src={avatarIcon} /> : null}
+              {avatarIcon ? <AvatarImage src={avatarIcon} alt={name} /> : null}
               <AvatarFallback>{name.slice(0, 2).toUpperCase()}</AvatarFallback>
             </Avatar>
             <div className="flex min-w-0 flex-col">
