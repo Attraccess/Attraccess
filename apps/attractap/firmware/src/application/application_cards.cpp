@@ -40,17 +40,6 @@ void Application::processCardAuthenticationData() {
 
   this->externalState = EXTERNAL_STATE_NONE;
 
-#ifdef HAS_LVGL_DISPLAY
-  // Two-card supervision (ATT-493): the user's own card is genuine, but the server says this tap
-  // must be authorised by a supervisor before a session can start. Hand off to the supervision
-  // sub-flow instead of unlocking. The session starts once a supervisor card is tapped here, or the
-  // supervisor approves from the web.
-  if (this->cardAuthenticationData.requiresSupervisor) {
-    this->beginSupervision();
-    return;
-  }
-#endif
-
   this->unlocked = true;
 
 #ifndef HAS_LVGL_DISPLAY

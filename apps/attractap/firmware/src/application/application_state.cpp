@@ -185,7 +185,8 @@ void Application::processState() {
             .username = this->cardAuthenticationData.username,
             .canManageResource = this->cardAuthenticationData.canManageResource,
             .hasIntroduction = this->cardAuthenticationData.hasIntroduction,
-            .isIntroducer = this->cardAuthenticationData.isIntroducer});
+            .isIntroducer = this->cardAuthenticationData.isIntroducer,
+            .requiresSupervisor = this->cardAuthenticationData.requiresSupervisor});
 #endif
 
     this->state = APPLICATION_STATE_AUTHENTICATE_CARD;

@@ -610,7 +610,7 @@ describe('AttractapCardHandler', () => {
       );
     });
 
-    it('flags requiresSupervisor for SUPERVISION_ALLOWED only when the user has no introduction', async () => {
+    it('keeps requiresSupervisor in the auth payload for SUPERVISION_ALLOWED when the user has no introduction', async () => {
       const socket = createMockSocket();
       attractapService.getNFCCardByUID.mockResolvedValueOnce(activeCard);
       resourceUsageService.canControllResource.mockResolvedValueOnce(false);

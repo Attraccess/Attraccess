@@ -5,6 +5,7 @@
   "requesterLabel": "Anfragender Nutzer",
   "notesLabel": "Notizen",
   "countdown": "Läuft ab in {{seconds}}s",
+  "ignore": "Ignorieren",
   "approve": "Genehmigen",
   "reject": "Ablehnen",
   "toast": {

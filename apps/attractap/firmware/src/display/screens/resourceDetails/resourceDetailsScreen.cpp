@@ -2,6 +2,7 @@
 #include <lvgl.h>
 #include <time.h>
 #include <stdio.h>
+#include <string.h>
 
 static const char *MAINTENANCE_INFO_TEXT = "Diese Ressource ist wegen Wartungsarbeiten nicht verfuegbar. Wartungsarbeiten duerfen nur von den unten aufgefuehrten Personen durchgefuehrt werden.";
 
@@ -593,15 +594,23 @@ void ResourceDetailsScreen::refreshAccessState()
    // Resource is blocked when it is under maintenance or reporting an unhealthy state.
    bool blocked = underMaintenance || isUnhealthy;
 
-   // No-introduction panel is shown only when the user is missing an introduction
-   // and the resource is not blocked (maintenance/health panels take priority).
+   bool ownsActiveUsage = this->resourceCacheValid && this->resourceCache.hasActiveUsage &&
+                          strcmp(this->resourceCache.activeUser, user.username.c_str()) == 0;
+   bool supervisedStartAvailable = user.requiresSupervisor && this->resourceCacheValid &&
+                                   !this->resourceCache.hasActiveUsage;
+
+   // No-introduction panel is shown only when the user is missing an introduction and has no
+   // supervised start/current-session action available (maintenance/health panels take priority).
    if (this->noIntroductionPanel)
    {
-      lv_obj_set_flag(this->noIntroductionPanel, LV_OBJ_FLAG_HIDDEN, user.hasIntroduction || blocked);
+      lv_obj_set_flag(this->noIntroductionPanel, LV_OBJ_FLAG_HIDDEN,
+                      user.hasIntroduction || supervisedStartAvailable || ownsActiveUsage || blocked);
    }
 
-   // Session controls require access; while blocked only maintainers may use the resource.
-   bool canUse = user.hasIntroduction || user.isIntroducer || user.canManageResource;
+   // Session controls require access, an available supervised start, or ownership of the active
+   // supervised session; while blocked only maintainers may use the resource.
+   bool canUse = user.hasIntroduction || user.isIntroducer || user.canManageResource ||
+                 supervisedStartAvailable || ownsActiveUsage;
    if (blocked)
    {
       canUse = isMaintainer;

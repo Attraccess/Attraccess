@@ -213,8 +213,8 @@ public:
         bool hasIntroduction;
         bool isIntroducer;
         // Two-card supervision (ATT-493). supervisionMode is the resource policy; requiresSupervisor
-        // is the server's verdict for this user (true => the tap must be authorised by a supervisor
-        // before a session can start).
+        // is the server's verdict for this user (true => starting a session requires supervisor
+        // approval; authentication itself still unlocks the resource details screen).
         String supervisionMode;
         bool requiresSupervisor;
     };
