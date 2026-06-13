@@ -5,6 +5,20 @@
     "push": "Push",
     "toast": "In-app"
   },
+  "groups": {
+    "general": {
+      "label": "All users",
+      "description": "Notifications every user may receive."
+    },
+    "resourceManagers": {
+      "label": "Introducers and maintainers",
+      "description": "Notifications for users who manage or supervise resources."
+    },
+    "admins": {
+      "label": "Admins",
+      "description": "Notifications tied to system-level or access-management permissions."
+    }
+  },
   "categories": {
     "messages": {
       "label": "Messages",
@@ -37,6 +51,10 @@
     "supervision_requests": {
       "label": "Supervision requests",
       "description": "Requests that need supervisor approval."
+    },
+    "access_changes": {
+      "label": "Access changes",
+      "description": "Changes to your permissions, introductions, introducer, or maintainer status."
     }
   },
   "description": {

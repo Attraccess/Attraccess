@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NotificationPreferencesForm } from './index';
@@ -63,6 +63,7 @@ vi.mock('@attraccess/react-query-client', () => ({
     RESOURCE_SESSION_ENDED: 'resource_session_ended',
     PROJECT_INVITATIONS: 'project_invitations',
     SUPERVISION_REQUESTS: 'supervision_requests',
+    ACCESS_CHANGES: 'access_changes',
   },
   UseNotificationsServiceNotificationsGetPreferencesKeyFn: () => ['NotificationsServiceNotificationsGetPreferences'],
   useNotificationsServiceNotificationsGetPreferences: () => ({ data: hoisted.preferences, isLoading: false }),
@@ -129,6 +130,7 @@ describe('NotificationPreferencesForm', () => {
     expect(screen.getAllByText('Messages').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Maintenance requests').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Resource health').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Access changes').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Email').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Push').length).toBeGreaterThan(0);
     expect(screen.getAllByText('In-app').length).toBeGreaterThan(0);
@@ -143,6 +145,27 @@ describe('NotificationPreferencesForm', () => {
     expect(screen.getByTestId('notification-preferences-mobile')).toHaveTextContent('Email');
     expect(screen.getByTestId('notification-preferences-mobile')).toHaveTextContent('Push');
     expect(screen.getByTestId('notification-preferences-mobile')).toHaveTextContent('In-app');
+  });
+
+  it('groups notification categories by relevant audience without hiding them', () => {
+    renderForm();
+
+    const general = screen.getByTestId('notification-group-general');
+    expect(within(general).getByText('All users')).toBeInTheDocument();
+    expect(within(general).getByText('Notifications every user may receive.')).toBeInTheDocument();
+    expect(within(general).getByText('Messages')).toBeInTheDocument();
+    expect(within(general).getByText('Project invitations')).toBeInTheDocument();
+
+    const resourceManagers = screen.getByTestId('notification-group-resourceManagers');
+    expect(within(resourceManagers).getByText('Introducers and maintainers')).toBeInTheDocument();
+    expect(within(resourceManagers).getByText('Notifications for users who manage or supervise resources.')).toBeInTheDocument();
+    expect(within(resourceManagers).getByText('Maintenance requests')).toBeInTheDocument();
+    expect(within(resourceManagers).getByText('Resource health')).toBeInTheDocument();
+
+    const admins = screen.getByTestId('notification-group-admins');
+    expect(within(admins).getByText('Admins')).toBeInTheDocument();
+    expect(within(admins).getByText('Notifications tied to system-level or access-management permissions.')).toBeInTheDocument();
+    expect(within(admins).getByText('Access changes')).toBeInTheDocument();
   });
 
   it('updates a single channel for the selected category', async () => {
