@@ -253,6 +253,7 @@ bool RgbGt911Driver::readTouch(TouchPoint &point)
     }
 
     uint8_t touched = 0;
+    bool stale = false;
     {
         // One GT911 point read = one atomic conversation on the shared bus, so
         // it can never interleave with a PN532 exchange on the NFC task
@@ -261,12 +262,34 @@ bool RgbGt911Driver::readTouch(TouchPoint &point)
         // a leaf lock, NFC code never takes lv_lock while holding it.
         I2CBusGuard busGuard;
         touched = touch.getPoint(x, y, touch.getSupportTouchPoint());
+        stale = touch.isLastSampleStale();
     }
 
     if (touched <= 0)
     {
+        // The GT911 scans every 5-15 ms while LVGL polls every 15 ms
+        // (LV_DEF_REFR_PERIOD); a poll can land before the controller has a
+        // fresh sample. Treating that as "finger lifted" splits one press into
+        // several press/release pairs — each pair is a CLICKED event, so
+        // switches toggled right back and taps got swallowed (ATT-541). Hold
+        // the last known press through stale polls; a real release is a fresh
+        // empty sample and is still reported immediately. The hold window is
+        // capped so a wedged controller/bus cannot leave a press stuck.
+        if (stale && lastTouchPressed && (millis() - lastFreshSampleMs) <= TOUCH_STALE_HOLD_MS)
+        {
+            point = lastTouchPoint;
+            point.pressed = true;
+            return true;
+        }
+        if (!stale)
+        {
+            lastFreshSampleMs = millis();
+        }
+        lastTouchPressed = false;
         return false;
     }
+
+    lastFreshSampleMs = millis();
 
     logger.debugf("Touch detected: touched=%d, x=%d, y=%d", touched, x[0], y[0]);
 
@@ -276,5 +299,8 @@ bool RgbGt911Driver::readTouch(TouchPoint &point)
     point.x = (int16_t)(gfx->width() - 1) - x[0];
     point.y = (int16_t)(gfx->height() - 1) - y[0];
     point.pressed = true;
+
+    lastTouchPoint = point;
+    lastTouchPressed = true;
     return true;
 }

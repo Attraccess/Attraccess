@@ -2247,11 +2247,30 @@ uint8_t Adafruit_PN532::ntag424_Authenticate(uint8_t *key, uint8_t keyno,
     return 0;
   }
 
-// 2.) AuthenticateFirst part 1
+  return ntag424_AuthenticateEV2First(key, keyno, cmd);
+}
+
+/*!
+    @brief   Run the AuthenticateEV2First handshake against the currently
+   selected application. Shared by NTAG424 (after ISOSelectFile of the NDEF
+   application) and MIFARE DESFire EV2/EV3 (after desfire_SelectApplication).
+
+    @param   key      encryption key
+    @param   keyno    number of key to authenticate against
+    @param   cmd      0x71 or 0x77
+
+    @return  1 = success; 0 = failed
+*/
+/**************************************************************************/
+uint8_t Adafruit_PN532::ntag424_AuthenticateEV2First(uint8_t *key,
+                                                     uint8_t keyno,
+                                                     uint8_t cmd)
+{
+// AuthenticateFirst part 1
 #ifdef NTAG424DEBUG
-  PN532DEBUGPRINT.println(F("2.) AuthenticateFirst part 1"));
+  PN532DEBUGPRINT.println(F("AuthenticateFirst part 1"));
 #endif
-  cmd_len = 13;
+  int cmd_len = 13;
   uint8_t cmd_auth1[cmd_len] = {PN532_COMMAND_INDATAEXCHANGE,
                                 0x01,
                                 0x90,
@@ -2520,9 +2539,8 @@ uint8_t Adafruit_PN532::ntag424_ChangeFileSettings(uint8_t fileno,
 */
 /**************************************************************************/
 uint8_t Adafruit_PN532::ntag424_ChangeKey(uint8_t *oldkey, uint8_t *newkey,
-                                          uint8_t keynumber)
+                                          uint8_t keynumber, uint8_t keyversion)
 {
-  uint8_t keyversion[1] = {0x01};
   uint8_t xorkey[16];
   for (int i = 0; i < 16; ++i)
   {
@@ -2553,14 +2571,14 @@ uint8_t Adafruit_PN532::ntag424_ChangeKey(uint8_t *oldkey, uint8_t *newkey,
   if (keynumber > 0)
   {
     memcpy(keydata, xorkey, 16);
-    memcpy(keydata + 16, keyversion, 1);
+    keydata[16] = keyversion;
     memcpy(keydata + 17, crcbytes, 4);
     keydata_length = 21;
   }
   else if (keynumber == 0)
   {
     memcpy(keydata, newkey, 16);
-    memcpy(keydata + 16, keyversion, 1);
+    keydata[16] = keyversion;
     keydata_length = 17;
   }
 #ifdef NTAG424DEBUG
@@ -3015,6 +3033,158 @@ uint8_t Adafruit_PN532::ntag424_GetVersion()
   PN532DEBUGPRINT.println(F("Card is not an NTAG424"));
 #endif
   return 0;
+}
+
+/*!
+    @brief   Send a DESFire SelectApplication to the picc (native command
+   0x5A, ISO7816-wrapped). Selecting an application terminates any active
+   authentication session.
+
+    @param   aid    3-byte application identifier, LSB first (master
+   application = 00 00 00)
+
+    @return  false on fail|true on success
+*/
+/**************************************************************************/
+bool Adafruit_PN532::desfire_SelectApplication(const uint8_t *aid)
+{
+  uint8_t cmd_select[11] = {PN532_COMMAND_INDATAEXCHANGE,
+                            0x01,
+                            NTAG424_COM_CLA,
+                            DESFIRE_CMD_SELECT_APPLICATION,
+                            0x00,
+                            0x00,
+                            0x03,
+                            aid[0],
+                            aid[1],
+                            aid[2],
+                            0x00};
+  if (!sendCommandCheckAck(cmd_select, sizeof(cmd_select)))
+  {
+#ifdef NTAG424DEBUG
+    PN532DEBUGPRINT.println(F("Failed to receive ACK for SelectApplication"));
+#endif
+    return false;
+  }
+  /* Read the response packet: D5 41 <status> 91 00 */
+  readdata(pn532_packetbuffer, 12);
+#ifdef NTAG424DEBUG
+  PN532DEBUGPRINT.print(F("SelectApplication response: "));
+  Adafruit_PN532::PrintHexChar(pn532_packetbuffer, 12);
+#endif
+  if (pn532_packetbuffer[7] != 0x00 || pn532_packetbuffer[8] != 0x91 ||
+      pn532_packetbuffer[9] != 0x00)
+  {
+#ifdef NTAG424DEBUG
+    PN532DEBUGPRINT.println(F("SelectApplication ResultError"));
+#endif
+    return false;
+  }
+  // selection invalidates any previous authentication
+  ntag424_Session.authenticated = false;
+  return true;
+}
+
+/*!
+    @brief   Send a DESFire CreateApplication to the picc (native command
+   0xCA, ISO7816-wrapped). On factory cards the default PICC master key
+   settings (0x0F) permit this without prior authentication.
+
+    @param   aid           3-byte application identifier, LSB first
+    @param   keySettings1  application master key settings
+    @param   keySettings2  number of keys | crypto method (0x80 = AES)
+
+    @return  false on fail|true on success
+*/
+/**************************************************************************/
+bool Adafruit_PN532::desfire_CreateApplication(const uint8_t *aid,
+                                               uint8_t keySettings1,
+                                               uint8_t keySettings2)
+{
+  uint8_t cmd_create[13] = {PN532_COMMAND_INDATAEXCHANGE,
+                            0x01,
+                            NTAG424_COM_CLA,
+                            DESFIRE_CMD_CREATE_APPLICATION,
+                            0x00,
+                            0x00,
+                            0x05,
+                            aid[0],
+                            aid[1],
+                            aid[2],
+                            keySettings1,
+                            keySettings2,
+                            0x00};
+  if (!sendCommandCheckAck(cmd_create, sizeof(cmd_create)))
+  {
+#ifdef NTAG424DEBUG
+    PN532DEBUGPRINT.println(F("Failed to receive ACK for CreateApplication"));
+#endif
+    return false;
+  }
+  /* Read the response packet: D5 41 <status> 91 00 */
+  readdata(pn532_packetbuffer, 12);
+#ifdef NTAG424DEBUG
+  PN532DEBUGPRINT.print(F("CreateApplication response: "));
+  Adafruit_PN532::PrintHexChar(pn532_packetbuffer, 12);
+#endif
+  if (pn532_packetbuffer[7] != 0x00 || pn532_packetbuffer[8] != 0x91 ||
+      pn532_packetbuffer[9] != 0x00)
+  {
+#ifdef NTAG424DEBUG
+    PN532DEBUGPRINT.println(F("CreateApplication ResultError"));
+#endif
+    return false;
+  }
+  return true;
+}
+
+/*!
+    @brief   Send a DESFire GetKeyVersion command for the selected
+   application.
+
+    @param   keynumber    Key number in the selected application
+    @param   keyversion   Output key version byte
+
+    @return  false on fail|true on success
+*/
+/**************************************************************************/
+bool Adafruit_PN532::desfire_GetKeyVersion(uint8_t keynumber,
+                                           uint8_t *keyversion)
+{
+  uint8_t cmd_get_version[9] = {PN532_COMMAND_INDATAEXCHANGE,
+                                0x01,
+                                NTAG424_COM_CLA,
+                                DESFIRE_CMD_GET_KEY_VERSION,
+                                0x00,
+                                0x00,
+                                0x01,
+                                keynumber,
+                                0x00};
+  if (!sendCommandCheckAck(cmd_get_version, sizeof(cmd_get_version)))
+  {
+#ifdef NTAG424DEBUG
+    PN532DEBUGPRINT.println(F("Failed to receive ACK for GetKeyVersion"));
+#endif
+    return false;
+  }
+
+  /* Read the response packet: D5 41 <status> <version> 91 00 */
+  readdata(pn532_packetbuffer, 13);
+#ifdef NTAG424DEBUG
+  PN532DEBUGPRINT.print(F("GetKeyVersion response: "));
+  Adafruit_PN532::PrintHexChar(pn532_packetbuffer, 13);
+#endif
+  if (pn532_packetbuffer[7] != 0x00 || pn532_packetbuffer[9] != 0x91 ||
+      pn532_packetbuffer[10] != 0x00)
+  {
+#ifdef NTAG424DEBUG
+    PN532DEBUGPRINT.println(F("GetKeyVersion ResultError"));
+#endif
+    return false;
+  }
+
+  *keyversion = pn532_packetbuffer[8];
+  return true;
 }
 
 /*!

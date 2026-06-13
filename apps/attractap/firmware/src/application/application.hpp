@@ -316,6 +316,10 @@ private:
     uint32_t pendingActionResourceId = 0;
     uint32_t pendingActionProjectId = 0;
     bool hasPendingFormRequest = false;
+    // True once the form for the in-flight action has been fully submitted and the
+    // START/STOP message sent. Guards against a re-delivered (retried by the server)
+    // RESOURCE_USAGE_FORM_REQUEST reopening the form from the beginning (ATT-545).
+    bool formFlowSubmitted = false;
     // Flags set by websocket callbacks when form events arrive; processed by LVGL thread
     volatile bool pendingFormRequestReady = false;
     volatile bool pendingFormFieldsReady = false;
@@ -325,6 +329,30 @@ private:
     API::ResourceUsageFormPageResult pendingFormPageResult;
     uint8_t formCursorFormIdx = 0;
     uint32_t formCursorOffset = 0;
+
+    // Prefetch cache for paginated form fields. Each navigation otherwise costs a
+    // full server round-trip; we cache visited pages and preload the next one so
+    // forward/back navigation renders instantly. Keyed by (formId, offset).
+    struct FormPageCacheEntry {
+      bool valid = false;
+      uint32_t formId = 0;
+      uint32_t offset = 0;
+      uint32_t lru = 0;
+      API::ResourceUsageFormFieldsPage page;
+    };
+    static constexpr uint8_t FORM_PAGE_CACHE_SIZE = 4;
+    FormPageCacheEntry formPageCache[FORM_PAGE_CACHE_SIZE];
+    uint32_t formCacheTick = 0;
+    // True while a GET for the field the user is currently waiting on is in flight.
+    bool awaitingFieldRender = false;
+
+    FormPageCacheEntry *findFormPageCache(uint32_t formId, uint32_t offset);
+    FormPageCacheEntry *storeFormPageCache(const API::ResourceUsageFormFieldsPage &page);
+    void invalidateFormPageCache(uint32_t formId, uint32_t offset);
+    void clearFormPageCache();
+    void renderFormFieldPage(const API::ResourceUsageFormFieldsPage &page);
+    bool computeNextFormCursor(uint8_t &formIdx, uint32_t &offset) const;
+    void prefetchNextFormField();
 
     void selectResource(const API::ResourceBrief &resource);
 

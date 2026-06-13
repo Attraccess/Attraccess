@@ -1,20 +1,12 @@
 import { useCallback, useMemo, useState } from 'react';
-import {
-  Button,
-  Modal,
-  ModalBackdrop,
-  ModalBody,
-  ModalContainer,
-  ModalDialog,
-  ModalFooter,
-  ModalHeader,
-} from '@heroui/react';
+import { Button, ModalBody, ModalFooter, ModalHeader } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { ArrowUpCircle, ExternalLink, X } from 'lucide-react';
 import { useSystemServiceGetUpdateStatus } from '@attraccess/react-query-client';
 import { UPDATE_CHECK_CACHE_TTL_MS } from '@attraccess/shared';
 import { useAuth } from '../../hooks/useAuth';
 import { Markdown } from '../markdown';
+import { StandardModal } from '../standardModal';
 import { readDismissedVersion, writeDismissedVersion } from './storage';
 import en from './en.json';
 import de from './de.json';
@@ -104,37 +96,31 @@ export function UpdateNotificationBanner() {
         </div>
       </div>
 
-      <Modal isOpen={isReleaseNotesOpen} onOpenChange={setIsReleaseNotesOpen}>
-        <ModalBackdrop>
-          <ModalContainer size="md">
-            <ModalDialog>
-              {({ close }) => (
-                <>
-                  <ModalHeader>{t('releaseNotesModalTitle', { version: release.version })}</ModalHeader>
-                  <ModalBody>
-                    {release.body?.trim() ? (
-                      <Markdown variant="compact">{release.body}</Markdown>
-                    ) : (
-                      <div className="text-default-500">{t('releaseNotesFallback')}</div>
-                    )}
-                  </ModalBody>
-                  <ModalFooter className="flex-wrap gap-2 justify-between">
-                    <a href={release.htmlUrl} target="_blank" rel="noopener noreferrer">
-                      <Button variant="secondary">
-                        {release.tagName}
-                        <ExternalLink size={14} />
-                      </Button>
-                    </a>
-                    <Button variant="primary" onPress={close}>
-                      {t('close')}
-                    </Button>
-                  </ModalFooter>
-                </>
+      <StandardModal isOpen={isReleaseNotesOpen} onOpenChange={setIsReleaseNotesOpen} size="md">
+        {({ close }) => (
+          <>
+            <ModalHeader>{t('releaseNotesModalTitle', { version: release.version })}</ModalHeader>
+            <ModalBody>
+              {release.body?.trim() ? (
+                <Markdown variant="compact">{release.body}</Markdown>
+              ) : (
+                <div className="text-default-500">{t('releaseNotesFallback')}</div>
               )}
-            </ModalDialog>
-          </ModalContainer>
-        </ModalBackdrop>
-      </Modal>
+            </ModalBody>
+            <ModalFooter className="flex-wrap gap-2 justify-between">
+              <a href={release.htmlUrl} target="_blank" rel="noopener noreferrer">
+                <Button variant="secondary">
+                  {release.tagName}
+                  <ExternalLink size={14} />
+                </Button>
+              </a>
+              <Button variant="primary" onPress={close}>
+                {t('close')}
+              </Button>
+            </ModalFooter>
+          </>
+        )}
+      </StandardModal>
     </>
   );
 }

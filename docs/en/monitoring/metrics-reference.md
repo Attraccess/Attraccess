@@ -102,8 +102,11 @@ attraccess_resource_maintenance_overdue > 0
 sum by (reset_reason) (increase(attraccess_attractap_crash_reports_total[1h]))
 
 # Alert signal: all readers offline (but some were connected recently)
-attraccess_attractap_devices_connected == 0
-  and max_over_time(attraccess_attractap_devices_connected[1h]) > 0
+sum(
+  (attraccess_attractap_devices_connected == bool 0)
+  *
+  (max_over_time(attraccess_attractap_devices_connected[1h]) > bool 0)
+) or vector(0)
 ```
 
 ## Billing Metrics
@@ -279,6 +282,40 @@ nodejs_heap_size_used_bytes / 1024 / 1024
 
 # Event loop lag
 nodejs_eventloop_lag_seconds
+```
+
+## Host and Container Metrics
+
+Bundled Coolify and Balena compose deployments scrape standard exporter metrics in addition to the Attraccess API metrics:
+
+| Source | Example Metrics | Description |
+|--------|-----------------|-------------|
+| `node-exporter` | `node_memory_MemAvailable_bytes`, `node_memory_MemTotal_bytes`, `node_filesystem_avail_bytes`, `node_filesystem_size_bytes` | Host RAM and filesystem capacity |
+| `cadvisor` | `container_memory_working_set_bytes`, `container_spec_memory_limit_bytes` | Docker container memory usage and configured limits |
+
+### Example PromQL Queries
+
+```promql
+# Host RAM usage ratio
+1 - (node_memory_MemAvailable_bytes{job="node-exporter"} / node_memory_MemTotal_bytes{job="node-exporter"})
+
+# Host filesystem usage ratio by mountpoint
+1 - (node_filesystem_avail_bytes{job="node-exporter"} / node_filesystem_size_bytes{job="node-exporter"})
+
+# Attraccess container memory usage ratio, when a container memory limit exists
+max(
+  (
+    container_memory_working_set_bytes{job="cadvisor",container_label_com_docker_compose_service="attraccess"}
+    /
+    (container_spec_memory_limit_bytes{job="cadvisor",container_label_com_docker_compose_service="attraccess"} > 0)
+  )
+  or
+  (
+    container_memory_working_set_bytes{job="cadvisor",container_label_io_balena_service_name="attraccess"}
+    /
+    (container_spec_memory_limit_bytes{job="cadvisor",container_label_io_balena_service_name="attraccess"} > 0)
+  )
+)
 ```
 
 ## See Also

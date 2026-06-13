@@ -1,17 +1,9 @@
 import { useState } from 'react';
-import {
-  Modal,
-  ModalBackdrop,
-  ModalBody,
-  ModalContainer,
-  ModalDialog,
-  ModalFooter,
-  ModalHeader,
-  ModalHeading,
-} from '@heroui/react';
+import { ModalBody, ModalFooter, ModalHeader, ModalHeading } from '@heroui/react';
 import { Button } from '@heroui/react';
 import { TextArea } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { StandardModal } from '../../../../../components/standardModal';
 import en from './translations/en';
 import de from './translations/de';
 
@@ -38,50 +30,45 @@ export const SessionNotesModal = ({ isOpen, onClose, onConfirm, mode, isSubmitti
   };
 
   return (
-    <Modal
+    <StandardModal
       isOpen={isOpen}
       onOpenChange={(open) => {
         if (!open) onClose();
       }}
+      size="md"
     >
-      <ModalBackdrop>
-        <ModalContainer size="md">
-          <ModalDialog>
-            {({ close }) => (
-              <>
-                <ModalHeader>
-                  <ModalHeading>{mode === SessionModalMode.START ? t('title.start') : t('title.end')}</ModalHeading>
-                </ModalHeader>
+      {({ close }) => (
+        <>
+          <ModalHeader>
+            <ModalHeading>{mode === SessionModalMode.START ? t('title.start') : t('title.end')}</ModalHeading>
+          </ModalHeader>
 
-                <ModalBody>
-                  <div className="space-y-2">
-                    <label htmlFor="notes" className="text-sm font-medium">
-                      {t('notesLabel')}
-                    </label>
-                    <TextArea
-                      id="notes"
-                      placeholder={t('notesPlaceholder')}
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
-                      className="w-full"
-                    />
-                    <p className="text-xs text-gray-500">{t('notesOptional')}</p>
-                  </div>
-                </ModalBody>
+          <ModalBody>
+            <div className="space-y-2">
+              <label htmlFor="notes" className="text-sm font-medium">
+                {t('notesLabel')}
+              </label>
+              <TextArea
+                id="notes"
+                placeholder={t('notesPlaceholder')}
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                className="w-full"
+              />
+              <p className="text-xs text-gray-500">{t('notesOptional')}</p>
+            </div>
+          </ModalBody>
 
-                <ModalFooter>
-                  <Button variant="ghost" onPress={close} isDisabled={isSubmitting}>
-                    {t('cancel')}
-                  </Button>
-                  <Button onPress={handleConfirm} isDisabled={isSubmitting}>
-                    {isSubmitting ? t('processing') : t('confirm')}
-                  </Button>
-                </ModalFooter>
-              </>
-            )}
-          </ModalDialog>
-        </ModalContainer>
-      </ModalBackdrop>
-    </Modal>
+          <ModalFooter>
+            <Button variant="ghost" onPress={close} isDisabled={isSubmitting}>
+              {t('cancel')}
+            </Button>
+            <Button onPress={handleConfirm} isDisabled={isSubmitting}>
+              {isSubmitting ? t('processing') : t('confirm')}
+            </Button>
+          </ModalFooter>
+        </>
+      )}
+    </StandardModal>
   );
 };

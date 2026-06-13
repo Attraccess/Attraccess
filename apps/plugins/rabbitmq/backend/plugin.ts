@@ -11,6 +11,9 @@ import { Auth } from '@attraccess/plugins-backend-sdk';
 import { Controller, DynamicModule, Get, Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { RabbitmqDetectionController } from './rabbitmq-detection.controller';
 import { RabbitmqDetectionService } from './rabbitmq-detection.service';
+import { RabbitmqManagementClient } from './rabbitmq-management-client';
+import { RabbitmqUsersController } from './rabbitmq-users.controller';
+import { RabbitmqUsersService } from './rabbitmq-users.service';
 
 // The host hands each plugin its PluginContext under this token. Recreate it
 // locally (do not import the value) so the artifact has no runtime dependency on
@@ -52,11 +55,13 @@ const plugin: PluginBackendModule = {
   register(context: PluginContext): DynamicModule {
     return {
       module: RabbitmqPluginModule,
-      controllers: [RabbitmqController, RabbitmqDetectionController],
+      controllers: [RabbitmqController, RabbitmqDetectionController, RabbitmqUsersController],
       providers: [
         { provide: PLUGIN_CONTEXT, useValue: context },
         RabbitmqService,
         RabbitmqDetectionService,
+        RabbitmqManagementClient,
+        RabbitmqUsersService,
       ],
     };
   },

@@ -28,6 +28,7 @@ import { SettingsService } from '../settings/settings.service';
 import { MetricsModule } from '../metrics/metrics.module';
 import { VersionModule } from '../version/version.module';
 import { MessagingModule } from '../messaging/messaging.module';
+import { PushModule } from '../push/push.module';
 
 @Module({
   imports: [
@@ -120,6 +121,7 @@ import { MessagingModule } from '../messaging/messaging.module';
     EncryptionModule,
     ProjectsModule,
     MessagingModule,
+    PushModule,
   ],
   controllers: [AppController],
   providers: [AppService],

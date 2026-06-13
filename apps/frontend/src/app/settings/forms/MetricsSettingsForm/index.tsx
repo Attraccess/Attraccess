@@ -10,11 +10,7 @@ import {
   TextField,
   Label,
   InputGroup,
-  Modal,
-  ModalBackdrop,
   ModalBody,
-  ModalContainer,
-  ModalDialog,
   ModalFooter,
   ModalHeader,
   ModalHeading,
@@ -24,6 +20,7 @@ import {
   useOverlayState,
 } from '@heroui/react';
 import { Button } from '../../../../components/button';
+import { StandardModal } from '../../../../components/standardModal';
 import { AlertTriangleIcon, ClipboardCopyIcon, KeyIcon, RefreshCwIcon, Trash2Icon } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -358,69 +355,59 @@ export function MetricsSettingsForm() {
       {togglesSection}
       {thresholdSection}
 
-      <Modal
+      <StandardModal
         isOpen={rerollModal.isOpen}
         onOpenChange={(o) => {
           if (!o) rerollModal.close();
         }}
+        size="sm"
       >
-        <ModalBackdrop>
-          <ModalContainer size="sm">
-            <ModalDialog>
-              {({ close }) => (
-                <>
-                  <ModalHeader>
-                    <ModalHeading>{t('confirmReroll.title')}</ModalHeading>
-                  </ModalHeader>
-                  <ModalBody>
-                    <p>{t('confirmReroll.description')}</p>
-                  </ModalBody>
-                  <ModalFooter>
-                    <Button variant="ghost" onPress={close}>
-                      {t('confirmReroll.cancel')}
-                    </Button>
-                    <Button variant="tertiary" onPress={() => generateApiKey()} isPending={isGenerating}>
-                      {t('confirmReroll.confirm')}
-                    </Button>
-                  </ModalFooter>
-                </>
-              )}
-            </ModalDialog>
-          </ModalContainer>
-        </ModalBackdrop>
-      </Modal>
+        {({ close }) => (
+          <>
+            <ModalHeader>
+              <ModalHeading>{t('confirmReroll.title')}</ModalHeading>
+            </ModalHeader>
+            <ModalBody>
+              <p>{t('confirmReroll.description')}</p>
+            </ModalBody>
+            <ModalFooter>
+              <Button variant="ghost" onPress={close}>
+                {t('confirmReroll.cancel')}
+              </Button>
+              <Button variant="tertiary" onPress={() => generateApiKey()} isPending={isGenerating}>
+                {t('confirmReroll.confirm')}
+              </Button>
+            </ModalFooter>
+          </>
+        )}
+      </StandardModal>
 
-      <Modal
+      <StandardModal
         isOpen={removeModal.isOpen}
         onOpenChange={(o) => {
           if (!o) removeModal.close();
         }}
+        size="sm"
       >
-        <ModalBackdrop>
-          <ModalContainer size="sm">
-            <ModalDialog>
-              {({ close }) => (
-                <>
-                  <ModalHeader>
-                    <ModalHeading>{t('confirmRemove.title')}</ModalHeading>
-                  </ModalHeader>
-                  <ModalBody>
-                    <p>{t('confirmRemove.description')}</p>
-                  </ModalBody>
-                  <ModalFooter>
-                    <Button variant="ghost" onPress={close}>
-                      {t('confirmRemove.cancel')}
-                    </Button>
-                    <Button variant="danger" onPress={() => deleteApiKey()} isPending={isDeleting}>
-                      {t('confirmRemove.confirm')}
-                    </Button>
-                  </ModalFooter>
-                </>
-              )}
-            </ModalDialog>
-          </ModalContainer>
-        </ModalBackdrop>
-      </Modal>
+        {({ close }) => (
+          <>
+            <ModalHeader>
+              <ModalHeading>{t('confirmRemove.title')}</ModalHeading>
+            </ModalHeader>
+            <ModalBody>
+              <p>{t('confirmRemove.description')}</p>
+            </ModalBody>
+            <ModalFooter>
+              <Button variant="ghost" onPress={close}>
+                {t('confirmRemove.cancel')}
+              </Button>
+              <Button variant="danger" onPress={() => deleteApiKey()} isPending={isDeleting}>
+                {t('confirmRemove.confirm')}
+              </Button>
+            </ModalFooter>
+          </>
+        )}
+      </StandardModal>
     </div>
   );
 }

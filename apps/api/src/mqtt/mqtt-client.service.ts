@@ -107,6 +107,7 @@ export class MqttClientService implements OnModuleDestroy {
 
       client.on('connect', () => {
         this.logger.log(`Connected to MQTT server ${server.name} (${url})`);
+        this.clients.set(serverId, client);
         this.updateHealthyServerCount();
         // Re-subscribe to all known topics for this server on each successful connect
         const topics = this.subscriptions.get(serverId);

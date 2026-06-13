@@ -16,6 +16,7 @@ import { MessageRateLimitService } from './rate-limiting/message-rate-limit.serv
 import { ResourceUsageModule } from '../resources/usage/resourceUsage.module';
 import { EmailModule } from '../email/email.module';
 import { SettingsModule } from '../settings/settings.module';
+import { PushModule } from '../push/push.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { SettingsModule } from '../settings/settings.module';
     ResourceUsageModule,
     EmailModule,
     SettingsModule,
+    PushModule,
   ],
   controllers: [MessagingController],
   providers: [MessagingService, MessagingLiveService, MessageNotificationListener, MessageRateLimitService],

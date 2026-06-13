@@ -57,14 +57,17 @@ Jeder Benutzer kann mehrere NFC-Karten mit seinem Konto verknuepfen. Dies ist nu
 
 ## Kartentypen
 
-Attractap-Leser unterstuetzen Standard-NFC-Karten, die mit dem PN532-Leser kompatibel sind:
+Attractap-Leser verwenden AES-verschluesselte Authentifizierung, die Karten mit Hardware-Krypto-Unterstuetzung erfordert:
 
 | Kartentyp | Unterstuetzt |
 |-----------|-------------|
-| MIFARE Classic 1K/4K | Ja |
-| MIFARE Ultralight | Ja |
-| NTAG213/215/216 | Ja |
-| Andere ISO 14443A-Karten | Ja |
+| NTAG424 DNA | Ja |
+| MIFARE DESFire EV2/EV3 | Ja |
+| MIFARE DESFire EV1 | Nein (fehlender Authentifizierungsmodus) |
+| MIFARE Classic / Ultralight / NTAG213-216 | Nein (keine AES-Authentifizierung) |
+
+> [!NOTE]
+> Auf MIFARE-DESFire-Karten speichert Attractap seine Schluessel in einer eigenen DESFire-Applikation (AID `0xACCE55`), die bei der Registrierung automatisch angelegt wird. Andere Applikationen auf der Karte (z.B. bestehende Zugangssysteme) bleiben unberuehrt.
 
 ## Administratorfunktionen
 
