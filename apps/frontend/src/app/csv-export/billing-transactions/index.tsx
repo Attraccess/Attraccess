@@ -102,6 +102,7 @@ export function BillingTransactionsExport(props: ExporterProps) {
       columns={columns}
       filename="billing-transactions.csv"
       exportType={CsvExportType.BILLING_TRANSACTIONS}
+      onCancel={props.onCancel}
     />
   );
 }

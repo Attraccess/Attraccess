@@ -1,15 +1,12 @@
-// CSV export page composition — date range picker, type cards, configure drawer
+// CSV export page composition — date range picker and export type cards
 // FEATURE: CSV export — top level page for /csv-export route
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { DateValue, DrawerHeader, RangeValue } from '@heroui/react';
-import { useCallback, useMemo, useRef, useState } from 'react';
-import { StandardDrawer } from '../../components/standardDrawer';
+import { DateValue, RangeValue } from '@heroui/react';
+import { useCallback, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { DateRangeSection } from './date-range-section';
 import { computeRange, Preset, rangeToDateBounds } from './date-range-section/compute-range';
-import { SelectedRangePill } from './date-range-section/selected-range-pill';
 import { ExportTypeKey, ExportTypeSection } from './export-type-section';
-import { ResourceUsageExport } from './resource-usage';
-import { BillingTransactionsExport } from './billing-transactions';
 import de from './de.json';
 import en from './en.json';
 
@@ -17,16 +14,19 @@ const DEFAULT_PRESET: Preset = 'last30d';
 
 export function CsvExport() {
   const { t } = useTranslations({ de, en });
+  const navigate = useNavigate();
 
   const [preset, setPreset] = useState<Preset>(DEFAULT_PRESET);
   const [dateRange, setDateRange] = useState<RangeValue<DateValue> | null>(computeRange(DEFAULT_PRESET));
-  const [activeExportKey, setActiveExportKey] = useState<ExportTypeKey | ''>('');
-  const [showExport, setShowExport] = useState(false);
+  const now = useRef(new Date());
 
   const openExport = useCallback((key: ExportTypeKey) => {
-    setActiveExportKey(key);
-    setShowExport(true);
-  }, []);
+    const { start, end } = rangeToDateBounds(dateRange, now.current);
+    const path = key === 'resourceUsageHours' ? '/csv-export/resource-usage-hours' : '/csv-export/billing-transactions';
+    const search = new URLSearchParams({ start: start.toISOString(), end: end.toISOString() });
+
+    navigate(`${path}?${search.toString()}`);
+  }, [dateRange, navigate]);
 
   const handleRangeChange = useCallback(
     (next: RangeValue<DateValue>) => {
@@ -34,19 +34,6 @@ export function CsvExport() {
       if (preset !== 'custom') setPreset('custom');
     },
     [preset],
-  );
-
-  const now = useRef(new Date());
-
-  const ExportComponent = useMemo(() => {
-    if (activeExportKey === 'resourceUsageHours') return ResourceUsageExport;
-    if (activeExportKey === 'billingTransactions') return BillingTransactionsExport;
-    return null;
-  }, [activeExportKey]);
-
-  const { start: startDate, end: endDate } = useMemo(
-    () => rangeToDateBounds(dateRange, now.current),
-    [dateRange],
   );
 
   return (
@@ -65,27 +52,6 @@ export function CsvExport() {
       />
 
       <ExportTypeSection range={dateRange} onOpen={openExport} t={t} />
-
-      <StandardDrawer
-        isOpen={showExport}
-        onOpenChange={(open) => {
-          if (!open) setShowExport(false);
-        }}
-      >
-        <div data-cy="csv-export-modal" className="contents">
-          <DrawerHeader className="flex w-full flex-col items-start gap-2">
-            <h2 className="text-lg font-semibold">{activeExportKey && t(`exports.${activeExportKey}.title`)}</h2>
-            <SelectedRangePill
-              range={dateRange}
-              emptyLabel={t('range.empty')}
-              summaryLabel={({ start, end, days }) => t('range.summary', { start, end, days })}
-              dataCy="csv-export-modal-range-pill"
-            />
-          </DrawerHeader>
-
-          {ExportComponent && <ExportComponent start={startDate} end={endDate} />}
-        </div>
-      </StandardDrawer>
     </div>
   );
 }

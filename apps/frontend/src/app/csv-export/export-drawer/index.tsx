@@ -1,6 +1,6 @@
-// Shared CSV export drawer content — templates, column picker, column config, preview, download
-// FEATURE: CSV export — drawer body and footer used by every export type
-import { Button, DrawerBody, DrawerFooter } from '@heroui/react';
+// Shared CSV export configuration content — templates, column picker, column config, preview, download
+// FEATURE: CSV export — body and footer used by every export type
+import { Button } from '@heroui/react';
 import { QueryStatus } from '@tanstack/react-query';
 import { DownloadIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -43,6 +43,7 @@ interface Props<TData extends Row> {
   filename: string;
   queryStatus: QueryStatus;
   exportType: CsvExportType;
+  onCancel?: () => void;
 }
 
 interface ItemRow {
@@ -51,7 +52,7 @@ interface ItemRow {
 }
 
 export function CsvExportDrawerContent<TData extends Row>(props: Props<TData>) {
-  const { columns, items, refetch, options, setOption, filename, queryStatus, exportType } = props;
+  const { columns, items, refetch, options, setOption, filename, queryStatus, exportType, onCancel } = props;
 
   const { t } = useTranslations({ de, en });
 
@@ -207,7 +208,7 @@ export function CsvExportDrawerContent<TData extends Row>(props: Props<TData>) {
 
   return (
     <>
-      <DrawerBody className="flex w-full flex-col gap-6 pb-24">
+      <div className="flex w-full flex-col gap-6 pb-24">
         <TemplateSection exportType={exportType} currentColumns={currentTemplateColumns} onApply={applyTemplate} />
 
         <ColumnPicker
@@ -251,9 +252,9 @@ export function CsvExportDrawerContent<TData extends Row>(props: Props<TData>) {
           refetch={refetch}
           queryStatus={queryStatus}
         />
-      </DrawerBody>
-      <DrawerFooter className="flex w-full flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-end">
-        <Button slot="close" variant="outline" className="w-full sm:w-auto" data-cy="csv-export-drawer-cancel-button">
+      </div>
+      <footer className="flex w-full flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-end">
+        <Button variant="outline" className="w-full sm:w-auto" onPress={onCancel} data-cy="csv-export-drawer-cancel-button">
           {t('actions.cancel')}
         </Button>
         <Button
@@ -266,7 +267,7 @@ export function CsvExportDrawerContent<TData extends Row>(props: Props<TData>) {
           <DownloadIcon className="size-4" />
           {t('actions.downloadCsv')}
         </Button>
-      </DrawerFooter>
+      </footer>
     </>
   );
 }

@@ -194,6 +194,7 @@ export function ResourceUsageExport(props: ExportProps) {
       filename="resource-usage.csv"
       queryStatus={fetchStatus}
       exportType={CsvExportType.RESOURCE_USAGE_HOURS}
+      onCancel={props.onCancel}
     />
   );
 }

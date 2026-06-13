@@ -33,6 +33,9 @@
       "end": "End: {{date}}"
     }
   },
+  "actions": {
+    "back": "Back to CSV exports"
+  },
   "exports": {
     "modal": {
       "subtitle": "from {{start}} to {{end}}"

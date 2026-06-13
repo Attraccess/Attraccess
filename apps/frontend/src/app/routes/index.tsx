@@ -18,6 +18,7 @@ import { AttractapList } from '../attractap/AttractapList';
 import { AttractapDiagnosticsPage } from '../attractap/AttractapDiagnosticsPage';
 import { NfcCardList } from '../attractap/NfcCardList';
 import { CsvExport } from '../csv-export';
+import { BillingTransactionsCsvExportPage, ResourceUsageCsvExportPage } from '../csv-export/configure-page';
 import { DocumentationEditor, DocumentationView } from '../resources/documentation';
 import { EmailTemplatesPage } from '../email-templates/EmailTemplatesPage';
 import { EditEmailTemplatePage } from '../email-templates/edit';
@@ -236,6 +237,16 @@ const coreRoutes: RouteConfig[] = [
   {
     path: '/csv-export',
     element: <CsvExport />,
+    authRequired: 'canManageBilling',
+  },
+  {
+    path: '/csv-export/resource-usage-hours',
+    element: <ResourceUsageCsvExportPage />,
+    authRequired: 'canManageBilling',
+  },
+  {
+    path: '/csv-export/billing-transactions',
+    element: <BillingTransactionsCsvExportPage />,
     authRequired: 'canManageBilling',
   },
   {
