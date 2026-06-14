@@ -54,10 +54,14 @@ def extract_build_id(firmware_bin_path, esptool_cmd, chip):
     if not os.path.exists(firmware_bin_path):
         return None
     try:
-        info_cmd = [*esptool_cmd, '--chip', chip, 'image_info', firmware_bin_path]
+        info_cmd = [*esptool_cmd, '--chip', chip, 'image_info', '--version', '2', firmware_bin_path]
         result = subprocess.run(info_cmd, capture_output=True, text=True)
         output = (result.stdout or '') + '\n' + (result.stderr or '')
         match = re.search(r'(?:ELF file SHA256|app_elf_sha256)[^0-9a-fA-F]*([0-9a-fA-F]{64})', output)
+        if not match:
+            # Older esptool output may not include the application-info block, but the
+            # validation hash is still better than leaving the manifest unindexed.
+            match = re.search(r'Validation hash[^0-9a-fA-F]*([0-9a-fA-F]{64})', output, re.IGNORECASE)
         if match:
             return match.group(1).lower()
     except Exception as e:

@@ -1,6 +1,6 @@
 import { CoredumpSymbolicationService } from './coredump-symbolication.service';
 import { AttractapFirmwareService } from './firmware.service';
-import { mkdtempSync, writeFileSync, chmodSync, rmSync } from 'fs';
+import { mkdtempSync, writeFileSync, chmodSync, rmSync, readFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
@@ -48,6 +48,10 @@ function buildCoredumpFixture(sha: string | null): Buffer {
 describe('CoredumpSymbolicationService', () => {
   const tempDirs: string[] = [];
   const originalCmd = process.env.ESP_COREDUMP_CMD;
+  const originalPath = process.env.PATH;
+  const originalGdb = process.env.ESP_COREDUMP_GDB;
+  const originalXtensaGdb = process.env.ESP_COREDUMP_XTENSA_GDB;
+  const originalRiscvGdb = process.env.ESP_COREDUMP_RISCV_GDB;
 
   function tempDir(): string {
     const dir = mkdtempSync(join(tmpdir(), 'symbolication-test-'));
@@ -60,6 +64,26 @@ describe('CoredumpSymbolicationService', () => {
       delete process.env.ESP_COREDUMP_CMD;
     } else {
       process.env.ESP_COREDUMP_CMD = originalCmd;
+    }
+    if (originalPath === undefined) {
+      delete process.env.PATH;
+    } else {
+      process.env.PATH = originalPath;
+    }
+    if (originalGdb === undefined) {
+      delete process.env.ESP_COREDUMP_GDB;
+    } else {
+      process.env.ESP_COREDUMP_GDB = originalGdb;
+    }
+    if (originalXtensaGdb === undefined) {
+      delete process.env.ESP_COREDUMP_XTENSA_GDB;
+    } else {
+      process.env.ESP_COREDUMP_XTENSA_GDB = originalXtensaGdb;
+    }
+    if (originalRiscvGdb === undefined) {
+      delete process.env.ESP_COREDUMP_RISCV_GDB;
+    } else {
+      process.env.ESP_COREDUMP_RISCV_GDB = originalRiscvGdb;
     }
   });
 
@@ -197,6 +221,25 @@ describe('CoredumpSymbolicationService', () => {
     expect(result.status).toBe('unavailable');
   });
 
+  it('returns unavailable when esp-coredump reports a missing GDB toolchain', async () => {
+    const binDir = tempDir();
+    const fakeTool = join(binDir, 'fake-esp-coredump');
+    writeFileSync(fakeTool, '#!/bin/sh\necho "GDB executable not found. Please install GDB."\nexit 0\n');
+    chmodSync(fakeTool, 0o755);
+    process.env.ESP_COREDUMP_CMD = fakeTool;
+
+    const elfPath = join(binDir, 'fw.elf');
+    writeFileSync(elfPath, 'elf');
+    const service = makeService({
+      resolveElfFile: jest.fn().mockReturnValue({ path: elfPath, firmware: { chip: 'esp32s3', buildId: 'abc' } }),
+    });
+
+    const result = await service.symbolicate(Buffer.from('core'), { variant: 'eth', buildId: null });
+
+    expect(result.status).toBe('unavailable');
+    expect(result.backtrace).toBeNull();
+  });
+
   it('returns success and the tool output when symbolication succeeds', async () => {
     const binDir = tempDir();
     const fakeTool = join(binDir, 'fake-esp-coredump');
@@ -216,5 +259,34 @@ describe('CoredumpSymbolicationService', () => {
     expect(result.status).toBe('success');
     expect(result.backtrace).toContain('ApplicationLoop::tick()');
     expect(result.buildId).toBe('f6899cb1067e5043');
+  });
+
+  it('passes an explicitly resolved GDB path to esp-coredump for Xtensa chips', async () => {
+    const binDir = tempDir();
+    const argsFile = join(binDir, 'args.txt');
+    const fakeTool = join(binDir, 'fake-esp-coredump');
+    const fakeGdb = join(binDir, 'xtensa-esp32s3-elf-gdb');
+    writeFileSync(fakeTool, `#!/bin/sh\nprintf '%s\\n' "$@" > "${argsFile}"\necho "#0 0x42066718 in ApplicationLoop::tick()"\n`);
+    writeFileSync(fakeGdb, '#!/bin/sh\nexit 0\n');
+    chmodSync(fakeTool, 0o755);
+    chmodSync(fakeGdb, 0o755);
+    process.env.ESP_COREDUMP_CMD = fakeTool;
+    process.env.PATH = `${binDir}${process.env.PATH ? `:${process.env.PATH}` : ''}`;
+
+    const elfPath = join(binDir, 'fw.elf');
+    writeFileSync(elfPath, 'elf');
+    const service = makeService({
+      resolveElfFile: jest
+        .fn()
+        .mockReturnValue({ path: elfPath, firmware: { chip: 'esp32s3', buildId: 'f6899cb1067e5043' } }),
+    });
+
+    const result = await service.symbolicate(Buffer.from('core'), { variant: 'eth', buildId: null });
+    const args = readFileSync(argsFile, 'utf8').trim().split('\n');
+
+    expect(result.status).toBe('success');
+    expect(args).toEqual(
+      expect.arrayContaining(['--chip', 'esp32s3', 'info_corefile', '--gdb', fakeGdb, '--core-format', 'raw']),
+    );
   });
 });

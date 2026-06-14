@@ -1,8 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { execFile } from 'child_process';
+import { existsSync } from 'fs';
 import { mkdtemp, rm, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
-import { join } from 'path';
+import { delimiter, join } from 'path';
 import { AttractapFirmwareService } from './firmware.service';
 
 export type SymbolicationStatus = 'success' | 'failed' | 'skipped' | 'unavailable';
@@ -24,6 +25,7 @@ const ESP_CORE_DUMP_INFO_MARKER = Buffer.from('ESP_CORE_DUMP_INFO', 'ascii');
 const BUILD_ID_SCAN_WINDOW_BYTES = 128;
 // esp-idf truncates the app ELF SHA256 to CONFIG_APP_RETRIEVE_LEN_ELF_SHA hex chars (default 16).
 const BUILD_ID_PATTERN = /[0-9a-fA-F]{16,64}/;
+const RISCV_CHIPS = new Set(['esp32c2', 'esp32c3', 'esp32c5', 'esp32c6', 'esp32c61', 'esp32h2', 'esp32h21', 'esp32h4', 'esp32p4']);
 
 @Injectable()
 export class CoredumpSymbolicationService {
@@ -48,9 +50,7 @@ export class CoredumpSymbolicationService {
       // different build would only produce esp-coredump's misleading SHA-mismatch failure.
       elf = this.firmwareService.resolveElfFile({ buildId });
       if (!elf) {
-        this.logger.warn(
-          `No firmware ELF matching coredump build id ${buildId} (variant=${options.variant ?? 'n/a'})`,
-        );
+        this.logger.warn(`No firmware ELF matching coredump build id ${buildId} (variant=${options.variant ?? 'n/a'})`);
         return {
           status: 'failed',
           backtrace: `No firmware ELF matching coredump build id ${buildId} was found on the server, so the coredump could not be symbolized. The reader is likely running a build that was never published with an ELF (e.g. a local development build).`,
@@ -88,7 +88,7 @@ export class CoredumpSymbolicationService {
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      if (this.isToolMissing(message)) {
+      if (this.isToolMissing(message) || this.isToolchainMissing(message)) {
         this.logger.error(`esp-coredump tool not available: ${message}`);
         return { status: 'unavailable', backtrace: null, buildId: buildId ?? null };
       }
@@ -116,18 +116,18 @@ export class CoredumpSymbolicationService {
     }
 
     const windowStart = markerIndex + ESP_CORE_DUMP_INFO_MARKER.length;
-    const window = coredump
-      .subarray(windowStart, windowStart + BUILD_ID_SCAN_WINDOW_BYTES)
-      .toString('latin1');
+    const window = coredump.subarray(windowStart, windowStart + BUILD_ID_SCAN_WINDOW_BYTES).toString('latin1');
 
     const match = window.match(BUILD_ID_PATTERN);
     return match ? match[0].toLowerCase() : null;
   }
 
   private runTool(elfPath: string, corePath: string, chip: string | null): Promise<string> {
+    const gdbPath = this.resolveGdbPath(chip);
     const args = [
       ...(chip ? ['--chip', chip] : []),
       'info_corefile',
+      ...(gdbPath ? ['--gdb', gdbPath] : []),
       '--core',
       corePath,
       '--core-format',
@@ -146,6 +146,10 @@ export class CoredumpSymbolicationService {
             reject(error);
             return;
           }
+          if (error || this.isToolchainMissing(combined)) {
+            reject(new Error(combined || error?.message || 'esp-coredump failed'));
+            return;
+          }
           if (!combined) {
             reject(error || new Error('esp-coredump produced no output'));
             return;
@@ -156,7 +160,52 @@ export class CoredumpSymbolicationService {
     });
   }
 
+  private resolveGdbPath(chip: string | null): string | null {
+    if (process.env.ESP_COREDUMP_GDB) {
+      return process.env.ESP_COREDUMP_GDB;
+    }
+
+    const normalizedChip = chip?.toLowerCase() ?? null;
+    const isRiscv = normalizedChip ? RISCV_CHIPS.has(normalizedChip) : false;
+    const archOverride = isRiscv ? process.env.ESP_COREDUMP_RISCV_GDB : process.env.ESP_COREDUMP_XTENSA_GDB;
+    if (archOverride) {
+      return archOverride;
+    }
+
+    const candidates = isRiscv ? ['riscv32-esp-elf-gdb'] : ['xtensa-esp32-elf-gdb', 'xtensa-esp32s3-elf-gdb'];
+    for (const candidate of candidates) {
+      const resolved = this.findExecutableOnPath(candidate);
+      if (resolved) {
+        return resolved;
+      }
+    }
+
+    return null;
+  }
+
+  private findExecutableOnPath(command: string): string | null {
+    if (command.includes('/')) {
+      return existsSync(command) ? command : null;
+    }
+
+    for (const directory of (process.env.PATH || '').split(delimiter)) {
+      if (!directory) {
+        continue;
+      }
+      const candidate = join(directory, command);
+      if (existsSync(candidate)) {
+        return candidate;
+      }
+    }
+
+    return null;
+  }
+
   private isToolMissing(message: string): boolean {
     return message.includes('ENOENT') || message.includes('not found');
+  }
+
+  private isToolchainMissing(message: string): boolean {
+    return message.includes('GDB executable not found') || message.includes('Please install GDB');
   }
 }
