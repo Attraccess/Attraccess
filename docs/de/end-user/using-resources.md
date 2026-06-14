@@ -36,6 +36,28 @@ Bevor Sie die meisten Ressourcen nutzen können, benötigen Sie eine Sicherheits
 > [!NOTE]
 > Nicht alle Ressourcen erfordern eine Einweisung. Manche Ressourcen sind für alle Benutzer ohne Einweisung zugänglich.
 
+## Beaufsichtigte Sitzung starten
+
+Manche Ressourcen erlauben oder erfordern beaufsichtigte Nutzung. In einer beaufsichtigten Sitzung starten Sie die Ressource, während eine qualifizierte Aufsicht anwesend ist. Eine Aufsicht kann Einweiser, Wartender oder Ressourcenverwalter für diese Ressource sein.
+
+Sie benötigen möglicherweise eine beaufsichtigte Sitzung, wenn:
+
+- Sie noch nicht eingewiesen sind, die Ressource aber beaufsichtigte Nutzung erlaubt
+- die Ressource für jede Sitzung Beaufsichtigung erfordert
+- ein Einweiser oder Wartender Ihr Training oder Ihre ersten Nutzungsversuche beaufsichtigen möchte
+
+So starten Sie eine beaufsichtigte Sitzung:
+
+1. Öffnen Sie die Ressourcen-Detailseite
+2. Wählen Sie die beaufsichtigte Startoption oder halten Sie Ihre NFC-Karte an einen Leser, der eine Beaufsichtigung anfordert
+3. Bitten Sie die Aufsicht, die Sitzung zu bestätigen, wenn Attraccess dazu auffordert
+4. Füllen Sie gegebenenfalls erforderliche Formularinformationen aus
+5. Starten Sie die Sitzung, sobald die Beaufsichtigung bestätigt wurde
+
+Die Aufsicht sieht die ausstehende Beaufsichtigungsanfrage und die Ressource, die Sie nutzen möchten. Wenn die Sitzung aktiv ist, wird die Aufsicht zusammen mit der Sitzung im Nutzungsverlauf gespeichert. Die Aufsicht kann die beaufsichtigte Sitzung ebenfalls beenden.
+
+Nachdem Sie genügend beaufsichtigte Sitzungen abgeschlossen haben, kann Attraccess Ihnen automatisch eine Einweisung für die Ressource oder für eine konfigurierte Ressourcengruppe erteilen. Falls dies aktiviert ist, wird die erforderliche Anzahl beaufsichtigter Sitzungen vom Ressourcenverwalter festgelegt.
+
 ## Nutzungssitzung starten
 
 Sobald Sie für eine Ressource eingewiesen sind, können Sie eine Nutzungssitzung starten:

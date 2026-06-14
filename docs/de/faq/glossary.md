@@ -10,6 +10,8 @@ Dieses Glossar erklärt wichtige Begriffe, die in der Attraccess-Dokumentation v
 | **Einweisung** | Eine Sicherheitsunterweisung, die einem Benutzer die Erlaubnis zur Nutzung einer bestimmten Ressource erteilt. Einweisungen werden typischerweise persönlich an der Maschine durchgeführt. |
 | **Einweiser** | Eine Person, die berechtigt ist, Einweisungen für eine Ressource zu erteilen. Einweiser bestätigen, dass ein Benutzer eine Sicherheitsunterweisung erhalten hat und die Maschine sicher bedienen kann. Sie können außerdem die Maschine steuern und Wartungen verwalten. |
 | **Wartender** | Eine Person, die eine Ressource steuern und deren Wartung verwalten kann, jedoch keine Einweisungen für andere Benutzer erteilen darf. Geeignet für Personen, die eine Maschine warten, ohne über den Zugang anderer zu entscheiden. |
+| **Beaufsichtigung** | Ein Nutzungsmodus, bei dem ein Benutzer eine Ressource startet und nutzt, während eine qualifizierte Aufsicht anwesend ist. Je nach Ressourceneinstellung kann Beaufsichtigung optional für nicht eingewiesene Benutzer oder für jede Sitzung erforderlich sein. |
+| **Aufsicht** | Ein Einweiser, Wartender oder Ressourcenverwalter, der eine beaufsichtigte Nutzungssitzung bestätigt und beaufsichtigt. |
 | **Nutzungssitzung** | Ein aufgezeichneter Zeitraum, in dem ein Benutzer eine Ressource aktiv nutzt. Sitzungen haben eine Start- und Endzeit. |
 | **Flow** | Ein visueller Automatisierungsablauf, der im Flow-Editor erstellt wird. Flows verbinden Auslöser, Aktionen und Bedingungen, um Aufgaben zu automatisieren. |
 | **Projekt** | Eine Möglichkeit, Arbeit und Teamzusammenarbeit zu organisieren. Nutzungssitzungen können zur Nachverfolgung mit Projekten verknüpft werden. |
