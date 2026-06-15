@@ -8,6 +8,7 @@ export enum NotificationCategory {
   PROJECT_INVITATIONS = 'project_invitations',
   SUPERVISION_REQUESTS = 'supervision_requests',
   ACCESS_CHANGES = 'access_changes',
+  NFC_CARDS = 'nfc_cards',
 }
 
 export enum NotificationChannel {
@@ -31,4 +32,5 @@ export const DEFAULT_NOTIFICATION_CHANNELS: NotificationCategoryPreferences = {
   [NotificationCategory.PROJECT_INVITATIONS]: { email: true, push: true, toast: true },
   [NotificationCategory.SUPERVISION_REQUESTS]: { email: false, push: true, toast: true },
   [NotificationCategory.ACCESS_CHANGES]: { email: false, push: true, toast: true },
+  [NotificationCategory.NFC_CARDS]: { email: false, push: true, toast: true },
 };
