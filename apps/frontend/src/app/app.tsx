@@ -67,7 +67,7 @@ function useRoutesWithAuthElements(routes: RouteConfig[]) {
 
   return useMemo(
     () =>
-      routesWithAuthElements.map((route: RouteConfig, index) => (
+      routesWithAuthElements.map((route: RouteConfig) => (
         <Route key={route.path} path={route.path} element={route.element} />
       )),
     [routesWithAuthElements],
@@ -101,20 +101,10 @@ function AppLayout(props: PropsWithChildren) {
 
   const { pullToRefreshIsEnabled } = usePtrStore();
   const isTouchDevice = useIsTouchDevice();
+  const isPullToRefreshActive = pullToRefreshIsEnabled && isTouchDevice;
 
-  return (
-    <PullToRefresh
-      onRefresh={() => queryClient.invalidateQueries()}
-      pullDownThreshold={90}
-      refreshingContent={<Spinner />}
-      pullingContent={
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', padding: '8px' }}>
-          <div style={{ fontSize: '14px' }}>{t('pullToRefresh')}</div>
-          <div style={{ fontSize: '24px' }}>↓</div>
-        </div>
-      }
-      isPullable={pullToRefreshIsEnabled && isTouchDevice}
-    >
+  const content = (
+    <>
       <RouterProvider navigate={navigate}>
         <I18nProvider locale={language}>
           <ToastProvider>
@@ -129,6 +119,27 @@ function AppLayout(props: PropsWithChildren) {
           </ToastProvider>
         </I18nProvider>
       </RouterProvider>
+    </>
+  );
+
+  if (!isPullToRefreshActive) {
+    return content;
+  }
+
+  return (
+    <PullToRefresh
+      onRefresh={() => queryClient.invalidateQueries()}
+      pullDownThreshold={90}
+      refreshingContent={<Spinner />}
+      pullingContent={
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', padding: '8px' }}>
+          <div style={{ fontSize: '14px' }}>{t('pullToRefresh')}</div>
+          <div style={{ fontSize: '24px' }}>↓</div>
+        </div>
+      }
+      isPullable
+    >
+      {content}
     </PullToRefresh>
   );
 }
