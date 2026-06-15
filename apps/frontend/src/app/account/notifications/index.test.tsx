@@ -138,10 +138,17 @@ describe('NotificationPreferencesForm', () => {
     expect(screen.getAllByText('In-app').length).toBeGreaterThan(0);
   });
 
-  it('renders a separate mobile list layout for notification channels', () => {
+  it('renders notification channel labels above each grouped category list', () => {
     renderForm();
 
-    expect(screen.getByTestId('notification-preferences-desktop')).toBeInTheDocument();
+    const generalLabels = screen.getByTestId('notification-channel-labels-general');
+    expect(within(generalLabels).queryByText('Notification')).not.toBeInTheDocument();
+    expect(within(generalLabels).getByText('Email')).toBeInTheDocument();
+    expect(within(generalLabels).getByText('Push')).toBeInTheDocument();
+    expect(within(generalLabels).getByText('In-app')).toBeInTheDocument();
+    expect(screen.getByTestId('notification-channel-labels-resourceManagers')).toBeInTheDocument();
+    expect(screen.getByTestId('notification-channel-labels-admins')).toBeInTheDocument();
+
     expect(screen.getByTestId('notification-preferences-mobile')).toBeInTheDocument();
     expect(screen.getByTestId('notification-preferences-mobile')).toHaveTextContent('Maintenance requests');
     expect(screen.getByTestId('notification-preferences-mobile')).toHaveTextContent('Email');
