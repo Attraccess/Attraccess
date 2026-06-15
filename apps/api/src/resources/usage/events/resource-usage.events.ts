@@ -17,7 +17,16 @@ export class ResourceUsageTakenOverEvent {
     public readonly resource: Pick<Resource, 'id' | 'name'>,
     public readonly takeoverTime: Date,
     public readonly newUser: User,
-    public readonly previousUser: User | null // Previous user might not exist if resource was free
+    public readonly previousUser: User | null, // Previous user might not exist if resource was free
+  ) {}
+}
+
+export class ResourceSessionEndedEvent {
+  public static readonly EVENT_NAME = 'resource.usage.session_ended';
+
+  constructor(
+    public readonly usage: ResourceUsage,
+    public readonly endedBy: Pick<User, 'id' | 'username'> | null,
   ) {}
 }
 
@@ -32,7 +41,7 @@ export class ResourceUsageNoteAddedEvent {
     public readonly resourceId: number,
     public readonly note: string,
     public readonly phase: 'start' | 'end',
-    public readonly author: Pick<User, 'id' | 'username'>
+    public readonly author: Pick<User, 'id' | 'username'>,
   ) {}
 }
 
@@ -48,7 +57,7 @@ export class SupervisedUsageStartedEvent {
     public readonly resourceId: number,
     public readonly userId: number,
     public readonly supervisorUserId: number,
-    public readonly usageId: number
+    public readonly usageId: number,
   ) {}
 }
 
@@ -64,6 +73,6 @@ export class SupervisedUsageEndedEvent {
     public readonly resourceId: number,
     public readonly userId: number,
     public readonly supervisorUserId: number,
-    public readonly usageId: number
+    public readonly usageId: number,
   ) {}
 }

@@ -1,4 +1,12 @@
-import { Injectable, BadRequestException, ForbiddenException, Logger, NotFoundException, Inject, forwardRef } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  ForbiddenException,
+  Logger,
+  NotFoundException,
+  Inject,
+  forwardRef,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull, FindOneOptions, EntityManager } from 'typeorm';
 import {
@@ -22,6 +30,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   ResourceUsageEvent,
   ResourceUsageTakenOverEvent,
+  ResourceSessionEndedEvent,
   ResourceUsageNoteAddedEvent,
   SupervisedUsageStartedEvent,
   SupervisedUsageEndedEvent,
@@ -285,9 +294,7 @@ export class ResourceUsageService {
           transactionalEntityManager,
         );
         if (!canManageMaintenance) {
-          this.logger.warn(
-            `User ${user.id} blocked from resource ${resourceId} because it is currently unhealthy`,
-          );
+          this.logger.warn(`User ${user.id} blocked from resource ${resourceId} because it is currently unhealthy`);
           throw new ResourceUnhealthyException(resourceId);
         }
         this.logger.debug(
@@ -396,9 +403,7 @@ export class ResourceUsageService {
           throw new BadRequestException('You must complete the resource introduction before using it');
         }
         if (resource.supervisionMode === SupervisionMode.SUPERVISION_REQUIRED) {
-          throw new BadRequestException(
-            'This resource requires a supervisor; request a supervised session instead',
-          );
+          throw new BadRequestException('This resource requires a supervisor; request a supervised session instead');
         }
       } else {
         await this.validateSupervisedStart(resourceId, user, supervisorUserId, transactionalEntityManager, resource);
@@ -709,6 +714,16 @@ export class ResourceUsageService {
 
     this.emitSystemUsageEvent(SystemEvent.RESOURCE_USAGE_ENDED, updatedUsage?.resource, updatedUsage?.user);
 
+    if (updatedUsage?.user?.id && (updatedUsage.user.id !== user.id || skipNoteNotification)) {
+      this.eventEmitter.emit(
+        ResourceSessionEndedEvent.EVENT_NAME,
+        new ResourceSessionEndedEvent(
+          updatedUsage,
+          skipNoteNotification ? null : { id: user.id, username: user.username },
+        ),
+      );
+    }
+
     // Counter signal for supervised-usage auto-promotion (ATT-488): every completed supervised session
     // is counted by the listener to decide when to auto-create an introduction for the supervised user.
     if (activeSession.supervisorUserId != null && activeSession.user?.id != null) {
@@ -903,7 +918,14 @@ export class ResourceUsageService {
       skip: (page - 1) * limit,
       take: limit,
       order: { startTime: 'DESC' },
-      relations: ['user', 'project', 'supervisorUser', 'formSubmissions', 'formSubmissions.form', 'formSubmissions.user'],
+      relations: [
+        'user',
+        'project',
+        'supervisorUser',
+        'formSubmissions',
+        'formSubmissions.form',
+        'formSubmissions.user',
+      ],
     });
 
     this.logger.debug(`Found ${data.length} usage records out of ${total} total for resource ${resourceId}`);

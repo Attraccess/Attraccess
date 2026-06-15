@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { ResourceUsageTakenOverEvent } from './events/resource-usage.events';
+import { ResourceSessionEndedEvent, ResourceUsageTakenOverEvent } from './events/resource-usage.events';
 import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../../notifications/notification-types';
 
@@ -22,6 +22,33 @@ export class ResourceSessionNotificationListener {
         this.notifications.sendEmailTemplate(recipient, NotificationCategory.RESOURCE_TAKEOVER, {
           resource: { id: event.resource.id, name: event.resource.name },
           takeover: { actorName: event.newUser.username ?? 'Another user' },
+        }),
+    });
+  }
+
+  @OnEvent(ResourceSessionEndedEvent.EVENT_NAME)
+  async handleSessionEnded(event: ResourceSessionEndedEvent): Promise<void> {
+    const recipient = event.usage.user;
+    const resource = event.usage.resource;
+    if (!recipient || !resource) {
+      return;
+    }
+
+    const endedBy = event.endedBy?.username ?? 'The system';
+
+    await this.notifications.dispatch({
+      category: NotificationCategory.RESOURCE_SESSION_ENDED,
+      recipients: [recipient],
+      actorId: event.endedBy?.id,
+      title: `${resource.name} session ended`,
+      body: `${endedBy} ended your active resource session.`,
+      url: `/resources/${resource.id}/usage`,
+      severity: 'warning',
+      dedupeKey: `resource_session_ended:${event.usage.id}`,
+      sendEmail: (recipient) =>
+        this.notifications.sendEmailTemplate(recipient, NotificationCategory.RESOURCE_SESSION_ENDED, {
+          resource: { id: resource.id, name: resource.name },
+          session: { id: event.usage.id, endedAt: event.usage.endTime, endedBy },
         }),
     });
   }

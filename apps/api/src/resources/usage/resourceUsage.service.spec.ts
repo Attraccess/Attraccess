@@ -29,6 +29,7 @@ import { ResourceUsageImpossibleMaintenanceInProgressException } from '../../exc
 import {
   ResourceUsageEvent,
   ResourceUsageTakenOverEvent,
+  ResourceSessionEndedEvent,
   ResourceUsageNoteAddedEvent,
   SupervisedUsageStartedEvent,
   SupervisedUsageEndedEvent,
@@ -1107,6 +1108,88 @@ describe('ResourceUsageService', () => {
       const eventPayload = emitted?.[1] as ResourceUsageEvent;
       expect(eventPayload).toBeInstanceOf(ResourceUsageEvent);
       expect(eventPayload.usage).toMatchObject({ id: 1, userId: 1, endNotes: 'Session completed' });
+    });
+
+    it("emits a resource session ended notification event after ending someone else's session", async () => {
+      const dto: EndUsageSessionDto = { notes: 'Manager stop' };
+      const sessionOwner = { id: 77, username: 'member' } as User;
+      const managerUser = {
+        id: 88,
+        username: 'manager',
+        systemPermissions: { canManageResources: true },
+      } as User;
+      const mockActiveSession = {
+        id: 5,
+        resourceId: 12,
+        userId: sessionOwner.id,
+        startTime: new Date(),
+        user: sessionOwner,
+        resource: { id: 12, name: 'Laser cutter' } as Resource,
+      } as ResourceUsage;
+      const mockUpdatedSession = {
+        ...mockActiveSession,
+        endTime: new Date(),
+        endNotes: `[By #${managerUser.id} - ${managerUser.username}] ${dto.notes}`,
+      };
+
+      resourceUsageRepository.findOne
+        .mockResolvedValueOnce(mockActiveSession)
+        .mockResolvedValueOnce(mockUpdatedSession)
+        .mockResolvedValueOnce(mockUpdatedSession);
+
+      const mockUpdateQueryBuilder = createMockQueryBuilder(null);
+      (transactionalEntityManager.createQueryBuilder as jest.Mock).mockReturnValue(
+        mockUpdateQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>,
+      );
+
+      await service.endSession(mockActiveSession.resourceId, managerUser, dto);
+
+      const endedEmit = eventEmitter.emit.mock.calls.find((c) => c[0] === ResourceSessionEndedEvent.EVENT_NAME);
+      expect(endedEmit).toBeDefined();
+      const payload = endedEmit?.[1] as ResourceSessionEndedEvent;
+      expect(payload).toBeInstanceOf(ResourceSessionEndedEvent);
+      expect(payload.usage).toBe(mockUpdatedSession);
+      expect(payload.endedBy).toEqual({ id: managerUser.id, username: managerUser.username });
+    });
+
+    it('emits a system resource session ended notification event for flow-ended sessions', async () => {
+      const owner = { id: 77, username: 'member' } as User;
+      const mockActiveSession = {
+        id: 5,
+        resourceId: 12,
+        userId: owner.id,
+        startTime: new Date(),
+        user: owner,
+        resource: { id: 12, name: 'Laser cutter' } as Resource,
+      } as ResourceUsage;
+      const mockUpdatedSession = {
+        ...mockActiveSession,
+        endTime: new Date(),
+        endNotes: 'Flow stop',
+      };
+
+      resourceUsageRepository.findOne
+        .mockResolvedValueOnce(mockActiveSession)
+        .mockResolvedValueOnce(mockUpdatedSession)
+        .mockResolvedValueOnce(mockUpdatedSession);
+
+      const mockUpdateQueryBuilder = createMockQueryBuilder(null);
+      (transactionalEntityManager.createQueryBuilder as jest.Mock).mockReturnValue(
+        mockUpdateQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>,
+      );
+
+      await service.endSession(
+        mockActiveSession.resourceId,
+        owner,
+        { notes: 'Flow stop' },
+        { skipFormSubmissions: true, skipNoteNotification: true },
+      );
+
+      const endedEmit = eventEmitter.emit.mock.calls.find((c) => c[0] === ResourceSessionEndedEvent.EVENT_NAME);
+      expect(endedEmit).toBeDefined();
+      const payload = endedEmit?.[1] as ResourceSessionEndedEvent;
+      expect(payload.usage).toBe(mockUpdatedSession);
+      expect(payload.endedBy).toBeNull();
     });
 
     const setupEndSession = () => {
