@@ -13,7 +13,7 @@ describe('NotificationDispatchService', () => {
   let preferences: { isChannelEnabled: jest.Mock };
   let push: { sendToUser: jest.Mock };
   let live: { emitToUser: jest.Mock };
-  let email: { sendMaintenanceRequestedEmail: jest.Mock };
+  let email: { sendMaintenanceRequestedEmail: jest.Mock; sendResourceTakeoverEmail: jest.Mock };
 
   const recipient = { id: 2, email: 'recipient@example.com' } as User;
 
@@ -21,7 +21,10 @@ describe('NotificationDispatchService', () => {
     preferences = { isChannelEnabled: jest.fn().mockResolvedValue(true) };
     push = { sendToUser: jest.fn().mockResolvedValue(undefined) };
     live = { emitToUser: jest.fn() };
-    email = { sendMaintenanceRequestedEmail: jest.fn() };
+    email = {
+      sendMaintenanceRequestedEmail: jest.fn(),
+      sendResourceTakeoverEmail: jest.fn().mockResolvedValue(undefined),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -109,6 +112,52 @@ describe('NotificationDispatchService', () => {
       sendEmail,
     });
 
+    expect(push.sendToUser).toHaveBeenCalledTimes(1);
+    expect(live.emitToUser).toHaveBeenCalledTimes(1);
+  });
+
+  it('maps resource takeover email templates to the email service', async () => {
+    await service.sendEmailTemplate(recipient, NotificationCategory.RESOURCE_TAKEOVER, {
+      resource: { id: 4, name: 'Laser cutter' },
+      takeover: { actorName: 'alice' },
+    });
+
+    expect(email.sendResourceTakeoverEmail).toHaveBeenCalledWith(
+      recipient,
+      { id: 4, name: 'Laser cutter' },
+      { actorName: 'alice' },
+    );
+  });
+
+  it('sends resource takeover email when email channel is enabled', async () => {
+    const sendEmail = jest.fn().mockResolvedValue(undefined);
+
+    await service.dispatch({
+      category: NotificationCategory.RESOURCE_TAKEOVER,
+      recipients: [recipient],
+      title: 'Laser cutter was taken over',
+      body: 'alice took over your active resource session.',
+      sendEmail,
+    });
+
+    expect(sendEmail).toHaveBeenCalledWith(recipient);
+  });
+
+  it('does not send resource takeover email when email channel is disabled', async () => {
+    preferences.isChannelEnabled.mockImplementation(async (_userId, _category, channel) => {
+      return channel !== NotificationChannel.EMAIL;
+    });
+    const sendEmail = jest.fn().mockResolvedValue(undefined);
+
+    await service.dispatch({
+      category: NotificationCategory.RESOURCE_TAKEOVER,
+      recipients: [recipient],
+      title: 'Laser cutter was taken over',
+      body: 'alice took over your active resource session.',
+      sendEmail,
+    });
+
+    expect(sendEmail).not.toHaveBeenCalled();
     expect(push.sendToUser).toHaveBeenCalledTimes(1);
     expect(live.emitToUser).toHaveBeenCalledTimes(1);
   });
