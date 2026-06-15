@@ -113,16 +113,14 @@ function AppLayout(props: PropsWithChildren) {
           <div style={{ fontSize: '24px' }}>↓</div>
         </div>
       }
-      isPullable={pullToRefreshIsEnabled && isTouchDevice}
+      isPullable={false && pullToRefreshIsEnabled && isTouchDevice}
     >
       <RouterProvider navigate={navigate}>
         <I18nProvider locale={language}>
           <ToastProvider>
             <ReactFlowProvider>
               <AttraccessUserActionsBridge>
-                <Layout noLayout={!isAuthenticated}>
-                  {props.children}
-                </Layout>
+                <Layout noLayout={!isAuthenticated}>{props.children}</Layout>
                 {isAuthenticated && <SupervisorApprovalListener />}
               </AttraccessUserActionsBridge>
             </ReactFlowProvider>

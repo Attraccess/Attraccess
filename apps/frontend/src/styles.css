@@ -21,6 +21,10 @@ body,
   overflow: hidden;
 }
 
+#root {
+  position: relative;
+}
+
 /* Expressive form validation errors: larger, bolder, with leading warning glyph */
 .field-error[data-visible="true"] {
   @apply text-sm font-medium flex items-start gap-1;
