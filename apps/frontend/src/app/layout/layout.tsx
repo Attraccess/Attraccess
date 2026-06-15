@@ -70,7 +70,7 @@ export function Layout({ children, noLayout }: LayoutProps) {
 
   if (noLayout) {
     return (
-      <div className="bg-background h-screen flex flex-col overflow-y-auto">
+      <div className="bg-background h-screen min-h-0 flex flex-col overflow-y-auto app-scroll-container">
         <ServerNotAvailable />
         {children}
       </div>
@@ -78,12 +78,12 @@ export function Layout({ children, noLayout }: LayoutProps) {
   }
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-screen min-h-0 bg-background">
       {/* Sidebar */}
       <Sidebar isOpen={isOpen} toggleSidebar={toggleSidebar} />
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
         {/* Mobile Header */}
         <Header toggleSidebar={toggleSidebar} />
 
@@ -96,7 +96,7 @@ export function Layout({ children, noLayout }: LayoutProps) {
         <GlobalMessagingLive enabled={isAuthenticated && !needsTwoFactorSetup} />
 
         {/* Page Content */}
-        <main className="flex-1 overflow-auto p-4 bg-background">{children}</main>
+        <main className="flex-1 min-h-0 overflow-auto p-4 bg-background app-scroll-container">{children}</main>
 
         {/* Global donation prompt for eligible users */}
         <DonationPrompt />
