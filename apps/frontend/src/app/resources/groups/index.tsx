@@ -1,5 +1,6 @@
 import { HTMLAttributes, useCallback, useMemo, useState } from 'react';
 import {
+  Link,
   Table,
   TableBody,
   TableCell,
@@ -31,7 +32,6 @@ import { ResourceGroupUpsertModal } from '../../resource-groups/upsertModal/reso
 import { GroupsToolbar } from './GroupsToolbar';
 import { filterAndSortGroups, GroupFilter } from './groupsFilter';
 import { TableRowActions } from '../../../components/tableRowActions';
-import { useNavigate } from 'react-router-dom';
 
 type ManageResourceGroupsProps = Omit<HTMLAttributes<HTMLElement>, 'children'> & {
   resourceId: number;
@@ -46,7 +46,6 @@ export function ManageResourceGroups({
   const { t } = useTranslations({ de, en });
   const queryClient = useQueryClient();
   const toast = useToastMessage();
-  const navigate = useNavigate();
 
   const { data: resource } = useResourcesServiceGetOneResourceById({ id: resourceId });
   const { data: groups } = useResourcesServiceResourceGroupsGetMany();
@@ -140,6 +139,8 @@ export function ManageResourceGroups({
     return { assigned, available: allGroups.length - assigned };
   }, [allGroups, assignedIds]);
 
+  const resourceName = resource?.name ?? '';
+
   const emptyMessage = allGroups.length === 0 ? t('empty.noGroups') : t('empty.noMatch');
 
   const renderTable = () => (
@@ -160,6 +161,10 @@ export function ManageResourceGroups({
               const isAssigned = assignedIds.has(group.id);
               const dotClass = isAssigned ? 'bg-success' : 'bg-default-300';
               const ringClass = isAssigned ? 'ring-success/30' : 'ring-default-300/30';
+              const actionLabel = t(isAssigned ? 'row.toggleOff' : 'row.toggleOn', {
+                resource: resourceName,
+                group: group.name,
+              });
               const buttonLabel = t(isAssigned ? 'row.remove' : 'row.add');
               const isPending = pendingGroupIds.has(group.id);
               return (
@@ -193,29 +198,33 @@ export function ManageResourceGroups({
                     </span>
                   </TableCell>
                   <TableCell>
-                    <TableRowActions
-                      ariaLabel={t('columns.actions')}
-                      triggerDataCy={`resource-group-row-${group.id}-actions`}
-                      actions={[
-                        {
-                          key: 'toggle',
-                          label: buttonLabel,
-                          icon: isAssigned ? <MinusIcon size={14} /> : <PlusIcon size={14} />,
-                          variant: isAssigned ? 'destructive' : 'default',
-                          isDisabled: isPending,
-                          isPending,
-                          onPress: () => handleToggle(group),
-                          dataCy: `resource-group-row-${group.id}-toggle`,
-                        },
-                        {
-                          key: 'open',
-                          label: `${t('row.openGroup')}: ${group.name}`,
-                          icon: <ChevronRightIcon size={14} />,
-                          onPress: () => navigate(`/resource-groups/${group.id}`),
-                          dataCy: `resource-group-row-${group.id}-open`,
-                        },
-                      ]}
-                    />
+                    <div className="flex items-center justify-end gap-2">
+                      <Link
+                        href={`/resource-groups/${group.id}`}
+                        className="text-xs inline-flex items-center gap-0.5"
+                        data-cy={`resource-group-row-${group.id}-open`}
+                        aria-label={`${t('row.openGroup')}: ${group.name}`}
+                      >
+                        {t('row.openGroup')}
+                        <ChevronRightIcon size={14} />
+                      </Link>
+                      <TableRowActions
+                        ariaLabel={actionLabel}
+                        triggerDataCy={`resource-group-row-${group.id}-actions`}
+                        actions={[
+                          {
+                            key: 'toggle',
+                            label: buttonLabel,
+                            icon: isAssigned ? <MinusIcon size={14} /> : <PlusIcon size={14} />,
+                            variant: isAssigned ? 'destructive' : 'default',
+                            isDisabled: isPending,
+                            isPending,
+                            onPress: () => handleToggle(group),
+                            dataCy: `resource-group-row-${group.id}-toggle`,
+                          },
+                        ]}
+                      />
+                    </div>
                   </TableCell>
                 </TableRow>
               );

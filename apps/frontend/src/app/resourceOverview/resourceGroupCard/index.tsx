@@ -32,7 +32,6 @@ import { FilterProps } from '../filterProps';
 import en from './en.json';
 import de from './de.json';
 import { SimplePagination } from '../../../components/simplePagination';
-import { TableRowActions } from '../../../components/tableRowActions';
 
 interface Props {
   groupId: number | 'none';
@@ -156,7 +155,7 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
                 <TableColumn width="0" className="text-left">
                   {t('columns.status')}
                 </TableColumn>
-                <TableColumn width="0">{t('columns.actions')}</TableColumn>
+                <TableColumn width="0">{''}</TableColumn>
               </TableHeader>
               <TableBody items={resources?.data ?? []} renderEmptyState={() => <EmptyState />}>
                 {(resource) => (
@@ -192,17 +191,7 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
                       <StatusChip resourceId={resource.id} />
                     </TableCell>
                     <TableCell>
-                      <TableRowActions
-                        ariaLabel={t('columns.actions')}
-                        actions={[
-                          {
-                            key: 'open',
-                            label: resource.name,
-                            icon: <ChevronRightIcon className="w-4 h-4" />,
-                            onPress: () => navigate(`/resources/${resource.id}`),
-                          },
-                        ]}
-                      />
+                      <ChevronRightIcon />
                     </TableCell>
                   </TableRow>
                 )}
