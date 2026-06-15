@@ -14,6 +14,7 @@ import { SettingsService } from '../settings/settings.service';
 import { SmtpServiceType } from '../settings/dto/smtp-settings.dto';
 import { MetricsService } from '../metrics/metrics.service';
 import { ExternalCallTimer } from '../metrics/instrumentation/external/external.helper';
+import { Repository } from 'typeorm';
 
 jest.mock('nodemailer', () => ({
   createTransport: jest.fn(),
@@ -100,6 +101,13 @@ describe('EmailService', () => {
             body: '<mjml><mj-body><mj-section><mj-column><mj-text>Hello {{user.username}}</mj-text><mj-text>{{takeover.actorName}} took over {{resource.name}}</mj-text><mj-text>{{resource.url}}</mj-text></mj-column></mj-section></mj-body></mjml>',
           });
         }
+        if (type === EmailTemplateType.ACCESS_CHANGE) {
+          return Promise.resolve({
+            type,
+            subject: '{{accessChange.title}}',
+            body: '<mjml><mj-body><mj-section><mj-column><mj-text>Hello {{user.username}}</mj-text><mj-text>{{accessChange.body}}</mj-text><mj-button href="{{accessChange.url}}">View change</mj-button></mj-column></mj-section></mj-body></mjml>',
+          });
+        }
         throw new Error('Unexpected template type');
       }),
     };
@@ -115,15 +123,20 @@ describe('EmailService', () => {
       time: <T>(_target: string, _operation: string, fn: () => Promise<T>) => fn(),
     };
 
+    const userRepository = {
+      findOne: jest.fn(),
+    };
+
     const service = new EmailService(
       settingsService as unknown as SettingsService,
       emailTemplateService as unknown as EmailTemplateService,
       mjmlService as unknown as MjmlService,
       metricsService as unknown as MetricsService,
       externalCallTimer as unknown as ExternalCallTimer,
+      userRepository as unknown as Repository<User>,
     );
 
-    return { service, sendMail, close, settingsService, emailTemplateService, mjmlService };
+    return { service, sendMail, close, settingsService, emailTemplateService, mjmlService, userRepository };
   };
 
   it('sends username changed email with resolved variables', async () => {
@@ -238,5 +251,41 @@ describe('EmailService', () => {
     expect(callArg.html).toContain('Hello bob');
     expect(callArg.html).toContain('alice took over Laser Cutter');
     expect(callArg.html).toContain('https://frontend.example/resources/4/usage');
+  });
+
+  it('sends access change email with title, body and resolved URL', async () => {
+    const { service, sendMail } = setup();
+    const user = makeUser({ username: 'dana', email: 'dana@example.com' });
+
+    await service.sendAccessChangeEmail(user, {
+      title: 'Your resource access changed',
+      body: 'You were made an introducer for resource #7.',
+      url: '/resources/7',
+    });
+
+    expect(sendMail).toHaveBeenCalledTimes(1);
+    const callArg = (sendMail as jest.Mock).mock.calls[0][0];
+    expect(callArg.to).toBe('dana@example.com');
+    expect(callArg.subject).toBe('Your resource access changed');
+    expect(callArg.html).toContain('Hello dana');
+    expect(callArg.html).toContain('You were made an introducer for resource #7.');
+    expect(callArg.html).toContain('https://frontend.example/resources/7');
+  });
+
+  it('loads a full recipient before sending access-change email for id-only notification recipients', async () => {
+    const { service, sendMail, userRepository } = setup();
+    userRepository.findOne.mockResolvedValue(makeUser({ id: 7, username: 'riley', email: 'riley@example.com' }));
+
+    await service.sendAccessChangeEmail({ id: 7 } as User, {
+      title: 'Your group access changed',
+      body: 'You received an introduction for group #5.',
+      url: '/resource-groups/5',
+    });
+
+    expect(userRepository.findOne).toHaveBeenCalledWith({ where: { id: 7 } });
+    const callArg = (sendMail as jest.Mock).mock.calls[0][0];
+    expect(callArg.to).toBe('riley@example.com');
+    expect(callArg.html).toContain('Hello riley');
+    expect(callArg.html).toContain('https://frontend.example/resource-groups/5');
   });
 });

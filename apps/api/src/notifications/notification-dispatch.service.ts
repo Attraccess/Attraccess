@@ -144,6 +144,14 @@ export class NotificationDispatchService {
         recipient,
         context.message as { conversationId: number; senderName: string; preview: string },
       );
+      return;
+    }
+
+    if (category === NotificationCategory.ACCESS_CHANGES) {
+      await this.emailService.sendAccessChangeEmail(
+        recipient,
+        context.accessChange as { title: string; body: string; url?: string },
+      );
     }
   }
 }

@@ -30,15 +30,23 @@ export class ResourceIntroductionsService {
   ) {}
 
   private notifyIntroductionChange(resourceId: number, userId: number, granted: boolean): void {
+    const title = 'Your resource access changed';
+    const body = granted
+      ? `You received an introduction for resource #${resourceId}.`
+      : `Your introduction for resource #${resourceId} was revoked.`;
+    const url = `/resources/${resourceId}`;
+
     void this.notifications.dispatch({
       category: NotificationCategory.ACCESS_CHANGES,
       recipients: [{ id: userId } as User],
-      title: 'Your resource access changed',
-      body: granted
-        ? `You received an introduction for resource #${resourceId}.`
-        : `Your introduction for resource #${resourceId} was revoked.`,
-      url: `/resources/${resourceId}`,
+      title,
+      body,
+      url,
       dedupeKey: `resource-introduction-${resourceId}-${userId}-${granted ? 'granted' : 'revoked'}`,
+      sendEmail: (recipient) =>
+        this.notifications.sendEmailTemplate(recipient, NotificationCategory.ACCESS_CHANGES, {
+          accessChange: { title, body, url },
+        }),
     }).catch((error) => {
       this.logger.error(`Failed to notify user ${userId} about resource introduction changes: ${(error as Error).message}`);
     });

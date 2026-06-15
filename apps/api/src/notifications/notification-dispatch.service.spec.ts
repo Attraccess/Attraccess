@@ -13,7 +13,7 @@ describe('NotificationDispatchService', () => {
   let preferences: { isChannelEnabled: jest.Mock };
   let push: { sendToUser: jest.Mock };
   let live: { emitToUser: jest.Mock };
-  let email: { sendMaintenanceRequestedEmail: jest.Mock; sendResourceTakeoverEmail: jest.Mock };
+  let email: { sendMaintenanceRequestedEmail: jest.Mock; sendResourceTakeoverEmail: jest.Mock; sendAccessChangeEmail: jest.Mock };
 
   const recipient = { id: 2, email: 'recipient@example.com' } as User;
 
@@ -24,6 +24,7 @@ describe('NotificationDispatchService', () => {
     email = {
       sendMaintenanceRequestedEmail: jest.fn(),
       sendResourceTakeoverEmail: jest.fn().mockResolvedValue(undefined),
+      sendAccessChangeEmail: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -114,6 +115,41 @@ describe('NotificationDispatchService', () => {
       body: 'Hello there',
       url: '/messages?conversation=10',
       severity: 'info',
+    });
+  });
+
+  it('does not call access-change email callback when the email channel is disabled', async () => {
+    preferences.isChannelEnabled.mockImplementation(async (_userId, _category, channel) => {
+      return channel !== NotificationChannel.EMAIL;
+    });
+    const sendEmail = jest.fn().mockResolvedValue(undefined);
+
+    await service.dispatch({
+      category: NotificationCategory.ACCESS_CHANGES,
+      recipients: [recipient],
+      title: 'Your access changed',
+      body: 'Your resource access changed.',
+      sendEmail,
+    });
+
+    expect(sendEmail).not.toHaveBeenCalled();
+    expect(push.sendToUser).toHaveBeenCalledTimes(1);
+    expect(live.emitToUser).toHaveBeenCalledTimes(1);
+  });
+
+  it('maps access-change template dispatches to the email service', async () => {
+    await service.sendEmailTemplate(recipient, NotificationCategory.ACCESS_CHANGES, {
+      accessChange: {
+        title: 'Your resource access changed',
+        body: 'You were made an introducer for resource #7.',
+        url: '/resources/7',
+      },
+    });
+
+    expect(email.sendAccessChangeEmail).toHaveBeenCalledWith(recipient, {
+      title: 'Your resource access changed',
+      body: 'You were made an introducer for resource #7.',
+      url: '/resources/7',
     });
   });
 

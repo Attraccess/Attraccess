@@ -17,6 +17,7 @@ export enum EmailTemplateType {
   MESSAGE_RECEIVED = 'message-received',
   RESOURCE_USAGE_NOTE_ADDED = 'resource-usage-note-added',
   RESOURCE_TAKEOVER = 'resource-takeover',
+  ACCESS_CHANGE = 'access-change',
 }
 
 @Entity('email_templates')
