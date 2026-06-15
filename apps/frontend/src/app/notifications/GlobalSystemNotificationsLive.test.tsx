@@ -43,14 +43,17 @@ describe('GlobalSystemNotificationsLive', () => {
     render(<GlobalSystemNotificationsLive />, { wrapper: MemoryRouter });
 
     hoisted.onUpdate?.({
-      title: 'Resource taken over',
-      body: 'Laser Cutter was taken over by Admin',
+      category: 'messages',
+      title: 'alice',
+      body: 'Hello there',
+      url: '/messages?conversation=10',
     });
 
     expect(hoisted.infoToast).toHaveBeenCalledWith({
-      title: 'Resource taken over',
-      description: 'Laser Cutter was taken over by Admin',
+      title: 'alice',
+      description: 'Hello there',
       duration: 5000,
+      action: expect.objectContaining({ label: 'Open' }),
     });
   });
 
