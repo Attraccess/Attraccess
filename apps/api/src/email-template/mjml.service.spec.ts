@@ -56,4 +56,28 @@ describe('MjmlService', () => {
       await expect(service.validateAndConvert(mjml)).rejects.toThrow(BadRequestException);
     });
   });
+
+  describe('injectContentIntoLayout', () => {
+    it('should inject content into the placeholder', () => {
+      const layout = '<mjml><mj-body>{{{content}}}</mj-body></mjml>';
+      const content = '<mj-section><mj-column><mj-text>Hello</mj-text></mj-column></mj-section>';
+      const result = service.injectContentIntoLayout(layout, content);
+      expect(result).toContain('Hello');
+      expect(result).not.toContain('{{{content}}}');
+    });
+
+    it('should replace all occurrences of the placeholder', () => {
+      const layout = '<mjml><mj-body>{{{content}}}{{{content}}}</mj-body></mjml>';
+      const content = '<mj-section></mj-section>';
+      const result = service.injectContentIntoLayout(layout, content);
+      expect(result.split('<mj-section></mj-section>').length - 1).toBe(2);
+      expect(result).not.toContain('{{{content}}}');
+    });
+
+    it('should throw BadRequestException when placeholder is missing', () => {
+      const layout = '<mjml><mj-body></mj-body></mjml>';
+      const content = '<mj-section></mj-section>';
+      expect(() => service.injectContentIntoLayout(layout, content)).toThrow(BadRequestException);
+    });
+  });
 });

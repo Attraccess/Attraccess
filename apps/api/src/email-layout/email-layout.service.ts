@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EmailLayout, EmailTemplate, EMAIL_LAYOUT_SINGLETON_ID } from '@attraccess/database-entities';
 import { Repository } from 'typeorm';
@@ -28,6 +28,9 @@ export class EmailLayoutService {
   }
 
   async update(dto: UpdateEmailLayoutDto): Promise<EmailLayout> {
+    if (!dto.body.includes('{{{content}}}')) {
+      throw new BadRequestException("Email layout body must contain the placeholder '{{{content}}}'");
+    }
     const testContent = `<mj-section><mj-column><mj-text>test</mj-text></mj-column></mj-section>`;
     const fullMjml = this.mjmlService.injectContentIntoLayout(dto.body, testContent);
     await this.mjmlService.validateAndConvert(fullMjml);

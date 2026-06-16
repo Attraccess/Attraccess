@@ -2,6 +2,10 @@
   "title": "E-Mail-Vorlagen",
   "subtitle": "Verwalten Sie die vom System verwendeten E-Mail-Vorlagen. Das globale Layout (Kopfzeile, Fußzeile, Stile) wird von allen Vorlagen gemeinsam genutzt.",
   "editLayout": "Globales Layout bearbeiten",
+  "tabs": {
+    "templates": "Vorlagen",
+    "layout": "Globales Layout"
+  },
   "columns": {
     "type": "Art",
     "subject": "Betreff",

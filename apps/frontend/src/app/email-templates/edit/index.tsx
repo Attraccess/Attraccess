@@ -166,9 +166,8 @@ export function EditEmailTemplatePage() {
     }
 
     if (parseMjmlisError) {
-      return `<p style="text-align:center; color: #f00; padding-top: 20px;">${t('preview.errorPrefix')} ${
-        (parseMjmlError as Error).message
-      }</p>`;
+      const errorMessage = parseMjmlError instanceof Error ? parseMjmlError.message : String(parseMjmlError);
+      return `<p style="text-align:center; color: #f00; padding-top: 20px;">${t('preview.errorPrefix')} ${errorMessage}</p>`;
     }
 
     return parsedBody?.html;
@@ -297,6 +296,7 @@ export function EditEmailTemplatePage() {
               srcDoc={previewHtml}
               title={t('preview.iframeTitle')}
               className="w-full h-full min-h-[435px] border-0 rounded-md bg-default-50"
+              sandbox="allow-same-origin"
             />
           </section>
         </div>

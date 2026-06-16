@@ -24,7 +24,6 @@ import { CsvExport } from '../csv-export';
 import { DocumentationEditor, DocumentationView } from '../resources/documentation';
 import { EmailTemplatesPage } from '../email-templates/EmailTemplatesPage';
 import { EditEmailTemplatePage } from '../email-templates/edit';
-import { EmailLayoutPage } from '../email-layout/EmailLayoutPage';
 import { ResourceGroupEditPage } from '../resource-groups';
 import { ResourceOverview } from '../resourceOverview';
 import { Dependencies } from '../dependencies';
@@ -313,7 +312,7 @@ const coreRoutes: RouteConfig[] = [
   },
   {
     path: '/email-layout',
-    element: <EmailLayoutPage />,
+    element: <Navigate to="/email-templates?tab=layout" replace />,
     authRequired: 'canManageSystemConfiguration',
   },
   {

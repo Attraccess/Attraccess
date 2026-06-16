@@ -44,6 +44,10 @@ export class MjmlService {
   }
 
   injectContentIntoLayout(layoutMjml: string, contentMjml: string): string {
-    return layoutMjml.replace('{{{content}}}', contentMjml);
+    const placeholder = '{{{content}}}';
+    if (!layoutMjml.includes(placeholder)) {
+      throw new BadRequestException(`Email layout is missing the required placeholder: ${placeholder}`);
+    }
+    return layoutMjml.split(placeholder).join(contentMjml);
   }
 }

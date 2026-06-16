@@ -2,6 +2,10 @@
   "title": "Email Templates",
   "subtitle": "Manage the email templates used by the system. The global layout (header, footer, styles) is shared across all templates.",
   "editLayout": "Edit Global Layout",
+  "tabs": {
+    "templates": "Templates",
+    "layout": "Global Layout"
+  },
   "columns": {
     "type": "Type",
     "subject": "Subject",
