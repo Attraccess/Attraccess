@@ -66,7 +66,6 @@ vi.mock('@attraccess/react-query-client', () => ({
     RESOURCE_SESSION_ENDED: 'resource_session_ended',
     NFC_CARDS: 'nfc_cards',
     PROJECT_INVITATIONS: 'project_invitations',
-    SUPERVISION_REQUESTS: 'supervision_requests',
     ACCESS_CHANGES: 'access_changes',
   },
   UseNotificationsServiceNotificationsGetPreferencesKeyFn: () => ['NotificationsServiceNotificationsGetPreferences'],

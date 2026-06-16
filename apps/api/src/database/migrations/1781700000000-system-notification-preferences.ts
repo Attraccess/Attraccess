@@ -8,7 +8,6 @@ const DEFAULT_CATEGORY_CHANNELS = JSON.stringify({
   resource_takeover: { email: false, push: true, toast: true },
   resource_session_ended: { email: false, push: true, toast: true },
   project_invitations: { email: true, push: true, toast: true },
-  supervision_requests: { email: false, push: true, toast: true },
 });
 
 export class SystemNotificationPreferences1781700000000 implements MigrationInterface {

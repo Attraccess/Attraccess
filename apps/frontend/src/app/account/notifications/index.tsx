@@ -35,7 +35,6 @@ const categoryGroups: Array<{ id: string; categories: NotificationCategory[] }> 
       NotificationCategory.MAINTENANCE_REQUESTS,
       NotificationCategory.RESOURCE_USAGE_NOTES,
       NotificationCategory.RESOURCE_HEALTH,
-      NotificationCategory.SUPERVISION_REQUESTS,
     ],
   },
   {

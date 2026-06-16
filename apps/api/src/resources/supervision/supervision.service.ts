@@ -7,8 +7,6 @@ import { SupervisionRequestDto } from './dtos/supervisionRequest.dto';
 import { SupervisionDecisionResponseDto } from './dtos/supervisionDecision.response.dto';
 import { SupervisionLiveService } from './supervision-live.service';
 import { SupervisionLiveEventType } from './dtos/supervisionLiveEvent.dto';
-import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
-import { NotificationCategory } from '../../notifications/notification-types';
 
 interface PendingSupervisionRequest {
   id: string;
@@ -44,7 +42,6 @@ export class SupervisionService {
   constructor(
     private readonly resourceUsageService: ResourceUsageService,
     private readonly supervisionLive: SupervisionLiveService,
-    private readonly notifications: NotificationDispatchService,
   ) {}
 
   /**
@@ -95,16 +92,6 @@ export class SupervisionService {
       requestId: id,
       request: this.toDto(stored),
     });
-    await this.notifications.dispatch({
-      category: NotificationCategory.SUPERVISION_REQUESTS,
-      recipients: [{ id: dto.supervisorUserId } as User],
-      actorId: requester.id,
-      title: 'Supervision requested',
-      body: `${requester.username ?? 'A user'} requested supervision for a resource session.`,
-      url: `/resources/${resourceId}/usage`,
-      severity: 'warning',
-    });
-
     return sessionPromise;
   }
 
