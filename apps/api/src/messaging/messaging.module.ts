@@ -14,17 +14,15 @@ import { MessagingController } from './messaging.controller';
 import { MessageNotificationListener } from './message-notification.listener';
 import { MessageRateLimitService } from './rate-limiting/message-rate-limit.service';
 import { ResourceUsageModule } from '../resources/usage/resourceUsage.module';
-import { EmailModule } from '../email/email.module';
 import { SettingsModule } from '../settings/settings.module';
-import { PushModule } from '../push/push.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Conversation, ConversationParticipant, Message, NotificationPreference, Resource, User]),
     ResourceUsageModule,
-    EmailModule,
     SettingsModule,
-    PushModule,
+    NotificationsModule,
   ],
   controllers: [MessagingController],
   providers: [MessagingService, MessagingLiveService, MessageNotificationListener, MessageRateLimitService],

@@ -9,6 +9,7 @@ import { NotificationCategory, NotificationChannel } from './notification-types'
 export interface NotificationDispatchRequest {
   category: NotificationCategory;
   recipients: User[];
+  channels?: NotificationChannel[];
   title: string;
   body: string;
   url?: string;
@@ -38,10 +39,21 @@ export class NotificationDispatchService {
   }
 
   private async dispatchToRecipient(request: NotificationDispatchRequest, recipient: User): Promise<void> {
+    const channels = request.channels ?? [
+      NotificationChannel.EMAIL,
+      NotificationChannel.PUSH,
+      NotificationChannel.TOAST,
+    ];
     const [emailEnabled, pushEnabled, toastEnabled] = await Promise.all([
-      this.preferences.isChannelEnabled(recipient.id, request.category, NotificationChannel.EMAIL),
-      this.preferences.isChannelEnabled(recipient.id, request.category, NotificationChannel.PUSH),
-      this.preferences.isChannelEnabled(recipient.id, request.category, NotificationChannel.TOAST),
+      channels.includes(NotificationChannel.EMAIL)
+        ? this.preferences.isChannelEnabled(recipient.id, request.category, NotificationChannel.EMAIL)
+        : Promise.resolve(false),
+      channels.includes(NotificationChannel.PUSH)
+        ? this.preferences.isChannelEnabled(recipient.id, request.category, NotificationChannel.PUSH)
+        : Promise.resolve(false),
+      channels.includes(NotificationChannel.TOAST)
+        ? this.preferences.isChannelEnabled(recipient.id, request.category, NotificationChannel.TOAST)
+        : Promise.resolve(false),
     ]);
 
     await Promise.all([

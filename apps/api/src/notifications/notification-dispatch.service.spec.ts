@@ -86,6 +86,37 @@ describe('NotificationDispatchService', () => {
     expect(live.emitToUser).toHaveBeenCalledTimes(1);
   });
 
+  it('only checks and sends requested channels when a channel subset is provided', async () => {
+    await service.dispatch({
+      category: NotificationCategory.MESSAGES,
+      recipients: [recipient],
+      channels: [NotificationChannel.TOAST],
+      title: 'alice',
+      body: 'Hello there',
+      url: '/messages?conversation=10',
+    });
+
+    expect(preferences.isChannelEnabled).toHaveBeenCalledWith(2, NotificationCategory.MESSAGES, NotificationChannel.TOAST);
+    expect(preferences.isChannelEnabled).not.toHaveBeenCalledWith(
+      2,
+      NotificationCategory.MESSAGES,
+      NotificationChannel.EMAIL,
+    );
+    expect(preferences.isChannelEnabled).not.toHaveBeenCalledWith(
+      2,
+      NotificationCategory.MESSAGES,
+      NotificationChannel.PUSH,
+    );
+    expect(push.sendToUser).not.toHaveBeenCalled();
+    expect(live.emitToUser).toHaveBeenCalledWith(2, {
+      category: NotificationCategory.MESSAGES,
+      title: 'alice',
+      body: 'Hello there',
+      url: '/messages?conversation=10',
+      severity: 'info',
+    });
+  });
+
   it('excludes the actor from recipients', async () => {
     await service.dispatch({
       category: NotificationCategory.RESOURCE_USAGE_NOTES,
