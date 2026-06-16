@@ -96,6 +96,7 @@ describe('EmailService', () => {
         }
         throw new Error('Unexpected template type');
       }),
+      getTranslationsMap: jest.fn().mockResolvedValue({}),
     };
     const mjmlService = {
       validateAndConvert: jest.fn().mockImplementation((template: string) => Promise.resolve(template)),

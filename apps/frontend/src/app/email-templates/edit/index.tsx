@@ -15,9 +15,13 @@ import {
   Input,
   Label,
   Link,
+  Tab,
+  TabList,
+  Tabs,
   TextField,
   useTheme,
 } from '@heroui/react';
+import type { Key } from '@heroui/react';
 import { Button } from '../../../components/button';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../components/toastProvider';
@@ -25,6 +29,8 @@ import { PageHeader } from '../../../components/pageHeader';
 import { StandardDrawer } from '../../../components/standardDrawer';
 import Editor, { type Monaco, type OnMount } from '@monaco-editor/react';
 import { Maximize } from 'lucide-react';
+import { OpenAPI } from '@attraccess/react-query-client';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import * as enTranslationsFile from './en.json';
 import * as deTranslationsFile from './de.json';
@@ -72,6 +78,244 @@ function registerVariableProvider(
       };
     },
   });
+}
+
+interface TranslationKey {
+  key: string;
+  defaultValue: string;
+}
+
+interface TemplateTranslationsResponse {
+  keys: TranslationKey[];
+  translations: Record<string, Record<string, string>>;
+}
+
+function extractTranslationKeys(content: string): TranslationKey[] {
+  const regex = /\{\{t\s+["']([^"']+)["']\s+["']([^"']*)["']/g;
+  const seen = new Set<string>();
+  const keys: TranslationKey[] = [];
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(content)) !== null) {
+    if (!seen.has(match[1])) {
+      seen.add(match[1]);
+      keys.push({ key: match[1], defaultValue: match[2] });
+    }
+  }
+  return keys;
+}
+
+function useTemplateTranslations(templateType: EmailTemplateType | undefined) {
+  const queryClient = useQueryClient();
+
+  const query = useQuery<TemplateTranslationsResponse>({
+    queryKey: ['email-template-translations', templateType],
+    queryFn: async () => {
+      const res = await fetch(`${OpenAPI.BASE}/api/email-templates/${templateType}/translations`, {
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Failed to load translations');
+      return res.json();
+    },
+    enabled: !!templateType,
+  });
+
+  const saveMutation = useMutation({
+    mutationFn: async ({ locale, translations }: { locale: string; translations: Record<string, string> }) => {
+      const res = await fetch(`${OpenAPI.BASE}/api/email-templates/${templateType}/translations`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ locale, translations }),
+      });
+      if (!res.ok) throw new Error('Failed to save translations');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['email-template-translations', templateType] });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (locale: string) => {
+      const res = await fetch(`${OpenAPI.BASE}/api/email-templates/${templateType}/translations/${locale}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Failed to delete locale');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['email-template-translations', templateType] });
+    },
+  });
+
+  return { query, saveMutation, deleteMutation };
+}
+
+interface TranslationsSectionProps {
+  templateType: EmailTemplateType;
+  liveContent: string;
+}
+
+function TranslationsSection({ templateType, liveContent }: TranslationsSectionProps) {
+  const { t } = useTranslations({ en: enTranslationsFile, de: deTranslationsFile });
+  const toast = useToastMessage();
+  const { query, saveMutation, deleteMutation } = useTemplateTranslations(templateType);
+
+  const extractedKeys = useMemo(() => extractTranslationKeys(liveContent), [liveContent]);
+
+  const existingLocales = useMemo(
+    () => Object.keys(query.data?.translations ?? {}),
+    [query.data],
+  );
+
+  const [selectedLocale, setSelectedLocale] = useState<string>('');
+  const [newLocale, setNewLocale] = useState('');
+  const [edited, setEdited] = useState<Record<string, string>>({});
+
+  // Auto-select first locale when data arrives
+  useEffect(() => {
+    if (!selectedLocale && existingLocales.length > 0) {
+      setSelectedLocale(existingLocales[0]);
+    }
+  }, [existingLocales, selectedLocale]);
+
+  // Sync edited state when locale or server data changes
+  useEffect(() => {
+    if (selectedLocale && query.data) {
+      setEdited(query.data.translations[selectedLocale] ?? {});
+    }
+  }, [selectedLocale, query.data]);
+
+  const handleAddLocale = () => {
+    const locale = newLocale.trim().toLowerCase();
+    if (!locale) return;
+    setSelectedLocale(locale);
+    setEdited({});
+    setNewLocale('');
+  };
+
+  const handleSave = async () => {
+    if (!selectedLocale) return;
+    try {
+      await saveMutation.mutateAsync({ locale: selectedLocale, translations: edited });
+      toast.success({ title: t('translations.saved') });
+    } catch {
+      toast.error({ title: t('translations.saving') });
+    }
+  };
+
+  const handleDeleteLocale = async (locale: string) => {
+    if (!window.confirm(t('translations.deleteConfirm', { locale }))) return;
+    await deleteMutation.mutateAsync(locale);
+    if (selectedLocale === locale) {
+      setSelectedLocale(existingLocales.find((l) => l !== locale) ?? '');
+    }
+  };
+
+  const allLocales = useMemo(() => {
+    const set = new Set(existingLocales);
+    if (selectedLocale) set.add(selectedLocale);
+    return Array.from(set);
+  }, [existingLocales, selectedLocale]);
+
+  return (
+    <section className="w-full flex flex-col gap-4" data-cy="translations-section">
+      <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
+        {t('sections.translations')}
+      </h3>
+
+      {/* Locale selector + add */}
+      <div className="flex flex-row flex-wrap items-center gap-2">
+        {allLocales.length > 0 && (
+          <Tabs
+            selectedKey={selectedLocale}
+            onSelectionChange={(key: Key) => setSelectedLocale(String(key))}
+          >
+            <TabList>
+              {allLocales.map((locale) => (
+                <Tab id={locale} key={locale}>
+                  <div className="flex items-center gap-1">
+                    {locale.toUpperCase()}
+                    <button
+                      type="button"
+                      className="text-default-400 hover:text-danger text-xs ml-1"
+                      onClick={(e) => { e.stopPropagation(); handleDeleteLocale(locale); }}
+                      aria-label={t('translations.deleteLocale')}
+                    >
+                      ×
+                    </button>
+                  </div>
+                </Tab>
+              ))}
+            </TabList>
+          </Tabs>
+        )}
+        <div className="flex gap-2 items-center ml-2">
+          <input
+            className="border border-default-300 rounded px-2 py-1 text-sm w-28 bg-transparent"
+            placeholder={t('translations.localePlaceholder')}
+            value={newLocale}
+            onChange={(e) => setNewLocale(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddLocale())}
+          />
+          <Button size="sm" variant="ghost" type="button" onPress={handleAddLocale}>
+            {t('translations.addLocale')}
+          </Button>
+        </div>
+      </div>
+
+      {extractedKeys.length === 0 ? (
+        <p className="text-sm text-default-500">{t('translations.noKeys')}</p>
+      ) : (
+        <>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="border-b border-default-200">
+                  <th className="text-left py-2 pr-4 font-medium text-default-600 w-1/4">{t('translations.keyColumn')}</th>
+                  <th className="text-left py-2 pr-4 font-medium text-default-600 w-1/3">{t('translations.defaultColumn')}</th>
+                  <th className="text-left py-2 font-medium text-default-600">{t('translations.translationColumn')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {extractedKeys.map(({ key, defaultValue }) => (
+                  <tr key={key} className="border-b border-default-100">
+                    <td className="py-2 pr-4 font-mono text-xs text-default-500 align-top pt-3">{key}</td>
+                    <td className="py-2 pr-4 text-default-600 align-top pt-3">{defaultValue}</td>
+                    <td className="py-2">
+                      <input
+                        className="w-full border border-default-300 rounded px-2 py-1 text-sm bg-transparent disabled:opacity-50"
+                        placeholder={!selectedLocale ? t('translations.locale') : t('translations.emptyTranslation')}
+                        value={edited[key] ?? ''}
+                        onChange={(e) =>
+                          setEdited((prev) => ({ ...prev, [key]: e.target.value }))
+                        }
+                        disabled={!selectedLocale}
+                        data-cy={`translation-input-${key}`}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {selectedLocale && (
+            <div className="flex justify-end">
+              <Button
+                variant="primary"
+                type="button"
+                onPress={handleSave}
+                isPending={saveMutation.isPending}
+                data-cy="save-translations-button"
+              >
+                {t('translations.save')}
+              </Button>
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  );
 }
 
 export function EditEmailTemplatePage() {
@@ -175,6 +419,9 @@ export function EditEmailTemplatePage() {
   }, [bodyIsEmpty, parsedBody, t, parseMjmlIsPending, parseMjmlisError, parseMjmlError]);
 
   const [editorIsExpanded, setEditorIsExpanded] = useState(false);
+
+  // Content fed to the translations section (debounced for key extraction)
+  const debouncedTranslationsContent = useDebounce(subject + '\n' + body, 700);
 
   const editor = useMemo(() => {
     const variableList = (
@@ -318,6 +565,13 @@ export function EditEmailTemplatePage() {
             {t('actions.save')}
           </Button>
         </div>
+
+        {templateType && (
+          <TranslationsSection
+            templateType={templateType as EmailTemplateType}
+            liveContent={debouncedTranslationsContent}
+          />
+        )}
       </Form>
     </div>
   );

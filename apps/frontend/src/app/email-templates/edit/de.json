@@ -15,7 +15,8 @@
   },
   "sections": {
     "template": "Vorlage",
-    "preview": "Vorschau"
+    "preview": "Vorschau",
+    "translations": "Übersetzungen"
   },
   "preview": {
     "iframeTitle": "Körper-Vorschau",
@@ -30,6 +31,21 @@
     "copied": "{{name}} kopiert",
     "copyFailed": "{{name}} konnte nicht kopiert werden",
     "completionDetail": "Template-Variable"
+  },
+  "translations": {
+    "noKeys": "Keine {{t}}-Helfer-Aufrufe in dieser Vorlage gefunden. Verwenden Sie {{t \"key\" \"Standardtext\"}} im Vorlageninhalt oder Betreff, um übersetzbare Zeichenfolgen hinzuzufügen.",
+    "keyColumn": "Schlüssel",
+    "defaultColumn": "Standard (Englisch)",
+    "translationColumn": "Übersetzung",
+    "locale": "Sprache",
+    "addLocale": "Hinzufügen",
+    "localePlaceholder": "z. B. de, fr, es",
+    "save": "Übersetzungen speichern",
+    "saving": "Speichern...",
+    "saved": "Übersetzungen gespeichert",
+    "deleteLocale": "Sprache löschen",
+    "deleteConfirm": "Alle Übersetzungen für die Sprache \"{{locale}}\" löschen?",
+    "emptyTranslation": "Fällt auf Standard zurück"
   },
   "actions": {
     "close": "Schließen",

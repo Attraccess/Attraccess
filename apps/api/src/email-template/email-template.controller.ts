@@ -1,11 +1,12 @@
-import { Controller, Get, Post, Body, Patch, Param, Query } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiBody, ApiParam, ApiQuery } from '@nestjs/swagger';
+import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiBody, ApiParam } from '@nestjs/swagger';
 import { Auth } from '@attraccess/plugins-backend-sdk';
 import { SystemPermission, EmailTemplate, EmailTemplateType } from '@attraccess/database-entities';
-import { EmailTemplateService } from './email-template.service';
+import { EmailTemplateService, TemplateTranslations } from './email-template.service';
 import { MjmlService } from './mjml.service';
 import { UpdateEmailTemplateDto } from './dto/update-email-template.dto';
 import { PreviewMjmlDto, PreviewMjmlResponseDto } from './dto/preview-mjml.dto';
+import { UpsertTranslationsDto } from './dto/upsert-translations.dto';
 
 @ApiTags('Email Templates')
 @ApiBearerAuth()
@@ -36,31 +37,58 @@ export class EmailTemplateController {
 
   @Get(':type')
   @Auth('canManageSystemConfiguration' as SystemPermission)
-  @ApiOperation({ summary: 'Get an email template by type and optional locale (defaults to "en")' })
-  @ApiParam({ name: 'type', enum: EmailTemplateType, enumName: 'EmailTemplateType', description: 'Template type' })
-  @ApiQuery({ name: 'locale', required: false, description: 'Locale (BCP 47 tag, e.g. "en", "de")' })
-  @ApiResponse({ status: 200, description: 'Email template found', type: EmailTemplate })
+  @ApiOperation({ summary: 'Get an email template by type' })
+  @ApiParam({ name: 'type', enum: EmailTemplateType, enumName: 'EmailTemplateType' })
+  @ApiResponse({ status: 200, type: EmailTemplate })
   @ApiResponse({ status: 404, description: 'Template not found' })
-  findOne(
-    @Param('type') type: EmailTemplateType,
-    @Query('locale') locale?: string,
-  ): Promise<EmailTemplate> {
-    return this.emailTemplateService.findOne(type, locale);
+  findOne(@Param('type') type: EmailTemplateType): Promise<EmailTemplate> {
+    return this.emailTemplateService.findOne(type);
   }
 
   @Patch(':type')
   @Auth('canManageSystemConfiguration' as SystemPermission)
-  @ApiOperation({ summary: 'Update an email template for a given locale (defaults to "en")' })
-  @ApiParam({ name: 'type', enum: EmailTemplateType, enumName: 'EmailTemplateType', description: 'Template type' })
-  @ApiQuery({ name: 'locale', required: false, description: 'Locale (BCP 47 tag, e.g. "en", "de")' })
-  @ApiResponse({ status: 200, description: 'Template updated successfully', type: EmailTemplate })
-  @ApiResponse({ status: 400, description: 'Invalid input data' })
-  @ApiResponse({ status: 404, description: 'Template not found' })
+  @ApiOperation({ summary: 'Update an email template' })
+  @ApiParam({ name: 'type', enum: EmailTemplateType, enumName: 'EmailTemplateType' })
+  @ApiResponse({ status: 200, type: EmailTemplate })
   update(
     @Param('type') type: EmailTemplateType,
     @Body() updateEmailTemplateDto: UpdateEmailTemplateDto,
-    @Query('locale') locale?: string,
   ): Promise<EmailTemplate> {
-    return this.emailTemplateService.update(type, updateEmailTemplateDto, locale);
+    return this.emailTemplateService.update(type, updateEmailTemplateDto);
+  }
+
+  @Get(':type/translations')
+  @Auth('canManageSystemConfiguration' as SystemPermission)
+  @ApiOperation({
+    summary: 'Get all translations for a template — returns extracted keys with defaults and all stored locale values',
+  })
+  @ApiParam({ name: 'type', enum: EmailTemplateType, enumName: 'EmailTemplateType' })
+  getTranslations(@Param('type') type: EmailTemplateType): Promise<TemplateTranslations> {
+    return this.emailTemplateService.getTranslations(type);
+  }
+
+  @Post(':type/translations')
+  @Auth('canManageSystemConfiguration' as SystemPermission)
+  @ApiOperation({ summary: 'Set translations for a locale (replaces all existing values for that locale)' })
+  @ApiParam({ name: 'type', enum: EmailTemplateType, enumName: 'EmailTemplateType' })
+  @ApiResponse({ status: 201, description: 'Translations saved' })
+  async setTranslations(
+    @Param('type') type: EmailTemplateType,
+    @Body() dto: UpsertTranslationsDto,
+  ): Promise<void> {
+    await this.emailTemplateService.setTranslations(type, dto.locale, dto.translations);
+  }
+
+  @Delete(':type/translations/:locale')
+  @Auth('canManageSystemConfiguration' as SystemPermission)
+  @ApiOperation({ summary: 'Delete all translations for a locale' })
+  @ApiParam({ name: 'type', enum: EmailTemplateType, enumName: 'EmailTemplateType' })
+  @ApiParam({ name: 'locale', description: 'BCP 47 locale tag' })
+  @ApiResponse({ status: 200, description: 'Translations deleted' })
+  deleteTranslations(
+    @Param('type') type: EmailTemplateType,
+    @Param('locale') locale: string,
+  ): Promise<void> {
+    return this.emailTemplateService.deleteTranslations(type, locale);
   }
 }

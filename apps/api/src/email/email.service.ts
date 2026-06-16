@@ -13,17 +13,12 @@ import {
   ResourceHealthStatus,
 } from '@attraccess/database-entities';
 import { dbCurrencyToUserCurrency } from '@attraccess/shared';
-import { createTranslator } from '@attraccess/plugins-backend-sdk';
 import * as Handlebars from 'handlebars';
 import { MjmlService } from '../email-template/mjml.service';
 import { EntityManager } from 'typeorm';
 import { SettingsService } from '../settings/settings.service';
 import { MetricsService } from '../metrics/metrics.service';
 import { ExternalCallTimer } from '../metrics/instrumentation/external/external.helper';
-import * as enTranslations from './translations/en.json';
-import * as deTranslations from './translations/de.json';
-
-const t = createTranslator({ en: enTranslations, de: deTranslations });
 
 @Injectable()
 export class EmailService {
@@ -40,18 +35,26 @@ export class EmailService {
     this.logger.debug('EmailService initialized');
   }
 
-  private async convertTemplate(template: EmailTemplate, context: Record<string, unknown>) {
-    const subjectTemplate = Handlebars.compile(template.subject);
+  private async convertTemplate(
+    template: EmailTemplate,
+    context: Record<string, unknown>,
+    locale: string,
+  ) {
+    const translationsMap = await this.emailTemplateService.getTranslationsMap(template.type, locale);
+
+    const hbs = Handlebars.create();
+    hbs.registerHelper('t', (key: string, defaultValue: string) => {
+      return new Handlebars.SafeString(translationsMap[key] ?? defaultValue);
+    });
+
+    const subjectTemplate = hbs.compile(template.subject);
     const subject = subjectTemplate(context);
 
     const bodyMjml = await this.mjmlService.validateAndConvert(template.body);
-    const bodyTemplate = Handlebars.compile(bodyMjml);
+    const bodyTemplate = hbs.compile(bodyMjml);
     const body = bodyTemplate(context);
 
-    return {
-      subject,
-      body,
-    };
+    return { subject, body };
   }
 
   private async sendEmail(
@@ -62,9 +65,9 @@ export class EmailService {
   ) {
     try {
       const locale = user.locale ?? 'en';
-      const dbTemplate = await this.emailTemplateService.findOne(templateType, locale, manager);
+      const dbTemplate = await this.emailTemplateService.findOne(templateType, manager);
 
-      const { subject, body } = await this.convertTemplate(dbTemplate, context);
+      const { subject, body } = await this.convertTemplate(dbTemplate, context, locale);
       const { transporter, from } = await this.createTransporter();
 
       this.logger.debug(
@@ -236,7 +239,7 @@ export class EmailService {
       total: dbCurrencyToUserCurrency(item.unitPrice * item.quantity, currencyMinorUnit),
     }));
 
-    const totalCredits = dbCurrencyToUserCurrency(-transaction.amount, currencyMinorUnit); // transaction.amount is negative when charging user
+    const totalCredits = dbCurrencyToUserCurrency(-transaction.amount, currencyMinorUnit);
 
     const context = {
       ...(await this.getBaseContext(user)),
@@ -251,7 +254,7 @@ export class EmailService {
       },
       items,
       totalCredits,
-      newBalance: dbCurrencyToUserCurrency(user.creditBalance, currencyMinorUnit), // already updated by DB triggers for completed tx
+      newBalance: dbCurrencyToUserCurrency(user.creditBalance, currencyMinorUnit),
     };
 
     await this.sendEmail(user, EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY, context);
@@ -271,11 +274,9 @@ export class EmailService {
       return;
     }
 
-    const locale = user.locale ?? 'en';
     const base = await this.getBaseContext(user);
     const becameUnhealthy = change.status === ResourceHealthStatus.UNHEALTHY;
     const resourceUrl = `${base.host.frontend}/resources/${resource.id}`;
-    const healthKey = becameUnhealthy ? 'degraded' : 'recovered';
 
     const context = {
       ...base,
@@ -289,9 +290,8 @@ export class EmailService {
         previousStatus: change.previousStatus ?? 'unknown',
         reason: change.reason,
         identifier: change.identifier,
-        headline: t(locale, `health.${healthKey}.headline`, { resourceName: resource.name }),
+        isDegraded: becameUnhealthy,
         headerColor: becameUnhealthy ? '#B91C1C' : '#047857',
-        bodyAction: t(locale, `health.${healthKey}.action`),
       },
     };
 
@@ -307,13 +307,9 @@ export class EmailService {
       return;
     }
 
-    const locale = user.locale ?? 'en';
     const base = await this.getBaseContext(user);
     const path = target.isGroup ? 'resource-groups' : 'resources';
     const resourceUrl = `${base.host.frontend}/${path}/${target.id}`;
-
-    const reasonKey = info.reason === 'age' ? 'age' : info.reason === 'inactivity' ? 'inactivity' : 'default';
-    const reasonText = t(locale, `retraining.reason.${reasonKey}`);
 
     const context = {
       ...base,
@@ -323,7 +319,8 @@ export class EmailService {
         url: resourceUrl,
       },
       retraining: {
-        reason: reasonText,
+        isAge: info.reason === 'age',
+        isInactivity: info.reason === 'inactivity',
         blocksAccess: info.blocksAccess,
       },
     };
@@ -369,10 +366,8 @@ export class EmailService {
       return;
     }
 
-    const locale = recipient.locale ?? 'en';
     const base = await this.getBaseContext(recipient);
     const resourceUrl = `${base.host.frontend}/resources/${resource.id}`;
-    const phaseAction = t(locale, `usageNote.phase.${note.phase}`);
 
     const context = {
       ...base,
@@ -383,8 +378,7 @@ export class EmailService {
       },
       note: {
         content: note.content,
-        phase: note.phase,
-        phaseAction,
+        isStart: note.phase === 'start',
         authorName: note.authorName,
       },
     };
