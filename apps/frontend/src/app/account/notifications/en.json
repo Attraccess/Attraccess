@@ -41,8 +41,8 @@
       "description": "When your active resource session is taken over."
     },
     "resource_session_ended": {
-      "label": "Resource session ended",
-      "description": "When your active resource session ends."
+      "label": "Resource session force-ended",
+      "description": "When someone else or the system ends your active resource session (not when you end it yourself)."
     },
     "nfc_cards": {
       "label": "NFC cards",

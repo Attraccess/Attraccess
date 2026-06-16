@@ -34,6 +34,11 @@ export class ResourceSessionNotificationListener {
       return;
     }
 
+    // Only notify when someone else (or the system) ended the session — not the user themselves.
+    if (event.endedBy !== null && event.endedBy.id === event.usage.userId) {
+      return;
+    }
+
     const endedBy = event.endedBy?.username ?? 'The system';
 
     await this.notifications.dispatch({

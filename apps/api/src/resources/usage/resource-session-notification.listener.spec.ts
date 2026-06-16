@@ -108,4 +108,51 @@ describe('ResourceSessionNotificationListener', () => {
       session: { id: 10, endedAt: new Date('2026-01-01T12:00:00.000Z'), endedBy: 'alice' },
     });
   });
+
+  it('does not notify when the user ends their own session', async () => {
+    const owner = { id: 2, username: 'bob', email: 'bob@example.com' } as User;
+    const resource = { id: 4, name: 'Laser cutter' } as Resource;
+
+    await listener.handleSessionEnded(
+      new ResourceSessionEndedEvent(
+        {
+          id: 10,
+          user: owner,
+          userId: owner.id,
+          resource,
+          resourceId: resource.id,
+          endTime: new Date('2026-01-01T12:00:00.000Z'),
+        } as never,
+        { id: owner.id, username: owner.username },
+      ),
+    );
+
+    expect(notifications.dispatch).not.toHaveBeenCalled();
+  });
+
+  it('notifies when the system (null endedBy) ends the session', async () => {
+    const owner = { id: 2, username: 'bob', email: 'bob@example.com' } as User;
+    const resource = { id: 4, name: 'Laser cutter' } as Resource;
+
+    await listener.handleSessionEnded(
+      new ResourceSessionEndedEvent(
+        {
+          id: 10,
+          user: owner,
+          userId: owner.id,
+          resource,
+          resourceId: resource.id,
+          endTime: new Date('2026-01-01T12:00:00.000Z'),
+        } as never,
+        null,
+      ),
+    );
+
+    expect(notifications.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        category: NotificationCategory.RESOURCE_SESSION_ENDED,
+        body: 'The system ended your active resource session.',
+      }),
+    );
+  });
 });
