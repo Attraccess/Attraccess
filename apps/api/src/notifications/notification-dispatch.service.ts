@@ -118,6 +118,15 @@ export class NotificationDispatchService {
       return;
     }
 
+    if (category === NotificationCategory.RESOURCE_TAKEOVER) {
+      await this.emailService.sendResourceTakeoverEmail(
+        recipient,
+        context.resource as { id: number; name: string },
+        context.takeover as { actorName: string },
+      );
+      return;
+    }
+
     if (category === NotificationCategory.MESSAGES) {
       await this.emailService.sendNewMessageEmail(
         recipient,

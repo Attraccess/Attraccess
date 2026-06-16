@@ -19,7 +19,6 @@ jest.mock('nodemailer', () => ({
   createTransport: jest.fn(),
 }));
 
-
 describe('EmailService', () => {
   const makeUser = (overrides: Partial<User> = {}): User =>
     ({
@@ -94,6 +93,13 @@ describe('EmailService', () => {
             body: '<mjml><mj-body><mj-section><mj-column><mj-text>{{user.username}}</mj-text><mj-text>{{resource.name}}</mj-text><mj-text>{{usage.roundedMinutes}}</mj-text><mj-text>{{totalCredits}}</mj-text><mj-text>{{newBalance}}</mj-text></mj-column></mj-section></mj-body></mjml>',
           });
         }
+        if (type === EmailTemplateType.RESOURCE_TAKEOVER) {
+          return Promise.resolve({
+            type,
+            subject: '{{resource.name}} was taken over',
+            body: '<mjml><mj-body><mj-section><mj-column><mj-text>Hello {{user.username}}</mj-text><mj-text>{{takeover.actorName}} took over {{resource.name}}</mj-text><mj-text>{{resource.url}}</mj-text></mj-column></mj-section></mj-body></mjml>',
+          });
+        }
         throw new Error('Unexpected template type');
       }),
     };
@@ -106,7 +112,7 @@ describe('EmailService', () => {
     };
 
     const externalCallTimer = {
-      time: <T,>(_target: string, _operation: string, fn: () => Promise<T>) => fn(),
+      time: <T>(_target: string, _operation: string, fn: () => Promise<T>) => fn(),
     };
 
     const service = new EmailService(
@@ -217,5 +223,20 @@ describe('EmailService', () => {
     // With minor unit 2, amounts are converted to user currency strings
     expect(callArg.html).toContain('3.45');
     expect(callArg.html).toContain('12.34');
+  });
+
+  it('sends resource takeover email with expected context', async () => {
+    const { service, sendMail } = setup();
+    const user = makeUser({ id: 2, username: 'bob', email: 'bob@example.com' });
+
+    await service.sendResourceTakeoverEmail(user, { id: 4, name: 'Laser Cutter' }, { actorName: 'alice' });
+
+    expect(sendMail).toHaveBeenCalledTimes(1);
+    const callArg = (sendMail as jest.Mock).mock.calls[0][0];
+    expect(callArg.to).toBe('bob@example.com');
+    expect(callArg.subject).toBe('Laser Cutter was taken over');
+    expect(callArg.html).toContain('Hello bob');
+    expect(callArg.html).toContain('alice took over Laser Cutter');
+    expect(callArg.html).toContain('https://frontend.example/resources/4/usage');
   });
 });

@@ -18,6 +18,11 @@ export class ResourceSessionNotificationListener {
       body: `${event.newUser.username ?? 'Another user'} took over your active resource session.`,
       url: `/resources/${event.resource.id}/usage`,
       severity: 'warning',
+      sendEmail: (recipient) =>
+        this.notifications.sendEmailTemplate(recipient, NotificationCategory.RESOURCE_TAKEOVER, {
+          resource: { id: event.resource.id, name: event.resource.name },
+          takeover: { actorName: event.newUser.username ?? 'Another user' },
+        }),
     });
   }
 }
