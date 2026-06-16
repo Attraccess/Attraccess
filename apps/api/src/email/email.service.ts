@@ -19,6 +19,8 @@ import { EntityManager } from 'typeorm';
 import { SettingsService } from '../settings/settings.service';
 import { MetricsService } from '../metrics/metrics.service';
 import { ExternalCallTimer } from '../metrics/instrumentation/external/external.helper';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 
 @Injectable()
 export class EmailService {
@@ -30,6 +32,8 @@ export class EmailService {
     private readonly mjmlService: MjmlService,
     private readonly metricsService: MetricsService,
     private readonly externalCallTimer: ExternalCallTimer,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
   ) {
     this.logger.debug('Initializing EmailService');
     this.logger.debug('EmailService initialized');
@@ -411,6 +415,35 @@ export class EmailService {
     };
 
     await this.sendEmail(recipient, EmailTemplateType.RESOURCE_TAKEOVER, context);
+  }
+
+  async sendAccessChangeEmail(
+    recipient: User,
+    accessChange: { title: string; body: string; url?: string },
+  ) {
+    const resolvedRecipient = recipient?.email
+      ? recipient
+      : await this.userRepository.findOne({ where: { id: recipient.id } });
+
+    if (!resolvedRecipient?.email) {
+      return;
+    }
+
+    const base = await this.getBaseContext(resolvedRecipient);
+    const url = accessChange.url
+      ? new URL(accessChange.url, base.host.frontend).toString()
+      : undefined;
+
+    const context = {
+      ...base,
+      accessChange: {
+        title: accessChange.title,
+        body: accessChange.body,
+        url,
+      },
+    };
+
+    await this.sendEmail(resolvedRecipient, EmailTemplateType.ACCESS_CHANGE, context);
   }
 
   async sendNewMessageEmail(

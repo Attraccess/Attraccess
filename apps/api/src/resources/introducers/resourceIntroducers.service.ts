@@ -21,15 +21,23 @@ export class ResourceIntroducersService {
 
   private notifyAccessChange(resourceId: number, userId: number, type: ResourceIntroducerType, granted: boolean): void {
     const role = type === ResourceIntroducerType.MAINTAINER ? 'maintainer' : 'introducer';
+    const title = 'Your resource access changed';
+    const body = granted
+      ? `You were made an ${role} for resource #${resourceId}.`.replace('an maintainer', 'a maintainer')
+      : `Your ${role} status for resource #${resourceId} was revoked.`;
+    const url = `/resources/${resourceId}`;
+
     void this.notifications.dispatch({
       category: NotificationCategory.ACCESS_CHANGES,
       recipients: [{ id: userId } as User],
-      title: 'Your resource access changed',
-      body: granted
-        ? `You were made an ${role} for resource #${resourceId}.`.replace('an maintainer', 'a maintainer')
-        : `Your ${role} status for resource #${resourceId} was revoked.`,
-      url: `/resources/${resourceId}`,
+      title,
+      body,
+      url,
       dedupeKey: `resource-access-${resourceId}-${userId}-${role}-${granted ? 'granted' : 'revoked'}`,
+      sendEmail: (recipient) =>
+        this.notifications.sendEmailTemplate(recipient, NotificationCategory.ACCESS_CHANGES, {
+          accessChange: { title, body, url },
+        }),
     }).catch((error) => {
       this.logger.error(`Failed to notify user ${userId} about resource access changes: ${(error as Error).message}`);
     });

@@ -14,7 +14,7 @@ describe('ResourceGroupsIntroductionsService notifications', () => {
   let service: ResourceGroupsIntroductionsService;
   let introductionRepository: { findOne: jest.Mock; create: jest.Mock; save: jest.Mock; update: jest.Mock; find: jest.Mock };
   let historyRepository: { findOne: jest.Mock; create: jest.Mock; save: jest.Mock; find: jest.Mock };
-  let notifications: { dispatch: jest.Mock };
+  let notifications: { dispatch: jest.Mock; sendEmailTemplate: jest.Mock };
 
   beforeEach(async () => {
     introductionRepository = {
@@ -30,7 +30,7 @@ describe('ResourceGroupsIntroductionsService notifications', () => {
       save: jest.fn().mockImplementation(async (data) => ({ id: 20, ...data })),
       find: jest.fn(),
     };
-    notifications = { dispatch: jest.fn().mockResolvedValue(undefined) };
+    notifications = { dispatch: jest.fn().mockResolvedValue(undefined), sendEmailTemplate: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -57,6 +57,19 @@ describe('ResourceGroupsIntroductionsService notifications', () => {
         url: '/resource-groups/5',
       }),
     );
+    const request = notifications.dispatch.mock.calls[0][0];
+    await request.sendEmail({ id: 3, email: 'user@example.com' });
+    expect(notifications.sendEmailTemplate).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 3 }),
+      NotificationCategory.ACCESS_CHANGES,
+      {
+        accessChange: {
+          title: 'Your group access changed',
+          body: 'You received an introduction for group #5.',
+          url: '/resource-groups/5',
+        },
+      },
+    );
   });
 
   it('does not notify when a group introduction is granted twice without an effective access change', async () => {
@@ -80,6 +93,7 @@ describe('ResourceGroupsIntroductionsService notifications', () => {
         recipients: [expect.objectContaining({ id: 3 })],
         body: 'Your introduction for group #5 was revoked.',
         url: '/resource-groups/5',
+        sendEmail: expect.any(Function),
       }),
     );
   });

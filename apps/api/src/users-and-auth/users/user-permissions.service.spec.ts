@@ -11,10 +11,10 @@ describe('UserPermissionsService', () => {
   let service: UserPermissionsService;
   let usersService: UsersService;
   let ssoService: SSOService;
-  let notifications: { dispatch: jest.Mock };
+  let notifications: { dispatch: jest.Mock; sendEmailTemplate: jest.Mock };
 
   beforeEach(async () => {
-    notifications = { dispatch: jest.fn().mockResolvedValue(undefined) };
+    notifications = { dispatch: jest.fn().mockResolvedValue(undefined), sendEmailTemplate: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -161,8 +161,14 @@ describe('UserPermissionsService', () => {
           title: 'Your permissions changed',
           body: 'Your system permissions were updated.',
           actorId: requestUser.id,
+          sendEmail: expect.any(Function),
         }),
       );
+      const request = notifications.dispatch.mock.calls[0][0];
+      await request.sendEmail(targetUser);
+      expect(notifications.sendEmailTemplate).toHaveBeenCalledWith(targetUser, NotificationCategory.ACCESS_CHANGES, {
+        accessChange: { title: 'Your permissions changed', body: 'Your system permissions were updated.' },
+      });
     });
 
     it('does not fail the permission update when notification dispatch fails', async () => {
