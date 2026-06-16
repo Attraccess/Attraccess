@@ -13,7 +13,7 @@ describe('NotificationDispatchService', () => {
   let preferences: { isChannelEnabled: jest.Mock };
   let push: { sendToUser: jest.Mock };
   let live: { emitToUser: jest.Mock };
-  let email: { sendMaintenanceRequestedEmail: jest.Mock; sendResourceTakeoverEmail: jest.Mock; sendAccessChangeEmail: jest.Mock };
+  let email: { sendMaintenanceRequestedEmail: jest.Mock; sendResourceTakeoverEmail: jest.Mock; sendAccessChangeEmail: jest.Mock; sendResourceSessionEndedEmail: jest.Mock };
 
   const recipient = { id: 2, email: 'recipient@example.com' } as User;
 
@@ -25,6 +25,7 @@ describe('NotificationDispatchService', () => {
       sendMaintenanceRequestedEmail: jest.fn(),
       sendResourceTakeoverEmail: jest.fn().mockResolvedValue(undefined),
       sendAccessChangeEmail: jest.fn(),
+      sendResourceSessionEndedEmail: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -227,5 +228,18 @@ describe('NotificationDispatchService', () => {
     expect(sendEmail).not.toHaveBeenCalled();
     expect(push.sendToUser).toHaveBeenCalledTimes(1);
     expect(live.emitToUser).toHaveBeenCalledTimes(1);
+  });
+
+  it('routes resource session ended email templates', async () => {
+    await service.sendEmailTemplate(recipient, NotificationCategory.RESOURCE_SESSION_ENDED, {
+      resource: { id: 4, name: 'Laser cutter' },
+      session: { id: 10, endedAt: new Date('2026-01-01T12:00:00.000Z'), endedBy: 'alice' },
+    });
+
+    expect(email.sendResourceSessionEndedEmail).toHaveBeenCalledWith(
+      recipient,
+      { id: 4, name: 'Laser cutter' },
+      { id: 10, endedAt: new Date('2026-01-01T12:00:00.000Z'), endedBy: 'alice' },
+    );
   });
 });

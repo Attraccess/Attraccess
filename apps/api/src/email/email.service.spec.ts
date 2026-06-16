@@ -108,6 +108,13 @@ describe('EmailService', () => {
             body: '<mjml><mj-body><mj-section><mj-column><mj-text>Hello {{user.username}}</mj-text><mj-text>{{accessChange.body}}</mj-text><mj-button href="{{accessChange.url}}">View change</mj-button></mj-column></mj-section></mj-body></mjml>',
           });
         }
+        if (type === EmailTemplateType.RESOURCE_SESSION_ENDED) {
+          return Promise.resolve({
+            type,
+            subject: '{{resource.name}} session ended',
+            body: '<mjml><mj-body><mj-section><mj-column><mj-text>Hello {{user.username}}</mj-text><mj-text>{{session.endedBy}} ended your session on {{resource.name}}.</mj-text><mj-text>{{resource.url}}</mj-text></mj-column></mj-section></mj-body></mjml>',
+          });
+        }
         throw new Error('Unexpected template type');
       }),
     };
@@ -287,5 +294,24 @@ describe('EmailService', () => {
     expect(callArg.to).toBe('riley@example.com');
     expect(callArg.html).toContain('Hello riley');
     expect(callArg.html).toContain('https://frontend.example/resource-groups/5');
+  });
+
+  it('sends resource session ended email with resource URL and actor context', async () => {
+    const { service, sendMail } = setup();
+    const user = makeUser({ id: 7, username: 'dana', email: 'dana@example.com' });
+
+    await service.sendResourceSessionEndedEmail(user, { id: 3, name: 'Laser Cutter' } as Resource, {
+      id: 99,
+      endedAt: new Date('2026-01-01T12:00:00.000Z'),
+      endedBy: 'alice',
+    });
+
+    expect(sendMail).toHaveBeenCalledTimes(1);
+    const callArg = (sendMail as jest.Mock).mock.calls[0][0];
+    expect(callArg.to).toBe('dana@example.com');
+    expect(callArg.subject).toBe('Laser Cutter session ended');
+    expect(callArg.html).toContain('Hello dana');
+    expect(callArg.html).toContain('alice ended your session on Laser Cutter');
+    expect(callArg.html).toContain('https://frontend.example/resources/3/usage');
   });
 });

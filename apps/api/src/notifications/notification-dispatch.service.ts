@@ -153,5 +153,13 @@ export class NotificationDispatchService {
         context.accessChange as { title: string; body: string; url?: string },
       );
     }
+
+    if (category === NotificationCategory.RESOURCE_SESSION_ENDED) {
+      await this.emailService.sendResourceSessionEndedEmail(
+        recipient,
+        context.resource as { id: number; name: string },
+        context.session as { id: number; endedAt: Date | string | null; endedBy: string },
+      );
+    }
   }
 }
