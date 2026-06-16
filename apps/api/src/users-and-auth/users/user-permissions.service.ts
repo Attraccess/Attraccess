@@ -35,13 +35,20 @@ export class UserPermissionsService {
   }
 
   private notifyPermissionsChanged(user: User, actorId: number): void {
+    const title = 'Your permissions changed';
+    const body = 'Your system permissions were updated.';
+
     void this.notifications.dispatch({
       category: NotificationCategory.ACCESS_CHANGES,
       recipients: [user],
-      title: 'Your permissions changed',
-      body: 'Your system permissions were updated.',
+      title,
+      body,
       actorId,
       dedupeKey: `system-permissions-${user.id}`,
+      sendEmail: (recipient) =>
+        this.notifications.sendEmailTemplate(recipient, NotificationCategory.ACCESS_CHANGES, {
+          accessChange: { title, body },
+        }),
     }).catch((error) => {
       this.logger.error(`Failed to notify user ${user.id} about permission changes: ${(error as Error).message}`);
     });

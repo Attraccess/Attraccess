@@ -21,15 +21,23 @@ export class ResourceGroupsIntroducersService {
 
   private notifyAccessChange(groupId: number, userId: number, type: ResourceIntroducerType, granted: boolean): void {
     const role = type === ResourceIntroducerType.MAINTAINER ? 'maintainer' : 'introducer';
+    const title = 'Your group access changed';
+    const body = granted
+      ? `You were made an ${role} for group #${groupId}.`.replace('an maintainer', 'a maintainer')
+      : `Your ${role} status for group #${groupId} was revoked.`;
+    const url = `/resource-groups/${groupId}`;
+
     void this.notifications.dispatch({
       category: NotificationCategory.ACCESS_CHANGES,
       recipients: [{ id: userId } as User],
-      title: 'Your group access changed',
-      body: granted
-        ? `You were made an ${role} for group #${groupId}.`.replace('an maintainer', 'a maintainer')
-        : `Your ${role} status for group #${groupId} was revoked.`,
-      url: `/resource-groups/${groupId}`,
+      title,
+      body,
+      url,
       dedupeKey: `group-access-${groupId}-${userId}-${role}-${granted ? 'granted' : 'revoked'}`,
+      sendEmail: (recipient) =>
+        this.notifications.sendEmailTemplate(recipient, NotificationCategory.ACCESS_CHANGES, {
+          accessChange: { title, body, url },
+        }),
     }).catch((error) => {
       this.logger.error(`Failed to notify user ${userId} about group access changes: ${(error as Error).message}`);
     });

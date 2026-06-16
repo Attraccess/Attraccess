@@ -29,15 +29,23 @@ export class ResourceGroupsIntroductionsService {
   ) {}
 
   private notifyIntroductionChange(groupId: number, userId: number, granted: boolean): void {
+    const title = 'Your group access changed';
+    const body = granted
+      ? `You received an introduction for group #${groupId}.`
+      : `Your introduction for group #${groupId} was revoked.`;
+    const url = `/resource-groups/${groupId}`;
+
     void this.notifications.dispatch({
       category: NotificationCategory.ACCESS_CHANGES,
       recipients: [{ id: userId } as User],
-      title: 'Your group access changed',
-      body: granted
-        ? `You received an introduction for group #${groupId}.`
-        : `Your introduction for group #${groupId} was revoked.`,
-      url: `/resource-groups/${groupId}`,
+      title,
+      body,
+      url,
       dedupeKey: `group-introduction-${groupId}-${userId}-${granted ? 'granted' : 'revoked'}`,
+      sendEmail: (recipient) =>
+        this.notifications.sendEmailTemplate(recipient, NotificationCategory.ACCESS_CHANGES, {
+          accessChange: { title, body, url },
+        }),
     }).catch((error) => {
       this.logger.error(`Failed to notify user ${userId} about group introduction changes: ${(error as Error).message}`);
     });

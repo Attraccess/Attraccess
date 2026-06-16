@@ -17,7 +17,7 @@ describe('ResourceIntroducersService', () => {
     createQueryBuilder: jest.Mock;
   };
   let eventEmitter: { emit: jest.Mock };
-  let notifications: { dispatch: jest.Mock };
+  let notifications: { dispatch: jest.Mock; sendEmailTemplate: jest.Mock };
 
   const emptyGroupQuery = {
     leftJoin: jest.fn().mockReturnThis(),
@@ -36,7 +36,7 @@ describe('ResourceIntroducersService', () => {
       createQueryBuilder: jest.fn().mockReturnValue(emptyGroupQuery),
     };
     eventEmitter = { emit: jest.fn() };
-    notifications = { dispatch: jest.fn().mockResolvedValue(undefined) };
+    notifications = { dispatch: jest.fn().mockResolvedValue(undefined), sendEmailTemplate: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -172,7 +172,15 @@ describe('ResourceIntroducersService', () => {
           title: 'Your resource access changed',
           body: 'You were made a maintainer for resource #1.',
           url: '/resources/1',
+          sendEmail: expect.any(Function),
         }),
+      );
+      const request = notifications.dispatch.mock.calls[0][0];
+      await request.sendEmail({ id: 2, email: 'user@example.com' });
+      expect(notifications.sendEmailTemplate).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 2 }),
+        NotificationCategory.ACCESS_CHANGES,
+        { accessChange: { title: 'Your resource access changed', body: 'You were made a maintainer for resource #1.', url: '/resources/1' } },
       );
     });
 
