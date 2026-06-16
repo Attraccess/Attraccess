@@ -2,7 +2,7 @@
 // FEATURE: Password policy strength scoring backbone
 
 import { Injectable } from '@nestjs/common';
-import { zxcvbn, zxcvbnOptions } from '@zxcvbn-ts/core';
+import { ZxcvbnFactory } from '@zxcvbn-ts/core';
 import * as zxcvbnCommonPackage from '@zxcvbn-ts/language-common';
 import * as zxcvbnEnPackage from '@zxcvbn-ts/language-en';
 import * as zxcvbnDePackage from '@zxcvbn-ts/language-de';
@@ -22,8 +22,10 @@ export interface ZxcvbnResult {
 
 @Injectable()
 export class ZxcvbnService {
+  private readonly zxcvbn: ZxcvbnFactory;
+
   constructor() {
-    zxcvbnOptions.setOptions({
+    this.zxcvbn = new ZxcvbnFactory({
       dictionary: {
         ...zxcvbnCommonPackage.dictionary,
         ...zxcvbnEnPackage.dictionary,
@@ -35,16 +37,16 @@ export class ZxcvbnService {
   }
 
   public evaluate(password: string, userInputs: string[] = []): ZxcvbnResult {
-    const result = zxcvbn(password, userInputs);
-    const crackTimes = result.crackTimesSeconds;
+    const result = this.zxcvbn.check(password, userInputs);
+    const crackTimes = result.crackTimes;
     return {
       score: result.score,
       guessesLog10: result.guessesLog10,
       crackTimesSeconds: {
-        offlineFastHashing1e10PerSecond: Number(crackTimes.offlineFastHashing1e10PerSecond),
-        offlineSlowHashing1e4PerSecond: Number(crackTimes.offlineSlowHashing1e4PerSecond),
-        onlineNoThrottling10PerSecond: Number(crackTimes.onlineNoThrottling10PerSecond),
-        onlineThrottling100PerHour: Number(crackTimes.onlineThrottling100PerHour),
+        offlineFastHashing1e10PerSecond: crackTimes.offlineFastHashingXPerSecond.seconds,
+        offlineSlowHashing1e4PerSecond: crackTimes.offlineSlowHashingXPerSecond.seconds,
+        onlineNoThrottling10PerSecond: crackTimes.onlineNoThrottlingXPerSecond.seconds,
+        onlineThrottling100PerHour: crackTimes.onlineThrottlingXPerHour.seconds,
       },
       warning: result.feedback.warning ?? '',
       suggestions: result.feedback.suggestions ?? [],
