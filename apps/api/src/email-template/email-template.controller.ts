@@ -30,7 +30,7 @@ export class EmailTemplateController {
       return this.mjmlService.convertToHtml(previewMjmlDto.mjmlContent);
     }
     const layout = await this.emailLayoutService.findGlobal();
-    const fullMjml = this.mjmlService.injectContentIntoLayout(layout.body, previewMjmlDto.mjmlContent);
+    const fullMjml = this.emailLayoutService.injectContentIntoLayout(layout.body, previewMjmlDto.mjmlContent);
     return this.mjmlService.convertToHtml(fullMjml);
   }
 

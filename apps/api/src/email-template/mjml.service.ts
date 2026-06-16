@@ -1,6 +1,3 @@
-// Async MJML-to-HTML conversion service wrapping mjml v5 async API
-// FEATURE: Email template rendering with MJML
-
 import { Injectable, BadRequestException } from '@nestjs/common';
 import mjml2html from 'mjml';
 
@@ -41,13 +38,5 @@ export class MjmlService {
     }
 
     return result.html;
-  }
-
-  injectContentIntoLayout(layoutMjml: string, contentMjml: string): string {
-    const placeholder = '{{{content}}}';
-    if (!layoutMjml.includes(placeholder)) {
-      throw new BadRequestException(`Email layout is missing the required placeholder: ${placeholder}`);
-    }
-    return layoutMjml.split(placeholder).join(contentMjml);
   }
 }

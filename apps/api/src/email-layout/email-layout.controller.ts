@@ -1,36 +1,33 @@
 import { Controller, Get, Body, Patch, Post } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { Auth } from '@attraccess/plugins-backend-sdk';
-import { SystemPermission, EmailLayout } from '@attraccess/database-entities';
+import { SystemPermission } from '@attraccess/database-entities';
 import { EmailLayoutService } from './email-layout.service';
-import { MjmlService } from '../email-template/mjml.service';
 import { UpdateEmailLayoutDto } from './dto/update-email-layout.dto';
-import { PreviewEmailLayoutDto, PREVIEW_SAMPLE_CONTENT } from './dto/preview-email-layout.dto';
+import { PreviewEmailLayoutDto } from './dto/preview-email-layout.dto';
 import { PreviewMjmlResponseDto } from '../email-template/dto/preview-mjml.dto';
+import { EmailLayoutResponseDto } from './dto/email-layout-response.dto';
 
 @ApiTags('Email Layout')
 @ApiBearerAuth()
 @Controller('email-layout')
 export class EmailLayoutController {
-  constructor(
-    private readonly emailLayoutService: EmailLayoutService,
-    private readonly mjmlService: MjmlService,
-  ) {}
+  constructor(private readonly emailLayoutService: EmailLayoutService) {}
 
   @Get()
   @Auth('canManageSystemConfiguration' as SystemPermission)
   @ApiOperation({ summary: 'Get the global email layout' })
-  @ApiResponse({ status: 200, type: EmailLayout })
-  findGlobal(): Promise<EmailLayout> {
+  @ApiResponse({ status: 200, type: EmailLayoutResponseDto })
+  findGlobal(): Promise<EmailLayoutResponseDto> {
     return this.emailLayoutService.findGlobal();
   }
 
   @Patch()
   @Auth('canManageSystemConfiguration' as SystemPermission)
   @ApiOperation({ summary: 'Update the global email layout' })
-  @ApiResponse({ status: 200, type: EmailLayout })
+  @ApiResponse({ status: 200, type: EmailLayoutResponseDto })
   @ApiResponse({ status: 400, description: 'Invalid MJML content' })
-  update(@Body() dto: UpdateEmailLayoutDto): Promise<EmailLayout> {
+  update(@Body() dto: UpdateEmailLayoutDto): Promise<EmailLayoutResponseDto> {
     return this.emailLayoutService.update(dto);
   }
 
@@ -38,8 +35,7 @@ export class EmailLayoutController {
   @Auth('canManageSystemConfiguration' as SystemPermission)
   @ApiOperation({ summary: 'Preview the global email layout with sample content injected' })
   @ApiResponse({ status: 200, type: PreviewMjmlResponseDto })
-  async previewLayout(@Body() dto: PreviewEmailLayoutDto): Promise<PreviewMjmlResponseDto> {
-    const fullMjml = this.mjmlService.injectContentIntoLayout(dto.body, PREVIEW_SAMPLE_CONTENT);
-    return this.mjmlService.convertToHtml(fullMjml);
+  previewLayout(@Body() dto: PreviewEmailLayoutDto): Promise<PreviewMjmlResponseDto> {
+    return this.emailLayoutService.previewLayout(dto.body);
   }
 }

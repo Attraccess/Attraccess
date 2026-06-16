@@ -14,13 +14,17 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../components/toastProvider';
 import { StandardDrawer } from '../../components/standardDrawer';
 import Editor, { type OnMount } from '@monaco-editor/react';
-import { useEmailLayout, useUpdateEmailLayout, usePreviewEmailLayout } from './api';
+import {
+  useEmailLayoutServiceEmailLayoutControllerFindGlobal,
+  useEmailLayoutServiceEmailLayoutControllerUpdate,
+  useEmailLayoutServiceEmailLayoutControllerPreviewLayout,
+} from '@attraccess/react-query-client';
 import { useDebounce } from '../../hooks/useDebounce';
 
 import * as enFile from './en.json';
 import * as deFile from './de.json';
 
-const CONTENT_PLACEHOLDER = '{{{content}}}';
+const CONTENT_PLACEHOLDER = '{{content}}';
 
 interface EmailLayoutTabProps {
   onCancel?: () => void;
@@ -31,15 +35,15 @@ export function EmailLayoutTab({ onCancel }: EmailLayoutTabProps) {
   const { theme } = useTheme();
   const toast = useToastMessage();
 
-  const { data: layout } = useEmailLayout();
-  const updateLayout = useUpdateEmailLayout();
+  const { data: layout } = useEmailLayoutServiceEmailLayoutControllerFindGlobal();
+  const updateLayout = useEmailLayoutServiceEmailLayoutControllerUpdate();
   const {
     mutate: previewLayout,
     data: previewData,
     isPending: isPreviewPending,
     isError: isPreviewError,
     error: previewError,
-  } = usePreviewEmailLayout();
+  } = useEmailLayoutServiceEmailLayoutControllerPreviewLayout();
 
   const [body, setBody] = useState('');
 
@@ -68,7 +72,7 @@ export function EmailLayoutTab({ onCancel }: EmailLayoutTabProps) {
 
   useEffect(() => {
     if (bodyIsEmpty) return;
-    previewLayout({ body: debouncedBody });
+    previewLayout({ requestBody: { body: debouncedBody } });
   }, [bodyIsEmpty, debouncedBody, previewLayout]);
 
   const previewHtml = useMemo(() => {
@@ -133,7 +137,7 @@ export function EmailLayoutTab({ onCancel }: EmailLayoutTabProps) {
     (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault();
       updateLayout.mutate(
-        { body },
+        { requestBody: { body } },
         {
           onSuccess: () => toast.success({ title: t('toast.saveSuccess') }),
           onError: () => toast.error({ title: t('toast.saveError') }),

@@ -1,10 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString } from 'class-validator';
 
-export class UpdateEmailLayoutDto {
+export class EmailLayoutResponseDto {
   @ApiProperty({
     description:
-      'Full MJML document for the global email layout. Must contain {{content}} as a placeholder where individual template sections will be injected.',
+      'Full MJML document for the global email layout. Contains {{content}} as a placeholder where individual template sections are injected.',
     example: `<mjml>
   <mj-body background-color="#F3F7FB" width="600px">
     <mj-section background-color="#FFFFFF" padding="20px 0">
@@ -17,12 +16,13 @@ export class UpdateEmailLayoutDto {
     {{content}}
     <mj-section background-color="#FFFFFF" padding="20px">
       <mj-column>
-        <mj-text font-size="12px" color="#6B7280" align="center">Footer</mj-text>
+        <mj-text font-size="12px" color="#6B7280" align="center" padding="5px 0 0 0">
+          Footer text
+        </mj-text>
       </mj-column>
     </mj-section>
   </mj-body>
 </mjml>`,
   })
-  @IsString()
   body!: string;
 }

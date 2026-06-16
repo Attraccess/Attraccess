@@ -267,12 +267,8 @@ export const entities = {
   NotificationPreference,
   PushSubscription,
   CompanionDevice,
-<<<<<<< HEAD
   Permission,
   Role,
   RolePermission,
   UserRole,
-=======
-  EmailLayout,
->>>>>>> 417dac81 (feat(ATT-574): refactor email templates into global layout and content sections)
 };
