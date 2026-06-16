@@ -6,7 +6,6 @@ export enum NotificationCategory {
   RESOURCE_TAKEOVER = 'resource_takeover',
   RESOURCE_SESSION_ENDED = 'resource_session_ended',
   PROJECT_INVITATIONS = 'project_invitations',
-  SUPERVISION_REQUESTS = 'supervision_requests',
   ACCESS_CHANGES = 'access_changes',
   NFC_CARDS = 'nfc_cards',
 }
@@ -30,7 +29,6 @@ export const DEFAULT_NOTIFICATION_CHANNELS: NotificationCategoryPreferences = {
   [NotificationCategory.RESOURCE_TAKEOVER]: { email: false, push: true, toast: true },
   [NotificationCategory.RESOURCE_SESSION_ENDED]: { email: false, push: true, toast: true },
   [NotificationCategory.PROJECT_INVITATIONS]: { email: true, push: true, toast: true },
-  [NotificationCategory.SUPERVISION_REQUESTS]: { email: false, push: true, toast: true },
   [NotificationCategory.ACCESS_CHANGES]: { email: false, push: true, toast: true },
   [NotificationCategory.NFC_CARDS]: { email: false, push: true, toast: true },
 };
