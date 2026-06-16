@@ -3,6 +3,7 @@
 import { useSSE } from '../../utils/sse';
 
 export interface SystemNotificationLiveEvent {
+  category?: string;
   title: string;
   body?: string;
   url?: string;
