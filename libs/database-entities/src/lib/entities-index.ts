@@ -99,6 +99,7 @@ import { Message, MessageReferenceType } from './entities/message.entity';
 import { NotificationPreference } from './entities/notification-preference.entity';
 import { PushSubscription } from './entities/push-subscription.entity';
 import { CompanionDevice } from './entities/companion-device.entity';
+import { EmailLayout, EMAIL_LAYOUT_SINGLETON_ID } from './entities/email-layout.entity';
 import { Permission } from './entities/permission.entity';
 import { Role } from './entities/role.entity';
 import { RolePermission } from './entities/role-permission.entity';
@@ -207,6 +208,8 @@ export {
   NotificationPreference,
   PushSubscription,
   CompanionDevice,
+  EmailLayout,
+  EMAIL_LAYOUT_SINGLETON_ID,
   Permission,
   Role,
   RolePermission,
@@ -264,8 +267,12 @@ export const entities = {
   NotificationPreference,
   PushSubscription,
   CompanionDevice,
+<<<<<<< HEAD
   Permission,
   Role,
   RolePermission,
   UserRole,
+=======
+  EmailLayout,
+>>>>>>> 417dac81 (feat(ATT-574): refactor email templates into global layout and content sections)
 };

@@ -133,6 +133,11 @@ export function useSidebarItems(): (SidebarItem | SidebarItemGroup)[] {
           icon: MailIcon,
         },
         {
+          path: '/email-layout',
+          translationKey: 'emailLayout',
+          icon: MailIcon,
+        },
+        {
           path: '/settings',
           translationKey: 'settings',
           icon: Settings2Icon,

@@ -42,4 +42,8 @@ export class MjmlService {
 
     return result.html;
   }
+
+  injectContentIntoLayout(layoutMjml: string, contentMjml: string): string {
+    return layoutMjml.replace('{{{content}}}', contentMjml);
+  }
 }
