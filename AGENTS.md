@@ -1,6 +1,9 @@
 # AGENTS.md
 
-Short reference for agents working in this repo.
+RULES:
+- do not commit auto-generated code (e.g. react-query api client)
+- do not manually modify the CHANGELOG.md, it is auto generated
+- do not commit specs/plan files, repo is code/docs only.
 
 ## Dev servers — always use `pnpm serve`
 
