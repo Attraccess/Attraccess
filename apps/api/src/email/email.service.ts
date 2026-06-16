@@ -110,9 +110,7 @@ export class EmailService {
   async sendVerificationEmail(user: User, verificationToken: string) {
     const url = await this.settingsService.getUrl();
     if (!url) throw new Error('Application URL not configured');
-    const verificationUrl = `${url}/verify-email?email=${encodeURIComponent(
-      user.email,
-    )}&token=${verificationToken}`;
+    const verificationUrl = `${url}/verify-email?email=${encodeURIComponent(user.email)}&token=${verificationToken}`;
 
     const context = {
       ...(await this.getBaseContext(user)),
@@ -285,9 +283,7 @@ export class EmailService {
         previousStatus: change.previousStatus ?? 'unknown',
         reason: change.reason,
         identifier: change.identifier,
-        headline: becameUnhealthy
-          ? `Resource degraded: ${resource.name}`
-          : `Resource recovered: ${resource.name}`,
+        headline: becameUnhealthy ? `Resource degraded: ${resource.name}` : `Resource recovered: ${resource.name}`,
         headerColor: becameUnhealthy ? '#B91C1C' : '#047857',
         bodyAction: becameUnhealthy ? 'has become degraded' : 'is healthy again',
       },
@@ -313,8 +309,8 @@ export class EmailService {
       info.reason === 'age'
         ? 'Your training has reached its maximum age and must be renewed.'
         : info.reason === 'inactivity'
-        ? 'You have not used this resource for the configured period and must be retrained.'
-        : 'Your training must be renewed.';
+          ? 'You have not used this resource for the configured period and must be retrained.'
+          : 'Your training must be renewed.';
 
     const context = {
       ...base,
@@ -456,8 +452,7 @@ export class EmailService {
 
     const base = await this.getBaseContext(recipient);
     const conversationUrl = `${base.host.frontend}/messages?conversation=${message.conversationId}`;
-    const preview =
-      message.preview.length > 200 ? `${message.preview.slice(0, 200).trimEnd()}…` : message.preview;
+    const preview = message.preview.length > 200 ? `${message.preview.slice(0, 200).trimEnd()}…` : message.preview;
 
     const context = {
       ...base,
@@ -469,6 +464,35 @@ export class EmailService {
     };
 
     await this.sendEmail(recipient, EmailTemplateType.MESSAGE_RECEIVED, context);
+  }
+
+  async sendResourceSessionEndedEmail(
+    recipient: User,
+    resource: Pick<Resource, 'id' | 'name'>,
+    session: { id: number; endedAt: Date | string | null; endedBy: string },
+  ) {
+    if (!recipient?.email) {
+      return;
+    }
+
+    const base = await this.getBaseContext(recipient);
+    const resourceUrl = `${base.host.frontend}/resources/${resource.id}/usage`;
+
+    const context = {
+      ...base,
+      resource: {
+        id: resource.id,
+        name: resource.name,
+        url: resourceUrl,
+      },
+      session: {
+        id: session.id,
+        endedAt: session.endedAt instanceof Date ? session.endedAt.toISOString() : session.endedAt,
+        endedBy: session.endedBy,
+      },
+    };
+
+    await this.sendEmail(recipient, EmailTemplateType.RESOURCE_SESSION_ENDED, context);
   }
 
   private async createTransporter(): Promise<{ transporter: ReturnType<typeof createTransport>; from: string }> {

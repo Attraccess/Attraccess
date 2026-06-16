@@ -41,8 +41,8 @@
       "description": "Wenn deine aktive Ressourcennutzung übernommen wird."
     },
     "resource_session_ended": {
-      "label": "Ressourcennutzung beendet",
-      "description": "Wenn deine aktive Ressourcennutzung endet."
+      "label": "Ressourcennutzung fremdbeendet",
+      "description": "Wenn jemand anderes oder das System deine aktive Ressourcennutzung beendet (nicht wenn du sie selbst beendest)."
     },
     "nfc_cards": {
       "label": "NFC-Karten",
