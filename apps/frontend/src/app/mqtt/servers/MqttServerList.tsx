@@ -3,6 +3,7 @@ import {
   Alert,
   AlertContent,
   AlertDescription,
+  Chip,
   ModalBody,
   ModalFooter,
   ModalHeader,
@@ -16,6 +17,9 @@ import {
   TableHeader,
   TableRow,
   TableScrollContainer,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
   useOverlayState,
 } from '@heroui/react';
 import { PencilIcon, Trash2Icon } from 'lucide-react';
@@ -30,12 +34,52 @@ import {
   useMqttServiceMqttServersGetAll,
   useMqttServiceMqttServersDeleteOne,
   useMqttServiceMqttServersGetAllKey,
+  useMqttServiceMqttServersGetStatusOfAll,
+  MqttServerConnectionStateDto,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { AlertStatusIcon } from '../../../components/AlertStatusIcon';
 import { EmptyState } from '../../../components/emptyState';
 import { PluginSlot } from '../../plugins/PluginSlot';
 import { MQTT_SERVER_LIST_ROW_SLOT, MqttServerSlotContext } from '../mqtt.slots';
+
+// Widen the generated enum to its string values so plain literals ('unknown', ...) remain assignable
+type MqttConnectionStatus = `${MqttServerConnectionStateDto['status']}`;
+
+const connectionStatusChipColor: Record<MqttConnectionStatus, 'success' | 'warning' | 'danger' | 'default'> = {
+  connected: 'success',
+  connecting: 'warning',
+  disconnected: 'danger',
+  unknown: 'default',
+};
+
+interface ConnectionStatusChipProps {
+  serverId: number;
+  state?: MqttServerConnectionStateDto;
+}
+
+function ConnectionStatusChip(props: Readonly<ConnectionStatusChipProps>) {
+  const { t } = useTranslations({ en, de });
+
+  const status: MqttConnectionStatus = props.state?.status ?? 'unknown';
+
+  const chip = (
+    <Chip color={connectionStatusChipColor[status]} data-cy={`mqtt-server-connection-status-${props.serverId}`}>
+      {t(`connectionStatus.${status}`)}
+    </Chip>
+  );
+
+  if (status === 'disconnected' && props.state?.lastError) {
+    return (
+      <Tooltip>
+        <TooltipTrigger tabIndex={0}>{chip}</TooltipTrigger>
+        <TooltipContent showArrow>{props.state.lastError}</TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  return chip;
+}
 
 export function MqttServerList() {
   const { t } = useTranslations({ en, de });
@@ -46,6 +90,15 @@ export function MqttServerList() {
   const [serverToDelete, setServerToDelete] = useState<number | null>(null);
 
   const { data: servers = [], isLoading, error } = useMqttServiceMqttServersGetAll();
+
+  const { data: connectionStates } = useMqttServiceMqttServersGetStatusOfAll(undefined, {
+    refetchInterval: 5000,
+  });
+
+  const connectionStateByServerId = new Map((connectionStates ?? []).map((state) => [state.serverId, state]));
+  const connectionStateDependency = (connectionStates ?? [])
+    .map((state) => `${state.serverId}:${state.status}:${state.lastError ?? ''}`)
+    .join('|');
 
   const deleteServer = useMqttServiceMqttServersDeleteOne({
     onSuccess: () => {
@@ -108,10 +161,12 @@ export function MqttServerList() {
             <TableHeader>
               <TableColumn isRowHeader>{t('columnName')}</TableColumn>
               <TableColumn>{t('columnAddress')}</TableColumn>
+              <TableColumn>{t('columnStatus')}</TableColumn>
               <TableColumn>{t('columnActions')}</TableColumn>
             </TableHeader>
             <TableBody
               items={servers}
+              dependencies={[connectionStateDependency]}
               renderEmptyState={() => <EmptyState message={t('noServersConfigured')} />}
             >
               {(server) => (
@@ -119,6 +174,9 @@ export function MqttServerList() {
                   <TableCell>{server.name}</TableCell>
                   <TableCell className="whitespace-nowrap">
                     {server.host}:{server.port}
+                  </TableCell>
+                  <TableCell>
+                    <ConnectionStatusChip serverId={server.id} state={connectionStateByServerId.get(server.id)} />
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-row gap-2">

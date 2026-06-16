@@ -3,6 +3,7 @@ import { PartialType } from '@nestjs/swagger';
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { ToBoolean } from '../../../common/request-transformers';
+import { MqttServerConnectionStatus } from '../../mqtt-client.service';
 
 /**
  * DTO for creating a new MQTT server
@@ -111,6 +112,51 @@ export class TestConnectionResponseDto {
     example: 'Connection successful',
   })
   message!: string;
+}
+
+/**
+ * Live connection state of a single MQTT server
+ */
+export class MqttServerConnectionStateDto {
+  @ApiProperty({
+    description: 'ID of the MQTT server',
+    example: 1,
+  })
+  serverId!: number;
+
+  @ApiProperty({
+    description: 'Current connection status of the server',
+    enum: MqttServerConnectionStatus,
+    enumName: 'MqttServerConnectionStatus',
+    example: MqttServerConnectionStatus.CONNECTED,
+  })
+  status!: MqttServerConnectionStatus;
+
+  @ApiProperty({
+    description: 'When the server last connected successfully',
+    type: String,
+    format: 'date-time',
+    required: false,
+    nullable: true,
+  })
+  lastConnectedAt!: Date | null;
+
+  @ApiProperty({
+    description: 'When the connection to the server was last lost',
+    type: String,
+    format: 'date-time',
+    required: false,
+    nullable: true,
+  })
+  lastDisconnectedAt!: Date | null;
+
+  @ApiProperty({
+    description: 'Last connection error message, if any',
+    required: false,
+    nullable: true,
+    example: 'connect ECONNREFUSED 127.0.0.1:1883',
+  })
+  lastError!: string | null;
 }
 
 /**
