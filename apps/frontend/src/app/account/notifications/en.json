@@ -44,6 +44,10 @@
       "label": "Resource session ended",
       "description": "When your active resource session ends."
     },
+    "nfc_cards": {
+      "label": "NFC cards",
+      "description": "When one of your NFC cards is registered, activated, deactivated, or deleted."
+    },
     "project_invitations": {
       "label": "Project invitations",
       "description": "Invitations to join projects."

@@ -27,6 +27,7 @@ const hoisted = vi.hoisted(() => ({
     isBusy: false,
     isLoadingKey: false,
   },
+  locale: 'en',
 }));
 
 vi.mock('@tanstack/react-query', async (importOriginal) => {
@@ -38,14 +39,15 @@ vi.mock('@tanstack/react-query', async (importOriginal) => {
 });
 
 vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: ({ en }: { en: Record<string, unknown> }) => ({
+  useTranslations: ({ en, de }: { en: Record<string, unknown>; de: Record<string, unknown> }) => ({
     t: (key: string) => {
+      const translations = hoisted.locale === 'de' ? de : en;
       const value = key.split('.').reduce<unknown>((current, part) => {
         if (current && typeof current === 'object' && part in current) {
           return (current as Record<string, unknown>)[part];
         }
         return undefined;
-      }, en);
+      }, translations);
       return typeof value === 'string' ? value : key;
     },
   }),
@@ -62,6 +64,7 @@ vi.mock('@attraccess/react-query-client', () => ({
     RESOURCE_HEALTH: 'resource_health',
     RESOURCE_TAKEOVER: 'resource_takeover',
     RESOURCE_SESSION_ENDED: 'resource_session_ended',
+    NFC_CARDS: 'nfc_cards',
     PROJECT_INVITATIONS: 'project_invitations',
     SUPERVISION_REQUESTS: 'supervision_requests',
     ACCESS_CHANGES: 'access_changes',
@@ -119,6 +122,7 @@ beforeEach(() => {
   hoisted.pushState.isSubscribed = true;
   hoisted.pushState.isBusy = false;
   hoisted.pushState.isLoadingKey = false;
+  hoisted.locale = 'en';
 });
 
 afterEach(() => {
@@ -132,6 +136,7 @@ describe('NotificationPreferencesForm', () => {
     expect(screen.getAllByText('Messages').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Maintenance requests').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Resource health').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('NFC cards').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Access changes').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Email').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Push').length).toBeGreaterThan(0);
@@ -163,6 +168,7 @@ describe('NotificationPreferencesForm', () => {
     expect(within(general).getByText('All users')).toBeInTheDocument();
     expect(within(general).getByText('Notifications every user may receive.')).toBeInTheDocument();
     expect(within(general).getByText('Messages')).toBeInTheDocument();
+    expect(within(general).getByText('NFC cards')).toBeInTheDocument();
     expect(within(general).getByText('Project invitations')).toBeInTheDocument();
 
     const resourceManagers = screen.getByTestId('notification-group-resourceManagers');
@@ -175,6 +181,18 @@ describe('NotificationPreferencesForm', () => {
     expect(within(admins).getByText('Admins')).toBeInTheDocument();
     expect(within(admins).getByText('Notifications tied to system-level or access-management permissions.')).toBeInTheDocument();
     expect(within(admins).getByText('Access changes')).toBeInTheDocument();
+  });
+
+  it('renders the German NFC card label and description', () => {
+    hoisted.locale = 'de';
+
+    renderForm();
+
+    const general = screen.getByTestId('notification-group-general');
+    expect(within(general).getByText('NFC-Karten')).toBeInTheDocument();
+    expect(
+      within(general).getByText('Wenn eine deiner NFC-Karten registriert, aktiviert, deaktiviert oder gelöscht wird.'),
+    ).toBeInTheDocument();
   });
 
   it('updates a single channel for the selected category', async () => {

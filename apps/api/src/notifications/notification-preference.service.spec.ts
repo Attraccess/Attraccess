@@ -44,6 +44,10 @@ describe('NotificationPreferenceService', () => {
           category: NotificationCategory.ACCESS_CHANGES,
           channels: { email: false, push: true, toast: true },
         },
+        {
+          category: NotificationCategory.NFC_CARDS,
+          channels: { email: false, push: true, toast: true },
+        },
       ]),
     );
   });
