@@ -388,6 +388,31 @@ export class EmailService {
     await this.sendEmail(recipient, EmailTemplateType.RESOURCE_USAGE_NOTE_ADDED, context);
   }
 
+  async sendResourceTakeoverEmail(
+    recipient: User,
+    resource: Pick<Resource, 'id' | 'name'>,
+    takeover: { actorName: string },
+  ) {
+    if (!recipient?.email) {
+      return;
+    }
+
+    const base = await this.getBaseContext(recipient);
+    const resourceUrl = `${base.host.frontend}/resources/${resource.id}/usage`;
+
+    const context = {
+      ...base,
+      resource: {
+        id: resource.id,
+        name: resource.name,
+        url: resourceUrl,
+      },
+      takeover,
+    };
+
+    await this.sendEmail(recipient, EmailTemplateType.RESOURCE_TAKEOVER, context);
+  }
+
   async sendNewMessageEmail(
     recipient: User,
     message: { conversationId: number; senderName: string; preview: string },
