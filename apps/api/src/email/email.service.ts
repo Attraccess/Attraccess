@@ -13,12 +13,17 @@ import {
   ResourceHealthStatus,
 } from '@attraccess/database-entities';
 import { dbCurrencyToUserCurrency } from '@attraccess/shared';
+import { createTranslator } from '@attraccess/plugins-backend-sdk';
 import * as Handlebars from 'handlebars';
 import { MjmlService } from '../email-template/mjml.service';
 import { EntityManager } from 'typeorm';
 import { SettingsService } from '../settings/settings.service';
 import { MetricsService } from '../metrics/metrics.service';
 import { ExternalCallTimer } from '../metrics/instrumentation/external/external.helper';
+import * as enTranslations from './translations/en.json';
+import * as deTranslations from './translations/de.json';
+
+const t = createTranslator({ en: enTranslations, de: deTranslations });
 
 @Injectable()
 export class EmailService {
@@ -56,7 +61,8 @@ export class EmailService {
     manager?: EntityManager,
   ) {
     try {
-      const dbTemplate = await this.emailTemplateService.findOne(templateType, manager);
+      const locale = user.locale ?? 'en';
+      const dbTemplate = await this.emailTemplateService.findOne(templateType, locale, manager);
 
       const { subject, body } = await this.convertTemplate(dbTemplate, context);
       const { transporter, from } = await this.createTransporter();
@@ -265,9 +271,11 @@ export class EmailService {
       return;
     }
 
+    const locale = user.locale ?? 'en';
     const base = await this.getBaseContext(user);
     const becameUnhealthy = change.status === ResourceHealthStatus.UNHEALTHY;
     const resourceUrl = `${base.host.frontend}/resources/${resource.id}`;
+    const healthKey = becameUnhealthy ? 'degraded' : 'recovered';
 
     const context = {
       ...base,
@@ -281,11 +289,9 @@ export class EmailService {
         previousStatus: change.previousStatus ?? 'unknown',
         reason: change.reason,
         identifier: change.identifier,
-        headline: becameUnhealthy
-          ? `Resource degraded: ${resource.name}`
-          : `Resource recovered: ${resource.name}`,
+        headline: t(locale, `health.${healthKey}.headline`, { resourceName: resource.name }),
         headerColor: becameUnhealthy ? '#B91C1C' : '#047857',
-        bodyAction: becameUnhealthy ? 'has become degraded' : 'is healthy again',
+        bodyAction: t(locale, `health.${healthKey}.action`),
       },
     };
 
@@ -301,16 +307,13 @@ export class EmailService {
       return;
     }
 
+    const locale = user.locale ?? 'en';
     const base = await this.getBaseContext(user);
     const path = target.isGroup ? 'resource-groups' : 'resources';
     const resourceUrl = `${base.host.frontend}/${path}/${target.id}`;
 
-    const reasonText =
-      info.reason === 'age'
-        ? 'Your training has reached its maximum age and must be renewed.'
-        : info.reason === 'inactivity'
-        ? 'You have not used this resource for the configured period and must be retrained.'
-        : 'Your training must be renewed.';
+    const reasonKey = info.reason === 'age' ? 'age' : info.reason === 'inactivity' ? 'inactivity' : 'default';
+    const reasonText = t(locale, `retraining.reason.${reasonKey}`);
 
     const context = {
       ...base,
@@ -366,9 +369,10 @@ export class EmailService {
       return;
     }
 
+    const locale = recipient.locale ?? 'en';
     const base = await this.getBaseContext(recipient);
     const resourceUrl = `${base.host.frontend}/resources/${resource.id}`;
-    const phaseAction = note.phase === 'start' ? 'starting' : 'finishing';
+    const phaseAction = t(locale, `usageNote.phase.${note.phase}`);
 
     const context = {
       ...base,

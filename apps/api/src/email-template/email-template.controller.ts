@@ -1,5 +1,5 @@
-import { Controller, Get, Post, Body, Patch, Param } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiBody, ApiParam } from '@nestjs/swagger';
+import { Controller, Get, Post, Body, Patch, Param, Query } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiBody, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { Auth } from '@attraccess/plugins-backend-sdk';
 import { SystemPermission, EmailTemplate, EmailTemplateType } from '@attraccess/database-entities';
 import { EmailTemplateService } from './email-template.service';
@@ -36,25 +36,31 @@ export class EmailTemplateController {
 
   @Get(':type')
   @Auth('canManageSystemConfiguration' as SystemPermission)
-  @ApiOperation({ summary: 'Get an email template by type' })
-  @ApiParam({ name: 'type', enum: EmailTemplateType, enumName: 'EmailTemplateType', description: 'Template type/type' })
+  @ApiOperation({ summary: 'Get an email template by type and optional locale (defaults to "en")' })
+  @ApiParam({ name: 'type', enum: EmailTemplateType, enumName: 'EmailTemplateType', description: 'Template type' })
+  @ApiQuery({ name: 'locale', required: false, description: 'Locale (BCP 47 tag, e.g. "en", "de")' })
   @ApiResponse({ status: 200, description: 'Email template found', type: EmailTemplate })
   @ApiResponse({ status: 404, description: 'Template not found' })
-  findOne(@Param('type') type: EmailTemplateType): Promise<EmailTemplate> {
-    return this.emailTemplateService.findOne(type);
+  findOne(
+    @Param('type') type: EmailTemplateType,
+    @Query('locale') locale?: string,
+  ): Promise<EmailTemplate> {
+    return this.emailTemplateService.findOne(type, locale);
   }
 
   @Patch(':type')
   @Auth('canManageSystemConfiguration' as SystemPermission)
-  @ApiOperation({ summary: 'Update an email template' })
-  @ApiParam({ name: 'type', enum: EmailTemplateType, enumName: 'EmailTemplateType', description: 'Template type/type' })
+  @ApiOperation({ summary: 'Update an email template for a given locale (defaults to "en")' })
+  @ApiParam({ name: 'type', enum: EmailTemplateType, enumName: 'EmailTemplateType', description: 'Template type' })
+  @ApiQuery({ name: 'locale', required: false, description: 'Locale (BCP 47 tag, e.g. "en", "de")' })
   @ApiResponse({ status: 200, description: 'Template updated successfully', type: EmailTemplate })
   @ApiResponse({ status: 400, description: 'Invalid input data' })
   @ApiResponse({ status: 404, description: 'Template not found' })
   update(
     @Param('type') type: EmailTemplateType,
     @Body() updateEmailTemplateDto: UpdateEmailTemplateDto,
+    @Query('locale') locale?: string,
   ): Promise<EmailTemplate> {
-    return this.emailTemplateService.update(type, updateEmailTemplateDto);
+    return this.emailTemplateService.update(type, updateEmailTemplateDto, locale);
   }
 }

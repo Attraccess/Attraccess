@@ -25,6 +25,7 @@ import { AcceptInvitation } from './accept-invitation';
 import { TwoFactorGate } from './two-factor-gate';
 import { AttraccessUserActionsBridge } from '../components/attraccessUserActionsBridge';
 import { SupervisorApprovalListener } from '../components/supervisorApproval/SupervisorApprovalListener';
+import { useLocaleSync } from '../hooks/useLocaleSync';
 
 function useRoutesWithAuthElements(routes: RouteConfig[]) {
   const { user } = useAuth();
@@ -170,6 +171,7 @@ function AppContent() {
 export function App() {
   const { isInitialized } = useAuth();
   const { setTheme } = useTheme();
+  useLocaleSync();
 
   useEffect(() => {
     const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';

@@ -1,3 +1,9 @@
+## [Unreleased]
+
+### 🚀 Features
+
+- **ATT-573:** backend i18n — per-user locale persistence (`locale` column on User), `createTranslator` utility for decentralized translation JSONs, per-locale email templates with `(type, locale)` composite PK, German translations for all 13 email types, and `PATCH /api/users/me/locale` endpoint synced from the frontend on every login/language change
+
 ## 1.7.0 (2026-06-05)
 
 ### 🚀 Features

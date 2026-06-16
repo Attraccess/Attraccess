@@ -32,6 +32,13 @@ export class EmailTemplate {
   })
   type!: EmailTemplateType;
 
+  @ApiProperty({
+    description: 'BCP 47 locale for which this template applies',
+    example: 'en',
+  })
+  @PrimaryColumn({ type: 'varchar', length: 10 })
+  locale!: string;
+
   @ApiProperty({ description: 'Email subject line', example: 'Verify Your Email Address' })
   @Column({ type: 'varchar', length: 255 })
   subject!: string;

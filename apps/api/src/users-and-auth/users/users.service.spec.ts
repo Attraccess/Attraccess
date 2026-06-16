@@ -352,6 +352,7 @@ describe('UsersService', () => {
           lockedUntil: null,
           failedLoginAttempts: 0,
           firstFailedLoginAt: null,
+          locale: 'en',
         } as User,
         {
           id: 2,
@@ -397,6 +398,7 @@ describe('UsersService', () => {
           lockedUntil: null,
           failedLoginAttempts: 0,
           firstFailedLoginAt: null,
+          locale: 'en',
         } as User,
       ];
 

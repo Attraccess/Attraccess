@@ -1,0 +1,25 @@
+{
+  "health": {
+    "degraded": {
+      "action": "ist ausgefallen",
+      "headline": "Ressource ausgefallen: {{resourceName}}"
+    },
+    "recovered": {
+      "action": "ist wieder verfügbar",
+      "headline": "Ressource wiederhergestellt: {{resourceName}}"
+    }
+  },
+  "retraining": {
+    "reason": {
+      "age": "Deine Einweisung hat ihr maximales Alter erreicht und muss erneuert werden.",
+      "inactivity": "Du hast diese Ressource seit der konfigurierten Periode nicht genutzt und musst erneut eingewiesen werden.",
+      "default": "Deine Einweisung muss erneuert werden."
+    }
+  },
+  "usageNote": {
+    "phase": {
+      "start": "Beginn",
+      "end": "Ende"
+    }
+  }
+}

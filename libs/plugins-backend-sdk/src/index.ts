@@ -9,3 +9,4 @@ export * from '@attraccess/database-entities';
 export * as entities from '@attraccess/database-entities';
 export * from './lib/auth.types';
 export * from './lib/dual-auth.guard';
+export * from './lib/i18n';
