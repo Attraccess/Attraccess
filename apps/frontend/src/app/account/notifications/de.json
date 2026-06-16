@@ -44,6 +44,10 @@
       "label": "Ressourcennutzung beendet",
       "description": "Wenn deine aktive Ressourcennutzung endet."
     },
+    "nfc_cards": {
+      "label": "NFC-Karten",
+      "description": "Wenn eine deiner NFC-Karten registriert, aktiviert, deaktiviert oder gelöscht wird."
+    },
     "project_invitations": {
       "label": "Projekteinladungen",
       "description": "Einladungen zu Projekten."

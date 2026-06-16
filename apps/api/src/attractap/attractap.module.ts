@@ -35,6 +35,7 @@ import { ResourceFlowsModule } from '../resources/flows/resource-flows.module';
 import { BillingModule } from '../billing/billing.module';
 import { ProjectsModule } from '../projects/projects.module';
 import { ResourceFormsModule } from '../resources/forms/forms.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -52,6 +53,7 @@ import { ResourceFormsModule } from '../resources/forms/forms.module';
     BillingModule,
     ProjectsModule,
     ResourceFormsModule,
+    NotificationsModule,
   ],
   providers: [
     AttractapService,

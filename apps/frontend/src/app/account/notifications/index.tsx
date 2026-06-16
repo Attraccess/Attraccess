@@ -25,6 +25,7 @@ const categoryGroups: Array<{ id: string; categories: NotificationCategory[] }> 
       NotificationCategory.MESSAGES,
       NotificationCategory.RESOURCE_TAKEOVER,
       NotificationCategory.RESOURCE_SESSION_ENDED,
+      NotificationCategory.NFC_CARDS,
       NotificationCategory.PROJECT_INVITATIONS,
     ],
   },
