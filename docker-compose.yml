@@ -132,10 +132,14 @@ services:
       context: ./tools/hetzner-dns-updater
       dockerfile: Dockerfile
     restart: unless-stopped
-    # Note: host networking is required to reliably read the machine's LAN IP on Linux hosts
-    # Docker Desktop for Mac does not support host networking; if running on macOS, consider
-    # passing the LAN IP via env var HETZNER_FORCE_IP or running this on a Linux host.
-    network_mode: host
+    # No host networking: it only ever needs to read the machine's LAN IP, never
+    # to bind a port. Sharing the host net stack put it alongside config-ui's
+    # dnsmasq and was blamed for the port 53 conflict (ATT-514). On balenaOS the
+    # IP is read via the supervisor API (supervisor-api label below). For plain
+    # docker-compose / Linux hosts, set HETZNER_FORCE_IP (the bridge IP is useless
+    # for a DDNS record). os.networkInterfaces() remains a last-resort fallback.
+    labels:
+      io.balena.features.supervisor-api: '1'
     #environment:
     #- HETZNER_DNS_UPDATER_ENABLED=${HETZNER_DNS_UPDATER_ENABLED}
     #- HETZNER_API_TOKEN=${HETZNER_API_TOKEN}

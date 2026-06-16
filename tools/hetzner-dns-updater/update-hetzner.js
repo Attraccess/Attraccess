@@ -121,19 +121,49 @@ function expandEnvRefs(input) {
   return out;
 }
 
-function pickLanIPv4() {
+function pickForcedIPv4() {
   const forcedRaw = process.env.HETZNER_FORCE_IP || '';
-  if (forcedRaw.trim() !== '') {
-    const resolved = expandEnvRefs(forcedRaw.trim());
-    if (resolved.includes('$') || resolved.includes('{') || resolved.includes('}')) {
-      log('HETZNER_FORCE_IP appears unresolved; ignoring');
-    } else if (isValidIPv4(resolved)) {
-      return resolved;
-    } else {
-      log(`HETZNER_FORCE_IP is not a valid IPv4 (${resolved}); ignoring`);
-    }
+  if (forcedRaw.trim() === '') return '';
+  const resolved = expandEnvRefs(forcedRaw.trim());
+  if (resolved.includes('$') || resolved.includes('{') || resolved.includes('}')) {
+    log('HETZNER_FORCE_IP appears unresolved; ignoring');
+  } else if (isValidIPv4(resolved)) {
+    return resolved;
+  } else {
+    log(`HETZNER_FORCE_IP is not a valid IPv4 (${resolved}); ignoring`);
   }
+  return '';
+}
 
+// Read the device LAN IP from the balenaOS supervisor API. This replaces host
+// networking (ATT-514): the container no longer needs to share the host net
+// stack just to discover its IP. Requires the io.balena.features.supervisor-api
+// label, which injects BALENA_SUPERVISOR_ADDRESS + BALENA_SUPERVISOR_API_KEY.
+async function pickSupervisorIPv4() {
+  const address = process.env.BALENA_SUPERVISOR_ADDRESS || '';
+  const apiKey = process.env.BALENA_SUPERVISOR_API_KEY || '';
+  if (!address || !apiKey) return '';
+  try {
+    const url = `${address.replace(/\/$/, '')}/v1/device?apikey=${encodeURIComponent(apiKey)}`;
+    const resp = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    if (!resp.ok) {
+      log(`supervisor API returned HTTP ${resp.status}; falling back`);
+      return '';
+    }
+    const data = await resp.json();
+    // ip_address is a space-separated list of the device's addresses
+    const candidates = String(data?.ip_address || '').split(/\s+/).filter(Boolean);
+    for (const ip of candidates) {
+      if (ip.startsWith('169.254.')) continue;
+      if (isValidIPv4(ip)) return ip;
+    }
+  } catch (err) {
+    log(`supervisor API lookup failed: ${String(err.message || err)}`);
+  }
+  return '';
+}
+
+function pickInterfaceIPv4() {
   const os = require('os');
   const nets = os.networkInterfaces();
   for (const [, addrs] of Object.entries(nets)) {
@@ -146,6 +176,13 @@ function pickLanIPv4() {
     }
   }
   return '';
+}
+
+// Resolution order: explicit override -> balena supervisor -> local interfaces.
+// Without host networking, local interfaces only yield the container's bridge IP
+// (useless for a DDNS record), so it is the last resort behind the first two.
+async function pickLanIPv4() {
+  return pickForcedIPv4() || (await pickSupervisorIPv4()) || pickInterfaceIPv4();
 }
 
 async function sleep(ms) {
@@ -187,7 +224,8 @@ async function main() {
   // Loop forever
   // eslint-disable-next-line no-constant-condition
   while (true) {
-    const ip = pickLanIPv4();
+    // eslint-disable-next-line no-await-in-loop
+    const ip = await pickLanIPv4();
     if (!ip) {
       log('could not determine LAN IP; retrying in 60s');
       // eslint-disable-next-line no-await-in-loop
