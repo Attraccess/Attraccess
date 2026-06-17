@@ -39,20 +39,11 @@ services:
       dockerfile: Dockerfile
     restart: 'no'
     entrypoint: ['/bin/sh', '-c']
-    environment:
-      # Pushover alerting is opt-in: prepare-provisioning.sh strips the
-      # secret-requiring contact point + policy when these are unset (ATT-539).
-      # The script call below is guarded with `[ -f ... ]` because this compose
-      # file can run against an older image that predates the script; in that
-      # case the provisioning bundle also lacks the secret-requiring files, so
-      # skipping the strip is safe and init must not hard-fail (ATT-549).
-      #
-      # PUSHOVER_API_TOKEN and PUSHOVER_USER_KEY are intentionally omitted here.
-      # Balena does not support the ${VAR:-} default syntax (ATT-593). Set them
-      # as balena *device* or *fleet* variables (not service-specific) so that
-      # balena auto-injects them into both monitoring-init and grafana:
-      #   balena env set PUSHOVER_API_TOKEN '<token>'   -d <uuid>
-      #   balena env set PUSHOVER_USER_KEY  '<userkey>' -d <uuid>
+    # PUSHOVER_API_TOKEN and PUSHOVER_USER_KEY must be set as balena device/fleet
+    # variables (not service-specific) so balena auto-injects them into both
+    # monitoring-init and grafana. Balena does not support ${VAR:-} syntax (ATT-593).
+    #   balena env set PUSHOVER_API_TOKEN '<token>'   -d <uuid>
+    #   balena env set PUSHOVER_USER_KEY  '<userkey>' -d <uuid>
     command:
       - >
         set -e &&
