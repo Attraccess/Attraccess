@@ -1845,4 +1845,84 @@ describe('ResourceUsageService', () => {
       );
     });
   });
+
+  describe('canControllResource (cache)', () => {
+    const mockUser: User = { id: 1, systemPermissions: { canManageResources: false } } as User;
+    const resourceId = 42;
+
+    beforeEach(() => {
+      resourceIntroductionService.hasValidIntroduction.mockResolvedValue(true);
+      resourceGroupsService.getGroupsOfResource.mockResolvedValue([]);
+    });
+
+    it('returns cached result on repeated call without hitting DB again', async () => {
+      const first = await service.canControllResource(resourceId, mockUser);
+      const second = await service.canControllResource(resourceId, mockUser);
+
+      expect(first).toBe(true);
+      expect(second).toBe(true);
+      expect(resourceIntroductionService.hasValidIntroduction).toHaveBeenCalledTimes(1);
+    });
+
+    it('re-queries DB after TTL expires', async () => {
+      jest.useFakeTimers();
+      try {
+        await service.canControllResource(resourceId, mockUser);
+        jest.advanceTimersByTime(31_000);
+        await service.canControllResource(resourceId, mockUser);
+
+        expect(resourceIntroductionService.hasValidIntroduction).toHaveBeenCalledTimes(2);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('clears cache on ResourceIntroductionChangedEvent', async () => {
+      await service.canControllResource(resourceId, mockUser);
+      expect(resourceIntroductionService.hasValidIntroduction).toHaveBeenCalledTimes(1);
+
+      service.handleIntroductionChanged({ introductionId: 99 } as import('../introductions/events/resource-introduction-changed.event').ResourceIntroductionChangedEvent);
+
+      await service.canControllResource(resourceId, mockUser);
+      expect(resourceIntroductionService.hasValidIntroduction).toHaveBeenCalledTimes(2);
+    });
+
+    it('clears cache on ResourceGroupIntroductionChangedEvent', async () => {
+      await service.canControllResource(resourceId, mockUser);
+      expect(resourceIntroductionService.hasValidIntroduction).toHaveBeenCalledTimes(1);
+
+      service.handleGroupIntroductionChanged({ resourceGroupId: 7 } as import('../groups/introductions/events/resource-group-introduction-changed.event').ResourceGroupIntroductionChangedEvent);
+
+      await service.canControllResource(resourceId, mockUser);
+      expect(resourceIntroductionService.hasValidIntroduction).toHaveBeenCalledTimes(2);
+    });
+
+    it('clears only the specific entry on ResourceIntroducerChangedEvent', async () => {
+      const otherUser: User = { id: 2, systemPermissions: { canManageResources: false } } as User;
+      await service.canControllResource(resourceId, mockUser);
+      await service.canControllResource(resourceId, otherUser);
+      expect(resourceIntroductionService.hasValidIntroduction).toHaveBeenCalledTimes(2);
+
+      service.handleIntroducerChanged({ introducerUserId: mockUser.id, resourceId } as import('../introducers/events/resource-introducer-changed.event').ResourceIntroducerChangedEvent);
+
+      await service.canControllResource(resourceId, mockUser);
+      // mockUser's entry was cleared; otherUser's entry should still be cached.
+      await service.canControllResource(resourceId, otherUser);
+      expect(resourceIntroductionService.hasValidIntroduction).toHaveBeenCalledTimes(3);
+    });
+
+    it('pruneAccessCache evicts expired entries', async () => {
+      jest.useFakeTimers();
+      try {
+        await service.canControllResource(resourceId, mockUser);
+        jest.advanceTimersByTime(31_000);
+        // @ts-expect-error access private method for testing
+        service.pruneAccessCache();
+        // @ts-expect-error access private field for testing
+        expect(service.accessCache.size).toBe(0);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+  });
 });

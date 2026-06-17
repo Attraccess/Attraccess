@@ -6,9 +6,12 @@ import {
   NotFoundException,
   Inject,
   forwardRef,
+  OnModuleInit,
+  OnModuleDestroy,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull, FindOneOptions, EntityManager } from 'typeorm';
+import { OnEvent } from '@nestjs/event-emitter';
 import {
   FormSubmission,
   Resource,
@@ -39,6 +42,9 @@ import { ResourceIntroductionsService } from '../introductions/resouceIntroducti
 import { ResourceIntroducersService } from '../introducers/resourceIntroducers.service';
 import { ResourceGroupsIntroductionsService } from '../groups/introductions/resourceGroups.introductions.service';
 import { ResourceGroupsService } from '../groups/resourceGroups.service';
+import { ResourceIntroductionChangedEvent } from '../introductions/events/resource-introduction-changed.event';
+import { ResourceGroupIntroductionChangedEvent } from '../groups/introductions/events/resource-group-introduction-changed.event';
+import { ResourceIntroducerChangedEvent } from '../introducers/events/resource-introducer-changed.event';
 import { ResourceRetrainingService } from '../retraining/resourceRetraining.service';
 import { ResourceMaintenanceService } from '../maintenances/maintenance.service';
 import { BillingService } from '../../billing/billing.service';
@@ -68,9 +74,13 @@ export interface StartSessionOptions {
 }
 
 @Injectable()
-export class ResourceUsageService {
+export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(ResourceUsageService.name);
   private sqliteEndSessionChain: Promise<unknown> = Promise.resolve();
+
+  private readonly accessCache = new Map<string, { result: boolean; expiresAt: number }>();
+  private readonly ACCESS_CACHE_TTL_MS = 30_000;
+  private cacheCleanupInterval: ReturnType<typeof setInterval> | null = null;
 
   private isSqliteDriver(manager: EntityManager | undefined = this.resourceUsageRepository.manager): boolean {
     const type = manager?.connection?.options?.type;
@@ -135,6 +145,43 @@ export class ResourceUsageService {
     private readonly rbacService: RbacService,
   ) {}
 
+  onModuleInit(): void {
+    this.cacheCleanupInterval = setInterval(() => this.pruneAccessCache(), 60_000);
+  }
+
+  onModuleDestroy(): void {
+    if (this.cacheCleanupInterval) {
+      clearInterval(this.cacheCleanupInterval);
+      this.cacheCleanupInterval = null;
+    }
+  }
+
+  private pruneAccessCache(): void {
+    const now = Date.now();
+    for (const [key, entry] of this.accessCache) {
+      if (entry.expiresAt <= now) {
+        this.accessCache.delete(key);
+      }
+    }
+  }
+
+  @OnEvent(ResourceIntroductionChangedEvent.EVENT_NAME)
+  handleIntroductionChanged(_event: ResourceIntroductionChangedEvent): void {
+    // Cannot cheaply map introductionId → (userId, resourceId) without a DB query, so clear all.
+    this.accessCache.clear();
+  }
+
+  @OnEvent(ResourceGroupIntroductionChangedEvent.EVENT_NAME)
+  handleGroupIntroductionChanged(_event: ResourceGroupIntroductionChangedEvent): void {
+    // Cannot cheaply map resourceGroupId → affected (userId, resourceId) pairs, so clear all.
+    this.accessCache.clear();
+  }
+
+  @OnEvent(ResourceIntroducerChangedEvent.EVENT_NAME)
+  handleIntroducerChanged(event: ResourceIntroducerChangedEvent): void {
+    this.accessCache.delete(`${event.introducerUserId}:${event.resourceId}`);
+  }
+
   private emitSystemUsageEvent(
     event: SystemEvent.RESOURCE_USAGE_STARTED | SystemEvent.RESOURCE_USAGE_ENDED,
     resource: Resource | undefined,
@@ -155,9 +202,27 @@ export class ResourceUsageService {
     user: User,
     transactionalEntityManager?: EntityManager,
   ): Promise<boolean> {
+    const key = `${user.id}:${resourceId}`;
+    const cached = this.accessCache.get(key);
+    if (cached && cached.expiresAt > Date.now()) {
+      this.logger.debug(`Cache hit for canControllResource user=${user.id} resource=${resourceId}`);
+      return cached.result;
+    }
+
+    const result = await this.canControllResourceUncached(resourceId, user, transactionalEntityManager);
+    this.accessCache.set(key, { result, expiresAt: Date.now() + this.ACCESS_CACHE_TTL_MS });
+    return result;
+  }
+
+  private async canControllResourceUncached(
+    resourceId: number,
+    user: User,
+    transactionalEntityManager?: EntityManager,
+  ): Promise<boolean> {
     // Prefer already-populated effectivePermissions on the request-bound user (set by SessionStrategy)
     // to avoid a redundant DB query on every resource start/stop.
-    const effectivePermissions = (user as AuthenticatedUser).effectivePermissions ?? await this.rbacService.getEffectivePermissions(user.id);
+    const effectivePermissions =
+      (user as AuthenticatedUser).effectivePermissions ?? (await this.rbacService.getEffectivePermissions(user.id));
     if (effectivePermissions.has('resources.update')) {
       return true;
     }
