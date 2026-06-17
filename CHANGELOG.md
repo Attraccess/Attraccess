@@ -76,6 +76,7 @@
 
 ### 🩹 Fixes
 
+- **ATT-593:** fix balena not parsing `${VAR:-default}` compose env syntax — Grafana admin credentials now use hardcoded defaults; Pushover vars removed from compose env and must be set as device/fleet variables so `monitoring-init` and `grafana` both see them ([ATT-593](https://linear.app/attraccess/issue/ATT-593))
 - **ATT-559:** all notification categories now default to email=true; backfill migration for existing users ([ATT-559](https://linear.app/attraccess/issue/ATT-559), [#1355](https://github.com/Attraccess/Attraccess/pull/1355))
 - **ATT-559:** email rendering — compile Handlebars templates before MJML validation so dynamic color/value variables don't fail attribute type checks ([ATT-559](https://linear.app/attraccess/issue/ATT-559), [#1355](https://github.com/Attraccess/Attraccess/pull/1355))
 - **ATT-559:** fix resource session-ended email template migration having a duplicate timestamp with the takeover template — renumbered to ensure both run on fresh installs ([ATT-559](https://linear.app/attraccess/issue/ATT-559), [#1355](https://github.com/Attraccess/Attraccess/pull/1355))
