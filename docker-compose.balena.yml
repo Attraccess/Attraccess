@@ -46,8 +46,13 @@ services:
       # file can run against an older image that predates the script; in that
       # case the provisioning bundle also lacks the secret-requiring files, so
       # skipping the strip is safe and init must not hard-fail (ATT-549).
-      - PUSHOVER_API_TOKEN=${PUSHOVER_API_TOKEN:-}
-      - PUSHOVER_USER_KEY=${PUSHOVER_USER_KEY:-}
+      #
+      # PUSHOVER_API_TOKEN and PUSHOVER_USER_KEY are intentionally omitted here.
+      # Balena does not support the ${VAR:-} default syntax (ATT-593). Set them
+      # as balena *device* or *fleet* variables (not service-specific) so that
+      # balena auto-injects them into both monitoring-init and grafana:
+      #   balena env set PUSHOVER_API_TOKEN '<token>'   -d <uuid>
+      #   balena env set PUSHOVER_USER_KEY  '<userkey>' -d <uuid>
     command:
       - >
         set -e &&
@@ -187,12 +192,15 @@ services:
     expose:
       - '3001'
     environment:
-      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-attraccess}
+      # Balena does not support ${VAR:-default} syntax (ATT-593). Defaults are
+      # hardcoded here; override by setting GF_SECURITY_ADMIN_USER /
+      # GF_SECURITY_ADMIN_PASSWORD as balena device or fleet variables.
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=attraccess
       - GF_SERVER_HTTP_PORT=3001
-      # Read by $__env{} interpolation in the provisioned Pushover contact point.
-      - PUSHOVER_API_TOKEN=${PUSHOVER_API_TOKEN:-}
-      - PUSHOVER_USER_KEY=${PUSHOVER_USER_KEY:-}
+      # PUSHOVER_API_TOKEN and PUSHOVER_USER_KEY are read from Balena device/fleet
+      # variables (auto-injected) — set them at the device level, not service-
+      # specific, so monitoring-init also sees them during provisioning setup.
     volumes:
       - grafana-provisioning:/etc/grafana/provisioning:ro
       - grafana-dashboards:/var/lib/grafana/dashboards:ro
