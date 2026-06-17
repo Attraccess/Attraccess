@@ -168,10 +168,10 @@ services:
       - '--path.rootfs=/host'
     expose:
       - '9100'
-    privileged: true
     # io.balena.features.procfs/sysfs bind-mount the host OS /proc and /sys into
-    # the container, letting node-exporter read real host CPU/RAM/disk metrics.
-    # privileged grants /dev access for disk and network interface collectors.
+    # the container, giving node-exporter access to host CPU/RAM/network metrics
+    # without privileged mode. The /host rootfs mount is needed for the filesystem
+    # collector (disk usage per mount point) since those paths aren't in the container.
     labels:
       io.balena.features.procfs: '1'
       io.balena.features.sysfs: '1'
