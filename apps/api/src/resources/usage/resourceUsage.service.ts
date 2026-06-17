@@ -80,6 +80,7 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
 
   private readonly accessCache = new Map<string, { result: boolean; expiresAt: number }>();
   private readonly ACCESS_CACHE_TTL_MS = 30_000;
+  private readonly ACCESS_CACHE_MAX_SIZE = 5_000;
   private cacheCleanupInterval: ReturnType<typeof setInterval> | null = null;
 
   private isSqliteDriver(manager: EntityManager | undefined = this.resourceUsageRepository.manager): boolean {
@@ -166,13 +167,13 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
   }
 
   @OnEvent(ResourceIntroductionChangedEvent.EVENT_NAME)
-  handleIntroductionChanged(_event: ResourceIntroductionChangedEvent): void {
+  handleIntroductionChanged(): void {
     // Cannot cheaply map introductionId → (userId, resourceId) without a DB query, so clear all.
     this.accessCache.clear();
   }
 
   @OnEvent(ResourceGroupIntroductionChangedEvent.EVENT_NAME)
-  handleGroupIntroductionChanged(_event: ResourceGroupIntroductionChangedEvent): void {
+  handleGroupIntroductionChanged(): void {
     // Cannot cheaply map resourceGroupId → affected (userId, resourceId) pairs, so clear all.
     this.accessCache.clear();
   }
@@ -202,15 +203,22 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     user: User,
     transactionalEntityManager?: EntityManager,
   ): Promise<boolean> {
+    // Bypass cache for transactional calls: the TEM may have uncommitted changes that differ
+    // from what the cache holds (e.g. an introduction granted within the same transaction).
+    if (transactionalEntityManager) {
+      return this.canControllResourceUncached(resourceId, user, transactionalEntityManager);
+    }
+
     const key = `${user.id}:${resourceId}`;
     const cached = this.accessCache.get(key);
     if (cached && cached.expiresAt > Date.now()) {
-      this.logger.debug(`Cache hit for canControllResource user=${user.id} resource=${resourceId}`);
       return cached.result;
     }
 
-    const result = await this.canControllResourceUncached(resourceId, user, transactionalEntityManager);
-    this.accessCache.set(key, { result, expiresAt: Date.now() + this.ACCESS_CACHE_TTL_MS });
+    const result = await this.canControllResourceUncached(resourceId, user);
+    if (this.accessCache.size < this.ACCESS_CACHE_MAX_SIZE) {
+      this.accessCache.set(key, { result, expiresAt: Date.now() + this.ACCESS_CACHE_TTL_MS });
+    }
     return result;
   }
 

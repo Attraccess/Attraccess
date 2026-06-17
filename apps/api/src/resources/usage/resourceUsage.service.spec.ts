@@ -1881,7 +1881,7 @@ describe('ResourceUsageService', () => {
       await service.canControllResource(resourceId, mockUser);
       expect(resourceIntroductionService.hasValidIntroduction).toHaveBeenCalledTimes(1);
 
-      service.handleIntroductionChanged({ introductionId: 99 } as import('../introductions/events/resource-introduction-changed.event').ResourceIntroductionChangedEvent);
+      service.handleIntroductionChanged();
 
       await service.canControllResource(resourceId, mockUser);
       expect(resourceIntroductionService.hasValidIntroduction).toHaveBeenCalledTimes(2);
@@ -1891,7 +1891,7 @@ describe('ResourceUsageService', () => {
       await service.canControllResource(resourceId, mockUser);
       expect(resourceIntroductionService.hasValidIntroduction).toHaveBeenCalledTimes(1);
 
-      service.handleGroupIntroductionChanged({ resourceGroupId: 7 } as import('../groups/introductions/events/resource-group-introduction-changed.event').ResourceGroupIntroductionChangedEvent);
+      service.handleGroupIntroductionChanged();
 
       await service.canControllResource(resourceId, mockUser);
       expect(resourceIntroductionService.hasValidIntroduction).toHaveBeenCalledTimes(2);
@@ -1923,6 +1923,38 @@ describe('ResourceUsageService', () => {
       } finally {
         jest.useRealTimers();
       }
+    });
+
+    it('bypasses cache when transactionalEntityManager is provided', async () => {
+      const fakeTem = {} as import('typeorm').EntityManager;
+
+      await service.canControllResource(resourceId, mockUser);
+      expect(resourceIntroductionService.hasValidIntroduction).toHaveBeenCalledTimes(1);
+
+      // Second call with TEM should bypass cache and hit DB again.
+      await service.canControllResource(resourceId, mockUser, fakeTem);
+      expect(resourceIntroductionService.hasValidIntroduction).toHaveBeenCalledTimes(2);
+
+      // Third call without TEM should still use the cache from the first non-TEM call.
+      await service.canControllResource(resourceId, mockUser);
+      expect(resourceIntroductionService.hasValidIntroduction).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not write to cache when at max size', async () => {
+      // @ts-expect-error access private field for testing
+      const MAX = service.ACCESS_CACHE_MAX_SIZE as number;
+      // @ts-expect-error access private field for testing
+      const cache = service.accessCache as Map<string, unknown>;
+
+      // Fill the cache to the limit with fake entries.
+      for (let i = 0; i < MAX; i++) {
+        cache.set(`stub:${i}`, { result: true, expiresAt: Date.now() + 30_000 });
+      }
+
+      // This call should compute the result but NOT write it to the full cache.
+      const result = await service.canControllResource(resourceId, mockUser);
+      expect(result).toBe(true);
+      expect(cache.size).toBe(MAX);
     });
   });
 });
