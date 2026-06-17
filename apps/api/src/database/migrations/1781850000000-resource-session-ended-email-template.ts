@@ -63,8 +63,8 @@ const RESOURCE_SESSION_ENDED_VARIABLES = [
   'session.endedBy',
 ].join(',');
 
-export class ResourceSessionEndedEmailTemplate1781800000000 implements MigrationInterface {
-  name = 'ResourceSessionEndedEmailTemplate1781800000000';
+export class ResourceSessionEndedEmailTemplate1781850000000 implements MigrationInterface {
+  name = 'ResourceSessionEndedEmailTemplate1781850000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(

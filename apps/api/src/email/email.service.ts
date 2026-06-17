@@ -43,9 +43,11 @@ export class EmailService {
     const subjectTemplate = Handlebars.compile(template.subject);
     const subject = subjectTemplate(context);
 
-    const bodyMjml = await this.mjmlService.validateAndConvert(template.body);
-    const bodyTemplate = Handlebars.compile(bodyMjml);
-    const body = bodyTemplate(context);
+    // Compile Handlebars first so all template variables (e.g. dynamic colors) are
+    // resolved before MJML validates attribute values.
+    const rawBodyTemplate = Handlebars.compile(template.body);
+    const resolvedMjml = rawBodyTemplate(context);
+    const body = await this.mjmlService.validateAndConvert(resolvedMjml);
 
     return {
       subject,
@@ -283,7 +285,7 @@ export class EmailService {
         previousStatus: change.previousStatus ?? 'unknown',
         reason: change.reason,
         identifier: change.identifier,
-        headline: becameUnhealthy ? `Resource degraded: ${resource.name}` : `Resource recovered: ${resource.name}`,
+        headline: becameUnhealthy ? 'Resource degraded' : 'Resource recovered',
         headerColor: becameUnhealthy ? '#B91C1C' : '#047857',
         bodyAction: becameUnhealthy ? 'has become degraded' : 'is healthy again',
       },
