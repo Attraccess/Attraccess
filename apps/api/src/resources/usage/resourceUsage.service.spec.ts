@@ -1925,19 +1925,16 @@ describe('ResourceUsageService', () => {
       }
     });
 
-    it('bypasses cache when transactionalEntityManager is provided', async () => {
+    it('uses cache even when transactionalEntityManager is provided', async () => {
       const fakeTem = {} as import('typeorm').EntityManager;
 
+      // First call (no TEM) populates the cache.
       await service.canControllResource(resourceId, mockUser);
       expect(resourceIntroductionService.hasValidIntroduction).toHaveBeenCalledTimes(1);
 
-      // Second call with TEM should bypass cache and hit DB again.
+      // Second call WITH a TEM should still hit the cache — no extra DB queries.
       await service.canControllResource(resourceId, mockUser, fakeTem);
-      expect(resourceIntroductionService.hasValidIntroduction).toHaveBeenCalledTimes(2);
-
-      // Third call without TEM should still use the cache from the first non-TEM call.
-      await service.canControllResource(resourceId, mockUser);
-      expect(resourceIntroductionService.hasValidIntroduction).toHaveBeenCalledTimes(2);
+      expect(resourceIntroductionService.hasValidIntroduction).toHaveBeenCalledTimes(1);
     });
 
     it('does not write to cache when at max size', async () => {

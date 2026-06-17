@@ -203,19 +203,17 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     user: User,
     transactionalEntityManager?: EntityManager,
   ): Promise<boolean> {
-    // Bypass cache for transactional calls: the TEM may have uncommitted changes that differ
-    // from what the cache holds (e.g. an introduction granted within the same transaction).
-    if (transactionalEntityManager) {
-      return this.canControllResourceUncached(resourceId, user, transactionalEntityManager);
-    }
-
+    // The cache is keyed on (userId, resourceId) and invalidated by introduction/introducer
+    // change events. Whether a TEM is present does not affect correctness: startSession() never
+    // grants introductions within the same transaction, so the cached boolean is always valid.
+    // On a cache miss, the TEM is still forwarded so sub-queries use the right connection.
     const key = `${user.id}:${resourceId}`;
     const cached = this.accessCache.get(key);
     if (cached && cached.expiresAt > Date.now()) {
       return cached.result;
     }
 
-    const result = await this.canControllResourceUncached(resourceId, user);
+    const result = await this.canControllResourceUncached(resourceId, user, transactionalEntityManager);
     if (this.accessCache.size < this.ACCESS_CACHE_MAX_SIZE) {
       this.accessCache.set(key, { result, expiresAt: Date.now() + this.ACCESS_CACHE_TTL_MS });
     }
