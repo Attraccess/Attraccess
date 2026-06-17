@@ -257,7 +257,7 @@ describe('EmailService', () => {
     expect(callArg.subject).toBe('Laser Cutter was taken over');
     expect(callArg.html).toContain('Hello bob');
     expect(callArg.html).toContain('alice took over Laser Cutter');
-    expect(callArg.html).toContain('https://frontend.example/resources/4/usage');
+    expect(callArg.html).toContain('https://frontend.example/resources/4');
   });
 
   it('sends access change email with title, body and resolved URL', async () => {
@@ -312,6 +312,6 @@ describe('EmailService', () => {
     expect(callArg.subject).toBe('Laser Cutter session ended');
     expect(callArg.html).toContain('Hello dana');
     expect(callArg.html).toContain('alice ended your session on Laser Cutter');
-    expect(callArg.html).toContain('https://frontend.example/resources/3/usage');
+    expect(callArg.html).toContain('https://frontend.example/resources/3');
   });
 });

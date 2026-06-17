@@ -398,7 +398,7 @@ export class EmailService {
     }
 
     const base = await this.getBaseContext(recipient);
-    const resourceUrl = `${base.host.frontend}/resources/${resource.id}/usage`;
+    const resourceUrl = `${base.host.frontend}/resources/${resource.id}`;
 
     const context = {
       ...base,
@@ -476,7 +476,7 @@ export class EmailService {
     }
 
     const base = await this.getBaseContext(recipient);
-    const resourceUrl = `${base.host.frontend}/resources/${resource.id}/usage`;
+    const resourceUrl = `${base.host.frontend}/resources/${resource.id}`;
 
     const context = {
       ...base,

@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useToastMessage } from '../../components/toastProvider';
 import { useAuth } from '../../hooks/useAuth';
 import { SystemNotificationLiveEvent, useSystemNotificationsLive } from './useSystemNotificationsLive';
+import { useWebPresence } from './useWebPresence';
 
 interface Props {
   enabled?: boolean;
@@ -14,6 +15,8 @@ export function GlobalSystemNotificationsLive({ enabled = true }: Props) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const toast = useToastMessage();
+
+  const isEnabled = enabled && Boolean(user);
 
   const handleNotification = useCallback(
     (notification: SystemNotificationLiveEvent) => {
@@ -36,8 +39,10 @@ export function GlobalSystemNotificationsLive({ enabled = true }: Props) {
 
   useSystemNotificationsLive({
     onNotification: handleNotification,
-    enabled: enabled && Boolean(user),
+    enabled: isEnabled,
   });
+
+  useWebPresence(isEnabled);
 
   return null;
 }

@@ -6,6 +6,7 @@ import { MetricsService } from '../metrics/metrics.service';
 import { CoredumpSymbolicationService } from './coredump-symbolication.service';
 import { NotificationDispatchService } from '../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../notifications/notification-types';
+import { AttractapFirmwareService } from './firmware.service';
 
 describe('AttractapService', () => {
   let service: AttractapService;
@@ -44,6 +45,7 @@ describe('AttractapService', () => {
       } as unknown as EncryptionService,
       {} as MetricsService,
       {} as CoredumpSymbolicationService,
+      {} as AttractapFirmwareService,
       notifications as unknown as NotificationDispatchService,
     );
   });

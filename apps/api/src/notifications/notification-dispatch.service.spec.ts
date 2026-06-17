@@ -12,7 +12,7 @@ describe('NotificationDispatchService', () => {
   let service: NotificationDispatchService;
   let preferences: { isChannelEnabled: jest.Mock };
   let push: { sendToUser: jest.Mock };
-  let live: { emitToUser: jest.Mock };
+  let live: { emitToUser: jest.Mock; isUserPresent: jest.Mock };
   let email: { sendMaintenanceRequestedEmail: jest.Mock; sendResourceTakeoverEmail: jest.Mock; sendAccessChangeEmail: jest.Mock; sendResourceSessionEndedEmail: jest.Mock };
 
   const recipient = { id: 2, email: 'recipient@example.com' } as User;
@@ -20,7 +20,7 @@ describe('NotificationDispatchService', () => {
   beforeEach(async () => {
     preferences = { isChannelEnabled: jest.fn().mockResolvedValue(true) };
     push = { sendToUser: jest.fn().mockResolvedValue(undefined) };
-    live = { emitToUser: jest.fn() };
+    live = { emitToUser: jest.fn(), isUserPresent: jest.fn().mockReturnValue(true) };
     email = {
       sendMaintenanceRequestedEmail: jest.fn(),
       sendResourceTakeoverEmail: jest.fn().mockResolvedValue(undefined),

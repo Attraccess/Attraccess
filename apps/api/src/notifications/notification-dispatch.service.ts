@@ -84,6 +84,9 @@ export class NotificationDispatchService {
   }
 
   private async tryToast(request: NotificationDispatchRequest, recipient: User): Promise<void> {
+    if (!this.liveService.isUserPresent(recipient.id)) {
+      return;
+    }
     this.liveService.emitToUser(recipient.id, {
       category: request.category,
       title: request.title,

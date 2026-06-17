@@ -16,7 +16,7 @@ export class ResourceSessionNotificationListener {
       actorId: event.newUser.id,
       title: `${event.resource.name} was taken over`,
       body: `${event.newUser.username ?? 'Another user'} took over your active resource session.`,
-      url: `/resources/${event.resource.id}/usage`,
+      url: `/resources/${event.resource.id}`,
       severity: 'warning',
       sendEmail: (recipient) =>
         this.notifications.sendEmailTemplate(recipient, NotificationCategory.RESOURCE_TAKEOVER, {
@@ -47,7 +47,7 @@ export class ResourceSessionNotificationListener {
       actorId: event.endedBy?.id,
       title: `${resource.name} session ended`,
       body: `${endedBy} ended your active resource session.`,
-      url: `/resources/${resource.id}/usage`,
+      url: `/resources/${resource.id}`,
       severity: 'warning',
       dedupeKey: `resource_session_ended:${event.usage.id}`,
       sendEmail: (recipient) =>

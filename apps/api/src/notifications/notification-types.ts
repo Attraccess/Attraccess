@@ -29,6 +29,6 @@ export const DEFAULT_NOTIFICATION_CHANNELS: NotificationCategoryPreferences = {
   [NotificationCategory.RESOURCE_TAKEOVER]: { email: false, push: true, toast: true },
   [NotificationCategory.RESOURCE_SESSION_ENDED]: { email: false, push: true, toast: true },
   [NotificationCategory.PROJECT_INVITATIONS]: { email: true, push: true, toast: true },
-  [NotificationCategory.ACCESS_CHANGES]: { email: false, push: true, toast: true },
+  [NotificationCategory.ACCESS_CHANGES]: { email: true, push: true, toast: true },
   [NotificationCategory.NFC_CARDS]: { email: false, push: true, toast: true },
 };

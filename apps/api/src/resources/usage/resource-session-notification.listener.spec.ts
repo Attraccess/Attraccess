@@ -41,7 +41,7 @@ describe('ResourceSessionNotificationListener', () => {
       actorId: 1,
       title: 'Laser cutter was taken over',
       body: 'alice took over your active resource session.',
-      url: '/resources/4/usage',
+      url: '/resources/4',
       severity: 'warning',
       sendEmail: expect.any(Function),
     });
@@ -95,7 +95,7 @@ describe('ResourceSessionNotificationListener', () => {
       actorId: actor.id,
       title: 'Laser cutter session ended',
       body: 'alice ended your active resource session.',
-      url: '/resources/4/usage',
+      url: '/resources/4',
       severity: 'warning',
       dedupeKey: 'resource_session_ended:10',
       sendEmail: expect.any(Function),
