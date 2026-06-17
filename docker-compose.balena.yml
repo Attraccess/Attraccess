@@ -161,6 +161,40 @@ services:
     env_file:
       - .env.docker-compose
 
+  node-exporter:
+    image: prom/node-exporter:v1.9.1
+    restart: unless-stopped
+    command:
+      - '--path.rootfs=/host'
+    expose:
+      - '9100'
+    privileged: true
+    # io.balena.features.procfs/sysfs bind-mount the host OS /proc and /sys into
+    # the container, letting node-exporter read real host CPU/RAM/disk metrics.
+    # privileged grants /dev access for disk and network interface collectors.
+    labels:
+      io.balena.features.procfs: '1'
+      io.balena.features.sysfs: '1'
+    volumes:
+      - /:/host:ro,rslave
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.51.0
+    restart: unless-stopped
+    expose:
+      - '8080'
+    privileged: true
+    # io.balena.features.balena-socket mounts the balena engine socket at both
+    # /var/run/balena-engine.sock and /var/run/docker.sock (backwards-compat),
+    # so cadvisor can discover and collect per-container metrics without config changes.
+    labels:
+      io.balena.features.procfs: '1'
+      io.balena.features.sysfs: '1'
+      io.balena.features.balena-socket: '1'
+    volumes:
+      - /:/rootfs:ro
+      - /dev/disk:/dev/disk:ro
+
   prometheus:
     image: prom/prometheus:v3.11.3
     restart: unless-stopped
@@ -172,6 +206,8 @@ services:
     depends_on:
       - config-ui
       - monitoring-init
+      - node-exporter
+      - cadvisor
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.retention.time=30d'
