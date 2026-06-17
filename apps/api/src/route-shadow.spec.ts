@@ -156,7 +156,7 @@ function parseImports(content: string): Map<string, string> {
   const re = /import\s*\{([^}]+)\}\s*from\s*['"]([^'"]+)['"]/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(content)) !== null) {
-    const names = m[1].split(',').map((n) => n.trim().split(/\s+as\s+/).pop()!.trim());
+    const names = m[1].split(',').map((n) => (n.trim().split(/\s+as\s+/).pop() ?? '').trim());
     for (const name of names) {
       if (name) map.set(name, m[2]);
     }
@@ -224,8 +224,9 @@ function detectShadowsInModule(
   const resolved: ControllerInfo[] = [];
   for (const name of controllerNames) {
     // Try the global map first (populated from file scanning)
-    if (controllerMap.has(name)) {
-      resolved.push(controllerMap.get(name)!);
+    const existing = controllerMap.get(name);
+    if (existing) {
+      resolved.push(existing);
       continue;
     }
     // Try resolving via import map
