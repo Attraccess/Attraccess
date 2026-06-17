@@ -131,7 +131,7 @@ export function PasswordPolicyHints({ password, username, email, policy, serverE
   const score = zxcvbn.result?.score ?? 0;
   const meetsScore = score >= policy.minZxcvbnScore;
   const crackTime = useMemo(() => {
-    const seconds = zxcvbn.result?.crackTimesSeconds.offlineSlowHashing1e4PerSecond;
+    const seconds = zxcvbn.result?.crackTimes.offlineSlowHashingXPerSecond.seconds;
     return formatSeconds(typeof seconds === 'number' ? seconds : Number(seconds ?? 0), t);
   }, [zxcvbn.result, t]);
 

@@ -1,29 +1,28 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { ZxcvbnResult } from '@zxcvbn-ts/core';
+import type { ZxcvbnFactory, ZxcvbnResult } from '@zxcvbn-ts/core';
 
 interface ZxcvbnState {
   ready: boolean;
   result: ZxcvbnResult | null;
 }
 
-let optionsConfigured = false;
+let factory: ZxcvbnFactory | null = null;
 
 async function loadZxcvbn() {
-  const [core, common, en, de] = await Promise.all([
+  const [{ ZxcvbnFactory: Factory }, common, en, de] = await Promise.all([
     import('@zxcvbn-ts/core'),
     import('@zxcvbn-ts/language-common'),
     import('@zxcvbn-ts/language-en'),
     import('@zxcvbn-ts/language-de'),
   ]);
-  if (!optionsConfigured) {
-    core.zxcvbnOptions.setOptions({
+  if (!factory) {
+    factory = new Factory({
       dictionary: { ...common.dictionary, ...en.dictionary, ...de.dictionary },
       graphs: common.adjacencyGraphs,
       translations: en.translations,
     });
-    optionsConfigured = true;
   }
-  return core.zxcvbn;
+  return (pw: string, inputs?: string[]) => factory!.check(pw, inputs);
 }
 
 export function useZxcvbn(password: string, userInputs: string[] = []): ZxcvbnState {
