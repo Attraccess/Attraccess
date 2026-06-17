@@ -302,7 +302,8 @@ export class ResourceFlowsService {
       where: { resourceId: In(resourceIds), type },
     });
     for (const node of nodes) {
-      map.get(node.resourceId)!.push(node);
+      const bucket = map.get(node.resourceId);
+      if (bucket) bucket.push(node);
     }
     return map;
   }

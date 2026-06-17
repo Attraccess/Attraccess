@@ -106,7 +106,8 @@ export class ResourceHealthService {
       order: { identifier: 'ASC' },
     });
     for (const entry of entries) {
-      map.get(entry.resourceId)!.push(entry);
+      const bucket = map.get(entry.resourceId);
+      if (bucket) bucket.push(entry);
     }
     return map;
   }
