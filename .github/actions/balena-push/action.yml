@@ -34,15 +34,8 @@ runs:
         cat balena.yml
       shell: bash
 
-    - name: Strip services unsupported by balena
-      run: |
-        # balena's compose schema rejects Compose `profiles` and host-firewall
-        # tooling. fail2ban (network_mode: host, iptables, /var/lib/docker mount)
-        # is opt-in self-host tooling and not meant for balena devices, so drop it
-        # from the balena image. Root docker-compose.yml stays intact for
-        # self-host/coolify deployments.
-        yq -i 'del(.services.fail2ban)' docker-compose.yml
-        cat docker-compose.yml
+    - name: Use balena-compatible compose file
+      run: cp docker-compose.balena.yml docker-compose.yml
       shell: bash
 
     - name: Install balena-cli

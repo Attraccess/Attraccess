@@ -181,33 +181,6 @@ services:
       - '--storage.tsdb.retention.time=30d'
       - '--web.enable-lifecycle'
 
-  node-exporter:
-    image: prom/node-exporter:v1.9.1
-    restart: unless-stopped
-    expose:
-      - '9100'
-    command:
-      - '--path.rootfs=/host'
-      - '--collector.filesystem.mount-points-exclude=^/(dev|proc|sys|run/credentials/.+|var/lib/docker/.+)($$|/)'
-      - '--collector.filesystem.fs-types-exclude=^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs)$$'
-    volumes:
-      - /:/host:ro,rslave
-
-  cadvisor:
-    image: gcr.io/cadvisor/cadvisor:v0.52.1
-    restart: unless-stopped
-    privileged: true
-    expose:
-      - '8080'
-    command:
-      - '--docker_only=true'
-      - '--store_container_labels=true'
-    volumes:
-      - /:/rootfs:ro
-      - /var/run:/var/run:ro
-      - /sys:/sys:ro
-      - /var/lib/docker:/var/lib/docker:ro
-
   grafana:
     image: grafana/grafana:13.0.1
     restart: unless-stopped
@@ -226,37 +199,6 @@ services:
       - grafana-data:/var/lib/grafana
     depends_on:
       - monitoring-init
-
-  # fail2ban is opt-in via the `fail2ban` Compose profile to keep developers
-  # from getting their own IP banned during local testing. Enable with:
-  #   docker compose --profile fail2ban up -d
-  # See docs/en/installation/docker-compose.md for tuning + Linux-only caveats.
-  fail2ban:
-    image: crazymax/fail2ban:1.1.0
-    profiles: ['fail2ban']
-    restart: unless-stopped
-    network_mode: host
-    cap_add:
-      - NET_ADMIN
-      - NET_RAW
-    depends_on:
-      - attraccess
-    volumes:
-      - ./fail2ban/jail.d:/etc/attraccess/jail.d:ro
-      - ./fail2ban/filter.d:/etc/attraccess/filter.d:ro
-      - ./fail2ban/entrypoint.sh:/usr/local/bin/attraccess-fail2ban-entrypoint.sh:ro
-      - fail2ban-data:/data
-      - /var/lib/docker/containers:/var/lib/docker/containers:ro
-    environment:
-      - TZ=${TZ:-Europe/Berlin}
-      - F2B_LOG_LEVEL=${F2B_LOG_LEVEL:-INFO}
-      - F2B_DB_PURGE_AGE=${F2B_DB_PURGE_AGE:-1d}
-      - F2B_IPTABLES_CHAIN=${F2B_IPTABLES_CHAIN:-DOCKER-USER}
-      - F2B_ATTRACCESS_MAXRETRY=${F2B_ATTRACCESS_MAXRETRY:-5}
-      - F2B_ATTRACCESS_FINDTIME=${F2B_ATTRACCESS_FINDTIME:-900}
-      - F2B_ATTRACCESS_BANTIME=${F2B_ATTRACCESS_BANTIME:-900}
-    entrypoint:
-      - /usr/local/bin/attraccess-fail2ban-entrypoint.sh
 
   duplicati:
     image: duplicati/duplicati:2.3.0.1-stable
@@ -291,4 +233,3 @@ volumes:
   grafana-provisioning:
   grafana-dashboards:
   duplicati:
-  fail2ban-data:
