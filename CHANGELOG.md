@@ -1,3 +1,9 @@
+## [Unreleased]
+
+### 🩹 Fixes
+
+- **ATT-559:** remove stale "Aufsichtsfreigaben" translation keys from notification settings — supervision requests use their own SSE/modal channel and should not appear as configurable standard notifications ([ATT-559](https://linear.app/attraccess/issue/ATT-559), [#1355](https://github.com/Attraccess/Attraccess/pull/1355))
+
 ## 1.7.0 (2026-06-05)
 
 ### 🚀 Features

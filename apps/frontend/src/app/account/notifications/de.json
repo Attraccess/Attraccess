@@ -52,10 +52,6 @@
       "label": "Projekteinladungen",
       "description": "Einladungen zu Projekten."
     },
-    "supervision_requests": {
-      "label": "Aufsichtsfreigaben",
-      "description": "Anfragen, die eine Freigabe durch eine Aufsicht benötigen."
-    },
     "access_changes": {
       "label": "Zugriffsänderungen",
       "description": "Änderungen an deinen Berechtigungen, Einweisungen, Einweiser- oder Wartendenstatus."

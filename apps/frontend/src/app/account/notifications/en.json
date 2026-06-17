@@ -52,10 +52,6 @@
       "label": "Project invitations",
       "description": "Invitations to join projects."
     },
-    "supervision_requests": {
-      "label": "Supervision requests",
-      "description": "Requests that need supervisor approval."
-    },
     "access_changes": {
       "label": "Access changes",
       "description": "Changes to your permissions, introductions, introducer, or maintainer status."
