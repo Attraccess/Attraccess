@@ -13,6 +13,8 @@ import { MetricsService } from '../metrics/metrics.service';
 import { CoredumpSymbolicationService } from './coredump-symbolication.service';
 import { AttractapFirmwareService } from './firmware.service';
 import { AttractapCrashReportDto } from './dtos/crash-report.dto';
+import { NotificationDispatchService } from '../notifications/notification-dispatch.service';
+import { NotificationCategory } from '../notifications/notification-types';
 
 @Injectable()
 export class AttractapService {
@@ -35,7 +37,30 @@ export class AttractapService {
     private readonly metricsService: MetricsService,
     private readonly coredumpSymbolicationService: CoredumpSymbolicationService,
     private readonly firmwareService: AttractapFirmwareService,
+    private readonly notifications: NotificationDispatchService,
   ) {}
+
+  private notifyNfcCardChange(card: NFCCard | undefined, action: 'registered' | 'activated' | 'deactivated' | 'deleted'): void {
+    if (!card?.user) {
+      return;
+    }
+
+    void this.notifications.dispatch({
+      category: NotificationCategory.NFC_CARDS,
+      recipients: [card.user],
+      title: `NFC card ${action}`,
+      body:
+        action === 'registered'
+          ? `NFC card #${card.id} was registered for your account.`
+          : action === 'deleted'
+            ? `NFC card #${card.id} was deleted from your account.`
+            : `NFC card #${card.id} was ${action}.`,
+      url: '/attractap/nfc-cards',
+      dedupeKey: `nfc-card-${card.id}-${action}`,
+    }).catch((error) => {
+      this.logger.error(`Failed to notify user ${card.user.id} about NFC card ${action}: ${(error as Error).message}`);
+    });
+  }
 
   public async getNFCCardByID(id: number): Promise<NFCCard | undefined> {
     const card = await this.nfcCardRepository.findOne({ where: { id }, relations: ['user'] });
@@ -79,7 +104,7 @@ export class AttractapService {
     user: User,
     data: Omit<NFCCard, 'id' | 'createdAt' | 'updatedAt' | 'user' | 'lastSeen' | 'isActive'>,
   ): Promise<NFCCard> {
-    return await this.nfcCardRepository.manager.transaction(async (transactionalEntityManager) => {
+    const card = await this.nfcCardRepository.manager.transaction(async (transactionalEntityManager) => {
       await transactionalEntityManager.update(NFCCard, { user }, { isActive: false });
 
       return await transactionalEntityManager.save(NFCCard, {
@@ -89,6 +114,8 @@ export class AttractapService {
         isActive: true,
       });
     });
+    this.notifyNfcCardChange(card, 'registered');
+    return card;
   }
 
   /**
@@ -97,7 +124,7 @@ export class AttractapService {
    * @returns The activated NFC card
    */
   public async activateNFCCard(id: number): Promise<NFCCard> {
-    return await this.nfcCardRepository.manager.transaction(async (transactionalEntityManager) => {
+    const card = await this.nfcCardRepository.manager.transaction(async (transactionalEntityManager) => {
       const card = await transactionalEntityManager.findOne(NFCCard, { where: { id }, relations: ['user'] });
 
       if (!card) {
@@ -116,6 +143,8 @@ export class AttractapService {
         isActive: true,
       });
     });
+    this.notifyNfcCardChange(card, 'activated');
+    return card;
   }
 
   /**
@@ -125,11 +154,16 @@ export class AttractapService {
    */
   public async deactivateNFCCard(id: number): Promise<NFCCard> {
     await this.nfcCardRepository.update(id, { isActive: false });
-    return await this.getNFCCardByID(id);
+    const card = await this.getNFCCardByID(id);
+    this.notifyNfcCardChange(card, 'deactivated');
+    return card;
   }
 
   public async deleteNFCCard(id: number): Promise<DeleteResult> {
-    return await this.nfcCardRepository.delete(id);
+    const card = await this.getNFCCardByID(id);
+    const result = await this.nfcCardRepository.delete(id);
+    this.notifyNfcCardChange(card, 'deleted');
+    return result;
   }
 
   public async updateNFCCardLastSeen(uid: string): Promise<null | true> {

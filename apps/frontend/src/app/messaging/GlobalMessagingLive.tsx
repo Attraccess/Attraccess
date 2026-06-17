@@ -1,32 +1,18 @@
-// Global in-app notifications for live messages outside the inbox page
+// Keeps message caches current from the per-user messaging stream.
 // FEATURE: Messaging inbox live updates
 import {
-  ConversationListItemDto,
   Message,
-  UseMessagingServiceMessagingListConversationsKeyFn,
   useMessagingServiceMessagingMarkConversationRead,
 } from '@attraccess/react-query-client';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { useToastMessage } from '../../components/toastProvider';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import de from './de.json';
-import en from './en.json';
 import { applyIncomingMessage, markConversationReadInCache } from './messageCache';
 import { useMessagingLive } from './useMessagingLive';
 
 interface Props {
   enabled?: boolean;
-}
-
-function getSenderName(message: Message, conversations?: ConversationListItemDto[]): string | undefined {
-  if (message.sender?.username) {
-    return message.sender.username;
-  }
-
-  return conversations?.find((conversation) => conversation.id === message.conversationId)?.otherParticipant?.username;
 }
 
 function getConversationFromSearch(search: string): number | null {
@@ -35,12 +21,9 @@ function getConversationFromSearch(search: string): number | null {
 }
 
 export function GlobalMessagingLive({ enabled = true }: Props) {
-  const { t } = useTranslations({ en, de });
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const toast = useToastMessage();
   const location = useLocation();
-  const navigate = useNavigate();
   const { mutate: markConversationRead } = useMessagingServiceMessagingMarkConversationRead();
 
   const handleLiveMessage = useCallback(
@@ -63,23 +46,8 @@ export function GlobalMessagingLive({ enabled = true }: Props) {
       if (message.senderId === currentUserId) {
         return;
       }
-
-      const conversations = queryClient.getQueryData<ConversationListItemDto[]>(
-        UseMessagingServiceMessagingListConversationsKeyFn(),
-      );
-      const senderName = getSenderName(message, conversations) ?? t('toast.newMessageFallbackSender');
-
-      toast.info({
-        title: t('toast.newMessageTitle', { sender: senderName }),
-        description: message.content,
-        duration: 4000,
-        action: {
-          label: t('toast.openMessage'),
-          onClick: () => navigate(`/messages?conversation=${message.conversationId}`),
-        },
-      });
     },
-    [location.pathname, location.search, markConversationRead, navigate, queryClient, t, toast, user?.id],
+    [location.pathname, location.search, markConversationRead, queryClient, user?.id],
   );
 
   useMessagingLive({

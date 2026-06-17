@@ -19,6 +19,8 @@ import { EntityManager } from 'typeorm';
 import { SettingsService } from '../settings/settings.service';
 import { MetricsService } from '../metrics/metrics.service';
 import { ExternalCallTimer } from '../metrics/instrumentation/external/external.helper';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 
 @Injectable()
 export class EmailService {
@@ -30,6 +32,8 @@ export class EmailService {
     private readonly mjmlService: MjmlService,
     private readonly metricsService: MetricsService,
     private readonly externalCallTimer: ExternalCallTimer,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
   ) {
     this.logger.debug('Initializing EmailService');
     this.logger.debug('EmailService initialized');
@@ -39,9 +43,11 @@ export class EmailService {
     const subjectTemplate = Handlebars.compile(template.subject);
     const subject = subjectTemplate(context);
 
-    const bodyMjml = await this.mjmlService.validateAndConvert(template.body);
-    const bodyTemplate = Handlebars.compile(bodyMjml);
-    const body = bodyTemplate(context);
+    // Compile Handlebars first so all template variables (e.g. dynamic colors) are
+    // resolved before MJML validates attribute values.
+    const rawBodyTemplate = Handlebars.compile(template.body);
+    const resolvedMjml = rawBodyTemplate(context);
+    const body = await this.mjmlService.validateAndConvert(resolvedMjml);
 
     return {
       subject,
@@ -106,9 +112,7 @@ export class EmailService {
   async sendVerificationEmail(user: User, verificationToken: string) {
     const url = await this.settingsService.getUrl();
     if (!url) throw new Error('Application URL not configured');
-    const verificationUrl = `${url}/verify-email?email=${encodeURIComponent(
-      user.email,
-    )}&token=${verificationToken}`;
+    const verificationUrl = `${url}/verify-email?email=${encodeURIComponent(user.email)}&token=${verificationToken}`;
 
     const context = {
       ...(await this.getBaseContext(user)),
@@ -281,9 +285,7 @@ export class EmailService {
         previousStatus: change.previousStatus ?? 'unknown',
         reason: change.reason,
         identifier: change.identifier,
-        headline: becameUnhealthy
-          ? `Resource degraded: ${resource.name}`
-          : `Resource recovered: ${resource.name}`,
+        headline: becameUnhealthy ? 'Resource degraded' : 'Resource recovered',
         headerColor: becameUnhealthy ? '#B91C1C' : '#047857',
         bodyAction: becameUnhealthy ? 'has become degraded' : 'is healthy again',
       },
@@ -309,8 +311,8 @@ export class EmailService {
       info.reason === 'age'
         ? 'Your training has reached its maximum age and must be renewed.'
         : info.reason === 'inactivity'
-        ? 'You have not used this resource for the configured period and must be retrained.'
-        : 'Your training must be renewed.';
+          ? 'You have not used this resource for the configured period and must be retrained.'
+          : 'Your training must be renewed.';
 
     const context = {
       ...base,
@@ -388,6 +390,60 @@ export class EmailService {
     await this.sendEmail(recipient, EmailTemplateType.RESOURCE_USAGE_NOTE_ADDED, context);
   }
 
+  async sendResourceTakeoverEmail(
+    recipient: User,
+    resource: Pick<Resource, 'id' | 'name'>,
+    takeover: { actorName: string },
+  ) {
+    if (!recipient?.email) {
+      return;
+    }
+
+    const base = await this.getBaseContext(recipient);
+    const resourceUrl = `${base.host.frontend}/resources/${resource.id}`;
+
+    const context = {
+      ...base,
+      resource: {
+        id: resource.id,
+        name: resource.name,
+        url: resourceUrl,
+      },
+      takeover,
+    };
+
+    await this.sendEmail(recipient, EmailTemplateType.RESOURCE_TAKEOVER, context);
+  }
+
+  async sendAccessChangeEmail(
+    recipient: User,
+    accessChange: { title: string; body: string; url?: string },
+  ) {
+    const resolvedRecipient = recipient?.email
+      ? recipient
+      : await this.userRepository.findOne({ where: { id: recipient.id } });
+
+    if (!resolvedRecipient?.email) {
+      return;
+    }
+
+    const base = await this.getBaseContext(resolvedRecipient);
+    const url = accessChange.url
+      ? new URL(accessChange.url, base.host.frontend).toString()
+      : undefined;
+
+    const context = {
+      ...base,
+      accessChange: {
+        title: accessChange.title,
+        body: accessChange.body,
+        url,
+      },
+    };
+
+    await this.sendEmail(resolvedRecipient, EmailTemplateType.ACCESS_CHANGE, context);
+  }
+
   async sendNewMessageEmail(
     recipient: User,
     message: { conversationId: number; senderName: string; preview: string },
@@ -398,8 +454,7 @@ export class EmailService {
 
     const base = await this.getBaseContext(recipient);
     const conversationUrl = `${base.host.frontend}/messages?conversation=${message.conversationId}`;
-    const preview =
-      message.preview.length > 200 ? `${message.preview.slice(0, 200).trimEnd()}…` : message.preview;
+    const preview = message.preview.length > 200 ? `${message.preview.slice(0, 200).trimEnd()}…` : message.preview;
 
     const context = {
       ...base,
@@ -411,6 +466,35 @@ export class EmailService {
     };
 
     await this.sendEmail(recipient, EmailTemplateType.MESSAGE_RECEIVED, context);
+  }
+
+  async sendResourceSessionEndedEmail(
+    recipient: User,
+    resource: Pick<Resource, 'id' | 'name'>,
+    session: { id: number; endedAt: Date | string | null; endedBy: string },
+  ) {
+    if (!recipient?.email) {
+      return;
+    }
+
+    const base = await this.getBaseContext(recipient);
+    const resourceUrl = `${base.host.frontend}/resources/${resource.id}`;
+
+    const context = {
+      ...base,
+      resource: {
+        id: resource.id,
+        name: resource.name,
+        url: resourceUrl,
+      },
+      session: {
+        id: session.id,
+        endedAt: session.endedAt instanceof Date ? session.endedAt.toISOString() : session.endedAt,
+        endedBy: session.endedBy,
+      },
+    };
+
+    await this.sendEmail(recipient, EmailTemplateType.RESOURCE_SESSION_ENDED, context);
   }
 
   private async createTransporter(): Promise<{ transporter: ReturnType<typeof createTransport>; from: string }> {

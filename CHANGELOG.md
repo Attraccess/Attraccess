@@ -1,3 +1,22 @@
+## [Unreleased]
+
+### 🚀 Features
+
+- **ATT-559:** push notifications + in-app toasts for all system events (resource takeover, session ended, health changes, usage notes, access changes, project invitations, maintenance requests, messages, NFC cards) with per-user channel preferences (email/push/toast) ([ATT-559](https://linear.app/attraccess/issue/ATT-559), [#1355](https://github.com/Attraccess/Attraccess/pull/1355))
+- **ATT-559:** iOS PWA permission modal — prompts for notification permission on gesture instead of auto-requesting on mount ([ATT-559](https://linear.app/attraccess/issue/ATT-559), [#1355](https://github.com/Attraccess/Attraccess/pull/1355))
+- **ATT-559:** web-presence tracking — PATCH /notifications/web-presence syncs tab visibility so in-app toasts only fire when the user has the tab focused ([ATT-559](https://linear.app/attraccess/issue/ATT-559), [#1355](https://github.com/Attraccess/Attraccess/pull/1355))
+
+### 🩹 Fixes
+
+- **ATT-559:** all notification categories now default to email=true; backfill migration for existing users ([ATT-559](https://linear.app/attraccess/issue/ATT-559), [#1355](https://github.com/Attraccess/Attraccess/pull/1355))
+- **ATT-559:** email rendering — compile Handlebars templates before MJML validation so dynamic color/value variables don't fail attribute type checks ([ATT-559](https://linear.app/attraccess/issue/ATT-559), [#1355](https://github.com/Attraccess/Attraccess/pull/1355))
+- **ATT-559:** fix resource session-ended email template migration having a duplicate timestamp with the takeover template — renumbered to ensure both run on fresh installs ([ATT-559](https://linear.app/attraccess/issue/ATT-559), [#1355](https://github.com/Attraccess/Attraccess/pull/1355))
+- **ATT-559:** fix usage-note email template using illegal `border-radius` on `mj-text` (MJML v5 rejects it); replaced with `container-background-color` ([ATT-559](https://linear.app/attraccess/issue/ATT-559), [#1355](https://github.com/Attraccess/Attraccess/pull/1355))
+- **ATT-559:** fix resource flow node editor Enter key reloading the page — wrapped inputs in a `<Form>` with `onSubmit` calling `e.preventDefault()` ([ATT-559](https://linear.app/attraccess/issue/ATT-559), [#1355](https://github.com/Attraccess/Attraccess/pull/1355))
+- **ATT-559:** fix project invitation button staying disabled after selecting a user — wired missing `onSelectionChange` handler ([ATT-559](https://linear.app/attraccess/issue/ATT-559), [#1355](https://github.com/Attraccess/Attraccess/pull/1355))
+- **ATT-559:** remove stale supervision-request translation keys from notification settings ([ATT-559](https://linear.app/attraccess/issue/ATT-559), [#1355](https://github.com/Attraccess/Attraccess/pull/1355))
+- **ATT-559:** remove dead `GET/PATCH /messaging/notification-preferences` endpoints and associated `shouldEmailMessageOnOffline`/`shouldPushMessageOnOffline` methods — message delivery now routes through `NotificationDispatchService` which correctly reads the unified `categoryChannels` preferences ([ATT-559](https://linear.app/attraccess/issue/ATT-559), [#1355](https://github.com/Attraccess/Attraccess/pull/1355))
+
 ## 1.7.0 (2026-06-05)
 
 ### 🚀 Features

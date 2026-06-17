@@ -1,15 +1,21 @@
+import { Logger } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { UserPermissionsService } from './user-permissions.service';
 import { UsersService } from './users.service';
 import { SSOService } from '../auth/sso/sso.service';
 import { User, AuthenticationType, SSOProviderType, SystemPermissions } from '@attraccess/database-entities';
+import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
+import { NotificationCategory } from '../../notifications/notification-types';
 
 describe('UserPermissionsService', () => {
   let service: UserPermissionsService;
   let usersService: UsersService;
   let ssoService: SSOService;
+  let notifications: { dispatch: jest.Mock; sendEmailTemplate: jest.Mock };
 
   beforeEach(async () => {
+    notifications = { dispatch: jest.fn().mockResolvedValue(undefined), sendEmailTemplate: jest.fn() };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UserPermissionsService,
@@ -25,6 +31,7 @@ describe('UserPermissionsService', () => {
           provide: SSOService,
           useValue: { getProviderByTypeAndIdWithConfiguration: jest.fn() },
         },
+        { provide: NotificationDispatchService, useValue: notifications },
       ],
     }).compile();
 
@@ -124,6 +131,74 @@ describe('UserPermissionsService', () => {
           systemPermissions: expect.objectContaining({ canManageResources: true, canManageUsers: true }),
         }),
       );
+    });
+
+    it('notifies the user when applied system permissions change', async () => {
+      const targetUser = {
+        id: 1,
+        username: 'alice',
+        systemPermissions: {
+          canManageResources: false,
+          canManageSystemConfiguration: false,
+          canManageUsers: false,
+          canManageBilling: false,
+        },
+        authenticationDetails: [],
+      } as User;
+
+      jest.spyOn(usersService, 'findOne').mockResolvedValue(targetUser);
+      jest.spyOn(usersService, 'updateOne').mockResolvedValue({
+        ...targetUser,
+        systemPermissions: { ...targetUser.systemPermissions, canManageResources: true },
+      } as User);
+
+      await service.updatePermissions(targetUser.id, { canManageResources: true }, requestUser);
+
+      expect(notifications.dispatch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          category: NotificationCategory.ACCESS_CHANGES,
+          recipients: [expect.objectContaining({ id: targetUser.id })],
+          title: 'Your permissions changed',
+          body: 'Your system permissions were updated.',
+          actorId: requestUser.id,
+          sendEmail: expect.any(Function),
+        }),
+      );
+      const request = notifications.dispatch.mock.calls[0][0];
+      await request.sendEmail(targetUser);
+      expect(notifications.sendEmailTemplate).toHaveBeenCalledWith(targetUser, NotificationCategory.ACCESS_CHANGES, {
+        accessChange: { title: 'Your permissions changed', body: 'Your system permissions were updated.' },
+      });
+    });
+
+    it('does not fail the permission update when notification dispatch fails', async () => {
+      const targetUser = {
+        id: 1,
+        username: 'alice',
+        systemPermissions: {
+          canManageResources: false,
+          canManageSystemConfiguration: false,
+          canManageUsers: false,
+          canManageBilling: false,
+        },
+        authenticationDetails: [],
+      } as User;
+      const updatedUser = {
+        ...targetUser,
+        systemPermissions: { ...targetUser.systemPermissions, canManageResources: true },
+      } as User;
+
+      jest.spyOn(usersService, 'findOne').mockResolvedValue(targetUser);
+      jest.spyOn(usersService, 'updateOne').mockResolvedValue(updatedUser);
+      notifications.dispatch.mockRejectedValue(new Error('push unavailable'));
+      const loggerSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+
+      await expect(service.updatePermissions(targetUser.id, { canManageResources: true }, requestUser)).resolves.toBe(
+        updatedUser,
+      );
+      expect(usersService.updateOne).toHaveBeenCalled();
+      expect(loggerSpy).toHaveBeenCalledWith('Failed to notify user 1 about permission changes: push unavailable');
+      loggerSpy.mockRestore();
     });
 
     it('saves canManageBilling when included in the request', async () => {
@@ -320,6 +395,41 @@ describe('UserPermissionsService', () => {
 
       expect(result).toHaveLength(2);
       expect(usersService.updateOne).toHaveBeenCalledTimes(2);
+    });
+
+    it('notifies each user whose permissions change in a bulk update', async () => {
+      const normalUser = {
+        id: 3,
+        username: 'bob',
+        systemPermissions: {
+          canManageResources: false,
+          canManageSystemConfiguration: false,
+          canManageUsers: false,
+          canManageBilling: false,
+        },
+        authenticationDetails: [],
+      } as User;
+
+      jest.spyOn(usersService, 'findOne').mockResolvedValue(normalUser);
+      jest.spyOn(usersService, 'updateOne').mockResolvedValue({
+        ...normalUser,
+        systemPermissions: { ...normalUser.systemPermissions, canManageResources: true },
+      } as User);
+
+      await service.bulkUpdatePermissions(
+        { updates: [{ userId: normalUser.id, permissions: { canManageResources: true } }] },
+        requestUser,
+      );
+
+      expect(notifications.dispatch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          category: NotificationCategory.ACCESS_CHANGES,
+          recipients: [expect.objectContaining({ id: normalUser.id })],
+          title: 'Your permissions changed',
+          body: 'Your system permissions were updated.',
+          actorId: requestUser.id,
+        }),
+      );
     });
   });
 });

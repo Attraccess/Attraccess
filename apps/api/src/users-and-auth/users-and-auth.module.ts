@@ -59,6 +59,7 @@ import { AuthAuditLogger } from './rate-limiting/auth-audit.logger';
 import { AuthRateLimitInterceptor } from './rate-limiting/auth-rate-limit.interceptor';
 import { LoginRateLimitGuard } from './rate-limiting/login.rate-limit.guard';
 import { PasswordPolicyModule } from './password-policy/password-policy.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -78,6 +79,7 @@ import { PasswordPolicyModule } from './password-policy/password-policy.module';
     LicenseModule,
     SettingsModule,
     PasswordPolicyModule,
+    NotificationsModule,
   ],
   providers: [
     UsersService,

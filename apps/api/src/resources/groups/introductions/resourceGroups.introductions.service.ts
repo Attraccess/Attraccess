@@ -1,18 +1,23 @@
 import { InjectRepository } from '@nestjs/typeorm';
 
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
   IntroductionHistoryAction,
   ResourceIntroduction,
   ResourceIntroductionHistoryItem,
+  User,
 } from '@attraccess/database-entities';
 import { EntityManager, Repository } from 'typeorm';
 import { UpdateResourceGroupIntroductionDto } from './dtos/update.request.dto';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResourceGroupIntroductionChangedEvent } from './events/resource-group-introduction-changed.event';
+import { NotificationDispatchService } from '../../../notifications/notification-dispatch.service';
+import { NotificationCategory } from '../../../notifications/notification-types';
 
 @Injectable()
 export class ResourceGroupsIntroductionsService {
+  private readonly logger = new Logger(ResourceGroupsIntroductionsService.name);
+
   constructor(
     @InjectRepository(ResourceIntroduction)
     private readonly resourceIntroductionRepository: Repository<ResourceIntroduction>,
@@ -20,7 +25,31 @@ export class ResourceGroupsIntroductionsService {
     private readonly resourceIntroductionHistoryItemRepository: Repository<ResourceIntroductionHistoryItem>,
     @Inject(EventEmitter2)
     private readonly eventEmitter: EventEmitter2,
+    private readonly notifications: NotificationDispatchService,
   ) {}
+
+  private notifyIntroductionChange(groupId: number, userId: number, granted: boolean): void {
+    const title = 'Your group access changed';
+    const body = granted
+      ? `You received an introduction for group #${groupId}.`
+      : `Your introduction for group #${groupId} was revoked.`;
+    const url = `/resource-groups/${groupId}`;
+
+    void this.notifications.dispatch({
+      category: NotificationCategory.ACCESS_CHANGES,
+      recipients: [{ id: userId } as User],
+      title,
+      body,
+      url,
+      dedupeKey: `group-introduction-${groupId}-${userId}-${granted ? 'granted' : 'revoked'}`,
+      sendEmail: (recipient) =>
+        this.notifications.sendEmailTemplate(recipient, NotificationCategory.ACCESS_CHANGES, {
+          accessChange: { title, body, url },
+        }),
+    }).catch((error) => {
+      this.logger.error(`Failed to notify user ${userId} about group introduction changes: ${(error as Error).message}`);
+    });
+  }
 
   private async getLastHistoryItemOfIntroduction(
     introductionId: number,
@@ -74,6 +103,8 @@ export class ResourceGroupsIntroductionsService {
       existingIntroduction.tutorUserId = tutorUserId;
     }
 
+    const previousHistoryItem = await this.getLastHistoryItemOfIntroduction(existingIntroduction.id);
+
     const historyItem = this.resourceIntroductionHistoryItemRepository.create({
       introduction: existingIntroduction,
       action: nextStatus,
@@ -86,6 +117,9 @@ export class ResourceGroupsIntroductionsService {
       ResourceGroupIntroductionChangedEvent.EVENT_NAME,
       new ResourceGroupIntroductionChangedEvent(groupId),
     );
+    if (previousHistoryItem?.action !== nextStatus && (previousHistoryItem || nextStatus === IntroductionHistoryAction.GRANT)) {
+      this.notifyIntroductionChange(groupId, userId, nextStatus === IntroductionHistoryAction.GRANT);
+    }
     return savedHistoryItem;
   }
 

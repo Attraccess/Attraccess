@@ -112,7 +112,6 @@ export class SupervisionService {
       requestId: id,
       request: this.toDto(stored, dto.supervisorUserId),
     });
-
     return sessionPromise;
   }
 

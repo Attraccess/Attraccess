@@ -1,4 +1,65 @@
 {
+  "columns": {
+    "category": "Notification",
+    "email": "Email",
+    "push": "Push",
+    "toast": "In-app"
+  },
+  "groups": {
+    "general": {
+      "label": "All users",
+      "description": "Notifications every user may receive."
+    },
+    "resourceManagers": {
+      "label": "Introducers and maintainers",
+      "description": "Notifications for users who manage or supervise resources."
+    },
+    "admins": {
+      "label": "Admins",
+      "description": "Notifications tied to system-level or access-management permissions."
+    }
+  },
+  "categories": {
+    "messages": {
+      "label": "Messages",
+      "description": "Direct message notifications."
+    },
+    "maintenance_requests": {
+      "label": "Maintenance requests",
+      "description": "New maintenance requests and updates."
+    },
+    "resource_usage_notes": {
+      "label": "Resource usage notes",
+      "description": "Notes added to resource usage sessions."
+    },
+    "resource_health": {
+      "label": "Resource health",
+      "description": "Resource health and status changes."
+    },
+    "resource_takeover": {
+      "label": "Resource takeover",
+      "description": "When your active resource session is taken over."
+    },
+    "resource_session_ended": {
+      "label": "Resource session force-ended",
+      "description": "When someone else or the system ends your active resource session (not when you end it yourself)."
+    },
+    "nfc_cards": {
+      "label": "NFC cards",
+      "description": "When one of your NFC cards is registered, activated, deactivated, or deleted."
+    },
+    "project_invitations": {
+      "label": "Project invitations",
+      "description": "Invitations to join projects."
+    },
+    "access_changes": {
+      "label": "Access changes",
+      "description": "Changes to your permissions, introductions, introducer, or maintainer status."
+    }
+  },
+  "description": {
+    "push": "Push preferences are saved for your account. Supported browsers are subscribed automatically when you use the app."
+  },
   "messagesEmailOnOffline": {
     "label": "Email me about messages when I'm offline",
     "description": "When you receive a direct message while you are not online, we send you an email so you don't miss it."

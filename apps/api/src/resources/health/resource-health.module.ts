@@ -5,13 +5,13 @@ import { ResourceHealthService } from './resource-health.service';
 import { ResourceHealthController } from './resource-health.controller';
 import { ResourceMaintenanceModule } from '../maintenances/maintenance.module';
 import { ResourceHealthNotificationListener } from './resource-health-notification.listener';
-import { EmailModule } from '../../email/email.module';
+import { NotificationsModule } from '../../notifications/notifications.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([ResourceHealthState, Resource, ResourceIntroducer, User]),
     ResourceMaintenanceModule,
-    EmailModule,
+    NotificationsModule,
   ],
   controllers: [ResourceHealthController],
   providers: [ResourceHealthService, ResourceHealthNotificationListener],

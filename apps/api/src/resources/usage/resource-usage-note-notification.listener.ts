@@ -6,7 +6,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Resource, ResourceIntroducer, User } from '@attraccess/database-entities';
 import { ResourceUsageNoteAddedEvent } from './events/resource-usage.events';
-import { EmailService } from '../../email/email.service';
+import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
+import { NotificationCategory } from '../../notifications/notification-types';
 
 @Injectable()
 export class ResourceUsageNoteNotificationListener {
@@ -19,7 +20,7 @@ export class ResourceUsageNoteNotificationListener {
     private readonly resourceIntroducerRepository: Repository<ResourceIntroducer>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
-    private readonly emailService: EmailService,
+    private readonly notifications: NotificationDispatchService,
   ) {}
 
   @OnEvent(ResourceUsageNoteAddedEvent.EVENT_NAME)
@@ -39,26 +40,20 @@ export class ResourceUsageNoteNotificationListener {
         return;
       }
 
-      this.logger.log(
-        `Dispatching usage-note emails to ${recipients.length} user(s) for resource ${resource.id}`,
-      );
-
-      await Promise.all(
-        recipients.map((recipient) =>
-          this.emailService
-            .sendResourceUsageNoteEmail(
-              recipient,
-              { id: resource.id, name: resource.name },
-              { content: event.note, phase: event.phase, authorName: event.author.username ?? 'A user' },
-            )
-            .catch((error) => {
-              this.logger.error(
-                `Failed to send usage-note email to user ${recipient.id} for resource ${resource.id}: ${error.message}`,
-                error.stack,
-              );
-            }),
-        ),
-      );
+      const authorName = event.author.username ?? 'A user';
+      await this.notifications.dispatch({
+        category: NotificationCategory.RESOURCE_USAGE_NOTES,
+        recipients,
+        actorId: event.author.id,
+        title: `Usage note added for ${resource.name}`,
+        body: `${authorName}: ${event.note}`,
+        url: `/resources/${resource.id}/usage`,
+        sendEmail: (recipient) =>
+          this.notifications.sendEmailTemplate(recipient, NotificationCategory.RESOURCE_USAGE_NOTES, {
+            resource: { id: resource.id, name: resource.name },
+            note: { content: event.note, phase: event.phase, authorName },
+          }),
+      });
     } catch (error) {
       this.logger.error(
         `Failed to process usage-note notification for resource ${event.resourceId}: ${error.message}`,

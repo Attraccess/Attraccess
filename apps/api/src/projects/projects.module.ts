@@ -17,11 +17,13 @@ import { ProjectUsageService } from './project-usage.service';
 import { ProjectAccessService } from './project-access.service';
 import { EmailModule } from '../email/email.module';
 import { ProjectInvitationsController } from './project-invitations.controller';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
     ConfigModule,
     EmailModule,
+    NotificationsModule,
     TypeOrmModule.forFeature([Project, ProjectMember, ProjectInvitation, ResourceUsage, BillingTransaction, Setting, User]),
     FileStorageModule,
   ],

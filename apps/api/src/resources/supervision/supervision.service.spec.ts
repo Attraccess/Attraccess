@@ -6,7 +6,6 @@ import { SupervisionLiveService } from './supervision-live.service';
 import { ResourceUsageService } from '../usage/resourceUsage.service';
 import { RequestSupervisedSessionDto } from './dtos/requestSupervisedSession.dto';
 import { SupervisionLiveEventType } from './dtos/supervisionLiveEvent.dto';
-
 // Lets pending request promises settle/flush without depending on real timers.
 const flush = () => new Promise((resolve) => setImmediate(resolve));
 
@@ -14,7 +13,6 @@ describe('SupervisionService', () => {
   let service: SupervisionService;
   let resourceUsageService: { validateSupervisedStart: jest.Mock; startSession: jest.Mock };
   let live: { emitToSupervisor: jest.Mock; getSupervisorSubject: jest.Mock };
-
   const requester: User = { id: 1, username: 'requester' } as User;
   const supervisor: User = { id: 2, username: 'supervisor' } as User;
   const dto: RequestSupervisedSessionDto = { supervisorUserId: 2, notes: 'please supervise' };
