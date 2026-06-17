@@ -79,6 +79,7 @@
     "glob": "^13.0.6",
     "handlebars": "^4.7.9",
     "identity-obj-proxy": "^3.0.0",
+    "ioredis": "^5.6.1",
     "intl-pluralrules": "^2.0.1",
     "jdenticon": "^3.3.0",
     "js-confetti": "^0.13.1",

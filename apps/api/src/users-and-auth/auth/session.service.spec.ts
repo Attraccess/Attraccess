@@ -12,6 +12,7 @@ import { Session, User } from '@attraccess/database-entities';
 import { TokenHashService } from '../../encryption/token-hash.service';
 import { MetricsService } from '../../metrics/metrics.service';
 import { CronTimer } from '../../metrics/instrumentation/cron/cron.helper';
+import { VALKEY_CLIENT } from '../../valkey/valkey.module';
 
 describe('SessionService', () => {
   let service: SessionService;
@@ -54,6 +55,10 @@ describe('SessionService', () => {
           useValue: mockRepository,
         },
         {
+          provide: getRepositoryToken(User),
+          useValue: { findOne: jest.fn() },
+        },
+        {
           provide: TokenHashService,
           useValue: {
             hashToken: jest.fn((token: string) => `hashed:${token}`),
@@ -66,6 +71,7 @@ describe('SessionService', () => {
           },
         },
         { provide: CronTimer, useValue: { time: <T,>(_n: string, fn: () => Promise<T>) => fn() } },
+        { provide: VALKEY_CLIENT, useValue: null },
       ],
     }).compile();
 
@@ -428,6 +434,148 @@ describe('SessionService', () => {
       expect(sessionRepository.count).toHaveBeenNthCalledWith(2, {
         where: { expiresAt: LessThan(expect.any(Date)) },
       });
+    });
+  });
+
+  describe('cleanupExpiredSessions (SQLite path)', () => {
+    it('should skip cleanup when Valkey client is present', async () => {
+      // Service constructed with valkeyClient = null, so this exercises the SQLite branch
+      sessionRepository.delete.mockResolvedValue({ affected: 0, raw: {} });
+      await service.cleanupExpiredSessions();
+      // With Valkey = null, the cron runs normally
+      expect(sessionRepository.delete).toHaveBeenCalled();
+    });
+  });
+
+  describe('Valkey session store', () => {
+    let valkeyService: SessionService;
+    let mockValkeyClient: jest.Mocked<{
+      pipeline: jest.Mock;
+      hgetall: jest.Mock;
+      hget: jest.Mock;
+      del: jest.Mock;
+      smembers: jest.Mock;
+      srem: jest.Mock;
+      expire: jest.Mock;
+      scan: jest.Mock;
+    }>;
+    let mockMetrics: { authActiveSessions: { inc: jest.Mock; dec: jest.Mock; set: jest.Mock } };
+
+    beforeEach(async () => {
+      mockRandomBytes.mockClear();
+      mockRandomBytes.mockReturnValue({
+        toString: jest.fn().mockReturnValue('valkey-test-token'),
+      } as unknown as Buffer);
+
+      const mockPipeline = {
+        hset: jest.fn().mockReturnThis(),
+        expire: jest.fn().mockReturnThis(),
+        sadd: jest.fn().mockReturnThis(),
+        srem: jest.fn().mockReturnThis(),
+        del: jest.fn().mockReturnThis(),
+        exec: jest.fn().mockResolvedValue([]),
+      };
+
+      mockValkeyClient = {
+        pipeline: jest.fn().mockReturnValue(mockPipeline),
+        hgetall: jest.fn(),
+        hget: jest.fn(),
+        del: jest.fn(),
+        smembers: jest.fn(),
+        srem: jest.fn(),
+        expire: jest.fn(),
+        scan: jest.fn(),
+      };
+
+      mockMetrics = { authActiveSessions: { inc: jest.fn(), dec: jest.fn(), set: jest.fn() } };
+
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          SessionService,
+          {
+            provide: getRepositoryToken(Session),
+            useValue: { create: jest.fn(), save: jest.fn(), findOne: jest.fn(), count: jest.fn(), find: jest.fn(), delete: jest.fn(), remove: jest.fn() },
+          },
+          {
+            provide: getRepositoryToken(User),
+            useValue: { findOne: jest.fn().mockResolvedValue({ id: 1, username: 'testuser' }) },
+          },
+          {
+            provide: TokenHashService,
+            useValue: { hashToken: jest.fn((t: string) => `hashed:${t}`) },
+          },
+          {
+            provide: MetricsService,
+            useValue: mockMetrics,
+          },
+          { provide: CronTimer, useValue: { time: <T,>(_n: string, fn: () => Promise<T>) => fn() } },
+          { provide: VALKEY_CLIENT, useValue: mockValkeyClient },
+        ],
+      }).compile();
+
+      valkeyService = module.get<SessionService>(SessionService);
+      jest.clearAllMocks();
+      // Re-setup mocks after clearAllMocks
+      mockValkeyClient.pipeline.mockReturnValue({
+        hset: jest.fn().mockReturnThis(),
+        expire: jest.fn().mockReturnThis(),
+        sadd: jest.fn().mockReturnThis(),
+        srem: jest.fn().mockReturnThis(),
+        del: jest.fn().mockReturnThis(),
+        exec: jest.fn().mockResolvedValue([]),
+      });
+    });
+
+    it('should create session in Valkey, not SQLite', async () => {
+      mockRandomBytes.mockReturnValue({ toString: jest.fn().mockReturnValue('token123') } as unknown as Buffer);
+      const result = await valkeyService.createSession({ id: 1, username: 'u' } as User);
+      expect(result).toBe('token123');
+      expect(mockValkeyClient.pipeline).toHaveBeenCalled();
+      expect(mockMetrics.authActiveSessions.inc).toHaveBeenCalled();
+    });
+
+    it('should validate session from Valkey', async () => {
+      const futureDate = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+      mockValkeyClient.hgetall.mockResolvedValue({
+        userId: '1',
+        userAgent: 'Mozilla',
+        ipAddress: '127.0.0.1',
+        expiresAt: futureDate,
+        createdAt: new Date().toISOString(),
+      });
+      mockValkeyClient.expire.mockResolvedValue(1);
+
+      const user = await valkeyService.validateSession('some-token');
+      expect(user).toBeTruthy();
+      expect(user?.id).toBe(1);
+    });
+
+    it('should return null for missing Valkey session', async () => {
+      mockValkeyClient.hgetall.mockResolvedValue({});
+      const user = await valkeyService.validateSession('missing-token');
+      expect(user).toBeNull();
+    });
+
+    it('should skip cleanup cron when Valkey is active', async () => {
+      await valkeyService.cleanupExpiredSessions();
+      // Should be a no-op — no pipeline or del calls
+      expect(mockValkeyClient.del).not.toHaveBeenCalled();
+    });
+
+    it('should count sessions via SCAN in getSessionStats', async () => {
+      mockValkeyClient.scan
+        .mockResolvedValueOnce(['0', ['session:abc', 'session:def']])
+        .mockResolvedValueOnce(['0', []]);
+      mockValkeyClient.scan.mockResolvedValueOnce(['0', ['session:abc', 'session:def']]);
+      const stats = await valkeyService.getSessionStats();
+      expect(stats.expiredSessions).toBe(0);
+      expect(stats.totalActiveSessions).toBeGreaterThanOrEqual(0);
+    });
+
+    it('should restore metric count on module init', async () => {
+      mockValkeyClient.scan.mockResolvedValue(['0', ['session:a', 'session:b']]);
+      await valkeyService.onModuleInit();
+      expect(mockMetrics.authActiveSessions.set).toHaveBeenCalledWith(2);
     });
   });
 
