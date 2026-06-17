@@ -1,0 +1,235 @@
+version: '2.4'
+
+services:
+  proxy:
+    image: 'jc21/nginx-proxy-manager:2.14.0'
+    restart: unless-stopped
+    ports:
+      - '80:80' # HTTP
+      - '81:81' # Proxy Manager Admin
+      - '443:443' # HTTPS
+      - '2883:1883' # MQTT
+      - '8883:8883' # MQTT SSL
+      - '8080:8080' # MQTT WS
+      - '8081:8081' # MQTT WS SSL
+    volumes:
+      - proxy-data:/data
+      - proxy-letsencrypt:/etc/letsencrypt
+    environment:
+      - INITIAL_ADMIN_EMAIL=admin@attraccess.org
+      - INITIAL_ADMIN_PASSWORD=password
+    env_file:
+      - .env.docker-compose
+
+  attraccess:
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: Dockerfile
+    expose:
+      - '3000'
+    volumes:
+      - attraccess-storage:/app/storage
+    env_file:
+      - .env.docker-compose
+
+  monitoring-init:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: 'no'
+    entrypoint: ['/bin/sh', '-c']
+    environment:
+      # Pushover alerting is opt-in: prepare-provisioning.sh strips the
+      # secret-requiring contact point + policy when these are unset (ATT-539).
+      # The script call below is guarded with `[ -f ... ]` because this compose
+      # file can run against an older image that predates the script; in that
+      # case the provisioning bundle also lacks the secret-requiring files, so
+      # skipping the strip is safe and init must not hard-fail (ATT-549).
+      - PUSHOVER_API_TOKEN=${PUSHOVER_API_TOKEN:-}
+      - PUSHOVER_USER_KEY=${PUSHOVER_USER_KEY:-}
+    command:
+      - >
+        set -e &&
+        if [ -f /app/share/monitoring/grafana/sync-managed-files.sh ]; then
+          sh /app/share/monitoring/grafana/sync-managed-files.sh /app/share/monitoring/grafana/provisioning /grafana-provisioning /app/share/monitoring/grafana/dashboards /grafana-dashboards;
+        else
+          rm -rf /grafana-provisioning/* /grafana-provisioning/.[!.]* /grafana-provisioning/..?* /grafana-dashboards/* /grafana-dashboards/.[!.]* /grafana-dashboards/..?* 2>/dev/null || true;
+          cp -rT /app/share/monitoring/grafana/provisioning /grafana-provisioning;
+          cp -rT /app/share/monitoring/grafana/dashboards /grafana-dashboards;
+        fi &&
+        if [ -f /app/share/monitoring/grafana/prepare-provisioning.sh ]; then
+          sh /app/share/monitoring/grafana/prepare-provisioning.sh /grafana-provisioning;
+        fi
+    volumes:
+      - prometheus-config:/prometheus-config
+      - grafana-provisioning:/grafana-provisioning
+      - grafana-dashboards:/grafana-dashboards
+
+  mailpit:
+    image: axllent/mailpit:v1.29.7
+    restart: unless-stopped
+    expose:
+      - '8025'
+      - '1025'
+    env_file:
+      - .env.docker-compose
+
+  webhook-site:
+    image: tarampampam/webhook-tester:2.3.0
+    restart: unless-stopped
+    expose:
+      - '80'
+    environment:
+      - STORAGE_DRIVER=fs
+      - FS_STORAGE_DIR=/storage
+    volumes:
+      - webhook-site:/storage
+    env_file:
+      - .env.docker-compose
+
+  rabbitmq:
+    image: rabbitmq:4.3.0-management
+    hostname: rabbitmq
+    restart: unless-stopped
+    command: '/bin/bash -c "rabbitmq-plugins enable --offline rabbitmq_mqtt rabbitmq_web_mqtt rabbitmq_amqp1_0; rabbitmq-server"'
+    expose:
+      - '15672' # RabbitMQ Management UI
+      - '5672' # RabbitMQ AMQP
+      - '1883' # MQTT
+      - '15675' # MQTT WebSocket
+    ports:
+      - '1883:1883' # MQTT direct (bypassing proxy)
+      - '15675:15675' # MQTT WebSocket direct (bypassing proxy)
+    environment:
+      RABBITMQ_HOST: '%'
+      RABBITMQ_DEFAULT_USER: attraccess
+      RABBITMQ_DEFAULT_PASS: password
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test:
+        - CMD
+        - rabbitmq-diagnostics
+        - '-q'
+        - ping
+      retries: 3
+      timeout: 5s
+      interval: 30s
+
+  zigbee2mqtt:
+    image: ghcr.io/koenkk/zigbee2mqtt:2.10.1
+    restart: unless-stopped
+    expose:
+      - '8080'
+    volumes:
+      - zigbee2mqtt:/app/data
+    env_file:
+      - .env.docker-compose
+
+  hetzner-dns-updater:
+    build:
+      context: ./tools/hetzner-dns-updater
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    # Note: host networking is required to reliably read the machine's LAN IP on Linux hosts
+    # Docker Desktop for Mac does not support host networking; if running on macOS, consider
+    # passing the LAN IP via env var HETZNER_FORCE_IP or running this on a Linux host.
+    network_mode: host
+    #environment:
+    #- HETZNER_DNS_UPDATER_ENABLED=${HETZNER_DNS_UPDATER_ENABLED}
+    #- HETZNER_API_TOKEN=${HETZNER_API_TOKEN}
+    #- HETZNER_ZONE_ID=${HETZNER_ZONE_ID}
+    #- HETZNER_RECORD_NAME=${HETZNER_RECORD_NAME}
+    #- HETZNER_TTL=${HETZNER_TTL:-300}
+    #- HETZNER_FORCE_IP=${HETZNER_FORCE_IP}
+    env_file:
+      - .env.docker-compose
+
+  config-ui:
+    build:
+      context: ./tools/config-ui
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    # host networking + DNS_LISTEN_ADDRESS/bind-interfaces avoids the balenaOS host
+    # dnsmasq port 53 conflict (127.0.0.2:53 / 10.114.102.1:53). Do NOT use `ports: 53:53`
+    # in bridge mode — docker-proxy binds 0.0.0.0:53 and collides with host dnsmasq.
+    network_mode: host
+    expose:
+      - 5380 # admin UI
+      - 53/udp # DNS
+      - 53/tcp # DNS
+    volumes:
+      - config-ui-data:/data
+      - prometheus-config:/etc/prometheus
+    env_file:
+      - .env.docker-compose
+
+  prometheus:
+    image: prom/prometheus:v3.11.3
+    restart: unless-stopped
+    expose:
+      - '9090'
+    volumes:
+      - prometheus-config:/etc/prometheus:ro
+      - prometheus-data:/prometheus
+    depends_on:
+      - config-ui
+      - monitoring-init
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+
+  grafana:
+    image: grafana/grafana:13.0.1
+    restart: unless-stopped
+    expose:
+      - '3001'
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-attraccess}
+      - GF_SERVER_HTTP_PORT=3001
+      # Read by $__env{} interpolation in the provisioned Pushover contact point.
+      - PUSHOVER_API_TOKEN=${PUSHOVER_API_TOKEN:-}
+      - PUSHOVER_USER_KEY=${PUSHOVER_USER_KEY:-}
+    volumes:
+      - grafana-provisioning:/etc/grafana/provisioning:ro
+      - grafana-dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - monitoring-init
+
+  duplicati:
+    image: duplicati/duplicati:2.3.0.1-stable
+    expose:
+      - '8200'
+    volumes:
+      - duplicati:/data
+      # mount volumes of all services that should be backed up
+      - proxy-data:/external-storage/proxy/data
+      - proxy-letsencrypt:/external-storage/proxy/letsencrypt
+      - attraccess-storage:/external-storage/attraccess
+      - webhook-site:/external-storage/webhook-site
+      - rabbitmq_data:/external-storage/rabbitmq
+      - zigbee2mqtt:/external-storage/zigbee2mqtt
+      - prometheus-data:/external-storage/prometheus
+      - grafana-data:/external-storage/grafana
+      - config-ui-data:/external-storage/config-ui
+    env_file:
+      - .env.docker-compose
+
+volumes:
+  proxy-data:
+  proxy-letsencrypt:
+  attraccess-storage:
+  webhook-site:
+  rabbitmq_data:
+  zigbee2mqtt:
+  config-ui-data:
+  prometheus-config:
+  prometheus-data:
+  grafana-data:
+  grafana-provisioning:
+  grafana-dashboards:
+  duplicati:
