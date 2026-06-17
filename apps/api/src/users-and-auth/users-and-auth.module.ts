@@ -132,16 +132,21 @@ import { NotificationsModule } from '../notifications/notifications.module';
   ],
   // Controller order is load-bearing: NestJS registers routes per-controller in
   // array order, and Express matches first-registered-wins. Controllers holding
-  // static GET/PATCH routes (me, local-signup-*) MUST precede the ones holding
-  // ':id'/':id/*' routes so those static paths are not shadowed by ':id'.
-  // UserPermissionsController is intentionally kept last so GET 'with-permission'
-  // stays shadowed by GET ':id' — preserving the existing (pre-refactor) behavior.
+  // static GET/PATCH routes MUST precede the ones holding ':id'/':id/*' routes
+  // so those static paths are not shadowed by ':id'.
+  //
+  // Rule: within any group sharing the same @Controller(prefix), put controllers
+  // with static-only routes BEFORE controllers with :param routes of the same
+  // HTTP method and segment depth.
+  //
+  // UserPermissionsController (GET 'with-permission') MUST come before
+  // UsersAdminController (GET ':id') to keep 'with-permission' reachable.
   controllers: [
     UsersRegistrationController,
     UserInvitationsController,
     UserProfileController,
-    UsersAdminController,
     UserPermissionsController,
+    UsersAdminController,
     AuthController,
     TwoFactorController,
     SSOController,
