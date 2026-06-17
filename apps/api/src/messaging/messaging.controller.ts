@@ -5,7 +5,6 @@ import {
   NotFoundException,
   Param,
   ParseIntPipe,
-  Patch,
   Post,
   Query,
   Req,
@@ -23,8 +22,6 @@ import { SendMessageDto } from './dtos/sendMessage.dto';
 import { ListMessagesQueryDto } from './dtos/listMessagesQuery.dto';
 import { ListMessagesResponseDto } from './dtos/listMessagesResponse.dto';
 import { ConversationListItemDto } from './dtos/conversationListItem.dto';
-import { NotificationPreferenceDto } from './dtos/notificationPreference.dto';
-import { UpdateNotificationPreferenceDto } from './dtos/updateNotificationPreference.dto';
 import { UnreadCountResponseDto } from './dtos/unreadCountResponse.dto';
 
 @ApiTags('Messaging')
@@ -158,28 +155,4 @@ export class MessagingController {
     );
   }
 
-  @Get('notification-preferences')
-  @Auth()
-  @ApiOperation({
-    summary: 'Get the authenticated user notification preferences',
-    operationId: 'messagingGetNotificationPreferences',
-  })
-  @ApiResponse({ status: 200, description: 'The notification preferences', type: NotificationPreferenceDto })
-  async getNotificationPreferences(@Req() req: AuthenticatedRequest): Promise<NotificationPreferenceDto> {
-    return this.messagingService.getNotificationPreference(req.user.id);
-  }
-
-  @Patch('notification-preferences')
-  @Auth()
-  @ApiOperation({
-    summary: 'Update the authenticated user notification preferences',
-    operationId: 'messagingUpdateNotificationPreferences',
-  })
-  @ApiResponse({ status: 200, description: 'The updated notification preferences', type: NotificationPreferenceDto })
-  async updateNotificationPreferences(
-    @Body() dto: UpdateNotificationPreferenceDto,
-    @Req() req: AuthenticatedRequest,
-  ): Promise<NotificationPreferenceDto> {
-    return this.messagingService.updateNotificationPreference(req.user.id, dto);
-  }
 }

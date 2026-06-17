@@ -15,6 +15,7 @@
 - **ATT-559:** fix resource flow node editor Enter key reloading the page — wrapped inputs in a `<Form>` with `onSubmit` calling `e.preventDefault()` ([ATT-559](https://linear.app/attraccess/issue/ATT-559), [#1355](https://github.com/Attraccess/Attraccess/pull/1355))
 - **ATT-559:** fix project invitation button staying disabled after selecting a user — wired missing `onSelectionChange` handler ([ATT-559](https://linear.app/attraccess/issue/ATT-559), [#1355](https://github.com/Attraccess/Attraccess/pull/1355))
 - **ATT-559:** remove stale supervision-request translation keys from notification settings ([ATT-559](https://linear.app/attraccess/issue/ATT-559), [#1355](https://github.com/Attraccess/Attraccess/pull/1355))
+- **ATT-559:** remove dead `GET/PATCH /messaging/notification-preferences` endpoints and associated `shouldEmailMessageOnOffline`/`shouldPushMessageOnOffline` methods — message delivery now routes through `NotificationDispatchService` which correctly reads the unified `categoryChannels` preferences ([ATT-559](https://linear.app/attraccess/issue/ATT-559), [#1355](https://github.com/Attraccess/Attraccess/pull/1355))
 
 ## 1.7.0 (2026-06-05)
 

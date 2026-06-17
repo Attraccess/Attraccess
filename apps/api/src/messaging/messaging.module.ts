@@ -1,13 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import {
-  Conversation,
-  ConversationParticipant,
-  Message,
-  NotificationPreference,
-  Resource,
-  User,
-} from '@attraccess/database-entities';
+import { Conversation, ConversationParticipant, Message, Resource, User } from '@attraccess/database-entities';
 import { MessagingService } from './messaging.service';
 import { MessagingLiveService } from './messaging-live.service';
 import { MessagingController } from './messaging.controller';
@@ -19,7 +12,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Conversation, ConversationParticipant, Message, NotificationPreference, Resource, User]),
+    TypeOrmModule.forFeature([Conversation, ConversationParticipant, Message, Resource, User]),
     ResourceUsageModule,
     SettingsModule,
     NotificationsModule,
