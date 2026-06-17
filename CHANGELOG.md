@@ -1,3 +1,9 @@
+## [Unreleased]
+
+### 🩹 Fixes
+
+- **ATT-592:** strip node-exporter and cadvisor from docker-compose before balena push — both services use host bind mounts that Balena rejects
+
 ## 1.8.0 (2026-06-17)
 
 ### 🚀 Features

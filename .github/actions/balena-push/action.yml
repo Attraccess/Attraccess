@@ -36,12 +36,13 @@ runs:
 
     - name: Strip services unsupported by balena
       run: |
-        # balena's compose schema rejects Compose `profiles` and host-firewall
-        # tooling. fail2ban (network_mode: host, iptables, /var/lib/docker mount)
-        # is opt-in self-host tooling and not meant for balena devices, so drop it
+        # balena's compose schema rejects host bind mounts and Compose `profiles`.
+        # fail2ban, node-exporter, and cadvisor all use host filesystem bind mounts
+        # (e.g. /:/host, /var/lib/docker, /sys) that Balena refuses. These are
+        # self-host/monitoring tooling not meant for balena devices, so drop them
         # from the balena image. Root docker-compose.yml stays intact for
         # self-host/coolify deployments.
-        yq -i 'del(.services.fail2ban)' docker-compose.yml
+        yq -i 'del(.services.fail2ban, .services.node-exporter, .services.cadvisor)' docker-compose.yml
         cat docker-compose.yml
       shell: bash
 
