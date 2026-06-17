@@ -1,9 +1,3 @@
-## [Unreleased]
-
-### 🩹 Fixes
-
-- **ATT-592:** add dedicated `docker-compose.balena.yml` without host bind mount services; balena push now uses it directly instead of mutating the shared compose file at CI time
-
 ## 1.8.0 (2026-06-17)
 
 ### 🚀 Features
