@@ -38,7 +38,7 @@ describe('NotificationPreferenceService', () => {
         },
         {
           category: NotificationCategory.RESOURCE_TAKEOVER,
-          channels: { email: false, push: true, toast: true },
+          channels: { email: true, push: true, toast: true },
         },
         {
           category: NotificationCategory.ACCESS_CHANGES,
@@ -46,7 +46,7 @@ describe('NotificationPreferenceService', () => {
         },
         {
           category: NotificationCategory.NFC_CARDS,
-          channels: { email: false, push: true, toast: true },
+          channels: { email: true, push: true, toast: true },
         },
       ]),
     );

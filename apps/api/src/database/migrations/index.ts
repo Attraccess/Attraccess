@@ -130,3 +130,4 @@ export * from './1781700000000-system-notification-preferences';
 export * from './1781800000000-resource-takeover-email-template';
 export * from './1781900000000-access-change-email-template';
 export * from './1782000000000-fix-access-change-email-default';
+export * from './1782100000000-enable-all-email-defaults';
