@@ -79,7 +79,7 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
   private sqliteEndSessionChain: Promise<unknown> = Promise.resolve();
 
   private readonly accessCache = new Map<string, { result: boolean; expiresAt: number }>();
-  private readonly ACCESS_CACHE_TTL_MS = 30_000;
+  private readonly ACCESS_CACHE_TTL_MS = 300_000;
   private readonly ACCESS_CACHE_MAX_SIZE = 5_000;
   private cacheCleanupInterval: ReturnType<typeof setInterval> | null = null;
 

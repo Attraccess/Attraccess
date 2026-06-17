@@ -1868,7 +1868,7 @@ describe('ResourceUsageService', () => {
       jest.useFakeTimers();
       try {
         await service.canControllResource(resourceId, mockUser);
-        jest.advanceTimersByTime(31_000);
+        jest.advanceTimersByTime(301_000);
         await service.canControllResource(resourceId, mockUser);
 
         expect(resourceIntroductionService.hasValidIntroduction).toHaveBeenCalledTimes(2);
@@ -1915,7 +1915,7 @@ describe('ResourceUsageService', () => {
       jest.useFakeTimers();
       try {
         await service.canControllResource(resourceId, mockUser);
-        jest.advanceTimersByTime(31_000);
+        jest.advanceTimersByTime(301_000);
         // @ts-expect-error access private method for testing
         service.pruneAccessCache();
         // @ts-expect-error access private field for testing
