@@ -19,6 +19,18 @@
         "{projectRoot}/.pio/**/*"
       ],
       "cache": true
+    },
+    "e2e": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npm run test:e2e",
+        "cwd": "apps/attractap/firmware/test"
+      },
+      "inputs": [
+        "{projectRoot}/test/**/*",
+        "{projectRoot}/src/**/*"
+      ],
+      "cache": false
     }
   }
 }
