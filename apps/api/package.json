@@ -32,7 +32,7 @@
     "identity-obj-proxy": "^3.0.0",
     "mjml": "^5.0.1",
     "mqtt": "^5.12.1",
-    "nodemailer": "^8.0.4",
+    "nodemailer": "^9.0.1",
     "passport": "^0.7.0",
     "passport-custom": "^1.1.1",
     "passport-jwt": "^4.0.1",
