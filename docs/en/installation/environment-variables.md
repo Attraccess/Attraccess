@@ -63,6 +63,10 @@ All configuration options for Attraccess that can be set via environment variabl
 |----------|---------|-------------|
 | `AUTH_SESSION_SECRET` | – | **Required.** Secret key for session encryption |
 | `SESSION_COOKIE_MAX_AGE` | `604800000` | Maximum session duration in milliseconds (default: 7 days) |
+| `VALKEY_URL` | – | Connection URL for a Valkey/Redis-compatible session store (e.g. `redis://valkey:6379`). When set, sessions are stored in Valkey with native TTL instead of SQLite — required for horizontal scaling. Falls back to SQLite when unset. Accepts any `ioredis`-compatible URL including `rediss://` (TLS), Redis Cluster, Sentinel, ElastiCache, and Upstash. |
+
+> [!NOTE]
+> The bundled Docker Compose variants (Balena, Coolify) include a `valkey/valkey:8-alpine` sidecar and set `VALKEY_URL` automatically. For external deployments, point `VALKEY_URL` at your own Valkey/Redis instance.
 
 ## Plugins
 

@@ -21,6 +21,20 @@ services:
     env_file:
       - .env.docker-compose
 
+  valkey:
+    image: valkey/valkey:8-alpine
+    restart: unless-stopped
+    expose:
+      - '6379'
+    volumes:
+      - valkey-data:/data
+    command: valkey-server --save 60 1 --loglevel warning
+    healthcheck:
+      test: ['CMD', 'valkey-cli', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
   attraccess:
     restart: unless-stopped
     build:
@@ -30,8 +44,13 @@ services:
       - '3000'
     volumes:
       - attraccess-storage:/app/storage
+    environment:
+      - VALKEY_URL=redis://valkey:6379
     env_file:
       - .env.docker-compose
+    depends_on:
+      valkey:
+        condition: service_healthy
 
   monitoring-init:
     build:
@@ -222,6 +241,7 @@ volumes:
   proxy-data:
   proxy-letsencrypt:
   attraccess-storage:
+  valkey-data:
   webhook-site:
   rabbitmq_data:
   zigbee2mqtt:

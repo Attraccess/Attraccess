@@ -1,3 +1,9 @@
+## [Unreleased]
+
+### 🚀 Features
+
+- **ATT-596:** Valkey as optional session store — enables horizontal scaling; falls back to SQLite when `VALKEY_URL` is unset ([ATT-596](https://linear.app/attraccess/issue/ATT-596/implement-valkey-as-optional-session-store), [#1423](https://github.com/Attraccess/Attraccess/pull/1423))
+
 ## 1.8.0 (2026-06-17)
 
 ### 🚀 Features
