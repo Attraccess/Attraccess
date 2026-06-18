@@ -102,6 +102,26 @@ Authentication is handled via **session cookies**. The system supports:
 - SSO via SAML
 - Two-factor authentication (TOTP)
 
+## NestJS API Conventions
+
+### Controller registration order is load-bearing
+
+NestJS (via Express) matches routes in the order they are registered — **first registered wins**. A `:param` segment (e.g. `GET /users/:id`) matches *any* single URL segment, including strings like `with-permission`. This creates a footgun:
+
+```
+// BROKEN — :id swallows every static path that follows
+controllers: [UsersAdminController,    // has GET :id
+              UserPermissionsController] // has GET with-permission ← unreachable!
+```
+
+**Rules to follow when adding or splitting a controller:**
+
+1. **Within a single controller file**, declare all static-segment routes *before* any `:param` route of the same HTTP method and same URL depth.
+2. **In the `controllers: []` array of a module**, list controllers that have only static routes *before* controllers that introduce `:param` routes at the same `@Controller(prefix)`.
+3. When multiple controllers share the same `@Controller('path')` prefix (e.g. all the `@Controller('users')` controllers), a `:param` route in an earlier controller will shadow static routes in later ones.
+
+An automated guard in `apps/api/src/route-shadow.spec.ts` enforces these rules in CI — any newly introduced shadow will cause the test suite to fail.
+
 ## See Also
 
 - [Developer Overview](developer/overview.md) – Getting started
