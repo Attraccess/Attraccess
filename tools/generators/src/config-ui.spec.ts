@@ -76,11 +76,11 @@ describe('config-ui', () => {
     });
   });
 
-  describe('docker-compose.yml', () => {
+  describe('docker-compose.balena.yml', () => {
     let content: string;
 
     beforeAll(() => {
-      content = readFile('docker-compose.yml');
+      content = readFile('docker-compose.balena.yml');
     });
 
     it('should define a config-ui service', () => {
@@ -193,7 +193,7 @@ describe('config-ui', () => {
     });
 
     it('admin UI port in docker-compose matches server.js default', () => {
-      const compose = readFile('docker-compose.yml');
+      const compose = readFile('docker-compose.balena.yml');
       const server = readFile('tools/config-ui/server.js');
       const composeSection = extractServiceBlock(compose, 'config-ui');
       expect(composeSection).toContain('5380');
@@ -201,7 +201,7 @@ describe('config-ui', () => {
     });
 
     it('data volume path is consistent between docker-compose and dnsmasq module', () => {
-      const compose = readFile('docker-compose.yml');
+      const compose = readFile('docker-compose.balena.yml');
       const dnsmasqModule = readFile('tools/config-ui/modules/dnsmasq.js');
       expect(compose).toContain('config-ui-data:/data');
       expect(dnsmasqModule).toContain("'/data'");
@@ -269,8 +269,8 @@ describe('config-ui', () => {
       expect(fileExists('tools/dns-server')).toBe(false);
     });
 
-    it('docker-compose.yml should not reference the removed dns-server service', () => {
-      const compose = readFile('docker-compose.yml');
+    it('docker-compose.balena.yml should not reference the removed dns-server service', () => {
+      const compose = readFile('docker-compose.balena.yml');
       expect(compose).not.toMatch(/^\s{2}dns-server:\s*$/m);
       expect(compose).not.toContain('dns-server-data');
       expect(compose).not.toContain('./tools/dns-server');

@@ -7,6 +7,6 @@ export type ValkeyConfigType = {
 
 export default registerAs('valkey', () =>
   loadEnv((z) => ({
-    VALKEY_URL: z.string().url().optional(),
+    VALKEY_URL: z.string().min(1).optional(),
   }))
 );
