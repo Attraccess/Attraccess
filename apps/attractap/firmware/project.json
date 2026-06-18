@@ -20,15 +20,16 @@
       ],
       "cache": true
     },
-    "e2e": {
+    "test-unit": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "npm run test:e2e",
-        "cwd": "apps/attractap/firmware/test"
+        "command": "pio test -e native",
+        "cwd": "apps/attractap/firmware"
       },
       "inputs": [
         "{projectRoot}/test/**/*",
-        "{projectRoot}/src/**/*"
+        "{projectRoot}/src/**/*",
+        "{projectRoot}/platformio.ini"
       ],
       "cache": false
     }

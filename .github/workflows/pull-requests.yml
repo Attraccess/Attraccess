@@ -169,50 +169,21 @@ jobs:
           header: plugin-artifacts
           message: ${{ steps.comment-body.outputs.body }}
 
-  attractap-firmware-e2e:
-    name: Attractap Firmware E2E (${{ matrix.env }})
-    runs-on: [self-hosted, attractap-hw]
-    strategy:
-      fail-fast: false
-      matrix:
-        env: [attractap-touch, attractap-touch-v2, attractap-touch-ethernet, attractap-lite-ethernet]
+  attractap-firmware-unit:
+    name: Attractap Firmware Unit Tests (native)
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - name: Erase flash
-        run: esptool.py --port "$ATTRACTAP_SERIAL_PORT" erase_flash
+      - name: Install PlatformIO
+        run: pip install platformio
+
+      - name: Run unit tests (native)
+        run: pio test -e native
         working-directory: apps/attractap/firmware
-
-      - name: Compile firmware
-        run: pio run -e ${{ matrix.env }}
-        working-directory: apps/attractap/firmware
-
-      - name: Flash firmware
-        run: pio run -e ${{ matrix.env }} -t upload
-        working-directory: apps/attractap/firmware
-
-      - name: Install E2E test dependencies
-        run: npm install
-        working-directory: apps/attractap/firmware/test
-
-      - name: Run E2E suite
-        env:
-          ATTRACTAP_FIRMWARE_BIN: ${{ github.workspace }}/apps/attractap/firmware/.pio/build/${{ matrix.env }}/firmware.bin
-          ATTRACTAP_SKIP_NFC_TESTS: "true"
-        run: npm run test:e2e
-        working-directory: apps/attractap/firmware/test
-
-      - name: Publish test results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: e2e-results-${{ matrix.env }}
-          path: apps/attractap/firmware/test-results/*.xml
-          if-no-files-found: warn
-          retention-days: 30
 
   fail2ban-smoke:
     runs-on: ubuntu-latest

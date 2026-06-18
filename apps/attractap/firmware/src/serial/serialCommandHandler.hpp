@@ -10,14 +10,13 @@ class SerialCommandHandler
 public:
     static void setup();
     static void loop();
+    static void processLine(const String &line);
 
 private:
     static constexpr size_t MAX_COMMAND_LENGTH = 256;
 
     static String inputBuffer;
     static Logger logger;
-
-    static void processLine(const String &line);
     static void handleCommand(const String &topic, const String &payload);
 
     static bool pinIsSet();
