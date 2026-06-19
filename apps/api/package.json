@@ -28,7 +28,7 @@
     "express": "4.22.1",
     "express-session": "^1.18.1",
     "glob": "^13.0.6",
-    "handlebars": "^4.7.8",
+    "handlebars": "^4.7.9",
     "identity-obj-proxy": "^3.0.0",
     "mjml": "^5.0.1",
     "mqtt": "^5.12.1",
