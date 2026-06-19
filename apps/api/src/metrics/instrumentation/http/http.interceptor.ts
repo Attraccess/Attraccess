@@ -23,6 +23,10 @@ export class HttpMetricsInterceptor implements NestInterceptor {
     }
     const httpCtx = context.switchToHttp();
     const request = httpCtx.getRequest<Request>();
+    // SSE connections are long-lived; recording their duration as HTTP latency is misleading.
+    if ((request.headers?.['accept'] ?? '').includes('text/event-stream')) {
+      return next.handle();
+    }
     const startTime = process.hrtime.bigint();
     const route = request.route?.path || 'unmatched';
     const method = request.method;
