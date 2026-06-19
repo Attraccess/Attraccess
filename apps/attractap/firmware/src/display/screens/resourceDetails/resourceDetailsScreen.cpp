@@ -276,11 +276,11 @@ void ResourceDetailsScreen::init()
    lv_obj_add_flag(this->startSessionButton, LV_OBJ_FLAG_HIDDEN);
    lv_obj_add_event_cb(this->startSessionButton, &ResourceDetailsScreen::onButtonClick, LV_EVENT_CLICKED, new ButtonClickEventData{this, BUTTON_CLICK_TYPE_START_SESSION});
 
-   lv_obj_t *labelForSessionToggleButton = lv_label_create(this->startSessionButton);
-   lv_obj_set_width(labelForSessionToggleButton, LV_SIZE_CONTENT);
-   lv_obj_set_height(labelForSessionToggleButton, LV_SIZE_CONTENT);
-   lv_obj_set_align(labelForSessionToggleButton, LV_ALIGN_CENTER);
-   lv_label_set_text(labelForSessionToggleButton, "Ressource verwenden");
+   this->startSessionButtonLabel = lv_label_create(this->startSessionButton);
+   lv_obj_set_width(this->startSessionButtonLabel, LV_SIZE_CONTENT);
+   lv_obj_set_height(this->startSessionButtonLabel, LV_SIZE_CONTENT);
+   lv_obj_set_align(this->startSessionButtonLabel, LV_ALIGN_CENTER);
+   lv_label_set_text(this->startSessionButtonLabel, "Ressource verwenden");
 
    this->stopSessionButton = lv_button_create(this->sessionControls);
    lv_obj_set_height(this->stopSessionButton, 50);
@@ -498,8 +498,7 @@ void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief 
    switch (resourceType)
    {
    case RESOURCE_TYPE_MACHINE:
-      lv_obj_set_flag(this->startSessionButton, LV_OBJ_FLAG_HIDDEN, resource.hasActiveUsage);
-      lv_obj_set_flag(this->stopSessionButton, LV_OBJ_FLAG_HIDDEN, !resource.hasActiveUsage);
+      // Start/stop button visibility is determined in refreshAccessState() with full user context
       lv_obj_add_flag(this->doorControls, LV_OBJ_FLAG_HIDDEN);
       break;
    case RESOURCE_TYPE_DOOR:
@@ -619,6 +618,60 @@ void ResourceDetailsScreen::refreshAccessState()
    {
       lv_obj_set_flag(this->sessionControls, LV_OBJ_FLAG_HIDDEN, !canUse);
    }
+
+   // Machine-type: determine which action buttons to show based on user permissions and session owner
+   if (this->resourceCacheValid)
+   {
+      resource_type_t resourceType = (this->resourceCache.type == 1) ? RESOURCE_TYPE_DOOR : RESOURCE_TYPE_MACHINE;
+      if (resourceType == RESOURCE_TYPE_MACHINE && this->startSessionButton && this->stopSessionButton)
+      {
+         bool showStart = false;
+         bool showStop = false;
+         bool isTakeover = false;
+
+         if (!this->resourceCache.hasActiveUsage)
+         {
+            // No active session: show start button
+            showStart = true;
+         }
+         else if (ownsActiveUsage)
+         {
+            // Current user owns the session: show stop button
+            showStop = true;
+         }
+         else
+         {
+            // Another user has an active session
+            bool canTakeOver = this->resourceCache.allowTakeOver &&
+                               (user.hasIntroduction || user.isIntroducer || user.canManageResource);
+            if (canTakeOver)
+            {
+               showStart = true;
+               isTakeover = true;
+            }
+            // Only introducers and resource managers can force-stop another user's session.
+            // When overtake is allowed, only resource managers (admins) see the stop button —
+            // introducers use the overtake button instead.
+            if (this->resourceCache.allowTakeOver)
+            {
+               showStop = user.canManageResource;
+            }
+            else
+            {
+               showStop = user.isIntroducer || user.canManageResource;
+            }
+         }
+
+         lv_obj_set_flag(this->startSessionButton, LV_OBJ_FLAG_HIDDEN, !showStart);
+         lv_obj_set_flag(this->stopSessionButton, LV_OBJ_FLAG_HIDDEN, !showStop);
+
+         if (this->startSessionButtonLabel)
+         {
+            lv_label_set_text(this->startSessionButtonLabel,
+                              isTakeover ? "Uebernehmen" : "Ressource verwenden");
+         }
+      }
+   }
 }
 void ResourceDetailsScreen::loop()
 {
@@ -655,6 +708,7 @@ void ResourceDetailsScreen::destroy()
    this->projectsPrevButton = nullptr;
    this->projectsNextButton = nullptr;
    this->startSessionButton = nullptr;
+   this->startSessionButtonLabel = nullptr;
    this->stopSessionButton = nullptr;
    this->doorControls = nullptr;
    this->flowButtonsContainer = nullptr;
