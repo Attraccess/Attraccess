@@ -42,9 +42,10 @@ export class AttractapSessionHandler {
   private supervisionService: SupervisionService;
 
   public async handleStartResourceUsageSession(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
-    const { resourceId, projectId } = data.payload as {
+    const { resourceId, projectId, forceTakeOver } = data.payload as {
       resourceId: number;
       projectId?: number;
+      forceTakeOver?: boolean;
     };
 
     if (
@@ -57,10 +58,11 @@ export class AttractapSessionHandler {
       return;
     }
 
+    const formAction = forceTakeOver ? ResourceFormAction.TAKEOVER : ResourceFormAction.START;
     const formSubmissions = await this.formsHandler.ensureFormsSatisfied({
       socket,
       resourceId,
-      action: ResourceFormAction.START,
+      action: formAction,
     });
     if (formSubmissions === null) {
       return;
@@ -84,10 +86,10 @@ export class AttractapSessionHandler {
       await this.resourceUsageService.startSession(
         resourceId,
         user,
-        { projectId, formSubmissions },
+        { projectId, formSubmissions, forceTakeOver },
         supervisorUserId ? { supervisorUserId } : {},
       );
-      this.formsHandler.clearFormDraft(socket, resourceId, ResourceFormAction.START);
+      this.formsHandler.clearFormDraft(socket, resourceId, formAction);
       // The card channel won — settle the still-open web request so any supervisor popups close.
       if (flow?.requestId) {
         this.supervisionService.settleByCard(flow.requestId);

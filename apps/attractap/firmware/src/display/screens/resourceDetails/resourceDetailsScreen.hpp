@@ -119,6 +119,7 @@ private:
     lv_obj_t *projectsPrevButton = nullptr;
     lv_obj_t *projectsNextButton = nullptr;
     lv_obj_t *startSessionButton = nullptr;
+    lv_obj_t *startSessionButtonLabel = nullptr;
     lv_obj_t *stopSessionButton = nullptr;
     lv_obj_t *doorControls = nullptr;
 
