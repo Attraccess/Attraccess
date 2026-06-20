@@ -5,11 +5,12 @@ import {
   NotificationCategory,
   NotificationCategoryPreferenceDto,
   UseNotificationsServiceNotificationsGetPreferencesKeyFn,
+  useLicenseServiceGetLicenseInformation,
   useNotificationsServiceNotificationsGetPreferences,
   useNotificationsServiceNotificationsUpdatePreferences,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { LabeledSwitch } from '../../../components/labeledSwitch';
 import { useToastMessage } from '../../../components/toastProvider';
@@ -17,31 +18,6 @@ import en from './en.json';
 import de from './de.json';
 
 type NotificationChannel = 'email' | 'push' | 'toast';
-
-const categoryGroups: Array<{ id: string; categories: NotificationCategory[] }> = [
-  {
-    id: 'general',
-    categories: [
-      NotificationCategory.MESSAGES,
-      NotificationCategory.RESOURCE_TAKEOVER,
-      NotificationCategory.RESOURCE_SESSION_ENDED,
-      NotificationCategory.NFC_CARDS,
-      NotificationCategory.PROJECT_INVITATIONS,
-    ],
-  },
-  {
-    id: 'resourceManagers',
-    categories: [
-      NotificationCategory.MAINTENANCE_REQUESTS,
-      NotificationCategory.RESOURCE_USAGE_NOTES,
-      NotificationCategory.RESOURCE_HEALTH,
-    ],
-  },
-  {
-    id: 'admins',
-    categories: [NotificationCategory.ACCESS_CHANGES],
-  },
-];
 
 const channels: NotificationChannel[] = ['email', 'push', 'toast'];
 
@@ -56,6 +32,36 @@ export function NotificationPreferencesForm() {
   const { t } = useTranslations({ en, de });
   const queryClient = useQueryClient();
   const { success: showSuccess, error: showError } = useToastMessage();
+  const { data: license } = useLicenseServiceGetLicenseInformation();
+  const hasMaintenance = license?.modules.includes('maintenance') ?? true;
+
+  const categoryGroups = useMemo(
+    () => [
+      {
+        id: 'general',
+        categories: [
+          NotificationCategory.MESSAGES,
+          NotificationCategory.RESOURCE_TAKEOVER,
+          NotificationCategory.RESOURCE_SESSION_ENDED,
+          NotificationCategory.NFC_CARDS,
+          NotificationCategory.PROJECT_INVITATIONS,
+        ],
+      },
+      {
+        id: 'resourceManagers',
+        categories: [
+          ...(hasMaintenance ? [NotificationCategory.MAINTENANCE_REQUESTS] : []),
+          NotificationCategory.RESOURCE_USAGE_NOTES,
+          NotificationCategory.RESOURCE_HEALTH,
+        ],
+      },
+      {
+        id: 'admins',
+        categories: [NotificationCategory.ACCESS_CHANGES],
+      },
+    ],
+    [hasMaintenance],
+  );
 
   const { data: preferences, isLoading } = useNotificationsServiceNotificationsGetPreferences();
 
