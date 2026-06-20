@@ -260,7 +260,23 @@
       "@tscircuit/ngspice-spice-engine>zod": "3.25.76",
       "calculate-packing>zod": "3.25.76",
       "circuit-json-to-gltf>zod": "3.25.76",
-      "circuit-json-to-spice>zod": "3.25.76"
+      "circuit-json-to-spice>zod": "3.25.76",
+      "handlebars": ">=4.7.9",
+      "multer": ">=2.2.0",
+      "qs": ">=6.15.2",
+      "@xmldom/xmldom": ">=0.8.13",
+      "ws": ">=8.21.0",
+      "tar": ">=7.5.16",
+      "lodash": ">=4.18.1",
+      "tmp": ">=0.2.7",
+      "serialize-javascript": ">=6.0.2",
+      "form-data": ">=4.0.6",
+      "nodemailer": ">=9.0.1",
+      "@microsoft/api-extractor>minimatch": ">=3.1.2",
+      "@nx/react>http-proxy-middleware": ">=3.0.7",
+      "@nx/module-federation>http-proxy-middleware": ">=3.0.7",
+      "hono": ">=4.12.25",
+      "piscina": ">=4.9.3"
     },
     "packageExtensions": {
       "circuit-json@0.0.425": {
