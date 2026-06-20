@@ -7,6 +7,7 @@ import {
   JoinColumn,
   OneToOne,
   OneToMany,
+  Index,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { Resource } from './resource.entity';
@@ -16,6 +17,9 @@ import { BillingTransaction } from './billing-transaction.entity';
 import { Project } from './project';
 import { FormSubmission } from './form';
 
+@Index('IDX_resource_usage_resourceId', ['resourceId'])
+@Index('IDX_resource_usage_endTime', ['endTime'])
+@Index('IDX_resource_usage_userId', ['userId'])
 @Entity()
 export class ResourceUsage {
   @PrimaryGeneratedColumn()
