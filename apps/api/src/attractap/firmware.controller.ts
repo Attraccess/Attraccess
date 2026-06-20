@@ -5,6 +5,8 @@ import { AttractapFirmwareService } from './firmware.service';
 import { AttractapFirmware } from './dtos/firmware.dto';
 import { Response } from 'express';
 import { AttractapGateway } from './websockets/websocket.gateway';
+import { RequiresLicense } from '../license/require-license.decorator';
+import { LicenseModuleType } from '../license/license.service';
 
 @ApiTags('Attractap')
 @Controller('attractap/firmwares')
@@ -26,6 +28,7 @@ export class AttractapFirmwareController {
     type: [AttractapFirmware],
   })
   @Auth('canManageSystemConfiguration')
+  @RequiresLicense(LicenseModuleType.ATTRACTAP)
   async getFirmwares(): Promise<AttractapFirmware[]> {
     this.logger.debug('GET /attractap/firmwares - Fetching all firmwares');
     const firmwares = await this.attractapFirmwareService.getFirmwares();

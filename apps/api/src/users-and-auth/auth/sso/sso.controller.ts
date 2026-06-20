@@ -20,6 +20,8 @@ import {
 import { SSOOIDCGuard } from './oidc/oidc.guard';
 import { AuthenticationType, SSOProvider, SSOProviderType, SystemPermissions } from '@attraccess/database-entities';
 import { AuthenticatedRequest, Auth } from '@attraccess/plugins-backend-sdk';
+import { RequiresLicense } from '../../../license/require-license.decorator';
+import { LicenseModuleType } from '../../../license/license.service';
 import { CreateSessionResponse } from '../auth.types';
 import { AuthService } from '../auth.service';
 import { SessionService } from '../session.service';
@@ -151,6 +153,7 @@ export class SSOController {
 
   @Get('providers/:id')
   @Auth('canManageSystemConfiguration')
+  @RequiresLicense(LicenseModuleType.SSO)
   @ApiOperation({ summary: 'Get SSO provider by ID with full configuration', operationId: 'getOneSSOProviderById' })
   @ApiParam({
     name: 'id',
@@ -183,6 +186,7 @@ export class SSOController {
 
   @Post('providers')
   @Auth('canManageSystemConfiguration')
+  @RequiresLicense(LicenseModuleType.SSO)
   @ApiOperation({ summary: 'Create a new SSO provider', operationId: 'createOneSsoProvider' })
   @ApiBody({ type: CreateSSOProviderDto })
   @ApiResponse({
@@ -200,6 +204,7 @@ export class SSOController {
 
   @Put('providers/:id')
   @Auth('canManageSystemConfiguration')
+  @RequiresLicense(LicenseModuleType.SSO)
   @ApiOperation({ summary: 'Update an existing SSO provider', operationId: 'updateOneSSOProvider' })
   @ApiParam({
     name: 'id',
@@ -226,6 +231,7 @@ export class SSOController {
 
   @Delete('providers/:id')
   @Auth('canManageSystemConfiguration')
+  @RequiresLicense(LicenseModuleType.SSO)
   @ApiOperation({ summary: 'Delete an SSO provider', operationId: 'deleteOneSSOProvider' })
   @ApiParam({
     name: 'id',
@@ -250,6 +256,7 @@ export class SSOController {
 
   @Get('discovery/authentik')
   @Auth('canManageSystemConfiguration')
+  @RequiresLicense(LicenseModuleType.SSO)
   @ApiOperation({ summary: 'Proxy Authentik OIDC well-known discovery', operationId: 'discoverAuthentikOidc' })
   @ApiQuery({ name: 'host', required: true, description: 'Authentik host, e.g. http://localhost:9000' })
   @ApiQuery({ name: 'applicationName', required: true, description: 'Authentik application slug' })
@@ -278,6 +285,7 @@ export class SSOController {
 
   @Get('discovery/keycloak')
   @Auth('canManageSystemConfiguration')
+  @RequiresLicense(LicenseModuleType.SSO)
   @ApiOperation({ summary: 'Proxy Keycloak OIDC well-known discovery', operationId: 'discoverKeycloakOidc' })
   @ApiQuery({ name: 'host', required: true, description: 'Keycloak host, e.g. http://localhost:8080' })
   @ApiQuery({ name: 'realm', required: true, description: 'Keycloak realm name' })
@@ -305,6 +313,7 @@ export class SSOController {
   }
 
   @Post(`/${SSOProviderType.OIDC}/:providerId/logout`)
+  @RequiresLicense(LicenseModuleType.SSO)
   @ApiOperation({ summary: 'SSO-initiated logout', operationId: 'ssoOidcLogout' })
   @ApiParam({
     name: 'providerId',
@@ -348,6 +357,7 @@ export class SSOController {
   }
 
   @Post(`/${SSOProviderType.SAML}/:providerId/logout`)
+  @RequiresLicense(LicenseModuleType.SSO)
   @ApiOperation({ summary: 'SAML-initiated logout', operationId: 'ssoSamlLogout' })
   @ApiParam({
     name: 'providerId',
@@ -391,6 +401,7 @@ export class SSOController {
   }
 
   @Post(`/${SSOProviderType.OIDC}/:providerId/users/delete`)
+  @RequiresLicense(LicenseModuleType.SSO)
   @ApiOperation({ summary: 'SSO-initiated user deletion', operationId: 'ssoOidcDeleteUser' })
   @ApiParam({
     name: 'providerId',
@@ -434,6 +445,7 @@ export class SSOController {
   }
 
   @Post(`/${SSOProviderType.SAML}/:providerId/users/delete`)
+  @RequiresLicense(LicenseModuleType.SSO)
   @ApiOperation({ summary: 'SAML-initiated user deletion', operationId: 'ssoSamlDeleteUser' })
   @ApiParam({
     name: 'providerId',
@@ -477,6 +489,7 @@ export class SSOController {
   }
 
   @Post(`/${SSOProviderType.OIDC}/:providerId/users/permissions`)
+  @RequiresLicense(LicenseModuleType.SSO)
   @ApiOperation({ summary: 'SSO-initiated permission update', operationId: 'ssoOidcUpdatePermissions' })
   @ApiParam({
     name: 'providerId',
@@ -524,6 +537,7 @@ export class SSOController {
   }
 
   @Post(`/${SSOProviderType.SAML}/:providerId/users/permissions`)
+  @RequiresLicense(LicenseModuleType.SSO)
   @ApiOperation({ summary: 'SAML-initiated permission update', operationId: 'ssoSamlUpdatePermissions' })
   @ApiParam({
     name: 'providerId',
