@@ -121,7 +121,7 @@ groups:
           severity: warning
         annotations:
           summary: "High request latency (p95 > 2s)"
-          description: "The 95th percentile request latency has exceeded 2 seconds for 10 minutes, with at least 0.1 req/s traffic (suppressed during idle periods to avoid low-sample-count noise)."
+          description: "The 95th percentile request latency exceeds 2 seconds in 5-minute evaluation windows and has remained above this threshold for at least 10 minutes, with at least 0.1 req/s traffic (suppressed during idle periods to avoid low-sample-count noise)."
         data:
           - refId: A
             relativeTimeRange:
