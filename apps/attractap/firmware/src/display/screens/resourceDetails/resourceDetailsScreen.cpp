@@ -286,6 +286,15 @@ void ResourceDetailsScreen::init()
    lv_obj_set_align(this->startSessionButtonLabel, LV_ALIGN_CENTER);
    lv_label_set_text(this->startSessionButtonLabel, "Ressource verwenden");
 
+   this->stopOtherUserNote = lv_label_create(this->sessionControls);
+   lv_obj_set_width(this->stopOtherUserNote, lv_pct(100));
+   lv_obj_set_height(this->stopOtherUserNote, LV_SIZE_CONTENT);
+   lv_label_set_long_mode(this->stopOtherUserNote, LV_LABEL_LONG_WRAP);
+   lv_label_set_text(this->stopOtherUserNote, "Sie beenden die Sitzung eines anderen Nutzers mit Ihren Adminrechten.");
+   lv_obj_set_style_text_color(this->stopOtherUserNote, lv_color_hex(0xF5A524), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_font(this->stopOtherUserNote, &lv_font_montserrat_10, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_add_flag(this->stopOtherUserNote, LV_OBJ_FLAG_HIDDEN);
+
    this->stopSessionButton = lv_button_create(this->sessionControls);
    lv_obj_set_height(this->stopSessionButton, 50);
    lv_obj_set_width(this->stopSessionButton, lv_pct(100));
@@ -672,6 +681,14 @@ void ResourceDetailsScreen::refreshAccessState()
          lv_obj_set_flag(this->startSessionButton, LV_OBJ_FLAG_HIDDEN, !showStart);
          lv_obj_set_flag(this->stopSessionButton, LV_OBJ_FLAG_HIDDEN, !showStop);
 
+         // Admin stopping another user's session: soften the button and show a warning note
+         bool isAdminStop = showStop && !ownsActiveUsage;
+         if (this->stopOtherUserNote)
+         {
+            lv_obj_set_flag(this->stopOtherUserNote, LV_OBJ_FLAG_HIDDEN, !isAdminStop);
+         }
+         lv_obj_set_style_bg_opa(this->stopSessionButton, isAdminStop ? 140 : 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+
          if (this->startSessionButtonLabel)
          {
             lv_label_set_text(this->startSessionButtonLabel,
@@ -726,6 +743,7 @@ void ResourceDetailsScreen::destroy()
    this->startSessionButton = nullptr;
    this->startSessionButtonLabel = nullptr;
    this->stopSessionButton = nullptr;
+   this->stopOtherUserNote = nullptr;
    this->doorControls = nullptr;
    this->flowButtonsContainer = nullptr;
    this->formsModalPanel = nullptr;
