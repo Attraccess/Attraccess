@@ -1,6 +1,6 @@
 {
   "name": "@attraccess/source",
-  "version": "1.8.0",
+  "version": "1.8.1",
   "license": "MIT",
   "scripts": {
     "serve": "node --experimental-strip-types scripts/dev-serve.mts",
