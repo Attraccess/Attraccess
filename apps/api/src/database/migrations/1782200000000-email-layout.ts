@@ -1,6 +1,7 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-const EMAIL_LAYOUT_SINGLETON_ID = 'global';
+const EMAIL_LAYOUT_SETTINGS_PARENT = 'email_layout';
+const EMAIL_LAYOUT_SETTINGS_KEY = 'body';
 
 const DEFAULT_GLOBAL_LAYOUT = `<mjml>
   <mj-head>
@@ -35,7 +36,7 @@ const DEFAULT_GLOBAL_LAYOUT = `<mjml>
       </mj-column>
     </mj-section>
 
-    {{{content}}}
+    {{content}}
 
     <mj-section padding="0">
       <mj-column>
@@ -64,18 +65,9 @@ export class EmailLayout1782200000000 implements MigrationInterface {
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
-      `CREATE TABLE "email_layout" (
-        "id" varchar(50) PRIMARY KEY NOT NULL,
-        "body" text NOT NULL,
-        "createdAt" datetime NOT NULL DEFAULT (datetime('now')),
-        "updatedAt" datetime NOT NULL DEFAULT (datetime('now'))
-      )`,
+      `INSERT INTO "setting" ("parent", "key", "value") VALUES ($1, $2, $3)`,
+      [EMAIL_LAYOUT_SETTINGS_PARENT, EMAIL_LAYOUT_SETTINGS_KEY, DEFAULT_GLOBAL_LAYOUT],
     );
-
-    await queryRunner.query(`INSERT INTO "email_layout" ("id", "body") VALUES ($1, $2)`, [
-      EMAIL_LAYOUT_SINGLETON_ID,
-      DEFAULT_GLOBAL_LAYOUT,
-    ]);
 
     const templates: Array<{ type: string; body: string }> = await queryRunner.query(
       `SELECT "type", "body" FROM "email_templates"`,
@@ -93,6 +85,9 @@ export class EmailLayout1782200000000 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`DROP TABLE "email_layout"`);
+    await queryRunner.query(
+      `DELETE FROM "setting" WHERE "parent" = $1 AND "key" = $2`,
+      [EMAIL_LAYOUT_SETTINGS_PARENT, EMAIL_LAYOUT_SETTINGS_KEY],
+    );
   }
 }
