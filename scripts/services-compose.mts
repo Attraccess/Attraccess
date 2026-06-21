@@ -16,12 +16,8 @@ const ACTIONS: Action[] = ['up', 'stop', 'down', 'status', 'list'];
 
 const SETS: Record<string, string[]> = {
   mailpit: ['mailpit'],
-  authentik: [
-    'authentik-postgresql',
-    'authentik-redis',
-    'authentik-server',
-    'authentik-worker',
-  ],
+  valkey: ['valkey'],
+  authentik: ['authentik-postgresql', 'authentik-redis', 'authentik-server', 'authentik-worker'],
   keycloak: ['keycloak'],
   'webhook-site': ['webhook-site'],
   rabbitmq: ['rabbitmq'],
@@ -51,14 +47,11 @@ Examples:
 `);
 }
 
-async function runCompose(
-  args: string[]
-): Promise<{ stdout: string; stderr: string }> {
-  const { stdout, stderr } = await execFileAsync(
-    'docker',
-    ['compose', '-f', composeFile, ...args],
-    { env: process.env, maxBuffer: 1024 * 1024 * 10 }
-  );
+async function runCompose(args: string[]): Promise<{ stdout: string; stderr: string }> {
+  const { stdout, stderr } = await execFileAsync('docker', ['compose', '-f', composeFile, ...args], {
+    env: process.env,
+    maxBuffer: 1024 * 1024 * 10,
+  });
   return { stdout, stderr };
 }
 
@@ -70,10 +63,7 @@ async function getComposeServices(): Promise<string[]> {
     .filter(Boolean);
 }
 
-function resolveSelectedServices(
-  tokens: string[],
-  allServices: string[]
-): string[] {
+function resolveSelectedServices(tokens: string[], allServices: string[]): string[] {
   if (tokens.includes('all')) {
     return [...allServices];
   }
@@ -100,10 +90,7 @@ function resolveSelectedServices(
   return [...selected];
 }
 
-function buildStopList(
-  allServices: string[],
-  selectedServices: string[]
-): string[] {
+function buildStopList(allServices: string[], selectedServices: string[]): string[] {
   const selected = new Set(selectedServices);
   return allServices.filter((service) => !selected.has(service));
 }
@@ -180,28 +167,16 @@ function ActionPicker({ onSelect }: { onSelect: (action: Action) => void }) {
     { flexDirection: 'column' },
     h(Text, null, 'Select action:'),
     ...ACTIONS.map((action, idx) =>
-      h(
-        Text,
-        { key: action, color: idx === index ? 'cyan' : undefined },
-        `${idx === index ? '> ' : '  '}${action}`
-      )
+      h(Text, { key: action, color: idx === index ? 'cyan' : undefined }, `${idx === index ? '> ' : '  '}${action}`),
     ),
-    h(Text, { dimColor: true }, 'Use Up/Down and Enter')
+    h(Text, { dimColor: true }, 'Use Up/Down and Enter'),
   );
 }
 
-function SetPicker({
-  defaultSelected,
-  onConfirm,
-}: {
-  defaultSelected: string[];
-  onConfirm: (sets: string[]) => void;
-}) {
+function SetPicker({ defaultSelected, onConfirm }: { defaultSelected: string[]; onConfirm: (sets: string[]) => void }) {
   const setNames = useMemo(() => Object.keys(SETS), []);
   const [cursor, setCursor] = useState(0);
-  const [selected, setSelected] = useState<Set<string>>(
-    () => new Set(defaultSelected)
-  );
+  const [selected, setSelected] = useState<Set<string>>(() => new Set(defaultSelected));
 
   useInput((input, key) => {
     if (key.upArrow) {
@@ -245,10 +220,10 @@ function SetPicker({
       return h(
         Text,
         { key: name, color: idx === cursor ? 'cyan' : undefined },
-        `${idx === cursor ? '> ' : '  '}${marker} ${name}`
+        `${idx === cursor ? '> ' : '  '}${marker} ${name}`,
       );
     }),
-    h(Text, { dimColor: true }, 'Space toggle, Enter confirm, "a" toggle all')
+    h(Text, { dimColor: true }, 'Space toggle, Enter confirm, "a" toggle all'),
   );
 }
 
@@ -284,7 +259,7 @@ function OutputScreen({
     { flexDirection: 'column' },
     h(Text, { color: isError ? 'red' : 'green' }, title),
     ...body,
-    h(Text, { dimColor: true }, 'Any key back to menu, q to exit')
+    h(Text, { dimColor: true }, 'Any key back to menu, q to exit'),
   );
 }
 
