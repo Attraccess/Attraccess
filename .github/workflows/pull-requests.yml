@@ -185,6 +185,15 @@ jobs:
       - name: Test Grafana provisioning prepare (Pushover opt-in)
         run: ./scripts/grafana-provisioning-prepare.spec.sh
 
+  balena-compose-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+      - uses: ./.github/actions/setup
+      - name: Validate docker-compose.balena.yml with balena's parser
+        run: node scripts/check-balena-compose.mjs
+
   containerize:
     runs-on: ubuntu-latest
     steps:

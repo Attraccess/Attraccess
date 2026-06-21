@@ -48,9 +48,11 @@ services:
       - VALKEY_URL=redis://valkey:6379
     env_file:
       - .env.docker-compose
+    # Balena only supports the short-form depends_on (service_started); the
+    # long-form `condition: service_healthy` is rejected (ATT-593-style). The app
+    # retries Valkey connections, and restart: unless-stopped covers startup races.
     depends_on:
-      valkey:
-        condition: service_healthy
+      - valkey
 
   monitoring-init:
     build:
