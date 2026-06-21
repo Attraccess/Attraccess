@@ -246,6 +246,8 @@ void ResourceDetailsScreen::init()
    lv_obj_set_flex_grow(this->projectsButton, 1);
    lv_obj_add_flag(this->projectsButton, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
    lv_obj_remove_flag(this->projectsButton, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_set_style_bg_color(this->projectsButton, lv_color_hex(0x006FEE), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_bg_opa(this->projectsButton, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_add_event_cb(this->projectsButton, &ResourceDetailsScreen::onProjectsButtonClick, LV_EVENT_CLICKED, this);
 
    this->projectsButtonLabel = lv_label_create(this->projectsButton);
@@ -273,6 +275,8 @@ void ResourceDetailsScreen::init()
    lv_obj_set_align(this->startSessionButton, LV_ALIGN_CENTER);
    lv_obj_add_flag(this->startSessionButton, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
    lv_obj_remove_flag(this->startSessionButton, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_set_style_bg_color(this->startSessionButton, lv_color_hex(0x17C964), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_bg_opa(this->startSessionButton, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_add_flag(this->startSessionButton, LV_OBJ_FLAG_HIDDEN);
    lv_obj_add_event_cb(this->startSessionButton, &ResourceDetailsScreen::onButtonClick, LV_EVENT_CLICKED, new ButtonClickEventData{this, BUTTON_CLICK_TYPE_START_SESSION});
 
@@ -332,6 +336,8 @@ void ResourceDetailsScreen::init()
    lv_obj_set_align(unlockDoorButton, LV_ALIGN_CENTER);
    lv_obj_add_flag(unlockDoorButton, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
    lv_obj_remove_flag(unlockDoorButton, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_set_style_bg_color(unlockDoorButton, lv_color_hex(0x17C964), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_bg_opa(unlockDoorButton, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_add_event_cb(unlockDoorButton, &ResourceDetailsScreen::onButtonClick, LV_EVENT_CLICKED, new ButtonClickEventData{this, BUTTON_CLICK_TYPE_UNLOCK_DOOR});
 
    lv_obj_t *labelForUnlockDoorButton = lv_label_create(unlockDoorButton);
@@ -533,7 +539,7 @@ void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief 
       lv_obj_set_align(flowButton, LV_ALIGN_CENTER);
       lv_obj_add_flag(flowButton, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
       lv_obj_remove_flag(flowButton, LV_OBJ_FLAG_SCROLLABLE);
-      lv_obj_set_style_bg_color(flowButton, lv_color_hex(0x5B5B5B), LV_PART_MAIN | LV_STATE_DEFAULT);
+      lv_obj_set_style_bg_color(flowButton, lv_color_hex(0x006FEE), LV_PART_MAIN | LV_STATE_DEFAULT);
       lv_obj_set_style_bg_opa(flowButton, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
 
       ButtonClickEventData *evt = new ButtonClickEventData{this, BUTTON_CLICK_TYPE_FLOW_BUTTON};
@@ -671,6 +677,9 @@ void ResourceDetailsScreen::refreshAccessState()
             lv_label_set_text(this->startSessionButtonLabel,
                               isTakeover ? "Uebernehmen" : "Ressource verwenden");
          }
+         // Takeover = warning orange (danger-soft on web), normal start = success green
+         lv_color_t startBgColor = isTakeover ? lv_color_hex(0xF5A524) : lv_color_hex(0x17C964);
+         lv_obj_set_style_bg_color(this->startSessionButton, startBgColor, LV_PART_MAIN | LV_STATE_DEFAULT);
       }
    }
 
