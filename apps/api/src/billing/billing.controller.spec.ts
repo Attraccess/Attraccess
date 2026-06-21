@@ -16,6 +16,7 @@ import { SumupTransactionCallbackDto } from './dto/sumup/sumup-transaction-callb
 import { ResourceFlowsService } from '../resources/flows/resource-flows.service';
 import { SseInstrumentation } from '../metrics/instrumentation/sse/sse.helper';
 import { Observable } from 'rxjs';
+import { LicenseService } from '../license/license.service';
 
 const baseReq = (userOverrides: DeepPartial<User> = {}) =>
   ({
@@ -99,6 +100,10 @@ describe('BillingController', () => {
         {
           provide: SseInstrumentation,
           useValue: { wrap: <T,>(_s: string, source: Observable<T>) => source },
+        },
+        {
+          provide: LicenseService,
+          useValue: { verifyLicense: jest.fn().mockResolvedValue({ valid: true, modules: [] }) },
         },
       ],
     }).compile();
