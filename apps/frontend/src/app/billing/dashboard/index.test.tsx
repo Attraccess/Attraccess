@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/react';
+import { useLicenseServiceGetLicenseInformation } from '@attraccess/react-query-client';
 import { describe, expect, it, vi } from 'vitest';
 import { BillingDashboardPage } from './index';
 
@@ -16,8 +17,6 @@ vi.mock('./summary', () => ({ SummaryCard: () => <div data-testid="summary" /> }
 vi.mock('../../../components/pageHeader', () => ({
   PageHeader: ({ title }: { title: string }) => <h1>{title}</h1>,
 }));
-
-import { useLicenseServiceGetLicenseInformation } from '@attraccess/react-query-client';
 
 function mockLicense(modules: string[] | undefined) {
   vi.mocked(useLicenseServiceGetLicenseInformation).mockReturnValue({

@@ -1,6 +1,8 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/react';
+import { useLicenseServiceGetLicenseInformation } from '@attraccess/react-query-client';
 import { describe, expect, it, vi } from 'vitest';
+import { useAuth } from '../../hooks/useAuth';
 import { SSOProvidersPage } from './SSOProvidersPage';
 
 vi.mock('@attraccess/react-query-client', () => ({
@@ -20,9 +22,6 @@ vi.mock('./providers/SSOProvidersList', () => ({
 vi.mock('../../components/pageHeader', () => ({
   PageHeader: ({ title }: { title: string }) => <h1>{title}</h1>,
 }));
-
-import { useLicenseServiceGetLicenseInformation } from '@attraccess/react-query-client';
-import { useAuth } from '../../hooks/useAuth';
 
 function mockLicense(modules: string[] | undefined) {
   vi.mocked(useLicenseServiceGetLicenseInformation).mockReturnValue({

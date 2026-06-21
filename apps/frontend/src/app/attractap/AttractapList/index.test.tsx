@@ -1,5 +1,7 @@
 import '@testing-library/jest-dom/vitest';
-import { render, screen } from '@testing-library/react';
+import React from 'react';
+import { render } from '@testing-library/react';
+import { useLicenseServiceGetLicenseInformation } from '@attraccess/react-query-client';
 import { describe, expect, it, vi } from 'vitest';
 import { AttractapList } from './index';
 
@@ -28,9 +30,6 @@ vi.mock('./delete', () => ({ AttractapDeleteModal: () => null }));
 vi.mock('../../../hooks/useNow', () => ({ useNow: () => new Date() }));
 vi.mock('../../../components/AlertStatusIcon', () => ({ AlertStatusIcon: () => null }));
 vi.mock('../../../components/emptyState', () => ({ EmptyState: () => <div data-testid="empty-state" /> }));
-
-import { useLicenseServiceGetLicenseInformation } from '@attraccess/react-query-client';
-import React from 'react';
 
 function mockLicense(modules: string[] | undefined) {
   vi.mocked(useLicenseServiceGetLicenseInformation).mockReturnValue({
