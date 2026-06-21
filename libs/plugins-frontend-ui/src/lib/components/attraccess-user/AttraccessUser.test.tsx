@@ -1,6 +1,5 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { AttraccessUser } from './AttraccessUser';
 
@@ -12,7 +11,7 @@ describe('AttraccessUser', () => {
     expect(screen.queryByText('supervisor')).not.toBeInTheDocument();
   });
 
-  it('starts a direct message from the inline action', async () => {
+  it('renders username and description without a standalone chat icon button', () => {
     const onStartDirectMessage = vi.fn();
     const user = { id: 42, username: 'supervisor' };
 
@@ -23,12 +22,10 @@ describe('AttraccessUser', () => {
     expect(screen.getByText('supervisor')).toBeInTheDocument();
     expect(screen.getByText('Lab manager')).toBeInTheDocument();
 
-    const inlineAction = container.querySelector('button');
-    expect(inlineAction).toBeInTheDocument();
-
-    if (!inlineAction) throw new Error('inlineAction not found');
-    await userEvent.click(inlineAction);
-
-    expect(onStartDirectMessage).toHaveBeenCalledWith(user);
+    // No standalone chat <button> — only the wrapping popover trigger (role="button")
+    const buttons = container.querySelectorAll('button');
+    expect(buttons).toHaveLength(0);
+    const roleButtons = container.querySelectorAll('[role="button"]');
+    expect(roleButtons).toHaveLength(1);
   });
 });
