@@ -14,6 +14,7 @@ import { LiveNotificationsService } from './liveNotificationsService';
 import { ResourceFlowsModule } from '../resources/flows/resource-flows.module';
 import { EmailModule } from '../email/email.module';
 import { SettingsModule } from '../settings/settings.module';
+import { LicenseModule } from '../license/license.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { SettingsModule } from '../settings/settings.module';
     forwardRef(() => ResourceFlowsModule),
     EmailModule,
     SettingsModule,
+    LicenseModule,
   ],
   controllers: [BillingController],
   providers: [BillingService, SumUpService, LiveNotificationsService],

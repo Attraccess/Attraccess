@@ -71,6 +71,7 @@ vi.mock('@attraccess/react-query-client', () => ({
   UseNotificationsServiceNotificationsGetPreferencesKeyFn: () => ['NotificationsServiceNotificationsGetPreferences'],
   useNotificationsServiceNotificationsGetPreferences: () => ({ data: hoisted.preferences, isLoading: false }),
   useNotificationsServiceNotificationsUpdatePreferences: () => ({ mutate: hoisted.mutate, isPending: hoisted.isPending }),
+  useLicenseServiceGetLicenseInformation: () => ({ data: { modules: ['maintenance'] } }),
 }));
 
 vi.mock('../../../components/toastProvider', () => ({

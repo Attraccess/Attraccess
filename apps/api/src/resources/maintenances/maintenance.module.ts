@@ -28,6 +28,7 @@ import { MaintenanceRequestService } from './maintenance-request.service';
 import { MaintenanceRequestController } from './maintenance-request.controller';
 import { MaintenanceRequestNotificationListener } from './maintenance-request-notification.listener';
 import { NotificationsModule } from '../../notifications/notifications.module';
+import { LicenseModule } from '../../license/license.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { NotificationsModule } from '../../notifications/notifications.module';
       User,
     ]),
     NotificationsModule,
+    LicenseModule,
   ],
   controllers: [ResourceMaintenanceController, MaintenanceScheduleController, MaintenanceRequestController],
   providers: [

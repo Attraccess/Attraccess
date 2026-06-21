@@ -1,6 +1,6 @@
 import { Input, Label, Spinner, TextField } from '@heroui/react';
 import { Navigate, useParams } from 'react-router-dom';
-import { SSOProviderType } from '@attraccess/react-query-client';
+import { SSOProviderType, useLicenseServiceGetLicenseInformation } from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useAuth } from '../../../hooks/useAuth';
 import { Button } from '../../../components/button';
@@ -18,6 +18,7 @@ export const SSOProviderFormPage = () => {
   const { t } = useTranslations({ en, de });
   const { hasPermission } = useAuth();
   const canManageSSO = hasPermission('canManageSystemConfiguration');
+  const { data: license } = useLicenseServiceGetLicenseInformation();
 
   const { providerId: providerIdParam } = useParams<{ providerId: string }>();
   const parsedProviderId = providerIdParam ? Number(providerIdParam) : undefined;
@@ -43,6 +44,10 @@ export const SSOProviderFormPage = () => {
   // Redirect if user doesn't have permission
   if (!canManageSSO) {
     return <Navigate to="/" />;
+  }
+
+  if (license && !license.modules.includes('sso')) {
+    return null;
   }
 
   if (isEditing && isLoadingProvider) {

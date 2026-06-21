@@ -26,6 +26,7 @@ import {
   Attractap,
   useAttractapServiceGetFirmwares,
   useAttractapServiceGetReaders,
+  useLicenseServiceGetLicenseInformation,
 } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../components/toastProvider';
 import { PageAction, PageHeader } from '../../../components/pageHeader';
@@ -42,6 +43,8 @@ export function AttractapList() {
     de,
     en,
   });
+
+  const { data: license } = useLicenseServiceGetLicenseInformation();
 
   const { data: firmwares } = useAttractapServiceGetFirmwares();
 
@@ -112,6 +115,10 @@ export function AttractapList() {
     },
     [firmwares],
   );
+
+  if (license && !license.modules.includes('attractap')) {
+    return null;
+  }
 
   return (
     <>

@@ -27,10 +27,13 @@ import { EnrollNfcCardResponseDto } from './dtos/enroll-nfc-card-response.dto';
 import { ResetNfcCardResponseDto } from './dtos/reset-nfc-card-response.dto';
 import { UpdateReaderDto } from './dtos/update-reader.dto';
 import { AttractapCrashReportDto } from './dtos/crash-report.dto';
+import { RequiresLicense } from '../license/require-license.decorator';
+import { LicenseModuleType } from '../license/license.service';
 
 @ApiTags('Attractap')
 @Controller('attractap/readers')
 @UseInterceptors(ClassSerializerInterceptor)
+@RequiresLicense(LicenseModuleType.ATTRACTAP)
 export class AttractapController {
   private readonly logger = new Logger(AttractapController.name);
 

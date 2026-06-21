@@ -20,6 +20,8 @@ import {
   Request,
   Sse,
 } from '@nestjs/common';
+import { LicenseModuleType } from '../license/license.service';
+import { RequiresLicense } from '../license/require-license.decorator';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { BillingService } from './billing.service';
 import { PaginationOptionsDto } from '../types/request';
@@ -43,6 +45,7 @@ import { ResourceFlowsService } from '../resources/flows/resource-flows.service'
 import { RefundTransactionDto } from './dto/refund-transaction.dto';
 import { SseInstrumentation } from '../metrics/instrumentation/sse/sse.helper';
 
+@RequiresLicense(LicenseModuleType.BILLING)
 @ApiTags('Billing')
 @Controller()
 export class BillingController {

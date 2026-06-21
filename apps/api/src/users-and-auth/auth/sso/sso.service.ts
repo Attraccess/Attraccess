@@ -117,6 +117,7 @@ export class SSOService {
   }
 
   public async updateProvider(id: number, updateDto: UpdateSSOProviderDto): Promise<SSOProvider> {
+    await this.licenseService.verifyLicense({ modules: [LicenseModuleType.SSO] });
     const provider = await this.getProviderById(id);
 
     if (provider.type === SSOProviderType.OIDC && updateDto.oidcConfiguration) {
@@ -137,6 +138,7 @@ export class SSOService {
   }
 
   public async deleteProvider(id: number): Promise<void> {
+    await this.licenseService.verifyLicense({ modules: [LicenseModuleType.SSO] });
     const provider = await this.getProviderById(id);
     if (provider.oidcConfiguration) {
       await this.oidcConfigRepository.delete(provider.oidcConfiguration.id);
