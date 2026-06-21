@@ -290,7 +290,7 @@ void ResourceDetailsScreen::init()
    lv_obj_set_width(this->stopOtherUserNote, lv_pct(100));
    lv_obj_set_height(this->stopOtherUserNote, LV_SIZE_CONTENT);
    lv_label_set_long_mode(this->stopOtherUserNote, LV_LABEL_LONG_WRAP);
-   lv_label_set_text(this->stopOtherUserNote, "Sie beenden die Sitzung eines anderen Nutzers mit Ihren Adminrechten.");
+   lv_label_set_text(this->stopOtherUserNote, "Achtung: Sie beenden die laufende Sitzung eines anderen Nutzers.");
    lv_obj_set_style_text_color(this->stopOtherUserNote, lv_color_hex(0xF5A524), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_font(this->stopOtherUserNote, &lv_font_montserrat_10, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_add_flag(this->stopOtherUserNote, LV_OBJ_FLAG_HIDDEN);
@@ -306,11 +306,11 @@ void ResourceDetailsScreen::init()
    lv_obj_add_flag(this->stopSessionButton, LV_OBJ_FLAG_HIDDEN);
    lv_obj_add_event_cb(this->stopSessionButton, &ResourceDetailsScreen::onButtonClick, LV_EVENT_CLICKED, new ButtonClickEventData{this, BUTTON_CLICK_TYPE_STOP_SESSION});
 
-   lv_obj_t *labelForStopSessionButton = lv_label_create(this->stopSessionButton);
-   lv_obj_set_width(labelForStopSessionButton, LV_SIZE_CONTENT);
-   lv_obj_set_height(labelForStopSessionButton, LV_SIZE_CONTENT);
-   lv_obj_set_align(labelForStopSessionButton, LV_ALIGN_CENTER);
-   lv_label_set_text(labelForStopSessionButton, "Sitzung beenden");
+   this->stopSessionButtonLabel = lv_label_create(this->stopSessionButton);
+   lv_obj_set_width(this->stopSessionButtonLabel, LV_SIZE_CONTENT);
+   lv_obj_set_height(this->stopSessionButtonLabel, LV_SIZE_CONTENT);
+   lv_obj_set_align(this->stopSessionButtonLabel, LV_ALIGN_CENTER);
+   lv_label_set_text(this->stopSessionButtonLabel, "Sitzung beenden");
 
    this->doorControls = lv_obj_create(this->sessionControls);
    lv_obj_remove_style_all(this->doorControls);
@@ -665,29 +665,31 @@ void ResourceDetailsScreen::refreshAccessState()
                showStart = true;
                isTakeover = true;
             }
-            // Only introducers and resource managers can force-stop another user's session.
-            // When overtake is allowed, only resource managers (admins) see the stop button —
-            // introducers use the overtake button instead.
-            if (this->resourceCache.allowTakeOver)
-            {
-               showStop = user.canManageResource;
-            }
-            else
-            {
-               showStop = user.isIntroducer || user.canManageResource;
-            }
+            // Introducers and resource managers can force-stop another user's session
+            // (mirrors the web frontend's canStopOtherUserSession). Not gated on allowTakeOver:
+            // an introducer can both take over and force-stop.
+            showStop = user.isIntroducer || user.canManageResource;
          }
 
          lv_obj_set_flag(this->startSessionButton, LV_OBJ_FLAG_HIDDEN, !showStart);
          lv_obj_set_flag(this->stopSessionButton, LV_OBJ_FLAG_HIDDEN, !showStop);
 
-         // Admin stopping another user's session: soften the button and show a warning note
-         bool isAdminStop = showStop && !ownsActiveUsage;
+         // Differentiate stopping your own session from force-stopping someone else's:
+         // - own session: solid danger red, full prominence, plain label, no note
+         // - foreign session: softened/darker red, warning label + orange note
+         bool isForeignStop = showStop && !ownsActiveUsage;
          if (this->stopOtherUserNote)
          {
-            lv_obj_set_flag(this->stopOtherUserNote, LV_OBJ_FLAG_HIDDEN, !isAdminStop);
+            lv_obj_set_flag(this->stopOtherUserNote, LV_OBJ_FLAG_HIDDEN, !isForeignStop);
          }
-         lv_obj_set_style_bg_opa(this->stopSessionButton, isAdminStop ? 140 : 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+         lv_color_t stopBgColor = isForeignStop ? lv_color_hex(0x920B3A) : lv_color_hex(0xF31260);
+         lv_obj_set_style_bg_color(this->stopSessionButton, stopBgColor, LV_PART_MAIN | LV_STATE_DEFAULT);
+         lv_obj_set_style_bg_opa(this->stopSessionButton, isForeignStop ? 200 : 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+         if (this->stopSessionButtonLabel)
+         {
+            lv_label_set_text(this->stopSessionButtonLabel,
+                              isForeignStop ? "Fremde Sitzung beenden" : "Sitzung beenden");
+         }
 
          if (this->startSessionButtonLabel)
          {
@@ -743,6 +745,7 @@ void ResourceDetailsScreen::destroy()
    this->startSessionButton = nullptr;
    this->startSessionButtonLabel = nullptr;
    this->stopSessionButton = nullptr;
+   this->stopSessionButtonLabel = nullptr;
    this->stopOtherUserNote = nullptr;
    this->doorControls = nullptr;
    this->flowButtonsContainer = nullptr;
