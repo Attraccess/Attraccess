@@ -117,22 +117,37 @@ void Application::handleResourceDetailsButtonClick(
   }
 
   switch (evt.buttonClickType) {
-  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_START_SESSION:
-    if (this->cardAuthenticationData.requiresSupervisor) {
+  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_START_SESSION: {
+    // Detect takeover: another user has an active session and the resource allows it
+    bool isTakeover = false;
+    for (uint16_t i = 0; i < this->resourceList.count; ++i) {
+      if (this->resourceList.items[i].id == this->selectedResourceId) {
+        const auto &res = this->resourceList.items[i];
+        isTakeover = res.hasActiveUsage && res.allowTakeOver &&
+                     strcmp(res.activeUser,
+                            this->cardAuthenticationData.username.c_str()) != 0;
+        break;
+      }
+    }
+
+    if (this->cardAuthenticationData.requiresSupervisor && !isTakeover) {
       this->beginSupervision();
       break;
     }
 
-    Display::resourceDetailsScreen.showActionProgress("Starte Sitzung");
+    Display::resourceDetailsScreen.showActionProgress(
+        isTakeover ? "Uebernehme Sitzung" : "Starte Sitzung");
     this->beginActionPause();
     this->pendingActionType = PENDING_ACTION_START_SESSION;
     this->pendingActionResourceId = this->selectedResourceId;
-    this->pendingActionProjectId = this->selectedProjectId;
+    this->pendingActionProjectId = isTakeover ? 0 : this->selectedProjectId;
     this->hasPendingFormRequest = false;
     this->formFlowSubmitted = false;
     this->api.startResourceUsageSession(this->selectedResourceId,
-                                        this->selectedProjectId);
+                                        isTakeover ? 0 : this->selectedProjectId,
+                                        isTakeover);
     break;
+  }
   case ResourceDetailsScreen::BUTTON_CLICK_TYPE_STOP_SESSION:
     Display::resourceDetailsScreen.showActionProgress("Beende Sitzung");
     this->beginActionPause();

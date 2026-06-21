@@ -55,7 +55,7 @@
       "executor": "@nx/js:node",
       "defaultConfiguration": "development",
       "continuous": true,
-      "dependsOn": [],
+      "dependsOn": ["copy-attractap-firmware-into-assets"],
       "options": {
         "buildTarget": "api:build",
         "watch": true

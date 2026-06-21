@@ -3,6 +3,8 @@ import { Session, User } from '@attraccess/database-entities';
 import { TokenHashService } from '../../../encryption/token-hash.service';
 import { SessionStore, SessionMetadata } from './session-store';
 
+const LAST_ACCESSED_THROTTLE_MS = 60_000;
+
 export class SqliteSessionStore implements SessionStore {
   constructor(
     private readonly sessionRepository: Repository<Session>,
@@ -27,8 +29,11 @@ export class SqliteSessionStore implements SessionStore {
       await this.sessionRepository.remove(session);
       return null;
     }
-    session.lastAccessedAt = new Date();
-    await this.sessionRepository.save(session);
+    // ponytail: skip write if within throttle window to reduce per-request DB pressure
+    if (!session.lastAccessedAt || Date.now() - session.lastAccessedAt.getTime() > LAST_ACCESSED_THROTTLE_MS) {
+      session.lastAccessedAt = new Date();
+      await this.sessionRepository.save(session);
+    }
     return session.user;
   }
 
