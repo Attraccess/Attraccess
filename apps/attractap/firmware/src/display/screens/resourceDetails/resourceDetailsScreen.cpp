@@ -493,7 +493,8 @@ void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief 
    }
 
    lv_obj_set_flag(this->sessionDetailsContainer, LV_OBJ_FLAG_HIDDEN, !resource.hasActiveUsage);
-   lv_obj_set_flag(this->flowButtonsContainer, LV_OBJ_FLAG_HIDDEN, !resource.hasActiveUsage);
+   // ponytail: always hide here; refreshAccessState() reveals it only to the session owner
+   lv_obj_add_flag(this->flowButtonsContainer, LV_OBJ_FLAG_HIDDEN);
 
    switch (resourceType)
    {
@@ -671,6 +672,12 @@ void ResourceDetailsScreen::refreshAccessState()
                               isTakeover ? "Uebernehmen" : "Ressource verwenden");
          }
       }
+   }
+
+   // Flow node buttons are only relevant to the person who owns the active session.
+   if (this->flowButtonsContainer)
+   {
+      lv_obj_set_flag(this->flowButtonsContainer, LV_OBJ_FLAG_HIDDEN, !ownsActiveUsage);
    }
 }
 void ResourceDetailsScreen::loop()
