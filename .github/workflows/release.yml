@@ -91,12 +91,141 @@ jobs:
           files: dist/plugin-zips/*.zip
           fail_on_unmatched_files: true
 
-  containerize:
-    needs: [lint, typecheck, test, build]
+  check-companion:
+    runs-on: ubuntu-latest
+    outputs:
+      exists: ${{ steps.check.outputs.exists }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+      - id: check
+        run: |
+          if [ -f "apps/companion/project.json" ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  build-companion-linux:
+    needs: check-companion
+    if: needs.check-companion.outputs.exists == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+      - uses: ./.github/actions/setup
+      - name: Install Linux packaging dependencies
+        run: sudo apt-get install -y fakeroot rpm
+      - name: Build Linux companion (x64 + arm64)
+        run: pnpm nx run companion:build
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: companion-linux-${{ github.run_id }}
+          path: |
+            apps/companion/dist/companion_linux_x64.AppImage
+            apps/companion/dist/companion_linux_arm64.AppImage
+          if-no-files-found: warn
+
+  build-companion-macos:
+    needs: check-companion
+    if: needs.check-companion.outputs.exists == 'true'
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+      - uses: ./.github/actions/setup
+      - name: Import Apple Developer certificate
+        if: ${{ secrets.APPLE_CERTIFICATE != '' }}
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -hex 16)"
+          echo "$APPLE_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$RUNNER_TEMP/certificate.p12" -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+          echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
+          echo "CSC_LINK=$RUNNER_TEMP/certificate.p12" >> "$GITHUB_ENV"
+          echo "CSC_KEY_PASSWORD=$APPLE_CERTIFICATE_PASSWORD" >> "$GITHUB_ENV"
+      - name: Build macOS companion (universal)
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.APPLE_CERTIFICATE != '' && 'true' || 'false' }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: pnpm nx run companion:build
+      - name: Clean up keychain
+        if: ${{ secrets.APPLE_CERTIFICATE != '' && always() }}
+        run: security delete-keychain "$KEYCHAIN_PATH" || true
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: companion-macos-${{ github.run_id }}
+          path: apps/companion/dist/companion_mac_universal.dmg
+          if-no-files-found: warn
+
+  build-companion-windows:
+    needs: check-companion
+    if: needs.check-companion.outputs.exists == 'true'
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+      - uses: ./.github/actions/setup
+      - name: Decode Windows code-signing certificate
+        if: ${{ secrets.WINDOWS_CERT_BASE64 != '' }}
+        shell: bash
+        env:
+          WINDOWS_CERT_BASE64: ${{ secrets.WINDOWS_CERT_BASE64 }}
+        run: |
+          echo "$WINDOWS_CERT_BASE64" | base64 --decode > "$RUNNER_TEMP/certificate.pfx"
+          echo "WIN_CSC_LINK=$RUNNER_TEMP/certificate.pfx" >> "$GITHUB_ENV"
+          echo "WIN_CSC_KEY_PASSWORD=${{ secrets.WINDOWS_CERT_PASSWORD }}" >> "$GITHUB_ENV"
+      - name: Build Windows companion (x64)
+        shell: bash
+        run: pnpm nx run companion:build
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: companion-windows-${{ github.run_id }}
+          path: apps/companion/dist/companion_win_x64.exe
+          if-no-files-found: warn
+
+  containerize:
+    needs: [lint, typecheck, test, build, build-companion-linux, build-companion-macos, build-companion-windows]
+    if: always() && !failure() && !cancelled()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Download companion Linux binaries
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: companion-linux-${{ github.run_id }}
+          path: apps/companion/dist
+
+      - name: Download companion macOS binary
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: companion-macos-${{ github.run_id }}
+          path: apps/companion/dist
+
+      - name: Download companion Windows binary
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: companion-windows-${{ github.run_id }}
+          path: apps/companion/dist
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef
