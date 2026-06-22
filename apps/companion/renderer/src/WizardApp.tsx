@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Card, Button, Input, FormField, StatusText } from '@attraccess/ui';
+import { Button, Card, FieldError, Input, Label, Spinner, TextField } from '@heroui/react';
 
 type Step = 'url' | 'register' | 'done';
 
@@ -21,7 +21,8 @@ declare global {
 export function WizardApp() {
   const [step, setStep] = useState<Step>('url');
   const [serverUrl, setServerUrl] = useState('');
-  const [status, setStatus] = useState<{ text: string; variant: 'default' | 'ok' | 'error' }>({ text: '', variant: 'default' });
+  const [errorMsg, setErrorMsg] = useState('');
+  const [statusText, setStatusText] = useState('');
   const [connecting, setConnecting] = useState(false);
   const [deviceId, setDeviceId] = useState<number | null>(null);
 
@@ -29,9 +30,8 @@ export function WizardApp() {
     window.companion.onInit(({ firstRun, serverUrl: saved }) => {
       if (!firstRun && saved) setServerUrl(saved);
     });
-    // ponytail: ws-status text is only visible on the register step; safe to update unconditionally
     window.companion.onWsStatus((s) => {
-      setStatus({ text: s === 'connected' ? 'Connected — awaiting registration…' : 'Reconnecting…', variant: 'default' });
+      setStatusText(s === 'connected' ? 'Connected — awaiting registration…' : 'Reconnecting…');
     });
     window.companion.onRegistered(({ id }) => {
       setDeviceId(id);
@@ -42,68 +42,86 @@ export function WizardApp() {
   async function handleConnect() {
     const url = serverUrl.trim().replace(/\/$/, '');
     if (!url) {
-      setStatus({ text: 'Please enter a server URL.', variant: 'error' });
+      setErrorMsg('Please enter a server URL.');
       return;
     }
+    setErrorMsg('');
     setConnecting(true);
-    setStatus({ text: 'Checking connectivity…', variant: 'default' });
 
     const ok = await window.companion.checkHealth(url);
     if (!ok) {
-      setStatus({ text: 'Could not reach server. Check the URL and try again.', variant: 'error' });
+      setErrorMsg('Could not reach server. Check the URL and try again.');
       setConnecting(false);
       return;
     }
 
-    setStatus({ text: '', variant: 'default' });
     setStep('register');
     await window.companion.register(url);
   }
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', padding: '24px' }}>
-      <Card>
-        {step === 'url' && (
-          <>
-            <h1 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '4px' }}>Attraccess Companion</h1>
-            <p style={{ color: 'var(--ui-text-muted)', fontSize: '0.875rem', marginBottom: '20px' }}>
-              Enter the URL of your Attraccess server to get started.
-            </p>
-            <FormField label="Server URL" htmlFor="serverUrl">
-              <Input
-                id="serverUrl"
-                type="url"
-                placeholder="https://attraccess.example.com"
+    <div className="flex items-center justify-center h-full p-6 bg-background">
+      <Card className="w-full max-w-md">
+        <Card.Content className="flex flex-col gap-4 p-8">
+          {step === 'url' && (
+            <>
+              <div>
+                <h1 className="text-xl font-bold">Attraccess Companion</h1>
+                <p className="text-fg-muted text-sm mt-1">
+                  Enter the URL of your Attraccess server to get started.
+                </p>
+              </div>
+              <TextField
                 value={serverUrl}
-                onChange={(e) => setServerUrl(e.target.value)}
-              />
-            </FormField>
-            <Button onClick={handleConnect} disabled={connecting}>Connect</Button>
-            <StatusText variant={status.variant}>{status.text}</StatusText>
-          </>
-        )}
+                onChange={setServerUrl}
+                type="url"
+                isInvalid={!!errorMsg}
+                fullWidth
+              >
+                <Label>Server URL</Label>
+                <Input placeholder="https://attraccess.example.com" />
+                <FieldError>{errorMsg}</FieldError>
+              </TextField>
+              <Button
+                variant="primary"
+                fullWidth
+                isDisabled={connecting}
+                onPress={handleConnect}
+              >
+                {connecting ? <Spinner /> : 'Connect'}
+              </Button>
+            </>
+          )}
 
-        {step === 'register' && (
-          <>
-            <h1 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '4px' }}>Registering…</h1>
-            <p style={{ color: 'var(--ui-text-muted)', fontSize: '0.875rem', marginBottom: '20px' }}>
-              The app is opening a connection and registering this device. Please wait.
-            </p>
-            <StatusText variant="default">{status.text || 'Connecting to server…'}</StatusText>
-          </>
-        )}
+          {step === 'register' && (
+            <>
+              <div>
+                <h1 className="text-xl font-bold">Registering…</h1>
+                <p className="text-fg-muted text-sm mt-1">
+                  Opening a connection and registering this device. Please wait.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 text-fg-muted text-sm">
+                <Spinner />
+                <span>{statusText || 'Connecting to server…'}</span>
+              </div>
+            </>
+          )}
 
-        {step === 'done' && (
-          <>
-            <h1 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '4px' }}>Setup complete!</h1>
-            <p style={{ color: 'var(--ui-text-muted)', fontSize: '0.875rem', marginBottom: '20px' }}>
-              This device has been registered. Please name it in the Attraccess admin panel.
-            </p>
-            {deviceId !== null && (
-              <StatusText variant="ok">Device ID: {deviceId}</StatusText>
-            )}
-          </>
-        )}
+          {step === 'done' && (
+            <>
+              <div>
+                <h1 className="text-xl font-bold text-success">Setup complete!</h1>
+                <p className="text-fg-muted text-sm mt-1">
+                  This device has been registered. Name it in the Attraccess admin panel.
+                </p>
+              </div>
+              {deviceId !== null && (
+                <p className="text-success text-sm text-center">Device ID: {deviceId}</p>
+              )}
+            </>
+          )}
+        </Card.Content>
       </Card>
     </div>
   );

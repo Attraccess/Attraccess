@@ -1,5 +1,4 @@
 @import "@heroui/styles";
-@import "../../../libs/ui/src/tokens.css";
 @plugin "@tailwindcss/typography";
 @custom-variant dark (&:where(.dark, .dark *));
 
