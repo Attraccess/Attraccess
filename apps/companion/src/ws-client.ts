@@ -1,13 +1,13 @@
 import WebSocket from 'ws';
 import { EventEmitter } from 'events';
 
-export type CompanionEventType =
-  | 'COMPANION_REQUEST_AUTHENTICATION'
-  | 'COMPANION_AUTHENTICATED'
-  | 'COMPANION_REGISTER'
-  | 'COMPANION_LOCK_PC'
-  | 'COMPANION_UNLOCK_PC'
-  | 'COMPANION_UPDATE_AVAILABLE';
+// ─── Payload types (mirrors companion.types.ts on the API side) ──────────────
+// These will be replaced by the generated client once ATT-623 is complete.
+
+export interface CompanionAuthenticatePayload {
+  id?: number;
+  token?: string;
+}
 
 export interface CompanionResource {
   id: number;
@@ -20,7 +20,7 @@ export interface AuthenticatedPayload {
   resources: CompanionResource[];
 }
 
-export interface RegisterPayload {
+export interface RegisterResponsePayload {
   id: number;
   token: string;
 }
@@ -30,10 +30,12 @@ export interface UpdateAvailablePayload {
   version: string;
 }
 
+// ─── Typed event emitter ──────────────────────────────────────────────────────
+
 export declare interface CompanionWsClient {
   on(event: 'request_authentication', listener: () => void): this;
   on(event: 'authenticated', listener: (payload: AuthenticatedPayload) => void): this;
-  on(event: 'register', listener: (payload: RegisterPayload) => void): this;
+  on(event: 'register_response', listener: (payload: RegisterResponsePayload) => void): this;
   on(event: 'lock_pc', listener: () => void): this;
   on(event: 'unlock_pc', listener: () => void): this;
   on(event: 'update_available', listener: (payload: UpdateAvailablePayload) => void): this;
@@ -69,9 +71,8 @@ export class CompanionWsClient extends EventEmitter {
 
     this.ws.on('message', (raw) => {
       try {
-        const msg = JSON.parse(raw.toString()) as { event: string; data: { type: CompanionEventType; payload: unknown } };
-        if (msg.event !== 'EVENT') return;
-        this.dispatch(msg.data.type, msg.data.payload);
+        const msg = JSON.parse(raw.toString()) as { event: string; data: unknown };
+        this.dispatch(msg.event, msg.data);
       } catch {
         // ignore malformed messages
       }
@@ -83,7 +84,7 @@ export class CompanionWsClient extends EventEmitter {
     });
 
     this.ws.on('error', () => {
-      // close event fires after error, reconnect handled there
+      // close fires after error; reconnect handled there
     });
   }
 
@@ -104,30 +105,34 @@ export class CompanionWsClient extends EventEmitter {
     this.ws?.close();
   }
 
-  sendAuthenticate(id?: number, token?: string) {
-    this.send('COMPANION_AUTHENTICATE', id !== undefined && token !== undefined ? { id, token } : {});
-  }
+  // ─── Send methods (Client → Server) ────────────────────────────────────────
 
   sendRegister() {
     this.send('COMPANION_REGISTER', {});
   }
 
-  private send(type: string, payload: unknown) {
+  sendAuthenticate(payload: CompanionAuthenticatePayload) {
+    this.send('COMPANION_AUTHENTICATE', payload);
+  }
+
+  private send(event: string, data: unknown) {
     if (this.ws?.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({ event: 'EVENT', data: { type, payload } }));
+      this.ws.send(JSON.stringify({ event, data }));
     }
   }
 
-  private dispatch(type: CompanionEventType, payload: unknown) {
-    switch (type) {
+  // ─── Receive dispatch (Server → Client) ────────────────────────────────────
+
+  private dispatch(event: string, data: unknown) {
+    switch (event) {
       case 'COMPANION_REQUEST_AUTHENTICATION':
         this.emit('request_authentication');
         break;
       case 'COMPANION_AUTHENTICATED':
-        this.emit('authenticated', payload as AuthenticatedPayload);
+        this.emit('authenticated', data as AuthenticatedPayload);
         break;
       case 'COMPANION_REGISTER':
-        this.emit('register', payload as RegisterPayload);
+        this.emit('register_response', data as RegisterResponsePayload);
         break;
       case 'COMPANION_LOCK_PC':
         this.emit('lock_pc');
@@ -136,7 +141,7 @@ export class CompanionWsClient extends EventEmitter {
         this.emit('unlock_pc');
         break;
       case 'COMPANION_UPDATE_AVAILABLE':
-        this.emit('update_available', payload as UpdateAvailablePayload);
+        this.emit('update_available', data as UpdateAvailablePayload);
         break;
     }
   }

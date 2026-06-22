@@ -8,14 +8,16 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import { Server } from 'ws';
-import { Inject, Logger } from '@nestjs/common';
+import { Inject, Logger, UsePipes, ValidationPipe } from '@nestjs/common';
 import { randomBytes } from 'crypto';
+import { AsyncApiPub, AsyncApiSub } from 'nestjs-asyncapi';
 import { CompanionService } from './companion.service';
 import {
+  CompanionAuthenticateDto,
+  CompanionAuthenticatedDto,
+  CompanionRegisterResponseDto,
+  CompanionUpdateAvailableDto,
   CompanionWebSocket,
-  CompanionEventType,
-  CompanionRegisterPayload,
-  CompanionAuthenticatedPayload,
 } from './companion.types';
 
 @WebSocketGateway({ path: '/api/companion/websocket' })
@@ -24,24 +26,25 @@ export class CompanionGateway implements OnGatewayConnection, OnGatewayDisconnec
   server: Server;
 
   private readonly logger = new Logger(CompanionGateway.name);
+  private readonly sockets = new Map<string, CompanionWebSocket>();
 
   @Inject(CompanionService)
   private companionService: CompanionService;
 
-  private readonly sockets = new Map<string, CompanionWebSocket>();
+  // ─── Connection lifecycle ─────────────────────────────────────────────────
 
-  public async handleConnection(client: WebSocket) {
+  public handleConnection(client: WebSocket) {
     const id = randomBytes(4).toString('base64url').slice(0, 6);
 
-    const sendEvent = (type: CompanionEventType, payload: unknown = {}) => {
-      (client as unknown as { send: (d: string) => void }).send(JSON.stringify({ event: 'EVENT', data: { type, payload } }));
+    const sendEvent = (event: string, payload: unknown = {}) => {
+      (client as unknown as { send: (d: string) => void }).send(JSON.stringify({ event, data: payload }));
     };
 
     Object.assign(client, { id, deviceId: null, sendEvent });
     this.sockets.set(id, client as unknown as CompanionWebSocket);
 
     this.logger.log(`Companion client connected: ${id}`);
-    sendEvent(CompanionEventType.COMPANION_REQUEST_AUTHENTICATION);
+    this.publishRequestAuthentication(client as unknown as CompanionWebSocket);
   }
 
   public handleDisconnect(client: CompanionWebSocket) {
@@ -49,92 +52,127 @@ export class CompanionGateway implements OnGatewayConnection, OnGatewayDisconnec
     this.sockets.delete(client.id);
   }
 
-  @SubscribeMessage('EVENT')
-  public async onEvent(
-    @MessageBody() data: { type: CompanionEventType; payload: unknown },
-    @ConnectedSocket() socket: CompanionWebSocket,
-  ) {
-    switch (data.type) {
-      case CompanionEventType.COMPANION_REGISTER:
-        await this.handleRegister(socket, data.payload as CompanionRegisterPayload);
-        break;
-      case CompanionEventType.COMPANION_AUTHENTICATE:
-        await this.handleAuthenticate(socket, data.payload as CompanionRegisterPayload);
-        break;
-      default:
-        this.logger.warn(`Unknown companion event type: ${data.type}`);
-    }
-  }
+  // ─── Client → Server ─────────────────────────────────────────────────────
 
-  private async handleRegister(socket: CompanionWebSocket, payload: CompanionRegisterPayload) {
+  @AsyncApiSub({
+    channel: 'COMPANION_REGISTER',
+    message: { name: 'COMPANION_REGISTER', payload: { type: Object } },
+    description: 'Client requests a new device registration (first run only). No payload required.',
+  })
+  @SubscribeMessage('COMPANION_REGISTER')
+  async onRegister(@ConnectedSocket() socket: CompanionWebSocket): Promise<void> {
     const { device, token } = await this.companionService.createDevice();
     socket.deviceId = device.id;
-
-    socket.sendEvent(CompanionEventType.COMPANION_REGISTER, { id: device.id, token });
     this.logger.log(`Companion device registered: id=${device.id}`);
 
-    await this.sendAuthenticated(socket);
+    this.publishRegisterResponse(socket, { id: device.id, token });
+    await this.publishAuthenticated(socket);
   }
 
-  private async handleAuthenticate(socket: CompanionWebSocket, payload: CompanionRegisterPayload) {
-    if (!payload.id || !payload.token) {
-      this.logger.warn('Companion authenticate: missing id or token, requesting re-registration');
-      socket.sendEvent(CompanionEventType.COMPANION_REQUEST_AUTHENTICATION);
+  @AsyncApiSub({
+    channel: 'COMPANION_AUTHENTICATE',
+    message: { name: 'COMPANION_AUTHENTICATE', payload: { type: CompanionAuthenticateDto } },
+    description:
+      'Client authenticates with stored credentials. Send empty payload {} on first run to trigger re-registration.',
+  })
+  @SubscribeMessage('COMPANION_AUTHENTICATE')
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
+  async onAuthenticate(
+    @MessageBody() body: CompanionAuthenticateDto,
+    @ConnectedSocket() socket: CompanionWebSocket,
+  ): Promise<void> {
+    if (!body.id || !body.token) {
+      this.logger.warn(`Companion ${socket.id}: missing credentials, requesting re-registration`);
+      this.publishRequestAuthentication(socket);
       return;
     }
 
-    const device = await this.companionService.findById(payload.id);
-    if (!device) {
-      this.logger.warn(`Companion authenticate: device ${payload.id} not found`);
-      socket.sendEvent(CompanionEventType.COMPANION_REQUEST_AUTHENTICATION);
-      return;
-    }
-
-    const valid = await this.companionService.verifyToken(device, payload.token);
-    if (!valid) {
-      this.logger.warn(`Companion authenticate: invalid token for device ${payload.id}`);
-      socket.sendEvent(CompanionEventType.COMPANION_REQUEST_AUTHENTICATION);
+    const device = await this.companionService.findById(body.id);
+    if (!device || !(await this.companionService.verifyToken(device, body.token))) {
+      this.logger.warn(`Companion ${socket.id}: invalid credentials for device ${body.id}`);
+      this.publishRequestAuthentication(socket);
       return;
     }
 
     socket.deviceId = device.id;
     await this.companionService.touchLastConnection(device);
-    await this.sendAuthenticated(socket);
+    await this.publishAuthenticated(socket);
   }
 
-  private async sendAuthenticated(socket: CompanionWebSocket) {
+  // ─── Server → Client (publishers) ────────────────────────────────────────
+
+  @AsyncApiPub({
+    channel: 'COMPANION_REQUEST_AUTHENTICATION',
+    message: { name: 'COMPANION_REQUEST_AUTHENTICATION', payload: { type: Object } },
+    description:
+      'Server requests credentials. Client should respond with COMPANION_AUTHENTICATE or COMPANION_REGISTER.',
+  })
+  private publishRequestAuthentication(socket: CompanionWebSocket): void {
+    socket.sendEvent('COMPANION_REQUEST_AUTHENTICATION');
+  }
+
+  @AsyncApiPub({
+    channel: 'COMPANION_REGISTER',
+    message: { name: 'COMPANION_REGISTER_RESPONSE', payload: { type: CompanionRegisterResponseDto } },
+    description: 'Server responds to COMPANION_REGISTER with the assigned device credentials to store in the keychain.',
+  })
+  private publishRegisterResponse(socket: CompanionWebSocket, payload: CompanionRegisterResponseDto): void {
+    socket.sendEvent('COMPANION_REGISTER', payload);
+  }
+
+  @AsyncApiPub({
+    channel: 'COMPANION_AUTHENTICATED',
+    message: { name: 'COMPANION_AUTHENTICATED', payload: { type: CompanionAuthenticatedDto } },
+    description: 'Server confirms authentication and provides the resource list for kiosk URL selection.',
+  })
+  private async publishAuthenticated(socket: CompanionWebSocket): Promise<void> {
     const device = await this.companionService.findById(socket.deviceId!);
     if (!device) return;
 
-    const payload: CompanionAuthenticatedPayload = {
+    const payload: CompanionAuthenticatedDto = {
       deviceId: device.id,
       deviceName: device.name,
       resources: (device.resources ?? []).map((r) => ({ id: r.id, name: r.name })),
     };
-    socket.sendEvent(CompanionEventType.COMPANION_AUTHENTICATED, payload);
+    socket.sendEvent('COMPANION_AUTHENTICATED', payload);
   }
 
-  public async sendLockPc(deviceId: number) {
-    for (const socket of this.sockets.values()) {
-      if (socket.deviceId === deviceId) {
-        socket.sendEvent(CompanionEventType.COMPANION_LOCK_PC);
-      }
+  @AsyncApiPub({
+    channel: 'COMPANION_LOCK_PC',
+    message: { name: 'COMPANION_LOCK_PC', payload: { type: Object } },
+    description: 'Server instructs the companion to show the fullscreen lockscreen overlay.',
+  })
+  public async sendLockPc(deviceId: number): Promise<void> {
+    for (const socket of this.socketsForDevice(deviceId)) {
+      socket.sendEvent('COMPANION_LOCK_PC');
     }
   }
 
-  public async sendUnlockPc(deviceId: number) {
-    for (const socket of this.sockets.values()) {
-      if (socket.deviceId === deviceId) {
-        socket.sendEvent(CompanionEventType.COMPANION_UNLOCK_PC);
-      }
+  @AsyncApiPub({
+    channel: 'COMPANION_UNLOCK_PC',
+    message: { name: 'COMPANION_UNLOCK_PC', payload: { type: Object } },
+    description: 'Server instructs the companion to dismiss the lockscreen overlay and clear the webview session.',
+  })
+  public async sendUnlockPc(deviceId: number): Promise<void> {
+    for (const socket of this.socketsForDevice(deviceId)) {
+      socket.sendEvent('COMPANION_UNLOCK_PC');
     }
   }
 
-  public async sendUpdateAvailable(deviceId: number, downloadUrl: string, version: string) {
-    for (const socket of this.sockets.values()) {
-      if (socket.deviceId === deviceId) {
-        socket.sendEvent(CompanionEventType.COMPANION_UPDATE_AVAILABLE, { downloadUrl, version });
-      }
+  @AsyncApiPub({
+    channel: 'COMPANION_UPDATE_AVAILABLE',
+    message: { name: 'COMPANION_UPDATE_AVAILABLE', payload: { type: CompanionUpdateAvailableDto } },
+    description: 'Server notifies the companion that a new version is available for download.',
+  })
+  public async sendUpdateAvailable(deviceId: number, payload: CompanionUpdateAvailableDto): Promise<void> {
+    for (const socket of this.socketsForDevice(deviceId)) {
+      socket.sendEvent('COMPANION_UPDATE_AVAILABLE', payload);
     }
+  }
+
+  // ─── Helpers ──────────────────────────────────────────────────────────────
+
+  private socketsForDevice(deviceId: number): CompanionWebSocket[] {
+    return Array.from(this.sockets.values()).filter((s) => s.deviceId === deviceId);
   }
 }
