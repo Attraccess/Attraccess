@@ -23,6 +23,9 @@
       "@attraccess/api-client": [
         "libs/api-client/src/index.ts"
       ],
+      "@attraccess/companion-ws-client": [
+        "libs/companion-ws-client/src/index.ts"
+      ],
       "@attraccess/attracces": [
         "tools/attracces/src/index.ts"
       ],

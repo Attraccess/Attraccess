@@ -1,0 +1,60 @@
+{
+  "name": "companion-ws-client",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/companion-ws-client/src",
+  "projectType": "library",
+  "tags": ["tag:scope:companion"],
+  "targets": {
+    "generate": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "{projectRoot}/tools/generate.ts",
+        "{workspaceRoot}/dist/apps/api/asyncapi.json"
+      ],
+      "outputs": ["{projectRoot}/src/lib"],
+      "options": {
+        "command": "ts-node --project tsconfig.json libs/companion-ws-client/tools/generate.ts"
+      },
+      "dependsOn": ["api:export-asyncapi"]
+    },
+    "build": {
+      "executor": "@nx/js:tsc",
+      "cache": true,
+      "inputs": [
+        "{projectRoot}/**/*",
+        "!{projectRoot}/**/*.spec.ts",
+        {
+          "externalDependencies": ["typescript"]
+        }
+      ],
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/libs/companion-ws-client",
+        "tsConfig": "libs/companion-ws-client/tsconfig.lib.json",
+        "packageJson": "libs/companion-ws-client/package.json",
+        "main": "libs/companion-ws-client/src/index.ts",
+        "clean": true
+      },
+      "dependsOn": ["generate"]
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "dependsOn": ["generate"],
+      "options": {
+        "cwd": "libs/companion-ws-client",
+        "command": "tsc --noEmit -p tsconfig.lib.json"
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "dependsOn": ["generate"],
+      "options": {
+        "cwd": "libs/companion-ws-client",
+        "command": "eslint src/ --max-warnings=0"
+      }
+    }
+  }
+}

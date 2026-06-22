@@ -29,6 +29,9 @@ log/
 # Auto-generated API + react-query client libs (regenerated from the OpenAPI spec on build)
 libs/api-client/src/generated/
 libs/react-query-client/src/lib/
+# Auto-generated companion WebSocket client (regenerated from the AsyncAPI spec on build)
+libs/companion-ws-client/src/lib/
+dist/apps/api/asyncapi.json
 .github/instructions/nx.instructions.md
 
 apps/api/src/assets/attractap-firmwares/

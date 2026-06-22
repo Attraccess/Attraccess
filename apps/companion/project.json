@@ -13,11 +13,12 @@
       "options": {
         "cwd": "apps/companion",
         "commands": [
-          "tsc -p tsconfig.app.json",
-          "electron-builder --config electron-builder.config.cjs --dir"
+          "esbuild src/main.ts --bundle --platform=node --external:electron --external:keytar --outfile=out/main.js --tsconfig=tsconfig.app.json",
+          "CI=true electron-builder --config electron-builder.config.cjs --dir"
         ],
         "parallel": false
-      }
+      },
+      "dependsOn": ["companion-ws-client:build"]
     },
     "typecheck": {
       "executor": "nx:run-commands",
