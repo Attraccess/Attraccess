@@ -26,7 +26,8 @@ describe('AttraccessUser', () => {
     const inlineAction = container.querySelector('button');
     expect(inlineAction).toBeInTheDocument();
 
-    await userEvent.click(inlineAction!);
+    if (!inlineAction) throw new Error('inlineAction not found');
+    await userEvent.click(inlineAction);
 
     expect(onStartDirectMessage).toHaveBeenCalledWith(user);
   });

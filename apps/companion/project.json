@@ -1,0 +1,36 @@
+{
+  "name": "companion",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/companion/src",
+  "projectType": "application",
+  "tags": ["tag:scope:companion"],
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["production", "^production"],
+      "outputs": ["{workspaceRoot}/dist/apps/companion"],
+      "options": {
+        "cwd": "apps/companion",
+        "commands": [
+          "tsc -p tsconfig.app.json",
+          "electron-builder --config electron-builder.config.cjs --dir"
+        ],
+        "parallel": false
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/companion",
+        "command": "tsc -p tsconfig.app.json --noEmit"
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint",
+      "options": {
+        "lintFilePatterns": ["apps/companion/**/*.ts"]
+      }
+    }
+  }
+}
