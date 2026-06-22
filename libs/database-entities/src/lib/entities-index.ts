@@ -46,6 +46,7 @@ import {
   GetVariablesNodeDataSchema,
   VariableChangedNodeDataSchema,
   VariableScopeSchema,
+  CompanionLockNodeDataSchema,
 } from './entities/resourceFlowNode';
 import {
   ResourceHealthState,
@@ -184,6 +185,7 @@ export {
   GetVariablesNodeDataSchema,
   VariableChangedNodeDataSchema,
   VariableScopeSchema,
+  CompanionLockNodeDataSchema,
   PasswordPolicy,
   PASSWORD_POLICY_SINGLETON_ID,
   PasswordHistory,

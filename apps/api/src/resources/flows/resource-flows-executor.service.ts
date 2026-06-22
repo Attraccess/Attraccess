@@ -47,6 +47,8 @@ import { FlowTimer } from '../../metrics/instrumentation/flow/flow.helper';
 import {
   ActivityTrackExecutor,
   BillingSetAdditionalItemsExecutor,
+  CompanionLockPcExecutor,
+  CompanionUnlockPcExecutor,
   EndUsageSessionExecutor,
   ErrorExecutor,
   GetVariablesExecutor,
@@ -67,6 +69,7 @@ import {
   heartbeatKey,
   topicMatches,
 } from './node-executors';
+import { CompanionGatewayService } from '../../companion/companion-gateway.service';
 
 // Handlebars helpers
 Handlebars.registerHelper('json', (value: unknown) => {
@@ -151,6 +154,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     private readonly variablesService: ResourceFlowVariablesService,
     private readonly cronTimer: CronTimer,
     private readonly flowTimer: FlowTimer,
+    private readonly companionGatewayService: CompanionGatewayService,
   ) {
     const flowConfig = this.configService.get<FlowConfigType>('flow');
     this.logTTLDays = flowConfig.FLOW_LOG_TTL_DAYS;
@@ -202,6 +206,9 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
       [ResourceFlowNodeType.PROCESSING_ERROR]: new ErrorExecutor(),
       [ResourceFlowNodeType.PROCESSING_SET_VARIABLES]: new SetVariablesExecutor(this.variablesService),
       [ResourceFlowNodeType.PROCESSING_GET_VARIABLES]: new GetVariablesExecutor(this.variablesService),
+
+      [ResourceFlowNodeType.OUTPUT_COMPANION_LOCK_PC]: new CompanionLockPcExecutor(this.companionGatewayService),
+      [ResourceFlowNodeType.OUTPUT_COMPANION_UNLOCK_PC]: new CompanionUnlockPcExecutor(this.companionGatewayService),
     };
   }
 

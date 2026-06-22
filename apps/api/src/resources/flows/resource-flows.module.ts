@@ -19,6 +19,7 @@ import flowConfig from './flow.config';
 import { MqttModule } from '../../mqtt/mqtt.module';
 import { ResourceUsageModule } from '../usage/resourceUsage.module';
 import { ResourceHealthModule } from '../health/resource-health.module';
+import { CompanionModule } from '../../companion/companion.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { ResourceHealthModule } from '../health/resource-health.module';
     MqttModule,
     forwardRef(() => ResourceUsageModule),
     ResourceHealthModule,
+    CompanionModule,
   ],
   controllers: [ResourceFlowsController, ResourceFlowVariablesController],
   providers: [

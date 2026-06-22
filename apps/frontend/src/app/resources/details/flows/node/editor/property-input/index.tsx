@@ -3,6 +3,7 @@ import { Button, Description, Input, Label, ModalBody, ModalHeader, NumberField,
 import { StandardModal } from '../../../../../../../components/standardModal';
 import { Select } from '../../../../../../../components/select';
 import { MqttServerSelect } from '../../../../../../../components/mqttServerSelect';
+import { CompanionDeviceSelect } from '../../../../../../../components/companionDeviceSelect';
 import { LabeledSwitch } from '../../../../../../../components/labeledSwitch';
 import { PlusIcon, XIcon } from 'lucide-react';
 import { TExists, TFunction } from '@attraccess/plugins-frontend-ui';
@@ -24,7 +25,7 @@ export interface Property<TValue> {
   stringVariant?: 'multiline';
   exclusiveMinimum?: number;
   maximum?: number;
-  selectFromEntity?: 'mqttServer';
+  selectFromEntity?: 'mqttServer' | 'companionDevice';
   selectFromEntityProperty?: string;
   overrideWithInput?: string;
   isCurrency?: boolean;
@@ -157,6 +158,20 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
           )}
         </StandardModal>
       </>
+    );
+  }
+
+  if (schema.selectFromEntity === 'companionDevice') {
+    return (
+      <CompanionDeviceSelect
+        selectedId={value as number}
+        onSelectionChange={(id) => onChange(id as TValue)}
+        label={!hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined}
+        ariaLabel={t('nodes.' + nodeType + '.config.' + name + '.label')}
+        placeholder={t('nodes.' + nodeType + '.config.' + name + '.placeholder')}
+        isRequired={isRequired}
+        className="w-full"
+      />
     );
   }
 

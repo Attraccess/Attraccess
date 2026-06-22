@@ -29,6 +29,8 @@ export enum ResourceFlowNodeType {
   PROCESSING_GET_VARIABLES = 'processing.variables.get',
   OUTPUT_RESOURCE_HEALTH_HEARTBEAT = 'output.resource.health.heartbeat',
   OUTPUT_RESOURCE_HEALTH_SET = 'output.resource.health.set',
+  OUTPUT_COMPANION_LOCK_PC = 'output.companion.lock-pc',
+  OUTPUT_COMPANION_UNLOCK_PC = 'output.companion.unlock-pc',
 }
 
 // Zod schemas for node data validation
@@ -215,6 +217,15 @@ export const ResourceHealthSetNodeDataSchema = z.object({
   }),
 });
 
+const CompanionDeviceIdSchema = z.number().int().positive().meta({
+  selectFromEntity: 'companionDevice',
+  entityProperty: 'id',
+});
+
+export const CompanionLockNodeDataSchema = z.object({
+  deviceId: CompanionDeviceIdSchema,
+});
+
 // Helper function to get the appropriate schema for a node type
 export function getNodeDataSchema(nodeType: ResourceFlowNodeType) {
   switch (nodeType) {
@@ -279,6 +290,10 @@ export function getNodeDataSchema(nodeType: ResourceFlowNodeType) {
 
     case ResourceFlowNodeType.INPUT_VARIABLE_CHANGED:
       return VariableChangedNodeDataSchema;
+
+    case ResourceFlowNodeType.OUTPUT_COMPANION_LOCK_PC:
+    case ResourceFlowNodeType.OUTPUT_COMPANION_UNLOCK_PC:
+      return CompanionLockNodeDataSchema;
 
     default: {
       const exhaustiveCheck: never = nodeType;
