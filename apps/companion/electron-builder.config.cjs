@@ -5,9 +5,9 @@ module.exports = {
   // ponytail: resolved at build time so it stays in sync with the installed version
   electronVersion: require('../../node_modules/electron/package.json').version,
   directories: {
-    output: 'dist',
+    output: '../../dist/apps/companion',
   },
-  files: ['out/**/*', 'src/index.html'],
+  files: ['out/**/*', 'src/**/*'],
   extraMetadata: {
     main: 'out/main.js',
   },
