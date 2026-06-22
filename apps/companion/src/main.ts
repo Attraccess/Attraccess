@@ -35,7 +35,7 @@ function checkHealth(serverUrl: string): Promise<boolean> {
 // ─── Kiosk webview URL selection ──────────────────────────────────────────────
 
 function kioskUrl(payload: AuthenticatedPayload): string {
-  const base = creds!.serverUrl;
+  const base = creds?.serverUrl ?? '';
   const timeout = `autoLogoff=${autoLogoffSeconds}`;
   if (payload.resources.length === 1) {
     return `${base}/kiosk/resources/${payload.resources[0].id}?${timeout}`;
@@ -169,9 +169,9 @@ function startWsClient(serverUrl: string, firstRun: boolean) {
 
   wsClient.on('request_authentication', () => {
     if (firstRun || !creds?.id) {
-      wsClient!.sendRegister();
+      wsClient?.sendRegister();
     } else {
-      wsClient!.sendAuthenticate({ id: creds.id, token: creds.token });
+      wsClient?.sendAuthenticate({ id: creds.id, token: creds.token });
     }
   });
 

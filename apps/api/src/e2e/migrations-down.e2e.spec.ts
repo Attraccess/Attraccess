@@ -5,6 +5,7 @@ import type { DataSource, DeepPartial, Repository } from 'typeorm';
 import {
   Attractap,
   AttractapCrashReport,
+  CompanionDevice,
   AuthenticationDetail,
   AuthenticationType,
   BillingTransaction,
@@ -187,6 +188,7 @@ const seedDatabase = async (dataSource: DataSource) => {
   const messageRepo = dataSource.getRepository(Message);
   const notificationPreferenceRepo = dataSource.getRepository(NotificationPreference);
   const pushSubscriptionRepo = dataSource.getRepository(PushSubscription);
+  const companionDeviceRepo = dataSource.getRepository(CompanionDevice);
 
   const resourceGroup = await ensureEntity(resourceGroupRepo, () => ({
     name: `Seed Group ${seedTag}`,
@@ -584,6 +586,11 @@ const seedDatabase = async (dataSource: DataSource) => {
     auth: 'seed-auth-secret',
     userAgent: 'Seed Browser/1.0',
     lastSeenAt: null,
+  }));
+
+  await ensureEntity(companionDeviceRepo, () => ({
+    name: `Seed Companion ${seedTag}`,
+    tokenHash: '$2b$10$seed.hash.placeholder.for.migration.testing.only',
   }));
 };
 

@@ -32,6 +32,7 @@ export interface UpdateAvailablePayload {
 
 // ─── Typed event emitter ──────────────────────────────────────────────────────
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export declare interface CompanionWsClient {
   on(event: 'request_authentication', listener: () => void): this;
   on(event: 'authenticated', listener: (payload: AuthenticatedPayload) => void): this;
@@ -43,6 +44,7 @@ export declare interface CompanionWsClient {
   on(event: 'disconnected', listener: () => void): this;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CompanionWsClient extends EventEmitter {
   private ws: WebSocket | null = null;
   private reconnectDelay = 2000;
@@ -131,7 +133,7 @@ export class CompanionWsClient extends EventEmitter {
       case 'COMPANION_AUTHENTICATED':
         this.emit('authenticated', data as AuthenticatedPayload);
         break;
-      case 'COMPANION_REGISTER':
+      case 'COMPANION_REGISTER_RESPONSE':
         this.emit('register_response', data as RegisterResponsePayload);
         break;
       case 'COMPANION_LOCK_PC':
