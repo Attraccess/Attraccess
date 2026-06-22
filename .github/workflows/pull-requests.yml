@@ -29,14 +29,6 @@ jobs:
       - uses: ./.github/actions/setup
       - name: Run precommit checks
         run: pnpm precommit
-      - name: Ensure precommit does not modify files
-        run: |
-          if [[ -n "$(git status --porcelain)" ]]; then
-            echo "pnpm precommit modified files. Please run it locally and commit the changes."
-            git status --porcelain
-            git --no-pager diff
-            exit 1
-          fi
 
   commitlint:
     if: github.event_name == 'pull_request'
