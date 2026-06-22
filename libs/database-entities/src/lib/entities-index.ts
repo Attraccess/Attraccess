@@ -96,6 +96,7 @@ import { ConversationParticipant } from './entities/conversation-participant.ent
 import { Message, MessageReferenceType } from './entities/message.entity';
 import { NotificationPreference } from './entities/notification-preference.entity';
 import { PushSubscription } from './entities/push-subscription.entity';
+import { CompanionDevice } from './entities/companion-device.entity';
 
 // Export all entities individually
 export {
@@ -197,6 +198,7 @@ export {
   MessageReferenceType,
   NotificationPreference,
   PushSubscription,
+  CompanionDevice,
 };
 
 // Export the entities object
@@ -248,4 +250,5 @@ export const entities = {
   Message,
   NotificationPreference,
   PushSubscription,
+  CompanionDevice,
 };

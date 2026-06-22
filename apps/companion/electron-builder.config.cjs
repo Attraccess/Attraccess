@@ -1,6 +1,6 @@
 /** @type {import('electron-builder').Configuration} */
 module.exports = {
-  appId: 'de.attraccess.companion',
+  appId: 'org.attraccess.companion',
   productName: 'Attraccess Companion',
   // ponytail: resolved at build time so it stays in sync with the installed version
   electronVersion: require('../../node_modules/electron/package.json').version,
