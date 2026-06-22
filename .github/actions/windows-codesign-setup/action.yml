@@ -1,0 +1,25 @@
+name: 'Windows Code-Sign Setup'
+description: >
+  Decode a base64-encoded PFX certificate and export WIN_CSC_LINK and
+  WIN_CSC_KEY_PASSWORD as environment variables so that electron-builder can
+  Authenticode-sign the app automatically.
+
+inputs:
+  cert-base64:
+    description: 'Base64-encoded PFX certificate (WINDOWS_CERT_BASE64 secret)'
+    required: true
+  cert-password:
+    description: 'Password for the PFX file (WINDOWS_CERT_PASSWORD secret)'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Decode Windows code-signing certificate
+      shell: bash
+      env:
+        WINDOWS_CERT_BASE64: ${{ inputs.cert-base64 }}
+      run: |
+        echo "$WINDOWS_CERT_BASE64" | base64 --decode > "$RUNNER_TEMP/certificate.pfx"
+        echo "WIN_CSC_LINK=$RUNNER_TEMP/certificate.pfx" >> "$GITHUB_ENV"
+        echo "WIN_CSC_KEY_PASSWORD=${{ inputs.cert-password }}" >> "$GITHUB_ENV"

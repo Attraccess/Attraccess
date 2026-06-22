@@ -24,6 +24,9 @@ jobs:
         run: sudo apt-get install -y fakeroot rpm
 
       - name: Build Linux companion (x64 + arm64)
+        # The companion project.json must configure electron-builder to output:
+        #   apps/companion/dist/companion_linux_x64.AppImage
+        #   apps/companion/dist/companion_linux_arm64.AppImage
         run: pnpm nx run companion:build
 
       - name: Upload Linux artifacts
@@ -43,27 +46,16 @@ jobs:
 
       - uses: ./.github/actions/setup
 
-      - name: Import Apple Developer certificate
+      - name: Set up macOS code signing
         if: ${{ secrets.APPLE_CERTIFICATE != '' }}
-        env:
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-        run: |
-          set -euo pipefail
-          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
-          KEYCHAIN_PASSWORD="$(openssl rand -hex 16)"
-          echo "$APPLE_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
-          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security import "$RUNNER_TEMP/certificate.p12" -P "$APPLE_CERTIFICATE_PASSWORD" \
-            -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
-          security list-keychain -d user -s "$KEYCHAIN_PATH"
-          echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
-          echo "CSC_LINK=$RUNNER_TEMP/certificate.p12" >> "$GITHUB_ENV"
-          echo "CSC_KEY_PASSWORD=$APPLE_CERTIFICATE_PASSWORD" >> "$GITHUB_ENV"
+        uses: ./.github/actions/macos-codesign-setup
+        with:
+          certificate: ${{ secrets.APPLE_CERTIFICATE }}
+          certificate-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
 
       - name: Build macOS companion (universal)
+        # The companion project.json must configure electron-builder to output:
+        #   apps/companion/dist/companion_mac_universal.dmg
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.APPLE_CERTIFICATE != '' && 'true' || 'false' }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
@@ -90,17 +82,16 @@ jobs:
 
       - uses: ./.github/actions/setup
 
-      - name: Decode Windows code-signing certificate
+      - name: Set up Windows code signing
         if: ${{ secrets.WINDOWS_CERT_BASE64 != '' }}
-        shell: bash
-        env:
-          WINDOWS_CERT_BASE64: ${{ secrets.WINDOWS_CERT_BASE64 }}
-        run: |
-          echo "$WINDOWS_CERT_BASE64" | base64 --decode > "$RUNNER_TEMP/certificate.pfx"
-          echo "WIN_CSC_LINK=$RUNNER_TEMP/certificate.pfx" >> "$GITHUB_ENV"
-          echo "WIN_CSC_KEY_PASSWORD=${{ secrets.WINDOWS_CERT_PASSWORD }}" >> "$GITHUB_ENV"
+        uses: ./.github/actions/windows-codesign-setup
+        with:
+          cert-base64: ${{ secrets.WINDOWS_CERT_BASE64 }}
+          cert-password: ${{ secrets.WINDOWS_CERT_PASSWORD }}
 
       - name: Build Windows companion (x64)
+        # The companion project.json must configure electron-builder to output:
+        #   apps/companion/dist/companion_win_x64.exe
         shell: bash
         run: pnpm nx run companion:build
 
