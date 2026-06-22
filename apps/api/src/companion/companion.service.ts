@@ -34,8 +34,9 @@ export class CompanionService {
     const token = randomBytes(32).toString('hex');
     const salt = await genSalt(10);
     const tokenHash = await hash(token, salt);
+    const name = randomBytes(3).toString('base64url').slice(0, 4);
 
-    const device = this.deviceRepo.create({ tokenHash });
+    const device = this.deviceRepo.create({ name, tokenHash });
     await this.deviceRepo.save(device);
     this.logger.log(`Registered new companion device id=${device.id}`);
     return { device, token };

@@ -33,7 +33,6 @@ import { VersionModule } from '../version/version.module';
 import { MessagingModule } from '../messaging/messaging.module';
 import { PushModule } from '../push/push.module';
 import { NotificationsModule } from '../notifications/notifications.module';
-import { CompanionModule } from '../companion/companion.module';
 
 @Module({
   imports: [
@@ -130,7 +129,6 @@ import { CompanionModule } from '../companion/companion.module';
     MessagingModule,
     PushModule,
     NotificationsModule,
-    CompanionModule,
   ],
   controllers: [AppController],
   providers: [AppService],
