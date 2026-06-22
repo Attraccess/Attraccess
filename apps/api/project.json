@@ -14,10 +14,18 @@
         "command": "node {projectRoot}/copy-attractap-firmware-into-assets.js"
       }
     },
+    "copy-companion-into-assets": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["companion:build"],
+      "cache": false,
+      "options": {
+        "command": "node {projectRoot}/copy-companion-into-assets.js"
+      }
+    },
     "build": {
       "executor": "nx:run-commands",
       "cache": true,
-      "dependsOn": ["copy-attractap-firmware-into-assets"],
+      "dependsOn": ["copy-attractap-firmware-into-assets", "copy-companion-into-assets"],
       "inputs": [
         "production",
         "^production",

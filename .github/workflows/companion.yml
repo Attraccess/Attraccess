@@ -1,0 +1,236 @@
+name: Companion App
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    paths:
+      - 'apps/companion/**'
+      - '.github/workflows/companion.yml'
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  packages: write
+  pull-requests: write
+
+env:
+  GHCR_IMAGE_NAME: ${{ vars.GHCR_IMAGE_NAME }}
+  DOCKERHUB_IMAGE_NAME: ${{ vars.DOCKERHUB_IMAGE_NAME }}
+  RELEASE_VERSION: ${{ github.event.release.tag_name }}
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - uses: ./.github/actions/setup
+
+      - name: Install Linux packaging dependencies
+        run: sudo apt-get install -y fakeroot rpm
+
+      - name: Build Linux companion (x64 + arm64)
+        # The companion project.json must configure electron-builder to output:
+        #   apps/companion/dist/companion_linux_x64.AppImage
+        #   apps/companion/dist/companion_linux_arm64.AppImage
+        run: pnpm nx run companion:build
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: companion-linux-${{ github.run_id }}
+          path: |
+            apps/companion/dist/companion_linux_x64.AppImage
+            apps/companion/dist/companion_linux_arm64.AppImage
+          if-no-files-found: error
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - uses: ./.github/actions/setup
+
+      - name: Import Apple Developer certificate
+        if: github.event_name == 'release'
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -hex 16)"
+          echo "$APPLE_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$RUNNER_TEMP/certificate.p12" -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+          echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
+          echo "CSC_LINK=$RUNNER_TEMP/certificate.p12" >> "$GITHUB_ENV"
+          echo "CSC_KEY_PASSWORD=$APPLE_CERTIFICATE_PASSWORD" >> "$GITHUB_ENV"
+
+      - name: Build macOS companion (universal)
+        # The companion project.json must configure electron-builder to output:
+        #   apps/companion/dist/companion_mac_universal.dmg
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: ${{ github.event_name == 'release' && 'true' || 'false' }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: pnpm nx run companion:build
+
+      - name: Clean up keychain
+        if: github.event_name == 'release' && always()
+        run: security delete-keychain "$KEYCHAIN_PATH" || true
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: companion-macos-${{ github.run_id }}
+          path: apps/companion/dist/companion_mac_universal.dmg
+          if-no-files-found: error
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - uses: ./.github/actions/setup
+
+      - name: Decode Windows code-signing certificate
+        if: github.event_name == 'release'
+        shell: bash
+        env:
+          WINDOWS_CERT_BASE64: ${{ secrets.WINDOWS_CERT_BASE64 }}
+        run: |
+          echo "$WINDOWS_CERT_BASE64" | base64 --decode > "$RUNNER_TEMP/certificate.pfx"
+          echo "WIN_CSC_LINK=$RUNNER_TEMP/certificate.pfx" >> "$GITHUB_ENV"
+          echo "WIN_CSC_KEY_PASSWORD=${{ secrets.WINDOWS_CERT_PASSWORD }}" >> "$GITHUB_ENV"
+
+      - name: Build Windows companion (x64)
+        # The companion project.json must configure electron-builder to output:
+        #   apps/companion/dist/companion_win_x64.exe
+        shell: bash
+        run: pnpm nx run companion:build
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: companion-windows-${{ github.run_id }}
+          path: apps/companion/dist/companion_win_x64.exe
+          if-no-files-found: error
+
+  pr-comment:
+    if: github.event_name == 'pull_request'
+    needs: [build-linux, build-macos, build-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build PR comment body
+        id: comment-body
+        run: |
+          set -euo pipefail
+          out="$(mktemp)"
+          {
+            echo "## Companion app artifacts"
+            echo ""
+            echo "Commit \`${{ github.event.pull_request.head.sha }}\` · workflow run [\`${{ github.run_id }}\`](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+            echo ""
+            echo "Unsigned binaries are available in the [workflow artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}):"
+            echo ""
+            echo "| Artifact | Platform |"
+            echo "| --- | --- |"
+            echo "| \`companion-linux-${{ github.run_id }}\` | Linux x64 + arm64 AppImage |"
+            echo "| \`companion-macos-${{ github.run_id }}\` | macOS universal DMG |"
+            echo "| \`companion-windows-${{ github.run_id }}\` | Windows x64 NSIS installer |"
+          } > "$out"
+          {
+            echo 'body<<EOF_BODY'
+            cat "$out"
+            echo 'EOF_BODY'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Post sticky PR comment with companion artifacts
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: companion-artifacts
+          message: ${{ steps.comment-body.outputs.body }}
+
+  containerize:
+    if: github.event_name == 'release'
+    needs: [build-linux, build-macos, build-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Download Linux binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: companion-linux-${{ github.run_id }}
+          path: apps/companion/dist
+
+      - name: Download macOS binary
+        uses: actions/download-artifact@v4
+        with:
+          name: companion-macos-${{ github.run_id }}
+          path: apps/companion/dist
+
+      - name: Download Windows binary
+        uses: actions/download-artifact@v4
+        with:
+          name: companion-windows-${{ github.run_id }}
+          path: apps/companion/dist
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Get Node.js version
+        id: node-version
+        run: echo "NODE_VERSION=$(cat .nvmrc | tr -d '[:space:]')" >> $GITHUB_OUTPUT
+
+      - name: Get short SHA
+        id: vars
+        run: echo "SHORT_SHA=$(echo $GITHUB_SHA | cut -c1-7)" >> $GITHUB_OUTPUT
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Compute Docker tags
+        id: docker-tags
+        run: |
+          TAGS="ghcr.io/${{ env.GHCR_IMAGE_NAME }}:${{ env.RELEASE_VERSION }}"
+          TAGS="${TAGS},${{ env.DOCKERHUB_IMAGE_NAME }}:${{ env.RELEASE_VERSION }}"
+          TAGS="${TAGS},ghcr.io/${{ env.GHCR_IMAGE_NAME }}:${{ env.RELEASE_VERSION }}-${{ steps.vars.outputs.SHORT_SHA }}"
+          TAGS="${TAGS},${{ env.DOCKERHUB_IMAGE_NAME }}:${{ env.RELEASE_VERSION }}-${{ steps.vars.outputs.SHORT_SHA }}"
+          if [[ "${{ github.event.release.prerelease }}" == "false" && "${{ github.event.release.target_commitish }}" == "main" ]]; then
+            TAGS="${TAGS},ghcr.io/${{ env.GHCR_IMAGE_NAME }}:latest"
+            TAGS="${TAGS},${{ env.DOCKERHUB_IMAGE_NAME }}:latest"
+          fi
+          echo "TAGS=${TAGS}" >> $GITHUB_OUTPUT
+
+      - name: Build and push Docker image (with companion binaries)
+        uses: docker/build-push-action@b66d8774c665b789105b440514f0c97e6f19b06f
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.docker-tags.outputs.TAGS }}
+          build-args: |
+            NODE_VERSION=${{ steps.node-version.outputs.NODE_VERSION }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
