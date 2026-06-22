@@ -1,0 +1,49 @@
+{
+  "name": "companion-ws-client",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/companion-ws-client/src",
+  "projectType": "library",
+  "tags": [],
+  "targets": {
+    "generate": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "dependsOn": ["api:export-asyncapi"],
+      "inputs": [
+        "{workspaceRoot}/dist/apps/api/asyncapi.json",
+        "{projectRoot}/tools/generate.ts"
+      ],
+      "outputs": ["{projectRoot}/src/lib"],
+      "options": {
+        "command": "ts-node --project tsconfig.json libs/companion-ws-client/tools/generate.ts"
+      }
+    },
+    "build": {
+      "executor": "@nx/js:tsc",
+      "cache": true,
+      "dependsOn": ["generate"],
+      "inputs": ["production", "^production"],
+      "outputs": ["{workspaceRoot}/dist/libs/companion-ws-client"],
+      "options": {
+        "outputPath": "dist/libs/companion-ws-client",
+        "main": "libs/companion-ws-client/src/index.ts",
+        "tsConfig": "libs/companion-ws-client/tsconfig.lib.json"
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["generate"],
+      "options": {
+        "cwd": "libs/companion-ws-client",
+        "command": "tsc --noEmit -p tsconfig.lib.json"
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint",
+      "dependsOn": ["generate"],
+      "options": {
+        "lintFilePatterns": ["libs/companion-ws-client/src/**/*.ts"]
+      }
+    }
+  }
+}

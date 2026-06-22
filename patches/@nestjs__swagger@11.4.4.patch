@@ -1,0 +1,53 @@
+diff --git a/package.json b/package.json
+index aa8c42889ccac658eeeeec1287ee5e2cf94befb5..3f5facaf76539c9c6999a8633497f0d6e8449731 100644
+--- a/package.json
++++ b/package.json
+@@ -20,7 +20,47 @@
+       "require": "./dist/plugin/index.js",
+       "default": "./dist/plugin/index.js"
+     },
+-    "./package.json": "./package.json"
++    "./package.json": "./package.json",
++    "./dist/utils/validate-path.util": {
++      "types": "./dist/utils/validate-path.util.d.ts",
++      "require": "./dist/utils/validate-path.util.js",
++      "default": "./dist/utils/validate-path.util.js"
++    },
++    "./dist/decorators/helpers": {
++      "types": "./dist/decorators/helpers.d.ts",
++      "require": "./dist/decorators/helpers.js",
++      "default": "./dist/decorators/helpers.js"
++    },
++    "./dist/interfaces/open-api-spec.interface": {
++      "types": "./dist/interfaces/open-api-spec.interface.d.ts",
++      "require": "./dist/interfaces/open-api-spec.interface.js",
++      "default": "./dist/interfaces/open-api-spec.interface.js"
++    },
++    "./dist/services/model-properties-accessor": {
++      "types": "./dist/services/model-properties-accessor.d.ts",
++      "require": "./dist/services/model-properties-accessor.js",
++      "default": "./dist/services/model-properties-accessor.js"
++    },
++    "./dist/services/schema-object-factory": {
++      "types": "./dist/services/schema-object-factory.d.ts",
++      "require": "./dist/services/schema-object-factory.js",
++      "default": "./dist/services/schema-object-factory.js"
++    },
++    "./dist/services/swagger-types-mapper": {
++      "types": "./dist/services/swagger-types-mapper.d.ts",
++      "require": "./dist/services/swagger-types-mapper.js",
++      "default": "./dist/services/swagger-types-mapper.js"
++    },
++    "./dist/utils": {
++      "types": "./dist/utils/index.d.ts",
++      "require": "./dist/utils/index.js",
++      "default": "./dist/utils/index.js"
++    },
++    "./dist/utils/strip-last-slash.util": {
++      "types": "./dist/utils/strip-last-slash.util.d.ts",
++      "require": "./dist/utils/strip-last-slash.util.js",
++      "default": "./dist/utils/strip-last-slash.util.js"
++    }
+   },
+   "scripts": {
+     "build": "tsc -p tsconfig.build.json",

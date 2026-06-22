@@ -2,7 +2,7 @@ import { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, session } from 'e
 import * as path from 'path';
 import * as https from 'https';
 import * as http from 'http';
-import { CompanionWsClient, AuthenticatedPayload, RegisterResponsePayload } from './ws-client';
+import { CompanionWsClient, CompanionAuthenticatedDto, CompanionRegisterResponseDto } from '@attraccess/companion-ws-client';
 import { loadCredentials, saveCredentials, StoredCredentials } from './keychain';
 
 // ─── State ───────────────────────────────────────────────────────────────────
@@ -13,7 +13,7 @@ let kioskWindow: BrowserWindow | null = null;
 let wsClient: CompanionWsClient | null = null;
 let creds: StoredCredentials | null = null;
 let autoLogoffSeconds = 300;
-let authenticatedPayload: AuthenticatedPayload | null = null;
+let authenticatedPayload: CompanionAuthenticatedDto | null = null;
 
 // ponytail: random uuid-ish partition key so the session is always fresh per launch
 const KIOSK_PARTITION = `memory:${Math.random().toString(36).slice(2)}`;
@@ -34,7 +34,7 @@ function checkHealth(serverUrl: string): Promise<boolean> {
 
 // ─── Kiosk webview URL selection ──────────────────────────────────────────────
 
-function kioskUrl(payload: AuthenticatedPayload): string {
+function kioskUrl(payload: CompanionAuthenticatedDto): string {
   const base = creds?.serverUrl ?? '';
   const timeout = `autoLogoff=${autoLogoffSeconds}`;
   if (payload.resources.length === 1) {
@@ -45,7 +45,7 @@ function kioskUrl(payload: AuthenticatedPayload): string {
 
 // ─── Kiosk window ────────────────────────────────────────────────────────────
 
-function openKiosk(payload: AuthenticatedPayload) {
+function openKiosk(payload: CompanionAuthenticatedDto) {
   if (kioskWindow && !kioskWindow.isDestroyed()) {
     kioskWindow.loadURL(kioskUrl(payload));
     return;
@@ -175,7 +175,7 @@ function startWsClient(serverUrl: string, firstRun: boolean) {
     }
   });
 
-  wsClient.on('register_response', async (payload: RegisterResponsePayload) => {
+  wsClient.on('register_response', async (payload: CompanionRegisterResponseDto) => {
     const url = creds?.serverUrl ?? '';
     creds = { serverUrl: url, id: payload.id, token: payload.token };
     await saveCredentials(creds);
@@ -183,7 +183,7 @@ function startWsClient(serverUrl: string, firstRun: boolean) {
     mainWindow?.webContents.send('registered', { id: payload.id });
   });
 
-  wsClient.on('authenticated', async (payload: AuthenticatedPayload) => {
+  wsClient.on('authenticated', async (payload: CompanionAuthenticatedDto) => {
     authenticatedPayload = payload;
     mainWindow?.webContents.send('authenticated', payload);
     openKiosk(payload);

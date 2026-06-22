@@ -54,3 +54,6 @@ bom.json
 docs/superpowers/
 # test coverage output
 coverage/
+
+# companion-ws-client — generated at build time
+libs/companion-ws-client/src/lib/
