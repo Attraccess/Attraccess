@@ -49,6 +49,9 @@
       ],
       "@attraccess/companion-ws-client": [
         "libs/companion-ws-client/src/index.ts"
+      ],
+      "@attraccess/ui": [
+        "libs/ui/src/index.ts"
       ]
     },
     "ignoreDeprecations": "6.0",

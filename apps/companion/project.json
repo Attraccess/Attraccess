@@ -5,10 +5,20 @@
   "projectType": "application",
   "tags": ["tag:scope:companion"],
   "targets": {
+    "build-renderer": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["production", "^production"],
+      "outputs": ["{projectRoot}/renderer/dist"],
+      "options": {
+        "cwd": "apps/companion/renderer",
+        "command": "vite build --config vite.config.ts"
+      }
+    },
     "build": {
       "executor": "nx:run-commands",
       "cache": true,
-      "dependsOn": ["companion-ws-client:build"],
+      "dependsOn": ["companion-ws-client:build", "build-renderer"],
       "inputs": ["production", "^production"],
       "outputs": ["{workspaceRoot}/apps/companion/out"],
       "options": {
@@ -35,13 +45,17 @@
       "dependsOn": ["companion-ws-client:generate"],
       "options": {
         "cwd": "apps/companion",
-        "command": "tsc -p tsconfig.app.json --noEmit"
+        "commands": [
+          "tsc -p tsconfig.app.json --noEmit",
+          "tsc -p tsconfig.renderer.json --noEmit"
+        ],
+        "parallel": false
       }
     },
     "lint": {
       "executor": "@nx/eslint:lint",
       "options": {
-        "lintFilePatterns": ["apps/companion/**/*.ts"]
+        "lintFilePatterns": ["apps/companion/**/*.ts", "apps/companion/**/*.tsx"]
       }
     }
   }

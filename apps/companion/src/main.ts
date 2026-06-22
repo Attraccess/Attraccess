@@ -127,8 +127,8 @@ function openWizardWindow(firstRun: boolean) {
     },
   });
 
-  // __dirname is out/ at runtime; renderer/ sits next to out/ at the app root
-  mainWindow.loadFile(path.join(__dirname, '../renderer/wizard.html'));
+  // __dirname is out/ at runtime; renderer/dist/ contains the React build
+  mainWindow.loadFile(path.join(__dirname, '../renderer/dist/index.html'));
   mainWindow.webContents.on('did-finish-load', () => {
     mainWindow?.webContents.send('init', { firstRun, serverUrl: creds?.serverUrl });
   });

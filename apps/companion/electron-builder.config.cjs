@@ -7,7 +7,7 @@ module.exports = {
   directories: {
     output: '../../dist/apps/companion',
   },
-  files: ['out/**/*', 'src/**/*'],
+  files: ['out/**/*', 'src/**/*', 'renderer/dist/**/*'],
   extraMetadata: {
     main: 'out/main.js',
   },
