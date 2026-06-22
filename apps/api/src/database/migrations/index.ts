@@ -133,3 +133,4 @@ export * from './1781900000000-access-change-email-template';
 export * from './1782000000000-fix-access-change-email-default';
 export * from './1782100000000-enable-all-email-defaults';
 export * from './1782200000000-companion-device';
+export * from './1782201000000-companion-device-unique-name';
