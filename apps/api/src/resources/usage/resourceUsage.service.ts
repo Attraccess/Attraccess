@@ -170,17 +170,20 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
   handleIntroductionChanged(): void {
     // Cannot cheaply map introductionId → (userId, resourceId) without a DB query, so clear all.
     this.accessCache.clear();
+    this.metricsService.authorizationCacheSize.set(0);
   }
 
   @OnEvent(ResourceGroupIntroductionChangedEvent.EVENT_NAME)
   handleGroupIntroductionChanged(): void {
     // Cannot cheaply map resourceGroupId → affected (userId, resourceId) pairs, so clear all.
     this.accessCache.clear();
+    this.metricsService.authorizationCacheSize.set(0);
   }
 
   @OnEvent(ResourceIntroducerChangedEvent.EVENT_NAME)
   handleIntroducerChanged(event: ResourceIntroducerChangedEvent): void {
     this.accessCache.delete(`${event.introducerUserId}:${event.resourceId}`);
+    this.metricsService.authorizationCacheSize.set(this.accessCache.size);
   }
 
   private emitSystemUsageEvent(
@@ -210,12 +213,15 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     const key = `${user.id}:${resourceId}`;
     const cached = this.accessCache.get(key);
     if (cached && cached.expiresAt > Date.now()) {
+      this.metricsService.authorizationCacheRequestsTotal.inc({ result: 'hit' });
       return cached.result;
     }
 
+    this.metricsService.authorizationCacheRequestsTotal.inc({ result: 'miss' });
     const result = await this.canControllResourceUncached(resourceId, user, transactionalEntityManager);
     if (this.accessCache.size < this.ACCESS_CACHE_MAX_SIZE) {
       this.accessCache.set(key, { result, expiresAt: Date.now() + this.ACCESS_CACHE_TTL_MS });
+      this.metricsService.authorizationCacheSize.set(this.accessCache.size);
     }
     return result;
   }
