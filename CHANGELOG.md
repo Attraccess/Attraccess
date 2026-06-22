@@ -1,3 +1,28 @@
+## 1.8.1 (2026-06-21)
+
+### 🚀 Features
+
+- **ATT-595:** add node-exporter and cadvisor to balena compose for host metrics ([#1419](https://github.com/Attraccess/Attraccess/pull/1419))
+- **ATT-596:** implement Valkey as optional session store ([#1423](https://github.com/Attraccess/Attraccess/pull/1423))
+- **ATT-599:** enforce license for all modules (attractap, sso, billing, maintenance) ([#1430](https://github.com/Attraccess/Attraccess/pull/1430))
+
+### 🩹 Fixes
+
+- **ATT-534:** fix route shadowing + add automated guard ([#1421](https://github.com/Attraccess/Attraccess/pull/1421))
+- **ATT-601:** fix Attractap resource details showing wrong action buttons when in use by another user ([#1434](https://github.com/Attraccess/Attraccess/pull/1434))
+- **ATT-601:** hide flow node buttons for non-session-owners + color-code action buttons ([#1439](https://github.com/Attraccess/Attraccess/pull/1439))
+- **ATT-602:** suppress HighRequestLatency alert under low traffic ([#1437](https://github.com/Attraccess/Attraccess/pull/1437))
+
+### 🔥 Performance
+
+- **ATT-577:** add DB indexes on hot-path query columns ([#1414](https://github.com/Attraccess/Attraccess/pull/1414))
+- **ATT-578:** throttle session lastAccessedAt write to avoid per-request DB write ([#1413](https://github.com/Attraccess/Attraccess/pull/1413))
+
+### ❤️ Thank You
+
+- Giesela-Bot @Giesela-Bot
+- Jan Jaap @jappyjan
+
 ## [Unreleased]
 
 ### 🚀 Features

@@ -114,14 +114,14 @@ groups:
       - uid: high-request-latency
         title: HighRequestLatency
         condition: C
-        for: 5m
+        for: 10m
         noDataState: OK
         execErrState: Error
         labels:
           severity: warning
         annotations:
           summary: "High request latency (p95 > 2s)"
-          description: "The 95th percentile request latency has exceeded 2 seconds for the last 5 minutes."
+          description: "The 95th percentile request latency exceeds 2 seconds in 5-minute evaluation windows and has remained above this threshold for at least 10 minutes, with at least 0.1 req/s traffic (suppressed during idle periods to avoid low-sample-count noise)."
         data:
           - refId: A
             relativeTimeRange:
@@ -130,7 +130,7 @@ groups:
             datasourceUid: attraccess-prometheus
             model:
               refId: A
-              expr: 'histogram_quantile(0.95, sum(rate(attraccess_http_request_duration_seconds_bucket{job="attraccess"}[5m])) by (le))'
+              expr: '(histogram_quantile(0.95, sum(rate(attraccess_http_request_duration_seconds_bucket{job="attraccess"}[5m])) by (le))) and on() (sum(rate(attraccess_http_request_duration_seconds_count{job="attraccess"}[5m])) > 0.1)'
               instant: true
               range: false
               datasource:

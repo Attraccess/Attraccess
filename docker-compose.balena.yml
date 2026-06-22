@@ -48,9 +48,11 @@ services:
       - VALKEY_URL=redis://valkey:6379
     env_file:
       - .env.docker-compose
+    # Balena only supports the short-form depends_on (service_started); the
+    # long-form `condition: service_healthy` is rejected (ATT-593-style). The app
+    # retries Valkey connections, and restart: unless-stopped covers startup races.
     depends_on:
-      valkey:
-        condition: service_healthy
+      - valkey
 
   monitoring-init:
     build:
@@ -180,6 +182,35 @@ services:
     env_file:
       - .env.docker-compose
 
+  node-exporter:
+    image: prom/node-exporter:v1.9.1
+    restart: unless-stopped
+    expose:
+      - '9100'
+    # io.balena.features.procfs/sysfs bind-mount the host OS /proc and /sys into
+    # the container, giving node-exporter access to host CPU/RAM/network metrics
+    # without privileged mode. Balena disallows arbitrary host bind mounts (e.g. /:/host),
+    # so filesystem collector metrics are limited to what procfs/sysfs expose.
+    labels:
+      io.balena.features.procfs: '1'
+      io.balena.features.sysfs: '1'
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.51.0
+    restart: unless-stopped
+    expose:
+      - '8080'
+    privileged: true
+    # io.balena.features.balena-socket mounts the balena engine socket at both
+    # /var/run/balena-engine.sock and /var/run/docker.sock (backwards-compat),
+    # so cadvisor can discover and collect per-container metrics without config changes.
+    # Balena disallows arbitrary host bind mounts (/:/rootfs, /dev/disk), so disk I/O
+    # metrics come from procfs/sysfs only.
+    labels:
+      io.balena.features.procfs: '1'
+      io.balena.features.sysfs: '1'
+      io.balena.features.balena-socket: '1'
+
   prometheus:
     image: prom/prometheus:v3.11.3
     restart: unless-stopped
@@ -191,6 +222,8 @@ services:
     depends_on:
       - config-ui
       - monitoring-init
+      - node-exporter
+      - cadvisor
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.retention.time=30d'

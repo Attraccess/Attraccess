@@ -1,6 +1,6 @@
 {
   "name": "@attraccess/env",
-  "version": "1.8.0",
+  "version": "1.8.1",
   "type": "commonjs",
   "main": "./src/index.js",
   "types": "./src/index.d.ts",

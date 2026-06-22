@@ -1,10 +1,13 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn, OneToMany, Index } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { Resource } from './resource.entity';
 import { User } from './user.entity';
 import { ResourceIntroductionHistoryItem } from './resourceIntroductionHistoryItem.entity';
 import { ResourceGroup } from './resourceGroup.entity';
 
+@Index('IDX_resource_introduction_resourceId', ['resourceId'])
+@Index('IDX_resource_introduction_receiverUserId', ['receiverUserId'])
+@Index('IDX_resource_introduction_resourceGroupId', ['resourceGroupId'])
 @Entity()
 export class ResourceIntroduction {
   @PrimaryGeneratedColumn()

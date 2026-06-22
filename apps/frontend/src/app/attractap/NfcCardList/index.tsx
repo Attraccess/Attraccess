@@ -30,6 +30,7 @@ import {
   NFCCard,
   useAttractapServiceEnrollNfcCard,
   useUsersServiceGetOneUserById,
+  useLicenseServiceGetLicenseInformation,
 } from '@attraccess/react-query-client';
 import { AttractapSelect } from '../AttractapSelect';
 import { useToastMessage } from '../../../components/toastProvider';
@@ -270,6 +271,8 @@ export function NfcCardList() {
     en,
   });
 
+  const { data: license } = useLicenseServiceGetLicenseInformation();
+
   const { data: cards, error: cardsError } = useAttractapServiceGetAllCards(undefined, {
     refetchInterval: 5000,
   });
@@ -295,6 +298,10 @@ export function NfcCardList() {
 
   const { hasPermission } = useAuth();
   const navigate = useNavigate();
+
+  if (license && !license.modules.includes('attractap')) {
+    return null;
+  }
 
   return (
     <>
