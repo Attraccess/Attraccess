@@ -3,13 +3,20 @@ import { NestFactory } from '@nestjs/core';
 import { Module } from '@nestjs/common';
 import { AsyncApiDocumentBuilder, AsyncApiModule } from 'nestjs-asyncapi';
 import { CompanionGateway } from './companion/companion.gateway';
-import { CompanionService } from './companion/companion.service';
+import { CompanionGatewayService } from './companion/companion-gateway.service';
+import { CompanionAuthHandler } from './companion/companion-auth.handler';
 import { resolveAppVersion } from './config/app.config';
 import { writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 
-// Minimal module — only what the scanner needs; CompanionService stubbed so no DB is required
-@Module({ providers: [CompanionGateway, { provide: CompanionService, useValue: {} }] })
+// Minimal module — only what the scanner needs; deps stubbed so no DB is required
+@Module({
+  providers: [
+    CompanionGateway,
+    { provide: CompanionGatewayService, useValue: {} },
+    { provide: CompanionAuthHandler, useValue: {} },
+  ],
+})
 class AsyncApiExportModule {}
 
 async function main() {

@@ -117,7 +117,7 @@ export class CompanionGateway implements OnGatewayConnection, OnGatewayDisconnec
     summary: 'Server instructs the companion to lock the PC',
   })
   public sendLockPc(deviceId: number): void {
-    this.gatewayService.sendLockCommand(deviceId);
+    void this.gatewayService.sendLockCommand(deviceId);
   }
 
   @AsyncApiSub({
@@ -126,7 +126,7 @@ export class CompanionGateway implements OnGatewayConnection, OnGatewayDisconnec
     summary: 'Server instructs the companion to unlock the PC',
   })
   public sendUnlockPc(deviceId: number): void {
-    this.gatewayService.sendUnlockCommand(deviceId);
+    void this.gatewayService.sendUnlockCommand(deviceId);
   }
 
   @AsyncApiSub({

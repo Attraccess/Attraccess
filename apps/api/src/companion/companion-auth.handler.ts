@@ -58,6 +58,7 @@ export class CompanionAuthHandler {
       id: device.id,
       name: device.name,
       resources,
+      locked: device.locked,
     });
 
     this.logger.log(`Companion device ${id} authenticated successfully`);

@@ -43,6 +43,9 @@ export class CompanionAuthenticatedDto {
 
   @ApiProperty({ description: 'Resources this device controls', type: [CompanionResourceDto] })
   resources!: CompanionResourceDto[];
+
+  @ApiProperty({ description: 'Whether the device should be locked right now (persisted across restarts)' })
+  locked!: boolean;
 }
 
 export class CompanionUpdateAvailableDto {

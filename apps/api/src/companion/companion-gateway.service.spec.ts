@@ -13,7 +13,7 @@ function makeSocket(deviceId: number | null, overrides: Partial<CompanionSocket>
   } as unknown as CompanionSocket;
 }
 
-const mockDeviceRepo = { findOne: jest.fn() };
+const mockDeviceRepo = { findOne: jest.fn(), update: jest.fn() };
 const mockFlowNodeRepo = {
   createQueryBuilder: jest.fn().mockReturnValue({
     innerJoinAndSelect: jest.fn().mockReturnThis(),
@@ -39,35 +39,40 @@ describe('CompanionGatewayService', () => {
   });
 
   describe('sendLockCommand', () => {
-    it('returns true and calls sendEvent on connected device', () => {
+    it('returns true and calls sendEvent on connected device', async () => {
       const socket = makeSocket(3);
       service.sockets.set(socket.id, socket);
 
-      const result = service.sendLockCommand(3);
+      const result = await service.sendLockCommand(3);
 
       expect(result).toBe(true);
       expect(socket.sendEvent).toHaveBeenCalledWith(CompanionEventType.COMPANION_LOCK_PC, {});
     });
 
-    it('returns false when device not connected', () => {
-      const result = service.sendLockCommand(999);
+    it('persists locked=true even when device not connected', async () => {
+      const result = await service.sendLockCommand(999);
+
       expect(result).toBe(false);
+      expect(mockDeviceRepo.update).toHaveBeenCalledWith(999, { locked: true });
     });
   });
 
   describe('sendUnlockCommand', () => {
-    it('returns true and calls sendEvent on connected device', () => {
+    it('returns true and calls sendEvent on connected device', async () => {
       const socket = makeSocket(4);
       service.sockets.set(socket.id, socket);
 
-      const result = service.sendUnlockCommand(4);
+      const result = await service.sendUnlockCommand(4);
 
       expect(result).toBe(true);
       expect(socket.sendEvent).toHaveBeenCalledWith(CompanionEventType.COMPANION_UNLOCK_PC, {});
     });
 
-    it('returns false when device not connected', () => {
-      expect(service.sendUnlockCommand(999)).toBe(false);
+    it('persists locked=false even when device not connected', async () => {
+      const result = await service.sendUnlockCommand(999);
+
+      expect(result).toBe(false);
+      expect(mockDeviceRepo.update).toHaveBeenCalledWith(999, { locked: false });
     });
   });
 

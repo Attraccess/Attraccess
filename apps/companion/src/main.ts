@@ -4,6 +4,8 @@ import * as https from 'https';
 import * as http from 'http';
 import { CompanionWsClient, CompanionAuthenticatedDto, CompanionRegisterResponseDto } from '@attraccess/companion-ws-client';
 import { loadCredentials, saveCredentials, StoredCredentials } from './keychain';
+import { normalizeServerUrl } from './server-url';
+import { dotIconPng } from './tray-icon';
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
@@ -22,7 +24,7 @@ const KIOSK_PARTITION = `memory:${Math.random().toString(36).slice(2)}`;
 
 function checkHealth(serverUrl: string): Promise<boolean> {
   return new Promise((resolve) => {
-    const url = new URL('/api/health', serverUrl);
+    const url = new URL('/api/info', serverUrl);
     const mod = url.protocol === 'https:' ? https : http;
     const req = mod.get(url.toString(), (res) => {
       resolve(res.statusCode !== undefined && res.statusCode < 400);
@@ -54,8 +56,8 @@ function openKiosk(payload: CompanionAuthenticatedDto) {
   const ses = session.fromPartition(KIOSK_PARTITION, { cache: false });
 
   kioskWindow = new BrowserWindow({
-    fullscreen: true,
-    alwaysOnTop: false,
+    show: false,
+    frame: false,
     webPreferences: { session: ses, nodeIntegration: false, contextIsolation: true },
   });
 
@@ -71,39 +73,65 @@ function reloadKiosk() {
   }
 }
 
+// macOS native fullscreen lives in its own Space, so hide() leaves a black
+// screen behind. simpleFullScreen avoids the Space; other platforms use native.
+function setOverlayFullscreen(on: boolean) {
+  if (!kioskWindow) return;
+  if (process.platform === 'darwin') kioskWindow.setSimpleFullScreen(on);
+  else kioskWindow.setFullScreen(on);
+}
+
 function showKioskOverlay() {
   kioskWindow?.setAlwaysOnTop(true, 'screen-saver');
-  kioskWindow?.setFullScreen(true);
+  setOverlayFullscreen(true);
   kioskWindow?.show();
   kioskWindow?.focus();
 }
 
 function hideKioskOverlay() {
   kioskWindow?.setAlwaysOnTop(false);
-  reloadKiosk();
+  setOverlayFullscreen(false);
+  kioskWindow?.hide();
+}
+
+// reopen/show the kiosk from the tray (recreates the window if it was closed)
+function reopenKiosk() {
+  if (!authenticatedPayload) return;
+  openKiosk(authenticatedPayload);
+  showKioskOverlay();
 }
 
 // ─── Tray ────────────────────────────────────────────────────────────────────
 
 type TrayState = 'locked' | 'unlocked' | 'disconnected';
 
+const TRAY_COLORS: Record<TrayState, [number, number, number]> = {
+  unlocked: [34, 197, 94], // green
+  locked: [239, 68, 68], // red
+  disconnected: [148, 163, 184], // gray
+};
+
+function dotIcon(color: [number, number, number]): Electron.NativeImage {
+  return nativeImage.createFromBuffer(dotIconPng(color));
+}
+
 function buildTrayMenu(state: TrayState): Menu {
   return Menu.buildFromTemplate([
     { label: `Status: ${state}`, enabled: false },
     { type: 'separator' },
+    { label: 'Open kiosk', enabled: !!authenticatedPayload, click: () => reopenKiosk() },
     { label: 'Settings', click: () => openWizardWindow(false) },
     { label: 'Quit', click: () => app.quit() },
   ]);
 }
 
 function setupTray() {
-  const icon = nativeImage.createEmpty();
-  tray = new Tray(icon);
-  tray.setToolTip('Attraccess Companion');
+  tray = new Tray(dotIcon(TRAY_COLORS.disconnected));
   setTrayState('disconnected');
 }
 
 function setTrayState(state: TrayState) {
+  tray?.setImage(dotIcon(TRAY_COLORS[state]));
   tray?.setContextMenu(buildTrayMenu(state));
   tray?.setToolTip(`Attraccess Companion — ${state}`);
 }
@@ -138,12 +166,13 @@ function openWizardWindow(firstRun: boolean) {
 // ─── IPC ─────────────────────────────────────────────────────────────────────
 
 ipcMain.handle('check-health', async (_evt, serverUrl: string) => {
-  return checkHealth(serverUrl);
+  return checkHealth(normalizeServerUrl(serverUrl));
 });
 
 ipcMain.handle('register', async (_evt, serverUrl: string) => {
-  creds = { serverUrl, id: 0, token: '' };
-  startWsClient(serverUrl, /* firstRun */ true);
+  const url = normalizeServerUrl(serverUrl);
+  creds = { serverUrl: url, id: 0, token: '' };
+  startWsClient(url, /* firstRun */ true);
   return true;
 });
 
@@ -187,6 +216,13 @@ function startWsClient(serverUrl: string, firstRun: boolean) {
     authenticatedPayload = payload;
     mainWindow?.webContents.send('authenticated', payload);
     openKiosk(payload);
+    // restore persisted lock state so a restart doesn't silently unlock
+    setTrayState(payload.locked ? 'locked' : 'unlocked');
+    if (payload.locked) {
+      showKioskOverlay();
+    } else {
+      hideKioskOverlay();
+    }
     if (mainWindow && !mainWindow.isDestroyed()) {
       setTimeout(() => mainWindow?.close(), 1500);
     }

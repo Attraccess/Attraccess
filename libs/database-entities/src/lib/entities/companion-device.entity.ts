@@ -22,6 +22,10 @@ export class CompanionDevice {
   @ApiProperty({ description: 'Resources this device controls', type: () => Resource, isArray: true })
   resources!: Resource[];
 
+  @Column({ type: 'boolean', default: false })
+  @ApiProperty({ description: 'Whether this device is currently locked (persisted so a restart re-locks)' })
+  locked!: boolean;
+
   @Column({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
   @ApiProperty({ description: 'Last time this device connected' })
   lastConnection!: Date;
