@@ -1,8 +1,8 @@
 import { BrowserWindow, screen } from 'electron';
 import * as path from 'path';
 
-// out/main.js lives in out/; src/index.html is one level up
-const LOCKSCREEN_HTML = path.join(__dirname, '..', 'src', 'index.html');
+// out/main.js lives in out/; renderer/dist/ is one level up
+const LOCKSCREEN_HTML = path.join(__dirname, '..', 'renderer', 'dist', 'lockscreen.html');
 
 let overlays: BrowserWindow[] = [];
 let quitting = false;
