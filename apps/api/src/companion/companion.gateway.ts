@@ -92,7 +92,7 @@ export class CompanionGateway implements OnGatewayConnection, OnGatewayDisconnec
     summary: 'Server requests the client to authenticate or register',
   })
   private publishRequestAuthentication(socket: CompanionSocket): void {
-    socket.sendEvent(CompanionEventType.COMPANION_REQUEST_AUTHENTICATION);
+    socket.sendEvent(CompanionEventType.COMPANION_REQUEST_AUTHENTICATION, {});
   }
 
   // ponytail: @AsyncApiSub stubs below — events emitted by CompanionAuthHandler, documented here for AsyncAPI spec
