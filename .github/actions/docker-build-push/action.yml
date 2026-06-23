@@ -1,0 +1,59 @@
+name: 'Docker Build and Push'
+description: >
+  Log in to GHCR and Docker Hub, read the Node.js version from .nvmrc,
+  set up Buildx, and build+push the image. Callers are responsible for
+  computing the tags list; this action handles the mechanical setup.
+
+inputs:
+  tags:
+    description: 'Newline- or comma-separated Docker tags to apply'
+    required: true
+  ghcr-token:
+    description: 'Token for GHCR login (use secrets.GITHUB_TOKEN)'
+    required: true
+  dockerhub-username:
+    description: 'Docker Hub username'
+    required: true
+  dockerhub-token:
+    description: 'Docker Hub token'
+    required: true
+
+outputs:
+  digest:
+    description: 'Image content-addressable digest (sha256:...)'
+    value: ${{ steps.build.outputs.digest }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Login to GitHub Container Registry
+      uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ inputs.ghcr-token }}
+
+    - name: Login to Docker Hub
+      uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef
+      with:
+        username: ${{ inputs.dockerhub-username }}
+        password: ${{ inputs.dockerhub-token }}
+
+    - name: Read Node.js version
+      id: node-version
+      shell: bash
+      run: echo "value=$(cat .nvmrc | tr -d '[:space:]')" >> "$GITHUB_OUTPUT"
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v4
+
+    - name: Build and push
+      id: build
+      uses: docker/build-push-action@b66d8774c665b789105b440514f0c97e6f19b06f
+      with:
+        context: .
+        push: true
+        tags: ${{ inputs.tags }}
+        build-args: NODE_VERSION=${{ steps.node-version.outputs.value }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max

@@ -32,6 +32,7 @@ libs/react-query-client/src/lib/
 .github/instructions/nx.instructions.md
 
 apps/api/src/assets/attractap-firmwares/
+apps/api/src/assets/companion-app/
 apps/attractap-touch-firmware/.pio/
 apps/api/src/assets/attractap-firmwares/
 secrets/
