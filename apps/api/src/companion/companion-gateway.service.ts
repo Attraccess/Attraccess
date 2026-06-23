@@ -52,11 +52,14 @@ export class CompanionGatewayService {
     return resources;
   }
 
-  public sendLockCommand(deviceId: number): boolean {
+  public async sendLockCommand(deviceId: number): Promise<boolean> {
+    // persist first so a restarted/offline device re-locks on next authenticate
+    await this.deviceRepository.update(deviceId, { locked: true });
     return this.sendCommandToDevice(deviceId, CompanionEventType.COMPANION_LOCK_PC);
   }
 
-  public sendUnlockCommand(deviceId: number): boolean {
+  public async sendUnlockCommand(deviceId: number): Promise<boolean> {
+    await this.deviceRepository.update(deviceId, { locked: false });
     return this.sendCommandToDevice(deviceId, CompanionEventType.COMPANION_UNLOCK_PC);
   }
 

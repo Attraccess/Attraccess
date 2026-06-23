@@ -506,6 +506,32 @@
             }
           }
         },
+        "companion": {
+          "lock-pc": {
+            "title": "PC sperren",
+            "description": "Sperrt den Bildschirm eines registrierten Companion-Geräts.",
+            "inputs": { "input": "Eingabe" },
+            "outputs": { "output": "Ausgabe" },
+            "config": {
+              "deviceId": {
+                "label": "Companion-Gerät",
+                "placeholder": "Gerät auswählen..."
+              }
+            }
+          },
+          "unlock-pc": {
+            "title": "PC entsperren",
+            "description": "Entsperrt den Bildschirm eines registrierten Companion-Geräts.",
+            "inputs": { "input": "Eingabe" },
+            "outputs": { "output": "Ausgabe" },
+            "config": {
+              "deviceId": {
+                "label": "Companion-Gerät",
+                "placeholder": "Gerät auswählen..."
+              }
+            }
+          }
+        },
         "health": {
           "heartbeat": {
             "title": "Lebenszeichen",

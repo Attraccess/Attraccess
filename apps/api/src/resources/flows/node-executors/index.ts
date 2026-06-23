@@ -15,3 +15,5 @@ export * from './health-heartbeat.executor';
 export * from './health-set.executor';
 export * from './set-variables.executor';
 export * from './get-variables.executor';
+export * from './companion-lock-pc.executor';
+export * from './companion-unlock-pc.executor';

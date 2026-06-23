@@ -55,7 +55,7 @@ describe('CompanionAuthHandler', () => {
 
   describe('existing device authentication', () => {
     it('sends COMPANION_AUTHENTICATED on valid credentials', async () => {
-      const device = { id: 5, name: 'Lab PC', tokenHash: 'hash' };
+      const device = { id: 5, name: 'Lab PC', tokenHash: 'hash', locked: false };
       mockService.findById.mockResolvedValue(device);
       mockService.verifyToken.mockResolvedValue(true);
       mockService.touchLastConnection.mockResolvedValue(undefined);
@@ -69,8 +69,23 @@ describe('CompanionAuthHandler', () => {
         id: 5,
         name: 'Lab PC',
         resources: [{ id: 42, name: '3D Printer' }],
+        locked: false,
       });
       expect(socket.deviceId).toBe(5);
+    });
+
+    it('echoes persisted locked=true so a restarted device re-locks', async () => {
+      mockService.findById.mockResolvedValue({ id: 5, name: 'Lab PC', tokenHash: 'hash', locked: true });
+      mockService.verifyToken.mockResolvedValue(true);
+      mockService.touchLastConnection.mockResolvedValue(undefined);
+      mockGatewayService.getResourcesForDevice.mockResolvedValue([]);
+      mockService.getLatestVersion.mockReturnValue(null);
+
+      const socket = makeSocket();
+      await handler.handleAuthenticate(socket, { id: 5, token: 'abc' });
+
+      const call = (socket.sendEvent as jest.Mock).mock.calls.find((c) => c[0] === CompanionEventType.COMPANION_AUTHENTICATED);
+      expect(call[1]).toMatchObject({ locked: true });
     });
 
     it('sends COMPANION_UNAUTHORIZED when device not found', async () => {
