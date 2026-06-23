@@ -1,3 +1,4 @@
 out/
 dist/
+renderer/dist/
 package-lock.json
