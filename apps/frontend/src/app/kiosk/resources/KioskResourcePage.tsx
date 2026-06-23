@@ -7,8 +7,7 @@ import { PasswordResetForm } from '../../unauthorized/password-reset/passwordRes
 import { ResourceOverviewTab } from '../../resources/details/overview/ResourceOverviewTab';
 import { useResourcesServiceGetOneResourceById } from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { filenameToUrl } from '../../../api';
-import { ShapesIcon } from 'lucide-react';
+import { ResourceImage } from '../../../components/ResourceImage';
 import en from './KioskResourcePage.en.json';
 import de from './KioskResourcePage.de.json';
 
@@ -19,7 +18,7 @@ function KioskLogin() {
     <div className="w-full max-w-md mx-auto space-y-6">
       {view === 'login' && (
         <LoginForm
-          onNeedsAccount={() => undefined}
+          onNeedsAccount={null}
           onForgotPassword={() => setView('forgot')}
         />
       )}
@@ -51,17 +50,12 @@ function KioskResourceContent({ resourceId }: { resourceId: number }) {
   return (
     <div className="w-full max-w-3xl mx-auto">
       <div className="flex items-center gap-4 mb-8">
-        {resource.imageFilename ? (
-          <img
-            src={filenameToUrl(resource.imageFilename)}
-            alt={resource.name}
-            className="w-14 h-14 rounded-xl object-cover"
-          />
-        ) : (
-          <div className="w-14 h-14 rounded-xl bg-default-200 flex items-center justify-center">
-            <ShapesIcon className="w-8 h-8 text-default-500" />
-          </div>
-        )}
+        <ResourceImage
+          imageFilename={resource.imageFilename}
+          name={resource.name}
+          className="w-14 h-14 rounded-xl"
+          iconClassName="w-8 h-8"
+        />
         <div>
           <h1 className="text-2xl font-bold">{resource.name}</h1>
           {resource.description && (

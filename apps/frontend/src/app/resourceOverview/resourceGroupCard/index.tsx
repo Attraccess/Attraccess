@@ -19,11 +19,11 @@ import {
 } from '@heroui/react';
 import { EmptyState } from '../../../components/emptyState';
 import { PageHeader } from '../../../components/pageHeader';
+import { ResourceImage } from '../../../components/ResourceImage';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { filenameToUrl } from '../../../api';
 import { StatusChip } from './statusChip';
-import { ChevronRightIcon, CogIcon, ShapesIcon } from 'lucide-react';
+import { ChevronRightIcon, CogIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useAuth } from '../../../hooks/useAuth';
 import { useDebounce } from '../../../hooks/useDebounce';
@@ -166,25 +166,11 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
                     onAction={() => navigate(`/resources/${resource.id}`)}
                   >
                     <TableCell>
-                      {resource.imageFilename ? (
-                        <img
-                          height={48}
-                          width={48}
-                          src={filenameToUrl(resource.imageFilename)}
-                          alt=""
-                          aria-hidden="true"
-                          className="object-contain"
-                          style={{ height: 48, width: 48 }}
-                        />
-                      ) : (
-                        <div
-                          className="flex items-center justify-center text-default-400"
-                          style={{ height: 48, width: 48 }}
-                          aria-hidden="true"
-                        >
-                          <ShapesIcon className="w-6 h-6" />
-                        </div>
-                      )}
+                      <ResourceImage
+                        imageFilename={resource.imageFilename}
+                        name={resource.name}
+                        className="w-12 h-12 rounded-none"
+                      />
                     </TableCell>
                     <TableCell>{resource.name}</TableCell>
                     <TableCell className="text-right">

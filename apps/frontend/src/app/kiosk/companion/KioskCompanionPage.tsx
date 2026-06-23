@@ -1,11 +1,12 @@
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
 import { Spinner } from '@heroui/react';
 import { ShapesIcon, ChevronRight } from 'lucide-react';
-import { OpenAPI } from '@attraccess/react-query-client';
-import { useResourcesServiceResourceUsageGetActiveSession } from '@attraccess/react-query-client';
+import {
+  useCompanionDevicesServiceGetCompanionDeviceResources,
+  useResourcesServiceResourceUsageGetActiveSession,
+} from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { filenameToUrl } from '../../../api';
+import { ResourceImage } from '../../../components/ResourceImage';
 import en from './KioskCompanionPage.en.json';
 import de from './KioskCompanionPage.de.json';
 
@@ -14,21 +15,6 @@ interface CompanionResource {
   name: string;
   description?: string;
   imageFilename?: string;
-}
-
-function useCompanionDeviceResources(deviceId: string | null) {
-  return useQuery({
-    queryKey: ['companion-device-resources', deviceId],
-    queryFn: async (): Promise<CompanionResource[]> => {
-      const res = await fetch(`${OpenAPI.BASE}/api/companion-devices/${encodeURIComponent(deviceId!)}/resources`, {
-        credentials: 'include',
-      });
-      if (!res.ok) throw new Error('Failed to fetch companion device resources');
-      return res.json();
-    },
-    enabled: !!deviceId,
-    refetchInterval: 10_000,
-  });
 }
 
 function ResourceRow({ resource, autoLogoff }: { resource: CompanionResource; autoLogoff: string | null }) {
@@ -41,7 +27,6 @@ function ResourceRow({ resource, autoLogoff }: { resource: CompanionResource; au
   );
 
   const isInUse = !!sessionData?.usage;
-
   const to = `/kiosk/resources/${resource.id}${autoLogoff ? `?autoLogoff=${autoLogoff}` : ''}`;
 
   return (
@@ -50,17 +35,11 @@ function ResourceRow({ resource, autoLogoff }: { resource: CompanionResource; au
       onClick={() => navigate(to)}
       className="w-full flex items-center gap-4 p-4 rounded-xl bg-default-100 hover:bg-default-200 transition-colors text-left"
     >
-      {resource.imageFilename ? (
-        <img
-          src={filenameToUrl(resource.imageFilename)}
-          alt={resource.name}
-          className="w-12 h-12 rounded-lg object-cover shrink-0"
-        />
-      ) : (
-        <div className="w-12 h-12 rounded-lg bg-default-200 flex items-center justify-center shrink-0">
-          <ShapesIcon className="w-6 h-6 text-default-500" />
-        </div>
-      )}
+      <ResourceImage
+        imageFilename={resource.imageFilename}
+        name={resource.name}
+        className="w-12 h-12 rounded-lg shrink-0"
+      />
       <div className="flex-1 min-w-0">
         <p className="font-semibold truncate">{resource.name}</p>
         {resource.description && (
@@ -84,7 +63,12 @@ export function KioskCompanionPage() {
   const deviceId = params.get('deviceId');
   const autoLogoff = params.get('autoLogoff');
 
-  const { data: resources, isLoading, error } = useCompanionDeviceResources(deviceId);
+  const { data: rawResources, isLoading, error } = useCompanionDevicesServiceGetCompanionDeviceResources(
+    { id: Number(deviceId) },
+    undefined,
+    { enabled: !!deviceId, refetchInterval: 10_000 },
+  );
+  const resources = rawResources as CompanionResource[] | undefined;
 
   if (!deviceId) {
     return (
