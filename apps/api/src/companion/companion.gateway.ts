@@ -10,6 +10,7 @@ import {
 import { Server } from 'ws';
 import { Inject, Logger, UsePipes, ValidationPipe } from '@nestjs/common';
 import { randomBytes } from 'crypto';
+import { AsyncApi, AsyncApiPub, AsyncApiSub } from 'nestjs-asyncapi';
 import { CompanionService } from './companion.service';
 import {
   CompanionAuthenticateDto,
@@ -19,6 +20,7 @@ import {
   CompanionWebSocket,
 } from './companion.types';
 
+@AsyncApi()
 @WebSocketGateway({ path: '/api/companion/websocket' })
 export class CompanionGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
@@ -53,8 +55,12 @@ export class CompanionGateway implements OnGatewayConnection, OnGatewayDisconnec
 
   // ─── Client → Server ─────────────────────────────────────────────────────
 
-  // ATT-623: add @AsyncApiReceive once nestjs-asyncapi is compatible with @nestjs/swagger@11
   @SubscribeMessage('COMPANION_REGISTER')
+  @AsyncApiPub({
+    channel: 'COMPANION_REGISTER',
+    message: { name: 'COMPANION_REGISTER', payload: Object },
+    summary: 'Register a new companion device (first run)',
+  })
   async onRegister(@ConnectedSocket() socket: CompanionWebSocket): Promise<void> {
     const { device, token } = await this.companionService.createDevice();
     socket.deviceId = device.id;
@@ -64,9 +70,13 @@ export class CompanionGateway implements OnGatewayConnection, OnGatewayDisconnec
     await this.publishAuthenticated(socket);
   }
 
-  // ATT-623: add @AsyncApiReceive once nestjs-asyncapi is compatible with @nestjs/swagger@11
   @SubscribeMessage('COMPANION_AUTHENTICATE')
   @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
+  @AsyncApiPub({
+    channel: 'COMPANION_AUTHENTICATE',
+    message: { name: 'COMPANION_AUTHENTICATE', payload: CompanionAuthenticateDto },
+    summary: 'Authenticate with stored device credentials',
+  })
   async onAuthenticate(
     @MessageBody() body: CompanionAuthenticateDto,
     @ConnectedSocket() socket: CompanionWebSocket,
@@ -91,14 +101,29 @@ export class CompanionGateway implements OnGatewayConnection, OnGatewayDisconnec
 
   // ─── Server → Client ─────────────────────────────────────────────────────
 
+  @AsyncApiSub({
+    channel: 'COMPANION_REQUEST_AUTHENTICATION',
+    message: { name: 'COMPANION_REQUEST_AUTHENTICATION', payload: Object },
+    summary: 'Server requests the client to authenticate or register',
+  })
   private publishRequestAuthentication(socket: CompanionWebSocket): void {
     socket.sendEvent('COMPANION_REQUEST_AUTHENTICATION');
   }
 
+  @AsyncApiSub({
+    channel: 'COMPANION_REGISTER_RESPONSE',
+    message: { name: 'COMPANION_REGISTER_RESPONSE', payload: CompanionRegisterResponseDto },
+    summary: 'Response to COMPANION_REGISTER with assigned credentials',
+  })
   private publishRegisterResponse(socket: CompanionWebSocket, payload: CompanionRegisterResponseDto): void {
     socket.sendEvent('COMPANION_REGISTER_RESPONSE', payload);
   }
 
+  @AsyncApiSub({
+    channel: 'COMPANION_AUTHENTICATED',
+    message: { name: 'COMPANION_AUTHENTICATED', payload: CompanionAuthenticatedDto },
+    summary: 'Sent after successful authentication with device info and resources',
+  })
   private async publishAuthenticated(socket: CompanionWebSocket): Promise<void> {
     if (!socket.deviceId) return;
     const device = await this.companionService.findById(socket.deviceId);
@@ -112,18 +137,33 @@ export class CompanionGateway implements OnGatewayConnection, OnGatewayDisconnec
     socket.sendEvent('COMPANION_AUTHENTICATED', payload);
   }
 
+  @AsyncApiSub({
+    channel: 'COMPANION_LOCK_PC',
+    message: { name: 'COMPANION_LOCK_PC', payload: Object },
+    summary: 'Server instructs the companion to lock the PC',
+  })
   public async sendLockPc(deviceId: number): Promise<void> {
     for (const socket of this.socketsForDevice(deviceId)) {
       socket.sendEvent('COMPANION_LOCK_PC');
     }
   }
 
+  @AsyncApiSub({
+    channel: 'COMPANION_UNLOCK_PC',
+    message: { name: 'COMPANION_UNLOCK_PC', payload: Object },
+    summary: 'Server instructs the companion to unlock the PC',
+  })
   public async sendUnlockPc(deviceId: number): Promise<void> {
     for (const socket of this.socketsForDevice(deviceId)) {
       socket.sendEvent('COMPANION_UNLOCK_PC');
     }
   }
 
+  @AsyncApiSub({
+    channel: 'COMPANION_UPDATE_AVAILABLE',
+    message: { name: 'COMPANION_UPDATE_AVAILABLE', payload: CompanionUpdateAvailableDto },
+    summary: 'Notifies the companion that a new version is available',
+  })
   public async sendUpdateAvailable(deviceId: number, payload: CompanionUpdateAvailableDto): Promise<void> {
     for (const socket of this.socketsForDevice(deviceId)) {
       socket.sendEvent('COMPANION_UPDATE_AVAILABLE', payload);

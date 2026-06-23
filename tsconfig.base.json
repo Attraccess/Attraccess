@@ -46,6 +46,9 @@
       ],
       "@attraccess/shared": [
         "libs/shared/src/index.ts"
+      ],
+      "@attraccess/companion-ws-client": [
+        "libs/companion-ws-client/src/index.ts"
       ]
     },
     "ignoreDeprecations": "6.0",

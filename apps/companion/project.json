@@ -8,19 +8,31 @@
     "build": {
       "executor": "nx:run-commands",
       "cache": true,
+      "dependsOn": ["companion-ws-client:build"],
       "inputs": ["production", "^production"],
-      "outputs": ["{workspaceRoot}/dist/apps/companion"],
+      "outputs": ["{workspaceRoot}/apps/companion/out"],
       "options": {
         "cwd": "apps/companion",
         "commands": [
-          "tsc -p tsconfig.app.json",
-          "electron-builder --config electron-builder.config.cjs --dir"
+          "esbuild src/main.ts --bundle --platform=node --external:electron --external:keytar --outfile=out/main.js --format=cjs --alias:@attraccess/companion-ws-client=../../libs/companion-ws-client/src/index.ts",
+          "esbuild src/preload.ts --bundle --platform=node --external:electron --outfile=out/preload.js --format=cjs"
         ],
         "parallel": false
       }
     },
+    "package": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "dependsOn": ["build"],
+      "outputs": ["{workspaceRoot}/dist/apps/companion"],
+      "options": {
+        "cwd": "apps/companion",
+        "command": "CI=true electron-builder --config electron-builder.config.cjs --dir"
+      }
+    },
     "typecheck": {
       "executor": "nx:run-commands",
+      "dependsOn": ["companion-ws-client:generate"],
       "options": {
         "cwd": "apps/companion",
         "command": "tsc -p tsconfig.app.json --noEmit"
