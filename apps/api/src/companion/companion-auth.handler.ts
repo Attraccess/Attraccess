@@ -34,13 +34,17 @@ export class CompanionAuthHandler {
     const { id, token, platform, appVersion } = payload;
     this.logger.debug(`Authenticating companion device ${id}`);
 
-    const device = await this.service.findById(id!);
+    if (id === undefined || token === undefined) {
+      return socket.sendEvent(CompanionEventType.COMPANION_UNAUTHORIZED, { message: 'PLEASE_REREGISTER' });
+    }
+
+    const device = await this.service.findById(id);
     if (!device) {
       this.logger.warn(`No companion device found for id ${id}`);
       return socket.sendEvent(CompanionEventType.COMPANION_UNAUTHORIZED, { message: 'PLEASE_REREGISTER' });
     }
 
-    const valid = await this.service.verifyToken(device, token!);
+    const valid = await this.service.verifyToken(device, token);
     if (!valid) {
       this.logger.warn(`Invalid token for companion device ${id}`);
       return socket.sendEvent(CompanionEventType.COMPANION_UNAUTHORIZED, { message: 'PLEASE_REREGISTER' });
