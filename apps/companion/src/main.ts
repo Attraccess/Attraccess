@@ -6,6 +6,13 @@ import { CompanionWsClient, CompanionAuthenticatedDto, CompanionRegisterResponse
 import { loadCredentials, saveCredentials, StoredCredentials } from './keychain';
 import { normalizeServerUrl } from './server-url';
 import { dotIconPng } from './tray-icon';
+import {
+  lockViaCGSession,
+  hasAccessibilityPermission,
+  promptAccessibilityPermission,
+  installLaunchAgent,
+} from './macos-lock';
+import { showLockOverlay, hideLockOverlay, markQuitting } from './lock-overlay';
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
@@ -73,32 +80,35 @@ function reloadKiosk() {
   }
 }
 
-// macOS native fullscreen lives in its own Space, so hide() leaves a black
-// screen behind. simpleFullScreen avoids the Space; other platforms use native.
-function setOverlayFullscreen(on: boolean) {
-  if (!kioskWindow) return;
-  if (process.platform === 'darwin') kioskWindow.setSimpleFullScreen(on);
-  else kioskWindow.setFullScreen(on);
-}
-
-function showKioskOverlay() {
-  kioskWindow?.setAlwaysOnTop(true, 'screen-saver');
-  setOverlayFullscreen(true);
-  kioskWindow?.show();
-  kioskWindow?.focus();
-}
-
-function hideKioskOverlay() {
-  kioskWindow?.setAlwaysOnTop(false);
-  setOverlayFullscreen(false);
-  kioskWindow?.hide();
-}
-
 // reopen/show the kiosk from the tray (recreates the window if it was closed)
 function reopenKiosk() {
   if (!authenticatedPayload) return;
   openKiosk(authenticatedPayload);
-  showKioskOverlay();
+  const win = kioskWindow;
+  if (win) {
+    win.setSimpleFullScreen(true);
+    win.show();
+    win.focus();
+  }
+}
+
+// ─── Lock / unlock ────────────────────────────────────────────────────────────
+
+async function lockComputer(): Promise<void> {
+  // macOS primary: try CGSession -suspend (invokes OS login screen).
+  // Fall back to overlay if it fails (sandboxed / restricted env).
+  const cgSessionOk = await lockViaCGSession();
+  if (!cgSessionOk) {
+    showLockOverlay();
+  } else {
+    // Belt-and-suspenders: also show overlay so the computer is blocked when
+    // the user returns from the macOS login screen before unlock_pc arrives.
+    showLockOverlay();
+  }
+}
+
+function unlockComputer(): void {
+  hideLockOverlay();
 }
 
 // ─── Tray ────────────────────────────────────────────────────────────────────
@@ -218,6 +228,12 @@ function startWsClient(serverUrl: string, firstRun: boolean) {
     // server only sends AUTHENTICATED in reply to AUTHENTICATE; register alone
     // never authenticates, so do it now instead of waiting for a relaunch
     wsClient?.sendAuthenticate({ id: payload.id, token: payload.token });
+
+    // install launchd user agent on first registration so the companion
+    // starts automatically on login (macOS only — no-op on other platforms)
+    installLaunchAgent(app.getPath('exe')).catch(() => {
+      // non-fatal — app may not be packaged yet in dev
+    });
   });
 
   wsClient.on('authenticated', async (payload: CompanionAuthenticatedDto) => {
@@ -227,24 +243,24 @@ function startWsClient(serverUrl: string, firstRun: boolean) {
     // restore persisted lock state so a restart doesn't silently unlock
     setTrayState(payload.locked ? 'locked' : 'unlocked');
     if (payload.locked) {
-      showKioskOverlay();
+      showLockOverlay();
     } else {
-      hideKioskOverlay();
+      hideLockOverlay();
     }
     if (mainWindow && !mainWindow.isDestroyed()) {
       setTimeout(() => mainWindow?.close(), 1500);
     }
   });
 
-  wsClient.on('lock_pc', () => {
+  wsClient.on('lock_pc', async () => {
     setTrayState('locked');
     reloadKiosk();
-    showKioskOverlay();
+    await lockComputer();
   });
 
   wsClient.on('unlock_pc', () => {
     setTrayState('unlocked');
-    hideKioskOverlay();
+    unlockComputer();
   });
 
   wsClient.on('update_available', (payload) => {
@@ -260,6 +276,13 @@ function startWsClient(serverUrl: string, firstRun: boolean) {
 app.whenReady().then(async () => {
   setupTray();
 
+  // macOS: prompt for Accessibility permission so the overlay can fully block
+  // keyboard and mouse input. Prompt on first launch; the user can grant it in
+  // System Settings → Privacy & Security → Accessibility.
+  if (!hasAccessibilityPermission()) {
+    promptAccessibilityPermission();
+  }
+
   creds = await loadCredentials();
   if (!creds?.serverUrl || !creds?.id) {
     openWizardWindow(/* firstRun */ true);
@@ -273,6 +296,8 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
+  markQuitting();
+  hideLockOverlay();
   wsClient?.stop();
 });
 
