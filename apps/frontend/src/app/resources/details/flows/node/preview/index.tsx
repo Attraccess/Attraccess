@@ -154,6 +154,8 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
         ];
 
       case ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_TRACK_ACTIVITY:
+      case ResourceFlowNodeType.OUTPUT_COMPANION_LOCK_PC:
+      case ResourceFlowNodeType.OUTPUT_COMPANION_UNLOCK_PC:
         return [];
 
       case ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT:
