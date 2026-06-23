@@ -6,8 +6,11 @@ import { LoginForm } from '../../unauthorized/loginForm';
 import { PasswordResetForm } from '../../unauthorized/password-reset/passwordResetForm';
 import { ResourceOverviewTab } from '../../resources/details/overview/ResourceOverviewTab';
 import { useResourcesServiceGetOneResourceById } from '@attraccess/react-query-client';
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { filenameToUrl } from '../../../api';
 import { ShapesIcon } from 'lucide-react';
+import en from './KioskResourcePage.en.json';
+import de from './KioskResourcePage.de.json';
 
 function KioskLogin() {
   const [view, setView] = useState<'login' | 'forgot'>('login');
@@ -26,6 +29,7 @@ function KioskLogin() {
 }
 
 function KioskResourceContent({ resourceId }: { resourceId: number }) {
+  const { t } = useTranslations({ en, de });
   const { data: resource, isLoading } = useResourcesServiceGetOneResourceById({ id: resourceId });
 
   if (isLoading) {
@@ -39,7 +43,7 @@ function KioskResourceContent({ resourceId }: { resourceId: number }) {
   if (!resource) {
     return (
       <div className="text-center text-muted-foreground py-12">
-        Resource not found.
+        {t('notFound')}
       </div>
     );
   }

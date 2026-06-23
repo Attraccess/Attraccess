@@ -1,11 +1,15 @@
 import { PropsWithChildren } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useAutoLogoff } from '../hooks/useAutoLogoff';
+import en from './KioskLayout.en.json';
+import de from './KioskLayout.de.json';
 
 function AutoLogoffBanner({ remaining }: { remaining: number }) {
+  const { t } = useTranslations({ en, de });
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 bg-warning/90 text-warning-foreground text-center p-4 text-lg font-medium">
-      Signing out in {remaining} second{remaining !== 1 ? 's' : ''} due to inactivity. Touch anywhere to stay signed in.
+      {t('autoLogoff.banner', { count: remaining })}
     </div>
   );
 }

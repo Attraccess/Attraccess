@@ -1,0 +1,8 @@
+{
+  "autoLogoff": {
+    "banner": {
+      "one": "Signing out in {{count}} second due to inactivity. Touch anywhere to stay signed in.",
+      "many": "Signing out in {{count}} seconds due to inactivity. Touch anywhere to stay signed in."
+    }
+  }
+}
