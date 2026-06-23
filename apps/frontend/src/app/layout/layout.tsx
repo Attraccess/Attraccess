@@ -18,10 +18,9 @@ import { GlobalPushNotifications } from '../notifications/GlobalPushNotification
 
 interface LayoutProps {
   children: React.ReactNode;
-  noLayout?: boolean;
 }
 
-export function Layout({ children, noLayout }: LayoutProps) {
+export function Layout({ children }: LayoutProps) {
   // Initialize with closed sidebar on mobile, open on desktop
   const [isOpen, setIsOpen] = useState(false);
 
@@ -70,7 +69,7 @@ export function Layout({ children, noLayout }: LayoutProps) {
     enabled: isAuthenticated && !needsTwoFactorSetup,
   });
 
-  if (noLayout) {
+  if (!isAuthenticated) {
     return (
       <div className="bg-background h-screen min-h-0 flex flex-col overflow-y-auto app-scroll-container">
         <ServerNotAvailable />

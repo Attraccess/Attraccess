@@ -57,6 +57,7 @@ const coreRoutes: RouteConfig[] = [
       </KioskLayout>
     ),
     authRequired: false,
+    noLayout: true,
   },
   {
     path: '/kiosk/companion',
@@ -66,6 +67,7 @@ const coreRoutes: RouteConfig[] = [
       </KioskLayout>
     ),
     authRequired: false,
+    noLayout: true,
   },
   {
     path: '/',

@@ -1,4 +1,4 @@
-import { Route, Routes, useNavigate, useLocation } from 'react-router-dom';
+import { Outlet, Route, Routes, useNavigate } from 'react-router-dom';
 import { Unauthorized } from './unauthorized/unauthorized';
 import { PropsWithChildren, useEffect, useMemo, useState } from 'react';
 import { Layout } from './layout/layout';
@@ -96,8 +96,6 @@ function AppLayout(props: PropsWithChildren) {
   const { isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const location = useLocation();
-  const isKioskRoute = location.pathname.startsWith('/kiosk');
 
   const { t, language } = useTranslations({ de, en });
 
@@ -111,7 +109,7 @@ function AppLayout(props: PropsWithChildren) {
         <ToastProvider>
           <ReactFlowProvider>
             <AttraccessUserActionsBridge>
-              <Layout noLayout={!isAuthenticated || isKioskRoute}>{props.children}</Layout>
+              {props.children}
               {isAuthenticated && <SupervisorApprovalListener />}
             </AttraccessUserActionsBridge>
           </ReactFlowProvider>
@@ -150,7 +148,12 @@ function AppLayout(props: PropsWithChildren) {
 function AppContent() {
   const { isAuthenticated } = useAuth();
   const allRoutes = useAllRoutes();
-  const routesWithAuthElements = useRoutesWithAuthElements(allRoutes);
+
+  const bareRoutes = useMemo(() => allRoutes.filter((r) => r.noLayout), [allRoutes]);
+  const layoutRoutes = useMemo(() => allRoutes.filter((r) => !r.noLayout), [allRoutes]);
+
+  const bareRouteElements = useRoutesWithAuthElements(bareRoutes);
+  const layoutRouteElements = useRoutesWithAuthElements(layoutRoutes);
 
   return (
     <TwoFactorGate>
@@ -173,9 +176,12 @@ function AppContent() {
           }
         />
 
-        {routesWithAuthElements}
+        {bareRouteElements}
 
-        {!isAuthenticated && <Route path="*" element={<Unauthorized />} />}
+        <Route element={<Layout><Outlet /></Layout>}>
+          {layoutRouteElements}
+          {!isAuthenticated && <Route path="*" element={<Unauthorized />} />}
+        </Route>
       </Routes>
     </TwoFactorGate>
   );
