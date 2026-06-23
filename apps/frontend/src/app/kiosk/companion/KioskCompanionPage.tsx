@@ -1,12 +1,9 @@
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Spinner } from '@heroui/react';
-import { ShapesIcon, ChevronRight } from 'lucide-react';
-import {
-  useCompanionDevicesServiceGetCompanionDeviceResources,
-  useResourcesServiceResourceUsageGetActiveSession,
-} from '@attraccess/react-query-client';
+import { ShapesIcon } from 'lucide-react';
+import { useCompanionDevicesServiceGetCompanionDeviceResources } from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { ResourceImage } from '../../../components/ResourceImage';
+import { ResourceListItem } from '../../../components/ResourceListItem';
 import en from './KioskCompanionPage.en.json';
 import de from './KioskCompanionPage.de.json';
 
@@ -17,47 +14,8 @@ interface CompanionResource {
   imageFilename?: string;
 }
 
-function ResourceRow({ resource, autoLogoff }: { resource: CompanionResource; autoLogoff: string | null }) {
-  const navigate = useNavigate();
-  const { t } = useTranslations({ en, de });
-  const { data: sessionData } = useResourcesServiceResourceUsageGetActiveSession(
-    { resourceId: resource.id },
-    undefined,
-    { refetchInterval: 5000 },
-  );
-
-  const isInUse = !!sessionData?.usage;
-  const to = `/kiosk/resources/${resource.id}${autoLogoff ? `?autoLogoff=${autoLogoff}` : ''}`;
-
-  return (
-    <button
-      type="button"
-      onClick={() => navigate(to)}
-      className="w-full flex items-center gap-4 p-4 rounded-xl bg-default-100 hover:bg-default-200 transition-colors text-left"
-    >
-      <ResourceImage
-        imageFilename={resource.imageFilename}
-        name={resource.name}
-        className="w-12 h-12 rounded-lg shrink-0"
-      />
-      <div className="flex-1 min-w-0">
-        <p className="font-semibold truncate">{resource.name}</p>
-        {resource.description && (
-          <p className="text-sm text-default-500 truncate">{resource.description}</p>
-        )}
-      </div>
-      <div className="flex items-center gap-2 shrink-0">
-        <span
-          className={`w-2.5 h-2.5 rounded-full ${isInUse ? 'bg-success' : 'bg-default-300'}`}
-          title={isInUse ? t('status.inUse') : t('status.available')}
-        />
-        <ChevronRight className="w-4 h-4 text-default-400" />
-      </div>
-    </button>
-  );
-}
-
 export function KioskCompanionPage() {
+  const navigate = useNavigate();
   const [params] = useSearchParams();
   const { t } = useTranslations({ en, de });
   const deviceId = params.get('deviceId');
@@ -108,7 +66,11 @@ export function KioskCompanionPage() {
     <div className="w-full max-w-lg mx-auto space-y-3">
       <h1 className="text-2xl font-bold mb-6 text-center">{t('title')}</h1>
       {resources.map((r) => (
-        <ResourceRow key={r.id} resource={r} autoLogoff={autoLogoff} />
+        <ResourceListItem
+          key={r.id}
+          resource={r}
+          onPress={() => navigate(`/kiosk/resources/${r.id}${autoLogoff ? `?autoLogoff=${autoLogoff}` : ''}`)}
+        />
       ))}
     </div>
   );
