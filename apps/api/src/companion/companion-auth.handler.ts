@@ -26,7 +26,7 @@ export class CompanionAuthHandler {
     const { device, token } = await this.service.createDevice();
 
     socket.deviceId = device.id;
-    socket.sendEvent(CompanionEventType.COMPANION_REGISTER, { id: device.id, token });
+    socket.sendEvent(CompanionEventType.COMPANION_REGISTER_RESPONSE, { id: device.id, token });
     this.logger.log(`New companion device registered with id ${device.id}`);
   }
 

@@ -41,14 +41,14 @@ describe('CompanionAuthHandler', () => {
   });
 
   describe('new device registration (empty payload)', () => {
-    it('creates device and sends COMPANION_REGISTER', async () => {
+    it('creates device and sends COMPANION_REGISTER_RESPONSE', async () => {
       mockService.createDevice.mockResolvedValue({ device: { id: 7 }, token: 'tok123' });
 
       const socket = makeSocket();
       await handler.handleAuthenticate(socket, {});
 
       expect(mockService.createDevice).toHaveBeenCalled();
-      expect(socket.sendEvent).toHaveBeenCalledWith(CompanionEventType.COMPANION_REGISTER, { id: 7, token: 'tok123' });
+      expect(socket.sendEvent).toHaveBeenCalledWith(CompanionEventType.COMPANION_REGISTER_RESPONSE, { id: 7, token: 'tok123' });
       expect(socket.deviceId).toBe(7);
     });
   });
