@@ -191,23 +191,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Login to Docker Hub
-        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Get Node.js Version
-        id: node-version
-        run: echo "NODE_VERSION=$(cat .nvmrc | tr -d '[:space:]')" >> $GITHUB_OUTPUT
-
       - name: Get short SHA
         id: vars
         run: echo "SHORT_SHA=$(echo $GITHUB_SHA | cut -c1-7)" >> $GITHUB_OUTPUT
@@ -221,22 +204,16 @@ jobs:
             echo "suffix=pr-${{ github.event.pull_request.number }}-${{ steps.vars.outputs.SHORT_SHA }}" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
       - name: Build and push Docker image
         id: build-and-push
-        uses: docker/build-push-action@b66d8774c665b789105b440514f0c97e6f19b06f
+        uses: ./.github/actions/docker-build-push
         with:
-          context: .
-          push: true
           tags: |
             ghcr.io/${{ env.GHCR_IMAGE_NAME }}:${{ steps.image-tag.outputs.suffix }}
             ${{ env.DOCKERHUB_IMAGE_NAME }}:${{ steps.image-tag.outputs.suffix }}
-          build-args: |
-            NODE_VERSION=${{ steps.node-version.outputs.NODE_VERSION }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          ghcr-token: ${{ secrets.GITHUB_TOKEN }}
+          dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
+          dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Post image URL comment to PR
         if: github.event_name == 'pull_request'
