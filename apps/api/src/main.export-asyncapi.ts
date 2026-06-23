@@ -4,6 +4,7 @@ import { Module } from '@nestjs/common';
 import { AsyncApiDocumentBuilder, AsyncApiModule } from 'nestjs-asyncapi';
 import { CompanionGateway } from './companion/companion.gateway';
 import { CompanionService } from './companion/companion.service';
+import { resolveAppVersion } from './config/app.config';
 import { writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 
@@ -17,7 +18,7 @@ async function main() {
   const config = new AsyncApiDocumentBuilder()
     .setTitle('Attraccess Companion WebSocket API')
     .setDescription('WebSocket protocol between the Companion desktop app and the Attraccess server')
-    .setVersion('1.0.0')
+    .setVersion(resolveAppVersion())
     .setDefaultContentType('application/json')
     .addServer('companion', {
       url: '{serverUrl}/api/companion/websocket',
