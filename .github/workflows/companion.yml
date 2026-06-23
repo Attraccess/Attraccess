@@ -65,7 +65,7 @@ jobs:
 
       - name: Clean up keychain
         if: ${{ secrets.APPLE_CERTIFICATE != '' && always() }}
-        run: security delete-keychain "$KEYCHAIN_PATH" || true
+        run: '[ -n "$KEYCHAIN_PATH" ] && security delete-keychain "$KEYCHAIN_PATH" || true'
 
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4

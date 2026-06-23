@@ -16,22 +16,10 @@ const KNOWN_BINARIES = [
   { filename: 'companion_linux_arm64.AppImage', platform: 'linux', arch: 'arm64' },
 ];
 
-// Clear assets directory
-if (fs.existsSync(assetsDir)) {
-  fs.readdirSync(assetsDir).forEach((file) => {
-    const curPath = path.join(assetsDir, file);
-    if (fs.lstatSync(curPath).isDirectory()) {
-      fs.rmSync(curPath, { recursive: true, force: true });
-    } else {
-      fs.unlinkSync(curPath);
-    }
-  });
-  console.log(`Cleared assets directory: ${assetsDir}`);
-}
-if (!fs.existsSync(assetsDir)) {
-  fs.mkdirSync(assetsDir, { recursive: true });
-  console.log(`Created assets directory: ${assetsDir}`);
-}
+// Clear and recreate assets directory
+fs.rmSync(assetsDir, { recursive: true, force: true });
+fs.mkdirSync(assetsDir, { recursive: true });
+console.log(`Cleared and recreated assets directory: ${assetsDir}`);
 
 if (!fs.existsSync(sourceDir)) {
   console.warn(`Warning: ${sourceDir} does not exist — no companion binaries to bundle.`);
