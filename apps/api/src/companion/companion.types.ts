@@ -55,9 +55,31 @@ export class CompanionUpdateAvailableDto {
 
 // ─── Socket type ─────────────────────────────────────────────────────────────
 
-export interface CompanionWebSocket extends Omit<WebSocket, 'send'> {
+export enum CompanionEventType {
+  COMPANION_REQUEST_AUTHENTICATION = 'COMPANION_REQUEST_AUTHENTICATION',
+  COMPANION_AUTHENTICATE = 'COMPANION_AUTHENTICATE',
+  COMPANION_REGISTER = 'COMPANION_REGISTER',
+  COMPANION_REGISTER_RESPONSE = 'COMPANION_REGISTER_RESPONSE',
+  COMPANION_AUTHENTICATED = 'COMPANION_AUTHENTICATED',
+  COMPANION_UNAUTHORIZED = 'COMPANION_UNAUTHORIZED',
+  COMPANION_LOCK_PC = 'COMPANION_LOCK_PC',
+  COMPANION_UNLOCK_PC = 'COMPANION_UNLOCK_PC',
+  COMPANION_UPDATE_AVAILABLE = 'COMPANION_UPDATE_AVAILABLE',
+}
+
+export interface CompanionAuthenticatePayload {
+  id?: number;
+  token?: string;
+  platform?: string;
+  appVersion?: string;
+}
+
+export interface CompanionSocket extends Omit<WebSocket, 'send'> {
   id: string;
   deviceId: CompanionDevice['id'] | null;
   send: (data: string) => void;
-  sendEvent: (event: string, payload?: unknown) => void;
+  sendEvent: (type: CompanionEventType, payload: unknown) => void;
 }
+
+// ponytail: alias for gateway code that predates CompanionSocket
+export type CompanionWebSocket = CompanionSocket;

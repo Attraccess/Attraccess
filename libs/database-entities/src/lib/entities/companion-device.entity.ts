@@ -9,7 +9,7 @@ export class CompanionDevice {
   @ApiProperty({ description: 'The ID of the companion device' })
   id!: number;
 
-  @Column({ type: 'text', nullable: false, default: 'Unnamed Device' })
+  @Column({ type: 'text', nullable: false, default: 'Unnamed Device', unique: true })
   @ApiProperty({ description: 'The display name of the companion device' })
   name!: string;
 

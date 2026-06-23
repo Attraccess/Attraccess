@@ -15,6 +15,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { Module, OnModuleInit } from '@nestjs/common';
 import { PluginModule } from '../plugin-system/plugin.module';
 import { AttractapModule } from '../attractap/attractap.module';
+import { CompanionModule } from '../companion/companion.module';
 import { AnalyticsModule } from '../analytics/analytics.module';
 import { EmailTemplateModule } from '../email-template/email-template.module';
 import sessionConfig from '../config/session.config';
@@ -32,7 +33,6 @@ import { VersionModule } from '../version/version.module';
 import { MessagingModule } from '../messaging/messaging.module';
 import { PushModule } from '../push/push.module';
 import { NotificationsModule } from '../notifications/notifications.module';
-import { CompanionModule } from '../companion/companion.module';
 
 @Module({
   imports: [
@@ -119,6 +119,7 @@ import { CompanionModule } from '../companion/companion.module';
     VersionModule,
     PluginModule.forRoot(),
     AttractapModule,
+    CompanionModule,
     AnalyticsModule,
     EmailTemplateModule,
     LicenseModule,
@@ -128,7 +129,6 @@ import { CompanionModule } from '../companion/companion.module';
     MessagingModule,
     PushModule,
     NotificationsModule,
-    CompanionModule,
   ],
   controllers: [AppController],
   providers: [AppService],
