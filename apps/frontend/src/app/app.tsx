@@ -1,4 +1,4 @@
-import { Route, Routes, useNavigate } from 'react-router-dom';
+import { Route, Routes, useNavigate, useLocation } from 'react-router-dom';
 import { Unauthorized } from './unauthorized/unauthorized';
 import { PropsWithChildren, useEffect, useMemo, useState } from 'react';
 import { Layout } from './layout/layout';
@@ -96,6 +96,8 @@ function AppLayout(props: PropsWithChildren) {
   const { isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isKioskRoute = location.pathname.startsWith('/kiosk');
 
   const { t, language } = useTranslations({ de, en });
 
@@ -109,7 +111,7 @@ function AppLayout(props: PropsWithChildren) {
         <ToastProvider>
           <ReactFlowProvider>
             <AttraccessUserActionsBridge>
-              <Layout noLayout={!isAuthenticated}>{props.children}</Layout>
+              <Layout noLayout={!isAuthenticated || isKioskRoute}>{props.children}</Layout>
               {isAuthenticated && <SupervisorApprovalListener />}
             </AttraccessUserActionsBridge>
           </ReactFlowProvider>

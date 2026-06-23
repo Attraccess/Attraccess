@@ -1,6 +1,9 @@
 import { Navigate } from 'react-router-dom';
 import { ResourceTabsLayout } from '../resources/details/layout/ResourceTabsLayout';
 import { ResourceOverviewTab } from '../resources/details/overview/ResourceOverviewTab';
+import { KioskLayout } from '../kiosk/layout/KioskLayout';
+import { KioskResourcePage } from '../kiosk/resources/KioskResourcePage';
+import { KioskCompanionPage } from '../kiosk/companion/KioskCompanionPage';
 import { ResourceHistoryTab } from '../resources/details/history/ResourceHistoryTab';
 import { ResourcePeopleTab } from '../resources/details/people/ResourcePeopleTab';
 import { ResourceGroupsTab } from '../resources/details/groups/ResourceGroupsTab';
@@ -46,6 +49,24 @@ import { UnauthorizedLayout } from '../unauthorized/unauthorized-layout/layout';
 const PasswordPolicySettingsPage = lazy(() => import('../settings/password-policy'));
 
 const coreRoutes: RouteConfig[] = [
+  {
+    path: '/kiosk/resources/:id',
+    element: (
+      <KioskLayout>
+        <KioskResourcePage />
+      </KioskLayout>
+    ),
+    authRequired: false,
+  },
+  {
+    path: '/kiosk/companion',
+    element: (
+      <KioskLayout>
+        <KioskCompanionPage />
+      </KioskLayout>
+    ),
+    authRequired: false,
+  },
   {
     path: '/',
     element: <Navigate to="/resources" replace />,
