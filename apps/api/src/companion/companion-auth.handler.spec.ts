@@ -17,7 +17,7 @@ const mockService = {
   findById: jest.fn(),
   verifyToken: jest.fn(),
   touchLastConnection: jest.fn(),
-  getLatestVersion: jest.fn(),
+  getManifest: jest.fn(),
 };
 
 const mockGatewayService = {
@@ -60,7 +60,7 @@ describe('CompanionAuthHandler', () => {
       mockService.verifyToken.mockResolvedValue(true);
       mockService.touchLastConnection.mockResolvedValue(undefined);
       mockGatewayService.getResourcesForDevice.mockResolvedValue([{ id: 42, name: '3D Printer' }]);
-      mockService.getLatestVersion.mockReturnValue(null);
+      mockService.getManifest.mockReturnValue(null);
 
       const socket = makeSocket();
       await handler.handleAuthenticate(socket, { id: 5, token: 'abc', platform: 'linux', appVersion: '1.0.0' });
@@ -79,7 +79,7 @@ describe('CompanionAuthHandler', () => {
       mockService.verifyToken.mockResolvedValue(true);
       mockService.touchLastConnection.mockResolvedValue(undefined);
       mockGatewayService.getResourcesForDevice.mockResolvedValue([]);
-      mockService.getLatestVersion.mockReturnValue(null);
+      mockService.getManifest.mockReturnValue(null);
 
       const socket = makeSocket();
       await handler.handleAuthenticate(socket, { id: 5, token: 'abc' });
@@ -113,7 +113,11 @@ describe('CompanionAuthHandler', () => {
       mockService.verifyToken.mockResolvedValue(true);
       mockService.touchLastConnection.mockResolvedValue(undefined);
       mockGatewayService.getResourcesForDevice.mockResolvedValue([]);
-      mockService.getLatestVersion.mockReturnValue({ version: '2.0.0', downloadUrl: '/download/linux/amd64' });
+      mockService.getManifest.mockReturnValue({
+        version: '2.0.0',
+        buildId: 'abc',
+        platforms: [{ platform: 'linux', arch: 'x64', filename: 'companion-linux-x64.AppImage' }],
+      });
 
       const socket = makeSocket();
       await handler.handleAuthenticate(socket, { id: 5, token: 'tok', platform: 'linux', appVersion: '1.0.0' });
@@ -121,7 +125,7 @@ describe('CompanionAuthHandler', () => {
       const calls = (socket.sendEvent as jest.Mock).mock.calls;
       const updateCall = calls.find((c) => c[0] === CompanionEventType.COMPANION_UPDATE_AVAILABLE);
       expect(updateCall).toBeDefined();
-      expect(updateCall[1]).toMatchObject({ version: '2.0.0' });
+      expect(updateCall[1]).toMatchObject({ version: '2.0.0', downloadUrl: '/api/companion/download/linux/x64' });
     });
 
     it('does not send COMPANION_UPDATE_AVAILABLE when version is current', async () => {
@@ -129,7 +133,11 @@ describe('CompanionAuthHandler', () => {
       mockService.verifyToken.mockResolvedValue(true);
       mockService.touchLastConnection.mockResolvedValue(undefined);
       mockGatewayService.getResourcesForDevice.mockResolvedValue([]);
-      mockService.getLatestVersion.mockReturnValue({ version: '1.0.0', downloadUrl: '/dl' });
+      mockService.getManifest.mockReturnValue({
+        version: '1.0.0',
+        buildId: 'abc',
+        platforms: [{ platform: 'linux', arch: 'x64', filename: 'companion-linux-x64.AppImage' }],
+      });
 
       const socket = makeSocket();
       await handler.handleAuthenticate(socket, { id: 5, token: 'tok', platform: 'linux', appVersion: '1.0.0' });
