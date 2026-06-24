@@ -25,6 +25,7 @@ import { AcceptInvitation } from './accept-invitation';
 import { TwoFactorGate } from './two-factor-gate';
 import { AttraccessUserActionsBridge } from '../components/attraccessUserActionsBridge';
 import { SupervisorApprovalListener } from '../components/supervisorApproval/SupervisorApprovalListener';
+import { KioskGuard } from './kiosk/KioskGuard';
 
 function useRoutesWithAuthElements(routes: RouteConfig[]) {
   const { user } = useAuth();
@@ -157,6 +158,7 @@ function AppContent() {
 
   return (
     <TwoFactorGate>
+      <KioskGuard />
       <Routes>
         <Route path="/verify-email" element={<VerifyEmail />} />
         <Route

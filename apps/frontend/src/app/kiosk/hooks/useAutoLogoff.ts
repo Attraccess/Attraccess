@@ -13,7 +13,6 @@ export function useAutoLogoff(seconds: number | null): AutoLogoffState {
   const [remaining, setRemaining] = useState<number | null>(seconds);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const remainingRef = useRef<number | null>(seconds);
-  const isPausedRef = useRef(false);
 
   const { mutate: endSession } = useAuthenticationServiceEndSession({
     onSettled: () => window.location.reload(),
@@ -30,27 +29,10 @@ export function useAutoLogoff(seconds: number | null): AutoLogoffState {
     remainingRef.current = seconds;
     setRemaining(seconds);
 
-    const handleActivity = () => {
-      if (!isPausedRef.current) {
-        reset();
-      }
-    };
-
-    // pause timer while form is submitting
-    const handleSubmit = () => {
-      isPausedRef.current = true;
-    };
-    const handleSubmitEnd = () => {
-      isPausedRef.current = false;
-    };
-
-    ACTIVITY_EVENTS.forEach((e) => window.addEventListener(e, handleActivity, { passive: true }));
-    window.addEventListener('submit', handleSubmit);
-    window.addEventListener('formdata', handleSubmitEnd);
+    // User interaction keeps the session alive; inactivity drains the timer.
+    ACTIVITY_EVENTS.forEach((e) => window.addEventListener(e, reset, { passive: true }));
 
     timerRef.current = setInterval(() => {
-      if (isPausedRef.current) return;
-
       remainingRef.current = (remainingRef.current ?? seconds) - 1;
       setRemaining(remainingRef.current);
 
@@ -62,9 +44,7 @@ export function useAutoLogoff(seconds: number | null): AutoLogoffState {
 
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
-      ACTIVITY_EVENTS.forEach((e) => window.removeEventListener(e, handleActivity));
-      window.removeEventListener('submit', handleSubmit);
-      window.removeEventListener('formdata', handleSubmitEnd);
+      ACTIVITY_EVENTS.forEach((e) => window.removeEventListener(e, reset));
     };
   }, [seconds, reset, endSession]);
 

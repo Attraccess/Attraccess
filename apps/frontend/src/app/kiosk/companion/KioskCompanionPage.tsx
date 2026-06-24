@@ -84,7 +84,6 @@ function KioskCompanionContent() {
 
   return (
     <div className="w-full max-w-lg mx-auto space-y-3">
-      <h1 className="text-2xl font-bold mb-6 text-center">{t('title')}</h1>
       {resources.map((r) => (
         <ResourceListItem
           key={r.id}
