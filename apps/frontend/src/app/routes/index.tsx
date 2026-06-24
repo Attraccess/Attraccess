@@ -47,6 +47,7 @@ import FirstTimeSetupPage from '../first-time-setup';
 import { UnauthorizedLayout } from '../unauthorized/unauthorized-layout/layout';
 
 const PasswordPolicySettingsPage = lazy(() => import('../settings/password-policy'));
+const CompanionSettingsPage = lazy(() => import('../settings/companion'));
 
 const coreRoutes: RouteConfig[] = [
   {
@@ -281,6 +282,15 @@ const coreRoutes: RouteConfig[] = [
     element: (
       <Suspense fallback={<div className="flex items-center justify-center p-8"><Spinner size="sm" /></div>}>
         <PasswordPolicySettingsPage />
+      </Suspense>
+    ),
+    authRequired: 'canManageSystemConfiguration',
+  },
+  {
+    path: '/settings/companion',
+    element: (
+      <Suspense fallback={<div className="flex items-center justify-center p-8"><Spinner size="sm" /></div>}>
+        <CompanionSettingsPage />
       </Suspense>
     ),
     authRequired: 'canManageSystemConfiguration',

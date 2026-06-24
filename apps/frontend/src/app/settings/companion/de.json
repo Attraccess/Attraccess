@@ -1,0 +1,83 @@
+{
+  "title": "Companion-App",
+  "subtitle": "Companion-Geräte verwalten und Desktop-App herunterladen",
+  "devices": {
+    "title": "Registrierte Geräte",
+    "subtitle": "Companion-App-Instanzen, die sich mit diesem Server verbunden haben",
+    "columns": {
+      "name": "Name",
+      "platform": "Plattform",
+      "lastSeen": "Zuletzt gesehen",
+      "status": "Status",
+      "actions": "Aktionen"
+    },
+    "status": {
+      "online": "Online",
+      "offline": "Offline"
+    },
+    "actions": {
+      "rename": "Umbenennen",
+      "delete": "Löschen"
+    },
+    "rename": {
+      "placeholder": "Gerätename",
+      "save": "Speichern",
+      "cancel": "Abbrechen"
+    }
+  },
+  "version": {
+    "title": "Gebündelte Version",
+    "subtitle": "Companion-App-Version in diesem Server-Build enthalten",
+    "noBinaries": "In diesem Build sind keine Companion-Binärdateien gebündelt (Entwicklungsmodus).",
+    "label": "Version {{version}}"
+  },
+  "download": {
+    "title": "Download",
+    "subtitle": "Companion-App für deine Plattform herunterladen",
+    "noBinaries": "Kein Download verfügbar — Binärdateien sind in diesem Server-Build nicht gebündelt.",
+    "button": "Herunterladen",
+    "platforms": {
+      "windows-x64": "Windows x64",
+      "macos-universal": "macOS (Universal)",
+      "linux-x64": "Linux x64",
+      "linux-arm64": "Linux arm64"
+    }
+  },
+  "setup": {
+    "title": "Einrichtungsanleitung",
+    "subtitle": "So verbindest du ein neues Gerät",
+    "steps": {
+      "download": {
+        "title": "Herunterladen & installieren",
+        "description": "Lade die Companion-App für deine Plattform herunter und führe den Installer aus."
+      },
+      "run": {
+        "title": "Companion-App starten",
+        "description": "Öffne die installierte Companion-App. Beim ersten Start erscheint ein Einrichtungsassistent."
+      },
+      "url": {
+        "title": "Attraccess-Server-URL eingeben",
+        "description": "Wenn du dazu aufgefordert wirst, gib die URL dieses Attraccess-Servers ein."
+      },
+      "register": {
+        "title": "Automatische Registrierung",
+        "description": "Die Companion-App registriert sich selbst — sie erscheint in der Tabelle \"Registrierte Geräte\" oben."
+      },
+      "name": {
+        "title": "Gerät benennen",
+        "description": "Klicke in der Tabelle auf \"Umbenennen\", um dem Gerät einen erkennbaren Namen zu geben."
+      },
+      "flow": {
+        "title": "Flow-Knoten hinzufügen",
+        "description": "Gehe zur Ressource, deren Flow diesen PC steuern soll -> oeffne den Flow-Tab -> fuege einen \"PC sperren\"- oder \"PC entsperren\"-Knoten hinzu und waehle dieses Geraet."
+      }
+    }
+  },
+  "updateAvailable": "Update verfügbar",
+  "deleteConfirm": {
+    "title": "Gerät löschen",
+    "message": "Möchtest du <bold>{{name}}</bold> wirklich löschen? Das Token wird widerrufen und eine aktive Verbindung wird beendet.",
+    "confirm": "Löschen",
+    "cancel": "Abbrechen"
+  }
+}
