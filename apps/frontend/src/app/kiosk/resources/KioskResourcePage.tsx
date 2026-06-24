@@ -1,6 +1,8 @@
-import { Navigate, useParams } from 'react-router-dom';
+import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Spinner } from '@heroui/react';
+import { ArrowLeftIcon } from 'lucide-react';
 import { useAuth } from '../../../hooks/useAuth';
+import { Button } from '../../../components/button';
 import { KioskLogin } from '../login/KioskLogin';
 import { ResourceOverviewTab } from '../../resources/details/overview/ResourceOverviewTab';
 import { useResourcesServiceGetOneResourceById } from '@attraccess/react-query-client';
@@ -11,6 +13,10 @@ import de from './KioskResourcePage.de.json';
 
 function KioskResourceContent({ resourceId }: { resourceId: number }) {
   const { t } = useTranslations({ en, de });
+  const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const deviceId = params.get('deviceId');
+  const autoLogoff = params.get('autoLogoff');
   const { data: resource, isLoading } = useResourcesServiceGetOneResourceById({ id: resourceId });
 
   if (isLoading) {
@@ -31,6 +37,18 @@ function KioskResourceContent({ resourceId }: { resourceId: number }) {
 
   return (
     <div className="w-full max-w-3xl mx-auto">
+      {deviceId && (
+        <Button
+          variant="secondary"
+          className="mb-4"
+          onPress={() =>
+            navigate(`/kiosk/companion?deviceId=${deviceId}${autoLogoff ? `&autoLogoff=${autoLogoff}` : ''}`)
+          }
+        >
+          <ArrowLeftIcon className="w-4 h-4" />
+          {t('backToResources')}
+        </Button>
+      )}
       <div className="flex items-center gap-4 mb-8">
         <ResourceImage
           imageFilename={resource.imageFilename}

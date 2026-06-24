@@ -89,7 +89,7 @@ function KioskCompanionContent() {
         <ResourceListItem
           key={r.id}
           resource={r}
-          onPress={() => navigate(`/kiosk/resources/${r.id}${autoLogoff ? `?autoLogoff=${autoLogoff}` : ''}`)}
+          onPress={() => navigate(`/kiosk/resources/${r.id}?deviceId=${deviceId}${autoLogoff ? `&autoLogoff=${autoLogoff}` : ''}`)}
         />
       ))}
     </div>
