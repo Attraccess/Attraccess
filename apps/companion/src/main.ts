@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, session } from 'electron';
+import { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, session, screen } from 'electron';
 import * as path from 'path';
 import * as https from 'https';
 import * as http from 'http';
@@ -12,7 +12,6 @@ import {
   promptAccessibilityPermission,
   installLaunchAgent,
 } from './macos-lock';
-import { showLockOverlay, hideLockOverlay, markQuitting } from './lock-overlay';
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
@@ -26,6 +25,9 @@ let authenticatedPayload: CompanionAuthenticatedDto | null = null;
 
 // ponytail: random uuid-ish partition key so the session is always fresh per launch
 const KIOSK_PARTITION = `memory:${Math.random().toString(36).slice(2)}`;
+
+// dark blanks that cover secondary displays while the kiosk is locked
+let secondaryOverlays: BrowserWindow[] = [];
 
 // ─── Health check ─────────────────────────────────────────────────────────────
 
@@ -94,21 +96,67 @@ function reopenKiosk() {
 
 // ─── Lock / unlock ────────────────────────────────────────────────────────────
 
-async function lockComputer(): Promise<void> {
-  // macOS primary: try CGSession -suspend (invokes OS login screen).
-  // Fall back to overlay if it fails (sandboxed / restricted env).
-  const cgSessionOk = await lockViaCGSession();
-  if (!cgSessionOk) {
-    showLockOverlay();
-  } else {
-    // Belt-and-suspenders: also show overlay so the computer is blocked when
-    // the user returns from the macOS login screen before unlock_pc arrives.
-    showLockOverlay();
+function addSecondaryOverlay(x: number, y: number, width: number, height: number): void {
+  const overlay = new BrowserWindow({
+    x, y, width, height,
+    frame: false,
+    alwaysOnTop: true,
+    focusable: false,
+    skipTaskbar: true,
+    backgroundColor: '#0f172a',
+    webPreferences: { nodeIntegration: false, contextIsolation: true },
+  });
+  overlay.setAlwaysOnTop(true, 'screen-saver');
+  overlay.loadURL('about:blank');
+  overlay.on('closed', () => { secondaryOverlays = secondaryOverlays.filter(w => w !== overlay); });
+  secondaryOverlays.push(overlay);
+}
+
+function showKioskOverlay(): void {
+  const win = kioskWindow;
+  if (!win || win.isDestroyed()) return;
+
+  // bring kiosk to front, fullscreen, always-on-top
+  win.setAlwaysOnTop(true, 'screen-saver');
+  if (process.platform === 'darwin') win.setSimpleFullScreen(true);
+  else win.setFullScreen(true);
+  win.show();
+  win.focus();
+
+  // cover any other displays with dark blanks
+  const kioskBounds = win.getBounds();
+  for (const display of screen.getAllDisplays()) {
+    const { x, y, width, height } = display.bounds;
+    // skip the display already covered by the kiosk window
+    if (x === kioskBounds.x && y === kioskBounds.y) continue;
+    addSecondaryOverlay(x, y, width, height);
   }
 }
 
+function hideKioskOverlay(): void {
+  const win = kioskWindow;
+  if (win && !win.isDestroyed()) {
+    win.setAlwaysOnTop(false);
+    if (process.platform === 'darwin') win.setSimpleFullScreen(false);
+    else win.setFullScreen(false);
+    win.hide();
+  }
+  for (const w of secondaryOverlays) {
+    if (!w.isDestroyed()) w.destroy();
+  }
+  secondaryOverlays = [];
+}
+
+async function lockComputer(): Promise<void> {
+  // macOS primary: CGSession -suspend triggers the OS login screen.
+  // Belt-and-suspenders: also show the kiosk overlay so the machine is
+  // covered when the user returns before unlock_pc arrives.
+  await lockViaCGSession();
+  showKioskOverlay();
+}
+
 function unlockComputer(): void {
-  hideLockOverlay();
+  hideKioskOverlay();
 }
 
 // ─── Tray ────────────────────────────────────────────────────────────────────
@@ -243,9 +291,9 @@ function startWsClient(serverUrl: string, firstRun: boolean) {
     // restore persisted lock state so a restart doesn't silently unlock
     setTrayState(payload.locked ? 'locked' : 'unlocked');
     if (payload.locked) {
-      showLockOverlay();
+      showKioskOverlay();
     } else {
-      hideLockOverlay();
+      hideKioskOverlay();
     }
     if (mainWindow && !mainWindow.isDestroyed()) {
       setTimeout(() => mainWindow?.close(), 1500);
@@ -296,8 +344,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
-  markQuitting();
-  hideLockOverlay();
+  hideKioskOverlay();
   wsClient?.stop();
 });
 
