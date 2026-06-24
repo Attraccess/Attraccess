@@ -1,4 +1,4 @@
-import { Button, FieldError, Input, Label, TextField } from '@heroui/react';
+import { Button, CardDescription, FieldError, Heading, Input, Label, TextField } from '@heroui/react';
 
 interface Props {
   pinInput: string;
@@ -13,10 +13,10 @@ export function PinSetupStep({ pinInput, pinConfirm, error, onPinInputChange, on
   return (
     <>
       <div>
-        <h1 className="text-xl font-bold">Set a PIN</h1>
-        <p className="text-fg-muted text-sm mt-1">
+        <Heading>Set a PIN</Heading>
+        <CardDescription>
           You'll need this PIN to access settings and quit the app.
-        </p>
+        </CardDescription>
       </div>
       <TextField value={pinInput} onChange={onPinInputChange} type="password" isInvalid={!!error} fullWidth>
         <Label>PIN</Label>

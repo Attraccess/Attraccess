@@ -1,4 +1,4 @@
-import { Button, FieldError, Input, Label, Spinner, TextField } from '@heroui/react';
+import { Button, CardDescription, FieldError, Heading, Input, Label, Spinner, TextField } from '@heroui/react';
 
 interface Props {
   serverUrl: string;
@@ -12,10 +12,10 @@ export function UrlStep({ serverUrl, connectError, connecting, onServerUrlChange
   return (
     <>
       <div>
-        <h1 className="text-xl font-bold">Attraccess Companion</h1>
-        <p className="text-fg-muted text-sm mt-1">
+        <Heading>Attraccess Companion</Heading>
+        <CardDescription>
           Enter the URL of your Attraccess server to get started.
-        </p>
+        </CardDescription>
       </div>
       <TextField value={serverUrl} onChange={onServerUrlChange} type="url" isInvalid={!!connectError} fullWidth>
         <Label>Server URL</Label>

@@ -1,4 +1,4 @@
-import { Button, FieldError, Input, Label, TextField } from '@heroui/react';
+import { Button, CardDescription, FieldError, Heading, Input, Label, TextField } from '@heroui/react';
 
 interface Props {
   pendingAction: 'settings' | 'quit' | null;
@@ -13,12 +13,12 @@ export function PinEntryStep({ pendingAction, pinEntry, error, onPinEntryChange,
   return (
     <>
       <div>
-        <h1 className="text-xl font-bold">{isQuit ? 'Confirm quit' : 'Access settings'}</h1>
-        <p className="text-fg-muted text-sm mt-1">
+        <Heading>{isQuit ? 'Confirm quit' : 'Access settings'}</Heading>
+        <CardDescription>
           {isQuit
             ? 'Enter your PIN to quit Attraccess Companion.'
             : 'Enter your PIN to access settings.'}
-        </p>
+        </CardDescription>
       </div>
       <TextField value={pinEntry} onChange={onPinEntryChange} type="password" isInvalid={!!error} fullWidth>
         <Label>PIN</Label>
