@@ -228,11 +228,32 @@ function openWizardWindow(firstRun: boolean) {
 
 // ─── IPC ─────────────────────────────────────────────────────────────────────
 
+function permissionsSnapshot() {
+  return {
+    needed: process.platform === 'darwin',
+    accessibility: hasAccessibilityPermission(),
+  };
+}
+
+function allPermissionsGranted() {
+  return !permissionsSnapshot().needed || permissionsSnapshot().accessibility;
+}
+
+ipcMain.handle('get-permissions', () => permissionsSnapshot());
+
+ipcMain.handle('request-permission', (_evt, name: string) => {
+  if (name === 'accessibility') promptAccessibilityPermission();
+  return permissionsSnapshot();
+});
+
 ipcMain.handle('check-health', async (_evt, serverUrl: string) => {
   return checkHealth(normalizeServerUrl(serverUrl));
 });
 
 ipcMain.handle('register', async (_evt, serverUrl: string) => {
+  if (!allPermissionsGranted()) {
+    throw new Error('accessibility-permission-required');
+  }
   const url = normalizeServerUrl(serverUrl);
   creds = { serverUrl: url, id: 0, token: '' };
   startWsClient(url, /* firstRun */ true);
@@ -324,16 +345,12 @@ function startWsClient(serverUrl: string, firstRun: boolean) {
 app.whenReady().then(async () => {
   setupTray();
 
-  // macOS: prompt for Accessibility permission so the overlay can fully block
-  // keyboard and mouse input. Prompt on first launch; the user can grant it in
-  // System Settings → Privacy & Security → Accessibility.
-  if (!hasAccessibilityPermission()) {
-    promptAccessibilityPermission();
-  }
-
   creds = await loadCredentials();
   if (!creds?.serverUrl || !creds?.id) {
     openWizardWindow(/* firstRun */ true);
+  } else if (!allPermissionsGranted()) {
+    // Permissions were revoked since last launch — open wizard to re-grant
+    openWizardWindow(/* firstRun */ false);
   } else {
     startWsClient(creds.serverUrl, /* firstRun */ false);
   }

@@ -4,6 +4,8 @@ contextBridge.exposeInMainWorld('companion', {
   checkHealth: (serverUrl: string) => ipcRenderer.invoke('check-health', serverUrl),
   register: (serverUrl: string) => ipcRenderer.invoke('register', serverUrl),
   setAutoLogoff: (seconds: number) => ipcRenderer.invoke('set-auto-logoff', seconds),
+  getPermissions: () => ipcRenderer.invoke('get-permissions'),
+  requestPermission: (name: string) => ipcRenderer.invoke('request-permission', name),
 
   onInit: (cb: (data: { firstRun: boolean; serverUrl?: string }) => void) =>
     ipcRenderer.on('init', (_e, data) => cb(data)),
