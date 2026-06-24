@@ -1,33 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
-import { Button, Card, FieldError, Input, Label, Spinner, TextField } from '@heroui/react';
-
-type Step = 'loading' | 'permissions' | 'pin-setup' | 'pin-entry' | 'url' | 'register' | 'done';
-
-interface Permissions {
-  needed: boolean;
-  accessibility: boolean;
-}
-
-interface CompanionBridge {
-  checkHealth: (url: string) => Promise<boolean>;
-  register: (url: string) => Promise<void>;
-  getPermissions: () => Promise<Permissions>;
-  requestPermission: (name: 'accessibility') => Promise<Permissions>;
-  isPinSet: () => Promise<boolean>;
-  savePin: (pin: string) => Promise<void>;
-  verifyPin: (pin: string) => Promise<boolean>;
-  confirmQuit: () => Promise<void>;
-  onInit: (cb: (data: { firstRun: boolean; serverUrl?: string; requirePin?: 'settings' | 'quit' }) => void) => void;
-  onWsStatus: (cb: (status: 'connected' | 'disconnected') => void) => void;
-  onRegistered: (cb: (data: { id: number }) => void) => void;
-  onAuthenticated: (cb: (data: unknown) => void) => void;
-}
-
-declare global {
-  interface Window {
-    companion: CompanionBridge;
-  }
-}
+import { Card } from '@heroui/react';
+import type { Step, Permissions } from './types';
+import { LoadingStep } from './steps/LoadingStep';
+import { PermissionsStep } from './steps/PermissionsStep';
+import { PinSetupStep } from './steps/PinSetupStep';
+import { PinEntryStep } from './steps/PinEntryStep';
+import { UrlStep } from './steps/UrlStep';
+import { RegisterStep } from './steps/RegisterStep';
+import { DoneStep } from './steps/DoneStep';
 
 export function WizardApp() {
   const [step, setStep] = useState<Step>('loading');
@@ -39,18 +19,15 @@ export function WizardApp() {
   const [perms, setPerms] = useState<Permissions | null>(null);
   const [pendingAction, setPendingAction] = useState<'settings' | 'quit' | null>(null);
 
-  // pin-setup
   const [pinInput, setPinInput] = useState('');
   const [pinConfirm, setPinConfirm] = useState('');
   const [pinSetupError, setPinSetupError] = useState('');
 
-  // pin-entry
   const [pinEntry, setPinEntry] = useState('');
   const [pinEntryError, setPinEntryError] = useState('');
 
   const isFirstRunRef = useRef(false);
 
-  // determine initial step from init + permissions + pin state
   useEffect(() => {
     window.companion.onInit(async ({ firstRun, serverUrl: saved, requirePin }) => {
       isFirstRunRef.current = firstRun;
@@ -86,7 +63,6 @@ export function WizardApp() {
     });
   }, []);
 
-  // poll permissions while on that step — auto-advance when granted
   useEffect(() => {
     if (step !== 'permissions') return;
     const id = setInterval(async () => {
@@ -172,169 +148,38 @@ export function WizardApp() {
     <div className="flex items-center justify-center h-full p-6 bg-background">
       <Card className="w-full max-w-md">
         <Card.Content className="flex flex-col gap-4 p-8">
-
-          {step === 'loading' && (
-            <div className="flex justify-center py-4"><Spinner /></div>
-          )}
-
-          {step === 'permissions' && (
-            <>
-              <div>
-                <h1 className="text-xl font-bold">Permissions required</h1>
-                <p className="text-fg-muted text-sm mt-1">
-                  Grant the following permissions before connecting to your server.
-                </p>
-              </div>
-              <div className="flex items-center justify-between gap-4 py-3 border-b border-divider">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium">Accessibility</p>
-                  <p className="text-fg-muted text-xs mt-0.5">
-                    Blocks keyboard and mouse input when a session is locked.
-                  </p>
-                </div>
-                {perms?.accessibility ? (
-                  <span className="text-success text-sm font-medium shrink-0">Granted</span>
-                ) : (
-                  <Button size="sm" variant="primary" onPress={handleGrantAccessibility} className="shrink-0">
-                    Grant
-                  </Button>
-                )}
-              </div>
-              {!perms?.accessibility && (
-                <p className="text-fg-muted text-xs">
-                  After granting in System Settings, this page updates automatically.
-                </p>
-              )}
-            </>
-          )}
-
+          {step === 'loading' && <LoadingStep />}
+          {step === 'permissions' && <PermissionsStep perms={perms} onGrant={handleGrantAccessibility} />}
           {step === 'pin-setup' && (
-            <>
-              <div>
-                <h1 className="text-xl font-bold">Set a PIN</h1>
-                <p className="text-fg-muted text-sm mt-1">
-                  You'll need this PIN to access settings and quit the app.
-                </p>
-              </div>
-              <TextField
-                value={pinInput}
-                onChange={setPinInput}
-                type="password"
-                isInvalid={!!pinSetupError}
-                fullWidth
-              >
-                <Label>PIN</Label>
-                <Input placeholder="At least 4 characters" />
-              </TextField>
-              <TextField
-                value={pinConfirm}
-                onChange={setPinConfirm}
-                type="password"
-                isInvalid={!!pinSetupError}
-                fullWidth
-              >
-                <Label>Confirm PIN</Label>
-                <Input placeholder="Repeat PIN" />
-                <FieldError>{pinSetupError}</FieldError>
-              </TextField>
-              <Button variant="primary" fullWidth onPress={handleSetPin}>
-                Set PIN
-              </Button>
-            </>
+            <PinSetupStep
+              pinInput={pinInput}
+              pinConfirm={pinConfirm}
+              error={pinSetupError}
+              onPinInputChange={setPinInput}
+              onPinConfirmChange={setPinConfirm}
+              onSubmit={handleSetPin}
+            />
           )}
-
           {step === 'pin-entry' && (
-            <>
-              <div>
-                <h1 className="text-xl font-bold">
-                  {pendingAction === 'quit' ? 'Confirm quit' : 'Access settings'}
-                </h1>
-                <p className="text-fg-muted text-sm mt-1">
-                  {pendingAction === 'quit'
-                    ? 'Enter your PIN to quit Attraccess Companion.'
-                    : 'Enter your PIN to access settings.'}
-                </p>
-              </div>
-              <TextField
-                value={pinEntry}
-                onChange={setPinEntry}
-                type="password"
-                isInvalid={!!pinEntryError}
-                fullWidth
-              >
-                <Label>PIN</Label>
-                <Input placeholder="Enter PIN" />
-                <FieldError>{pinEntryError}</FieldError>
-              </TextField>
-              <Button
-                variant="primary"
-                fullWidth
-                onPress={handleVerifyPin}
-              >
-                {pendingAction === 'quit' ? 'Quit' : 'Confirm'}
-              </Button>
-            </>
+            <PinEntryStep
+              pendingAction={pendingAction}
+              pinEntry={pinEntry}
+              error={pinEntryError}
+              onPinEntryChange={setPinEntry}
+              onSubmit={handleVerifyPin}
+            />
           )}
-
           {step === 'url' && (
-            <>
-              <div>
-                <h1 className="text-xl font-bold">Attraccess Companion</h1>
-                <p className="text-fg-muted text-sm mt-1">
-                  Enter the URL of your Attraccess server to get started.
-                </p>
-              </div>
-              <TextField
-                value={serverUrl}
-                onChange={setServerUrl}
-                type="url"
-                isInvalid={!!connectError}
-                fullWidth
-              >
-                <Label>Server URL</Label>
-                <Input placeholder="https://attraccess.example.com" />
-                <FieldError>{connectError}</FieldError>
-              </TextField>
-              <Button
-                variant="primary"
-                fullWidth
-                isDisabled={connecting}
-                onPress={handleConnect}
-              >
-                {connecting ? <Spinner /> : 'Connect'}
-              </Button>
-            </>
+            <UrlStep
+              serverUrl={serverUrl}
+              connectError={connectError}
+              connecting={connecting}
+              onServerUrlChange={setServerUrl}
+              onConnect={handleConnect}
+            />
           )}
-
-          {step === 'register' && (
-            <>
-              <div>
-                <h1 className="text-xl font-bold">Registering…</h1>
-                <p className="text-fg-muted text-sm mt-1">
-                  Opening a connection and registering this device. Please wait.
-                </p>
-              </div>
-              <div className="flex items-center gap-2 text-fg-muted text-sm">
-                <Spinner />
-                <span>{statusText || 'Connecting to server…'}</span>
-              </div>
-            </>
-          )}
-
-          {step === 'done' && (
-            <>
-              <div>
-                <h1 className="text-xl font-bold text-success">Setup complete!</h1>
-                <p className="text-fg-muted text-sm mt-1">
-                  This device has been registered. Name it in the Attraccess admin panel.
-                </p>
-              </div>
-              {deviceId !== null && (
-                <p className="text-success text-sm text-center">Device ID: {deviceId}</p>
-              )}
-            </>
-          )}
-
+          {step === 'register' && <RegisterStep statusText={statusText} />}
+          {step === 'done' && <DoneStep deviceId={deviceId} />}
         </Card.Content>
       </Card>
     </div>
