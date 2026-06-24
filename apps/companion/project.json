@@ -5,6 +5,18 @@
   "projectType": "application",
   "tags": ["tag:scope:companion"],
   "targets": {
+    "serve": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["companion-ws-client:generate"],
+      "options": {
+        "cwd": "apps/companion",
+        "parallel": true,
+        "commands": [
+          "vite dev --config renderer/vite.config.ts --port 5273 --strictPort",
+          "node tools/dev.mjs"
+        ]
+      }
+    },
     "build-renderer": {
       "executor": "nx:run-commands",
       "cache": true,

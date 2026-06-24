@@ -3,6 +3,8 @@ import { Spinner } from '@heroui/react';
 import { ShapesIcon } from 'lucide-react';
 import { useCompanionDevicesServiceGetCompanionDeviceResources } from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useAuth } from '../../../hooks/useAuth';
+import { KioskLogin } from '../login/KioskLogin';
 import { ResourceListItem } from '../../../components/ResourceListItem';
 import en from './KioskCompanionPage.en.json';
 import de from './KioskCompanionPage.de.json';
@@ -15,6 +17,24 @@ interface CompanionResource {
 }
 
 export function KioskCompanionPage() {
+  const { isAuthenticated, isInitialized } = useAuth();
+
+  if (!isInitialized) {
+    return (
+      <div className="flex items-center justify-center min-h-64">
+        <Spinner color="accent" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <KioskLogin />;
+  }
+
+  return <KioskCompanionContent />;
+}
+
+function KioskCompanionContent() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const { t } = useTranslations({ en, de });

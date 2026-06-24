@@ -66,7 +66,7 @@ describe('CompanionAuthHandler', () => {
       await handler.handleAuthenticate(socket, { id: 5, token: 'abc', platform: 'linux', appVersion: '1.0.0' });
 
       expect(socket.sendEvent).toHaveBeenCalledWith(CompanionEventType.COMPANION_AUTHENTICATED, {
-        id: 5,
+        deviceId: 5,
         name: 'Lab PC',
         resources: [{ id: 42, name: '3D Printer' }],
         locked: false,

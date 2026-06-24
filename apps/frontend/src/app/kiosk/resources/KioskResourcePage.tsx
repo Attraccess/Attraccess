@@ -1,31 +1,13 @@
-import { useState } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import { Spinner } from '@heroui/react';
 import { useAuth } from '../../../hooks/useAuth';
-import { LoginForm } from '../../unauthorized/loginForm';
-import { PasswordResetForm } from '../../unauthorized/password-reset/passwordResetForm';
+import { KioskLogin } from '../login/KioskLogin';
 import { ResourceOverviewTab } from '../../resources/details/overview/ResourceOverviewTab';
 import { useResourcesServiceGetOneResourceById } from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { ResourceImage } from '../../../components/ResourceImage';
 import en from './KioskResourcePage.en.json';
 import de from './KioskResourcePage.de.json';
-
-function KioskLogin() {
-  const [view, setView] = useState<'login' | 'forgot'>('login');
-
-  return (
-    <div className="w-full max-w-md mx-auto space-y-6">
-      {view === 'login' && (
-        <LoginForm
-          onNeedsAccount={null}
-          onForgotPassword={() => setView('forgot')}
-        />
-      )}
-      {view === 'forgot' && <PasswordResetForm onGoBack={() => setView('login')} />}
-    </div>
-  );
-}
 
 function KioskResourceContent({ resourceId }: { resourceId: number }) {
   const { t } = useTranslations({ en, de });

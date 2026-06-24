@@ -155,8 +155,13 @@ function openWizardWindow(firstRun: boolean) {
     },
   });
 
-  // __dirname is out/ at runtime; renderer/dist/ contains the React build
-  mainWindow.loadFile(path.join(__dirname, '../renderer/dist/index.html'));
+  // dev: load the Vite HMR server; prod: __dirname is out/, renderer/dist/ has the build
+  const devUrl = process.env.COMPANION_DEV_RENDERER_URL;
+  if (devUrl) {
+    mainWindow.loadURL(devUrl);
+  } else {
+    mainWindow.loadFile(path.join(__dirname, '../renderer/dist/index.html'));
+  }
   mainWindow.webContents.on('did-finish-load', () => {
     mainWindow?.webContents.send('init', { firstRun, serverUrl: creds?.serverUrl });
   });
@@ -210,6 +215,9 @@ function startWsClient(serverUrl: string, firstRun: boolean) {
     await saveCredentials(creds);
     firstRun = false;
     mainWindow?.webContents.send('registered', { id: payload.id });
+    // server only sends AUTHENTICATED in reply to AUTHENTICATE; register alone
+    // never authenticates, so do it now instead of waiting for a relaunch
+    wsClient?.sendAuthenticate({ id: payload.id, token: payload.token });
   });
 
   wsClient.on('authenticated', async (payload: CompanionAuthenticatedDto) => {

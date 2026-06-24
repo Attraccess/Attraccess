@@ -55,7 +55,7 @@ export class CompanionController {
   }
 
   @Get(':id/resources')
-  @Auth('canManageResources')
+  @Auth()
   @ApiOperation({ summary: 'List resources that reference this companion device', operationId: 'getCompanionDeviceResources' })
   @ApiParam({ name: 'id', type: Number })
   @ApiResponse({ status: 200 })
