@@ -1,4 +1,3 @@
-import { resolve } from 'path';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
@@ -12,11 +11,5 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
-    rollupOptions: {
-      input: {
-        wizard: resolve(__dirname, 'index.html'),
-        lockscreen: resolve(__dirname, 'lockscreen.html'),
-      },
-    },
   },
 });
