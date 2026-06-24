@@ -31,7 +31,14 @@ export function UnauthorizedLayout({ children }: UnauthorizedLayoutProps) {
 
       {/* Right side with form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8 sm:p-12 lg:p-16">
-        <div className="w-full max-w-md space-y-8">{children}</div>
+        <div className="w-full max-w-md space-y-8">
+          {/* Branding — always shown above the form */}
+          <div className="flex items-center justify-center gap-3">
+            <img src="/logo.png" alt="Attraccess" className="h-12 w-auto" />
+            <span className="text-2xl font-bold">Attraccess</span>
+          </div>
+          {children}
+        </div>
       </div>
     </div>
   );

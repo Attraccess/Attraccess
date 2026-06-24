@@ -1,4 +1,4 @@
-import { Route, Routes, useNavigate } from 'react-router-dom';
+import { Outlet, Route, Routes, useNavigate } from 'react-router-dom';
 import { Unauthorized } from './unauthorized/unauthorized';
 import { PropsWithChildren, useEffect, useMemo, useState } from 'react';
 import { Layout } from './layout/layout';
@@ -25,6 +25,7 @@ import { AcceptInvitation } from './accept-invitation';
 import { TwoFactorGate } from './two-factor-gate';
 import { AttraccessUserActionsBridge } from '../components/attraccessUserActionsBridge';
 import { SupervisorApprovalListener } from '../components/supervisorApproval/SupervisorApprovalListener';
+import { KioskGuard } from './kiosk/KioskGuard';
 
 function useRoutesWithAuthElements(routes: RouteConfig[]) {
   const { user } = useAuth();
@@ -109,7 +110,7 @@ function AppLayout(props: PropsWithChildren) {
         <ToastProvider>
           <ReactFlowProvider>
             <AttraccessUserActionsBridge>
-              <Layout noLayout={!isAuthenticated}>{props.children}</Layout>
+              {props.children}
               {isAuthenticated && <SupervisorApprovalListener />}
             </AttraccessUserActionsBridge>
           </ReactFlowProvider>
@@ -148,10 +149,16 @@ function AppLayout(props: PropsWithChildren) {
 function AppContent() {
   const { isAuthenticated } = useAuth();
   const allRoutes = useAllRoutes();
-  const routesWithAuthElements = useRoutesWithAuthElements(allRoutes);
+
+  const bareRoutes = useMemo(() => allRoutes.filter((r) => r.noLayout), [allRoutes]);
+  const layoutRoutes = useMemo(() => allRoutes.filter((r) => !r.noLayout), [allRoutes]);
+
+  const bareRouteElements = useRoutesWithAuthElements(bareRoutes);
+  const layoutRouteElements = useRoutesWithAuthElements(layoutRoutes);
 
   return (
     <TwoFactorGate>
+      <KioskGuard />
       <Routes>
         <Route path="/verify-email" element={<VerifyEmail />} />
         <Route
@@ -171,9 +178,12 @@ function AppContent() {
           }
         />
 
-        {routesWithAuthElements}
+        {bareRouteElements}
 
-        {!isAuthenticated && <Route path="*" element={<Unauthorized />} />}
+        <Route element={<Layout><Outlet /></Layout>}>
+          {layoutRouteElements}
+          {!isAuthenticated && <Route path="*" element={<Unauthorized />} />}
+        </Route>
       </Routes>
     </TwoFactorGate>
   );

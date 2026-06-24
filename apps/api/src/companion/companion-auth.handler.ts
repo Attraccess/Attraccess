@@ -55,7 +55,7 @@ export class CompanionAuthHandler {
 
     const resources = await this.gatewayService.getResourcesForDevice(device.id);
     socket.sendEvent(CompanionEventType.COMPANION_AUTHENTICATED, {
-      id: device.id,
+      deviceId: device.id,
       name: device.name,
       resources,
       locked: device.locked,
