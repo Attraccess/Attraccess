@@ -1,6 +1,5 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { AttraccessUser } from './AttraccessUser';
 
@@ -12,23 +11,19 @@ describe('AttraccessUser', () => {
     expect(screen.queryByText('supervisor')).not.toBeInTheDocument();
   });
 
-  it('starts a direct message from the inline action', async () => {
+  it('renders username and description without a standalone chat icon button', () => {
     const onStartDirectMessage = vi.fn();
     const user = { id: 42, username: 'supervisor' };
 
-    const { container } = render(
+    render(
       <AttraccessUser user={user} description="Lab manager" onStartDirectMessage={onStartDirectMessage} />,
     );
 
     expect(screen.getByText('supervisor')).toBeInTheDocument();
     expect(screen.getByText('Lab manager')).toBeInTheDocument();
 
-    const inlineAction = container.querySelector('button');
-    expect(inlineAction).toBeInTheDocument();
-
-    if (!inlineAction) throw new Error('inlineAction not found');
-    await userEvent.click(inlineAction);
-
-    expect(onStartDirectMessage).toHaveBeenCalledWith(user);
+    // A single interactive trigger wrapping the user info — no separate standalone chat button
+    expect(screen.getByRole('button', { name: /supervisor/i })).toBeInTheDocument();
+    expect(screen.getAllByRole('button')).toHaveLength(1);
   });
 });
