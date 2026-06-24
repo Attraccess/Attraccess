@@ -1,24 +1,21 @@
 import { Button, CardDescription, FieldError, Heading, Input, Label, TextField } from '@heroui/react';
 
 interface Props {
-  pendingAction: 'settings' | 'quit' | null;
+  title: string;
+  description: string;
+  submitLabel: string;
   pinEntry: string;
   error: string;
   onPinEntryChange: (v: string) => void;
   onSubmit: () => void;
 }
 
-export function PinEntryStep({ pendingAction, pinEntry, error, onPinEntryChange, onSubmit }: Props) {
-  const isQuit = pendingAction === 'quit';
+export function PinEntryStep({ title, description, submitLabel, pinEntry, error, onPinEntryChange, onSubmit }: Props) {
   return (
     <>
       <div>
-        <Heading>{isQuit ? 'Confirm quit' : 'Access settings'}</Heading>
-        <CardDescription>
-          {isQuit
-            ? 'Enter your PIN to quit Attraccess Companion.'
-            : 'Enter your PIN to access settings.'}
-        </CardDescription>
+        <Heading>{title}</Heading>
+        <CardDescription>{description}</CardDescription>
       </div>
       <TextField value={pinEntry} onChange={onPinEntryChange} type="password" isInvalid={!!error} fullWidth>
         <Label>PIN</Label>
@@ -26,7 +23,7 @@ export function PinEntryStep({ pendingAction, pinEntry, error, onPinEntryChange,
         <FieldError>{error}</FieldError>
       </TextField>
       <Button variant="primary" fullWidth onPress={onSubmit}>
-        {isQuit ? 'Quit' : 'Confirm'}
+        {submitLabel}
       </Button>
     </>
   );

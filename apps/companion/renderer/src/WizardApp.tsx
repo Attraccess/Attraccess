@@ -162,7 +162,11 @@ export function WizardApp() {
           )}
           {step === 'pin-entry' && (
             <PinEntryStep
-              pendingAction={pendingAction}
+              title={pendingAction === 'quit' ? 'Confirm quit' : 'Access settings'}
+              description={pendingAction === 'quit'
+                ? 'Enter your PIN to quit Attraccess Companion.'
+                : 'Enter your PIN to access settings.'}
+              submitLabel={pendingAction === 'quit' ? 'Quit' : 'Confirm'}
               pinEntry={pinEntry}
               error={pinEntryError}
               onPinEntryChange={setPinEntry}
