@@ -30,8 +30,12 @@ export function KioskLayout({ children }: PropsWithChildren) {
   const { remaining, isWarning } = useAutoLogoff(autoLogoffSeconds);
 
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-10 p-4">
       {isWarning && remaining !== null && <AutoLogoffBanner remaining={remaining} />}
+      <div className="flex items-center gap-3">
+        <img src="/logo.png" alt="Attraccess" className="h-16 w-auto" />
+        <span className="text-3xl font-bold">Attraccess</span>
+      </div>
       {children}
     </div>
   );
