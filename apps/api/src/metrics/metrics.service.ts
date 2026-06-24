@@ -51,6 +51,8 @@ export class MetricsService implements OnModuleInit {
 
   public readonly pluginsLoaded: Gauge;
 
+  public readonly companionDownloadsTotal: Counter;
+
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
@@ -234,6 +236,13 @@ export class MetricsService implements OnModuleInit {
     this.pluginsLoaded = new Gauge({
       name: 'attraccess_plugins_loaded',
       help: 'Number of loaded plugins',
+      registers: [this.registry],
+    });
+
+    this.companionDownloadsTotal = new Counter({
+      name: 'attraccess_companion_downloads_total',
+      help: 'Total number of companion app binary download attempts',
+      labelNames: ['platform', 'arch', 'status'],
       registers: [this.registry],
     });
 

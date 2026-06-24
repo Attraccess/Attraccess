@@ -1,34 +1,69 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CompanionDevice } from '@attraccess/database-entities';
 import { randomBytes } from 'crypto';
 import { genSalt, hash, compare } from 'bcrypt';
-import { existsSync, readFileSync } from 'fs';
+import { createReadStream, existsSync, readFileSync, statSync } from 'fs';
 import { join } from 'path';
-
-interface CompanionsJson {
-  companions: Array<{ platform: string; version: string; downloadUrl: string }>;
-}
+import { CompanionManifestDto, CompanionVersionDto } from './dtos/companion.dto';
 
 @Injectable()
 export class CompanionService {
   private readonly logger = new Logger(CompanionService.name);
-  private companionsJson: CompanionsJson | null = null;
+  private readonly assetsDir: string;
+  private manifest: CompanionManifestDto | null = null;
 
   constructor(
     @InjectRepository(CompanionDevice)
     private readonly deviceRepo: Repository<CompanionDevice>,
   ) {
-    const companionsPath = join(__dirname, 'assets', 'companions.json');
-    if (existsSync(companionsPath)) {
+    this.assetsDir = join(__dirname, 'assets', 'companion-app');
+    const manifestPath = join(this.assetsDir, 'companions.json');
+    if (existsSync(manifestPath)) {
       try {
-        this.companionsJson = JSON.parse(readFileSync(companionsPath, 'utf8')) as CompanionsJson;
-      } catch (error) {
-        this.logger.warn(`Failed to load companions.json: ${(error as Error).message}`);
+        this.manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as CompanionManifestDto;
+        this.logger.log(`Loaded companion manifest: version=${this.manifest.version}, platforms=${this.manifest.platforms.length}`);
+      } catch (err) {
+        this.logger.error(`Failed to parse companions.json: ${(err as Error).message}`);
       }
+    } else {
+      this.logger.warn(`companions.json not found at: ${manifestPath}`);
     }
   }
+
+  // --- Binary download ---
+
+  getManifest(): CompanionManifestDto | null {
+    return this.manifest;
+  }
+
+  getLatestVersion(): CompanionVersionDto | null {
+    if (!this.manifest) return null;
+    return { version: this.manifest.version, buildId: this.manifest.buildId };
+  }
+
+  getBinaryStream(platform: string, arch: string): { stream: NodeJS.ReadableStream; size: number; filename: string } {
+    if (!this.manifest) {
+      throw new NotFoundException('No companion manifest available');
+    }
+
+    const entry = this.manifest.platforms.find((p) => p.platform === platform && p.arch === arch);
+    if (!entry) {
+      throw new NotFoundException(`No companion binary for platform=${platform} arch=${arch}`);
+    }
+
+    const binaryPath = join(this.assetsDir, entry.filename);
+    if (!existsSync(binaryPath)) {
+      this.logger.error(`Companion binary not found on disk: ${binaryPath}`);
+      throw new NotFoundException(`Companion binary file not found for platform=${platform} arch=${arch}`);
+    }
+
+    const { size } = statSync(binaryPath);
+    return { stream: createReadStream(binaryPath), size, filename: entry.filename };
+  }
+
+  // --- Device management ---
 
   async createDevice(): Promise<{ device: CompanionDevice; token: string }> {
     const token = randomBytes(32).toString('hex');
@@ -65,11 +100,5 @@ export class CompanionService {
 
   async delete(id: number): Promise<void> {
     await this.deviceRepo.delete(id);
-  }
-
-  getLatestVersion(platform: string): { version: string; downloadUrl: string } | null {
-    if (!this.companionsJson) return null;
-    const entry = this.companionsJson.companions.find((c) => c.platform === platform);
-    return entry ? { version: entry.version, downloadUrl: entry.downloadUrl } : null;
   }
 }

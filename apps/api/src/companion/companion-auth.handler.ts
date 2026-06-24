@@ -68,14 +68,17 @@ export class CompanionAuthHandler {
   private async maybeSendUpdateAvailable(socket: CompanionSocket, platform: string | undefined, appVersion: string | undefined): Promise<void> {
     if (!platform || !appVersion) return;
 
-    const latest = this.service.getLatestVersion(platform);
-    if (!latest) return;
+    const manifest = this.service.getManifest();
+    if (!manifest || manifest.version === appVersion) return;
 
-    if (latest.version !== appVersion) {
-      socket.sendEvent(CompanionEventType.COMPANION_UPDATE_AVAILABLE, {
-        version: latest.version,
-        downloadUrl: latest.downloadUrl,
-      });
-    }
+    const entry = manifest.platforms.find((p) => p.platform === platform);
+    const downloadUrl = entry
+      ? `/api/companion/download/${entry.platform}/${entry.arch}`
+      : `/api/companion/download/${platform}/x64`;
+
+    socket.sendEvent(CompanionEventType.COMPANION_UPDATE_AVAILABLE, {
+      version: manifest.version,
+      downloadUrl,
+    });
   }
 }

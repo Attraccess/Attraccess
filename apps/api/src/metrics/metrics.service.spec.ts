@@ -133,4 +133,24 @@ describe('MetricsService', () => {
       expect(metrics).not.toContain('websocket_connections_active');
     });
   });
+
+  describe('companion download metrics (ATT-614)', () => {
+    it('companionDownloadsTotal counter is defined', () => {
+      expect(service.companionDownloadsTotal).toBeDefined();
+    });
+
+    it('companionDownloadsTotal appears in prometheus output with platform/arch/status labels', async () => {
+      service.companionDownloadsTotal.inc({ platform: 'linux', arch: 'x64', status: 'success' });
+      service.companionDownloadsTotal.inc({ platform: 'linux', arch: 'x64', status: 'not_found' });
+
+      const metrics = await service.getMetrics();
+      expect(metrics).toContain('attraccess_companion_downloads_total{platform="linux",arch="x64",status="success"} 1');
+      expect(metrics).toContain('attraccess_companion_downloads_total{platform="linux",arch="x64",status="not_found"} 1');
+    });
+
+    it('uses attraccess_ prefix (consistent with naming convention)', async () => {
+      const metrics = await service.getMetrics();
+      expect(metrics).toContain('attraccess_companion_downloads_total');
+    });
+  });
 });
