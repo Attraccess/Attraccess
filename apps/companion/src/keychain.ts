@@ -2,6 +2,7 @@ import * as keytar from 'keytar';
 
 const SERVICE = 'attraccess-companion';
 const ACCOUNT = 'device-credentials';
+const PIN_ACCOUNT = 'device-pin';
 
 export interface StoredCredentials {
   id: number;
@@ -25,4 +26,12 @@ export async function saveCredentials(creds: StoredCredentials): Promise<void> {
 
 export async function clearCredentials(): Promise<void> {
   await keytar.deletePassword(SERVICE, ACCOUNT);
+}
+
+export async function savePin(pinHash: string): Promise<void> {
+  await keytar.setPassword(SERVICE, PIN_ACCOUNT, pinHash);
+}
+
+export async function loadPin(): Promise<string | null> {
+  return keytar.getPassword(SERVICE, PIN_ACCOUNT);
 }

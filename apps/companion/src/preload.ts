@@ -6,6 +6,10 @@ contextBridge.exposeInMainWorld('companion', {
   setAutoLogoff: (seconds: number) => ipcRenderer.invoke('set-auto-logoff', seconds),
   getPermissions: () => ipcRenderer.invoke('get-permissions'),
   requestPermission: (name: string) => ipcRenderer.invoke('request-permission', name),
+  isPinSet: () => ipcRenderer.invoke('is-pin-set'),
+  savePin: (pin: string) => ipcRenderer.invoke('save-pin', pin),
+  verifyPin: (pin: string) => ipcRenderer.invoke('verify-pin', pin),
+  confirmQuit: () => ipcRenderer.invoke('confirm-quit'),
 
   onInit: (cb: (data: { firstRun: boolean; serverUrl?: string }) => void) =>
     ipcRenderer.on('init', (_e, data) => cb(data)),

@@ -2,8 +2,9 @@ import { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, session, screen }
 import * as path from 'path';
 import * as https from 'https';
 import * as http from 'http';
+import { createHash } from 'crypto';
 import { CompanionWsClient, CompanionAuthenticatedDto, CompanionRegisterResponseDto } from '@attraccess/companion-ws-client';
-import { loadCredentials, saveCredentials, StoredCredentials } from './keychain';
+import { loadCredentials, saveCredentials, StoredCredentials, loadPin, savePin } from './keychain';
 import { normalizeServerUrl } from './server-url';
 import { dotIconPng } from './tray-icon';
 import {
@@ -22,12 +23,30 @@ let wsClient: CompanionWsClient | null = null;
 let creds: StoredCredentials | null = null;
 let autoLogoffSeconds = 30;
 let authenticatedPayload: CompanionAuthenticatedDto | null = null;
+let pinHash: string | null = null;
+let allowQuit = false;
+let kioskLocked = false;
 
 // ponytail: random uuid-ish partition key so the session is always fresh per launch
 const KIOSK_PARTITION = `memory:${Math.random().toString(36).slice(2)}`;
 
 // dark blanks that cover secondary displays while the kiosk is locked
 let secondaryOverlays: BrowserWindow[] = [];
+
+// ─── PIN helpers ──────────────────────────────────────────────────────────────
+
+function hashPin(pin: string): string {
+  return createHash('sha256').update(pin).digest('hex');
+}
+
+function isPinSet(): boolean {
+  return !!pinHash;
+}
+
+function verifyPin(input: string): boolean {
+  if (!pinHash) return false;
+  return hashPin(input) === pinHash;
+}
 
 // ─── Health check ─────────────────────────────────────────────────────────────
 
@@ -66,11 +85,14 @@ function openKiosk(payload: CompanionAuthenticatedDto) {
 
   kioskWindow = new BrowserWindow({
     show: false,
-    frame: false,
+    frame: true,
     webPreferences: { session: ses, nodeIntegration: false, contextIsolation: true },
   });
 
   kioskWindow.loadURL(kioskUrl(payload));
+  kioskWindow.on('close', (event) => {
+    if (kioskLocked) event.preventDefault();
+  });
   kioskWindow.on('closed', () => { kioskWindow = null; });
 }
 
@@ -82,16 +104,21 @@ function reloadKiosk() {
   }
 }
 
-// reopen/show the kiosk from the tray (recreates the window if it was closed)
+// open the resource panel from the tray — windowed, not blocking
 function reopenKiosk() {
   if (!authenticatedPayload) return;
   openKiosk(authenticatedPayload);
   const win = kioskWindow;
-  if (win) {
-    win.setSimpleFullScreen(true);
-    win.show();
-    win.focus();
-  }
+  if (!win || win.isDestroyed()) return;
+  kioskLocked = false;
+  win.setAlwaysOnTop(false);
+  if (process.platform === 'darwin') win.setSimpleFullScreen(false);
+  else win.setFullScreen(false);
+  win.setResizable(true);
+  win.setSize(960, 720);
+  win.center();
+  win.show();
+  win.focus();
 }
 
 // ─── Lock / unlock ────────────────────────────────────────────────────────────
@@ -116,7 +143,7 @@ function showKioskOverlay(): void {
   const win = kioskWindow;
   if (!win || win.isDestroyed()) return;
 
-  // bring kiosk to front, fullscreen, always-on-top
+  kioskLocked = true;
   win.setAlwaysOnTop(true, 'screen-saver');
   if (process.platform === 'darwin') win.setSimpleFullScreen(true);
   else win.setFullScreen(true);
@@ -134,6 +161,7 @@ function showKioskOverlay(): void {
 }
 
 function hideKioskOverlay(): void {
+  kioskLocked = false;
   const win = kioskWindow;
   if (win && !win.isDestroyed()) {
     win.setAlwaysOnTop(false);
@@ -177,8 +205,14 @@ function buildTrayMenu(state: TrayState): Menu {
   return Menu.buildFromTemplate([
     { label: `Status: ${state}`, enabled: false },
     { type: 'separator' },
-    { label: 'Open kiosk', enabled: !!authenticatedPayload, click: () => reopenKiosk() },
-    { label: 'Settings', click: () => openWizardWindow(false) },
+    { label: 'Open resource panel', enabled: !!authenticatedPayload, click: () => reopenKiosk() },
+    { label: 'Settings', click: () => {
+      if (isPinSet()) {
+        openWizardWindow({ requirePin: 'settings' });
+      } else {
+        openWizardWindow({ firstRun: false });
+      }
+    }},
     { label: 'Quit', click: () => app.quit() },
   ]);
 }
@@ -196,15 +230,25 @@ function setTrayState(state: TrayState) {
 
 // ─── Wizard window ────────────────────────────────────────────────────────────
 
-function openWizardWindow(firstRun: boolean) {
+interface WizardOpts {
+  firstRun?: boolean;
+  requirePin?: 'settings' | 'quit';
+}
+
+function openWizardWindow(opts: WizardOpts = {}) {
   if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.focus();
-    return;
+    if (opts.requirePin) {
+      // Close existing window and reopen as PIN dialog
+      mainWindow.destroy();
+    } else {
+      mainWindow.focus();
+      return;
+    }
   }
 
   mainWindow = new BrowserWindow({
     width: 520,
-    height: 420,
+    height: 460,
     resizable: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -221,7 +265,11 @@ function openWizardWindow(firstRun: boolean) {
     mainWindow.loadFile(path.join(__dirname, '../renderer/dist/index.html'));
   }
   mainWindow.webContents.on('did-finish-load', () => {
-    mainWindow?.webContents.send('init', { firstRun, serverUrl: creds?.serverUrl });
+    mainWindow?.webContents.send('init', {
+      firstRun: opts.firstRun ?? false,
+      serverUrl: creds?.serverUrl,
+      requirePin: opts.requirePin,
+    });
   });
   mainWindow.on('closed', () => { mainWindow = null; });
 }
@@ -244,6 +292,21 @@ ipcMain.handle('get-permissions', () => permissionsSnapshot());
 ipcMain.handle('request-permission', (_evt, name: string) => {
   if (name === 'accessibility') promptAccessibilityPermission();
   return permissionsSnapshot();
+});
+
+ipcMain.handle('is-pin-set', () => isPinSet());
+
+ipcMain.handle('save-pin', async (_evt, pin: string) => {
+  const hash = hashPin(pin);
+  await savePin(hash);
+  pinHash = hash;
+});
+
+ipcMain.handle('verify-pin', (_evt, pin: string) => verifyPin(pin));
+
+ipcMain.handle('confirm-quit', () => {
+  allowQuit = true;
+  app.quit();
 });
 
 ipcMain.handle('check-health', async (_evt, serverUrl: string) => {
@@ -345,12 +408,13 @@ function startWsClient(serverUrl: string, firstRun: boolean) {
 app.whenReady().then(async () => {
   setupTray();
 
-  creds = await loadCredentials();
+  [creds, pinHash] = await Promise.all([loadCredentials(), loadPin()]);
+
   if (!creds?.serverUrl || !creds?.id) {
-    openWizardWindow(/* firstRun */ true);
+    openWizardWindow({ firstRun: true });
   } else if (!allPermissionsGranted()) {
     // Permissions were revoked since last launch — open wizard to re-grant
-    openWizardWindow(/* firstRun */ false);
+    openWizardWindow({ firstRun: false });
   } else {
     startWsClient(creds.serverUrl, /* firstRun */ false);
   }
@@ -360,7 +424,13 @@ app.on('window-all-closed', () => {
   // keep running in tray
 });
 
-app.on('before-quit', () => {
+app.on('before-quit', (event) => {
+  if (pinHash && !allowQuit) {
+    event.preventDefault();
+    openWizardWindow({ requirePin: 'quit' });
+    return;
+  }
+  allowQuit = false;
   hideKioskOverlay();
   wsClient?.stop();
 });
