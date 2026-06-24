@@ -86,12 +86,7 @@ function openKiosk(payload: CompanionAuthenticatedDto) {
   kioskWindow = new BrowserWindow({
     show: false,
     frame: true,
-    webPreferences: {
-      session: ses,
-      nodeIntegration: false,
-      contextIsolation: true,
-      preload: path.join(__dirname, 'kiosk-preload.js'),
-    },
+    webPreferences: { session: ses, nodeIntegration: false, contextIsolation: true },
   });
 
   kioskWindow.loadURL(kioskUrl(payload));
@@ -194,12 +189,11 @@ function unlockComputer(): void {
 
 // ─── Tray ────────────────────────────────────────────────────────────────────
 
-type TrayState = 'locked' | 'unlocked' | 'idle_lock' | 'disconnected';
+type TrayState = 'locked' | 'unlocked' | 'disconnected';
 
 const TRAY_COLORS: Record<TrayState, [number, number, number]> = {
-  unlocked: [34, 197, 94],   // green
-  locked: [239, 68, 68],     // red
-  idle_lock: [245, 158, 11], // orange
+  unlocked: [34, 197, 94],       // green
+  locked: [239, 68, 68],         // red
   disconnected: [148, 163, 184], // gray
 };
 
@@ -208,15 +202,9 @@ function dotIcon(color: [number, number, number]): Electron.NativeImage {
 }
 
 function buildTrayMenu(state: TrayState): Menu {
-  const sessionActive = state === 'unlocked' || state === 'idle_lock';
   return Menu.buildFromTemplate([
-    ...(sessionActive
-      ? [
-          ...(state === 'idle_lock'
-            ? [{ label: 'Dismiss idle lock', click: () => dismissIdleLock() }]
-            : []),
-          { type: 'separator' as const },
-        ]
+    ...(state === 'unlocked'
+      ? [{ type: 'separator' as const }]
       : [
           { label: state === 'disconnected' ? 'Connecting…' : 'No active session', enabled: false },
           { type: 'separator' as const },
@@ -236,15 +224,12 @@ function buildTrayMenu(state: TrayState): Menu {
   ]);
 }
 
-let currentTrayState: TrayState = 'disconnected';
-
 function setupTray() {
   tray = new Tray(dotIcon(TRAY_COLORS.disconnected));
   setTrayState('disconnected');
 }
 
 function setTrayState(state: TrayState) {
-  currentTrayState = state;
   tray?.setImage(dotIcon(TRAY_COLORS[state]));
   tray?.setContextMenu(buildTrayMenu(state));
   const resourceName = authenticatedPayload?.resources[0]?.name;
@@ -252,13 +237,6 @@ function setTrayState(state: TrayState) {
     ? `Attraccess Companion — ${resourceName} (${state})`
     : `Attraccess Companion — ${state}`;
   tray?.setToolTip(tooltip);
-}
-
-// ─── Session management ───────────────────────────────────────────────────────
-
-function dismissIdleLock(): void {
-  setTrayState('unlocked');
-  kioskWindow?.webContents.send('kiosk-dismiss-idle');
 }
 
 // ─── Wizard window ────────────────────────────────────────────────────────────
@@ -360,13 +338,6 @@ ipcMain.handle('set-auto-logoff', (_evt, seconds: number) => {
   autoLogoffSeconds = seconds;
 });
 
-ipcMain.on('kiosk-idle-warning', (_evt, isWarning: boolean) => {
-  if (isWarning) {
-    setTrayState('idle_lock');
-  } else if (currentTrayState === 'idle_lock') {
-    setTrayState('unlocked');
-  }
-});
 
 // ─── WebSocket wiring ─────────────────────────────────────────────────────────
 
