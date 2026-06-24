@@ -15,17 +15,15 @@ describe('AttraccessUser', () => {
     const onStartDirectMessage = vi.fn();
     const user = { id: 42, username: 'supervisor' };
 
-    const { container } = render(
+    render(
       <AttraccessUser user={user} description="Lab manager" onStartDirectMessage={onStartDirectMessage} />,
     );
 
     expect(screen.getByText('supervisor')).toBeInTheDocument();
     expect(screen.getByText('Lab manager')).toBeInTheDocument();
 
-    // No standalone chat <button> — only the wrapping popover trigger (role="button")
-    const buttons = container.querySelectorAll('button');
-    expect(buttons).toHaveLength(0);
-    const roleButtons = container.querySelectorAll('[role="button"]');
-    expect(roleButtons).toHaveLength(1);
+    // A single interactive trigger wrapping the user info — no separate standalone chat button
+    expect(screen.getByRole('button', { name: /supervisor/i })).toBeInTheDocument();
+    expect(screen.getAllByRole('button')).toHaveLength(1);
   });
 });
