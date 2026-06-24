@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, session, screen, shell, dialog } from 'electron';
+import { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, session, screen, dialog } from 'electron';
 import * as path from 'path';
 import * as https from 'https';
 import * as http from 'http';
@@ -207,17 +207,11 @@ function dotIcon(color: [number, number, number]): Electron.NativeImage {
   return nativeImage.createFromBuffer(dotIconPng(color));
 }
 
-function resourceLabel(): string {
-  const name = authenticatedPayload?.resources[0]?.name;
-  return name ? ` on ${name}` : '';
-}
-
 function buildTrayMenu(state: TrayState): Menu {
   const sessionActive = state === 'unlocked' || state === 'idle_lock';
   return Menu.buildFromTemplate([
     ...(sessionActive
       ? [
-          { label: `End session${resourceLabel()}`, click: () => { void endSession(); } },
           ...(state === 'idle_lock'
             ? [{ label: 'Dismiss idle lock', click: () => dismissIdleLock() }]
             : []),
@@ -265,41 +259,6 @@ function setTrayState(state: TrayState) {
 function dismissIdleLock(): void {
   setTrayState('unlocked');
   kioskWindow?.webContents.send('kiosk-dismiss-idle');
-}
-
-function tryEndSessionViaApi(serverUrl: string, resourceId: number, cookieHeader: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    const url = new URL(`/api/resources/${resourceId}/usage/end`, serverUrl);
-    const mod = url.protocol === 'https:' ? https : http;
-    const body = '{}';
-    const req = mod.request(url.toString(), {
-      method: 'PUT',
-      headers: { Cookie: cookieHeader, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
-    }, (res) => {
-      resolve((res.statusCode ?? 500) < 400);
-    });
-    req.on('error', () => resolve(false));
-    req.setTimeout(5000, () => { req.destroy(); resolve(false); });
-    req.end(body);
-  });
-}
-
-async function endSession(): Promise<void> {
-  if (!authenticatedPayload || !creds) return;
-  const resourceId = authenticatedPayload.resources[0]?.id;
-  if (resourceId === undefined) return;
-
-  // Try using the user's session cookie from the kiosk window partition
-  const kioskSes = session.fromPartition(KIOSK_PARTITION);
-  const cookies = await kioskSes.cookies.get({ url: creds.serverUrl });
-  if (cookies.length > 0) {
-    const cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ');
-    const ok = await tryEndSessionViaApi(creds.serverUrl, resourceId, cookieHeader);
-    if (ok) return;
-  }
-
-  // Fallback: open resource page in the system browser for the user to end the session
-  void shell.openExternal(`${creds.serverUrl}/resources/${resourceId}`);
 }
 
 // ─── Wizard window ────────────────────────────────────────────────────────────
