@@ -14,7 +14,7 @@ let mainWindow: BrowserWindow | null = null;
 let kioskWindow: BrowserWindow | null = null;
 let wsClient: CompanionWsClient | null = null;
 let creds: StoredCredentials | null = null;
-let autoLogoffSeconds = 300;
+let autoLogoffSeconds = 30;
 let authenticatedPayload: CompanionAuthenticatedDto | null = null;
 
 // ponytail: random uuid-ish partition key so the session is always fresh per launch
