@@ -25,7 +25,8 @@
         "mqttServers": "MQTT Servers",
         "csvExport": "CSV Export",
         "balena": "Balena",
-        "settings": "Settings"
+        "settings": "Settings",
+        "companion": "Companion App"
       }
     }
   },

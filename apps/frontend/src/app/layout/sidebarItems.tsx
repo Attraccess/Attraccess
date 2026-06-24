@@ -11,6 +11,7 @@ import {
   LucideProps,
   MailIcon,
   MessageSquareIcon,
+  MonitorSmartphoneIcon,
   NfcIcon,
   PackageIcon,
   Settings2Icon,
@@ -119,6 +120,11 @@ export function useSidebarItems(): (SidebarItem | SidebarItemGroup)[] {
           path: '/settings',
           translationKey: 'settings',
           icon: Settings2Icon,
+        },
+        {
+          path: '/settings/companion',
+          translationKey: 'companion',
+          icon: MonitorSmartphoneIcon,
         },
         {
           path: '/csv-export',
