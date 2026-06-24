@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, session, screen } from 'electron';
+import { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, session, screen, dialog } from 'electron';
 import * as path from 'path';
 import * as https from 'https';
 import * as http from 'http';
@@ -192,8 +192,8 @@ function unlockComputer(): void {
 type TrayState = 'locked' | 'unlocked' | 'disconnected';
 
 const TRAY_COLORS: Record<TrayState, [number, number, number]> = {
-  unlocked: [34, 197, 94], // green
-  locked: [239, 68, 68], // red
+  unlocked: [34, 197, 94],       // green
+  locked: [239, 68, 68],         // red
   disconnected: [148, 163, 184], // gray
 };
 
@@ -203,8 +203,12 @@ function dotIcon(color: [number, number, number]): Electron.NativeImage {
 
 function buildTrayMenu(state: TrayState): Menu {
   return Menu.buildFromTemplate([
-    { label: `Status: ${state}`, enabled: false },
-    { type: 'separator' },
+    ...(state === 'unlocked'
+      ? [{ type: 'separator' as const }]
+      : [
+          { label: state === 'disconnected' ? 'Connecting…' : 'No active session', enabled: false },
+          { type: 'separator' as const },
+        ]),
     { label: 'Open resource panel', enabled: !!authenticatedPayload, click: () => reopenKiosk() },
     { label: 'Settings', click: () => {
       if (isPinSet()) {
@@ -212,6 +216,9 @@ function buildTrayMenu(state: TrayState): Menu {
       } else {
         openWizardWindow({ firstRun: false });
       }
+    }},
+    { label: 'About', click: () => {
+      void dialog.showMessageBox({ title: 'Attraccess Companion', message: `Attraccess Companion\nVersion ${app.getVersion()}` });
     }},
     { label: 'Quit', click: () => app.quit() },
   ]);
@@ -225,7 +232,11 @@ function setupTray() {
 function setTrayState(state: TrayState) {
   tray?.setImage(dotIcon(TRAY_COLORS[state]));
   tray?.setContextMenu(buildTrayMenu(state));
-  tray?.setToolTip(`Attraccess Companion — ${state}`);
+  const resourceName = authenticatedPayload?.resources[0]?.name;
+  const tooltip = resourceName
+    ? `Attraccess Companion — ${resourceName} (${state})`
+    : `Attraccess Companion — ${state}`;
+  tray?.setToolTip(tooltip);
 }
 
 // ─── Wizard window ────────────────────────────────────────────────────────────
@@ -326,6 +337,7 @@ ipcMain.handle('register', async (_evt, serverUrl: string) => {
 ipcMain.handle('set-auto-logoff', (_evt, seconds: number) => {
   autoLogoffSeconds = seconds;
 });
+
 
 // ─── WebSocket wiring ─────────────────────────────────────────────────────────
 
