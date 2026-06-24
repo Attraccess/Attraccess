@@ -1,20 +1,16 @@
 import { PropsWithChildren } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Alert, AlertContent, AlertDescription } from '@heroui/react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useAutoLogoff } from '../hooks/useAutoLogoff';
-import en from './KioskLayout.en.json';
-import de from './KioskLayout.de.json';
 
-function AutoLogoffBanner({ remaining }: { remaining: number }) {
-  const { t } = useTranslations({ en, de });
+// Inactivity countdown shown as a thin bar at the very top of the page that
+// drains as the timer runs down and refills on activity (like the attractap UI).
+function AutoLogoffBar({ fraction }: { fraction: number }) {
   return (
-    <div className="fixed top-0 left-0 right-0 z-50">
-      <Alert status="warning">
-        <AlertContent>
-          <AlertDescription>{t('autoLogoff.banner', { count: remaining })}</AlertDescription>
-        </AlertContent>
-      </Alert>
+    <div className="fixed top-0 left-0 right-0 h-1 bg-default-200/40 z-50">
+      <div
+        className="h-full bg-primary transition-[width] duration-1000 ease-linear"
+        style={{ width: `${Math.max(0, Math.min(1, fraction)) * 100}%` }}
+      />
     </div>
   );
 }
@@ -27,11 +23,11 @@ export function KioskLayout({ children }: PropsWithChildren) {
     return parsed && parsed > 0 ? parsed : null;
   })();
 
-  const { remaining, isWarning } = useAutoLogoff(autoLogoffSeconds);
+  const { remaining } = useAutoLogoff(autoLogoffSeconds);
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-10 p-4">
-      {isWarning && remaining !== null && <AutoLogoffBanner remaining={remaining} />}
+      {autoLogoffSeconds && remaining !== null && <AutoLogoffBar fraction={remaining / autoLogoffSeconds} />}
       <div className="flex items-center gap-3">
         <img src="/logo.png" alt="Attraccess" className="h-16 w-auto" />
         <span className="text-3xl font-bold">Attraccess</span>

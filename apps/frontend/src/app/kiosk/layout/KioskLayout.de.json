@@ -1,8 +1,0 @@
-{
-  "autoLogoff": {
-    "banner": {
-      "one": "Abmeldung in {{count}} Sekunde aufgrund von Inaktivität. Irgendwo berühren, um angemeldet zu bleiben.",
-      "many": "Abmeldung in {{count}} Sekunden aufgrund von Inaktivität. Irgendwo berühren, um angemeldet zu bleiben."
-    }
-  }
-}
