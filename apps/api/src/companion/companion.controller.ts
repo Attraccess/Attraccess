@@ -5,21 +5,85 @@ import {
   Delete,
   Get,
   Inject,
+  Logger,
   NotFoundException,
   Param,
   ParseIntPipe,
   Patch,
+  Res,
   UseInterceptors,
 } from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Auth } from '@attraccess/plugins-backend-sdk';
 import { CompanionDevice } from '@attraccess/database-entities';
+import { Response } from 'express';
 import { CompanionService } from './companion.service';
 import { CompanionGateway } from './companion.gateway';
 import { CompanionGatewayService } from './companion-gateway.service';
+import { CompanionManifestDto } from './dtos/companion.dto';
 
 class RenameCompanionDeviceDto {
   name!: string;
+}
+
+@ApiTags('Companion')
+@Controller('companion')
+export class CompanionDownloadController {
+  private readonly logger = new Logger(CompanionDownloadController.name);
+
+  public constructor(@Inject(CompanionService) private readonly service: CompanionService) {}
+
+  @Get('versions')
+  @Auth('canManageSystemConfiguration')
+  @ApiOperation({ summary: 'Get companion app manifest', operationId: 'getCompanionVersions' })
+  @ApiResponse({ status: 200, type: CompanionManifestDto })
+  @ApiResponse({ status: 404, description: 'No companion manifest available' })
+  getVersions(): CompanionManifestDto {
+    const manifest = this.service.getManifest();
+    if (!manifest) {
+      throw new NotFoundException('No companion manifest available');
+    }
+    return manifest;
+  }
+
+  @Get('download/:platform/:arch')
+  @ApiOperation({ summary: 'Download companion app binary', operationId: 'downloadCompanionBinary' })
+  @ApiParam({ name: 'platform', example: 'linux' })
+  @ApiParam({ name: 'arch', example: 'x64' })
+  @ApiResponse({ status: 200, description: 'Binary stream' })
+  @ApiResponse({ status: 404, description: 'Platform/arch not found' })
+  async downloadBinary(
+    @Param('platform') platform: string,
+    @Param('arch') arch: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    try {
+      const { stream, size, filename } = this.service.getBinaryStream(platform, arch);
+
+      res.set({
+        'Content-Type': 'application/octet-stream',
+        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Content-Length': size.toString(),
+        'Cache-Control': 'no-cache',
+      });
+
+      stream.on('error', (err) => {
+        this.logger.error(`Stream error: ${err.message}`, err.stack);
+        if (!res.headersSent) {
+          res.status(500).send('Stream error during download');
+        }
+      });
+
+      stream.pipe(res);
+    } catch (err) {
+      if (err instanceof NotFoundException) {
+        res.status(404).send(err.message);
+        return;
+      }
+      this.logger.error(`Error serving companion binary: ${(err as Error).message}`);
+      res.status(500).send('Internal server error');
+    }
+  }
 }
 
 @ApiTags('Companion Devices')
