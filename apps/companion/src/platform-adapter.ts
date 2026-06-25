@@ -1,20 +1,7 @@
-// Thin dispatch table — routes each cross-platform OS action to the correct
-// platform implementation. main.ts depends only on this file; the platform
-// modules (macos-lock, windows-lock) are imported here with explicit prefixes
-// so the mapping is obvious at a glance.
-
 import type { App } from 'electron';
-
-import {
-  hasAccessibilityPermission as macosHasAccessibilityPermission,
-  promptAccessibilityPermission as macosPromptAccessibilityPermission,
-  installLaunchAgent as macosInstallStartupEntry,
-} from './macos-lock';
-
-import {
-  lockWorkStation as windowsLockWorkStation,
-  installAutostart as windowsInstallStartupEntry,
-} from './windows-lock';
+import { WindowsAdapter } from './windows-adapter';
+import { MacosAdapter } from './macos-adapter';
+import { NullAdapter } from './null-adapter';
 
 export interface OsAdapter {
   /**
@@ -42,58 +29,7 @@ export interface OsAdapter {
   lockShortcuts(): readonly string[];
 }
 
-const windowsAdapter: OsAdapter = {
-  tryOsLock: () => windowsLockWorkStation(),
-  installStartupEntry: (app) => windowsInstallStartupEntry(app.getPath('exe')),
-  permissionsStatus: () => ({ needed: false, accessibility: true }),
-  requestPermissions: () => undefined,
-  lockShortcuts: () => [
-    'CommandOrControl+Q',
-    'CommandOrControl+W',
-    'Alt+F4',
-    'Control+Shift+Escape', // Task Manager
-    'Super',
-    'Super+D',              // Show desktop
-    'Super+R',              // Run dialog
-    'Super+X',              // Quick Link menu
-    'Control+Escape',       // Start menu (Alt path)
-    // Alt+Tab / Win+Tab are OS-reserved and will silently fail — that is fine
-  ],
-};
-
-const macosAdapter: OsAdapter = {
-  // macOS kiosk lock is done inside showKioskOverlay() via win.setKiosk(true);
-  // there is no separate OS lock step analogous to LockWorkStation.
-  tryOsLock: async () => false,
-  installStartupEntry: (app) => macosInstallStartupEntry(app.getPath('exe')),
-  permissionsStatus: () => ({
-    needed: true,
-    accessibility: macosHasAccessibilityPermission(),
-  }),
-  requestPermissions: () => macosPromptAccessibilityPermission(),
-  // setKiosk(true) already blocks Cmd+Tab, Mission Control, Spaces, force-quit,
-  // and app-hide via NSApplicationPresentationOptions. This list covers the gaps
-  // those presentation options leave.
-  lockShortcuts: () => [
-    'CommandOrControl+Q',
-    'CommandOrControl+W',
-    'CommandOrControl+M',      // minimize
-    'CommandOrControl+H',      // hide
-    'CommandOrControl+Space',  // Spotlight
-    'CommandOrControl+Alt+Space',
-    'CommandOrControl+`',      // cycle app windows
-  ],
-};
-
-const nullAdapter: OsAdapter = {
-  tryOsLock: async () => false,
-  installStartupEntry: async (_app) => undefined,
-  permissionsStatus: () => ({ needed: false, accessibility: true }),
-  requestPermissions: () => undefined,
-  lockShortcuts: () => [],
-};
-
 export const osAdapter: OsAdapter =
-  process.platform === 'win32' ? windowsAdapter :
-  process.platform === 'darwin' ? macosAdapter :
-  nullAdapter;
+  process.platform === 'win32' ? new WindowsAdapter() :
+  process.platform === 'darwin' ? new MacosAdapter() :
+  new NullAdapter();
