@@ -1,6 +1,7 @@
 import type { App } from 'electron';
 import { WindowsAdapter } from './windows-adapter';
 import { MacosAdapter } from './macos-adapter';
+import { LinuxAdapter } from './linux-adapter';
 import { NullAdapter } from './null-adapter';
 
 export interface OsAdapter {
@@ -27,9 +28,16 @@ export interface OsAdapter {
    * fail — the caller wraps each registration in try/catch.
    */
   lockShortcuts(): readonly string[];
+
+  /**
+   * Called when the computer is unlocked. Platform implementations may release
+   * grabbed resources (e.g. Linux VT lock) here.
+   */
+  onUnlock?(): void;
 }
 
 export const osAdapter: OsAdapter =
   process.platform === 'win32' ? new WindowsAdapter() :
   process.platform === 'darwin' ? new MacosAdapter() :
+  process.platform === 'linux' ? new LinuxAdapter() :
   new NullAdapter();
