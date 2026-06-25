@@ -47,8 +47,11 @@ export function hasAccessibilityPermission(): boolean {
 export function promptAccessibilityPermission(): void {
   if (process.platform !== 'darwin') return;
   try {
-    const { systemPreferences } = require('electron') as typeof import('electron');
+    const { systemPreferences, shell } = require('electron') as typeof import('electron');
+    // Registers the app in TCC so it appears in the Accessibility list
     systemPreferences.isTrustedAccessibilityClient(true);
+    // Open directly to the Accessibility pane — user just needs to toggle the switch
+    shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility');
   } catch {
     // ignore — test env or non-Electron runtime
   }
