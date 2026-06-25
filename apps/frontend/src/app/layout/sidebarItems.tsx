@@ -11,6 +11,7 @@ import {
   LucideProps,
   MailIcon,
   MessageSquareIcon,
+  MonitorSmartphoneIcon,
   NfcIcon,
   PackageIcon,
   Settings2Icon,
@@ -94,17 +95,33 @@ export function useSidebarItems(): (SidebarItem | SidebarItemGroup)[] {
       icon: UsersIcon,
     });
 
+    // Devices group
+    const devicesGroup: SidebarItemGroup = {
+      translationKey: 'devices',
+      isGroup: true,
+      icon: MonitorSmartphoneIcon,
+      items: [
+        {
+          path: '/devices/mqtt/servers',
+          translationKey: 'mqttServers',
+          icon: ServerIcon,
+        },
+        {
+          path: '/devices/companion',
+          translationKey: 'companion',
+          icon: MonitorSmartphoneIcon,
+        },
+      ],
+    };
+
+    items.push(devicesGroup);
+
     // System group
     const systemGroup: SidebarItemGroup = {
       translationKey: 'system',
       isGroup: true,
       icon: CogIcon,
       items: [
-        {
-          path: '/mqtt/servers',
-          translationKey: 'mqttServers',
-          icon: ServerIcon,
-        },
         {
           path: '/plugins',
           translationKey: 'plugins',

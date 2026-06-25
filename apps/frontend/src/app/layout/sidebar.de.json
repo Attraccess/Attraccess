@@ -17,12 +17,18 @@
         "userManagement": "Benutzerverwaltung"
       }
     },
+    "devices": {
+      "label": "Geräte",
+      "items": {
+        "mqttServers": "MQTT-Server",
+        "companion": "Companion-App"
+      }
+    },
     "system": {
       "label": "System",
       "items": {
         "plugins": "Plugins",
         "emailTemplates": "E-Mail-Vorlagen",
-        "mqttServers": "MQTT-Server",
         "csvExport": "CSV-Export",
         "balena": "Balena",
         "settings": "Einstellungen"
