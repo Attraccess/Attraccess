@@ -18,6 +18,7 @@ import { AttractapModule } from '../attractap/attractap.module';
 import { CompanionModule } from '../companion/companion.module';
 import { AnalyticsModule } from '../analytics/analytics.module';
 import { EmailTemplateModule } from '../email-template/email-template.module';
+import { EmailLayoutModule } from '../email-layout/email-layout.module';
 import sessionConfig from '../config/session.config';
 import valkeyConfig from '../config/valkey.config';
 import { ValkeyModule } from '../valkey/valkey.module';
@@ -122,6 +123,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     CompanionModule,
     AnalyticsModule,
     EmailTemplateModule,
+    EmailLayoutModule,
     LicenseModule,
     BillingModule,
     EncryptionModule,

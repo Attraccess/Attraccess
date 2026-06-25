@@ -7,7 +7,13 @@
     "password-changed": "Password Changed",
     "resource-usage-billing-transaction-summary": "Resource Usage Billing Transaction Summary",
     "user-invitation": "User Invitation",
-    "project-invitation": "Project Invitation"
+    "project-invitation": "Project Invitation",
+    "delete-account-confirmation": "Delete Account Confirmation",
+    "resource-health-changed": "Resource Health Changed",
+    "user-retraining-required": "User Retraining Required",
+    "maintenance-request-created": "Maintenance Request Created",
+    "message-received": "New Message (Offline Fallback)",
+    "resource-usage-note-added": "Resource Usage Note Added"
   },
   "form": {
     "subject": "Subject",

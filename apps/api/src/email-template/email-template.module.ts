@@ -1,14 +1,15 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { EmailTemplate } from '@attraccess/database-entities';
 import { EmailTemplateService } from './email-template.service';
 import { EmailTemplateController } from './email-template.controller';
-import { MjmlService } from './mjml.service';
+import { MjmlModule } from './mjml.module';
+import { EmailLayoutModule } from '../email-layout/email-layout.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([EmailTemplate])],
-  providers: [EmailTemplateService, MjmlService],
+  imports: [TypeOrmModule.forFeature([EmailTemplate]), MjmlModule, forwardRef(() => EmailLayoutModule)],
+  providers: [EmailTemplateService],
   controllers: [EmailTemplateController],
-  exports: [EmailTemplateService, MjmlService],
+  exports: [EmailTemplateService],
 })
 export class EmailTemplateModule {}

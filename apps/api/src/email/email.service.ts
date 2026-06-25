@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { EmailTemplateService } from '../email-template/email-template.service';
+import { EmailLayoutService } from '../email-layout/email-layout.service';
 import { createTransport } from 'nodemailer';
 import {
   User,
@@ -14,7 +15,6 @@ import {
 } from '@attraccess/database-entities';
 import { dbCurrencyToUserCurrency } from '@attraccess/shared';
 import * as Handlebars from 'handlebars';
-import { MjmlService } from '../email-template/mjml.service';
 import { EntityManager } from 'typeorm';
 import { SettingsService } from '../settings/settings.service';
 import { MetricsService } from '../metrics/metrics.service';
@@ -29,7 +29,7 @@ export class EmailService {
   constructor(
     private readonly settingsService: SettingsService,
     private readonly emailTemplateService: EmailTemplateService,
-    private readonly mjmlService: MjmlService,
+    private readonly emailLayoutService: EmailLayoutService,
     private readonly metricsService: MetricsService,
     private readonly externalCallTimer: ExternalCallTimer,
     @InjectRepository(User)
@@ -43,11 +43,9 @@ export class EmailService {
     const subjectTemplate = Handlebars.compile(template.subject);
     const subject = subjectTemplate(context);
 
-    // Compile Handlebars first so all template variables (e.g. dynamic colors) are
-    // resolved before MJML validates attribute values.
-    const rawBodyTemplate = Handlebars.compile(template.body);
-    const resolvedMjml = rawBodyTemplate(context);
-    const body = await this.mjmlService.validateAndConvert(resolvedMjml);
+    const bodyHtml = await this.emailLayoutService.renderWithTemplate(template);
+    const bodyTemplate = Handlebars.compile(bodyHtml);
+    const body = bodyTemplate(context);
 
     return {
       subject,
@@ -104,6 +102,8 @@ export class EmailService {
       host: {
         frontend: url,
         backend: url,
+        notificationPreferencesUrl: `${url}/account`,
+        logoUrl: `${url}/logo.png`,
       },
       url,
     } as const;

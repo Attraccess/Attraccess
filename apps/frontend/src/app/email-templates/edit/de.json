@@ -7,7 +7,13 @@
     "password-changed": "Passwort geändert",
     "resource-usage-billing-transaction-summary": "Ressourcennutzung Kostenübersicht",
     "user-invitation": "Benutzereinladung",
-    "project-invitation": "Projekteinladung"
+    "project-invitation": "Projekteinladung",
+    "delete-account-confirmation": "Kontolöschung Bestätigung",
+    "resource-health-changed": "Ressourcen-Gesundheitsstatus geändert",
+    "user-retraining-required": "Nachschulung erforderlich",
+    "maintenance-request-created": "Wartungsanfrage erstellt",
+    "message-received": "Neue Nachricht (Offline-Fallback)",
+    "resource-usage-note-added": "Ressourcen-Nutzungsnotiz hinzugefügt"
   },
   "form": {
     "subject": "Betreff",

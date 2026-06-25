@@ -1,0 +1,33 @@
+{
+  "title": "Global Email Layout",
+  "subtitle": "Edit the MJML layout that wraps all email templates. Use {{{content}}} where template content should appear.",
+  "sections": {
+    "editor": "Layout Editor",
+    "preview": "Preview"
+  },
+  "placeholder": {
+    "hint": "Required placeholder",
+    "description": "Insert {{{content}}} in your layout where individual template body sections will be injected.",
+    "copy": "Copy {{{content}}}"
+  },
+  "preview": {
+    "iframeTitle": "Layout Preview",
+    "loading": "Loading preview...",
+    "errorPrefix": "Preview error:",
+    "emptyPlaceholder": "Start editing the MJML layout to see a preview."
+  },
+  "actions": {
+    "save": "Save Layout",
+    "cancel": "Cancel",
+    "expand": "Expand editor",
+    "close": "Close",
+    "backToTemplates": "Back to Templates"
+  },
+  "form": {
+    "mjmlDocumentation": "MJML Documentation"
+  },
+  "toast": {
+    "saveSuccess": "Global email layout saved successfully.",
+    "saveError": "Failed to save layout."
+  }
+}

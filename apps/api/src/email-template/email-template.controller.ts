@@ -6,6 +6,7 @@ import { EmailTemplateService } from './email-template.service';
 import { MjmlService } from './mjml.service';
 import { UpdateEmailTemplateDto } from './dto/update-email-template.dto';
 import { PreviewMjmlDto, PreviewMjmlResponseDto } from './dto/preview-mjml.dto';
+import { EmailLayoutService } from '../email-layout/email-layout.service';
 
 @ApiTags('Email Templates')
 @ApiBearerAuth()
@@ -14,16 +15,23 @@ export class EmailTemplateController {
   constructor(
     private readonly emailTemplateService: EmailTemplateService,
     private readonly mjmlService: MjmlService,
+    private readonly emailLayoutService: EmailLayoutService,
   ) {}
 
   @Post('preview-mjml')
   @Auth('canManageSystemConfiguration' as SystemPermission)
-  @ApiOperation({ summary: 'Preview MJML content as HTML' })
+  @ApiOperation({ summary: 'Preview MJML template content as HTML, wrapped in the global email layout' })
   @ApiBody({ type: PreviewMjmlDto })
   @ApiResponse({ status: 200, description: 'MJML preview result', type: PreviewMjmlResponseDto })
   @ApiResponse({ status: 400, description: 'Invalid MJML content' })
   async previewMjml(@Body() previewMjmlDto: PreviewMjmlDto): Promise<PreviewMjmlResponseDto> {
-    return this.mjmlService.convertToHtml(previewMjmlDto.mjmlContent);
+    const isFullMjmlDocument = /^\s*<mjml[\s>]/i.test(previewMjmlDto.mjmlContent);
+    if (isFullMjmlDocument) {
+      return this.mjmlService.convertToHtml(previewMjmlDto.mjmlContent);
+    }
+    const layout = await this.emailLayoutService.findGlobal();
+    const fullMjml = this.emailLayoutService.injectContentIntoLayout(layout.body, previewMjmlDto.mjmlContent);
+    return this.mjmlService.convertToHtml(fullMjml);
   }
 
   @Get()

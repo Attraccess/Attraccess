@@ -8,7 +8,7 @@ import {
   Resource,
 } from '@attraccess/database-entities';
 import { EmailTemplateService } from '../email-template/email-template.service';
-import { MjmlService } from '../email-template/mjml.service';
+import { EmailLayoutService } from '../email-layout/email-layout.service';
 import { createTransport } from 'nodemailer';
 import { SettingsService } from '../settings/settings.service';
 import { SmtpServiceType } from '../settings/dto/smtp-settings.dto';
@@ -118,8 +118,8 @@ describe('EmailService', () => {
         throw new Error('Unexpected template type');
       }),
     };
-    const mjmlService = {
-      validateAndConvert: jest.fn().mockImplementation((template: string) => Promise.resolve(template)),
+    const emailLayoutService = {
+      renderWithTemplate: jest.fn().mockImplementation((template: { body: string }) => Promise.resolve(template.body)),
     };
 
     const metricsService = {
@@ -137,13 +137,13 @@ describe('EmailService', () => {
     const service = new EmailService(
       settingsService as unknown as SettingsService,
       emailTemplateService as unknown as EmailTemplateService,
-      mjmlService as unknown as MjmlService,
+      emailLayoutService as unknown as EmailLayoutService,
       metricsService as unknown as MetricsService,
       externalCallTimer as unknown as ExternalCallTimer,
       userRepository as unknown as Repository<User>,
     );
 
-    return { service, sendMail, close, settingsService, emailTemplateService, mjmlService, userRepository };
+    return { service, sendMail, close, settingsService, emailTemplateService, emailLayoutService, userRepository };
   };
 
   it('sends username changed email with resolved variables', async () => {

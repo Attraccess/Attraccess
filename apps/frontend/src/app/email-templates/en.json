@@ -1,6 +1,11 @@
 {
   "title": "Email Templates",
-  "subtitle": "Manage the email templates used by the system.",
+  "subtitle": "Manage the email templates used by the system. The global layout (header, footer, styles) is shared across all templates.",
+  "editLayout": "Edit Global Layout",
+  "tabs": {
+    "templates": "Templates",
+    "layout": "Global Layout"
+  },
   "columns": {
     "type": "Type",
     "subject": "Subject",
@@ -17,6 +22,11 @@
     "resource-usage-billing-transaction-summary": "Resource Usage Billing Transaction Summary",
     "user-invitation": "User Invitation",
     "project-invitation": "Project Invitation",
-    "delete-account-confirmation": "Delete Account Confirmation"
+    "delete-account-confirmation": "Delete Account Confirmation",
+    "resource-health-changed": "Resource Health Changed",
+    "user-retraining-required": "User Retraining Required",
+    "maintenance-request-created": "Maintenance Request Created",
+    "message-received": "New Message (Offline Fallback)",
+    "resource-usage-note-added": "Resource Usage Note Added"
   }
 }
