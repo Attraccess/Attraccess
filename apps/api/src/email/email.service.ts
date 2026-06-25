@@ -103,6 +103,7 @@ export class EmailService {
         frontend: url,
         backend: url,
         notificationPreferencesUrl: `${url}/account`,
+        logoUrl: `${url}/logo.png`,
       },
       url,
     } as const;

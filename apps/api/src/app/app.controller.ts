@@ -1,12 +1,24 @@
-import { Controller, Get, Post } from '@nestjs/common';
+import { Controller, Get, Header, Post, StreamableFile } from '@nestjs/common';
 import { AppService } from './app.service';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Auth } from '@attraccess/plugins-backend-sdk';
+import { readFileSync } from 'fs';
+import { join } from 'path';
+
+const LOGO_PNG = readFileSync(join(__dirname, 'assets', 'logo.png'));
 
 @ApiTags('System')
 @Controller()
 export class AppController {
   constructor(private readonly appService: AppService) {}
+
+  @Get('/logo.png')
+  @Header('Content-Type', 'image/png')
+  @Header('Cache-Control', 'public, max-age=86400')
+  @ApiOperation({ summary: 'Return the Attraccess logo', operationId: 'getLogo' })
+  getLogo(): StreamableFile {
+    return new StreamableFile(LOGO_PNG);
+  }
 
   @Get('/info')
   @ApiOperation({ summary: 'Return API information', operationId: 'info' })

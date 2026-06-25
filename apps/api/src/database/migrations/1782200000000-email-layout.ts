@@ -26,8 +26,8 @@ const DEFAULT_GLOBAL_LAYOUT = `<mjml>
     <mj-section background-color="#FFFFFF" padding="24px 0 16px 0">
       <mj-column>
         <mj-image
-          src="{{host.frontend}}/logo.png"
-          width="120px"
+          src="{{host.logoUrl}}"
+          width="200px"
           href="https://attraccess.org"
           alt="Attraccess"
           padding="0"
