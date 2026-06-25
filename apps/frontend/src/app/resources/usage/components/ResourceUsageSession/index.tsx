@@ -27,6 +27,9 @@ import { FlatSection } from '../../../../../components/flatSection';
 import { RequestMaintenanceButton } from '../../../details/maintenance-management/request';
 import { InstantMaintenanceButton } from '../../../details/maintenance-management/instant';
 
+// ponytail: only these 3 events affect session/control state; health and other events don't need a refetch
+const SESSION_EVENTS = new Set(['resource.usage.session_started', 'resource.usage.session_ended', 'resource.usage.session_taken_over']);
+
 type ResourceUsageSessionProps = Omit<HTMLAttributes<HTMLElement>, 'children' | 'resource'> & {
   resourceId: number;
   resource: Resource;
@@ -52,7 +55,7 @@ export function ResourceUsageSession({
   useSSE({
     path: `/api/resources/${resourceId}/events`,
     onUpdate: (data: { eventType?: string; inUse?: boolean }) => {
-      if (data.eventType !== undefined) {
+      if (data.eventType && SESSION_EVENTS.has(data.eventType)) {
         invalidateSessionQueries();
       }
     },

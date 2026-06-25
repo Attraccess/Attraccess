@@ -110,61 +110,43 @@ export class SSEController implements OnModuleInit, OnModuleDestroy {
     return !!activeUsage;
   }
 
+  private emitToResource(resourceId: number, data: object): void {
+    const subject = this.resourceSubjects.get(resourceId);
+    if (!subject) return;
+    subject.next({ data });
+  }
+
   @OnEvent(ResourceSessionStartedEvent.EVENT_NAME)
   handleResourceUsage(event: ResourceSessionStartedEvent) {
-    const {
-      usage: { resource },
-    } = event;
-
-    // Check if we have any subscribers for this resource
-    if (!this.resourceSubjects.has(resource.id)) {
-      return;
-    }
-
-    // Get the subject for this resource
-    const subject = this.resourceSubjects.get(resource.id);
-
-    // Create event data with inUse flag
-    const eventData = {
+    const { usage: { resource } } = event;
+    this.emitToResource(resource.id, {
       ...event,
       inUse: true,
       eventType: ResourceSessionStartedEvent.EVENT_NAME,
-    };
-
-    // Emit the event to all subscribers
-    subject.next({ data: eventData });
-
+    });
     this.logger.debug(`Emitted ${ResourceSessionStartedEvent.EVENT_NAME} event for resource ${resource.id}`);
   }
 
   @OnEvent(ResourceUsageSessionEndedEvent.EVENT_NAME)
   handleResourceSessionEnded(event: ResourceUsageSessionEndedEvent) {
     const resourceId = event.usage.resourceId;
-    if (!this.resourceSubjects.has(resourceId)) {
-      return;
-    }
-    this.resourceSubjects.get(resourceId).next({
-      data: {
-        eventType: ResourceUsageSessionEndedEvent.EVENT_NAME,
-        resourceId,
-        inUse: false,
-      },
+    this.emitToResource(resourceId, {
+      eventType: ResourceUsageSessionEndedEvent.EVENT_NAME,
+      resourceId,
+      inUse: false,
     });
+    this.logger.debug(`Emitted ${ResourceUsageSessionEndedEvent.EVENT_NAME} event for resource ${resourceId}`);
   }
 
   @OnEvent(ResourceUsageSessionTakenOverEvent.EVENT_NAME)
   handleResourceUsageTakenOver(event: ResourceUsageSessionTakenOverEvent) {
     const resourceId = event.resource.id;
-    if (!this.resourceSubjects.has(resourceId)) {
-      return;
-    }
-    this.resourceSubjects.get(resourceId).next({
-      data: {
-        eventType: ResourceUsageSessionTakenOverEvent.EVENT_NAME,
-        resourceId,
-        inUse: true,
-      },
+    this.emitToResource(resourceId, {
+      eventType: ResourceUsageSessionTakenOverEvent.EVENT_NAME,
+      resourceId,
+      inUse: true,
     });
+    this.logger.debug(`Emitted ${ResourceUsageSessionTakenOverEvent.EVENT_NAME} event for resource ${resourceId}`);
   }
 
   @OnEvent(ResourceHealthChangedEvent.EVENT_NAME)
