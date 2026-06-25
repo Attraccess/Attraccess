@@ -19,6 +19,19 @@
         "{projectRoot}/.pio/**/*"
       ],
       "cache": true
+    },
+    "test-unit": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pio test -e native",
+        "cwd": "apps/attractap/firmware"
+      },
+      "inputs": [
+        "{projectRoot}/test/**/*",
+        "{projectRoot}/src/**/*",
+        "{projectRoot}/platformio.ini"
+      ],
+      "cache": false
     }
   }
 }

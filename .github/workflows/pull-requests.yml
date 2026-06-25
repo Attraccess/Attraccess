@@ -161,6 +161,22 @@ jobs:
           header: plugin-artifacts
           message: ${{ steps.comment-body.outputs.body }}
 
+  attractap-firmware-unit:
+    name: Attractap Firmware Unit Tests (native)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Install PlatformIO
+        run: pip install platformio
+
+      - name: Run unit tests (native)
+        run: pio test -e native
+        working-directory: apps/attractap/firmware
+
   fail2ban-smoke:
     runs-on: ubuntu-latest
     steps:
