@@ -17,16 +17,21 @@
         "userManagement": "User Management"
       }
     },
+    "devices": {
+      "label": "Devices",
+      "items": {
+        "mqttServers": "MQTT Servers",
+        "companion": "Companion App"
+      }
+    },
     "system": {
       "label": "System",
       "items": {
         "plugins": "Plugins",
         "emailTemplates": "Email Templates",
-        "mqttServers": "MQTT Servers",
         "csvExport": "CSV Export",
         "balena": "Balena",
-        "settings": "Settings",
-        "companion": "Companion App"
+        "settings": "Settings"
       }
     }
   },

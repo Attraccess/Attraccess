@@ -95,17 +95,33 @@ export function useSidebarItems(): (SidebarItem | SidebarItemGroup)[] {
       icon: UsersIcon,
     });
 
+    // Devices group
+    const devicesGroup: SidebarItemGroup = {
+      translationKey: 'devices',
+      isGroup: true,
+      icon: MonitorSmartphoneIcon,
+      items: [
+        {
+          path: '/devices/mqtt/servers',
+          translationKey: 'mqttServers',
+          icon: ServerIcon,
+        },
+        {
+          path: '/devices/companion',
+          translationKey: 'companion',
+          icon: MonitorSmartphoneIcon,
+        },
+      ],
+    };
+
+    items.push(devicesGroup);
+
     // System group
     const systemGroup: SidebarItemGroup = {
       translationKey: 'system',
       isGroup: true,
       icon: CogIcon,
       items: [
-        {
-          path: '/mqtt/servers',
-          translationKey: 'mqttServers',
-          icon: ServerIcon,
-        },
         {
           path: '/plugins',
           translationKey: 'plugins',
@@ -120,11 +136,6 @@ export function useSidebarItems(): (SidebarItem | SidebarItemGroup)[] {
           path: '/settings',
           translationKey: 'settings',
           icon: Settings2Icon,
-        },
-        {
-          path: '/settings/companion',
-          translationKey: 'companion',
-          icon: MonitorSmartphoneIcon,
         },
         {
           path: '/csv-export',

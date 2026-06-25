@@ -188,12 +188,12 @@ const coreRoutes: RouteConfig[] = [
     authRequired: true,
   },
   {
-    path: '/mqtt/servers',
+    path: '/devices/mqtt/servers',
     element: <MqttServersPage />,
     authRequired: 'canManageResources',
   },
   {
-    path: '/mqtt/servers/:serverId',
+    path: '/devices/mqtt/servers/:serverId',
     element: <EditMqttServerPage />,
     authRequired: 'canManageResources',
   },
@@ -287,7 +287,7 @@ const coreRoutes: RouteConfig[] = [
     authRequired: 'canManageSystemConfiguration',
   },
   {
-    path: '/settings/companion',
+    path: '/devices/companion',
     element: (
       <Suspense fallback={<div className="flex items-center justify-center p-8"><Spinner size="sm" /></div>}>
         <CompanionSettingsPage />

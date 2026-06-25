@@ -72,7 +72,7 @@ export function EditMqttServerPage() {
       queryClient.invalidateQueries({
         queryKey: [useMqttServiceMqttServersGetAllKey],
       });
-      navigate('/mqtt/servers');
+      navigate('/devices/mqtt/servers');
     },
     onError: (err: Error) => {
       showError({
@@ -95,7 +95,7 @@ export function EditMqttServerPage() {
   };
 
   const handleCancel = () => {
-    navigate('/mqtt/servers');
+    navigate('/devices/mqtt/servers');
   };
 
   if (isLoadingServer) {
