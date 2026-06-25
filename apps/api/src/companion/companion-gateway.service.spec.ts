@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { CompanionGatewayService } from './companion-gateway.service';
 import { CompanionDevice, ResourceFlowNode } from '@attraccess/database-entities';
 import { CompanionEventType, CompanionSocket } from './companion.types';
@@ -32,6 +33,7 @@ describe('CompanionGatewayService', () => {
         CompanionGatewayService,
         { provide: getRepositoryToken(CompanionDevice), useValue: mockDeviceRepo },
         { provide: getRepositoryToken(ResourceFlowNode), useValue: mockFlowNodeRepo },
+        { provide: EventEmitter2, useValue: { emit: jest.fn() } },
       ],
     }).compile();
 

@@ -1,7 +1,19 @@
 import { NotFoundException } from '@nestjs/common';
-import { Repository } from 'typeorm';
-import { CompanionDevice } from '@attraccess/database-entities';
+import type { Repository } from 'typeorm';
+import type { CompanionDevice } from '@attraccess/database-entities';
 import { CompanionService } from './companion.service';
+
+jest.mock('@nestjs/typeorm', () => ({
+  InjectRepository: () => jest.fn(),
+}));
+jest.mock('@attraccess/database-entities', () => ({
+  CompanionDevice: class CompanionDevice {},
+}));
+jest.mock('bcrypt', () => ({
+  genSalt: jest.fn(),
+  hash: jest.fn(),
+  compare: jest.fn(),
+}));
 
 jest.mock('fs', () => ({
   existsSync: jest.fn(),

@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import type { Repository } from 'typeorm';
 import { CompanionDevice } from '@attraccess/database-entities';
 import { randomBytes } from 'crypto';
 import { genSalt, hash, compare } from 'bcrypt';

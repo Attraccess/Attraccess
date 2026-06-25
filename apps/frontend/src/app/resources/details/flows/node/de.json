@@ -125,6 +125,34 @@
           }
         }
       },
+      "companion": {
+        "idle": {
+          "title": "Companion: Gerät inaktiv",
+          "description": "Wird ausgelöst, wenn das Gerät eines Companion-Geräts für die konfigurierte Zeit inaktiv war.",
+          "outputs": {
+            "output": "Ausgabe"
+          },
+          "config": {
+            "deviceId": {
+              "label": "Companion-Gerät",
+              "placeholder": "Gerät auswählen..."
+            }
+          }
+        },
+        "active": {
+          "title": "Companion: Gerät aktiv",
+          "description": "Wird ausgelöst, wenn das Gerät eines Companion-Geräts wieder aktiv wird.",
+          "outputs": {
+            "output": "Ausgabe"
+          },
+          "config": {
+            "deviceId": {
+              "label": "Companion-Gerät",
+              "placeholder": "Gerät auswählen..."
+            }
+          }
+        }
+      },
       "variable": {
         "changed": {
           "title": "Variable geändert",

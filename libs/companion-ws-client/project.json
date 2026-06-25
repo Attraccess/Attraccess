@@ -7,7 +7,7 @@
   "targets": {
     "generate": {
       "executor": "nx:run-commands",
-      "cache": true,
+      "cache": false,
       "dependsOn": ["api:export-asyncapi"],
       "inputs": [
         "{workspaceRoot}/dist/apps/api/asyncapi.json",

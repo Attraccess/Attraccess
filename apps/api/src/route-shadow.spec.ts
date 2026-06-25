@@ -240,9 +240,18 @@ function detectShadowsInModule(
     }
   }
 
+  // Deduplicate by filePath: a file exporting multiple @Controller classes is
+  // registered once; the same ControllerInfo object must not be counted twice.
+  const seenFiles = new Set<string>();
+  const deduped = resolved.filter((info) => {
+    if (seenFiles.has(info.filePath)) return false;
+    seenFiles.add(info.filePath);
+    return true;
+  });
+
   // Group controllers by their @Controller(prefix)
   const byPrefix = new Map<string, ControllerInfo[]>();
-  for (const info of resolved) {
+  for (const info of deduped) {
     const group = byPrefix.get(info.prefix) ?? [];
     group.push(info);
     byPrefix.set(info.prefix, group);
