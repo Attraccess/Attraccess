@@ -48,6 +48,16 @@ type FormatDateTime = ReturnType<typeof useDateTimeFormatter>;
 
 type DeviceWithConnected = CompanionDevice & { connected?: boolean };
 
+function isOutdated(deviceVersion: string, latestVersion: string): boolean {
+  const a = deviceVersion.split('.').map(Number);
+  const b = latestVersion.split('.').map(Number);
+  for (let i = 0; i < 3; i++) {
+    if ((a[i] ?? 0) < (b[i] ?? 0)) return true;
+    if ((a[i] ?? 0) > (b[i] ?? 0)) return false;
+  }
+  return false;
+}
+
 function platformLabel(platform: string, arch: string): string {
   if (platform === 'win32' || platform === 'windows') return 'Windows x64';
   if (platform === 'darwin' || platform === 'macos') return 'macOS (Universal)';
@@ -58,17 +68,20 @@ function platformLabel(platform: string, arch: string): string {
 
 interface DeviceRowProps {
   device: CompanionDevice;
+  latestVersion: string | null;
   onRenameStart: (device: CompanionDevice) => void;
   onDeleteStart: (device: CompanionDevice) => void;
   t: (key: string) => string;
   formatDateTime: FormatDateTime;
 }
 
-function DeviceRow({ device, onRenameStart, onDeleteStart, t, formatDateTime }: DeviceRowProps) {
+function DeviceRow({ device, latestVersion, onRenameStart, onDeleteStart, t, formatDateTime }: DeviceRowProps) {
   const { data } = useCompanionDevicesServiceGetCompanionDevice({ id: device.id }, undefined, {
     refetchInterval: 30000,
   });
   const isOnline = (data as DeviceWithConnected | undefined)?.connected ?? false;
+  const appVersion = device.appVersion ?? null;
+  const showUpdateBadge = appVersion !== null && latestVersion !== null && isOutdated(appVersion, latestVersion);
 
   return (
     <TableRow key={device.id} id={device.id}>
@@ -79,6 +92,14 @@ function DeviceRow({ device, onRenameStart, onDeleteStart, t, formatDateTime }: 
         </Chip>
       </TableCell>
       <TableCell className="whitespace-nowrap">{formatDateTime(device.lastConnection) as ReactNode}</TableCell>
+      <TableCell>
+        <div className="flex flex-col gap-1">
+          <span className="text-sm">{appVersion ?? '—'}</span>
+          {showUpdateBadge && (
+            <Chip color="warning" size="sm">{t('updateAvailable')}</Chip>
+          )}
+        </div>
+      </TableCell>
       <TableCell>
         <div className="flex flex-row gap-2 flex-wrap">
           <Button variant="ghost" size="sm" onPress={() => onRenameStart(device)}>
@@ -203,6 +224,7 @@ export function CompanionSettingsPage() {
                     <TableColumn isRowHeader>{t('devices.columns.name')}</TableColumn>
                     <TableColumn>{t('devices.columns.status')}</TableColumn>
                     <TableColumn>{t('devices.columns.lastSeen')}</TableColumn>
+                    <TableColumn>{t('devices.columns.version')}</TableColumn>
                     <TableColumn>{t('devices.columns.actions')}</TableColumn>
                   </TableHeader>
                   <TableBody items={devices ?? []} renderEmptyState={() => <EmptyState />}>
@@ -210,6 +232,7 @@ export function CompanionSettingsPage() {
                       <DeviceRow
                         key={device.id}
                         device={device}
+                        latestVersion={manifest?.version ?? null}
                         onRenameStart={handleRenameStart}
                         onDeleteStart={setDeletingDevice}
                         t={t}
