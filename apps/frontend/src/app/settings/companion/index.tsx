@@ -11,6 +11,9 @@ import {
   AlertTitle,
   Card,
   Chip,
+  DrawerBody,
+  DrawerFooter,
+  DrawerHeader,
   Input,
   Spinner,
   Table,
@@ -37,6 +40,7 @@ import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-front
 import { useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '../../../components/pageHeader';
 import { Button } from '../../../components/button';
+import { StandardDrawer } from '../../../components/standardDrawer';
 import { EmptyState } from '../../../components/emptyState';
 import { DeleteConfirmationModal } from '../../../components/deleteConfirmationModal';
 import { useToastMessage } from '../../../components/toastProvider';
@@ -58,21 +62,20 @@ function platformLabel(platform: string, arch: string): string {
 
 interface DeviceRowProps {
   device: CompanionDevice;
-  isRenaming: boolean;
   onRenameStart: (device: CompanionDevice) => void;
   onDeleteStart: (device: CompanionDevice) => void;
   t: (key: string) => string;
   formatDateTime: FormatDateTime;
 }
 
-function DeviceRow({ device, isRenaming, onRenameStart, onDeleteStart, t, formatDateTime }: DeviceRowProps) {
+function DeviceRow({ device, onRenameStart, onDeleteStart, t, formatDateTime }: DeviceRowProps) {
   const { data } = useCompanionDevicesServiceGetCompanionDevice({ id: device.id }, undefined, {
     refetchInterval: 30000,
   });
   const isOnline = (data as DeviceWithConnected | undefined)?.connected ?? false;
 
   return (
-    <TableRow key={device.id} id={device.id} className={isRenaming ? 'bg-primary-50' : undefined}>
+    <TableRow key={device.id} id={device.id}>
       <TableCell>{device.name}</TableCell>
       <TableCell>
         <Chip color={isOnline ? 'success' : 'default'} size="sm">
@@ -170,33 +173,6 @@ export function CompanionSettingsPage() {
           <span className="text-sm text-default-500">{t('devices.subtitle')}</span>
         </Card.Header>
         <Card.Content>
-          {renamingDevice && (
-            <div className="flex flex-col gap-2 mb-4">
-              <span className="text-sm text-default-500">
-                {t('devices.rename.label', { name: renamingDevice.name })}
-              </span>
-              <div className="flex items-center gap-2 flex-wrap">
-                <TextField
-                  value={renameValue}
-                  onChange={setRenameValue}
-                  className="max-w-xs"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleRenameSave();
-                    if (e.key === 'Escape') setRenamingDevice(null);
-                  }}
-                  autoFocus
-                >
-                  <Input placeholder={t('devices.rename.placeholder')} />
-                </TextField>
-                <Button size="sm" variant="primary" isPending={isRenamePending} onPress={handleRenameSave}>
-                  {t('devices.rename.save')}
-                </Button>
-                <Button size="sm" variant="ghost" onPress={() => setRenamingDevice(null)}>
-                  {t('devices.rename.cancel')}
-                </Button>
-              </div>
-            </div>
-          )}
           {devicesLoading ? (
             <div className="flex justify-center py-6">
               <Spinner size="sm" />
@@ -216,7 +192,6 @@ export function CompanionSettingsPage() {
                       <DeviceRow
                         key={device.id}
                         device={device}
-                        isRenaming={renamingDevice?.id === device.id}
                         onRenameStart={handleRenameStart}
                         onDeleteStart={setDeletingDevice}
                         t={t}
@@ -311,6 +286,36 @@ export function CompanionSettingsPage() {
           </Card.Content>
         </Card>
       </div>
+
+      {/* Rename drawer */}
+      <StandardDrawer isOpen={!!renamingDevice} onOpenChange={(open) => { if (!open) setRenamingDevice(null); }}>
+        <DrawerHeader>
+          <h2 className="text-lg font-semibold">{t('devices.rename.title')}</h2>
+          {renamingDevice && (
+            <p className="text-sm text-default-500">{t('devices.rename.label', { name: renamingDevice.name })}</p>
+          )}
+        </DrawerHeader>
+        <DrawerBody>
+          <TextField
+            value={renameValue}
+            onChange={setRenameValue}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleRenameSave();
+            }}
+            autoFocus
+          >
+            <Input placeholder={t('devices.rename.placeholder')} />
+          </TextField>
+        </DrawerBody>
+        <DrawerFooter>
+          <Button variant="ghost" onPress={() => setRenamingDevice(null)}>
+            {t('devices.rename.cancel')}
+          </Button>
+          <Button variant="primary" isPending={isRenamePending} onPress={handleRenameSave}>
+            {t('devices.rename.save')}
+          </Button>
+        </DrawerFooter>
+      </StandardDrawer>
 
       {/* Delete confirmation */}
       <DeleteConfirmationModal

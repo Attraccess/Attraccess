@@ -20,10 +20,11 @@
       "delete": "Delete"
     },
     "rename": {
+      "title": "Rename Device",
       "placeholder": "Device name",
       "save": "Save",
       "cancel": "Cancel",
-      "label": "Renaming: {{name}}",
+      "label": "Current name: {{name}}",
       "success": "Device renamed",
       "error": "Failed to rename device"
     },

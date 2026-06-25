@@ -20,10 +20,11 @@
       "delete": "Löschen"
     },
     "rename": {
+      "title": "Gerät umbenennen",
       "placeholder": "Gerätename",
       "save": "Speichern",
       "cancel": "Abbrechen",
-      "label": "Umbenennen: {{name}}",
+      "label": "Aktueller Name: {{name}}",
       "success": "Gerät umbenannt",
       "error": "Umbenennen fehlgeschlagen"
     },
