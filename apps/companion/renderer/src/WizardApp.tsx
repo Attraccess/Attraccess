@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Card } from '@heroui/react';
-import type { Step, Permissions } from './types';
+import type { Step, Permissions, CompanionSettings } from './types';
 import { LoadingStep } from './steps/LoadingStep';
 import { PermissionsStep } from './steps/PermissionsStep';
 import { PinSetupStep } from './steps/PinSetupStep';
@@ -8,6 +8,7 @@ import { PinEntryStep } from './steps/PinEntryStep';
 import { UrlStep } from './steps/UrlStep';
 import { RegisterStep } from './steps/RegisterStep';
 import { DoneStep } from './steps/DoneStep';
+import { SettingsStep } from './steps/SettingsStep';
 
 export function WizardApp() {
   const [step, setStep] = useState<Step>('loading');
@@ -28,11 +29,16 @@ export function WizardApp() {
   const [pinEntry, setPinEntry] = useState('');
   const [pinEntryError, setPinEntryError] = useState('');
 
+  const [appSettings, setAppSettings] = useState<CompanionSettings>({ idleTimeoutMinutes: 15 });
+
   useEffect(() => {
     window.companion.onInit(async ({ serverUrl: saved, requirePin, registered: reg, connected: conn }) => {
       if (saved) setServerUrl(saved);
       setRegistered(reg);
       setConnected(conn);
+
+      // Load settings on init
+      window.companion.getSettings().then(setAppSettings).catch(() => undefined);
 
       if (requirePin) {
         setPendingAction(requirePin);
@@ -195,6 +201,18 @@ export function WizardApp() {
               onConnect={handleConnect}
               onDisconnect={handleDisconnect}
               onChangePin={pendingAction === 'settings' ? () => setStep('pin-setup') : undefined}
+              onOpenSettings={pendingAction === 'settings' ? () => setStep('settings') : undefined}
+            />
+          )}
+          {step === 'settings' && (
+            <SettingsStep
+              settings={appSettings}
+              onSave={async (s) => {
+                await window.companion.saveSettings(s);
+                setAppSettings(s);
+                setStep('url');
+              }}
+              onBack={() => setStep('url')}
             />
           )}
           {step === 'register' && <RegisterStep statusText={statusText} />}

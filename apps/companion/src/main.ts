@@ -1,5 +1,6 @@
-import { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, session, screen, dialog, globalShortcut } from 'electron';
+import { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, session, screen, dialog, globalShortcut, powerMonitor } from 'electron';
 import * as path from 'path';
+import * as fs from 'fs';
 import * as https from 'https';
 import * as http from 'http';
 import { createHash } from 'crypto';
@@ -29,6 +30,65 @@ let _kioskSessionId = 0;
 
 // dark blanks that cover secondary displays while the kiosk is locked
 let secondaryOverlays: BrowserWindow[] = [];
+
+// ─── Local settings ───────────────────────────────────────────────────────────
+
+export interface CompanionSettings {
+  idleTimeoutMinutes: number; // 0 = disabled
+}
+
+const SETTINGS_DEFAULTS: CompanionSettings = { idleTimeoutMinutes: 15 };
+
+function settingsPath(): string {
+  return path.join(app.getPath('userData'), 'settings.json');
+}
+
+function loadSettings(): CompanionSettings {
+  try {
+    const raw = fs.readFileSync(settingsPath(), 'utf8');
+    return { ...SETTINGS_DEFAULTS, ...(JSON.parse(raw) as Partial<CompanionSettings>) };
+  } catch {
+    return { ...SETTINGS_DEFAULTS };
+  }
+}
+
+function saveSettings(s: CompanionSettings): void {
+  fs.writeFileSync(settingsPath(), JSON.stringify(s, null, 2));
+}
+
+let settings: CompanionSettings = { ...SETTINGS_DEFAULTS };
+
+// ─── Idle detection ───────────────────────────────────────────────────────────
+
+let idleState: 'active' | 'idle' = 'active';
+let idlePollTimer: NodeJS.Timeout | null = null;
+
+function startIdleDetection(): void {
+  stopIdleDetection();
+  if (settings.idleTimeoutMinutes <= 0) return;
+
+  const thresholdSeconds = settings.idleTimeoutMinutes * 60;
+  idlePollTimer = setInterval(() => {
+    if (!wsClient) return;
+    const idleSeconds = powerMonitor.getSystemIdleTime();
+    const nowIdle = idleSeconds >= thresholdSeconds;
+    if (nowIdle && idleState === 'active') {
+      idleState = 'idle';
+      wsClient.sendIdle({ idleSeconds, platform: process.platform });
+    } else if (!nowIdle && idleState === 'idle') {
+      idleState = 'active';
+      wsClient.sendActive({ idleSeconds, platform: process.platform });
+    }
+  }, 5000);
+}
+
+function stopIdleDetection(): void {
+  if (idlePollTimer) {
+    clearInterval(idlePollTimer);
+    idlePollTimer = null;
+  }
+  idleState = 'active';
+}
 
 // ─── PIN helpers ──────────────────────────────────────────────────────────────
 
@@ -418,6 +478,13 @@ ipcMain.handle('set-auto-logoff', (_evt, seconds: number) => {
   autoLogoffSeconds = seconds;
 });
 
+ipcMain.handle('get-settings', () => settings);
+
+ipcMain.handle('save-settings', (_evt, newSettings: CompanionSettings) => {
+  settings = { ...SETTINGS_DEFAULTS, ...newSettings };
+  saveSettings(settings);
+  if (wsClient) startIdleDetection();
+});
 
 // ─── WebSocket wiring ─────────────────────────────────────────────────────────
 
@@ -429,10 +496,12 @@ function startWsClient(serverUrl: string, firstRun: boolean) {
     wsConnected = true;
     setTrayState('unlocked');
     mainWindow?.webContents.send('ws-status', 'connected');
+    startIdleDetection();
   });
 
   wsClient.on('disconnected', () => {
     wsConnected = false;
+    stopIdleDetection();
     setTrayState('disconnected');
     mainWindow?.webContents.send('ws-status', 'disconnected');
   });
@@ -500,6 +569,7 @@ function startWsClient(serverUrl: string, firstRun: boolean) {
 
 app.whenReady().then(async () => {
   setupTray();
+  settings = loadSettings();
 
   [creds, pinHash] = await Promise.all([loadCredentials(), loadPin()]);
 
@@ -532,6 +602,7 @@ app.on('before-quit', (event) => {
     return;
   }
   allowQuit = false;
+  stopIdleDetection();
   hideKioskOverlay();
   wsClient?.stop();
 });

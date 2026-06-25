@@ -13,12 +13,14 @@ import { randomBytes } from 'crypto';
 import { AsyncApi, AsyncApiPub, AsyncApiSub } from 'nestjs-asyncapi';
 import { CompanionGatewayService } from './companion-gateway.service';
 import { CompanionAuthHandler } from './companion-auth.handler';
+import { CompanionAuthenticated } from './companion-authenticated.decorator';
 import {
   CompanionAuthenticateDto,
   CompanionAuthenticatedDto,
   CompanionRegisterResponseDto,
   CompanionUpdateAvailableDto,
   CompanionAuthenticatePayload,
+  CompanionIdleDto,
   CompanionSocket,
   CompanionEventType,
 } from './companion.types';
@@ -82,6 +84,36 @@ export class CompanionGateway implements OnGatewayConnection, OnGatewayDisconnec
     @ConnectedSocket() socket: CompanionSocket,
   ): Promise<void> {
     await this.authHandler.handleAuthenticate(socket, body as CompanionAuthenticatePayload);
+  }
+
+  @SubscribeMessage('COMPANION_IDLE')
+  @CompanionAuthenticated()
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
+  @AsyncApiPub({
+    channel: 'COMPANION_IDLE',
+    message: { name: 'COMPANION_IDLE', payload: CompanionIdleDto },
+    summary: 'Companion reports that the machine has become idle',
+  })
+  onIdle(
+    @MessageBody() body: CompanionIdleDto,
+    @ConnectedSocket() socket: CompanionSocket,
+  ): void {
+    this.gatewayService.handleIdleEvent(socket.deviceId as number, body);
+  }
+
+  @SubscribeMessage('COMPANION_ACTIVE')
+  @CompanionAuthenticated()
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
+  @AsyncApiPub({
+    channel: 'COMPANION_ACTIVE',
+    message: { name: 'COMPANION_ACTIVE', payload: CompanionIdleDto },
+    summary: 'Companion reports that the machine has become active after being idle',
+  })
+  onActive(
+    @MessageBody() body: CompanionIdleDto,
+    @ConnectedSocket() socket: CompanionSocket,
+  ): void {
+    this.gatewayService.handleActiveEvent(socket.deviceId as number, body);
   }
 
   // ─── Server → Client ─────────────────────────────────────────────────────

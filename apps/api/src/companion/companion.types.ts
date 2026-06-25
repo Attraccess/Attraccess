@@ -1,6 +1,6 @@
 import { CompanionDevice } from '@attraccess/database-entities';
 import { ApiProperty } from '@nestjs/swagger';
-import { IsInt, IsOptional, IsString } from 'class-validator';
+import { IsInt, IsNumber, IsOptional, IsString } from 'class-validator';
 
 // ─── Client → Server DTOs ────────────────────────────────────────────────────
 
@@ -56,6 +56,17 @@ export class CompanionUpdateAvailableDto {
   version!: string;
 }
 
+export class CompanionIdleDto {
+  @ApiProperty({ description: 'Seconds the machine has been idle' })
+  @IsNumber()
+  idleSeconds!: number;
+
+  @ApiProperty({ description: 'OS platform', required: false })
+  @IsOptional()
+  @IsString()
+  platform?: string;
+}
+
 // ─── Socket type ─────────────────────────────────────────────────────────────
 
 export enum CompanionEventType {
@@ -68,6 +79,8 @@ export enum CompanionEventType {
   COMPANION_LOCK_PC = 'COMPANION_LOCK_PC',
   COMPANION_UNLOCK_PC = 'COMPANION_UNLOCK_PC',
   COMPANION_UPDATE_AVAILABLE = 'COMPANION_UPDATE_AVAILABLE',
+  COMPANION_IDLE = 'COMPANION_IDLE',
+  COMPANION_ACTIVE = 'COMPANION_ACTIVE',
 }
 
 export interface CompanionAuthenticatePayload {

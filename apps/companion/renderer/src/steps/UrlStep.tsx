@@ -10,6 +10,7 @@ interface Props {
   onConnect: () => void;
   onDisconnect: () => void;
   onChangePin?: () => void;
+  onOpenSettings?: () => void;
 }
 
 export function UrlStep({
@@ -22,6 +23,7 @@ export function UrlStep({
   onConnect,
   onDisconnect,
   onChangePin,
+  onOpenSettings,
 }: Props) {
   // Already registered: show status, never a Connect button — re-connecting an
   // existing device would re-register it. To switch servers, Disconnect first.
@@ -39,6 +41,11 @@ export function UrlStep({
           />
           <span>{connected ? 'Connected' : 'Disconnected'}</span>
         </div>
+        {onOpenSettings && (
+          <Button variant="secondary" fullWidth onPress={onOpenSettings}>
+            Settings
+          </Button>
+        )}
         {onChangePin && (
           <Button variant="secondary" fullWidth onPress={onChangePin}>
             Change PIN

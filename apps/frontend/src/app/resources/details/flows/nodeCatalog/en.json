@@ -12,6 +12,7 @@
     "mqtt": "MQTT",
     "http": "HTTP",
     "logic": "Logic",
-    "health": "Health"
+    "health": "Health",
+    "companion": "Companion"
   }
 }

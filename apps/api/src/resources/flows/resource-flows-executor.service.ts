@@ -26,6 +26,7 @@ import {
   ResourceHealthHeartbeatNodeDataSchema,
   ResourceHealthSource,
   ResourceHealthStatus,
+  CompanionIdleActiveNodeDataSchema,
 } from '@attraccess/database-entities';
 import { ResourceFlowVariablesService } from './resource-flow-variables.service';
 import { OnEvent } from '@nestjs/event-emitter';
@@ -209,6 +210,8 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
 
       [ResourceFlowNodeType.OUTPUT_COMPANION_LOCK_PC]: new CompanionLockPcExecutor(this.companionGatewayService),
       [ResourceFlowNodeType.OUTPUT_COMPANION_UNLOCK_PC]: new CompanionUnlockPcExecutor(this.companionGatewayService),
+      [ResourceFlowNodeType.INPUT_COMPANION_IDLE]: passthrough,
+      [ResourceFlowNodeType.INPUT_COMPANION_ACTIVE]: passthrough,
     };
   }
 
@@ -865,6 +868,26 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     const dataWithVariables = variables ? { ...data, variables } : data;
     const compiledTemplate = Handlebars.compile(template);
     return compiledTemplate(dataWithVariables);
+  }
+
+  @OnEvent('companion.idle')
+  async handleCompanionIdle(event: { deviceId: number; payload: object }): Promise<void> {
+    await this.triggerCompanionEvent(event.deviceId, ResourceFlowNodeType.INPUT_COMPANION_IDLE, event.payload);
+  }
+
+  @OnEvent('companion.active')
+  async handleCompanionActive(event: { deviceId: number; payload: object }): Promise<void> {
+    await this.triggerCompanionEvent(event.deviceId, ResourceFlowNodeType.INPUT_COMPANION_ACTIVE, event.payload);
+  }
+
+  private async triggerCompanionEvent(deviceId: number, type: ResourceFlowNodeType, payload: object): Promise<void> {
+    const allNodes = await this.flowNodeRepository.find({ where: { type } });
+    const matching = allNodes.filter((node) => {
+      const parsed = CompanionIdleActiveNodeDataSchema.safeParse(node.data ?? {});
+      return parsed.success && parsed.data.deviceId === deviceId;
+    });
+    if (matching.length === 0) return;
+    await this.startFlow(matching, { payload });
   }
 
   public async pressButton(resourceId: number, buttonId: string, executingUserId: number) {

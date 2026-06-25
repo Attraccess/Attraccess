@@ -2,7 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CompanionDevice, ResourceFlowNode } from '@attraccess/database-entities';
-import { CompanionEventType, CompanionSocket } from './companion.types';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { CompanionEventType, CompanionIdleDto, CompanionSocket } from './companion.types';
 
 @Injectable()
 export class CompanionGatewayService {
@@ -16,6 +17,7 @@ export class CompanionGatewayService {
     private readonly deviceRepository: Repository<CompanionDevice>,
     @InjectRepository(ResourceFlowNode)
     private readonly flowNodeRepository: Repository<ResourceFlowNode>,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   public getConnectedDevices(): CompanionDevice[] {
@@ -61,6 +63,14 @@ export class CompanionGatewayService {
   public async sendUnlockCommand(deviceId: number): Promise<boolean> {
     await this.deviceRepository.update(deviceId, { locked: false });
     return this.sendCommandToDevice(deviceId, CompanionEventType.COMPANION_UNLOCK_PC);
+  }
+
+  public handleIdleEvent(deviceId: number, payload: CompanionIdleDto): void {
+    this.eventEmitter.emit('companion.idle', { deviceId, payload });
+  }
+
+  public handleActiveEvent(deviceId: number, payload: CompanionIdleDto): void {
+    this.eventEmitter.emit('companion.active', { deviceId, payload });
   }
 
   private sendCommandToDevice(deviceId: number, type: CompanionEventType): boolean {

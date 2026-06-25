@@ -1,8 +1,12 @@
-export type Step = 'loading' | 'permissions' | 'pin-setup' | 'pin-entry' | 'url' | 'register' | 'done';
+export type Step = 'loading' | 'permissions' | 'pin-setup' | 'pin-entry' | 'url' | 'register' | 'done' | 'settings';
 
 export interface Permissions {
   needed: boolean;
   accessibility: boolean;
+}
+
+export interface CompanionSettings {
+  idleTimeoutMinutes: number;
 }
 
 export interface CompanionBridge {
@@ -15,6 +19,8 @@ export interface CompanionBridge {
   verifyPin: (pin: string) => Promise<boolean>;
   confirmQuit: () => Promise<void>;
   disconnect: () => Promise<void>;
+  getSettings: () => Promise<CompanionSettings>;
+  saveSettings: (s: CompanionSettings) => Promise<void>;
   onInit: (cb: (data: { serverUrl?: string; requirePin?: 'settings' | 'quit'; registered: boolean; connected: boolean }) => void) => void;
   onWsStatus: (cb: (status: 'connected' | 'disconnected') => void) => void;
   onRegistered: (cb: (data: { id: number }) => void) => void;
