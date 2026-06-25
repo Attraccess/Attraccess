@@ -1,4 +1,5 @@
 import { ReactNode, useState } from 'react';
+import { lt, valid } from 'semver';
 import {
   Accordion,
   AccordionBody,
@@ -49,13 +50,8 @@ type FormatDateTime = ReturnType<typeof useDateTimeFormatter>;
 type DeviceWithConnected = CompanionDevice & { connected?: boolean };
 
 function isOutdated(deviceVersion: string, latestVersion: string): boolean {
-  const a = deviceVersion.split('.').map(Number);
-  const b = latestVersion.split('.').map(Number);
-  for (let i = 0; i < 3; i++) {
-    if ((a[i] ?? 0) < (b[i] ?? 0)) return true;
-    if ((a[i] ?? 0) > (b[i] ?? 0)) return false;
-  }
-  return false;
+  if (!valid(deviceVersion) || !valid(latestVersion)) return false;
+  return lt(deviceVersion, latestVersion);
 }
 
 function platformLabel(platform: string, arch: string): string {
@@ -79,8 +75,9 @@ function DeviceRow({ device, latestVersion, onRenameStart, onDeleteStart, t, for
   const { data } = useCompanionDevicesServiceGetCompanionDevice({ id: device.id }, undefined, {
     refetchInterval: 30000,
   });
-  const isOnline = (data as DeviceWithConnected | undefined)?.connected ?? false;
-  const appVersion = device.appVersion ?? null;
+  const fetchedDevice = data as DeviceWithConnected | undefined;
+  const isOnline = fetchedDevice?.connected ?? false;
+  const appVersion = fetchedDevice?.appVersion ?? device.appVersion ?? null;
   const showUpdateBadge = appVersion !== null && latestVersion !== null && isOutdated(appVersion, latestVersion);
 
   return (
