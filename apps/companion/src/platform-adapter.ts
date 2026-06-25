@@ -28,6 +28,12 @@ export interface OsAdapter {
    * fail — the caller wraps each registration in try/catch.
    */
   lockShortcuts(): readonly string[];
+
+  /**
+   * Called when the computer is unlocked. Platform implementations may release
+   * grabbed resources (e.g. Linux VT lock) here.
+   */
+  onUnlock?(): void;
 }
 
 export const osAdapter: OsAdapter =

@@ -44,13 +44,17 @@ respond to `loginctl lock-session`. In that case the Electron kiosk overlay is s
 shown as the authoritative lock, but the desktop remains accessible until the user
 switches back to the overlay.
 
-**X11 input grab:**
-The Electron kiosk window covers the primary display and separate dark-overlay windows
-cover secondary displays. `XGrabKeyboard`/`XGrabPointer` are not used — Electron's
-fullscreen + always-on-top + registered global shortcuts block the common escape paths.
-A determined local user with physical access could switch virtual terminals (`Ctrl+Alt+Fx`);
-this is by design — companion-app locking is a software convenience, not a physical
-security measure.
+**X11 VT switch blocking:**
+The companion attempts to block virtual-terminal switching (`Ctrl+Alt+Fx`) by calling
+`VT_LOCKSWITCH` (Linux kernel ioctl) via a short-lived `python3` helper that holds
+the lock for the duration of the session and calls `VT_UNLOCKSWITCH` on exit.
+This requires `CAP_SYS_TTY_CONFIG` on the process; without it the attempt fails
+gracefully and the Electron kiosk overlay remains the authoritative lock.
+On Wayland with `ext-session-lock-v1` (GNOME ≥ 43, KDE Plasma 5.27+, sway)
+`loginctl lock-session` delegates to the compositor, which blocks VT switching at the
+Wayland protocol level — no extra capability needed.
+`Ctrl+Alt+F1`–`F12` are additionally registered as global shortcuts; this is effective
+on Wayland compositors that surface them to the application layer.
 
 **Autostart:**
 Two entries are installed on first registration:

@@ -303,6 +303,7 @@ function lockComputer(): void {
 }
 
 function unlockComputer(): void {
+  osAdapter.onUnlock?.();
   hideKioskOverlay();
 }
 

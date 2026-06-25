@@ -1,6 +1,6 @@
 // jest.mock is hoisted before imports — keep it here.
 /* eslint-disable import/first */
-jest.mock('child_process', () => ({ execFile: jest.fn() }));
+jest.mock('child_process', () => ({ execFile: jest.fn(), spawn: jest.fn() }));
 
 jest.mock('fs/promises', () => ({
   mkdir: jest.fn().mockResolvedValue(undefined),
@@ -8,17 +8,21 @@ jest.mock('fs/promises', () => ({
   access: jest.fn().mockResolvedValue(undefined),
 }));
 
-import { execFile } from 'child_process';
+import { execFile, spawn } from 'child_process';
 import * as fsp from 'fs/promises';
 import {
   tryLockSession,
   installDesktopAutostart,
   isAutostartInstalled,
+  tryVtLock,
+  releaseVtLock,
 } from './linux-lock';
 /* eslint-enable import/first */
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockExecFile = execFile as unknown as jest.Mock<any>;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockSpawn = spawn as unknown as jest.Mock<any>;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockWriteFile = fsp.writeFile as unknown as jest.Mock<any>;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -34,6 +38,39 @@ beforeEach(() => {
 });
 
 afterAll(() => setPlatform('linux'));
+
+// ─── VT lock helpers ──────────────────────────────────────────────────────────
+
+type DataListener = (chunk: Buffer) => void;
+type ExitListener = () => void;
+
+interface MockProc {
+  stdout: { on: jest.Mock };
+  stdin: { end: jest.Mock };
+  on: jest.Mock;
+  kill: jest.Mock;
+  _emitData: (s: string) => void;
+  _emitExit: () => void;
+}
+
+function makeMockProc(): MockProc {
+  const dataListeners: DataListener[] = [];
+  const exitListeners: ExitListener[] = [];
+  return {
+    stdout: {
+      on: jest.fn((event: string, listener: DataListener) => {
+        if (event === 'data') dataListeners.push(listener);
+      }),
+    },
+    stdin: { end: jest.fn() },
+    on: jest.fn((event: string, listener: ExitListener) => {
+      if (event === 'exit') exitListeners.push(listener);
+    }),
+    kill: jest.fn(),
+    _emitData: (s: string) => dataListeners.forEach((l) => l(Buffer.from(s))),
+    _emitExit: () => exitListeners.forEach((l) => l()),
+  };
+}
 
 // ─── tryLockSession ───────────────────────────────────────────────────────────
 
@@ -67,6 +104,85 @@ describe('tryLockSession', () => {
     );
     expect(await tryLockSession()).toBe(false);
     expect(mockExecFile).toHaveBeenCalledTimes(2);
+  });
+});
+
+// ─── tryVtLock ───────────────────────────────────────────────────────────────
+
+describe('tryVtLock', () => {
+  afterEach(() => releaseVtLock());
+
+  it('returns false on non-Linux without spawning', async () => {
+    setPlatform('win32');
+    expect(await tryVtLock()).toBe(false);
+    expect(mockSpawn).not.toHaveBeenCalled();
+  });
+
+  it('returns true when python3 outputs "locked"', async () => {
+    const proc = makeMockProc();
+    mockSpawn.mockReturnValue(proc);
+
+    const prom = tryVtLock();
+    proc._emitData('locked\n');
+    expect(await prom).toBe(true);
+    expect(mockSpawn).toHaveBeenCalledWith(
+      'python3',
+      ['-u', '-c', expect.any(String)],
+      expect.objectContaining({ stdio: ['pipe', 'pipe', 'ignore'] }),
+    );
+  });
+
+  it('returns false when python3 outputs an error', async () => {
+    const proc = makeMockProc();
+    mockSpawn.mockReturnValue(proc);
+
+    const prom = tryVtLock();
+    proc._emitData('err:perm\n');
+    expect(await prom).toBe(false);
+    expect(proc.kill).toHaveBeenCalled();
+  });
+
+  it('returns false when the process exits without output', async () => {
+    const proc = makeMockProc();
+    mockSpawn.mockReturnValue(proc);
+
+    const prom = tryVtLock();
+    proc._emitExit();
+    expect(await prom).toBe(false);
+  });
+
+  it('returns true immediately when already locked (no second spawn)', async () => {
+    const proc = makeMockProc();
+    mockSpawn.mockReturnValue(proc);
+
+    const prom = tryVtLock();
+    proc._emitData('locked\n');
+    expect(await prom).toBe(true);
+
+    expect(await tryVtLock()).toBe(true);
+    expect(mockSpawn).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ─── releaseVtLock ────────────────────────────────────────────────────────────
+
+describe('releaseVtLock', () => {
+  afterEach(() => releaseVtLock());
+
+  it('is a no-op when not locked', () => {
+    expect(() => releaseVtLock()).not.toThrow();
+  });
+
+  it('ends stdin of the grab process on release', async () => {
+    const proc = makeMockProc();
+    mockSpawn.mockReturnValue(proc);
+
+    const prom = tryVtLock();
+    proc._emitData('locked\n');
+    await prom;
+
+    releaseVtLock();
+    expect(proc.stdin.end).toHaveBeenCalled();
   });
 });
 
