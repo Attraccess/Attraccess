@@ -8,12 +8,12 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import { Server } from 'ws';
-import { Inject, Logger, UseGuards, UsePipes, ValidationPipe } from '@nestjs/common';
+import { Inject, Logger, UsePipes, ValidationPipe } from '@nestjs/common';
 import { randomBytes } from 'crypto';
 import { AsyncApi, AsyncApiPub, AsyncApiSub } from 'nestjs-asyncapi';
 import { CompanionGatewayService } from './companion-gateway.service';
 import { CompanionAuthHandler } from './companion-auth.handler';
-import { CompanionAuthenticatedGuard } from './companion-authenticated.guard';
+import { CompanionAuthenticated } from './companion-authenticated.decorator';
 import {
   CompanionAuthenticateDto,
   CompanionAuthenticatedDto,
@@ -87,7 +87,7 @@ export class CompanionGateway implements OnGatewayConnection, OnGatewayDisconnec
   }
 
   @SubscribeMessage('COMPANION_IDLE')
-  @UseGuards(CompanionAuthenticatedGuard)
+  @CompanionAuthenticated()
   @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
   @AsyncApiPub({
     channel: 'COMPANION_IDLE',
@@ -102,7 +102,7 @@ export class CompanionGateway implements OnGatewayConnection, OnGatewayDisconnec
   }
 
   @SubscribeMessage('COMPANION_ACTIVE')
-  @UseGuards(CompanionAuthenticatedGuard)
+  @CompanionAuthenticated()
   @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
   @AsyncApiPub({
     channel: 'COMPANION_ACTIVE',
