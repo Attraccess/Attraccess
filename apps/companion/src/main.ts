@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, session, screen, dialog } from 'electron';
+import { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, session, screen, dialog, globalShortcut } from 'electron';
 import * as path from 'path';
 import * as https from 'https';
 import * as http from 'http';
@@ -8,7 +8,6 @@ import { loadCredentials, saveCredentials, StoredCredentials, loadPin, savePin }
 import { normalizeServerUrl } from './server-url';
 import { dotIconPng } from './tray-icon';
 import {
-  lockViaCGSession,
   hasAccessibilityPermission,
   promptAccessibilityPermission,
   installLaunchAgent,
@@ -112,7 +111,7 @@ function reopenKiosk() {
   if (!win || win.isDestroyed()) return;
   kioskLocked = false;
   win.setAlwaysOnTop(false);
-  if (process.platform === 'darwin') win.setSimpleFullScreen(false);
+  if (process.platform === 'darwin') win.setKiosk(false);
   else win.setFullScreen(false);
   win.setResizable(true);
   win.setSize(960, 720);
@@ -123,17 +122,44 @@ function reopenKiosk() {
 
 // ─── Lock / unlock ────────────────────────────────────────────────────────────
 
+// Keyboard escapes swallowed while locked. Process switching (Cmd+Tab, Mission
+// Control, Spaces), force-quit and app-hide are blocked by the kiosk
+// presentation options that setKiosk(true) engages, so this list only covers
+// the gaps those options leave.
+const LOCK_SHORTCUTS = [
+  'CommandOrControl+Q',
+  'CommandOrControl+W',
+  'CommandOrControl+M',
+  'CommandOrControl+H',
+  'CommandOrControl+Space',     // Spotlight
+  'CommandOrControl+Alt+Space', // Spotlight (alt)
+  'CommandOrControl+`',         // cycle app windows
+];
+
+function registerLockShortcuts(): void {
+  for (const accel of LOCK_SHORTCUTS) {
+    // ponytail: some accels are OS-reserved and throw; swallowing the rest is enough
+    try { globalShortcut.register(accel, () => undefined); } catch { /* reserved */ }
+  }
+}
+
 function addSecondaryOverlay(x: number, y: number, width: number, height: number): void {
   const overlay = new BrowserWindow({
     x, y, width, height,
     frame: false,
     alwaysOnTop: true,
-    focusable: false,
     skipTaskbar: true,
     backgroundColor: '#0f172a',
     webPreferences: { nodeIntegration: false, contextIsolation: true },
   });
   overlay.setAlwaysOnTop(true, 'screen-saver');
+  // Must use the SAME fullscreen mode as the main window. Presentation options
+  // are app-global and last-write-wins; mixing kiosk + simpleFullScreen lets the
+  // looser simpleFullScreen options clobber kiosk's disableProcessSwitching,
+  // re-enabling Space swiping. Uniform kiosk = identical options = no clobber,
+  // and it covers the display's menu bar.
+  if (process.platform === 'darwin') overlay.setKiosk(true);
+  else overlay.setFullScreen(true);
   overlay.loadURL('about:blank');
   overlay.on('closed', () => { secondaryOverlays = secondaryOverlays.filter(w => w !== overlay); });
   secondaryOverlays.push(overlay);
@@ -145,10 +171,17 @@ function showKioskOverlay(): void {
 
   kioskLocked = true;
   win.setAlwaysOnTop(true, 'screen-saver');
-  if (process.platform === 'darwin') win.setSimpleFullScreen(true);
-  else win.setFullScreen(true);
+  if (process.platform === 'darwin') {
+    // Kiosk mode engages NSApplicationPresentationOptions: hides the menu bar,
+    // disables process switching (Cmd+Tab / Mission Control / Spaces), force
+    // quit, session termination and app hide — the things setSimpleFullScreen
+    // left open.
+    win.setKiosk(true);
+  } else {
+    win.setFullScreen(true);
+  }
   win.show();
-  win.focus();
+  registerLockShortcuts();
 
   // cover any other displays with dark blanks
   const kioskBounds = win.getBounds();
@@ -158,28 +191,56 @@ function showKioskOverlay(): void {
     if (x === kioskBounds.x && y === kioskBounds.y) continue;
     addSecondaryOverlay(x, y, width, height);
   }
+
+  // focus last — the secondary kiosk windows can grab focus as they're created
+  win.focus();
 }
 
 function hideKioskOverlay(): void {
   kioskLocked = false;
+  globalShortcut.unregisterAll();
+
+  // Order matters. setKiosk(false) restores the presentation options that were
+  // current when THAT window entered kiosk, and the LAST call wins (options are
+  // app-global). The main window saved the pre-lock (default) options; each
+  // secondary saved the already-strict options. So the secondaries must exit
+  // kiosk FIRST and the main window LAST — otherwise a secondary's restore
+  // re-applies the strict no-process-switching options and they stick after
+  // unlock (swipe-to-Space stays blocked).
+  for (const w of secondaryOverlays) {
+    if (w.isDestroyed()) continue;
+    const kill = () => { if (!w.isDestroyed()) w.destroy(); };
+    if (process.platform === 'darwin' && w.isKiosk()) {
+      w.once('leave-full-screen', kill);
+      w.setKiosk(false);
+      setTimeout(kill, 1000);
+    } else {
+      kill();
+    }
+  }
+  secondaryOverlays = [];
+
   const win = kioskWindow;
   if (win && !win.isDestroyed()) {
     win.setAlwaysOnTop(false);
-    if (process.platform === 'darwin') win.setSimpleFullScreen(false);
-    else win.setFullScreen(false);
-    win.hide();
+    if (process.platform === 'darwin' && win.isKiosk()) {
+      // Exiting kiosk is an async native-fullscreen transition; hiding mid-flight
+      // is ignored and leaves a black frame. Hide once the transition lands
+      // (with a fallback in case the event is missed).
+      const doHide = () => { if (!win.isDestroyed()) win.hide(); };
+      win.once('leave-full-screen', doHide);
+      win.setKiosk(false);
+      setTimeout(doHide, 1000);
+    } else {
+      if (process.platform !== 'darwin') win.setFullScreen(false);
+      win.hide();
+    }
   }
-  for (const w of secondaryOverlays) {
-    if (!w.isDestroyed()) w.destroy();
-  }
-  secondaryOverlays = [];
 }
 
-async function lockComputer(): Promise<void> {
-  // macOS primary: CGSession -suspend triggers the OS login screen.
-  // Belt-and-suspenders: also show the kiosk overlay so the machine is
-  // covered when the user returns before unlock_pc arrives.
-  await lockViaCGSession();
+function lockComputer(): void {
+  // Server-controlled lock: the kiosk overlay is the lock (the OS login screen
+  // can't be dismissed by an unlock_pc message, so it's not usable here).
   showKioskOverlay();
 }
 
@@ -396,10 +457,10 @@ function startWsClient(serverUrl: string, firstRun: boolean) {
     }
   });
 
-  wsClient.on('lock_pc', async () => {
+  wsClient.on('lock_pc', () => {
     setTrayState('locked');
     reloadKiosk();
-    await lockComputer();
+    lockComputer();
   });
 
   wsClient.on('unlock_pc', () => {
@@ -437,6 +498,12 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', (event) => {
+  // A locked machine must never be quittable — not even with a PIN. It unlocks
+  // only when the server says so.
+  if (kioskLocked && !allowQuit) {
+    event.preventDefault();
+    return;
+  }
   if (pinHash && !allowQuit) {
     event.preventDefault();
     openWizardWindow({ requirePin: 'quit' });

@@ -1,27 +1,6 @@
-import { execFile } from 'child_process';
-import { promisify } from 'util';
 import * as path from 'path';
 import * as os from 'os';
 import * as fsp from 'fs/promises';
-
-const execFileAsync = promisify(execFile);
-
-// ─── CGSession lock ───────────────────────────────────────────────────────────
-
-/**
- * Invokes the macOS lock screen via CGSession -suspend.
- * Returns true if the command succeeded; false on non-macOS or failure.
- * Failure usually means the app is sandboxed or CGSession is unavailable.
- */
-export async function lockViaCGSession(): Promise<boolean> {
-  if (process.platform !== 'darwin') return false;
-  try {
-    await execFileAsync('/usr/bin/CGSession', ['-suspend']);
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 // ─── Accessibility permission ─────────────────────────────────────────────────
 

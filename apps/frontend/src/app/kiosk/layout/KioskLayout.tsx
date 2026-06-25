@@ -43,19 +43,26 @@ export function KioskLayout({ children }: PropsWithChildren) {
   const { remaining } = useAutoLogoff(isAuthenticated ? autoLogoffSeconds : null);
 
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-10 p-4">
-      {autoLogoffSeconds && remaining !== null && <AutoLogoffBar fraction={remaining / autoLogoffSeconds} />}
-      {isAuthenticated && (
-        <Button variant="ghost" size="sm" onPress={logout} className="fixed top-3 left-3 z-50">
-          <LogOutIcon className="w-4 h-4" />
-          {t('signOut')}
-        </Button>
-      )}
-      <div className="flex items-center gap-3">
-        <img src="/logo.png" alt="Attraccess" className="h-16 w-auto" />
-        <span className="text-3xl font-bold">Attraccess</span>
+    // #root is overflow:hidden (app-shell scroll strategy), so the kiosk needs
+    // its own scroll container — otherwise content taller than the viewport
+    // (e.g. the windowed resource panel) is clipped with nowhere to scroll.
+    // Inner min-h-screen keeps content centered when it fits, grows when it
+    // doesn't, and the outer h-screen container scrolls.
+    <div className="h-screen overflow-y-auto bg-background">
+      <div className="min-h-screen flex flex-col items-center justify-center gap-10 p-4">
+        {autoLogoffSeconds && remaining !== null && <AutoLogoffBar fraction={remaining / autoLogoffSeconds} />}
+        {isAuthenticated && (
+          <Button variant="ghost" size="sm" onPress={logout} className="fixed top-3 left-3 z-50">
+            <LogOutIcon className="w-4 h-4" />
+            {t('signOut')}
+          </Button>
+        )}
+        <div className="flex items-center gap-3">
+          <img src="/logo.png" alt="Attraccess" className="h-16 w-auto" />
+          <span className="text-3xl font-bold">Attraccess</span>
+        </div>
+        {children}
       </div>
-      {children}
     </div>
   );
 }

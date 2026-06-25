@@ -7,30 +7,20 @@ jest.mock('electron', () => ({
   },
 }));
 
-jest.mock('child_process', () => ({
-  execFile: jest.fn(
-    (_cmd: string, _args: string[], cb: (err: Error | null) => void) => cb(null),
-  ),
-}));
-
 jest.mock('fs/promises', () => ({
   mkdir: jest.fn().mockResolvedValue(undefined),
   writeFile: jest.fn().mockResolvedValue(undefined),
   access: jest.fn().mockResolvedValue(undefined),
 }));
 
-import * as childProcess from 'child_process';
 import * as fsp from 'fs/promises';
 import {
-  lockViaCGSession,
   hasAccessibilityPermission,
   installLaunchAgent,
   isLaunchAgentInstalled,
 } from './macos-lock';
 /* eslint-enable import/first */
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const mockExecFile = childProcess.execFile as unknown as jest.Mock<any>;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockWriteFile = fsp.writeFile as unknown as jest.Mock<any>;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -47,36 +37,6 @@ beforeEach(() => {
 
 afterAll(() => {
   setPlatform('darwin');
-});
-
-// ─── lockViaCGSession ─────────────────────────────────────────────────────────
-
-describe('lockViaCGSession', () => {
-  it('returns false immediately on non-macOS without invoking execFile', async () => {
-    setPlatform('linux');
-    expect(await lockViaCGSession()).toBe(false);
-    expect(mockExecFile).not.toHaveBeenCalled();
-  });
-
-  it('returns true on macOS when CGSession exits cleanly', async () => {
-    mockExecFile.mockImplementationOnce(
-      (_cmd: string, _args: string[], cb: (err: Error | null) => void) => cb(null),
-    );
-    expect(await lockViaCGSession()).toBe(true);
-    expect(mockExecFile).toHaveBeenCalledWith(
-      '/usr/bin/CGSession',
-      ['-suspend'],
-      expect.any(Function),
-    );
-  });
-
-  it('returns false on macOS when CGSession fails', async () => {
-    mockExecFile.mockImplementationOnce(
-      (_cmd: string, _args: string[], cb: (err: Error | null) => void) =>
-        cb(new Error('spawn ENOENT')),
-    );
-    expect(await lockViaCGSession()).toBe(false);
-  });
 });
 
 // ─── hasAccessibilityPermission ───────────────────────────────────────────────
