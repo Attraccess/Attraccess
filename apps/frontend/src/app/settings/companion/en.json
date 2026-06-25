@@ -22,7 +22,14 @@
     "rename": {
       "placeholder": "Device name",
       "save": "Save",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "label": "Renaming: {{name}}",
+      "success": "Device renamed",
+      "error": "Failed to rename device"
+    },
+    "delete": {
+      "success": "Device deleted",
+      "error": "Failed to delete device"
     }
   },
   "version": {

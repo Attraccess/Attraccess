@@ -58,20 +58,21 @@ function platformLabel(platform: string, arch: string): string {
 
 interface DeviceRowProps {
   device: CompanionDevice;
+  isRenaming: boolean;
   onRenameStart: (device: CompanionDevice) => void;
   onDeleteStart: (device: CompanionDevice) => void;
   t: (key: string) => string;
   formatDateTime: FormatDateTime;
 }
 
-function DeviceRow({ device, onRenameStart, onDeleteStart, t, formatDateTime }: DeviceRowProps) {
+function DeviceRow({ device, isRenaming, onRenameStart, onDeleteStart, t, formatDateTime }: DeviceRowProps) {
   const { data } = useCompanionDevicesServiceGetCompanionDevice({ id: device.id }, undefined, {
     refetchInterval: 30000,
   });
   const isOnline = (data as DeviceWithConnected | undefined)?.connected ?? false;
 
   return (
-    <TableRow key={device.id} id={device.id}>
+    <TableRow key={device.id} id={device.id} className={isRenaming ? 'bg-primary-50' : undefined}>
       <TableCell>{device.name}</TableCell>
       <TableCell>
         <Chip color={isOnline ? 'success' : 'default'} size="sm">
@@ -114,14 +115,14 @@ export function CompanionSettingsPage() {
 
   const listKey = UseCompanionDevicesServiceListCompanionDevicesKeyFn();
 
-  const { mutate: rename, isPending: isRenaming } = useCompanionDevicesServiceRenameCompanionDevice({
+  const { mutate: rename, isPending: isRenamePending } = useCompanionDevicesServiceRenameCompanionDevice({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: listKey });
       setRenamingDevice(null);
-      toast.success({ title: t('devices.actions.rename') });
+      toast.success({ title: t('devices.rename.success') });
     },
     onError: () => {
-      toast.error({ title: t('devices.actions.rename') });
+      toast.error({ title: t('devices.rename.error') });
     },
   });
 
@@ -129,10 +130,10 @@ export function CompanionSettingsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: listKey });
       setDeletingDevice(null);
-      toast.success({ title: t('devices.actions.delete') });
+      toast.success({ title: t('devices.delete.success') });
     },
     onError: () => {
-      toast.error({ title: t('devices.actions.delete') });
+      toast.error({ title: t('devices.delete.error') });
     },
   });
 
@@ -170,25 +171,30 @@ export function CompanionSettingsPage() {
         </Card.Header>
         <Card.Content>
           {renamingDevice && (
-            <div className="flex items-center gap-2 mb-4 flex-wrap">
-              <TextField
-                value={renameValue}
-                onChange={setRenameValue}
-                className="max-w-xs"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleRenameSave();
-                  if (e.key === 'Escape') setRenamingDevice(null);
-                }}
-                autoFocus
-              >
-                <Input placeholder={t('devices.rename.placeholder')} />
-              </TextField>
-              <Button size="sm" variant="primary" isPending={isRenaming} onPress={handleRenameSave}>
-                {t('devices.rename.save')}
-              </Button>
-              <Button size="sm" variant="ghost" onPress={() => setRenamingDevice(null)}>
-                {t('devices.rename.cancel')}
-              </Button>
+            <div className="flex flex-col gap-2 mb-4">
+              <span className="text-sm text-default-500">
+                {t('devices.rename.label', { name: renamingDevice.name })}
+              </span>
+              <div className="flex items-center gap-2 flex-wrap">
+                <TextField
+                  value={renameValue}
+                  onChange={setRenameValue}
+                  className="max-w-xs"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleRenameSave();
+                    if (e.key === 'Escape') setRenamingDevice(null);
+                  }}
+                  autoFocus
+                >
+                  <Input placeholder={t('devices.rename.placeholder')} />
+                </TextField>
+                <Button size="sm" variant="primary" isPending={isRenamePending} onPress={handleRenameSave}>
+                  {t('devices.rename.save')}
+                </Button>
+                <Button size="sm" variant="ghost" onPress={() => setRenamingDevice(null)}>
+                  {t('devices.rename.cancel')}
+                </Button>
+              </div>
             </div>
           )}
           {devicesLoading ? (
@@ -210,6 +216,7 @@ export function CompanionSettingsPage() {
                       <DeviceRow
                         key={device.id}
                         device={device}
+                        isRenaming={renamingDevice?.id === device.id}
                         onRenameStart={handleRenameStart}
                         onDeleteStart={setDeletingDevice}
                         t={t}
