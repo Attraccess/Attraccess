@@ -1,6 +1,7 @@
 import type { App } from 'electron';
 import { WindowsAdapter } from './windows-adapter';
 import { MacosAdapter } from './macos-adapter';
+import { LinuxAdapter } from './linux-adapter';
 import { NullAdapter } from './null-adapter';
 
 export interface OsAdapter {
@@ -32,4 +33,5 @@ export interface OsAdapter {
 export const osAdapter: OsAdapter =
   process.platform === 'win32' ? new WindowsAdapter() :
   process.platform === 'darwin' ? new MacosAdapter() :
+  process.platform === 'linux' ? new LinuxAdapter() :
   new NullAdapter();
