@@ -5,8 +5,6 @@ import { Auth } from '@attraccess/plugins-backend-sdk';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
-const LOGO_PNG = readFileSync(join(__dirname, 'assets', 'logo.png'));
-
 @ApiTags('System')
 @Controller()
 export class AppController {
@@ -17,7 +15,7 @@ export class AppController {
   @Header('Cache-Control', 'public, max-age=86400')
   @ApiOperation({ summary: 'Return the Attraccess logo', operationId: 'getLogo' })
   getLogo(): StreamableFile {
-    return new StreamableFile(LOGO_PNG);
+    return new StreamableFile(readFileSync(join(__dirname, 'assets', 'logo.png')));
   }
 
   @Get('/info')
