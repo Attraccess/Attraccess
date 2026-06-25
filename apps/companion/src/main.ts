@@ -4,7 +4,7 @@ import * as https from 'https';
 import * as http from 'http';
 import { createHash } from 'crypto';
 import { CompanionWsClient, CompanionAuthenticatedDto, CompanionRegisterResponseDto } from '@attraccess/companion-ws-client';
-import { loadCredentials, saveCredentials, StoredCredentials, loadPin, savePin } from './keychain';
+import { loadCredentials, saveCredentials, clearCredentials, StoredCredentials, loadPin, savePin } from './keychain';
 import { normalizeServerUrl } from './server-url';
 import { dotIconPng } from './tray-icon';
 import { attraccessLogoSvg } from './logo-svg';
@@ -26,6 +26,7 @@ let authenticatedPayload: CompanionAuthenticatedDto | null = null;
 let pinHash: string | null = null;
 let allowQuit = false;
 let kioskLocked = false;
+let wsConnected = false;
 
 // ponytail: increment per new kiosk window so each open gets a fresh web session (sign-out on close)
 let _kioskSessionId = 0;
@@ -348,6 +349,8 @@ function openWizardWindow(opts: WizardOpts = {}) {
       firstRun: opts.firstRun ?? false,
       serverUrl: creds?.serverUrl,
       requirePin: opts.requirePin,
+      registered: !!creds?.id,
+      connected: wsConnected,
     });
   });
   mainWindow.on('closed', () => { mainWindow = null; });
@@ -379,6 +382,14 @@ ipcMain.handle('save-pin', async (_evt, pin: string) => {
   const hash = hashPin(pin);
   await savePin(hash);
   pinHash = hash;
+  // An already-registered device that just set its first PIN can now connect
+  // and close the wizard. First-run devices have no creds yet and instead reach
+  // the connect step via the URL screen; changing a PIN re-uses an already-
+  // running client. Both are covered by the creds.id && !wsClient guard.
+  if (creds?.id && !wsClient) {
+    startWsClient(creds.serverUrl, /* firstRun */ false);
+    mainWindow?.close();
+  }
 });
 
 ipcMain.handle('verify-pin', (_evt, pin: string) => verifyPin(pin));
@@ -386,6 +397,21 @@ ipcMain.handle('verify-pin', (_evt, pin: string) => verifyPin(pin));
 ipcMain.handle('confirm-quit', () => {
   allowQuit = true;
   app.quit();
+});
+
+// Actively forget this device's registration. Only way to drop a registration —
+// otherwise a device keeps the same id forever. Clears creds, stops the client
+// and tears down any session so the wizard returns to a clean first-run state.
+ipcMain.handle('disconnect', async () => {
+  wsClient?.stop();
+  wsClient = null;
+  wsConnected = false;
+  authenticatedPayload = null;
+  kioskLocked = false;
+  if (kioskWindow && !kioskWindow.isDestroyed()) kioskWindow.destroy();
+  await clearCredentials();
+  creds = null;
+  setTrayState('disconnected');
 });
 
 ipcMain.handle('check-health', async (_evt, serverUrl: string) => {
@@ -414,11 +440,13 @@ function startWsClient(serverUrl: string, firstRun: boolean) {
   wsClient = new CompanionWsClient(serverUrl);
 
   wsClient.on('connected', () => {
+    wsConnected = true;
     setTrayState('unlocked');
     mainWindow?.webContents.send('ws-status', 'connected');
   });
 
   wsClient.on('disconnected', () => {
+    wsConnected = false;
     setTrayState('disconnected');
     mainWindow?.webContents.send('ws-status', 'disconnected');
   });
@@ -492,8 +520,10 @@ app.whenReady().then(async () => {
 
   if (!creds?.serverUrl || !creds?.id) {
     openWizardWindow({ firstRun: true });
-  } else if (!allPermissionsGranted()) {
-    // Permissions were revoked since last launch — open wizard to re-grant
+  } else if (!allPermissionsGranted() || !pinHash) {
+    // Existing device missing permissions or a PIN (e.g. registered before PINs
+    // existed): run the wizard to fix both before connecting. A connection must
+    // never be established without a PIN.
     openWizardWindow({ firstRun: false });
   } else {
     startWsClient(creds.serverUrl, /* firstRun */ false);

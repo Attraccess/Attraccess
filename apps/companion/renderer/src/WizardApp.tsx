@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from '@heroui/react';
 import type { Step, Permissions } from './types';
 import { LoadingStep } from './steps/LoadingStep';
@@ -18,6 +18,8 @@ export function WizardApp() {
   const [deviceId, setDeviceId] = useState<number | null>(null);
   const [perms, setPerms] = useState<Permissions | null>(null);
   const [pendingAction, setPendingAction] = useState<'settings' | 'quit' | null>(null);
+  const [registered, setRegistered] = useState(false);
+  const [connected, setConnected] = useState(false);
 
   const [pinInput, setPinInput] = useState('');
   const [pinConfirm, setPinConfirm] = useState('');
@@ -26,12 +28,11 @@ export function WizardApp() {
   const [pinEntry, setPinEntry] = useState('');
   const [pinEntryError, setPinEntryError] = useState('');
 
-  const isFirstRunRef = useRef(false);
-
   useEffect(() => {
-    window.companion.onInit(async ({ firstRun, serverUrl: saved, requirePin }) => {
-      isFirstRunRef.current = firstRun;
+    window.companion.onInit(async ({ serverUrl: saved, requirePin, registered: reg, connected: conn }) => {
       if (saved) setServerUrl(saved);
+      setRegistered(reg);
+      setConnected(conn);
 
       if (requirePin) {
         setPendingAction(requirePin);
@@ -45,9 +46,11 @@ export function WizardApp() {
       ]);
       setPerms(p);
 
+      // PIN is mandatory: route to setup whenever none is set, not just on a
+      // brand-new install (already-registered devices must get prompted too).
       if (p.needed && !p.accessibility) {
         setStep('permissions');
-      } else if (firstRun && !pinSet) {
+      } else if (!pinSet) {
         setStep('pin-setup');
       } else {
         setStep('url');
@@ -55,6 +58,7 @@ export function WizardApp() {
     });
 
     window.companion.onWsStatus((s) => {
+      setConnected(s === 'connected');
       setStatusText(s === 'connected' ? 'Connected — awaiting registration…' : 'Reconnecting…');
     });
     window.companion.onRegistered(({ id }) => {
@@ -73,7 +77,7 @@ export function WizardApp() {
       setPerms(p);
       if (p.accessibility) {
         clearInterval(id);
-        setStep(isFirstRunRef.current && !pinSet ? 'pin-setup' : 'url');
+        setStep(!pinSet ? 'pin-setup' : 'url');
       }
     }, 1000);
     return () => clearInterval(id);
@@ -84,7 +88,7 @@ export function WizardApp() {
     setPerms(p);
     if (p.accessibility) {
       const pinSet = await window.companion.isPinSet();
-      setStep(isFirstRunRef.current && !pinSet ? 'pin-setup' : 'url');
+      setStep(!pinSet ? 'pin-setup' : 'url');
     }
   }
 
@@ -116,6 +120,13 @@ export function WizardApp() {
     } else {
       setStep('url');
     }
+  }
+
+  async function handleDisconnect() {
+    await window.companion.disconnect();
+    setRegistered(false);
+    setConnected(false);
+    setConnectError('');
   }
 
   async function handleConnect() {
@@ -178,8 +189,12 @@ export function WizardApp() {
               serverUrl={serverUrl}
               connectError={connectError}
               connecting={connecting}
+              registered={registered}
+              connected={connected}
               onServerUrlChange={setServerUrl}
               onConnect={handleConnect}
+              onDisconnect={handleDisconnect}
+              onChangePin={pendingAction === 'settings' ? () => setStep('pin-setup') : undefined}
             />
           )}
           {step === 'register' && <RegisterStep statusText={statusText} />}

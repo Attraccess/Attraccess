@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('companion', {
   savePin: (pin: string) => ipcRenderer.invoke('save-pin', pin),
   verifyPin: (pin: string) => ipcRenderer.invoke('verify-pin', pin),
   confirmQuit: () => ipcRenderer.invoke('confirm-quit'),
+  disconnect: () => ipcRenderer.invoke('disconnect'),
 
   onInit: (cb: (data: { firstRun: boolean; serverUrl?: string }) => void) =>
     ipcRenderer.on('init', (_e, data) => cb(data)),

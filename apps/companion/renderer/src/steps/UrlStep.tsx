@@ -4,11 +4,53 @@ interface Props {
   serverUrl: string;
   connectError: string;
   connecting: boolean;
+  registered: boolean;
+  connected: boolean;
   onServerUrlChange: (v: string) => void;
   onConnect: () => void;
+  onDisconnect: () => void;
+  onChangePin?: () => void;
 }
 
-export function UrlStep({ serverUrl, connectError, connecting, onServerUrlChange, onConnect }: Props) {
+export function UrlStep({
+  serverUrl,
+  connectError,
+  connecting,
+  registered,
+  connected,
+  onServerUrlChange,
+  onConnect,
+  onDisconnect,
+  onChangePin,
+}: Props) {
+  // Already registered: show status, never a Connect button — re-connecting an
+  // existing device would re-register it. To switch servers, Disconnect first.
+  if (registered) {
+    return (
+      <>
+        <div>
+          <Heading>Attraccess Companion</Heading>
+          <CardDescription>{serverUrl}</CardDescription>
+        </div>
+        <div className="flex items-center gap-2 text-sm">
+          <span
+            className="inline-block h-2.5 w-2.5 rounded-full"
+            style={{ backgroundColor: connected ? '#22c55e' : '#f59e0b' }}
+          />
+          <span>{connected ? 'Connected' : 'Disconnected'}</span>
+        </div>
+        {onChangePin && (
+          <Button variant="secondary" fullWidth onPress={onChangePin}>
+            Change PIN
+          </Button>
+        )}
+        <Button variant="danger" fullWidth onPress={onDisconnect}>
+          Disconnect
+        </Button>
+      </>
+    );
+  }
+
   return (
     <>
       <div>
@@ -25,6 +67,11 @@ export function UrlStep({ serverUrl, connectError, connecting, onServerUrlChange
       <Button variant="primary" fullWidth isDisabled={connecting} onPress={onConnect}>
         {connecting ? <Spinner /> : 'Connect'}
       </Button>
+      {onChangePin && (
+        <Button variant="secondary" fullWidth onPress={onChangePin}>
+          Change PIN
+        </Button>
+      )}
     </>
   );
 }
