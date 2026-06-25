@@ -3,7 +3,9 @@ import { useSearchParams } from 'react-router-dom';
 import { LogOutIcon } from 'lucide-react';
 import { Button, ProgressBar } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { AttraccessLogo } from '@attraccess/ui';
 import { useAutoLogoff } from '../hooks/useAutoLogoff';
+import { KioskScreensaver } from '../KioskScreensaver';
 import { useAuth } from '../../../hooks/useAuth';
 
 const en = { signOut: 'Sign out' };
@@ -49,6 +51,8 @@ export function KioskLayout({ children }: PropsWithChildren) {
     // Inner min-h-screen keeps content centered when it fits, grows when it
     // doesn't, and the outer h-screen container scrolls.
     <div className="h-screen overflow-y-auto bg-background">
+      {/* Blanks the login screen after inactivity; auto-logoff covers the authenticated case. */}
+      <KioskScreensaver enabled={!isAuthenticated} />
       <div className="min-h-screen flex flex-col items-center justify-center gap-10 p-4">
         {autoLogoffSeconds && remaining !== null && <AutoLogoffBar fraction={remaining / autoLogoffSeconds} />}
         {isAuthenticated && (
@@ -57,9 +61,8 @@ export function KioskLayout({ children }: PropsWithChildren) {
             {t('signOut')}
           </Button>
         )}
-        <div className="flex items-center gap-3">
-          <img src="/logo.png" alt="Attraccess" className="h-16 w-auto" />
-          <span className="text-3xl font-bold">Attraccess</span>
+        <div className="flex items-center">
+          <AttraccessLogo className="h-16 w-auto" />
         </div>
         {children}
       </div>

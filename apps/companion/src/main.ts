@@ -7,6 +7,7 @@ import { CompanionWsClient, CompanionAuthenticatedDto, CompanionRegisterResponse
 import { loadCredentials, saveCredentials, StoredCredentials, loadPin, savePin } from './keychain';
 import { normalizeServerUrl } from './server-url';
 import { dotIconPng } from './tray-icon';
+import { attraccessLogoSvg } from './logo-svg';
 import {
   hasAccessibilityPermission,
   promptAccessibilityPermission,
@@ -160,7 +161,13 @@ function addSecondaryOverlay(x: number, y: number, width: number, height: number
   // and it covers the display's menu bar.
   if (process.platform === 'darwin') overlay.setKiosk(true);
   else overlay.setFullScreen(true);
-  overlay.loadURL('about:blank');
+  // Centered, dimmed "Locked by" + Attraccess lockup on the dark blocker. color: drives the wordmark.
+  const blockerHtml =
+    `<!doctype html><html><body style="margin:0;height:100vh;display:flex;flex-direction:column;` +
+    `align-items:center;justify-content:center;gap:1.25rem;background:#0f172a;color:#cbd5e1;opacity:.55">` +
+    `<span style="font:500 14px/1 system-ui,sans-serif;letter-spacing:.06em">Locked by</span>` +
+    `<div style="width:38vw;max-width:520px">${attraccessLogoSvg}</div></body></html>`;
+  overlay.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(blockerHtml));
   overlay.on('closed', () => { secondaryOverlays = secondaryOverlays.filter(w => w !== overlay); });
   secondaryOverlays.push(overlay);
 }
