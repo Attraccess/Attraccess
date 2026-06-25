@@ -1,4 +1,4 @@
-import { HTMLAttributes, useMemo } from 'react';
+import { HTMLAttributes, useCallback, useMemo } from 'react';
 import { Spinner } from '@heroui/react';
 import { Clock } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -11,11 +11,15 @@ import { StartSessionControls } from '../StartSessionControls';
 import {
   useAccessControlServiceResourceIntroducersGetMany,
   useResourcesServiceResourceUsageGetActiveSession,
+  useResourcesServiceResourceUsageGetActiveSessionKey,
+  useResourcesServiceResourceUsageCanControlKey,
   Resource,
   useResourcesServiceResourceUsageCanControl,
   useResourceMaintenancesServiceFindMaintenances,
   SupervisionMode,
 } from '@attraccess/react-query-client';
+import { useQueryClient } from '@tanstack/react-query';
+import { useSSE } from '../../../../../utils/sse';
 import en from './translations/en.json';
 import de from './translations/de.json';
 import { MaintenanceInProgressDisplay } from './maintenance';
@@ -38,13 +42,25 @@ export function ResourceUsageSession({
   const { t } = useTranslations({ en, de });
   const { hasPermission, user } = useAuth();
   const canManageResources = hasPermission('canManageResources');
+  const queryClient = useQueryClient();
+
+  const invalidateSessionQueries = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: [useResourcesServiceResourceUsageGetActiveSessionKey] });
+    queryClient.invalidateQueries({ queryKey: [useResourcesServiceResourceUsageCanControlKey] });
+  }, [queryClient]);
+
+  useSSE({
+    path: `/api/resources/${resourceId}/events`,
+    onUpdate: (data: { eventType?: string; inUse?: boolean }) => {
+      if (data.eventType !== undefined) {
+        invalidateSessionQueries();
+      }
+    },
+  });
 
   const { data: access, isLoading: isLoadingIntroStatus } = useResourcesServiceResourceUsageCanControl(
     { resourceId },
     undefined,
-    {
-      refetchInterval: 3000,
-    },
   );
 
   const { data: introducers, isLoading: isLoadingIntroducers } = useAccessControlServiceResourceIntroducersGetMany({
@@ -54,9 +70,6 @@ export function ResourceUsageSession({
   const { data: activeSessionResponse, isLoading: isLoadingSession } = useResourcesServiceResourceUsageGetActiveSession(
     { resourceId },
     undefined,
-    {
-      refetchInterval: 3000,
-    },
   );
 
   const activeSession = useMemo(() => activeSessionResponse?.usage, [activeSessionResponse]);

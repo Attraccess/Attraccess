@@ -13,7 +13,7 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Resource } from '@attraccess/database-entities';
-import { ResourceUsageEvent } from '../usage/events/resource-usage.events';
+import { ResourceUsageEvent, ResourceSessionEndedEvent, ResourceUsageTakenOverEvent } from '../usage/events/resource-usage.events';
 import { ResourceHealthChangedEvent } from '../health/events/resource-health-changed.event';
 import { ApiTags } from '@nestjs/swagger';
 import { SseInstrumentation } from '../../metrics/instrumentation/sse/sse.helper';
@@ -135,6 +135,36 @@ export class SSEController implements OnModuleInit, OnModuleDestroy {
     subject.next({ data: eventData });
 
     this.logger.debug(`Emitted ${ResourceUsageEvent.EVENT_NAME} event for resource ${resource.id}`);
+  }
+
+  @OnEvent(ResourceSessionEndedEvent.EVENT_NAME)
+  handleResourceSessionEnded(event: ResourceSessionEndedEvent) {
+    const resourceId = event.usage.resourceId;
+    if (!this.resourceSubjects.has(resourceId)) {
+      return;
+    }
+    this.resourceSubjects.get(resourceId).next({
+      data: {
+        eventType: ResourceSessionEndedEvent.EVENT_NAME,
+        resourceId,
+        inUse: false,
+      },
+    });
+  }
+
+  @OnEvent(ResourceUsageTakenOverEvent.EVENT_NAME)
+  handleResourceUsageTakenOver(event: ResourceUsageTakenOverEvent) {
+    const resourceId = event.resource.id;
+    if (!this.resourceSubjects.has(resourceId)) {
+      return;
+    }
+    this.resourceSubjects.get(resourceId).next({
+      data: {
+        eventType: ResourceUsageTakenOverEvent.EVENT_NAME,
+        resourceId,
+        inUse: true,
+      },
+    });
   }
 
   @OnEvent(ResourceHealthChangedEvent.EVENT_NAME)
