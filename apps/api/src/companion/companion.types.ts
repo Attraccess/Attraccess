@@ -48,6 +48,11 @@ export class CompanionAuthenticatedDto {
   locked!: boolean;
 }
 
+export class CompanionDeviceRenamedDto {
+  @ApiProperty({ description: 'New device name' })
+  deviceName!: string;
+}
+
 export class CompanionUpdateAvailableDto {
   @ApiProperty({ description: 'Direct download URL for the new binary' })
   downloadUrl!: string;
@@ -81,6 +86,7 @@ export enum CompanionEventType {
   COMPANION_UPDATE_AVAILABLE = 'COMPANION_UPDATE_AVAILABLE',
   COMPANION_IDLE = 'COMPANION_IDLE',
   COMPANION_ACTIVE = 'COMPANION_ACTIVE',
+  COMPANION_DEVICE_RENAMED = 'COMPANION_DEVICE_RENAMED',
 }
 
 export interface CompanionAuthenticatePayload {

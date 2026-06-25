@@ -65,6 +65,10 @@ export class CompanionGatewayService {
     return this.sendCommandToDevice(deviceId, CompanionEventType.COMPANION_UNLOCK_PC);
   }
 
+  public sendDeviceRenamed(deviceId: number, deviceName: string): void {
+    this.sendCommandToDevice(deviceId, CompanionEventType.COMPANION_DEVICE_RENAMED, { deviceName });
+  }
+
   public handleIdleEvent(deviceId: number, payload: CompanionIdleDto): void {
     this.eventEmitter.emit('companion.idle', { deviceId, payload });
   }
@@ -73,14 +77,14 @@ export class CompanionGatewayService {
     this.eventEmitter.emit('companion.active', { deviceId, payload });
   }
 
-  private sendCommandToDevice(deviceId: number, type: CompanionEventType): boolean {
+  private sendCommandToDevice(deviceId: number, type: CompanionEventType, payload: unknown = {}): boolean {
     const socket = [...this.sockets.values()].find((s) => s.deviceId === deviceId);
     if (!socket) {
       this.logger.warn(`Device ${deviceId} not connected, cannot send ${type}`);
       return false;
     }
     try {
-      socket.sendEvent(type, {});
+      socket.sendEvent(type, payload);
       return true;
     } catch (error) {
       this.logger.error(`Failed to send ${type} to device ${deviceId}: ${(error as Error).message}`);
