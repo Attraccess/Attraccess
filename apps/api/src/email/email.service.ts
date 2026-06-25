@@ -102,6 +102,7 @@ export class EmailService {
       host: {
         frontend: url,
         backend: url,
+        notificationPreferencesUrl: `${url}/account`,
       },
       url,
     } as const;
