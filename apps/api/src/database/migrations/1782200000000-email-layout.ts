@@ -52,8 +52,6 @@ const DEFAULT_GLOBAL_LAYOUT = `<mjml>
       <mj-column>
         <mj-text font-size="12px" color="#9CA3AF" align="center" padding="0">
           <a href="https://attraccess.org" style="color:#9CA3AF;">attraccess.org</a>
-          &nbsp;·&nbsp;
-          <a href="{{host.frontend}}" style="color:#9CA3AF;">{{host.frontend}}</a>
         </mj-text>
       </mj-column>
     </mj-section>
