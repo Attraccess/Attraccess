@@ -476,6 +476,32 @@
           }
         }
       },
+      "companion": {
+        "lock-pc": {
+          "title": "Lock PC",
+          "description": "Locks the screen on a registered companion device.",
+          "inputs": { "input": "Input" },
+          "outputs": { "output": "Output" },
+          "config": {
+            "deviceId": {
+              "label": "Companion device",
+              "placeholder": "Select a device..."
+            }
+          }
+        },
+        "unlock-pc": {
+          "title": "Unlock PC",
+          "description": "Unlocks the screen on a registered companion device.",
+          "inputs": { "input": "Input" },
+          "outputs": { "output": "Output" },
+          "config": {
+            "deviceId": {
+              "label": "Companion device",
+              "placeholder": "Select a device..."
+            }
+          }
+        }
+      },
       "resource": {
         "usage": {
           "end-session": {
@@ -532,32 +558,6 @@
             },
             "outputs": {
               "output": "Output"
-            }
-          }
-        },
-        "companion": {
-          "lock-pc": {
-            "title": "Lock PC",
-            "description": "Locks the screen on a registered companion device.",
-            "inputs": { "input": "Input" },
-            "outputs": { "output": "Output" },
-            "config": {
-              "deviceId": {
-                "label": "Companion device",
-                "placeholder": "Select a device..."
-              }
-            }
-          },
-          "unlock-pc": {
-            "title": "Unlock PC",
-            "description": "Unlocks the screen on a registered companion device.",
-            "inputs": { "input": "Input" },
-            "outputs": { "output": "Output" },
-            "config": {
-              "deviceId": {
-                "label": "Companion device",
-                "placeholder": "Select a device..."
-              }
             }
           }
         },
