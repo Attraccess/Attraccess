@@ -24,7 +24,7 @@
       "placeholder": "Gerätename",
       "save": "Speichern",
       "cancel": "Abbrechen",
-      "label": "Aktueller Name: {{name}}",
+      "label": "Neuer Name für \"{{name}}\"",
       "success": "Gerät umbenannt",
       "error": "Umbenennen fehlgeschlagen"
     },

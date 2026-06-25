@@ -24,7 +24,7 @@
       "placeholder": "Device name",
       "save": "Save",
       "cancel": "Cancel",
-      "label": "Current name: {{name}}",
+      "label": "New name for \"{{name}}\"",
       "success": "Device renamed",
       "error": "Failed to rename device"
     },

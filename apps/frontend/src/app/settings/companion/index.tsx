@@ -15,6 +15,7 @@ import {
   DrawerFooter,
   DrawerHeader,
   Input,
+  Label,
   Spinner,
   Table,
   TableBody,
@@ -291,9 +292,6 @@ export function CompanionSettingsPage() {
       <StandardDrawer isOpen={!!renamingDevice} onOpenChange={(open) => { if (!open) setRenamingDevice(null); }}>
         <DrawerHeader>
           <h2 className="text-lg font-semibold">{t('devices.rename.title')}</h2>
-          {renamingDevice && (
-            <p className="text-sm text-default-500">{t('devices.rename.label', { name: renamingDevice.name })}</p>
-          )}
         </DrawerHeader>
         <DrawerBody>
           <TextField
@@ -304,6 +302,7 @@ export function CompanionSettingsPage() {
             }}
             autoFocus
           >
+            <Label>{t('devices.rename.label', { name: renamingDevice?.name ?? '' })}</Label>
             <Input placeholder={t('devices.rename.placeholder')} />
           </TextField>
         </DrawerBody>
