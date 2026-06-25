@@ -8,11 +8,7 @@ import { loadCredentials, saveCredentials, clearCredentials, StoredCredentials, 
 import { normalizeServerUrl } from './server-url';
 import { dotIconPng } from './tray-icon';
 import { attraccessLogoSvg } from './logo-svg';
-import {
-  hasAccessibilityPermission,
-  promptAccessibilityPermission,
-  installLaunchAgent,
-} from './macos-lock';
+import { osAdapter } from './platform-adapter';
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
@@ -124,24 +120,14 @@ function reopenKiosk() {
 
 // ─── Lock / unlock ────────────────────────────────────────────────────────────
 
-// Keyboard escapes swallowed while locked. Process switching (Cmd+Tab, Mission
-// Control, Spaces), force-quit and app-hide are blocked by the kiosk
-// presentation options that setKiosk(true) engages, so this list only covers
-// the gaps those options leave.
-const LOCK_SHORTCUTS = [
-  'CommandOrControl+Q',
-  'CommandOrControl+W',
-  'CommandOrControl+M',
-  'CommandOrControl+H',
-  'CommandOrControl+Space',     // Spotlight
-  'CommandOrControl+Alt+Space', // Spotlight (alt)
-  'CommandOrControl+`',         // cycle app windows
-];
-
 function registerLockShortcuts(): void {
-  for (const accel of LOCK_SHORTCUTS) {
-    // ponytail: some accels are OS-reserved and throw; swallowing the rest is enough
-    try { globalShortcut.register(accel, () => undefined); } catch { /* reserved */ }
+  for (const accel of osAdapter.lockShortcuts()) {
+    try {
+      globalShortcut.register(accel, () => undefined);
+    } catch (err) {
+      // OS-reserved shortcuts cannot be overridden; log so failures are visible
+      console.warn(`[companion] could not register lock shortcut "${accel}":`, err);
+    }
   }
 }
 
@@ -247,8 +233,12 @@ function hideKioskOverlay(): void {
 }
 
 function lockComputer(): void {
-  // Server-controlled lock: the kiosk overlay is the lock (the OS login screen
-  // can't be dismissed by an unlock_pc message, so it's not usable here).
+  // Attempt OS-level lock (e.g. LockWorkStation on Windows) as an extra security
+  // layer. The Electron overlay is always shown regardless — it is the
+  // authoritative server-controlled lock that unlock_pc can dismiss.
+  osAdapter.tryOsLock().catch((err) =>
+    console.warn('[companion] OS lock failed:', err),
+  );
   showKioskOverlay();
 }
 
@@ -357,20 +347,18 @@ function openWizardWindow(opts: WizardOpts = {}) {
 // ─── IPC ─────────────────────────────────────────────────────────────────────
 
 function permissionsSnapshot() {
-  return {
-    needed: process.platform === 'darwin',
-    accessibility: hasAccessibilityPermission(),
-  };
+  return osAdapter.permissionsStatus();
 }
 
 function allPermissionsGranted() {
-  return !permissionsSnapshot().needed || permissionsSnapshot().accessibility;
+  const { needed, accessibility } = permissionsSnapshot();
+  return !needed || accessibility;
 }
 
 ipcMain.handle('get-permissions', () => permissionsSnapshot());
 
 ipcMain.handle('request-permission', (_evt, name: string) => {
-  if (name === 'accessibility') promptAccessibilityPermission();
+  if (name === 'accessibility') osAdapter.requestPermissions();
   return permissionsSnapshot();
 });
 
@@ -467,11 +455,10 @@ function startWsClient(serverUrl: string, firstRun: boolean) {
     // never authenticates, so do it now instead of waiting for a relaunch
     wsClient?.sendAuthenticate({ id: payload.id, token: payload.token });
 
-    // install launchd user agent on first registration so the companion
-    // starts automatically on login (macOS only — no-op on other platforms)
-    installLaunchAgent(app.getPath('exe')).catch(() => {
-      // non-fatal — app may not be packaged yet in dev
-    });
+    // install OS startup entry so the companion launches automatically after login
+    osAdapter.installStartupEntry(app).catch((err) =>
+      console.warn('[companion] startup entry install failed:', err),
+    );
   });
 
   wsClient.on('authenticated', async (payload: CompanionAuthenticatedDto) => {
