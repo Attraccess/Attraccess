@@ -311,11 +311,6 @@ const coreRoutes: RouteConfig[] = [
     authRequired: 'canManageSystemConfiguration',
   },
   {
-    path: '/email-layout',
-    element: <Navigate to="/email-templates?tab=layout" replace />,
-    authRequired: 'canManageSystemConfiguration',
-  },
-  {
     path: '/messages',
     element: <MessagesPage />,
     authRequired: true,
