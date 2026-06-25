@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { ResourceSessionEndedEvent, ResourceUsageTakenOverEvent } from './events/resource-usage.events';
+import { ResourceUsageSessionEndedEvent, ResourceUsageSessionTakenOverEvent } from './events/resource-usage.events';
 import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../../notifications/notification-types';
 
@@ -8,8 +8,8 @@ import { NotificationCategory } from '../../notifications/notification-types';
 export class ResourceSessionNotificationListener {
   constructor(private readonly notifications: NotificationDispatchService) {}
 
-  @OnEvent(ResourceUsageTakenOverEvent.EVENT_NAME)
-  async handleTakenOver(event: ResourceUsageTakenOverEvent): Promise<void> {
+  @OnEvent(ResourceUsageSessionTakenOverEvent.EVENT_NAME)
+  async handleTakenOver(event: ResourceUsageSessionTakenOverEvent): Promise<void> {
     await this.notifications.dispatch({
       category: NotificationCategory.RESOURCE_TAKEOVER,
       recipients: [event.previousUser],
@@ -26,8 +26,8 @@ export class ResourceSessionNotificationListener {
     });
   }
 
-  @OnEvent(ResourceSessionEndedEvent.EVENT_NAME)
-  async handleSessionEnded(event: ResourceSessionEndedEvent): Promise<void> {
+  @OnEvent(ResourceUsageSessionEndedEvent.EVENT_NAME)
+  async handleSessionEnded(event: ResourceUsageSessionEndedEvent): Promise<void> {
     const recipient = event.usage.user;
     const resource = event.usage.resource;
     if (!recipient || !resource) {

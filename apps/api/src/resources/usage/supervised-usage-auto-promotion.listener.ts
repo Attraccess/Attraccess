@@ -5,7 +5,7 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, Not, Repository } from 'typeorm';
 import { AutoIntroductionTarget, Resource, ResourceUsage } from '@attraccess/database-entities';
-import { SupervisedUsageEndedEvent } from './events/resource-usage.events';
+import { ResourceSupervisedUsageEndedEvent } from './events/resource-usage.events';
 import { ResourceIntroductionsService } from '../introductions/resouceIntroductions.service';
 import { ResourceGroupsIntroductionsService } from '../groups/introductions/resourceGroups.introductions.service';
 
@@ -22,8 +22,8 @@ export class SupervisedUsageAutoPromotionListener {
     private readonly resourceGroupsIntroductionsService: ResourceGroupsIntroductionsService,
   ) {}
 
-  @OnEvent(SupervisedUsageEndedEvent.EVENT_NAME)
-  async handleSupervisedUsageEnded(event: SupervisedUsageEndedEvent): Promise<void> {
+  @OnEvent(ResourceSupervisedUsageEndedEvent.EVENT_NAME)
+  async handleSupervisedUsageEnded(event: ResourceSupervisedUsageEndedEvent): Promise<void> {
     try {
       const resource = await this.resourceRepository.findOne({ where: { id: event.resourceId } });
       if (!resource) {
@@ -56,7 +56,7 @@ export class SupervisedUsageAutoPromotionListener {
     }
   }
 
-  private async promoteForResource(event: SupervisedUsageEndedEvent, threshold: number): Promise<void> {
+  private async promoteForResource(event: ResourceSupervisedUsageEndedEvent, threshold: number): Promise<void> {
     const { resourceId, userId, supervisorUserId } = event;
 
     // Idempotent: never create a duplicate introduction.
@@ -78,7 +78,7 @@ export class SupervisedUsageAutoPromotionListener {
 
   private async promoteForGroup(
     resource: Resource,
-    event: SupervisedUsageEndedEvent,
+    event: ResourceSupervisedUsageEndedEvent,
     threshold: number,
   ): Promise<void> {
     const { userId, supervisorUserId } = event;

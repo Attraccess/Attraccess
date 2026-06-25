@@ -28,12 +28,12 @@ import { ResourceUnhealthyException } from '../../exceptions/resource.unhealthy.
 import { ResourceHealthService } from '../health/resource-health.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
-  ResourceUsageEvent,
-  ResourceUsageTakenOverEvent,
-  ResourceSessionEndedEvent,
+  ResourceSessionStartedEvent,
+  ResourceUsageSessionTakenOverEvent,
+  ResourceUsageSessionEndedEvent,
   ResourceUsageNoteAddedEvent,
-  SupervisedUsageStartedEvent,
-  SupervisedUsageEndedEvent,
+  ResourceSupervisedUsageStartedEvent,
+  ResourceSupervisedUsageEndedEvent,
 } from './events/resource-usage.events';
 import { ResourceIntroductionsService } from '../introductions/resouceIntroductions.service';
 import { ResourceIntroducersService } from '../introducers/resourceIntroducers.service';
@@ -536,8 +536,8 @@ export class ResourceUsageService {
 
         // Emit event for the takeover
         this.eventEmitter.emit(
-          ResourceUsageTakenOverEvent.EVENT_NAME,
-          new ResourceUsageTakenOverEvent(resource, now, user, existingActiveSession.user),
+          ResourceUsageSessionTakenOverEvent.EVENT_NAME,
+          new ResourceUsageSessionTakenOverEvent(resource, now, user, existingActiveSession.user),
         );
       } else {
         // Defer event for the newly started session until after commit
@@ -582,8 +582,8 @@ export class ResourceUsageService {
     // session start is counted there to decide when to auto-create an introduction for the user.
     if (supervisorUserId !== null && newSession?.id) {
       this.eventEmitter.emit(
-        SupervisedUsageStartedEvent.EVENT_NAME,
-        new SupervisedUsageStartedEvent(resourceId, user.id, supervisorUserId, newSession.id),
+        ResourceSupervisedUsageStartedEvent.EVENT_NAME,
+        new ResourceSupervisedUsageStartedEvent(resourceId, user.id, supervisorUserId, newSession.id),
       );
     }
 
@@ -716,8 +716,8 @@ export class ResourceUsageService {
 
     if (updatedUsage?.user?.id && (updatedUsage.user.id !== user.id || skipNoteNotification)) {
       this.eventEmitter.emit(
-        ResourceSessionEndedEvent.EVENT_NAME,
-        new ResourceSessionEndedEvent(
+        ResourceUsageSessionEndedEvent.EVENT_NAME,
+        new ResourceUsageSessionEndedEvent(
           updatedUsage,
           skipNoteNotification ? null : { id: user.id, username: user.username },
         ),
@@ -728,8 +728,8 @@ export class ResourceUsageService {
     // is counted by the listener to decide when to auto-create an introduction for the supervised user.
     if (activeSession.supervisorUserId != null && activeSession.user?.id != null) {
       this.eventEmitter.emit(
-        SupervisedUsageEndedEvent.EVENT_NAME,
-        new SupervisedUsageEndedEvent(
+        ResourceSupervisedUsageEndedEvent.EVENT_NAME,
+        new ResourceSupervisedUsageEndedEvent(
           resourceId,
           activeSession.user.id,
           activeSession.supervisorUserId,
@@ -820,7 +820,7 @@ export class ResourceUsageService {
       where: { id: usageId },
       relations: ['resource', 'user'],
     });
-    await this.eventEmitter.emitAsync(ResourceUsageEvent.EVENT_NAME, new ResourceUsageEvent(usage));
+    await this.eventEmitter.emitAsync(ResourceSessionStartedEvent.EVENT_NAME, new ResourceSessionStartedEvent(usage));
   }
 
   private async handleDoorAction(resourceId: number, user: User, action: ResourceUsageAction): Promise<ResourceUsage> {

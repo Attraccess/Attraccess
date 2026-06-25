@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { Resource, User } from '@attraccess/database-entities';
-import { ResourceSessionEndedEvent, ResourceUsageTakenOverEvent } from './events/resource-usage.events';
+import { ResourceUsageSessionEndedEvent, ResourceUsageSessionTakenOverEvent } from './events/resource-usage.events';
 import { ResourceSessionNotificationListener } from './resource-session-notification.listener';
 import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../../notifications/notification-types';
@@ -27,7 +27,7 @@ describe('ResourceSessionNotificationListener', () => {
 
   it('notifies the previous user when their resource session is taken over', async () => {
     await listener.handleTakenOver(
-      new ResourceUsageTakenOverEvent(
+      new ResourceUsageSessionTakenOverEvent(
         { id: 4, name: 'Laser cutter' } as Resource,
         new Date('2026-01-01T12:00:00.000Z'),
         { id: 1, username: 'alice' } as User,
@@ -49,7 +49,7 @@ describe('ResourceSessionNotificationListener', () => {
 
   it('sends resource takeover email through the notification dispatcher callback', async () => {
     await listener.handleTakenOver(
-      new ResourceUsageTakenOverEvent(
+      new ResourceUsageSessionTakenOverEvent(
         { id: 4, name: 'Laser cutter' } as Resource,
         new Date('2026-01-01T12:00:00.000Z'),
         { id: 1, username: 'alice' } as User,
@@ -76,7 +76,7 @@ describe('ResourceSessionNotificationListener', () => {
     const resource = { id: 4, name: 'Laser cutter' } as Resource;
 
     await listener.handleSessionEnded(
-      new ResourceSessionEndedEvent(
+      new ResourceUsageSessionEndedEvent(
         {
           id: 10,
           user: owner,
@@ -114,7 +114,7 @@ describe('ResourceSessionNotificationListener', () => {
     const resource = { id: 4, name: 'Laser cutter' } as Resource;
 
     await listener.handleSessionEnded(
-      new ResourceSessionEndedEvent(
+      new ResourceUsageSessionEndedEvent(
         {
           id: 10,
           user: owner,
@@ -135,7 +135,7 @@ describe('ResourceSessionNotificationListener', () => {
     const resource = { id: 4, name: 'Laser cutter' } as Resource;
 
     await listener.handleSessionEnded(
-      new ResourceSessionEndedEvent(
+      new ResourceUsageSessionEndedEvent(
         {
           id: 10,
           user: owner,

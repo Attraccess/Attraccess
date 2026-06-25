@@ -5,7 +5,7 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Resource, ResourceIntroducer, ResourceMaintenanceRequest, User } from '@attraccess/database-entities';
-import { MaintenanceRequestCreatedEvent } from './events/maintenance-request-created.event';
+import { ResourceMaintenanceRequestCreatedEvent } from './events/maintenance-request-created.event';
 import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../../notifications/notification-types';
 
@@ -25,8 +25,8 @@ export class MaintenanceRequestNotificationListener {
     private readonly notifications: NotificationDispatchService,
   ) {}
 
-  @OnEvent(MaintenanceRequestCreatedEvent.EVENT_NAME)
-  async handleRequestCreated(event: MaintenanceRequestCreatedEvent): Promise<void> {
+  @OnEvent(ResourceMaintenanceRequestCreatedEvent.EVENT_NAME)
+  async handleRequestCreated(event: ResourceMaintenanceRequestCreatedEvent): Promise<void> {
     try {
       const request = await this.requestRepository.findOne({
         where: { id: event.requestId },

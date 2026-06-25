@@ -27,12 +27,12 @@ import { ResourceMaintenanceService } from '../maintenances/maintenance.service'
 import { ResourceNotFoundException } from '../../exceptions/resource.notFound.exception';
 import { ResourceUsageImpossibleMaintenanceInProgressException } from '../../exceptions/resource.maintenance.inUse.exception';
 import {
-  ResourceUsageEvent,
-  ResourceUsageTakenOverEvent,
-  ResourceSessionEndedEvent,
+  ResourceSessionStartedEvent,
+  ResourceUsageSessionTakenOverEvent,
+  ResourceUsageSessionEndedEvent,
   ResourceUsageNoteAddedEvent,
-  SupervisedUsageStartedEvent,
-  SupervisedUsageEndedEvent,
+  ResourceSupervisedUsageStartedEvent,
+  ResourceSupervisedUsageEndedEvent,
 } from './events/resource-usage.events';
 import { BillingService } from '../../billing/billing.service';
 import { InsufficientBalanceError } from '../../billing/errors/insufficient-balance.error';
@@ -433,12 +433,12 @@ describe('ResourceUsageService', () => {
         isFinalized: false,
       });
       expect(mockQueryBuilder.execute).toHaveBeenCalled();
-      expect(eventEmitter.emitAsync).toHaveBeenCalledWith(ResourceUsageEvent.EVENT_NAME, expect.any(Object));
+      expect(eventEmitter.emitAsync).toHaveBeenCalledWith(ResourceSessionStartedEvent.EVENT_NAME, expect.any(Object));
 
-      const emitted = eventEmitter.emitAsync.mock.calls.find((c) => c[0] === ResourceUsageEvent.EVENT_NAME);
+      const emitted = eventEmitter.emitAsync.mock.calls.find((c) => c[0] === ResourceSessionStartedEvent.EVENT_NAME);
       expect(emitted).toBeDefined();
-      const usageEvent = emitted?.[1] as ResourceUsageEvent;
-      expect(usageEvent).toBeInstanceOf(ResourceUsageEvent);
+      const usageEvent = emitted?.[1] as ResourceSessionStartedEvent;
+      expect(usageEvent).toBeInstanceOf(ResourceSessionStartedEvent);
       expect(usageEvent.usage).toMatchObject({
         resourceId: 1,
         userId: 1,
@@ -580,17 +580,17 @@ describe('ResourceUsageService', () => {
       expect(mockUpdateQueryBuilder.where).toHaveBeenCalledWith('id = :id', { id: 1 });
       expect(mockInsertQueryBuilder.insert).toHaveBeenCalled();
       // One event for the ended previous session (emitAsync) and one takeover event (emit)
-      expect(eventEmitter.emitAsync).toHaveBeenCalledWith(ResourceUsageEvent.EVENT_NAME, expect.any(Object));
-      expect(eventEmitter.emit).toHaveBeenCalledWith(ResourceUsageTakenOverEvent.EVENT_NAME, expect.any(Object));
+      expect(eventEmitter.emitAsync).toHaveBeenCalledWith(ResourceSessionStartedEvent.EVENT_NAME, expect.any(Object));
+      expect(eventEmitter.emit).toHaveBeenCalledWith(ResourceUsageSessionTakenOverEvent.EVENT_NAME, expect.any(Object));
 
-      const usageEmit = eventEmitter.emitAsync.mock.calls.find((c) => c[0] === ResourceUsageEvent.EVENT_NAME);
-      const usagePayload = usageEmit?.[1] as ResourceUsageEvent;
-      expect(usagePayload).toBeInstanceOf(ResourceUsageEvent);
+      const usageEmit = eventEmitter.emitAsync.mock.calls.find((c) => c[0] === ResourceSessionStartedEvent.EVENT_NAME);
+      const usagePayload = usageEmit?.[1] as ResourceSessionStartedEvent;
+      expect(usagePayload).toBeInstanceOf(ResourceSessionStartedEvent);
       expect(usagePayload.usage).toMatchObject({ id: 1, userId: 2, endNotes: expect.stringContaining('takeover') });
 
-      const takeoverEmit = eventEmitter.emit.mock.calls.find((c) => c[0] === ResourceUsageTakenOverEvent.EVENT_NAME);
-      const takeoverPayload = takeoverEmit?.[1] as ResourceUsageTakenOverEvent;
-      expect(takeoverPayload).toBeInstanceOf(ResourceUsageTakenOverEvent);
+      const takeoverEmit = eventEmitter.emit.mock.calls.find((c) => c[0] === ResourceUsageSessionTakenOverEvent.EVENT_NAME);
+      const takeoverPayload = takeoverEmit?.[1] as ResourceUsageSessionTakenOverEvent;
+      expect(takeoverPayload).toBeInstanceOf(ResourceUsageSessionTakenOverEvent);
       expect(takeoverPayload.resource).toMatchObject({
         id: mockResourceWithTakeOver.id,
         name: mockResourceWithTakeOver.name,
@@ -897,7 +897,7 @@ describe('ResourceUsageService', () => {
       expect(result).toMatchObject({ id: 1, resourceId: 1, userId: 1, endTime: null, isFinalized: true });
       expect(billingService.handleResourceUsageStart).toHaveBeenCalled();
       expect(mockQueryBuilder.insert).toHaveBeenCalled();
-      expect(eventEmitter.emitAsync).toHaveBeenCalledWith(ResourceUsageEvent.EVENT_NAME, expect.any(Object));
+      expect(eventEmitter.emitAsync).toHaveBeenCalledWith(ResourceSessionStartedEvent.EVENT_NAME, expect.any(Object));
       expect(flowExecutorService.trackResourceActivity).toHaveBeenCalledWith(createdSession.resourceId);
     });
   });
@@ -957,10 +957,10 @@ describe('ResourceUsageService', () => {
       expect(result).toEqual(finalizedSession);
       expect(mockQueryBuilder.values).toHaveBeenCalledWith(expect.objectContaining({ supervisorUserId: 2 }));
 
-      const counterEmit = eventEmitter.emit.mock.calls.find((c) => c[0] === SupervisedUsageStartedEvent.EVENT_NAME);
+      const counterEmit = eventEmitter.emit.mock.calls.find((c) => c[0] === ResourceSupervisedUsageStartedEvent.EVENT_NAME);
       expect(counterEmit).toBeDefined();
-      const payload = counterEmit?.[1] as SupervisedUsageStartedEvent;
-      expect(payload).toBeInstanceOf(SupervisedUsageStartedEvent);
+      const payload = counterEmit?.[1] as ResourceSupervisedUsageStartedEvent;
+      expect(payload).toBeInstanceOf(ResourceSupervisedUsageStartedEvent);
       expect(payload).toMatchObject({ resourceId: 1, userId: 1, supervisorUserId: 2 });
     });
 
@@ -1102,11 +1102,11 @@ describe('ResourceUsageService', () => {
 
       expect(result).toBe(mockUpdatedSession);
       expect(resourceUsageRepository.manager.transaction).toHaveBeenCalled();
-      expect(eventEmitter.emitAsync).toHaveBeenCalledWith(ResourceUsageEvent.EVENT_NAME, expect.any(Object));
+      expect(eventEmitter.emitAsync).toHaveBeenCalledWith(ResourceSessionStartedEvent.EVENT_NAME, expect.any(Object));
 
-      const emitted = eventEmitter.emitAsync.mock.calls.find((c) => c[0] === ResourceUsageEvent.EVENT_NAME);
-      const eventPayload = emitted?.[1] as ResourceUsageEvent;
-      expect(eventPayload).toBeInstanceOf(ResourceUsageEvent);
+      const emitted = eventEmitter.emitAsync.mock.calls.find((c) => c[0] === ResourceSessionStartedEvent.EVENT_NAME);
+      const eventPayload = emitted?.[1] as ResourceSessionStartedEvent;
+      expect(eventPayload).toBeInstanceOf(ResourceSessionStartedEvent);
       expect(eventPayload.usage).toMatchObject({ id: 1, userId: 1, endNotes: 'Session completed' });
     });
 
@@ -1144,10 +1144,10 @@ describe('ResourceUsageService', () => {
 
       await service.endSession(mockActiveSession.resourceId, managerUser, dto);
 
-      const endedEmit = eventEmitter.emit.mock.calls.find((c) => c[0] === ResourceSessionEndedEvent.EVENT_NAME);
+      const endedEmit = eventEmitter.emit.mock.calls.find((c) => c[0] === ResourceUsageSessionEndedEvent.EVENT_NAME);
       expect(endedEmit).toBeDefined();
-      const payload = endedEmit?.[1] as ResourceSessionEndedEvent;
-      expect(payload).toBeInstanceOf(ResourceSessionEndedEvent);
+      const payload = endedEmit?.[1] as ResourceUsageSessionEndedEvent;
+      expect(payload).toBeInstanceOf(ResourceUsageSessionEndedEvent);
       expect(payload.usage).toBe(mockUpdatedSession);
       expect(payload.endedBy).toEqual({ id: managerUser.id, username: managerUser.username });
     });
@@ -1185,9 +1185,9 @@ describe('ResourceUsageService', () => {
         { skipFormSubmissions: true, skipNoteNotification: true },
       );
 
-      const endedEmit = eventEmitter.emit.mock.calls.find((c) => c[0] === ResourceSessionEndedEvent.EVENT_NAME);
+      const endedEmit = eventEmitter.emit.mock.calls.find((c) => c[0] === ResourceUsageSessionEndedEvent.EVENT_NAME);
       expect(endedEmit).toBeDefined();
-      const payload = endedEmit?.[1] as ResourceSessionEndedEvent;
+      const payload = endedEmit?.[1] as ResourceUsageSessionEndedEvent;
       expect(payload.usage).toBe(mockUpdatedSession);
       expect(payload.endedBy).toBeNull();
     });
@@ -1282,7 +1282,7 @@ describe('ResourceUsageService', () => {
       expect(resourceIntroducersService.canMaintain).not.toHaveBeenCalled();
       expect(mockUpdateQueryBuilder.update).toHaveBeenCalledWith(ResourceUsage);
       expect(billingService.chargeForResourceUsage).toHaveBeenCalledWith(mockUpdatedSession, expect.anything());
-      expect(eventEmitter.emitAsync).toHaveBeenCalledWith(ResourceUsageEvent.EVENT_NAME, expect.any(Object));
+      expect(eventEmitter.emitAsync).toHaveBeenCalledWith(ResourceSessionStartedEvent.EVENT_NAME, expect.any(Object));
       expect(flowExecutorService.runFlow).toHaveBeenCalledWith(
         mockActiveSession.resourceId,
         ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
@@ -1447,10 +1447,10 @@ describe('ResourceUsageService', () => {
 
       await service.endSession(mockActiveSession.resourceId, supervisorUser, dto);
 
-      const endedEmit = eventEmitter.emit.mock.calls.find((c) => c[0] === SupervisedUsageEndedEvent.EVENT_NAME);
+      const endedEmit = eventEmitter.emit.mock.calls.find((c) => c[0] === ResourceSupervisedUsageEndedEvent.EVENT_NAME);
       expect(endedEmit).toBeDefined();
-      const payload = endedEmit?.[1] as SupervisedUsageEndedEvent;
-      expect(payload).toBeInstanceOf(SupervisedUsageEndedEvent);
+      const payload = endedEmit?.[1] as ResourceSupervisedUsageEndedEvent;
+      expect(payload).toBeInstanceOf(ResourceSupervisedUsageEndedEvent);
       expect(payload).toMatchObject({ resourceId: 40, userId: 60, supervisorUserId: 61, usageId: 9 });
     });
 
@@ -1478,7 +1478,7 @@ describe('ResourceUsageService', () => {
 
       await service.endSession(mockActiveSession.resourceId, sessionOwner, dto);
 
-      const endedEmit = eventEmitter.emit.mock.calls.find((c) => c[0] === SupervisedUsageEndedEvent.EVENT_NAME);
+      const endedEmit = eventEmitter.emit.mock.calls.find((c) => c[0] === ResourceSupervisedUsageEndedEvent.EVENT_NAME);
       expect(endedEmit).toBeUndefined();
     });
   });
@@ -1520,11 +1520,11 @@ describe('ResourceUsageService', () => {
       const result = await service.lockDoor(10, mockUser);
 
       expect(result).toBe(saved);
-      expect(eventEmitter.emitAsync).toHaveBeenCalledWith(ResourceUsageEvent.EVENT_NAME, expect.any(Object));
+      expect(eventEmitter.emitAsync).toHaveBeenCalledWith(ResourceSessionStartedEvent.EVENT_NAME, expect.any(Object));
 
       const emitted = eventEmitter.emitAsync.mock.calls[0];
-      const payload = emitted[1] as ResourceUsageEvent;
-      expect(payload).toBeInstanceOf(ResourceUsageEvent);
+      const payload = emitted[1] as ResourceSessionStartedEvent;
+      expect(payload).toBeInstanceOf(ResourceSessionStartedEvent);
       expect(payload.usage).toMatchObject({
         id: 100,
         usageAction: ResourceUsageAction.DoorLock,
@@ -1551,11 +1551,11 @@ describe('ResourceUsageService', () => {
       const result = await service.unlockDoor(10, mockUser);
 
       expect(result).toBe(saved);
-      expect(eventEmitter.emitAsync).toHaveBeenCalledWith(ResourceUsageEvent.EVENT_NAME, expect.any(Object));
+      expect(eventEmitter.emitAsync).toHaveBeenCalledWith(ResourceSessionStartedEvent.EVENT_NAME, expect.any(Object));
 
       const emitted = eventEmitter.emitAsync.mock.calls[0];
-      const payload = emitted[1] as ResourceUsageEvent;
-      expect(payload).toBeInstanceOf(ResourceUsageEvent);
+      const payload = emitted[1] as ResourceSessionStartedEvent;
+      expect(payload).toBeInstanceOf(ResourceSessionStartedEvent);
       expect(payload.usage).toMatchObject({
         id: 101,
         usageAction: ResourceUsageAction.DoorUnlock,
@@ -1582,11 +1582,11 @@ describe('ResourceUsageService', () => {
       const result = await service.unlatchDoor(10, mockUser);
 
       expect(result).toBe(saved);
-      expect(eventEmitter.emitAsync).toHaveBeenCalledWith(ResourceUsageEvent.EVENT_NAME, expect.any(Object));
+      expect(eventEmitter.emitAsync).toHaveBeenCalledWith(ResourceSessionStartedEvent.EVENT_NAME, expect.any(Object));
 
       const emitted = eventEmitter.emitAsync.mock.calls[0];
-      const payload = emitted[1] as ResourceUsageEvent;
-      expect(payload).toBeInstanceOf(ResourceUsageEvent);
+      const payload = emitted[1] as ResourceSessionStartedEvent;
+      expect(payload).toBeInstanceOf(ResourceSessionStartedEvent);
       expect(payload.usage).toMatchObject({
         id: 102,
         usageAction: ResourceUsageAction.DoorUnlatch,

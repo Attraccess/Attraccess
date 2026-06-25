@@ -29,7 +29,7 @@ import {
 } from '@attraccess/database-entities';
 import { ResourceFlowVariablesService } from './resource-flow-variables.service';
 import { OnEvent } from '@nestjs/event-emitter';
-import { ResourceUsageEvent } from '../usage/events/resource-usage.events';
+import { ResourceSessionStartedEvent } from '../usage/events/resource-usage.events';
 import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { FlowConfigType } from './flow.config';
@@ -390,8 +390,8 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     });
   }
 
-  @OnEvent(ResourceUsageEvent.EVENT_NAME)
-  async handleResourceUsageEvent(event: ResourceUsageEvent) {
+  @OnEvent(ResourceSessionStartedEvent.EVENT_NAME)
+  async handleResourceSessionStartedEvent(event: ResourceSessionStartedEvent) {
     try {
       const { usage } = event;
 

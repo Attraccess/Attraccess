@@ -221,7 +221,7 @@ describe('BillingService', () => {
     });
   });
 
-  describe('handleResourceUsageEvent', () => {
+  describe('handleResourceSessionStartedEvent', () => {
     const createMockManager = () => {
       return {
         findOneBy: jest.fn().mockResolvedValue(null),
