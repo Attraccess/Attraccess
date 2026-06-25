@@ -27,8 +27,8 @@ let pinHash: string | null = null;
 let allowQuit = false;
 let kioskLocked = false;
 
-// ponytail: random uuid-ish partition key so the session is always fresh per launch
-const KIOSK_PARTITION = `memory:${Math.random().toString(36).slice(2)}`;
+// ponytail: increment per new kiosk window so each open gets a fresh web session (sign-out on close)
+let _kioskSessionId = 0;
 
 // dark blanks that cover secondary displays while the kiosk is locked
 let secondaryOverlays: BrowserWindow[] = [];
@@ -81,7 +81,7 @@ function openKiosk(payload: CompanionAuthenticatedDto) {
     return;
   }
 
-  const ses = session.fromPartition(KIOSK_PARTITION, { cache: false });
+  const ses = session.fromPartition(`memory:kiosk-${++_kioskSessionId}`, { cache: false });
 
   kioskWindow = new BrowserWindow({
     show: false,
