@@ -224,99 +224,86 @@ export function CompanionSettingsPage() {
         </Card.Content>
       </Card>
 
-      {/* Bundled Version */}
-      <Card>
-        <Card.Header className="flex flex-col items-start gap-1">
-          <span className="text-base font-semibold">{t('version.title')}</span>
-          <span className="text-sm text-default-500">{t('version.subtitle')}</span>
-        </Card.Header>
-        <Card.Content>
-          {manifestLoading ? (
-            <Spinner size="sm" />
-          ) : manifest ? (
-            <Chip color="success">{t('version.label', { version: manifest.version })}</Chip>
-          ) : (
-            <Alert color="default">
-              <AlertContent>
-                <AlertTitle>{t('version.noBinaries')}</AlertTitle>
-              </AlertContent>
-            </Alert>
-          )}
-        </Card.Content>
-      </Card>
-
-      {/* Download */}
-      <Card>
-        <Card.Header className="flex flex-col items-start gap-1">
-          <span className="text-base font-semibold">{t('download.title')}</span>
-          <span className="text-sm text-default-500">{t('download.subtitle')}</span>
-        </Card.Header>
-        <Card.Content>
-          {!manifest && !manifestLoading ? (
-            <Alert color="default">
-              <AlertContent>
-                <AlertTitle>{t('download.noBinaries')}</AlertTitle>
-              </AlertContent>
-            </Alert>
-          ) : manifestLoading ? (
-            <Spinner size="sm" />
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {manifest?.platforms.map((entry) => (
-                <Card key={`${entry.platform}-${entry.arch}`} className="border border-divider">
-                  <Card.Content className="flex flex-col items-center gap-3 py-4">
-                    <MonitorIcon size={28} className="text-default-400" />
-                    <span className="text-sm font-medium text-center">
-                      {platformLabel(entry.platform, entry.arch)}
-                    </span>
-                    <a
-                      href={downloadUrl(entry.platform, entry.arch)}
-                      download={entry.filename}
-                      className="w-full"
-                    >
-                      <Button variant="primary" size="sm" className="w-full">
-                        <DownloadIcon className="w-4 h-4" />
-                        {t('download.button')}
-                      </Button>
-                    </a>
-                  </Card.Content>
-                </Card>
-              ))}
+      {/* Download + Setup side by side */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Download */}
+        <Card>
+          <Card.Header className="flex flex-col items-start gap-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-base font-semibold">{t('download.title')}</span>
+              {manifest && !manifestLoading && (
+                <Chip color="success" size="sm">{t('version.label', { version: manifest.version })}</Chip>
+              )}
             </div>
-          )}
-        </Card.Content>
-      </Card>
-
-      {/* Setup Instructions */}
-      <Card>
-        <Card.Header className="flex flex-col items-start gap-1">
-          <span className="text-base font-semibold">{t('setup.title')}</span>
-          <span className="text-sm text-default-500">{t('setup.subtitle')}</span>
-        </Card.Header>
-        <Card.Content>
-          <Accordion>
-            {SETUP_STEPS.map((step, idx) => (
-              <AccordionItem key={step} id={step} aria-label={t(`setup.steps.${step}.title`)}>
-                <AccordionHeading>
-                  <AccordionTrigger>
-                    <span className="flex items-center gap-3">
-                      <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold shrink-0">
-                        {idx + 1}
+            <span className="text-sm text-default-500">{t('download.subtitle')}</span>
+          </Card.Header>
+          <Card.Content>
+            {!manifest && !manifestLoading ? (
+              <Alert color="default">
+                <AlertContent>
+                  <AlertTitle>{t('download.noBinaries')}</AlertTitle>
+                </AlertContent>
+              </Alert>
+            ) : manifestLoading ? (
+              <Spinner size="sm" />
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {manifest?.platforms.map((entry) => (
+                  <Card key={`${entry.platform}-${entry.arch}`} className="border border-divider">
+                    <Card.Content className="flex flex-col items-center gap-3 py-4">
+                      <MonitorIcon size={28} className="text-default-400" />
+                      <span className="text-sm font-medium text-center">
+                        {platformLabel(entry.platform, entry.arch)}
                       </span>
-                      {t(`setup.steps.${step}.title`)}
-                    </span>
-                  </AccordionTrigger>
-                </AccordionHeading>
-                <AccordionPanel>
-                  <AccordionBody>
-                    <p className="text-sm text-default-600 ml-9">{t(`setup.steps.${step}.description`)}</p>
-                  </AccordionBody>
-                </AccordionPanel>
-              </AccordionItem>
-            ))}
-          </Accordion>
-        </Card.Content>
-      </Card>
+                      <a
+                        href={downloadUrl(entry.platform, entry.arch)}
+                        download={entry.filename}
+                        className="w-full"
+                      >
+                        <Button variant="primary" size="sm" className="w-full">
+                          <DownloadIcon className="w-4 h-4" />
+                          {t('download.button')}
+                        </Button>
+                      </a>
+                    </Card.Content>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </Card.Content>
+        </Card>
+
+        {/* Setup Instructions */}
+        <Card>
+          <Card.Header className="flex flex-col items-start gap-1">
+            <span className="text-base font-semibold">{t('setup.title')}</span>
+            <span className="text-sm text-default-500">{t('setup.subtitle')}</span>
+          </Card.Header>
+          <Card.Content>
+            <Accordion>
+              {SETUP_STEPS.map((step, idx) => (
+                <AccordionItem key={step} id={step} aria-label={t(`setup.steps.${step}.title`)}>
+                  <AccordionHeading>
+                    <AccordionTrigger>
+                      <span className="flex items-center gap-3">
+                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold shrink-0">
+                          {idx + 1}
+                        </span>
+                        {t(`setup.steps.${step}.title`)}
+                      </span>
+                    </AccordionTrigger>
+                  </AccordionHeading>
+                  <AccordionPanel>
+                    <AccordionBody>
+                      <p className="text-sm text-default-600 ml-9">{t(`setup.steps.${step}.description`)}</p>
+                    </AccordionBody>
+                  </AccordionPanel>
+                </AccordionItem>
+              ))}
+            </Accordion>
+          </Card.Content>
+        </Card>
+      </div>
 
       {/* Delete confirmation */}
       <DeleteConfirmationModal

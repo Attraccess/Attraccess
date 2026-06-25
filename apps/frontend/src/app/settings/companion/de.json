@@ -26,9 +26,6 @@
     }
   },
   "version": {
-    "title": "Gebündelte Version",
-    "subtitle": "Companion-App-Version in diesem Server-Build enthalten",
-    "noBinaries": "In diesem Build sind keine Companion-Binärdateien gebündelt (Entwicklungsmodus).",
     "label": "Version {{version}}"
   },
   "download": {

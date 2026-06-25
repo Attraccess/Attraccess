@@ -26,9 +26,6 @@
     }
   },
   "version": {
-    "title": "Bundled Version",
-    "subtitle": "Companion app version included in this server build",
-    "noBinaries": "No companion binaries are bundled in this build (development mode).",
     "label": "Version {{version}}"
   },
   "download": {
