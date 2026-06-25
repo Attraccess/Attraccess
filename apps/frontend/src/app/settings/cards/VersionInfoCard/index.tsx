@@ -1,4 +1,4 @@
-import { Chip, cn } from '@heroui/react';
+import { Card, CardContent, CardHeader, Chip, Skeleton } from '@heroui/react';
 import { ArrowUpCircleIcon, CheckCircleIcon, GitCommitHorizontalIcon, PackageIcon, TagIcon, WifiOffIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useSystemServiceGetCurrentVersion, useSystemServiceGetUpdateStatus } from '@attraccess/react-query-client';
@@ -13,10 +13,10 @@ const GITHUB_REPO = 'https://github.com/Attraccess/Attraccess';
 
 export function VersionInfoCard({ className }: VersionInfoCardProps = {}) {
   const { t } = useTranslations({ en, de });
-  const { data: versionInfo } = useSystemServiceGetCurrentVersion();
+  const { data: versionInfo, isLoading: isVersionLoading } = useSystemServiceGetCurrentVersion();
   const { data: updateStatus } = useSystemServiceGetUpdateStatus();
 
-  const isDev = !versionInfo?.version || versionInfo.version === '0.0.0-dev';
+  const isDev = !isVersionLoading && (!versionInfo?.version || versionInfo.version === '0.0.0-dev');
 
   const updateChip = updateStatus ? (
     updateStatus.checkSucceeded ? (
@@ -45,37 +45,30 @@ export function VersionInfoCard({ className }: VersionInfoCardProps = {}) {
     )
   ) : null;
 
-  const releaseUrl = versionInfo?.version && !isDev
-    ? `${GITHUB_REPO}/releases/tag/v${versionInfo.version}`
-    : `${GITHUB_REPO}/releases`;
+  const releaseUrl =
+    versionInfo?.version && !isDev ? `${GITHUB_REPO}/releases/tag/v${versionInfo.version}` : `${GITHUB_REPO}/releases`;
 
-  const commitUrl = versionInfo?.commitHash
-    ? `${GITHUB_REPO}/commit/${versionInfo.commitHash}`
-    : null;
+  const commitUrl = versionInfo?.commitHash ? `${GITHUB_REPO}/commit/${versionInfo.commitHash}` : null;
 
   return (
-    <section
-      className={cn(
-        'w-full flex flex-col gap-4 rounded-large border border-default-200 bg-default-50 p-6',
-        className,
-      )}
-      data-cy="version-info-section"
-    >
-      <div className="flex items-center justify-between gap-2">
+    <Card className={className} data-cy="version-info-section">
+      <CardHeader className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 text-default-700">
           <PackageIcon size={18} />
           <h3 className="text-sm uppercase tracking-wide font-semibold">{t('title')}</h3>
         </div>
         {updateChip}
-      </div>
+      </CardHeader>
 
-      <div className="flex flex-col gap-3">
+      <CardContent className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-default-600 text-sm">
             <TagIcon size={14} />
             <span>{t('currentVersion')}</span>
           </div>
-          {isDev ? (
+          {isVersionLoading ? (
+            <Skeleton className="w-20 h-4 rounded" />
+          ) : isDev ? (
             <span className="text-sm text-default-500 font-mono">{t('devVersion')}</span>
           ) : (
             <a
@@ -124,7 +117,7 @@ export function VersionInfoCard({ className }: VersionInfoCardProps = {}) {
             </a>
           </div>
         )}
-      </div>
-    </section>
+      </CardContent>
+    </Card>
   );
 }
