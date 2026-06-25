@@ -81,10 +81,12 @@ export async function tryVtLock(): Promise<boolean> {
 
     let resolved = false;
     let buf = '';
+    let timer: ReturnType<typeof setTimeout> | null = null;
 
     const settle = (ok: boolean) => {
       if (resolved) return;
       resolved = true;
+      if (timer !== null) clearTimeout(timer);
       if (!ok) proc.kill();
       resolve(ok);
     };
@@ -100,7 +102,7 @@ export async function tryVtLock(): Promise<boolean> {
       settle(false);
     });
 
-    setTimeout(() => settle(false), 3000);
+    timer = setTimeout(() => settle(false), 3000);
   });
 }
 
