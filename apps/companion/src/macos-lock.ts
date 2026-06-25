@@ -57,8 +57,6 @@ function buildPlist(execPath: string): string {
 \t</array>
 \t<key>RunAtLoad</key>
 \t<true/>
-\t<key>KeepAlive</key>
-\t<true/>
 </dict>
 </plist>
 `;

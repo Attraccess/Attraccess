@@ -68,8 +68,10 @@ describe('installLaunchAgent', () => {
     expect(content).toContain('/Applications/Attraccess.app/Contents/MacOS/app');
     expect(content).toContain('com.attraccess.companion');
     expect(content).toContain('<key>RunAtLoad</key>');
-    expect(content).toContain('<key>KeepAlive</key>');
     expect(content).toContain('<true/>');
+    // KeepAlive must NOT be set: it relaunches the app on every quit, trapping
+    // the user in an unquittable loop. Login autostart only needs RunAtLoad.
+    expect(content).not.toContain('KeepAlive');
   });
 });
 
