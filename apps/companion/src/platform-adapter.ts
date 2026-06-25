@@ -30,6 +30,14 @@ export interface OsAdapter {
 
   /** Trigger the OS permission request flow (no-op if no permissions are needed). */
   requestPermissions(): void;
+
+  /**
+   * Global shortcuts to register while the lock overlay is active.
+   * Each platform returns the keyboard escapes relevant to that OS.
+   * Shortcuts that the OS reserves and cannot be overridden will silently
+   * fail — the caller wraps each registration in try/catch.
+   */
+  lockShortcuts(): readonly string[];
 }
 
 const windowsAdapter: OsAdapter = {
@@ -37,6 +45,18 @@ const windowsAdapter: OsAdapter = {
   installStartupEntry: (execPath) => windowsInstallStartupEntry(execPath),
   permissionsStatus: () => ({ needed: false, accessibility: true }),
   requestPermissions: () => undefined,
+  lockShortcuts: () => [
+    'CommandOrControl+Q',
+    'CommandOrControl+W',
+    'Alt+F4',
+    'Control+Shift+Escape', // Task Manager
+    'Super',
+    'Super+D',              // Show desktop
+    'Super+R',              // Run dialog
+    'Super+X',              // Quick Link menu
+    'Control+Escape',       // Start menu (Alt path)
+    // Alt+Tab / Win+Tab are OS-reserved and will silently fail — that is fine
+  ],
 };
 
 const macosAdapter: OsAdapter = {
@@ -49,6 +69,18 @@ const macosAdapter: OsAdapter = {
     accessibility: macosHasAccessibilityPermission(),
   }),
   requestPermissions: () => macosPromptAccessibilityPermission(),
+  // setKiosk(true) already blocks Cmd+Tab, Mission Control, Spaces, force-quit,
+  // and app-hide via NSApplicationPresentationOptions. This list covers the gaps
+  // those presentation options leave.
+  lockShortcuts: () => [
+    'CommandOrControl+Q',
+    'CommandOrControl+W',
+    'CommandOrControl+M',      // minimize
+    'CommandOrControl+H',      // hide
+    'CommandOrControl+Space',  // Spotlight
+    'CommandOrControl+Alt+Space',
+    'CommandOrControl+`',      // cycle app windows
+  ],
 };
 
 const nullAdapter: OsAdapter = {
@@ -56,6 +88,7 @@ const nullAdapter: OsAdapter = {
   installStartupEntry: async () => undefined,
   permissionsStatus: () => ({ needed: false, accessibility: true }),
   requestPermissions: () => undefined,
+  lockShortcuts: () => [],
 };
 
 export const osAdapter: OsAdapter =

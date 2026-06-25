@@ -120,32 +120,8 @@ function reopenKiosk() {
 
 // ─── Lock / unlock ────────────────────────────────────────────────────────────
 
-// Keyboard escapes swallowed while locked. Process switching (Cmd+Tab, Mission
-// Control, Spaces), force-quit and app-hide are blocked by the kiosk
-// presentation options that setKiosk(true) engages, so this list only covers
-// the gaps those options leave.
-const LOCK_SHORTCUTS = [
-  'CommandOrControl+Q',
-  'CommandOrControl+W',
-  'CommandOrControl+M',
-  'CommandOrControl+H',
-  'CommandOrControl+Space',     // Spotlight / Windows search
-  'CommandOrControl+Alt+Space', // Spotlight (alt)
-  'CommandOrControl+`',         // cycle app windows
-  // Windows: block common task-switch, Start-menu, and Task Manager escapes.
-  // OS-reserved shortcuts (Super, Alt+Tab, Win+Tab) may fail silently —
-  // caught by the try/catch in registerLockShortcuts.
-  'Alt+F4',
-  'Control+Shift+Escape', // Task Manager
-  'Super',
-  'Super+D',              // Show desktop
-  'Super+R',              // Run dialog
-  'Super+X',              // Quick Link menu
-  'Control+Escape',       // Start menu (Alt path)
-];
-
 function registerLockShortcuts(): void {
-  for (const accel of LOCK_SHORTCUTS) {
+  for (const accel of osAdapter.lockShortcuts()) {
     // ponytail: some accels are OS-reserved and throw; swallowing the rest is enough
     try { globalShortcut.register(accel, () => undefined); } catch { /* reserved */ }
   }
