@@ -122,8 +122,12 @@ function reopenKiosk() {
 
 function registerLockShortcuts(): void {
   for (const accel of osAdapter.lockShortcuts()) {
-    // ponytail: some accels are OS-reserved and throw; swallowing the rest is enough
-    try { globalShortcut.register(accel, () => undefined); } catch { /* reserved */ }
+    try {
+      globalShortcut.register(accel, () => undefined);
+    } catch (err) {
+      // OS-reserved shortcuts cannot be overridden; log so failures are visible
+      console.warn(`[companion] could not register lock shortcut "${accel}":`, err);
+    }
   }
 }
 
