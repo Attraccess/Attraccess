@@ -13,6 +13,7 @@ import {
   promptAccessibilityPermission,
   installLaunchAgent,
 } from './macos-lock';
+import { lockWorkStation, installAutostart } from './windows-lock';
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
@@ -133,9 +134,16 @@ const LOCK_SHORTCUTS = [
   'CommandOrControl+W',
   'CommandOrControl+M',
   'CommandOrControl+H',
-  'CommandOrControl+Space',     // Spotlight
+  'CommandOrControl+Space',     // Spotlight / Windows search
   'CommandOrControl+Alt+Space', // Spotlight (alt)
   'CommandOrControl+`',         // cycle app windows
+  // Windows: block common task-switch / Start-menu escapes.
+  // OS-reserved shortcuts (Super, Alt+Tab) may fail silently — caught by the
+  // try/catch in registerLockShortcuts.
+  'Alt+F4',
+  'Super',
+  'Super+D',
+  'Control+Escape',
 ];
 
 function registerLockShortcuts(): void {
@@ -247,8 +255,11 @@ function hideKioskOverlay(): void {
 }
 
 function lockComputer(): void {
-  // Server-controlled lock: the kiosk overlay is the lock (the OS login screen
-  // can't be dismissed by an unlock_pc message, so it's not usable here).
+  // On Windows, engage the OS lock screen as an extra security layer.
+  // Best-effort: if LockWorkStation fails (e.g. no interactive session or kiosk
+  // mode), the Electron overlay below is the authoritative server-controlled lock.
+  // ponytail: fire-and-forget; overlay is always shown regardless of outcome
+  if (process.platform === 'win32') lockWorkStation().catch(() => undefined);
   showKioskOverlay();
 }
 
@@ -467,11 +478,9 @@ function startWsClient(serverUrl: string, firstRun: boolean) {
     // never authenticates, so do it now instead of waiting for a relaunch
     wsClient?.sendAuthenticate({ id: payload.id, token: payload.token });
 
-    // install launchd user agent on first registration so the companion
-    // starts automatically on login (macOS only — no-op on other platforms)
-    installLaunchAgent(app.getPath('exe')).catch(() => {
-      // non-fatal — app may not be packaged yet in dev
-    });
+    // install OS startup entry so the companion launches automatically after login
+    installLaunchAgent(app.getPath('exe')).catch(() => undefined);  // macOS
+    installAutostart(app.getPath('exe')).catch(() => undefined);    // Windows
   });
 
   wsClient.on('authenticated', async (payload: CompanionAuthenticatedDto) => {
