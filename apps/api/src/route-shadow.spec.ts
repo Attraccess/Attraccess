@@ -102,27 +102,52 @@ function shadows(a: RouteDecl, b: RouteDecl): boolean {
 }
 
 /**
- * Parse a controller source file.
+ * Parse every @Controller class declared in a source file.
+ *
+ * A single file may hold multiple controllers, each with its own
+ * @Controller(prefix) — so we scan linearly and attribute each route decorator
+ * to the controller class it lives in, rather than collapsing the whole file
+ * onto its first class/prefix.
+ *
  * Skips template-literal paths (back-tick) because we cannot evaluate
  * TypeScript expressions statically; those would need a full compiler run.
  */
-function parseController(filePath: string): ControllerInfo | null {
+function parseControllers(filePath: string): ControllerInfo[] {
   const content = readFileSync(filePath, 'utf-8');
-
-  const classMatch = content.match(/export class (\w+)/);
-  if (!classMatch) return null;
-  const className = classMatch[1];
-
-  // @Controller() or @Controller('prefix') or @Controller("prefix")
-  const prefixMatch = content.match(/@Controller\(\s*(?:['"]([^'"]*)['"])?\s*\)/);
-  const prefix = normalisePath(prefixMatch?.[1] ?? '');
-
-  const routes: RouteDecl[] = [];
   const lines = content.split('\n');
+
   const methodRe = new RegExp(`@(${HTTP_METHODS.join('|')})\\(([^)]*)\\)`);
+  const controllerRe = /@Controller\(\s*(?:['"]([^'"]*)['"])?\s*\)/;
+  const classRe = /export class (\w+)/;
+
+  const controllers: ControllerInfo[] = [];
+  let pendingPrefix: string | null = null; // set by @Controller(...), consumed at the next class
+  let current: ControllerInfo | null = null;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
+
+    const cm = controllerRe.exec(line);
+    if (cm) {
+      pendingPrefix = normalisePath(cm[1] ?? '');
+      continue;
+    }
+
+    const clsMatch = classRe.exec(line);
+    if (clsMatch) {
+      if (pendingPrefix !== null) {
+        current = { className: clsMatch[1], prefix: pendingPrefix, routes: [], filePath };
+        controllers.push(current);
+        pendingPrefix = null;
+      } else {
+        // A non-controller class ends the previous controller's body.
+        current = null;
+      }
+      continue;
+    }
+
+    if (!current) continue;
+
     const m = methodRe.exec(line);
     if (!m) continue;
 
@@ -140,10 +165,10 @@ function parseController(filePath: string): ControllerInfo | null {
     if (routePath === null) continue;
 
     const segs = pathSegments(routePath);
-    routes.push({ method, path: routePath, lineNumber: i + 1, segments: segs });
+    current.routes.push({ method, path: routePath, lineNumber: i + 1, segments: segs });
   }
 
-  return { className, prefix, routes, filePath };
+  return controllers;
 }
 
 // ─── Module parsing ───────────────────────────────────────────────────────────
@@ -233,11 +258,11 @@ function detectShadowsInModule(
     const importPath = importMap.get(name);
     if (!importPath) continue;
     const absolutePath = resolve(moduleDir, importPath + '.ts');
-    const info = parseController(absolutePath);
-    if (info) {
+    for (const info of parseControllers(absolutePath)) {
       controllerMap.set(info.className, info);
-      resolved.push(info);
     }
+    const resolvedInfo = controllerMap.get(name);
+    if (resolvedInfo) resolved.push(resolvedInfo);
   }
 
   // Group controllers by their @Controller(prefix)
@@ -316,8 +341,7 @@ describe('Route-shadow guard (ATT-534)', () => {
 
     controllerMap = new Map();
     for (const file of controllerFiles) {
-      const info = parseController(file);
-      if (info) controllerMap.set(info.className, info);
+      for (const info of parseControllers(file)) controllerMap.set(info.className, info);
     }
   });
 
