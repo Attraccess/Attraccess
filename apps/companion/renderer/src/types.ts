@@ -15,7 +15,7 @@ export interface CompanionBridge {
   verifyPin: (pin: string) => Promise<boolean>;
   confirmQuit: () => Promise<void>;
   disconnect: () => Promise<void>;
-  onInit: (cb: (data: { firstRun: boolean; serverUrl?: string; requirePin?: 'settings' | 'quit'; registered: boolean; connected: boolean }) => void) => void;
+  onInit: (cb: (data: { serverUrl?: string; requirePin?: 'settings' | 'quit'; registered: boolean; connected: boolean }) => void) => void;
   onWsStatus: (cb: (status: 'connected' | 'disconnected') => void) => void;
   onRegistered: (cb: (data: { id: number }) => void) => void;
   onAuthenticated: (cb: (data: unknown) => void) => void;

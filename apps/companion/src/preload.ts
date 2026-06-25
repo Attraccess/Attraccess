@@ -12,7 +12,7 @@ contextBridge.exposeInMainWorld('companion', {
   confirmQuit: () => ipcRenderer.invoke('confirm-quit'),
   disconnect: () => ipcRenderer.invoke('disconnect'),
 
-  onInit: (cb: (data: { firstRun: boolean; serverUrl?: string }) => void) =>
+  onInit: (cb: (data: { serverUrl?: string }) => void) =>
     ipcRenderer.on('init', (_e, data) => cb(data)),
   onWsStatus: (cb: (status: 'connected' | 'disconnected') => void) =>
     ipcRenderer.on('ws-status', (_e, status) => cb(status)),

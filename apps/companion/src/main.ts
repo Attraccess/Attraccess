@@ -283,7 +283,7 @@ function buildTrayMenu(state: TrayState): Menu {
       if (isPinSet()) {
         openWizardWindow({ requirePin: 'settings' });
       } else {
-        openWizardWindow({ firstRun: false });
+        openWizardWindow();
       }
     }},
     { label: 'About', click: () => {
@@ -311,7 +311,6 @@ function setTrayState(state: TrayState) {
 // ─── Wizard window ────────────────────────────────────────────────────────────
 
 interface WizardOpts {
-  firstRun?: boolean;
   requirePin?: 'settings' | 'quit';
 }
 
@@ -346,7 +345,6 @@ function openWizardWindow(opts: WizardOpts = {}) {
   }
   mainWindow.webContents.on('did-finish-load', () => {
     mainWindow?.webContents.send('init', {
-      firstRun: opts.firstRun ?? false,
       serverUrl: creds?.serverUrl,
       requirePin: opts.requirePin,
       registered: !!creds?.id,
@@ -519,12 +517,12 @@ app.whenReady().then(async () => {
   [creds, pinHash] = await Promise.all([loadCredentials(), loadPin()]);
 
   if (!creds?.serverUrl || !creds?.id) {
-    openWizardWindow({ firstRun: true });
+    openWizardWindow();
   } else if (!allPermissionsGranted() || !pinHash) {
     // Existing device missing permissions or a PIN (e.g. registered before PINs
     // existed): run the wizard to fix both before connecting. A connection must
     // never be established without a PIN.
-    openWizardWindow({ firstRun: false });
+    openWizardWindow();
   } else {
     startWsClient(creds.serverUrl, /* firstRun */ false);
   }
