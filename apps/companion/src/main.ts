@@ -1,11 +1,18 @@
-import { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, session } from 'electron';
+import { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, session, screen, dialog, globalShortcut } from 'electron';
 import * as path from 'path';
 import * as https from 'https';
 import * as http from 'http';
+import { createHash } from 'crypto';
 import { CompanionWsClient, CompanionAuthenticatedDto, CompanionRegisterResponseDto } from '@attraccess/companion-ws-client';
-import { loadCredentials, saveCredentials, StoredCredentials } from './keychain';
+import { loadCredentials, saveCredentials, clearCredentials, StoredCredentials, loadPin, savePin } from './keychain';
 import { normalizeServerUrl } from './server-url';
 import { dotIconPng } from './tray-icon';
+import { attraccessLogoSvg } from './logo-svg';
+import {
+  hasAccessibilityPermission,
+  promptAccessibilityPermission,
+  installLaunchAgent,
+} from './macos-lock';
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
@@ -16,9 +23,31 @@ let wsClient: CompanionWsClient | null = null;
 let creds: StoredCredentials | null = null;
 let autoLogoffSeconds = 30;
 let authenticatedPayload: CompanionAuthenticatedDto | null = null;
+let pinHash: string | null = null;
+let allowQuit = false;
+let kioskLocked = false;
+let wsConnected = false;
 
-// ponytail: random uuid-ish partition key so the session is always fresh per launch
-const KIOSK_PARTITION = `memory:${Math.random().toString(36).slice(2)}`;
+// ponytail: increment per new kiosk window so each open gets a fresh web session (sign-out on close)
+let _kioskSessionId = 0;
+
+// dark blanks that cover secondary displays while the kiosk is locked
+let secondaryOverlays: BrowserWindow[] = [];
+
+// ─── PIN helpers ──────────────────────────────────────────────────────────────
+
+function hashPin(pin: string): string {
+  return createHash('sha256').update(pin).digest('hex');
+}
+
+function isPinSet(): boolean {
+  return !!pinHash;
+}
+
+function verifyPin(input: string): boolean {
+  if (!pinHash) return false;
+  return hashPin(input) === pinHash;
+}
 
 // ─── Health check ─────────────────────────────────────────────────────────────
 
@@ -53,15 +82,18 @@ function openKiosk(payload: CompanionAuthenticatedDto) {
     return;
   }
 
-  const ses = session.fromPartition(KIOSK_PARTITION, { cache: false });
+  const ses = session.fromPartition(`memory:kiosk-${++_kioskSessionId}`, { cache: false });
 
   kioskWindow = new BrowserWindow({
     show: false,
-    frame: false,
+    frame: true,
     webPreferences: { session: ses, nodeIntegration: false, contextIsolation: true },
   });
 
   kioskWindow.loadURL(kioskUrl(payload));
+  kioskWindow.on('close', (event) => {
+    if (kioskLocked) event.preventDefault();
+  });
   kioskWindow.on('closed', () => { kioskWindow = null; });
 }
 
@@ -73,32 +105,155 @@ function reloadKiosk() {
   }
 }
 
-// macOS native fullscreen lives in its own Space, so hide() leaves a black
-// screen behind. simpleFullScreen avoids the Space; other platforms use native.
-function setOverlayFullscreen(on: boolean) {
-  if (!kioskWindow) return;
-  if (process.platform === 'darwin') kioskWindow.setSimpleFullScreen(on);
-  else kioskWindow.setFullScreen(on);
-}
-
-function showKioskOverlay() {
-  kioskWindow?.setAlwaysOnTop(true, 'screen-saver');
-  setOverlayFullscreen(true);
-  kioskWindow?.show();
-  kioskWindow?.focus();
-}
-
-function hideKioskOverlay() {
-  kioskWindow?.setAlwaysOnTop(false);
-  setOverlayFullscreen(false);
-  kioskWindow?.hide();
-}
-
-// reopen/show the kiosk from the tray (recreates the window if it was closed)
+// open the resource panel from the tray — windowed, not blocking
 function reopenKiosk() {
   if (!authenticatedPayload) return;
   openKiosk(authenticatedPayload);
+  const win = kioskWindow;
+  if (!win || win.isDestroyed()) return;
+  kioskLocked = false;
+  win.setAlwaysOnTop(false);
+  if (process.platform === 'darwin') win.setKiosk(false);
+  else win.setFullScreen(false);
+  win.setResizable(true);
+  win.setSize(960, 720);
+  win.center();
+  win.show();
+  win.focus();
+}
+
+// ─── Lock / unlock ────────────────────────────────────────────────────────────
+
+// Keyboard escapes swallowed while locked. Process switching (Cmd+Tab, Mission
+// Control, Spaces), force-quit and app-hide are blocked by the kiosk
+// presentation options that setKiosk(true) engages, so this list only covers
+// the gaps those options leave.
+const LOCK_SHORTCUTS = [
+  'CommandOrControl+Q',
+  'CommandOrControl+W',
+  'CommandOrControl+M',
+  'CommandOrControl+H',
+  'CommandOrControl+Space',     // Spotlight
+  'CommandOrControl+Alt+Space', // Spotlight (alt)
+  'CommandOrControl+`',         // cycle app windows
+];
+
+function registerLockShortcuts(): void {
+  for (const accel of LOCK_SHORTCUTS) {
+    // ponytail: some accels are OS-reserved and throw; swallowing the rest is enough
+    try { globalShortcut.register(accel, () => undefined); } catch { /* reserved */ }
+  }
+}
+
+function addSecondaryOverlay(x: number, y: number, width: number, height: number): void {
+  const overlay = new BrowserWindow({
+    x, y, width, height,
+    frame: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    backgroundColor: '#0f172a',
+    webPreferences: { nodeIntegration: false, contextIsolation: true },
+  });
+  overlay.setAlwaysOnTop(true, 'screen-saver');
+  // Must use the SAME fullscreen mode as the main window. Presentation options
+  // are app-global and last-write-wins; mixing kiosk + simpleFullScreen lets the
+  // looser simpleFullScreen options clobber kiosk's disableProcessSwitching,
+  // re-enabling Space swiping. Uniform kiosk = identical options = no clobber,
+  // and it covers the display's menu bar.
+  if (process.platform === 'darwin') overlay.setKiosk(true);
+  else overlay.setFullScreen(true);
+  // Centered, dimmed "Locked by" + Attraccess lockup on the dark blocker. color: drives the wordmark.
+  const blockerHtml =
+    `<!doctype html><html><body style="margin:0;height:100vh;display:flex;flex-direction:column;` +
+    `align-items:center;justify-content:center;gap:1.25rem;background:#0f172a;color:#cbd5e1;opacity:.55">` +
+    `<span style="font:500 14px/1 system-ui,sans-serif;letter-spacing:.06em">Locked by</span>` +
+    `<div style="width:38vw;max-width:520px">${attraccessLogoSvg}</div></body></html>`;
+  overlay.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(blockerHtml));
+  overlay.on('closed', () => { secondaryOverlays = secondaryOverlays.filter(w => w !== overlay); });
+  secondaryOverlays.push(overlay);
+}
+
+function showKioskOverlay(): void {
+  const win = kioskWindow;
+  if (!win || win.isDestroyed()) return;
+
+  kioskLocked = true;
+  win.setAlwaysOnTop(true, 'screen-saver');
+  if (process.platform === 'darwin') {
+    // Kiosk mode engages NSApplicationPresentationOptions: hides the menu bar,
+    // disables process switching (Cmd+Tab / Mission Control / Spaces), force
+    // quit, session termination and app hide — the things setSimpleFullScreen
+    // left open.
+    win.setKiosk(true);
+  } else {
+    win.setFullScreen(true);
+  }
+  win.show();
+  registerLockShortcuts();
+
+  // cover any other displays with dark blanks
+  const kioskBounds = win.getBounds();
+  for (const display of screen.getAllDisplays()) {
+    const { x, y, width, height } = display.bounds;
+    // skip the display already covered by the kiosk window
+    if (x === kioskBounds.x && y === kioskBounds.y) continue;
+    addSecondaryOverlay(x, y, width, height);
+  }
+
+  // focus last — the secondary kiosk windows can grab focus as they're created
+  win.focus();
+}
+
+function hideKioskOverlay(): void {
+  kioskLocked = false;
+  globalShortcut.unregisterAll();
+
+  // Order matters. setKiosk(false) restores the presentation options that were
+  // current when THAT window entered kiosk, and the LAST call wins (options are
+  // app-global). The main window saved the pre-lock (default) options; each
+  // secondary saved the already-strict options. So the secondaries must exit
+  // kiosk FIRST and the main window LAST — otherwise a secondary's restore
+  // re-applies the strict no-process-switching options and they stick after
+  // unlock (swipe-to-Space stays blocked).
+  for (const w of secondaryOverlays) {
+    if (w.isDestroyed()) continue;
+    const kill = () => { if (!w.isDestroyed()) w.destroy(); };
+    if (process.platform === 'darwin' && w.isKiosk()) {
+      w.once('leave-full-screen', kill);
+      w.setKiosk(false);
+      setTimeout(kill, 1000);
+    } else {
+      kill();
+    }
+  }
+  secondaryOverlays = [];
+
+  const win = kioskWindow;
+  if (win && !win.isDestroyed()) {
+    win.setAlwaysOnTop(false);
+    if (process.platform === 'darwin' && win.isKiosk()) {
+      // Exiting kiosk is an async native-fullscreen transition; hiding mid-flight
+      // is ignored and leaves a black frame. Hide once the transition lands
+      // (with a fallback in case the event is missed).
+      const doHide = () => { if (!win.isDestroyed()) win.hide(); };
+      win.once('leave-full-screen', doHide);
+      win.setKiosk(false);
+      setTimeout(doHide, 1000);
+    } else {
+      if (process.platform !== 'darwin') win.setFullScreen(false);
+      win.hide();
+    }
+  }
+}
+
+function lockComputer(): void {
+  // Server-controlled lock: the kiosk overlay is the lock (the OS login screen
+  // can't be dismissed by an unlock_pc message, so it's not usable here).
   showKioskOverlay();
+}
+
+function unlockComputer(): void {
+  hideKioskOverlay();
 }
 
 // ─── Tray ────────────────────────────────────────────────────────────────────
@@ -106,8 +261,8 @@ function reopenKiosk() {
 type TrayState = 'locked' | 'unlocked' | 'disconnected';
 
 const TRAY_COLORS: Record<TrayState, [number, number, number]> = {
-  unlocked: [34, 197, 94], // green
-  locked: [239, 68, 68], // red
+  unlocked: [34, 197, 94],       // green
+  locked: [239, 68, 68],         // red
   disconnected: [148, 163, 184], // gray
 };
 
@@ -117,10 +272,23 @@ function dotIcon(color: [number, number, number]): Electron.NativeImage {
 
 function buildTrayMenu(state: TrayState): Menu {
   return Menu.buildFromTemplate([
-    { label: `Status: ${state}`, enabled: false },
-    { type: 'separator' },
-    { label: 'Open kiosk', enabled: !!authenticatedPayload, click: () => reopenKiosk() },
-    { label: 'Settings', click: () => openWizardWindow(false) },
+    ...(state === 'unlocked'
+      ? [{ type: 'separator' as const }]
+      : [
+          { label: state === 'disconnected' ? 'Connecting…' : 'No active session', enabled: false },
+          { type: 'separator' as const },
+        ]),
+    { label: 'Open resource panel', enabled: !!authenticatedPayload, click: () => reopenKiosk() },
+    { label: 'Settings', click: () => {
+      if (isPinSet()) {
+        openWizardWindow({ requirePin: 'settings' });
+      } else {
+        openWizardWindow();
+      }
+    }},
+    { label: 'About', click: () => {
+      void dialog.showMessageBox({ title: 'Attraccess Companion', message: `Attraccess Companion\nVersion ${app.getVersion()}` });
+    }},
     { label: 'Quit', click: () => app.quit() },
   ]);
 }
@@ -133,20 +301,33 @@ function setupTray() {
 function setTrayState(state: TrayState) {
   tray?.setImage(dotIcon(TRAY_COLORS[state]));
   tray?.setContextMenu(buildTrayMenu(state));
-  tray?.setToolTip(`Attraccess Companion — ${state}`);
+  const resourceName = authenticatedPayload?.resources[0]?.name;
+  const tooltip = resourceName
+    ? `Attraccess Companion — ${resourceName} (${state})`
+    : `Attraccess Companion — ${state}`;
+  tray?.setToolTip(tooltip);
 }
 
 // ─── Wizard window ────────────────────────────────────────────────────────────
 
-function openWizardWindow(firstRun: boolean) {
+interface WizardOpts {
+  requirePin?: 'settings' | 'quit';
+}
+
+function openWizardWindow(opts: WizardOpts = {}) {
   if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.focus();
-    return;
+    if (opts.requirePin) {
+      // Close existing window and reopen as PIN dialog
+      mainWindow.destroy();
+    } else {
+      mainWindow.focus();
+      return;
+    }
   }
 
   mainWindow = new BrowserWindow({
     width: 520,
-    height: 420,
+    height: 460,
     resizable: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -163,18 +344,82 @@ function openWizardWindow(firstRun: boolean) {
     mainWindow.loadFile(path.join(__dirname, '../renderer/dist/index.html'));
   }
   mainWindow.webContents.on('did-finish-load', () => {
-    mainWindow?.webContents.send('init', { firstRun, serverUrl: creds?.serverUrl });
+    mainWindow?.webContents.send('init', {
+      serverUrl: creds?.serverUrl,
+      requirePin: opts.requirePin,
+      registered: !!creds?.id,
+      connected: wsConnected,
+    });
   });
   mainWindow.on('closed', () => { mainWindow = null; });
 }
 
 // ─── IPC ─────────────────────────────────────────────────────────────────────
 
+function permissionsSnapshot() {
+  return {
+    needed: process.platform === 'darwin',
+    accessibility: hasAccessibilityPermission(),
+  };
+}
+
+function allPermissionsGranted() {
+  return !permissionsSnapshot().needed || permissionsSnapshot().accessibility;
+}
+
+ipcMain.handle('get-permissions', () => permissionsSnapshot());
+
+ipcMain.handle('request-permission', (_evt, name: string) => {
+  if (name === 'accessibility') promptAccessibilityPermission();
+  return permissionsSnapshot();
+});
+
+ipcMain.handle('is-pin-set', () => isPinSet());
+
+ipcMain.handle('save-pin', async (_evt, pin: string) => {
+  const hash = hashPin(pin);
+  await savePin(hash);
+  pinHash = hash;
+  // An already-registered device that just set its first PIN can now connect
+  // and close the wizard. First-run devices have no creds yet and instead reach
+  // the connect step via the URL screen; changing a PIN re-uses an already-
+  // running client. Both are covered by the creds.id && !wsClient guard.
+  if (creds?.id && !wsClient) {
+    startWsClient(creds.serverUrl, /* firstRun */ false);
+    mainWindow?.close();
+  }
+});
+
+ipcMain.handle('verify-pin', (_evt, pin: string) => verifyPin(pin));
+
+ipcMain.handle('confirm-quit', () => {
+  allowQuit = true;
+  app.quit();
+});
+
+// Actively forget this device's registration. Only way to drop a registration —
+// otherwise a device keeps the same id forever. Clears creds, stops the client
+// and tears down any session so the wizard returns to a clean first-run state.
+ipcMain.handle('disconnect', async () => {
+  wsClient?.stop();
+  wsClient = null;
+  wsConnected = false;
+  authenticatedPayload = null;
+  kioskLocked = false;
+  if (kioskWindow && !kioskWindow.isDestroyed()) kioskWindow.destroy();
+  await clearCredentials();
+  creds = null;
+  setTrayState('disconnected');
+});
+
 ipcMain.handle('check-health', async (_evt, serverUrl: string) => {
   return checkHealth(normalizeServerUrl(serverUrl));
 });
 
 ipcMain.handle('register', async (_evt, serverUrl: string) => {
+  if (!allPermissionsGranted()) {
+    throw new Error('accessibility-permission-required');
+  }
   const url = normalizeServerUrl(serverUrl);
   creds = { serverUrl: url, id: 0, token: '' };
   startWsClient(url, /* firstRun */ true);
@@ -185,6 +430,7 @@ ipcMain.handle('set-auto-logoff', (_evt, seconds: number) => {
   autoLogoffSeconds = seconds;
 });
 
+
 // ─── WebSocket wiring ─────────────────────────────────────────────────────────
 
 function startWsClient(serverUrl: string, firstRun: boolean) {
@@ -192,11 +438,13 @@ function startWsClient(serverUrl: string, firstRun: boolean) {
   wsClient = new CompanionWsClient(serverUrl);
 
   wsClient.on('connected', () => {
+    wsConnected = true;
     setTrayState('unlocked');
     mainWindow?.webContents.send('ws-status', 'connected');
   });
 
   wsClient.on('disconnected', () => {
+    wsConnected = false;
     setTrayState('disconnected');
     mainWindow?.webContents.send('ws-status', 'disconnected');
   });
@@ -218,6 +466,12 @@ function startWsClient(serverUrl: string, firstRun: boolean) {
     // server only sends AUTHENTICATED in reply to AUTHENTICATE; register alone
     // never authenticates, so do it now instead of waiting for a relaunch
     wsClient?.sendAuthenticate({ id: payload.id, token: payload.token });
+
+    // install launchd user agent on first registration so the companion
+    // starts automatically on login (macOS only — no-op on other platforms)
+    installLaunchAgent(app.getPath('exe')).catch(() => {
+      // non-fatal — app may not be packaged yet in dev
+    });
   });
 
   wsClient.on('authenticated', async (payload: CompanionAuthenticatedDto) => {
@@ -239,12 +493,12 @@ function startWsClient(serverUrl: string, firstRun: boolean) {
   wsClient.on('lock_pc', () => {
     setTrayState('locked');
     reloadKiosk();
-    showKioskOverlay();
+    lockComputer();
   });
 
   wsClient.on('unlock_pc', () => {
     setTrayState('unlocked');
-    hideKioskOverlay();
+    unlockComputer();
   });
 
   wsClient.on('update_available', (payload) => {
@@ -260,9 +514,15 @@ function startWsClient(serverUrl: string, firstRun: boolean) {
 app.whenReady().then(async () => {
   setupTray();
 
-  creds = await loadCredentials();
+  [creds, pinHash] = await Promise.all([loadCredentials(), loadPin()]);
+
   if (!creds?.serverUrl || !creds?.id) {
-    openWizardWindow(/* firstRun */ true);
+    openWizardWindow();
+  } else if (!allPermissionsGranted() || !pinHash) {
+    // Existing device missing permissions or a PIN (e.g. registered before PINs
+    // existed): run the wizard to fix both before connecting. A connection must
+    // never be established without a PIN.
+    openWizardWindow();
   } else {
     startWsClient(creds.serverUrl, /* firstRun */ false);
   }
@@ -272,7 +532,20 @@ app.on('window-all-closed', () => {
   // keep running in tray
 });
 
-app.on('before-quit', () => {
+app.on('before-quit', (event) => {
+  // A locked machine must never be quittable — not even with a PIN. It unlocks
+  // only when the server says so.
+  if (kioskLocked && !allowQuit) {
+    event.preventDefault();
+    return;
+  }
+  if (pinHash && !allowQuit) {
+    event.preventDefault();
+    openWizardWindow({ requirePin: 'quit' });
+    return;
+  }
+  allowQuit = false;
+  hideKioskOverlay();
   wsClient?.stop();
 });
 

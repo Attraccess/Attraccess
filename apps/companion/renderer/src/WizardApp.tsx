@@ -1,36 +1,64 @@
 import { useState, useEffect } from 'react';
-import { Button, Card, FieldError, Input, Label, Spinner, TextField } from '@heroui/react';
-
-type Step = 'url' | 'register' | 'done';
-
-interface CompanionBridge {
-  checkHealth: (url: string) => Promise<boolean>;
-  register: (url: string) => Promise<void>;
-  onInit: (cb: (data: { firstRun: boolean; serverUrl?: string }) => void) => void;
-  onWsStatus: (cb: (status: 'connected' | 'disconnected') => void) => void;
-  onRegistered: (cb: (data: { id: number }) => void) => void;
-  onAuthenticated: (cb: (data: unknown) => void) => void;
-}
-
-declare global {
-  interface Window {
-    companion: CompanionBridge;
-  }
-}
+import { Card } from '@heroui/react';
+import type { Step, Permissions } from './types';
+import { LoadingStep } from './steps/LoadingStep';
+import { PermissionsStep } from './steps/PermissionsStep';
+import { PinSetupStep } from './steps/PinSetupStep';
+import { PinEntryStep } from './steps/PinEntryStep';
+import { UrlStep } from './steps/UrlStep';
+import { RegisterStep } from './steps/RegisterStep';
+import { DoneStep } from './steps/DoneStep';
 
 export function WizardApp() {
-  const [step, setStep] = useState<Step>('url');
+  const [step, setStep] = useState<Step>('loading');
   const [serverUrl, setServerUrl] = useState('');
-  const [errorMsg, setErrorMsg] = useState('');
+  const [connectError, setConnectError] = useState('');
   const [statusText, setStatusText] = useState('');
   const [connecting, setConnecting] = useState(false);
   const [deviceId, setDeviceId] = useState<number | null>(null);
+  const [perms, setPerms] = useState<Permissions | null>(null);
+  const [pendingAction, setPendingAction] = useState<'settings' | 'quit' | null>(null);
+  const [registered, setRegistered] = useState(false);
+  const [connected, setConnected] = useState(false);
+
+  const [pinInput, setPinInput] = useState('');
+  const [pinConfirm, setPinConfirm] = useState('');
+  const [pinSetupError, setPinSetupError] = useState('');
+
+  const [pinEntry, setPinEntry] = useState('');
+  const [pinEntryError, setPinEntryError] = useState('');
 
   useEffect(() => {
-    window.companion.onInit(({ firstRun, serverUrl: saved }) => {
-      if (!firstRun && saved) setServerUrl(saved);
+    window.companion.onInit(async ({ serverUrl: saved, requirePin, registered: reg, connected: conn }) => {
+      if (saved) setServerUrl(saved);
+      setRegistered(reg);
+      setConnected(conn);
+
+      if (requirePin) {
+        setPendingAction(requirePin);
+        setStep('pin-entry');
+        return;
+      }
+
+      const [p, pinSet] = await Promise.all([
+        window.companion.getPermissions(),
+        window.companion.isPinSet(),
+      ]);
+      setPerms(p);
+
+      // PIN is mandatory: route to setup whenever none is set, not just on a
+      // brand-new install (already-registered devices must get prompted too).
+      if (p.needed && !p.accessibility) {
+        setStep('permissions');
+      } else if (!pinSet) {
+        setStep('pin-setup');
+      } else {
+        setStep('url');
+      }
     });
+
     window.companion.onWsStatus((s) => {
+      setConnected(s === 'connected');
       setStatusText(s === 'connected' ? 'Connected — awaiting registration…' : 'Reconnecting…');
     });
     window.companion.onRegistered(({ id }) => {
@@ -39,88 +67,138 @@ export function WizardApp() {
     });
   }, []);
 
+  useEffect(() => {
+    if (step !== 'permissions') return;
+    const id = setInterval(async () => {
+      const [p, pinSet] = await Promise.all([
+        window.companion.getPermissions(),
+        window.companion.isPinSet(),
+      ]);
+      setPerms(p);
+      if (p.accessibility) {
+        clearInterval(id);
+        setStep(!pinSet ? 'pin-setup' : 'url');
+      }
+    }, 1000);
+    return () => clearInterval(id);
+  }, [step]);
+
+  async function handleGrantAccessibility() {
+    const p = await window.companion.requestPermission('accessibility');
+    setPerms(p);
+    if (p.accessibility) {
+      const pinSet = await window.companion.isPinSet();
+      setStep(!pinSet ? 'pin-setup' : 'url');
+    }
+  }
+
+  async function handleSetPin() {
+    if (pinInput.length < 4) {
+      setPinSetupError('PIN must be at least 4 characters.');
+      return;
+    }
+    if (pinInput !== pinConfirm) {
+      setPinSetupError('PINs do not match.');
+      return;
+    }
+    await window.companion.savePin(pinInput);
+    setPinInput('');
+    setPinConfirm('');
+    setPinSetupError('');
+    setStep('url');
+  }
+
+  async function handleVerifyPin() {
+    const ok = await window.companion.verifyPin(pinEntry);
+    if (!ok) {
+      setPinEntryError('Incorrect PIN.');
+      return;
+    }
+    setPinEntryError('');
+    if (pendingAction === 'quit') {
+      await window.companion.confirmQuit();
+    } else {
+      setStep('url');
+    }
+  }
+
+  async function handleDisconnect() {
+    await window.companion.disconnect();
+    setRegistered(false);
+    setConnected(false);
+    setConnectError('');
+  }
+
   async function handleConnect() {
     const url = serverUrl.trim().replace(/\/$/, '');
     if (!url) {
-      setErrorMsg('Please enter a server URL.');
+      setConnectError('Please enter a server URL.');
       return;
     }
-    setErrorMsg('');
+    setConnectError('');
     setConnecting(true);
 
     const ok = await window.companion.checkHealth(url);
     if (!ok) {
-      setErrorMsg('Could not reach server. Check the URL and try again.');
+      setConnectError('Could not reach server. Check the URL and try again.');
       setConnecting(false);
       return;
     }
 
     setStep('register');
-    await window.companion.register(url);
+    try {
+      await window.companion.register(url);
+    } catch {
+      setConnectError('Permissions are required before connecting.');
+      setStep('permissions');
+      setConnecting(false);
+    }
   }
 
   return (
     <div className="flex items-center justify-center h-full p-6 bg-background">
       <Card className="w-full max-w-md">
         <Card.Content className="flex flex-col gap-4 p-8">
+          {step === 'loading' && <LoadingStep />}
+          {step === 'permissions' && <PermissionsStep perms={perms} onGrant={handleGrantAccessibility} />}
+          {step === 'pin-setup' && (
+            <PinSetupStep
+              pinInput={pinInput}
+              pinConfirm={pinConfirm}
+              error={pinSetupError}
+              onPinInputChange={setPinInput}
+              onPinConfirmChange={setPinConfirm}
+              onSubmit={handleSetPin}
+            />
+          )}
+          {step === 'pin-entry' && (
+            <PinEntryStep
+              title={pendingAction === 'quit' ? 'Confirm quit' : 'Access settings'}
+              description={pendingAction === 'quit'
+                ? 'Enter your PIN to quit Attraccess Companion.'
+                : 'Enter your PIN to access settings.'}
+              submitLabel={pendingAction === 'quit' ? 'Quit' : 'Confirm'}
+              pinEntry={pinEntry}
+              error={pinEntryError}
+              onPinEntryChange={setPinEntry}
+              onSubmit={handleVerifyPin}
+            />
+          )}
           {step === 'url' && (
-            <>
-              <div>
-                <h1 className="text-xl font-bold">Attraccess Companion</h1>
-                <p className="text-fg-muted text-sm mt-1">
-                  Enter the URL of your Attraccess server to get started.
-                </p>
-              </div>
-              <TextField
-                value={serverUrl}
-                onChange={setServerUrl}
-                type="url"
-                isInvalid={!!errorMsg}
-                fullWidth
-              >
-                <Label>Server URL</Label>
-                <Input placeholder="https://attraccess.example.com" />
-                <FieldError>{errorMsg}</FieldError>
-              </TextField>
-              <Button
-                variant="primary"
-                fullWidth
-                isDisabled={connecting}
-                onPress={handleConnect}
-              >
-                {connecting ? <Spinner /> : 'Connect'}
-              </Button>
-            </>
+            <UrlStep
+              serverUrl={serverUrl}
+              connectError={connectError}
+              connecting={connecting}
+              registered={registered}
+              connected={connected}
+              onServerUrlChange={setServerUrl}
+              onConnect={handleConnect}
+              onDisconnect={handleDisconnect}
+              onChangePin={pendingAction === 'settings' ? () => setStep('pin-setup') : undefined}
+            />
           )}
-
-          {step === 'register' && (
-            <>
-              <div>
-                <h1 className="text-xl font-bold">Registering…</h1>
-                <p className="text-fg-muted text-sm mt-1">
-                  Opening a connection and registering this device. Please wait.
-                </p>
-              </div>
-              <div className="flex items-center gap-2 text-fg-muted text-sm">
-                <Spinner />
-                <span>{statusText || 'Connecting to server…'}</span>
-              </div>
-            </>
-          )}
-
-          {step === 'done' && (
-            <>
-              <div>
-                <h1 className="text-xl font-bold text-success">Setup complete!</h1>
-                <p className="text-fg-muted text-sm mt-1">
-                  This device has been registered. Name it in the Attraccess admin panel.
-                </p>
-              </div>
-              {deviceId !== null && (
-                <p className="text-success text-sm text-center">Device ID: {deviceId}</p>
-              )}
-            </>
-          )}
+          {step === 'register' && <RegisterStep statusText={statusText} />}
+          {step === 'done' && <DoneStep deviceId={deviceId} />}
         </Card.Content>
       </Card>
     </div>

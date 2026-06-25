@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useAuthenticationServiceEndSession } from '@attraccess/react-query-client';
 
-const ACTIVITY_EVENTS = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart'] as const;
+const ACTIVITY_EVENTS = ['mousemove', 'mousedown', 'keydown', 'scroll', 'wheel', 'touchstart'] as const;
 const WARNING_THRESHOLD_SECONDS = 60;
 
 export interface AutoLogoffState {
@@ -30,7 +30,9 @@ export function useAutoLogoff(seconds: number | null): AutoLogoffState {
     setRemaining(seconds);
 
     // User interaction keeps the session alive; inactivity drains the timer.
-    ACTIVITY_EVENTS.forEach((e) => window.addEventListener(e, reset, { passive: true }));
+    // capture:true so non-bubbling 'scroll' events from nested scroll containers
+    // (e.g. the kiosk's overflow-y-auto wrapper) still reach this window listener.
+    ACTIVITY_EVENTS.forEach((e) => window.addEventListener(e, reset, { passive: true, capture: true }));
 
     timerRef.current = setInterval(() => {
       remainingRef.current = (remainingRef.current ?? seconds) - 1;
@@ -44,7 +46,7 @@ export function useAutoLogoff(seconds: number | null): AutoLogoffState {
 
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
-      ACTIVITY_EVENTS.forEach((e) => window.removeEventListener(e, reset));
+      ACTIVITY_EVENTS.forEach((e) => window.removeEventListener(e, reset, { capture: true }));
     };
   }, [seconds, reset, endSession]);
 
