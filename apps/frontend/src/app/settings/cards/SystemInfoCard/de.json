@@ -1,0 +1,10 @@
+{
+  "title": "Systemübersicht",
+  "users": "Benutzer",
+  "resources": "Ressourcen",
+  "projects": "Projekte",
+  "activeAuthSessions": "Aktive Sitzungen",
+  "activeResourceUsageSessions": "Aktive Ressourcennutzung",
+  "uptime": "Laufzeit",
+  "nodeVersion": "Node.js"
+}
