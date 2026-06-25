@@ -8,12 +8,7 @@ import { loadCredentials, saveCredentials, clearCredentials, StoredCredentials, 
 import { normalizeServerUrl } from './server-url';
 import { dotIconPng } from './tray-icon';
 import { attraccessLogoSvg } from './logo-svg';
-import {
-  hasAccessibilityPermission,
-  promptAccessibilityPermission,
-  installLaunchAgent,
-} from './macos-lock';
-import { lockWorkStation, installAutostart } from './windows-lock';
+import { osAdapter } from './platform-adapter';
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
@@ -137,13 +132,16 @@ const LOCK_SHORTCUTS = [
   'CommandOrControl+Space',     // Spotlight / Windows search
   'CommandOrControl+Alt+Space', // Spotlight (alt)
   'CommandOrControl+`',         // cycle app windows
-  // Windows: block common task-switch / Start-menu escapes.
-  // OS-reserved shortcuts (Super, Alt+Tab) may fail silently — caught by the
-  // try/catch in registerLockShortcuts.
+  // Windows: block common task-switch, Start-menu, and Task Manager escapes.
+  // OS-reserved shortcuts (Super, Alt+Tab, Win+Tab) may fail silently —
+  // caught by the try/catch in registerLockShortcuts.
   'Alt+F4',
+  'Control+Shift+Escape', // Task Manager
   'Super',
-  'Super+D',
-  'Control+Escape',
+  'Super+D',              // Show desktop
+  'Super+R',              // Run dialog
+  'Super+X',              // Quick Link menu
+  'Control+Escape',       // Start menu (Alt path)
 ];
 
 function registerLockShortcuts(): void {
@@ -255,11 +253,12 @@ function hideKioskOverlay(): void {
 }
 
 function lockComputer(): void {
-  // On Windows, engage the OS lock screen as an extra security layer.
-  // Best-effort: if LockWorkStation fails (e.g. no interactive session or kiosk
-  // mode), the Electron overlay below is the authoritative server-controlled lock.
-  // ponytail: fire-and-forget; overlay is always shown regardless of outcome
-  if (process.platform === 'win32') lockWorkStation().catch(() => undefined);
+  // Attempt OS-level lock (e.g. LockWorkStation on Windows) as an extra security
+  // layer. The Electron overlay is always shown regardless — it is the
+  // authoritative server-controlled lock that unlock_pc can dismiss.
+  osAdapter.tryOsLock().catch((err) =>
+    console.warn('[companion] OS lock failed:', err),
+  );
   showKioskOverlay();
 }
 
@@ -368,20 +367,18 @@ function openWizardWindow(opts: WizardOpts = {}) {
 // ─── IPC ─────────────────────────────────────────────────────────────────────
 
 function permissionsSnapshot() {
-  return {
-    needed: process.platform === 'darwin',
-    accessibility: hasAccessibilityPermission(),
-  };
+  return osAdapter.permissionsStatus();
 }
 
 function allPermissionsGranted() {
-  return !permissionsSnapshot().needed || permissionsSnapshot().accessibility;
+  const { needed, accessibility } = permissionsSnapshot();
+  return !needed || accessibility;
 }
 
 ipcMain.handle('get-permissions', () => permissionsSnapshot());
 
 ipcMain.handle('request-permission', (_evt, name: string) => {
-  if (name === 'accessibility') promptAccessibilityPermission();
+  if (name === 'accessibility') osAdapter.requestPermissions();
   return permissionsSnapshot();
 });
 
@@ -479,8 +476,9 @@ function startWsClient(serverUrl: string, firstRun: boolean) {
     wsClient?.sendAuthenticate({ id: payload.id, token: payload.token });
 
     // install OS startup entry so the companion launches automatically after login
-    installLaunchAgent(app.getPath('exe')).catch(() => undefined);  // macOS
-    installAutostart(app.getPath('exe')).catch(() => undefined);    // Windows
+    osAdapter.installStartupEntry(app.getPath('exe')).catch((err) =>
+      console.warn('[companion] startup entry install failed:', err),
+    );
   });
 
   wsClient.on('authenticated', async (payload: CompanionAuthenticatedDto) => {
