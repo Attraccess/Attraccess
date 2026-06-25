@@ -3,6 +3,8 @@
 // modules (macos-lock, windows-lock) are imported here with explicit prefixes
 // so the mapping is obvious at a glance.
 
+import type { App } from 'electron';
+
 import {
   hasAccessibilityPermission as macosHasAccessibilityPermission,
   promptAccessibilityPermission as macosPromptAccessibilityPermission,
@@ -23,7 +25,7 @@ export interface OsAdapter {
   tryOsLock(): Promise<boolean>;
 
   /** Add the companion to OS startup so it auto-launches after login. */
-  installStartupEntry(execPath: string): Promise<void>;
+  installStartupEntry(app: App): Promise<void>;
 
   /** Snapshot of platform-specific permission state for the renderer wizard. */
   permissionsStatus(): { needed: boolean; accessibility: boolean };
@@ -42,7 +44,7 @@ export interface OsAdapter {
 
 const windowsAdapter: OsAdapter = {
   tryOsLock: () => windowsLockWorkStation(),
-  installStartupEntry: (execPath) => windowsInstallStartupEntry(execPath),
+  installStartupEntry: (app) => windowsInstallStartupEntry(app.getPath('exe')),
   permissionsStatus: () => ({ needed: false, accessibility: true }),
   requestPermissions: () => undefined,
   lockShortcuts: () => [
@@ -63,7 +65,7 @@ const macosAdapter: OsAdapter = {
   // macOS kiosk lock is done inside showKioskOverlay() via win.setKiosk(true);
   // there is no separate OS lock step analogous to LockWorkStation.
   tryOsLock: async () => false,
-  installStartupEntry: (execPath) => macosInstallStartupEntry(execPath),
+  installStartupEntry: (app) => macosInstallStartupEntry(app.getPath('exe')),
   permissionsStatus: () => ({
     needed: true,
     accessibility: macosHasAccessibilityPermission(),
@@ -85,7 +87,7 @@ const macosAdapter: OsAdapter = {
 
 const nullAdapter: OsAdapter = {
   tryOsLock: async () => false,
-  installStartupEntry: async () => undefined,
+  installStartupEntry: async (_app) => undefined,
   permissionsStatus: () => ({ needed: false, accessibility: true }),
   requestPermissions: () => undefined,
   lockShortcuts: () => [],

@@ -452,7 +452,7 @@ function startWsClient(serverUrl: string, firstRun: boolean) {
     wsClient?.sendAuthenticate({ id: payload.id, token: payload.token });
 
     // install OS startup entry so the companion launches automatically after login
-    osAdapter.installStartupEntry(app.getPath('exe')).catch((err) =>
+    osAdapter.installStartupEntry(app).catch((err) =>
       console.warn('[companion] startup entry install failed:', err),
     );
   });
