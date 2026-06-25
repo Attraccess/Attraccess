@@ -135,3 +135,4 @@ export * from './1782100000000-enable-all-email-defaults';
 export * from './1782200000000-companion-device';
 export * from './1782201000000-companion-device-unique-name';
 export * from './1782202000000-companion-device-locked';
+export * from './1782300000000-rbac-data-model';

@@ -99,6 +99,10 @@ import { Message, MessageReferenceType } from './entities/message.entity';
 import { NotificationPreference } from './entities/notification-preference.entity';
 import { PushSubscription } from './entities/push-subscription.entity';
 import { CompanionDevice } from './entities/companion-device.entity';
+import { Permission } from './entities/permission.entity';
+import { Role } from './entities/role.entity';
+import { RolePermission } from './entities/role-permission.entity';
+import { UserRole, UserRoleSource } from './entities/user-role.entity';
 
 // Export all entities individually
 export {
@@ -203,6 +207,11 @@ export {
   NotificationPreference,
   PushSubscription,
   CompanionDevice,
+  Permission,
+  Role,
+  RolePermission,
+  UserRole,
+  UserRoleSource,
 };
 
 // Export the entities object
@@ -255,4 +264,8 @@ export const entities = {
   NotificationPreference,
   PushSubscription,
   CompanionDevice,
+  Permission,
+  Role,
+  RolePermission,
+  UserRole,
 };
