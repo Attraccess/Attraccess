@@ -2,7 +2,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { AttractapGateway } from './websocket.gateway';
 import { ReaderDeletedEvent, ReaderUpdatedEvent } from '../events';
-import { ResourceUsageEvent, ResourceUsageTakenOverEvent } from '../../resources/usage/events/resource-usage.events';
+import { ResourceSessionStartedEvent, ResourceUsageSessionTakenOverEvent } from '../../resources/usage/events/resource-usage.events';
 import { ResourceChangedEvent } from '../../resources/events/resource-changed.event';
 import { ResourceMaintenanceChangedEvent } from '../../resources/maintenances/events/resource-maintenance-changed.event';
 import { ResourceFlowChangedEvent } from '../../resources/flows/events/resource-flow-changed.event';
@@ -27,14 +27,14 @@ export class WebSocketEventService {
     this.attractapGateway.disconnectReader(event.readerId);
   }
 
-  @OnEvent(ResourceUsageEvent.EVENT_NAME)
-  public async onResourceUsage(event: ResourceUsageEvent) {
+  @OnEvent(ResourceSessionStartedEvent.EVENT_NAME)
+  public async onResourceUsage(event: ResourceSessionStartedEvent) {
     this.logger.debug('Got resource usage started event');
     this.attractapGateway.sendResourceListToReadersWithResource(event.usage.resource.id);
   }
 
-  @OnEvent(ResourceUsageTakenOverEvent.EVENT_NAME)
-  public async onResourceUsageTakenOver(event: ResourceUsageTakenOverEvent) {
+  @OnEvent(ResourceUsageSessionTakenOverEvent.EVENT_NAME)
+  public async onResourceUsageTakenOver(event: ResourceUsageSessionTakenOverEvent) {
     this.logger.debug('Got resource usage ended event');
     this.attractapGateway.sendResourceListToReadersWithResource(event.resource.id);
   }

@@ -1,4 +1,4 @@
-export class MaintenanceRequestCreatedEvent {
+export class ResourceMaintenanceRequestCreatedEvent {
   static readonly EVENT_NAME = 'resource.maintenance-request.created';
 
   constructor(

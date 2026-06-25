@@ -9,7 +9,7 @@ import {
 } from '@attraccess/database-entities';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResourceMaintenanceService } from './maintenance.service';
-import { MaintenanceRequestCreatedEvent } from './events/maintenance-request-created.event';
+import { ResourceMaintenanceRequestCreatedEvent } from './events/maintenance-request-created.event';
 import { ListMaintenanceRequestsDto } from './dtos/list-maintenance-requests.dto';
 import { PaginatedMaintenanceRequestResponse } from './dtos/paginated-maintenance-request-response.dto';
 import { ResolveMaintenanceRequestAction } from './dtos/resolve-maintenance-request.dto';
@@ -46,8 +46,8 @@ export class MaintenanceRequestService {
 
     const saved = await this.requestRepository.save(request);
     this.eventEmitter.emit(
-      MaintenanceRequestCreatedEvent.EVENT_NAME,
-      new MaintenanceRequestCreatedEvent(resourceId, saved.id),
+      ResourceMaintenanceRequestCreatedEvent.EVENT_NAME,
+      new ResourceMaintenanceRequestCreatedEvent(resourceId, saved.id),
     );
     return saved;
   }

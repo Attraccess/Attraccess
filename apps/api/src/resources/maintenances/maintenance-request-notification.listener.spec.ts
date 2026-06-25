@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Resource, ResourceIntroducer, ResourceMaintenanceRequest, User } from '@attraccess/database-entities';
 import { MaintenanceRequestNotificationListener } from './maintenance-request-notification.listener';
-import { MaintenanceRequestCreatedEvent } from './events/maintenance-request-created.event';
+import { ResourceMaintenanceRequestCreatedEvent } from './events/maintenance-request-created.event';
 import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../../notifications/notification-types';
 
@@ -48,7 +48,7 @@ describe('MaintenanceRequestNotificationListener', () => {
     } as ResourceMaintenanceRequest);
     resourceRepository.findOne.mockResolvedValue({ id: 4, name: 'Laser cutter', groups: [] } as unknown as Resource);
 
-    await listener.handleRequestCreated(new MaintenanceRequestCreatedEvent(4, 9));
+    await listener.handleRequestCreated(new ResourceMaintenanceRequestCreatedEvent(4, 9));
 
     expect(dispatch.dispatch).toHaveBeenCalledWith(
       expect.objectContaining({

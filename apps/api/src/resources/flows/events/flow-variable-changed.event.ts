@@ -1,7 +1,7 @@
 import { ResourceFlowVariableScope } from '@attraccess/database-entities';
 
-export class FlowVariableChangedEvent {
-  static readonly EVENT_NAME = 'flow-variable.changed';
+export class ResourceFlowVariableChangedEvent {
+  static readonly EVENT_NAME = 'resource.flow.variable.changed';
 
   constructor(
     public readonly scope: ResourceFlowVariableScope,

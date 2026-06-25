@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { WebSocketEventService } from './websocket-event.service';
 import { AttractapGateway } from './websocket.gateway';
 import { ReaderDeletedEvent, ReaderUpdatedEvent } from '../events';
-import { ResourceUsageEvent, ResourceUsageTakenOverEvent } from '../../resources/usage/events/resource-usage.events';
+import { ResourceSessionStartedEvent, ResourceUsageSessionTakenOverEvent } from '../../resources/usage/events/resource-usage.events';
 import { ResourceChangedEvent } from '../../resources/events/resource-changed.event';
 import { ResourceMaintenanceChangedEvent } from '../../resources/maintenances/events/resource-maintenance-changed.event';
 import { ResourceHealthChangedEvent } from '../../resources/health/events/resource-health-changed.event';
@@ -54,7 +54,7 @@ describe('WebSocketEventService', () => {
 
   describe('onResourceUsage', () => {
     it('calls sendResourceListToReadersWithResource with the resource id', async () => {
-      const event = { usage: { resource: { id: 10 } } } as unknown as ResourceUsageEvent;
+      const event = { usage: { resource: { id: 10 } } } as unknown as ResourceSessionStartedEvent;
       await service.onResourceUsage(event);
       expect(gateway.sendResourceListToReadersWithResource).toHaveBeenCalledWith(10);
     });
@@ -62,7 +62,7 @@ describe('WebSocketEventService', () => {
 
   describe('onResourceUsageTakenOver', () => {
     it('calls sendResourceListToReadersWithResource with the resource id', async () => {
-      const event = { resource: { id: 20 } } as unknown as ResourceUsageTakenOverEvent;
+      const event = { resource: { id: 20 } } as unknown as ResourceUsageSessionTakenOverEvent;
       await service.onResourceUsageTakenOver(event);
       expect(gateway.sendResourceListToReadersWithResource).toHaveBeenCalledWith(20);
     });
