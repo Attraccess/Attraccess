@@ -39,7 +39,7 @@ export class SSEController implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit() {
-    // Send keep-alive messages every 30 seconds to prevent connection timeouts
+    // Send keep-alive messages every 10 seconds to prevent connection timeouts
     this.keepAliveInterval = setInterval(() => {
       // For each resource subject, emit a keep-alive event; prune dead subjects
       this.resourceSubjects.forEach((subject, id) => {
