@@ -7,6 +7,7 @@ import { UsersService } from './users.service';
 import { ChangeUsernameDto } from './dtos/changeUsername.dto';
 import { ChangeEmailDto } from './dtos/changeEmail.dto';
 import { DeleteAccountConfirmDto } from './dtos/deleteAccountConfirm.dto';
+import { UpdateLocaleDto } from './dtos/updateLocale.dto';
 import { mapEmailSendError } from './email-send-error.util';
 
 @ApiTags('Users')
@@ -78,5 +79,16 @@ export class UserProfileController {
     } catch (error) {
       throw mapEmailSendError(error);
     }
+  }
+
+  @Auth()
+  @Patch('me/locale')
+  @ApiOperation({
+    summary: 'Update preferred locale',
+    operationId: 'updateMyLocale',
+  })
+  @ApiResponse({ status: 200, description: 'Locale updated.', type: User })
+  async updateMyLocale(@Req() request: AuthenticatedRequest, @Body() body: UpdateLocaleDto): Promise<User> {
+    return this.usersService.updateLocale(request.user.id, body.locale);
   }
 }

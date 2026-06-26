@@ -793,6 +793,21 @@ export class UsersService {
     await repo.softDelete(user.id);
   }
 
+  async updateLocale(userId: number, locale: string): Promise<User> {
+    const cleaned = locale.trim().toLowerCase().slice(0, 10);
+    if (!cleaned) {
+      throw new BadRequestException('Locale cannot be empty');
+    }
+
+    await this.userRepository.update(userId, { locale: cleaned });
+
+    const updated = await this.findOne({ id: userId });
+    if (!updated) {
+      throw new UserNotFoundException(userId);
+    }
+    return updated;
+  }
+
   async withTransaction<T>(handler: (manager: EntityManager) => Promise<T>): Promise<T> {
     return this.dataSource.transaction(handler);
   }
