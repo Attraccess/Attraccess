@@ -1,0 +1,13 @@
+{
+  "title": "Version & Updates",
+  "currentVersion": "Current Version",
+  "commitHash": "Commit",
+  "noCommit": "Unknown",
+  "devVersion": "Development build",
+  "updateAvailable": "Update available",
+  "upToDate": "Up to date",
+  "checkFailed": "Update check failed",
+  "latestVersion": "Latest: {{version}}",
+  "viewRelease": "View release",
+  "viewCommit": "View commit"
+}
