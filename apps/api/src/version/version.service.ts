@@ -1,10 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
+import { Repository, IsNull, MoreThan } from 'typeorm';
 import axios, { AxiosInstance } from 'axios';
 import * as semver from 'semver';
+import { User, Resource, Project, ResourceUsage, Session } from '@attraccess/database-entities';
 import { UPDATE_CHECK_CACHE_TTL_MS } from '@attraccess/shared';
 import { AppConfigType } from '../config/app.config';
 import { ReleaseDto } from './dto/release.dto';
+import { SystemInfoDto } from './dto/system-info.dto';
 import { UpdateStatusDto } from './dto/update-status.dto';
 import { VersionInfoDto } from './dto/version-info.dto';
 
@@ -32,7 +36,14 @@ export class VersionService {
   private readonly http: AxiosInstance;
   private cache: CacheEntry | null = null;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    @InjectRepository(User) private readonly userRepository: Repository<User>,
+    @InjectRepository(Resource) private readonly resourceRepository: Repository<Resource>,
+    @InjectRepository(Project) private readonly projectRepository: Repository<Project>,
+    @InjectRepository(ResourceUsage) private readonly resourceUsageRepository: Repository<ResourceUsage>,
+    @InjectRepository(Session) private readonly sessionRepository: Repository<Session>,
+  ) {
     this.http = axios.create({
       timeout: GITHUB_REQUEST_TIMEOUT_MS,
       headers: {
@@ -47,7 +58,29 @@ export class VersionService {
     const appConfig = this.configService.get<AppConfigType>('app');
     const raw = appConfig?.VERSION ?? '0.0.0-dev';
     const normalized = semver.valid(semver.clean(raw)) ?? raw;
-    return { version: normalized };
+    const commitHash = appConfig?.COMMIT_SHA ?? null;
+    return { version: normalized, commitHash };
+  }
+
+  async getSystemInfo(): Promise<SystemInfoDto> {
+    const [usersTotal, resourcesTotal, projectsTotal, activeResourceUsageSessions, activeAuthSessions] =
+      await Promise.all([
+        this.userRepository.count(),
+        this.resourceRepository.count(),
+        this.projectRepository.count(),
+        this.resourceUsageRepository.count({ where: { endTime: IsNull() } }),
+        this.sessionRepository.count({ where: { expiresAt: MoreThan(new Date()) } }),
+      ]);
+
+    return {
+      uptimeSeconds: Math.floor(process.uptime()),
+      nodeVersion: process.version,
+      usersTotal,
+      resourcesTotal,
+      projectsTotal,
+      activeResourceUsageSessions,
+      activeAuthSessions,
+    };
   }
 
   async getUpdateStatus(forceRefresh = false): Promise<UpdateStatusDto> {

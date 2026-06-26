@@ -10,6 +10,8 @@ import { AuthRateLimitCard } from './cards/AuthRateLimitCard';
 import { MessagingRateLimitCard } from './cards/MessagingRateLimitCard';
 import { PasswordPolicyCard } from './cards/PasswordPolicyCard';
 import { PushSettingsCard } from './cards/PushSettingsCard';
+import { VersionInfoCard } from './cards/VersionInfoCard';
+import { SystemInfoCard } from './cards/SystemInfoCard';
 
 export function SystemSettingsPage() {
   const { t } = useTranslations({ en, de });
@@ -18,6 +20,8 @@ export function SystemSettingsPage() {
     <div>
       <PageHeader title={t('title')} subtitle={t('subtitle')} icon={<Settings2Icon size={20} />} />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+        <VersionInfoCard />
+        <SystemInfoCard />
         <AppSettingsCard variant="standalone" />
         <SmtpSettingsCard variant="standalone" />
         <MetricsSettingsCard />
