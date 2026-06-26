@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, session, screen, dialog, globalShortcut, powerMonitor } from 'electron';
+import { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, session, screen, dialog, globalShortcut, powerMonitor, shell } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as https from 'https';
@@ -487,6 +487,82 @@ ipcMain.handle('save-settings', (_evt, newSettings: CompanionSettings) => {
   if (wsClient) startIdleDetection();
 });
 
+// ─── Auto-update ──────────────────────────────────────────────────────────────
+
+function downloadFile(url: string, dest: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const parsed = new URL(url);
+    const mod = parsed.protocol === 'https:' ? https : http;
+    const file = fs.createWriteStream(dest);
+    const req = mod.get(url, (res) => {
+      if (res.statusCode !== 200) {
+        file.close();
+        fs.unlink(dest, () => undefined);
+        return reject(new Error(`Download failed: HTTP ${res.statusCode ?? 'unknown'}`));
+      }
+      res.pipe(file);
+      file.on('finish', () => file.close(() => resolve()));
+    });
+    req.on('error', (err) => { file.close(); fs.unlink(dest, () => undefined); reject(err); });
+    req.setTimeout(120000, () => { req.destroy(); reject(new Error('Download timed out')); });
+  });
+}
+
+async function applyUpdate(serverUrl: string, downloadUrl: string, version: string): Promise<void> {
+  const absUrl = downloadUrl.startsWith('http') ? downloadUrl : `${serverUrl}${downloadUrl}`;
+  const ext = path.extname(absUrl.split('?')[0] ?? '') || (process.platform === 'win32' ? '.exe' : process.platform === 'darwin' ? '.dmg' : '');
+  const dest = path.join(app.getPath('temp'), `attraccess-companion-update-${version}${ext}`);
+
+  console.info(`[companion] downloading update v${version} from ${absUrl}`);
+  try {
+    await downloadFile(absUrl, dest);
+  } catch (err) {
+    console.error('[companion] update download failed:', err);
+    tray?.setToolTip(`Attraccess Companion — update v${version} download failed`);
+    return;
+  }
+
+  console.info(`[companion] update downloaded to ${dest}`);
+
+  if (process.platform === 'linux') {
+    // AppImage: chmod+x, then relaunch from new path — AppImage replaces itself at next run
+    try {
+      fs.chmodSync(dest, 0o755);
+    } catch (err) {
+      console.error('[companion] chmod failed:', err);
+    }
+    app.relaunch({ execPath: dest });
+    allowQuit = true;
+    app.exit(0);
+  } else if (process.platform === 'win32') {
+    // NSIS installer: run silently, then quit — installer restarts the app
+    void shell.openPath(dest).then((errMsg) => {
+      if (errMsg) {
+        console.error('[companion] failed to launch Windows installer:', errMsg);
+        return;
+      }
+      allowQuit = true;
+      app.quit();
+    });
+  } else {
+    // macOS DMG: open it and let the user drag the app — fully automated DMG
+    // manipulation is unsafe (requires unmounting, hdiutil, SIP bypass)
+    void shell.openPath(dest).then((errMsg) => {
+      if (errMsg) {
+        console.error('[companion] failed to open macOS DMG:', errMsg);
+        tray?.setToolTip(`Attraccess Companion — update v${version} ready (open manually)`);
+        return;
+      }
+      void dialog.showMessageBox({
+        type: 'info',
+        title: 'Attraccess Companion — Update Ready',
+        message: `Version ${version} is ready to install.\n\nDrag "Attraccess Companion" from the opened disk image to your Applications folder, then relaunch.`,
+        buttons: ['OK'],
+      });
+    });
+  }
+}
+
 // ─── WebSocket wiring ─────────────────────────────────────────────────────────
 
 function startWsClient(serverUrl: string, firstRun: boolean) {
@@ -511,7 +587,7 @@ function startWsClient(serverUrl: string, firstRun: boolean) {
     if (firstRun || !creds?.id) {
       wsClient?.sendRegister();
     } else {
-      wsClient?.sendAuthenticate({ id: creds.id, token: creds.token });
+      wsClient?.sendAuthenticate({ id: creds.id, token: creds.token, platform: process.platform, appVersion: app.getVersion() });
     }
   });
 
@@ -523,7 +599,7 @@ function startWsClient(serverUrl: string, firstRun: boolean) {
     mainWindow?.webContents.send('registered', { id: payload.id });
     // server only sends AUTHENTICATED in reply to AUTHENTICATE; register alone
     // never authenticates, so do it now instead of waiting for a relaunch
-    wsClient?.sendAuthenticate({ id: payload.id, token: payload.token });
+    wsClient?.sendAuthenticate({ id: payload.id, token: payload.token, platform: process.platform, appVersion: app.getVersion() });
 
     // install OS startup entry so the companion launches automatically after login
     osAdapter.installStartupEntry(app).catch((err) =>
@@ -565,8 +641,10 @@ function startWsClient(serverUrl: string, firstRun: boolean) {
   });
 
   wsClient.on('update_available', (payload) => {
-    // ponytail: tray tooltip for now; full OTA download+relaunch in ATT-623
-    tray?.setToolTip(`Update available: ${payload.version}`);
+    tray?.setToolTip(`Attraccess Companion — downloading update v${payload.version}…`);
+    applyUpdate(serverUrl, payload.downloadUrl, payload.version).catch((err) =>
+      console.error('[companion] applyUpdate error:', err),
+    );
   });
 
   wsClient.connect();

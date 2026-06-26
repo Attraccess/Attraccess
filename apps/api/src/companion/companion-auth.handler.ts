@@ -52,6 +52,7 @@ export class CompanionAuthHandler {
 
     await this.service.touchLastConnection(device, appVersion);
     socket.deviceId = device.id;
+    socket.platform = platform ?? null;
 
     const resources = await this.gatewayService.getResourcesForDevice(device.id);
     socket.sendEvent(CompanionEventType.COMPANION_AUTHENTICATED, {

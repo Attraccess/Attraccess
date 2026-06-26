@@ -10,6 +10,7 @@ import {
   Param,
   ParseIntPipe,
   Patch,
+  Post,
   Res,
   UseInterceptors,
 } from '@nestjs/common';
@@ -21,6 +22,7 @@ import { CompanionService } from './companion.service';
 import { CompanionGateway } from './companion.gateway';
 import { CompanionGatewayService } from './companion-gateway.service';
 import { CompanionManifestDto } from './dtos/companion.dto';
+import { CompanionEventType } from './companion.types';
 import { MetricsService } from '../metrics/metrics.service';
 
 class RenameCompanionDeviceDto {
@@ -51,12 +53,10 @@ export class CompanionDownloadController {
   }
 
   @Get('download/:platform/:arch')
-  @Auth()
   @ApiOperation({ summary: 'Download companion app binary', operationId: 'downloadCompanionBinary' })
   @ApiParam({ name: 'platform', example: 'linux' })
   @ApiParam({ name: 'arch', example: 'x64' })
   @ApiResponse({ status: 200, description: 'Binary stream' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Platform/arch not found' })
   async downloadBinary(
     @Param('platform') platform: string,
@@ -171,5 +171,53 @@ export class CompanionController {
 
     this.gateway.disconnectDevice(id);
     await this.service.delete(id);
+  }
+
+  @Post(':id/trigger-update')
+  @Auth('canManageResources')
+  @ApiOperation({ summary: 'Push update notification to a specific connected companion device', operationId: 'triggerCompanionDeviceUpdate' })
+  @ApiParam({ name: 'id', type: Number })
+  @ApiResponse({ status: 200, description: 'Whether the device was notified' })
+  @ApiResponse({ status: 404 })
+  async triggerUpdate(@Param('id', ParseIntPipe) id: number): Promise<{ notified: boolean }> {
+    const device = await this.service.findById(id);
+    if (!device) throw new NotFoundException(`Companion device ${id} not found`);
+
+    const manifest = this.service.getManifest();
+    if (!manifest) return { notified: false };
+
+    const socket = [...this.gatewayService.sockets.values()].find((s) => s.deviceId === id);
+    if (!socket) return { notified: false };
+
+    const platform = socket.platform ?? 'linux';
+    const entry = manifest.platforms.find((p) => p.platform === platform);
+    const downloadUrl = entry
+      ? `/api/companion/download/${entry.platform}/${entry.arch}`
+      : `/api/companion/download/${platform}/x64`;
+
+    this.gateway.sendUpdateAvailable(id, { version: manifest.version, downloadUrl });
+    return { notified: true };
+  }
+
+  @Post('update-all')
+  @Auth('canManageSystemConfiguration')
+  @ApiOperation({ summary: 'Push update notification to all connected companion devices', operationId: 'updateAllCompanionDevices' })
+  @ApiResponse({ status: 200, description: 'Number of devices notified' })
+  triggerUpdateAll(): { notified: number } {
+    const manifest = this.service.getManifest();
+    if (!manifest) return { notified: 0 };
+
+    let notified = 0;
+    for (const socket of this.gatewayService.sockets.values()) {
+      if (socket.deviceId === null) continue;
+      const platform = socket.platform ?? 'linux';
+      const entry = manifest.platforms.find((p) => p.platform === platform);
+      const downloadUrl = entry
+        ? `/api/companion/download/${entry.platform}/${entry.arch}`
+        : `/api/companion/download/${platform}/x64`;
+      socket.sendEvent(CompanionEventType.COMPANION_UPDATE_AVAILABLE, { version: manifest.version, downloadUrl });
+      notified++;
+    }
+    return { notified };
   }
 }

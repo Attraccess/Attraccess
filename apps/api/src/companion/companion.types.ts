@@ -14,6 +14,16 @@ export class CompanionAuthenticateDto {
   @IsOptional()
   @IsString()
   token?: string;
+
+  @ApiProperty({ description: 'OS platform (e.g. linux, darwin, win32)', required: false })
+  @IsOptional()
+  @IsString()
+  platform?: string;
+
+  @ApiProperty({ description: 'Companion app version', required: false })
+  @IsOptional()
+  @IsString()
+  appVersion?: string;
 }
 
 // ─── Server → Client DTOs ────────────────────────────────────────────────────
@@ -99,6 +109,7 @@ export interface CompanionAuthenticatePayload {
 export interface CompanionSocket extends Omit<WebSocket, 'send'> {
   id: string;
   deviceId: CompanionDevice['id'] | null;
+  platform: string | null;
   send: (data: string) => void;
   sendEvent: (type: CompanionEventType, payload: unknown) => void;
 }

@@ -18,7 +18,11 @@
     },
     "actions": {
       "rename": "Rename",
-      "delete": "Delete"
+      "delete": "Delete",
+      "pushUpdate": "Push Update",
+      "pushUpdateSuccess": "Update pushed",
+      "pushUpdateError": "Failed to push update",
+      "pushUpdateOffline": "Device is offline"
     },
     "rename": {
       "title": "Rename Device",
@@ -80,6 +84,12 @@
     }
   },
   "updateAvailable": "Update available",
+  "updateAll": {
+    "button": "Update all",
+    "success": "Update pushed to {{count}} device(s)",
+    "error": "Failed to push update",
+    "noManifest": "No update available"
+  },
   "deleteConfirm": {
     "title": "Delete device",
     "message": "Are you sure you want to delete <bold>{{name}}</bold>? Its token will be revoked and any active connection will be terminated.",

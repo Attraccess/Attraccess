@@ -24,10 +24,7 @@ jobs:
         run: sudo apt-get install -y fakeroot rpm
 
       - name: Build Linux companion (x64 + arm64)
-        # The companion project.json must configure electron-builder to output:
-        #   apps/companion/dist/companion_linux_x64.AppImage
-        #   apps/companion/dist/companion_linux_arm64.AppImage
-        run: pnpm nx run companion:build
+        run: pnpm nx run companion:package
 
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
@@ -54,14 +51,12 @@ jobs:
           certificate-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
 
       - name: Build macOS companion (universal)
-        # The companion project.json must configure electron-builder to output:
-        #   apps/companion/dist/companion_mac_universal.dmg
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.APPLE_CERTIFICATE != '' && 'true' || 'false' }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: pnpm nx run companion:build
+        run: pnpm nx run companion:package
 
       - name: Clean up keychain
         if: ${{ secrets.APPLE_CERTIFICATE != '' && always() }}
@@ -90,10 +85,8 @@ jobs:
           cert-password: ${{ secrets.WINDOWS_CERT_PASSWORD }}
 
       - name: Build Windows companion (x64)
-        # The companion project.json must configure electron-builder to output:
-        #   apps/companion/dist/companion_win_x64.exe
         shell: bash
-        run: pnpm nx run companion:build
+        run: pnpm nx run companion:package
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4

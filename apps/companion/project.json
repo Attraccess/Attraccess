@@ -44,12 +44,12 @@
     },
     "package": {
       "executor": "nx:run-commands",
-      "cache": true,
+      "cache": false,
       "dependsOn": ["build"],
-      "outputs": ["{workspaceRoot}/dist/apps/companion"],
+      "outputs": ["{projectRoot}/dist"],
       "options": {
         "cwd": "apps/companion",
-        "command": "CI=true electron-builder --config electron-builder.config.cjs --dir"
+        "command": "CI=true electron-builder --config electron-builder.config.cjs"
       }
     },
     "typecheck": {

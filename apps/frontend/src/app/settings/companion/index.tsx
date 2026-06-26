@@ -28,7 +28,7 @@ import {
   TableScrollContainer,
   TextField,
 } from '@heroui/react';
-import { DownloadIcon, MonitorIcon, MonitorSmartphoneIcon, PencilIcon, Trash2Icon } from 'lucide-react';
+import { DownloadIcon, MonitorIcon, MonitorSmartphoneIcon, PencilIcon, RefreshCwIcon, Trash2Icon } from 'lucide-react';
 import {
   CompanionDevice,
   UseCompanionDevicesServiceListCompanionDevicesKeyFn,
@@ -39,7 +39,7 @@ import {
   useCompanionServiceGetCompanionVersions,
 } from '@attraccess/react-query-client';
 import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '../../../components/pageHeader';
 import { Button } from '../../../components/button';
 import { StandardDrawer } from '../../../components/standardDrawer';
@@ -72,11 +72,13 @@ interface DeviceRowProps {
   latestVersion: string | null;
   onRenameStart: (device: CompanionDevice) => void;
   onDeleteStart: (device: CompanionDevice) => void;
+  onPushUpdate: (deviceId: number) => void;
+  isPushUpdatePending: boolean;
   t: (key: string) => string;
   formatDateTime: FormatDateTime;
 }
 
-function DeviceRow({ device, latestVersion, onRenameStart, onDeleteStart, t, formatDateTime }: DeviceRowProps) {
+function DeviceRow({ device, latestVersion, onRenameStart, onDeleteStart, onPushUpdate, isPushUpdatePending, t, formatDateTime }: DeviceRowProps) {
   const { data } = useCompanionDevicesServiceGetCompanionDevice({ id: device.id }, undefined, {
     refetchInterval: 30000,
   });
@@ -104,6 +106,18 @@ function DeviceRow({ device, latestVersion, onRenameStart, onDeleteStart, t, for
       </TableCell>
       <TableCell>
         <div className="flex flex-row gap-2 flex-wrap">
+          {showUpdateBadge && (
+            <Button
+              variant="primary"
+              size="sm"
+              onPress={() => onPushUpdate(device.id)}
+              isPending={isPushUpdatePending}
+              isDisabled={!isOnline}
+            >
+              <RefreshCwIcon className="w-4 h-4" />
+              {t('devices.actions.pushUpdate')}
+            </Button>
+          )}
           <Button variant="ghost" size="sm" onPress={() => onRenameStart(device)}>
             <PencilIcon className="w-4 h-4" />
             {t('devices.actions.rename')}
@@ -148,6 +162,33 @@ export function CompanionSettingsPage() {
     },
   });
 
+  const { mutate: updateAll, isPending: isUpdateAllPending } = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`${getBaseUrl()}/api/companion-devices/update-all`, { method: 'POST', credentials: 'include' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json() as Promise<{ notified: number }>;
+    },
+    onSuccess: (data) => {
+      toast.success({ title: t('updateAll.success', { count: String(data.notified) }) });
+    },
+    onError: () => {
+      toast.error({ title: t('updateAll.error') });
+    },
+  });
+
+  const { mutate: pushUpdate, isPending: isPushUpdatePending } = useMutation({
+    mutationFn: async (deviceId: number) => {
+      const res = await fetch(`${getBaseUrl()}/api/companion-devices/${deviceId}/trigger-update`, { method: 'POST', credentials: 'include' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    },
+    onSuccess: () => {
+      toast.success({ title: t('devices.actions.pushUpdateSuccess') });
+    },
+    onError: () => {
+      toast.error({ title: t('devices.actions.pushUpdateError') });
+    },
+  });
+
   const { mutate: deleteDevice, isPending: isDeleting } = useCompanionDevicesServiceDeleteCompanionDevice({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: listKey });
@@ -187,9 +228,22 @@ export function CompanionSettingsPage() {
 
       {/* Registered Devices */}
       <Card>
-        <Card.Header className="flex flex-col items-start gap-1">
-          <span className="text-base font-semibold">{t('devices.title')}</span>
-          <span className="text-sm text-default-500">{t('devices.subtitle')}</span>
+        <Card.Header className="flex flex-row items-center justify-between gap-2 flex-wrap">
+          <div className="flex flex-col gap-1">
+            <span className="text-base font-semibold">{t('devices.title')}</span>
+            <span className="text-sm text-default-500">{t('devices.subtitle')}</span>
+          </div>
+          {manifest && (
+            <Button
+              variant="primary"
+              size="sm"
+              onPress={() => updateAll()}
+              isPending={isUpdateAllPending}
+            >
+              <RefreshCwIcon className="w-4 h-4" />
+              {t('updateAll.button')}
+            </Button>
+          )}
         </Card.Header>
         <Card.Content>
           {devicesLoading ? (
@@ -215,6 +269,8 @@ export function CompanionSettingsPage() {
                         latestVersion={manifest?.version ?? null}
                         onRenameStart={handleRenameStart}
                         onDeleteStart={setDeletingDevice}
+                        onPushUpdate={pushUpdate}
+                        isPushUpdatePending={isPushUpdatePending}
                         t={t}
                         formatDateTime={formatDateTime}
                       />

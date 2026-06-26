@@ -4,11 +4,13 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { CompanionGatewayService } from './companion-gateway.service';
 import { CompanionDevice, ResourceFlowNode } from '@attraccess/database-entities';
 import { CompanionEventType, CompanionSocket } from './companion.types';
+import { CompanionService } from './companion.service';
 
 function makeSocket(deviceId: number | null, overrides: Partial<CompanionSocket> = {}): CompanionSocket {
   return {
     id: `sock-${deviceId ?? 'x'}`,
     deviceId,
+    platform: null,
     sendEvent: jest.fn(),
     ...overrides,
   } as unknown as CompanionSocket;
@@ -34,6 +36,7 @@ describe('CompanionGatewayService', () => {
         { provide: getRepositoryToken(CompanionDevice), useValue: mockDeviceRepo },
         { provide: getRepositoryToken(ResourceFlowNode), useValue: mockFlowNodeRepo },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
+        { provide: CompanionService, useValue: { getManifest: jest.fn().mockReturnValue(null) } },
       ],
     }).compile();
 

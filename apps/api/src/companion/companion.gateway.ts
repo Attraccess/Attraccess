@@ -49,7 +49,7 @@ export class CompanionGateway implements OnGatewayConnection, OnGatewayDisconnec
       (client as unknown as { send: (d: string) => void }).send(JSON.stringify({ event: type, data: payload }));
     };
 
-    Object.assign(client, { id, deviceId: null, sendEvent });
+    Object.assign(client, { id, deviceId: null, platform: null, sendEvent });
     this.gatewayService.sockets.set(id, client as unknown as CompanionSocket);
 
     this.logger.log(`Companion client connected: ${id}`);
