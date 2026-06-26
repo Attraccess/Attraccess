@@ -83,7 +83,7 @@ export class UsersRegistrationController {
     @Req() req: Request,
   ): Promise<User> {
     const acceptLanguage = req.headers['accept-language'];
-    const locale = (acceptLanguage?.split(',')[0]?.split(';')[0] ?? '').trim().toLowerCase().slice(0, 10) || 'en';
+    const locale = (acceptLanguage?.split(',')[0]?.split(';')[0] ?? '').trim() || 'en';
     return this.registrationService.createOne(body, locale);
   }
 

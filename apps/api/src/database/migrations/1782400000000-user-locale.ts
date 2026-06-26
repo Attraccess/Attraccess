@@ -5,7 +5,7 @@ export class UserLocale1782400000000 implements MigrationInterface {
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
-      `ALTER TABLE "user" ADD COLUMN "locale" varchar(10) NOT NULL DEFAULT 'en'`,
+      `ALTER TABLE "user" ADD COLUMN "locale" varchar(35) NOT NULL DEFAULT 'en'`,
     );
   }
 

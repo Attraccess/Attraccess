@@ -554,9 +554,9 @@ describe('UsersService', () => {
       expect(mockMetricsService.usersPerLocale.inc).toHaveBeenCalledWith({ locale: 'de' });
     });
 
-    it('normalises locale to lowercase and truncates to 10 chars', async () => {
-      await service.createOne({ username: 'usr', email: 'u@x.com', externalIdentifier: null, locale: 'ZH-HANT-TW-X' });
-      expect(userRepository.save).toHaveBeenCalledWith(expect.objectContaining({ locale: 'zh-hant-tw' }));
+    it('stores the full BCP 47 locale tag without lowercasing or truncating', async () => {
+      await service.createOne({ username: 'usr', email: 'u@x.com', externalIdentifier: null, locale: 'ZH-Hant-TW' });
+      expect(userRepository.save).toHaveBeenCalledWith(expect.objectContaining({ locale: 'ZH-Hant-TW' }));
     });
 
     it('leaves locale at column default when not provided', async () => {
@@ -573,11 +573,11 @@ describe('UsersService', () => {
       jest.spyOn(userRepository, 'update').mockResolvedValue({} as UpdateResult);
       jest.spyOn(service, 'findOne').mockResolvedValueOnce(existing).mockResolvedValueOnce(updated);
 
-      const result = await service.updateLocale(1, 'DE');
-      expect(userRepository.update).toHaveBeenCalledWith(1, { locale: 'de' });
-      expect(mockMetricsService.usersLocaleSyncsTotal.inc).toHaveBeenCalledWith({ locale: 'de' });
+      const result = await service.updateLocale(1, 'de-DE');
+      expect(userRepository.update).toHaveBeenCalledWith(1, { locale: 'de-DE' });
+      expect(mockMetricsService.usersLocaleSyncsTotal.inc).toHaveBeenCalledWith({ locale: 'de-DE' });
       expect(mockMetricsService.usersPerLocale.dec).toHaveBeenCalledWith({ locale: 'en' });
-      expect(mockMetricsService.usersPerLocale.inc).toHaveBeenCalledWith({ locale: 'de' });
+      expect(mockMetricsService.usersPerLocale.inc).toHaveBeenCalledWith({ locale: 'de-DE' });
       expect(result).toEqual(updated);
     });
 

@@ -268,7 +268,7 @@ export class UsersService {
     user.email = data.email;
     user.externalIdentifier = data.externalIdentifier;
     if (userData.locale) {
-      user.locale = userData.locale.trim().toLowerCase().slice(0, 10) || 'en';
+      user.locale = userData.locale.trim() || 'en';
     }
 
     // Check if this is the first user in the system
@@ -667,7 +667,7 @@ export class UsersService {
         user.email = data.email;
         user.externalIdentifier = null;
         if (data.locale) {
-          user.locale = data.locale.trim().toLowerCase().slice(0, 10) || 'en';
+          user.locale = data.locale.trim() || 'en';
         }
 
         const systemPermissions: SystemPermissions = {
@@ -804,7 +804,7 @@ export class UsersService {
   }
 
   async updateLocale(userId: number, locale: string): Promise<User> {
-    const cleaned = locale.trim().toLowerCase().slice(0, 10);
+    const cleaned = locale.trim();
     if (!cleaned) {
       throw new BadRequestException('Locale cannot be empty');
     }
