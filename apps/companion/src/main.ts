@@ -561,7 +561,6 @@ function startWsClient(serverUrl: string, firstRun: boolean) {
     if (authenticatedPayload) {
       authenticatedPayload = { ...authenticatedPayload, deviceName: payload.deviceName };
     }
-    setTrayState(kioskLocked ? 'locked' : wsConnected ? 'unlocked' : 'disconnected');
   });
 
   wsClient.on('update_available', (payload) => {
