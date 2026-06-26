@@ -1,6 +1,6 @@
-import { ResourceUsage, useAnalyticsServiceGetResourceUsageHoursInDateRange } from '@attraccess/react-query-client';
+import { ResourceUsage, useAnalyticsServiceGetResourceUsageHoursInDateRangeInfinite } from '@attraccess/react-query-client';
 import { ExportProps } from '../export-props';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDateTimeFormatter, useNumberFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import de from './de.json';
 import en from './en.json';
@@ -13,13 +13,31 @@ export function ResourceUsageExport(props: ExportProps) {
   });
 
   const {
-    data: resourceUsageExport,
-    status: fetchStatus,
+    data,
+    status,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
     refetch,
-  } = useAnalyticsServiceGetResourceUsageHoursInDateRange({
+  } = useAnalyticsServiceGetResourceUsageHoursInDateRangeInfinite({
     start: props.start.toISOString(),
     end: props.end.toISOString(),
   });
+
+  // Auto-fetch all pages for complete CSV export
+  useEffect(() => {
+    if (hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  const resourceUsageExport = useMemo(
+    () => data?.pages.flatMap((page) => page.data) ?? [],
+    [data],
+  );
+
+  // Show loading while any page is still being fetched
+  const fetchStatus = status === 'success' && (hasNextPage || isFetchingNextPage) ? 'pending' : status;
 
   const formatDateTimeFull = useDateTimeFormatter({ showDate: true, showTime: true, showSeconds: true });
   const formatUsageDuration = useNumberFormatter();
@@ -130,7 +148,7 @@ export function ResourceUsageExport(props: ExportProps) {
   return (
     <CsvExportDrawerContent
       columns={columns as ColumnDefinition<ResourceUsage>[]}
-      items={(resourceUsageExport ?? []) as ResourceUsage[]}
+      items={resourceUsageExport as ResourceUsage[]}
       refetch={refetch}
       options={options}
       setOption={setOption}

@@ -13,7 +13,7 @@ export class AnalyticsService {
     private billingTransactionRepository: Repository<BillingTransaction>,
   ) {}
 
-  public async getResourceUsageHoursInDateRange(dateRange: DateRangeValue) {
+  public async getResourceUsageHoursInDateRange(dateRange: DateRangeValue, page = 1, limit = 500) {
     const findOptions: FindManyOptions<ResourceUsage> = {
       where: {
         startTime: Between(dateRange.start, dateRange.end),
@@ -24,12 +24,14 @@ export class AnalyticsService {
         userId: 'DESC',
       },
       relations: ['user', 'resource', 'supervisorUser'],
+      skip: (page - 1) * limit,
+      take: limit,
     };
 
-    return await this.resourceUsageRepository.find(findOptions);
+    return await this.resourceUsageRepository.findAndCount(findOptions);
   }
 
-  public async getBillingTransactionsInDateRange(dateRange: DateRangeValue) {
+  public async getBillingTransactionsInDateRange(dateRange: DateRangeValue, page = 1, limit = 500) {
     const findOptions: FindManyOptions<BillingTransaction> = {
       where: {
         createdAt: Between(dateRange.start, dateRange.end),
@@ -40,8 +42,10 @@ export class AnalyticsService {
         userId: 'DESC',
       },
       relations: ['user', 'resourceUsage', 'resourceUsage.resource', 'items'],
+      skip: (page - 1) * limit,
+      take: limit,
     };
 
-    return await this.billingTransactionRepository.find(findOptions);
+    return await this.billingTransactionRepository.findAndCount(findOptions);
   }
 }
