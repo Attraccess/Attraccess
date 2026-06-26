@@ -2,12 +2,13 @@ import {
   Body,
   Controller,
   Get,
-  Headers,
   Param,
   ParseIntPipe,
   Post,
+  Req,
   UseInterceptors,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { User } from '@attraccess/database-entities';
 import { AuthRateLimitInterceptor } from '../rate-limiting/auth-rate-limit.interceptor';
@@ -79,8 +80,9 @@ export class UsersRegistrationController {
   })
   async createOne(
     @Body() body: CreateUserDto,
-    @Headers('accept-language') acceptLanguage?: string,
+    @Req() req: Request,
   ): Promise<User> {
+    const acceptLanguage = req.headers['accept-language'];
     const locale = (acceptLanguage?.split(',')[0]?.split(';')[0] ?? '').trim().toLowerCase().slice(0, 10) || 'en';
     return this.registrationService.createOne(body, locale);
   }
