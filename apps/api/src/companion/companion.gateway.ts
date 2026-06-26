@@ -17,6 +17,7 @@ import { CompanionAuthenticated } from './companion-authenticated.decorator';
 import {
   CompanionAuthenticateDto,
   CompanionAuthenticatedDto,
+  CompanionDeviceRenamedDto,
   CompanionRegisterResponseDto,
   CompanionUpdateAvailableDto,
   CompanionAuthenticatePayload,
@@ -171,6 +172,13 @@ export class CompanionGateway implements OnGatewayConnection, OnGatewayDisconnec
       socket.sendEvent(CompanionEventType.COMPANION_UPDATE_AVAILABLE, payload);
     }
   }
+
+  @AsyncApiSub({
+    channel: 'COMPANION_DEVICE_RENAMED',
+    message: { name: 'COMPANION_DEVICE_RENAMED', payload: CompanionDeviceRenamedDto },
+    summary: 'Notifies the companion that its display name has been changed by an admin',
+  })
+  private _specDeviceRenamed() { /* emitted by CompanionGatewayService.sendDeviceRenamed */ }
 
   public disconnectDevice(deviceId: number): void {
     for (const s of [...this.gatewayService.sockets.values()].filter((s) => s.deviceId === deviceId)) {

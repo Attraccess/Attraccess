@@ -558,6 +558,12 @@ function startWsClient(serverUrl: string, firstRun: boolean) {
     unlockComputer();
   });
 
+  wsClient.on('device_renamed', (payload) => {
+    if (authenticatedPayload) {
+      authenticatedPayload = { ...authenticatedPayload, deviceName: payload.deviceName };
+    }
+  });
+
   wsClient.on('update_available', (payload) => {
     // ponytail: tray tooltip for now; full OTA download+relaunch in ATT-623
     tray?.setToolTip(`Update available: ${payload.version}`);

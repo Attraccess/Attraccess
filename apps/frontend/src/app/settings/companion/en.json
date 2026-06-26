@@ -21,9 +21,17 @@
       "delete": "Delete"
     },
     "rename": {
+      "title": "Rename Device",
       "placeholder": "Device name",
       "save": "Save",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "label": "New name for \"{{name}}\"",
+      "success": "Device renamed",
+      "error": "Failed to rename device"
+    },
+    "delete": {
+      "success": "Device deleted",
+      "error": "Failed to delete device"
     }
   },
   "version": {

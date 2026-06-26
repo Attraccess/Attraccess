@@ -154,7 +154,9 @@ export class CompanionController {
   ): Promise<CompanionDevice> {
     const device = await this.service.findById(id);
     if (!device) throw new NotFoundException(`Companion device ${id} not found`);
-    return this.service.updateName(id, dto.name);
+    const updated = await this.service.updateName(id, dto.name);
+    this.gatewayService.sendDeviceRenamed(id, dto.name);
+    return updated;
   }
 
   @Delete(':id')

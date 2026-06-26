@@ -12,7 +12,11 @@ import {
   AlertTitle,
   Card,
   Chip,
+  DrawerBody,
+  DrawerFooter,
+  DrawerHeader,
   Input,
+  Label,
   Spinner,
   Table,
   TableBody,
@@ -38,6 +42,7 @@ import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-front
 import { useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '../../../components/pageHeader';
 import { Button } from '../../../components/button';
+import { StandardDrawer } from '../../../components/standardDrawer';
 import { EmptyState } from '../../../components/emptyState';
 import { DeleteConfirmationModal } from '../../../components/deleteConfirmationModal';
 import { useToastMessage } from '../../../components/toastProvider';
@@ -132,14 +137,14 @@ export function CompanionSettingsPage() {
 
   const listKey = UseCompanionDevicesServiceListCompanionDevicesKeyFn();
 
-  const { mutate: rename, isPending: isRenaming } = useCompanionDevicesServiceRenameCompanionDevice({
+  const { mutate: rename, isPending: isRenamePending } = useCompanionDevicesServiceRenameCompanionDevice({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: listKey });
       setRenamingDevice(null);
-      toast.success({ title: t('devices.actions.rename') });
+      toast.success({ title: t('devices.rename.success') });
     },
     onError: () => {
-      toast.error({ title: t('devices.actions.rename') });
+      toast.error({ title: t('devices.rename.error') });
     },
   });
 
@@ -147,10 +152,10 @@ export function CompanionSettingsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: listKey });
       setDeletingDevice(null);
-      toast.success({ title: t('devices.actions.delete') });
+      toast.success({ title: t('devices.delete.success') });
     },
     onError: () => {
-      toast.error({ title: t('devices.actions.delete') });
+      toast.error({ title: t('devices.delete.error') });
     },
   });
 
@@ -187,28 +192,6 @@ export function CompanionSettingsPage() {
           <span className="text-sm text-default-500">{t('devices.subtitle')}</span>
         </Card.Header>
         <Card.Content>
-          {renamingDevice && (
-            <div className="flex items-center gap-2 mb-4 flex-wrap">
-              <TextField
-                value={renameValue}
-                onChange={setRenameValue}
-                className="max-w-xs"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleRenameSave();
-                  if (e.key === 'Escape') setRenamingDevice(null);
-                }}
-                autoFocus
-              >
-                <Input placeholder={t('devices.rename.placeholder')} />
-              </TextField>
-              <Button size="sm" variant="primary" isPending={isRenaming} onPress={handleRenameSave}>
-                {t('devices.rename.save')}
-              </Button>
-              <Button size="sm" variant="ghost" onPress={() => setRenamingDevice(null)}>
-                {t('devices.rename.cancel')}
-              </Button>
-            </div>
-          )}
           {devicesLoading ? (
             <div className="flex justify-center py-6">
               <Spinner size="sm" />
@@ -324,6 +307,34 @@ export function CompanionSettingsPage() {
           </Card.Content>
         </Card>
       </div>
+
+      {/* Rename drawer */}
+      <StandardDrawer isOpen={!!renamingDevice} onOpenChange={(open) => { if (!open) setRenamingDevice(null); }}>
+        <DrawerHeader>
+          <h2 className="text-lg font-semibold">{t('devices.rename.title')}</h2>
+        </DrawerHeader>
+        <DrawerBody>
+          <TextField
+            value={renameValue}
+            onChange={setRenameValue}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleRenameSave();
+            }}
+            autoFocus
+          >
+            <Label>{t('devices.rename.label', { name: renamingDevice?.name ?? '' })}</Label>
+            <Input placeholder={t('devices.rename.placeholder')} />
+          </TextField>
+        </DrawerBody>
+        <DrawerFooter>
+          <Button variant="ghost" onPress={() => setRenamingDevice(null)}>
+            {t('devices.rename.cancel')}
+          </Button>
+          <Button variant="primary" isPending={isRenamePending} onPress={handleRenameSave}>
+            {t('devices.rename.save')}
+          </Button>
+        </DrawerFooter>
+      </StandardDrawer>
 
       {/* Delete confirmation */}
       <DeleteConfirmationModal
