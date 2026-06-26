@@ -180,13 +180,28 @@ describe('Node.js version consistency', () => {
   });
 
   describe('GitHub Actions workflows read Node.js version from .nvmrc', () => {
-    const workflowsWithDocker = [
-      'pull-requests.yml',
-      'release.yml',
-      'docker-nightly-latest.yml',
-    ];
+    // Workflows that handle Docker build inline (not via the shared action)
+    const workflowsWithInlineDocker = ['docker-nightly-latest.yml'];
 
-    workflowsWithDocker.forEach((workflowFile) => {
+    // Workflows that delegate to the shared docker-build-push composite action,
+    // which internally reads .nvmrc and passes NODE_VERSION as a build-arg
+    const workflowsUsingDockerAction = ['pull-requests.yml', 'release.yml'];
+
+    const dockerBuildPushAction = readFile(
+      '.github/actions/docker-build-push/action.yml'
+    );
+
+    describe('.github/actions/docker-build-push/action.yml', () => {
+      it('should read NODE_VERSION from .nvmrc', () => {
+        expect(dockerBuildPushAction).toContain('cat .nvmrc');
+      });
+
+      it('should pass NODE_VERSION as a Docker build-arg', () => {
+        expect(dockerBuildPushAction).toContain('NODE_VERSION=');
+      });
+    });
+
+    workflowsWithInlineDocker.forEach((workflowFile) => {
       describe(workflowFile, () => {
         let content: string;
 
@@ -198,10 +213,33 @@ describe('Node.js version consistency', () => {
           expect(content).toContain('cat .nvmrc');
         });
 
-        it('should pass NODE_VERSION as a Docker build-arg', () => {
-          expect(content).toContain(
-            'NODE_VERSION=${{ steps.node-version.outputs.NODE_VERSION }}'
+        it('should not hardcode a Node.js version in build-args', () => {
+          const buildArgLines = content
+            .split('\n')
+            .filter(
+              (l) =>
+                l.includes('NODE_VERSION=') &&
+                !l.includes('${{') &&
+                !l.includes('cat .nvmrc')
+            );
+          const hardcodedVersionArgs = buildArgLines.filter((l) =>
+            /NODE_VERSION=\d+/.test(l)
           );
+          expect(hardcodedVersionArgs).toHaveLength(0);
+        });
+      });
+    });
+
+    workflowsUsingDockerAction.forEach((workflowFile) => {
+      describe(workflowFile, () => {
+        let content: string;
+
+        beforeAll(() => {
+          content = readFile(`.github/workflows/${workflowFile}`);
+        });
+
+        it('should use the docker-build-push composite action for Docker builds', () => {
+          expect(content).toContain('.github/actions/docker-build-push');
         });
 
         it('should not hardcode a Node.js version in build-args', () => {
