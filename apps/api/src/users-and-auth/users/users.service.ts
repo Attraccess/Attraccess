@@ -217,6 +217,7 @@ export class UsersService {
     externalIdentifier: string | null;
     isEmailVerified?: boolean;
     skipUsernameSanitization?: boolean;
+    locale?: string;
   }): Promise<User> {
     const data = {
       username: this.cleanupUsername(userData.username),
@@ -266,6 +267,9 @@ export class UsersService {
     user.username = data.username;
     user.email = data.email;
     user.externalIdentifier = data.externalIdentifier;
+    if (userData.locale) {
+      user.locale = userData.locale.trim().toLowerCase().slice(0, 10) || 'en';
+    }
 
     // Check if this is the first user in the system
     this.logger.debug('Checking if this is the first user in the system');
@@ -633,7 +637,7 @@ export class UsersService {
   }
 
   async createMany(
-    users: Array<{ username: string; email: string; systemPermissions: Partial<SystemPermissions> }>,
+    users: Array<{ username: string; email: string; systemPermissions: Partial<SystemPermissions>; locale?: string }>,
     options?: { grantAllPermissionsToFirst?: boolean; manager?: EntityManager },
   ): Promise<User[]> {
     if (users.length === 0) {
@@ -644,6 +648,7 @@ export class UsersService {
       username: this.cleanupUsername(userData.username),
       email: userData.email.trim(),
       systemPermissions: userData.systemPermissions ?? {},
+      locale: userData.locale,
     }));
 
     const run = async (manager: EntityManager) => {
@@ -660,6 +665,9 @@ export class UsersService {
         user.username = data.username;
         user.email = data.email;
         user.externalIdentifier = null;
+        if (data.locale) {
+          user.locale = data.locale.trim().toLowerCase().slice(0, 10) || 'en';
+        }
 
         const systemPermissions: SystemPermissions = {
           canManageResources: data.systemPermissions.canManageResources ?? false,

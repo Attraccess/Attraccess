@@ -26,7 +26,7 @@ export class UserRegistrationService {
     private readonly signupDomainService: SignupDomainService,
   ) {}
 
-  public async createOne(body: CreateUserDto): Promise<User> {
+  public async createOne(body: CreateUserDto, locale?: string): Promise<User> {
     this.logger.debug(`Creating new user with username: ${body.username} and email: ${body.email}`);
 
     if (body.overwriteFirstTimeAdmin) {
@@ -47,6 +47,7 @@ export class UserRegistrationService {
       username: body.username,
       email: body.email,
       externalIdentifier: null,
+      locale,
     });
     this.logger.debug(`User created with ID: ${user.id}`);
 

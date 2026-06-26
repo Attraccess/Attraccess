@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   Param,
   ParseIntPipe,
   Post,
@@ -76,8 +77,12 @@ export class UsersRegistrationController {
     status: 403,
     description: 'First-time setup is already complete (only relevant when overwriteFirstTimeAdmin is true).',
   })
-  async createOne(@Body() body: CreateUserDto): Promise<User> {
-    return this.registrationService.createOne(body);
+  async createOne(
+    @Body() body: CreateUserDto,
+    @Headers('accept-language') acceptLanguage?: string,
+  ): Promise<User> {
+    const locale = (acceptLanguage?.split(',')[0]?.split(';')[0] ?? '').trim().toLowerCase().slice(0, 10) || 'en';
+    return this.registrationService.createOne(body, locale);
   }
 
   @Get('local-signup-enabled')
