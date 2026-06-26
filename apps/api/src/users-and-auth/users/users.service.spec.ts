@@ -352,6 +352,7 @@ describe('UsersService', () => {
           lockedUntil: null,
           failedLoginAttempts: 0,
           firstFailedLoginAt: null,
+          locale: 'en',
         } as User,
         {
           id: 2,
@@ -397,6 +398,7 @@ describe('UsersService', () => {
           lockedUntil: null,
           failedLoginAttempts: 0,
           firstFailedLoginAt: null,
+          locale: 'en',
         } as User,
       ];
 
@@ -534,6 +536,46 @@ describe('UsersService', () => {
       jest.spyOn(service, 'isSSOUser').mockResolvedValueOnce(true);
 
       await expect(service.changeUsername(5, 'newuser', me)).rejects.toThrow(SSOUsernameChangeForbiddenException);
+    });
+  });
+
+  describe('createOne – locale', () => {
+    beforeEach(() => {
+      jest.spyOn(userRepository, 'findOne').mockResolvedValue(null);
+      jest.spyOn(userRepository, 'count').mockResolvedValue(1);
+      jest.spyOn(userRepository, 'save').mockImplementation(async (data) => ({ id: 99, ...data }) as User);
+    });
+
+    it('sets locale when provided', async () => {
+      await service.createOne({ username: 'usr', email: 'u@x.com', externalIdentifier: null, locale: 'de' });
+      expect(userRepository.save).toHaveBeenCalledWith(expect.objectContaining({ locale: 'de' }));
+    });
+
+    it('normalises locale to lowercase and truncates to 10 chars', async () => {
+      await service.createOne({ username: 'usr', email: 'u@x.com', externalIdentifier: null, locale: 'ZH-HANT-TW-X' });
+      expect(userRepository.save).toHaveBeenCalledWith(expect.objectContaining({ locale: 'zh-hant-tw' }));
+    });
+
+    it('leaves locale at column default when not provided', async () => {
+      await service.createOne({ username: 'usr', email: 'u@x.com', externalIdentifier: null });
+      const saved = (userRepository.save as jest.Mock).mock.calls[0][0] as Partial<User>;
+      expect(saved.locale).toBeUndefined();
+    });
+  });
+
+  describe('updateLocale', () => {
+    it('saves cleaned locale and returns user', async () => {
+      const user = { id: 1, locale: 'de' } as User;
+      jest.spyOn(userRepository, 'update').mockResolvedValue({} as UpdateResult);
+      jest.spyOn(service, 'findOne').mockResolvedValue(user);
+
+      const result = await service.updateLocale(1, 'DE');
+      expect(userRepository.update).toHaveBeenCalledWith(1, { locale: 'de' });
+      expect(result).toEqual(user);
+    });
+
+    it('throws BadRequestException for empty locale', async () => {
+      await expect(service.updateLocale(1, '   ')).rejects.toThrow(BadRequestException);
     });
   });
 });
