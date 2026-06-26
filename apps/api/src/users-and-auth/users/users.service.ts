@@ -808,6 +808,7 @@ export class UsersService {
     }
 
     await this.userRepository.update(userId, { locale: cleaned });
+    this.metricsService.usersLocaleSyncsTotal.inc({ locale: cleaned });
 
     const updated = await this.findOne({ id: userId });
     if (!updated) {

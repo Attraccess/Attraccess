@@ -24,6 +24,7 @@ export class MetricsService implements OnModuleInit {
 
   public readonly usersTotal: Gauge;
   public readonly usersRegisteredTotal: Counter;
+  public readonly usersLocaleSyncsTotal: Counter;
 
   public readonly resourcesTotal: Gauge;
   public readonly resourceUsageSessionsActive: Gauge;
@@ -115,6 +116,13 @@ export class MetricsService implements OnModuleInit {
     this.usersRegisteredTotal = new Counter({
       name: 'attraccess_users_registered_total',
       help: 'Total number of user registrations',
+      registers: [this.registry],
+    });
+
+    this.usersLocaleSyncsTotal = new Counter({
+      name: 'attraccess_users_locale_syncs_total',
+      help: 'Total number of user locale sync calls, labelled by locale',
+      labelNames: ['locale'],
       registers: [this.registry],
     });
 

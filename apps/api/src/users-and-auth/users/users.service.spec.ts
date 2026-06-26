@@ -14,6 +14,7 @@ import { MetricsService } from '../../metrics/metrics.service';
 const mockMetricsService = {
   usersRegisteredTotal: { inc: jest.fn() },
   usersTotal: { inc: jest.fn(), dec: jest.fn(), set: jest.fn() },
+  usersLocaleSyncsTotal: { inc: jest.fn() },
 };
 
 describe('UsersService', () => {
@@ -564,13 +565,14 @@ describe('UsersService', () => {
   });
 
   describe('updateLocale', () => {
-    it('saves cleaned locale and returns user', async () => {
+    it('saves cleaned locale, increments metric, and returns user', async () => {
       const user = { id: 1, locale: 'de' } as User;
       jest.spyOn(userRepository, 'update').mockResolvedValue({} as UpdateResult);
       jest.spyOn(service, 'findOne').mockResolvedValue(user);
 
       const result = await service.updateLocale(1, 'DE');
       expect(userRepository.update).toHaveBeenCalledWith(1, { locale: 'de' });
+      expect(mockMetricsService.usersLocaleSyncsTotal.inc).toHaveBeenCalledWith({ locale: 'de' });
       expect(result).toEqual(user);
     });
 
