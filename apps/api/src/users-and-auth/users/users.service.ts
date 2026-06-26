@@ -294,6 +294,7 @@ export class UsersService {
     this.logger.debug(`User saved with ID: ${savedUser.id}`);
     this.metricsService.usersRegisteredTotal.inc();
     this.metricsService.usersTotal.inc();
+    this.metricsService.usersPerLocale.inc({ locale: savedUser.locale ?? 'en' });
     return savedUser;
   }
 
@@ -690,11 +691,11 @@ export class UsersService {
       return repo.save(entities);
     };
 
-    if (options?.manager) {
-      return run(options.manager);
+    const savedUsers = await (options?.manager ? run(options.manager) : this.userRepository.manager.transaction(run));
+    for (const u of savedUsers) {
+      this.metricsService.usersPerLocale.inc({ locale: u.locale ?? 'en' });
     }
-
-    return this.userRepository.manager.transaction(run);
+    return savedUsers;
   }
 
   async deleteMany(ids: number[]): Promise<void> {
@@ -799,6 +800,7 @@ export class UsersService {
     });
 
     await repo.softDelete(user.id);
+    this.metricsService.usersPerLocale.dec({ locale: user.locale ?? 'en' });
   }
 
   async updateLocale(userId: number, locale: string): Promise<User> {
@@ -807,8 +809,16 @@ export class UsersService {
       throw new BadRequestException('Locale cannot be empty');
     }
 
+    const existing = await this.findOne({ id: userId });
+    if (!existing) {
+      throw new UserNotFoundException(userId);
+    }
+    const oldLocale = existing.locale ?? 'en';
+
     await this.userRepository.update(userId, { locale: cleaned });
     this.metricsService.usersLocaleSyncsTotal.inc({ locale: cleaned });
+    this.metricsService.usersPerLocale.dec({ locale: oldLocale });
+    this.metricsService.usersPerLocale.inc({ locale: cleaned });
 
     const updated = await this.findOne({ id: userId });
     if (!updated) {

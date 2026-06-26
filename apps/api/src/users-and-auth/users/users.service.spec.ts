@@ -15,6 +15,7 @@ const mockMetricsService = {
   usersRegisteredTotal: { inc: jest.fn() },
   usersTotal: { inc: jest.fn(), dec: jest.fn(), set: jest.fn() },
   usersLocaleSyncsTotal: { inc: jest.fn() },
+  usersPerLocale: { inc: jest.fn(), dec: jest.fn(), set: jest.fn() },
 };
 
 describe('UsersService', () => {
@@ -550,6 +551,7 @@ describe('UsersService', () => {
     it('sets locale when provided', async () => {
       await service.createOne({ username: 'usr', email: 'u@x.com', externalIdentifier: null, locale: 'de' });
       expect(userRepository.save).toHaveBeenCalledWith(expect.objectContaining({ locale: 'de' }));
+      expect(mockMetricsService.usersPerLocale.inc).toHaveBeenCalledWith({ locale: 'de' });
     });
 
     it('normalises locale to lowercase and truncates to 10 chars', async () => {
@@ -565,15 +567,18 @@ describe('UsersService', () => {
   });
 
   describe('updateLocale', () => {
-    it('saves cleaned locale, increments metric, and returns user', async () => {
-      const user = { id: 1, locale: 'de' } as User;
+    it('saves cleaned locale, updates gauge, and returns user', async () => {
+      const existing = { id: 1, locale: 'en' } as User;
+      const updated = { id: 1, locale: 'de' } as User;
       jest.spyOn(userRepository, 'update').mockResolvedValue({} as UpdateResult);
-      jest.spyOn(service, 'findOne').mockResolvedValue(user);
+      jest.spyOn(service, 'findOne').mockResolvedValueOnce(existing).mockResolvedValueOnce(updated);
 
       const result = await service.updateLocale(1, 'DE');
       expect(userRepository.update).toHaveBeenCalledWith(1, { locale: 'de' });
       expect(mockMetricsService.usersLocaleSyncsTotal.inc).toHaveBeenCalledWith({ locale: 'de' });
-      expect(result).toEqual(user);
+      expect(mockMetricsService.usersPerLocale.dec).toHaveBeenCalledWith({ locale: 'en' });
+      expect(mockMetricsService.usersPerLocale.inc).toHaveBeenCalledWith({ locale: 'de' });
+      expect(result).toEqual(updated);
     });
 
     it('throws BadRequestException for empty locale', async () => {
