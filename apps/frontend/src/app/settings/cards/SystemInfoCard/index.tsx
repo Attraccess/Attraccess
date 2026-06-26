@@ -1,8 +1,7 @@
 import { Card, CardContent, CardHeader, Skeleton } from '@heroui/react';
 import { ActivityIcon, ClockIcon, CpuIcon, FolderIcon, ServerIcon, UsersIcon } from 'lucide-react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useFormatedDuration, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useSystemServiceGetSystemInfo } from '@attraccess/react-query-client';
-import { formatDuration } from '../../../../utils/duration';
 import en from './en.json';
 import de from './de.json';
 
@@ -13,6 +12,7 @@ export type SystemInfoCardProps = {
 export function SystemInfoCard({ className }: SystemInfoCardProps = {}) {
   const { t } = useTranslations({ en, de });
   const { data } = useSystemServiceGetSystemInfo();
+  const formattedUptime = useFormatedDuration((data?.uptimeSeconds ?? 0) / 60);
 
   return (
     <Card className={className} data-cy="system-info-section">
@@ -28,7 +28,7 @@ export function SystemInfoCard({ className }: SystemInfoCardProps = {}) {
           { icon: <FolderIcon size={14} />, label: t('projects'), value: data?.projectsTotal },
           { icon: <ActivityIcon size={14} />, label: t('activeAuthSessions'), value: data?.activeAuthSessions },
           { icon: <ActivityIcon size={14} />, label: t('activeResourceUsageSessions'), value: data?.activeResourceUsageSessions },
-          { icon: <ClockIcon size={14} />, label: t('uptime'), value: data != null ? formatDuration(data.uptimeSeconds) : undefined },
+          { icon: <ClockIcon size={14} />, label: t('uptime'), value: data != null ? formattedUptime : undefined },
           { icon: <ServerIcon size={14} />, label: t('nodeVersion'), value: data?.nodeVersion },
         ].map(({ icon, label, value }) => (
           <div key={label} className="flex items-center justify-between">
