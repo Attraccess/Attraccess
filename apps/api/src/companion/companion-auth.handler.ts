@@ -50,7 +50,7 @@ export class CompanionAuthHandler {
       return socket.sendEvent(CompanionEventType.COMPANION_UNAUTHORIZED, { message: 'PLEASE_REREGISTER' });
     }
 
-    await this.service.touchLastConnection(device);
+    await this.service.touchLastConnection(device, appVersion);
     socket.deviceId = device.id;
 
     const resources = await this.gatewayService.getResourcesForDevice(device.id);

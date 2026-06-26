@@ -33,4 +33,8 @@ export class CompanionDevice {
   @Column({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
   @ApiProperty({ description: 'First time this device connected' })
   firstConnection!: Date;
+
+  @Column({ type: 'text', nullable: true, default: null })
+  @ApiProperty({ description: 'App version reported by this device on last connect', nullable: true })
+  appVersion!: string | null;
 }

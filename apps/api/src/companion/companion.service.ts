@@ -85,8 +85,8 @@ export class CompanionService {
     return compare(token, device.tokenHash);
   }
 
-  async touchLastConnection(device: CompanionDevice): Promise<void> {
-    await this.deviceRepo.update(device.id, { lastConnection: new Date() });
+  async touchLastConnection(device: CompanionDevice, appVersion?: string): Promise<void> {
+    await this.deviceRepo.update(device.id, { lastConnection: new Date(), ...(appVersion !== undefined && { appVersion }) });
   }
 
   async findAll(): Promise<CompanionDevice[]> {
