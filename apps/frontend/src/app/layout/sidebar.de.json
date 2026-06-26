@@ -13,8 +13,15 @@
         "projects": "Projekte",
         "messages": "Nachrichten",
         "billing": "Zahlungen",
-        "attractap": "NFC-Karten",
-        "userManagement": "Benutzerverwaltung"
+        "attractap": "NFC-Karten"
+      }
+    },
+    "users": {
+      "label": "Benutzer",
+      "items": {
+        "userList": "Benutzerliste",
+        "userSecurity": "Sicherheit",
+        "sso": "Single Sign-On"
       }
     },
     "devices": {
@@ -28,10 +35,12 @@
       "label": "System",
       "items": {
         "plugins": "Plugins",
-        "emailTemplates": "E-Mail-Vorlagen",
+        "emails": "E-Mails",
+        "messagingSettings": "Nachrichteneinstellungen",
         "csvExport": "CSV-Export",
         "balena": "Balena",
-        "settings": "Einstellungen"
+        "settings": "Einstellungen",
+        "monitoring": "Überwachung"
       }
     }
   },

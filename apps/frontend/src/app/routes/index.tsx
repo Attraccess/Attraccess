@@ -24,6 +24,7 @@ import { CsvExport } from '../csv-export';
 import { DocumentationEditor, DocumentationView } from '../resources/documentation';
 import { EmailTemplatesPage } from '../email-templates/EmailTemplatesPage';
 import { EditEmailTemplatePage } from '../email-templates/edit';
+import { EmailsPage } from '../emails/EmailsPage';
 import { ResourceGroupEditPage } from '../resource-groups';
 import { ResourceOverview } from '../resourceOverview';
 import { Dependencies } from '../dependencies';
@@ -48,6 +49,10 @@ import { UnauthorizedLayout } from '../unauthorized/unauthorized-layout/layout';
 
 const PasswordPolicySettingsPage = lazy(() => import('../settings/password-policy'));
 const CompanionSettingsPage = lazy(() => import('../settings/companion'));
+const EmailLayoutPage = lazy(() => import('../email-layout/EmailLayoutPage'));
+const UserSecurityPage = lazy(() => import('../user-management/security'));
+const MessagingSettingsPage = lazy(() => import('../messaging/settings'));
+const MonitoringPage = lazy(() => import('../monitoring'));
 
 const coreRoutes: RouteConfig[] = [
   {
@@ -277,11 +282,47 @@ const coreRoutes: RouteConfig[] = [
     element: <SystemSettingsPage />,
     authRequired: 'canManageSystemConfiguration',
   },
+  // User security section
   {
-    path: '/settings/security/password-policy',
+    path: '/users/security',
+    element: (
+      <Suspense fallback={<div className="flex items-center justify-center p-8"><Spinner size="sm" /></div>}>
+        <UserSecurityPage />
+      </Suspense>
+    ),
+    authRequired: 'canManageSystemConfiguration',
+  },
+  {
+    path: '/users/security/password-policy',
     element: (
       <Suspense fallback={<div className="flex items-center justify-center p-8"><Spinner size="sm" /></div>}>
         <PasswordPolicySettingsPage />
+      </Suspense>
+    ),
+    authRequired: 'canManageSystemConfiguration',
+  },
+  // Backwards compat redirect for old password policy path
+  {
+    path: '/settings/security/password-policy',
+    element: <Navigate to="/users/security/password-policy" replace />,
+    authRequired: false,
+  },
+  // Messaging settings
+  {
+    path: '/messages/settings',
+    element: (
+      <Suspense fallback={<div className="flex items-center justify-center p-8"><Spinner size="sm" /></div>}>
+        <MessagingSettingsPage />
+      </Suspense>
+    ),
+    authRequired: 'canManageSystemConfiguration',
+  },
+  // Monitoring
+  {
+    path: '/monitoring',
+    element: (
+      <Suspense fallback={<div className="flex items-center justify-center p-8"><Spinner size="sm" /></div>}>
+        <MonitoringPage />
       </Suspense>
     ),
     authRequired: 'canManageSystemConfiguration',
@@ -300,15 +341,41 @@ const coreRoutes: RouteConfig[] = [
     element: <AccountPage />,
     authRequired: true,
   },
+  // Emails section
   {
-    path: '/email-templates',
+    path: '/emails',
+    element: <EmailsPage />,
+    authRequired: 'canManageSystemConfiguration',
+  },
+  {
+    path: '/emails/templates',
     element: <EmailTemplatesPage />,
     authRequired: 'canManageSystemConfiguration',
   },
   {
-    path: '/email-templates/:type',
+    path: '/emails/templates/:type',
     element: <EditEmailTemplatePage />,
     authRequired: 'canManageSystemConfiguration',
+  },
+  {
+    path: '/emails/layout',
+    element: (
+      <Suspense fallback={<div className="flex items-center justify-center p-8"><Spinner size="sm" /></div>}>
+        <EmailLayoutPage />
+      </Suspense>
+    ),
+    authRequired: 'canManageSystemConfiguration',
+  },
+  // Backwards compat redirects for old email-templates paths
+  {
+    path: '/email-templates',
+    element: <Navigate to="/emails/templates" replace />,
+    authRequired: false,
+  },
+  {
+    path: '/email-templates/:type',
+    element: <Navigate to="/emails/templates" replace />,
+    authRequired: false,
   },
   {
     path: '/messages',

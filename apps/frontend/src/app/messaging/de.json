@@ -25,5 +25,6 @@
     "newMessageTitle": "Neue Nachricht von {{sender}}",
     "newMessageFallbackSender": "Jemand",
     "openMessage": "Öffnen"
-  }
+  },
+  "settingsButton": "Einstellungen"
 }

@@ -1,0 +1,9 @@
+{
+  "title": "User Security",
+  "subtitle": "Authentication rate limiting, password policy, and single sign-on",
+  "sso": {
+    "title": "Single Sign-On",
+    "subtitle": "Configure SSO providers for user authentication",
+    "openButton": "Manage Providers"
+  }
+}
