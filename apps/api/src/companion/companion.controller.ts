@@ -22,7 +22,6 @@ import { CompanionService } from './companion.service';
 import { CompanionGateway } from './companion.gateway';
 import { CompanionGatewayService } from './companion-gateway.service';
 import { CompanionManifestDto } from './dtos/companion.dto';
-import { CompanionEventType } from './companion.types';
 import { MetricsService } from '../metrics/metrics.service';
 
 class RenameCompanionDeviceDto {
@@ -53,6 +52,7 @@ export class CompanionDownloadController {
   }
 
   @Get('download/:platform/:arch')
+  // ponytail: intentionally public — companion app fetches its own update binary without a user session
   @ApiOperation({ summary: 'Download companion app binary', operationId: 'downloadCompanionBinary' })
   @ApiParam({ name: 'platform', example: 'linux' })
   @ApiParam({ name: 'arch', example: 'x64' })
@@ -183,20 +183,8 @@ export class CompanionController {
     const device = await this.service.findById(id);
     if (!device) throw new NotFoundException(`Companion device ${id} not found`);
 
-    const manifest = this.service.getManifest();
-    if (!manifest) return { notified: false };
-
-    const socket = [...this.gatewayService.sockets.values()].find((s) => s.deviceId === id);
-    if (!socket) return { notified: false };
-
-    const platform = socket.platform ?? 'linux';
-    const entry = manifest.platforms.find((p) => p.platform === platform);
-    const downloadUrl = entry
-      ? `/api/companion/download/${entry.platform}/${entry.arch}`
-      : `/api/companion/download/${platform}/x64`;
-
-    this.gateway.sendUpdateAvailable(id, { version: manifest.version, downloadUrl });
-    return { notified: true };
+    const notified = this.gatewayService.sendUpdateAvailable(id);
+    return { notified };
   }
 
   @Post('update-all')
@@ -204,20 +192,12 @@ export class CompanionController {
   @ApiOperation({ summary: 'Push update notification to all connected companion devices', operationId: 'updateAllCompanionDevices' })
   @ApiResponse({ status: 200, description: 'Number of devices notified' })
   triggerUpdateAll(): { notified: number } {
-    const manifest = this.service.getManifest();
-    if (!manifest) return { notified: 0 };
-
-    let notified = 0;
-    for (const socket of this.gatewayService.sockets.values()) {
-      if (socket.deviceId === null) continue;
-      const platform = socket.platform ?? 'linux';
-      const entry = manifest.platforms.find((p) => p.platform === platform);
-      const downloadUrl = entry
-        ? `/api/companion/download/${entry.platform}/${entry.arch}`
-        : `/api/companion/download/${platform}/x64`;
-      socket.sendEvent(CompanionEventType.COMPANION_UPDATE_AVAILABLE, { version: manifest.version, downloadUrl });
-      notified++;
-    }
+    const deviceIds = [...new Set(
+      [...this.gatewayService.sockets.values()]
+        .map((s) => s.deviceId)
+        .filter((id): id is number => id !== null),
+    )];
+    const notified = deviceIds.filter((id) => this.gatewayService.sendUpdateAvailable(id)).length;
     return { notified };
   }
 }

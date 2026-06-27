@@ -148,6 +148,7 @@ export function CompanionSettingsPage() {
   const [renamingDevice, setRenamingDevice] = useState<CompanionDevice | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [deletingDevice, setDeletingDevice] = useState<CompanionDevice | null>(null);
+  const [pushUpdatePendingId, setPushUpdatePendingId] = useState<number | null>(null);
 
   const listKey = UseCompanionDevicesServiceListCompanionDevicesKeyFn();
 
@@ -176,15 +177,18 @@ export function CompanionSettingsPage() {
     },
   });
 
-  const { mutate: pushUpdate, isPending: isPushUpdatePending } = useMutation({
+  const { mutate: pushUpdate } = useMutation({
     mutationFn: async (deviceId: number) => {
+      setPushUpdatePendingId(deviceId);
       const res = await fetch(`${getBaseUrl()}/api/companion-devices/${deviceId}/trigger-update`, { method: 'POST', credentials: 'include' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
     },
     onSuccess: () => {
+      setPushUpdatePendingId(null);
       toast.success({ title: t('devices.actions.pushUpdateSuccess') });
     },
     onError: () => {
+      setPushUpdatePendingId(null);
       toast.error({ title: t('devices.actions.pushUpdateError') });
     },
   });
@@ -270,7 +274,7 @@ export function CompanionSettingsPage() {
                         onRenameStart={handleRenameStart}
                         onDeleteStart={setDeletingDevice}
                         onPushUpdate={pushUpdate}
-                        isPushUpdatePending={isPushUpdatePending}
+                        isPushUpdatePending={pushUpdatePendingId === device.id}
                         t={t}
                         formatDateTime={formatDateTime}
                       />

@@ -504,7 +504,7 @@ function downloadFile(url: string, dest: string): Promise<void> {
       file.on('finish', () => file.close(() => resolve()));
     });
     req.on('error', (err) => { file.close(); fs.unlink(dest, () => undefined); reject(err); });
-    req.setTimeout(120000, () => { req.destroy(); reject(new Error('Download timed out')); });
+    req.setTimeout(120000, () => { req.destroy(); file.close(); fs.unlink(dest, () => undefined); reject(new Error('Download timed out')); });
   });
 }
 
