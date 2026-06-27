@@ -12,6 +12,8 @@ export function ResourceUsageExport(props: ExportProps) {
     en,
   });
 
+  const [fetchAll, setFetchAll] = useState(false);
+
   const {
     data,
     status,
@@ -24,20 +26,20 @@ export function ResourceUsageExport(props: ExportProps) {
     end: props.end.toISOString(),
   });
 
-  // Auto-fetch all pages for complete CSV export
+  // ponytail: only fetch remaining pages after user clicks export
   useEffect(() => {
-    if (hasNextPage && !isFetchingNextPage) {
+    if (fetchAll && hasNextPage && !isFetchingNextPage) {
       fetchNextPage();
     }
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+  }, [fetchAll, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const resourceUsageExport = useMemo(
     () => data?.pages.flatMap((page) => page.data) ?? [],
     [data],
   );
 
-  // Show loading while any page is still being fetched
-  const fetchStatus = status === 'success' && (hasNextPage || isFetchingNextPage) ? 'pending' : status;
+  const isFetchingAllPages = fetchAll && (hasNextPage || isFetchingNextPage);
+  const fetchStatus = status === 'success' && isFetchingAllPages ? 'pending' : status;
 
   const formatDateTimeFull = useDateTimeFormatter({ showDate: true, showTime: true, showSeconds: true });
   const formatUsageDuration = useNumberFormatter();
@@ -154,6 +156,8 @@ export function ResourceUsageExport(props: ExportProps) {
       setOption={setOption}
       filename="resource-usage.csv"
       queryStatus={fetchStatus}
+      onFetchAllPages={() => setFetchAll(true)}
+      isFetchingAllPages={isFetchingAllPages}
     />
   );
 }
