@@ -24,7 +24,7 @@ export function Toolbar({
   ...filterProps
 }: Readonly<ToolbarProps & FilterProps>) {
   const { hasPermission } = useAuth();
-  const canManageResources = hasPermission('canManageResources');
+  const canManageResources = hasPermission('resources.update');
   const navigate = useNavigate();
 
   const { t } = useTranslations({

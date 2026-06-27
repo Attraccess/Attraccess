@@ -44,7 +44,7 @@ export function ResourceUsageSession({
 }: ResourceUsageSessionProps) {
   const { t } = useTranslations({ en, de });
   const { hasPermission, user } = useAuth();
-  const canManageResources = hasPermission('canManageResources');
+  const canManageResources = hasPermission('resources.update');
   const queryClient = useQueryClient();
 
   const invalidateSessionQueries = useCallback(() => {

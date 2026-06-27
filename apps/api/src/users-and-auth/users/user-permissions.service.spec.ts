@@ -1,157 +1,150 @@
-import { Logger } from '@nestjs/common';
+import { ForbiddenException, Logger } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { UserPermissionsService } from './user-permissions.service';
 import { UsersService } from './users.service';
-import { SSOService } from '../auth/sso/sso.service';
-import { User, AuthenticationType, SSOProviderType, SystemPermissions } from '@attraccess/database-entities';
+import { RbacService } from '../rbac/rbac.service';
+import { User } from '@attraccess/database-entities';
 import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../../notifications/notification-types';
+import { UserNotFoundException } from '../../exceptions/user.notFound.exception';
+
+const RESOURCE_MANAGER_ROLE = {
+  id: 1,
+  key: 'resource-manager',
+  rolePermissions: [{ permissionKey: 'resources.update' }, { permissionKey: 'resources.create' }],
+};
+const USER_MANAGER_ROLE = {
+  id: 2,
+  key: 'user-manager',
+  rolePermissions: [{ permissionKey: 'users.update' }, { permissionKey: 'users.create' }],
+};
+const SYSTEM_ADMIN_ROLE = {
+  id: 3,
+  key: 'system-admin',
+  rolePermissions: [{ permissionKey: 'system.settings.manage' }],
+};
+const BILLING_MANAGER_ROLE = {
+  id: 4,
+  key: 'billing-manager',
+  rolePermissions: [{ permissionKey: 'billing.manage' }],
+};
+const ALL_ROLES = [RESOURCE_MANAGER_ROLE, USER_MANAGER_ROLE, SYSTEM_ADMIN_ROLE, BILLING_MANAGER_ROLE];
+
+const ALL_PERMISSIONS = new Set([
+  'resources.update',
+  'resources.create',
+  'users.update',
+  'users.create',
+  'system.settings.manage',
+  'billing.manage',
+  'users.roles.manage',
+]);
 
 describe('UserPermissionsService', () => {
   let service: UserPermissionsService;
-  let usersService: UsersService;
-  let ssoService: SSOService;
+  let usersService: { findOne: jest.Mock; findByPermission: jest.Mock };
+  let rbacService: {
+    getRoles: jest.Mock;
+    getUserRoles: jest.Mock;
+    assignRole: jest.Mock;
+    revokeRole: jest.Mock;
+    getEffectivePermissions: jest.Mock;
+  };
   let notifications: { dispatch: jest.Mock; sendEmailTemplate: jest.Mock };
 
+  const requestUser = {
+    id: 99,
+    effectivePermissions: ALL_PERMISSIONS,
+  } as never as User;
+
+  const targetUser = { id: 1, username: 'alice' } as User;
+
   beforeEach(async () => {
-    notifications = { dispatch: jest.fn().mockResolvedValue(undefined), sendEmailTemplate: jest.fn() };
+    notifications = {
+      dispatch: jest.fn().mockResolvedValue(undefined),
+      sendEmailTemplate: jest.fn().mockResolvedValue(undefined),
+    };
+
+    rbacService = {
+      getRoles: jest.fn().mockResolvedValue(ALL_ROLES),
+      getUserRoles: jest.fn().mockResolvedValue([]),
+      assignRole: jest.fn().mockResolvedValue(undefined),
+      revokeRole: jest.fn().mockResolvedValue(undefined),
+      getEffectivePermissions: jest.fn().mockResolvedValue(new Set<string>()),
+    };
+
+    usersService = {
+      findOne: jest.fn().mockResolvedValue(targetUser),
+      findByPermission: jest.fn().mockResolvedValue({ data: [], total: 0, page: 1, limit: 10 }),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UserPermissionsService,
-        {
-          provide: UsersService,
-          useValue: {
-            findOne: jest.fn(),
-            updateOne: jest.fn(),
-            findByPermission: jest.fn(),
-          },
-        },
-        {
-          provide: SSOService,
-          useValue: { getProviderByTypeAndIdWithConfiguration: jest.fn() },
-        },
+        { provide: UsersService, useValue: usersService },
+        { provide: RbacService, useValue: rbacService },
         { provide: NotificationDispatchService, useValue: notifications },
       ],
     }).compile();
 
     service = module.get<UserPermissionsService>(UserPermissionsService);
-    usersService = module.get<UsersService>(UsersService);
-    ssoService = module.get<SSOService>(SSOService);
   });
 
-  const requestUser = {
-    id: 99,
-    systemPermissions: {
-      canManageResources: true,
-      canManageSystemConfiguration: true,
-      canManageUsers: true,
-      canManageBilling: true,
-    },
-  } as User;
-
   describe('updatePermissions', () => {
-    it('allows updating non-SSO-mapped permissions when only some permissions have SSO mappings', async () => {
-      const targetUser = {
-        id: 1,
-        systemPermissions: {
-          canManageResources: false,
-          canManageSystemConfiguration: false,
-          canManageUsers: false,
-          canManageBilling: false,
-        },
-        authenticationDetails: [{ type: AuthenticationType.SSO, providerType: SSOProviderType.OIDC, providerId: 42 }],
-      } as User;
+    it('throws ForbiddenException when actor updates their own permissions', async () => {
+      await expect(
+        service.updatePermissions(requestUser.id, { canManageResources: true }, requestUser),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
 
-      jest.spyOn(usersService, 'findOne').mockResolvedValue(targetUser);
-      jest.spyOn(usersService, 'updateOne').mockResolvedValue(targetUser);
-      jest.spyOn(ssoService, 'getProviderByTypeAndIdWithConfiguration').mockResolvedValue({
-        oidcConfiguration: { permissionMappings: { canManageUsers: ['admins'] } },
-      } as never);
+    it('throws UserNotFoundException when user does not exist', async () => {
+      usersService.findOne.mockResolvedValueOnce(null);
+      await expect(
+        service.updatePermissions(targetUser.id, { canManageResources: true }, requestUser),
+      ).rejects.toBeInstanceOf(UserNotFoundException);
+    });
+
+    it('calls assignRole when a permission flag is set to true', async () => {
+      // findOne called twice: once to get user, once after update
+      usersService.findOne.mockResolvedValue(targetUser);
 
       await service.updatePermissions(targetUser.id, { canManageResources: true }, requestUser);
 
-      expect(usersService.updateOne).toHaveBeenCalledWith(
+      expect(rbacService.assignRole).toHaveBeenCalledWith(
         targetUser.id,
-        expect.objectContaining({
-          systemPermissions: expect.objectContaining({ canManageResources: true }),
-        }),
+        RESOURCE_MANAGER_ROLE.id,
+        ALL_PERMISSIONS,
       );
     });
 
-    it('silently skips SSO-mapped permissions included in the request body', async () => {
-      const targetUser = {
-        id: 1,
-        systemPermissions: {
-          canManageResources: false,
-          canManageSystemConfiguration: false,
-          canManageUsers: false,
-          canManageBilling: false,
-        },
-        authenticationDetails: [{ type: AuthenticationType.SSO, providerType: SSOProviderType.OIDC, providerId: 42 }],
-      } as User;
+    it('calls revokeRole when a permission flag is set to false and user has the role', async () => {
+      rbacService.getUserRoles.mockResolvedValue([{ roleId: RESOURCE_MANAGER_ROLE.id }]);
 
-      jest.spyOn(usersService, 'findOne').mockResolvedValue(targetUser);
-      jest.spyOn(usersService, 'updateOne').mockResolvedValue(targetUser);
-      jest.spyOn(ssoService, 'getProviderByTypeAndIdWithConfiguration').mockResolvedValue({
-        oidcConfiguration: { permissionMappings: { canManageResources: ['resource-admins'] } },
-      } as never);
+      await service.updatePermissions(targetUser.id, { canManageResources: false }, requestUser);
 
-      await service.updatePermissions(
-        targetUser.id,
-        { canManageResources: true, canManageSystemConfiguration: true },
-        requestUser,
-      );
-
-      const savedPermissions = (usersService.updateOne as jest.Mock).mock.calls[0][1].systemPermissions;
-      expect(savedPermissions.canManageResources).toBe(false);
-      expect(savedPermissions.canManageSystemConfiguration).toBe(true);
+      expect(rbacService.revokeRole).toHaveBeenCalledWith(targetUser.id, RESOURCE_MANAGER_ROLE.id);
     });
 
-    it('applies full update when user has no SSO permission mappings', async () => {
-      const targetUser = {
-        id: 1,
-        systemPermissions: {
-          canManageResources: false,
-          canManageSystemConfiguration: false,
-          canManageUsers: false,
-          canManageBilling: false,
-        },
-        authenticationDetails: [],
-      } as User;
+    it('skips revokeRole when user does not have the role', async () => {
+      rbacService.getUserRoles.mockResolvedValue([]);
 
-      jest.spyOn(usersService, 'findOne').mockResolvedValue(targetUser);
-      jest.spyOn(usersService, 'updateOne').mockResolvedValue(targetUser);
+      await service.updatePermissions(targetUser.id, { canManageResources: false }, requestUser);
 
-      await service.updatePermissions(targetUser.id, { canManageResources: true, canManageUsers: true }, requestUser);
-
-      expect(usersService.updateOne).toHaveBeenCalledWith(
-        targetUser.id,
-        expect.objectContaining({
-          systemPermissions: expect.objectContaining({ canManageResources: true, canManageUsers: true }),
-        }),
-      );
+      expect(rbacService.revokeRole).not.toHaveBeenCalled();
     });
 
-    it('notifies the user when applied system permissions change', async () => {
-      const targetUser = {
-        id: 1,
-        username: 'alice',
-        systemPermissions: {
-          canManageResources: false,
-          canManageSystemConfiguration: false,
-          canManageUsers: false,
-          canManageBilling: false,
-        },
-        authenticationDetails: [],
-      } as User;
+    it('throws ForbiddenException when actor lacks permissions to grant a role', async () => {
+      const limitedRequestUser = {
+        id: 99,
+        effectivePermissions: new Set(['billing.manage']), // only has billing, not resources.*
+      } as never as User;
 
-      jest.spyOn(usersService, 'findOne').mockResolvedValue(targetUser);
-      jest.spyOn(usersService, 'updateOne').mockResolvedValue({
-        ...targetUser,
-        systemPermissions: { ...targetUser.systemPermissions, canManageResources: true },
-      } as User);
+      await expect(
+        service.updatePermissions(targetUser.id, { canManageResources: true }, limitedRequestUser),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
 
+    it('dispatches notification when permissions changed', async () => {
       await service.updatePermissions(targetUser.id, { canManageResources: true }, requestUser);
 
       expect(notifications.dispatch).toHaveBeenCalledWith(
@@ -159,277 +152,109 @@ describe('UserPermissionsService', () => {
           category: NotificationCategory.ACCESS_CHANGES,
           recipients: [expect.objectContaining({ id: targetUser.id })],
           title: 'Your permissions changed',
-          body: 'Your system permissions were updated.',
           actorId: requestUser.id,
           sendEmail: expect.any(Function),
         }),
       );
-      const request = notifications.dispatch.mock.calls[0][0];
-      await request.sendEmail(targetUser);
-      expect(notifications.sendEmailTemplate).toHaveBeenCalledWith(targetUser, NotificationCategory.ACCESS_CHANGES, {
-        accessChange: { title: 'Your permissions changed', body: 'Your system permissions were updated.' },
-      });
+    });
+
+    it('does not dispatch notification when no roles changed', async () => {
+      // Only undefined flags — no changes
+      await service.updatePermissions(targetUser.id, {}, requestUser);
+
+      expect(notifications.dispatch).not.toHaveBeenCalled();
     });
 
     it('does not fail the permission update when notification dispatch fails', async () => {
-      const targetUser = {
-        id: 1,
-        username: 'alice',
-        systemPermissions: {
-          canManageResources: false,
-          canManageSystemConfiguration: false,
-          canManageUsers: false,
-          canManageBilling: false,
-        },
-        authenticationDetails: [],
-      } as User;
-      const updatedUser = {
-        ...targetUser,
-        systemPermissions: { ...targetUser.systemPermissions, canManageResources: true },
-      } as User;
-
-      jest.spyOn(usersService, 'findOne').mockResolvedValue(targetUser);
-      jest.spyOn(usersService, 'updateOne').mockResolvedValue(updatedUser);
       notifications.dispatch.mockRejectedValue(new Error('push unavailable'));
       const loggerSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation();
 
-      await expect(service.updatePermissions(targetUser.id, { canManageResources: true }, requestUser)).resolves.toBe(
-        updatedUser,
+      await expect(
+        service.updatePermissions(targetUser.id, { canManageResources: true }, requestUser),
+      ).resolves.toBe(targetUser);
+
+      expect(loggerSpy).toHaveBeenCalledWith(
+        `Failed to notify user ${targetUser.id} about permission changes: push unavailable`,
       );
-      expect(usersService.updateOne).toHaveBeenCalled();
-      expect(loggerSpy).toHaveBeenCalledWith('Failed to notify user 1 about permission changes: push unavailable');
       loggerSpy.mockRestore();
     });
 
-    it('saves canManageBilling when included in the request', async () => {
-      const targetUser = {
-        id: 1,
-        systemPermissions: {
-          canManageResources: true,
-          canManageSystemConfiguration: true,
-          canManageUsers: true,
-          canManageBilling: true,
-        },
-        authenticationDetails: [],
-      } as User;
-
-      jest.spyOn(usersService, 'findOne').mockResolvedValue(targetUser);
-      jest.spyOn(usersService, 'updateOne').mockResolvedValue(targetUser);
+    it('handles all four permission flags in a single call', async () => {
+      rbacService.getUserRoles.mockResolvedValue([
+        { roleId: SYSTEM_ADMIN_ROLE.id },
+        { roleId: BILLING_MANAGER_ROLE.id },
+      ]);
 
       await service.updatePermissions(
         targetUser.id,
-        { canManageResources: true, canManageSystemConfiguration: true, canManageUsers: true, canManageBilling: false },
-        requestUser,
-      );
-
-      expect(usersService.updateOne).toHaveBeenCalledWith(
-        targetUser.id,
-        expect.objectContaining({
-          systemPermissions: expect.objectContaining({ canManageBilling: false }),
-        }),
-      );
-    });
-
-    /**
-     * Regression guard: every key on SystemPermissions must round-trip through
-     * updatePermissions. If a new permission is added to the entity but forgotten
-     * in UpdateUserPermissionsDto or the handler, this test fails.
-     */
-    it('persists every SystemPermissions field — regression guard for missing DTO/handler entries', async () => {
-      const allTrue: SystemPermissions = {
-        canManageResources: true,
-        canManageSystemConfiguration: true,
-        canManageUsers: true,
-        canManageBilling: true,
-      };
-
-      const targetUser = {
-        id: 1,
-        systemPermissions: { ...allTrue },
-        authenticationDetails: [],
-      } as User;
-
-      jest.spyOn(usersService, 'findOne').mockResolvedValue(targetUser);
-      jest.spyOn(usersService, 'updateOne').mockResolvedValue(targetUser);
-
-      const allFalse = Object.fromEntries(
-        (Object.keys(allTrue) as Array<keyof SystemPermissions>).map((k) => [k, false]),
-      ) as Record<keyof SystemPermissions, boolean>;
-
-      await service.updatePermissions(targetUser.id, allFalse, requestUser);
-
-      const saved = (usersService.updateOne as jest.Mock).mock.calls[0][1].systemPermissions;
-
-      for (const key of Object.keys(allTrue) as Array<keyof SystemPermissions>) {
-        expect(saved[key]).toBe(false);
-      }
-    });
-
-    it('does not apply any changes when all requested permissions are SSO-managed', async () => {
-      const targetUser = {
-        id: 1,
-        systemPermissions: {
-          canManageResources: false,
+        {
+          canManageResources: true,
           canManageSystemConfiguration: false,
-          canManageUsers: false,
+          canManageUsers: true,
           canManageBilling: false,
         },
-        authenticationDetails: [{ type: AuthenticationType.SSO, providerType: SSOProviderType.OIDC, providerId: 42 }],
-      } as User;
-
-      jest.spyOn(usersService, 'findOne').mockResolvedValue(targetUser);
-      jest.spyOn(usersService, 'updateOne').mockResolvedValue(targetUser);
-      jest.spyOn(ssoService, 'getProviderByTypeAndIdWithConfiguration').mockResolvedValue({
-        oidcConfiguration: {
-          permissionMappings: {
-            canManageResources: ['r'],
-            canManageUsers: ['u'],
-            canManageSystemConfiguration: ['s'],
-          },
-        },
-      } as never);
-
-      await service.updatePermissions(
-        targetUser.id,
-        { canManageResources: true, canManageUsers: true, canManageSystemConfiguration: true },
         requestUser,
       );
 
-      const savedPermissions = (usersService.updateOne as jest.Mock).mock.calls[0][1].systemPermissions;
-      expect(savedPermissions.canManageResources).toBe(false);
-      expect(savedPermissions.canManageUsers).toBe(false);
-      expect(savedPermissions.canManageSystemConfiguration).toBe(false);
+      expect(rbacService.assignRole).toHaveBeenCalledWith(targetUser.id, RESOURCE_MANAGER_ROLE.id, ALL_PERMISSIONS);
+      expect(rbacService.assignRole).toHaveBeenCalledWith(targetUser.id, USER_MANAGER_ROLE.id, ALL_PERMISSIONS);
+      expect(rbacService.revokeRole).toHaveBeenCalledWith(targetUser.id, SYSTEM_ADMIN_ROLE.id);
+      expect(rbacService.revokeRole).toHaveBeenCalledWith(targetUser.id, BILLING_MANAGER_ROLE.id);
     });
   });
 
   describe('bulkUpdatePermissions', () => {
-    it('applies only non-SSO-managed permissions for SSO users in bulk update', async () => {
-      const ssoUser = {
-        id: 2,
-        systemPermissions: {
-          canManageResources: false,
-          canManageSystemConfiguration: false,
-          canManageUsers: false,
-          canManageBilling: false,
-        },
-        authenticationDetails: [{ type: AuthenticationType.SSO, providerType: SSOProviderType.OIDC, providerId: 7 }],
-      } as User;
-      const normalUser = {
-        id: 3,
-        systemPermissions: {
-          canManageResources: false,
-          canManageSystemConfiguration: false,
-          canManageUsers: false,
-          canManageBilling: false,
-        },
-        authenticationDetails: [],
-      } as User;
+    it('skips own-user updates in bulk operation', async () => {
+      await service.bulkUpdatePermissions(
+        { updates: [{ userId: requestUser.id, permissions: { canManageResources: true } }] },
+        requestUser,
+      );
 
-      jest
-        .spyOn(usersService, 'findOne')
-        .mockImplementation(({ id }) => Promise.resolve(id === 2 ? ssoUser : id === 3 ? normalUser : null));
-      jest.spyOn(usersService, 'updateOne').mockImplementation(async (id) => (id === ssoUser.id ? ssoUser : normalUser));
-      jest.spyOn(ssoService, 'getProviderByTypeAndIdWithConfiguration').mockResolvedValue({
-        oidcConfiguration: { permissionMappings: { canManageResources: ['resource-admins'] } },
-      } as never);
+      expect(rbacService.assignRole).not.toHaveBeenCalled();
+    });
+
+    it('updates multiple users in a single call', async () => {
+      const userA = { id: 10, username: 'a' } as User;
+      const userB = { id: 11, username: 'b' } as User;
+      usersService.findOne.mockImplementation(({ id }: { id: number }) =>
+        Promise.resolve(id === 10 ? userA : id === 11 ? userB : null),
+      );
 
       await service.bulkUpdatePermissions(
         {
           updates: [
-            { userId: ssoUser.id, permissions: { canManageResources: true, canManageSystemConfiguration: true } },
-            { userId: normalUser.id, permissions: { canManageResources: true } },
+            { userId: 10, permissions: { canManageResources: true } },
+            { userId: 11, permissions: { canManageBilling: true } },
           ],
         },
         requestUser,
       );
 
-      const ssoCall = (usersService.updateOne as jest.Mock).mock.calls.find(([id]) => id === ssoUser.id);
-      expect(ssoCall).toBeDefined();
-      expect(ssoCall[1].systemPermissions.canManageResources).toBe(false);
-      expect(ssoCall[1].systemPermissions.canManageSystemConfiguration).toBe(true);
+      expect(rbacService.assignRole).toHaveBeenCalledWith(10, RESOURCE_MANAGER_ROLE.id, ALL_PERMISSIONS);
+      expect(rbacService.assignRole).toHaveBeenCalledWith(11, BILLING_MANAGER_ROLE.id, ALL_PERMISSIONS);
+    });
+  });
 
-      const normalCall = (usersService.updateOne as jest.Mock).mock.calls.find(([id]) => id === normalUser.id);
-      expect(normalCall).toBeDefined();
-      expect(normalCall[1].systemPermissions.canManageResources).toBe(true);
+  describe('getPermissions', () => {
+    it('returns boolean shape derived from effective RBAC permissions', async () => {
+      rbacService.getEffectivePermissions.mockResolvedValue(
+        new Set(['resources.update', 'resources.create', 'billing.manage']),
+      );
+
+      const result = await service.getPermissions(targetUser.id);
+
+      expect(result).toEqual({
+        canManageResources: true,
+        canManageSystemConfiguration: false,
+        canManageUsers: false,
+        canManageBilling: true,
+      });
     });
 
-    it('includes SSO users in bulk result when their update contains non-SSO-managed permissions', async () => {
-      const ssoUser = {
-        id: 2,
-        systemPermissions: {
-          canManageResources: false,
-          canManageSystemConfiguration: false,
-          canManageUsers: false,
-          canManageBilling: false,
-        },
-        authenticationDetails: [{ type: AuthenticationType.SSO, providerType: SSOProviderType.OIDC, providerId: 7 }],
-      } as User;
-      const normalUser = {
-        id: 3,
-        systemPermissions: {
-          canManageResources: false,
-          canManageSystemConfiguration: false,
-          canManageUsers: false,
-          canManageBilling: false,
-        },
-        authenticationDetails: [],
-      } as User;
+    it('throws UserNotFoundException when user does not exist', async () => {
+      usersService.findOne.mockResolvedValueOnce(null);
 
-      jest
-        .spyOn(usersService, 'findOne')
-        .mockImplementation(({ id }) => Promise.resolve(id === 2 ? ssoUser : id === 3 ? normalUser : null));
-      jest.spyOn(usersService, 'updateOne').mockImplementation(async (id) => (id === ssoUser.id ? ssoUser : normalUser));
-      jest.spyOn(ssoService, 'getProviderByTypeAndIdWithConfiguration').mockResolvedValue({
-        oidcConfiguration: { permissionMappings: { canManageResources: ['admins'] } },
-      } as never);
-
-      const result = await service.bulkUpdatePermissions(
-        {
-          updates: [
-            { userId: ssoUser.id, permissions: { canManageSystemConfiguration: true } },
-            { userId: normalUser.id, permissions: { canManageResources: true } },
-          ],
-        },
-        requestUser,
-      );
-
-      expect(result).toHaveLength(2);
-      expect(usersService.updateOne).toHaveBeenCalledTimes(2);
-    });
-
-    it('notifies each user whose permissions change in a bulk update', async () => {
-      const normalUser = {
-        id: 3,
-        username: 'bob',
-        systemPermissions: {
-          canManageResources: false,
-          canManageSystemConfiguration: false,
-          canManageUsers: false,
-          canManageBilling: false,
-        },
-        authenticationDetails: [],
-      } as User;
-
-      jest.spyOn(usersService, 'findOne').mockResolvedValue(normalUser);
-      jest.spyOn(usersService, 'updateOne').mockResolvedValue({
-        ...normalUser,
-        systemPermissions: { ...normalUser.systemPermissions, canManageResources: true },
-      } as User);
-
-      await service.bulkUpdatePermissions(
-        { updates: [{ userId: normalUser.id, permissions: { canManageResources: true } }] },
-        requestUser,
-      );
-
-      expect(notifications.dispatch).toHaveBeenCalledWith(
-        expect.objectContaining({
-          category: NotificationCategory.ACCESS_CHANGES,
-          recipients: [expect.objectContaining({ id: normalUser.id })],
-          title: 'Your permissions changed',
-          body: 'Your system permissions were updated.',
-          actorId: requestUser.id,
-        }),
-      );
+      await expect(service.getPermissions(999)).rejects.toBeInstanceOf(UserNotFoundException);
     });
   });
 });

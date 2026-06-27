@@ -1,13 +1,6 @@
 import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
-import {
-  AuthenticationType,
-  SSOProviderType,
-  SystemPermissions,
-  User,
-} from '@attraccess/database-entities';
-import { getSsoManagedPermissionKeys } from '@attraccess/shared';
+import { User } from '@attraccess/database-entities';
 import { UsersService } from './users.service';
-import { SSOService } from '../auth/sso/sso.service';
 import { UserNotFoundException } from '../../exceptions/user.notFound.exception';
 import { UpdateUserPermissionsDto } from './dtos/updateUserPermissions.dto';
 import { BulkUpdateUserPermissionsDto } from './dtos/bulkUpdateUserPermissions.dto';
@@ -15,24 +8,26 @@ import { PermissionFilter } from './dtos/getUsersWithPermissionQuery.dto';
 import { PaginatedUsersResponseDto } from './dtos/paginatedUsersResponse.dto';
 import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../../notifications/notification-types';
+import { RbacService } from '../rbac/rbac.service';
+import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 
-/**
- * System-permission reads/writes for users, honoring SSO-managed permission
- * mappings and grant-only-what-you-have rules.
- */
+// Maps old boolean permission flags to the role keys they correspond to
+const PERMISSION_TO_ROLE: Record<string, string> = {
+  canManageResources: 'resource-manager',
+  canManageSystemConfiguration: 'system-admin',
+  canManageUsers: 'user-manager',
+  canManageBilling: 'billing-manager',
+};
+
 @Injectable()
 export class UserPermissionsService {
   private readonly logger = new Logger(UserPermissionsService.name);
 
   constructor(
     private readonly usersService: UsersService,
-    private readonly ssoService: SSOService,
+    private readonly rbacService: RbacService,
     private readonly notifications: NotificationDispatchService,
   ) {}
-
-  private permissionsChanged(before: Partial<SystemPermissions>, after: Partial<SystemPermissions>): boolean {
-    return (Object.keys(after) as Array<keyof SystemPermissions>).some((key) => before[key] !== after[key]);
-  }
 
   private notifyPermissionsChanged(user: User, actorId: number): void {
     const title = 'Your permissions changed';
@@ -54,111 +49,54 @@ export class UserPermissionsService {
     });
   }
 
-  private async getSsoManagedPermissions(user: User): Promise<string[]> {
-    const authenticationDetails = user.authenticationDetails ?? [];
-    const ssoDetails = authenticationDetails.filter(
-      (detail) => detail.type === AuthenticationType.SSO && detail.providerId && detail.providerType,
-    );
-
-    if (ssoDetails.length === 0) {
-      return [];
-    }
-
-    const ssoManagedKeys = new Set<string>();
-
-    for (const detail of ssoDetails) {
-      const provider = await this.ssoService.getProviderByTypeAndIdWithConfiguration(
-        detail.providerType as SSOProviderType,
-        detail.providerId as number,
-      );
-
-      if (!provider) {
-        continue;
-      }
-
-      const permissionMappings =
-        detail.providerType === SSOProviderType.OIDC
-          ? provider.oidcConfiguration?.permissionMappings
-          : provider.samlConfiguration?.permissionMappings;
-
-      getSsoManagedPermissionKeys(permissionMappings).forEach((key) => ssoManagedKeys.add(key));
-    }
-
-    return Array.from(ssoManagedKeys);
-  }
-
-  /**
-   * Validates that a user can grant the specified permissions
-   * @param user The user attempting to grant permissions
-   * @param permissions The permissions being granted
-   * @throws ForbiddenException if the user tries to grant a permission they don't have
-   */
-  private validateCanGrantPermissions(user: User, permissions: Partial<SystemPermissions>): void {
-    for (const permission of Object.keys(permissions)) {
-      // If the permission is being set to true, check if the user has it
-      if (permissions[permission] === true && !user.systemPermissions[permission]) {
-        this.logger.warn(`User ${user.id} attempted to grant ${permission} permission they don't have`);
-        throw new ForbiddenException('You cannot grant permissions you do not have');
-      }
-    }
-  }
-
-  public async updatePermissions(
-    id: number,
-    body: UpdateUserPermissionsDto,
-    requestUser: User,
-  ): Promise<User> {
+  public async updatePermissions(id: number, body: UpdateUserPermissionsDto, requestUser: User): Promise<User> {
     this.logger.debug(`Updating permissions for user ID: ${id}, by user ID: ${requestUser.id}`);
 
-    // Prevent users from updating their own permissions
     if (requestUser.id === id) {
       this.logger.warn(`User ${id} attempted to update their own permissions`);
       throw new ForbiddenException('You cannot update your own permissions');
     }
 
-    // Validate the user can grant the requested permissions
-    this.validateCanGrantPermissions(requestUser, body);
-
-    // Get the user to update
-    const user = await this.usersService.findOne({ id }, ['authenticationDetails']);
+    const user = await this.usersService.findOne({ id });
     if (!user) {
       this.logger.debug(`User not found with ID: ${id}`);
       throw new UserNotFoundException(id);
     }
 
-    const ssoManagedPermissions = await this.getSsoManagedPermissions(user);
+    const actorPermissions = (requestUser as AuthenticatedUser).effectivePermissions ?? new Set<string>();
+    const roles = await this.rbacService.getRoles();
+    let changed = false;
 
-    // Create an update object with just the systemPermissions
-    const updates: Partial<User> = {
-      systemPermissions: {
-        ...user.systemPermissions,
-      },
-    };
+    for (const [flag, roleKey] of Object.entries(PERMISSION_TO_ROLE)) {
+      const value = (body as Record<string, boolean | undefined>)[flag];
+      if (value === undefined) continue;
 
-    // Update only the permissions that were specified in the request AND are not managed by SSO
-    if (body.canManageResources !== undefined && !ssoManagedPermissions.includes('canManageResources')) {
-      updates.systemPermissions.canManageResources = body.canManageResources;
+      const role = roles.find((r) => r.key === roleKey);
+      if (!role) continue;
+
+      if (value) {
+        // cannot-grant-what-you-don't-have: actor must hold all role permissions
+        const rolePermKeys = role.rolePermissions?.map((rp) => rp.permissionKey) ?? [];
+        const missing = rolePermKeys.filter((k) => !actorPermissions.has(k));
+        if (missing.length > 0) {
+          throw new ForbiddenException('You cannot grant permissions you do not have');
+        }
+        await this.rbacService.assignRole(id, role.id, actorPermissions);
+        changed = true;
+      } else {
+        const userRoles = await this.rbacService.getUserRoles(id);
+        const existing = userRoles.find((ur) => ur.roleId === role.id);
+        if (existing) {
+          await this.rbacService.revokeRole(id, role.id);
+          changed = true;
+        }
+      }
     }
 
-    if (body.canManageSystemConfiguration !== undefined && !ssoManagedPermissions.includes('canManageSystemConfiguration')) {
-      updates.systemPermissions.canManageSystemConfiguration = body.canManageSystemConfiguration;
-    }
+    const updatedUser = await this.usersService.findOne({ id });
+    if (!updatedUser) throw new UserNotFoundException(id);
 
-    if (body.canManageUsers !== undefined && !ssoManagedPermissions.includes('canManageUsers')) {
-      updates.systemPermissions.canManageUsers = body.canManageUsers;
-    }
-
-    if (body.canManageBilling !== undefined && !ssoManagedPermissions.includes('canManageBilling')) {
-      updates.systemPermissions.canManageBilling = body.canManageBilling;
-    }
-
-    this.logger.debug(`Applying permission updates for user ID: ${id}: ${JSON.stringify(updates.systemPermissions)}`);
-
-    // Update the user
-    const updatedUser = await this.usersService.updateOne(id, updates);
-    this.logger.debug(`Successfully updated permissions for user ID: ${id}`);
-
-    if (this.permissionsChanged(user.systemPermissions, updates.systemPermissions)) {
+    if (changed) {
       this.notifyPermissionsChanged(updatedUser, requestUser.id);
     }
 
@@ -168,73 +106,17 @@ export class UserPermissionsService {
   public async bulkUpdatePermissions(body: BulkUpdateUserPermissionsDto, requestUser: User): Promise<User[]> {
     this.logger.debug(`Bulk updating permissions for ${body.updates.length} users, by user ID: ${requestUser.id}`);
 
-    // First, validate that the user is not trying to grant permissions they don't have
-    for (const update of body.updates) {
-      this.validateCanGrantPermissions(requestUser, update.permissions);
-    }
-
     const updatedUsers: User[] = [];
-    const updateCandidates: Array<{ update: BulkUpdateUserPermissionsDto['updates'][number]; user: User; ssoManagedPermissions: string[] }> = [];
-
     for (const update of body.updates) {
-      // Skip if user is trying to update their own permissions
       if (requestUser.id === update.userId) {
         this.logger.warn(`User ${update.userId} attempted to update their own permissions in bulk operation, skipping`);
         continue;
       }
-
-      const user = await this.usersService.findOne({ id: update.userId }, ['authenticationDetails']);
-      if (!user) {
-        this.logger.debug(`User not found with ID: ${update.userId}, skipping`);
-        continue;
-      }
-
-      const ssoManagedPermissions = await this.getSsoManagedPermissions(user);
-      updateCandidates.push({ update, user, ssoManagedPermissions });
-    }
-
-    for (const { update, user, ssoManagedPermissions } of updateCandidates) {
       try {
-        // Create an update object with just the systemPermissions
-        const updates: Partial<User> = {
-          systemPermissions: {
-            ...user.systemPermissions,
-          },
-        };
-
-        // Update only the permissions that were specified in the request AND are not managed by SSO
-        if (update.permissions.canManageResources !== undefined && !ssoManagedPermissions.includes('canManageResources')) {
-          updates.systemPermissions.canManageResources = update.permissions.canManageResources;
-        }
-
-        if (update.permissions.canManageSystemConfiguration !== undefined && !ssoManagedPermissions.includes('canManageSystemConfiguration')) {
-          updates.systemPermissions.canManageSystemConfiguration = update.permissions.canManageSystemConfiguration;
-        }
-
-        if (update.permissions.canManageUsers !== undefined && !ssoManagedPermissions.includes('canManageUsers')) {
-          updates.systemPermissions.canManageUsers = update.permissions.canManageUsers;
-        }
-
-        if (update.permissions.canManageBilling !== undefined && !ssoManagedPermissions.includes('canManageBilling')) {
-          updates.systemPermissions.canManageBilling = update.permissions.canManageBilling;
-        }
-
-        this.logger.debug(
-          `Applying permission updates for user ID: ${update.userId}: ${JSON.stringify(updates.systemPermissions)}`,
-        );
-
-        // Update the user
-        const updatedUser = await this.usersService.updateOne(update.userId, updates);
-        this.logger.debug(`Successfully updated permissions for user ID: ${update.userId}`);
-
-        if (this.permissionsChanged(user.systemPermissions, updates.systemPermissions)) {
-          this.notifyPermissionsChanged(updatedUser, requestUser.id);
-        }
-
-        updatedUsers.push(updatedUser);
+        const updated = await this.updatePermissions(update.userId, update.permissions, requestUser);
+        updatedUsers.push(updated);
       } catch (error) {
-        this.logger.error(`Error updating user ID: ${update.userId}: ${error.message}`);
-        // Continue with the next user even if there's an error
+        this.logger.error(`Error updating user ID: ${update.userId}: ${(error as Error).message}`);
       }
     }
 
@@ -242,18 +124,24 @@ export class UserPermissionsService {
     return updatedUsers;
   }
 
-  public async getPermissions(id: number): Promise<SystemPermissions> {
+  public async getPermissions(id: number): Promise<Record<string, boolean>> {
     this.logger.debug(`Getting permissions for user ID: ${id}`);
 
-    // Get the user
     const user = await this.usersService.findOne({ id });
     if (!user) {
       this.logger.debug(`User not found with ID: ${id}`);
       throw new UserNotFoundException(id);
     }
 
-    this.logger.debug(`Returning permissions for user ID: ${id}`);
-    return user.systemPermissions;
+    const effectivePermissions = await this.rbacService.getEffectivePermissions(id);
+
+    // Map effective RBAC permissions back to the legacy boolean shape for backward compat
+    return {
+      canManageResources: effectivePermissions.has('resources.update'),
+      canManageSystemConfiguration: effectivePermissions.has('system.settings.manage'),
+      canManageUsers: effectivePermissions.has('users.update'),
+      canManageBilling: effectivePermissions.has('billing.manage'),
+    };
   }
 
   public async getAllWithPermission(query: {

@@ -38,7 +38,7 @@ export class CompanionDownloadController {
   ) {}
 
   @Get('versions')
-  @Auth('canManageSystemConfiguration')
+  @Auth('system.settings.manage')
   @ApiOperation({ summary: 'Get companion app manifest', operationId: 'getCompanionVersions' })
   @ApiResponse({ status: 200, type: CompanionManifestDto })
   @ApiResponse({ status: 404, description: 'No companion manifest available' })
@@ -107,7 +107,7 @@ export class CompanionController {
   ) {}
 
   @Get()
-  @Auth('canManageResources')
+  @Auth('resources.update')
   @ApiOperation({ summary: 'List all registered companion devices', operationId: 'listCompanionDevices' })
   @ApiResponse({ status: 200, type: [CompanionDevice] })
   async list(): Promise<CompanionDevice[]> {
@@ -115,7 +115,7 @@ export class CompanionController {
   }
 
   @Get(':id')
-  @Auth('canManageResources')
+  @Auth('resources.update')
   @ApiOperation({ summary: 'Get a companion device', operationId: 'getCompanionDevice' })
   @ApiParam({ name: 'id', type: Number })
   @ApiResponse({ status: 200, type: CompanionDevice })
@@ -142,7 +142,7 @@ export class CompanionController {
   }
 
   @Patch(':id')
-  @Auth('canManageResources')
+  @Auth('resources.update')
   @ApiOperation({ summary: 'Rename a companion device', operationId: 'renameCompanionDevice' })
   @ApiParam({ name: 'id', type: Number })
   @ApiBody({ type: RenameCompanionDeviceDto })
@@ -160,7 +160,7 @@ export class CompanionController {
   }
 
   @Delete(':id')
-  @Auth('canManageResources')
+  @Auth('resources.update')
   @ApiOperation({ summary: 'Delete a companion device and kick its connection', operationId: 'deleteCompanionDevice' })
   @ApiParam({ name: 'id', type: Number })
   @ApiResponse({ status: 200 })

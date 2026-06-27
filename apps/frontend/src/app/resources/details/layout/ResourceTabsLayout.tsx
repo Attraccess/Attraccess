@@ -72,7 +72,7 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
 
   const { t } = useTranslations({ en, de });
 
-  const canManageResources = hasPermission('canManageResources');
+  const canManageResources = hasPermission('resources.update');
 
   const {
     data: resource,

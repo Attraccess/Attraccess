@@ -49,7 +49,7 @@ export class ResourcesController {
     description: 'The resource has been successfully created.',
     type: Resource,
   })
-  @Auth('canManageResources')
+  @Auth('resources.create')
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(FileInterceptor('image'))
   async createOne(@Body() createDto: CreateResourceDto, @UploadedFile() image?: FileUpload): Promise<Resource> {
@@ -75,7 +75,7 @@ export class ResourcesController {
   ): Promise<PaginatedResponse<Resource>> {
     let onlyWithPermissionForUserId: number | undefined;
 
-    if (!req.user.systemPermissions.canManageResources) {
+    if (!req.user.effectivePermissions?.has('resources.update')) {
       if (query.onlyWithPermissions === true) {
         onlyWithPermissionForUserId = req.user.id;
       }
@@ -139,7 +139,7 @@ export class ResourcesController {
     description: 'The resource has been successfully updated.',
     type: Resource,
   })
-  @Auth('canManageResources')
+  @Auth('resources.update')
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(FileInterceptor('image'))
   async updateOne(
@@ -157,7 +157,7 @@ export class ResourcesController {
     status: 204,
     description: 'The resource has been successfully deleted.',
   })
-  @Auth('canManageResources')
+  @Auth('resources.delete')
   async deleteOne(@Param('id', ParseIntPipe) id: number): Promise<void> {
     await this.resourcesService.deleteResource(id);
   }

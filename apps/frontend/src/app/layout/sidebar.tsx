@@ -21,7 +21,6 @@ import {
 } from '@heroui/react';
 import { buttonVariants } from '@heroui/styles';
 import { useAllRoutes } from '../routes';
-import { SystemPermissions } from '@attraccess/react-query-client';
 import de from './sidebar.de.json';
 import en from './sidebar.en.json';
 import { Logo } from '../../components/logo';
@@ -129,10 +128,11 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
 
       const requiredPermissions = (
         Array.isArray(routeOfItem?.authRequired) ? routeOfItem?.authRequired : [routeOfItem?.authRequired]
-      ) as (keyof SystemPermissions)[];
+      ) as string[];
 
+      const effectivePermissions: string[] = (user as any)?.effectivePermissions ?? [];
       const userHasAllRequiredPermissions = requiredPermissions.every(
-        (permission) => user.systemPermissions[permission] === true,
+        (permission) => effectivePermissions.includes(permission),
       );
 
       return userHasAllRequiredPermissions;

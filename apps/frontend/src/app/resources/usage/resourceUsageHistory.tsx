@@ -27,7 +27,7 @@ export function ResourceUsageHistory({ resourceId, hideHeader, ...rest }: Resour
   const { t } = useTranslations({ en, de });
   const { t: tHistoryTable } = useTranslations({ en: historyTableEn, de: historyTableDe });
   const { hasPermission } = useAuth();
-  const canManageResources = hasPermission('canManageResources');
+  const canManageResources = hasPermission('resources.update');
   const queryClient = useQueryClient();
   const toast = useToastMessage();
 

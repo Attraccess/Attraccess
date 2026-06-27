@@ -280,7 +280,7 @@ export class ResourceMaintenanceService {
     transactionalEntityManager?: EntityManager,
   ): Promise<boolean> {
     // Check if the user has system permissions to manage all resources
-    if (user.systemPermissions && user.systemPermissions.canManageResources === true) {
+    if (user.effectivePermissions?.has('resources.maintenance.manage') === true) {
       return true;
     }
 

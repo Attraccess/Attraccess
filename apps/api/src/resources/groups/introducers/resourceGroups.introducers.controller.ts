@@ -49,7 +49,7 @@ export class ResourceGroupsIntroducersController {
   }
 
   @Post('/:userId/grant')
-  @Auth('canManageResources')
+  @Auth('resources.access.manage')
   @ApiOperation({
     summary: 'Grant a user introduction permission for a resource group',
     operationId: 'resourceGroupIntroducersGrant',
@@ -69,7 +69,7 @@ export class ResourceGroupsIntroducersController {
   }
 
   @Post('/:userId/revoke')
-  @Auth('canManageResources')
+  @Auth('resources.access.manage')
   @ApiOperation({
     summary: 'Revoke a user introduction permission for a resource group',
     operationId: 'resourceGroupIntroducersRevoke',

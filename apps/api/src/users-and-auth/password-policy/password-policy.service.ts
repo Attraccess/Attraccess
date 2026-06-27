@@ -137,10 +137,10 @@ export class PasswordPolicyService implements OnModuleInit {
   }
 
   public resolveRole(user: User | null | undefined): PasswordPolicyRole | undefined {
-    if (!user) {
-      return undefined;
-    }
-    if (user.systemPermissions?.canManageSystemConfiguration) {
+    if (!user) return undefined;
+    // effectivePermissions is attached for request-bound users; DB-loaded users default to normal policy
+    const effectivePerms = (user as any).effectivePermissions as Set<string> | undefined;
+    if (effectivePerms?.has('system.settings.manage')) {
       return PasswordPolicyRole.ADMIN;
     }
     return undefined;

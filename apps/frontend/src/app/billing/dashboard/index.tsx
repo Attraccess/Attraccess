@@ -30,7 +30,7 @@ export function BillingDashboardPage() {
             key: 'administration',
             label: t('actions.administration'),
             icon: <Settings2Icon />,
-            isHidden: !hasPermission('canManageBilling'),
+            isHidden: !hasPermission('billing.manage'),
             onPress: () => navigate('/billing/administration'),
           },
         ]}

@@ -138,7 +138,7 @@ const coreRoutes: RouteConfig[] = [
         <ResourceGroupsTab />
       </ResourceTabsLayout>
     ),
-    authRequired: 'canManageResources',
+    authRequired: 'resources.update',
   },
   {
     path: '/resources/:id/flows',
@@ -156,12 +156,12 @@ const coreRoutes: RouteConfig[] = [
         <FormListPage />
       </ResourceTabsLayout>
     ),
-    authRequired: 'canManageResources',
+    authRequired: 'resources.update',
   },
   {
     path: '/resources/:id/forms/:formId',
     element: <FormEditorPage />,
-    authRequired: 'canManageResources',
+    authRequired: 'resources.update',
   },
   {
     path: '/resources/:id/documentation',
@@ -171,7 +171,7 @@ const coreRoutes: RouteConfig[] = [
   {
     path: '/resources/:id/documentation/edit',
     element: <DocumentationEditor />,
-    authRequired: 'canManageResources',
+    authRequired: 'resources.update',
   },
   {
     path: '/resources/:id/maintenance',
@@ -190,42 +190,42 @@ const coreRoutes: RouteConfig[] = [
   {
     path: '/devices/mqtt/servers',
     element: <MqttServersPage />,
-    authRequired: 'canManageResources',
+    authRequired: 'resources.update',
   },
   {
     path: '/devices/mqtt/servers/:serverId',
     element: <EditMqttServerPage />,
-    authRequired: 'canManageResources',
+    authRequired: 'resources.update',
   },
   {
     path: '/sso/providers',
     element: <SSOProvidersPage />,
-    authRequired: 'canManageSystemConfiguration',
+    authRequired: 'system.settings.manage',
   },
   {
     path: '/sso/providers/new',
     element: <SSOProviderFormPage />,
-    authRequired: 'canManageSystemConfiguration',
+    authRequired: 'system.settings.manage',
   },
   {
     path: '/sso/providers/:providerId',
     element: <SSOProviderFormPage />,
-    authRequired: 'canManageSystemConfiguration',
+    authRequired: 'system.settings.manage',
   },
   {
     path: '/balena',
     element: <BalenaPage />,
-    authRequired: 'canManageSystemConfiguration',
+    authRequired: 'system.settings.manage',
   },
   {
     path: '/users',
     element: <UserManagementPage />,
-    authRequired: 'canManageUsers',
+    authRequired: 'users.roles.manage',
   },
   {
     path: '/users/:id',
     element: <UserManagementDetailsPage />,
-    authRequired: 'canManageUsers',
+    authRequired: 'users.roles.manage',
   },
   {
     path: '/attractap',
@@ -240,12 +240,12 @@ const coreRoutes: RouteConfig[] = [
   {
     path: '/attractap/readers',
     element: <AttractapList />,
-    authRequired: 'canManageResources',
+    authRequired: 'resources.update',
   },
   {
     path: '/attractap/readers/:readerId/diagnostics',
     element: <AttractapDiagnosticsPage />,
-    authRequired: 'canManageResources',
+    authRequired: 'resources.update',
   },
   {
     path: '/billing',
@@ -255,27 +255,27 @@ const coreRoutes: RouteConfig[] = [
   {
     path: '/billing/administration',
     element: <BillingAdministrationPage />,
-    authRequired: 'canManageBilling',
+    authRequired: 'billing.manage',
   },
   {
     path: '/csv-export',
     element: <CsvExport />,
-    authRequired: 'canManageBilling',
+    authRequired: 'billing.manage',
   },
   {
     path: '/billing/administration/sumup',
     element: <SumUpPage />,
-    authRequired: 'canManageBilling',
+    authRequired: 'billing.manage',
   },
   {
     path: '/plugins',
     element: <PluginsList />,
-    authRequired: 'canManageSystemConfiguration',
+    authRequired: 'system.settings.manage',
   },
   {
     path: '/settings',
     element: <SystemSettingsPage />,
-    authRequired: 'canManageSystemConfiguration',
+    authRequired: 'system.settings.manage',
   },
   {
     path: '/settings/security/password-policy',
@@ -284,7 +284,7 @@ const coreRoutes: RouteConfig[] = [
         <PasswordPolicySettingsPage />
       </Suspense>
     ),
-    authRequired: 'canManageSystemConfiguration',
+    authRequired: 'system.settings.manage',
   },
   {
     path: '/devices/companion',
@@ -293,7 +293,7 @@ const coreRoutes: RouteConfig[] = [
         <CompanionSettingsPage />
       </Suspense>
     ),
-    authRequired: 'canManageSystemConfiguration',
+    authRequired: 'system.settings.manage',
   },
   {
     path: '/account',
@@ -303,12 +303,12 @@ const coreRoutes: RouteConfig[] = [
   {
     path: '/email-templates',
     element: <EmailTemplatesPage />,
-    authRequired: 'canManageSystemConfiguration',
+    authRequired: 'system.settings.manage',
   },
   {
     path: '/email-templates/:type',
     element: <EditEmailTemplatePage />,
-    authRequired: 'canManageSystemConfiguration',
+    authRequired: 'system.settings.manage',
   },
   {
     path: '/messages',

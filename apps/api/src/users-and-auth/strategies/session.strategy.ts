@@ -4,6 +4,7 @@ import { Strategy } from 'passport-custom';
 import { Request } from 'express';
 import { SessionService } from '../auth/session.service';
 import { TwoFactorService } from '../auth/two-factor.service';
+import { RbacService } from '../rbac/rbac.service';
 import { User } from '@attraccess/database-entities';
 
 const TWO_FACTOR_SETUP_ALLOWED_PREFIXES = ['/auth/two-factor', '/auth/session', '/users/me'];
@@ -15,6 +16,7 @@ export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
   constructor(
     private readonly sessionService: SessionService,
     private readonly twoFactorService: TwoFactorService,
+    private readonly rbacService: RbacService,
   ) {
     super();
   }
@@ -33,6 +35,9 @@ export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
       this.logger.debug(`Invalid or expired session token: ${token.substring(0, 8)}...`);
       throw new UnauthorizedException('Invalid or expired session');
     }
+
+    // Attach effectivePermissions before 2FA check so isPrivilegedUser() can use them
+    (user as any).effectivePermissions = await this.rbacService.getEffectivePermissions(user.id);
 
     if (!this.isTwoFactorSetupAllowedPath(req)) {
       const status = await this.twoFactorService.getStatus(user);

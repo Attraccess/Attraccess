@@ -65,7 +65,7 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
     return Math.ceil(resources.total / perPage);
   }, [resources, perPage]);
 
-  const canManageResources = hasPermission('canManageResources');
+  const canManageResources = hasPermission('resources.update');
 
   const { data: introductionStatus } = useAccessControlServiceResourceGroupIntroducersIsIntroducer(
     {

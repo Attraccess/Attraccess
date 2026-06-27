@@ -155,7 +155,7 @@ export class SSOController {
   }
 
   @Get('providers/:id')
-  @Auth('canManageSystemConfiguration')
+  @Auth('system.sso.manage')
 
   @ApiOperation({ summary: 'Get SSO provider by ID with full configuration', operationId: 'getOneSSOProviderById' })
   @ApiParam({
@@ -188,7 +188,7 @@ export class SSOController {
   }
 
   @Post('providers')
-  @Auth('canManageSystemConfiguration')
+  @Auth('system.sso.manage')
 
   @ApiOperation({ summary: 'Create a new SSO provider', operationId: 'createOneSsoProvider' })
   @ApiBody({ type: CreateSSOProviderDto })
@@ -206,7 +206,7 @@ export class SSOController {
   }
 
   @Put('providers/:id')
-  @Auth('canManageSystemConfiguration')
+  @Auth('system.sso.manage')
 
   @ApiOperation({ summary: 'Update an existing SSO provider', operationId: 'updateOneSSOProvider' })
   @ApiParam({
@@ -233,7 +233,7 @@ export class SSOController {
   }
 
   @Delete('providers/:id')
-  @Auth('canManageSystemConfiguration')
+  @Auth('system.sso.manage')
 
   @ApiOperation({ summary: 'Delete an SSO provider', operationId: 'deleteOneSSOProvider' })
   @ApiParam({
@@ -258,7 +258,7 @@ export class SSOController {
   }
 
   @Get('discovery/authentik')
-  @Auth('canManageSystemConfiguration')
+  @Auth('system.sso.manage')
 
   @ApiOperation({ summary: 'Proxy Authentik OIDC well-known discovery', operationId: 'discoverAuthentikOidc' })
   @ApiQuery({ name: 'host', required: true, description: 'Authentik host, e.g. http://localhost:9000' })
@@ -287,7 +287,7 @@ export class SSOController {
   }
 
   @Get('discovery/keycloak')
-  @Auth('canManageSystemConfiguration')
+  @Auth('system.sso.manage')
 
   @ApiOperation({ summary: 'Proxy Keycloak OIDC well-known discovery', operationId: 'discoverKeycloakOidc' })
   @ApiQuery({ name: 'host', required: true, description: 'Keycloak host, e.g. http://localhost:8080' })

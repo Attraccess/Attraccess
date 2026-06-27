@@ -3,6 +3,7 @@ import { ResourceUsageController } from './resourceUsage.controller';
 import { ResourceUsageService } from './resourceUsage.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Resource, ResourceIntroducer, ResourceUsage, User } from '@attraccess/database-entities';
+import { RbacModule } from '../../users-and-auth/rbac/rbac.module';
 import { ResourceUsageNoteNotificationListener } from './resource-usage-note-notification.listener';
 import { ResourceSessionNotificationListener } from './resource-session-notification.listener';
 import { SupervisedUsageAutoPromotionListener } from './supervised-usage-auto-promotion.listener';
@@ -21,6 +22,7 @@ import { ResourceRetrainingModule } from '../retraining/resourceRetraining.modul
 @Module({
   imports: [
     TypeOrmModule.forFeature([ResourceUsage, Resource, ResourceIntroducer, User]),
+    RbacModule,
     NotificationsModule,
     ResourceIntroducersModule,
     ResourceIntroductionsModule,

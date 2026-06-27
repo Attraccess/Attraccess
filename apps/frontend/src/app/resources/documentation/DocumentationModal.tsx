@@ -60,7 +60,7 @@ function DocumentationModalComponent({ resourceId, children }: Readonly<Document
 
   const { hasPermission } = useAuth();
 
-  const canManageResources = hasPermission('canManageResources');
+  const canManageResources = hasPermission('resources.update');
 
   const renderDocumentationContent = useCallback(() => {
     if (isLoading || isFetching) {

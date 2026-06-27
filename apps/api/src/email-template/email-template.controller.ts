@@ -19,7 +19,7 @@ export class EmailTemplateController {
   ) {}
 
   @Post('preview-mjml')
-  @Auth('canManageSystemConfiguration' as SystemPermission)
+  @Auth('system.settings.manage')
   @ApiOperation({ summary: 'Preview MJML template content as HTML, wrapped in the global email layout' })
   @ApiBody({ type: PreviewMjmlDto })
   @ApiResponse({ status: 200, description: 'MJML preview result', type: PreviewMjmlResponseDto })
@@ -35,7 +35,7 @@ export class EmailTemplateController {
   }
 
   @Get()
-  @Auth('canManageSystemConfiguration' as SystemPermission)
+  @Auth('system.settings.manage')
   @ApiOperation({ summary: 'List all email templates' })
   @ApiResponse({ status: 200, description: 'List of email templates', type: [EmailTemplate] })
   findAll(): Promise<EmailTemplate[]> {
@@ -43,7 +43,7 @@ export class EmailTemplateController {
   }
 
   @Get(':type')
-  @Auth('canManageSystemConfiguration' as SystemPermission)
+  @Auth('system.settings.manage')
   @ApiOperation({ summary: 'Get an email template by type' })
   @ApiParam({ name: 'type', enum: EmailTemplateType, enumName: 'EmailTemplateType', description: 'Template type/type' })
   @ApiResponse({ status: 200, description: 'Email template found', type: EmailTemplate })
@@ -53,7 +53,7 @@ export class EmailTemplateController {
   }
 
   @Patch(':type')
-  @Auth('canManageSystemConfiguration' as SystemPermission)
+  @Auth('system.settings.manage')
   @ApiOperation({ summary: 'Update an email template' })
   @ApiParam({ name: 'type', enum: EmailTemplateType, enumName: 'EmailTemplateType', description: 'Template type/type' })
   @ApiResponse({ status: 200, description: 'Template updated successfully', type: EmailTemplate })

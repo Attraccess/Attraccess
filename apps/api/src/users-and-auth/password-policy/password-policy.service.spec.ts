@@ -346,16 +346,16 @@ describe('PasswordPolicyService', () => {
       await expect(service.deleteOverride(PasswordPolicyRole.ADMIN)).rejects.toThrow();
     });
 
-    it('resolveRole returns admin for canManageSystemConfiguration users', () => {
+    it('resolveRole returns admin for users with system.settings.manage permission', () => {
       const role = service.resolveRole({
-        systemPermissions: { canManageSystemConfiguration: true } as never,
+        effectivePermissions: new Set(['system.settings.manage']),
       } as never);
       expect(role).toBe(PasswordPolicyRole.ADMIN);
     });
 
     it('resolveRole returns undefined for plain users', () => {
       const role = service.resolveRole({
-        systemPermissions: { canManageSystemConfiguration: false } as never,
+        effectivePermissions: new Set<string>(),
       } as never);
       expect(role).toBeUndefined();
     });

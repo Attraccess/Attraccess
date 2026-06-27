@@ -92,7 +92,7 @@ export class UserPasswordService {
     this.logger.debug(`Setting password for user ID: ${id}, by user ID: ${requestUser.id}`);
 
     // Prevent users from updating their own password through this endpoint
-    if (requestUser.id !== id && !requestUser.systemPermissions.canManageUsers) {
+    if (requestUser.id !== id && !requestUser.effectivePermissions?.has('users.update')) {
       this.logger.warn(`User ${id} attempted to change password of another user without permission`);
       throw new ForbiddenException('You cannot change password of another user without permission');
     }

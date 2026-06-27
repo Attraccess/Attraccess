@@ -29,7 +29,7 @@ export class IsResourceGroupIntroducerGuard implements CanActivate {
     }
 
     // Check if the user has system permissions to manage all resources
-    if (user.systemPermissions && user.systemPermissions.canManageResources === true) {
+    if (user.effectivePermissions?.has('resources.access.manage') === true) {
       return true;
     }
 

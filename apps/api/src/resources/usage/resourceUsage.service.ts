@@ -50,6 +50,7 @@ import { ResourceFormAction } from '@attraccess/database-entities';
 import { MetricsService } from '../../metrics/metrics.service';
 import { SystemEvent } from '@attraccess/plugins-backend-sdk';
 import { PluginEventsService } from '../../plugin-system/plugin-events.service';
+import { RbacService } from '../../users-and-auth/rbac/rbac.service';
 
 export interface EndSessionOptions {
   /** Skip persisting required END-action form submissions (used by automated/flow paths). */
@@ -114,6 +115,7 @@ export class ResourceUsageService {
     private readonly metricsService: MetricsService,
     private readonly resourceHealthService: ResourceHealthService,
     private readonly pluginEvents: PluginEventsService,
+    private readonly rbacService: RbacService,
   ) {}
 
   private emitSystemUsageEvent(
@@ -136,7 +138,8 @@ export class ResourceUsageService {
     user: User,
     transactionalEntityManager?: EntityManager,
   ): Promise<boolean> {
-    if (user.systemPermissions?.canManageResources) {
+    const effectivePermissions = await this.rbacService.getEffectivePermissions(user.id);
+    if (effectivePermissions.has('resources.update')) {
       return true;
     }
 
@@ -226,7 +229,8 @@ export class ResourceUsageService {
       throw new NotFoundException(`Supervisor with ID ${supervisorUserId} not found`);
     }
 
-    const supervisorCanManage = supervisor.systemPermissions?.canManageResources === true;
+    const supervisorPermissions = await this.rbacService.getEffectivePermissions(supervisor.id);
+    const supervisorCanManage = supervisorPermissions.has('resources.update');
     const supervisorCanMaintain = await this.resourceIntroducersService.canMaintain(
       resourceId,
       supervisorUserId,
@@ -621,7 +625,8 @@ export class ResourceUsageService {
     }
 
     // Check if the user is authorized to end the session
-    const canManageResources = user.systemPermissions?.canManageResources || false;
+    const userPermissions = await this.rbacService.getEffectivePermissions(user.id);
+    const canManageResources = userPermissions.has('resources.update');
     const isSessionOwner = activeSession.user.id === user.id;
     // The supervisor of a supervised session may end it as well.
     const isSupervisor = activeSession.supervisorUserId != null && activeSession.supervisorUserId === user.id;

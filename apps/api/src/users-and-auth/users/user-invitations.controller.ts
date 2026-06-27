@@ -30,13 +30,13 @@ export class UserInvitationsController {
     status: 400,
     description: 'Invalid input data.',
   })
-  @Auth('canManageUsers')
+  @Auth('users.create')
   async inviteUser(@Body() body: InviteUserDto): Promise<User> {
     return this.invitationService.inviteUser(body);
   }
 
   @Post('/invite-csv')
-  @Auth('canManageUsers')
+  @Auth('users.create')
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Invite multiple users from a CSV file', operationId: 'inviteUsersFromCsv' })

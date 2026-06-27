@@ -19,6 +19,7 @@ describe('AttractapCardHandler', () => {
   let resourceIntroducersService: { isIntroducer: jest.Mock };
   let metricsService: { attractapNfcTapsTotal: { inc: jest.Mock } };
   let resourceRepository: { findOne: jest.Mock };
+  let rbacService: { getEffectivePermissions: jest.Mock };
 
   const mockUser = { id: 1, username: 'testuser' };
   const mockReaderWithEnrollment = {
@@ -69,6 +70,7 @@ describe('AttractapCardHandler', () => {
     metricsService = { attractapNfcTapsTotal: { inc: jest.fn() } };
     // Default: a resource that does not support supervision (introduction_required).
     resourceRepository = { findOne: jest.fn().mockResolvedValue({ id: 10, supervisionMode: 'introduction_required' }) };
+    rbacService = { getEffectivePermissions: jest.fn().mockResolvedValue(new Set<string>()) };
 
     (handler as any).websocketService = websocketService;
     (handler as any).attractapService = attractapService;
@@ -77,6 +79,7 @@ describe('AttractapCardHandler', () => {
     (handler as any).resourceIntroducersService = resourceIntroducersService;
     (handler as any).metricsService = metricsService;
     (handler as any).resourceRepository = resourceRepository;
+    (handler as any).rbacService = rbacService;
   });
 
   describe('startEnrollOfNewNfcCard', () => {
@@ -494,7 +497,6 @@ describe('AttractapCardHandler', () => {
       user: {
         id: 5,
         username: 'carduser',
-        systemPermissions: { canManageResources: true },
       },
     };
 
@@ -564,6 +566,7 @@ describe('AttractapCardHandler', () => {
       attractapService.getNFCCardByUID.mockResolvedValueOnce(activeCard);
       resourceUsageService.canControllResource.mockResolvedValueOnce(true);
       resourceIntroducersService.isIntroducer.mockResolvedValueOnce(true);
+      rbacService.getEffectivePermissions.mockResolvedValueOnce(new Set(['resources.access.manage']));
       const data = { payload: { uid: 'abc', resourceId: 10 } } as AttractapEvent['data'];
 
       await handler.handleCardAuthenticationRequest(socket, data);

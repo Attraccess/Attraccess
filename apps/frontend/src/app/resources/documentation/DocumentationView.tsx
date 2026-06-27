@@ -35,7 +35,7 @@ function DocumentationViewComponent() {
     navigate(`/resources/${resourceId}/documentation/edit`);
   }, [navigate, resourceId]);
 
-  const canManageResources = hasPermission('canManageResources');
+  const canManageResources = hasPermission('resources.update');
 
   // Handle loading state
   if (isLoadingResource) {

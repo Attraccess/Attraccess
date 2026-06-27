@@ -1,7 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import {
   OpenAPI,
-  SystemPermissions,
   useAuthenticationServiceCreateSession,
   useAuthenticationServiceEndSession,
   useTwoFactorAuthenticationServiceGetTwoFactorStatus,
@@ -101,11 +100,9 @@ export function useAuth() {
     twoFactorStatus,
     isTwoFactorStatusLoading,
     needsTwoFactorSetup: !!twoFactorStatus?.required && !twoFactorStatus?.enabled,
-    hasPermission: (permission: keyof SystemPermissions) => {
-      if (!currentUser?.systemPermissions || typeof currentUser.systemPermissions !== 'object') {
-        return false;
-      }
-      return (currentUser.systemPermissions as SystemPermissions)[permission] ?? false;
+    hasPermission: (permission: string) => {
+      const effectivePermissions: string[] = (currentUser as any)?.effectivePermissions ?? [];
+      return effectivePermissions.includes(permission);
     },
   };
 }

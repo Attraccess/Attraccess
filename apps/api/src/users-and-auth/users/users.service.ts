@@ -31,6 +31,7 @@ import { addDays } from 'date-fns';
 import { randomBytes } from 'crypto';
 import { TokenHashService } from '../../encryption/token-hash.service';
 import { MetricsService } from '../../metrics/metrics.service';
+import { RbacService } from '../rbac/rbac.service';
 
 class DeleteAccountTokenInvalidException extends BadRequestException {
   constructor() {
@@ -99,6 +100,7 @@ export class UsersService {
     private dataSource: DataSource,
     private readonly tokenHashService: TokenHashService,
     private readonly metricsService: MetricsService,
+    private readonly rbacService: RbacService,
   ) {}
 
   public validateUsernameOrThrow(username: string): void {
@@ -270,24 +272,17 @@ export class UsersService {
     // Check if this is the first user in the system
     this.logger.debug('Checking if this is the first user in the system');
     const totalUsers = await this.userRepository.count();
-    if (totalUsers === 0) {
-      this.logger.debug('First user in system - granting all system permissions');
-      // This is the first user, grant all system permissions
-      type permissionKeys = keyof SystemPermissions;
-
-      const permissions: Record<permissionKeys, true> = {
-        canManageResources: true,
-        canManageSystemConfiguration: true,
-        canManageUsers: true,
-        canManageBilling: true,
-      };
-
-      user.systemPermissions = permissions;
-    }
+    const isFirstUser = totalUsers === 0;
 
     this.logger.debug('Saving new user to database');
     const savedUser = await this.userRepository.save(user);
     this.logger.debug(`User saved with ID: ${savedUser.id}`);
+
+    if (isFirstUser) {
+      this.logger.debug('First user in system - assigning owner role');
+      await this.rbacService.assignRoleByKey(savedUser.id, 'owner');
+    }
+
     this.metricsService.usersRegisteredTotal.inc();
     this.metricsService.usersTotal.inc();
     return savedUser;
@@ -381,7 +376,7 @@ export class UsersService {
     this.validateUsernameOrThrow(newUsername);
 
     const isSelf = executingUser.id === targetUserId;
-    const canManageUsers = !!executingUser.systemPermissions?.canManageUsers;
+    const canManageUsers = !!(executingUser as any).effectivePermissions?.has('users.update');
 
     if (!isSelf && !canManageUsers) {
       throw new ForbiddenException("You do not have permission to change this user's username");
@@ -436,7 +431,7 @@ export class UsersService {
     }
 
     const isSelf = executingUser.id === targetUserId;
-    const canManageUsers = !!executingUser.systemPermissions?.canManageUsers;
+    const canManageUsers = !!(executingUser as any).effectivePermissions?.has('users.update');
 
     if (!isSelf && !canManageUsers) {
       throw new ForbiddenException("You do not have permission to change this user's email");
@@ -668,18 +663,18 @@ export class UsersService {
           canManageBilling: data.systemPermissions.canManageBilling ?? false,
         };
 
-        if (options?.grantAllPermissionsToFirst && totalExisting === 0 && index === 0) {
-          systemPermissions.canManageResources = true;
-          systemPermissions.canManageSystemConfiguration = true;
-          systemPermissions.canManageUsers = true;
-          systemPermissions.canManageBilling = true;
-        }
-
         user.systemPermissions = systemPermissions;
         return user;
       });
 
-      return repo.save(entities);
+      const saved = await repo.save(entities);
+
+      // Assign owner role to the first user when bootstrapping
+      if (options?.grantAllPermissionsToFirst && totalExisting === 0 && saved.length > 0) {
+        await this.rbacService.assignRoleByKey(saved[0].id, 'owner');
+      }
+
+      return saved;
     };
 
     if (options?.manager) {

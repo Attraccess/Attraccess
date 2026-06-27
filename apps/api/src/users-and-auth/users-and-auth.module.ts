@@ -31,6 +31,9 @@ import type { Redis } from 'ioredis';
 import { LocalStrategy } from './strategies/local.strategy';
 import { SessionStrategy } from './strategies/session.strategy';
 
+import { RbacModule } from './rbac/rbac.module';
+import { RbacController } from './rbac/rbac.controller';
+
 // Constants and Entities
 
 import {
@@ -88,6 +91,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     SettingsModule,
     PasswordPolicyModule,
     NotificationsModule,
+    RbacModule,
   ],
   providers: [
     {
@@ -178,7 +182,8 @@ import { NotificationsModule } from '../notifications/notifications.module';
     AuthController,
     TwoFactorController,
     SSOController,
+    RbacController,
   ],
-  exports: [UsersService, AuthService, SessionService, BruteForceProtectionService, AuthAuditLogger],
+  exports: [UsersService, AuthService, SessionService, BruteForceProtectionService, AuthAuditLogger, RbacModule],
 })
 export class UsersAndAuthModule {}

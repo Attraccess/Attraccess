@@ -27,7 +27,7 @@ export function useResourceTabs(resourceId: number): {
   canManageMaintenance: boolean;
 } {
   const { hasPermission, user } = useAuth();
-  const canManageResources = hasPermission('canManageResources');
+  const canManageResources = hasPermission('resources.update');
 
   const { data: introducerData } = useAccessControlServiceResourceIntroducersIsIntroducer(
     {

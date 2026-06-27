@@ -78,7 +78,7 @@ export class PluginController {
   @ApiOperation({ summary: 'Upload a new plugin', operationId: 'uploadPlugin' })
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(FileInterceptor('pluginZip'))
-  @Auth('canManageSystemConfiguration')
+  @Auth('system.plugins.manage')
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async uploadPlugin(@UploadedFile() file: FileUpload, @Body() body: UploadPluginDto) {
     this.logger.log(`Uploading plugin ${file.originalname}`);
@@ -91,7 +91,7 @@ export class PluginController {
     status: 200,
     description: 'The plugin has been deleted',
   })
-  @Auth('canManageSystemConfiguration')
+  @Auth('system.plugins.manage')
   deletePlugin(@Param('pluginId') pluginId: string) {
     return this.pluginService.deletePlugin(pluginId);
   }

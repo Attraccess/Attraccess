@@ -6,7 +6,7 @@ import { CreateMqttServerDto, UpdateMqttServerDto } from './dtos/mqtt-server.dto
 import { Auth } from '@attraccess/plugins-backend-sdk';
 
 @ApiTags('MQTT')
-@Auth('canManageResources')
+@Auth('resources.update')
 @Controller('mqtt/servers')
 export class MqttServerController {
   constructor(private readonly mqttServerService: MqttServerService) {}

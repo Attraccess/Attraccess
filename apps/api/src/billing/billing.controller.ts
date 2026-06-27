@@ -67,7 +67,7 @@ export class BillingController {
     @Param('userId', ParseIntPipe) userId: number,
     @Req() request: AuthenticatedRequest,
   ): Promise<BalanceDto> {
-    if (request.user.id !== userId && !request.user.systemPermissions.canManageBilling) {
+    if (request.user.id !== userId && !request.user.effectivePermissions?.has('billing.manage')) {
       throw new ForbiddenException('You are not allowed to get the billing balance for this user.');
     }
 
@@ -88,7 +88,7 @@ export class BillingController {
     @Query() query: PaginationOptionsDto,
     @Req() request: AuthenticatedRequest,
   ): Promise<TransactionsDto> {
-    if (userId !== request.user.id && !request.user.systemPermissions.canManageBilling) {
+    if (userId !== request.user.id && !request.user.effectivePermissions?.has('billing.manage')) {
       throw new ForbiddenException('You are not allowed to get the billing transactions for this user.');
     }
 
@@ -109,7 +109,7 @@ export class BillingController {
   @Post('/users/:userId/billing/transactions')
   @ApiOperation({ summary: 'Top up or charge the billing balance for a user', operationId: 'createManualTransaction' })
   @ApiResponse({ status: 200, description: 'The billing balance for the user has been topped up.', type: Number })
-  @Auth('canManageBilling')
+  @Auth('billing.manage')
   async createManualTransaction(
     @Param('userId', ParseIntPipe) userId: number,
     @Req() request: AuthenticatedRequest,
@@ -151,7 +151,7 @@ export class BillingController {
   }
 
   @Post('/resources/:resourceId/billing/configuration')
-  @Auth('canManageBilling')
+  @Auth('billing.manage')
   @ApiOperation({
     summary: 'Update the billing configuration for a resource',
     operationId: 'updateResourceBillingConfiguration',
@@ -169,7 +169,7 @@ export class BillingController {
   }
 
   @Post('/billing/sumup/configuration/api-key')
-  @Auth('canManageBilling')
+  @Auth('billing.manage')
   @ApiOperation({
     summary: 'Set the SumUp configuration',
     operationId: 'setSumUpApiKey',
@@ -181,7 +181,7 @@ export class BillingController {
   }
 
   @Post('/billing/configuration')
-  @Auth('canManageBilling')
+  @Auth('billing.manage')
   @ApiOperation({
     summary: 'Set the billing configuration',
     operationId: 'setBillingConfiguration',
@@ -225,7 +225,7 @@ export class BillingController {
   }
 
   @Post('/billing/sumup/readers/pair')
-  @Auth('canManageBilling')
+  @Auth('billing.manage')
   @ApiOperation({
     summary: 'Pair a SumUp reader',
     operationId: 'pairSumUpReader',
@@ -236,7 +236,7 @@ export class BillingController {
   }
 
   @Delete('/billing/sumup/readers/:readerId')
-  @Auth('canManageBilling')
+  @Auth('billing.manage')
   @ApiOperation({
     summary: 'Remove a SumUp reader',
     operationId: 'removeSumUpReader',
@@ -288,7 +288,7 @@ export class BillingController {
   }
 
   @Post('/billing/transactions/:transactionId/refund')
-  @Auth('canManageBilling')
+  @Auth('billing.manage')
   @ApiOperation({
     summary: 'Refund a billing transaction',
     operationId: 'refundTransaction',

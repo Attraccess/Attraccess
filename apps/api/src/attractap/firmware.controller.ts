@@ -27,7 +27,7 @@ export class AttractapFirmwareController {
     description: 'Firmwares fetched successfully',
     type: [AttractapFirmware],
   })
-  @Auth('canManageSystemConfiguration')
+  @Auth('system.settings.manage')
   @RequiresLicense(LicenseModuleType.ATTRACTAP)
   async getFirmwares(): Promise<AttractapFirmware[]> {
     this.logger.debug('GET /attractap/firmwares - Fetching all firmwares');

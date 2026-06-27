@@ -56,7 +56,7 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
 
   const { data: resource } = useResourcesServiceGetOneResourceById({ id: resourceId });
 
-  const canManageResources = hasPermission('canManageResources');
+  const canManageResources = hasPermission('resources.update');
   const canStartSession = canManageResources || access?.canControl || permissions?.isIntroducer;
   const canTakeover = resource?.allowTakeOver && canStartSession;
   const canStopOtherUserSession = permissions?.isIntroducer || canManageResources;

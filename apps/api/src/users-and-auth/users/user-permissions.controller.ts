@@ -16,7 +16,7 @@ export class UserPermissionsController {
   constructor(private readonly permissionsService: UserPermissionsService) {}
 
   @Patch(':id/permissions')
-  @Auth('canManageUsers')
+  @Auth('users.roles.manage')
   @ApiOperation({ summary: "Update a user's system permissions", operationId: 'updatePermissions' })
   @ApiResponse({
     status: 200,
@@ -44,7 +44,7 @@ export class UserPermissionsController {
   }
 
   @Post('permissions')
-  @Auth('canManageUsers')
+  @Auth('users.roles.manage')
   @ApiOperation({ summary: 'Bulk update user permissions', operationId: 'bulkUpdatePermissions' })
   @ApiResponse({
     status: 200,
@@ -67,7 +67,7 @@ export class UserPermissionsController {
   }
 
   @Get(':id/permissions')
-  @Auth('canManageUsers')
+  @Auth('users.roles.manage')
   @ApiOperation({ summary: "Get a user's system permissions", operationId: 'getPermissions' })
   @ApiResponse({
     status: 200,
@@ -87,7 +87,7 @@ export class UserPermissionsController {
   }
 
   @Get('with-permission')
-  @Auth('canManageUsers')
+  @Auth('users.roles.manage')
   @ApiOperation({ summary: 'Get users with a specific permission', operationId: 'getAllWithPermission' })
   @ApiResponse({
     status: 200,

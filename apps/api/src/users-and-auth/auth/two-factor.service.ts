@@ -205,10 +205,11 @@ export class TwoFactorService {
   }
 
   private isPrivilegedUser(user: User): boolean {
-    if (!user?.systemPermissions) {
-      return false;
-    }
-    return Object.values(user.systemPermissions).some((value) => value === true);
+    const effectivePerms = (user as any).effectivePermissions as Set<string> | undefined;
+    if (!effectivePerms) return false;
+    // Any permission beyond the default 'resources.read' (granted to all users) is considered privileged
+    const PRIVILEGED = ['resources.create', 'resources.update', 'users.create', 'system.settings.manage', 'billing.manage'];
+    return PRIVILEGED.some((p) => effectivePerms.has(p));
   }
 
   private async isCodeValid(secret: string, code: string): Promise<boolean> {
