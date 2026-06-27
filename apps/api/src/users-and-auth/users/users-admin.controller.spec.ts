@@ -58,7 +58,6 @@ describe('UsersAdminController', () => {
         username: 'testuser',
         email: 'test@example.com',
         isEmailVerified: true,
-        systemPermissions: {},
         authenticationDetails: [],
       } as User;
 

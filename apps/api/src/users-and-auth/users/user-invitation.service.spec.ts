@@ -60,7 +60,6 @@ describe('UserInvitationService – parseCsvFile', () => {
       {
         email: 'john@example.com',
         username: 'user1',
-        systemPermissions: { canManageUsers: true },
         row: 1,
       },
     ]);

@@ -3,7 +3,7 @@ import { IsArray, IsOptional, IsString } from 'class-validator';
 
 export class SSOPermissionMappingsDto {
   @ApiProperty({
-    description: 'Role names that grant resource management permissions',
+    description: 'SSO role names that grant the resource-manager RBAC role',
     required: false,
     isArray: true,
     type: String,
@@ -12,10 +12,10 @@ export class SSOPermissionMappingsDto {
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  canManageResources?: string[];
+  'resource-manager'?: string[];
 
   @ApiProperty({
-    description: 'Role names that grant system configuration permissions',
+    description: 'SSO role names that grant the system-admin RBAC role',
     required: false,
     isArray: true,
     type: String,
@@ -24,10 +24,10 @@ export class SSOPermissionMappingsDto {
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  canManageSystemConfiguration?: string[];
+  'system-admin'?: string[];
 
   @ApiProperty({
-    description: 'Role names that grant user management permissions',
+    description: 'SSO role names that grant the user-manager RBAC role',
     required: false,
     isArray: true,
     type: String,
@@ -36,10 +36,10 @@ export class SSOPermissionMappingsDto {
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  canManageUsers?: string[];
+  'user-manager'?: string[];
 
   @ApiProperty({
-    description: 'Role names that grant billing management permissions',
+    description: 'SSO role names that grant the billing-manager RBAC role',
     required: false,
     isArray: true,
     type: String,
@@ -48,5 +48,5 @@ export class SSOPermissionMappingsDto {
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  canManageBilling?: string[];
+  'billing-manager'?: string[];
 }

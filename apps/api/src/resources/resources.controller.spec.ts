@@ -72,7 +72,7 @@ describe('ResourcesController', () => {
       jest.spyOn(service, 'listResources').mockResolvedValue(paginatedResponse);
 
       const result = await controller.getAll({ page: 1, limit: 10 }, {
-        user: { id: 1, systemPermissions: { canManageResources: true } },
+        user: { id: 1 },
       } as AuthenticatedRequest);
 
       expect(result).toEqual({

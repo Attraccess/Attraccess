@@ -10,7 +10,6 @@ import {
 import { ApiProperty } from '@nestjs/swagger';
 import { Exclude } from 'class-transformer';
 import { SSOProvider } from './ssoProvider.entity';
-import { SystemPermission } from './user.entity';
 
 @Entity()
 export class SSOProviderSAMLConfiguration {
@@ -117,7 +116,7 @@ export class SSOProviderSAMLConfiguration {
       canManageBilling: ['attraccess_billing'],
     },
   })
-  permissionMappings?: Partial<Record<SystemPermission, string[]>> | null;
+  permissionMappings?: Record<string, string[]> | null;
 
   @Column({ type: 'text', nullable: true })
   @ApiProperty({

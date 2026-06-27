@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Body, Patch, Param } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiBody, ApiParam } from '@nestjs/swagger';
 import { Auth } from '@attraccess/plugins-backend-sdk';
-import { SystemPermission, EmailTemplate, EmailTemplateType } from '@attraccess/database-entities';
+import { EmailTemplate, EmailTemplateType } from '@attraccess/database-entities';
 import { EmailTemplateService } from './email-template.service';
 import { MjmlService } from './mjml.service';
 import { UpdateEmailTemplateDto } from './dto/update-email-template.dto';

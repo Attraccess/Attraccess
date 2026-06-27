@@ -31,7 +31,7 @@ function mockLicense(modules: string[] | undefined) {
 
 function mockAuth(canManage: boolean) {
   vi.mocked(useAuth).mockReturnValue({
-    hasPermission: (p: string) => p === 'canManageSystemConfiguration' ? canManage : false,
+    hasPermission: (p: string) => p === 'system.settings.manage' ? canManage : false,
   } as ReturnType<typeof useAuth>);
 }
 

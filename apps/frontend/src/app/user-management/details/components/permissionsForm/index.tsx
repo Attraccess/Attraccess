@@ -6,10 +6,11 @@ import { useToastMessage } from '../../../../../components/toastProvider';
 import {
   ApiError,
   User,
-  useUsersServiceGetPermissions,
-  useUsersServiceUpdatePermissions,
-  SystemPermissions,
-  useUsersServiceFindManyKey,
+  useRbacServiceListRoles,
+  useUsersServiceGetUserRoleAssignments,
+  useUsersServiceAssignRoleToUser,
+  useUsersServiceRevokeRoleFromUser,
+  useUsersServiceGetUserRoleAssignmentsKey,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -17,6 +18,9 @@ import en from './en.json';
 import de from './de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../../global-translations/api-errors.en.json';
 import API_ERROR_TRANSLATIONS_DE from '../../../../../global-translations/api-errors.de.json';
+
+// Roles shown in the permissions form (default 'user' and 'owner' are excluded)
+const MANAGEABLE_ROLE_KEYS = ['resource-manager', 'system-admin', 'user-manager', 'billing-manager'];
 
 interface UserPermissionFormProps {
   user: User;
@@ -32,28 +36,63 @@ export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({ user, ss
   const toast = useToastMessage();
   const queryClient = useQueryClient();
   const isSsoManaged = (ssoManagedProviders?.length ?? 0) > 0;
-  // If providers are set but no granular keys are provided, treat all permissions as SSO-managed
-  const isPermissionSsoManaged = (permission: string) => {
+  const isRoleSsoManaged = (roleKey: string) => {
     if (!isSsoManaged) return false;
     if (ssoManagedPermissionKeys === undefined) return true;
-    return ssoManagedPermissionKeys.has(permission);
+    return ssoManagedPermissionKeys.has(roleKey);
   };
   const ssoProvidersLabel = isSsoManaged
     ? (ssoManagedProviders ?? []).join(', ')
     : t('ssoManaged.providerFallback');
 
-  const { data: userPermissions, isLoading } = useUsersServiceGetPermissions({ id: user.id });
-  const { mutateAsync: savePermissions, isPending: isSavingPermissions } = useUsersServiceUpdatePermissions({
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: [useUsersServiceFindManyKey],
-      });
+  const { data: allRoles, isLoading: isLoadingRoles } = useRbacServiceListRoles();
+  const { data: userRoles, isLoading: isLoadingUserRoles } = useUsersServiceGetUserRoleAssignments({ id: user.id });
 
-      toast.success({
-        title: t('messages.updated'),
-      });
-    },
-    onError: (error) => {
+  const { mutateAsync: assignRole, isPending: isAssigning } = useUsersServiceAssignRoleToUser();
+  const { mutateAsync: revokeRole, isPending: isRevoking } = useUsersServiceRevokeRoleFromUser();
+  const isSaving = isAssigning || isRevoking;
+
+  const manageableRoles = (allRoles ?? []).filter((r) => MANAGEABLE_ROLE_KEYS.includes(r.key));
+
+  const [selectedRoleIds, setSelectedRoleIds] = useState<Set<number>>(new Set());
+
+  useEffect(() => {
+    if (userRoles) {
+      setSelectedRoleIds(new Set(userRoles.map((ur) => ur.roleId)));
+    }
+  }, [userRoles]);
+
+  const allManageableSsoManaged = isSsoManaged && manageableRoles.every((r) => isRoleSsoManaged(r.key));
+
+  const handleRoleToggle = (roleId: number) => (checked: boolean) => {
+    setSelectedRoleIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(roleId);
+      else next.delete(roleId);
+      return next;
+    });
+  };
+
+  const handleSave = async () => {
+    if (allManageableSsoManaged) return;
+
+    const currentRoleIds = new Set((userRoles ?? []).map((ur) => ur.roleId));
+
+    const toAssign = [...selectedRoleIds].filter((id) => !currentRoleIds.has(id));
+    const toRevoke = [...currentRoleIds].filter((id) => {
+      const role = manageableRoles.find((r) => r.id === id);
+      return role && !selectedRoleIds.has(id);
+    });
+
+    try {
+      await Promise.all([
+        ...toAssign.map((roleId) => assignRole({ id: user.id, requestBody: { roleId } })),
+        ...toRevoke.map((roleId) => revokeRole({ id: user.id, roleId })),
+      ]);
+
+      await queryClient.invalidateQueries({ queryKey: [useUsersServiceGetUserRoleAssignmentsKey] });
+      toast.success({ title: t('messages.updated') });
+    } catch (error) {
       toast.apiError({
         error: error as ApiError,
         t,
@@ -61,51 +100,10 @@ export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({ user, ss
         baseTranslationKey: 'api',
         fallbackKey: 'generic',
       });
-    },
-  });
-
-  const [permissions, setPermissions] = useState<Record<keyof SystemPermissions, boolean>>({
-    canManageResources: false,
-    canManageSystemConfiguration: false,
-    canManageUsers: false,
-    canManageBilling: false,
-  });
-
-  const allPermissionsSsoManaged =
-    isSsoManaged && Object.keys(permissions).every((p) => isPermissionSsoManaged(p));
-
-  // Update local state when permissions data is loaded
-  useEffect(() => {
-    if (userPermissions) {
-      setPermissions({
-        canManageResources: userPermissions.canManageResources ?? false,
-        canManageSystemConfiguration: userPermissions.canManageSystemConfiguration ?? false,
-        canManageUsers: userPermissions.canManageUsers ?? false,
-        canManageBilling: userPermissions.canManageBilling ?? false,
-      });
     }
-  }, [userPermissions]);
-
-  const handlePermissionChange = (permission: string) => (checked: boolean) => {
-    setPermissions((prev) => ({
-      ...prev,
-      [permission]: checked,
-    }));
   };
 
-  const handleSave = async () => {
-    if (allPermissionsSsoManaged) {
-      return;
-    }
-    await savePermissions({
-      id: user.id,
-      requestBody: permissions,
-    }).catch(() => {
-      // Error handling is performed in onError above.
-    });
-  };
-
-  if (isLoading) {
+  if (isLoadingRoles || isLoadingUserRoles) {
     return (
       <div className="flex justify-center p-4" data-cy="user-permission-form-loading">
         Loading permissions...
@@ -114,13 +112,8 @@ export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({ user, ss
   }
 
   return (
-    <section
-      className="w-full flex flex-col gap-4"
-      data-cy="user-permission-form-section"
-    >
-      <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
-        {t('title')}
-      </h3>
+    <section className="w-full flex flex-col gap-4" data-cy="user-permission-form-section">
+      <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">{t('title')}</h3>
       {isSsoManaged ? (
         <div
           className="rounded-md border border-warning-200 bg-warning-50 px-3 py-2 text-warning-700"
@@ -131,15 +124,15 @@ export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({ user, ss
         </div>
       ) : null}
       <div className="flex flex-col gap-2">
-        {Object.keys(permissions).map((permission) => (
+        {manageableRoles.map((role) => (
           <LabeledSwitch
-            key={permission}
-            isSelected={permissions[permission as keyof SystemPermissions]}
-            onChange={handlePermissionChange(permission as keyof SystemPermissions)}
-            isDisabled={isPermissionSsoManaged(permission)}
-            data-cy={`user-permission-form-${permission}-checkbox`}
+            key={role.id}
+            isSelected={selectedRoleIds.has(role.id)}
+            onChange={handleRoleToggle(role.id)}
+            isDisabled={isRoleSsoManaged(role.key)}
+            data-cy={`user-permission-form-${role.key}-checkbox`}
           >
-            {t(`permissions.${permission}`)}
+            {t(`permissions.${role.key}`)}
           </LabeledSwitch>
         ))}
       </div>
@@ -147,8 +140,8 @@ export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({ user, ss
         <Button
           variant="primary"
           onPress={handleSave}
-          isPending={isSavingPermissions}
-          isDisabled={allPermissionsSsoManaged}
+          isPending={isSaving}
+          isDisabled={allManageableSsoManaged}
           data-cy="user-permission-form-save-button"
         >
           {t('actions.save')}

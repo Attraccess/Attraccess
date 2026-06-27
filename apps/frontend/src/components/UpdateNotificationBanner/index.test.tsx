@@ -48,7 +48,7 @@ let hasPermissionMock = vi.fn((_: string) => true);
 vi.mock('../../hooks/useAuth', () => ({
   useAuth: () => ({
     hasPermission: hasPermissionMock,
-    user: { id: 1, systemPermissions: { canManageSystemConfiguration: true } },
+    user: { id: 1 },
     isAuthenticated: true,
     isInitialized: true,
     logout: vi.fn(),

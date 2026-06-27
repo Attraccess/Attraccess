@@ -6,7 +6,7 @@ import { HeartHandshake, Share2 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import en from './en.json';
 import de from './de.json';
-import { useLicenseServiceGetLicenseInformation, User } from '@attraccess/react-query-client';
+import { useLicenseServiceGetLicenseInformation } from '@attraccess/react-query-client';
 
 const SNOOZE_KEY = 'donationPrompt:snoozedUntil';
 
@@ -31,16 +31,18 @@ function setSnoozedForOneMonth() {
   }
 }
 
-function userHasAnyManagePermission(user: User | null): boolean {
-  if (!user) return false;
-  return Object.values(user.systemPermissions).some((enabled) => enabled === true);
-}
-
 export function DonationPrompt() {
   const { t } = useTranslations({ en, de });
-  const { user } = useAuth();
+  const { hasPermission } = useAuth();
 
-  const isEligible = useMemo(() => userHasAnyManagePermission(user), [user]);
+  // Show donation prompt to users with any elevated role (i.e., any permission beyond the default resources.read)
+  const isEligible = useMemo(
+    () =>
+      ['resources.update', 'system.settings.manage', 'users.update', 'billing.manage', 'users.roles.manage'].some(
+        (p) => hasPermission(p),
+      ),
+    [hasPermission],
+  );
   const { data: license } = useLicenseServiceGetLicenseInformation();
 
   const [isVisible, setIsVisible] = useState(false);

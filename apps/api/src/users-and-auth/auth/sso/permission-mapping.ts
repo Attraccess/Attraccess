@@ -1,51 +1,43 @@
-import { SystemPermission, SystemPermissions } from '@attraccess/database-entities';
 import { hasConfiguredPermissionMapping as hasConfiguredPermissionMappingShared } from '@attraccess/shared';
 
-export type SSOPermissionMapping = Partial<Record<SystemPermission, string[]>>;
-
-export const DEFAULT_PERMISSION_KEY_MAP: Record<string, SystemPermission> = {
-  canmanageresources: 'canManageResources',
-  canmanagesystemconfiguration: 'canManageSystemConfiguration',
-  canmanageusers: 'canManageUsers',
-  canmanagebilling: 'canManageBilling',
-};
+export type SsoRoleMapping = Record<string, string[]>;
 
 export const normalizePermissionToken = (token: string): string => {
   return token.toLowerCase().replace(/[^a-z0-9]/g, '');
 };
 
-export const hasConfiguredPermissionMapping = (
-  mapping?: SSOPermissionMapping | null,
-): boolean => hasConfiguredPermissionMappingShared(mapping);
-
-const normalizeRoleNames = (roleNames: string[]): Set<string> => {
-  return new Set(roleNames.map(normalizePermissionToken).filter((value) => value.length > 0));
+// Maps normalized legacy SSO role names to RBAC role keys for backward compat
+const LEGACY_SSO_NAME_TO_ROLE_KEY: Record<string, string> = {
+  canmanageresources: 'resource-manager',
+  canmanagesystemconfiguration: 'system-admin',
+  canmanageusers: 'user-manager',
+  canmanagebilling: 'billing-manager',
 };
 
-export const resolvePermissionsFromRoles = (
+export const hasConfiguredPermissionMapping = (
+  mapping?: SsoRoleMapping | null,
+): boolean => hasConfiguredPermissionMappingShared(mapping as Record<string, unknown> | null | undefined);
+
+export const resolveRoleKeysFromSsoRoles = (
   roleNames: string[],
-  mapping?: SSOPermissionMapping | null,
-): Partial<SystemPermissions> => {
-  const normalizedRoles = normalizeRoleNames(roleNames);
-  const updates: Partial<SystemPermissions> = {};
+  mapping?: SsoRoleMapping | null,
+): Set<string> => {
+  const normalizedRoles = new Set(roleNames.map(normalizePermissionToken).filter((v) => v.length > 0));
+  const result = new Set<string>();
 
   if (hasConfiguredPermissionMapping(mapping)) {
-    (Object.keys(mapping ?? {}) as Array<keyof SystemPermissions>).forEach((permissionKey) => {
-      const configuredRoles = mapping?.[permissionKey] ?? [];
-      if (!configuredRoles || configuredRoles.length === 0) {
-        return;
+    for (const [roleKey, configuredRoles] of Object.entries(mapping ?? {})) {
+      if ((configuredRoles ?? []).some((r) => normalizedRoles.has(normalizePermissionToken(r)))) {
+        result.add(roleKey);
       }
-      updates[permissionKey] = configuredRoles.some((role) => normalizedRoles.has(normalizePermissionToken(role)));
-    });
-    return updates;
+    }
+    return result;
   }
 
-  normalizedRoles.forEach((role) => {
-    const permissionKey = DEFAULT_PERMISSION_KEY_MAP[role];
-    if (permissionKey) {
-      updates[permissionKey] = true;
-    }
-  });
-
-  return updates;
+  // Default: map legacy SSO role names to RBAC role keys
+  for (const role of normalizedRoles) {
+    const rbacKey = LEGACY_SSO_NAME_TO_ROLE_KEY[role];
+    if (rbacKey) result.add(rbacKey);
+  }
+  return result;
 };

@@ -6,18 +6,14 @@ import {
   AuthenticationType,
   SSOProviderOIDCConfiguration,
   SSOProviderType,
-  SystemPermissions,
   User,
 } from '@attraccess/database-entities';
 import { UsersService } from '../../../users/users.service';
 import { ModuleRef } from '@nestjs/core';
 import { AccountLinkingRequiredException } from './exceptions/account-linking-required.exception';
 import { AuthService } from '../../auth.service';
-import {
-  DEFAULT_PERMISSION_KEY_MAP,
-  normalizePermissionToken,
-  resolvePermissionsFromRoles,
-} from '../permission-mapping';
+import { normalizePermissionToken, resolveRoleKeysFromSsoRoles } from '../permission-mapping';
+import { RbacService } from '../../../rbac/rbac.service';
 import { OidcCookieStateStore, OIDCAppState } from './oidc-cookie-state-store';
 import { MetricsService } from '../../../../metrics/metrics.service';
 import { classifySsoFailureReason, markSsoFailureMetricRecorded, recordSsoLoginFailure } from '../sso-metrics';
@@ -242,7 +238,7 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', true
   }
 
   private getPermissionClaimValues(claimSources: unknown[]): unknown[] {
-    const paths = ['systemPermissions', 'permissions', 'roles', 'groups', 'realm_access.roles'];
+    const paths = ['permissions', 'roles', 'groups', 'realm_access.roles'];
     if (this.config.clientId) {
       paths.push(`resource_access.${this.config.clientId}.roles`);
     }
@@ -260,93 +256,56 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', true
     return values;
   }
 
-  private resolvePermissionUpdates(claimSources: unknown[]): Partial<SystemPermissions> {
-    const directUpdates: Partial<SystemPermissions> = {};
+  private resolveRoleNamesFromClaims(claimSources: unknown[]): string[] {
     const roleNames: string[] = [];
-
     const claimValues = this.getPermissionClaimValues(claimSources);
     this.logger.debug(`Permission claim values: ${JSON.stringify(claimValues)}`);
 
     for (const value of claimValues) {
       if (Array.isArray(value)) {
         for (const entry of value) {
-          if (typeof entry === 'string') {
-            roleNames.push(entry);
-          }
+          if (typeof entry === 'string') roleNames.push(entry);
         }
         continue;
       }
-
       if (typeof value === 'string') {
         roleNames.push(value);
         continue;
       }
-
       if (value && typeof value === 'object') {
-        for (const [key, entry] of Object.entries(value)) {
-          const normalizedKey = normalizePermissionToken(key);
-          const permissionKey = DEFAULT_PERMISSION_KEY_MAP[normalizedKey];
-          if (permissionKey && typeof entry === 'boolean') {
-            directUpdates[permissionKey] = entry;
-            continue;
-          }
-
-          if (Array.isArray(entry)) {
+        for (const entry of Object.values(value)) {
+          if (typeof entry === 'string') roleNames.push(entry);
+          else if (Array.isArray(entry)) {
             for (const item of entry) {
-              if (typeof item === 'string') {
-                roleNames.push(item);
-              }
+              if (typeof item === 'string') roleNames.push(item);
             }
-            continue;
-          }
-
-          if (typeof entry === 'string') {
-            roleNames.push(entry);
           }
         }
       }
     }
 
-    this.logger.debug(`Resolved role names: ${JSON.stringify(roleNames)}`);
-    this.logger.debug(`Direct permission updates: ${JSON.stringify(directUpdates)}`);
-    const roleBasedUpdates = resolvePermissionsFromRoles(roleNames, this.config.permissionMappings);
-    this.logger.debug(`Role-based updates: ${JSON.stringify(roleBasedUpdates)}`);
-    return {
-      ...roleBasedUpdates,
-      ...directUpdates,
-    };
-  }
-
-  private buildDefaultPermissions(): SystemPermissions {
-    return {
-      canManageResources: false,
-      canManageSystemConfiguration: false,
-      canManageUsers: false,
-      canManageBilling: false,
-    };
+    this.logger.debug(`Resolved SSO role names: ${JSON.stringify(roleNames)}`);
+    return roleNames;
   }
 
   private async syncPermissionsFromClaims(
     user: User,
     claimSources: unknown[],
-    usersService: UsersService,
+    _usersService: UsersService,
   ): Promise<User> {
-    const updates = this.resolvePermissionUpdates(claimSources);
-    if (Object.keys(updates).length === 0) {
-      this.logger.debug('No permission updates resolved from SSO claims');
-      return user;
-    }
+    const roleNames = this.resolveRoleNamesFromClaims(claimSources);
+    const roleKeys = resolveRoleKeysFromSsoRoles(roleNames, this.config.permissionMappings);
+    this.logger.debug(`RBAC role keys from SSO: ${JSON.stringify([...roleKeys])}`);
 
-    const current = user.systemPermissions ?? this.buildDefaultPermissions();
-    const merged = { ...current, ...updates };
-    const shouldUpdate = Object.keys(updates).some(
-      (key) => merged[key as keyof SystemPermissions] !== current[key as keyof SystemPermissions],
-    );
-    if (!shouldUpdate) {
-      return user;
+    const rbacService = this.moduleRef.get(RbacService, { strict: false });
+    if (rbacService) {
+      await rbacService.syncSsoRoles(
+        user.id,
+        [...roleKeys],
+        SSOProviderType.OIDC,
+        this.config.ssoProviderId,
+      );
     }
-
-    this.logger.debug(`Updating permissions for user ${user.id} from SSO claims`);
-    return await usersService.updateOne(user.id, { systemPermissions: merged });
+    return user;
   }
 }

@@ -1,30 +1,16 @@
 {
   "inputs": {
     "file": "Datei auswählen",
-    "yesValue": "Wert für Ja",
     "fieldMapping": {
       "email": "E-Mail",
-      "username": "Benutzername",
-      "canManageResources": "Ressourcen verwalten",
-      "canManageSystemConfiguration": "Systemkonfiguration verwalten",
-      "canManageUsers": "Benutzer verwalten",
-      "canManageBilling": "Zahlungen verwalten"
+      "username": "Benutzername"
     }
   },
   "preview": {
     "columns": {
       "index": "Index",
       "username": "Benutzername",
-      "email": "E-Mail",
-      "permissions": {
-        "label": "Berechtigungen",
-        "values": {
-          "canManageResources": "Ressourcen verwalten",
-          "canManageSystemConfiguration": "Systemkonfiguration verwalten",
-          "canManageUsers": "Benutzer verwalten",
-          "canManageBilling": "Rechnungen verwalten"
-        }
-      }
+      "email": "E-Mail"
     }
   },
   "actions": {

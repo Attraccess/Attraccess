@@ -1,9 +1,5 @@
 import {
   Badge,
-  Chip,
-  TextField,
-  Label,
-  Input,
   Table,
   TableBody,
   TableCell,
@@ -22,7 +18,6 @@ import { Select } from '../../../../components/select';
 import { parse as parseCsv } from 'csv-parse/browser/esm';
 import {
   CsvInviteUploadDto,
-  SystemPermissions,
   useUsersServiceInviteUsersFromCsv,
   ApiError,
 } from '@attraccess/react-query-client';
@@ -59,29 +54,6 @@ export function CsvInvite({ onSuccess, onError }: Props) {
 
   const [emailKey, setEmailKey] = useState<string | undefined>(undefined);
   const [usernameKey, setUsernameKey] = useState<string | undefined>(undefined);
-
-  const [permissions, setPermissions] = useState<
-    Record<keyof SystemPermissions, { keyMapping: string; yesValue: string }>
-  >({
-    canManageResources: { keyMapping: 'canManageResources', yesValue: 'true' },
-    canManageSystemConfiguration: { keyMapping: 'canManageSystemConfiguration', yesValue: 'true' },
-    canManageUsers: { keyMapping: 'canManageUsers', yesValue: 'true' },
-    canManageBilling: { keyMapping: 'canManageBilling', yesValue: 'true' },
-  });
-
-  const updatePermissionKeyMapping = useCallback((permission: keyof SystemPermissions, key: string) => {
-    setPermissions((prev) => ({
-      ...prev,
-      [permission]: { ...prev[permission], keyMapping: key },
-    }));
-  }, []);
-
-  const updatePermissionYesValue = useCallback((permission: keyof SystemPermissions, yesValue: string) => {
-    setPermissions((prev) => ({
-      ...prev,
-      [permission]: { ...prev[permission], yesValue },
-    }));
-  }, []);
 
   const selectFile = useCallback(() => {
     const file = document.createElement('input') as HTMLInputElement;
@@ -164,23 +136,13 @@ export function CsvInvite({ onSuccess, onError }: Props) {
         data[header] = column;
       });
 
-      const user = {
+      return {
         index: index + 1,
         username: data[usernameKey ?? ''] ?? '',
         email: data[emailKey ?? ''] ?? '',
-        permissions: [] as string[],
       };
-
-      Object.entries(permissions).forEach(([permission, mapping]) => {
-        const dataValue = data[mapping.keyMapping];
-        if (dataValue?.trim() === mapping.yesValue) {
-          user.permissions.push(permission);
-        }
-      });
-
-      return user;
     });
-  }, [csvHeaders, previewRows, usernameKey, emailKey, permissions]);
+  }, [csvHeaders, previewRows, usernameKey, emailKey]);
 
   const [rowErrors, setRowErrors] = useState<CsvRowError[]>([]);
   const [ignoredRows, setIgnoredRows] = useState<number[]>([]);
@@ -189,10 +151,9 @@ export function CsvInvite({ onSuccess, onError }: Props) {
     (rowsToIgnore?: number[]) => ({
       emailKey: emailKey ?? '',
       usernameKey: usernameKey ?? '',
-      permissions,
       ignoredRows: rowsToIgnore ?? ignoredRows,
     }),
-    [emailKey, usernameKey, permissions, ignoredRows],
+    [emailKey, usernameKey, ignoredRows],
   );
 
   const { mutate: inviteUsers, isPending } = useUsersServiceInviteUsersFromCsv({
@@ -279,29 +240,6 @@ export function CsvInvite({ onSuccess, onError }: Props) {
         isRequired
       />
 
-      {Object.entries(permissions).map(([permission, mapping]) => (
-        <div key={permission} className="flex flex-row gap-2 flex-wrap">
-          <Select
-            className="flex-1"
-            label={t('inputs.fieldMapping.' + permission)}
-            value={mapping.keyMapping}
-            onChange={(key) => updatePermissionKeyMapping(permission as keyof SystemPermissions, key)}
-            items={csvHeaders.map((header) => ({
-              label: header,
-              key: header,
-            }))}
-          />
-          <TextField
-            className="flex-1"
-            value={mapping.yesValue}
-            onChange={(value) => updatePermissionYesValue(permission as keyof SystemPermissions, value)}
-          >
-            <Label>{t('inputs.yesValue')}</Label>
-            <Input />
-          </TextField>
-        </div>
-      ))}
-
       <Table data-cy="csv-invite-table">
         <TableScrollContainer>
           <TableContent aria-label="csv-invite-table">
@@ -309,7 +247,6 @@ export function CsvInvite({ onSuccess, onError }: Props) {
               <TableColumn isRowHeader>{t('preview.columns.index')}</TableColumn>
               <TableColumn>{t('preview.columns.username')}</TableColumn>
               <TableColumn>{t('preview.columns.email')}</TableColumn>
-              <TableColumn>{t('preview.columns.permissions.label')}</TableColumn>
             </TableHeader>
             <TableBody items={previewUsers} renderEmptyState={() => <EmptyState />}>
               {(user) => (
@@ -317,11 +254,6 @@ export function CsvInvite({ onSuccess, onError }: Props) {
                   <TableCell>#{user.index}</TableCell>
                   <TableCell className="w-full">{user.username}</TableCell>
                   <TableCell>{user.email}</TableCell>
-                  <TableCell className="flex-row flex gap-2 flex-wrap">
-                    {user.permissions.map((permission) => (
-                      <Chip key={permission}>{t('preview.columns.permissions.values.' + permission)}</Chip>
-                    ))}
-                  </TableCell>
                 </TableRow>
               )}
             </TableBody>

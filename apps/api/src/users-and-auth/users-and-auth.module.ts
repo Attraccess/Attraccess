@@ -162,23 +162,12 @@ import { NotificationsModule } from '../notifications/notifications.module';
       inject: [ModuleRef, SettingsService, OidcCookieStateStore],
     },
   ],
-  // Controller order is load-bearing: NestJS registers routes per-controller in
-  // array order, and Express matches first-registered-wins. Controllers holding
-  // static GET/PATCH routes MUST precede the ones holding ':id'/':id/*' routes
-  // so those static paths are not shadowed by ':id'.
-  //
-  // Rule: within any group sharing the same @Controller(prefix), put controllers
-  // with static-only routes BEFORE controllers with :param routes of the same
-  // HTTP method and segment depth.
-  //
-  // UserPermissionsController (GET 'with-permission') MUST come before
-  // UsersAdminController (GET ':id') to keep 'with-permission' reachable.
   controllers: [
     UsersRegistrationController,
     UserInvitationsController,
     UserProfileController,
-    UserPermissionsController,
     UsersAdminController,
+    UserPermissionsController,
     AuthController,
     TwoFactorController,
     SSOController,

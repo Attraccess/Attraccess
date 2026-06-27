@@ -346,7 +346,6 @@ export class ResourceUsageService {
           id: usageUser.id,
           username: usageUser.username,
           email: usageUser.email,
-          systemPermissions: usageUser.systemPermissions,
           createdAt: usageUser.createdAt,
           updatedAt: usageUser.updatedAt,
           billingFactor: usageUser.billingFactor,

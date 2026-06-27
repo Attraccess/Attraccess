@@ -1,7 +1,6 @@
 import { Controller, Get, Body, Patch, Post } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { Auth } from '@attraccess/plugins-backend-sdk';
-import { SystemPermission } from '@attraccess/database-entities';
 import { EmailLayoutService } from './email-layout.service';
 import { UpdateEmailLayoutDto } from './dto/update-email-layout.dto';
 import { PreviewEmailLayoutDto } from './dto/preview-email-layout.dto';

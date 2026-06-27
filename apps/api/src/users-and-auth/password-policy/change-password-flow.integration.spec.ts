@@ -222,7 +222,7 @@ describe('Password policy on remaining endpoints (integration)', () => {
         passwordService.setUserPassword(
           42,
           { password: WEAK_PASSWORD },
-          { id: 42, systemPermissions: { canManageUsers: false } } as never,
+          { id: 42 } as never,
         ),
       ).rejects.toBeInstanceOf(PasswordPolicyViolationException);
       expect(changePassword).not.toHaveBeenCalled();
@@ -233,7 +233,7 @@ describe('Password policy on remaining endpoints (integration)', () => {
       await passwordService.setUserPassword(
         42,
         { password: STRONG_PASSWORD },
-        { id: 42, systemPermissions: { canManageUsers: false } } as never,
+        { id: 42 } as never,
       );
       expect(changePassword).toHaveBeenCalledWith(expect.objectContaining({ id: 42 }), STRONG_PASSWORD);
     });
@@ -249,7 +249,7 @@ describe('Password policy on remaining endpoints (integration)', () => {
         passwordService.setUserPassword(
           42,
           { password: STRONG_PASSWORD },
-          { id: 42, systemPermissions: { canManageUsers: false } } as never,
+          { id: 42 } as never,
         ),
       ).rejects.toMatchObject({
         policyErrors: expect.arrayContaining([{ code: 'PASSWORD_REUSED', params: { historySize: 3 } }]),
@@ -267,7 +267,7 @@ describe('Password policy on remaining endpoints (integration)', () => {
       await passwordService.setUserPassword(
         42,
         { password: STRONG_PASSWORD },
-        { id: 42, systemPermissions: { canManageUsers: false } } as never,
+        { id: 42 } as never,
       );
       expect(historyRepo.save).toHaveBeenCalledWith(
         expect.objectContaining({ userId: 42, passwordHash: currentHash }),
@@ -343,7 +343,7 @@ describe('Password policy on remaining endpoints (integration)', () => {
         passwordService.setUserPassword(
           42,
           { password: 'SuperSecretLeakable123!' },
-          { id: 42, systemPermissions: { canManageUsers: false } } as never,
+          { id: 42 } as never,
         ),
       ).rejects.toBeInstanceOf(PasswordPolicyViolationException);
 

@@ -5,7 +5,6 @@ import {
   FindOneOptions as TypeormFindOneOptions,
   FindOptionsWhere,
   In,
-  DeepPartial,
   EntityManager,
 } from 'typeorm';
 import {
@@ -13,7 +12,6 @@ import {
   AuthenticationType,
   ResourceUsage,
   Session,
-  SystemPermissions,
   User,
   SSOProviderType,
 } from '@attraccess/database-entities';
@@ -63,9 +61,7 @@ type UpdateUserData = Partial<
     | 'lockedUntil'
     | 'failedLoginAttempts'
     | 'firstFailedLoginAt'
-  > & {
-    systemPermissions: Partial<SystemPermissions>;
-  }
+  >
 >;
 
 const FindOneOptionsSchema = z
@@ -327,18 +323,11 @@ export class UsersService {
       isEmailVerified: updateData.isEmailVerified ?? undefined,
       passwordResetToken: updateData.passwordResetToken?.trim() ?? undefined,
       passwordResetTokenExpiresAt: updateData.passwordResetTokenExpiresAt ?? undefined,
-      systemPermissions: updateData.systemPermissions ?? undefined,
       lockedUntil: 'lockedUntil' in updateData ? updateData.lockedUntil : undefined,
       failedLoginAttempts: updateData.failedLoginAttempts ?? undefined,
       firstFailedLoginAt: 'firstFailedLoginAt' in updateData ? updateData.firstFailedLoginAt : undefined,
     };
     this.logger.debug(`Updating user with ID: ${id}, updates: ${JSON.stringify(updates)}`);
-
-    if (updateData.systemPermissions !== undefined) {
-      updates.systemPermissions = {
-        ...updateData.systemPermissions,
-      } as DeepPartial<SystemPermissions>;
-    }
 
     // If email is being updated, check for uniqueness
     const userRepo = manager ? manager.getRepository(User) : this.userRepository;
@@ -523,50 +512,6 @@ export class UsersService {
     };
   }
 
-  async findByPermission(
-    permission: keyof SystemPermissions,
-    options: PaginationOptions & { search?: string },
-  ): Promise<PaginatedResponse<User>> {
-    this.logger.debug(`Finding users with permission "${permission}" and options: ${JSON.stringify(options)}`);
-    const paginationOptions = PaginationOptionsSchema.parse(options);
-    const { search } = options;
-    const { page, limit } = paginationOptions;
-    const skip = (page - 1) * limit;
-
-    // Create a query to find users with the specified permission
-    const query = this.userRepository.createQueryBuilder('user');
-
-    // Add where clause for the specific permission = true
-    query.where(`user.systemPermissions${permission.charAt(0).toUpperCase() + permission.slice(1)} = :value`, {
-      value: true,
-    });
-
-    // Add search clause if provided
-    if (search) {
-      this.logger.debug(`Searching for users with query: ${search}`);
-      query.andWhere('(user.username LIKE :search OR user.email LIKE :search)', {
-        search: `%${search}%`,
-      });
-    }
-
-    // Add pagination
-    query.skip(skip).take(limit);
-
-    // Execute the query
-    this.logger.debug(`Executing query for users with permission "${permission}"`);
-    const [users, total] = await query.getManyAndCount();
-
-    this.logger.debug(
-      `Found ${total} total users with permission "${permission}", returning page ${page} with ${users.length} results`,
-    );
-    return {
-      data: users,
-      total,
-      page: paginationOptions.page,
-      limit: paginationOptions.limit,
-    };
-  }
-
   async changeBillingFactor(targetUserId: number, newBillingFactor: number): Promise<User> {
     const targetUser = await this.findOne({ id: targetUserId });
     if (!targetUser) {
@@ -628,7 +573,7 @@ export class UsersService {
   }
 
   async createMany(
-    users: Array<{ username: string; email: string; systemPermissions: Partial<SystemPermissions> }>,
+    users: Array<{ username: string; email: string }>,
     options?: { grantAllPermissionsToFirst?: boolean; manager?: EntityManager },
   ): Promise<User[]> {
     if (users.length === 0) {
@@ -638,14 +583,13 @@ export class UsersService {
     const normalized = users.map((userData) => ({
       username: this.cleanupUsername(userData.username),
       email: userData.email.trim(),
-      systemPermissions: userData.systemPermissions ?? {},
     }));
 
     const run = async (manager: EntityManager) => {
       const repo = manager.getRepository(User);
       const totalExisting = await repo.count();
 
-      const entities = normalized.map((data, index) => {
+      const entities = normalized.map((data) => {
         this.validateUsernameOrThrow(data.username);
         if (!data.email) {
           throw new BadRequestException('Email is required');
@@ -655,15 +599,6 @@ export class UsersService {
         user.username = data.username;
         user.email = data.email;
         user.externalIdentifier = null;
-
-        const systemPermissions: SystemPermissions = {
-          canManageResources: data.systemPermissions.canManageResources ?? false,
-          canManageSystemConfiguration: data.systemPermissions.canManageSystemConfiguration ?? false,
-          canManageUsers: data.systemPermissions.canManageUsers ?? false,
-          canManageBilling: data.systemPermissions.canManageBilling ?? false,
-        };
-
-        user.systemPermissions = systemPermissions;
         return user;
       });
 

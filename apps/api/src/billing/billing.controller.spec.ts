@@ -22,9 +22,6 @@ const baseReq = (userOverrides: DeepPartial<User> = {}) =>
   ({
     user: {
       id: 1,
-      systemPermissions: {
-        canManageBilling: false,
-      },
       ...userOverrides,
     },
   }) as AuthenticatedRequest;

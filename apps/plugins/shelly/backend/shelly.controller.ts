@@ -1,6 +1,5 @@
 // REST surface for the Shelly device registry, mounted into the host API under
-// `/shelly`. Gated behind `canManageResources` — the same access level as the
-// host MQTT servers settings (device management is an admin-ish capability).
+// `/shelly`. Gated behind `resources.update` (device management is an admin-ish capability).
 import {
   BadRequestException,
   Body,
@@ -31,7 +30,7 @@ interface ProbeOutcome {
   at: string;
 }
 
-@Auth('canManageResources')
+@Auth('resources.update')
 @Controller('shelly')
 export class ShellyController {
   // esbuild does not emit decorator metadata, so Nest cannot infer constructor

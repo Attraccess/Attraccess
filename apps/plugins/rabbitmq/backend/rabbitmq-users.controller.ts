@@ -25,7 +25,7 @@ import {
 import { RabbitmqUsersService } from './rabbitmq-users.service';
 import type { RabbitmqUserList, SetRabbitmqPermissionDto, UpsertRabbitmqUserDto } from './rabbitmq-users.types';
 
-@Auth('canManageResources')
+@Auth('resources.update')
 @Controller('rabbitmq')
 export class RabbitmqUsersController {
   // esbuild does not emit decorator metadata, so Nest cannot infer constructor

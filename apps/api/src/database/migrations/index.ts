@@ -138,3 +138,4 @@ export * from './1782202000000-companion-device-locked';
 export * from './1782200000000-email-layout';
 export * from './1782203000000-companion-device-app-version';
 export * from './1782300000000-rbac-data-model';
+export * from './1782400000000-drop-boolean-permissions';

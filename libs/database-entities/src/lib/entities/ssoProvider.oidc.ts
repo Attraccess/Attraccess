@@ -10,7 +10,6 @@ import {
 import { ApiProperty } from '@nestjs/swagger';
 import { Exclude } from 'class-transformer';
 import { SSOProvider } from './ssoProvider.entity';
-import { SystemPermission } from './user.entity';
 
 @Entity()
 export class SSOProviderOIDCConfiguration {
@@ -106,7 +105,7 @@ export class SSOProviderOIDCConfiguration {
       canManageUsers: ['attraccess_admin'],
     },
   })
-  permissionMappings?: Partial<Record<SystemPermission, string[]>> | null;
+  permissionMappings?: Record<string, string[]> | null;
 
   @CreateDateColumn()
   @ApiProperty({

@@ -106,4 +106,39 @@ export class RbacService {
 
     await this.userRoleRepository.delete({ userId, roleId, source: UserRoleSource.MANUAL });
   }
+
+  async syncSsoRoles(
+    userId: number,
+    roleKeys: string[],
+    ssoProviderType: string,
+    ssoProviderId: number,
+  ): Promise<void> {
+    const targetRoleKeys = new Set(roleKeys);
+
+    const currentSsoRoles = await this.userRoleRepository.find({
+      where: { userId, source: UserRoleSource.SSO, ssoProviderType, ssoProviderId },
+      relations: ['role'],
+    });
+
+    for (const ur of currentSsoRoles) {
+      if (!targetRoleKeys.has(ur.role.key)) {
+        await this.userRoleRepository.delete({ id: ur.id });
+      }
+    }
+
+    const currentRoleKeys = new Set(currentSsoRoles.map((ur) => ur.role.key));
+    for (const roleKey of targetRoleKeys) {
+      if (currentRoleKeys.has(roleKey)) continue;
+      const role = await this.roleRepository.findOne({ where: { key: roleKey } });
+      if (!role) continue;
+      const existing = await this.userRoleRepository.findOne({
+        where: { userId, roleId: role.id, source: UserRoleSource.SSO, ssoProviderType, ssoProviderId },
+      });
+      if (!existing) {
+        await this.userRoleRepository.save(
+          this.userRoleRepository.create({ userId, roleId: role.id, source: UserRoleSource.SSO, ssoProviderType, ssoProviderId }),
+        );
+      }
+    }
+  }
 }

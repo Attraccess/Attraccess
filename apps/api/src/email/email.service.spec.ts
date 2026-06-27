@@ -31,7 +31,6 @@ describe('EmailService', () => {
       emailVerificationTokenExpiresAt: null,
       createdAt: new Date(),
       updatedAt: new Date(),
-      systemPermissions: { canManageResources: false, canManageSystemConfiguration: false, canManageUsers: false },
       passwordResetToken: null,
       passwordResetTokenExpiresAt: null,
       externalIdentifier: null,

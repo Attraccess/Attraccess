@@ -8,17 +8,14 @@ import {
 } from '@node-saml/passport-saml';
 import { ModuleRef } from '@nestjs/core';
 import { UsersService } from '../../../users/users.service';
-import { SSOProviderSAMLConfiguration, SSOProviderType, SystemPermissions, User } from '@attraccess/database-entities';
+import { SSOProviderSAMLConfiguration, SSOProviderType, User } from '@attraccess/database-entities';
 import { AccountLinkingRequiredException } from '../oidc/exceptions/account-linking-required.exception';
 import { EncryptionService } from '../../../../encryption/encryption.service';
 import { SSOSamlRequest, SSOSamlRequestOptions } from './saml.types';
 import { MetricsService } from '../../../../metrics/metrics.service';
 import { classifySsoFailureReason, markSsoFailureMetricRecorded, recordSsoLoginFailure } from '../sso-metrics';
-import {
-  DEFAULT_PERMISSION_KEY_MAP,
-  normalizePermissionToken,
-  resolvePermissionsFromRoles,
-} from '../permission-mapping';
+import { resolveRoleKeysFromSsoRoles } from '../permission-mapping';
+import { RbacService } from '../../../rbac/rbac.service';
 
 type StrategyCtor = new (...args: unknown[]) => Strategy;
 type SamlOptionsCallback = (error: Error | null, samlOptions?: PassportSamlConfig) => void;
@@ -277,101 +274,39 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
     return values;
   }
 
-  private resolvePermissionUpdates(profile: SamlProfile, config: SSOProviderSAMLConfiguration): Partial<SystemPermissions> {
+  private resolveRoleNamesFromClaims(profile: SamlProfile): string[] {
     const roleNames: string[] = [];
-    const directUpdates: Partial<SystemPermissions> = {};
-
     for (const value of this.getPermissionClaimValues(profile)) {
       if (Array.isArray(value)) {
         for (const entry of value) {
-          if (typeof entry === 'string') {
-            roleNames.push(entry);
-          }
+          if (typeof entry === 'string') roleNames.push(entry);
         }
-        continue;
-      }
-
-      if (typeof value === 'string') {
+      } else if (typeof value === 'string') {
         roleNames.push(value);
-        continue;
       }
     }
-
-    const profileRecord = profile as Record<string, unknown>;
-    const attributeRecord = (profileRecord.attributes ?? {}) as Record<string, unknown>;
-    const entries = [...Object.entries(profileRecord), ...Object.entries(attributeRecord)];
-    for (const [key, entry] of entries) {
-      const normalizedKey = normalizePermissionToken(key);
-      const permissionKey = DEFAULT_PERMISSION_KEY_MAP[normalizedKey];
-      if (!permissionKey) {
-        continue;
-      }
-
-      const coerced = this.coerceBoolean(entry);
-      if (typeof coerced === 'boolean') {
-        directUpdates[permissionKey] = coerced;
-      }
-    }
-
-    const roleUpdates = resolvePermissionsFromRoles(roleNames, config.permissionMappings);
-    return {
-      ...roleUpdates,
-      ...directUpdates,
-    };
-  }
-
-  private coerceBoolean(value: unknown): boolean | undefined {
-    if (typeof value === 'boolean') {
-      return value;
-    }
-
-    if (typeof value === 'string') {
-      const normalized = value.trim().toLowerCase();
-      if (['true', '1', 'yes', 'on'].includes(normalized)) {
-        return true;
-      }
-      if (['false', '0', 'no', 'off'].includes(normalized)) {
-        return false;
-      }
-    }
-
-    if (Array.isArray(value) && value.length > 0) {
-      return this.coerceBoolean(value[0]);
-    }
-
-    return undefined;
-  }
-
-  private buildDefaultPermissions(): SystemPermissions {
-    return {
-      canManageResources: false,
-      canManageSystemConfiguration: false,
-      canManageUsers: false,
-      canManageBilling: false,
-    };
+    return roleNames;
   }
 
   private async syncPermissionsFromClaims(
     user: User,
     profile: SamlProfile,
     config: SSOProviderSAMLConfiguration,
-    usersService: UsersService,
+    _usersService: UsersService,
   ): Promise<User> {
-    const updates = this.resolvePermissionUpdates(profile, config);
-    if (Object.keys(updates).length === 0) {
-      return user;
-    }
+    const roleNames = this.resolveRoleNamesFromClaims(profile);
+    const roleKeys = resolveRoleKeysFromSsoRoles(roleNames, config.permissionMappings);
+    this.logger.debug(`RBAC role keys from SAML: ${JSON.stringify([...roleKeys])}`);
 
-    const current = user.systemPermissions ?? this.buildDefaultPermissions();
-    const merged = { ...current, ...updates };
-    const shouldUpdate = Object.keys(updates).some(
-      (key) => merged[key as keyof SystemPermissions] !== current[key as keyof SystemPermissions],
-    );
-    if (!shouldUpdate) {
-      return user;
+    const rbacService = this.moduleRef.get(RbacService, { strict: false });
+    if (rbacService) {
+      await rbacService.syncSsoRoles(
+        user.id,
+        [...roleKeys],
+        SSOProviderType.SAML,
+        config.ssoProviderId,
+      );
     }
-
-    this.logger.debug(`Updating permissions for user ${user.id} from SAML claims`);
-    return await usersService.updateOne(user.id, { systemPermissions: merged });
+    return user;
   }
 }

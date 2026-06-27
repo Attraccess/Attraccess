@@ -121,8 +121,8 @@ export function ResourceBillingInfoEditor(props: Props) {
     });
   }, [updateConfiguration, resourceId, creditsPerUsage, creditsPerMinute, configuration]);
 
-  const { user } = useAuth();
-  if (!user?.systemPermissions.canManageBilling) {
+  const { hasPermission } = useAuth();
+  if (!hasPermission('billing.manage')) {
     return null;
   }
 

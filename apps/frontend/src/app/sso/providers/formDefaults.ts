@@ -1,11 +1,6 @@
 import { CreateSSOProviderDto, SSOPermissionMappingsDto, SSOProviderType } from '@attraccess/react-query-client';
 
-export const permissionKeys = [
-  'canManageResources',
-  'canManageSystemConfiguration',
-  'canManageUsers',
-  'canManageBilling',
-] as const;
+export const permissionKeys = ['resource-manager', 'system-admin', 'user-manager', 'billing-manager'] as const;
 
 export type PermissionKey = (typeof permissionKeys)[number];
 
@@ -33,10 +28,10 @@ export const getDefaultSamlConfiguration = () => ({
 });
 
 export const emptyPermissionMappingsInput: Record<PermissionKey, string> = {
-  canManageResources: '',
-  canManageSystemConfiguration: '',
-  canManageUsers: '',
-  canManageBilling: '',
+  'resource-manager': '',
+  'system-admin': '',
+  'user-manager': '',
+  'billing-manager': '',
 };
 
 export const defaultProviderValues: CreateSSOProviderDto = {
@@ -57,10 +52,16 @@ export const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/
 export const buildPermissionMappingInputs = (
   mapping?: SSOPermissionMappingsDto | null,
 ): Record<PermissionKey, string> => ({
-  canManageResources: Array.isArray(mapping?.canManageResources) ? mapping?.canManageResources.join(', ') : '',
-  canManageSystemConfiguration: Array.isArray(mapping?.canManageSystemConfiguration)
-    ? mapping?.canManageSystemConfiguration.join(', ')
+  'resource-manager': Array.isArray((mapping as Record<string, unknown>)?.['resource-manager'])
+    ? ((mapping as Record<string, string[]>)?.['resource-manager'] ?? []).join(', ')
     : '',
-  canManageUsers: Array.isArray(mapping?.canManageUsers) ? mapping?.canManageUsers.join(', ') : '',
-  canManageBilling: Array.isArray(mapping?.canManageBilling) ? mapping?.canManageBilling.join(', ') : '',
+  'system-admin': Array.isArray((mapping as Record<string, unknown>)?.['system-admin'])
+    ? ((mapping as Record<string, string[]>)?.['system-admin'] ?? []).join(', ')
+    : '',
+  'user-manager': Array.isArray((mapping as Record<string, unknown>)?.['user-manager'])
+    ? ((mapping as Record<string, string[]>)?.['user-manager'] ?? []).join(', ')
+    : '',
+  'billing-manager': Array.isArray((mapping as Record<string, unknown>)?.['billing-manager'])
+    ? ((mapping as Record<string, string[]>)?.['billing-manager'] ?? []).join(', ')
+    : '',
 });

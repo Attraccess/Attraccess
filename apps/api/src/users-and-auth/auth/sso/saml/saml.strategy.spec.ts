@@ -1,8 +1,9 @@
 import { ModuleRef } from '@nestjs/core';
-import { SSOProviderSAMLConfiguration } from '@attraccess/database-entities';
+import { SSOProviderSAMLConfiguration, SSOProviderType } from '@attraccess/database-entities';
 import { SSOSamlStrategy } from './saml.strategy';
 import { SSOSamlRequest } from './saml.types';
 import { AccountLinkingRequiredException } from '../oidc/exceptions/account-linking-required.exception';
+import { RbacService } from '../../../rbac/rbac.service';
 
 type SamlProfile = Record<string, unknown>;
 
@@ -130,40 +131,31 @@ describe('SSOSamlStrategy', () => {
     expect(user.username).toBe('name.surname');
   });
 
-  it('syncs permissions from SAML role attributes', async () => {
+  it('syncs RBAC roles from SAML role attributes', async () => {
+    const rbacService = { syncSsoRoles: jest.fn().mockResolvedValue(undefined) };
+
     const usersService = {
-      findOne: jest.fn(),
-      updateOne: jest.fn(async (_id: number, update: { systemPermissions: Record<string, boolean> }) => ({
-        id: 44,
-        systemPermissions: update.systemPermissions,
-      })),
+      findOne: jest.fn().mockImplementation((query: Record<string, unknown>) => {
+        if ('externalIdentifier' in query) {
+          return Promise.resolve({ id: 44, externalIdentifier: 'saml-user' });
+        }
+        return Promise.resolve(null);
+      }),
+      updateOne: jest.fn(),
     };
 
-    usersService.findOne.mockImplementation((query: Record<string, unknown>) => {
-      if ('externalIdentifier' in query) {
-        return Promise.resolve({
-          id: 44,
-          externalIdentifier: 'saml-user',
-          systemPermissions: {
-            canManageResources: false,
-            canManageSystemConfiguration: false,
-            canManageUsers: false,
-            canManageBilling: false,
-          },
-        });
-      }
-      return Promise.resolve(null);
-    });
-
     const moduleRef = {
-      get: jest.fn().mockResolvedValue(usersService),
+      get: jest.fn((token: unknown) => {
+        if (token === RbacService) return rbacService;
+        return usersService;
+      }),
     } as unknown as ModuleRef;
 
     const strategy = new SSOSamlStrategy(moduleRef);
     const request = buildRequest(30, 'email');
     request.ssoSamlOptions.samlConfiguration.permissionMappings = {
-      canManageUsers: ['attraccess_admin'],
-      canManageBilling: ['billing-role'],
+      'user-manager': ['attraccess_admin'],
+      'billing-manager': ['billing-role'],
     };
 
     const profile = {
@@ -174,17 +166,13 @@ describe('SSOSamlStrategy', () => {
       },
     } as SamlProfile;
 
-    const user = await strategy.validate(request, profile);
+    await strategy.validate(request, profile);
 
-    expect(usersService.updateOne).toHaveBeenCalledWith(44, {
-      systemPermissions: {
-        canManageResources: false,
-        canManageSystemConfiguration: false,
-        canManageUsers: true,
-        canManageBilling: true,
-      },
-    });
-    expect(user.systemPermissions.canManageUsers).toBe(true);
-    expect(user.systemPermissions.canManageBilling).toBe(true);
+    expect(rbacService.syncSsoRoles).toHaveBeenCalledWith(
+      44,
+      expect.arrayContaining(['user-manager', 'billing-manager']),
+      SSOProviderType.SAML,
+      30,
+    );
   });
 });

@@ -158,15 +158,7 @@ describe('UsersService', () => {
     it('the following created user should not have any permissions', async () => {
       jest.spyOn(userRepository, 'findOne').mockResolvedValue(null);
       jest.spyOn(userRepository, 'save').mockImplementation(async (data) => {
-        return {
-          id: 1,
-          ...data,
-          systemPermissions: {
-            canManageResources: false,
-            canManageSystemConfiguration: false,
-            ...(data.systemPermissions || {}),
-          },
-        } as User;
+        return { id: 1, ...data } as User;
       });
       jest.spyOn(userRepository, 'count').mockResolvedValue(1);
 
@@ -176,10 +168,6 @@ describe('UsersService', () => {
         username: 'test',
         email: 'test@example.com',
         externalIdentifier: null,
-        systemPermissions: {
-          canManageResources: false,
-          canManageSystemConfiguration: false,
-        },
       });
     });
 
@@ -270,34 +258,6 @@ describe('UsersService', () => {
       await expect(service.updateOne(1, { externalIdentifier: 'value' })).rejects.toThrow(UserNotFoundException);
     });
 
-    it('should persist system permission updates', async () => {
-      const user = {
-        id: 1,
-        systemPermissions: {
-          canManageResources: true,
-          canManageSystemConfiguration: false,
-          canManageUsers: false,
-          canManageBilling: false,
-        },
-      } as User;
-      const permissionsUpdate = {
-        canManageResources: true,
-        canManageSystemConfiguration: true,
-        canManageUsers: false,
-        canManageBilling: false,
-      };
-      jest.spyOn(userRepository, 'update').mockResolvedValue({ affected: 1 } as UpdateResult);
-      jest.spyOn(userRepository, 'findOne').mockResolvedValue(user);
-
-      await service.updateOne(1, { systemPermissions: permissionsUpdate });
-
-      expect(userRepository.update).toHaveBeenCalledWith(
-        1,
-        expect.objectContaining({
-          systemPermissions: permissionsUpdate,
-        }),
-      );
-    });
   });
 
   describe('findMany', () => {
@@ -307,12 +267,6 @@ describe('UsersService', () => {
           id: 1,
           username: 'user1',
           email: 'user1@example.com',
-          systemPermissions: {
-            canManageResources: false,
-            canManageSystemConfiguration: false,
-            canManageUsers: false,
-            canManageBilling: false,
-          },
           createdAt: new Date(),
           updatedAt: new Date(),
           isEmailVerified: false,
@@ -352,12 +306,6 @@ describe('UsersService', () => {
           id: 2,
           username: 'user2',
           email: 'user2@example.com',
-          systemPermissions: {
-            canManageResources: false,
-            canManageSystemConfiguration: false,
-            canManageUsers: false,
-            canManageBilling: false,
-          },
           createdAt: new Date(),
           updatedAt: new Date(),
           isEmailVerified: false,
@@ -422,11 +370,7 @@ describe('UsersService', () => {
         id: 1,
         username: 'olduser',
         email: 'user@example.com',
-        systemPermissions: {
-          canManageResources: false,
-          canManageSystemConfiguration: false,
-          canManageUsers: false,
-        },
+
         createdAt: new Date(),
         updatedAt: new Date(),
         isEmailVerified: false,

@@ -18,7 +18,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { SSOOIDCGuard } from './oidc/oidc.guard';
-import { AuthenticationType, SSOProvider, SSOProviderType, SystemPermissions } from '@attraccess/database-entities';
+import { AuthenticationType, SSOProvider, SSOProviderType } from '@attraccess/database-entities';
 import { AuthenticatedRequest, Auth } from '@attraccess/plugins-backend-sdk';
 import { RequiresLicense, SkipLicenseCheck } from '../../../license/require-license.decorator';
 import { LicenseModuleType } from '../../../license/license.service';
@@ -44,7 +44,8 @@ import { SSOLinkTokenService } from './link-token.service';
 import { timingSafeEqual } from 'crypto';
 import { SSOProvisioningPermissionsDto, SSOProvisioningUserDto } from './dto/sso-provisioning.dto';
 import { InvalidSSOProviderIdException, SSOProviderNotFoundException } from './errors';
-import { resolvePermissionsFromRoles } from './permission-mapping';
+import { resolveRoleKeysFromSsoRoles } from './permission-mapping';
+import { RbacService } from '../../rbac/rbac.service';
 import { MetricsService } from '../../../metrics/metrics.service';
 @ApiTags('Authentication')
 @Controller('auth/sso')
@@ -61,6 +62,7 @@ export class SSOController {
     private readonly linkTokenService: SSOLinkTokenService,
     private readonly settingsService: SettingsService,
     private readonly metricsService: MetricsService,
+    private readonly rbacService: RbacService,
   ) {}
 
   @Get('providers')
@@ -530,11 +532,7 @@ export class SSOController {
     this.assertProvisioningAuthorized(provider, request);
 
     const user = await this.resolveProvisioningUser(SSOProviderType.OIDC, parsedProviderId, body);
-    const updates = this.buildPermissionUpdates(provider, body);
-    if (Object.keys(updates).length > 0) {
-      const mergedPermissions = { ...(user.systemPermissions ?? {}), ...updates };
-      await this.usersService.updateOne(user.id, { systemPermissions: mergedPermissions });
-    }
+    await this.applyProvisioningPermissions(user.id, provider, body);
 
     return { OK: true };
   }
@@ -578,11 +576,7 @@ export class SSOController {
     this.assertProvisioningAuthorized(provider, request);
 
     const user = await this.resolveProvisioningUser(SSOProviderType.SAML, parsedProviderId, body);
-    const updates = this.buildPermissionUpdates(provider, body);
-    if (Object.keys(updates).length > 0) {
-      const mergedPermissions = { ...(user.systemPermissions ?? {}), ...updates };
-      await this.usersService.updateOne(user.id, { systemPermissions: mergedPermissions });
-    }
+    await this.applyProvisioningPermissions(user.id, provider, body);
 
     return { OK: true };
   }
@@ -853,49 +847,33 @@ export class SSOController {
     return user;
   }
 
-  private extractPermissionUpdates(payload: SSOProvisioningPermissionsDto): Partial<SystemPermissions> {
-    const updates: Partial<SystemPermissions> = {};
+  private static readonly LEGACY_FIELD_TO_ROLE: Record<string, string> = {
+    canManageResources: 'resource-manager',
+    canManageSystemConfiguration: 'system-admin',
+    canManageUsers: 'user-manager',
+    canManageBilling: 'billing-manager',
+  };
 
-    if (payload.canManageResources !== undefined) {
-      updates.canManageResources = payload.canManageResources;
-    }
-    if (payload.canManageSystemConfiguration !== undefined) {
-      updates.canManageSystemConfiguration = payload.canManageSystemConfiguration;
-    }
-    if (payload.canManageUsers !== undefined) {
-      updates.canManageUsers = payload.canManageUsers;
-    }
-    if (payload.canManageBilling !== undefined) {
-      updates.canManageBilling = payload.canManageBilling;
-    }
-
-    return updates as {
-      canManageResources?: boolean;
-      canManageSystemConfiguration?: boolean;
-      canManageUsers?: boolean;
-      canManageBilling?: boolean;
-    };
-  }
-
-  private buildPermissionUpdates(
+  private async applyProvisioningPermissions(
+    userId: number,
     provider: SSOProvider,
     payload: SSOProvisioningPermissionsDto,
-  ): Partial<SystemPermissions> {
-    const updates = this.extractPermissionUpdates(payload);
-    const roleNames = payload.roles?.map((role) => role.trim()).filter((role) => role.length > 0) ?? [];
-    if (roleNames.length === 0) {
-      return updates;
-    }
-
+  ): Promise<void> {
     const mapping =
       provider.type === SSOProviderType.OIDC
         ? provider.oidcConfiguration?.permissionMappings
         : provider.samlConfiguration?.permissionMappings;
-    const roleUpdates = resolvePermissionsFromRoles(roleNames, mapping);
 
-    return {
-      ...roleUpdates,
-      ...updates,
-    };
+    const roleNames = (payload.roles ?? []).map((r) => r.trim()).filter((r) => r.length > 0);
+    const roleKeys = resolveRoleKeysFromSsoRoles(roleNames, mapping);
+
+    // Legacy boolean fields: true → add to target set; false is implicit via syncSsoRoles removing absent keys
+    for (const [field, roleKey] of Object.entries(SSOController.LEGACY_FIELD_TO_ROLE)) {
+      if ((payload as Record<string, unknown>)[field] === true) {
+        roleKeys.add(roleKey);
+      }
+    }
+
+    await this.rbacService.syncSsoRoles(userId, [...roleKeys], provider.type, provider.id);
   }
 }

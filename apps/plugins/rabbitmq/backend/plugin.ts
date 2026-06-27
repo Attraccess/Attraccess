@@ -36,7 +36,7 @@ class RabbitmqService implements OnModuleInit {
 
 // Mounts `GET /rabbitmq/status` into the host API. Same access level as the
 // host MQTT servers controller.
-@Auth('canManageResources')
+@Auth('resources.update')
 @Controller('rabbitmq')
 class RabbitmqController {
   // esbuild does not emit decorator metadata, so Nest cannot infer constructor

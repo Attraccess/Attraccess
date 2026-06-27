@@ -2,7 +2,6 @@ import {
   UseUsersServiceGetOneUserByIdKeyFn,
   useUsersServiceChangeUserEmail,
   useUsersServiceFindManyKey,
-  useUsersServiceGetAllWithPermissionKey,
 } from '@attraccess/react-query-client';
 import { cn, TextField, Label, Input } from '@heroui/react';
 import { Button } from '../../../../../components/button';
@@ -32,9 +31,6 @@ export function ChangeEmailForm({ userId, ...divProps }: Props & Omit<HTMLAttrib
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: UseUsersServiceGetOneUserByIdKeyFn({ id: userId }),
-      });
-      queryClient.invalidateQueries({
-        queryKey: [useUsersServiceGetAllWithPermissionKey],
       });
       queryClient.invalidateQueries({
         queryKey: [useUsersServiceFindManyKey],

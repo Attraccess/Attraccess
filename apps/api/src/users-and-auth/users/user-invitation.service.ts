@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
-import { SystemPermissions, User } from '@attraccess/database-entities';
+import { User } from '@attraccess/database-entities';
 import { EntityManager } from 'typeorm';
 import { parse as parseCsv } from 'csv-parse';
 import { Readable } from 'stream';
@@ -29,7 +29,7 @@ export class UserInvitationService {
   ) {}
 
   private async inviteUsersTransactional(
-    candidates: Array<{ username: string; email: string; systemPermissions: Partial<SystemPermissions> }>,
+    candidates: Array<{ username: string; email: string }>,
     options?: { grantAllPermissionsToFirst?: boolean },
   ): Promise<User[]> {
     await this.usersService.ensureLicenseForNewUsers(candidates.length);
@@ -55,7 +55,7 @@ export class UserInvitationService {
     file: FileUpload | undefined,
     config: CsvInviteConfigDto,
   ): Promise<{
-    candidates: Array<{ username: string; email: string; systemPermissions: Partial<SystemPermissions>; row: number }>;
+    candidates: Array<{ username: string; email: string; row: number }>;
     errors: CsvInviteRowErrorDto[];
     emailRowMap: Map<string, number[]>;
     usernameRowMap: Map<string, number[]>;
@@ -81,7 +81,6 @@ export class UserInvitationService {
     const candidates: Array<{
       username: string;
       email: string;
-      systemPermissions: Partial<SystemPermissions>;
       row: number;
     }> = [];
     const errors: CsvInviteRowErrorDto[] = [];
@@ -163,21 +162,6 @@ export class UserInvitationService {
           usernameRowMap.set(normalizedUsername, [...(usernameRowMap.get(normalizedUsername) ?? []), rowNumber]);
         }
 
-        const systemPermissions: Partial<SystemPermissions> = {};
-        (
-          Object.entries(config.permissions ?? {}) as [
-            keyof SystemPermissions,
-            { keyMapping: string; yesValue: string },
-          ][]
-        )
-          .filter(([, mapping]) => !!mapping?.keyMapping)
-          .forEach(([permissionKey, mapping]) => {
-            const value = (rowData[mapping.keyMapping] ?? '').trim();
-            if (value === mapping.yesValue) {
-              systemPermissions[permissionKey] = true;
-            }
-          });
-
         if (rowErrors.length) {
           errors.push(...rowErrors);
           continue;
@@ -186,7 +170,6 @@ export class UserInvitationService {
         candidates.push({
           username: normalizedUsername,
           email,
-          systemPermissions,
           row: rowNumber,
         });
       }
@@ -213,13 +196,7 @@ export class UserInvitationService {
   public async inviteUser(body: InviteUserDto): Promise<User> {
     try {
       const [invited] = await this.inviteUsersTransactional(
-        [
-          {
-            username: body.username,
-            email: body.email,
-            systemPermissions: {},
-          },
-        ],
+        [{ username: body.username, email: body.email }],
         { grantAllPermissionsToFirst: true },
       );
 
