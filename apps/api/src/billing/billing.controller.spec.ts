@@ -280,7 +280,7 @@ describe('BillingController', () => {
 
   describe('streamEvents', () => {
     it('returns observable from liveNotificationsService subject', async () => {
-      const fakeObservable = { subscribe: jest.fn() };
+      const fakeObservable = { subscribe: jest.fn(), pipe: jest.fn().mockReturnThis() };
       const subject = { asObservable: jest.fn().mockReturnValue(fakeObservable) };
       live.getTransactionSubject.mockReturnValue(subject);
       const req = baseReq({ id: 77 });

@@ -195,13 +195,25 @@ describe('Node.js version consistency', () => {
         });
 
         it('should read NODE_VERSION from .nvmrc', () => {
-          expect(content).toContain('cat .nvmrc');
+          // Accept either inline reading or delegation to the docker-build-push composite action
+          const usesCompositeAction = content.includes(
+            './.github/actions/docker-build-push'
+          );
+          expect(
+            content.includes('cat .nvmrc') || usesCompositeAction
+          ).toBe(true);
         });
 
         it('should pass NODE_VERSION as a Docker build-arg', () => {
-          expect(content).toContain(
-            'NODE_VERSION=${{ steps.node-version.outputs.NODE_VERSION }}'
+          // Accept either inline build-arg or delegation to the docker-build-push composite action
+          const usesCompositeAction = content.includes(
+            './.github/actions/docker-build-push'
           );
+          expect(
+            content.includes(
+              'NODE_VERSION=${{ steps.node-version.outputs.NODE_VERSION }}'
+            ) || usesCompositeAction
+          ).toBe(true);
         });
 
         it('should not hardcode a Node.js version in build-args', () => {

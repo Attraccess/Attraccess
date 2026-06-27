@@ -23,7 +23,6 @@
     "@internationalized/date": "3.12.1",
     "@khmyznikov/pwa-install": "^0.6.3",
     "@licenso/client": "^1.2.0",
-    "@million/lint": "^1.0.14",
     "@monaco-editor/react": "^4.7.0",
     "@nestjs-modules/mailer": "^2.3.6",
     "@nestjs/common": "^11.1.24",
@@ -263,7 +262,13 @@
       "@tscircuit/ngspice-spice-engine>zod": "3.25.76",
       "calculate-packing>zod": "3.25.76",
       "circuit-json-to-gltf>zod": "3.25.76",
-      "circuit-json-to-spice>zod": "3.25.76"
+      "circuit-json-to-spice>zod": "3.25.76",
+      "multer": ">=2.2.0",
+      "piscina": ">=4.9.3",
+      "hono": ">=4.12.25",
+      "sharp": ">=0.34.5",
+      "http-proxy-middleware": ">=3.0.7",
+      "@xmldom/xmldom": ">=0.9.10"
     },
     "packageExtensions": {
       "circuit-json@0.0.425": {
