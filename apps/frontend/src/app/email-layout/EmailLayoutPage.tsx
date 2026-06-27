@@ -1,7 +1,7 @@
 import { Layout } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PageHeader } from '../../components/pageHeader';
-import { EmailLayoutTab } from './EmailLayoutTab';
+import { EmailLayoutEditor } from './EmailLayoutEditor';
 import en from './en.json';
 import de from './de.json';
 
@@ -16,7 +16,7 @@ export function EmailLayoutPage() {
         icon={<Layout size={20} />}
         backTo="/emails"
       />
-      <EmailLayoutTab />
+      <EmailLayoutEditor />
     </div>
   );
 }
