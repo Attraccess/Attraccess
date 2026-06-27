@@ -301,12 +301,6 @@ const coreRoutes: RouteConfig[] = [
     ),
     authRequired: 'canManageSystemConfiguration',
   },
-  // Backwards compat redirect for old password policy path
-  {
-    path: '/settings/security/password-policy',
-    element: <Navigate to="/users/security/password-policy" replace />,
-    authRequired: false,
-  },
   // Messaging settings
   {
     path: '/messages/settings',
@@ -365,17 +359,6 @@ const coreRoutes: RouteConfig[] = [
       </Suspense>
     ),
     authRequired: 'canManageSystemConfiguration',
-  },
-  // Backwards compat redirects for old email-templates paths
-  {
-    path: '/email-templates',
-    element: <Navigate to="/emails/templates" replace />,
-    authRequired: false,
-  },
-  {
-    path: '/email-templates/:type',
-    element: <Navigate to="/emails/templates" replace />,
-    authRequired: false,
   },
   {
     path: '/messages',
