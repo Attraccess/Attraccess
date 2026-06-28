@@ -58,7 +58,7 @@ describe('SSOProvidersPage license gate', () => {
     expect(screen.getByRole('heading')).toBeInTheDocument();
   });
 
-  it('redirects when user lacks canManageSystemConfiguration', () => {
+  it('redirects when user lacks system.settings.manage permission', () => {
     mockAuth(false);
     mockLicense(['sso']);
     render(<SSOProvidersPage />);

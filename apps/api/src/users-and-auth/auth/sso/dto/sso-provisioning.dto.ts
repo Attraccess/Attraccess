@@ -24,7 +24,10 @@ export class SSOProvisioningUserDto {
 
 export class SSOProvisioningPermissionsDto extends SSOProvisioningUserDto {
   @ApiProperty({
-    description: 'Role or group names to evaluate against the configured permission mappings',
+    description:
+      'Role or group names to evaluate against the configured RBAC role mappings. ' +
+      'This is the preferred way to provision roles — values are matched against the ' +
+      '`permissionMappings` configured on the SSO provider.',
     required: false,
     isArray: true,
     type: String,
@@ -35,9 +38,23 @@ export class SSOProvisioningPermissionsDto extends SSOProvisioningUserDto {
   @IsString({ each: true })
   roles?: string[];
 
+  // ─── Legacy boolean fields (deprecated) ────────────────────────────────────
+  // These fields existed when Attraccess used a flat boolean permission model.
+  // They are still accepted for backward compatibility with existing IdP
+  // provisioning configurations, and are mapped to the equivalent RBAC roles:
+  //   canManageResources        → resource-manager
+  //   canManageSystemConfiguration → system-admin
+  //   canManageUsers            → user-manager
+  //   canManageBilling          → billing-manager
+  //
+  // New integrations should use `roles` + per-provider `permissionMappings` instead.
+  // ───────────────────────────────────────────────────────────────────────────
+
+  /** @deprecated Use `roles` + provider `permissionMappings` instead. Grants the `resource-manager` role when `true`. */
   @ApiProperty({
-    description: 'Whether the user can manage resources',
+    description: '[Deprecated] Use `roles` + provider `permissionMappings` instead. Grants the `resource-manager` RBAC role when `true`.',
     required: false,
+    deprecated: true,
     example: true,
   })
   @IsBoolean()
@@ -45,9 +62,11 @@ export class SSOProvisioningPermissionsDto extends SSOProvisioningUserDto {
   @ToBoolean()
   canManageResources?: boolean;
 
+  /** @deprecated Use `roles` + provider `permissionMappings` instead. Grants the `system-admin` role when `true`. */
   @ApiProperty({
-    description: 'Whether the user can manage system configuration',
+    description: '[Deprecated] Use `roles` + provider `permissionMappings` instead. Grants the `system-admin` RBAC role when `true`.',
     required: false,
+    deprecated: true,
     example: false,
   })
   @IsBoolean()
@@ -55,9 +74,11 @@ export class SSOProvisioningPermissionsDto extends SSOProvisioningUserDto {
   @ToBoolean()
   canManageSystemConfiguration?: boolean;
 
+  /** @deprecated Use `roles` + provider `permissionMappings` instead. Grants the `user-manager` role when `true`. */
   @ApiProperty({
-    description: 'Whether the user can manage users',
+    description: '[Deprecated] Use `roles` + provider `permissionMappings` instead. Grants the `user-manager` RBAC role when `true`.',
     required: false,
+    deprecated: true,
     example: false,
   })
   @IsBoolean()
@@ -65,9 +86,11 @@ export class SSOProvisioningPermissionsDto extends SSOProvisioningUserDto {
   @ToBoolean()
   canManageUsers?: boolean;
 
+  /** @deprecated Use `roles` + provider `permissionMappings` instead. Grants the `billing-manager` role when `true`. */
   @ApiProperty({
-    description: 'Whether the user can manage billing',
+    description: '[Deprecated] Use `roles` + provider `permissionMappings` instead. Grants the `billing-manager` RBAC role when `true`.',
     required: false,
+    deprecated: true,
     example: false,
   })
   @IsBoolean()

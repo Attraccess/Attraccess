@@ -215,16 +215,16 @@ export class ResourceUsageController {
     @Req() req: AuthenticatedRequest,
   ): Promise<GetResourceHistoryResponseDto> {
     // Allow users to see their own history, or admins to see all history
-    const canManageResources = (req.user as AuthenticatedUser).effectivePermissions?.has('resources.update') === true;
+    const canUpdateResources = (req.user as AuthenticatedUser).effectivePermissions?.has('resources.update') === true;
     const isViewingOwnHistory = query.userId === req.user.id || query.userId === undefined;
 
     // If not an admin and trying to view someone else's history, deny access
-    if (!canManageResources && !isViewingOwnHistory) {
+    if (!canUpdateResources && !isViewingOwnHistory) {
       throw new ForbiddenException('You can only view your own usage history');
     }
 
     // If not an admin, force filtering by the current user's ID
-    if (!canManageResources) {
+    if (!canUpdateResources) {
       query.userId = req.user.id;
     }
 

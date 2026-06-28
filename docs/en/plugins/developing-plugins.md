@@ -348,8 +348,10 @@ route props (`path`, `element`, ...) with an `authRequired` field:
 |----------------|---------|
 | `false` | Public route, no authentication. |
 | `true` | Any logged-in user. |
-| `"canManageResources"` | A single required system permission. |
-| `["a", "b"]` | Any one of several required permissions. |
+| `"resources.update"` | A single required RBAC permission key. |
+| `["resources.update", "resources.create"]` | Any one of several RBAC permission keys. |
+
+See [Permissions](../user-management/permissions.md) for the full list of available permission keys.
 
 The host wraps each plugin route in an error boundary and merges it with the
 core routes, so a route that throws cannot take down the rest of the app.

@@ -62,7 +62,7 @@ export interface EndSessionOptions {
 export interface StartSessionOptions {
   /**
    * When set, the session is started as a supervised session attributed to this supervisor.
-   * The supervisor is validated against the resource (introducer/maintainer or canManageResources).
+   * The supervisor is validated against the resource (introducer/maintainer or `resources.update` permission).
    */
   supervisorUserId?: number;
 }
@@ -625,12 +625,12 @@ export class ResourceUsageService {
 
     // Check if the user is authorized to end the session
     const userPermissions = await this.rbacService.getEffectivePermissions(user.id);
-    const canManageResources = userPermissions.has('resources.update');
+    const canUpdateResources = userPermissions.has('resources.update');
     const isSessionOwner = activeSession.user.id === user.id;
     // The supervisor of a supervised session may end it as well.
     const isSupervisor = activeSession.supervisorUserId != null && activeSession.supervisorUserId === user.id;
 
-    if (!isSessionOwner && !isSupervisor && !canManageResources) {
+    if (!isSessionOwner && !isSupervisor && !canUpdateResources) {
       const canMaintain = await this.resourceIntroducersService.canMaintain(activeSession.resourceId, user.id, true);
       if (!canMaintain) {
         this.logger.warn(

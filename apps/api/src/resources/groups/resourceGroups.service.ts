@@ -16,7 +16,7 @@ interface GetOneSearchOptions {
 
 export interface GroupVisibilityContext {
   userId: number;
-  canManageResources: boolean;
+  canUpdateResources: boolean;
 }
 
 @Injectable()
@@ -101,7 +101,7 @@ export class ResourceGroupsService {
 
   public async getMany(visibility?: GroupVisibilityContext): Promise<ResourceGroup[]> {
     // Users that can manage resources (and any caller without a visibility context) see every group.
-    if (!visibility || visibility.canManageResources) {
+    if (!visibility || visibility.canUpdateResources) {
       return await this.resourceGroupRepository.find();
     }
 
@@ -134,7 +134,7 @@ export class ResourceGroupsService {
     }
 
     // Hidden groups are only visible to managers and users that are part of the group.
-    if (group.isHidden && visibility && !visibility.canManageResources) {
+    if (group.isHidden && visibility && !visibility.canUpdateResources) {
       const isPartOfGroup = await this.userIsPartOfGroup(group.id, visibility.userId);
       if (!isPartOfGroup) {
         throw new ResourceGroupNotFoundException({ id: searchOptions.id });

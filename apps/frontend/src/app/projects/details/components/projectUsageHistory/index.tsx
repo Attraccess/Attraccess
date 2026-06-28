@@ -58,7 +58,7 @@ export function ProjectUsageHistory({ projectId }: ProjectUsageHistoryProps) {
             title={t('history.title')}
             showAllUsers={false}
             setShowAllUsers={() => undefined}
-            canManageResources={false}
+            canUpdateResources={false}
           />
         </Card.Header>
         <Card.Content>

@@ -65,7 +65,7 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
     return Math.ceil(resources.total / perPage);
   }, [resources, perPage]);
 
-  const canManageResources = hasPermission('resources.update');
+  const canUpdateResources = hasPermission('resources.update');
 
   const { data: introductionStatus } = useAccessControlServiceResourceGroupIntroducersIsIntroducer(
     {
@@ -79,8 +79,8 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
   );
 
   const hasAccessToGroupSettings = useMemo(() => {
-    return canManageResources || introductionStatus?.isIntroducer;
-  }, [introductionStatus, canManageResources]);
+    return canUpdateResources || introductionStatus?.isIntroducer;
+  }, [introductionStatus, canUpdateResources]);
 
   const title = useMemo(() => {
     if (groupId === 'none') {

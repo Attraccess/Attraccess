@@ -60,7 +60,7 @@ export class UsersAdminController {
   async getOneById(@Param('id', ParseIntPipe) id: number, @Req() request: AuthenticatedRequest): Promise<User> {
     const authenticatedUser = request.user;
 
-    // Allow access if the user is requesting their own data or has canManageUsers permission
+    // Allow access if the user is requesting their own data or has users.read permission
     if (authenticatedUser?.id !== id && !authenticatedUser.effectivePermissions?.has('users.read')) {
       this.logger.debug(
         `Access denied - User ID ${authenticatedUser.id} attempting to access user ID ${id} without required permissions`,

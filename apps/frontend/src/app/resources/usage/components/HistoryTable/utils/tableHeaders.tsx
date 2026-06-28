@@ -7,11 +7,11 @@ export function generateHeaderColumns(
   t: TFunction,
   resource: Resource,
   showAllUsers: boolean,
-  canManageResources: boolean,
+  canUpdateResources: boolean,
 ): ReactElement<TableColumnProps>[] {
   const headers: ReactElement<TableColumnProps>[] = [];
 
-  const showUser = canManageResources && showAllUsers;
+  const showUser = canUpdateResources && showAllUsers;
 
   if (showUser) {
     headers.push(<TableColumn key="user" id="user" isRowHeader>{t('headers.user')}</TableColumn>);

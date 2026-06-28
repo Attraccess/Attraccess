@@ -11,7 +11,7 @@ export class UserPermissionsService {
 
   notifyPermissionsChanged(user: User, actorId: number): void {
     const title = 'Your permissions changed';
-    const body = 'Your system permissions were updated.';
+    const body = 'Your RBAC role assignments were updated.';
 
     void this.notifications.dispatch({
       category: NotificationCategory.ACCESS_CHANGES,
@@ -19,7 +19,7 @@ export class UserPermissionsService {
       title,
       body,
       actorId,
-      dedupeKey: `system-permissions-${user.id}`,
+      dedupeKey: `rbac-roles-${user.id}`,
       sendEmail: (recipient) =>
         this.notifications.sendEmailTemplate(recipient, NotificationCategory.ACCESS_CHANGES, {
           accessChange: { title, body },

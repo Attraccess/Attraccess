@@ -60,7 +60,7 @@ function DocumentationModalComponent({ resourceId, children }: Readonly<Document
 
   const { hasPermission } = useAuth();
 
-  const canManageResources = hasPermission('resources.update');
+  const canUpdateResources = hasPermission('resources.update');
 
   const renderDocumentationContent = useCallback(() => {
     if (isLoading || isFetching) {
@@ -129,7 +129,7 @@ function DocumentationModalComponent({ resourceId, children }: Readonly<Document
             <ModalHeader className="flex justify-between items-center">
               <div>{t('title')}</div>
               <div className="flex gap-1">
-                {canManageResources && (
+                {canUpdateResources && (
                   <Button
                     variant="secondary"
                     isIconOnly

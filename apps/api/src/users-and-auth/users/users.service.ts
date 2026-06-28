@@ -365,14 +365,14 @@ export class UsersService {
     this.validateUsernameOrThrow(newUsername);
 
     const isSelf = executingUser.id === targetUserId;
-    const canManageUsers = !!(executingUser as any).effectivePermissions?.has('users.update');
+    const canUpdateUsers = !!(executingUser as any).effectivePermissions?.has('users.update');
 
-    if (!isSelf && !canManageUsers) {
+    if (!isSelf && !canUpdateUsers) {
       throw new ForbiddenException("You do not have permission to change this user's username");
     }
 
     // Apply once-per-day restriction only when changing own username
-    if (isSelf && !canManageUsers) {
+    if (isSelf && !canUpdateUsers) {
       const now = new Date();
       if (targetUser.lastUsernameChangeAt) {
         const msSince = now.getTime() - new Date(targetUser.lastUsernameChangeAt).getTime();
@@ -420,9 +420,9 @@ export class UsersService {
     }
 
     const isSelf = executingUser.id === targetUserId;
-    const canManageUsers = !!(executingUser as any).effectivePermissions?.has('users.update');
+    const canUpdateUsers = !!(executingUser as any).effectivePermissions?.has('users.update');
 
-    if (!isSelf && !canManageUsers) {
+    if (!isSelf && !canUpdateUsers) {
       throw new ForbiddenException("You do not have permission to change this user's email");
     }
 

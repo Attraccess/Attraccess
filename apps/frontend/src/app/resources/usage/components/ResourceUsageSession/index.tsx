@@ -44,7 +44,7 @@ export function ResourceUsageSession({
 }: ResourceUsageSessionProps) {
   const { t } = useTranslations({ en, de });
   const { hasPermission, user } = useAuth();
-  const canManageResources = hasPermission('resources.update');
+  const canUpdateResources = hasPermission('resources.update');
   const queryClient = useQueryClient();
 
   const invalidateSessionQueries = useCallback(() => {
@@ -83,7 +83,7 @@ export function ResourceUsageSession({
     return introducers?.some((introducer) => introducer.userId === user?.id);
   }, [introducers, user]);
 
-  const canStartSession = canManageResources || access?.canControl || isIntroducer;
+  const canStartSession = canUpdateResources || access?.canControl || isIntroducer;
 
   // A not-introduced user may still start via a supervisor when the resource allows it.
   const supervisionEnabled =

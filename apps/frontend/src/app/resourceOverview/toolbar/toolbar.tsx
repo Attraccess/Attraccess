@@ -24,7 +24,7 @@ export function Toolbar({
   ...filterProps
 }: Readonly<ToolbarProps & FilterProps>) {
   const { hasPermission } = useAuth();
-  const canManageResources = hasPermission('resources.update');
+  const canUpdateResources = hasPermission('resources.update');
   const navigate = useNavigate();
 
   const { t } = useTranslations({
@@ -75,7 +75,7 @@ export function Toolbar({
       </div>
 
       <div className="flex flex-row gap-2 justify-end mb-6">
-        {canManageResources && (
+        {canUpdateResources && (
           <div className="flex items-center gap-2 mr-1 hidden md:flex">
             <ResourceEditModal onUpdated={(resource) => navigate(`/resources/${resource.id}`)} closeOnSuccess>
               {(onOpen: () => void) => (

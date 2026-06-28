@@ -14,7 +14,7 @@ export class ResourceGroupsController {
   private getVisibilityContext(req: AuthenticatedRequest): GroupVisibilityContext {
     return {
       userId: req.user.id,
-      canManageResources: req.user.effectivePermissions?.has('resources.update') === true,
+      canUpdateResources: req.user.effectivePermissions?.has('resources.update') === true,
     };
   }
 

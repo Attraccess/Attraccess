@@ -93,7 +93,7 @@ function buildStatus(overrides: Partial<UpdateStatusDto> = {}): UpdateStatusDto 
 describe('UpdateNotificationBanner', () => {
   beforeEach(() => {
     localStorage.clear();
-    hasPermissionMock = vi.fn((permission: string) => permission === 'canManageSystemConfiguration');
+    hasPermissionMock = vi.fn((permission: string) => permission === 'system.settings.manage');
     updateStatusValue = undefined;
     mockLanguage = 'en';
   });

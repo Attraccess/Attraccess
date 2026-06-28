@@ -20,7 +20,7 @@ import { SimplePagination } from '../../../../../components/simplePagination';
 interface HistoryTableProps {
   resourceId: number;
   showAllUsers?: boolean;
-  canManageResources: boolean;
+  canUpdateResources: boolean;
   onSessionClick: (session: ResourceUsage) => void;
   projectPlaceholder: string;
   resolveProjectId: (session: ResourceUsage) => number | null;
@@ -68,7 +68,7 @@ const ProjectAssignmentCell = ({
 export const HistoryTable = ({
   resourceId,
   showAllUsers = false,
-  canManageResources,
+  canUpdateResources,
   onSessionClick,
   projectPlaceholder,
   resolveProjectId,
@@ -105,8 +105,8 @@ export const HistoryTable = ({
       return [];
     }
 
-    return generateHeaderColumns(t, resource, showAllUsers, canManageResources);
-  }, [t, showAllUsers, canManageResources, resource]);
+    return generateHeaderColumns(t, resource, showAllUsers, canUpdateResources);
+  }, [t, showAllUsers, canUpdateResources, resource]);
 
   const totalPages = useMemo(() => {
     if (!usageHistory?.total) {
@@ -157,7 +157,7 @@ export const HistoryTable = ({
                   onAction={() => onSessionClick(session)}
                 >
                   {resource
-                    ? generateRowCells(session, t, resource, showAllUsers, canManageResources, (sessionToRender) => (
+                    ? generateRowCells(session, t, resource, showAllUsers, canUpdateResources, (sessionToRender) => (
                         <ProjectAssignmentCell
                           session={sessionToRender}
                           canEdit={Boolean(sessionToRender.endTime) && sessionToRender.userId === user?.id}

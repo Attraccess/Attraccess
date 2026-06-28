@@ -22,12 +22,12 @@ export interface ResourceTabDescriptor {
 
 export function useResourceTabs(resourceId: number): {
   tabs: ResourceTabDescriptor[];
-  canManageResources: boolean;
+  canUpdateResources: boolean;
   isIntroducer: boolean;
   canManageMaintenance: boolean;
 } {
   const { hasPermission, user } = useAuth();
-  const canManageResources = hasPermission('resources.update');
+  const canUpdateResources = hasPermission('resources.update');
 
   const { data: introducerData } = useAccessControlServiceResourceIntroducersIsIntroducer(
     {
@@ -50,21 +50,21 @@ export function useResourceTabs(resourceId: number): {
       { key: 'history', path: 'history', translationKey: 'tabs.history' },
     ];
 
-    if (isIntroducer || canManageResources) {
+    if (isIntroducer || canUpdateResources) {
       list.push({ key: 'people', path: 'people', translationKey: 'tabs.people' });
     }
-    if (canManageResources) {
+    if (canUpdateResources) {
       list.push({ key: 'groups', path: 'groups', translationKey: 'tabs.groups' });
     }
     if (canManageMaintenance) {
       list.push({ key: 'maintenance', path: 'maintenance', translationKey: 'tabs.maintenance' });
     }
-    if (canManageResources) {
+    if (canUpdateResources) {
       list.push({ key: 'flows', path: 'flows', translationKey: 'tabs.flows' });
       list.push({ key: 'forms', path: 'forms', translationKey: 'tabs.forms' });
     }
     return list;
-  }, [isIntroducer, canManageResources, canManageMaintenance]);
+  }, [isIntroducer, canUpdateResources, canManageMaintenance]);
 
-  return { tabs, canManageResources, isIntroducer, canManageMaintenance };
+  return { tabs, canUpdateResources, isIntroducer, canManageMaintenance };
 }

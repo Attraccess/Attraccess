@@ -72,7 +72,7 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
 
   const { t } = useTranslations({ en, de });
 
-  const canManageResources = hasPermission('resources.update');
+  const canUpdateResources = hasPermission('resources.update');
 
   const {
     data: resource,
@@ -140,7 +140,7 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
       key: 'qr',
       label: t('actions.qrCode'),
       icon: <QrCodeIcon className="w-4 h-4" />,
-      isHidden: !canManageResources,
+      isHidden: !canUpdateResources,
       onPress: () => qrOpenRef.current(),
       dataCy: 'qr-code-button',
     },
@@ -148,7 +148,7 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
       key: 'edit',
       label: t('actions.edit'),
       icon: <PenSquareIcon className="w-4 h-4" />,
-      isHidden: !canManageResources,
+      isHidden: !canUpdateResources,
       onPress: () => editOpenRef.current(),
       dataCy: 'edit-resource-button',
     },
@@ -157,7 +157,7 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
       label: t('actions.delete'),
       icon: <Trash className="w-4 h-4" />,
       variant: 'destructive',
-      isHidden: !canManageResources,
+      isHidden: !canUpdateResources,
       onPress: open,
       dataCy: 'delete-resource-button',
     },
@@ -219,7 +219,7 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
 
       <div className="flex-1 min-h-0 overflow-auto">{children ?? <Outlet />}</div>
 
-      {canManageResources && (
+      {canUpdateResources && (
         <>
           <DeleteConfirmationModal
             isOpen={isOpen}
