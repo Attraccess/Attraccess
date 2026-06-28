@@ -1,7 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsObject, IsOptional, IsString, ValidateNested, IsArray, IsBoolean, IsNotEmpty } from 'class-validator';
 import { Type } from 'class-transformer';
-import { SSOPermissionMappingsDto } from './permission-mapping.dto';
 
 export class UpdateOIDCConfigurationDto {
   @ApiProperty({
@@ -89,14 +88,15 @@ export class UpdateOIDCConfigurationDto {
   emailClaimPaths?: string[];
 
   @ApiProperty({
-    description: 'Optional mapping between Attraccess permissions and role names',
+    description: 'Maps any RBAC role key (system-provided or user-defined) to the SSO role names that should grant it.',
     required: false,
-    type: SSOPermissionMappingsDto,
+    type: 'object',
+    additionalProperties: { type: 'array', items: { type: 'string' } },
+    example: { 'resource-manager': ['attraccess_resources'], 'my-custom-role': ['my_sso_group'] },
   })
   @IsOptional()
-  @ValidateNested()
-  @Type(() => SSOPermissionMappingsDto)
-  permissionMappings?: SSOPermissionMappingsDto;
+  @IsObject()
+  permissionMappings?: Record<string, string[]>;
 }
 
 export class UpdateSAMLConfigurationDto {
@@ -194,14 +194,15 @@ export class UpdateSAMLConfigurationDto {
   provisioningSecret?: string;
 
   @ApiProperty({
-    description: 'Optional mapping between Attraccess permissions and SAML role values',
+    description: 'Maps any RBAC role key (system-provided or user-defined) to the SAML role values that should grant it.',
     required: false,
-    type: SSOPermissionMappingsDto,
+    type: 'object',
+    additionalProperties: { type: 'array', items: { type: 'string' } },
+    example: { 'resource-manager': ['attraccess_resources'], 'my-custom-role': ['my_sso_group'] },
   })
   @IsOptional()
-  @ValidateNested()
-  @Type(() => SSOPermissionMappingsDto)
-  permissionMappings?: SSOPermissionMappingsDto;
+  @IsObject()
+  permissionMappings?: Record<string, string[]>;
 
   @ApiProperty({
     description: 'PEM encoded Service Provider certificate used when signing requests',

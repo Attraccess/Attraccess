@@ -1,52 +1,18 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsArray, IsOptional, IsString } from 'class-validator';
 
+// ponytail: index-signature class — class-validator skips dynamic keys, so the parent DTO
+// uses @IsObject() for shallow validation. Keys are any RBAC role key (system or user-defined).
 export class SSOPermissionMappingsDto {
   @ApiProperty({
-    description: 'SSO role names that grant the resource-manager RBAC role',
-    required: false,
-    isArray: true,
-    type: String,
-    example: ['attraccess_resources'],
+    description:
+      'Maps any RBAC role key (system-provided or user-defined) to the SSO role names that should grant it.',
+    type: 'object',
+    additionalProperties: { type: 'array', items: { type: 'string' } },
+    example: {
+      'resource-manager': ['attraccess_resources'],
+      'system-admin': ['attraccess_config_admin'],
+      'my-custom-role': ['my_sso_group'],
+    },
   })
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  'resource-manager'?: string[];
-
-  @ApiProperty({
-    description: 'SSO role names that grant the system-admin RBAC role',
-    required: false,
-    isArray: true,
-    type: String,
-    example: ['attraccess_config_admin'],
-  })
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  'system-admin'?: string[];
-
-  @ApiProperty({
-    description: 'SSO role names that grant the user-manager RBAC role',
-    required: false,
-    isArray: true,
-    type: String,
-    example: ['attraccess_admin'],
-  })
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  'user-manager'?: string[];
-
-  @ApiProperty({
-    description: 'SSO role names that grant the billing-manager RBAC role',
-    required: false,
-    isArray: true,
-    type: String,
-    example: ['attraccess_billing'],
-  })
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  'billing-manager'?: string[];
+  [rbacRoleKey: string]: string[];
 }

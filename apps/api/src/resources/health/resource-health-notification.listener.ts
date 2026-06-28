@@ -76,8 +76,8 @@ export class ResourceHealthNotificationListener {
 
     const admins = await this.userRepository
       .createQueryBuilder('user')
-      .where((qb) => `user.id IN ${qb.subQuery().select('ur.userId').from('user_role', 'ur').innerJoin('role', 'r', 'r.id = ur.roleId').where('r.key = :rKey').getQuery()}`)
-      .setParameter('rKey', 'resource-manager')
+      .where((qb) => `user.id IN ${qb.subQuery().select('ur.userId').from('user_role', 'ur').innerJoin('role_permission', 'rp', 'rp.roleId = ur.roleId').where('rp.permissionKey = :permKey').getQuery()}`)
+      .setParameter('permKey', 'resources.maintenance.manage')
       .getMany();
 
     const introducerWhere: Array<Record<string, unknown>> = [{ resourceId: resource.id }];
