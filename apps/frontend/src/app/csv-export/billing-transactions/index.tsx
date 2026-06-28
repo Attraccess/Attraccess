@@ -4,11 +4,11 @@ import de from './de.json';
 import en from './en.json';
 import {
   BillingTransaction,
-  useAnalyticsServiceGetBillingTransactionsInDateRange,
+  useAnalyticsServiceGetBillingTransactionsInDateRangeInfinite,
   useBillingServiceGetBillingConfiguration,
 } from '@attraccess/react-query-client';
 import { CsvExportDrawerContent, ColumnDefinition } from '../export-drawer';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { dbCurrencyToUserCurrency } from '@attraccess/shared';
 
 export function BillingTransactionsExport(props: ExporterProps) {
@@ -19,10 +19,32 @@ export function BillingTransactionsExport(props: ExporterProps) {
     en,
   });
 
-  const { data: billingTransactions, status: fetchStatus } = useAnalyticsServiceGetBillingTransactionsInDateRange({
+  const [fetchAll, setFetchAll] = useState(false);
+
+  const {
+    data,
+    status: fetchStatus,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useAnalyticsServiceGetBillingTransactionsInDateRangeInfinite({
     start: start.toISOString(),
     end: end.toISOString(),
   });
+
+  // ponytail: only fetch remaining pages after user clicks export
+  useEffect(() => {
+    if (fetchAll && hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  }, [fetchAll, hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  const billingTransactions = useMemo(
+    () => data?.pages.flatMap((page) => page.data) ?? [],
+    [data],
+  );
+
+  const isFetchingAllPages = fetchAll && (hasNextPage || isFetchingNextPage);
 
   const { data: billingConfiguration, status: billingConfigurationFetchStatus } =
     useBillingServiceGetBillingConfiguration();
@@ -80,9 +102,11 @@ export function BillingTransactionsExport(props: ExporterProps) {
   return (
     <CsvExportDrawerContent
       queryStatus={billingConfigurationFetchStatus === 'success' ? fetchStatus : billingConfigurationFetchStatus}
-      items={(billingTransactions ?? []) as BillingTransaction[]}
+      items={billingTransactions as BillingTransaction[]}
       columns={columns}
       filename="billing-transactions.csv"
+      onFetchAllPages={() => setFetchAll(true)}
+      isFetchingAllPages={isFetchingAllPages}
     />
   );
 }
