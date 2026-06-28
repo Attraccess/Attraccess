@@ -1,11 +1,46 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { ForegroundAppInfo, SystemMetricsAdapter, UsbDeviceInfo } from '../types';
+import { ForegroundAppInfo, SystemMetricsAdapter } from '../types';
+import { startUsbWatcher } from '../usb-watcher';
 
 const execAsync = promisify(exec);
 
-export class WindowsMetricsAdapter implements SystemMetricsAdapter {
-  async getForegroundApp(): Promise<ForegroundAppInfo | null> {
+const FOREGROUND_INTERVAL_MS = 500;
+
+export class WindowsMetricsAdapter extends SystemMetricsAdapter {
+  private foregroundTimer: ReturnType<typeof setInterval> | null = null;
+  private usbStop: (() => void) | null = null;
+  private lastForeground: ForegroundAppInfo | null = null;
+
+  async start(): Promise<void> {
+    // USB: libusb events via 'usb' package
+    this.usbStop = startUsbWatcher(
+      (d) => this.emit('usbDeviceAdded', d),
+      (d) => this.emit('usbDeviceRemoved', d),
+    );
+
+    // Foreground: poll via PowerShell.
+    // ponytail: Win32 SetWinEventHook needs a native message-pump; no scriptable event-based alternative.
+    this.lastForeground = await this.queryForegroundApp();
+    this.emit('foregroundAppChanged', this.lastForeground);
+
+    this.foregroundTimer = setInterval(async () => {
+      const current = await this.queryForegroundApp();
+      if (!foregroundEqual(current, this.lastForeground)) {
+        this.lastForeground = current;
+        this.emit('foregroundAppChanged', current);
+      }
+    }, FOREGROUND_INTERVAL_MS);
+  }
+
+  stop(): void {
+    if (this.foregroundTimer) clearInterval(this.foregroundTimer);
+    this.foregroundTimer = null;
+    this.usbStop?.();
+    this.usbStop = null;
+  }
+
+  private async queryForegroundApp(): Promise<ForegroundAppInfo | null> {
     try {
       const script = [
         'Add-Type -TypeDefinition \'',
@@ -37,28 +72,10 @@ export class WindowsMetricsAdapter implements SystemMetricsAdapter {
       return null;
     }
   }
+}
 
-  async getUsbDevices(): Promise<UsbDeviceInfo[]> {
-    try {
-      const { stdout } = await execAsync(
-        'powershell -NoProfile -NonInteractive -Command "Get-PnpDevice -Class USB -Status OK | Select-Object -ExpandProperty InstanceId"',
-        { timeout: 5000 }
-      );
-
-      // PowerShell USB enumeration gives instance IDs like USB\VID_1234&PID_5678\...
-      const devices: UsbDeviceInfo[] = [];
-      for (const line of stdout.split('\n')) {
-        const match = line.match(/VID_([0-9A-F]{4})&PID_([0-9A-F]{4})/i);
-        if (match) {
-          devices.push({
-            vendorId: parseInt(match[1], 16),
-            productId: parseInt(match[2], 16),
-          });
-        }
-      }
-      return devices;
-    } catch {
-      return [];
-    }
-  }
+function foregroundEqual(a: ForegroundAppInfo | null, b: ForegroundAppInfo | null): boolean {
+  if (a === null && b === null) return true;
+  if (a === null || b === null) return false;
+  return a.pid === b.pid && a.name === b.name;
 }
