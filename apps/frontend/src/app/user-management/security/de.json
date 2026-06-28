@@ -1,6 +1,10 @@
 {
   "title": "Benutzersicherheit",
   "subtitle": "Authentifizierungs-Ratenlimits, Passwortrichtlinien und Single Sign-On",
+  "actions": {
+    "twoFactorPolicy": "Zwei-Faktor-Richtlinie",
+    "editSignupDomains": "Registrierungs-Domains"
+  },
   "sso": {
     "title": "Single Sign-On",
     "subtitle": "SSO-Anbieter für die Benutzerauthentifizierung konfigurieren",

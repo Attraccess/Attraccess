@@ -1,12 +1,14 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { ShieldIcon, KeyRoundIcon } from 'lucide-react';
+import { ShieldIcon, KeyRoundIcon, ShieldCheckIcon, Settings2Icon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@heroui/react';
-import { PageHeader } from '../../../components/pageHeader';
+import { PageHeader, PageAction } from '../../../components/pageHeader';
 import { AuthRateLimitCard } from '../../settings/cards/AuthRateLimitCard';
 import { PasswordPolicyCard } from '../../settings/cards/PasswordPolicyCard';
 import { Button } from '../../../components/button';
 import { useLicenseServiceGetLicenseInformation } from '@attraccess/react-query-client';
+import { TwoFactorPolicyModal } from '../two-factor-policy-modal';
+import { AllowedSignupDomainsEditorModal } from '../allowed-signup-domains-editor-modal';
 import en from './en.json';
 import de from './de.json';
 
@@ -24,6 +26,28 @@ export function UserSecurityPage() {
         subtitle={t('subtitle')}
         icon={<ShieldIcon size={20} />}
         backTo="/users"
+        actions={[
+          {
+            key: 'two-factor-policy',
+            label: t('actions.twoFactorPolicy'),
+            icon: <ShieldCheckIcon className="w-4 h-4" />,
+            renderTrigger: (triggerProps) => (
+              <TwoFactorPolicyModal>
+                {(onOpen) => <Button {...triggerProps} onPress={onOpen} />}
+              </TwoFactorPolicyModal>
+            ),
+          },
+          {
+            key: 'signup-domains',
+            label: t('actions.editSignupDomains'),
+            icon: <Settings2Icon className="w-4 h-4" />,
+            renderTrigger: (triggerProps) => (
+              <AllowedSignupDomainsEditorModal>
+                {(onOpen) => <Button {...triggerProps} onPress={onOpen} />}
+              </AllowedSignupDomainsEditorModal>
+            ),
+          },
+        ] satisfies PageAction[]}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
