@@ -46,3 +46,11 @@ Pin a port (strict — fails on collision):
 - `VITE_PORT=4250 pnpm serve`
 
 Solo `pnpm nx serve api` is **not** wrapped. Prefer `pnpm serve --only=api`.
+
+# For Frontend Work
+
+We use HeroUI, use it. Use as little tailwind/custom css as possible.
+
+Use HeroUI React documentation from @Docs https://heroui.com/react/llms.txt
+For component-specific documentation @Docs https://heroui.com/react/llms-components.txt
+For patterns and best practices @Docs https://heroui.com/react/llms-patterns.txt
