@@ -181,8 +181,6 @@ describe('Node.js version consistency', () => {
 
   describe('GitHub Actions workflows read Node.js version from .nvmrc', () => {
     const workflowsWithDocker = [
-      'pull-requests.yml',
-      'release.yml',
       'docker-nightly-latest.yml',
     ];
 

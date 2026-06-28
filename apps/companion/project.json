@@ -36,7 +36,7 @@
       "options": {
         "cwd": "apps/companion",
         "commands": [
-          "esbuild src/main.ts --bundle --platform=node --external:electron --external:keytar --outfile=out/main.js --format=cjs --alias:@attraccess/companion-ws-client=../../libs/companion-ws-client/src/index.ts",
+          "esbuild src/main.ts --bundle --platform=node --external:electron --external:keytar --external:usb --outfile=out/main.js --format=cjs --alias:@attraccess/companion-ws-client=../../libs/companion-ws-client/src/index.ts",
           "esbuild src/preload.ts --bundle --platform=node --external:electron --outfile=out/preload.js --format=cjs"
         ],
         "parallel": false
@@ -62,6 +62,23 @@
           "tsc -p tsconfig.renderer.json --noEmit"
         ],
         "parallel": false
+      }
+    },
+    "test": {
+      "executor": "@nx/jest:jest",
+      "cache": true,
+      "inputs": [
+        "default",
+        "^production",
+        "{workspaceRoot}/jest.preset.js",
+        {
+          "externalDependencies": ["jest"]
+        }
+      ],
+      "outputs": ["{workspaceRoot}/coverage/apps/companion"],
+      "options": {
+        "jestConfig": "apps/companion/jest.config.ts",
+        "passWithNoTests": true
       }
     },
     "lint": {
