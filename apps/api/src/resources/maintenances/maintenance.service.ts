@@ -2,6 +2,7 @@ import { Injectable, Logger, BadRequestException, NotFoundException, Inject } fr
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, EntityManager } from 'typeorm';
 import { ResourceMaintenance, ResourceMaintenanceSchedule, Resource, ResourceIntroducer, User } from '@attraccess/database-entities';
+import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { CreateMaintenanceDto } from './dtos/createMaintenance.dto';
 import { ListMaintenancesDto } from './dtos/listMaintenances.dto';
 import { PaginatedMaintenanceResponse } from './dtos/paginatedMaintenanceResponse.dto';
@@ -275,12 +276,12 @@ export class ResourceMaintenanceService {
    * Check if a user can manage maintenance for a specific resource
    */
   async canManageMaintenance(
-    user: User,
+    user: User | AuthenticatedUser,
     resourceId: number,
     transactionalEntityManager?: EntityManager,
   ): Promise<boolean> {
     // Check if the user has system permissions to manage all resources
-    if (user.effectivePermissions?.has('resources.maintenance.manage') === true) {
+    if ((user as AuthenticatedUser).effectivePermissions?.has('resources.maintenance.manage') === true) {
       return true;
     }
 

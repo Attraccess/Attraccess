@@ -1,5 +1,6 @@
 import { ForbiddenException, Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
 import { User } from '@attraccess/database-entities';
+import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { UsersService } from './users.service';
 import { AuthService } from '../auth/auth.service';
 import { EmailService } from '../../email/email.service';
@@ -88,11 +89,11 @@ export class UserPasswordService {
     });
   }
 
-  public async setUserPassword(id: number, body: SetUserPasswordDto, requestUser: User): Promise<void> {
+  public async setUserPassword(id: number, body: SetUserPasswordDto, requestUser: User | AuthenticatedUser): Promise<void> {
     this.logger.debug(`Setting password for user ID: ${id}, by user ID: ${requestUser.id}`);
 
     // Prevent users from updating their own password through this endpoint
-    if (requestUser.id !== id && !requestUser.effectivePermissions?.has('users.update')) {
+    if (requestUser.id !== id && !(requestUser as AuthenticatedUser).effectivePermissions?.has('users.update')) {
       this.logger.warn(`User ${id} attempted to change password of another user without permission`);
       throw new ForbiddenException('You cannot change password of another user without permission');
     }

@@ -55,7 +55,7 @@ describe('SsoController', () => {
       updatedAt: new Date(),
       ssoProvider: null,
     },
-  } as SSOProvider;
+  } as unknown as SSOProvider;
 
   const mockSamlProvider: SSOProvider = {
     id: 2,
@@ -81,7 +81,7 @@ describe('SsoController', () => {
       updatedAt: new Date(),
       ssoProvider: null,
     },
-  } as SSOProvider;
+  } as unknown as SSOProvider;
 
   beforeEach(async () => {
     module = await Test.createTestingModule({
