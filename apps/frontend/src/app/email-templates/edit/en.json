@@ -24,10 +24,11 @@
     "preview": "Preview"
   },
   "preview": {
-    "iframeTitle": "Body Preview",
+    "iframeTitle": "Email Preview (with layout)",
     "loading": "Loading...",
     "errorPrefix": "Error loading preview.",
-    "emptyPlaceholder": "Start editing the MJML body to see a preview."
+    "emptyPlaceholder": "Start editing the MJML body to see a preview.",
+    "mjmlWarnings": "MJML warnings (content may not render as expected)"
   },
   "variables": {
     "title": "Available variables",

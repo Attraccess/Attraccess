@@ -1,20 +1,21 @@
 {
   "title": "Global Email Layout",
-  "subtitle": "Edit the MJML layout that wraps all email templates. Use {{{content}}} where template content should appear.",
+  "subtitle": "Edit the MJML layout that wraps all email templates. Use \\{{content}} where template content should appear.",
   "sections": {
     "editor": "Layout Editor",
-    "preview": "Preview"
+    "preview": "Preview (with sample content)"
   },
   "placeholder": {
     "hint": "Required placeholder",
-    "description": "Insert {{{content}}} in your layout where individual template body sections will be injected.",
-    "copy": "Copy {{{content}}}"
+    "description": "Insert \\{{content}} where email content should appear. The preview replaces it with sample content. Note: all text in MJML must be inside tags like <mj-section><mj-column><mj-text>your text</mj-text></mj-column></mj-section> — plain text outside tags is silently ignored.",
+    "copy": "Copy \\{{content}}"
   },
   "preview": {
     "iframeTitle": "Layout Preview",
     "loading": "Loading preview...",
     "errorPrefix": "Preview error:",
-    "emptyPlaceholder": "Start editing the MJML layout to see a preview."
+    "emptyPlaceholder": "Start editing the MJML layout to see a preview.",
+    "mjmlWarnings": "MJML warnings (content may not render as expected)"
   },
   "actions": {
     "save": "Save Layout",

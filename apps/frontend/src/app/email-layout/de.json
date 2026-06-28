@@ -1,20 +1,21 @@
 {
   "title": "Globales E-Mail-Layout",
-  "subtitle": "Bearbeite das MJML-Layout, das alle E-Mail-Vorlagen umschließt. Verwende {{{content}}}, wo der Vorlageninhalt erscheinen soll.",
+  "subtitle": "Bearbeite das MJML-Layout, das alle E-Mail-Vorlagen umschließt. Verwende \\{{content}}, wo der Vorlageninhalt erscheinen soll.",
   "sections": {
     "editor": "Layout-Editor",
-    "preview": "Vorschau"
+    "preview": "Vorschau (mit Beispielinhalt)"
   },
   "placeholder": {
     "hint": "Erforderlicher Platzhalter",
-    "description": "Füge {{{content}}} in dein Layout ein, wo die Inhalte der einzelnen E-Mail-Vorlagen eingefügt werden sollen.",
-    "copy": "{{{content}}} kopieren"
+    "description": "Füge \\{{content}} ein, wo der E-Mail-Inhalt erscheinen soll. Die Vorschau ersetzt es durch Beispielinhalt. Hinweis: Aller Text in MJML muss in Tags eingeschlossen sein, z.B. <mj-section><mj-column><mj-text>dein Text</mj-text></mj-column></mj-section> — einfacher Text außerhalb von Tags wird stillschweigend ignoriert.",
+    "copy": "\\{{content}} kopieren"
   },
   "preview": {
     "iframeTitle": "Layout-Vorschau",
     "loading": "Vorschau wird geladen...",
     "errorPrefix": "Vorschaufehler:",
-    "emptyPlaceholder": "Beginne mit der Bearbeitung des MJML-Layouts, um eine Vorschau zu sehen."
+    "emptyPlaceholder": "Beginne mit der Bearbeitung des MJML-Layouts, um eine Vorschau zu sehen.",
+    "mjmlWarnings": "MJML-Warnungen (Inhalt wird möglicherweise nicht wie erwartet dargestellt)"
   },
   "actions": {
     "save": "Layout speichern",

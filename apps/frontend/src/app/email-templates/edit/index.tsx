@@ -161,8 +161,9 @@ export function EditEmailTemplatePage() {
       return `<p style="text-align:center; color: #00f; padding-top: 20px;">${t('preview.loading')}</p>`;
     }
 
-    if (parsedBody?.error) {
-      return `<p style="text-align:center; color: #f00; padding-top: 20px;">${parsedBody.error}</p>`;
+    // Show rendered HTML even when MJML has warnings — the warning banner handles user feedback
+    if (parsedBody?.html) {
+      return parsedBody.html;
     }
 
     if (parseMjmlisError) {
@@ -170,7 +171,7 @@ export function EditEmailTemplatePage() {
       return `<p style="text-align:center; color: #f00; padding-top: 20px;">${t('preview.errorPrefix')} ${errorMessage}</p>`;
     }
 
-    return parsedBody?.html;
+    return '';
   }, [bodyIsEmpty, parsedBody, t, parseMjmlIsPending, parseMjmlisError, parseMjmlError]);
 
   const [editorIsExpanded, setEditorIsExpanded] = useState(false);
@@ -292,6 +293,11 @@ export function EditEmailTemplatePage() {
             <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
               {t('sections.preview')}
             </h3>
+            {!parseMjmlIsPending && !parseMjmlisError && parsedBody?.error && (
+              <p className="text-xs text-warning-600 bg-warning-50 border border-warning-200 rounded p-2">
+                {t('preview.mjmlWarnings')}: {parsedBody.error}
+              </p>
+            )}
             <iframe
               srcDoc={previewHtml}
               title={t('preview.iframeTitle')}

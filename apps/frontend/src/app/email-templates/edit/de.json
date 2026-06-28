@@ -24,10 +24,11 @@
     "preview": "Vorschau"
   },
   "preview": {
-    "iframeTitle": "Körper-Vorschau",
+    "iframeTitle": "E-Mail-Vorschau (mit Layout)",
     "loading": "Laden...",
     "errorPrefix": "Fehler beim Laden der Vorschau.",
-    "emptyPlaceholder": "Beginnen Sie mit dem Bearbeiten des MJML-Inhalts, um eine Vorschau zu sehen."
+    "emptyPlaceholder": "Beginnen Sie mit dem Bearbeiten des MJML-Inhalts, um eine Vorschau zu sehen.",
+    "mjmlWarnings": "MJML-Warnungen (Inhalt wird möglicherweise nicht wie erwartet dargestellt)"
   },
   "variables": {
     "title": "Verfügbare Variablen",

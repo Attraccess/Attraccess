@@ -82,14 +82,15 @@ export function EmailLayoutTab({ onCancel }: EmailLayoutTabProps) {
     if (isPreviewPending) {
       return `<p style="text-align:center;color:#00f;padding-top:20px;">${t('preview.loading')}</p>`;
     }
-    if (previewData?.error) {
-      return `<p style="text-align:center;color:#f00;padding-top:20px;">${previewData.error}</p>`;
+    // Show rendered HTML even when MJML has warnings — the warning banner handles user feedback
+    if (previewData?.html) {
+      return previewData.html;
     }
     if (isPreviewError) {
       const errorMessage = previewError instanceof Error ? previewError.message : String(previewError);
       return `<p style="text-align:center;color:#f00;padding-top:20px;">${t('preview.errorPrefix')} ${errorMessage}</p>`;
     }
-    return previewData?.html ?? '';
+    return '';
   }, [bodyIsEmpty, previewData, isPreviewPending, isPreviewError, previewError, t]);
 
   const [editorIsExpanded, setEditorIsExpanded] = useState(false);
@@ -188,6 +189,11 @@ export function EmailLayoutTab({ onCancel }: EmailLayoutTabProps) {
           <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
             {t('sections.preview')}
           </h3>
+          {!isPreviewPending && !isPreviewError && previewData?.error && (
+            <p className="text-xs text-warning-600 bg-warning-50 border border-warning-200 rounded p-2">
+              {t('preview.mjmlWarnings')}: {previewData.error}
+            </p>
+          )}
           <iframe
             srcDoc={previewHtml}
             title={t('preview.iframeTitle')}
