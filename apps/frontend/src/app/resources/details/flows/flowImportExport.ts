@@ -122,10 +122,16 @@ function parseFlowImport(raw: unknown): { nodes: ResourceFlowNodeDto[]; edges: R
       throw new Error(INVALID_STRUCTURE_ERROR);
     }
 
+    const newSource = idMap.get(source);
+    const newTarget = idMap.get(target);
+    if (!newSource || !newTarget) {
+      throw new Error(INVALID_STRUCTURE_ERROR);
+    }
+
     return {
       id: crypto.randomUUID(),
-      source: idMap.get(source) ?? source,
-      target: idMap.get(target) ?? target,
+      source: newSource,
+      target: newTarget,
       sourceHandle: (sourceHandle as string | null | undefined) ?? null,
       targetHandle: (targetHandle as string | null | undefined) ?? null,
     };
