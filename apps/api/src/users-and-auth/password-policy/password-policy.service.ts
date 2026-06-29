@@ -35,6 +35,7 @@ import {
 } from '@attraccess/shared';
 import { HibpClient } from './hibp.client';
 import { ZxcvbnService } from './zxcvbn.service';
+import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 
 export const POLICY_FIELDS: Array<keyof PasswordPolicyConfig> = [
   'minLength',
@@ -139,7 +140,7 @@ export class PasswordPolicyService implements OnModuleInit {
   public resolveRole(user: User | null | undefined): PasswordPolicyRole | undefined {
     if (!user) return undefined;
     // effectivePermissions is attached for request-bound users; DB-loaded users default to normal policy
-    const effectivePerms = (user as any).effectivePermissions as Set<string> | undefined;
+    const effectivePerms = (user as AuthenticatedUser).effectivePermissions;
     if (effectivePerms?.has('system.settings.manage')) {
       return PasswordPolicyRole.ADMIN;
     }

@@ -6,6 +6,7 @@ import { SessionService } from '../auth/session.service';
 import { TwoFactorService } from '../auth/two-factor.service';
 import { RbacService } from '../rbac/rbac.service';
 import { User } from '@attraccess/database-entities';
+import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 
 const TWO_FACTOR_SETUP_ALLOWED_PREFIXES = ['/auth/two-factor', '/auth/session', '/users/me'];
 
@@ -37,7 +38,7 @@ export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
     }
 
     // Attach effectivePermissions before 2FA check so isPrivilegedUser() can use them
-    (user as any).effectivePermissions = await this.rbacService.getEffectivePermissions(user.id);
+    (user as AuthenticatedUser).effectivePermissions = await this.rbacService.getEffectivePermissions(user.id);
 
     if (!this.isTwoFactorSetupAllowedPath(req)) {
       const status = await this.twoFactorService.getStatus(user);

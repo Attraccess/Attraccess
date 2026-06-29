@@ -12,7 +12,7 @@ import { UsersService } from '../../../users/users.service';
 import { ModuleRef } from '@nestjs/core';
 import { AccountLinkingRequiredException } from './exceptions/account-linking-required.exception';
 import { AuthService } from '../../auth.service';
-import { normalizePermissionToken, resolveRoleKeysFromSsoRoles } from '../permission-mapping';
+import { resolveRoleKeysFromSsoRoles } from '../permission-mapping';
 import { RbacService } from '../../../rbac/rbac.service';
 import { OidcCookieStateStore, OIDCAppState } from './oidc-cookie-state-store';
 import { MetricsService } from '../../../../metrics/metrics.service';
@@ -181,7 +181,7 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', true
 
     if (user) {
       this.logger.log(`Found existing user with SSO binding: ${oidcUserId}`);
-      return await this.syncPermissionsFromClaims(user, claimSources, usersService);
+      return await this.syncPermissionsFromClaims(user, claimSources);
     }
 
     // Step 2: No user found by external ID, check by email
@@ -234,7 +234,7 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', true
     });
 
     this.logger.log(`New user (ID: ${user.id}) created successfully with SSO subject: ${oidcUserId}`);
-    return await this.syncPermissionsFromClaims(user, claimSources, usersService);
+    return await this.syncPermissionsFromClaims(user, claimSources);
   }
 
   private getPermissionClaimValues(claimSources: unknown[]): unknown[] {
@@ -291,7 +291,6 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', true
   private async syncPermissionsFromClaims(
     user: User,
     claimSources: unknown[],
-    _usersService: UsersService,
   ): Promise<User> {
     const roleNames = this.resolveRoleNamesFromClaims(claimSources);
     const roleKeys = resolveRoleKeysFromSsoRoles(roleNames, this.config.permissionMappings);

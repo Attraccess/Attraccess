@@ -213,7 +213,7 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
 
     let user = await usersService.findOne({ externalIdentifier: samlUserId }).catch(() => null);
     if (user) {
-      return await this.syncPermissionsFromClaims(user, profile, config, usersService);
+      return await this.syncPermissionsFromClaims(user, profile, config);
     }
 
     user = await usersService.findOne({ email }, ['authenticationDetails']).catch(() => null);
@@ -252,7 +252,7 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
       throw error;
     }
 
-    return await this.syncPermissionsFromClaims(user, profile, config, usersService);
+    return await this.syncPermissionsFromClaims(user, profile, config);
   }
 
   private getPermissionClaimValues(profile: SamlProfile): unknown[] {
@@ -292,7 +292,6 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
     user: User,
     profile: SamlProfile,
     config: SSOProviderSAMLConfiguration,
-    _usersService: UsersService,
   ): Promise<User> {
     const roleNames = this.resolveRoleNamesFromClaims(profile);
     const roleKeys = resolveRoleKeysFromSsoRoles(roleNames, config.permissionMappings);

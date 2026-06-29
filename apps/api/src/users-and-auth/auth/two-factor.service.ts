@@ -6,6 +6,7 @@ import { TwoFactorPolicy } from './two-factor.dto';
 import { SettingsService } from '../../settings/settings.service';
 import { EncryptionService } from '../../encryption/encryption.service';
 import { MetricsService } from '../../metrics/metrics.service';
+import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 
 @Injectable()
 export class TwoFactorService {
@@ -205,7 +206,7 @@ export class TwoFactorService {
   }
 
   private isPrivilegedUser(user: User): boolean {
-    const effectivePerms = (user as any).effectivePermissions as Set<string> | undefined;
+    const effectivePerms = (user as AuthenticatedUser).effectivePermissions;
     if (!effectivePerms) return false;
     // Privileged = has any permission beyond the default 'resources.read' granted to all users
     return [...effectivePerms].some((p) => p !== 'resources.read');

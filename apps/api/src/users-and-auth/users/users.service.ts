@@ -30,6 +30,7 @@ import { randomBytes } from 'crypto';
 import { TokenHashService } from '../../encryption/token-hash.service';
 import { MetricsService } from '../../metrics/metrics.service';
 import { RbacService } from '../rbac/rbac.service';
+import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 
 class DeleteAccountTokenInvalidException extends BadRequestException {
   constructor() {
@@ -370,7 +371,7 @@ export class UsersService {
     this.validateUsernameOrThrow(newUsername);
 
     const isSelf = executingUser.id === targetUserId;
-    const canUpdateUsers = !!(executingUser as any).effectivePermissions?.has('users.update');
+    const canUpdateUsers = !!(executingUser as AuthenticatedUser).effectivePermissions?.has('users.update');
 
     if (!isSelf && !canUpdateUsers) {
       throw new ForbiddenException("You do not have permission to change this user's username");
@@ -425,7 +426,7 @@ export class UsersService {
     }
 
     const isSelf = executingUser.id === targetUserId;
-    const canUpdateUsers = !!(executingUser as any).effectivePermissions?.has('users.update');
+    const canUpdateUsers = !!(executingUser as AuthenticatedUser).effectivePermissions?.has('users.update');
 
     if (!isSelf && !canUpdateUsers) {
       throw new ForbiddenException("You do not have permission to change this user's email");

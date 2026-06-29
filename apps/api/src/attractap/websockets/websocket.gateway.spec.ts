@@ -33,6 +33,7 @@ import { AttractapSupervisionHandler } from './handlers/supervision.handler';
 import { SupervisionService } from '../../resources/supervision/supervision.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Resource } from '@attraccess/database-entities';
+import { RbacService } from '../../users-and-auth/rbac/rbac.service';
 
 const mockMetricsService = {
   attractapDevicesConnected: { inc: jest.fn(), dec: jest.fn(), set: jest.fn() },
@@ -105,6 +106,7 @@ describe('AttractapGateway', () => {
         { provide: WS_METRICS, useValue: mockWsMetrics },
         { provide: MetricsToggleService, useValue: mockMetricsToggle },
         { provide: SupervisionService, useValue: {} },
+        { provide: RbacService, useValue: {} },
         { provide: getRepositoryToken(Resource), useValue: {} },
         ResourceListService,
         ResourceActionGuard,
