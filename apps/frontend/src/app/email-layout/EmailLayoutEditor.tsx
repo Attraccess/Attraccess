@@ -6,18 +6,24 @@ import {
   DrawerHeader,
   Form,
   Link,
+  ModalBody,
+  ModalFooter,
+  ModalHeader,
+  ModalHeading,
   useTheme,
 } from '@heroui/react';
-import { Maximize } from 'lucide-react';
+import { Maximize, RotateCcw } from 'lucide-react';
 import { Button } from '../../components/button';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../components/toastProvider';
 import { StandardDrawer } from '../../components/standardDrawer';
+import { StandardModal } from '../../components/standardModal';
 import Editor, { type OnMount } from '@monaco-editor/react';
 import {
   useEmailLayoutServiceEmailLayoutControllerFindGlobal,
   useEmailLayoutServiceEmailLayoutControllerUpdate,
   useEmailLayoutServiceEmailLayoutControllerPreviewLayout,
+  useEmailLayoutServiceEmailLayoutControllerResetToDefault as useResetLayoutToDefault,
 } from '@attraccess/react-query-client';
 import { useDebounce } from '../../hooks/useDebounce';
 
@@ -33,6 +39,7 @@ export function EmailLayoutEditor() {
 
   const { data: layout } = useEmailLayoutServiceEmailLayoutControllerFindGlobal();
   const updateLayout = useEmailLayoutServiceEmailLayoutControllerUpdate();
+  const resetLayout = useResetLayoutToDefault();
   const {
     mutate: previewLayout,
     data: previewData,
@@ -89,7 +96,21 @@ export function EmailLayoutEditor() {
   }, [bodyIsEmpty, previewData, isPreviewPending, isPreviewError, previewError, t]);
 
   const [editorIsExpanded, setEditorIsExpanded] = useState(false);
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
   const hasPlaceholder = body.includes(CONTENT_PLACEHOLDER);
+
+  const onResetConfirm = useCallback(() => {
+    resetLayout.mutate(undefined, {
+      onSuccess: (data) => {
+        setBody(data.body);
+        setResetConfirmOpen(false);
+        toast.success({ title: t('toast.resetSuccess') });
+      },
+      onError: () => {
+        toast.error({ title: t('toast.resetError') });
+      },
+    });
+  }, [resetLayout, toast, t]);
 
   const editorContent = useMemo(
     () => (
@@ -195,6 +216,15 @@ export function EmailLayoutEditor() {
 
       <div className="flex flex-row gap-4 w-full justify-end mt-4">
         <Button
+          variant="ghost"
+          type="button"
+          onPress={() => setResetConfirmOpen(true)}
+          data-cy="email-layout-reset-button"
+        >
+          <RotateCcw size={16} />
+          {t('actions.resetToDefault')}
+        </Button>
+        <Button
           variant="primary"
           type="submit"
           isPending={updateLayout.isPending}
@@ -203,6 +233,27 @@ export function EmailLayoutEditor() {
           {t('actions.save')}
         </Button>
       </div>
+
+      <StandardModal isOpen={resetConfirmOpen} onOpenChange={setResetConfirmOpen} size="sm">
+        {({ close }) => (
+          <>
+            <ModalHeader>
+              <ModalHeading>{t('resetConfirm.title')}</ModalHeading>
+            </ModalHeader>
+            <ModalBody>
+              <p>{t('resetConfirm.message')}</p>
+            </ModalBody>
+            <ModalFooter>
+              <Button variant="ghost" onPress={close}>
+                {t('resetConfirm.cancel')}
+              </Button>
+              <Button variant="danger" isPending={resetLayout.isPending} onPress={onResetConfirm}>
+                {t('resetConfirm.confirm')}
+              </Button>
+            </ModalFooter>
+          </>
+        )}
+      </StandardModal>
     </Form>
   );
 }
