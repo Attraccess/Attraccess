@@ -10,7 +10,6 @@ import {
   Param,
   ParseIntPipe,
   Patch,
-  Post,
   Res,
   UseInterceptors,
 } from '@nestjs/common';
@@ -173,31 +172,4 @@ export class CompanionController {
     await this.service.delete(id);
   }
 
-  @Post(':id/trigger-update')
-  @Auth('canManageResources')
-  @ApiOperation({ summary: 'Push update notification to a specific connected companion device', operationId: 'triggerCompanionDeviceUpdate' })
-  @ApiParam({ name: 'id', type: Number })
-  @ApiResponse({ status: 200, description: 'Whether the device was notified' })
-  @ApiResponse({ status: 404 })
-  async triggerUpdate(@Param('id', ParseIntPipe) id: number): Promise<{ notified: boolean }> {
-    const device = await this.service.findById(id);
-    if (!device) throw new NotFoundException(`Companion device ${id} not found`);
-
-    const notified = this.gatewayService.sendUpdateAvailable(id);
-    return { notified };
-  }
-
-  @Post('update-all')
-  @Auth('canManageSystemConfiguration')
-  @ApiOperation({ summary: 'Push update notification to all connected companion devices', operationId: 'updateAllCompanionDevices' })
-  @ApiResponse({ status: 200, description: 'Number of devices notified' })
-  triggerUpdateAll(): { notified: number } {
-    const deviceIds = [...new Set(
-      [...this.gatewayService.sockets.values()]
-        .map((s) => s.deviceId)
-        .filter((id): id is number => id !== null),
-    )];
-    const notified = deviceIds.filter((id) => this.gatewayService.sendUpdateAvailable(id)).length;
-    return { notified };
-  }
 }

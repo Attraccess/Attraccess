@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, session, screen, dialog, globalShortcut, powerMonitor, shell } from 'electron';
+import { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, session, screen, dialog, globalShortcut, powerMonitor } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as https from 'https';
@@ -510,7 +510,7 @@ function downloadFile(url: string, dest: string): Promise<void> {
 
 async function applyUpdate(serverUrl: string, downloadUrl: string, version: string): Promise<void> {
   const absUrl = downloadUrl.startsWith('http') ? downloadUrl : `${serverUrl}${downloadUrl}`;
-  const ext = path.extname(absUrl.split('?')[0] ?? '') || (process.platform === 'win32' ? '.exe' : process.platform === 'darwin' ? '.dmg' : '');
+  const ext = path.extname(absUrl.split('?')[0] ?? '') || osAdapter.updateExtension;
   const dest = path.join(app.getPath('temp'), `attraccess-companion-update-${version}${ext}`);
 
   console.info(`[companion] downloading update v${version} from ${absUrl}`);
@@ -523,44 +523,7 @@ async function applyUpdate(serverUrl: string, downloadUrl: string, version: stri
   }
 
   console.info(`[companion] update downloaded to ${dest}`);
-
-  if (process.platform === 'linux') {
-    // AppImage: chmod+x, then relaunch from new path — AppImage replaces itself at next run
-    try {
-      fs.chmodSync(dest, 0o755);
-    } catch (err) {
-      console.error('[companion] chmod failed:', err);
-    }
-    app.relaunch({ execPath: dest });
-    allowQuit = true;
-    app.exit(0);
-  } else if (process.platform === 'win32') {
-    // NSIS installer: run silently, then quit — installer restarts the app
-    void shell.openPath(dest).then((errMsg) => {
-      if (errMsg) {
-        console.error('[companion] failed to launch Windows installer:', errMsg);
-        return;
-      }
-      allowQuit = true;
-      app.quit();
-    });
-  } else {
-    // macOS DMG: open it and let the user drag the app — fully automated DMG
-    // manipulation is unsafe (requires unmounting, hdiutil, SIP bypass)
-    void shell.openPath(dest).then((errMsg) => {
-      if (errMsg) {
-        console.error('[companion] failed to open macOS DMG:', errMsg);
-        tray?.setToolTip(`Attraccess Companion — update v${version} ready (open manually)`);
-        return;
-      }
-      void dialog.showMessageBox({
-        type: 'info',
-        title: 'Attraccess Companion — Update Ready',
-        message: `Version ${version} is ready to install.\n\nDrag "Attraccess Companion" from the opened disk image to your Applications folder, then relaunch.`,
-        buttons: ['OK'],
-      });
-    });
-  }
+  await osAdapter.applyUpdate(dest, version, () => { allowQuit = true; });
 }
 
 // ─── WebSocket wiring ─────────────────────────────────────────────────────────

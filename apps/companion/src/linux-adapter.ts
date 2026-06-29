@@ -1,8 +1,11 @@
 import type { App } from 'electron';
+import { app } from 'electron';
+import * as fs from 'fs';
 import type { OsAdapter } from './platform-adapter';
 import { tryLockSession, installDesktopAutostart, tryVtLock, releaseVtLock } from './linux-lock';
 
 export class LinuxAdapter implements OsAdapter {
+  readonly updateExtension = '';
   async tryOsLock(): Promise<boolean> {
     const [sessionLocked] = await Promise.all([
       tryLockSession(),
@@ -47,5 +50,11 @@ export class LinuxAdapter implements OsAdapter {
       'Control+Alt+F7', 'Control+Alt+F8', 'Control+Alt+F9',
       'Control+Alt+F10', 'Control+Alt+F11', 'Control+Alt+F12',
     ];
+  }
+
+  async applyUpdate(dest: string, _version: string, _allowQuit: () => void): Promise<void> {
+    try { fs.chmodSync(dest, 0o755); } catch (err) { console.error('[companion] chmod failed:', err); }
+    app.relaunch({ execPath: dest });
+    app.exit(0); // app.exit bypasses before-quit — no need for allowQuit
   }
 }

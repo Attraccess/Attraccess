@@ -1,8 +1,10 @@
 import type { App } from 'electron';
+import { app, shell } from 'electron';
 import type { OsAdapter } from './platform-adapter';
 import { lockWorkStation, installAutostart } from './windows-lock';
 
 export class WindowsAdapter implements OsAdapter {
+  readonly updateExtension = '.exe';
   tryOsLock(): Promise<boolean> {
     return lockWorkStation();
   }
@@ -32,5 +34,12 @@ export class WindowsAdapter implements OsAdapter {
       'Control+Escape',       // Start menu (Alt path)
       // Alt+Tab / Win+Tab are OS-reserved — registration will fail silently
     ];
+  }
+
+  async applyUpdate(dest: string, _version: string, allowQuit: () => void): Promise<void> {
+    const errMsg = await shell.openPath(dest);
+    if (errMsg) { console.error('[companion] failed to launch Windows installer:', errMsg); return; }
+    allowQuit();
+    app.quit();
   }
 }

@@ -1,10 +1,9 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CompanionDevice, ResourceFlowNode } from '@attraccess/database-entities';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { CompanionEventType, CompanionIdleDto, CompanionSocket } from './companion.types';
-import { CompanionService } from './companion.service';
 
 @Injectable()
 export class CompanionGatewayService {
@@ -19,8 +18,6 @@ export class CompanionGatewayService {
     @InjectRepository(ResourceFlowNode)
     private readonly flowNodeRepository: Repository<ResourceFlowNode>,
     private readonly eventEmitter: EventEmitter2,
-    @Inject(CompanionService)
-    private readonly companionService: CompanionService,
   ) {}
 
   public getConnectedDevices(): CompanionDevice[] {
@@ -70,25 +67,6 @@ export class CompanionGatewayService {
 
   public sendDeviceRenamed(deviceId: number, deviceName: string): void {
     this.sendCommandToDevice(deviceId, CompanionEventType.COMPANION_DEVICE_RENAMED, { deviceName });
-  }
-
-  public sendUpdateAvailable(deviceId: number): boolean {
-    const socket = [...this.sockets.values()].find((s) => s.deviceId === deviceId);
-    if (!socket) return false;
-
-    const manifest = this.companionService.getManifest();
-    if (!manifest) return false;
-
-    const platform = socket.platform ?? undefined;
-    const entry = platform ? manifest.platforms.find((p) => p.platform === platform) : undefined;
-    const downloadUrl = entry
-      ? `/api/companion/download/${entry.platform}/${entry.arch}`
-      : `/api/companion/download/${platform ?? 'linux'}/x64`;
-
-    return this.sendCommandToDevice(deviceId, CompanionEventType.COMPANION_UPDATE_AVAILABLE, {
-      version: manifest.version,
-      downloadUrl,
-    });
   }
 
   public handleIdleEvent(deviceId: number, payload: CompanionIdleDto): void {

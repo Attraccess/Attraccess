@@ -167,11 +167,7 @@ export class CompanionGateway implements OnGatewayConnection, OnGatewayDisconnec
     message: { name: 'COMPANION_UPDATE_AVAILABLE', payload: CompanionUpdateAvailableDto },
     summary: 'Notifies the companion that a new version is available',
   })
-  public sendUpdateAvailable(deviceId: number, payload: CompanionUpdateAvailableDto): void {
-    for (const socket of [...this.gatewayService.sockets.values()].filter((s) => s.deviceId === deviceId)) {
-      socket.sendEvent(CompanionEventType.COMPANION_UPDATE_AVAILABLE, payload);
-    }
-  }
+  private _specUpdateAvailable() { /* emitted by CompanionAuthHandler.maybeSendUpdateAvailable on connect */ }
 
   @AsyncApiSub({
     channel: 'COMPANION_DEVICE_RENAMED',

@@ -18,11 +18,7 @@
     },
     "actions": {
       "rename": "Umbenennen",
-      "delete": "Löschen",
-      "pushUpdate": "Update senden",
-      "pushUpdateSuccess": "Update gesendet",
-      "pushUpdateError": "Update konnte nicht gesendet werden",
-      "pushUpdateOffline": "Gerät ist offline"
+      "delete": "Löschen"
     },
     "rename": {
       "title": "Gerät umbenennen",
@@ -84,12 +80,6 @@
     }
   },
   "updateAvailable": "Update verfügbar",
-  "updateAll": {
-    "button": "Alle aktualisieren",
-    "success": "Update an {{count}} Gerät(e) gesendet",
-    "error": "Update konnte nicht gesendet werden",
-    "noManifest": "Kein Update verfügbar"
-  },
   "deleteConfirm": {
     "title": "Gerät löschen",
     "message": "Möchtest du <bold>{{name}}</bold> wirklich löschen? Das Token wird widerrufen und eine aktive Verbindung wird beendet.",
