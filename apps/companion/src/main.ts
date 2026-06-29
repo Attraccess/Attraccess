@@ -25,8 +25,6 @@ let pinHash: string | null = null;
 let allowQuit = false;
 let kioskLocked = false;
 let wsConnected = false;
-// ponytail: created here once; passed into metric modules added in follow-on tickets (foreground app, USB, etc.)
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const metricsAdapter: SystemMetricsAdapter = createMetricsAdapter();
 
 // ponytail: increment per new kiosk window so each open gets a fresh web session (sign-out on close)
@@ -39,9 +37,10 @@ let secondaryOverlays: BrowserWindow[] = [];
 
 export interface CompanionSettings {
   idleTimeoutMinutes: number; // 0 = disabled
+  foregroundApp: boolean;
 }
 
-const SETTINGS_DEFAULTS: CompanionSettings = { idleTimeoutMinutes: 15 };
+const SETTINGS_DEFAULTS: CompanionSettings = { idleTimeoutMinutes: 15, foregroundApp: true };
 
 function settingsPath(): string {
   return path.join(app.getPath('userData'), 'settings.json');
@@ -92,6 +91,27 @@ function stopIdleDetection(): void {
     idlePollTimer = null;
   }
   idleState = 'active';
+}
+
+// ─── Foreground app monitoring ────────────────────────────────────────────────
+
+let metricsStarted = false;
+
+function startForegroundAppMonitoring(): void {
+  if (metricsStarted || !settings.foregroundApp) return;
+  metricsStarted = true;
+  metricsAdapter.on('foregroundAppChanged', (app) => {
+    if (!wsClient || !app) return;
+    wsClient.sendForegroundapp({ appName: app.name, bundleId: app.bundleId, pid: app.pid });
+  });
+  metricsAdapter.start().catch((err) => console.warn('[companion] metrics adapter start failed:', err));
+}
+
+function stopForegroundAppMonitoring(): void {
+  if (!metricsStarted) return;
+  metricsStarted = false;
+  metricsAdapter.stop();
+  metricsAdapter.removeAllListeners('foregroundAppChanged');
 }
 
 // ─── PIN helpers ──────────────────────────────────────────────────────────────
@@ -488,7 +508,11 @@ ipcMain.handle('get-settings', () => settings);
 ipcMain.handle('save-settings', (_evt, newSettings: CompanionSettings) => {
   settings = { ...SETTINGS_DEFAULTS, ...newSettings };
   saveSettings(settings);
-  if (wsClient) startIdleDetection();
+  if (wsClient) {
+    startIdleDetection();
+    stopForegroundAppMonitoring();
+    startForegroundAppMonitoring();
+  }
 });
 
 // ─── WebSocket wiring ─────────────────────────────────────────────────────────
@@ -502,11 +526,13 @@ function startWsClient(serverUrl: string, firstRun: boolean) {
     setTrayState('unlocked');
     mainWindow?.webContents.send('ws-status', 'connected');
     startIdleDetection();
+    startForegroundAppMonitoring();
   });
 
   wsClient.on('disconnected', () => {
     wsConnected = false;
     stopIdleDetection();
+    stopForegroundAppMonitoring();
     setTrayState('disconnected');
     mainWindow?.webContents.send('ws-status', 'disconnected');
   });
@@ -614,6 +640,7 @@ app.on('before-quit', (event) => {
   }
   allowQuit = false;
   stopIdleDetection();
+  stopForegroundAppMonitoring();
   hideKioskOverlay();
   wsClient?.stop();
 });
