@@ -358,8 +358,8 @@ importers:
         specifier: ^5.1.7
         version: 5.1.7
       swagger-typescript-api:
-        specifier: ^13.12.0
-        version: 13.12.0(encoding@0.1.13)(magicast@0.3.5)(react@19.2.6)
+        specifier: ^13.12.3
+        version: 13.12.3(encoding@0.1.13)(magicast@0.3.5)(react@19.2.6)
       tailwind-merge:
         specifier: ^3.5.0
         version: 3.6.0
@@ -2126,12 +2126,12 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@biomejs/js-api@4.0.0':
-    resolution: {integrity: sha512-EOArR/6drRzM1/hwOIz1pZw90FL31Ud4Y7hEHGWVtMNmAwS9SrwZ8hMENGlLVXCeGW/kL46p8kX7eO6x9Nmezg==}
+  '@biomejs/js-api@6.0.0':
+    resolution: {integrity: sha512-8HP7wexjQo5Np1J9h0B2x8L5G0GZpCacgjykxLHtvLPvF0hNqSG754oh8bxo+OSFDpVGMfSjmLO+ZY/5KbfjmQ==}
     peerDependencies:
-      '@biomejs/wasm-bundler': ^2.3.0
-      '@biomejs/wasm-nodejs': ^2.3.0
-      '@biomejs/wasm-web': ^2.3.0
+      '@biomejs/wasm-bundler': ^2.5.0
+      '@biomejs/wasm-nodejs': ^2.5.0
+      '@biomejs/wasm-web': ^2.5.0
     peerDependenciesMeta:
       '@biomejs/wasm-bundler':
         optional: true
@@ -2140,8 +2140,8 @@ packages:
       '@biomejs/wasm-web':
         optional: true
 
-  '@biomejs/wasm-nodejs@2.4.16':
-    resolution: {integrity: sha512-3BSGXHJ25Is+9gRgV+Gwz7YdMktrMOBP+Vw3RwXy3Y/CHqXbbNSyhaMt6VFk1J/WAGutdYfBy+NzhlvOftwd+g==}
+  '@biomejs/wasm-nodejs@2.5.0':
+    resolution: {integrity: sha512-8yng33quWVLdyfNiYmr9Hq3fd9GTRqXAbhrsvpaw+iME1gd7oJBVcczucDFl/tsz69TnfrR42O/PDBoA8MSWYw==}
 
   '@borewit/text-codec@0.2.2':
     resolution: {integrity: sha512-DDaRehssg1aNrH4+2hnj1B7vnUGEjU6OIlyRdkMd0aUdIUvKXrJfXsy8LVtXAy7DRvYVluWbMspsRhz2lcW0mQ==}
@@ -9771,8 +9771,8 @@ packages:
   dompurify@2.5.9:
     resolution: {integrity: sha512-i6mvVmWN4xo9LrhCOZrDgSs9noW6nOahbrmzjRbPF36YPyj5Ue5lgok0MHDWkG7xzpWFO2OYttXdzM7rJxHvNA==}
 
-  dompurify@3.4.7:
-    resolution: {integrity: sha512-2jBxDJY4RR06tQNy4w5FlFH7kfxsQZlufd0sbv+chfHCxeJwrFw2baUDsSwvBISD4K4RDbd0PTfy3uNXsR6siA==}
+  dompurify@3.4.11:
+    resolution: {integrity: sha512-zhlUV12GsaRzMsf9q5M254YhA4+VuF0fG+QFqu6aYpoGlKtz+w8//jBcGVYBgQkR5GHjUomejY84AV+/uPbWdw==}
 
   domutils@2.8.0:
     resolution: {integrity: sha512-w96Cjofp72M5IIhpjgobBimYEfoPjx1Vx0BSX9P30WBdZW2WIKU0T1Bd0kz2eNZ9ikjKgHbEyKx8BB6H1L3h3A==}
@@ -10046,6 +10046,9 @@ packages:
 
   es-toolkit@1.47.0:
     resolution: {integrity: sha512-n1GuoD0WEQZMBk5tttoZSqwgyLx01oqa5XsBmCHwPyNe1S9jPBEmtR2pSgp2kJuWE3ciFZ6yRHmY4pM4C3OOkw==}
+
+  es-toolkit@1.49.0:
+    resolution: {integrity: sha512-G5iZ6Pc/FNRY/soKZHC+TxGDD83rHUDXxzaWhGCX44vAv/tMs56WMusnm/KMNK+luUPsgA9U28cGr4RDlSzL2g==}
 
   es5-ext@0.10.64:
     resolution: {integrity: sha512-p2snDhiLaXe6dahss1LddxqEm+SkuDvV8dnIQG0MWjyHpcMNfXKPE+/Cc0y+PhxJX3A4xGNeFCj5oc0BUh6deg==}
@@ -13435,6 +13438,11 @@ packages:
     engines: {node: ^18 || >=20}
     hasBin: true
 
+  nanoid@5.1.16:
+    resolution: {integrity: sha512-kVrnsrJqMR8+oLJnGEmSWw9BivK5mt7H3FZatVRjrc5wGqFYuBxX1yG7+A7Gi5AefkX6t/oCkizcQgpu0cY1dQ==}
+    engines: {node: ^18 || >=20}
+    hasBin: true
+
   nanoid@5.1.9:
     resolution: {integrity: sha512-ZUvP7KeBLe3OZ1ypw6dI/TzYJuvHP77IM4Ry73waSQTLn8/g8rpdjfyVAh7t1/+FjBtG4lCP42MEbDxOsRpBMw==}
     engines: {node: ^18 || >=20}
@@ -16382,8 +16390,8 @@ packages:
   swagger-schema-official@2.0.0-bab6bed:
     resolution: {integrity: sha512-rCC0NWGKr/IJhtRuPq/t37qvZHI/mH4I4sxflVM+qgVe5Z2uOCivzWaVbuioJaB61kvm5UvB7b49E+oBY0M8jA==}
 
-  swagger-typescript-api@13.12.0:
-    resolution: {integrity: sha512-tE9bHjN3luZeVJEitha7R7PSgYRjPa7+G1491MMVZxkmnUaOZspHg/G9+++OsY3+S6pz4v1aiLPt4mwsyRjZgg==}
+  swagger-typescript-api@13.12.3:
+    resolution: {integrity: sha512-t6DyvxtpSqU0TgbPCzKgobdDIR4I+7/JHQuSwT52O4puGawTvq5H8JoUkh9haJi+z7Ip7Hv2PsZlOHuvSSf5pg==}
     engines: {node: '>=20'}
     hasBin: true
 
@@ -18114,8 +18122,8 @@ packages:
   yoga-layout@3.2.1:
     resolution: {integrity: sha512-0LPOt3AxKqMdFBZA3HBAt/t/8vIKq7VaQYbuA8WxCgung+p9TVyKRYdpvCb80HcdTN2NkbIKbhNwKUfm3tQywQ==}
 
-  yummies@7.19.4:
-    resolution: {integrity: sha512-OO7jPtnYW+D8DX/1P1vQsWGZZjpQljuW2oEHc3RJ1a8e6SiWOtIUCL8sTwkLO6kaf7NfocRr/ld48vXZnO2hOg==}
+  yummies@7.20.1:
+    resolution: {integrity: sha512-H/AxRy+SjVlfpeI0TkiVkU/M2n+XpR1XGt5yS5r7GsP9Iz3mr17dbq9DLW18PmMlyKO78+yvH/9Z9VAnVuV3og==}
     peerDependencies:
       mobx: ^6.12.4
       react: 19.2.6
@@ -20648,11 +20656,11 @@ snapshots:
   '@biomejs/cli-win32-x64@2.4.15':
     optional: true
 
-  '@biomejs/js-api@4.0.0(@biomejs/wasm-nodejs@2.4.16)':
+  '@biomejs/js-api@6.0.0(@biomejs/wasm-nodejs@2.5.0)':
     optionalDependencies:
-      '@biomejs/wasm-nodejs': 2.4.16
+      '@biomejs/wasm-nodejs': 2.5.0
 
-  '@biomejs/wasm-nodejs@2.4.16': {}
+  '@biomejs/wasm-nodejs@2.5.0': {}
 
   '@borewit/text-codec@0.2.2': {}
 
@@ -29669,7 +29677,7 @@ snapshots:
 
   dompurify@2.5.9: {}
 
-  dompurify@3.4.7:
+  dompurify@3.4.11:
     optionalDependencies:
       '@types/trusted-types': 2.0.7
 
@@ -30092,6 +30100,8 @@ snapshots:
   es-toolkit@1.46.1: {}
 
   es-toolkit@1.47.0: {}
+
+  es-toolkit@1.49.0: {}
 
   es5-ext@0.10.64:
     dependencies:
@@ -34711,6 +34721,8 @@ snapshots:
 
   nanoid@5.1.11: {}
 
+  nanoid@5.1.16: {}
+
   nanoid@5.1.9: {}
 
   napi-build-utils@2.0.0: {}
@@ -38402,25 +38414,25 @@ snapshots:
 
   swagger-schema-official@2.0.0-bab6bed: {}
 
-  swagger-typescript-api@13.12.0(encoding@0.1.13)(magicast@0.3.5)(react@19.2.6):
+  swagger-typescript-api@13.12.3(encoding@0.1.13)(magicast@0.3.5)(react@19.2.6):
     dependencies:
       '@apidevtools/swagger-parser': 12.1.0(openapi-types@12.1.3)
-      '@biomejs/js-api': 4.0.0(@biomejs/wasm-nodejs@2.4.16)
-      '@biomejs/wasm-nodejs': 2.4.16
+      '@biomejs/js-api': 6.0.0(@biomejs/wasm-nodejs@2.5.0)
+      '@biomejs/wasm-nodejs': 2.5.0
       '@types/swagger-schema-official': 2.0.25
       c12: 3.3.4(magicast@0.3.5)
       citty: 0.2.2
       consola: 3.4.2
-      es-toolkit: 1.47.0
+      es-toolkit: 1.49.0
       eta: 3.5.0
-      nanoid: 5.1.11
+      nanoid: 5.1.16
       openapi-types: 12.1.3
       swagger-schema-official: 2.0.0-bab6bed
       swagger2openapi: 7.0.8(encoding@0.1.13)
       type-fest: 5.7.0
       typescript: 6.0.3
       yaml: 2.9.0
-      yummies: 7.19.4(react@19.2.6)
+      yummies: 7.20.1(react@19.2.6)
     transitivePeerDependencies:
       - '@biomejs/wasm-bundler'
       - '@biomejs/wasm-web'
@@ -40412,13 +40424,13 @@ snapshots:
 
   yoga-layout@3.2.1: {}
 
-  yummies@7.19.4(react@19.2.6):
+  yummies@7.20.1(react@19.2.6):
     dependencies:
       class-variance-authority: 0.7.1
       clsx: 2.1.1
       dayjs: 1.11.21
-      dompurify: 3.4.7
-      nanoid: 5.1.11
+      dompurify: 3.4.11
+      nanoid: 5.1.16
       tailwind-merge: 3.6.0
     optionalDependencies:
       react: 19.2.6

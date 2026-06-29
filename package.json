@@ -120,7 +120,7 @@
     "sonner": "^2.0.7",
     "spark-md5": "^3.0.2",
     "sqlite3": "^5.1.7",
-    "swagger-typescript-api": "^13.12.0",
+    "swagger-typescript-api": "^13.12.3",
     "tailwind-merge": "^3.5.0",
     "tailwindcss": "^4.3.0",
     "tslib": "^2.8.1",
@@ -240,7 +240,7 @@
     "vitest": "^4.1.9",
     "webpack-cli": "^7.0.2"
   },
-  "packageManager": "pnpm@10.34.1+sha512.b58fbde6dca66a929538021581f648b4570b6ca19b18e7cbd7f2c07a7b24454155388dacdf08f2af3678e88a6d1fe04f9d609df24bf51735a060ea041b374ab7",
+  "packageManager": "pnpm@10.34.4+sha512.h2i+VSAK4/Iia2Un/Momh+FLxOXxLXchoPJdo99HkVF3BYZI20F3uvNIEg+guidS2NjZP2vq8f5krhjajelhrw==",
   "engines": {
     "node": ">=24.0.0",
     "pnpm": ">=10.0.0"
