@@ -15,9 +15,29 @@ import { ApiBearerAuth, ApiUnauthorizedResponse } from '@nestjs/swagger';
 import { DualAuthGuard } from './dual-auth.guard';
 import { AuthenticatedUser } from './auth.types';
 
-const NeedsPermissions = Reflector.createDecorator<string[]>();
+// Canonical set of system permission keys — mirrors the RBAC seed migration.
+// Adding a key here is the only change needed to make it usable in @Auth().
+export type SystemPermission =
+  | 'resources.read'
+  | 'resources.create'
+  | 'resources.update'
+  | 'resources.delete'
+  | 'resources.access.manage'
+  | 'resources.maintenance.manage'
+  | 'users.read'
+  | 'users.create'
+  | 'users.update'
+  | 'users.delete'
+  | 'users.roles.manage'
+  | 'system.settings.manage'
+  | 'system.sso.manage'
+  | 'system.plugins.manage'
+  | 'billing.read'
+  | 'billing.manage';
 
-export function Auth(...permissions: string[]) {
+const NeedsPermissions = Reflector.createDecorator<SystemPermission[]>();
+
+export function Auth(...permissions: SystemPermission[]) {
   return applyDecorators(
     NeedsPermissions(permissions),
     UseGuards(DualAuthGuard, EffectivePermissionsGuard),
