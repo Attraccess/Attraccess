@@ -6,6 +6,7 @@ import { SettingsStoreService } from '../settings/settings-store.service';
 import { MjmlService } from '../email-template/mjml.service';
 import { PreviewMjmlResponseDto } from '../email-template/dto/preview-mjml.dto';
 import { PREVIEW_SAMPLE_CONTENT } from './dto/preview-email-layout.dto';
+import { readDefaultLayoutBody } from '../email-template/email-defaults';
 
 const EMAIL_LAYOUT_PARENT = 'email_layout';
 const EMAIL_LAYOUT_KEY = 'body';
@@ -54,6 +55,12 @@ export class EmailLayoutService {
 
     await this.settingsStore.setPlainSetting(EMAIL_LAYOUT_PARENT, EMAIL_LAYOUT_KEY, dto.body);
 
+    return this.findGlobal();
+  }
+
+  async resetToDefault(): Promise<EmailLayoutResponseDto> {
+    const defaultBody = readDefaultLayoutBody();
+    await this.settingsStore.setPlainSetting(EMAIL_LAYOUT_PARENT, EMAIL_LAYOUT_KEY, defaultBody);
     return this.findGlobal();
   }
 }

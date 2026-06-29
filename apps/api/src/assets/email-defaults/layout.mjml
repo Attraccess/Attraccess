@@ -1,0 +1,58 @@
+<mjml>
+  <mj-head>
+    <mj-attributes>
+      <mj-all font-family="Helvetica, Arial, sans-serif" />
+      <mj-text font-size="16px" line-height="1.5" color="#1F2937" />
+      <mj-button
+        background-color="#2563EB"
+        color="#FFFFFF"
+        font-size="16px"
+        font-weight="bold"
+        padding="12px 30px"
+        border-radius="6px"
+        text-decoration="none"
+      />
+    </mj-attributes>
+    <mj-style>
+      a { color: #2563EB; text-decoration: none; }
+    </mj-style>
+  </mj-head>
+  <mj-body background-color="#F8FAFC" width="600px">
+    <mj-section background-color="#FFFFFF" padding="24px 0 16px 0">
+      <mj-column>
+        <mj-image
+          src="{{host.logoUrl}}"
+          width="200px"
+          href="https://attraccess.org"
+          alt="Attraccess"
+          padding="0"
+        />
+      </mj-column>
+    </mj-section>
+
+    <mj-section padding="0">
+      <mj-column>
+        <mj-divider border-color="#E2E8F0" border-width="1px" />
+      </mj-column>
+    </mj-section>
+
+    {{content}}
+
+    <mj-section padding="0">
+      <mj-column>
+        <mj-divider border-color="#E2E8F0" border-width="1px" />
+      </mj-column>
+    </mj-section>
+    <mj-section background-color="#FFFFFF" padding="16px 20px">
+      <mj-column>
+        <mj-text font-size="12px" color="#9CA3AF" align="center" padding="0">
+          <a href="https://attraccess.org" style="color:#9CA3AF;">attraccess.org</a>
+          &nbsp;·&nbsp;
+          <a href="{{host.frontend}}" style="color:#9CA3AF;">{{host.frontend}}</a>
+          &nbsp;·&nbsp;
+          <a href="{{host.notificationPreferencesUrl}}" style="color:#9CA3AF;">Notification preferences</a>
+        </mj-text>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>
