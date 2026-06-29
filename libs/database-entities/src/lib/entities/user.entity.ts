@@ -45,6 +45,13 @@ export class User {
   @Exclude()
   email!: string;
 
+  @Column({ type: 'varchar', length: 35, default: 'en' })
+  @ApiProperty({
+    description: "The user's preferred locale (BCP 47 language tag)",
+    example: 'en',
+  })
+  locale!: string;
+
   @Column({ default: false, type: 'boolean' })
   @ApiProperty({
     description: 'Whether the user has verified their email address',

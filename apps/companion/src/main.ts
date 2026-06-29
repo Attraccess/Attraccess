@@ -10,6 +10,7 @@ import { normalizeServerUrl } from './server-url';
 import { dotIconPng } from './tray-icon';
 import { attraccessLogoSvg } from './logo-svg';
 import { osAdapter } from './platform-adapter';
+import { createMetricsAdapter, SystemMetricsAdapter } from './metrics';
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
@@ -24,6 +25,9 @@ let pinHash: string | null = null;
 let allowQuit = false;
 let kioskLocked = false;
 let wsConnected = false;
+// ponytail: created here once; passed into metric modules added in follow-on tickets (foreground app, USB, etc.)
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const metricsAdapter: SystemMetricsAdapter = createMetricsAdapter();
 
 // ponytail: increment per new kiosk window so each open gets a fresh web session (sign-out on close)
 let _kioskSessionId = 0;

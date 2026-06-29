@@ -244,7 +244,7 @@ export function EditEmailTemplatePage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8" data-cy="edit-email-template-page">
-      <PageHeader title={t('templateType.' + templateType)} subtitle={t('subtitle')} backTo="/email-templates" />
+      <PageHeader title={t('templateType.' + templateType)} subtitle={t('subtitle')} backTo="/emails/templates" />
       <Form onSubmit={onSubmit} className="gap-8" data-cy="edit-email-template-form">
         <div className="flex flex-col flex-wrap gap-8 w-full lg:flex-row lg:gap-6">
           <section
@@ -304,7 +304,7 @@ export function EditEmailTemplatePage() {
         <div className="flex flex-row gap-4 w-full justify-end mt-4">
           <Button
             variant="ghost"
-            onPress={() => navigate('/email-templates')}
+            onPress={() => navigate('/emails/templates')}
             data-cy="edit-email-template-cancel-button"
           >
             {t('actions.cancel')}

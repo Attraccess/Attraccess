@@ -8,8 +8,8 @@ const LEGACY_KEY_TO_RBAC_ROLE: Record<string, string> = {
   canManageBilling: 'billing-manager',
 };
 
-export class DropBooleanPermissions1782400000000 implements MigrationInterface {
-  name = 'DropBooleanPermissions1782400000000';
+export class DropBooleanPermissions1782500000000 implements MigrationInterface {
+  name = 'DropBooleanPermissions1782500000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Migrate SSO provider OIDC permissionMappings JSON keys from boolean names to RBAC role keys

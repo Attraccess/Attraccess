@@ -15,7 +15,7 @@ import { BillingConfigurationDto } from './dto/configuration.dto';
 import { SumupTransactionCallbackDto } from './dto/sumup/sumup-transaction-callback.dto';
 import { ResourceFlowsService } from '../resources/flows/resource-flows.service';
 import { SseInstrumentation } from '../metrics/instrumentation/sse/sse.helper';
-import { Observable } from 'rxjs';
+import { Observable, Subject } from 'rxjs';
 import { LicenseService } from '../license/license.service';
 
 const baseReq = (userOverrides: DeepPartial<User> = {}) =>
@@ -49,6 +49,7 @@ describe('BillingController', () => {
   };
   let live: {
     getTransactionSubject: jest.Mock;
+    deleteSubjectIfUnobserved: jest.Mock;
   };
 
   beforeEach(async () => {
@@ -73,6 +74,7 @@ describe('BillingController', () => {
     };
     live = {
       getTransactionSubject: jest.fn(),
+      deleteSubjectIfUnobserved: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -277,14 +279,14 @@ describe('BillingController', () => {
 
   describe('streamEvents', () => {
     it('returns observable from liveNotificationsService subject', async () => {
-      const fakeObservable = { subscribe: jest.fn() };
-      const subject = { asObservable: jest.fn().mockReturnValue(fakeObservable) };
+      const rxSubject = new Subject<{ data: BillingTransaction }>();
+      const subject = { asObservable: jest.fn().mockReturnValue(rxSubject.asObservable()) };
       live.getTransactionSubject.mockReturnValue(subject);
       const req = baseReq({ id: 77 });
       const res = await controller.streamEvents(req);
       expect(live.getTransactionSubject).toHaveBeenCalledWith(77);
       expect(subject.asObservable).toHaveBeenCalled();
-      expect(res).toBe(fakeObservable);
+      expect(res).toBeDefined();
     });
   });
 });

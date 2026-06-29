@@ -8,6 +8,9 @@
     },
     {
       "path": "./tsconfig.renderer.json"
+    },
+    {
+      "path": "./tsconfig.spec.json"
     }
   ]
 }

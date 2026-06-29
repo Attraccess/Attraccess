@@ -1,4 +1,5 @@
 import {
+  ActivityIcon,
   BookOpenIcon,
   BugIcon,
   CogIcon,
@@ -7,6 +8,7 @@ import {
   FileIcon,
   FolderIcon,
   GiftIcon,
+  KeyRoundIcon,
   LightbulbIcon,
   LucideProps,
   MailIcon,
@@ -16,6 +18,7 @@ import {
   PackageIcon,
   Settings2Icon,
   ServerIcon,
+  ShieldIcon,
   UsersIcon,
 } from 'lucide-react';
 import newGithubIssueUrl from 'new-github-issue-url';
@@ -89,11 +92,32 @@ export function useSidebarItems(): (SidebarItem | SidebarItemGroup)[] {
       licenseModule: 'billing',
     });
 
-    items.push({
-      path: '/users',
-      translationKey: 'userManagement',
+    // Users group
+    const usersGroup: SidebarItemGroup = {
+      translationKey: 'users',
+      isGroup: true,
       icon: UsersIcon,
-    });
+      items: [
+        {
+          path: '/users',
+          translationKey: 'userList',
+          icon: UsersIcon,
+        },
+        {
+          path: '/users/security',
+          translationKey: 'userSecurity',
+          icon: ShieldIcon,
+        },
+        {
+          path: '/sso/providers',
+          translationKey: 'sso',
+          icon: KeyRoundIcon,
+          licenseModule: 'sso',
+        },
+      ],
+    };
+
+    items.push(usersGroup);
 
     // Devices group
     const devicesGroup: SidebarItemGroup = {
@@ -128,14 +152,24 @@ export function useSidebarItems(): (SidebarItem | SidebarItemGroup)[] {
           icon: PackageIcon,
         },
         {
-          path: '/email-templates',
-          translationKey: 'emailTemplates',
+          path: '/emails',
+          translationKey: 'emails',
           icon: MailIcon,
+        },
+        {
+          path: '/messages/settings',
+          translationKey: 'messagingSettings',
+          icon: MessageSquareIcon,
         },
         {
           path: '/settings',
           translationKey: 'settings',
           icon: Settings2Icon,
+        },
+        {
+          path: '/monitoring',
+          translationKey: 'monitoring',
+          icon: ActivityIcon,
         },
         {
           path: '/csv-export',

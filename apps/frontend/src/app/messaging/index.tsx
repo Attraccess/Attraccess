@@ -7,8 +7,8 @@ import {
 import { Card, cn } from '@heroui/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { MailIcon, ArrowLeftIcon } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { MailIcon, ArrowLeftIcon, Settings2Icon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
@@ -21,7 +21,8 @@ import { markConversationReadInCache } from './messageCache';
 
 export function MessagesPage() {
   const { t } = useTranslations({ en, de });
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const [searchParams, setSearchParams] = useSearchParams();
@@ -87,7 +88,16 @@ export function MessagesPage() {
 
   return (
     <div>
-      <PageHeader title={t('title')} subtitle={t('subtitle')} icon={<MailIcon />} />
+      <PageHeader
+        title={t('title')}
+        subtitle={t('subtitle')}
+        icon={<MailIcon />}
+        actions={
+          hasPermission('canManageSystemConfiguration')
+            ? [{ key: 'settings', label: t('settingsButton'), icon: <Settings2Icon size={16} />, onPress: () => navigate('/messages/settings') }]
+            : undefined
+        }
+      />
 
       <Card className="overflow-hidden">
         <div className="grid h-[calc(100vh-13rem)] min-h-[28rem] grid-cols-1 lg:h-[70vh] lg:grid-cols-[320px_1fr]">

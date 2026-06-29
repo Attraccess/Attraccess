@@ -29,7 +29,7 @@ export class UserInvitationService {
   ) {}
 
   private async inviteUsersTransactional(
-    candidates: Array<{ username: string; email: string }>,
+    candidates: Array<{ username: string; email: string; locale?: string }>,
     options?: { grantAllPermissionsToFirst?: boolean },
   ): Promise<User[]> {
     await this.usersService.ensureLicenseForNewUsers(candidates.length);
@@ -193,10 +193,10 @@ export class UserInvitationService {
     return { candidates, errors, emailRowMap, usernameRowMap };
   }
 
-  public async inviteUser(body: InviteUserDto): Promise<User> {
+  public async inviteUser(body: InviteUserDto, adminLocale?: string): Promise<User> {
     try {
       const [invited] = await this.inviteUsersTransactional(
-        [{ username: body.username, email: body.email }],
+        [{ username: body.username, email: body.email, locale: adminLocale }],
         { grantAllPermissionsToFirst: true },
       );
 
@@ -209,6 +209,7 @@ export class UserInvitationService {
   public async inviteUsersFromCsv(
     file: FileUpload | undefined,
     rawConfig: string | CsvInviteConfigDto,
+    adminLocale?: string,
   ): Promise<User[]> {
     let configPayload: CsvInviteConfigDto | string;
     try {
@@ -267,7 +268,10 @@ export class UserInvitationService {
     }
 
     try {
-      const invitedUsers = await this.inviteUsersTransactional(candidates, { grantAllPermissionsToFirst: true });
+      const invitedUsers = await this.inviteUsersTransactional(
+        candidates.map((c) => ({ ...c, locale: adminLocale })),
+        { grantAllPermissionsToFirst: true },
+      );
       return invitedUsers;
     } catch (error) {
       throw mapEmailSendError(error);

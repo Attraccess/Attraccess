@@ -1,8 +1,8 @@
-import { Body, Controller, Post, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Post, Req, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { ApiBody, ApiConsumes, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { User } from '@attraccess/database-entities';
-import { Auth } from '@attraccess/plugins-backend-sdk';
+import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { AuthRateLimitInterceptor } from '../rate-limiting/auth-rate-limit.interceptor';
 import { InviteUserDto } from './dtos/inviteUser.dto';
 import {
@@ -31,8 +31,8 @@ export class UserInvitationsController {
     description: 'Invalid input data.',
   })
   @Auth('users.create')
-  async inviteUser(@Body() body: InviteUserDto): Promise<User> {
-    return this.invitationService.inviteUser(body);
+  async inviteUser(@Req() request: AuthenticatedRequest, @Body() body: InviteUserDto): Promise<User> {
+    return this.invitationService.inviteUser(body, request.user.locale);
   }
 
   @Post('/invite-csv')
@@ -53,9 +53,10 @@ export class UserInvitationsController {
     type: CsvInviteErrorResponseDto,
   })
   async inviteUsersFromCsv(
+    @Req() request: AuthenticatedRequest,
     @UploadedFile() file: FileUpload | undefined,
     @Body('config') rawConfig: string | CsvInviteConfigDto,
   ): Promise<User[]> {
-    return this.invitationService.inviteUsersFromCsv(file, rawConfig);
+    return this.invitationService.inviteUsersFromCsv(file, rawConfig, request.user.locale);
   }
 }

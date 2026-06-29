@@ -26,11 +26,7 @@ import * as deFile from './de.json';
 
 const CONTENT_PLACEHOLDER = '{{content}}';
 
-interface EmailLayoutTabProps {
-  onCancel?: () => void;
-}
-
-export function EmailLayoutTab({ onCancel }: EmailLayoutTabProps) {
+export function EmailLayoutEditor() {
   const { t } = useTranslations({ en: enFile, de: deFile });
   const { theme } = useTheme();
   const toast = useToastMessage();
@@ -198,11 +194,6 @@ export function EmailLayoutTab({ onCancel }: EmailLayoutTabProps) {
       </div>
 
       <div className="flex flex-row gap-4 w-full justify-end mt-4">
-        {onCancel && (
-          <Button variant="ghost" onPress={onCancel}>
-            {t('actions.cancel')}
-          </Button>
-        )}
         <Button
           variant="primary"
           type="submit"

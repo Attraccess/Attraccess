@@ -15,6 +15,8 @@ import { RbacService } from '../rbac/rbac.service';
 const mockMetricsService = {
   usersRegisteredTotal: { inc: jest.fn() },
   usersTotal: { inc: jest.fn(), dec: jest.fn(), set: jest.fn() },
+  usersLocaleSyncsTotal: { inc: jest.fn() },
+  usersPerLocale: { inc: jest.fn(), dec: jest.fn(), set: jest.fn() },
 };
 
 const mockRbacService = {
@@ -301,6 +303,7 @@ describe('UsersService', () => {
           lockedUntil: null,
           failedLoginAttempts: 0,
           firstFailedLoginAt: null,
+          locale: 'en',
         } as User,
         {
           id: 2,
@@ -340,6 +343,7 @@ describe('UsersService', () => {
           lockedUntil: null,
           failedLoginAttempts: 0,
           firstFailedLoginAt: null,
+          locale: 'en',
         } as User,
       ];
 
@@ -468,6 +472,51 @@ describe('UsersService', () => {
       jest.spyOn(service, 'isSSOUser').mockResolvedValueOnce(true);
 
       await expect(service.changeUsername(5, 'newuser', me)).rejects.toThrow(SSOUsernameChangeForbiddenException);
+    });
+  });
+
+  describe('createOne – locale', () => {
+    beforeEach(() => {
+      jest.spyOn(userRepository, 'findOne').mockResolvedValue(null);
+      jest.spyOn(userRepository, 'count').mockResolvedValue(1);
+      jest.spyOn(userRepository, 'save').mockImplementation(async (data) => ({ id: 99, ...data }) as User);
+    });
+
+    it('sets locale when provided', async () => {
+      await service.createOne({ username: 'usr', email: 'u@x.com', externalIdentifier: null, locale: 'de' });
+      expect(userRepository.save).toHaveBeenCalledWith(expect.objectContaining({ locale: 'de' }));
+      expect(mockMetricsService.usersPerLocale.inc).toHaveBeenCalledWith({ locale: 'de' });
+    });
+
+    it('stores the full BCP 47 locale tag without lowercasing or truncating', async () => {
+      await service.createOne({ username: 'usr', email: 'u@x.com', externalIdentifier: null, locale: 'ZH-Hant-TW' });
+      expect(userRepository.save).toHaveBeenCalledWith(expect.objectContaining({ locale: 'ZH-Hant-TW' }));
+    });
+
+    it('leaves locale at column default when not provided', async () => {
+      await service.createOne({ username: 'usr', email: 'u@x.com', externalIdentifier: null });
+      const saved = (userRepository.save as jest.Mock).mock.calls[0][0] as Partial<User>;
+      expect(saved.locale).toBeUndefined();
+    });
+  });
+
+  describe('updateLocale', () => {
+    it('saves cleaned locale, updates gauge, and returns user', async () => {
+      const existing = { id: 1, locale: 'en' } as User;
+      const updated = { id: 1, locale: 'de' } as User;
+      jest.spyOn(userRepository, 'update').mockResolvedValue({} as UpdateResult);
+      jest.spyOn(service, 'findOne').mockResolvedValueOnce(existing).mockResolvedValueOnce(updated);
+
+      const result = await service.updateLocale(1, 'de-DE');
+      expect(userRepository.update).toHaveBeenCalledWith(1, { locale: 'de-DE' });
+      expect(mockMetricsService.usersLocaleSyncsTotal.inc).toHaveBeenCalledWith({ locale: 'de-DE' });
+      expect(mockMetricsService.usersPerLocale.dec).toHaveBeenCalledWith({ locale: 'en' });
+      expect(mockMetricsService.usersPerLocale.inc).toHaveBeenCalledWith({ locale: 'de-DE' });
+      expect(result).toEqual(updated);
+    });
+
+    it('throws BadRequestException for empty locale', async () => {
+      await expect(service.updateLocale(1, '   ')).rejects.toThrow(BadRequestException);
     });
   });
 });

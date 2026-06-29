@@ -6,7 +6,16 @@ import { User, Resource, Project, ResourceGroup, MqttServer, ResourceUsage, Sess
 describe('MetricsService', () => {
   let service: MetricsService;
 
-  const mockUserRepo = { count: jest.fn().mockResolvedValue(10) };
+  const mockQueryBuilder = {
+    select: jest.fn().mockReturnThis(),
+    addSelect: jest.fn().mockReturnThis(),
+    groupBy: jest.fn().mockReturnThis(),
+    getRawMany: jest.fn().mockResolvedValue([{ locale: 'en', count: '10' }]),
+  };
+  const mockUserRepo = {
+    count: jest.fn().mockResolvedValue(10),
+    createQueryBuilder: jest.fn().mockReturnValue(mockQueryBuilder),
+  };
   const mockResourceRepo = { count: jest.fn().mockResolvedValue(5) };
   const mockProjectRepo = { count: jest.fn().mockResolvedValue(3) };
   const mockResourceGroupRepo = { count: jest.fn().mockResolvedValue(2) };
@@ -80,6 +89,18 @@ describe('MetricsService', () => {
       expect(mockSessionRepo.count).toHaveBeenCalledWith({
         where: { expiresAt: expect.anything() },
       });
+    });
+
+    it('seeds usersPerLocale gauge from locale GROUP BY query', async () => {
+      mockQueryBuilder.getRawMany.mockResolvedValueOnce([
+        { locale: 'en', count: '8' },
+        { locale: 'de-DE', count: '2' },
+      ]);
+      await service.onModuleInit();
+
+      const metricsOutput = await service.getMetrics();
+      expect(metricsOutput).toContain('attraccess_users_per_locale{locale="en"} 8');
+      expect(metricsOutput).toContain('attraccess_users_per_locale{locale="de-DE"} 2');
     });
   });
 

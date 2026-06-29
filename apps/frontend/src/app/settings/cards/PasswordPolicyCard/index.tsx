@@ -66,7 +66,7 @@ export function PasswordPolicyCard({ className }: PasswordPolicyCardProps = {}) 
       )}
 
       <div>
-        <Button variant="primary" onPress={() => navigate('/settings/security/password-policy')}>
+        <Button variant="primary" onPress={() => navigate('/users/security/password-policy')}>
           {t('openButton')}
         </Button>
       </div>

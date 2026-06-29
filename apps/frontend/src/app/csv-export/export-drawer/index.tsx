@@ -38,6 +38,8 @@ interface Props<TData extends Row> {
   setOption?: (key: string, nextValue: boolean) => void;
   filename: string;
   queryStatus: QueryStatus;
+  onFetchAllPages?: () => void;
+  isFetchingAllPages?: boolean;
 }
 
 interface ItemRow {
@@ -46,7 +48,7 @@ interface ItemRow {
 }
 
 export function CsvExportDrawerContent<TData extends Row>(props: Props<TData>) {
-  const { columns, items, refetch, options, setOption, filename, queryStatus } = props;
+  const { columns, items, refetch, options, setOption, filename, queryStatus, onFetchAllPages, isFetchingAllPages } = props;
 
   const { t } = useTranslations({ de, en });
 
@@ -87,6 +89,27 @@ export function CsvExportDrawerContent<TData extends Row>(props: Props<TData>) {
     a.click();
   }, [selectedColumns, itemRows, filename]);
 
+  const [pendingDownload, setPendingDownload] = useState(false);
+
+  // When all pages finish loading after user triggered export, auto-download
+  useEffect(() => {
+    if (pendingDownload && !isFetchingAllPages) {
+      setPendingDownload(false);
+      downloadCsv();
+    }
+  }, [pendingDownload, isFetchingAllPages, downloadCsv]);
+
+  const handleExport = useCallback(() => {
+    if (onFetchAllPages) {
+      setPendingDownload(true);
+      onFetchAllPages();
+    } else {
+      downloadCsv();
+    }
+  }, [onFetchAllPages, downloadCsv]);
+
+  const isExporting = pendingDownload || !!isFetchingAllPages;
+
   const columnsLite = useMemo(() => columns.map((c) => ({ key: c.key, label: c.label })), [columns]);
 
   return (
@@ -124,8 +147,9 @@ export function CsvExportDrawerContent<TData extends Row>(props: Props<TData>) {
         <Button
           variant="primary"
           className="w-full sm:w-auto"
-          onPress={() => downloadCsv()}
-          isDisabled={selectedColumns.length === 0 || items.length === 0}
+          onPress={handleExport}
+          isDisabled={selectedColumns.length === 0 || items.length === 0 || isExporting}
+          isPending={isExporting}
           data-cy="resource-usage-export-download-csv-button"
         >
           <DownloadIcon className="size-4" />
