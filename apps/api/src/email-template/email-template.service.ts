@@ -5,29 +5,11 @@ import { EntityManager, Repository } from 'typeorm';
 import { UpdateEmailTemplateDto } from './dto/update-email-template.dto';
 import { MjmlService } from './mjml.service';
 import { EMAIL_TEMPLATE_DEFAULTS, readDefaultTemplateBody } from './email-defaults';
-
-export interface TranslationKey {
-  key: string;
-  defaultValue: string;
-}
+import { extractTranslationKeys, TranslationKey } from '@attraccess/shared';
 
 export interface TemplateTranslations {
   keys: TranslationKey[];
   translations: Record<string, Record<string, string>>;
-}
-
-function extractTranslationKeys(content: string): TranslationKey[] {
-  const regex = /\{\{t\s+["']([^"']+)["']\s+["']([^"']*)["']/g;
-  const seen = new Set<string>();
-  const keys: TranslationKey[] = [];
-  let match: RegExpExecArray | null;
-  while ((match = regex.exec(content)) !== null) {
-    if (!seen.has(match[1])) {
-      seen.add(match[1]);
-      keys.push({ key: match[1], defaultValue: match[2] });
-    }
-  }
-  return keys;
 }
 
 @Injectable()

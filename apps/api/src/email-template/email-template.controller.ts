@@ -7,6 +7,7 @@ import { MjmlService } from './mjml.service';
 import { UpdateEmailTemplateDto } from './dto/update-email-template.dto';
 import { PreviewMjmlDto, PreviewMjmlResponseDto } from './dto/preview-mjml.dto';
 import { UpsertTranslationsDto } from './dto/upsert-translations.dto';
+import { GetTranslationsResponseDto } from './dto/get-translations-response.dto';
 import { EmailLayoutService } from '../email-layout/email-layout.service';
 
 @ApiTags('Email Templates')
@@ -82,6 +83,7 @@ export class EmailTemplateController {
     summary: 'Get all translations for a template — returns extracted keys with defaults and all stored locale values',
   })
   @ApiParam({ name: 'type', enum: EmailTemplateType, enumName: 'EmailTemplateType' })
+  @ApiResponse({ status: 200, type: GetTranslationsResponseDto })
   getTranslations(@Param('type') type: EmailTemplateType): Promise<TemplateTranslations> {
     return this.emailTemplateService.getTranslations(type);
   }

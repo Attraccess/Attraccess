@@ -54,6 +54,7 @@
     "saved": "Translations saved",
     "deleteLocale": "Delete locale",
     "deleteConfirm": "Delete all translations for locale \"{{locale}}\"?",
+    "deleteConfirmButton": "Delete",
     "emptyTranslation": "Falls back to default"
   },
   "actions": {

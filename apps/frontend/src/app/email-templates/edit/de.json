@@ -54,6 +54,7 @@
     "saved": "Übersetzungen gespeichert",
     "deleteLocale": "Sprache löschen",
     "deleteConfirm": "Alle Übersetzungen für die Sprache \"{{locale}}\" löschen?",
+    "deleteConfirmButton": "Löschen",
     "emptyTranslation": "Fällt auf Standard zurück"
   },
   "actions": {
