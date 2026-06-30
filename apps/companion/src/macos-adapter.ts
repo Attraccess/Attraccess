@@ -1,6 +1,6 @@
 import type { App } from 'electron';
 import { app, dialog, shell } from 'electron';
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -49,20 +49,20 @@ export class MacosAdapter implements OsAdapter {
   async applyUpdate(dest: string, version: string, _allowQuit: () => void): Promise<void> {
     const tmpMount = path.join(os.tmpdir(), `attraccess-update-${version}`);
     try {
-      execSync(`hdiutil attach "${dest}" -nobrowse -quiet -mountpoint "${tmpMount}"`);
-      const appInDmg = execSync(`find "${tmpMount}" -maxdepth 1 -name "*.app"`, { encoding: 'utf8' }).trim();
+      execFileSync('hdiutil', ['attach', dest, '-nobrowse', '-quiet', '-mountpoint', tmpMount]);
+      const appInDmg = execFileSync('find', [tmpMount, '-maxdepth', '1', '-name', '*.app'], { encoding: 'utf8' }).trim();
       if (!appInDmg) throw new Error('no .app bundle found in DMG');
       // Derive the current .app bundle path from the running executable
       // e.g. /Applications/App.app/Contents/MacOS/App → /Applications/App.app
       const currentApp = process.execPath.replace(/\/Contents\/MacOS\/[^/]+$/, '');
-      execSync(`ditto "${appInDmg}" "${currentApp}"`);
-      execSync(`hdiutil detach "${tmpMount}" -quiet`);
+      execFileSync('ditto', [appInDmg, currentApp]);
+      execFileSync('hdiutil', ['detach', tmpMount, '-quiet']);
       try { fs.unlinkSync(dest); } catch { /* best-effort cleanup */ }
       app.relaunch({ execPath: process.execPath });
       app.exit(0); // app.exit bypasses before-quit — no need for allowQuit
     } catch (err) {
       console.error('[companion] macOS silent update failed, falling back to manual install:', err);
-      try { execSync(`hdiutil detach "${tmpMount}" -quiet`); } catch { /* best-effort */ }
+      try { execFileSync('hdiutil', ['detach', tmpMount, '-quiet']); } catch { /* best-effort */ }
       const errMsg = await shell.openPath(dest);
       if (errMsg) { console.error('[companion] failed to open macOS DMG:', errMsg); return; }
       await dialog.showMessageBox({
