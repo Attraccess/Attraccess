@@ -5,7 +5,7 @@ module.exports = {
   // ponytail: resolved at build time so it stays in sync with the installed version
   electronVersion: require('../../node_modules/electron/package.json').version,
   directories: {
-    // CI and copy-companion-into-assets.js both expect apps/companion/dist/
+    // gitignored via apps/companion/.gitignore; CI and copy-companion-into-assets.js both read from here
     output: 'dist',
   },
   files: ['out/**/*', 'src/**/*', 'renderer/dist/**/*'],
