@@ -1,6 +1,9 @@
 import { Navigate } from 'react-router-dom';
 import { ResourceTabsLayout } from '../resources/details/layout/ResourceTabsLayout';
 import { ResourceOverviewTab } from '../resources/details/overview/ResourceOverviewTab';
+import { KioskLayout } from '../kiosk/layout/KioskLayout';
+import { KioskResourcePage } from '../kiosk/resources/KioskResourcePage';
+import { KioskCompanionPage } from '../kiosk/companion/KioskCompanionPage';
 import { ResourceHistoryTab } from '../resources/details/history/ResourceHistoryTab';
 import { ResourcePeopleTab } from '../resources/details/people/ResourcePeopleTab';
 import { ResourceGroupsTab } from '../resources/details/groups/ResourceGroupsTab';
@@ -21,6 +24,7 @@ import { CsvExport } from '../csv-export';
 import { DocumentationEditor, DocumentationView } from '../resources/documentation';
 import { EmailTemplatesPage } from '../email-templates/EmailTemplatesPage';
 import { EditEmailTemplatePage } from '../email-templates/edit';
+import { EmailsPage } from '../emails/EmailsPage';
 import { ResourceGroupEditPage } from '../resource-groups';
 import { ResourceOverview } from '../resourceOverview';
 import { Dependencies } from '../dependencies';
@@ -44,8 +48,33 @@ import FirstTimeSetupPage from '../first-time-setup';
 import { UnauthorizedLayout } from '../unauthorized/unauthorized-layout/layout';
 
 const PasswordPolicySettingsPage = lazy(() => import('../settings/password-policy'));
+const CompanionSettingsPage = lazy(() => import('../settings/companion'));
+const EmailLayoutPage = lazy(() => import('../email-layout/EmailLayoutPage'));
+const UserSecurityPage = lazy(() => import('../user-management/security'));
+const MessagingSettingsPage = lazy(() => import('../messaging/settings'));
+const MonitoringPage = lazy(() => import('../monitoring'));
 
 const coreRoutes: RouteConfig[] = [
+  {
+    path: '/kiosk/resources/:id',
+    element: (
+      <KioskLayout>
+        <KioskResourcePage />
+      </KioskLayout>
+    ),
+    authRequired: false,
+    noLayout: true,
+  },
+  {
+    path: '/kiosk/companion',
+    element: (
+      <KioskLayout>
+        <KioskCompanionPage />
+      </KioskLayout>
+    ),
+    authRequired: false,
+    noLayout: true,
+  },
   {
     path: '/',
     element: <Navigate to="/resources" replace />,
@@ -164,12 +193,12 @@ const coreRoutes: RouteConfig[] = [
     authRequired: true,
   },
   {
-    path: '/mqtt/servers',
+    path: '/devices/mqtt/servers',
     element: <MqttServersPage />,
     authRequired: 'canManageResources',
   },
   {
-    path: '/mqtt/servers/:serverId',
+    path: '/devices/mqtt/servers/:serverId',
     element: <EditMqttServerPage />,
     authRequired: 'canManageResources',
   },
@@ -253,11 +282,50 @@ const coreRoutes: RouteConfig[] = [
     element: <SystemSettingsPage />,
     authRequired: 'canManageSystemConfiguration',
   },
+  // User security section
   {
-    path: '/settings/security/password-policy',
+    path: '/users/security',
+    element: (
+      <Suspense fallback={<div className="flex items-center justify-center p-8"><Spinner size="sm" /></div>}>
+        <UserSecurityPage />
+      </Suspense>
+    ),
+    authRequired: 'canManageSystemConfiguration',
+  },
+  {
+    path: '/users/security/password-policy',
     element: (
       <Suspense fallback={<div className="flex items-center justify-center p-8"><Spinner size="sm" /></div>}>
         <PasswordPolicySettingsPage />
+      </Suspense>
+    ),
+    authRequired: 'canManageSystemConfiguration',
+  },
+  // Messaging settings
+  {
+    path: '/messages/settings',
+    element: (
+      <Suspense fallback={<div className="flex items-center justify-center p-8"><Spinner size="sm" /></div>}>
+        <MessagingSettingsPage />
+      </Suspense>
+    ),
+    authRequired: 'canManageSystemConfiguration',
+  },
+  // Monitoring
+  {
+    path: '/monitoring',
+    element: (
+      <Suspense fallback={<div className="flex items-center justify-center p-8"><Spinner size="sm" /></div>}>
+        <MonitoringPage />
+      </Suspense>
+    ),
+    authRequired: 'canManageSystemConfiguration',
+  },
+  {
+    path: '/devices/companion',
+    element: (
+      <Suspense fallback={<div className="flex items-center justify-center p-8"><Spinner size="sm" /></div>}>
+        <CompanionSettingsPage />
       </Suspense>
     ),
     authRequired: 'canManageSystemConfiguration',
@@ -267,14 +335,29 @@ const coreRoutes: RouteConfig[] = [
     element: <AccountPage />,
     authRequired: true,
   },
+  // Emails section
   {
-    path: '/email-templates',
+    path: '/emails',
+    element: <EmailsPage />,
+    authRequired: 'canManageSystemConfiguration',
+  },
+  {
+    path: '/emails/templates',
     element: <EmailTemplatesPage />,
     authRequired: 'canManageSystemConfiguration',
   },
   {
-    path: '/email-templates/:type',
+    path: '/emails/templates/:type',
     element: <EditEmailTemplatePage />,
+    authRequired: 'canManageSystemConfiguration',
+  },
+  {
+    path: '/emails/layout',
+    element: (
+      <Suspense fallback={<div className="flex items-center justify-center p-8"><Spinner size="sm" /></div>}>
+        <EmailLayoutPage />
+      </Suspense>
+    ),
     authRequired: 'canManageSystemConfiguration',
   },
   {

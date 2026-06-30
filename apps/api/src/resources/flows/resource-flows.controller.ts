@@ -10,6 +10,7 @@ import {
 } from './dto';
 import { ResourceFlowLogEvent, ResourceFlowsExecutorService } from './resource-flows-executor.service';
 import { Observable, Subject } from 'rxjs';
+import { finalize } from 'rxjs/operators';
 import { ResourceFlowNodeSchemaDto } from './dto/resource-flow-node-schemas-response.dto';
 import { SseInstrumentation } from '../../metrics/instrumentation/sse/sse.helper';
 
@@ -181,18 +182,22 @@ export class ResourceFlowsController {
       this.resourceFlowsExecutorService.resourceFlowLogSubjects.set(resourceId, new Subject<ResourceFlowLogEvent>());
     }
 
-    // Get the subject for this resource
     const subject = this.resourceFlowsExecutorService.resourceFlowLogSubjects.get(resourceId);
 
-    // Send initial state immediately
-    setTimeout(async () => {
-      subject.next({
-        data: { keepalive: true },
-      });
+    setTimeout(() => {
+      subject.next({ data: { keepalive: true } });
     }, 100);
 
-    // Create an observable from the subject
-    return this.sse.wrap('resource_flows', subject.asObservable());
+    return this.sse.wrap(
+      'resource_flows',
+      subject.asObservable().pipe(
+        finalize(() => {
+          if (!subject.observed) {
+            this.resourceFlowsExecutorService.resourceFlowLogSubjects.delete(resourceId);
+          }
+        }),
+      ),
+    );
   }
 
   @Post('/buttons/:buttonId/press')

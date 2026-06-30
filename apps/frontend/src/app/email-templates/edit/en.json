@@ -7,7 +7,16 @@
     "password-changed": "Password Changed",
     "resource-usage-billing-transaction-summary": "Resource Usage Billing Transaction Summary",
     "user-invitation": "User Invitation",
-    "project-invitation": "Project Invitation"
+    "project-invitation": "Project Invitation",
+    "delete-account-confirmation": "Delete Account Confirmation",
+    "resource-health-changed": "Resource Health Changed",
+    "user-retraining-required": "User Retraining Required",
+    "maintenance-request-created": "Maintenance Request Created",
+    "message-received": "New Message (Offline Fallback)",
+    "resource-usage-note-added": "Resource Usage Note Added",
+    "resource-takeover": "Resource Takeover",
+    "resource-session-ended": "Resource Session Ended",
+    "access-change": "Access Change"
   },
   "form": {
     "subject": "Subject",
@@ -51,6 +60,17 @@
     "close": "Close",
     "cancel": "Cancel",
     "save": "Save Changes",
-    "expand": "Expand editor"
+    "expand": "Expand editor",
+    "resetToDefault": "Reset to Default"
+  },
+  "resetConfirm": {
+    "title": "Reset template to default?",
+    "message": "This will overwrite your customizations with the bundled default template. This cannot be undone.",
+    "confirm": "Reset",
+    "cancel": "Cancel"
+  },
+  "toast": {
+    "resetSuccess": "Template reset to default.",
+    "resetError": "Failed to reset template."
   }
 }

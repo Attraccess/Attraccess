@@ -4,6 +4,7 @@ import {
   useEmailTemplatesServiceEmailTemplateControllerFindOne as useFindOneEmailTemplate,
   useEmailTemplatesServiceEmailTemplateControllerUpdate as useUpdateEmailTemplate,
   useEmailTemplatesServiceEmailTemplateControllerPreviewMjml,
+  useEmailTemplatesServiceEmailTemplateControllerResetToDefault as useResetTemplateToDefault,
   EmailTemplateType,
 } from '@attraccess/react-query-client';
 import {
@@ -15,6 +16,10 @@ import {
   Input,
   Label,
   Link,
+  ModalBody,
+  ModalFooter,
+  ModalHeader,
+  ModalHeading,
   Tab,
   TabList,
   Tabs,
@@ -27,8 +32,9 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../components/toastProvider';
 import { PageHeader } from '../../../components/pageHeader';
 import { StandardDrawer } from '../../../components/standardDrawer';
+import { StandardModal } from '../../../components/standardModal';
 import Editor, { type Monaco, type OnMount } from '@monaco-editor/react';
-import { Maximize } from 'lucide-react';
+import { Maximize, RotateCcw } from 'lucide-react';
 import { OpenAPI } from '@attraccess/react-query-client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
@@ -372,6 +378,27 @@ export function EditEmailTemplatePage() {
     }
   }, [template.data]);
 
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+  const resetTemplate = useResetTemplateToDefault();
+
+  const onResetConfirm = useCallback(() => {
+    if (!templateType) return;
+    resetTemplate.mutate(
+      { type: templateType },
+      {
+        onSuccess: (data) => {
+          setSubject(data.subject);
+          setBody(data.body);
+          setResetConfirmOpen(false);
+          toast.success({ title: t('toast.resetSuccess') });
+        },
+        onError: () => {
+          toast.error({ title: t('toast.resetError') });
+        },
+      },
+    );
+  }, [resetTemplate, templateType, toast, t]);
+
   const updateTemplate = useUpdateEmailTemplate();
   const {
     mutate: parseMjml,
@@ -410,9 +437,8 @@ export function EditEmailTemplatePage() {
     }
 
     if (parseMjmlisError) {
-      return `<p style="text-align:center; color: #f00; padding-top: 20px;">${t('preview.errorPrefix')} ${
-        (parseMjmlError as Error).message
-      }</p>`;
+      const errorMessage = parseMjmlError instanceof Error ? parseMjmlError.message : String(parseMjmlError);
+      return `<p style="text-align:center; color: #f00; padding-top: 20px;">${t('preview.errorPrefix')} ${errorMessage}</p>`;
     }
 
     return parsedBody?.html;
@@ -492,7 +518,7 @@ export function EditEmailTemplatePage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8" data-cy="edit-email-template-page">
-      <PageHeader title={t('templateType.' + templateType)} subtitle={t('subtitle')} backTo="/email-templates" />
+      <PageHeader title={t('templateType.' + templateType)} subtitle={t('subtitle')} backTo="/emails/templates" />
       <Form onSubmit={onSubmit} className="gap-8" data-cy="edit-email-template-form">
         <div className="flex flex-col flex-wrap gap-8 w-full lg:flex-row lg:gap-6">
           <section
@@ -544,6 +570,7 @@ export function EditEmailTemplatePage() {
               srcDoc={previewHtml}
               title={t('preview.iframeTitle')}
               className="w-full h-full min-h-[435px] border-0 rounded-md bg-default-50"
+              sandbox="allow-same-origin"
             />
           </section>
         </div>
@@ -551,10 +578,18 @@ export function EditEmailTemplatePage() {
         <div className="flex flex-row gap-4 w-full justify-end mt-4">
           <Button
             variant="ghost"
-            onPress={() => navigate('/email-templates')}
+            onPress={() => navigate('/emails/templates')}
             data-cy="edit-email-template-cancel-button"
           >
             {t('actions.cancel')}
+          </Button>
+          <Button
+            variant="ghost"
+            onPress={() => setResetConfirmOpen(true)}
+            data-cy="edit-email-template-reset-button"
+          >
+            <RotateCcw size={16} />
+            {t('actions.resetToDefault')}
           </Button>
           <Button
             variant="primary"
@@ -573,6 +608,27 @@ export function EditEmailTemplatePage() {
           />
         )}
       </Form>
+
+      <StandardModal isOpen={resetConfirmOpen} onOpenChange={setResetConfirmOpen} size="sm">
+        {({ close }) => (
+          <>
+            <ModalHeader>
+              <ModalHeading>{t('resetConfirm.title')}</ModalHeading>
+            </ModalHeader>
+            <ModalBody>
+              <p>{t('resetConfirm.message')}</p>
+            </ModalBody>
+            <ModalFooter>
+              <Button variant="ghost" onPress={close}>
+                {t('resetConfirm.cancel')}
+              </Button>
+              <Button variant="danger" isPending={resetTemplate.isPending} onPress={onResetConfirm}>
+                {t('resetConfirm.confirm')}
+              </Button>
+            </ModalFooter>
+          </>
+        )}
+      </StandardModal>
     </div>
   );
 }

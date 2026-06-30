@@ -65,7 +65,7 @@ export default function AccountPage() {
           </div>
         </FlatSection>
 
-        <FlatSection icon={<BellIcon size={16} />} title={t('sections.notifications')}>
+        <FlatSection icon={<BellIcon size={16} />} title={t('sections.notifications')} className="sm:col-span-2 xl:col-span-3">
           <div className="flex flex-col gap-6">
             <NotificationPreferencesForm />
           </div>

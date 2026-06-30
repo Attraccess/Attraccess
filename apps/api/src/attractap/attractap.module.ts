@@ -37,6 +37,7 @@ import { BillingModule } from '../billing/billing.module';
 import { ProjectsModule } from '../projects/projects.module';
 import { ResourceFormsModule } from '../resources/forms/forms.module';
 import { SupervisionModule } from '../resources/supervision/supervision.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -55,6 +56,7 @@ import { SupervisionModule } from '../resources/supervision/supervision.module';
     ProjectsModule,
     ResourceFormsModule,
     SupervisionModule,
+    NotificationsModule,
   ],
   providers: [
     AttractapService,

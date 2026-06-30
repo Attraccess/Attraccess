@@ -22,4 +22,11 @@ export class SupervisionLiveService {
   public emitToSupervisor(userId: number, event: SupervisionLiveEventDto): void {
     this.getSupervisorSubject(userId).next({ data: event });
   }
+
+  public deleteSubjectIfUnobserved(userId: number): void {
+    const subject = this.subjects.get(userId);
+    if (subject && !subject.observed) {
+      this.subjects.delete(userId);
+    }
+  }
 }

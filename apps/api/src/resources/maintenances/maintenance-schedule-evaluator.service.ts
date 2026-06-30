@@ -13,7 +13,7 @@ import {
 } from '@attraccess/database-entities';
 import { ResourceMaintenanceService } from './maintenance.service';
 import { ResourceMaintenanceChangedEvent } from './events/resource-maintenance-changed.event';
-import { ResourceUsageEvent } from '../usage/events/resource-usage.events';
+import { ResourceSessionStartedEvent } from '../usage/events/resource-usage.events';
 import { CronTimer } from '../../metrics/instrumentation/cron/cron.helper';
 
 /**
@@ -251,8 +251,8 @@ export class MaintenanceScheduleEvaluatorService {
    * On usage events (session ended): evaluate schedules for that resource so USAGE_HOURS and USAGE_COUNT
    * triggers take effect immediately instead of waiting for the next cron run.
    */
-  @OnEvent(ResourceUsageEvent.EVENT_NAME)
-  async onResourceUsage(event: ResourceUsageEvent): Promise<void> {
+  @OnEvent(ResourceSessionStartedEvent.EVENT_NAME)
+  async onResourceUsage(event: ResourceSessionStartedEvent): Promise<void> {
     const resourceId = event.usage?.resource?.id;
     if (resourceId == null) return;
     // Only re-evaluate when a session was ended (endTime set); that's when usage minutes and session count increase.

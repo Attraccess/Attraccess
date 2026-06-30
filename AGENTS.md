@@ -1,6 +1,9 @@
 # AGENTS.md
 
-Short reference for agents working in this repo.
+RULES:
+- do not commit auto-generated code (e.g. react-query api client)
+- do not manually modify the CHANGELOG.md, it is auto generated
+- do not commit specs/plan files, repo is code/docs only.
 
 ## Dev servers — always use `pnpm serve`
 
@@ -43,3 +46,11 @@ Pin a port (strict — fails on collision):
 - `VITE_PORT=4250 pnpm serve`
 
 Solo `pnpm nx serve api` is **not** wrapped. Prefer `pnpm serve --only=api`.
+
+# For Frontend Work
+
+We use HeroUI, use it. Use as little tailwind/custom css as possible.
+
+Use HeroUI React documentation from @Docs https://heroui.com/react/llms.txt
+For component-specific documentation @Docs https://heroui.com/react/llms-components.txt
+For patterns and best practices @Docs https://heroui.com/react/llms-patterns.txt

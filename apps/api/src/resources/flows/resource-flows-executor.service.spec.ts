@@ -21,6 +21,7 @@ import { ResourceHealthService } from '../health/resource-health.service';
 import { ResourceFlowVariablesService } from './resource-flow-variables.service';
 import { CronTimer } from '../../metrics/instrumentation/cron/cron.helper';
 import { FlowTimer } from '../../metrics/instrumentation/flow/flow.helper';
+import { CompanionGatewayService } from '../../companion/companion-gateway.service';
 
 // Minimal edge shape for our mocks
 type Edge = { source: string; target: string; sourceHandle?: string | null };
@@ -170,6 +171,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
         timeFlow: <T,>(_t: string, fn: () => Promise<T>) => fn(),
         timeNode: <T,>(_n: string, fn: () => Promise<T>) => fn(),
       } as unknown as FlowTimer,
+      { sendLockCommand: jest.fn(() => true), sendUnlockCommand: jest.fn(() => true) } as unknown as CompanionGatewayService,
     );
   });
 
@@ -1015,6 +1017,7 @@ describe('ResourceFlowsExecutorService MQTT', () => {
         timeFlow: <T,>(_t: string, fn: () => Promise<T>) => fn(),
         timeNode: <T,>(_n: string, fn: () => Promise<T>) => fn(),
       } as unknown as FlowTimer,
+      { sendLockCommand: jest.fn(() => true), sendUnlockCommand: jest.fn(() => true) } as unknown as CompanionGatewayService,
     );
   });
 

@@ -10,7 +10,10 @@ import {
 import { ResourceMaintenanceRequest } from '@attraccess/database-entities';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { CanManageMaintenance } from './canManageMaintenance.decorator';
+import { LicenseModuleType } from '../../license/license.service';
+import { RequiresLicense } from '../../license/require-license.decorator';
 
+@RequiresLicense(LicenseModuleType.MAINTENANCE)
 @ApiTags('Resource Maintenances')
 @Controller('resources/:resourceId/maintenance-requests')
 @Auth()

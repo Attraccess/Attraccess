@@ -1,0 +1,20 @@
+{
+  "name": "@attraccess/ui",
+  "version": "1.8.0",
+  "type": "module",
+  "main": "./index.js",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.js",
+      "default": "./index.js"
+    },
+    "./tokens.css": "./tokens.css"
+  },
+  "files": [
+    "index*.js",
+    "index.d.ts",
+    "tokens.css"
+  ]
+}

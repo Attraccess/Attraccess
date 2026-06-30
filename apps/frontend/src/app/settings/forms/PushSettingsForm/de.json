@@ -18,14 +18,14 @@
   "applyCustomButton": "Eigene Schlüssel anwenden",
   "keysReplaced": {
     "title": "VAPID-Schlüssel aktualisiert",
-    "description": "{count} Push-Abonnement(e) mit dem alten Schlüssel entfernt. Betroffene Nutzer müssen Push auf ihren Geräten erneut aktivieren."
+    "description": "{{count}} Push-Abonnement(e) mit dem alten Schlüssel entfernt. Betroffene Nutzer müssen Push auf ihren Geräten erneut aktivieren."
   },
   "errors": {
     "replaceFailed": "VAPID-Schlüssel konnten nicht aktualisiert werden."
   },
   "confirmWarning": {
     "title": "VAPID-Schlüssel ersetzen?",
-    "description": "Dies löscht alle {count} Push-Abonnement(e). Jeder Nutzer muss Push-Benachrichtigungen auf jedem Gerät erneut aktivieren.",
+    "description": "Dies löscht alle {{count}} Push-Abonnement(e). Jeder Nutzer muss Push-Benachrichtigungen auf jedem Gerät erneut aktivieren.",
     "continue": "Weiter",
     "cancel": "Abbrechen"
   },

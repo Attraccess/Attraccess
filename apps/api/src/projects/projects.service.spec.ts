@@ -12,6 +12,7 @@ import { ProjectAccessService } from './project-access.service';
 import { EmailService } from '../email/email.service';
 import { NotFoundException } from '@nestjs/common';
 import { MetricsService } from '../metrics/metrics.service';
+import { NotificationDispatchService } from '../notifications/notification-dispatch.service';
 
 const mockMetricsService = {
   projectsTotal: { inc: jest.fn(), dec: jest.fn(), set: jest.fn() },
@@ -89,6 +90,7 @@ describe('ProjectsService', () => {
         { provide: ProjectAccessService, useValue: projectAccessService },
         { provide: EmailService, useValue: { sendProjectInvitationEmail: jest.fn() } },
         { provide: MetricsService, useValue: mockMetricsService },
+        { provide: NotificationDispatchService, useValue: { dispatch: jest.fn() } },
       ],
     }).compile();
 

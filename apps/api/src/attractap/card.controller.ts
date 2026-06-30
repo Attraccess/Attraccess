@@ -5,9 +5,12 @@ import { AttractapService } from './attractap.service';
 import { AppKeyRequestDto } from './dtos/app-key-request.dto';
 import { AppKeyResponseDto } from './dtos/app-key-response.dto';
 import { NfcCardSetActiveStateDto } from './dtos/nfc-card-set-active-state.dto';
+import { RequiresLicense } from '../license/require-license.decorator';
+import { LicenseModuleType } from '../license/license.service';
 
 @ApiTags('Attractap')
 @Controller('attractap/cards')
+@RequiresLicense(LicenseModuleType.ATTRACTAP)
 export class AttractapNfcCardsController {
   public constructor(
     @Inject(AttractapService)

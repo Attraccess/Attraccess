@@ -5,6 +5,7 @@ import type { DataSource, DeepPartial, Repository } from 'typeorm';
 import {
   Attractap,
   AttractapCrashReport,
+  CompanionDevice,
   AuthenticationDetail,
   AuthenticationType,
   BillingTransaction,
@@ -71,6 +72,9 @@ import {
   User,
   entities,
   UsageDurationUnit,
+  Role,
+  UserRole,
+  UserRoleSource,
 } from '@attraccess/database-entities';
 
 jest.setTimeout(120_000);
@@ -187,6 +191,7 @@ const seedDatabase = async (dataSource: DataSource) => {
   const messageRepo = dataSource.getRepository(Message);
   const notificationPreferenceRepo = dataSource.getRepository(NotificationPreference);
   const pushSubscriptionRepo = dataSource.getRepository(PushSubscription);
+  const companionDeviceRepo = dataSource.getRepository(CompanionDevice);
 
   const resourceGroup = await ensureEntity(resourceGroupRepo, () => ({
     name: `Seed Group ${seedTag}`,
@@ -585,6 +590,25 @@ const seedDatabase = async (dataSource: DataSource) => {
     userAgent: 'Seed Browser/1.0',
     lastSeenAt: null,
   }));
+
+  await ensureEntity(companionDeviceRepo, () => ({
+    name: `Seed Companion ${seedTag}`,
+    tokenHash: '$2b$10$seed.hash.placeholder.for.migration.testing.only',
+  }));
+
+  const roleRepo = dataSource.getRepository(Role);
+  const userRoleRepo = dataSource.getRepository(UserRole);
+  const userRole = await roleRepo.findOne({ where: { key: 'user' } });
+  if (userRole) {
+    await ensureEntity(userRoleRepo, () => ({
+      userId: primaryUser.id,
+      roleId: userRole.id,
+      source: UserRoleSource.MANUAL,
+      ssoProviderType: null,
+      ssoProviderId: null,
+      externalValue: null,
+    }));
+  }
 };
 
 const assertAllEntitiesHaveRows = async (dataSource: DataSource) => {

@@ -4,12 +4,8 @@ import { PageHeader } from '../../components/pageHeader';
 import en from './en.json';
 import de from './de.json';
 import { AppSettingsCard } from './cards/AppSettingsCard';
-import { SmtpSettingsCard } from './cards/SmtpSettingsCard';
-import { MetricsSettingsCard } from './cards/MetricsSettingsCard';
-import { AuthRateLimitCard } from './cards/AuthRateLimitCard';
-import { MessagingRateLimitCard } from './cards/MessagingRateLimitCard';
-import { PasswordPolicyCard } from './cards/PasswordPolicyCard';
-import { PushSettingsCard } from './cards/PushSettingsCard';
+import { VersionInfoCard } from './cards/VersionInfoCard';
+import { SystemInfoCard } from './cards/SystemInfoCard';
 
 export function SystemSettingsPage() {
   const { t } = useTranslations({ en, de });
@@ -18,13 +14,9 @@ export function SystemSettingsPage() {
     <div>
       <PageHeader title={t('title')} subtitle={t('subtitle')} icon={<Settings2Icon size={20} />} />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-        <AppSettingsCard variant="standalone" />
-        <SmtpSettingsCard variant="standalone" />
-        <MetricsSettingsCard />
-        <AuthRateLimitCard />
-        <MessagingRateLimitCard />
-        <PasswordPolicyCard />
-        <PushSettingsCard />
+        <VersionInfoCard />
+        <SystemInfoCard />
+        <AppSettingsCard variant="standalone" className="lg:col-span-2" />
       </div>
     </div>
   );

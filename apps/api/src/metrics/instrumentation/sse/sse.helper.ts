@@ -6,7 +6,7 @@ import { SSE_METRICS } from '../../definitions/tokens';
 import { SseMetrics } from '../../definitions/sse.metrics';
 import { MetricsToggleService } from '../../settings/metrics-toggle.service';
 
-export type SseStream = 'resource_usage' | 'billing' | 'resource_flows' | 'messaging' | 'supervision';
+export type SseStream = 'resource_usage' | 'billing' | 'resource_flows' | 'messaging' | 'supervision' | 'notifications';
 
 @Injectable()
 export class SseInstrumentation {

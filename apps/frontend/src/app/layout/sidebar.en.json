@@ -13,19 +13,34 @@
         "projects": "Projects",
         "messages": "Messages",
         "billing": "Billing",
-        "attractap": "NFC-Cards",
-        "userManagement": "User Management"
+        "attractap": "NFC-Cards"
+      }
+    },
+    "users": {
+      "label": "Users",
+      "items": {
+        "userList": "User List",
+        "userSecurity": "Security",
+        "sso": "Single Sign-On"
+      }
+    },
+    "devices": {
+      "label": "Devices",
+      "items": {
+        "mqttServers": "MQTT Servers",
+        "companion": "Companion App"
       }
     },
     "system": {
       "label": "System",
       "items": {
         "plugins": "Plugins",
-        "emailTemplates": "Email Templates",
-        "mqttServers": "MQTT Servers",
+        "emails": "Emails",
+        "messagingSettings": "Messaging Settings",
         "csvExport": "CSV Export",
         "balena": "Balena",
-        "settings": "Settings"
+        "settings": "Settings",
+        "monitoring": "Monitoring"
       }
     }
   },

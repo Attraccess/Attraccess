@@ -17,7 +17,10 @@ import { CanManageMaintenance } from './canManageMaintenance.decorator';
 import { MaintenanceScheduleService } from './maintenance-schedule.service';
 import { CreateMaintenanceScheduleDto } from './dtos/create-maintenance-schedule.dto';
 import { UpdateMaintenanceScheduleDto } from './dtos/update-maintenance-schedule.dto';
+import { LicenseModuleType } from '../../license/license.service';
+import { RequiresLicense } from '../../license/require-license.decorator';
 
+@RequiresLicense(LicenseModuleType.MAINTENANCE)
 @ApiTags('Resource Maintenance Schedules')
 @Controller('resources/:resourceId/maintenance-schedules')
 @Auth()

@@ -20,7 +20,7 @@ import API_ERROR_TRANSLATIONS_EN from '../../global-translations/api-errors.en.j
 import { getTranslationKeyForApiError } from '../../utils/apiError';
 
 interface LoginFormProps {
-  onNeedsAccount: () => void;
+  onNeedsAccount: (() => void) | null;
   onForgotPassword: () => void;
 }
 
@@ -74,7 +74,7 @@ function LoginFormHeader(props: LoginFormProps & { isLocalSignupEnabled: boolean
   return (
     <div>
       <h2 className="text-3xl font-bold">{t('title')}</h2>
-      {isLocalSignupEnabled && (
+      {isLocalSignupEnabled && onNeedsAccount && (
         <p className="mt-2 text-gray-600 dark:text-gray-300">
           {t('noAccount')}{' '}
           <Button variant="secondary" onPress={onNeedsAccount} data-cy="login-form-sign-up-button">

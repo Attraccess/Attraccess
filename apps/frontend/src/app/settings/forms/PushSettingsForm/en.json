@@ -18,14 +18,14 @@
   "applyCustomButton": "Apply custom keys",
   "keysReplaced": {
     "title": "VAPID keys updated",
-    "description": "Removed {count} push subscription(s) bound to the old key. Affected users must re-enable push on their devices."
+    "description": "Removed {{count}} push subscription(s) bound to the old key. Affected users must re-enable push on their devices."
   },
   "errors": {
     "replaceFailed": "Could not update the VAPID keys."
   },
   "confirmWarning": {
     "title": "Replace VAPID keys?",
-    "description": "This deletes all {count} push subscription(s). Every user must re-enable push notifications on each device.",
+    "description": "This deletes all {{count}} push subscription(s). Every user must re-enable push notifications on each device.",
     "continue": "Continue",
     "cancel": "Cancel"
   },

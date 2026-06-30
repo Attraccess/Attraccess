@@ -24,6 +24,8 @@ export class MetricsService implements OnModuleInit {
 
   public readonly usersTotal: Gauge;
   public readonly usersRegisteredTotal: Counter;
+  public readonly usersLocaleSyncsTotal: Counter;
+  public readonly usersPerLocale: Gauge;
 
   public readonly resourcesTotal: Gauge;
   public readonly resourceUsageSessionsActive: Gauge;
@@ -50,6 +52,8 @@ export class MetricsService implements OnModuleInit {
   public readonly mqttServersHealthy: Gauge;
 
   public readonly pluginsLoaded: Gauge;
+
+  public readonly companionDownloadsTotal: Counter;
 
   constructor(
     @InjectRepository(User)
@@ -113,6 +117,20 @@ export class MetricsService implements OnModuleInit {
     this.usersRegisteredTotal = new Counter({
       name: 'attraccess_users_registered_total',
       help: 'Total number of user registrations',
+      registers: [this.registry],
+    });
+
+    this.usersLocaleSyncsTotal = new Counter({
+      name: 'attraccess_users_locale_syncs_total',
+      help: 'Total number of user locale sync calls, labelled by locale',
+      labelNames: ['locale'],
+      registers: [this.registry],
+    });
+
+    this.usersPerLocale = new Gauge({
+      name: 'attraccess_users_per_locale',
+      help: 'Number of users with each locale set',
+      labelNames: ['locale'],
       registers: [this.registry],
     });
 
@@ -237,11 +255,18 @@ export class MetricsService implements OnModuleInit {
       registers: [this.registry],
     });
 
+    this.companionDownloadsTotal = new Counter({
+      name: 'attraccess_companion_downloads_total',
+      help: 'Total number of companion app binary download attempts',
+      labelNames: ['platform', 'arch', 'status'],
+      registers: [this.registry],
+    });
+
   }
 
   async onModuleInit(): Promise<void> {
     this.logger.log('Initializing gauge metrics from database...');
-    const [users, resources, projects, groups, mqttServers, activeUsageSessions, activeAuthSessions] = await Promise.all([
+    const [users, resources, projects, groups, mqttServers, activeUsageSessions, activeAuthSessions, localeCounts] = await Promise.all([
       this.userRepository.count(),
       this.resourceRepository.count(),
       this.projectRepository.count(),
@@ -249,6 +274,12 @@ export class MetricsService implements OnModuleInit {
       this.mqttServerRepository.count(),
       this.resourceUsageRepository.count({ where: { endTime: IsNull() } }),
       this.sessionRepository.count({ where: { expiresAt: MoreThan(new Date()) } }),
+      this.userRepository
+        .createQueryBuilder('user')
+        .select('user.locale', 'locale')
+        .addSelect('COUNT(*)', 'count')
+        .groupBy('user.locale')
+        .getRawMany<{ locale: string; count: string }>(),
     ]);
 
     this.usersTotal.set(users);
@@ -258,6 +289,9 @@ export class MetricsService implements OnModuleInit {
     this.mqttServersTotal.set(mqttServers);
     this.resourceUsageSessionsActive.set(activeUsageSessions);
     this.authActiveSessions.set(activeAuthSessions);
+    for (const row of localeCounts) {
+      this.usersPerLocale.set({ locale: row.locale ?? 'en' }, parseInt(row.count, 10));
+    }
 
     try {
       this.pluginsLoaded.set(PluginService.getPlugins().length);

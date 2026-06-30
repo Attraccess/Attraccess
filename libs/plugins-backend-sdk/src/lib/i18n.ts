@@ -1,3 +1,5 @@
+import * as Handlebars from 'handlebars';
+
 type TranslationRecord = Record<string, unknown>;
 
 interface TranslationModules<T extends TranslationRecord = TranslationRecord> {
@@ -21,13 +23,6 @@ function getNestedValue(obj: TranslationRecord, key: string): string | undefined
   return typeof current === 'string' ? current : undefined;
 }
 
-function interpolate(template: string, vars: Record<string, unknown>): string {
-  return template.replace(/\{\{(\w+)\}\}/g, (_, key) => {
-    const val = vars[key];
-    return val !== undefined && val !== null ? String(val) : `{{${key}}}`;
-  });
-}
-
 export function createTranslator<T extends TranslationRecord>(translations: TranslationModules<T>) {
   return function t(locale: string, key: string, vars?: Record<string, unknown>): string {
     const lang = locale in translations ? locale : 'en';
@@ -39,6 +34,6 @@ export function createTranslator<T extends TranslationRecord>(translations: Tran
       return `!!!${key}!!!`;
     }
 
-    return vars ? interpolate(translation, vars) : translation;
+    return vars ? Handlebars.compile(translation)(vars) : translation;
   };
 }

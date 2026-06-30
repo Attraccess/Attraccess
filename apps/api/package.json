@@ -1,6 +1,6 @@
 {
   "name": "@attraccess/api",
-  "version": "1.7.0",
+  "version": "1.8.1",
   "private": true,
   "dependencies": {
     "@nestjs-modules/mailer": "^2.0.2",
@@ -19,6 +19,7 @@
     "@nestjs/typeorm": "^11.0.0",
     "@nestjs/websockets": "^11.1.0",
     "axios": "^1.13.5",
+    "ioredis": "^5.6.1",
     "bcrypt": "^6.0.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.0",
@@ -31,7 +32,7 @@
     "identity-obj-proxy": "^3.0.0",
     "mjml": "^5.0.1",
     "mqtt": "^5.12.1",
-    "nodemailer": "^8.0.4",
+    "nodemailer": "^9.0.1",
     "passport": "^0.7.0",
     "passport-custom": "^1.1.1",
     "passport-jwt": "^4.0.1",
@@ -42,6 +43,7 @@
     "tslib": "^2.8.1",
     "typeorm": "0.3.29",
     "uuid": "^14.0.0",
+    "nestjs-asyncapi": "^1.4.0",
     "ws": "^8.19.0",
     "zod": "^4.1.5"
   }

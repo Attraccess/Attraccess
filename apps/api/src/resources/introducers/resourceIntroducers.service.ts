@@ -1,18 +1,47 @@
-import { ResourceIntroducer, ResourceIntroducerType } from '@attraccess/database-entities';
-import { Inject, Injectable } from '@nestjs/common';
+import { ResourceIntroducer, ResourceIntroducerType, User } from '@attraccess/database-entities';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
 import { ResourceIntroducerChangedEvent } from './events/resource-introducer-changed.event';
+import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
+import { NotificationCategory } from '../../notifications/notification-types';
 
 @Injectable()
 export class ResourceIntroducersService {
+  private readonly logger = new Logger(ResourceIntroducersService.name);
+
   constructor(
     @InjectRepository(ResourceIntroducer)
     private readonly resourceIntroducerRepository: Repository<ResourceIntroducer>,
     @Inject(EventEmitter2)
     private readonly eventEmitter: EventEmitter2,
+    private readonly notifications: NotificationDispatchService,
   ) {}
+
+  private notifyAccessChange(resourceId: number, userId: number, type: ResourceIntroducerType, granted: boolean): void {
+    const role = type === ResourceIntroducerType.MAINTAINER ? 'maintainer' : 'introducer';
+    const title = 'Your resource access changed';
+    const body = granted
+      ? `You were made an ${role} for resource #${resourceId}.`.replace('an maintainer', 'a maintainer')
+      : `Your ${role} status for resource #${resourceId} was revoked.`;
+    const url = `/resources/${resourceId}`;
+
+    void this.notifications.dispatch({
+      category: NotificationCategory.ACCESS_CHANGES,
+      recipients: [{ id: userId } as User],
+      title,
+      body,
+      url,
+      dedupeKey: `resource-access-${resourceId}-${userId}-${role}-${granted ? 'granted' : 'revoked'}`,
+      sendEmail: (recipient) =>
+        this.notifications.sendEmailTemplate(recipient, NotificationCategory.ACCESS_CHANGES, {
+          accessChange: { title, body, url },
+        }),
+    }).catch((error) => {
+      this.logger.error(`Failed to notify user ${userId} about resource access changes: ${(error as Error).message}`);
+    });
+  }
 
   public async getMany(resourceId: number, type?: ResourceIntroducerType): Promise<ResourceIntroducer[]> {
     const directIntroducers = await this.resourceIntroducerRepository.find({
@@ -68,6 +97,7 @@ export class ResourceIntroducersService {
       if (existingIntroducer.type !== type) {
         existingIntroducer.type = type;
         await this.resourceIntroducerRepository.save(existingIntroducer);
+        this.notifyAccessChange(resourceId, userId, type, true);
         this.eventEmitter.emit(
           ResourceIntroducerChangedEvent.EVENT_NAME,
           new ResourceIntroducerChangedEvent(resourceId, userId),
@@ -78,6 +108,7 @@ export class ResourceIntroducersService {
 
     const introducer = this.resourceIntroducerRepository.create({ resourceId, userId, type });
     const savedIntroducer = await this.resourceIntroducerRepository.save(introducer);
+    this.notifyAccessChange(resourceId, userId, type, true);
     this.eventEmitter.emit(
       ResourceIntroducerChangedEvent.EVENT_NAME,
       new ResourceIntroducerChangedEvent(resourceId, userId),
@@ -92,6 +123,7 @@ export class ResourceIntroducersService {
     }
 
     await this.resourceIntroducerRepository.remove(introducer);
+    this.notifyAccessChange(resourceId, userId, introducer.type, false);
     this.eventEmitter.emit(
       ResourceIntroducerChangedEvent.EVENT_NAME,
       new ResourceIntroducerChangedEvent(resourceId, userId),

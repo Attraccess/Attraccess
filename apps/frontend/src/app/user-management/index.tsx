@@ -42,8 +42,6 @@ import { EmptyState } from '../../components/emptyState';
 import en from './en.json';
 import de from './de.json';
 import { useDebounce } from '../../hooks/useDebounce';
-import { AllowedSignupDomainsEditorModal } from './allowed-signup-domains-editor-modal';
-import { TwoFactorPolicyModal } from './two-factor-policy-modal';
 import { InviteUserModal } from './invite-user-modal';
 import { useNavigate } from 'react-router-dom';
 import { SimplePagination } from '../../components/simplePagination';
@@ -111,33 +109,6 @@ export const UserManagementPage: React.FC = () => {
               renderTrigger: (triggerProps) => (
                 <InviteUserModal>{(onOpen) => <Button {...triggerProps} onPress={onOpen} />}</InviteUserModal>
               ),
-            },
-            {
-              key: 'two-factor-policy',
-              label: t('actions.twoFactorPolicy'),
-              icon: <ShieldCheckIcon className="w-4 h-4" />,
-              renderTrigger: (triggerProps) => (
-                <TwoFactorPolicyModal>
-                  {(onOpenTwoFactorPolicy) => <Button {...triggerProps} onPress={onOpenTwoFactorPolicy} />}
-                </TwoFactorPolicyModal>
-              ),
-            },
-            {
-              key: 'allowed-signup-domains',
-              label: t('actions.editAllowedSignupDomains'),
-              icon: <Settings2Icon className="w-4 h-4" />,
-              renderTrigger: (triggerProps) => (
-                <AllowedSignupDomainsEditorModal>
-                  {(onOpen) => <Button {...triggerProps} onPress={onOpen} />}
-                </AllowedSignupDomainsEditorModal>
-              ),
-            },
-            {
-              key: 'sso',
-              label: t('actions.sso'),
-              icon: <KeyIcon className="w-4 h-4" />,
-              isHidden: !license?.modules.includes('sso'),
-              onPress: () => navigate('/sso/providers'),
             },
           ] satisfies PageAction[]
         }

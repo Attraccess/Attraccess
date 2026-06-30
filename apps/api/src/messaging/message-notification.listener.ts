@@ -1,5 +1,4 @@
-// Sends an email fallback and a browser push notification to offline conversation participants
-// who have an unread message.
+// Sends configurable message notifications to conversation participants.
 // FEATURE: Messaging email fallback for offline recipients
 // FEATURE: Messaging push notifications for offline recipients
 import { Injectable, Logger } from '@nestjs/common';
@@ -9,9 +8,8 @@ import { Repository } from 'typeorm';
 import { ConversationParticipant, Message, User } from '@attraccess/database-entities';
 import { MessageCreatedEvent } from './events/message-created.event';
 import { MessagingLiveService } from './messaging-live.service';
-import { MessagingService } from './messaging.service';
-import { EmailService } from '../email/email.service';
-import { PushService } from '../push/push.service';
+import { NotificationDispatchService } from '../notifications/notification-dispatch.service';
+import { NotificationCategory, NotificationChannel } from '../notifications/notification-types';
 
 const PUSH_PREVIEW_MAX_LENGTH = 140;
 
@@ -25,9 +23,7 @@ export class MessageNotificationListener {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private readonly liveService: MessagingLiveService,
-    private readonly messagingService: MessagingService,
-    private readonly emailService: EmailService,
-    private readonly pushService: PushService,
+    private readonly notifications: NotificationDispatchService,
   ) {}
 
   @OnEvent(MessageCreatedEvent.EVENT_NAME)
@@ -48,9 +44,12 @@ export class MessageNotificationListener {
       const sender = await this.userRepository.findOne({ where: { id: message.senderId } });
       const senderName = sender?.username ?? 'Someone';
 
+      await this.dispatchToast(recipients, message, senderName);
+
+      const offlineRecipients = recipients.filter((recipient) => !this.liveService.isOnline(recipient.userId));
       await Promise.all(
-        recipients.map((recipient) =>
-          this.notifyRecipient(recipient, message, senderName).catch((error) => {
+        offlineRecipients.map((recipient) =>
+          this.dispatchOfflineNotification(recipient, message, senderName).catch((error) => {
             this.logger.error(
               `Failed to send offline message notification to user ${recipient.userId} for conversation ${message.conversationId}: ${error.message}`,
               error.stack,
@@ -66,76 +65,81 @@ export class MessageNotificationListener {
     }
   }
 
-  private async notifyRecipient(
+  private async dispatchToast(
+    participants: ConversationParticipant[],
+    message: Message,
+    senderName: string,
+  ): Promise<void> {
+    const recipients = participants.map((participant) => participant.user).filter((user): user is User => Boolean(user));
+    if (recipients.length === 0) {
+      return;
+    }
+
+    await this.notifications.dispatch({
+      category: NotificationCategory.MESSAGES,
+      recipients,
+      actorId: message.senderId,
+      channels: [NotificationChannel.TOAST],
+      title: senderName,
+      body: message.content,
+      url: `/messages?conversation=${message.conversationId}`,
+      dedupeKey: `message-conversation-${message.conversationId}`,
+    });
+  }
+
+  private async dispatchOfflineNotification(
     participant: ConversationParticipant,
     message: Message,
     senderName: string,
   ): Promise<void> {
-    // Online recipients see the message live; no notification needed.
-    if (this.liveService.isOnline(participant.userId)) {
+    const recipient = participant.user;
+    if (!recipient) {
       return;
     }
 
-    // Email debounces per unread burst; push fires per message (expected chat UX).
-    await Promise.all([
-      this.sendEmailFallback(participant, message, senderName),
-      this.sendPushNotification(participant, message, senderName),
-    ]);
+    const preview = this.truncatePreview(message.content);
+
+    await this.notifications.dispatch({
+      category: NotificationCategory.MESSAGES,
+      recipients: [recipient],
+      actorId: message.senderId,
+      channels: [NotificationChannel.EMAIL, NotificationChannel.PUSH],
+      title: senderName,
+      body: preview,
+      url: `/messages?conversation=${message.conversationId}`,
+      dedupeKey: `message-conversation-${message.conversationId}`,
+      sendEmail: async (emailRecipient) => this.sendEmailFallback(participant, message, senderName, emailRecipient),
+    });
   }
 
   private async sendEmailFallback(
     participant: ConversationParticipant,
     message: Message,
     senderName: string,
+    recipient: User,
   ): Promise<void> {
     // Debounce per conversation: only one email per unread burst. If we already notified this
     // participant and they have not read the conversation since, skip until they catch up.
-    if (this.alreadyNotifiedForCurrentBurst(participant)) {
+    if (this.alreadyNotifiedForCurrentBurst(participant) || !recipient.email) {
       return;
     }
 
-    // Respect the opt-out preference.
-    if (!(await this.messagingService.shouldEmailMessageOnOffline(participant.userId))) {
-      return;
-    }
-
-    const recipient = participant.user;
-    if (!recipient?.email) {
-      return;
-    }
-
-    await this.emailService.sendNewMessageEmail(recipient, {
-      conversationId: message.conversationId,
-      senderName,
-      preview: message.content,
+    await this.notifications.sendEmailTemplate(recipient, NotificationCategory.MESSAGES, {
+      message: {
+        conversationId: message.conversationId,
+        senderName,
+        preview: message.content,
+      },
     });
 
     // Record the delivery marker so subsequent messages in this burst do not re-send.
     await this.participantRepository.update({ id: participant.id }, { lastNotifiedAt: message.createdAt });
   }
 
-  private async sendPushNotification(
-    participant: ConversationParticipant,
-    message: Message,
-    senderName: string,
-  ): Promise<void> {
-    // Respect the opt-out preference (separate toggle from email).
-    if (!(await this.messagingService.shouldPushMessageOnOffline(participant.userId))) {
-      return;
-    }
-
-    const preview =
-      message.content.length > PUSH_PREVIEW_MAX_LENGTH
-        ? `${message.content.slice(0, PUSH_PREVIEW_MAX_LENGTH).trimEnd()}…`
-        : message.content;
-
-    await this.pushService.sendToUser(participant.userId, {
-      title: senderName,
-      body: preview,
-      url: `/messages?conversation=${message.conversationId}`,
-      // One notification per conversation: newer messages replace the previous one.
-      tag: `message-conversation-${message.conversationId}`,
-    });
+  private truncatePreview(content: string): string {
+    return content.length > PUSH_PREVIEW_MAX_LENGTH
+      ? `${content.slice(0, PUSH_PREVIEW_MAX_LENGTH).trimEnd()}…`
+      : content;
   }
 
   private alreadyNotifiedForCurrentBurst(participant: ConversationParticipant): boolean {

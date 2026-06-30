@@ -7,7 +7,16 @@
     "password-changed": "Passwort geändert",
     "resource-usage-billing-transaction-summary": "Ressourcennutzung Kostenübersicht",
     "user-invitation": "Benutzereinladung",
-    "project-invitation": "Projekteinladung"
+    "project-invitation": "Projekteinladung",
+    "delete-account-confirmation": "Kontolöschung Bestätigung",
+    "resource-health-changed": "Ressourcen-Gesundheitsstatus geändert",
+    "user-retraining-required": "Nachschulung erforderlich",
+    "maintenance-request-created": "Wartungsanfrage erstellt",
+    "message-received": "Neue Nachricht (Offline-Fallback)",
+    "resource-usage-note-added": "Ressourcen-Nutzungsnotiz hinzugefügt",
+    "resource-takeover": "Ressourcenübernahme",
+    "resource-session-ended": "Ressourcen-Sitzung beendet",
+    "access-change": "Zugriffsänderung"
   },
   "form": {
     "subject": "Betreff",
@@ -51,6 +60,17 @@
     "close": "Schließen",
     "cancel": "Abbrechen",
     "save": "Änderungen speichern",
-    "expand": "Editor vergrößern"
+    "expand": "Editor vergrößern",
+    "resetToDefault": "Standard wiederherstellen"
+  },
+  "resetConfirm": {
+    "title": "Vorlage auf Standard zurücksetzen?",
+    "message": "Dies überschreibt Ihre Anpassungen mit der Standard-Vorlage. Dies kann nicht rückgängig gemacht werden.",
+    "confirm": "Zurücksetzen",
+    "cancel": "Abbrechen"
+  },
+  "toast": {
+    "resetSuccess": "Vorlage auf Standard zurückgesetzt.",
+    "resetError": "Vorlage konnte nicht zurückgesetzt werden."
   }
 }

@@ -15,9 +15,13 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { Module, OnModuleInit } from '@nestjs/common';
 import { PluginModule } from '../plugin-system/plugin.module';
 import { AttractapModule } from '../attractap/attractap.module';
+import { CompanionModule } from '../companion/companion.module';
 import { AnalyticsModule } from '../analytics/analytics.module';
 import { EmailTemplateModule } from '../email-template/email-template.module';
+import { EmailLayoutModule } from '../email-layout/email-layout.module';
 import sessionConfig from '../config/session.config';
+import valkeyConfig from '../config/valkey.config';
+import { ValkeyModule } from '../valkey/valkey.module';
 import { LicenseModule } from '../license/license.module';
 import { LicenseService } from '../license/license.service';
 import { BillingModule } from '../billing/billing.module';
@@ -29,14 +33,16 @@ import { MetricsModule } from '../metrics/metrics.module';
 import { VersionModule } from '../version/version.module';
 import { MessagingModule } from '../messaging/messaging.module';
 import { PushModule } from '../push/push.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
-      load: [appConfiguration, storageConfigObject, sessionConfig],
+      load: [appConfiguration, storageConfigObject, sessionConfig, valkeyConfig],
       isGlobal: true,
     }),
 
+    ValkeyModule,
     EventEmitterModule.forRoot(),
     ScheduleModule.forRoot(),
     UsersAndAuthModule,
@@ -114,14 +120,17 @@ import { PushModule } from '../push/push.module';
     VersionModule,
     PluginModule.forRoot(),
     AttractapModule,
+    CompanionModule,
     AnalyticsModule,
     EmailTemplateModule,
+    EmailLayoutModule,
     LicenseModule,
     BillingModule,
     EncryptionModule,
     ProjectsModule,
     MessagingModule,
     PushModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

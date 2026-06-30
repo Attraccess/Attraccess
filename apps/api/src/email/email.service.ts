@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { EmailTemplateService } from '../email-template/email-template.service';
+import { EmailLayoutService } from '../email-layout/email-layout.service';
 import { createTransport } from 'nodemailer';
 import {
   User,
@@ -14,11 +15,12 @@ import {
 } from '@attraccess/database-entities';
 import { dbCurrencyToUserCurrency } from '@attraccess/shared';
 import * as Handlebars from 'handlebars';
-import { MjmlService } from '../email-template/mjml.service';
 import { EntityManager } from 'typeorm';
 import { SettingsService } from '../settings/settings.service';
 import { MetricsService } from '../metrics/metrics.service';
 import { ExternalCallTimer } from '../metrics/instrumentation/external/external.helper';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 
 @Injectable()
 export class EmailService {
@@ -27,9 +29,11 @@ export class EmailService {
   constructor(
     private readonly settingsService: SettingsService,
     private readonly emailTemplateService: EmailTemplateService,
-    private readonly mjmlService: MjmlService,
+    private readonly emailLayoutService: EmailLayoutService,
     private readonly metricsService: MetricsService,
     private readonly externalCallTimer: ExternalCallTimer,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
   ) {
     this.logger.debug('Initializing EmailService');
     this.logger.debug('EmailService initialized');
@@ -50,8 +54,8 @@ export class EmailService {
     const subjectTemplate = hbs.compile(template.subject);
     const subject = subjectTemplate(context);
 
-    const bodyMjml = await this.mjmlService.validateAndConvert(template.body);
-    const bodyTemplate = hbs.compile(bodyMjml);
+    const bodyHtml = await this.emailLayoutService.renderWithTemplate(template);
+    const bodyTemplate = hbs.compile(bodyHtml);
     const body = bodyTemplate(context);
 
     return { subject, body };
@@ -107,6 +111,8 @@ export class EmailService {
       host: {
         frontend: url,
         backend: url,
+        notificationPreferencesUrl: `${url}/account`,
+        logoUrl: `${url}/logo.png`,
       },
       url,
     } as const;
@@ -115,9 +121,7 @@ export class EmailService {
   async sendVerificationEmail(user: User, verificationToken: string) {
     const url = await this.settingsService.getUrl();
     if (!url) throw new Error('Application URL not configured');
-    const verificationUrl = `${url}/verify-email?email=${encodeURIComponent(
-      user.email,
-    )}&token=${verificationToken}`;
+    const verificationUrl = `${url}/verify-email?email=${encodeURIComponent(user.email)}&token=${verificationToken}`;
 
     const context = {
       ...(await this.getBaseContext(user)),
@@ -386,6 +390,60 @@ export class EmailService {
     await this.sendEmail(recipient, EmailTemplateType.RESOURCE_USAGE_NOTE_ADDED, context);
   }
 
+  async sendResourceTakeoverEmail(
+    recipient: User,
+    resource: Pick<Resource, 'id' | 'name'>,
+    takeover: { actorName: string },
+  ) {
+    if (!recipient?.email) {
+      return;
+    }
+
+    const base = await this.getBaseContext(recipient);
+    const resourceUrl = `${base.host.frontend}/resources/${resource.id}`;
+
+    const context = {
+      ...base,
+      resource: {
+        id: resource.id,
+        name: resource.name,
+        url: resourceUrl,
+      },
+      takeover,
+    };
+
+    await this.sendEmail(recipient, EmailTemplateType.RESOURCE_TAKEOVER, context);
+  }
+
+  async sendAccessChangeEmail(
+    recipient: User,
+    accessChange: { title: string; body: string; url?: string },
+  ) {
+    const resolvedRecipient = recipient?.email
+      ? recipient
+      : await this.userRepository.findOne({ where: { id: recipient.id } });
+
+    if (!resolvedRecipient?.email) {
+      return;
+    }
+
+    const base = await this.getBaseContext(resolvedRecipient);
+    const url = accessChange.url
+      ? new URL(accessChange.url, base.host.frontend).toString()
+      : undefined;
+
+    const context = {
+      ...base,
+      accessChange: {
+        title: accessChange.title,
+        body: accessChange.body,
+        url,
+      },
+    };
+
+    await this.sendEmail(resolvedRecipient, EmailTemplateType.ACCESS_CHANGE, context);
+  }
+
   async sendNewMessageEmail(
     recipient: User,
     message: { conversationId: number; senderName: string; preview: string },
@@ -396,8 +454,7 @@ export class EmailService {
 
     const base = await this.getBaseContext(recipient);
     const conversationUrl = `${base.host.frontend}/messages?conversation=${message.conversationId}`;
-    const preview =
-      message.preview.length > 200 ? `${message.preview.slice(0, 200).trimEnd()}…` : message.preview;
+    const preview = message.preview.length > 200 ? `${message.preview.slice(0, 200).trimEnd()}…` : message.preview;
 
     const context = {
       ...base,
@@ -409,6 +466,35 @@ export class EmailService {
     };
 
     await this.sendEmail(recipient, EmailTemplateType.MESSAGE_RECEIVED, context);
+  }
+
+  async sendResourceSessionEndedEmail(
+    recipient: User,
+    resource: Pick<Resource, 'id' | 'name'>,
+    session: { id: number; endedAt: Date | string | null; endedBy: string },
+  ) {
+    if (!recipient?.email) {
+      return;
+    }
+
+    const base = await this.getBaseContext(recipient);
+    const resourceUrl = `${base.host.frontend}/resources/${resource.id}`;
+
+    const context = {
+      ...base,
+      resource: {
+        id: resource.id,
+        name: resource.name,
+        url: resourceUrl,
+      },
+      session: {
+        id: session.id,
+        endedAt: session.endedAt instanceof Date ? session.endedAt.toISOString() : session.endedAt,
+        endedBy: session.endedBy,
+      },
+    };
+
+    await this.sendEmail(recipient, EmailTemplateType.RESOURCE_SESSION_ENDED, context);
   }
 
   private async createTransporter(): Promise<{ transporter: ReturnType<typeof createTransport>; from: string }> {

@@ -9,11 +9,12 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Observable, Subject } from 'rxjs';
+import { finalize } from 'rxjs/operators';
 import { OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Resource } from '@attraccess/database-entities';
-import { ResourceUsageEvent } from '../usage/events/resource-usage.events';
+import { ResourceSessionStartedEvent, ResourceUsageSessionEndedEvent, ResourceUsageSessionTakenOverEvent } from '../usage/events/resource-usage.events';
 import { ResourceHealthChangedEvent } from '../health/events/resource-health-changed.event';
 import { ApiTags } from '@nestjs/swagger';
 import { SseInstrumentation } from '../../metrics/instrumentation/sse/sse.helper';
@@ -38,11 +39,15 @@ export class SSEController implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit() {
-    // Send keep-alive messages every 30 seconds to prevent connection timeouts
+    // Send keep-alive messages every 10 seconds to prevent connection timeouts
     this.keepAliveInterval = setInterval(() => {
-      // For each resource subject, emit a keep-alive event
-      this.resourceSubjects.forEach((subject) => {
-        subject.next({ data: { keepalive: true } });
+      // For each resource subject, emit a keep-alive event; prune dead subjects
+      this.resourceSubjects.forEach((subject, id) => {
+        if (subject.observed) {
+          subject.next({ data: { keepalive: true } });
+        } else {
+          this.resourceSubjects.delete(id);
+        }
       });
     }, 10000);
   }
@@ -89,8 +94,17 @@ export class SSEController implements OnModuleInit, OnModuleDestroy {
       });
     }, 1000);
 
-    // Create an observable from the subject
-    return this.sse.wrap('resource_usage', subject.asObservable());
+    // Create an observable from the subject; prune when last subscriber disconnects
+    return this.sse.wrap(
+      'resource_usage',
+      subject.asObservable().pipe(
+        finalize(() => {
+          if (!subject.observed) {
+            this.resourceSubjects.delete(resourceId);
+          }
+        }),
+      ),
+    );
   }
 
   private async getResourceInUseStatus(resourceId: number): Promise<boolean> {
@@ -110,31 +124,43 @@ export class SSEController implements OnModuleInit, OnModuleDestroy {
     return !!activeUsage;
   }
 
-  @OnEvent(ResourceUsageEvent.EVENT_NAME)
-  handleResourceUsage(event: ResourceUsageEvent) {
-    const {
-      usage: { resource },
-    } = event;
+  private emitToResource(resourceId: number, data: object): void {
+    const subject = this.resourceSubjects.get(resourceId);
+    if (!subject) return;
+    subject.next({ data });
+  }
 
-    // Check if we have any subscribers for this resource
-    if (!this.resourceSubjects.has(resource.id)) {
-      return;
-    }
-
-    // Get the subject for this resource
-    const subject = this.resourceSubjects.get(resource.id);
-
-    // Create event data with inUse flag
-    const eventData = {
+  @OnEvent(ResourceSessionStartedEvent.EVENT_NAME)
+  handleResourceUsage(event: ResourceSessionStartedEvent) {
+    const { usage: { resource } } = event;
+    this.emitToResource(resource.id, {
       ...event,
       inUse: true,
-      eventType: ResourceUsageEvent.EVENT_NAME,
-    };
+      eventType: ResourceSessionStartedEvent.EVENT_NAME,
+    });
+    this.logger.debug(`Emitted ${ResourceSessionStartedEvent.EVENT_NAME} event for resource ${resource.id}`);
+  }
 
-    // Emit the event to all subscribers
-    subject.next({ data: eventData });
+  @OnEvent(ResourceUsageSessionEndedEvent.EVENT_NAME)
+  handleResourceSessionEnded(event: ResourceUsageSessionEndedEvent) {
+    const resourceId = event.usage.resourceId;
+    this.emitToResource(resourceId, {
+      eventType: ResourceUsageSessionEndedEvent.EVENT_NAME,
+      resourceId,
+      inUse: false,
+    });
+    this.logger.debug(`Emitted ${ResourceUsageSessionEndedEvent.EVENT_NAME} event for resource ${resourceId}`);
+  }
 
-    this.logger.debug(`Emitted ${ResourceUsageEvent.EVENT_NAME} event for resource ${resource.id}`);
+  @OnEvent(ResourceUsageSessionTakenOverEvent.EVENT_NAME)
+  handleResourceUsageTakenOver(event: ResourceUsageSessionTakenOverEvent) {
+    const resourceId = event.resource.id;
+    this.emitToResource(resourceId, {
+      eventType: ResourceUsageSessionTakenOverEvent.EVENT_NAME,
+      resourceId,
+      inUse: true,
+    });
+    this.logger.debug(`Emitted ${ResourceUsageSessionTakenOverEvent.EVENT_NAME} event for resource ${resourceId}`);
   }
 
   @OnEvent(ResourceHealthChangedEvent.EVENT_NAME)

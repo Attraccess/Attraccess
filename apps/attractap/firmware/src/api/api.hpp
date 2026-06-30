@@ -269,7 +269,7 @@ public:
     void sendResetNfcCard(bool success);
     void sendResetNfcCardCancel();
 
-    void startResourceUsageSession(uint32_t resourceId, uint32_t projectId = 0);
+    void startResourceUsageSession(uint32_t resourceId, uint32_t projectId = 0, bool forceTakeOver = false);
     void stopResourceUsageSession(uint32_t resourceId);
     void requestFormFields(uint32_t resourceId, ResourceUsageFormActionType action, uint32_t formId, uint32_t offset, uint32_t limit);
     void submitFormPage(uint32_t resourceId, ResourceUsageFormActionType action, const FormPageSubmission &page);

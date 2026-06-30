@@ -4,6 +4,7 @@ import { EmailTemplate, EmailTemplateTranslation, EmailTemplateType } from '@att
 import { EntityManager, Repository } from 'typeorm';
 import { UpdateEmailTemplateDto } from './dto/update-email-template.dto';
 import { MjmlService } from './mjml.service';
+import { EMAIL_TEMPLATE_DEFAULTS, readDefaultTemplateBody } from './email-defaults';
 
 export interface TranslationKey {
   key: string;
@@ -63,6 +64,20 @@ export class EmailTemplateService {
       body: updateEmailTemplateDto.body,
       subject: updateEmailTemplateDto.subject,
     });
+
+    return this.findOne(type);
+  }
+
+  async resetToDefault(type: EmailTemplateType): Promise<EmailTemplate> {
+    await this.findOne(type);
+
+    const defaults = EMAIL_TEMPLATE_DEFAULTS[type];
+    const body = readDefaultTemplateBody(type);
+
+    await this.emailTemplateRepository.update(
+      { type },
+      { subject: defaults.subject, body, variables: defaults.variables },
+    );
 
     return this.findOne(type);
   }

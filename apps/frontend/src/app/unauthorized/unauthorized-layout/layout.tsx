@@ -1,4 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { AttraccessLogo } from '@attraccess/ui';
 import React from 'react';
 import en from './en.json';
 import de from './de.json';
@@ -31,7 +32,13 @@ export function UnauthorizedLayout({ children }: UnauthorizedLayoutProps) {
 
       {/* Right side with form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8 sm:p-12 lg:p-16">
-        <div className="w-full max-w-md space-y-8">{children}</div>
+        <div className="w-full max-w-md space-y-8">
+          {/* Branding — always shown above the form */}
+          <div className="flex items-center justify-center">
+            <AttraccessLogo className="h-12 w-auto" />
+          </div>
+          {children}
+        </div>
       </div>
     </div>
   );

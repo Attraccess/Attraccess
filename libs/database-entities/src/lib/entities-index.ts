@@ -47,6 +47,8 @@ import {
   GetVariablesNodeDataSchema,
   VariableChangedNodeDataSchema,
   VariableScopeSchema,
+  CompanionLockNodeDataSchema,
+  CompanionIdleActiveNodeDataSchema,
 } from './entities/resourceFlowNode';
 import {
   ResourceHealthState,
@@ -97,6 +99,12 @@ import { ConversationParticipant } from './entities/conversation-participant.ent
 import { Message, MessageReferenceType } from './entities/message.entity';
 import { NotificationPreference } from './entities/notification-preference.entity';
 import { PushSubscription } from './entities/push-subscription.entity';
+import { CompanionDevice } from './entities/companion-device.entity';
+import { EmailLayout, EMAIL_LAYOUT_SINGLETON_ID } from './entities/email-layout.entity';
+import { Permission } from './entities/permission.entity';
+import { Role } from './entities/role.entity';
+import { RolePermission } from './entities/role-permission.entity';
+import { UserRole, UserRoleSource } from './entities/user-role.entity';
 
 // Export all entities individually
 export {
@@ -185,6 +193,8 @@ export {
   GetVariablesNodeDataSchema,
   VariableChangedNodeDataSchema,
   VariableScopeSchema,
+  CompanionLockNodeDataSchema,
+  CompanionIdleActiveNodeDataSchema,
   PasswordPolicy,
   PASSWORD_POLICY_SINGLETON_ID,
   PasswordHistory,
@@ -199,6 +209,14 @@ export {
   MessageReferenceType,
   NotificationPreference,
   PushSubscription,
+  CompanionDevice,
+  EmailLayout,
+  EMAIL_LAYOUT_SINGLETON_ID,
+  Permission,
+  Role,
+  RolePermission,
+  UserRole,
+  UserRoleSource,
 };
 
 // Export the entities object
@@ -251,4 +269,9 @@ export const entities = {
   Message,
   NotificationPreference,
   PushSubscription,
+  CompanionDevice,
+  Permission,
+  Role,
+  RolePermission,
+  UserRole,
 };

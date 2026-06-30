@@ -125,6 +125,34 @@
           }
         }
       },
+      "companion": {
+        "idle": {
+          "title": "Companion: machine idle",
+          "description": "Fires when a companion device's machine has been idle for the configured threshold.",
+          "outputs": {
+            "output": "Output"
+          },
+          "config": {
+            "deviceId": {
+              "label": "Companion device",
+              "placeholder": "Select a device..."
+            }
+          }
+        },
+        "active": {
+          "title": "Companion: machine active",
+          "description": "Fires when a companion device's machine returns from idle.",
+          "outputs": {
+            "output": "Output"
+          },
+          "config": {
+            "deviceId": {
+              "label": "Companion device",
+              "placeholder": "Select a device..."
+            }
+          }
+        }
+      },
       "variable": {
         "changed": {
           "title": "Variable changed",
@@ -445,6 +473,32 @@
               }
             },
             "retain": { "label": "Retain message" }
+          }
+        }
+      },
+      "companion": {
+        "lock-pc": {
+          "title": "Lock PC",
+          "description": "Locks the screen on a registered companion device.",
+          "inputs": { "input": "Input" },
+          "outputs": { "output": "Output" },
+          "config": {
+            "deviceId": {
+              "label": "Companion device",
+              "placeholder": "Select a device..."
+            }
+          }
+        },
+        "unlock-pc": {
+          "title": "Unlock PC",
+          "description": "Unlocks the screen on a registered companion device.",
+          "inputs": { "input": "Input" },
+          "outputs": { "output": "Output" },
+          "config": {
+            "deviceId": {
+              "label": "Companion device",
+              "placeholder": "Select a device..."
+            }
           }
         }
       },

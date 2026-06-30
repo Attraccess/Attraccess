@@ -5,6 +5,7 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PageHeader } from '../../components/pageHeader';
 import { SSOProvidersList } from './providers/SSOProvidersList';
 import { useAuth } from '../../hooks/useAuth';
+import { useLicenseServiceGetLicenseInformation } from '@attraccess/react-query-client';
 import en from './en.json';
 import de from './de.json';
 
@@ -13,10 +14,15 @@ export const SSOProvidersPage: React.FC = () => {
   const canManageSSO = hasPermission('canManageSystemConfiguration');
   const { t } = useTranslations({ en, de });
   const navigate = useNavigate();
+  const { data: license } = useLicenseServiceGetLicenseInformation();
 
   // Redirect if user doesn't have permission
   if (!canManageSSO) {
     return <Navigate to="/" />;
+  }
+
+  if (license && !license.modules.includes('sso')) {
+    return null;
   }
 
   return (

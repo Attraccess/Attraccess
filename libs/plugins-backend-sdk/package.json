@@ -1,6 +1,6 @@
 {
   "name": "@attraccess/plugins-backend-sdk",
-  "version": "1.7.0",
+  "version": "1.8.1",
   "type": "commonjs",
   "main": "./src/index.js",
   "types": "./src/index.d.ts",
@@ -29,6 +29,7 @@
     "typeorm": "0.3.29",
     "@nestjs/swagger": "^11.2.0",
     "express": "4.22.1",
-    "@nestjs/passport": "^11.0.5"
+    "@nestjs/passport": "^11.0.5",
+    "handlebars": "^4.7.9"
   }
 }

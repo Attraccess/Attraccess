@@ -3,7 +3,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { In, IsNull, Not } from 'typeorm';
 import { AutoIntroductionTarget, Resource, ResourceUsage } from '@attraccess/database-entities';
 import { SupervisedUsageAutoPromotionListener } from './supervised-usage-auto-promotion.listener';
-import { SupervisedUsageEndedEvent } from './events/resource-usage.events';
+import { ResourceSupervisedUsageEndedEvent } from './events/resource-usage.events';
 import { ResourceIntroductionsService } from '../introductions/resouceIntroductions.service';
 import { ResourceGroupsIntroductionsService } from '../groups/introductions/resourceGroups.introductions.service';
 
@@ -28,7 +28,7 @@ describe('SupervisedUsageAutoPromotionListener', () => {
       ...overrides,
     } as Resource);
 
-  const event = new SupervisedUsageEndedEvent(RESOURCE_ID, USER_ID, SUPERVISOR_ID, 99);
+  const event = new ResourceSupervisedUsageEndedEvent(RESOURCE_ID, USER_ID, SUPERVISOR_ID, 99);
 
   beforeEach(async () => {
     usageRepository = { count: jest.fn().mockResolvedValue(0) };

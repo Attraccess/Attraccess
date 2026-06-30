@@ -14,10 +14,17 @@
         "command": "node {projectRoot}/copy-attractap-firmware-into-assets.js"
       }
     },
+    "copy-companion-into-assets": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": {
+        "command": "node {projectRoot}/copy-companion-into-assets.js"
+      }
+    },
     "build": {
       "executor": "nx:run-commands",
       "cache": true,
-      "dependsOn": ["copy-attractap-firmware-into-assets"],
+      "dependsOn": ["copy-attractap-firmware-into-assets", "copy-companion-into-assets"],
       "inputs": [
         "production",
         "^production",
@@ -55,7 +62,7 @@
       "executor": "@nx/js:node",
       "defaultConfiguration": "development",
       "continuous": true,
-      "dependsOn": [],
+      "dependsOn": ["copy-attractap-firmware-into-assets"],
       "options": {
         "buildTarget": "api:build",
         "watch": true
@@ -76,6 +83,32 @@
       "outputs": ["{workspaceRoot}/dist/apps/{projectName}-swagger/swagger.json"],
       "options": {
         "command": "LICENSE_KEY=\"I AM USING THIS SOFTWARE ONLY FOR NON-PROFIT AND COMPLY TO ALL TERMS OF THE LICENSE.md at https://github.com/Attraccess/Attraccess/blob/main/LICENSE.md\" AUTH_SESSION_SECRET=super-secret ATTRACCESS_URL=http://localhost:3000 SMTP_SERVICE=SMTP SMTP_HOST=not-a-host SMTP_PORT=1234 SMTP_FROM=mail@attraccess.org node dist/apps/api-swagger/main.js"
+      }
+    },
+    "asyncapi-build": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "{projectRoot}/src/companion/companion.gateway.ts",
+        "{projectRoot}/src/companion/companion.types.ts",
+        "{projectRoot}/src/main.export-asyncapi.ts",
+        "{projectRoot}/webpack.config.asyncapi.js"
+      ],
+      "outputs": ["{workspaceRoot}/dist/apps/api-asyncapi"],
+      "options": {
+        "command": "webpack-cli build",
+        "config": "apps/api/webpack.config.asyncapi.js",
+        "args": ["node-env=production"],
+        "output-path": "dist/apps/api-asyncapi"
+      }
+    },
+    "export-asyncapi": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["asyncapi-build"],
+      "cache": true,
+      "outputs": ["{workspaceRoot}/dist/apps/api/asyncapi.json"],
+      "options": {
+        "command": "node dist/apps/api-asyncapi/main.js"
       }
     },
     "test": {

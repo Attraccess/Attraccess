@@ -18,6 +18,14 @@ import { AuthService } from './auth/auth.service';
 import { AuthController } from './auth/auth.controller';
 import { TwoFactorController } from './auth/two-factor.controller';
 import { SessionService } from './auth/session.service';
+import { SESSION_STORE, SessionStore } from './auth/session-store/session-store';
+import { SqliteSessionStore } from './auth/session-store/sqlite.session-store';
+import { ValkeySessionStore } from './auth/session-store/valkey.session-store';
+import { VALKEY_CLIENT } from '../valkey/valkey.module';
+import { TokenHashService } from '../encryption/token-hash.service';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import type { Redis } from 'ioredis';
 
 // Strategies
 import { LocalStrategy } from './strategies/local.strategy';
@@ -59,6 +67,7 @@ import { AuthAuditLogger } from './rate-limiting/auth-audit.logger';
 import { AuthRateLimitInterceptor } from './rate-limiting/auth-rate-limit.interceptor';
 import { LoginRateLimitGuard } from './rate-limiting/login.rate-limit.guard';
 import { PasswordPolicyModule } from './password-policy/password-policy.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -78,8 +87,29 @@ import { PasswordPolicyModule } from './password-policy/password-policy.module';
     LicenseModule,
     SettingsModule,
     PasswordPolicyModule,
+    NotificationsModule,
   ],
   providers: [
+    {
+      provide: SESSION_STORE,
+      inject: [
+        { token: VALKEY_CLIENT, optional: true },
+        getRepositoryToken(Session),
+        getRepositoryToken(User),
+        TokenHashService,
+      ],
+      useFactory: (
+        valkeyClient: Redis | null,
+        sessionRepo: Repository<Session>,
+        userRepo: Repository<User>,
+        tokenHashService: TokenHashService,
+      ): SessionStore => {
+        if (valkeyClient) {
+          return new ValkeySessionStore(valkeyClient, userRepo, tokenHashService);
+        }
+        return new SqliteSessionStore(sessionRepo, tokenHashService);
+      },
+    },
     UsersService,
     SignupDomainService,
     UserRegistrationService,
@@ -130,16 +160,21 @@ import { PasswordPolicyModule } from './password-policy/password-policy.module';
   ],
   // Controller order is load-bearing: NestJS registers routes per-controller in
   // array order, and Express matches first-registered-wins. Controllers holding
-  // static GET/PATCH routes (me, local-signup-*) MUST precede the ones holding
-  // ':id'/':id/*' routes so those static paths are not shadowed by ':id'.
-  // UserPermissionsController is intentionally kept last so GET 'with-permission'
-  // stays shadowed by GET ':id' — preserving the existing (pre-refactor) behavior.
+  // static GET/PATCH routes MUST precede the ones holding ':id'/':id/*' routes
+  // so those static paths are not shadowed by ':id'.
+  //
+  // Rule: within any group sharing the same @Controller(prefix), put controllers
+  // with static-only routes BEFORE controllers with :param routes of the same
+  // HTTP method and segment depth.
+  //
+  // UserPermissionsController (GET 'with-permission') MUST come before
+  // UsersAdminController (GET ':id') to keep 'with-permission' reachable.
   controllers: [
     UsersRegistrationController,
     UserInvitationsController,
     UserProfileController,
-    UsersAdminController,
     UserPermissionsController,
+    UsersAdminController,
     AuthController,
     TwoFactorController,
     SSOController,

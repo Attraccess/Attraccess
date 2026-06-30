@@ -5,8 +5,9 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Resource, ResourceIntroducer, ResourceMaintenanceRequest, User } from '@attraccess/database-entities';
-import { MaintenanceRequestCreatedEvent } from './events/maintenance-request-created.event';
-import { EmailService } from '../../email/email.service';
+import { ResourceMaintenanceRequestCreatedEvent } from './events/maintenance-request-created.event';
+import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
+import { NotificationCategory } from '../../notifications/notification-types';
 
 @Injectable()
 export class MaintenanceRequestNotificationListener {
@@ -21,11 +22,11 @@ export class MaintenanceRequestNotificationListener {
     private readonly requestRepository: Repository<ResourceMaintenanceRequest>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
-    private readonly emailService: EmailService,
+    private readonly notifications: NotificationDispatchService,
   ) {}
 
-  @OnEvent(MaintenanceRequestCreatedEvent.EVENT_NAME)
-  async handleRequestCreated(event: MaintenanceRequestCreatedEvent): Promise<void> {
+  @OnEvent(ResourceMaintenanceRequestCreatedEvent.EVENT_NAME)
+  async handleRequestCreated(event: ResourceMaintenanceRequestCreatedEvent): Promise<void> {
     try {
       const request = await this.requestRepository.findOne({
         where: { id: event.requestId },
@@ -51,26 +52,18 @@ export class MaintenanceRequestNotificationListener {
 
       const requestedBy = request.createdByUser?.username ?? 'A user';
 
-      this.logger.log(
-        `Dispatching maintenance-request emails to ${recipients.length} user(s) for resource ${resource.id}`,
-      );
-
-      await Promise.all(
-        recipients.map((recipient) =>
-          this.emailService
-            .sendMaintenanceRequestedEmail(
-              recipient,
-              { id: resource.id, name: resource.name },
-              { id: request.id, reason: request.reason, requestedBy },
-            )
-            .catch((error) => {
-              this.logger.error(
-                `Failed to send maintenance-request email to user ${recipient.id} for resource ${resource.id}: ${error.message}`,
-                error.stack,
-              );
-            }),
-        ),
-      );
+      await this.notifications.dispatch({
+        category: NotificationCategory.MAINTENANCE_REQUESTS,
+        recipients,
+        title: `Maintenance requested for ${resource.name}`,
+        body: `${requestedBy} requested maintenance: ${request.reason}`,
+        url: `/resources/${resource.id}/maintenance`,
+        sendEmail: (recipient) =>
+          this.notifications.sendEmailTemplate(recipient, NotificationCategory.MAINTENANCE_REQUESTS, {
+            resource: { id: resource.id, name: resource.name },
+            request: { id: request.id, reason: request.reason, requestedBy },
+          }),
+      });
     } catch (error) {
       this.logger.error(
         `Failed to process maintenance-request notification for resource ${event.resourceId}: ${error.message}`,

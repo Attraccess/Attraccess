@@ -1,0 +1,36 @@
+<mj-section background-color="#FFFFFF" padding="32px 20px 8px 20px">
+  <mj-column>
+    <mj-text padding="0 0 12px 0">{{t 'greeting' 'Hello'}} {{user.username}},</mj-text>
+    <mj-text padding="0 0 8px 0">
+      {{t 'body_prefix' 'Your session on'}} <strong>{{resource.name}}</strong> {{t 'body_suffix' 'has ended. Here is your receipt:'}}
+    </mj-text>
+    <mj-text font-size="14px" color="#4B5563" padding="0 0 4px 0">
+      {{t 'start_label' 'Start:'}} {{usage.startTime}}<br/>
+      {{t 'end_label' 'End:'}} {{usage.endTime}}<br/>
+      {{t 'duration_label' 'Duration:'}} {{usage.roundedMinutes}} min
+    </mj-text>
+  </mj-column>
+</mj-section>
+<mj-section background-color="#FFFFFF" padding="0 20px 24px 20px">
+  <mj-column>
+    <mj-table>
+      <tr><th align="left">{{t 'col_item' 'Item'}}</th><th align="right">{{t 'col_qty' 'Qty'}}</th><th align="right">{{t 'col_unit' 'Unit'}}</th><th align="right">{{t 'col_total' 'Total'}}</th></tr>
+      {{#each items}}
+      <tr>
+        <td>{{this.name}}</td>
+        <td align="right">{{this.quantity}}</td>
+        <td align="right">{{this.unitPrice}}</td>
+        <td align="right">{{this.total}}</td>
+      </tr>
+      {{/each}}
+      <tr>
+        <td colspan="3" align="right"><strong>{{t 'total_credits' 'Total Credits'}}</strong></td>
+        <td align="right"><strong>{{totalCredits}}</strong></td>
+      </tr>
+      <tr>
+        <td colspan="3" align="right">{{t 'new_balance' 'New Balance'}}</td>
+        <td align="right">{{newBalance}}</td>
+      </tr>
+    </mj-table>
+  </mj-column>
+</mj-section>

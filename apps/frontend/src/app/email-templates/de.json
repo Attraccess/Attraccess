@@ -1,6 +1,11 @@
 {
   "title": "E-Mail-Vorlagen",
-  "subtitle": "Verwalten Sie die vom System verwendeten E-Mail-Vorlagen.",
+  "subtitle": "Verwalten Sie die vom System verwendeten E-Mail-Vorlagen. Das globale Layout (Kopfzeile, Fußzeile, Stile) wird von allen Vorlagen gemeinsam genutzt.",
+  "editLayout": "Globales Layout bearbeiten",
+  "tabs": {
+    "templates": "Vorlagen",
+    "layout": "Globales Layout"
+  },
   "columns": {
     "type": "Art",
     "subject": "Betreff",
@@ -17,6 +22,11 @@
     "resource-usage-billing-transaction-summary": "Ressourcen-Nutzung Kostenübersicht",
     "user-invitation": "Benutzereinladung",
     "project-invitation": "Projekteinladung",
-    "delete-account-confirmation": "Kontolöschung Bestätigung"
+    "delete-account-confirmation": "Kontolöschung Bestätigung",
+    "resource-health-changed": "Ressourcen-Gesundheitsstatus geändert",
+    "user-retraining-required": "Nachschulung erforderlich",
+    "maintenance-request-created": "Wartungsanfrage erstellt",
+    "message-received": "Neue Nachricht (Offline-Fallback)",
+    "resource-usage-note-added": "Ressourcen-Nutzungsnotiz hinzugefügt"
   }
 }

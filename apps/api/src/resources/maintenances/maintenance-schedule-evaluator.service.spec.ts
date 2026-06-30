@@ -4,7 +4,7 @@ import { Repository } from 'typeorm';
 import { MaintenanceScheduleEvaluatorService } from './maintenance-schedule-evaluator.service';
 import { ResourceMaintenanceService } from './maintenance.service';
 import { ResourceMaintenanceChangedEvent } from './events/resource-maintenance-changed.event';
-import { ResourceUsageEvent } from '../usage/events/resource-usage.events';
+import { ResourceSessionStartedEvent } from '../usage/events/resource-usage.events';
 import { CronTimer } from '../../metrics/instrumentation/cron/cron.helper';
 import {
   ResourceMaintenanceSchedule,
@@ -266,18 +266,18 @@ describe('MaintenanceScheduleEvaluatorService', () => {
     it('should not call evaluateResource when usage has no resource or resource id', async () => {
       const evalSpy = jest.spyOn(service, 'evaluateResource').mockResolvedValue();
 
-      await service.onResourceUsage(new ResourceUsageEvent({ id: 1, resource: null } as never));
+      await service.onResourceUsage(new ResourceSessionStartedEvent({ id: 1, resource: null } as never));
       expect(evalSpy).not.toHaveBeenCalled();
 
       await service.onResourceUsage(
-        new ResourceUsageEvent({ id: 1, resource: {} } as never),
+        new ResourceSessionStartedEvent({ id: 1, resource: {} } as never),
       );
       expect(evalSpy).not.toHaveBeenCalled();
     });
 
     it('should not call evaluateResource when session not ended (endTime null)', async () => {
       const evalSpy = jest.spyOn(service, 'evaluateResource').mockResolvedValue();
-      const event = new ResourceUsageEvent({
+      const event = new ResourceSessionStartedEvent({
         id: 1,
         endTime: null,
         resource: { id: resourceId },
@@ -290,7 +290,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
 
     it('should call evaluateResource when session ended (endTime set)', async () => {
       const evalSpy = jest.spyOn(service, 'evaluateResource').mockResolvedValue();
-      const event = new ResourceUsageEvent({
+      const event = new ResourceSessionStartedEvent({
         id: 1,
         endTime: new Date(),
         resource: { id: resourceId },

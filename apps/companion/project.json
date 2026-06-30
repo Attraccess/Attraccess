@@ -1,0 +1,99 @@
+{
+  "name": "companion",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/companion/src",
+  "projectType": "application",
+  "tags": ["tag:scope:companion"],
+  "targets": {
+    "serve": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["companion-ws-client:generate"],
+      "options": {
+        "cwd": "apps/companion",
+        "parallel": true,
+        "commands": [
+          "vite dev --config renderer/vite.config.ts --port 5273 --strictPort",
+          "node tools/dev.mjs"
+        ]
+      }
+    },
+    "build-renderer": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["production", "^production"],
+      "outputs": ["{projectRoot}/renderer/dist"],
+      "options": {
+        "cwd": "apps/companion/renderer",
+        "command": "vite build --config vite.config.ts"
+      }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "dependsOn": ["companion-ws-client:build", "build-renderer"],
+      "inputs": ["production", "^production"],
+      "outputs": ["{workspaceRoot}/apps/companion/out"],
+      "options": {
+        "cwd": "apps/companion",
+        "commands": [
+          "esbuild src/main.ts --bundle --platform=node --external:electron --external:keytar --external:usb --outfile=out/main.js --format=cjs --alias:@attraccess/companion-ws-client=../../libs/companion-ws-client/src/index.ts",
+          "esbuild src/preload.ts --bundle --platform=node --external:electron --outfile=out/preload.js --format=cjs"
+        ],
+        "parallel": false
+      }
+    },
+    "package": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "dependsOn": ["build"],
+      "outputs": ["{workspaceRoot}/dist/apps/companion"],
+      "options": {
+        "cwd": "apps/companion",
+        "command": "CI=true electron-builder --config electron-builder.config.cjs --dir"
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["companion-ws-client:generate"],
+      "options": {
+        "cwd": "apps/companion",
+        "commands": [
+          "tsc -p tsconfig.app.json --noEmit",
+          "tsc -p tsconfig.renderer.json --noEmit"
+        ],
+        "parallel": false
+      }
+    },
+    "test": {
+      "executor": "@nx/jest:jest",
+      "cache": true,
+      "inputs": [
+        "default",
+        "^production",
+        "{workspaceRoot}/jest.preset.js",
+        {
+          "externalDependencies": ["jest"]
+        }
+      ],
+      "outputs": ["{workspaceRoot}/coverage/apps/companion"],
+      "options": {
+        "jestConfig": "apps/companion/jest.config.ts",
+        "passWithNoTests": true
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint",
+      "options": {
+        "lintFilePatterns": ["apps/companion/**/*.ts", "apps/companion/**/*.tsx"]
+      }
+    },
+    "test": {
+      "executor": "@nx/jest:jest",
+      "cache": true,
+      "inputs": ["default", "^production", "{workspaceRoot}/jest.preset.js"],
+      "options": {
+        "jestConfig": "apps/companion/jest.config.ts"
+      }
+    }
+  }
+}

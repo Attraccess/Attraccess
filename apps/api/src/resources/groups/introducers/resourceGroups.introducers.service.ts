@@ -1,18 +1,47 @@
 import { InjectRepository } from '@nestjs/typeorm';
-import { Inject, Injectable } from '@nestjs/common';
-import { ResourceIntroducer, ResourceIntroducerType } from '@attraccess/database-entities';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { ResourceIntroducer, ResourceIntroducerType, User } from '@attraccess/database-entities';
 import { Repository } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResourceGroupIntroducerChangedEvent } from './events/resource-group-introducer-changed.event';
+import { NotificationDispatchService } from '../../../notifications/notification-dispatch.service';
+import { NotificationCategory } from '../../../notifications/notification-types';
 
 @Injectable()
 export class ResourceGroupsIntroducersService {
+  private readonly logger = new Logger(ResourceGroupsIntroducersService.name);
+
   constructor(
     @InjectRepository(ResourceIntroducer)
     private readonly resourceIntroducerRepository: Repository<ResourceIntroducer>,
     @Inject(EventEmitter2)
     private readonly eventEmitter: EventEmitter2,
+    private readonly notifications: NotificationDispatchService,
   ) {}
+
+  private notifyAccessChange(groupId: number, userId: number, type: ResourceIntroducerType, granted: boolean): void {
+    const role = type === ResourceIntroducerType.MAINTAINER ? 'maintainer' : 'introducer';
+    const title = 'Your group access changed';
+    const body = granted
+      ? `You were made an ${role} for group #${groupId}.`.replace('an maintainer', 'a maintainer')
+      : `Your ${role} status for group #${groupId} was revoked.`;
+    const url = `/resource-groups/${groupId}`;
+
+    void this.notifications.dispatch({
+      category: NotificationCategory.ACCESS_CHANGES,
+      recipients: [{ id: userId } as User],
+      title,
+      body,
+      url,
+      dedupeKey: `group-access-${groupId}-${userId}-${role}-${granted ? 'granted' : 'revoked'}`,
+      sendEmail: (recipient) =>
+        this.notifications.sendEmailTemplate(recipient, NotificationCategory.ACCESS_CHANGES, {
+          accessChange: { title, body, url },
+        }),
+    }).catch((error) => {
+      this.logger.error(`Failed to notify user ${userId} about group access changes: ${(error as Error).message}`);
+    });
+  }
 
   public async getMany(groupId: number): Promise<ResourceIntroducer[]> {
     return this.resourceIntroducerRepository.find({
@@ -36,6 +65,7 @@ export class ResourceGroupsIntroducersService {
       if (existingIntroducer.type !== type) {
         existingIntroducer.type = type;
         await this.resourceIntroducerRepository.save(existingIntroducer);
+        this.notifyAccessChange(groupId, userId, type, true);
         this.eventEmitter.emit(
           ResourceGroupIntroducerChangedEvent.EVENT_NAME,
           new ResourceGroupIntroducerChangedEvent(groupId),
@@ -45,6 +75,7 @@ export class ResourceGroupsIntroducersService {
     }
 
     const savedIntroducer = await this.createOne(groupId, userId, type);
+    this.notifyAccessChange(groupId, userId, type, true);
     this.eventEmitter.emit(
       ResourceGroupIntroducerChangedEvent.EVENT_NAME,
       new ResourceGroupIntroducerChangedEvent(groupId),
@@ -74,6 +105,7 @@ export class ResourceGroupsIntroducersService {
     }
 
     const savedIntroducer = await this.resourceIntroducerRepository.remove(introducer);
+    this.notifyAccessChange(groupId, userId, introducer.type, false);
     this.eventEmitter.emit(
       ResourceGroupIntroducerChangedEvent.EVENT_NAME,
       new ResourceGroupIntroducerChangedEvent(groupId),

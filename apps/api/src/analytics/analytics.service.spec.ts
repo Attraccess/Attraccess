@@ -10,7 +10,7 @@ describe('AnalyticsService', () => {
   let repository: jest.Mocked<Repository<ResourceUsage>>;
 
   const mockRepository = {
-    find: jest.fn(),
+    findAndCount: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -43,7 +43,7 @@ describe('AnalyticsService', () => {
   });
 
   describe('getResourceUsageHoursInDateRange', () => {
-    it('should return resource usage for a date range', async () => {
+    it('should return resource usage for a date range with default pagination', async () => {
       const dateRange: DateRangeValue = {
         start: new Date('2023-01-01'),
         end: new Date('2023-01-31'),
@@ -64,11 +64,11 @@ describe('AnalyticsService', () => {
         },
       ];
 
-      mockRepository.find.mockResolvedValue(expectedResourceUsage);
+      mockRepository.findAndCount.mockResolvedValue([expectedResourceUsage, 1]);
 
       const result = await service.getResourceUsageHoursInDateRange(dateRange);
 
-      expect(repository.find).toHaveBeenCalledWith({
+      expect(repository.findAndCount).toHaveBeenCalledWith({
         where: {
           startTime: Between(dateRange.start, dateRange.end),
         },
@@ -78,9 +78,26 @@ describe('AnalyticsService', () => {
           startTime: 'DESC',
         },
         relations: ['user', 'resource', 'supervisorUser'],
+        skip: 0,
+        take: 500,
       });
 
-      expect(result).toEqual(expectedResourceUsage);
+      expect(result).toEqual([expectedResourceUsage, 1]);
+    });
+
+    it('should apply skip/take for page 2', async () => {
+      const dateRange: DateRangeValue = {
+        start: new Date('2023-01-01'),
+        end: new Date('2023-01-31'),
+      };
+
+      mockRepository.findAndCount.mockResolvedValue([[], 1000]);
+
+      await service.getResourceUsageHoursInDateRange(dateRange, 2, 100);
+
+      expect(repository.findAndCount).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: 100, take: 100 }),
+      );
     });
 
     it('should return an empty array when no records are found', async () => {
@@ -89,23 +106,11 @@ describe('AnalyticsService', () => {
         end: new Date('2023-02-28'),
       };
 
-      mockRepository.find.mockResolvedValue([]);
+      mockRepository.findAndCount.mockResolvedValue([[], 0]);
 
       const result = await service.getResourceUsageHoursInDateRange(dateRange);
 
-      expect(repository.find).toHaveBeenCalledWith({
-        where: {
-          startTime: Between(dateRange.start, dateRange.end),
-        },
-        order: {
-          id: 'DESC',
-          userId: 'DESC',
-          startTime: 'DESC',
-        },
-        relations: ['user', 'resource', 'supervisorUser'],
-      });
-
-      expect(result).toEqual([]);
+      expect(result).toEqual([[], 0]);
     });
   });
 });

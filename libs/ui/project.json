@@ -1,0 +1,32 @@
+{
+  "name": "ui",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/ui/src",
+  "projectType": "library",
+  "tags": ["tag:scope:ui"],
+  "targets": {
+    "build": {
+      "executor": "@nx/vite:build",
+      "cache": true,
+      "inputs": ["production", "^production"],
+      "outputs": ["{workspaceRoot}/dist/libs/ui"],
+      "options": {
+        "project": "libs/ui/vite.config.ts",
+        "outputPath": "dist/libs/ui"
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "libs/ui",
+        "command": "tsc -p tsconfig.lib.json --noEmit"
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint",
+      "options": {
+        "lintFilePatterns": ["libs/ui/**/*.ts", "libs/ui/**/*.tsx"]
+      }
+    }
+  }
+}

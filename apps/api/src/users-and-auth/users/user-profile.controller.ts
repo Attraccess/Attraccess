@@ -84,7 +84,7 @@ export class UserProfileController {
   @Auth()
   @Patch('me/locale')
   @ApiOperation({
-    summary: 'Update preferred locale (last one wins — call on every language change and app load)',
+    summary: 'Update preferred locale',
     operationId: 'updateMyLocale',
   })
   @ApiResponse({ status: 200, description: 'Locale updated.', type: User })

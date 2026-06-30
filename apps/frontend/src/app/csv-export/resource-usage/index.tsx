@@ -1,6 +1,6 @@
-import { ResourceUsage, useAnalyticsServiceGetResourceUsageHoursInDateRange } from '@attraccess/react-query-client';
+import { ResourceUsage, useAnalyticsServiceGetResourceUsageHoursInDateRangeInfinite } from '@attraccess/react-query-client';
 import { ExportProps } from '../export-props';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDateTimeFormatter, useNumberFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import de from './de.json';
 import en from './en.json';
@@ -12,14 +12,34 @@ export function ResourceUsageExport(props: ExportProps) {
     en,
   });
 
+  const [fetchAll, setFetchAll] = useState(false);
+
   const {
-    data: resourceUsageExport,
-    status: fetchStatus,
+    data,
+    status,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
     refetch,
-  } = useAnalyticsServiceGetResourceUsageHoursInDateRange({
+  } = useAnalyticsServiceGetResourceUsageHoursInDateRangeInfinite({
     start: props.start.toISOString(),
     end: props.end.toISOString(),
   });
+
+  // ponytail: only fetch remaining pages after user clicks export
+  useEffect(() => {
+    if (fetchAll && hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  }, [fetchAll, hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  const resourceUsageExport = useMemo(
+    () => data?.pages.flatMap((page) => page.data) ?? [],
+    [data],
+  );
+
+  const isFetchingAllPages = fetchAll && (hasNextPage || isFetchingNextPage);
+  const fetchStatus = status === 'success' && isFetchingAllPages ? 'pending' : status;
 
   const formatDateTimeFull = useDateTimeFormatter({ showDate: true, showTime: true, showSeconds: true });
   const formatUsageDuration = useNumberFormatter();
@@ -130,12 +150,14 @@ export function ResourceUsageExport(props: ExportProps) {
   return (
     <CsvExportDrawerContent
       columns={columns as ColumnDefinition<ResourceUsage>[]}
-      items={(resourceUsageExport ?? []) as ResourceUsage[]}
+      items={resourceUsageExport as ResourceUsage[]}
       refetch={refetch}
       options={options}
       setOption={setOption}
       filename="resource-usage.csv"
       queryStatus={fetchStatus}
+      onFetchAllPages={() => setFetchAll(true)}
+      isFetchingAllPages={isFetchingAllPages}
     />
   );
 }

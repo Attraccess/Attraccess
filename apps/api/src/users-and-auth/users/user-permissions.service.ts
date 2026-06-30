@@ -13,6 +13,8 @@ import { UpdateUserPermissionsDto } from './dtos/updateUserPermissions.dto';
 import { BulkUpdateUserPermissionsDto } from './dtos/bulkUpdateUserPermissions.dto';
 import { PermissionFilter } from './dtos/getUsersWithPermissionQuery.dto';
 import { PaginatedUsersResponseDto } from './dtos/paginatedUsersResponse.dto';
+import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
+import { NotificationCategory } from '../../notifications/notification-types';
 
 /**
  * System-permission reads/writes for users, honoring SSO-managed permission
@@ -25,7 +27,32 @@ export class UserPermissionsService {
   constructor(
     private readonly usersService: UsersService,
     private readonly ssoService: SSOService,
+    private readonly notifications: NotificationDispatchService,
   ) {}
+
+  private permissionsChanged(before: Partial<SystemPermissions>, after: Partial<SystemPermissions>): boolean {
+    return (Object.keys(after) as Array<keyof SystemPermissions>).some((key) => before[key] !== after[key]);
+  }
+
+  private notifyPermissionsChanged(user: User, actorId: number): void {
+    const title = 'Your permissions changed';
+    const body = 'Your system permissions were updated.';
+
+    void this.notifications.dispatch({
+      category: NotificationCategory.ACCESS_CHANGES,
+      recipients: [user],
+      title,
+      body,
+      actorId,
+      dedupeKey: `system-permissions-${user.id}`,
+      sendEmail: (recipient) =>
+        this.notifications.sendEmailTemplate(recipient, NotificationCategory.ACCESS_CHANGES, {
+          accessChange: { title, body },
+        }),
+    }).catch((error) => {
+      this.logger.error(`Failed to notify user ${user.id} about permission changes: ${(error as Error).message}`);
+    });
+  }
 
   private async getSsoManagedPermissions(user: User): Promise<string[]> {
     const authenticationDetails = user.authenticationDetails ?? [];
@@ -131,6 +158,10 @@ export class UserPermissionsService {
     const updatedUser = await this.usersService.updateOne(id, updates);
     this.logger.debug(`Successfully updated permissions for user ID: ${id}`);
 
+    if (this.permissionsChanged(user.systemPermissions, updates.systemPermissions)) {
+      this.notifyPermissionsChanged(updatedUser, requestUser.id);
+    }
+
     return updatedUser;
   }
 
@@ -195,6 +226,10 @@ export class UserPermissionsService {
         // Update the user
         const updatedUser = await this.usersService.updateOne(update.userId, updates);
         this.logger.debug(`Successfully updated permissions for user ID: ${update.userId}`);
+
+        if (this.permissionsChanged(user.systemPermissions, updates.systemPermissions)) {
+          this.notifyPermissionsChanged(updatedUser, requestUser.id);
+        }
 
         updatedUsers.push(updatedUser);
       } catch (error) {

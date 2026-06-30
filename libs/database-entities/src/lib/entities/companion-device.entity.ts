@@ -1,0 +1,40 @@
+import { Column, Entity, JoinTable, ManyToMany, PrimaryGeneratedColumn } from 'typeorm';
+import { ApiProperty } from '@nestjs/swagger';
+import { Exclude } from 'class-transformer';
+import { Resource } from './resource.entity';
+
+@Entity()
+export class CompanionDevice {
+  @PrimaryGeneratedColumn()
+  @ApiProperty({ description: 'The ID of the companion device' })
+  id!: number;
+
+  @Column({ type: 'text', nullable: false, default: 'Unnamed Device', unique: true })
+  @ApiProperty({ description: 'The display name of the companion device' })
+  name!: string;
+
+  @Column({ type: 'text', nullable: false })
+  @Exclude()
+  tokenHash!: string;
+
+  @ManyToMany(() => Resource)
+  @JoinTable()
+  @ApiProperty({ description: 'Resources this device controls', type: () => Resource, isArray: true })
+  resources!: Resource[];
+
+  @Column({ type: 'boolean', default: false })
+  @ApiProperty({ description: 'Whether this device is currently locked (persisted so a restart re-locks)' })
+  locked!: boolean;
+
+  @Column({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
+  @ApiProperty({ description: 'Last time this device connected' })
+  lastConnection!: Date;
+
+  @Column({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
+  @ApiProperty({ description: 'First time this device connected' })
+  firstConnection!: Date;
+
+  @Column({ type: 'text', nullable: true, default: null })
+  @ApiProperty({ description: 'App version reported by this device on last connect', nullable: true })
+  appVersion!: string | null;
+}

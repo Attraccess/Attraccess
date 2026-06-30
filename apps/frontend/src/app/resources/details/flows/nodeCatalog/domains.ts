@@ -7,13 +7,14 @@ import {
   DoorOpenIcon,
   GlobeIcon,
   HeartPulseIcon,
+  MonitorIcon,
   MessageSquareIcon,
   ShuffleIcon,
 } from 'lucide-react';
 
-export type Domain = 'manual' | 'resource' | 'door' | 'mqtt' | 'http' | 'logic' | 'health';
+export type Domain = 'manual' | 'resource' | 'door' | 'mqtt' | 'http' | 'logic' | 'health' | 'companion';
 
-export const DOMAIN_ORDER: Domain[] = ['manual', 'resource', 'door', 'mqtt', 'http', 'logic', 'health'];
+export const DOMAIN_ORDER: Domain[] = ['manual', 'resource', 'door', 'mqtt', 'http', 'logic', 'health', 'companion'];
 
 interface DomainDef {
   color: string;
@@ -28,12 +29,14 @@ export const DOMAINS: Record<Domain, DomainDef> = {
   door:     { color: 'amber',  iconBg: 'bg-amber-100 dark:bg-amber-900/30',   iconFg: 'text-amber-700 dark:text-amber-300',   icon: DoorOpenIcon },
   mqtt:     { color: 'purple', iconBg: 'bg-purple-100 dark:bg-purple-900/30', iconFg: 'text-purple-700 dark:text-purple-300', icon: MessageSquareIcon },
   http:     { color: 'cyan',   iconBg: 'bg-cyan-100 dark:bg-cyan-900/30',     iconFg: 'text-cyan-700 dark:text-cyan-300',     icon: GlobeIcon },
-  logic:    { color: 'slate',  iconBg: 'bg-slate-100 dark:bg-slate-800',      iconFg: 'text-slate-700 dark:text-slate-300',   icon: ShuffleIcon },
-  health:   { color: 'rose',   iconBg: 'bg-rose-100 dark:bg-rose-900/30',     iconFg: 'text-rose-700 dark:text-rose-300',     icon: HeartPulseIcon },
+  logic:     { color: 'slate',  iconBg: 'bg-slate-100 dark:bg-slate-800',        iconFg: 'text-slate-700 dark:text-slate-300',   icon: ShuffleIcon },
+  health:    { color: 'rose',   iconBg: 'bg-rose-100 dark:bg-rose-900/30',       iconFg: 'text-rose-700 dark:text-rose-300',     icon: HeartPulseIcon },
+  companion: { color: 'indigo', iconBg: 'bg-indigo-100 dark:bg-indigo-900/30',   iconFg: 'text-indigo-700 dark:text-indigo-300', icon: MonitorIcon },
 };
 
 export function nodeTypeDomain(nodeType: string): Domain {
   if (nodeType === 'input.button') return 'manual';
+  if (nodeType.includes('.companion.')) return 'companion';
   if (nodeType.includes('.door.')) return 'door';
   if (nodeType.includes('.health.')) return 'health';
   if (nodeType.includes('.http.')) return 'http';

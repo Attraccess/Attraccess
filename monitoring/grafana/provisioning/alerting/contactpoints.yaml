@@ -2,9 +2,11 @@ apiVersion: 1
 
 # Pushover contact point. Secrets are NOT stored here — they are read from the
 # grafana container environment via Grafana's $__env{} interpolation. Set them
-# as balena service variables on the `grafana` service (never commit them):
-#   balena env set PUSHOVER_API_TOKEN '<token>'   -d <uuid> -s grafana
-#   balena env set PUSHOVER_USER_KEY  '<userkey>' -d <uuid> -s grafana
+# as balena *device* or *fleet* variables (NOT service-specific) so that both
+# the grafana and monitoring-init services see them (ATT-593 — balena does not
+# support ${VAR:-} compose syntax so these cannot be passed via compose env):
+#   balena env set PUSHOVER_API_TOKEN '<token>'   -d <uuid>
+#   balena env set PUSHOVER_USER_KEY  '<userkey>' -d <uuid>
 contactPoints:
   - orgId: 1
     name: Pushover

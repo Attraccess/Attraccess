@@ -1,0 +1,13 @@
+{
+  "title": "Version & Updates",
+  "currentVersion": "Aktuelle Version",
+  "commitHash": "Commit",
+  "noCommit": "Unbekannt",
+  "devVersion": "Entwicklungs-Build",
+  "updateAvailable": "Update verfügbar",
+  "upToDate": "Aktuell",
+  "checkFailed": "Update-Prüfung fehlgeschlagen",
+  "latestVersion": "Aktuellste: {{version}}",
+  "viewRelease": "Release ansehen",
+  "viewCommit": "Commit ansehen"
+}

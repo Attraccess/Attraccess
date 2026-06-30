@@ -1,0 +1,137 @@
+name: Companion App
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    paths:
+      - 'apps/companion/**'
+      - '.github/workflows/companion.yml'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - uses: ./.github/actions/setup
+
+      - name: Install Linux packaging dependencies
+        run: sudo apt-get install -y fakeroot rpm
+
+      - name: Build Linux companion (x64 + arm64)
+        # The companion project.json must configure electron-builder to output:
+        #   apps/companion/dist/companion_linux_x64.AppImage
+        #   apps/companion/dist/companion_linux_arm64.AppImage
+        run: pnpm nx run companion:build
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: companion-linux-${{ github.run_id }}
+          path: |
+            apps/companion/dist/companion_linux_x64.AppImage
+            apps/companion/dist/companion_linux_arm64.AppImage
+          if-no-files-found: warn
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - uses: ./.github/actions/setup
+
+      - name: Set up macOS code signing
+        if: ${{ secrets.APPLE_CERTIFICATE != '' }}
+        uses: ./.github/actions/macos-codesign-setup
+        with:
+          certificate: ${{ secrets.APPLE_CERTIFICATE }}
+          certificate-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+
+      - name: Build macOS companion (universal)
+        # The companion project.json must configure electron-builder to output:
+        #   apps/companion/dist/companion_mac_universal.dmg
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.APPLE_CERTIFICATE != '' && 'true' || 'false' }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: pnpm nx run companion:build
+
+      - name: Clean up keychain
+        if: ${{ secrets.APPLE_CERTIFICATE != '' && always() }}
+        run: '[ -n "$KEYCHAIN_PATH" ] && security delete-keychain "$KEYCHAIN_PATH" || true'
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: companion-macos-${{ github.run_id }}
+          path: apps/companion/dist/companion_mac_universal.dmg
+          if-no-files-found: warn
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - uses: ./.github/actions/setup
+
+      - name: Set up Windows code signing
+        if: ${{ secrets.WINDOWS_CERT_BASE64 != '' }}
+        uses: ./.github/actions/windows-codesign-setup
+        with:
+          cert-base64: ${{ secrets.WINDOWS_CERT_BASE64 }}
+          cert-password: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+
+      - name: Build Windows companion (x64)
+        # The companion project.json must configure electron-builder to output:
+        #   apps/companion/dist/companion_win_x64.exe
+        shell: bash
+        run: pnpm nx run companion:build
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: companion-windows-${{ github.run_id }}
+          path: apps/companion/dist/companion_win_x64.exe
+          if-no-files-found: warn
+
+  pr-comment:
+    needs: [build-linux, build-macos, build-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build PR comment body
+        id: comment-body
+        run: |
+          set -euo pipefail
+          out="$(mktemp)"
+          {
+            echo "## Companion app artifacts"
+            echo ""
+            echo "Commit \`${{ github.event.pull_request.head.sha }}\` · workflow run [\`${{ github.run_id }}\`](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+            echo ""
+            echo "Unsigned binaries are available in the [workflow artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}):"
+            echo ""
+            echo "| Artifact | Platform |"
+            echo "| --- | --- |"
+            echo "| \`companion-linux-${{ github.run_id }}\` | Linux x64 + arm64 AppImage |"
+            echo "| \`companion-macos-${{ github.run_id }}\` | macOS universal DMG |"
+            echo "| \`companion-windows-${{ github.run_id }}\` | Windows x64 NSIS installer |"
+          } > "$out"
+          {
+            echo 'body<<EOF_BODY'
+            cat "$out"
+            echo 'EOF_BODY'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Post sticky PR comment with companion artifacts
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: companion-artifacts
+          message: ${{ steps.comment-body.outputs.body }}
