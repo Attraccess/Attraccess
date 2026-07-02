@@ -92,6 +92,13 @@ export function NotificationPreferencesForm() {
     [mutate],
   );
 
+  const toggleCategory = useCallback(
+    (category: NotificationCategory, value: boolean) => {
+      mutate({ requestBody: { category, channels: { email: value, push: value, toast: value } } });
+    },
+    [mutate],
+  );
+
   const runBulkUpdate = useCallback(
     async (
       updates: Array<{ category: NotificationCategory; channelValues: Partial<Record<NotificationChannel, boolean>> }>,
@@ -125,18 +132,6 @@ export function NotificationPreferencesForm() {
     [runBulkUpdate],
   );
 
-  const toggleGroup = useCallback(
-    (groupCategories: NotificationCategory[], value: boolean) => {
-      void runBulkUpdate(
-        groupCategories.map((category) => ({
-          category,
-          channelValues: { email: value, push: value, toast: value },
-        })),
-      );
-    },
-    [runBulkUpdate],
-  );
-
   const toggleAll = useCallback(
     (value: boolean) => {
       void runBulkUpdate(
@@ -149,20 +144,21 @@ export function NotificationPreferencesForm() {
     [categoryGroups, runBulkUpdate],
   );
 
+  const isCategoryAllEnabled = useCallback(
+    (category: NotificationCategory) =>
+      channels.every((ch) => Boolean(getCategoryPreference(preferences?.categories, category)?.channels[ch])),
+    [preferences],
+  );
+
   const isGroupChannelAllEnabled = useCallback(
     (groupCategories: NotificationCategory[], channel: NotificationChannel) =>
       groupCategories.every((cat) => Boolean(getCategoryPreference(preferences?.categories, cat)?.channels[channel])),
     [preferences],
   );
 
-  const isGroupAllEnabled = useCallback(
-    (groupCategories: NotificationCategory[]) => channels.every((ch) => isGroupChannelAllEnabled(groupCategories, ch)),
-    [isGroupChannelAllEnabled],
-  );
-
   const isAllEnabled = useMemo(
-    () => categoryGroups.every((g) => isGroupAllEnabled(g.categories)),
-    [categoryGroups, isGroupAllEnabled],
+    () => categoryGroups.flatMap((g) => g.categories).every((cat) => isCategoryAllEnabled(cat)),
+    [categoryGroups, isCategoryAllEnabled],
   );
 
   const disabled = isLoading || isBulkUpdating;
@@ -204,24 +200,14 @@ export function NotificationPreferencesForm() {
         {categoryGroups.map((group) => {
           return (
             <section key={group.id} data-testid={`notification-group-${group.id}`} className="flex flex-col gap-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex flex-col gap-1">
-                  <h3 className="text-sm font-semibold text-default-700">{t(`groups.${group.id}.label`)}</h3>
-                  <p className="text-xs text-default-500">{t(`groups.${group.id}.description`)}</p>
-                </div>
-                <LabeledSwitch
-                  aria-label={`${t('toggleAll.toggleGroup')} ${t(`groups.${group.id}.label`)}`}
-                  isSelected={isGroupAllEnabled(group.categories)}
-                  isDisabled={disabled}
-                  onChange={(value) => toggleGroup(group.categories, value)}
-                  data-testid={`notifications-toggle-group-${group.id}`}
-                  data-cy={`notifications-toggle-group-${group.id}`}
-                />
+              <div className="flex flex-col gap-1">
+                <h3 className="text-sm font-semibold text-default-700">{t(`groups.${group.id}.label`)}</h3>
+                <p className="text-xs text-default-500">{t(`groups.${group.id}.description`)}</p>
               </div>
 
               <div
                 data-testid={`notification-channel-labels-${group.id}`}
-                className="hidden grid-cols-[minmax(0,1fr)_repeat(3,minmax(4rem,6rem))] gap-3 px-3 text-xs font-medium text-default-500 lg:grid"
+                className="hidden grid-cols-[minmax(0,1fr)_repeat(3,minmax(4rem,6rem))_minmax(4rem,6rem)] gap-3 px-3 text-xs font-medium text-default-500 lg:grid"
               >
                 <span aria-hidden="true" />
                 {channels.map((channel) => (
@@ -238,6 +224,7 @@ export function NotificationPreferencesForm() {
                     />
                   </div>
                 ))}
+                <span className="text-center">{t('columns.all')}</span>
               </div>
 
               <div className="flex flex-col gap-3 lg:gap-0 lg:divide-y lg:divide-default-200 lg:rounded-lg lg:border lg:border-default-200">
@@ -245,7 +232,7 @@ export function NotificationPreferencesForm() {
                   return (
                     <div
                       key={category}
-                      className="rounded-lg border border-default-200 p-3 lg:grid lg:grid-cols-[minmax(0,1fr)_repeat(3,minmax(4rem,6rem))] lg:gap-3 lg:rounded-none lg:border-0"
+                      className="rounded-lg border border-default-200 p-3 lg:grid lg:grid-cols-[minmax(0,1fr)_repeat(3,minmax(4rem,6rem))_minmax(4rem,6rem)] lg:gap-3 lg:rounded-none lg:border-0"
                     >
                       <div className="flex flex-col gap-1">
                         <span className="text-sm font-medium">{t(`categories.${category}.label`)}</span>
@@ -262,6 +249,17 @@ export function NotificationPreferencesForm() {
                             {renderChannelSwitch(category, channel)}
                           </div>
                         ))}
+                        <div className="flex min-h-11 items-center justify-between gap-4 py-2 lg:min-h-0 lg:justify-center lg:py-0">
+                          <span className="text-sm text-default-700 lg:hidden">{t('columns.all')}</span>
+                          <LabeledSwitch
+                            aria-label={`${t(`categories.${category}.label`)} ${t('columns.all')}`}
+                            isSelected={isCategoryAllEnabled(category)}
+                            isDisabled={disabled}
+                            onChange={(value) => toggleCategory(category, value)}
+                            data-testid={`notifications-${category}-all`}
+                            data-cy={`notifications-${category}-all`}
+                          />
+                        </div>
                       </div>
                     </div>
                   );

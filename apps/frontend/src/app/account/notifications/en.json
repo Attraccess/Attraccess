@@ -3,7 +3,8 @@
     "category": "Notification",
     "email": "Email",
     "push": "Push",
-    "toast": "In-app"
+    "toast": "In-app",
+    "all": "All"
   },
   "groups": {
     "general": {
