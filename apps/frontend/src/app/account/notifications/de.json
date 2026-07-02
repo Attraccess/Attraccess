@@ -73,6 +73,12 @@
       "subscribeFailed": "Push-Benachrichtigungen konnten nicht aktiviert werden. Bitte prüfe die Benachrichtigungs-Berechtigungen deines Browsers."
     }
   },
+  "toggleAll": {
+    "label": "Alle Benachrichtigungen",
+    "description": "Alle Benachrichtigungen auf einmal aktivieren oder deaktivieren.",
+    "toggleGroup": "Alle Benachrichtigungen in",
+    "toggleChannel": "Alle umschalten"
+  },
   "messages": {
     "updated": "Benachrichtigungseinstellungen aktualisiert"
   },

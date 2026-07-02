@@ -1,5 +1,3 @@
-// Per-user notification preferences control for the account page
-// FEATURE: Messaging notification preferences
 import {
   ApiError,
   NotificationCategory,
@@ -10,7 +8,7 @@ import {
   useNotificationsServiceNotificationsUpdatePreferences,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { LabeledSwitch } from '../../../components/labeledSwitch';
 import { useToastMessage } from '../../../components/toastProvider';
@@ -34,6 +32,8 @@ export function NotificationPreferencesForm() {
   const { success: showSuccess, error: showError } = useToastMessage();
   const { data: license } = useLicenseServiceGetLicenseInformation();
   const hasMaintenance = license?.modules.includes('maintenance') ?? true;
+  const isBulkUpdatingRef = useRef(false);
+  const [isBulkUpdating, setIsBulkUpdating] = useState(false);
 
   const categoryGroups = useMemo(
     () => [
@@ -65,21 +65,23 @@ export function NotificationPreferencesForm() {
 
   const { data: preferences, isLoading } = useNotificationsServiceNotificationsGetPreferences();
 
-  const { mutate } = useNotificationsServiceNotificationsUpdatePreferences({
+  const { mutate, mutateAsync } = useNotificationsServiceNotificationsUpdatePreferences({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: UseNotificationsServiceNotificationsGetPreferencesKeyFn() });
-      showSuccess({ title: t('messages.updated') });
+      if (!isBulkUpdatingRef.current) showSuccess({ title: t('messages.updated') });
     },
     onError: (rawError) => {
-      let messageToDisplay = t('errors.updateFailed');
-      if (rawError instanceof ApiError) {
-        const body = rawError.body as { message?: string | string[] } | undefined;
-        const msg = Array.isArray(body?.message) ? body?.message[0] : body?.message;
-        if (typeof msg === 'string' && msg.trim().length > 0) {
-          messageToDisplay = msg;
+      if (!isBulkUpdatingRef.current) {
+        let messageToDisplay = t('errors.updateFailed');
+        if (rawError instanceof ApiError) {
+          const body = rawError.body as { message?: string | string[] } | undefined;
+          const msg = Array.isArray(body?.message) ? body?.message[0] : body?.message;
+          if (typeof msg === 'string' && msg.trim().length > 0) {
+            messageToDisplay = msg;
+          }
         }
+        showError({ title: messageToDisplay });
       }
-      showError({ title: messageToDisplay });
     },
   });
 
@@ -90,10 +92,84 @@ export function NotificationPreferencesForm() {
     [mutate],
   );
 
+  const runBulkUpdate = useCallback(
+    async (
+      updates: Array<{ category: NotificationCategory; channelValues: Partial<Record<NotificationChannel, boolean>> }>,
+    ) => {
+      isBulkUpdatingRef.current = true;
+      setIsBulkUpdating(true);
+      try {
+        const results = await Promise.allSettled(
+          updates.map(({ category, channelValues }) =>
+            mutateAsync({ requestBody: { category, channels: channelValues } }),
+          ),
+        );
+        const hasError = results.some((r) => r.status === 'rejected');
+        if (hasError) {
+          showError({ title: t('errors.updateFailed') });
+        } else {
+          showSuccess({ title: t('messages.updated') });
+        }
+      } finally {
+        isBulkUpdatingRef.current = false;
+        setIsBulkUpdating(false);
+      }
+    },
+    [mutateAsync, showSuccess, showError, t],
+  );
+
+  const toggleGroupChannel = useCallback(
+    (groupCategories: NotificationCategory[], channel: NotificationChannel, value: boolean) => {
+      void runBulkUpdate(groupCategories.map((category) => ({ category, channelValues: { [channel]: value } })));
+    },
+    [runBulkUpdate],
+  );
+
+  const toggleGroup = useCallback(
+    (groupCategories: NotificationCategory[], value: boolean) => {
+      void runBulkUpdate(
+        groupCategories.map((category) => ({
+          category,
+          channelValues: { email: value, push: value, toast: value },
+        })),
+      );
+    },
+    [runBulkUpdate],
+  );
+
+  const toggleAll = useCallback(
+    (value: boolean) => {
+      void runBulkUpdate(
+        categoryGroups.flatMap((g) => g.categories).map((category) => ({
+          category,
+          channelValues: { email: value, push: value, toast: value },
+        })),
+      );
+    },
+    [categoryGroups, runBulkUpdate],
+  );
+
+  const isGroupChannelAllEnabled = useCallback(
+    (groupCategories: NotificationCategory[], channel: NotificationChannel) =>
+      groupCategories.every((cat) => Boolean(getCategoryPreference(preferences?.categories, cat)?.channels[channel])),
+    [preferences],
+  );
+
+  const isGroupAllEnabled = useCallback(
+    (groupCategories: NotificationCategory[]) => channels.every((ch) => isGroupChannelAllEnabled(groupCategories, ch)),
+    [isGroupChannelAllEnabled],
+  );
+
+  const isAllEnabled = useMemo(
+    () => categoryGroups.every((g) => isGroupAllEnabled(g.categories)),
+    [categoryGroups, isGroupAllEnabled],
+  );
+
+  const disabled = isLoading || isBulkUpdating;
+
   const renderChannelSwitch = (category: NotificationCategory, channel: NotificationChannel) => {
     const preference = getCategoryPreference(preferences?.categories, category);
     const selected = Boolean(preference?.channels[channel]);
-    const disabled = isLoading;
 
     return (
       <LabeledSwitch
@@ -109,13 +185,38 @@ export function NotificationPreferencesForm() {
 
   return (
     <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between rounded-lg border border-default-200 p-3">
+        <div className="flex flex-col gap-1">
+          <span className="text-sm font-semibold">{t('toggleAll.label')}</span>
+          <span className="text-xs text-default-500">{t('toggleAll.description')}</span>
+        </div>
+        <LabeledSwitch
+          aria-label={t('toggleAll.label')}
+          isSelected={isAllEnabled}
+          isDisabled={disabled}
+          onChange={toggleAll}
+          data-testid="notifications-toggle-all"
+          data-cy="notifications-toggle-all"
+        />
+      </div>
+
       <div data-testid="notification-preferences-mobile" className="flex flex-row gap-4 flex-wrap">
         {categoryGroups.map((group) => {
           return (
             <section key={group.id} data-testid={`notification-group-${group.id}`} className="flex flex-col gap-3">
-              <div className="flex flex-col gap-1">
-                <h3 className="text-sm font-semibold text-default-700">{t(`groups.${group.id}.label`)}</h3>
-                <p className="text-xs text-default-500">{t(`groups.${group.id}.description`)}</p>
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex flex-col gap-1">
+                  <h3 className="text-sm font-semibold text-default-700">{t(`groups.${group.id}.label`)}</h3>
+                  <p className="text-xs text-default-500">{t(`groups.${group.id}.description`)}</p>
+                </div>
+                <LabeledSwitch
+                  aria-label={`${t('toggleAll.toggleGroup')} ${t(`groups.${group.id}.label`)}`}
+                  isSelected={isGroupAllEnabled(group.categories)}
+                  isDisabled={disabled}
+                  onChange={(value) => toggleGroup(group.categories, value)}
+                  data-testid={`notifications-toggle-group-${group.id}`}
+                  data-cy={`notifications-toggle-group-${group.id}`}
+                />
               </div>
 
               <div
@@ -123,9 +224,20 @@ export function NotificationPreferencesForm() {
                 className="hidden grid-cols-[minmax(0,1fr)_repeat(3,minmax(4rem,6rem))] gap-3 px-3 text-xs font-medium text-default-500 lg:grid"
               >
                 <span aria-hidden="true" />
-                <span className="text-center">{t('columns.email')}</span>
-                <span className="text-center">{t('columns.push')}</span>
-                <span className="text-center">{t('columns.toast')}</span>
+                {channels.map((channel) => (
+                  <div key={channel} className="flex flex-col items-center gap-1">
+                    <span className="text-center">{t(`columns.${channel}`)}</span>
+                    <LabeledSwitch
+                      size="sm"
+                      aria-label={`${t('toggleAll.toggleChannel')} ${t(`columns.${channel}`)}`}
+                      isSelected={isGroupChannelAllEnabled(group.categories, channel)}
+                      isDisabled={disabled}
+                      onChange={(value) => toggleGroupChannel(group.categories, channel, value)}
+                      data-testid={`notifications-toggle-channel-${group.id}-${channel}`}
+                      data-cy={`notifications-toggle-channel-${group.id}-${channel}`}
+                    />
+                  </div>
+                ))}
               </div>
 
               <div className="flex flex-col gap-3 lg:gap-0 lg:divide-y lg:divide-default-200 lg:rounded-lg lg:border lg:border-default-200">
