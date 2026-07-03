@@ -1,0 +1,22 @@
+dependencies:
+  idf: ">=5.5.0"
+
+  # UI (touch variants; dead-stripped from the headless lite build)
+  lvgl/lvgl: "9.3.0"
+
+  # JSON for the websocket API protocol (framework-agnostic despite the name)
+  bblanchon/arduinojson: "^7.0.0"
+
+  # Websocket client (managed component since IDF 5.x)
+  espressif/esp_websocket_client: "^1.2.0"
+
+  # ST7701 480x480 RGB panel (both display variants) + 3-wire SPI init transport
+  espressif/esp_lcd_st7701: "^1.0.0"
+  espressif/esp_lcd_panel_io_additions: "^1.0.0"
+
+  # Qualia S3: XCA9554 IO expander (panel init/backlight) + FocalTech touch
+  espressif/esp_io_expander_tca9554: "^2.0.0"
+  espressif/esp_lcd_touch_ft5x06: "^1.0.6"
+
+  # Attractap Lite: WS2812 LED ring (RMT backend)
+  espressif/led_strip: "^3.0.0"
