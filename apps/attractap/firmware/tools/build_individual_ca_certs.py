@@ -270,7 +270,6 @@ def create_ca_index_header(cert_files):
         "#pragma once",
         "",
         "// Auto-generated CA certificate index",
-        "#include <Arduino.h>",
         "",
         f"#define CA_CERT_COUNT {len(cert_files)}",
         "",
@@ -286,12 +285,12 @@ def create_ca_index_header(cert_files):
     # Add extern declarations for each certificate
     for i, (name, filename) in enumerate(cert_files):
         var_name = f"ca_cert_{i:02d}_data"
-        header_content.append(f"extern const char {var_name}[] PROGMEM;")
+        header_content.append(f"extern const char {var_name}[];")
     
     header_content.extend([
         "",
         "// CA certificate index array",
-        "extern const CACertInfo ca_certificates[CA_CERT_COUNT] PROGMEM;",
+        "extern const CACertInfo ca_certificates[CA_CERT_COUNT];",
         ""
     ])
     
@@ -310,7 +309,7 @@ def create_ca_data_file(cert_files, certificates_map):
         var_name = f"ca_cert_{i:02d}_data"
         cert_data = certificates_map[name]['data']
         
-        cpp_content.append(f"const char {var_name}[] PROGMEM = R\"CERT(")
+        cpp_content.append(f"const char {var_name}[] = R\"CERT(")
         cpp_content.append(cert_data)
         cpp_content.append(")CERT\";")
         cpp_content.append("")
@@ -318,7 +317,7 @@ def create_ca_data_file(cert_files, certificates_map):
     # Add index array
     cpp_content.extend([
         "// CA certificate index array",
-        "const CACertInfo ca_certificates[CA_CERT_COUNT] PROGMEM = {"
+        "const CACertInfo ca_certificates[CA_CERT_COUNT] = {"
     ])
     
     for i, (name, filename) in enumerate(cert_files):

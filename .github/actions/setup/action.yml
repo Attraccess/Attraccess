@@ -1,5 +1,11 @@
 name: 'Setup Workspace'
-description: 'Install Node.js, pnpm, dependencies, Python, and PlatformIO. Must be called after actions/checkout.'
+description: 'Install Node.js, pnpm, dependencies, Python, and the ESP-IDF toolchain. Must be called after actions/checkout.'
+
+inputs:
+  esp-idf:
+    description: 'Install the ESP-IDF toolchain (needed for jobs that build the Attractap firmware)'
+    required: false
+    default: 'true'
 
 runs:
   using: 'composite'
@@ -23,8 +29,27 @@ runs:
       with:
         python-version: '3.x'
 
-    - name: Install PlatformIO and ESP tools
+    - name: Install ESP tools
       run: |
         python -m pip install --upgrade pip
-        pip install platformio esptool
+        pip install esptool requests
+      shell: bash
+
+    - name: Cache ESP-IDF
+      if: inputs.esp-idf == 'true'
+      id: cache-esp-idf
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/esp/esp-idf
+          ~/.espressif
+        key: esp-idf-v5.5-esp32s3-${{ runner.os }}
+
+    - name: Install ESP-IDF v5.5
+      if: inputs.esp-idf == 'true' && steps.cache-esp-idf.outputs.cache-hit != 'true'
+      run: |
+        mkdir -p ~/esp
+        git clone --depth 1 --shallow-submodules --recursive -b v5.5 \
+          https://github.com/espressif/esp-idf.git ~/esp/esp-idf
+        ~/esp/esp-idf/install.sh esp32s3
       shell: bash

@@ -1,95 +1,73 @@
 # Attractap Firmware
 
-This directory contains the firmware for the Attractap device, an ESP32-C3 based RFID/NFC reader.
+Firmware for the Attractap NFC readers (ESP32-S3), built on **ESP-IDF v5.5** (`idf.py` + CMake — no Arduino, no PlatformIO).
 
-## Web Installation
+## Variants
 
-You can install the firmware directly from your web browser using [ESP Web Tools](https://esphome.github.io/esp-web-tools/), which allows for a seamless installation experience without requiring command-line tools.
+One firmware per hardware flavor, defined by a file in `variants/`:
 
-### Requirements
+| Variant | Board | Hardware |
+| --- | --- | --- |
+| `attractap-touch` | ESP32-S3 DevKitC (V3 hardware) | ST7701 480x480 RGB panel, GT911 touch, TCA9554 IO expander, PN532 NFC, WiFi |
+| `attractap-touch-v2` | ESP32-S3 DevKitC (V4 hardware) | as above, 16-bit PCA9555-compatible expander @0x24, PN532 @0x64 |
+| `attractap-touch-ethernet` | Adafruit Qualia S3 RGB666 | TL040WVS03 panel via XCA9554 expander, FocalTech touch, W5500 ethernet |
+| `attractap-lite-ethernet` | Adafruit Qualia S3 | headless, WS2812 24-LED ring, W5500 ethernet |
 
-- Chrome or Edge browser on desktop (Web Serial is not supported on mobile or Firefox)
-- ESP32-C3 based Attractap device
-- USB connection to your computer
+Each variant file sets the compile definitions (pins, feature flags, firmware
+name) and the source subtrees excluded for that hardware. The firmware version
+lives in `version.txt` — bump it whenever firmware source changes (CI enforces
+this).
 
-### Quick Installation
+## Building
 
-1. Connect your Attractap device to your computer via USB
-2. Visit our [firmware installation page](https://OWNER_NAME.github.io/Attraccess/) (replace OWNER_NAME with your GitHub username)
-3. Click the "Install" button and follow the on-screen instructions
-4. If prompted, select the correct serial port for your device
-5. Wait for the installation to complete
+Prerequisites: [ESP-IDF v5.5](https://docs.espressif.com/projects/esp-idf/en/v5.5/esp32s3/get-started/index.html) installed for the `esp32s3` target, plus `pip install esptool requests`.
 
-### Manual Installation
-
-If the web installer doesn't work for you, you can download the firmware binary from the GitHub Pages site and flash it manually:
-
-```bash
-# Install esptool
-pip install esptool
-
-# Flash the firmware
-esptool.py --chip esp32c3 --port /dev/ttyUSB0 --baud 921600 write_flash 0x0 merged-firmware.bin
-```
-
-Replace `/dev/ttyUSB0` with the correct port for your device:
-
-- On Windows, this will be a COM port (e.g., COM3)
-- On macOS, this will be something like `/dev/tty.usbserial-X`
-- On Linux, it's typically `/dev/ttyUSB0` or `/dev/ttyACM0`
-
-## Development Setup
-
-1. Install [PlatformIO](https://platformio.org/)
-2. Clone this repository
-3. Open the `apps/attractap/firmware` directory in PlatformIO
-4. Build and upload the firmware
-
-## Development
-
-### Project Structure
-
-- `src/`: Contains the source code for the firmware
-- `include/`: Header files
-- `lib/`: Libraries
-- `platformio.ini`: PlatformIO configuration file
-
-### Building
-
-To build the firmware, run:
+Build every shipped variant (also what CI and `pnpm nx run attractap-firmware:build` run):
 
 ```bash
-pio run -e attractap
+python3 build_firmwares.py
 ```
 
-### Uploading During Development
+This generates the CA-certificate headers (`src/certs/`), builds each variant
+into `build/<variant>/`, and writes `firmware_output/` containing per variant:
 
-To upload the firmware to a connected device, run:
+- `<name>_<variant>.bin` — merged image for the web serial flasher (flash at offset `0x0`)
+- `<name>_<variant>_ota.bin` — app-only image for OTA updates via the server
+- `<name>_<variant>.elf` — unstripped ELF for server-side coredump symbolication
+- `firmwares.json` — manifest consumed by the Attraccess API/frontend
+
+Build a single variant during development:
 
 ```bash
-pio run -e attractap -t upload
+idf.py -B build/attractap-touch -DATTRACTAP_VARIANT=attractap-touch build
+idf.py -B build/attractap-touch flash monitor
 ```
 
-## Continuous Integration
+Debug build (replaces the old `attractap-touch-debug` PlatformIO env):
 
-This project uses GitHub Actions for continuous integration:
+```bash
+idf.py -B build/dbg -DATTRACTAP_VARIANT=attractap-touch \
+       -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.debug" build
+```
 
-1. When changes are pushed to the `main` branch that affect files in the `apps/attractap/firmware` directory, a build is triggered
-2. The firmware is built using PlatformIO, creating a merged binary for ESP Web Tools
-3. The files are automatically deployed to GitHub Pages with a web installer interface
-4. The firmware can be installed using any browser that supports Web Serial API
+Note: `tools/build_individual_ca_certs.py` needs network access on the first
+run (it downloads Mozilla's CA bundle, cached for 7 days). Run it once before
+`idf.py` when building without `build_firmwares.py`.
 
-### How ESP Web Tools Integration Works
+## Flashing
 
-The GitHub Actions workflow:
+- **Web flasher (initial install):** the Attraccess frontend flashes the merged
+  `.bin` over Web Serial (Chrome/Edge). The device console runs on the ESP32-S3
+  USB-Serial-JTAG port.
+- **CLI:** `python -m esptool --chip esp32s3 write_flash 0x0 firmware_output/<name>_<variant>.bin`
+- **OTA:** upload `firmware_output` via the Attraccess server; updates stream to
+  the readers over the websocket.
 
-1. Builds the firmware using PlatformIO
-2. Creates a merged binary file compatible with ESP Web Tools
-3. Generates a manifest.json file with absolute URLs to the firmware
-4. Deploys these files to GitHub Pages
-5. Creates a web interface with the ESP Web Tools install button
+## Serial provisioning console
 
-The manifest.json file contains the necessary information for ESP Web Tools to install the firmware, including the URL to the firmware binary and the chip family (ESP32-C3).
+The firmware speaks a line protocol on the USB console (115200 8N1):
+`CMND <topic> <json>` in, `RESP <topic> <json>` out — used by the frontend's
+hardware setup flow. Log lines have the format `[Module] LEVEL: message`.
 
 ## Attractap Lite LED Animations
 
@@ -113,7 +91,3 @@ The Attractap Lite variant uses a WS2812 LED ring for status feedback. For a use
 | `triggerSuccess()` | Green | Auth succeeded |
 | `triggerError()` | Red flash | Auth failed |
 | `triggerIndicate()` | Yellow flash | Card held too long |
-
-## License
-
-[Specify your license here]

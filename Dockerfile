@@ -70,19 +70,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install esp-coredump plus the ESP GDB binaries it shells out to for Xtensa
-# (ESP32/S2/S3) and RISC-V (ESP32-C3/C6/H2) coredumps.
+# (ESP32/S2/S3) and RISC-V (ESP32-C3/C6/H2) coredumps. The GDB tarballs come
+# straight from Espressif's binutils-gdb releases (PlatformIO, which used to
+# fetch them, is no longer part of the firmware toolchain).
+ARG ESP_GDB_VERSION=16.2_20250324
 RUN python3 -m venv /opt/venv && \
     /opt/venv/bin/pip install --no-cache-dir --upgrade pip && \
-    /opt/venv/bin/pip install --no-cache-dir esp-coredump platformio && \
-    mkdir -p /opt/platformio && \
-    PLATFORMIO_CORE_DIR=/opt/platformio PLATFORMIO_PACKAGES_DIR=/opt/platformio/packages /opt/venv/bin/platformio pkg install --global --tool platformio/tool-xtensa-esp-elf-gdb && \
-    PLATFORMIO_CORE_DIR=/opt/platformio PLATFORMIO_PACKAGES_DIR=/opt/platformio/packages /opt/venv/bin/platformio pkg install --global --tool platformio/tool-riscv32-esp-elf-gdb
-ENV PLATFORMIO_CORE_DIR=/opt/platformio
-ENV PLATFORMIO_PACKAGES_DIR=/opt/platformio/packages
-ENV PATH="/opt/venv/bin:/opt/platformio/packages/tool-xtensa-esp-elf-gdb/bin:/opt/platformio/packages/tool-riscv32-esp-elf-gdb/bin:${PATH}"
+    /opt/venv/bin/pip install --no-cache-dir esp-coredump && \
+    mkdir -p /opt/esp-gdb && cd /opt/esp-gdb && \
+    arch="$(uname -m)"; case "$arch" in aarch64|arm64) gdb_arch=aarch64-linux-gnu ;; *) gdb_arch=x86_64-linux-gnu ;; esac && \
+    curl -fsSL -o xtensa-gdb.tar.gz "https://github.com/espressif/binutils-gdb/releases/download/esp-gdb-v${ESP_GDB_VERSION}/xtensa-esp-elf-gdb-${ESP_GDB_VERSION}-${gdb_arch}.tar.gz" && \
+    curl -fsSL -o riscv-gdb.tar.gz "https://github.com/espressif/binutils-gdb/releases/download/esp-gdb-v${ESP_GDB_VERSION}/riscv32-esp-elf-gdb-${ESP_GDB_VERSION}-${gdb_arch}.tar.gz" && \
+    tar -xzf xtensa-gdb.tar.gz && tar -xzf riscv-gdb.tar.gz && \
+    rm -f xtensa-gdb.tar.gz riscv-gdb.tar.gz
+ENV PATH="/opt/venv/bin:/opt/esp-gdb/xtensa-esp-elf-gdb/bin:/opt/esp-gdb/riscv32-esp-elf-gdb/bin:${PATH}"
 ENV ESP_COREDUMP_CMD=/opt/venv/bin/esp-coredump
-ENV ESP_COREDUMP_XTENSA_GDB=/opt/platformio/packages/tool-xtensa-esp-elf-gdb/bin/xtensa-esp32-elf-gdb
-ENV ESP_COREDUMP_RISCV_GDB=/opt/platformio/packages/tool-riscv32-esp-elf-gdb/bin/riscv32-esp-elf-gdb
+ENV ESP_COREDUMP_XTENSA_GDB=/opt/esp-gdb/xtensa-esp-elf-gdb/bin/xtensa-esp32-elf-gdb
+ENV ESP_COREDUMP_RISCV_GDB=/opt/esp-gdb/riscv32-esp-elf-gdb/bin/riscv32-esp-elf-gdb
 
 # Copy the pre-built application (these will be built in the CI pipeline)
 COPY --from=builder /app/dist dist
