@@ -3,6 +3,9 @@
 
 #include "application.hpp"
 #include "../serial/serialCommandHandler.hpp"
+#include "platform.hpp"
+#include <cstring>
+#include <string>
 #ifdef ESP_PLATFORM
 #include "esp_heap_caps.h"
 #include "esp_task_wdt.h"
@@ -74,7 +77,7 @@ void Application::setup() {
 
 #ifdef HAS_LVGL_DISPLAY
   this->api.onDeviceName(
-      [this](String deviceName) { Display::setDeviceName(deviceName); });
+      [this](std::string deviceName) { Display::setDeviceName(deviceName); });
 #endif
   this->api.setResourceListUpdateCallback(
       [this](const API::ResourceList &resourceList) {
@@ -183,15 +186,15 @@ void Application::setup() {
     // Ensure UI operations on LVGL thread
     struct ErrPayload {
       Application *self;
-      String t;
-      String m;
+      std::string t;
+      std::string m;
     };
     ErrPayload *p = new ErrPayload();
     if (!p)
       return;
     p->self = this;
-    p->t = String(title);
-    p->m = String(message);
+    p->t = title;
+    p->m = message;
     Display::asyncCall(
         [](void *u) {
           auto *pl = (ErrPayload *)u;
@@ -221,7 +224,7 @@ void Application::setup() {
     struct ActionResultPayload {
       Application *self;
       bool ok;
-      String eventType;
+      std::string eventType;
     };
     ActionResultPayload *p = new ActionResultPayload();
     if (!p) {
@@ -230,7 +233,7 @@ void Application::setup() {
     p->self = this;
     p->ok = success;
     if (type) {
-      p->eventType = String(type);
+      p->eventType = type;
     }
     Display::asyncCall(
         [](void *u) {
@@ -253,9 +256,9 @@ void Application::setup() {
   });
 #endif
 
-  this->api.setFirmwareUpdateMetaCallback([this](String availableVersion) {
+  this->api.setFirmwareUpdateMetaCallback([this](std::string availableVersion) {
     this->externalState = EXTERNAL_STATE_FIRMWARE_UPDATE;
-    this->availableFirmwareVersion = String(availableVersion);
+    this->availableFirmwareVersion = availableVersion;
   });
 
   this->api.setFirmwareUpdateProgressCallback([this](int percent) {
@@ -273,7 +276,7 @@ void Application::setup() {
   Display::resourceDetailsScreen.setProjectsPageRequestCallback(
       [this](uint32_t page) { this->requestProjectsPage(page); });
   Display::resourceDetailsScreen.setProjectSelectionCallback(
-      [this](uint32_t projectId, const String &projectName) {
+      [this](uint32_t projectId, const std::string &projectName) {
         this->handleProjectSelection(projectId, projectName);
       });
   Display::resourceDetailsScreen.setFormPageNextCallback(
@@ -286,7 +289,7 @@ void Application::setup() {
       [this]() { this->handleFormsCancel(); });
 
   Display::setPinScreen.setOnPinConfirmedCallback(
-      [this](String pin) { Settings::setDevicePin(pin); });
+      [this](std::string pin) { Settings::setDevicePin(pin); });
 
   Display::connectionConfigurationScreen.setOnCancelPinLockCallback([this]() {
     Display::transitionToScreen(&Display::initScreen);
@@ -323,14 +326,14 @@ void Application::setup() {
   Display::setTouchCallback(
       [this](int16_t x, int16_t y) { this->handleTouch(x, y); });
 
-  this->api.setEnrollNewCardGetAvailableKeyNoCallback([this](String username) {
+  this->api.setEnrollNewCardGetAvailableKeyNoCallback([this](std::string username) {
     this->apiEnrollNewCardGetAvailableKeyNoData = {
         username = username,
     };
     this->externalState = EXTERNAL_STATE_ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO;
   });
 
-  this->api.setEnrollNewCardCallback([this](uint8_t keyNo, String key) {
+  this->api.setEnrollNewCardCallback([this](uint8_t keyNo, std::string key) {
     uint8_t keyBytes[16] = {0};
     stringToHexArray(key, keyBytes, 16);
 
@@ -343,7 +346,7 @@ void Application::setup() {
     this->enrollKeyMaterialReady = true;
   });
 
-  this->api.setEnrollNewCardErrorCallback([this](String error) {
+  this->api.setEnrollNewCardErrorCallback([this](std::string error) {
     // Runs on the websocket task. Copy into the fixed buffer, then publish via
     // the volatile flag (set last) so the main loop reads a complete message.
     if (error == "CARD_ALREADY_ENROLLED") {
@@ -360,7 +363,7 @@ void Application::setup() {
       [this]() { this->enrollCancelRequested = true; });
 
   this->api.setResetNfcCardCallback(
-      [this](String username, uint8_t keyNo, String key) {
+      [this](std::string username, uint8_t keyNo, std::string key) {
         uint8_t keyBytes[16] = {0};
         stringToHexArray(key, keyBytes, 16);
 
@@ -395,7 +398,7 @@ void Application::setup() {
 
         // Build the secondary hint: who may approve + the web fallback note. Runs on the websocket
         // task, so write the fixed buffer and publish via the volatile flag (set last).
-        String hint = "Tutor-Karte auflegen oder per\nApp/Web bestaetigen";
+        std::string hint = "Tutor-Karte auflegen oder per\nApp/Web bestaetigen";
         if (result.supervisorCount > 0) {
           hint += "\n";
           for (uint8_t i = 0; i < result.supervisorCount; i++) {

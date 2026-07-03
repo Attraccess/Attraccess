@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "../IScreen.hpp"
 #include "../../../logger/logger.hpp"
 #include "../../../utils.hpp"
@@ -19,7 +21,7 @@ public:
     void onScreenLeave();
     void loop() override;
     lv_obj_t *getScreen() override;
-    String getName() override;
+    std::string getName() override;
     void destroy() override;
 
     enum Status
@@ -31,13 +33,13 @@ public:
     };
 
     void setTimeoutTime(uint32_t timeoutTime);
-    void setRequesterName(String requesterName);
+    void setRequesterName(std::string requesterName);
     void setStatus(Status status);
     // Override the status line text (used for specific error messages). Cleared automatically on the
     // next setStatus() call that isn't STATUS_ERROR.
-    void setStatusMessage(const String &message);
+    void setStatusMessage(const std::string &message);
     // Secondary hint listing who may approve (tutor names) plus the web fallback note.
-    void setSupervisorHint(const String &hint);
+    void setSupervisorHint(const std::string &hint);
     void setOnCancelCallback(std::function<void()> callback);
 
 private:
@@ -49,9 +51,9 @@ private:
     lv_obj_t *statusLabel = nullptr;
     lv_obj_t *hintLabel = nullptr;
     lv_obj_t *cancelButton = nullptr;
-    String requesterNameCache;
-    String statusMessageOverride;
-    String hintCache;
+    std::string requesterNameCache;
+    std::string statusMessageOverride;
+    std::string hintCache;
     Status status = STATUS_WAITING;
 
     std::function<void()> onCancelCallback;

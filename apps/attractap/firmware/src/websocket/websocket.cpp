@@ -1,7 +1,11 @@
 #include "websocket.hpp"
+#include "platform.hpp"
 #include "esp_heap_caps.h"
 #include "esp_system.h"
-#include <Preferences.h>
+#include "settings/kvstore.hpp"
+#include <cstdlib>
+#include <cstring>
+#include <string>
 
 // Deliberate-reboot reason handed to the crash reporter across the SW reset (see
 // api_diag.cpp). Lives in the same NVS namespace as the boot diagnostics record
@@ -141,7 +145,7 @@ void Websocket::publishConnectionStatus()
     if (apiConfig.useSSL)
     {
         State::setWebsocketCertProgress(
-            String(this->_certManager.getCurrentCertName()),
+            std::string(this->_certManager.getCurrentCertName()),
             this->_certManager.getCurrentCertIndex(),
             this->_certManager.getCertCount(),
             this->_certManager.getRememberedFailureCount());
@@ -203,10 +207,10 @@ void Websocket::connectWebSocketLocked()
     }
 
     AttraccessApiConfig apiConfig = Settings::getAttraccessApiConfig();
-    String serverHostname = apiConfig.hostname;
+    std::string serverHostname = apiConfig.hostname;
     uint16_t serverPort = apiConfig.port;
 
-    if (serverHostname.isEmpty() || serverPort == 0)
+    if (serverHostname.empty() || serverPort == 0)
     {
         logger.error("connectWebSocket: serverHostname or serverPort is empty");
         setState(INIT);
@@ -256,7 +260,7 @@ void Websocket::connectWebSocketLocked()
             this->consecutiveConnectFailures = 0;
             return;
         }
-        logger.error((String("Failed to restart WebSocket client: ") + esp_err_to_name(restartRet)).c_str());
+        logger.error((std::string("Failed to restart WebSocket client: ") + esp_err_to_name(restartRet)).c_str());
     }
 
     lockWsClient();
@@ -268,8 +272,8 @@ void Websocket::connectWebSocketLocked()
         esp_websocket_client_destroy(oldClient);
     }
 
-    String protocol = (apiConfig.useSSL) ? "wss" : "ws";
-    String wsUrl = protocol + "://" + serverHostname + ":" + String(serverPort) + "/api/attractap/websocket";
+    std::string protocol = (apiConfig.useSSL) ? "wss" : "ws";
+    std::string wsUrl = protocol + "://" + serverHostname + ":" + std::to_string(serverPort) + "/api/attractap/websocket";
     logger.info(("Connecting to WebSocket: " + wsUrl).c_str());
 
     esp_websocket_client_config_t websocket_cfg = {};
@@ -317,7 +321,7 @@ void Websocket::connectWebSocketLocked()
     if (ret != ESP_OK)
     {
         esp_websocket_client_destroy(newClient);
-        handleConnectFailure((String("esp_websocket_client_start: ") + esp_err_to_name(ret)).c_str());
+        handleConnectFailure((std::string("esp_websocket_client_start: ") + esp_err_to_name(ret)).c_str());
         return;
     }
 
@@ -353,7 +357,7 @@ void Websocket::handleConnectFailure(const char *reason)
         // Record why we are rebooting so the next boot's crash report carries the
         // real cause instead of a bare "SW" reset reason. The API layer reads and
         // clears this key once the report is acknowledged (see api_diag.cpp).
-        Preferences prefs;
+        KVStore prefs;
         if (prefs.begin(BOOT_DIAG_NAMESPACE, false))
         {
             prefs.putString(BOOT_DIAG_REBOOT_REASON_KEY, "WEBSOCKET_RECONNECT_HEAP_EXHAUSTION");
@@ -450,7 +454,7 @@ void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, v
         }
         else if (data->op_code == 0x02)
         { // Binary frame
-            logger.debug(("Received binary data: " + String(data->data_len) + " bytes").c_str());
+            logger.debug(("Received binary data: " + std::to_string(data->data_len) + " bytes").c_str());
 
             if (this->binaryDataCallback)
             {
@@ -465,12 +469,12 @@ void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, v
         break;
 
     default:
-        logger.error(("Unknown event: " + String(event_id)).c_str());
+        logger.error(("Unknown event: " + std::to_string(event_id)).c_str());
         break;
     }
 }
 
-void Websocket::sendMessage(const String &message)
+void Websocket::sendMessage(const std::string &message)
 {
     this->logger.debug(("sendMessage: " + message).c_str());
     enqueueMessage(message.c_str(), message.length());

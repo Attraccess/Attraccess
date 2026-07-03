@@ -115,10 +115,10 @@ void ConnectionConfigurationScreen::init()
    lv_textarea_set_one_line(this->serverHostname, true);
    lv_obj_add_event_cb(this->serverHostname, &ConnectionConfigurationScreen::onTextAreaEvent, LV_EVENT_ALL, this);
 
-   String fullHostname = apiConfig.hostname;
+   std::string fullHostname = apiConfig.hostname;
    if (apiConfig.port != 0)
    {
-      fullHostname += ":" + String(apiConfig.port);
+      fullHostname += ":" + std::to_string(apiConfig.port);
    }
    lv_textarea_set_text(this->serverHostname, fullHostname.c_str());
 
@@ -210,7 +210,7 @@ void ConnectionConfigurationScreen::init()
                                              this->onCancelPinLockCallback();
                                           } });
 
-   this->pinInputPage.setOnConfirmCallback([this](String pin)
+   this->pinInputPage.setOnConfirmCallback([this](std::string pin)
                                            { return this->onPinLockConfirmCallback(pin); });
    this->pinLockOverlay = this->pinInputPage.init("Entsperren mit PIN", this->screen);
    lv_obj_add_flag(this->pinLockOverlay, LV_OBJ_FLAG_IGNORE_LAYOUT);
@@ -233,7 +233,7 @@ lv_obj_t *ConnectionConfigurationScreen::getScreen()
    return this->screen;
 }
 
-String ConnectionConfigurationScreen::getName()
+std::string ConnectionConfigurationScreen::getName()
 {
    return "ConnectionConfigurationScreen";
 }

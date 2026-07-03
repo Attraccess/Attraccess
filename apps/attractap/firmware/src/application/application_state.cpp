@@ -2,6 +2,7 @@
 // FEATURE: application-state
 
 #include "application.hpp"
+#include "platform.hpp"
 
 void Application::processState() {
 #ifdef HAS_WS2812_LED
@@ -9,7 +10,7 @@ void Application::processState() {
 #endif
 
   AttraccessApiConfig attraccessApiConfig = Settings::getAttraccessApiConfig();
-  bool connectionIsConfigured = !attraccessApiConfig.hostname.isEmpty() &&
+  bool connectionIsConfigured = !attraccessApiConfig.hostname.empty() &&
                                 attraccessApiConfig.hostname != "" &&
                                 attraccessApiConfig.port > 0;
 
@@ -495,7 +496,7 @@ void Application::processEnrollment() {
     this->enrollErrorPending = false;
     this->beeper.errorBeep();
     Display::enrollmentScreen.setStatus(EnrollmentScreen::STATUS_ERROR);
-    Display::enrollmentScreen.setStatusMessage(String(this->enrollErrorMessage));
+    Display::enrollmentScreen.setStatusMessage(this->enrollErrorMessage);
     this->enrollPhase = ENROLL_PHASE_ERROR;
     this->enrollPhaseChangedMs = now;
     return;

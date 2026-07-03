@@ -1,21 +1,21 @@
 #pragma once
 
 #include <esp_netif.h>
-#include <Arduino.h>
 #include <ArduinoJson.h>
+#include <string>
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 
 class State
 {
 public:
-    static void setWifiState(bool connected, esp_ip4_addr_t ip, String ssid);
+    static void setWifiState(bool connected, esp_ip4_addr_t ip, std::string ssid);
     static void setEthernetState(bool connected, esp_ip4_addr_t ip);
     struct NetworkState
     {
         bool wifi_connected;
         esp_ip4_addr_t wifi_ip;
-        String wifi_ssid;
+        std::string wifi_ssid;
         bool ethernet_connected;
         esp_ip4_addr_t ethernet_ip;
     };
@@ -31,20 +31,20 @@ public:
         WS_CONNECTED,
     };
 
-    static void setWebsocketState(bool connected, String hostname, uint16_t port, bool useSSL);
+    static void setWebsocketState(bool connected, std::string hostname, uint16_t port, bool useSSL);
     static void setWebsocketPhase(WebsocketPhase phase);
     // Cert sweep progress (only meaningful while connecting over SSL).
-    static void setWebsocketCertProgress(String certName, int certIndex, int certCount, int rememberedRetryCount);
+    static void setWebsocketCertProgress(std::string certName, int certIndex, int certCount, int rememberedRetryCount);
     // Seconds until the next reconnect attempt (negative/zero means "now").
     static void setWebsocketNextAttemptSeconds(int seconds);
     struct WebsocketState
     {
         bool connected;
-        String hostname;
+        std::string hostname;
         uint16_t port;
         bool useSSL;
         WebsocketPhase phase;
-        String certName;
+        std::string certName;
         int certIndex;
         int certCount;
         int rememberedRetryCount;
@@ -52,11 +52,11 @@ public:
     };
     static WebsocketState getWebsocketState();
 
-    static void setApiState(bool authenticated, String deviceName);
+    static void setApiState(bool authenticated, std::string deviceName);
     struct ApiState
     {
         bool authenticated;
-        String deviceName;
+        std::string deviceName;
     };
     static ApiState getApiState();
 
@@ -67,22 +67,22 @@ private:
 
     static esp_ip4_addr_t wifi_ip;
     static bool wifi_connected;
-    static String wifi_ssid;
+    static std::string wifi_ssid;
 
     static esp_ip4_addr_t ethernet_ip;
     static bool ethernet_connected;
 
-    static String websocket_hostname;
+    static std::string websocket_hostname;
     static uint16_t websocket_port;
     static bool websocket_use_ssl;
     static bool websocket_connected;
     static WebsocketPhase websocket_phase;
-    static String websocket_cert_name;
+    static std::string websocket_cert_name;
     static int websocket_cert_index;
     static int websocket_cert_count;
     static int websocket_remembered_retry_count;
     static int websocket_next_attempt_seconds;
 
     static bool api_authenticated;
-    static String api_device_name;
+    static std::string api_device_name;
 };

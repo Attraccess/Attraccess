@@ -183,7 +183,7 @@ void ResourceListScreen::onContainerDelete(lv_event_t *e)
    delete evt;
 }
 
-String ResourceListScreen::getName()
+std::string ResourceListScreen::getName()
 {
    return "ResourceListScreen";
 }

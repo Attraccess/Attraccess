@@ -1,6 +1,7 @@
 #pragma once
 
-#include <Arduino.h>
+#include <string>
+
 #include <vector>
 #include <lvgl.h>
 #include "lv_conf.h"
@@ -52,14 +53,14 @@ public:
     static FirmwareUpdateScreen firmwareUpdateScreen;
 
     static void setTouchCallback(std::function<void(int16_t, int16_t)> callback);
-    static void setDeviceName(String deviceName);
+    static void setDeviceName(std::string deviceName);
     static void logFromLvgl(lv_log_level_t level, const char *buf);
 
     // Returns false if the display driver reported that touch hardware was not found at init.
     static bool hasTouchInput();
 
     // Global error popup helpers
-    static void showErrorPopup(const String &title, const String &message);
+    static void showErrorPopup(const std::string &title, const std::string &message);
     static void showInsufficientBalancePopup(std::function<void(uint32_t amountCents)> onStart, std::function<void()> onCancel);
     static void hidePopup();
 
@@ -105,7 +106,7 @@ private:
 
     static void initDeviceOverlay();
     static lv_obj_t *deviceNameLabel;
-    static String deviceNameInitValue;
+    static std::string deviceNameInitValue;
 
     static lv_obj_t *activePopup;
     static lv_timer_t *popupAutoCloseTimer;

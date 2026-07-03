@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "../IScreen.hpp"
 #include "../../../logger/logger.hpp"
 #include "../../../utils.hpp"
@@ -13,7 +15,7 @@ public:
     void onScreenLeave();
     void loop() override;
     lv_obj_t *getScreen() override;
-    String getName() override;
+    std::string getName() override;
     void destroy() override;
 
     // Visual phase of the enrollment flow. Drives the status line text + color
@@ -27,11 +29,11 @@ public:
     };
 
     void setEnrollmentTimeoutTime(uint32_t enrollmentTimeoutTime);
-    void setUserName(String userName);
+    void setUserName(std::string userName);
     void setStatus(Status status);
     // Override the status line text (used for specific error messages). Cleared
     // automatically on the next setStatus() call that isn't STATUS_ERROR.
-    void setStatusMessage(const String &message);
+    void setStatusMessage(const std::string &message);
     void setOnCancelCallback(std::function<void()> callback);
 
 private:
@@ -42,8 +44,8 @@ private:
     lv_obj_t *userNameLabel = nullptr;
     lv_obj_t *statusLabel = nullptr;
     lv_obj_t *cancelButton = nullptr;
-    String userNameCache;
-    String statusMessageOverride;
+    std::string userNameCache;
+    std::string statusMessageOverride;
     Status status = STATUS_WAITING;
 
     std::function<void()> onCancelCallback;

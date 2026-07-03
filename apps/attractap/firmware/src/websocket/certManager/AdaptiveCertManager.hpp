@@ -1,7 +1,8 @@
 #pragma once
 
-#include <Arduino.h>
-#include <Preferences.h>
+#include <string>
+#include "../../settings/kvstore.hpp"
+
 #include <esp_websocket_client.h>
 #include "../../certs/ca_index.hpp"
 #include "../../logger/logger.hpp"
@@ -38,7 +39,7 @@ public:
     int getRememberedFailureCount() const;
 
 private:
-    Preferences preferences;
+    KVStore preferences;
     int currentCertIndex;
     int successfulCertIndex;
     bool initialized;

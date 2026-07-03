@@ -2,6 +2,7 @@
 
 #include <Wire.h>
 #include "../utils.hpp"
+#include "platform.hpp"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -36,7 +37,7 @@ std::vector<IScreen *> Display::pendingDestroyScreens;
 uint32_t Display::transitionStartTime = 0;
 bool Display::transitionComplete = true;
 std::function<void()> Display::onTransitionComplete = nullptr;
-String Display::deviceNameInitValue = "Attractap";
+std::string Display::deviceNameInitValue = "Attractap";
 
 lv_obj_t *Display::deviceNameLabel = NULL;
 BootScreen Display::bootScreen;

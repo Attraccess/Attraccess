@@ -1,6 +1,10 @@
 #pragma once
 
-#include <Arduino.h>
+#include <cstdint>
+#include <ctime>
+#include <string>
+
+#include "driver/i2c_master.h"
 
 /**
  * Shared I2C bus clock (Hz). GT911 touch, PN532 NFC and the PCA9555 IO expander
@@ -13,8 +17,29 @@
  */
 static constexpr uint32_t ATTRACTAP_I2C_CLOCK_HZ = 400000;
 
-String hexToString(uint8_t *uid, uint8_t uidLength);
-bool stringToHexArray(String hexString, uint8_t *array, uint8_t arrayLength);
+/**
+ * Per-transaction I2C timeout, parity with the old Wire.setTimeOut(50):
+ * prevents a stuck slave from stalling a task indefinitely.
+ */
+static constexpr int ATTRACTAP_I2C_XFER_TIMEOUT_MS = 50;
+
+/**
+ * Shared I2C master bus (i2c_master driver). One physical bus on every
+ * variant: PN532 NFC, touch controller and IO expander all hang off it.
+ * initSharedI2CBus() must run once in app_main before any device is added;
+ * the clock is configured per device in addSharedI2CDevice (the new driver
+ * has no bus-global clock, which retires the old "library X reset my bus
+ * clock" workarounds for good).
+ */
+bool initSharedI2CBus(int sda, int scl);
+i2c_master_bus_handle_t getSharedI2CBus();
+i2c_master_dev_handle_t addSharedI2CDevice(uint8_t address7bit, uint32_t sclSpeedHz = ATTRACTAP_I2C_CLOCK_HZ);
+
+std::string hexToString(const uint8_t *uid, uint8_t uidLength);
+bool stringToHexArray(const std::string &hexString, uint8_t *array, uint8_t arrayLength);
+
+// In-place ASCII whitespace trim (replacement for Arduino String::trim()).
+void trimString(std::string &s);
 
 /**
  * Global lock serializing all traffic on the shared I2C bus.
@@ -75,7 +100,7 @@ void recoverI2CBus(int sda, int scl);
  * @param millis The milliseconds to convert
  * @return The time string
  */
-String millisToTimeString(double millis);
+std::string millisToTimeString(double millis);
 
 /**
  * @brief Convert a UTC time_t to a time string in the format "DD.MM. HH:MM"
@@ -83,7 +108,7 @@ String millisToTimeString(double millis);
  * @param utcOffsetMinutes Minutes east of UTC to apply before formatting (0 = render UTC)
  * @return The time string
  */
-String timeToTimeString(time_t time, int utcOffsetMinutes = 0);
+std::string timeToTimeString(time_t time, int utcOffsetMinutes = 0);
 
 /**
  * @brief Parse an ISO8601 datetime string (e.g. "2025-10-16T12:34:56Z" or with offset) to time_t (UTC)
@@ -96,7 +121,7 @@ String timeToTimeString(time_t time, int utcOffsetMinutes = 0);
  *
  * Returns (time_t)-1 on parse failure.
  */
-time_t parseIso8601ToTimeT(const String &iso8601);
+time_t parseIso8601ToTimeT(const std::string &iso8601);
 
 /**
  * @brief Translate a machine error key from the server into a human-readable
@@ -110,4 +135,4 @@ time_t parseIso8601ToTimeT(const String &iso8601);
  * @param errorKey The error key/string received from the server
  * @return Human-readable German error message
  */
-String translateReaderError(const String &errorKey);
+std::string translateReaderError(const std::string &errorKey);

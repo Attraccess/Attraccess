@@ -48,7 +48,7 @@ void FirmwareUpdateScreen::init()
     }
     else
     {
-        String placeholder = String(FIRMWARE_VERSION) + " -> ??.??.??";
+        std::string placeholder = std::string(FIRMWARE_VERSION) + " -> ??.??.??";
         lv_label_set_text(this->versionsLabel, placeholder.c_str());
     }
 
@@ -69,15 +69,15 @@ void FirmwareUpdateScreen::loop()
 {
 }
 
-void FirmwareUpdateScreen::setAvailableVersion(String availablevVersion)
+void FirmwareUpdateScreen::setAvailableVersion(std::string availablevVersion)
 {
     this->availableVersionCache = availablevVersion;
-    this->logger.debugf("Updating available version to %s", availablevVersion);
+    this->logger.debugf("Updating available version to %s", availablevVersion.c_str());
     if (!this->versionsLabel)
     {
         return;
     }
-    String s = String(FIRMWARE_VERSION) + " -> " + availablevVersion;
+    std::string s = std::string(FIRMWARE_VERSION) + " -> " + availablevVersion;
     lv_label_set_text(this->versionsLabel, s.c_str());
 }
 

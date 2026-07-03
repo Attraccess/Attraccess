@@ -479,7 +479,7 @@ void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief 
    lv_label_set_text(this->resourceDescription, resource.description);
 
    // Update introducer/maintainer panel lists (same set of allowed users)
-   String introducersText = this->buildIntroducersText(resource);
+   std::string introducersText = this->buildIntroducersText(resource);
    if (this->introducersListLabel)
    {
       lv_label_set_text(this->introducersListLabel, introducersText.c_str());
@@ -566,9 +566,9 @@ void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief 
    this->updateElapsedTimeDisplay();
    this->refreshAccessState();
 }
-String ResourceDetailsScreen::buildIntroducersText(const API::ResourceBrief &resource)
+std::string ResourceDetailsScreen::buildIntroducersText(const API::ResourceBrief &resource)
 {
-   String list;
+   std::string list;
    for (uint8_t i = 0; i < resource.introducerCount; ++i)
    {
       if (i > 0)
@@ -830,7 +830,7 @@ void ResourceDetailsScreen::onContainerDelete(lv_event_t *e)
       delete evt;
    }
 }
-String ResourceDetailsScreen::getName()
+std::string ResourceDetailsScreen::getName()
 {
    return "ResourceDetailsScreen";
 }

@@ -4,8 +4,10 @@
 #include "api.hpp"
 
 #ifdef ESP_PLATFORM
-#include <Preferences.h>
+#include "settings/kvstore.hpp"
+#include <cstring>
 #include <memory>
+#include <string>
 #include "esp_system.h"
 #include "esp_heap_caps.h"
 #include "esp_partition.h"
@@ -136,7 +138,7 @@ void API::sendPendingCrashReport()
     }
 
     CrashBootRecord rec = {0};
-    Preferences prefs;
+    KVStore prefs;
     prefs.begin(BOOT_DIAG_NAMESPACE, true);
     size_t read = prefs.getBytes(BOOT_DIAG_PENDING_KEY, &rec, sizeof(rec));
     prefs.end();
@@ -153,11 +155,11 @@ void API::sendPendingCrashReport()
     // Optional deliberate-reboot reason left behind by the firmware before it
     // rebooted itself (e.g. the websocket reconnect heap-recovery reboot). Absent
     // for ordinary/unexpected resets, in which case the field is omitted.
-    char rebootReason[64] = {0};
+    std::string rebootReason;
     {
-        Preferences reasonPrefs;
+        KVStore reasonPrefs;
         reasonPrefs.begin(BOOT_DIAG_NAMESPACE, true);
-        reasonPrefs.getString(BOOT_DIAG_REBOOT_REASON_KEY, rebootReason, sizeof(rebootReason));
+        rebootReason = reasonPrefs.getString(BOOT_DIAG_REBOOT_REASON_KEY);
         reasonPrefs.end();
     }
 
@@ -166,7 +168,7 @@ void API::sendPendingCrashReport()
     this->crashReportSentCoredump = (bool)coredump;
 
     this->logger.infof("Uploading crash report: reset=%s rebootReason=%s uptime=%ums heap=%u coredump=%s",
-                       resetStr, rebootReason[0] ? rebootReason : "(none)", rec.uptimeMs,
+                       resetStr, rebootReason.empty() ? "(none)" : rebootReason.c_str(), rec.uptimeMs,
                        rec.freeInternalHeap, coredump ? "yes" : "no");
 
     // Build the event manually into a single heap buffer: an oversized coredump
@@ -175,9 +177,9 @@ void API::sendPendingCrashReport()
     const char *wifi = rec.wifiConnected ? "CONNECTED" : "DISCONNECTED";
 
     char rebootReasonField[96] = {0};
-    if (rebootReason[0] != '\0')
+    if (!rebootReason.empty())
     {
-        snprintf(rebootReasonField, sizeof(rebootReasonField), ",\"rebootReason\":\"%s\"", rebootReason);
+        snprintf(rebootReasonField, sizeof(rebootReasonField), ",\"rebootReason\":\"%s\"", rebootReason.c_str());
     }
 
     char head[416];
@@ -250,7 +252,7 @@ void API::onCrashReportResponse(JsonObject data)
     }
 
     this->logger.info("Crash report accepted; clearing stored record");
-    Preferences prefs;
+    KVStore prefs;
     prefs.begin(BOOT_DIAG_NAMESPACE, false);
     prefs.remove(BOOT_DIAG_PENDING_KEY);
     prefs.remove(BOOT_DIAG_REBOOT_REASON_KEY);

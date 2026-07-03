@@ -2,6 +2,7 @@
 #include <lvgl.h>
 #include <time.h>
 #include <stdio.h>
+#include <cstdlib>
 
 static const char *SELECT_FIELD_PLACEHOLDER = "Bitte Option waehlen";
 static const char *SELECT_FIELD_NO_OPTIONS = "Keine Optionen verfuegbar";
@@ -104,7 +105,7 @@ void ResourceDetailsScreen::renderFormField(const API::ResourceUsageFormFieldsPa
 
    if (this->formsModalProgressLabel)
    {
-      String progress = String(fieldNumber) + " / " + String(totalFields);
+      std::string progress = std::to_string(fieldNumber) + " / " + std::to_string(totalFields);
       lv_label_set_text(this->formsModalProgressLabel, progress.c_str());
    }
 
@@ -477,8 +478,8 @@ void ResourceDetailsScreen::buildCurrentFormField()
       return;
    }
 
-   String pageTitle = "Bitte Formular ausfuellen";
-   String resourceName = "";
+   std::string pageTitle = "Bitte Formular ausfuellen";
+   std::string resourceName = "";
 
    if (this->formsModalMeta)
    {
@@ -501,7 +502,7 @@ void ResourceDetailsScreen::buildCurrentFormField()
       }
    }
 
-   String formName = "";
+   std::string formName = "";
    if (this->formsModalMeta)
    {
       for (uint8_t i = 0; i < this->formsModalMeta->formCount && i < API::MAX_FORMS_PER_REQUEST; ++i)
@@ -518,8 +519,8 @@ void ResourceDetailsScreen::buildCurrentFormField()
    // first line, resource + form scope on the second.
    if (this->formsBreadcrumbLabel)
    {
-      String breadcrumb = pageTitle;
-      String scope = resourceName;
+      std::string breadcrumb = pageTitle;
+      std::string scope = resourceName;
       if (formName.length() > 0)
       {
          if (scope.length() > 0)
@@ -547,7 +548,7 @@ void ResourceDetailsScreen::buildCurrentFormField()
          lv_obj_set_flex_align(fieldContainer, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
          lv_obj_set_style_pad_row(fieldContainer, 6, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-         String fieldTitle = field.name;
+         std::string fieldTitle = field.name;
          if (field.isRequired)
          {
             fieldTitle += " *";
@@ -676,7 +677,7 @@ void ResourceDetailsScreen::buildCurrentFormField()
 
             lv_obj_t *preview = lv_obj_create(fieldContainer);
             widget.input = preview;
-            widget.textValue = field.hasValue ? field.value : String("");
+            widget.textValue = field.hasValue ? field.value : std::string("");
             lv_obj_remove_style_all(preview);
             lv_obj_add_flag(preview, LV_OBJ_FLAG_CLICKABLE);
             lv_obj_remove_flag(preview, LV_OBJ_FLAG_SCROLLABLE);
@@ -782,8 +783,8 @@ bool ResourceDetailsScreen::collectCurrentField(API::FormPageSubmission &outPage
       }
 
       // Text/number values live in widget.textValue (committed by the fullscreen editor).
-      String value = widget.textValue;
-      value.trim();
+      std::string value = widget.textValue;
+      trimString(value);
 
       if (value.length() == 0)
       {
@@ -800,7 +801,7 @@ bool ResourceDetailsScreen::collectCurrentField(API::FormPageSubmission &outPage
       if (widget.type == API::ResourceUsageFormFieldType::NUMBER)
       {
          answer.type = API::FormSubmissionAnswer::ValueType::NUMBER;
-         answer.numberValue = value.toDouble();
+         answer.numberValue = strtod(value.c_str(), nullptr);
       }
       else
       {
@@ -867,8 +868,8 @@ void ResourceDetailsScreen::updateFieldPreview(FormFieldWidget &widget)
    {
       return;
    }
-   String trimmed = widget.textValue;
-   trimmed.trim();
+   std::string trimmed = widget.textValue;
+   trimString(trimmed);
    if (trimmed.length() == 0)
    {
       // Empty: show the field placeholder (or a generic hint) in muted gray.
@@ -902,7 +903,7 @@ void ResourceDetailsScreen::openFormsEditor(uint16_t widgetIndex)
 
    if (this->formsEditorTitleLabel)
    {
-      String title = widget.definition ? widget.definition->name : String("");
+      std::string title = widget.definition ? widget.definition->name : std::string("");
       if (widget.isRequired)
       {
          title += " *";
@@ -959,7 +960,7 @@ void ResourceDetailsScreen::closeFormsEditor(bool commit)
           widget.type != API::ResourceUsageFormFieldType::SELECT)
       {
          const char *text = lv_textarea_get_text(this->formsEditorTextarea);
-         widget.textValue = text ? String(text) : String("");
+         widget.textValue = text ? std::string(text) : std::string("");
          this->updateFieldPreview(widget);
       }
    }

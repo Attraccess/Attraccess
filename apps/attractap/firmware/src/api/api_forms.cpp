@@ -2,6 +2,9 @@
 // FEATURE: api-forms
 
 #include "api.hpp"
+#include <cstdio>
+#include <cstring>
+#include <string>
 
 void API::setResourceFormsRequestCallback(std::function<void(const ResourceUsageFormRequest &)> callback)
 {
@@ -162,7 +165,10 @@ void API::onResourceUsageFormFields(JsonObject data)
                 }
                 else if (valueVariant.is<double>())
                 {
-                    field.value = String(valueVariant.as<double>());
+                    // Match Arduino String(double): 2 decimal places
+                    char numBuf[32];
+                    snprintf(numBuf, sizeof(numBuf), "%.2f", valueVariant.as<double>());
+                    field.value = numBuf;
                 }
                 else
                 {
@@ -301,8 +307,8 @@ void API::parseFormFieldOptions(ResourceUsageFormField &field, JsonVariantConst 
                 {
                     continue;
                 }
-                String value = raw;
-                value.trim();
+                std::string value = raw;
+                trimString(value);
                 if (value.length() == 0)
                 {
                     continue;

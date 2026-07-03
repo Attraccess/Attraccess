@@ -1,7 +1,8 @@
 #include "ethernet.hpp"
-#include <Arduino.h>
+#include "platform.hpp"
 #include "esp_system.h"
 #include "esp_mac.h"
+#include <string>
 
 // Static member definitions
 Ethernet::EthernetState Ethernet::_state = ETHERNET_STATE_INIT;
@@ -139,7 +140,7 @@ esp_err_t Ethernet::initializeNetwork()
     esp_err_t ret = initSPI();
     if (ret != ESP_OK)
     {
-        logger.error((String("Failed to initialize SPI: ") + esp_err_to_name(ret)).c_str());
+        logger.error((std::string("Failed to initialize SPI: ") + esp_err_to_name(ret)).c_str());
         return ret;
     }
 
@@ -148,7 +149,7 @@ esp_err_t Ethernet::initializeNetwork()
     ret = ethernet_init(&eth_handle, &eth_port_cnt);
     if (ret != ESP_OK)
     {
-        logger.error((String("Failed to initialize Ethernet driver: ") + esp_err_to_name(ret)).c_str());
+        logger.error((std::string("Failed to initialize Ethernet driver: ") + esp_err_to_name(ret)).c_str());
         return ret;
     }
 
@@ -164,14 +165,14 @@ esp_err_t Ethernet::initializeNetwork()
         return ESP_FAIL;
     }
 
-    esp_netif_set_hostname(eth_netif, String(Settings::getHostname() + "-eth").c_str());
+    esp_netif_set_hostname(eth_netif, (Settings::getHostname() + "-eth").c_str());
 
     eth_netif_glue = esp_eth_new_netif_glue(eth_handle);
     // Attach Ethernet driver to TCP/IP stack
     ret = esp_netif_attach(eth_netif, eth_netif_glue);
     if (ret != ESP_OK)
     {
-        logger.error((String("Failed to attach netif: ") + esp_err_to_name(ret)).c_str());
+        logger.error((std::string("Failed to attach netif: ") + esp_err_to_name(ret)).c_str());
         return ret;
     }
 
@@ -179,14 +180,14 @@ esp_err_t Ethernet::initializeNetwork()
     ret = esp_event_handler_register(ETH_EVENT, ESP_EVENT_ANY_ID, &eth_event_handler, nullptr);
     if (ret != ESP_OK)
     {
-        logger.error((String("Failed to register ETH event handler: ") + esp_err_to_name(ret)).c_str());
+        logger.error((std::string("Failed to register ETH event handler: ") + esp_err_to_name(ret)).c_str());
         return ret;
     }
 
     ret = esp_event_handler_register(IP_EVENT, IP_EVENT_ETH_GOT_IP, &got_ip_event_handler, nullptr);
     if (ret != ESP_OK)
     {
-        logger.error((String("Failed to register IP event handler: ") + esp_err_to_name(ret)).c_str());
+        logger.error((std::string("Failed to register IP event handler: ") + esp_err_to_name(ret)).c_str());
         return ret;
     }
 
@@ -194,7 +195,7 @@ esp_err_t Ethernet::initializeNetwork()
     ret = esp_netif_dhcpc_start(eth_netif);
     if (ret != ESP_OK && ret != ESP_ERR_ESP_NETIF_DHCP_ALREADY_STARTED)
     {
-        logger.error((String("Failed to start DHCP client: ") + esp_err_to_name(ret)).c_str());
+        logger.error((std::string("Failed to start DHCP client: ") + esp_err_to_name(ret)).c_str());
         return ret;
     }
     logger.info("DHCP client started");
@@ -203,7 +204,7 @@ esp_err_t Ethernet::initializeNetwork()
     ret = esp_eth_start(eth_handle);
     if (ret != ESP_OK)
     {
-        logger.error((String("Failed to start Ethernet: ") + esp_err_to_name(ret)).c_str());
+        logger.error((std::string("Failed to start Ethernet: ") + esp_err_to_name(ret)).c_str());
         return ret;
     }
 
@@ -231,7 +232,7 @@ esp_err_t Ethernet::initSPI()
         ret = gpio_install_isr_service(0);
         if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE)
         {
-            logger.error((String("Failed to install GPIO ISR service: ") + esp_err_to_name(ret)).c_str());
+            logger.error((std::string("Failed to install GPIO ISR service: ") + esp_err_to_name(ret)).c_str());
             return ret;
         }
         logger.info("GPIO ISR service installed for interrupt mode");
@@ -240,7 +241,7 @@ esp_err_t Ethernet::initSPI()
     // Configure W5500 reset pin (if available)
     if (PIN_W5500_RESET >= 0)
     {
-        logger.info(("Configuring reset pin GPIO" + String(PIN_W5500_RESET)).c_str());
+        logger.info(("Configuring reset pin GPIO" + std::to_string(PIN_W5500_RESET)).c_str());
         uint64_t pin_mask = (1ULL << PIN_W5500_RESET);
         gpio_config_t reset_gpio_config = {
             .pin_bit_mask = pin_mask,
@@ -252,7 +253,7 @@ esp_err_t Ethernet::initSPI()
         ret = gpio_config(&reset_gpio_config);
         if (ret != ESP_OK)
         {
-            logger.error((String("Failed to configure reset GPIO: ") + esp_err_to_name(ret)).c_str());
+            logger.error((std::string("Failed to configure reset GPIO: ") + esp_err_to_name(ret)).c_str());
             return ret;
         }
 
@@ -287,7 +288,7 @@ esp_err_t Ethernet::initSPI()
 #endif
     if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE)
     {
-        logger.error((String("Failed to initialize SPI bus: ") + esp_err_to_name(ret)).c_str());
+        logger.error((std::string("Failed to initialize SPI bus: ") + esp_err_to_name(ret)).c_str());
         return ret;
     }
     else if (ret == ESP_ERR_INVALID_STATE)
@@ -324,7 +325,7 @@ esp_err_t Ethernet::initSPI()
 #endif
     if (ret != ESP_OK)
     {
-        logger.error((String("Failed to add SPI device: ") + esp_err_to_name(ret)).c_str());
+        logger.error((std::string("Failed to add SPI device: ") + esp_err_to_name(ret)).c_str());
         return ret;
     }
 
@@ -349,7 +350,7 @@ esp_err_t Ethernet::ethernet_init(esp_eth_handle_t *eth_handles, uint8_t *eth_po
     // Configure interrupt pin (if available)
     if (PIN_W5500_INT >= 0)
     {
-        logger.info(("Configuring interrupt pin GPIO" + String(PIN_W5500_INT)).c_str());
+        logger.info(("Configuring interrupt pin GPIO" + std::to_string(PIN_W5500_INT)).c_str());
         w5500_config.int_gpio_num = PIN_W5500_INT;
     }
     else

@@ -1,5 +1,7 @@
 #include "connectionConfigurationScreen.hpp"
 
+#include "platform.hpp"
+
 // PIN-lock overlay: unlock flow and its callbacks.
 
 void ConnectionConfigurationScreen::disablePinLock()
@@ -18,9 +20,9 @@ void ConnectionConfigurationScreen::enablePinLock()
    lv_obj_clear_flag(this->pinLockOverlay, LV_OBJ_FLAG_HIDDEN);
 }
 
-bool ConnectionConfigurationScreen::onPinLockConfirmCallback(String pin)
+bool ConnectionConfigurationScreen::onPinLockConfirmCallback(std::string pin)
 {
-   String devicePin = Settings::getDeviceConfig().passCode;
+   std::string devicePin = Settings::getDeviceConfig().passCode;
    bool matches = pin == devicePin;
 
    if (!matches)

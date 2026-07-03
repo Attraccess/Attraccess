@@ -37,7 +37,7 @@ void NoResourcesScreen::loop()
    // nothing to do
 }
 
-String NoResourcesScreen::getName()
+std::string NoResourcesScreen::getName()
 {
    return "NoResourcesScreen";
 }

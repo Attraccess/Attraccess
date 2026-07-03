@@ -1,5 +1,7 @@
 #include "enrollmentScreen.hpp"
 
+#include "platform.hpp"
+
 // Palette — dark, neutral background with explicit high-contrast white text.
 // The previous design left label text colour unset (defaulting to near-black)
 // on a dark purple background, which is the "bad contrast / hard to read"
@@ -178,7 +180,7 @@ void EnrollmentScreen::setEnrollmentTimeoutTime(uint32_t enrollmentTimeoutTime)
    this->updateTimeoutBar();
 }
 
-void EnrollmentScreen::setUserName(String userName)
+void EnrollmentScreen::setUserName(std::string userName)
 {
    this->userNameCache = userName;
    if (this->userNameLabel)
@@ -197,7 +199,7 @@ void EnrollmentScreen::setStatus(Status status)
    this->applyStatus();
 }
 
-void EnrollmentScreen::setStatusMessage(const String &message)
+void EnrollmentScreen::setStatusMessage(const std::string &message)
 {
    this->statusMessageOverride = message;
    this->applyStatus();
@@ -225,7 +227,7 @@ void EnrollmentScreen::onCancelButtonEvent(lv_event_t *e)
    }
 }
 
-String EnrollmentScreen::getName()
+std::string EnrollmentScreen::getName()
 {
    return "EnrollmentScreen";
 }

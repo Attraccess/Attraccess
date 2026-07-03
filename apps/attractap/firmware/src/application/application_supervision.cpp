@@ -2,6 +2,7 @@
 // FEATURE: application-supervision
 
 #include "application.hpp"
+#include "platform.hpp"
 
 #ifdef HAS_LVGL_DISPLAY
 
@@ -71,7 +72,7 @@ void Application::processSupervision() {
   // Secondary hint from the server's request acknowledgement (eligible supervisor names).
   if (this->supervisionHintReady) {
     this->supervisionHintReady = false;
-    Display::supervisionScreen.setSupervisorHint(String(this->supervisionHintMessage));
+    Display::supervisionScreen.setSupervisorHint(this->supervisionHintMessage);
   }
 
   // Web approval resolved the request: the session is already started server-side. Show success and
@@ -92,7 +93,7 @@ void Application::processSupervision() {
     this->supervisionFailed = false;
     this->beeper.errorBeep();
     Display::supervisionScreen.setStatus(SupervisionScreen::STATUS_ERROR);
-    Display::supervisionScreen.setStatusMessage(String(this->supervisionErrorMessage));
+    Display::supervisionScreen.setStatusMessage(this->supervisionErrorMessage);
     this->supervisionPhase = SUPERVISION_PHASE_ERROR;
     this->supervisionTerminalError = true;
     this->supervisionPhaseChangedMs = now;
@@ -105,7 +106,7 @@ void Application::processSupervision() {
     this->supervisionCardRejected = false;
     this->beeper.errorBeep();
     Display::supervisionScreen.setStatus(SupervisionScreen::STATUS_ERROR);
-    Display::supervisionScreen.setStatusMessage(String(this->supervisionErrorMessage));
+    Display::supervisionScreen.setStatusMessage(this->supervisionErrorMessage);
     this->supervisionPhase = SUPERVISION_PHASE_ERROR;
     this->supervisionTerminalError = false;
     this->supervisionPhaseChangedMs = now;

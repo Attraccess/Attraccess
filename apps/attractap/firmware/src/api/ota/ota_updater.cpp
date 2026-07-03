@@ -2,6 +2,8 @@
 // FEATURE: firmware-ota
 
 #include "ota_updater.hpp"
+#include "platform.hpp"
+#include <string>
 
 void OtaUpdater::begin(JsonObject firmwareMeta)
 {
@@ -39,13 +41,13 @@ void OtaUpdater::begin(JsonObject firmwareMeta)
     esp_err_t err = esp_ota_begin(this->ota.updatePartition, OTA_SIZE_UNKNOWN, &this->ota.otaHandle);
     if (err != ESP_OK)
     {
-        this->logger.error((String("esp_ota_begin failed: ") + esp_err_to_name(err)).c_str());
+        this->logger.error((std::string("esp_ota_begin failed: ") + esp_err_to_name(err)).c_str());
         this->ota.inProgress = false;
         return;
     }
     this->ota.lastReportedPercent = -1;
 
-    String availableVersion = firmwareMeta["version"].as<String>();
+    std::string availableVersion = firmwareMeta["version"].as<std::string>();
     if (this->metaCallback)
     {
         this->logger.debugf("Firmware update available: %s > %s", FIRMWARE_VERSION, availableVersion.c_str());
@@ -107,7 +109,7 @@ void OtaUpdater::onChunk(esp_websocket_event_data_t data)
         esp_err_t werr = esp_ota_write(this->ota.otaHandle, fragmentPtr, fragmentLen);
         if (werr != ESP_OK)
         {
-            this->abortFirmwareUpdate((String("esp_ota_write failed: ") + esp_err_to_name(werr)).c_str());
+            this->abortFirmwareUpdate((std::string("esp_ota_write failed: ") + esp_err_to_name(werr)).c_str());
             return;
         }
         this->ota.bytesWritten += (uint32_t)fragmentLen;
@@ -153,13 +155,13 @@ void OtaUpdater::onChunk(esp_websocket_event_data_t data)
     esp_err_t endErr = esp_ota_end(this->ota.otaHandle);
     if (endErr != ESP_OK)
     {
-        this->abortFirmwareUpdate((String("esp_ota_end failed: ") + esp_err_to_name(endErr)).c_str());
+        this->abortFirmwareUpdate((std::string("esp_ota_end failed: ") + esp_err_to_name(endErr)).c_str());
         return;
     }
     esp_err_t setBootErr = esp_ota_set_boot_partition(this->ota.updatePartition);
     if (setBootErr != ESP_OK)
     {
-        this->abortFirmwareUpdate((String("esp_ota_set_boot_partition failed: ") + esp_err_to_name(setBootErr)).c_str());
+        this->abortFirmwareUpdate((std::string("esp_ota_set_boot_partition failed: ") + esp_err_to_name(setBootErr)).c_str());
         return;
     }
 
@@ -201,7 +203,7 @@ void OtaUpdater::tick()
 
 void OtaUpdater::abortFirmwareUpdate(const char *reason)
 {
-    this->logger.error((String("OTA aborted: ") + reason).c_str());
+    this->logger.error((std::string("OTA aborted: ") + reason).c_str());
     if (this->ota.otaHandle)
     {
         esp_ota_abort(this->ota.otaHandle);

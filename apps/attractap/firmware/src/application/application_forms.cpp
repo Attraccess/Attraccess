@@ -212,7 +212,7 @@ void Application::handleFormsCancel() {
   this->endActionPause();
 }
 
-void Application::onActionResult(const String &eventType) {
+void Application::onActionResult(const std::string &eventType) {
   if (eventType == "START_RESOURCE_USAGE_SESSION" ||
       eventType == "STOP_RESOURCE_USAGE_SESSION") {
     this->pendingActionType = PENDING_ACTION_NONE;

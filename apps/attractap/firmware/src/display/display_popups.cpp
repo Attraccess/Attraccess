@@ -4,7 +4,7 @@
 // and an insufficient-balance top-up dialog. Both replace any active popup and
 // store the overlay in Display::activePopup so hidePopup can tear it down.
 
-void Display::showErrorPopup(const String &title, const String &message)
+void Display::showErrorPopup(const std::string &title, const std::string &message)
 {
     // Close existing popup if any
     Display::hidePopup();

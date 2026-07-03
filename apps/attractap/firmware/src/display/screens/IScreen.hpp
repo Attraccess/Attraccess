@@ -1,7 +1,8 @@
 #pragma once
 
+#include <string>
+
 #include <lvgl.h>
-#include <Arduino.h>
 
 /**
  * Set a label's text only when it actually changed.
@@ -34,7 +35,7 @@ public:
     virtual void init() = 0;
     virtual void onScreenLeave() = 0;
     virtual void loop() = 0;
-    virtual String getName() = 0;
+    virtual std::string getName() = 0;
     virtual lv_obj_t *getScreen() = 0;
 
     /** Destroy the LVGL tree to release RAM; default is no-op. */

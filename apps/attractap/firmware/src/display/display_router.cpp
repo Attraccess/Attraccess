@@ -1,6 +1,7 @@
 #include "display.hpp"
 
 #include <algorithm>
+#include "platform.hpp"
 
 // Screen routing: transition between IScreen instances with a fade animation.
 // Unloading of the previous screen is deferred until the transition completes

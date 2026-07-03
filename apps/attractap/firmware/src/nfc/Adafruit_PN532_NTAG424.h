@@ -13,13 +13,12 @@
 #ifndef ADAFRUIT_PN532_H
 #define ADAFRUIT_PN532_H
 
-#include "Arduino.h"
+#include <cstddef>
+#include <cstdint>
 
-#include <Adafruit_I2CDevice.h>
-#include <Adafruit_SPIDevice.h>
 #include "mbedtls/aes.h"
 #include "mbedtlscmac.h"
-#include <Arduino_CRC32.h>
+#include "pn532_i2c.hpp"
 
 #define PN532_PREAMBLE (0x00)   ///< Command sequence start, byte 1/3
 #define PN532_STARTCODE1 (0x00) ///< Command sequence start, byte 2/3
@@ -183,12 +182,9 @@
 class Adafruit_PN532
 {
 public:
-  Adafruit_PN532(uint8_t clk, uint8_t miso, uint8_t mosi,
-                 uint8_t ss);                          // Software SPI
-  Adafruit_PN532(uint8_t ss, SPIClass *theSPI = &SPI); // Hardware SPI
-  Adafruit_PN532(uint8_t irq, uint8_t reset,
-                 TwoWire *theWire = &Wire);              // Hardware I2C
-  Adafruit_PN532(uint8_t reset, HardwareSerial *theSer); // Hardware UART
+  // I2C on the shared bus (SPI/UART/software-SPI transports were removed with
+  // the Arduino port — no Attractap hardware ever used them).
+  explicit Adafruit_PN532(uint8_t i2cAddress = PN532_I2C_ADDRESS);
   bool begin(void);
 
   void reset(void);
@@ -385,26 +381,23 @@ public:
                                uint8_t dataLen);
 
   // Help functions to display formatted text
-  static void PrintHex(const byte *data, const uint32_t numBytes);
-  static void PrintHexChar(const byte *pbtData, const uint32_t numBytes);
+  static void PrintHex(const uint8_t *data, const uint32_t numBytes);
+  static void PrintHexChar(const uint8_t *pbtData, const uint32_t numBytes);
 
 private:
-  int8_t _irq = -1, _reset = -1, _cs = -1;
   int8_t _uid[7];      // ISO14443A uid
   int8_t _uidLen;      // uid len
   int8_t _key[6];      // Mifare Classic key
   int8_t _inListedTag; // Tg number of inlisted tag.
 
-  // Low level communication functions that handle both SPI and I2C.
+  // Low level I2C communication functions.
   void readdata(uint8_t *buff, uint8_t n);
   void writecommand(uint8_t *cmd, uint8_t cmdlen);
   bool isready();
   bool waitready(uint16_t timeout);
   bool readack();
 
-  Adafruit_SPIDevice *spi_dev = NULL;
-  Adafruit_I2CDevice *i2c_dev = NULL;
-  HardwareSerial *ser_dev = NULL;
+  Pn532I2cDevice *i2c_dev = NULL;
 };
 
 #endif

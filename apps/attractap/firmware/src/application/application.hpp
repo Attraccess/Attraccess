@@ -1,7 +1,8 @@
 #pragma once
 
-#include <Arduino.h>
-#include <Preferences.h>
+#include <string>
+#include "settings/kvstore.hpp"
+
 #include "../nfc/nfc.hpp"
 #include "../logger/logger.hpp"
 #include "settings/settings.hpp"
@@ -78,7 +79,7 @@ private:
 #ifdef HAS_LVGL_DISPLAY
     struct ApiEnrollNewCardGetAvailableKeyNoData_t
     {
-        String username;
+        std::string username;
     };
     ApiEnrollNewCardGetAvailableKeyNoData_t apiEnrollNewCardGetAvailableKeyNoData;
     uint32_t apiEnrollNewCardGetAvailableKeyNoStartTimeMs;
@@ -114,8 +115,8 @@ private:
     volatile bool enrollKeyMaterialReady = false;
     volatile bool enrollCancelRequested = false;
     volatile bool enrollErrorPending = false;
-    // Fixed buffer, not an Arduino String: the producer runs on the websocket
-    // task and the consumer on the main loop. A String would reallocate its
+    // Fixed buffer, not an Arduino std::string: the producer runs on the websocket
+    // task and the consumer on the main loop. A std::string would reallocate its
     // heap buffer on assignment, which the main loop could observe mid-update
     // (dangling pointer / torn read). A plain char[] has no pointer to dangle.
     char enrollErrorMessage[64] = {0};
@@ -134,7 +135,7 @@ private:
     // factory key back as soon as a card is presented.
     struct ApiResetNfcCardData_t
     {
-        String username;
+        std::string username;
         uint8_t keyNo;
         uint8_t keyBytes[16];
     };
@@ -202,7 +203,7 @@ private:
     // True while dwelling on a terminal error (vs a recoverable card rejection); decided on the loop.
     bool supervisionTerminalError = false;
     volatile bool supervisionCancelRequested = false;
-    // Producer (websocket task) / consumer (main loop) — fixed buffers, not Arduino String (see the
+    // Producer (websocket task) / consumer (main loop) — fixed buffers, not Arduino std::string (see the
     // enrollment error buffer rationale).
     char supervisionErrorMessage[64] = {0};
     char supervisionHintMessage[160] = {0};
@@ -224,7 +225,7 @@ private:
 
     int firmwareUpdateProgressPct;
 
-    String availableFirmwareVersion;
+    std::string availableFirmwareVersion;
 
     static void
     networkTask(void *parameter);
@@ -249,7 +250,7 @@ private:
         bool wifiConnected;
     };
 
-    Preferences bootDiagPreferences;
+    KVStore bootDiagPreferences;
     uint32_t lastBootSnapshotMs = 0;
 
     void setupBootDiagnostics();
@@ -300,11 +301,11 @@ private:
     API::ProjectsOfUserResponse projectsOfUserResponse;
     bool projectsOfUserResponseUpdated = false;
     uint32_t selectedProjectId = 0;
-    String selectedProjectName;
+    std::string selectedProjectName;
     uint32_t projectsCurrentPage = 1;
     uint32_t projectsTotalCount = 0;
     bool projectsHasMore = false;
-    String currentProjectsUser;
+    std::string currentProjectsUser;
 
     enum pending_action_t
     {
@@ -358,7 +359,7 @@ private:
 
     void requestProjectsPage(uint32_t page);
     void clearProjectSelection();
-    void handleProjectSelection(uint32_t projectId, const String &projectName);
+    void handleProjectSelection(uint32_t projectId, const std::string &projectName);
     void handleFormsRequest(const API::ResourceUsageFormRequest &request);
     void handleFormFields(const API::ResourceUsageFormFieldsPage &page);
     void handleFormPageResult(const API::ResourceUsageFormPageResult &result);
@@ -372,7 +373,7 @@ private:
     uint32_t totalFormFields() const;
     uint32_t globalFormFieldNumber() const;
     bool isLastFormField() const;
-    void onActionResult(const String &eventType);
+    void onActionResult(const std::string &eventType);
 #endif
 
     enum applicationState_t
