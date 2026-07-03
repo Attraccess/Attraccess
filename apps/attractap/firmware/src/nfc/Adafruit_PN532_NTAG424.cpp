@@ -2278,8 +2278,10 @@ uint8_t Adafruit_PN532::ntag424_AuthenticateEV2First(uint8_t *key,
   uint8_t prefix[7] = {
       PN532_COMMAND_INDATAEXCHANGE, 0x01, 0x90, 0xaf, 0x00, 0x00, 0x20};
   uint8_t postfix[1] = {0x00};
-  int apdusize = sizeof(prefix) + sizeof(answer_enc) + sizeof(postfix);
-  uint8_t apdu[apdusize];
+  // Fixed-size (all sizeofs are compile-time constants) — the old VLA form
+  // trips GCC 14's -Werror=dangling-pointer analysis.
+  uint8_t apdu[sizeof(prefix) + sizeof(answer_enc) + sizeof(postfix)];
+  const int apdusize = sizeof(apdu);
   memcpy(&apdu[0], prefix, sizeof(prefix));
   memcpy(&apdu[sizeof(prefix)], answer_enc, sizeof(answer_enc));
   memcpy(&apdu[sizeof(prefix) + sizeof(answer_enc)], postfix, sizeof(postfix));
