@@ -21,8 +21,11 @@ include("${ATTRACTAP_VARIANT_FILE}")
 # scripts/check-attractap-firmware-version.sh and build_firmwares.py).
 file(STRINGS "${CMAKE_CURRENT_LIST_DIR}/version.txt" ATTRACTAP_VERSION LIMIT_COUNT 1)
 
-# The lvgl managed component compiles against our lv_conf.h instead of its Kconfig.
-add_compile_definitions(LV_CONF_PATH="${CMAKE_CURRENT_LIST_DIR}/include/lv_conf.h")
-
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+
+# The lvgl managed component compiles against our lv_conf.h instead of its
+# Kconfig (defining LV_CONF_PATH overrides lvgl's CONFIG_LV_CONF_SKIP default;
+# the value must be a quoted string — lv_conf_internal.h does `#include LV_CONF_PATH`).
+idf_build_set_property(COMPILE_OPTIONS "-DLV_CONF_PATH=\"${CMAKE_CURRENT_LIST_DIR}/include/lv_conf.h\"" APPEND)
+
 project(attractap)
