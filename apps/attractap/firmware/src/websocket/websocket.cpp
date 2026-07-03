@@ -470,7 +470,10 @@ void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, v
         break;
 
     default:
-        logger.error(("Unknown event: " + std::to_string(event_id)).c_str());
+        // esp_websocket_client >=1.5.0 emits benign lifecycle events we don't act on
+        // (BEFORE_CONNECT=5, BEGIN=6, FINISH=7). They are not errors, so keep them at
+        // debug to avoid crying wolf in production (ERROR-only) log builds.
+        logger.debugf("Unhandled websocket event: %d", (int)event_id);
         break;
     }
 }
