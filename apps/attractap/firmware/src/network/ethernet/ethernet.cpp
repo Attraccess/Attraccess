@@ -10,7 +10,9 @@ Logger Ethernet::logger("Ethernet");
 esp_netif_t *Ethernet::eth_netif = nullptr;
 esp_eth_handle_t Ethernet::eth_handle = nullptr;
 esp_eth_netif_glue_handle_t Ethernet::eth_netif_glue = nullptr;
-spi_device_handle_t Ethernet::spi_handle = nullptr;
+spi_host_device_t Ethernet::spi_host = SPI2_HOST;
+spi_device_interface_config_t Ethernet::spi_devcfg = {};
+bool Ethernet::spi_ready = false;
 uint32_t Ethernet::retry_count = 0;
 uint32_t Ethernet::last_retry_time = 0;
 uint32_t Ethernet::dhcp_start_time = 0;
@@ -219,7 +221,7 @@ esp_err_t Ethernet::initSPI()
     logger.info("Initializing SPI for W5500");
 
     // If SPI device is already initialized, we're done
-    if (spi_handle != nullptr)
+    if (spi_ready)
     {
         logger.info("SPI device already initialized");
         return ESP_OK;
@@ -300,34 +302,22 @@ esp_err_t Ethernet::initSPI()
         logger.info("SPI bus initialized successfully");
     }
 
-    // Initialize SPI device
-    spi_device_interface_config_t devcfg = {
-        .command_bits = 16,
-        .address_bits = 8,
-        .dummy_bits = 0,
-        .mode = 0,
-        .duty_cycle_pos = 0,
-        .cs_ena_pretrans = 0,
-        .cs_ena_posttrans = 0,
-        .clock_speed_hz = 20 * 1000 * 1000, // 20MHz
-        .input_delay_ns = 0,
-        .spics_io_num = PIN_ETH_SPI_CS,
-        .flags = 0,
-        .queue_size = 20,
-        .pre_cb = nullptr,
-        .post_cb = nullptr,
-    };
+    // SPI device parameters — the IDF 5.x W5500 driver adds/removes the SPI
+    // device itself, so only the configuration is prepared here.
+    spi_devcfg = {};
+    spi_devcfg.command_bits = 16;
+    spi_devcfg.address_bits = 8;
+    spi_devcfg.mode = 0;
+    spi_devcfg.clock_speed_hz = 20 * 1000 * 1000; // 20MHz
+    spi_devcfg.spics_io_num = PIN_ETH_SPI_CS;
+    spi_devcfg.queue_size = 20;
 
 #ifdef DISPLAY_TOUCHSCREEN_LVGL
-    ret = spi_bus_add_device(SPI3_HOST, &devcfg, &spi_handle);
+    spi_host = SPI3_HOST;
 #else
-    ret = spi_bus_add_device(SPI2_HOST, &devcfg, &spi_handle);
+    spi_host = SPI2_HOST;
 #endif
-    if (ret != ESP_OK)
-    {
-        logger.error((std::string("Failed to add SPI device: ") + esp_err_to_name(ret)).c_str());
-        return ret;
-    }
+    spi_ready = true;
 
     logger.info("SPI initialization completed");
     return ESP_OK;
@@ -338,14 +328,14 @@ esp_err_t Ethernet::ethernet_init(esp_eth_handle_t *eth_handles, uint8_t *eth_po
     logger.info("Initializing W5500 Ethernet driver");
 
     // SPI should already be initialized
-    if (spi_handle == nullptr)
+    if (!spi_ready)
     {
         logger.error("SPI not initialized");
         return ESP_FAIL;
     }
 
-    // Initialize W5500 configuration
-    eth_w5500_config_t w5500_config = ETH_W5500_DEFAULT_CONFIG(spi_handle);
+    // Initialize W5500 configuration (the driver adds the SPI device itself)
+    eth_w5500_config_t w5500_config = ETH_W5500_DEFAULT_CONFIG(spi_host, &spi_devcfg);
 
     // Configure interrupt pin (if available)
     if (PIN_W5500_INT >= 0)
@@ -571,10 +561,7 @@ void Ethernet::cleanupPartialInit()
         eth_netif = nullptr;
     }
 
-    // Clean up SPI device (but keep SPI bus for other devices)
-    if (spi_handle != nullptr)
-    {
-        spi_bus_remove_device(spi_handle);
-        spi_handle = nullptr;
-    }
+    // The W5500 driver owns its SPI device and removed it during uninstall;
+    // the SPI bus itself stays up for other users.
+    spi_ready = false;
 }

@@ -60,6 +60,7 @@
 #include "Adafruit_PN532_NTAG424.h"
 
 #include <cstring>
+#include "esp_random.h"
 #include "esp_rom_crc.h"
 #include "pn532_platform.hpp"
 
@@ -1317,7 +1318,7 @@ void Adafruit_PN532::ntag424_random(uint8_t *output, uint8_t bytecount)
 {
   for (int i = 0; i < bytecount; i++)
   {
-    output[i] = random(256);
+    output[i] = (uint8_t)(esp_random() & 0xFF); // was Arduino random(256)
   }
 }
 
@@ -1348,7 +1349,7 @@ uint8_t Adafruit_PN532::ntag424_apdu_send(
 {
   Serial.print("cmd_counter: ");
   Serial.println(ntag424_Session.cmd_counter);
-  uint8_t apdusize = 8 + (7 + cmd_header_length + cmd_data_length + 2) & 0xff;
+  uint8_t apdusize = (8 + (7 + cmd_header_length + cmd_data_length + 2)) & 0xff;
   uint8_t apdu[apdusize];
   uint8_t offset = 0;
   apdu[0] = PN532_COMMAND_INDATAEXCHANGE;
@@ -2856,13 +2857,9 @@ uint8_t Adafruit_PN532::ntag424_GetVersion()
   ntag424_VersionInfo.HWStorageSize = pn532_packetbuffer[13];
   ntag424_VersionInfo.HWProtocol = pn532_packetbuffer[14];
 
-  if (!pn532_packetbuffer[14] == 0xaf)
-  {
-#ifdef NTAG424DEBUG
-    PN532DEBUGPRINT.println(F("Missing additional frame request 1."));
-#endif
-    return 0;
-  }
+  // NOTE: upstream Adafruit code wrote `if (!pn532_packetbuffer[14] == 0xaf)`,
+  // which is always false — the additional-frame check was never active. Kept
+  // disabled for behavior parity with the shipped Arduino builds.
   pn532_packetbuffer[0] = PN532_COMMAND_INDATAEXCHANGE;
   pn532_packetbuffer[1] = 1; /* Card number */
   pn532_packetbuffer[2] = NTAG424_COM_CLA;
@@ -2887,13 +2884,7 @@ uint8_t Adafruit_PN532::ntag424_GetVersion()
   ntag424_VersionInfo.SWStorageSize = pn532_packetbuffer[13];
   ntag424_VersionInfo.SWProtocol = pn532_packetbuffer[14];
 
-  if (!pn532_packetbuffer[14] == 0xaf)
-  {
-#ifdef NTAG424DEBUG
-    PN532DEBUGPRINT.println(F("Missing additional frame request 2."));
-#endif
-    return 0;
-  }
+  // See note above: the upstream additional-frame check was never active.
   pn532_packetbuffer[0] = PN532_COMMAND_INDATAEXCHANGE;
   pn532_packetbuffer[1] = 1; /* Card number */
   pn532_packetbuffer[2] = NTAG424_COM_CLA;

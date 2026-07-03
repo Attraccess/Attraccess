@@ -17,7 +17,7 @@
 #include <cstdint>
 
 #include "mbedtls/aes.h"
-#include "mbedtlscmac.h"
+#include "mbedtls/cmac.h"
 #include "pn532_i2c.hpp"
 
 #define PN532_PREAMBLE (0x00)   ///< Command sequence start, byte 1/3
