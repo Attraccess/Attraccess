@@ -2,6 +2,7 @@
 // FEATURE: api-diag
 
 #include "api.hpp"
+#include <cstdio>
 
 #ifdef ESP_PLATFORM
 #include "settings/kvstore.hpp"

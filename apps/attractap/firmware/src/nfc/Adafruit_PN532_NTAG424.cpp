@@ -59,6 +59,8 @@
 
 #include "Adafruit_PN532_NTAG424.h"
 
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include "esp_random.h"
 #include "esp_rom_crc.h"

@@ -1,4 +1,5 @@
 #include "display.hpp"
+#include <cstdlib>
 
 // Global overlay popups rendered on the LVGL top layer: a generic error dialog
 // and an insufficient-balance top-up dialog. Both replace any active popup and
