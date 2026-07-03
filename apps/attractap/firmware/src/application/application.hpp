@@ -34,14 +34,16 @@ public:
                     api(),
                     externalState(EXTERNAL_STATE_NONE),
                     firmwareUpdateProgressPct(0),
+#ifdef HAS_LVGL_DISPLAY
+                    bootDone(false),
+#endif
                     unlocked(false)
 #ifdef HAS_LVGL_DISPLAY
                     ,
                     resourceCount(0),
                     resourceIsSelected(false),
-                    bootDone(false),
-                    resourceListUpdated(false),
-                    selectedResourceChanged(false)
+                    selectedResourceChanged(false),
+                    resourceListUpdated(false)
 #endif
     {
     }
