@@ -1,13 +1,19 @@
-if(NOT DEFINED ATTRACTAP_DEFINES)
-    message(FATAL_ERROR "ATTRACTAP_DEFINES not set — build via the top-level project so a variant file is loaded")
-endif()
+# NOTE: ESP-IDF includes this file twice. The first time is the early
+# requirements-expansion pass, which runs in an isolated scope where the
+# top-level project variables (ATTRACTAP_*) do not exist and where
+# idf_component_register() returns immediately after recording REQUIRES.
+if(NOT CMAKE_BUILD_EARLY_EXPANSION)
+    if(NOT DEFINED ATTRACTAP_DEFINES)
+        message(FATAL_ERROR "ATTRACTAP_DEFINES not set — build via the top-level project so a variant file is loaded")
+    endif()
 
-file(GLOB_RECURSE ATTRACTAP_SRCS
-     "${CMAKE_CURRENT_LIST_DIR}/../src/*.cpp"
-     "${CMAKE_CURRENT_LIST_DIR}/../src/*.c")
+    file(GLOB_RECURSE ATTRACTAP_SRCS
+         "${CMAKE_CURRENT_LIST_DIR}/../src/*.cpp"
+         "${CMAKE_CURRENT_LIST_DIR}/../src/*.c")
 
-if(DEFINED ATTRACTAP_EXCLUDE_REGEX AND NOT "${ATTRACTAP_EXCLUDE_REGEX}" STREQUAL "")
-    list(FILTER ATTRACTAP_SRCS EXCLUDE REGEX "${ATTRACTAP_EXCLUDE_REGEX}")
+    if(DEFINED ATTRACTAP_EXCLUDE_REGEX AND NOT "${ATTRACTAP_EXCLUDE_REGEX}" STREQUAL "")
+        list(FILTER ATTRACTAP_SRCS EXCLUDE REGEX "${ATTRACTAP_EXCLUDE_REGEX}")
+    endif()
 endif()
 
 idf_component_register(

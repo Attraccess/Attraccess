@@ -9,4 +9,4 @@ firmware_output/*
 src/certs/
 .cache/
 platformio_temp.ini
-compile_commands.json
+compile_commands.jsondependencies.lock
