@@ -1,6 +1,6 @@
 #pragma once
-#include <Arduino.h>
-#include <Wire.h>
+#include <cstdint>
+#include "driver/i2c_master.h"
 #include "../logger/logger.hpp"
 
 #ifndef IOEXPANDER_I2C_ADDR
@@ -71,6 +71,7 @@ public:
 private:
     Logger logger = Logger("IOExp");
     uint8_t i2cAddress = 0;
+    i2c_master_dev_handle_t dev = nullptr;
     uint8_t outputState = 0x00;
 #ifdef IO_EXPANDER_16BIT
     uint8_t outputState1 = 0x00;
