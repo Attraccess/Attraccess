@@ -419,7 +419,7 @@ void ResourceDetailsScreen::updateProjectsPaginationControls()
 
    if (this->projectsPaginationLabel)
    {
-      lv_label_set_text_fmt(this->projectsPaginationLabel, "Seite %u von %u", this->projectsCurrentPage, totalPages);
+      lv_label_set_text_fmt(this->projectsPaginationLabel, "Seite %u von %u", (unsigned)this->projectsCurrentPage, (unsigned)totalPages);
    }
 
    if (this->projectsPrevButton)
