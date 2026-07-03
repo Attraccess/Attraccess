@@ -1,4 +1,5 @@
 #include "connectionConfigurationScreen.hpp"
+#include <string>
 
 // Screen construction (tabs/widgets) and lifecycle. Behaviour-specific logic
 // lives in sibling translation units:

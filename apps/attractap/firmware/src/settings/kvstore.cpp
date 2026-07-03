@@ -1,4 +1,5 @@
 #include "kvstore.hpp"
+#include <string>
 
 #include <vector>
 

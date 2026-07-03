@@ -1,4 +1,5 @@
 #include "connectionConfigurationScreen.hpp"
+#include <string>
 #include <functional>
 #include <cstring>
 

@@ -1,4 +1,5 @@
 #include "enrollmentScreen.hpp"
+#include <string>
 #include <functional>
 
 #include "platform.hpp"

@@ -1,4 +1,5 @@
 #include "noResourcesScreen.hpp"
+#include <string>
 
 void NoResourcesScreen::init()
 {

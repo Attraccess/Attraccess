@@ -1,4 +1,5 @@
 #include "settings.hpp"
+#include <string>
 
 #include "esp_random.h"
 

@@ -1,4 +1,5 @@
 #include "initscreen.hpp"
+#include <string>
 #include <functional>
 
 #include <cstdio>

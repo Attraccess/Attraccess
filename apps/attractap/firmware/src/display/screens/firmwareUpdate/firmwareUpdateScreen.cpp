@@ -1,4 +1,5 @@
 #include "firmwareUpdateScreen.hpp"
+#include <string>
 
 void FirmwareUpdateScreen::init()
 {

@@ -1,4 +1,6 @@
 #include "display.hpp"
+#include <vector>
+#include <string>
 #include <functional>
 
 #include "../utils.hpp"

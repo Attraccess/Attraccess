@@ -1,4 +1,5 @@
 #include "bootscreen.hpp"
+#include <string>
 
 void BootScreen::init()
 {

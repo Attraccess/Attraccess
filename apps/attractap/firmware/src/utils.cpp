@@ -1,4 +1,5 @@
 #include "utils.hpp"
+#include <string>
 #include <cstdio>
 #include <cstring>
 #include "driver/gpio.h"

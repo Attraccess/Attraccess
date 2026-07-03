@@ -1,4 +1,5 @@
 #include "logger.hpp"
+#include <string>
 #include <cstdio>
 #include <cstring>
 #include <algorithm>

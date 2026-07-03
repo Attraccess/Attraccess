@@ -2,6 +2,7 @@
 // FEATURE: application-form-flow
 
 #include "application.hpp"
+#include <string>
 
 #ifdef HAS_LVGL_DISPLAY
 void Application::handleFormsRequest(

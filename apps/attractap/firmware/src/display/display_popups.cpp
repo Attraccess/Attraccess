@@ -1,4 +1,5 @@
 #include "display.hpp"
+#include <string>
 #include <functional>
 #include <cstdlib>
 

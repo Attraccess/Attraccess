@@ -2,6 +2,7 @@
 // FEATURE: Cross-task state synchronization for network and API status
 
 #include "state.hpp"
+#include <string>
 
 struct StateLock
 {

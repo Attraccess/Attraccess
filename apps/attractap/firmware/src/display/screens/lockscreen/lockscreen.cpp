@@ -1,4 +1,5 @@
 #include "lockscreen.hpp"
+#include <string>
 
 #include <cstring>
 

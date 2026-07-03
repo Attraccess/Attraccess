@@ -1,4 +1,5 @@
 #include "setPinScreen.hpp"
+#include <string>
 #include <functional>
 #include <cstring>
 

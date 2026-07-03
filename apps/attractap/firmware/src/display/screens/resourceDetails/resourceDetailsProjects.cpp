@@ -1,4 +1,5 @@
 #include "resourceDetailsScreen.hpp"
+#include <string>
 #include <functional>
 #include <lvgl.h>
 #include <time.h>
