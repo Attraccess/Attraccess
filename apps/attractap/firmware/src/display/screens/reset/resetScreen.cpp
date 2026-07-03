@@ -1,4 +1,5 @@
 #include "resetScreen.hpp"
+#include <functional>
 
 #include "platform.hpp"
 

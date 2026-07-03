@@ -2,6 +2,7 @@
 // FEATURE: api-core
 
 #include "api.hpp"
+#include <functional>
 #include "../utils.hpp"
 #include "platform.hpp"
 #include "freertos/FreeRTOS.h"

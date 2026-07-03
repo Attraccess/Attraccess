@@ -2,6 +2,7 @@
 // FEATURE: api-resources
 
 #include "api.hpp"
+#include <functional>
 #include <string.h>
 #include <string>
 

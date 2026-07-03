@@ -2,6 +2,7 @@
 // FEATURE: api-auth
 
 #include "api.hpp"
+#include <functional>
 #include <string>
 
 void API::onRegistrationData(JsonObject data)

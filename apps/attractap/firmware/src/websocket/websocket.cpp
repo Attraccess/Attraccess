@@ -1,4 +1,5 @@
 #include "websocket.hpp"
+#include <functional>
 #include "platform.hpp"
 #include "esp_heap_caps.h"
 #include "esp_system.h"

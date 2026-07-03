@@ -1,5 +1,7 @@
 #pragma once
 
+#include <functional>
+
 #include <ArduinoJson.h>
 #include <string>
 #include "../settings/settings.hpp"

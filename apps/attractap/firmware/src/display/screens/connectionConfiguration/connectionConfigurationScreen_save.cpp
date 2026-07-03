@@ -1,4 +1,5 @@
 #include "connectionConfigurationScreen.hpp"
+#include <functional>
 #include <cstring>
 
 // Save-button widgets, field validation and the save flow.

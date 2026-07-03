@@ -2,6 +2,7 @@
 // FEATURE: api-forms
 
 #include "api.hpp"
+#include <functional>
 #include <cstdio>
 #include <cstring>
 #include <string>

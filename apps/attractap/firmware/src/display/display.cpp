@@ -1,4 +1,5 @@
 #include "display.hpp"
+#include <functional>
 
 #include "../utils.hpp"
 #include "platform.hpp"

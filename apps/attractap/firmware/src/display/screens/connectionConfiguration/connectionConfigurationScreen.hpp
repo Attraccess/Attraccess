@@ -1,5 +1,7 @@
 #pragma once
 
+#include <functional>
+
 #include <string>
 #include "../../screens/IScreen.hpp"
 #include "../../../settings/settings.hpp"

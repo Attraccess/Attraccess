@@ -2,6 +2,7 @@
 // FEATURE: api-projects
 
 #include "api.hpp"
+#include <functional>
 
 void API::requestProjectsOfUser(uint32_t page)
 {

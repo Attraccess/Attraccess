@@ -1,4 +1,5 @@
 #include "resourceListScreen.hpp"
+#include <functional>
 
 void ResourceListScreen::init()
 {

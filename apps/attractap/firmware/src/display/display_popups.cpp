@@ -1,4 +1,5 @@
 #include "display.hpp"
+#include <functional>
 #include <cstdlib>
 
 // Global overlay popups rendered on the LVGL top layer: a generic error dialog

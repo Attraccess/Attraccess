@@ -1,4 +1,5 @@
 #include "supervisionScreen.hpp"
+#include <functional>
 
 #include "platform.hpp"
 

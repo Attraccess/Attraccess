@@ -2,6 +2,7 @@
 // FEATURE: api-card-auth
 
 #include "api.hpp"
+#include <functional>
 #include <cstring>
 #include <string>
 

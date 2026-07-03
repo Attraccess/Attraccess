@@ -1,4 +1,5 @@
 #include "pinInputPage.hpp"
+#include <functional>
 
 #include <cstring>
 

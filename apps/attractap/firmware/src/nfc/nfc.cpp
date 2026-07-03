@@ -1,4 +1,5 @@
 #include "nfc.hpp"
+#include <functional>
 #include "platform.hpp"
 #include "esp_system.h"
 #include <cstring>
