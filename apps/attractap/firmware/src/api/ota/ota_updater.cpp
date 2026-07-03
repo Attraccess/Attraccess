@@ -2,6 +2,7 @@
 // FEATURE: firmware-ota
 
 #include "ota_updater.hpp"
+#include "esp_app_format.h"
 #include "platform.hpp"
 #include <string>
 

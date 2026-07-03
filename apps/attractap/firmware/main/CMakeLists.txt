@@ -34,6 +34,7 @@ idf_component_register(
         esp_system
         esp_partition
         app_update
+        esp_app_format
         espcoredump
         nvs_flash
         mbedtls
