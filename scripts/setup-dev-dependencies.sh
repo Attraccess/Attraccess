@@ -200,6 +200,12 @@ install_esp_idf() {
             https://github.com/espressif/esp-idf.git "$HOME/esp/esp-idf"
     fi
     "$HOME/esp/esp-idf/install.sh" esp32s3
+    # ESP-IDF's Linux installer marks cmake/ninja "on request" and skips them,
+    # assuming the system provides them (NixOS et al. don't) — install them
+    # into the IDF tool set explicitly when absent.
+    if ! command -v cmake &>/dev/null || ! command -v ninja &>/dev/null; then
+        python3 "$HOME/esp/esp-idf/tools/idf_tools.py" install cmake ninja
+    fi
     echo "  To use idf.py directly in a shell: . \$HOME/esp/esp-idf/export.sh"
     echo "  (build_firmwares.py finds ESP-IDF in \$HOME/esp/esp-idf automatically)"
 }

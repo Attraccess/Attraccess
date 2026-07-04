@@ -20,7 +20,9 @@ this).
 
 ## Building
 
-Prerequisites: [ESP-IDF v5.5](https://docs.espressif.com/projects/esp-idf/en/v5.5/esp32s3/get-started/index.html) installed for the `esp32s3` target. No extra Python packages are needed — `esptool` is picked up from your `PATH` or from ESP-IDF's own Python environment.
+Prerequisites: [ESP-IDF v5.5](https://docs.espressif.com/projects/esp-idf/en/v5.5/esp32s3/get-started/index.html) installed for the `esp32s3` target. No extra Python packages are needed — `esptool` is picked up from your `PATH` or from ESP-IDF's own Python environment, and `cmake`/`ninja` are installed into the IDF tool set automatically if your system lacks them.
+
+NixOS note: Espressif's prebuilt binaries (xtensa toolchain, cmake, ninja) are dynamically linked against FHS paths, so they need `programs.nix-ld.enable = true;` (or an FHS environment like `steam-run`) to execute.
 
 Build every shipped variant (also what CI and `pnpm nx run attractap-firmware:build` run):
 

@@ -137,11 +137,29 @@ def find_idf_export():
 
 
 def run_idf(args):
-    """Run idf.py, sourcing ESP-IDF's export.sh first when it is not on PATH."""
-    if shutil.which("idf.py"):
+    """Run idf.py, sourcing ESP-IDF's export.sh first when it is not on PATH.
+
+    idf.py refuses to run without cmake and ninja, but ESP-IDF's Linux
+    installer marks both "on_request" (tools.json) and never installs them,
+    assuming the system provides them — which e.g. NixOS does not. So when
+    they are missing after export.sh, fetch them into the IDF tool set
+    (~/.espressif) once and re-source.
+    """
+    if shutil.which("idf.py") and shutil.which("cmake") and shutil.which("ninja"):
         return subprocess.run(["idf.py", *args]).returncode
     export_script = find_idf_export()
-    command = "source " + shlex.quote(export_script) + " >/dev/null && idf.py " +         " ".join(shlex.quote(a) for a in args)
+    if not export_script:
+        print("Error: idf.py needs cmake and ninja on PATH, and no ESP-IDF "
+              "export.sh was found to install them from")
+        return 1
+    source_export = "source " + shlex.quote(export_script) + " >/dev/null"
+    ensure_tools = (
+        "if ! command -v cmake >/dev/null 2>&1 || ! command -v ninja >/dev/null 2>&1; then "
+        'echo "cmake/ninja not found — installing them into the ESP-IDF tool set..."; '
+        'python "$IDF_PATH/tools/idf_tools.py" install cmake ninja && ' + source_export + "; "
+        "fi"
+    )
+    command = source_export + " && " + ensure_tools + " && idf.py " + " ".join(shlex.quote(a) for a in args)
     return subprocess.run(["bash", "-c", command]).returncode
 
 
