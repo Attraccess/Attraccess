@@ -1,6 +1,6 @@
 #!/bin/bash
 # Setup script for Attraccess development environment
-# Installs: Docker, Node.js, pnpm, Python, PlatformIO, esptool
+# Installs: Docker, Node.js, pnpm, Python, ESP-IDF, esptool
 # Run from repo root: ./scripts/setup-dev-dependencies.sh
 
 set -e
@@ -159,11 +159,10 @@ install_python() {
     fi
 }
 
-# --- PlatformIO & esptool ---
-check_platformio() {
-    if command -v pio &>/dev/null || command -v platformio &>/dev/null; then
-        echo "✓ PlatformIO is installed"
-        (pio --version 2>/dev/null || platformio --version 2>/dev/null) || true
+# --- ESP-IDF & esptool (Attractap firmware toolchain) ---
+check_esp_idf() {
+    if [[ -f "$HOME/esp/esp-idf/export.sh" ]] || [[ -n "${IDF_PATH:-}" && -f "${IDF_PATH}/export.sh" ]]; then
+        echo "✓ ESP-IDF is installed"
         return 0
     fi
     return 1
@@ -177,20 +176,29 @@ check_esptool() {
     return 1
 }
 
-install_platformio() {
-    echo "Installing PlatformIO and esptool..."
+install_esp_idf() {
+    echo "Installing ESP-IDF v5.5 (Attractap firmware toolchain)..."
     if ! python3 -m pip --version &>/dev/null; then
         echo "  pip not found. Install it with: sudo apt install python3-pip"
-        echo "  Then re-run this script or: pip3 install --user platformio esptool"
+        echo "  Then re-run this script."
         return 1
     fi
     python3 -m pip install --user --upgrade pip
-    python3 -m pip install --user --upgrade platformio esptool
+    python3 -m pip install --user --upgrade esptool requests
     # Ensure ~/.local/bin is in PATH
     if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
         echo "  Add to your shell profile: export PATH=\"\$HOME/.local/bin:\$PATH\""
         export PATH="$HOME/.local/bin:$PATH"
     fi
+    # ~/esp/esp-idf is one of the locations build_firmwares.py auto-detects
+    if [[ ! -d "$HOME/esp/esp-idf" ]]; then
+        mkdir -p "$HOME/esp"
+        git clone --depth 1 --shallow-submodules --recursive -b v5.5 \
+            https://github.com/espressif/esp-idf.git "$HOME/esp/esp-idf"
+    fi
+    "$HOME/esp/esp-idf/install.sh" esp32s3
+    echo "  To use idf.py directly in a shell: . \$HOME/esp/esp-idf/export.sh"
+    echo "  (build_firmwares.py finds ESP-IDF in \$HOME/esp/esp-idf automatically)"
 }
 
 # --- Git submodules ---
@@ -259,9 +267,9 @@ main() {
     fi
     echo ""
 
-    # PlatformIO
-    if ! check_platformio || ! check_esptool; then
-        install_platformio || echo "⚠ PlatformIO install failed. Install manually: pip3 install --user platformio esptool"
+    # ESP-IDF (Attractap firmware)
+    if ! check_esp_idf || ! check_esptool; then
+        install_esp_idf || echo "⚠ ESP-IDF install failed. See https://docs.espressif.com/projects/esp-idf/en/v5.5/esp32s3/get-started/"
     fi
     echo ""
 
