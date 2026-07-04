@@ -1425,8 +1425,10 @@ uint8_t Adafruit_PN532::ntag424_apdu_send(
       Serial.println("IV-init:");
       Adafruit_PN532::PrintHex(iv, 16);
 #endif
+      // Only the first AES block is the IV; encrypting sizeof(iv)=32 bytes
+      // would overflow ive[16] and smash the stack (crashed changeKey on IDF).
       Adafruit_PN532::ntag424_encrypt(ntag424_Session.session_key_enc,
-                                      sizeof(iv), iv, ive);
+                                      sizeof(ive), iv, ive);
       // encrypt cmd_data using SesAuthENCKey
       // padded_payload_length
       // uint8_t payload_encrypted[32];
@@ -1589,8 +1591,9 @@ uint8_t Adafruit_PN532::ntag424_apdu_send(
     memset(ivd + 7, 0, 25);
     // Serial.println("IV-init:");
     // Adafruit_PN532::PrintHex(iv, 16);
+    // Same overflow as the command-IV path: only one block fits in ivde[16].
     Adafruit_PN532::ntag424_encrypt(ntag424_Session.session_key_enc,
-                                    sizeof(ivd), ivd, ivde);
+                                    sizeof(ivde), ivd, ivde);
     uint8_t *respplain = (uint8_t *)malloc(response_length - 10);
 #ifdef NTAG424DEBUG
     PN532DEBUGPRINT.println(F("Encrypted Response(pcd < picc)"));
