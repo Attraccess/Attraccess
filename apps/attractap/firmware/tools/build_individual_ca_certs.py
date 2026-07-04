@@ -14,7 +14,7 @@ Features:
 
 import os
 import sys
-import requests
+import urllib.request
 import re
 import hashlib
 import shutil
@@ -207,10 +207,12 @@ def download_mozilla_bundle():
     """Download the Mozilla root CA bundle."""
     print("Downloading Mozilla root CA bundle...")
     try:
-        response = requests.get(MOZILLA_CA_URL, timeout=30)
-        response.raise_for_status()
-        print(f"Downloaded {len(response.text)} bytes")
-        return response.text
+        with urllib.request.urlopen(MOZILLA_CA_URL, timeout=30) as response:
+            if response.status != 200:
+                raise RuntimeError(f"HTTP {response.status}")
+            bundle_text = response.read().decode("utf-8")
+        print(f"Downloaded {len(bundle_text)} bytes")
+        return bundle_text
     except Exception as e:
         print(f"Error downloading CA bundle: {e}")
         return None

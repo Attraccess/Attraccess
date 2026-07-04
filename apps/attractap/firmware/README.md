@@ -20,7 +20,7 @@ this).
 
 ## Building
 
-Prerequisites: [ESP-IDF v5.5](https://docs.espressif.com/projects/esp-idf/en/v5.5/esp32s3/get-started/index.html) installed for the `esp32s3` target, plus `pip install esptool requests`.
+Prerequisites: [ESP-IDF v5.5](https://docs.espressif.com/projects/esp-idf/en/v5.5/esp32s3/get-started/index.html) installed for the `esp32s3` target. No extra Python packages are needed — `esptool` is picked up from your `PATH` or from ESP-IDF's own Python environment.
 
 Build every shipped variant (also what CI and `pnpm nx run attractap-firmware:build` run):
 

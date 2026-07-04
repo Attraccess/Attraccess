@@ -32,6 +32,35 @@ def resolve_python_command():
     return "python3"
 
 
+def resolve_esptool_command():
+    """Find a working esptool invocation without assuming pip-installed
+    packages in the system Python (which e.g. NixOS does not even ship pip
+    for). Preference order:
+      1. esptool on PATH (pip --user install, nixpkgs esptool, sourced IDF env)
+      2. ESP-IDF's own Python virtualenv — the IDF installer always bundles
+         esptool there ($IDF_PYTHON_ENV_PATH, or ~/.espressif/python_env/*)
+      3. the current interpreter (works when esptool is importable here)
+    """
+    for cmd in ("esptool.py", "esptool"):
+        if shutil.which(cmd):
+            return [cmd]
+
+    idf_pythons = []
+    env_path = os.environ.get("IDF_PYTHON_ENV_PATH")
+    if env_path:
+        idf_pythons.append(os.path.join(env_path, "bin", "python"))
+    tools_path = os.environ.get("IDF_TOOLS_PATH", os.path.expanduser("~/.espressif"))
+    idf_pythons.extend(sorted(
+        glob.glob(os.path.join(tools_path, "python_env", "*", "bin", "python")),
+        reverse=True,  # prefer the newest IDF env
+    ))
+    for python in idf_pythons:
+        if os.path.exists(python):
+            return [python, "-m", "esptool"]
+
+    return [resolve_python_command(), "-m", "esptool"]
+
+
 def extract_cmake_value(content, variable):
     """Extract `set(<variable> "<value>")` from a variant .cmake file."""
     match = re.search(rf'set\(\s*{re.escape(variable)}\s+"([^"]*)"\s*\)', content)
@@ -85,13 +114,6 @@ def generate_certificates(python_cmd):
     """Generate the adaptive-TLS CA certificate headers (src/certs/) before the
     build — the successor of the old PlatformIO `extra_scripts pre:` hook."""
     print("Generating CA certificates...")
-    try:
-        import requests  # noqa: F401 — dependency of the generator script
-    except ImportError:
-        print("Installing 'requests' for the certificate generator...")
-        for extra in ([], ["--user"], ["--break-system-packages"]):
-            if subprocess.run([python_cmd, "-m", "pip", "install", *extra, "requests"]).returncode == 0:
-                break
     script = os.path.join(FIRMWARE_DIR, "tools", "build_individual_ca_certs.py")
     result = subprocess.run([python_cmd, script], cwd=FIRMWARE_DIR)
     if result.returncode != 0:
@@ -134,7 +156,7 @@ def main():
         sys.exit(0)
 
     python_cmd = resolve_python_command()
-    esptool_cmd = [python_cmd, "-m", "esptool"]
+    esptool_cmd = resolve_esptool_command()
 
     with open("version.txt") as f:
         firmware_version = f.read().strip().splitlines()[0]

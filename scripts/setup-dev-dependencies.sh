@@ -178,17 +178,20 @@ check_esptool() {
 
 install_esp_idf() {
     echo "Installing ESP-IDF v5.5 (Attractap firmware toolchain)..."
-    if ! python3 -m pip --version &>/dev/null; then
-        echo "  pip not found. Install it with: sudo apt install python3-pip"
-        echo "  Then re-run this script."
-        return 1
-    fi
-    python3 -m pip install --user --upgrade pip
-    python3 -m pip install --user --upgrade esptool requests
-    # Ensure ~/.local/bin is in PATH
-    if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
-        echo "  Add to your shell profile: export PATH=\"\$HOME/.local/bin:\$PATH\""
-        export PATH="$HOME/.local/bin:$PATH"
+    # Optional convenience: an esptool on PATH. Skipped when the system Python
+    # has no pip (e.g. NixOS) — ESP-IDF's install.sh below always bundles
+    # esptool inside its own Python environment, which build_firmwares.py
+    # falls back to automatically.
+    if python3 -m pip --version &>/dev/null; then
+        python3 -m pip install --user --upgrade esptool || true
+        # Ensure ~/.local/bin is in PATH
+        if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
+            echo "  Add to your shell profile: export PATH=\"\$HOME/.local/bin:\$PATH\""
+            export PATH="$HOME/.local/bin:$PATH"
+        fi
+    else
+        echo "  System Python has no pip — skipping user-level esptool install"
+        echo "  (ESP-IDF provides esptool in its own Python environment)"
     fi
     # ~/esp/esp-idf is one of the locations build_firmwares.py auto-detects
     if [[ ! -d "$HOME/esp/esp-idf" ]]; then
