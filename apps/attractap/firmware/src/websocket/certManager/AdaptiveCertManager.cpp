@@ -93,16 +93,12 @@ bool AdaptiveCertManager::getCertificate(const char **certData, const char **cer
 
     logger.debug("Writing cert data to pointer");
     // Configure WebSocket with current certificate
-    *certData = (const char *)pgm_read_ptr(&ca_certificates[currentCertIndex].data);
-
-    // Yield to prevent watchdog timeout when accessing PROGMEM
-    yield();
+    *certData = ca_certificates[currentCertIndex].data;
 
     if (certName)
     {
         logger.debug("Writing cert name to pointer");
-        *certName = (const char *)pgm_read_ptr(&ca_certificates[currentCertIndex].name);
-        yield(); // Yield after accessing PROGMEM
+        *certName = ca_certificates[currentCertIndex].name;
     }
 
     const char *currentCertName = getCurrentCertName();
@@ -203,9 +199,7 @@ const char *AdaptiveCertManager::getCurrentCertName() const
         return "Invalid";
     }
 
-    const char *name = (const char *)pgm_read_ptr(&ca_certificates[currentCertIndex].name);
-    yield(); // Yield after accessing PROGMEM
-    return name;
+    return ca_certificates[currentCertIndex].name;
 }
 
 int AdaptiveCertManager::getCurrentCertIndex() const

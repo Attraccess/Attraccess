@@ -1,6 +1,8 @@
 #pragma once
 
-#include <Arduino.h>
+#include <functional>
+
+#include <string>
 #include "../../screens/IScreen.hpp"
 #include "../../../settings/settings.hpp"
 #include "../../shared/pinInput/pinInputPage.hpp"
@@ -12,16 +14,16 @@ public:
     void onScreenLeave();
     lv_obj_t *getScreen() override;
     void loop() override;
-    String getName() override;
+    std::string getName() override;
     void destroy() override;
 
     struct ConnectionConfig
     {
-        String ssid;
-        String password;
-        String host;
+        std::string ssid;
+        std::string password;
+        std::string host;
         bool useSSL;
-        String devicePin;
+        std::string devicePin;
         bool beeperEnabled;
     };
 
@@ -39,7 +41,7 @@ private:
     lv_obj_t *pinLockOverlay = nullptr;
     bool pinLockEnabled = true;
     std::function<void()> onCancelPinLockCallback;
-    bool onPinLockConfirmCallback(String pin);
+    bool onPinLockConfirmCallback(std::string pin);
 
     lv_obj_t *tabs = nullptr;
     lv_obj_t *keyboard = nullptr;

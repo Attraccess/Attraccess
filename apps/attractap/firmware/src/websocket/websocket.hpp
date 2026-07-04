@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Arduino.h>
+#include <string>
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/queue.h"
@@ -25,7 +25,7 @@ public:
     };
     void setup();
     void loop();
-    void sendMessage(const String &message);
+    void sendMessage(const std::string &message);
     void sendMessage(const char *message, size_t length);
     void setMessageCallbackRaw(std::function<void(const char *, size_t)> callback);
     void setBinaryDataCallback(std::function<void(esp_websocket_event_data_t)> callback);

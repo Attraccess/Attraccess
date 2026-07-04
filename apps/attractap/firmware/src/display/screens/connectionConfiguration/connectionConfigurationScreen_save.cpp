@@ -1,4 +1,6 @@
 #include "connectionConfigurationScreen.hpp"
+#include <string>
+#include <functional>
 #include <cstring>
 
 // Save-button widgets, field validation and the save flow.
@@ -45,20 +47,20 @@ void ConnectionConfigurationScreen::onSaveButtonEvent(lv_event_t *e)
    const char *hostText = lv_textarea_get_text(self->serverHostname);
    const char *devicePinText = self->devicePin ? lv_textarea_get_text(self->devicePin) : "";
 
-   String hostValue = String(hostText ? hostText : "");
-   if (hostValue.startsWith("https://"))
+   std::string hostValue = hostText ? hostText : "";
+   if (hostValue.rfind("https://", 0) == 0)
    {
-      hostValue.remove(0, 8);
+      hostValue.erase(0, 8);
       lv_textarea_set_text(self->serverHostname, hostValue.c_str());
    }
 
-   if (hostValue.startsWith("http://"))
+   if (hostValue.rfind("http://", 0) == 0)
    {
-      hostValue.remove(0, 7);
+      hostValue.erase(0, 7);
       lv_textarea_set_text(self->serverHostname, hostValue.c_str());
    }
 
-   bool hostValid = !hostValue.isEmpty() && hostnameLooksValid(hostValue.c_str());
+   bool hostValid = !hostValue.empty() && hostnameLooksValid(hostValue.c_str());
    bool devicePinValid = pinLooksValid(devicePinText);
 
    // Update label colors
@@ -100,11 +102,11 @@ void ConnectionConfigurationScreen::onSaveButtonEvent(lv_event_t *e)
    if (self->onSaveCallback)
    {
       ConnectionConfigurationScreen::ConnectionConfig cfg;
-      cfg.ssid = String(ssidText);
-      cfg.password = String(passwordText);
+      cfg.ssid = std::string(ssidText);
+      cfg.password = std::string(passwordText);
       cfg.host = hostValue;
       cfg.useSSL = lv_obj_has_state(self->useSSLSwitch, LV_STATE_CHECKED);
-      cfg.devicePin = String(devicePinText);
+      cfg.devicePin = std::string(devicePinText);
       cfg.beeperEnabled = lv_obj_has_state(self->beeperEnabled, LV_STATE_CHECKED);
       self->onSaveCallback(cfg);
    }
