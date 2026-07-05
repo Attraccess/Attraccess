@@ -1,4 +1,4 @@
-import { CreateSSOProviderDto, SSOPermissionMappingsDto, SSOProviderType } from '@attraccess/react-query-client';
+import { CreateSSOProviderDto, SSOProviderType } from '@attraccess/react-query-client';
 
 export const permissionKeys = ['resource-manager', 'system-admin', 'user-manager', 'billing-manager'] as const;
 
@@ -50,7 +50,7 @@ export const ensureSamlConfiguration = (config?: CreateSSOProviderDto['samlConfi
 export const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 export const buildPermissionMappingInputs = (
-  mapping?: SSOPermissionMappingsDto | null,
+  mapping?: Record<string, string[]> | null,
 ): Record<PermissionKey, string> => ({
   'resource-manager': Array.isArray((mapping as Record<string, unknown>)?.['resource-manager'])
     ? ((mapping as Record<string, string[]>)?.['resource-manager'] ?? []).join(', ')

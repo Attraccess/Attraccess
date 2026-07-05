@@ -104,7 +104,9 @@ describe('SSOSamlStrategy', () => {
       ),
     };
     const moduleRef = {
-      get: jest.fn().mockResolvedValue(usersService),
+      get: jest.fn().mockImplementation((token: unknown) =>
+        token === RbacService ? null : usersService,
+      ),
     } as unknown as ModuleRef;
 
     const strategy = new SSOSamlStrategy(moduleRef);

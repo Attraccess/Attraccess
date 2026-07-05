@@ -67,6 +67,7 @@ describe('UsersAdminController', () => {
         user: {
           ...user,
           jwtTokenId: 'test-jwt-token-id',
+          effectivePermissions: new Set<string>(),
         },
         authInfo: { tokenId: 'test-token' },
         logout: jest.fn(),

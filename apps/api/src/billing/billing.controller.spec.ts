@@ -18,7 +18,7 @@ import { SseInstrumentation } from '../metrics/instrumentation/sse/sse.helper';
 import { Observable, Subject } from 'rxjs';
 import { LicenseService } from '../license/license.service';
 
-const baseReq = (userOverrides: DeepPartial<User> = {}) =>
+const baseReq = (userOverrides: DeepPartial<User> & { effectivePermissions?: Set<string> } = {}) =>
   ({
     user: {
       id: 1,

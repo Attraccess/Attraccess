@@ -25,6 +25,7 @@ import {
   ShieldCheckIcon,
   ShieldOffIcon,
   UserPlusIcon,
+  Users,
 } from 'lucide-react';
 import { TableToolbar } from '../../components/TableToolbar';
 import {

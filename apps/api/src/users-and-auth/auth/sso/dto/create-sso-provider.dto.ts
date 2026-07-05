@@ -85,7 +85,7 @@ export class CreateOIDCConfigurationDto {
   @ApiProperty({
     description: 'Maps any RBAC role key (system-provided or user-defined) to the SSO role names that should grant it.',
     required: false,
-    type: 'object',
+    type: Object,
     additionalProperties: { type: 'array', items: { type: 'string' } },
     example: { 'resource-manager': ['attraccess_resources'], 'my-custom-role': ['my_sso_group'] },
   })
@@ -182,7 +182,7 @@ export class CreateSAMLConfigurationDto {
   @ApiProperty({
     description: 'Maps any RBAC role key (system-provided or user-defined) to the SAML role values that should grant it.',
     required: false,
-    type: 'object',
+    type: Object,
     additionalProperties: { type: 'array', items: { type: 'string' } },
     example: { 'resource-manager': ['attraccess_resources'], 'my-custom-role': ['my_sso_group'] },
   })

@@ -170,6 +170,7 @@ describe('UsersService', () => {
         username: 'test',
         email: 'test@example.com',
         externalIdentifier: null,
+        isEmailVerified: false,
       });
     });
 

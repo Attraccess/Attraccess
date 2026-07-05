@@ -220,7 +220,7 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
     if (user) {
       if (user.authenticationDetails.length === 0) {
         const updated = await usersService.updateOne(user.id, { externalIdentifier: samlUserId });
-        return await this.syncPermissionsFromClaims(updated, profile, config, usersService);
+        return await this.syncPermissionsFromClaims(updated, profile, config);
       }
 
       const error = new AccountLinkingRequiredException({

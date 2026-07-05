@@ -52,73 +52,11 @@ export class DropBooleanPermissions1782500000000 implements MigrationInterface {
       );
     }
 
-    // Drop boolean permission columns from user table (data already migrated in rbac-data-model migration)
-    // SQLite does not support DROP COLUMN directly, so recreate the table without those columns.
-    // Billing triggers reference "user" — drop them before the DROP TABLE so SQLite doesn't error,
-    // then recreate them after the rename.
-    await queryRunner.query(`DROP TRIGGER IF EXISTS "trg_billing_transaction_balance_after_insert"`);
-    await queryRunner.query(`DROP TRIGGER IF EXISTS "trg_billing_transaction_balance_after_update"`);
-    await queryRunner.query(`DROP TRIGGER IF EXISTS "trg_billing_transaction_balance_after_delete"`);
-
-    await queryRunner.query(`
-      CREATE TABLE "user_new" AS
-      SELECT
-        "id", "username", "email", "isEmailVerified",
-        "emailVerificationToken", "emailVerificationTokenExpiresAt",
-        "passwordResetToken", "passwordResetTokenExpiresAt",
-        "createdAt", "updatedAt", "deletedAt",
-        "lastUsernameChangeAt", "lockedUntil", "failedLoginAttempts", "firstFailedLoginAt",
-        "deleteAccountToken", "deleteAccountTokenExpiresAt", "deleteAccountRequestedAt",
-        "externalIdentifier", "nfcKeySeedToken", "creditBalance", "billingFactor"
-      FROM "user"
-    `);
-
-    await queryRunner.query(`DROP TABLE "user"`);
-    await queryRunner.query(`ALTER TABLE "user_new" RENAME TO "user"`);
-
-    // Recreate unique indexes on user
-    await queryRunner.query(`CREATE UNIQUE INDEX "IDX_user_username" ON "user" ("username")`);
-    await queryRunner.query(`CREATE UNIQUE INDEX "IDX_user_email" ON "user" ("email")`);
-
-    // Recreate billing triggers pointing at the renamed table
-    await queryRunner.query(
-      `CREATE TRIGGER "trg_billing_transaction_balance_after_insert"
-       AFTER INSERT ON "billing_transaction"
-       BEGIN
-         UPDATE "user"
-         SET creditBalance = creditBalance + NEW.amount,
-             updatedAt = datetime('now')
-         WHERE id = NEW.userId AND NEW.status = 'completed';
-       END`,
-    );
-    await queryRunner.query(
-      `CREATE TRIGGER "trg_billing_transaction_balance_after_update"
-       AFTER UPDATE ON "billing_transaction"
-       BEGIN
-         UPDATE "user"
-         SET creditBalance = creditBalance - OLD.amount,
-             updatedAt = datetime('now')
-         WHERE id = OLD.userId
-           AND OLD.status = 'completed'
-           AND (OLD.userId != NEW.userId OR OLD.amount != NEW.amount OR OLD.status != NEW.status);
-         UPDATE "user"
-         SET creditBalance = creditBalance + NEW.amount,
-             updatedAt = datetime('now')
-         WHERE id = NEW.userId
-           AND NEW.status = 'completed'
-           AND (OLD.userId != NEW.userId OR OLD.amount != NEW.amount OR OLD.status != NEW.status);
-       END`,
-    );
-    await queryRunner.query(
-      `CREATE TRIGGER "trg_billing_transaction_balance_after_delete"
-       AFTER DELETE ON "billing_transaction"
-       BEGIN
-         UPDATE "user"
-         SET creditBalance = creditBalance - OLD.amount,
-             updatedAt = datetime('now')
-         WHERE id = OLD.userId AND OLD.status = 'completed';
-       END`,
-    );
+    // Drop boolean permission columns — SQLite 3.35+ supports ALTER TABLE DROP COLUMN directly.
+    await queryRunner.query(`ALTER TABLE "user" DROP COLUMN "canManageResources"`);
+    await queryRunner.query(`ALTER TABLE "user" DROP COLUMN "canManageSystemConfiguration"`);
+    await queryRunner.query(`ALTER TABLE "user" DROP COLUMN "canManageUsers"`);
+    await queryRunner.query(`ALTER TABLE "user" DROP COLUMN "canManageBilling"`);
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {

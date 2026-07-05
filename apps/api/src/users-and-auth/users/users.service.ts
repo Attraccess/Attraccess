@@ -266,6 +266,7 @@ export class UsersService {
     user.username = data.username;
     user.email = data.email;
     user.externalIdentifier = data.externalIdentifier;
+    user.isEmailVerified = data.isEmailVerified;
     if (userData.locale) {
       user.locale = userData.locale.trim() || 'en';
     }

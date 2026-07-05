@@ -20,6 +20,7 @@ describe('MaintenanceRequestNotificationListener', () => {
     userRepository = {
       createQueryBuilder: jest.fn().mockReturnValue({
         where: jest.fn().mockReturnThis(),
+        setParameter: jest.fn().mockReturnThis(),
         getMany: jest.fn().mockResolvedValue([{ id: 2, email: 'admin@example.com' } as User]),
       }),
     };

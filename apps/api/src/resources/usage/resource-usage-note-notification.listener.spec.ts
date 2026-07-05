@@ -30,6 +30,7 @@ describe('ResourceUsageNoteNotificationListener', () => {
   const setAdmins = (admins: User[]) => {
     userRepository.createQueryBuilder.mockReturnValue({
       where: jest.fn().mockReturnThis(),
+      setParameter: jest.fn().mockReturnThis(),
       getMany: jest.fn().mockResolvedValue(admins),
     });
   };
