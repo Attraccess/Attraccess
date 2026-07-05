@@ -1,8 +1,8 @@
 <mj-section background-color="#FFFFFF" padding="32px 20px 24px 20px">
   <mj-column>
-    <mj-text padding="0 0 12px 0">{{t 'greeting' 'Hello'}} {{user.username}},</mj-text>
+    <mj-text padding="0 0 12px 0">{{t 'greeting' 'Hello {name},' name=user.username}}</mj-text>
     <mj-text padding="0 0 12px 0">
-      {{t 'body_prefix' 'Your username was changed from'}} <strong>{{user.previousUsername}}</strong> {{t 'body_to' 'to'}} <strong>{{user.newUsername}}</strong>.
+      {{t 'body' 'Your username was changed from <strong>{from}</strong> to <strong>{to}</strong>.' from=user.previousUsername to=user.newUsername}}
     </mj-text>
     <mj-text font-size="13px" color="#9CA3AF" padding="0">
       {{t 'footer' 'If you did not make this change, please contact support immediately.'}}

@@ -47,8 +47,13 @@ export class EmailService {
     const translationsMap = await this.emailTemplateService.getTranslationsMap(template.type, locale);
 
     const hbs = Handlebars.create();
-    hbs.registerHelper('t', (key: string, defaultValue: string) => {
-      return new Handlebars.SafeString(translationsMap[key] ?? defaultValue);
+    hbs.registerHelper('t', (key: string, defaultValue: string, options: Handlebars.HelperOptions) => {
+      const raw = translationsMap[key] ?? defaultValue;
+      const hash = options?.hash ?? {};
+      const result = raw.replace(/\{(\w+(?:\.\w+)*)\}/g, (_: string, name: string) =>
+        name in hash ? Handlebars.escapeExpression(String(hash[name] ?? '')) : `{${name}}`,
+      );
+      return new Handlebars.SafeString(result);
     });
 
     const subjectTemplate = hbs.compile(template.subject);

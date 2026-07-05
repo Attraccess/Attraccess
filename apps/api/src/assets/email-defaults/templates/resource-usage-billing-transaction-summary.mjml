@@ -1,13 +1,13 @@
 <mj-section background-color="#FFFFFF" padding="32px 20px 8px 20px">
   <mj-column>
-    <mj-text padding="0 0 12px 0">{{t 'greeting' 'Hello'}} {{user.username}},</mj-text>
+    <mj-text padding="0 0 12px 0">{{t 'greeting' 'Hello {name},' name=user.username}}</mj-text>
     <mj-text padding="0 0 8px 0">
-      {{t 'body_prefix' 'Your session on'}} <strong>{{resource.name}}</strong> {{t 'body_suffix' 'has ended. Here is your receipt:'}}
+      {{t 'body' 'Your session on <strong>{resource}</strong> has ended. Here is your receipt:' resource=resource.name}}
     </mj-text>
     <mj-text font-size="14px" color="#4B5563" padding="0 0 4px 0">
-      {{t 'start_label' 'Start:'}} {{usage.startTime}}<br/>
-      {{t 'end_label' 'End:'}} {{usage.endTime}}<br/>
-      {{t 'duration_label' 'Duration:'}} {{usage.roundedMinutes}} min
+      {{t 'start_label' 'Start: {time}' time=usage.startTime}}<br/>
+      {{t 'end_label' 'End: {time}' time=usage.endTime}}<br/>
+      {{t 'duration_label' 'Duration: {minutes} min' minutes=usage.roundedMinutes}}
     </mj-text>
   </mj-column>
 </mj-section>
