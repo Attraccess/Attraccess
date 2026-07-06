@@ -785,6 +785,31 @@ describe('BillingService', () => {
   });
 
   describe('BillingService chargeForResourceUsage', () => {
+    it('returns an existing completed usage transaction without charging again', async () => {
+      const existingTransaction = {
+        id: 123,
+        resourceUsageId: 5,
+        userId: 10,
+        amount: 0,
+        status: BillingTransactionStatus.Completed,
+      } as BillingTransaction;
+      const usage: Partial<ResourceUsage> = {
+        id: 5,
+        usageInMinutes: 10,
+        resource: { id: 1, name: 'CNC' } as Resource,
+        user: { id: 10, billingFactor: 100 } as User,
+      };
+
+      billingTransactionRepository.findOneBy.mockResolvedValue(existingTransaction);
+
+      const result = await service.chargeForResourceUsage(usage as ResourceUsage);
+
+      expect(result).toBe(existingTransaction);
+      expect(billingTransactionItemRepository.manager.transaction).not.toHaveBeenCalled();
+      expect(liveNotificationsService.notifyTransactionUpdate).not.toHaveBeenCalled();
+      expect(emailService.sendResourceUsageBillingSummaryEmail).not.toHaveBeenCalled();
+    });
+
     it('sends email after completing usage transaction', async () => {
       const usage: Partial<ResourceUsage> = {
         id: 5,
