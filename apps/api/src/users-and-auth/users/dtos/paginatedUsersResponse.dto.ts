@@ -5,4 +5,7 @@ import { ApiProperty } from '@nestjs/swagger';
 export class PaginatedUsersResponseDto extends PaginatedResponse<User> {
   @ApiProperty({ type: [User] })
   data: User[];
+
+  @ApiProperty({ required: false })
+  nextPage?: number;
 }

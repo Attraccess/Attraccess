@@ -109,14 +109,17 @@ export class UsersAdminController {
     description: 'Forbidden - User does not have permission to manage users.',
   })
   async findMany(@Query() query: FindManyUsersQueryDto): Promise<PaginatedUsersResponseDto> {
-    const result = (await this.usersService.findMany({
+    const result = await this.usersService.findMany({
       page: query.page,
       limit: query.limit,
       search: query.search,
       ids: query.ids,
-    })) as PaginatedUsersResponseDto;
+    });
     this.logger.debug(`Found ${result.total} users total, returning ${result.data.length} users`);
-    return result;
+    return {
+      ...result,
+      nextPage: result.page * result.limit < result.total ? result.page + 1 : undefined,
+    };
   }
 
   @Post(':id/password')

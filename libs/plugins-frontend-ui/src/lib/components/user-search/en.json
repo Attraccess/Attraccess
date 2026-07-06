@@ -1,6 +1,10 @@
 {
   "label": "User",
   "placeholder": "Search by username or email",
+  "chooseUser": "Choose user",
+  "modalTitle": "Choose a user",
+  "searchPlaceholder": "Search by username or email",
+  "empty": "No users found",
   "noUsersFound": "No users found",
   "typeToSearch": "Type to search for users"
 }

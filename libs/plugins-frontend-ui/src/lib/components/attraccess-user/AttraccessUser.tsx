@@ -16,6 +16,8 @@ interface AttraccessUserProps {
   className?: string;
   onStartDirectMessage?: (user: User) => void;
   variant?: 'full' | 'mini';
+  /** When false, render as plain display without the direct-message popover. Defaults to true. */
+  interactive?: boolean;
 }
 
 export function AttraccessUser({
@@ -24,6 +26,7 @@ export function AttraccessUser({
   className,
   onStartDirectMessage,
   variant = 'full',
+  interactive = true,
 }: Readonly<AttraccessUserProps>) {
   const { t } = useTranslations({ en, de });
   const actions = useAttraccessUserActions();
@@ -45,7 +48,7 @@ export function AttraccessUser({
       actions.onStartDirectMessage(user);
     }
   }, [user, onStartDirectMessage, actions]);
-  const isInteractive = !!user && !!startDirectMessage;
+  const isInteractive = interactive && !!user && !!startDirectMessage;
 
   const avatar = (
     <Avatar>
