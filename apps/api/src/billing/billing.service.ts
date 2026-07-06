@@ -262,7 +262,7 @@ export class BillingService {
       });
     }
     if (existingTransaction) {
-      return existingTransaction;
+      throw new BadRequestException('Billing transaction already exists for this resource usage');
     }
 
     const doCalculation = async (manager: EntityManager) => {
