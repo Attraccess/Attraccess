@@ -85,7 +85,7 @@
     "js-confetti": "^0.13.1",
     "keytar": "^7.9.0",
     "lodash-es": "^4.18.1",
-    "lucide-react": "^1.14.0",
+    "lucide-react": "^1.23.0",
     "mjml": "^5.2.2",
     "mjml-react": "^2.0.8",
     "mkcert": "^3.2.0",
