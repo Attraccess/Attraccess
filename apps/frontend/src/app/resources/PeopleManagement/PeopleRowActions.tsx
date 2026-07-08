@@ -1,9 +1,8 @@
-import { Tooltip } from '@heroui/react';
-import { Button } from '../../../components/button';
 import { HistoryIcon, ShieldCheckIcon, ShieldOffIcon, Trash2Icon } from 'lucide-react';
 import { User } from '@attraccess/react-query-client';
 import { TFunction } from '@attraccess/plugins-frontend-ui';
 import { PersonRow } from './types';
+import { TableRowActions } from '../../../components/tableRowActions';
 
 interface PeopleRowActionsProps {
   t: TFunction;
@@ -37,78 +36,47 @@ export function PeopleRowActions(props: Readonly<PeopleRowActionsProps>) {
   } = props;
 
   return (
-    <div className="flex gap-2 flex-wrap">
-      {row.introduction && (
-        <Tooltip>
-          <Tooltip.Trigger>
-            <Button
-              variant="ghost"
-              isIconOnly
-              onPress={() => onOpenHistory(row.user.id)}
-              aria-label={t('rowActions.history')}
-              data-cy={`people-row-history-${row.user.id}`}
-            >
-              <HistoryIcon className="w-4 h-4" />
-            </Button>
-          </Tooltip.Trigger>
-          <Tooltip.Content>{t('rowActions.history')}</Tooltip.Content>
-        </Tooltip>
-      )}
-
-      {canManageIntroductions &&
-        (row.hasValidIntroduction ? (
-          <Tooltip>
-            <Tooltip.Trigger>
-              <Button
-                variant="ghost"
-                isIconOnly
-                isPending={isRevokingIntroduction && pendingIntroductionUserId === row.user.id}
-                onPress={() => onToggleIntroduction(row.user, 'revoke')}
-                aria-label={t('rowActions.revokeIntroduction')}
-                data-cy={`people-row-revoke-introduction-${row.user.id}`}
-              >
-                <ShieldOffIcon className="w-4 h-4" />
-              </Button>
-            </Tooltip.Trigger>
-            <Tooltip.Content>{t('rowActions.revokeIntroduction')}</Tooltip.Content>
-          </Tooltip>
-        ) : row.introduction ? (
-          <Tooltip>
-            <Tooltip.Trigger>
-              <Button
-                variant="ghost"
-                isIconOnly
-                isPending={isGrantingIntroduction && pendingIntroductionUserId === row.user.id}
-                onPress={() => onToggleIntroduction(row.user, 'grant')}
-                aria-label={t('rowActions.grantIntroduction')}
-                data-cy={`people-row-grant-introduction-${row.user.id}`}
-              >
-                <ShieldCheckIcon className="w-4 h-4" />
-              </Button>
-            </Tooltip.Trigger>
-            <Tooltip.Content>{t('rowActions.grantIntroduction')}</Tooltip.Content>
-          </Tooltip>
-        ) : null)}
-
-      {canManageIntroducers && row.introducer && (
-        <Tooltip>
-          <Tooltip.Trigger>
-            <Button
-              variant="ghost"
-              isIconOnly
-              isPending={isRevokingIntroducer && pendingIntroducerUserId === row.user.id}
-              onPress={() => onRevokeIntroducer(row.user.id)}
-              aria-label={row.isMaintainer ? t('rowActions.revokeMaintainer') : t('rowActions.revokeIntroducer')}
-              data-cy={`people-row-revoke-introducer-${row.user.id}`}
-            >
-              <Trash2Icon className="w-4 h-4" />
-            </Button>
-          </Tooltip.Trigger>
-          <Tooltip.Content>
-            {row.isMaintainer ? t('rowActions.revokeMaintainer') : t('rowActions.revokeIntroducer')}
-          </Tooltip.Content>
-        </Tooltip>
-      )}
-    </div>
+    <TableRowActions
+      ariaLabel={t('columns.actions')}
+      triggerDataCy={`people-row-actions-${row.user.id}`}
+      actions={[
+        row.introduction && {
+          key: 'history',
+          label: t('rowActions.history'),
+          icon: <HistoryIcon className="w-4 h-4" />,
+          onPress: () => onOpenHistory(row.user.id),
+          dataCy: `people-row-history-${row.user.id}`,
+        },
+        canManageIntroductions &&
+          row.hasValidIntroduction && {
+            key: 'revoke-introduction',
+            label: t('rowActions.revokeIntroduction'),
+            icon: <ShieldOffIcon className="w-4 h-4" />,
+            isPending: isRevokingIntroduction && pendingIntroductionUserId === row.user.id,
+            onPress: () => onToggleIntroduction(row.user, 'revoke'),
+            dataCy: `people-row-revoke-introduction-${row.user.id}`,
+          },
+        canManageIntroductions &&
+          !row.hasValidIntroduction &&
+          row.introduction && {
+            key: 'grant-introduction',
+            label: t('rowActions.grantIntroduction'),
+            icon: <ShieldCheckIcon className="w-4 h-4" />,
+            isPending: isGrantingIntroduction && pendingIntroductionUserId === row.user.id,
+            onPress: () => onToggleIntroduction(row.user, 'grant'),
+            dataCy: `people-row-grant-introduction-${row.user.id}`,
+          },
+        canManageIntroducers &&
+          row.introducer && {
+            key: 'revoke-introducer',
+            label: row.isMaintainer ? t('rowActions.revokeMaintainer') : t('rowActions.revokeIntroducer'),
+            icon: <Trash2Icon className="w-4 h-4" />,
+            variant: 'destructive',
+            isPending: isRevokingIntroducer && pendingIntroducerUserId === row.user.id,
+            onPress: () => onRevokeIntroducer(row.user.id),
+            dataCy: `people-row-revoke-introducer-${row.user.id}`,
+          },
+      ]}
+    />
   );
 }

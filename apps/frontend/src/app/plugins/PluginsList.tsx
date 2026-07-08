@@ -25,6 +25,7 @@ import { UploadPluginModal } from './UploadPluginModal';
 import { useToastMessage } from '../../components/toastProvider';
 import { EmptyState } from '../../components/emptyState';
 import { PageHeader } from '../../components/pageHeader';
+import { TableRowActions } from '../../components/tableRowActions';
 
 import de from './PluginsList.de.json';
 import en from './PluginsList.en.json';
@@ -169,17 +170,20 @@ export function PluginsList() {
                     )}
                   </TableCell>
                   <TableCell>
-                    <Tooltip>
-                      <Button
-                        variant="danger-soft"
-                        isIconOnly
-                        onPress={() => handleDeleteClick(plugin.id)}
-                        data-cy={`plugins-list-delete-plugin-button-${plugin.id}`}
-                      >
-                        <Trash2 size={18} />
-                      </Button>
-                      <TooltipContent>{t('deleteTooltip')}</TooltipContent>
-                    </Tooltip>
+                    <TableRowActions
+                      ariaLabel={t('columns.actions')}
+                      triggerDataCy={`plugins-list-actions-button-${plugin.id}`}
+                      actions={[
+                        {
+                          key: 'delete',
+                          label: t('deleteTooltip'),
+                          icon: <Trash2 size={18} />,
+                          variant: 'destructive',
+                          onPress: () => handleDeleteClick(plugin.id),
+                          dataCy: `plugins-list-delete-plugin-button-${plugin.id}`,
+                        },
+                      ]}
+                    />
                   </TableCell>
                 </TableRow>
               )}

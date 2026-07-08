@@ -11,7 +11,8 @@
       "reason": "Grund",
       "createdBy": "Angelegt von",
       "completedBy": "Abgeschlossen von",
-      "completedAt": "Abgeschlossen am"
+      "completedAt": "Abgeschlossen am",
+      "actions": "Aktionen"
     }
   },
   "actions": {

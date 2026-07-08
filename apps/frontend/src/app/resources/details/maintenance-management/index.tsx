@@ -23,10 +23,11 @@ import de from './de.json';
 import en from './en.json';
 import { ResourceMaintenanceUpsertModal } from './upsert';
 import { MarkDoneModal } from './mark-done';
-import { CheckCircleIcon, CogIcon, ConstructionIcon, ExternalLinkIcon, PlusIcon } from 'lucide-react';
+import { CheckCircleIcon, ConstructionIcon, ExternalLinkIcon, PlusIcon } from 'lucide-react';
 import { useNow } from '../../../../hooks/useNow';
 import { EmptyState } from '../../../../components/emptyState';
 import { FlatSection } from '../../../../components/flatSection';
+import { TableRowActions } from '../../../../components/tableRowActions';
 
 interface Props extends Omit<HTMLAttributes<HTMLElement>, 'children'> {
   resourceId: number;
@@ -141,9 +142,7 @@ export function MaintenanceManagement(props: Props) {
             <TableColumn>{t('table.columns.createdBy')}</TableColumn>
             <TableColumn>{t('table.columns.completedBy')}</TableColumn>
             <TableColumn>{t('table.columns.completedAt')}</TableColumn>
-            <TableColumn>
-              <CogIcon />
-            </TableColumn>
+            <TableColumn>{t('table.columns.actions')}</TableColumn>
           </TableHeader>
           <TableBody items={maintenanceWithStatus} renderEmptyState={() => <EmptyState />}>
             {(maintenance) => (
@@ -175,9 +174,17 @@ export function MaintenanceManagement(props: Props) {
                   {maintenance.isActive && (
                     <MarkDoneModal resourceId={resourceId} maintenanceId={maintenance.id}>
                       {(openMarkDone: () => void) => (
-                        <Button variant="tertiary" isIconOnly onPress={openMarkDone}>
-                          <CheckCircleIcon className="w-4 h-4" />
-                        </Button>
+                        <TableRowActions
+                          ariaLabel={t('table.columns.actions')}
+                          actions={[
+                            {
+                              key: 'mark-done',
+                              label: t('actions.markDone.title'),
+                              icon: <CheckCircleIcon className="w-4 h-4" />,
+                              onPress: openMarkDone,
+                            },
+                          ]}
+                        />
                       )}
                     </MarkDoneModal>
                   )}

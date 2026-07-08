@@ -130,9 +130,8 @@ describe('PluginsList', () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.click(
-      document.querySelector('[data-cy="plugins-list-delete-plugin-button-plugin-1"]') as Element
-    );
+    await user.click(document.querySelector('[data-cy="plugins-list-actions-button-plugin-1"]') as Element);
+    await user.click(await screen.findByRole('menuitem', { name: /remove plugin/i }));
 
     await waitFor(() =>
       expect(
@@ -146,9 +145,8 @@ describe('PluginsList', () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.click(
-      document.querySelector('[data-cy="plugins-list-delete-plugin-button-plugin-1"]') as Element
-    );
+    await user.click(document.querySelector('[data-cy="plugins-list-actions-button-plugin-1"]') as Element);
+    await user.click(await screen.findByRole('menuitem', { name: /remove plugin/i }));
     const confirm = await waitFor(() =>
       document.querySelector('[data-cy="plugins-list-delete-confirmation-delete-button"]')
     );

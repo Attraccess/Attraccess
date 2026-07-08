@@ -8,13 +8,13 @@ import {
   TableBody,
   TableRow,
   TableCell,
-  Button,
 } from '@heroui/react';
 import { Edit3, Mail } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../../components/pageHeader';
 import { EmptyState } from '../../components/emptyState';
+import { TableRowActions } from '../../components/tableRowActions';
 
 import en from './en.json';
 import de from './de.json';
@@ -39,9 +39,17 @@ export function EmailTemplatesPage() {
       type: t(`templateTypes.${item.type}`),
       subject: item.subject,
       actions: (
-        <Button variant="ghost" isIconOnly aria-label={t('editButton')} onPress={() => openEditor(item.type)}>
-          <Edit3 size={18} />
-        </Button>
+        <TableRowActions
+          ariaLabel={t('columns.actions')}
+          actions={[
+            {
+              key: 'edit',
+              label: t('editButton'),
+              icon: <Edit3 size={18} />,
+              onPress: () => openEditor(item.type),
+            },
+          ]}
+        />
       ),
     }));
   }, [emailTemplates, t, openEditor]);

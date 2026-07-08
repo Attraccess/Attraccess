@@ -10,7 +10,6 @@ import {
   TableRow,
   TableScrollContainer,
 } from '@heroui/react';
-import { Button } from '../../../components/button';
 import {
   Resource,
   ResourceGroup,
@@ -32,6 +31,7 @@ import { useToastMessage } from '../../../components/toastProvider';
 import { ResourceGroupUpsertModal } from '../../resource-groups/upsertModal/resourceGroupUpsertModal';
 import { GroupsToolbar } from './GroupsToolbar';
 import { filterAndSortGroups, GroupFilter } from './groupsFilter';
+import { TableRowActions } from '../../../components/tableRowActions';
 
 type ManageResourceGroupsProps = Omit<HTMLAttributes<HTMLElement>, 'children'> & {
   resourceId: number;
@@ -193,29 +193,38 @@ export function ManageResourceGroups({
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Button
-                      size="sm"
-                      variant={isAssigned ? 'danger-soft' : 'primary'}
-                      isDisabled={isPending}
-                      isPending={isPending}
-                      onPress={() => handleToggle(group)}
-                      aria-label={actionLabel}
-                      data-cy={`resource-group-row-${group.id}-toggle`}
-                    >
-                      {isPending ? null : isAssigned ? <MinusIcon size={14} /> : <PlusIcon size={14} />}
-                      {buttonLabel}
-                    </Button>
+                    <span className={isAssigned ? 'text-success' : 'text-default-400'}>
+                      {isAssigned ? t('filter.assigned') : t('filter.available')}
+                    </span>
                   </TableCell>
                   <TableCell>
-                    <Link
-                      href={`/resource-groups/${group.id}`}
-                      className="text-xs inline-flex items-center gap-0.5"
-                      data-cy={`resource-group-row-${group.id}-open`}
-                      aria-label={`${t('row.openGroup')}: ${group.name}`}
-                    >
-                      {t('row.openGroup')}
-                      <ChevronRightIcon size={14} />
-                    </Link>
+                    <div className="flex items-center justify-end gap-2">
+                      <Link
+                        href={`/resource-groups/${group.id}`}
+                        className="text-xs inline-flex items-center gap-0.5"
+                        data-cy={`resource-group-row-${group.id}-open`}
+                        aria-label={`${t('row.openGroup')}: ${group.name}`}
+                      >
+                        {t('row.openGroup')}
+                        <ChevronRightIcon size={14} />
+                      </Link>
+                      <TableRowActions
+                        ariaLabel={actionLabel}
+                        triggerDataCy={`resource-group-row-${group.id}-actions`}
+                        actions={[
+                          {
+                            key: 'toggle',
+                            label: buttonLabel,
+                            icon: isAssigned ? <MinusIcon size={14} /> : <PlusIcon size={14} />,
+                            variant: isAssigned ? 'destructive' : 'default',
+                            isDisabled: isPending,
+                            isPending,
+                            onPress: () => handleToggle(group),
+                            dataCy: `resource-group-row-${group.id}-toggle`,
+                          },
+                        ]}
+                      />
+                    </div>
                   </TableCell>
                 </TableRow>
               );

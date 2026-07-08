@@ -1,10 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Alert,
-  AlertContent,
-  AlertDescription,
-  AlertTitle,
-  Button,
   Card,
   Chip,
   Table,
@@ -18,7 +13,6 @@ import {
 } from '@heroui/react';
 import { ActivityIcon, ArrowRightIcon, CpuIcon, LogsIcon, PencilIcon, Trash2Icon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { AlertStatusIcon } from '../../../components/AlertStatusIcon';
 import { EmptyState } from '../../../components/emptyState';
 import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { AttractapEditor } from '../AttractapEditor/AttractapEditor';
@@ -33,6 +27,7 @@ import { PageAction, PageHeader } from '../../../components/pageHeader';
 import { AttractapHardwareSetup } from '../HardwareSetup';
 import { WebSerialConsole } from '../HardwareSetup/WebSerialConsole';
 import { useNow } from '../../../hooks/useNow';
+import { TableRowActions } from '../../../components/tableRowActions';
 
 import de from './de.json';
 import en from './en.json';
@@ -199,38 +194,38 @@ export function AttractapList() {
                           </TableCell>
                           <TableCell className="whitespace-nowrap">{formatDateTime(reader.lastConnection)}</TableCell>
                           <TableCell>
-                            <div className="flex flex-row gap-2">
-                              <Button
-                                variant="ghost"
-                                onPress={() => setOpenedReaderEditor(reader.id)}
-                                data-cy={`attractap-list-edit-reader-button-${reader.id}`}
-                              >
-                                <PencilIcon className="w-4 h-4" />
-                                {t('table.actions.editReader')}
-                              </Button>
-
-                              <Button
-                                variant="ghost"
-                                onPress={() => navigate(`/attractap/readers/${reader.id}/diagnostics`)}
-                                data-cy={`attractap-list-diagnostics-reader-button-${reader.id}`}
-                              >
-                                <ActivityIcon className="w-4 h-4" />
-                                {t('table.actions.diagnostics')}
-                              </Button>
-
-                              <AttractapDeleteModal readerId={reader.id}>
-                                {(onOpen) => (
-                                  <Button
-                                    variant="danger-soft"
-                                    onPress={onOpen}
-                                    data-cy={`attractap-list-delete-reader-button-${reader.id}`}
-                                  >
-                                    <Trash2Icon className="w-4 h-4" />
-                                    {t('table.actions.deleteReader')}
-                                  </Button>
-                                )}
-                              </AttractapDeleteModal>
-                            </div>
+                            <AttractapDeleteModal readerId={reader.id}>
+                              {(onOpen) => (
+                                <TableRowActions
+                                  ariaLabel={t('table.columns.actions')}
+                                  triggerDataCy={`attractap-list-actions-button-${reader.id}`}
+                                  actions={[
+                                    {
+                                      key: 'edit',
+                                      label: t('table.actions.editReader'),
+                                      icon: <PencilIcon className="w-4 h-4" />,
+                                      onPress: () => setOpenedReaderEditor(reader.id),
+                                      dataCy: `attractap-list-edit-reader-button-${reader.id}`,
+                                    },
+                                    {
+                                      key: 'diagnostics',
+                                      label: t('table.actions.diagnostics'),
+                                      icon: <ActivityIcon className="w-4 h-4" />,
+                                      onPress: () => navigate(`/attractap/readers/${reader.id}/diagnostics`),
+                                      dataCy: `attractap-list-diagnostics-reader-button-${reader.id}`,
+                                    },
+                                    {
+                                      key: 'delete',
+                                      label: t('table.actions.deleteReader'),
+                                      icon: <Trash2Icon className="w-4 h-4" />,
+                                      variant: 'destructive',
+                                      onPress: onOpen,
+                                      dataCy: `attractap-list-delete-reader-button-${reader.id}`,
+                                    },
+                                  ]}
+                                />
+                              )}
+                            </AttractapDeleteModal>
                           </TableCell>
                         </TableRow>
                       )}
