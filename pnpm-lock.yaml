@@ -253,8 +253,8 @@ importers:
         specifier: ^4.18.1
         version: 4.18.1
       lucide-react:
-        specifier: ^1.14.0
-        version: 1.14.0(react@19.2.6)
+        specifier: ^1.23.0
+        version: 1.23.0(react@19.2.6)
       mjml:
         specifier: ^5.2.2
         version: 5.2.2(relateurl@0.2.7)(svgo@4.0.1)(terser@5.48.0)(typescript@6.0.3)
@@ -12849,8 +12849,8 @@ packages:
   lru-queue@0.1.0:
     resolution: {integrity: sha512-BpdYkt9EvGl8OfWHDQPISVpcl5xZthb+XPsbELj5AQXxIC8IriDZIQYjBJPEm5rS420sjZ0TLEzRcq5KdBhYrQ==}
 
-  lucide-react@1.14.0:
-    resolution: {integrity: sha512-+1mdWcfSJVUsaTIjN9zoezmUhfXo5l0vP7ekBMPo3jcS/aIkxHnXqAPsByszMZx/Y8oQBRJxJx5xg+RH3urzxA==}
+  lucide-react@1.23.0:
+    resolution: {integrity: sha512-38BpJcD0JhFosxHApP/BYsBetLpQFRoTRzEzstM/XCc3jsAG7wqaY1lgVwxiUe3xqYE+lNxo2PkCmYwXWrwwIw==}
     peerDependencies:
       react: 19.2.6
 
@@ -33697,7 +33697,7 @@ snapshots:
     dependencies:
       es5-ext: 0.10.64
 
-  lucide-react@1.14.0(react@19.2.6):
+  lucide-react@1.23.0(react@19.2.6):
     dependencies:
       react: 19.2.6
 
