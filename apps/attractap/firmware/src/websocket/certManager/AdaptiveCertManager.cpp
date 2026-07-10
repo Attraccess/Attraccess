@@ -3,12 +3,11 @@
 // Preference keys
 const char *AdaptiveCertManager::PREF_NAMESPACE = "cert_mgr";
 const char *AdaptiveCertManager::PREF_SUCCESSFUL_CERT = "success_cert";
-
-// Global instance
-AdaptiveCertManager adaptiveCertManager;
+const char *AdaptiveCertManager::PREF_SUCCESSFUL_CERT_NAME = "success_name";
+const char *AdaptiveCertManager::PREF_SUCCESSFUL_HOST = "success_host";
 
 AdaptiveCertManager::AdaptiveCertManager()
-    : currentCertIndex(0), successfulCertIndex(-1), initialized(false), rememberedCertFailureCount(0), logger("AdaptiveCertManager")
+    : currentCertIndex(0), currentCertAttemptCount(0), successfulCertIndex(-1), initialized(false), rememberedCertFailureCount(0), logger("AdaptiveCertManager")
 {
 }
 
@@ -58,28 +57,19 @@ bool AdaptiveCertManager::getCertificate(const char **certData, const char **cer
 
     logger.infof("Available certificates: %d", CA_CERT_COUNT);
 
-    // If we have a remembered successful certificate, start with that
+    // A locked (once-successful) certificate is always used, no matter how often
+    // it failed since: connect failures with a known-good cert mean the server is
+    // unreachable, not that another CA would help. Only reset() unlocks it.
     if (successfulCertIndex >= 0 && isValidCertIndex(successfulCertIndex))
     {
-        // Only use remembered cert if we haven't failed too many times
-        if (rememberedCertFailureCount < 5)
-        {
-            currentCertIndex = successfulCertIndex;
-            logger.infof("Using remembered certificate (index %d, failure count: %d/5)",
-                         currentCertIndex, rememberedCertFailureCount);
-        }
-        else
-        {
-            // Too many failures, start iterating from beginning
-            currentCertIndex = 0;
-            rememberedCertFailureCount = 0; // Reset counter for fresh iteration
-            logger.info("Remembered certificate failed too many times, starting fresh iteration");
-        }
+        currentCertIndex = successfulCertIndex;
+        logger.infof("Using locked certificate (index %d, failure count: %d)",
+                     currentCertIndex, rememberedCertFailureCount);
     }
     else
     {
-        // No remembered certificate, start with first certificate
-        logger.info("No remembered certificate found, starting fresh search");
+        // No locked certificate, iterate the list
+        logger.info("No locked certificate found, continuing sweep");
     }
 
     if (!isValidCertIndex(currentCertIndex))
@@ -108,7 +98,7 @@ bool AdaptiveCertManager::getCertificate(const char **certData, const char **cer
     return true;
 }
 
-void AdaptiveCertManager::markSuccess()
+void AdaptiveCertManager::markSuccess(const std::string &serverKey)
 {
     if (!initialized)
     {
@@ -116,13 +106,45 @@ void AdaptiveCertManager::markSuccess()
     }
 
     const char *certName = getCurrentCertName();
-    logger.infof("Certificate successful: %s (index %d)",
-                 certName, currentCertIndex);
+    logger.infof("Certificate successful: %s (index %d, server %s)",
+                 certName, currentCertIndex, serverKey.c_str());
 
     successfulCertIndex = currentCertIndex;
+    successfulServerKey = serverKey;
     rememberedCertFailureCount = 0; // Reset failure counter on success
+    currentCertAttemptCount = 0;
 
     saveSuccessfulCertIndexToPreferences(currentCertIndex);
+    // The name guards the lock against the CA list being reordered by a
+    // firmware update: an index alone would silently point at a different CA.
+    preferences.putString(PREF_SUCCESSFUL_CERT_NAME, certName);
+    preferences.putString(PREF_SUCCESSFUL_HOST, serverKey);
+}
+
+void AdaptiveCertManager::ensureLockMatchesServer(const std::string &serverKey)
+{
+    if (!initialized || successfulCertIndex < 0)
+    {
+        return;
+    }
+
+    if (successfulServerKey.empty())
+    {
+        // Lock from a firmware that did not track the server yet: it was
+        // successful against the currently configured server, so adopt the key
+        // instead of forcing the whole fleet through a fresh sweep after OTA.
+        successfulServerKey = serverKey;
+        preferences.putString(PREF_SUCCESSFUL_HOST, serverKey);
+        logger.infof("Adopted server %s for existing certificate lock", serverKey.c_str());
+        return;
+    }
+
+    if (successfulServerKey != serverKey)
+    {
+        logger.infof("API server changed (%s -> %s), clearing certificate lock",
+                     successfulServerKey.c_str(), serverKey.c_str());
+        this->reset();
+    }
 }
 
 bool AdaptiveCertManager::markFailure()
@@ -135,36 +157,30 @@ bool AdaptiveCertManager::markFailure()
 
     const char *failedCertName = getCurrentCertName();
 
-    // Check if the failed certificate is the remembered one
-    if (successfulCertIndex >= 0 && currentCertIndex == successfulCertIndex)
+    // A locked certificate is never given up on: the lock only clears via reset().
+    // Report the sweep as "exhausted" so the caller applies its regular backoff.
+    if (successfulCertIndex >= 0)
     {
         rememberedCertFailureCount++;
-        logger.infof("Remembered certificate failed: %s (index %d/%d, failure count: %d/5)",
-                     failedCertName, currentCertIndex, CA_CERT_COUNT - 1, rememberedCertFailureCount);
-
-        // If we haven't hit the failure limit, retry the same certificate
-        if (rememberedCertFailureCount < 5)
-        {
-            logger.infof("Will retry remembered certificate (attempt %d/5)",
-                         rememberedCertFailureCount + 1);
-            return false; // Don't increment currentCertIndex, retry same cert
-        }
-        else
-        {
-            // Hit failure limit, start fresh iteration
-            logger.info("Remembered certificate failed too many times, starting fresh iteration");
-            this->reset();
-            // Continue to regular iteration logic below
-        }
+        logger.infof("Locked certificate failed: %s (index %d, failure count: %d); keeping it",
+                     failedCertName, currentCertIndex, rememberedCertFailureCount);
+        return true;
     }
-    else
+
+    // Regular iteration through certificates
+    logger.infof("Certificate failed during iteration: %s (index %d/%d, attempt %d/%d)",
+                 failedCertName, currentCertIndex, CA_CERT_COUNT - 1,
+                 currentCertAttemptCount + 1, ATTEMPTS_PER_CERT);
+
+    currentCertAttemptCount++;
+    if (currentCertAttemptCount < ATTEMPTS_PER_CERT)
     {
-        // Regular iteration through certificates
-        logger.infof("Certificate failed during iteration: %s (index %d/%d)",
-                     failedCertName, currentCertIndex, CA_CERT_COUNT - 1);
+        // Give the same cert another try before moving on.
+        return false;
     }
 
     // Move to next certificate in iteration
+    currentCertAttemptCount = 0;
     currentCertIndex++;
 
     bool exhausted = false;
@@ -186,10 +202,19 @@ bool AdaptiveCertManager::markFailure()
 void AdaptiveCertManager::reset()
 {
     currentCertIndex = 0;
+    currentCertAttemptCount = 0;
     successfulCertIndex = -1;
+    successfulServerKey.clear();
     rememberedCertFailureCount = 0;
     preferences.remove(PREF_SUCCESSFUL_CERT);
-    logger.info("Reset to first certificate");
+    preferences.remove(PREF_SUCCESSFUL_CERT_NAME);
+    preferences.remove(PREF_SUCCESSFUL_HOST);
+    logger.info("Certificate lock cleared, reset to first certificate");
+}
+
+bool AdaptiveCertManager::isLocked() const
+{
+    return successfulCertIndex >= 0;
 }
 
 const char *AdaptiveCertManager::getCurrentCertName() const
@@ -228,14 +253,47 @@ void AdaptiveCertManager::loadSuccessfulCertIndexFromPreferences()
     logger.info("Loading certificate");
 
     successfulCertIndex = preferences.getInt(PREF_SUCCESSFUL_CERT, -1);
+    successfulServerKey = preferences.getString(PREF_SUCCESSFUL_HOST);
+
+    // Sanitize here, the only place a locked index enters: a firmware update may
+    // have shrunk the CA list, and an out-of-range lock would otherwise be kept
+    // forever (markFailure never unlocks). Drop it and sweep fresh instead.
+    if (successfulCertIndex >= 0 && !isValidCertIndex(successfulCertIndex))
+    {
+        logger.errorf("Stored certificate index %d is out of range (max %d), clearing lock",
+                      successfulCertIndex, CA_CERT_COUNT - 1);
+        this->reset();
+        return;
+    }
+
+    // A firmware update may also have reordered the list, leaving the index in
+    // range but pointing at a different CA. The stored name catches that; a lock
+    // from a firmware that did not record the name adopts the current one (same
+    // rationale as the server-key adoption in ensureLockMatchesServer).
+    if (successfulCertIndex >= 0)
+    {
+        std::string storedCertName = preferences.getString(PREF_SUCCESSFUL_CERT_NAME);
+        const char *currentName = ca_certificates[successfulCertIndex].name;
+        if (storedCertName.empty())
+        {
+            preferences.putString(PREF_SUCCESSFUL_CERT_NAME, currentName);
+        }
+        else if (storedCertName != currentName)
+        {
+            logger.errorf("Stored certificate index %d now maps to '%s' (was '%s'), clearing lock",
+                          successfulCertIndex, currentName, storedCertName.c_str());
+            this->reset();
+            return;
+        }
+    }
 
     if (successfulCertIndex >= 0)
     {
-        logger.infof("Found remembered certificate: index %d", successfulCertIndex);
+        logger.infof("Found locked certificate: index %d", successfulCertIndex);
     }
     else
     {
-        logger.info("No remembered certificate found");
+        logger.info("No locked certificate found");
     }
 }
 
