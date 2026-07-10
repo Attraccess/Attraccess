@@ -190,6 +190,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
+      # Firmware must be built on the runner: the Docker builder has no
+      # ESP-IDF, so the in-container build is skipped and the pre-built
+      # firmware_output/ from the build context is bundled instead.
+      - uses: ./.github/actions/build-attractap-firmware
+
       - name: Download companion Linux binaries
         uses: actions/download-artifact@v4
         continue-on-error: true
@@ -271,6 +276,10 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+
+      # Balena's remote builder has no ESP-IDF either; pre-build the firmware
+      # so `balena push` uploads firmware_output/ with the build context.
+      - uses: ./.github/actions/build-attractap-firmware
 
       - uses: ./.github/actions/balena-push
         with:

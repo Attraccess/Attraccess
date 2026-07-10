@@ -16,14 +16,6 @@ RUN apt-get update && apt-get install -y \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-# Optional: ESP tooling often used by firmware-related scripts
-# Create a virtual environment to avoid PEP 668 restrictions on Alpine
-RUN python3 -m venv /opt/venv
-ENV VIRTUAL_ENV=/opt/venv
-ENV PATH="$VIRTUAL_ENV/bin:$PATH"
-RUN pip install --upgrade pip && \
-    pip install platformio esptool
-
 WORKDIR /app
 
 # Copy package.json, lockfile, patches (required for pnpm patchedDependencies), and .npmrc first for better layer caching
@@ -36,8 +28,15 @@ RUN corepack enable && pnpm install --frozen-lockfile
 # Copy the rest of the application
 COPY . .
 
-# Build the application
+# Build the application. The Attractap firmware is NOT built here (no ESP-IDF
+# in this image — build_firmwares.py skips itself); CI pre-builds it into
+# apps/attractap/firmware/firmware_output/ before invoking docker build, and
+# the api build bundles it into its assets.
 RUN pnpm nx run-many -t build --projects=api,frontend
+
+# Fail loudly if the image would ship without any firmware — an empty manifest
+# breaks OTA updates and the /api/attractap/firmwares endpoint (ATT-715).
+RUN node -e "const f = require('/app/dist/apps/api/assets/attractap-firmwares/firmwares.json'); if (!f.firmwares.length) { console.error('No Attractap firmwares bundled. Build them first: cd apps/attractap/firmware && python3 build_firmwares.py (requires ESP-IDF v5.5)'); process.exit(1); }"
 
 # Strip stray pnpm config Nx copies into generated dist package.json files;
 # pnpm 10 only respects pnpm.overrides / pnpm.onlyBuiltDependencies at the workspace root.
