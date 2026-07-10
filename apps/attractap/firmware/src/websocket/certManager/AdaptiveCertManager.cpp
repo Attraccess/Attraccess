@@ -207,13 +207,24 @@ void AdaptiveCertManager::loadSuccessfulCertIndexFromPreferences()
 
     successfulCertIndex = preferences.getInt(PREF_SUCCESSFUL_CERT, -1);
 
+    // Sanitize here, the only place a locked index enters: a firmware update may
+    // have shrunk the CA list, and an out-of-range lock would otherwise be kept
+    // forever (markFailure never unlocks). Drop it and sweep fresh instead.
+    if (successfulCertIndex >= 0 && !isValidCertIndex(successfulCertIndex))
+    {
+        logger.errorf("Stored certificate index %d is out of range (max %d), clearing lock",
+                      successfulCertIndex, CA_CERT_COUNT - 1);
+        this->reset();
+        return;
+    }
+
     if (successfulCertIndex >= 0)
     {
-        logger.infof("Found remembered certificate: index %d", successfulCertIndex);
+        logger.infof("Found locked certificate: index %d", successfulCertIndex);
     }
     else
     {
-        logger.info("No remembered certificate found");
+        logger.info("No locked certificate found");
     }
 }
 

@@ -166,10 +166,10 @@ void ConnectionConfigurationScreen::init()
    lv_obj_set_style_bg_opa(this->resetCertButton, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_add_event_cb(this->resetCertButton, &ConnectionConfigurationScreen::onResetCertificateButtonEvent, LV_EVENT_CLICKED, this);
 
-   lv_obj_t *resetCertLabel = lv_label_create(this->resetCertButton);
-   lv_obj_set_align(resetCertLabel, LV_ALIGN_CENTER);
-   lv_label_set_text(resetCertLabel, "Zertifikat zuruecksetzen");
-   lv_obj_set_style_text_color(resetCertLabel, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
+   this->resetCertLabel = lv_label_create(this->resetCertButton);
+   lv_obj_set_align(this->resetCertLabel, LV_ALIGN_CENTER);
+   lv_label_set_text(this->resetCertLabel, "Zertifikat zuruecksetzen");
+   lv_obj_set_style_text_color(this->resetCertLabel, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
 
    lv_obj_t *containerForSaveButton = this->createSaveContainer(apiTab);
    this->createSaveButton(containerForSaveButton);
@@ -280,6 +280,7 @@ void ConnectionConfigurationScreen::destroy()
    this->useSSLSwitch = nullptr;
    this->labelForUseSSLSwitch = nullptr;
    this->resetCertButton = nullptr;
+   this->resetCertLabel = nullptr;
    this->devicePin = nullptr;
    this->labelForDevicePin = nullptr;
    this->beeperEnabled = nullptr;

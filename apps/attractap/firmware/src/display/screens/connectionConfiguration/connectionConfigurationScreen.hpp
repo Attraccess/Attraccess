@@ -60,6 +60,7 @@ private:
     lv_obj_t *labelForUseSSLSwitch = nullptr;
     lv_color_t labelForUseSSLSwitchDefaultColor;
     lv_obj_t *resetCertButton = nullptr;
+    lv_obj_t *resetCertLabel = nullptr;
 
     static void onTextAreaEvent(lv_event_t *e);
     static void onKeyboardEvent(lv_event_t *e);

@@ -171,13 +171,12 @@ void ConnectionConfigurationScreen::onResetCertificateButtonEvent(lv_event_t *e)
    }
 
    // One-shot feedback: relabel and disable until the screen is rebuilt.
+   if (self->resetCertLabel)
+   {
+      lv_label_set_text(self->resetCertLabel, "Zurueckgesetzt");
+   }
    if (self->resetCertButton)
    {
-      lv_obj_t *label = lv_obj_get_child(self->resetCertButton, 0);
-      if (label)
-      {
-         lv_label_set_text(label, "Zurueckgesetzt");
-      }
       lv_obj_add_state(self->resetCertButton, LV_STATE_DISABLED);
    }
 }
