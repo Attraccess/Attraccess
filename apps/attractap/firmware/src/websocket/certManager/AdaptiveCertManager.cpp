@@ -3,6 +3,7 @@
 // Preference keys
 const char *AdaptiveCertManager::PREF_NAMESPACE = "cert_mgr";
 const char *AdaptiveCertManager::PREF_SUCCESSFUL_CERT = "success_cert";
+const char *AdaptiveCertManager::PREF_SUCCESSFUL_HOST = "success_host";
 
 AdaptiveCertManager::AdaptiveCertManager()
     : currentCertIndex(0), successfulCertIndex(-1), initialized(false), rememberedCertFailureCount(0), logger("AdaptiveCertManager")
@@ -96,7 +97,7 @@ bool AdaptiveCertManager::getCertificate(const char **certData, const char **cer
     return true;
 }
 
-void AdaptiveCertManager::markSuccess()
+void AdaptiveCertManager::markSuccess(const std::string &serverKey)
 {
     if (!initialized)
     {
@@ -104,13 +105,41 @@ void AdaptiveCertManager::markSuccess()
     }
 
     const char *certName = getCurrentCertName();
-    logger.infof("Certificate successful: %s (index %d)",
-                 certName, currentCertIndex);
+    logger.infof("Certificate successful: %s (index %d, server %s)",
+                 certName, currentCertIndex, serverKey.c_str());
 
     successfulCertIndex = currentCertIndex;
+    successfulServerKey = serverKey;
     rememberedCertFailureCount = 0; // Reset failure counter on success
 
     saveSuccessfulCertIndexToPreferences(currentCertIndex);
+    preferences.putString(PREF_SUCCESSFUL_HOST, serverKey);
+}
+
+void AdaptiveCertManager::ensureLockMatchesServer(const std::string &serverKey)
+{
+    if (!initialized || successfulCertIndex < 0)
+    {
+        return;
+    }
+
+    if (successfulServerKey.empty())
+    {
+        // Lock from a firmware that did not track the server yet: it was
+        // successful against the currently configured server, so adopt the key
+        // instead of forcing the whole fleet through a fresh sweep after OTA.
+        successfulServerKey = serverKey;
+        preferences.putString(PREF_SUCCESSFUL_HOST, serverKey);
+        logger.infof("Adopted server %s for existing certificate lock", serverKey.c_str());
+        return;
+    }
+
+    if (successfulServerKey != serverKey)
+    {
+        logger.infof("API server changed (%s -> %s), clearing certificate lock",
+                     successfulServerKey.c_str(), serverKey.c_str());
+        this->reset();
+    }
 }
 
 bool AdaptiveCertManager::markFailure()
@@ -160,8 +189,10 @@ void AdaptiveCertManager::reset()
 {
     currentCertIndex = 0;
     successfulCertIndex = -1;
+    successfulServerKey.clear();
     rememberedCertFailureCount = 0;
     preferences.remove(PREF_SUCCESSFUL_CERT);
+    preferences.remove(PREF_SUCCESSFUL_HOST);
     logger.info("Certificate lock cleared, reset to first certificate");
 }
 
@@ -206,6 +237,7 @@ void AdaptiveCertManager::loadSuccessfulCertIndexFromPreferences()
     logger.info("Loading certificate");
 
     successfulCertIndex = preferences.getInt(PREF_SUCCESSFUL_CERT, -1);
+    successfulServerKey = preferences.getString(PREF_SUCCESSFUL_HOST);
 
     // Sanitize here, the only place a locked index enters: a firmware update may
     // have shrunk the CA list, and an out-of-range lock would otherwise be kept

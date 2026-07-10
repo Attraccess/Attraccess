@@ -228,6 +228,9 @@ void Websocket::connectWebSocketLocked()
     if (apiConfig.useSSL)
     {
         logger.info("connectWebSocket: using SSL");
+        // A changed API address invalidates the locked certificate decision:
+        // the lock only proves anything about the server it was made against.
+        this->_certManager.ensureLockMatchesServer(serverHostname + ":" + std::to_string(serverPort));
         if (!this->_certManager.getCertificate(&certPem))
         {
             logger.error("Failed to get certificate");
@@ -469,7 +472,7 @@ void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, v
         // plain connect would pin index 0 and skip the sweep after a switch to SSL.
         if (apiConfig.useSSL)
         {
-            this->_certManager.markSuccess();
+            this->_certManager.markSuccess(apiConfig.hostname + ":" + std::to_string(apiConfig.port));
         }
         resetReconnectBackoff();
         setState(CONNECTED);

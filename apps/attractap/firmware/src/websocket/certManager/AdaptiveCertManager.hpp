@@ -20,9 +20,15 @@ public:
     bool getCertificate(const char **certData);
     bool getCertificate(const char **certData, const char **certName);
 
-    // Mark current certificate as successful. Locks the decision: from now on
-    // only this certificate is used until reset() is called.
-    void markSuccess();
+    // Mark current certificate as successful. Locks the decision for the given
+    // server (hostname:port): from now on only this certificate is used until
+    // reset() is called or the server changes.
+    void markSuccess(const std::string &serverKey);
+
+    // Clear the lock when it was established against a different server (the
+    // API address changed). Locks from firmware versions that did not track the
+    // server adopt the given key instead of being cleared.
+    void ensureLockMatchesServer(const std::string &serverKey);
 
     // Mark current certificate as failed and try next.
     // Returns true when the full certificate list was exhausted (a complete sweep failed).
@@ -47,6 +53,7 @@ private:
     KVStore preferences;
     int currentCertIndex;
     int successfulCertIndex;
+    std::string successfulServerKey;
     bool initialized;
     int rememberedCertFailureCount;
     mutable Logger logger;
@@ -54,6 +61,7 @@ private:
     // Preference keys
     static const char *PREF_NAMESPACE;
     static const char *PREF_SUCCESSFUL_CERT;
+    static const char *PREF_SUCCESSFUL_HOST;
 
     // Internal methods
     void loadSuccessfulCertIndexFromPreferences();
