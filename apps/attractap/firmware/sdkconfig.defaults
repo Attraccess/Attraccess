@@ -34,6 +34,13 @@ CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
 # --- Optimization: production firmware is CPU-bound (LVGL software rendering) ---
 CONFIG_COMPILER_OPTIMIZATION_PERF=y
 
+# --- RGB LCD anti-drift (ATT-717) ---
+# The Touch RGB panels free-run from a PSRAM framebuffer with no bounce buffers.
+# When flash/PSRAM bus contention (WiFi bring-up, NVS writes) underruns the LCD
+# GDMA, the frame shifts permanently. Restarting the GDMA channel every VBlank
+# resyncs within one frame instead.
+CONFIG_LCD_RGB_RESTART_IN_VSYNC=y
+
 # --- Ethernet (W5500 over SPI; wifi-only variants gate it at runtime) ---
 CONFIG_ETH_USE_SPI_ETHERNET=y
 CONFIG_ETH_SPI_ETHERNET_W5500=y
