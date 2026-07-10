@@ -52,15 +52,20 @@ public:
 private:
     KVStore preferences;
     int currentCertIndex;
+    int currentCertAttemptCount;
     int successfulCertIndex;
     std::string successfulServerKey;
     bool initialized;
     int rememberedCertFailureCount;
     mutable Logger logger;
 
+    // How many times a cert is retried before moving to the next one in the sweep.
+    static const int ATTEMPTS_PER_CERT = 2;
+
     // Preference keys
     static const char *PREF_NAMESPACE;
     static const char *PREF_SUCCESSFUL_CERT;
+    static const char *PREF_SUCCESSFUL_CERT_NAME;
     static const char *PREF_SUCCESSFUL_HOST;
 
     // Internal methods

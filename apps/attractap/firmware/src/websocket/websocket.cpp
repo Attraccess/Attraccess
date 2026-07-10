@@ -380,9 +380,11 @@ void Websocket::handleConnectFailure(const char *reason)
 // Last line of defense against any connect-loop the device cannot escape on its
 // own (wedged TLS stack, exhausted socket state, ...): if network and server
 // config are present but no connection could be established for a whole
-// watchdog period, reboot into a clean slate. Certificate iteration no longer
-// resets on its own (the decision is locked once successful), so a reboot never
-// loses cert progress.
+// watchdog period, reboot into a clean slate. An advancing certificate sweep
+// re-arms the watchdog: the sweep position is RAM-only and a full sweep takes
+// longer than one watchdog period, so rebooting mid-sweep would restart it at
+// index 0 forever and certs late in the list would never be reached. Only a
+// locked certificate (index frozen) or a truly stuck attempt lets it fire.
 void Websocket::checkConnectWatchdog(const AttraccessApiConfig &apiConfig)
 {
     bool waitingForConnection = _state != CONNECTED && !apiConfig.hostname.empty() && apiConfig.port != 0;
@@ -393,7 +395,11 @@ void Websocket::checkConnectWatchdog(const AttraccessApiConfig &apiConfig)
     }
 
     uint32_t now = millis();
-    if (this->connectWatchdogStartMs == 0)
+    int certIndex = this->_certManager.getCurrentCertIndex();
+    bool sweepAdvanced = certIndex != this->connectWatchdogCertIndex;
+    this->connectWatchdogCertIndex = certIndex;
+
+    if (this->connectWatchdogStartMs == 0 || sweepAdvanced)
     {
         this->connectWatchdogStartMs = now ? now : 1;
         return;

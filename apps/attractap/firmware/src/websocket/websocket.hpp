@@ -96,6 +96,10 @@ private:
     // network and server config are present (ATT-714).
     static constexpr uint32_t CONNECT_WATCHDOG_TIMEOUT_MS = 90000;
     uint32_t connectWatchdogStartMs = 0; // 0 = not waiting
+    // Cert index seen at the last watchdog check: an advancing sweep re-arms the
+    // watchdog, since a full sweep (certs x attempts x retry interval) takes far
+    // longer than one watchdog period and the sweep position only lives in RAM.
+    int connectWatchdogCertIndex = 0;
     void checkConnectWatchdog(const AttraccessApiConfig &apiConfig);
 
     uint32_t lastInboundFrameTime = 0;

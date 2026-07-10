@@ -3,10 +3,11 @@
 // Preference keys
 const char *AdaptiveCertManager::PREF_NAMESPACE = "cert_mgr";
 const char *AdaptiveCertManager::PREF_SUCCESSFUL_CERT = "success_cert";
+const char *AdaptiveCertManager::PREF_SUCCESSFUL_CERT_NAME = "success_name";
 const char *AdaptiveCertManager::PREF_SUCCESSFUL_HOST = "success_host";
 
 AdaptiveCertManager::AdaptiveCertManager()
-    : currentCertIndex(0), successfulCertIndex(-1), initialized(false), rememberedCertFailureCount(0), logger("AdaptiveCertManager")
+    : currentCertIndex(0), currentCertAttemptCount(0), successfulCertIndex(-1), initialized(false), rememberedCertFailureCount(0), logger("AdaptiveCertManager")
 {
 }
 
@@ -111,8 +112,12 @@ void AdaptiveCertManager::markSuccess(const std::string &serverKey)
     successfulCertIndex = currentCertIndex;
     successfulServerKey = serverKey;
     rememberedCertFailureCount = 0; // Reset failure counter on success
+    currentCertAttemptCount = 0;
 
     saveSuccessfulCertIndexToPreferences(currentCertIndex);
+    // The name guards the lock against the CA list being reordered by a
+    // firmware update: an index alone would silently point at a different CA.
+    preferences.putString(PREF_SUCCESSFUL_CERT_NAME, certName);
     preferences.putString(PREF_SUCCESSFUL_HOST, serverKey);
 }
 
@@ -163,10 +168,19 @@ bool AdaptiveCertManager::markFailure()
     }
 
     // Regular iteration through certificates
-    logger.infof("Certificate failed during iteration: %s (index %d/%d)",
-                 failedCertName, currentCertIndex, CA_CERT_COUNT - 1);
+    logger.infof("Certificate failed during iteration: %s (index %d/%d, attempt %d/%d)",
+                 failedCertName, currentCertIndex, CA_CERT_COUNT - 1,
+                 currentCertAttemptCount + 1, ATTEMPTS_PER_CERT);
+
+    currentCertAttemptCount++;
+    if (currentCertAttemptCount < ATTEMPTS_PER_CERT)
+    {
+        // Give the same cert another try before moving on.
+        return false;
+    }
 
     // Move to next certificate in iteration
+    currentCertAttemptCount = 0;
     currentCertIndex++;
 
     bool exhausted = false;
@@ -188,10 +202,12 @@ bool AdaptiveCertManager::markFailure()
 void AdaptiveCertManager::reset()
 {
     currentCertIndex = 0;
+    currentCertAttemptCount = 0;
     successfulCertIndex = -1;
     successfulServerKey.clear();
     rememberedCertFailureCount = 0;
     preferences.remove(PREF_SUCCESSFUL_CERT);
+    preferences.remove(PREF_SUCCESSFUL_CERT_NAME);
     preferences.remove(PREF_SUCCESSFUL_HOST);
     logger.info("Certificate lock cleared, reset to first certificate");
 }
@@ -248,6 +264,27 @@ void AdaptiveCertManager::loadSuccessfulCertIndexFromPreferences()
                       successfulCertIndex, CA_CERT_COUNT - 1);
         this->reset();
         return;
+    }
+
+    // A firmware update may also have reordered the list, leaving the index in
+    // range but pointing at a different CA. The stored name catches that; a lock
+    // from a firmware that did not record the name adopts the current one (same
+    // rationale as the server-key adoption in ensureLockMatchesServer).
+    if (successfulCertIndex >= 0)
+    {
+        std::string storedCertName = preferences.getString(PREF_SUCCESSFUL_CERT_NAME);
+        const char *currentName = ca_certificates[successfulCertIndex].name;
+        if (storedCertName.empty())
+        {
+            preferences.putString(PREF_SUCCESSFUL_CERT_NAME, currentName);
+        }
+        else if (storedCertName != currentName)
+        {
+            logger.errorf("Stored certificate index %d now maps to '%s' (was '%s'), clearing lock",
+                          successfulCertIndex, currentName, storedCertName.c_str());
+            this->reset();
+            return;
+        }
     }
 
     if (successfulCertIndex >= 0)
