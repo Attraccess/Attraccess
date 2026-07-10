@@ -90,6 +90,7 @@ void Websocket::loop()
 
     if (!connectionAttemptsEnabled)
     {
+        this->connectWatchdogStartMs = 0;
         return;
     }
 
@@ -98,10 +99,12 @@ void Websocket::loop()
 
     if (!network_is_connected)
     {
+        this->connectWatchdogStartMs = 0;
         return;
     }
 
     AttraccessApiConfig apiConfig = Settings::getAttraccessApiConfig();
+    this->checkConnectWatchdog(apiConfig);
     bool apiConfigChanged = _lastApiConfig.hostname != apiConfig.hostname || _lastApiConfig.port != apiConfig.port || _lastApiConfig.useSSL != apiConfig.useSSL;
     if (apiConfigChanged)
     {
@@ -149,11 +152,12 @@ void Websocket::publishConnectionStatus()
             std::string(this->_certManager.getCurrentCertName()),
             this->_certManager.getCurrentCertIndex(),
             this->_certManager.getCertCount(),
-            this->_certManager.getRememberedFailureCount());
+            this->_certManager.getRememberedFailureCount(),
+            this->_certManager.isLocked());
     }
     else
     {
-        State::setWebsocketCertProgress("", 0, 0, 0);
+        State::setWebsocketCertProgress("", 0, 0, 0, false);
     }
 
     // Seconds until the next reconnect attempt (0 while connected or due now).
@@ -370,6 +374,54 @@ void Websocket::handleConnectFailure(const char *reason)
     }
 }
 
+// Last line of defense against any connect-loop the device cannot escape on its
+// own (wedged TLS stack, exhausted socket state, ...): if network and server
+// config are present but no connection could be established for a whole
+// watchdog period, reboot into a clean slate. Certificate iteration no longer
+// resets on its own (the decision is locked once successful), so a reboot never
+// loses cert progress.
+void Websocket::checkConnectWatchdog(const AttraccessApiConfig &apiConfig)
+{
+    bool waitingForConnection = _state != CONNECTED && !apiConfig.hostname.empty() && apiConfig.port != 0;
+    if (!waitingForConnection)
+    {
+        this->connectWatchdogStartMs = 0;
+        return;
+    }
+
+    uint32_t now = millis();
+    if (this->connectWatchdogStartMs == 0)
+    {
+        this->connectWatchdogStartMs = now ? now : 1;
+        return;
+    }
+
+    if (now - this->connectWatchdogStartMs < CONNECT_WATCHDOG_TIMEOUT_MS)
+    {
+        return;
+    }
+
+    this->logger.errorf("No connection for %u ms despite network and config; rebooting to recover",
+                        (unsigned)CONNECT_WATCHDOG_TIMEOUT_MS);
+
+    // Same mechanism as handleConnectFailure: leave the reboot cause for the
+    // next boot's crash report (read and cleared by api_diag.cpp).
+    KVStore prefs;
+    if (prefs.begin(BOOT_DIAG_NAMESPACE, false))
+    {
+        prefs.putString(BOOT_DIAG_REBOOT_REASON_KEY, "WEBSOCKET_CONNECT_TIMEOUT");
+        prefs.end();
+    }
+
+    delay(200);
+    esp_restart();
+}
+
+void Websocket::resetCertificateTrust()
+{
+    this->_certManager.reset();
+}
+
 bool Websocket::shouldReconnect()
 {
     return millis() - this->lastReconnectAttemptTime >= this->nextRetryDelayMs;
@@ -413,6 +465,9 @@ void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, v
     case WEBSOCKET_EVENT_CONNECTED:
         logger.info("WebSocket connected");
         this->consecutiveConnectFailures = 0;
+        // Only an SSL connect proves anything about the certificate; locking on a
+        // plain connect would pin index 0 and skip the sweep after a switch to SSL.
+        if (apiConfig.useSSL)
         {
             this->_certManager.markSuccess();
         }

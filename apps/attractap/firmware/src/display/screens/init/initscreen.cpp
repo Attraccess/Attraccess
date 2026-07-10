@@ -344,8 +344,9 @@ void InitScreen::loop()
 
    State::WebsocketState websocketState = State::getWebsocketState();
    bool networkUp = networkState.wifi_connected || networkState.ethernet_connected;
-   // A repeating cert sweep or remembered-cert retry is the "stuck" signal.
-   bool sweeping = websocketState.useSSL && (websocketState.certIndex > 0 || websocketState.rememberedRetryCount > 0);
+   // A repeating cert sweep is the "searching" signal; a locked cert never sweeps.
+   bool sweeping = websocketState.useSSL && !websocketState.certLocked &&
+                   (websocketState.certIndex > 0 || websocketState.rememberedRetryCount > 0);
    if (websocketState.connected)
    {
       setLabelTextIfChanged(this->apiConnectionLabel, "API verbunden");
@@ -382,11 +383,13 @@ void InitScreen::loop()
    // Cert evaluation line (only relevant while connecting over SSL)
    if (websocketState.useSSL && !websocketState.connected && websocketState.certCount > 0)
    {
-      std::string cert = "CA: " + websocketState.certName + "  (" +
-                         std::to_string(websocketState.certIndex + 1) + "/" + std::to_string(websocketState.certCount) + ")";
+      std::string cert = "CA: " + websocketState.certName + "  " +
+                         (websocketState.certLocked
+                              ? "(fixiert)"
+                              : "(" + std::to_string(websocketState.certIndex + 1) + "/" + std::to_string(websocketState.certCount) + ")");
       if (websocketState.rememberedRetryCount > 0)
       {
-         cert += "  Wdh " + std::to_string(websocketState.rememberedRetryCount) + "/5";
+         cert += "  Wdh " + std::to_string(websocketState.rememberedRetryCount);
       }
       setLabelTextIfChanged(this->certLabel, cert.c_str());
       if (lv_obj_has_flag(this->certLabel, LV_OBJ_FLAG_HIDDEN))

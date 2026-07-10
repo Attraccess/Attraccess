@@ -29,11 +29,13 @@ public:
 
     void setOnSaveCallback(std::function<void(const ConnectionConfig &)> onSaveCallback);
     void setOnCancelPinLockCallback(std::function<void()> onCancelPinLockCallback);
+    void setOnResetCertificateCallback(std::function<void()> onResetCertificateCallback);
     void disablePinLock();
     void enablePinLock();
 
 private:
     std::function<void(const ConnectionConfig &)> onSaveCallback;
+    std::function<void()> onResetCertificateCallback;
 
     PinInputPage pinInputPage;
     lv_obj_t *screen = nullptr;
@@ -57,10 +59,12 @@ private:
     lv_obj_t *useSSLSwitch = nullptr;
     lv_obj_t *labelForUseSSLSwitch = nullptr;
     lv_color_t labelForUseSSLSwitchDefaultColor;
+    lv_obj_t *resetCertButton = nullptr;
 
     static void onTextAreaEvent(lv_event_t *e);
     static void onKeyboardEvent(lv_event_t *e);
     static void onSaveButtonEvent(lv_event_t *e);
+    static void onResetCertificateButtonEvent(lv_event_t *e);
     static void onWifiDropdownEvent(lv_event_t *e);
     void showKeyboardFor(lv_obj_t *targetTextArea);
     void hideKeyboardIfNoFocus();

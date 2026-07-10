@@ -41,6 +41,7 @@ std::string State::websocket_cert_name = "";
 int State::websocket_cert_index = 0;
 int State::websocket_cert_count = 0;
 int State::websocket_remembered_retry_count = 0;
+bool State::websocket_cert_locked = false;
 int State::websocket_next_attempt_seconds = 0;
 bool State::api_authenticated = false;
 std::string State::api_device_name = "";
@@ -89,13 +90,14 @@ void State::setWebsocketPhase(WebsocketPhase phase)
     websocket_phase = phase;
 }
 
-void State::setWebsocketCertProgress(std::string certName, int certIndex, int certCount, int rememberedRetryCount)
+void State::setWebsocketCertProgress(std::string certName, int certIndex, int certCount, int rememberedRetryCount, bool certLocked)
 {
     StateLock lock(state_mutex);
     websocket_cert_name = certName;
     websocket_cert_index = certIndex;
     websocket_cert_count = certCount;
     websocket_remembered_retry_count = rememberedRetryCount;
+    websocket_cert_locked = certLocked;
 }
 
 void State::setWebsocketNextAttemptSeconds(int seconds)
@@ -117,6 +119,7 @@ State::WebsocketState State::getWebsocketState()
     state.certIndex = websocket_cert_index;
     state.certCount = websocket_cert_count;
     state.rememberedRetryCount = websocket_remembered_retry_count;
+    state.certLocked = websocket_cert_locked;
     state.secondsUntilNextAttempt = websocket_next_attempt_seconds;
 
     return state;

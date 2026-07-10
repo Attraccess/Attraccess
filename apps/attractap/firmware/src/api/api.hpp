@@ -289,6 +289,9 @@ public:
     void disableConnectionAttempts();
     void enableConnectionAttempts();
 
+    // Clear the locked TLS certificate decision (device settings button).
+    void resetCertificateTrust();
+
     // Error callback for server responses carrying an error field
     void setErrorCallback(std::function<void(const char *title, const char *message)> callback);
     // Generic action result callback for async operations (start/stop sessions, door controls, flow buttons)

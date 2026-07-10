@@ -20,22 +20,27 @@ public:
     bool getCertificate(const char **certData);
     bool getCertificate(const char **certData, const char **certName);
 
-    // Mark current certificate as successful
+    // Mark current certificate as successful. Locks the decision: from now on
+    // only this certificate is used until reset() is called.
     void markSuccess();
 
     // Mark current certificate as failed and try next.
     // Returns true when the full certificate list was exhausted (a complete sweep failed).
+    // Once a certificate is locked, no iteration happens and this always returns true.
     bool markFailure();
 
-    // Reset to start from first certificate
+    // Clear the locked certificate and restart the sweep from the first one.
     void reset();
+
+    // Whether a certificate is locked (successfully used at least once).
+    bool isLocked() const;
 
     // Get current certificate info
     const char *getCurrentCertName() const;
     int getCurrentCertIndex() const;
     // Total number of available CA certificates.
     int getCertCount() const;
-    // How many times the remembered certificate has failed in a row (0-5).
+    // How many times the locked certificate has failed in a row.
     int getRememberedFailureCount() const;
 
 private:
@@ -55,6 +60,3 @@ private:
     void saveSuccessfulCertIndexToPreferences(int certIndex);
     bool isValidCertIndex(int index) const;
 };
-
-// Global instance
-extern AdaptiveCertManager adaptiveCertManager;

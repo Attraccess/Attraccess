@@ -153,3 +153,31 @@ void ConnectionConfigurationScreen::setOnSaveCallback(std::function<void(const C
 {
    this->onSaveCallback = onSaveCallback;
 }
+
+void ConnectionConfigurationScreen::setOnResetCertificateCallback(std::function<void()> onResetCertificateCallback)
+{
+   this->onResetCertificateCallback = onResetCertificateCallback;
+}
+
+void ConnectionConfigurationScreen::onResetCertificateButtonEvent(lv_event_t *e)
+{
+   ConnectionConfigurationScreen *self = static_cast<ConnectionConfigurationScreen *>(lv_event_get_user_data(e));
+   if (!self)
+      return;
+
+   if (self->onResetCertificateCallback)
+   {
+      self->onResetCertificateCallback();
+   }
+
+   // One-shot feedback: relabel and disable until the screen is rebuilt.
+   if (self->resetCertButton)
+   {
+      lv_obj_t *label = lv_obj_get_child(self->resetCertButton, 0);
+      if (label)
+      {
+         lv_label_set_text(label, "Zurueckgesetzt");
+      }
+      lv_obj_add_state(self->resetCertButton, LV_STATE_DISABLED);
+   }
+}

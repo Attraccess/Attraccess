@@ -155,6 +155,22 @@ void ConnectionConfigurationScreen::init()
    lv_label_set_text(sslInfoLabel, "Selbst-Signierte Zertifikate werden (aktuell) nicht unterstuetzt. Eine Verbindung ohne SSL ist sehr unsicher und sollte vermieden werden.");
    lv_obj_set_style_text_color(sslInfoLabel, lv_color_hex(0xFF8000), LV_PART_MAIN | LV_STATE_DEFAULT);
 
+   // Reset the locked certificate decision (ATT-714): once a cert worked it is
+   // pinned forever, this is the only way to unpin it after a server cert change.
+   this->resetCertButton = lv_button_create(apiTab);
+   lv_obj_set_width(this->resetCertButton, LV_SIZE_CONTENT);
+   lv_obj_set_height(this->resetCertButton, LV_SIZE_CONTENT);
+   lv_obj_set_align(this->resetCertButton, LV_ALIGN_CENTER);
+   lv_obj_remove_flag(this->resetCertButton, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_set_style_bg_color(this->resetCertButton, lv_color_hex(0xFF8000), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_bg_opa(this->resetCertButton, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_add_event_cb(this->resetCertButton, &ConnectionConfigurationScreen::onResetCertificateButtonEvent, LV_EVENT_CLICKED, this);
+
+   lv_obj_t *resetCertLabel = lv_label_create(this->resetCertButton);
+   lv_obj_set_align(resetCertLabel, LV_ALIGN_CENTER);
+   lv_label_set_text(resetCertLabel, "Zertifikat zuruecksetzen");
+   lv_obj_set_style_text_color(resetCertLabel, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
+
    lv_obj_t *containerForSaveButton = this->createSaveContainer(apiTab);
    this->createSaveButton(containerForSaveButton);
 
@@ -263,6 +279,7 @@ void ConnectionConfigurationScreen::destroy()
    this->labelForServerHostname = nullptr;
    this->useSSLSwitch = nullptr;
    this->labelForUseSSLSwitch = nullptr;
+   this->resetCertButton = nullptr;
    this->devicePin = nullptr;
    this->labelForDevicePin = nullptr;
    this->beeperEnabled = nullptr;
