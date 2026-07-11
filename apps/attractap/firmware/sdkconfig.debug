@@ -1,0 +1,5 @@
+# Development overlay (successor of the attractap-touch-debug PlatformIO env):
+#   idf.py -B build/dbg -DATTRACTAP_VARIANT=attractap-touch \
+#          -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.debug" build
+CONFIG_COMPILER_OPTIMIZATION_DEBUG=y
+CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_ENABLE=y

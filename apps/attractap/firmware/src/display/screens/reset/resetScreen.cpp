@@ -1,4 +1,8 @@
 #include "resetScreen.hpp"
+#include <string>
+#include <functional>
+
+#include "platform.hpp"
 
 // Palette — shared with EnrollmentScreen for visual consistency (ATT-506).
 // Dark, neutral background with explicit high-contrast white text.
@@ -176,7 +180,7 @@ void ResetScreen::setTimeoutTime(uint32_t timeoutTime)
    this->updateTimeoutBar();
 }
 
-void ResetScreen::setUserName(String userName)
+void ResetScreen::setUserName(std::string userName)
 {
    this->userNameCache = userName;
    if (this->userNameLabel)
@@ -195,7 +199,7 @@ void ResetScreen::setStatus(Status status)
    this->applyStatus();
 }
 
-void ResetScreen::setStatusMessage(const String &message)
+void ResetScreen::setStatusMessage(const std::string &message)
 {
    this->statusMessageOverride = message;
    this->applyStatus();
@@ -223,7 +227,7 @@ void ResetScreen::onCancelButtonEvent(lv_event_t *e)
    }
 }
 
-String ResetScreen::getName()
+std::string ResetScreen::getName()
 {
    return "ResetScreen";
 }

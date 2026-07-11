@@ -1,4 +1,9 @@
 #include "nfc.hpp"
+#include <functional>
+#include "platform.hpp"
+#include "esp_system.h"
+#include <cstring>
+#include <string>
 
 uint8_t NFC::FACTORY_KEY[16] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
@@ -34,13 +39,9 @@ void NFC::setup()
         // The LVGL task is already polling GT911 touch on the shared bus at this
         // point — keep the whole PN532 bring-up atomic on the bus (ATT-554).
         I2CBusGuard busGuard;
+        // Clock (400 kHz) and 50 ms transfer timeout are per-device settings of
+        // the i2c_master driver now — nothing to restore after begin() anymore.
         this->pn532.begin();
-        // Adafruit BusIO's I2CDevice::begin() (called inside pn532.begin()) re-invokes
-        // Wire.begin(), which can reset the bus clock to the 100 kHz default and the
-        // bus timeout to the framework default. Restore 400 kHz Fast Mode and the
-        // 50 ms timeout (same pitfall as the SensorLib restore in rgb_gt911_driver).
-        Wire.setClock(ATTRACTAP_I2C_CLOCK_HZ);
-        Wire.setTimeOut(50);
     }
 
     this->logger.info("Checking hardware");
@@ -365,7 +366,7 @@ void NFC::checkHardware(bool logHardwareInfo)
         {
             this->logger.error("PN53x board not found, restarting in 5 seconds");
             delay(5000);
-            ESP.restart();
+            esp_restart();
         }
     }
 
@@ -376,8 +377,8 @@ void NFC::checkHardware(bool logHardwareInfo)
 
     // Got ok data, print it out!
     this->logger.info("Found chip PN53x");
-    this->logger.info((String((versiondata >> 24) & 0xFF) + " HEX").c_str());
-    this->logger.info(("Firmware ver. " + String((versiondata >> 16) & 0xFF) + "." + String((versiondata >> 8) & 0xFF)).c_str());
+    this->logger.info((std::to_string((versiondata >> 24) & 0xFF) + " HEX").c_str());
+    this->logger.info(("Firmware ver. " + std::to_string((versiondata >> 16) & 0xFF) + "." + std::to_string((versiondata >> 8) & 0xFF)).c_str());
 }
 
 bool NFC::getAvailableKeyNo(uint8_t *uid, uint8_t *uidLength, uint8_t *keyNo)

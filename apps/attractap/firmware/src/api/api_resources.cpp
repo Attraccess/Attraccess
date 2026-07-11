@@ -2,6 +2,9 @@
 // FEATURE: api-resources
 
 #include "api.hpp"
+#include <functional>
+#include <string.h>
+#include <string>
 
 void API::onResourceList(JsonObject data)
 {
@@ -13,10 +16,10 @@ void API::onResourceList(JsonObject data)
     }
     this->resourceListMessageCounter = messageCounter;
 
-    if (data["payload"]["readerName"].is<String>())
+    if (data["payload"]["readerName"].is<const char *>())
     {
         this->logger.info("Received updated reader name");
-        String readerName = data["payload"]["readerName"].as<String>();
+        std::string readerName = data["payload"]["readerName"].as<std::string>();
 
         if (this->deviceNameCallback != nullptr)
         {

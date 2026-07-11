@@ -1,4 +1,5 @@
 #include "connectionConfigurationScreen.hpp"
+#include <string>
 
 // Screen construction (tabs/widgets) and lifecycle. Behaviour-specific logic
 // lives in sibling translation units:
@@ -115,10 +116,10 @@ void ConnectionConfigurationScreen::init()
    lv_textarea_set_one_line(this->serverHostname, true);
    lv_obj_add_event_cb(this->serverHostname, &ConnectionConfigurationScreen::onTextAreaEvent, LV_EVENT_ALL, this);
 
-   String fullHostname = apiConfig.hostname;
+   std::string fullHostname = apiConfig.hostname;
    if (apiConfig.port != 0)
    {
-      fullHostname += ":" + String(apiConfig.port);
+      fullHostname += ":" + std::to_string(apiConfig.port);
    }
    lv_textarea_set_text(this->serverHostname, fullHostname.c_str());
 
@@ -153,6 +154,22 @@ void ConnectionConfigurationScreen::init()
    lv_obj_set_align(sslInfoLabel, LV_ALIGN_CENTER);
    lv_label_set_text(sslInfoLabel, "Selbst-Signierte Zertifikate werden (aktuell) nicht unterstuetzt. Eine Verbindung ohne SSL ist sehr unsicher und sollte vermieden werden.");
    lv_obj_set_style_text_color(sslInfoLabel, lv_color_hex(0xFF8000), LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   // Reset the locked certificate decision (ATT-714): once a cert worked it is
+   // pinned forever, this is the only way to unpin it after a server cert change.
+   this->resetCertButton = lv_button_create(apiTab);
+   lv_obj_set_width(this->resetCertButton, LV_SIZE_CONTENT);
+   lv_obj_set_height(this->resetCertButton, LV_SIZE_CONTENT);
+   lv_obj_set_align(this->resetCertButton, LV_ALIGN_CENTER);
+   lv_obj_remove_flag(this->resetCertButton, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_set_style_bg_color(this->resetCertButton, lv_color_hex(0xFF8000), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_bg_opa(this->resetCertButton, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_add_event_cb(this->resetCertButton, &ConnectionConfigurationScreen::onResetCertificateButtonEvent, LV_EVENT_CLICKED, this);
+
+   this->resetCertLabel = lv_label_create(this->resetCertButton);
+   lv_obj_set_align(this->resetCertLabel, LV_ALIGN_CENTER);
+   lv_label_set_text(this->resetCertLabel, "Zertifikat zuruecksetzen");
+   lv_obj_set_style_text_color(this->resetCertLabel, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
 
    lv_obj_t *containerForSaveButton = this->createSaveContainer(apiTab);
    this->createSaveButton(containerForSaveButton);
@@ -210,7 +227,7 @@ void ConnectionConfigurationScreen::init()
                                              this->onCancelPinLockCallback();
                                           } });
 
-   this->pinInputPage.setOnConfirmCallback([this](String pin)
+   this->pinInputPage.setOnConfirmCallback([this](std::string pin)
                                            { return this->onPinLockConfirmCallback(pin); });
    this->pinLockOverlay = this->pinInputPage.init("Entsperren mit PIN", this->screen);
    lv_obj_add_flag(this->pinLockOverlay, LV_OBJ_FLAG_IGNORE_LAYOUT);
@@ -233,7 +250,7 @@ lv_obj_t *ConnectionConfigurationScreen::getScreen()
    return this->screen;
 }
 
-String ConnectionConfigurationScreen::getName()
+std::string ConnectionConfigurationScreen::getName()
 {
    return "ConnectionConfigurationScreen";
 }
@@ -262,6 +279,8 @@ void ConnectionConfigurationScreen::destroy()
    this->labelForServerHostname = nullptr;
    this->useSSLSwitch = nullptr;
    this->labelForUseSSLSwitch = nullptr;
+   this->resetCertButton = nullptr;
+   this->resetCertLabel = nullptr;
    this->devicePin = nullptr;
    this->labelForDevicePin = nullptr;
    this->beeperEnabled = nullptr;

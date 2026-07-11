@@ -203,7 +203,7 @@ export class ResourcesService {
     const queryBuilder = this.resourceRepository
       .createQueryBuilder('resource')
       .leftJoinAndSelect('resource.groups', 'groups')
-      .orderBy('resource.createdAt', 'DESC');
+      .orderBy('resource.name', 'ASC');
 
     if (onlyInUse || onlyInUseByUserId !== undefined || returnUsingUser) {
       if (returnUsingUser) {
