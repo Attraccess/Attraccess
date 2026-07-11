@@ -614,43 +614,40 @@ export class ResourceUsageService {
 
     this.logger.debug(`Ending session for resource ${resourceId} by user ${user.id}`, { dto });
 
-    // Find active session
-    const activeSession = await this.getActiveSession(resourceId, true);
-    if (!activeSession) {
-      throw new BadRequestException('No active session found');
-    }
-
-    // Check if the user is authorized to end the session
-    const canManageResources = user.systemPermissions?.canManageResources || false;
-    const isSessionOwner = activeSession.user.id === user.id;
-    // The supervisor of a supervised session may end it as well.
-    const isSupervisor = activeSession.supervisorUserId != null && activeSession.supervisorUserId === user.id;
-
-    if (!isSessionOwner && !isSupervisor && !canManageResources) {
-      const canMaintain = await this.resourceIntroducersService.canMaintain(activeSession.resourceId, user.id, true);
-      if (!canMaintain) {
-        this.logger.warn(
-          `User ${user.id} not authorized to end session ${activeSession.id} owned by user ${activeSession.user.id}`,
-        );
-        throw new ForbiddenException('You are not authorized to end this session');
-      }
-    }
-
-    const endTime = new Date();
-
-    this.logger.debug(`Ending session ${activeSession.id} at ${endTime.toISOString()}`);
-
-    let endNotes = dto.notes;
-
-    if (!isSessionOwner) {
-      endNotes = `[By #${user.id} - ${user.username}] ${endNotes ?? ''}`;
-    }
-
     // Defer event emission until after the transaction commits to avoid stale reads in listeners
+    let activeSession: ResourceUsage | null = null;
     let endedUsageIdToEmit: number | null = null;
     let formSubmissions: FormSubmission[] = [];
     const executeEndSession = async () =>
       await this.resourceUsageRepository.manager.transaction(async (transactionalEntityManager) => {
+        activeSession = await this.getActiveSession(resourceId, true, transactionalEntityManager);
+        if (!activeSession) {
+          throw new BadRequestException('No active session found');
+        }
+
+        const canManageResources = user.systemPermissions?.canManageResources || false;
+        const isSessionOwner = activeSession.user.id === user.id;
+        // The supervisor of a supervised session may end it as well.
+        const isSupervisor = activeSession.supervisorUserId != null && activeSession.supervisorUserId === user.id;
+
+        if (!isSessionOwner && !isSupervisor && !canManageResources) {
+          const canMaintain = await this.resourceIntroducersService.canMaintain(activeSession.resourceId, user.id, true);
+          if (!canMaintain) {
+            this.logger.warn(
+              `User ${user.id} not authorized to end session ${activeSession.id} owned by user ${activeSession.user.id}`,
+            );
+            throw new ForbiddenException('You are not authorized to end this session');
+          }
+        }
+
+        const endTime = new Date();
+        let endNotes = dto.notes;
+        if (!isSessionOwner) {
+          endNotes = `[By #${user.id} - ${user.username}] ${endNotes ?? ''}`;
+        }
+
+        this.logger.debug(`Ending session ${activeSession.id} at ${endTime.toISOString()}`);
+
         const updateData = {
           endTime,
           endNotes,
@@ -726,7 +723,7 @@ export class ResourceUsageService {
 
     // Counter signal for supervised-usage auto-promotion (ATT-488): every completed supervised session
     // is counted by the listener to decide when to auto-create an introduction for the supervised user.
-    if (activeSession.supervisorUserId != null && activeSession.user?.id != null) {
+    if (activeSession?.supervisorUserId != null && activeSession.user?.id != null) {
       this.eventEmitter.emit(
         ResourceSupervisedUsageEndedEvent.EVENT_NAME,
         new ResourceSupervisedUsageEndedEvent(

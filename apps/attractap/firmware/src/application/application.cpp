@@ -302,6 +302,9 @@ void Application::setup() {
         this->handleConnectionConfigurationSave(cfg);
       });
 
+  Display::connectionConfigurationScreen.setOnResetCertificateCallback(
+      [this]() { this->api.resetCertificateTrust(); });
+
   Display::initScreen.setOnOpenSettingsCallback([this]() {
     this->state = APPLICATION_STATE_CONFIGURATION_REQUIRED;
     this->api.disableConnectionAttempts();

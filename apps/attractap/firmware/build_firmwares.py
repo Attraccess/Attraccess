@@ -225,8 +225,15 @@ def main():
             sys.exit(1)
 
         build_dir = os.path.join("build", variant)
+        # Per-variant sdkconfig, regenerated from sdkconfig.defaults on every
+        # build: an existing sdkconfig silently shadows the defaults file, so
+        # a stale one drops newly added CONFIG_ flags (bit us on ATT-717).
+        sdkconfig_path = os.path.abspath(os.path.join(build_dir, "sdkconfig"))
+        if os.path.exists(sdkconfig_path):
+            os.remove(sdkconfig_path)
         build_args = [
             "-B", build_dir,
+            f"-DSDKCONFIG={sdkconfig_path}",
             f"-DATTRACTAP_VARIANT={variant}",
             "-DATTRACTAP_LOG_LEVEL=ERROR",  # production runtime log level
             "build",

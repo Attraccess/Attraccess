@@ -34,7 +34,7 @@ public:
     static void setWebsocketState(bool connected, std::string hostname, uint16_t port, bool useSSL);
     static void setWebsocketPhase(WebsocketPhase phase);
     // Cert sweep progress (only meaningful while connecting over SSL).
-    static void setWebsocketCertProgress(std::string certName, int certIndex, int certCount, int rememberedRetryCount);
+    static void setWebsocketCertProgress(std::string certName, int certIndex, int certCount, int rememberedRetryCount, bool certLocked);
     // Seconds until the next reconnect attempt (negative/zero means "now").
     static void setWebsocketNextAttemptSeconds(int seconds);
     struct WebsocketState
@@ -48,6 +48,7 @@ public:
         int certIndex;
         int certCount;
         int rememberedRetryCount;
+        bool certLocked;
         int secondsUntilNextAttempt;
     };
     static WebsocketState getWebsocketState();
@@ -81,6 +82,7 @@ private:
     static int websocket_cert_index;
     static int websocket_cert_count;
     static int websocket_remembered_retry_count;
+    static bool websocket_cert_locked;
     static int websocket_next_attempt_seconds;
 
     static bool api_authenticated;

@@ -192,6 +192,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
+      # Pre-build the Attractap firmware on the runner: the Dockerfile has no
+      # ESP-IDF and fails loudly if no firmware is bundled (ATT-715).
+      - uses: ./.github/actions/build-attractap-firmware
+
       - name: Get short SHA
         id: vars
         run: echo "SHORT_SHA=$(echo $GITHUB_SHA | cut -c1-7)" >> $GITHUB_OUTPUT

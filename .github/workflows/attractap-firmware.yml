@@ -20,37 +20,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Setup Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.x'
-
-      - name: Install ESP tools
-        run: |
-          python -m pip install --upgrade pip
-          pip install esptool
-
-      - name: Cache ESP-IDF
-        id: cache-esp-idf
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/esp/esp-idf
-            ~/.espressif
-          key: esp-idf-v5.5-esp32s3-${{ runner.os }}
-
-      - name: Install ESP-IDF v5.5
-        if: steps.cache-esp-idf.outputs.cache-hit != 'true'
-        run: |
-          mkdir -p ~/esp
-          git clone --depth 1 --shallow-submodules --recursive -b v5.5 \
-            https://github.com/espressif/esp-idf.git ~/esp/esp-idf
-          ~/esp/esp-idf/install.sh esp32s3
-
-      - name: Build all firmware variants
-        run: |
-          cd apps/attractap/firmware
-          python3 build_firmwares.py
+      - uses: ./.github/actions/build-attractap-firmware
 
       - name: Upload firmware artifacts
         uses: actions/upload-artifact@v4

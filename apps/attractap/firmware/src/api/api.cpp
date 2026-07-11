@@ -360,3 +360,8 @@ void API::enableConnectionAttempts()
 {
     this->websocket.enableConnectionAttempts();
 }
+
+void API::resetCertificateTrust()
+{
+    this->websocket.resetCertificateTrust();
+}

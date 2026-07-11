@@ -30,6 +30,10 @@ INDEX_FILE = OUTPUT_DIR / "ca_index.hpp"
 TIMESTAMP_FILE = OUTPUT_DIR / ".last_download"
 MAX_CERT_AGE_DAYS = 7
 
+# Only keep this many CAs (most common first, per PRIORITY_CAS order) instead
+# of storing the full Mozilla bundle - keeps flash usage and build time down.
+CERT_LIMIT = 20
+
 # Most common Certificate Authorities in order of popularity
 # Based on SSL certificate market share and usage statistics
 PRIORITY_CAS = [
@@ -123,6 +127,12 @@ PRIORITY_CAS = [
     "Certum Trusted Network CA 2",
 ]
 
+def config_fingerprint():
+    """Fingerprint of the selection config; a change must invalidate cached output."""
+    return hashlib.sha256(
+        (str(CERT_LIMIT) + "\n" + "\n".join(PRIORITY_CAS)).encode()
+    ).hexdigest()[:16]
+
 def check_certificates_age():
     """Check if existing certificates are recent enough (less than MAX_CERT_AGE_DAYS old)."""
     if not OUTPUT_DIR.exists():
@@ -138,10 +148,15 @@ def check_certificates_age():
         return False
     
     try:
-        # Read the timestamp of last download
+        # Read the timestamp (line 1) and config fingerprint (line 2) of the last run
         with open(TIMESTAMP_FILE, 'r') as f:
-            timestamp_str = f.read().strip()
-        
+            lines = f.read().strip().split('\n')
+        timestamp_str = lines[0]
+
+        if len(lines) < 2 or lines[1] != config_fingerprint():
+            print(f"🔧 Certificate selection config changed - need to regenerate certificates")
+            return False
+
         last_download = datetime.fromisoformat(timestamp_str)
         now = datetime.now()
         age = now - last_download
@@ -161,25 +176,31 @@ def check_certificates_age():
         return False
 
 def save_download_timestamp():
-    """Save the current timestamp to indicate when certificates were last downloaded."""
+    """Save the current timestamp and config fingerprint of this run."""
     timestamp = datetime.now().isoformat()
     with open(TIMESTAMP_FILE, 'w') as f:
-        f.write(timestamp)
+        f.write(timestamp + '\n' + config_fingerprint())
     print(f"💾 Saved download timestamp: {timestamp}")
 
-def prioritize_certificates(certificates):
-    """Reorder certificates to put most common CAs first."""
-    print(f"Reordering {len(certificates)} certificates by priority...")
-    
+def prioritize_certificates(certificates, limit):
+    """Pick the `limit` most common CAs, PRIORITY_CAS order first."""
+    print(f"Selecting top {limit} of {len(certificates)} certificates by priority...")
+
     # Create a map for quick lookup
     cert_map = {cert['name']: cert for cert in certificates}
-    
+
     # Start with prioritized certificates
     prioritized_certs = []
     used_names = set()
-    
+
     # Add priority certificates first
     for priority_name in PRIORITY_CAS:
+        if len(prioritized_certs) >= limit:
+            break
+        # Already consumed (e.g. by an earlier partial match) - do not fall
+        # through to partial matching, that would append an unrelated cert.
+        if priority_name in used_names:
+            continue
         # Try exact match first
         if priority_name in cert_map:
             prioritized_certs.append(cert_map[priority_name])
@@ -188,18 +209,19 @@ def prioritize_certificates(certificates):
         else:
             # Try partial matching for certificates that might have slightly different names
             for cert_name in cert_map:
-                if (priority_name.lower() in cert_name.lower() or 
+                if (priority_name.lower() in cert_name.lower() or
                     cert_name.lower() in priority_name.lower()) and cert_name not in used_names:
                     prioritized_certs.append(cert_map[cert_name])
                     used_names.add(cert_name)
                     print(f"✓ Priority CA (partial match): {cert_name} (matched {priority_name})")
                     break
-    
-    # Add remaining certificates that weren't prioritized
-    remaining_certs = [cert for cert in certificates if cert['name'] not in used_names]
+
+    # Fill any slots left by priority CAs missing from the bundle
+    remaining_slots = limit - len(prioritized_certs)
+    remaining_certs = [cert for cert in certificates if cert['name'] not in used_names][:remaining_slots]
     print(f"✓ Added {len(prioritized_certs)} priority certificates")
     print(f"✓ Adding {len(remaining_certs)} remaining certificates")
-    
+
     # Return prioritized certificates first, then the rest
     return prioritized_certs + remaining_certs
 
@@ -377,10 +399,11 @@ def main():
         print("No certificates found!")
         sys.exit(1)
     
-    # Prioritize certificates to put most common CAs first
+    # Keep only the most common CERT_LIMIT certificates
     print(f"\n🔄 Prioritizing certificates...")
-    prioritized_certs = prioritize_certificates(all_certs)
-    
+    prioritized_certs = prioritize_certificates(all_certs, CERT_LIMIT)
+    print(f"✂️  Keeping top {len(prioritized_certs)} certificates (CERT_LIMIT={CERT_LIMIT})")
+
     # Create certificate files list
     cert_files = []
     for cert in prioritized_certs:
