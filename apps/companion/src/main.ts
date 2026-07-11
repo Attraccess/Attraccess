@@ -1,6 +1,8 @@
 import { app, ipcMain } from 'electron';
 import * as https from 'https';
 import * as http from 'http';
+import * as fs from 'fs';
+import * as path from 'path';
 import { createHash } from 'crypto';
 import { CompanionWsClient, CompanionAuthenticatedDto, CompanionRegisterResponseDto } from '@attraccess/companion-ws-client';
 import { loadCredentials, saveCredentials, clearCredentials, loadPin, savePin } from './keychain';
@@ -144,12 +146,12 @@ async function applyUpdate(serverUrl: string, downloadUrl: string, version: stri
     await downloadFile(absUrl, dest);
   } catch (err) {
     console.error('[companion] update download failed:', err);
-    tray?.setToolTip(`Attraccess Companion — update v${version} download failed`);
+    state.tray?.setToolTip(`Attraccess Companion — update v${version} download failed`);
     return;
   }
 
   console.info(`[companion] update downloaded to ${dest}`);
-  await osAdapter.applyUpdate(dest, version, () => { allowQuit = true; });
+  await osAdapter.applyUpdate(dest, version, () => { state.allowQuit = true; });
 }
 
 // ─── WebSocket wiring ─────────────────────────────────────────────────────────
