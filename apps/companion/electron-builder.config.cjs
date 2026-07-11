@@ -5,7 +5,7 @@ module.exports = {
   // ponytail: resolved at build time so it stays in sync with the installed version
   electronVersion: require('../../node_modules/electron/package.json').version,
   directories: {
-    output: '../../dist/apps/companion',
+    output: 'dist',
   },
   files: ['out/**/*', 'src/**/*', 'renderer/dist/**/*'],
   extraMetadata: {
@@ -13,7 +13,15 @@ module.exports = {
   },
   // ponytail: companion has no native modules; skip pnpm production-install which trashes workspace dev-deps
   npmRebuild: false,
-  mac: { target: 'dir' },
-  win: { target: 'dir' },
-  linux: { target: 'dir' },
+  // artifactName pattern matches what copy-companion-into-assets.js and the CI expect
+  artifactName: 'companion_${os}_${arch}.${ext}',
+  mac: {
+    target: [{ target: 'dmg', arch: ['universal'] }],
+  },
+  win: {
+    target: [{ target: 'nsis', arch: ['x64'] }],
+  },
+  linux: {
+    target: [{ target: 'AppImage', arch: ['x64', 'arm64'] }],
+  },
 };

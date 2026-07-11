@@ -241,7 +241,7 @@ export function CompanionSettingsPage() {
             <span className="text-sm text-default-500">{t('download.subtitle')}</span>
           </Card.Header>
           <Card.Content>
-            {!manifest && !manifestLoading ? (
+            {(!manifest || manifest.platforms.length === 0) && !manifestLoading ? (
               <Alert color="default">
                 <AlertContent>
                   <AlertTitle>{t('download.noBinaries')}</AlertTitle>
