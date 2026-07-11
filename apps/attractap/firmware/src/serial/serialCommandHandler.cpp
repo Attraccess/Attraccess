@@ -4,12 +4,19 @@
 #include <lwip/inet.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "driver/usb_serial_jtag.h"
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <string>
 
 #include "../settings/settings.hpp"
 #include "../network/wifi/wifi.hpp"
 #include "../state/state.hpp"
+#include "../utils.hpp"
+#include "platform.hpp"
 
-String SerialCommandHandler::inputBuffer = "";
+std::string SerialCommandHandler::inputBuffer = "";
 Logger SerialCommandHandler::logger("SerialCmd");
 
 void SerialCommandHandler::setup()
@@ -20,9 +27,12 @@ void SerialCommandHandler::setup()
 
 void SerialCommandHandler::loop()
 {
-    while (Serial.available())
+    // Non-blocking drain of the USB-Serial-JTAG RX buffer (driver installed in
+    // main.cpp during startup; 0-tick timeout = don't wait for more bytes).
+    uint8_t byte;
+    while (usb_serial_jtag_read_bytes(&byte, 1, 0) == 1)
     {
-        char c = static_cast<char>(Serial.read());
+        char c = static_cast<char>(byte);
 
         if (c == '\r')
         {
@@ -50,39 +60,39 @@ void SerialCommandHandler::loop()
     }
 }
 
-void SerialCommandHandler::processLine(const String &line)
+void SerialCommandHandler::processLine(const std::string &line)
 {
-    String trimmed = line;
-    trimmed.trim();
+    std::string trimmed = line;
+    trimString(trimmed);
 
     // Search for "CMND" in the line to handle cases where garbage characters prefix the command
-    int cmndIndex = trimmed.indexOf("CMND");
-    if (cmndIndex < 0)
+    size_t cmndIndex = trimmed.find("CMND");
+    if (cmndIndex == std::string::npos)
     {
         logger.errorf("Invalid command format (no CMND): %s", trimmed.c_str());
         return;
     }
 
     // Extract everything from "CMND" onwards, removing any leading garbage
-    trimmed = trimmed.substring(cmndIndex);
-    trimmed.trim();
+    trimmed = trimmed.substr(cmndIndex);
+    trimString(trimmed);
 
-    int firstSpace = trimmed.indexOf(' ');
-    if (firstSpace < 0)
+    size_t firstSpace = trimmed.find(' ');
+    if (firstSpace == std::string::npos)
     {
         logger.errorf("Invalid command format (no space): %s", trimmed.c_str());
         return;
     }
 
-    String remainder = trimmed.substring(firstSpace + 1);
-    remainder.trim();
+    std::string remainder = trimmed.substr(firstSpace + 1);
+    trimString(remainder);
 
-    int secondSpace = remainder.indexOf(' ');
-    String topic = (secondSpace >= 0) ? remainder.substring(0, secondSpace) : remainder;
-    String payload = (secondSpace >= 0) ? remainder.substring(secondSpace + 1) : "";
+    size_t secondSpace = remainder.find(' ');
+    std::string topic = (secondSpace != std::string::npos) ? remainder.substr(0, secondSpace) : remainder;
+    std::string payload = (secondSpace != std::string::npos) ? remainder.substr(secondSpace + 1) : "";
 
-    topic.trim();
-    payload.trim();
+    trimString(topic);
+    trimString(payload);
 
     if (topic.length() == 0)
     {
@@ -120,7 +130,7 @@ bool SerialCommandHandler::validateNewCode(const char *code)
     return true;
 }
 
-bool SerialCommandHandler::ensureAuthorized(const char *codeFromPayload, String &errorOut)
+bool SerialCommandHandler::ensureAuthorized(const char *codeFromPayload, std::string &errorOut)
 {
     if (!pinIsSet())
     {
@@ -133,7 +143,7 @@ bool SerialCommandHandler::ensureAuthorized(const char *codeFromPayload, String 
         return false;
     }
 
-    if (Settings::getDeviceConfig().passCode != String(codeFromPayload))
+    if (Settings::getDeviceConfig().passCode != std::string(codeFromPayload))
     {
         errorOut = "INVALID_AUTH_CODE";
         return false;
@@ -142,11 +152,11 @@ bool SerialCommandHandler::ensureAuthorized(const char *codeFromPayload, String 
     return true;
 }
 
-String SerialCommandHandler::ipToString(const esp_ip4_addr_t &ip)
+std::string SerialCommandHandler::ipToString(const esp_ip4_addr_t &ip)
 {
     char buf[16];
     snprintf(buf, sizeof(buf), IPSTR, IP2STR(&ip));
-    return String(buf);
+    return std::string(buf);
 }
 
 const char *SerialCommandHandler::encryptionTypeToString(wifi_auth_mode_t mode)
@@ -174,7 +184,7 @@ const char *SerialCommandHandler::encryptionTypeToString(wifi_auth_mode_t mode)
     }
 }
 
-void SerialCommandHandler::handleCommand(const String &topic, const String &payload)
+void SerialCommandHandler::handleCommand(const std::string &topic, const std::string &payload)
 {
     bool hasPin = pinIsSet();
 
@@ -198,7 +208,7 @@ void SerialCommandHandler::handleCommand(const String &topic, const String &payl
     if (topic == "debug.crash")
     {
         logger.error("debug.crash received - forcing panic for crash-report e2e test (ATT-474)");
-        Serial.flush();
+        fflush(stdout);
         abort();
         return;
     }
@@ -208,7 +218,7 @@ void SerialCommandHandler::handleCommand(const String &topic, const String &payl
         DynamicJsonDocument resp(64);
         resp["pinIsSet"] = hasPin;
 
-        String json;
+        std::string json;
         serializeJson(resp, json);
         sendJsonResponse(topic, json);
         return;
@@ -227,7 +237,7 @@ void SerialCommandHandler::handleCommand(const String &topic, const String &payl
 
         if (hasPin)
         {
-            String authError;
+            std::string authError;
             if (!ensureAuthorized(currentCode, authError))
             {
                 sendErrorResponse(topic, authError.c_str());
@@ -235,12 +245,12 @@ void SerialCommandHandler::handleCommand(const String &topic, const String &payl
             }
         }
 
-        Settings::setDevicePin(String(newCode));
+        Settings::setDevicePin(std::string(newCode));
 
         DynamicJsonDocument resp(64);
         resp["success"] = true;
         resp["pinIsSet"] = true;
-        String json;
+        std::string json;
         serializeJson(resp, json);
         sendJsonResponse(topic, json);
         return;
@@ -253,7 +263,7 @@ void SerialCommandHandler::handleCommand(const String &topic, const String &payl
     }
 
     const char *authCode = payloadObj["authCode"].is<const char *>() ? payloadObj["authCode"].as<const char *>() : nullptr;
-    String authError;
+    std::string authError;
     if (!ensureAuthorized(authCode, authError))
     {
         sendErrorResponse(topic, authError.c_str());
@@ -271,7 +281,7 @@ void SerialCommandHandler::handleCommand(const String &topic, const String &payl
         resp["ethernet_connected"] = net.ethernet_connected;
         resp["ethernet_ip"] = net.ethernet_connected ? ipToString(net.ethernet_ip) : "";
 
-        String json;
+        std::string json;
         serializeJson(resp, json);
         sendJsonResponse(topic, json);
         return;
@@ -308,7 +318,7 @@ void SerialCommandHandler::handleCommand(const String &topic, const String &payl
             obj["isOpen"] = scan.networks[i].isOpen;
         }
 
-        String json;
+        std::string json;
         serializeJson(arr, json);
         sendJsonResponse(topic, json);
         return;
@@ -325,12 +335,12 @@ void SerialCommandHandler::handleCommand(const String &topic, const String &payl
             return;
         }
 
-        Settings::saveNetworkConfig(String(ssid), String(password ? password : ""));
-        Wifi::connectToNetwork(String(ssid), String(password ? password : ""));
+        Settings::saveNetworkConfig(std::string(ssid), std::string(password ? password : ""));
+        Wifi::connectToNetwork(std::string(ssid), std::string(password ? password : ""));
 
         DynamicJsonDocument resp(64);
         resp["success"] = true;
-        String json;
+        std::string json;
         serializeJson(resp, json);
         sendJsonResponse(topic, json);
         return;
@@ -342,7 +352,7 @@ void SerialCommandHandler::handleCommand(const String &topic, const String &payl
         auto api = State::getApiState();
         AttraccessAuthConfig authCfg = Settings::getAttraccessAuthConfig();
 
-        String status = "disconnected";
+        std::string status = "disconnected";
         if (ws.hostname.length() > 0 && ws.port > 0)
         {
             if (ws.connected)
@@ -360,9 +370,9 @@ void SerialCommandHandler::handleCommand(const String &topic, const String &payl
         resp["hostname"] = ws.hostname;
         resp["port"] = ws.port;
         resp["useSSL"] = ws.useSSL;
-        resp["deviceId"] = String(authCfg.readerId);
+        resp["deviceId"] = std::to_string(authCfg.readerId);
 
-        String json;
+        std::string json;
         serializeJson(resp, json);
         sendJsonResponse(topic, json);
         return;
@@ -380,11 +390,11 @@ void SerialCommandHandler::handleCommand(const String &topic, const String &payl
             return;
         }
 
-        Settings::saveAttraccessApiConfig(String(hostname), port, useSSL);
+        Settings::saveAttraccessApiConfig(std::string(hostname), port, useSSL);
 
         DynamicJsonDocument resp(64);
         resp["success"] = true;
-        String json;
+        std::string json;
         serializeJson(resp, json);
         sendJsonResponse(topic, json);
         return;
@@ -393,19 +403,17 @@ void SerialCommandHandler::handleCommand(const String &topic, const String &payl
     sendErrorResponse(topic, "UNKNOWN_TOPIC");
 }
 
-void SerialCommandHandler::sendJsonResponse(const String &topic, const String &payload)
+void SerialCommandHandler::sendJsonResponse(const std::string &topic, const std::string &payload)
 {
-    Serial.print("RESP ");
-    Serial.print(topic);
-    Serial.print(" ");
-    Serial.println(payload);
+    // Exact wire format "RESP <topic> <payload>\n" — the provisioning tooling parses it.
+    printf("RESP %s %s\n", topic.c_str(), payload.c_str());
 }
 
-void SerialCommandHandler::sendErrorResponse(const String &topic, const char *error)
+void SerialCommandHandler::sendErrorResponse(const std::string &topic, const char *error)
 {
     DynamicJsonDocument resp(128);
     resp["error"] = error ? error : "UNKNOWN_ERROR";
-    String json;
+    std::string json;
     serializeJson(resp, json);
     sendJsonResponse(topic, json);
 }

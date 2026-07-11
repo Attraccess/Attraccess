@@ -12,6 +12,8 @@ module.exports = {
   extraMetadata: {
     main: 'out/main.js',
   },
+  // ponytail: companion has no native modules; skip pnpm production-install which trashes workspace dev-deps
+  npmRebuild: false,
   mac: {
     target: [{ target: 'dmg', arch: 'universal' }],
     artifactName: 'companion_mac_universal.dmg',

@@ -22,6 +22,7 @@ import {
   CompanionUpdateAvailableDto,
   CompanionAuthenticatePayload,
   CompanionIdleDto,
+  CompanionForegroundAppDto,
   CompanionSocket,
   CompanionEventType,
 } from './companion.types';
@@ -115,6 +116,21 @@ export class CompanionGateway implements OnGatewayConnection, OnGatewayDisconnec
     @ConnectedSocket() socket: CompanionSocket,
   ): void {
     this.gatewayService.handleActiveEvent(socket.deviceId as number, body);
+  }
+
+  @SubscribeMessage('COMPANION_FOREGROUND_APP')
+  @CompanionAuthenticated()
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
+  @AsyncApiPub({
+    channel: 'COMPANION_FOREGROUND_APP',
+    message: { name: 'COMPANION_FOREGROUND_APP', payload: CompanionForegroundAppDto },
+    summary: 'Companion reports the currently focused foreground application',
+  })
+  onForegroundApp(
+    @MessageBody() body: CompanionForegroundAppDto,
+    @ConnectedSocket() socket: CompanionSocket,
+  ): void {
+    this.gatewayService.handleForegroundAppEvent(socket.deviceId as number, body);
   }
 
   // ─── Server → Client ─────────────────────────────────────────────────────

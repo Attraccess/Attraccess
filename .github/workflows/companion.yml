@@ -37,6 +37,9 @@ jobs:
 
   build-macos:
     runs-on: macos-latest
+    env:
+      # secrets are not allowed in step-level `if`, so expose presence as job env
+      HAS_APPLE_CERT: ${{ secrets.APPLE_CERTIFICATE != '' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -44,7 +47,7 @@ jobs:
       - uses: ./.github/actions/setup
 
       - name: Set up macOS code signing
-        if: ${{ secrets.APPLE_CERTIFICATE != '' }}
+        if: ${{ env.HAS_APPLE_CERT == 'true' }}
         uses: ./.github/actions/macos-codesign-setup
         with:
           certificate: ${{ secrets.APPLE_CERTIFICATE }}
@@ -59,7 +62,7 @@ jobs:
         run: pnpm nx run companion:package
 
       - name: Clean up keychain
-        if: ${{ secrets.APPLE_CERTIFICATE != '' && always() }}
+        if: ${{ env.HAS_APPLE_CERT == 'true' && always() }}
         run: '[ -n "$KEYCHAIN_PATH" ] && security delete-keychain "$KEYCHAIN_PATH" || true'
 
       - name: Upload macOS artifact
@@ -71,6 +74,8 @@ jobs:
 
   build-windows:
     runs-on: windows-latest
+    env:
+      HAS_WINDOWS_CERT: ${{ secrets.WINDOWS_CERT_BASE64 != '' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -78,7 +83,7 @@ jobs:
       - uses: ./.github/actions/setup
 
       - name: Set up Windows code signing
-        if: ${{ secrets.WINDOWS_CERT_BASE64 != '' }}
+        if: ${{ env.HAS_WINDOWS_CERT == 'true' }}
         uses: ./.github/actions/windows-codesign-setup
         with:
           cert-base64: ${{ secrets.WINDOWS_CERT_BASE64 }}

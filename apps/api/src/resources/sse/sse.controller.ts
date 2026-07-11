@@ -9,6 +9,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Observable, Subject } from 'rxjs';
+import { finalize } from 'rxjs/operators';
 import { OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -38,11 +39,15 @@ export class SSEController implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit() {
-    // Send keep-alive messages every 30 seconds to prevent connection timeouts
+    // Send keep-alive messages every 10 seconds to prevent connection timeouts
     this.keepAliveInterval = setInterval(() => {
-      // For each resource subject, emit a keep-alive event
-      this.resourceSubjects.forEach((subject) => {
-        subject.next({ data: { keepalive: true } });
+      // For each resource subject, emit a keep-alive event; prune dead subjects
+      this.resourceSubjects.forEach((subject, id) => {
+        if (subject.observed) {
+          subject.next({ data: { keepalive: true } });
+        } else {
+          this.resourceSubjects.delete(id);
+        }
       });
     }, 10000);
   }
@@ -89,8 +94,17 @@ export class SSEController implements OnModuleInit, OnModuleDestroy {
       });
     }, 1000);
 
-    // Create an observable from the subject
-    return this.sse.wrap('resource_usage', subject.asObservable());
+    // Create an observable from the subject; prune when last subscriber disconnects
+    return this.sse.wrap(
+      'resource_usage',
+      subject.asObservable().pipe(
+        finalize(() => {
+          if (!subject.observed) {
+            this.resourceSubjects.delete(resourceId);
+          }
+        }),
+      ),
+    );
   }
 
   private async getResourceInUseStatus(resourceId: number): Promise<boolean> {

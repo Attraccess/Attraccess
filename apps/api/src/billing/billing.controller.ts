@@ -38,6 +38,7 @@ import { SetBillingConfigurationDto } from './dto/set-configuration.dto';
 import { SumupTopUpDto } from './dto/sumup/top-up.dto';
 import { SumupTransactionCallbackDto } from './dto/sumup/sumup-transaction-callback.dto';
 import { Observable } from 'rxjs';
+import { finalize } from 'rxjs/operators';
 import { LiveNotificationsService } from './liveNotificationsService';
 import { SumUpConfigurationDto } from './dto/sumup/sumup-configuration.dto';
 import { ResourceBillingConfigurationDto } from './dto/resource-billing-configuration.dto';
@@ -280,11 +281,14 @@ export class BillingController {
   async streamEvents(@Request() request: AuthenticatedRequest): Promise<Observable<{ data: BillingTransaction }>> {
     this.logger.log(`Client connected to SSE for user ${request.user.id}`);
 
-    // Get the subject for this resource
-    const subject = this.liveNotificationsService.getTransactionSubject(request.user.id);
-
-    // Create an observable from the subject
-    return this.sse.wrap('billing', subject.asObservable());
+    const { id: userId } = request.user;
+    const subject = this.liveNotificationsService.getTransactionSubject(userId);
+    return this.sse.wrap(
+      'billing',
+      subject.asObservable().pipe(
+        finalize(() => this.liveNotificationsService.deleteSubjectIfUnobserved(userId)),
+      ),
+    );
   }
 
   @Post('/billing/transactions/:transactionId/refund')

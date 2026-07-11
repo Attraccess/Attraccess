@@ -1243,6 +1243,35 @@ describe('ResourceUsageService', () => {
       );
     });
 
+    it('looks up the active session inside the stop transaction', async () => {
+      const dto: EndUsageSessionDto = { notes: 'Session completed' };
+      const sessionOwner = { id: 1, username: 'owner' } as User;
+      const mockActiveSession = {
+        id: 5,
+        resourceId: 12,
+        userId: sessionOwner.id,
+        startTime: new Date(),
+        user: sessionOwner,
+        resource: { id: 12, name: 'Laser cutter' } as Resource,
+      } as ResourceUsage;
+      const mockUpdatedSession = { ...mockActiveSession, endTime: new Date(), endNotes: 'Session completed' };
+      let transactionStarted = false;
+
+      (resourceUsageRepository.manager.transaction as jest.Mock).mockImplementationOnce(async (cb) => {
+        transactionStarted = true;
+        return cb(transactionalEntityManager);
+      });
+      resourceUsageRepository.findOne.mockImplementation(async () => {
+        expect(transactionStarted).toBe(true);
+        return resourceUsageRepository.findOne.mock.calls.length === 1 ? mockActiveSession : mockUpdatedSession;
+      });
+
+      await service.endSession(mockActiveSession.resourceId, sessionOwner, dto);
+
+      expect(flowExecutorService.runFlow).toHaveBeenCalledTimes(1);
+      expect(billingService.chargeForResourceUsage).toHaveBeenCalledTimes(1);
+    });
+
     it('allows users with canManageResources to end sessions owned by others', async () => {
       const dto: EndUsageSessionDto = { notes: 'Manual stop' };
       const sessionOwner = { id: 77, username: 'member' } as User;

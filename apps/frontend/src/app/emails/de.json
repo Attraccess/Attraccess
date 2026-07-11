@@ -1,0 +1,14 @@
+{
+  "title": "E-Mails",
+  "subtitle": "E-Mail-Versand konfigurieren und Vorlagen verwalten",
+  "subPages": {
+    "templates": {
+      "title": "E-Mail-Vorlagen",
+      "description": "Bearbeiten Sie die E-Mail-Vorlagen, die an Benutzer gesendet werden."
+    },
+    "layout": {
+      "title": "Globales Layout",
+      "description": "Konfigurieren Sie die gemeinsame Kopfzeile, Fußzeile und Stile für alle E-Mails."
+    }
+  }
+}

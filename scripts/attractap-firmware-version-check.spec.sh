@@ -16,11 +16,8 @@ pass() { echo "  ✓ $1"; }
 make_repo() {
   local dir="$1"
   mkdir -p "$dir/apps/attractap/firmware/src" "$dir/apps/frontend"
-  cat >"$dir/apps/attractap/firmware/platformio.ini" <<'EOF'
-[env]
-build_flags =
-	-D FIRMWARE_VERSION='"'"'"1.3.24"'"'"'
-EOF
+  echo '1.3.24' >"$dir/apps/attractap/firmware/version.txt"
+  echo '# build config' >"$dir/apps/attractap/firmware/sdkconfig.defaults"
   echo 'void setup() {}' >"$dir/apps/attractap/firmware/src/main.cpp"
   echo 'frontend' >"$dir/apps/frontend/README.md"
   git -C "$dir" init --quiet
@@ -54,7 +51,7 @@ echo "case: firmware config changed without version bump -> fail"
 TMP="$(mktemp -d)"
 make_repo "$TMP"
 BASE="$(git -C "$TMP" rev-parse HEAD)"
-echo 'monitor_speed = 9600' >>"$TMP/apps/attractap/firmware/platformio.ini"
+echo 'CONFIG_EXAMPLE=y' >>"$TMP/apps/attractap/firmware/sdkconfig.defaults"
 git -C "$TMP" add .
 git -C "$TMP" commit --quiet -m 'change firmware config'
 if run_check "$TMP" "$BASE" >/dev/null 2>&1; then
@@ -69,7 +66,7 @@ TMP="$(mktemp -d)"
 make_repo "$TMP"
 BASE="$(git -C "$TMP" rev-parse HEAD)"
 echo 'void loop() {}' >>"$TMP/apps/attractap/firmware/src/main.cpp"
-perl -0pi -e 's/1\.3\.24/1.3.25/' "$TMP/apps/attractap/firmware/platformio.ini"
+echo '1.3.25' >"$TMP/apps/attractap/firmware/version.txt"
 git -C "$TMP" add .
 git -C "$TMP" commit --quiet -m 'change firmware source and version'
 if run_check "$TMP" "$BASE" >/dev/null 2>&1; then

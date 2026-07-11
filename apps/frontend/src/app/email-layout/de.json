@@ -21,13 +21,22 @@
     "cancel": "Abbrechen",
     "expand": "Editor erweitern",
     "close": "Schließen",
-    "backToTemplates": "Zurück zu Vorlagen"
+    "backToTemplates": "Zurück zu Vorlagen",
+    "resetToDefault": "Standard wiederherstellen"
   },
   "form": {
     "mjmlDocumentation": "MJML-Dokumentation"
   },
   "toast": {
     "saveSuccess": "Globales E-Mail-Layout erfolgreich gespeichert.",
-    "saveError": "Layout konnte nicht gespeichert werden."
+    "saveError": "Layout konnte nicht gespeichert werden.",
+    "resetSuccess": "E-Mail-Layout auf Standard zurückgesetzt.",
+    "resetError": "Layout konnte nicht zurückgesetzt werden."
+  },
+  "resetConfirm": {
+    "title": "Layout auf Standard zurücksetzen?",
+    "message": "Dies überschreibt Ihre Anpassungen mit dem Standard-Layout. Dies kann nicht rückgängig gemacht werden.",
+    "confirm": "Zurücksetzen",
+    "cancel": "Abbrechen"
   }
 }

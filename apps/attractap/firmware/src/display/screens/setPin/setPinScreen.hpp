@@ -5,7 +5,7 @@
 #include "../../../logger/logger.hpp"
 #include "../../shared/pinInput/pinInputPage.hpp"
 
-#include <Arduino.h>
+#include <string>
 
 class SetPinScreen : public IScreen
 {
@@ -15,15 +15,15 @@ public:
     void onScreenLeave();
     lv_obj_t *getScreen() override;
     void loop() override;
-    String getName() override;
+    std::string getName() override;
     void destroy() override;
 
-    void setOnPinConfirmedCallback(std::function<void(String)> onPinConfirmed);
+    void setOnPinConfirmedCallback(std::function<void(std::string)> onPinConfirmed);
 
 private:
     Logger logger;
     lv_obj_t *screen = nullptr;
     PinInputPage pinInputPage;
 
-    std::function<void(String)> onPinConfirmed;
+    std::function<void(std::string)> onPinConfirmed;
 };
