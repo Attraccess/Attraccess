@@ -24,6 +24,7 @@ import {
 import { SearchIcon, UserPlusIcon } from 'lucide-react';
 import { useTranslations } from '../../i18n';
 import { AttraccessUser } from '../attraccess-user/AttraccessUser';
+import { groupUsersByLetter, useDebouncedValue } from './UserSearch.utils';
 import { User, useUsersServiceFindManyInfinite } from '@attraccess/react-query-client';
 
 import en from './en.json';
@@ -40,36 +41,6 @@ interface UserSearchProps {
 
 const PAGE_SIZE = 50;
 const SEARCH_DEBOUNCE_MS = 300;
-
-export function useDebouncedValue<T>(value: T, delayMs: number): T {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const id = setTimeout(() => setDebounced(value), delayMs);
-    return () => clearTimeout(id);
-  }, [value, delayMs]);
-  return debounced;
-}
-
-export interface UserGroup {
-  letter: string;
-  users: User[];
-}
-
-// The API returns users sorted by username (ASC), so equal-letter runs are contiguous
-// and a single pass produces the address-book groups.
-export function groupUsersByLetter(users: User[]): UserGroup[] {
-  const out: UserGroup[] = [];
-  for (const user of users) {
-    const letter = (user.username?.[0] ?? '#').toUpperCase();
-    const last = out[out.length - 1];
-    if (last && last.letter === letter) {
-      last.users.push(user);
-    } else {
-      out.push({ letter, users: [user] });
-    }
-  }
-  return out;
-}
 
 export function UserSearch(props: Readonly<UserSearchProps>) {
   const { label, placeholder, onSelectionChange, afterAutocomplete, wrapperProps, afterSelection } = props;

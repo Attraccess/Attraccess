@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { User } from '@attraccess/react-query-client';
-import { groupUsersByLetter, useDebouncedValue } from './UserSearch';
+import { groupUsersByLetter, useDebouncedValue } from './UserSearch.utils';
 
 const user = (id: number, username: string) => ({ id, username }) as User;
 
