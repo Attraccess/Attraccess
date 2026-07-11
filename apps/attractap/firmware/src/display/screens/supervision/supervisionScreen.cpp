@@ -1,4 +1,8 @@
 #include "supervisionScreen.hpp"
+#include <string>
+#include <functional>
+
+#include "platform.hpp"
 
 // Palette — shared with Enrollment/Reset screens for visual consistency (ATT-506).
 #define SUPERVISION_COLOR_BG 0x14142A
@@ -184,7 +188,7 @@ void SupervisionScreen::setTimeoutTime(uint32_t timeoutTime)
    this->updateTimeoutBar();
 }
 
-void SupervisionScreen::setRequesterName(String requesterName)
+void SupervisionScreen::setRequesterName(std::string requesterName)
 {
    this->requesterNameCache = requesterName;
    if (this->requesterNameLabel)
@@ -203,13 +207,13 @@ void SupervisionScreen::setStatus(Status status)
    this->applyStatus();
 }
 
-void SupervisionScreen::setStatusMessage(const String &message)
+void SupervisionScreen::setStatusMessage(const std::string &message)
 {
    this->statusMessageOverride = message;
    this->applyStatus();
 }
 
-void SupervisionScreen::setSupervisorHint(const String &hint)
+void SupervisionScreen::setSupervisorHint(const std::string &hint)
 {
    this->hintCache = hint;
    if (this->hintLabel)
@@ -240,7 +244,7 @@ void SupervisionScreen::onCancelButtonEvent(lv_event_t *e)
    }
 }
 
-String SupervisionScreen::getName()
+std::string SupervisionScreen::getName()
 {
    return "SupervisionScreen";
 }

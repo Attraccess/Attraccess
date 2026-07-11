@@ -25,6 +25,7 @@ import { ZxcvbnService } from './zxcvbn.service';
 import { PasswordPolicyViolationException } from './password-policy.errors';
 import { BruteForceProtectionService } from '../rate-limiting/brute-force.service';
 import { AuthAuditLogger } from '../rate-limiting/auth-audit.logger';
+import { RbacService } from '../rbac/rbac.service';
 
 const STRONG_PASSWORD = 'Tr0ub4dor-Hummingbird-9!plate';
 const ANOTHER_STRONG_PASSWORD = 'Diff3rent-Hummingbird-9!plate';
@@ -196,6 +197,7 @@ async function buildController(opts: BuildOpts = {}) {
         },
       },
       { provide: AuthAuditLogger, useValue: { log: jest.fn() } },
+      { provide: RbacService, useValue: { getEffectivePermissions: jest.fn(async () => new Set<string>()) } },
     ],
   }).compile();
 

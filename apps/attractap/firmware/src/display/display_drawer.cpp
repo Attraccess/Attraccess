@@ -1,4 +1,5 @@
 #include "display.hpp"
+#include <functional>
 
 // Hidden maintenance drawer rendered on the LVGL top layer. It is revealed by a
 // pull-down gesture that starts at the very top edge of the screen and drags

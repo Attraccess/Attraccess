@@ -1,8 +1,0 @@
-{
-  "title": "Metriken",
-  "subtitle": "Authentifizierung des Prometheus-Metriken-Endpunkts",
-  "apiKeyStatus": {
-    "configured": "API-Schlüssel konfiguriert",
-    "missing": "API-Schlüssel nicht konfiguriert"
-  }
-}

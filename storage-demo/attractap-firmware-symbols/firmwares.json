@@ -1,0 +1,68 @@
+{
+  "firmwares": [
+    {
+      "name": "attractap_touch",
+      "friendlyName": "Attractap Touch",
+      "variant": "wifi",
+      "variantFriendlyName": "WiFi",
+      "version": "1.3.28",
+      "boardFamily": "ESP32-S3",
+      "filename": "attractap_touch_wifi.bin",
+      "filenameOTA": "attractap_touch_wifi_ota.bin",
+      "elfFilename": "ab5405ac50ff297f31e17b8b64abdab9637d9ae4afe1dda8f69b008d413f40ef-attractap_touch_wifi.elf",
+      "buildId": "ab5405ac50ff297f31e17b8b64abdab9637d9ae4afe1dda8f69b008d413f40ef",
+      "chip": "esp32s3",
+      "flashMode": "dio",
+      "flashFreq": "80m",
+      "flashSize": "16MB"
+    },
+    {
+      "name": "attractap_touch_v2",
+      "friendlyName": "Attractap Touch V2",
+      "variant": "wifi",
+      "variantFriendlyName": "WiFi",
+      "version": "1.3.28",
+      "boardFamily": "ESP32-S3",
+      "filename": "attractap_touch_v2_wifi.bin",
+      "filenameOTA": "attractap_touch_v2_wifi_ota.bin",
+      "elfFilename": "3353d6d346b987dd3d81d80160adab3007be9ba63759fc3f5a0aca1812c436cf-attractap_touch_v2_wifi.elf",
+      "buildId": "3353d6d346b987dd3d81d80160adab3007be9ba63759fc3f5a0aca1812c436cf",
+      "chip": "esp32s3",
+      "flashMode": "dio",
+      "flashFreq": "80m",
+      "flashSize": "16MB"
+    },
+    {
+      "name": "attractap_touch",
+      "friendlyName": "Attractap Touch",
+      "variant": "ethernet",
+      "variantFriendlyName": "Ethernet",
+      "version": "1.3.28",
+      "boardFamily": "ESP32-S3",
+      "filename": "attractap_touch_ethernet.bin",
+      "filenameOTA": "attractap_touch_ethernet_ota.bin",
+      "elfFilename": "84b3fcf46b1609b6380b1480adf0f643bcce1d99a88522f588c02a83ebec2b7d-attractap_touch_ethernet.elf",
+      "buildId": "84b3fcf46b1609b6380b1480adf0f643bcce1d99a88522f588c02a83ebec2b7d",
+      "chip": "esp32s3",
+      "flashMode": "dio",
+      "flashFreq": "80m",
+      "flashSize": "16MB"
+    },
+    {
+      "name": "attractap_lite",
+      "friendlyName": "Attractap Lite",
+      "variant": "ethernet",
+      "variantFriendlyName": "Ethernet",
+      "version": "1.3.28",
+      "boardFamily": "ESP32-S3",
+      "filename": "attractap_lite_ethernet.bin",
+      "filenameOTA": "attractap_lite_ethernet_ota.bin",
+      "elfFilename": "ceb394c994254f61328be76fb8e9fe7ea6cd1c221b8d0be83dfd720921186475-attractap_lite_ethernet.elf",
+      "buildId": "ceb394c994254f61328be76fb8e9fe7ea6cd1c221b8d0be83dfd720921186475",
+      "chip": "esp32s3",
+      "flashMode": "dio",
+      "flashFreq": "80m",
+      "flashSize": "16MB"
+    }
+  ]
+}

@@ -142,7 +142,7 @@ describe('ResourcesService', () => {
         expect(result.limit).toEqual(10);
         expect(resourceRepository.createQueryBuilder).toHaveBeenCalledWith('resource');
         expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith('resource.groups', 'groups');
-        expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith('resource.createdAt', 'DESC');
+        expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith('resource.name', 'ASC');
         expect(mockQueryBuilder.skip).toHaveBeenCalledWith(0);
         expect(mockQueryBuilder.take).toHaveBeenCalledWith(10);
       });
@@ -448,7 +448,7 @@ describe('ResourcesService', () => {
 
         // Verify that basic joins happen before filters
         expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith('resource.groups', 'groups');
-        expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith('resource.createdAt', 'DESC');
+        expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith('resource.name', 'ASC');
         expect(mockQueryBuilder.getManyAndCount).toHaveBeenCalled();
 
         // Verify that permission-related joins are called

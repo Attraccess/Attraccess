@@ -2,21 +2,29 @@
 // FEATURE: application-session
 
 #include "application.hpp"
+#include "platform.hpp"
+#include <cstdlib>
+#include <cstring>
+#include <string>
 
 #ifdef HAS_LVGL_DISPLAY
 void Application::handleConnectionConfigurationSave(
     const ConnectionConfigurationScreen::ConnectionConfig &cfg) {
   // split cfg.host into hostname and port (if no port present, use 443)
-  String hostname = cfg.host;
-  String port = "443";
-  if (cfg.host.indexOf(":") != -1) {
-    hostname = cfg.host.substring(0, cfg.host.indexOf(":"));
-    port = cfg.host.substring(cfg.host.indexOf(":") + 1);
+  std::string host = cfg.host;
+  std::string hostname = host;
+  std::string port = "443";
+  size_t colonPos = host.find(":");
+  if (colonPos != std::string::npos) {
+    hostname = host.substr(0, colonPos);
+    port = host.substr(colonPos + 1);
   }
-  Settings::saveNetworkConfig(cfg.ssid, cfg.password);
-  Settings::saveAttraccessApiConfig(hostname, port.toInt(), cfg.useSSL);
+  Settings::saveNetworkConfig(std::string(cfg.ssid.c_str()),
+                              std::string(cfg.password.c_str()));
+  Settings::saveAttraccessApiConfig(
+      hostname, (uint16_t)strtol(port.c_str(), nullptr, 10), cfg.useSSL);
 
-    Settings::setDevicePin(cfg.devicePin);
+    Settings::setDevicePin(std::string(cfg.devicePin.c_str()));
     Settings::setBeeperEnabled(cfg.beeperEnabled);
 
     this->state = APPLICATION_STATE_INIT;
@@ -86,7 +94,7 @@ void Application::clearProjectSelection() {
 }
 
 void Application::handleProjectSelection(uint32_t projectId,
-                                         const String &projectName) {
+                                         const std::string &projectName) {
   this->selectedProjectId = projectId;
   this->selectedProjectName = projectName;
   Display::resourceDetailsScreen.setSelectedProject(projectId,

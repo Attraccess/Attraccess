@@ -11,21 +11,19 @@ import {
   useAuthenticationServiceUpdateOneSsoProvider,
   useAuthenticationServiceGetAllSsoProvidersKey,
   useAuthenticationServiceGetOneSsoProviderByIdKey,
+  useRbacServiceListRoles,
 } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../components/toastProvider';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { OpenIDConfiguration } from './discovery/OpenIDC.data';
 import { hasRequiredSamlSigningMaterial } from './signingMaterial';
 import {
-  PermissionKey,
   buildPermissionMappingInputs,
   defaultProviderValues,
-  emptyPermissionMappingsInput,
   ensureOidcConfiguration,
   ensureSamlConfiguration,
   getDefaultOidcConfiguration,
   getDefaultSamlConfiguration,
-  permissionKeys,
 } from './formDefaults';
 import en from './en.json';
 import de from './de.json';
@@ -43,11 +41,10 @@ export const useSSOProviderForm = (providerId?: number) => {
   const [usernameClaimPathsInput, setUsernameClaimPathsInput] = useState('');
   const [emailClaimPathsInput, setEmailClaimPathsInput] = useState('');
   const [emailAttributeKeysInput, setEmailAttributeKeysInput] = useState('');
-  const [oidcPermissionMappingsInput, setOidcPermissionMappingsInput] =
-    useState<Record<PermissionKey, string>>(emptyPermissionMappingsInput);
-  const [samlPermissionMappingsInput, setSamlPermissionMappingsInput] =
-    useState<Record<PermissionKey, string>>(emptyPermissionMappingsInput);
+  const [oidcPermissionMappingsInput, setOidcPermissionMappingsInput] = useState<Record<string, string>>({});
+  const [samlPermissionMappingsInput, setSamlPermissionMappingsInput] = useState<Record<string, string>>({});
   const queryClient = useQueryClient();
+  const { data: roles } = useRbacServiceListRoles();
 
   const { success, error: showError } = useToastMessage();
   const createSSOProvider = useAuthenticationServiceCreateOneSsoProvider({
@@ -145,8 +142,9 @@ export const useSSOProviderForm = (providerId?: number) => {
       );
       setOidcPermissionMappingsInput(
         buildPermissionMappingInputs(
+          (roles ?? []).map((r) => r.key),
           (extendedProvider.oidcConfiguration.permissionMappings ?? undefined) as
-            | Partial<Record<PermissionKey, string[]>>
+            | Record<string, string[]>
             | undefined,
         ),
       );
@@ -154,7 +152,7 @@ export const useSSOProviderForm = (providerId?: number) => {
       setScopesInput('');
       setUsernameClaimPathsInput('');
       setEmailClaimPathsInput('');
-      setOidcPermissionMappingsInput(emptyPermissionMappingsInput);
+      setOidcPermissionMappingsInput({});
     }
 
     if (extendedProvider.type === SSOProviderType.SAML && extendedProvider.samlConfiguration) {
@@ -178,18 +176,19 @@ export const useSSOProviderForm = (providerId?: number) => {
       );
       setSamlPermissionMappingsInput(
         buildPermissionMappingInputs(
+          (roles ?? []).map((r) => r.key),
           (extendedProvider.samlConfiguration.permissionMappings ?? undefined) as
-            | Partial<Record<PermissionKey, string[]>>
+            | Record<string, string[]>
             | undefined,
         ),
       );
     } else {
       setEmailAttributeKeysInput('');
-      setSamlPermissionMappingsInput(emptyPermissionMappingsInput);
+      setSamlPermissionMappingsInput({});
     }
 
     setFormValues(updatedFormValues);
-  }, [providerDetails]);
+  }, [providerDetails, roles]);
 
   const setOidc = useCallback((field: keyof NonNullable<CreateSSOProviderDto['oidcConfiguration']>, value: string) => {
     setFormValues((prev) => ({
@@ -272,14 +271,19 @@ export const useSSOProviderForm = (providerId?: number) => {
 
       const sanitizeOptional = (value?: string) => (value && value.trim().length > 0 ? value.trim() : undefined);
 
-      const buildPermissionMappings = (inputs: Record<PermissionKey, string>) => {
-        const mappings: Partial<Record<PermissionKey, string[]>> = {};
-        permissionKeys.forEach((key) => {
+      const buildPermissionMappings = (
+        inputs: Record<string, string>,
+        existingMappings?: Record<string, string[]> | null,
+      ) => {
+        const mappings: Record<string, string[]> = { ...(existingMappings ?? {}) };
+        for (const key of (roles ?? []).map((r) => r.key)) {
           const parsed = parseList(inputs[key] ?? '');
           if (parsed.length > 0) {
             mappings[key] = parsed;
+          } else {
+            delete mappings[key];
           }
-        });
+        }
         return Object.keys(mappings).length > 0 ? mappings : undefined;
       };
 
@@ -305,7 +309,10 @@ export const useSSOProviderForm = (providerId?: number) => {
         if (scopesInput.trim().length > 0) payload.scopes = parseList(scopesInput);
         if (usernameClaimPathsInput.trim().length > 0) payload.usernameClaimPaths = parseList(usernameClaimPathsInput);
         if (emailClaimPathsInput.trim().length > 0) payload.emailClaimPaths = parseList(emailClaimPathsInput);
-        const permissionMappings = buildPermissionMappings(oidcPermissionMappingsInput);
+        const permissionMappings = buildPermissionMappings(
+          oidcPermissionMappingsInput,
+          (providerDetails?.oidcConfiguration?.permissionMappings ?? undefined) as Record<string, string[]> | undefined,
+        );
         if (permissionMappings) payload.permissionMappings = permissionMappings;
 
         return payload;
@@ -343,7 +350,10 @@ export const useSSOProviderForm = (providerId?: number) => {
           delete payload.provisioningSecret;
         }
 
-        const permissionMappings = buildPermissionMappings(samlPermissionMappingsInput);
+        const permissionMappings = buildPermissionMappings(
+          samlPermissionMappingsInput,
+          (providerDetails?.samlConfiguration?.permissionMappings ?? undefined) as Record<string, string[]> | undefined,
+        );
         if (permissionMappings) {
           payload.permissionMappings = permissionMappings;
         } else {
@@ -409,7 +419,9 @@ export const useSSOProviderForm = (providerId?: number) => {
     isEditing,
     navigate,
     oidcPermissionMappingsInput,
+    providerDetails,
     providerId,
+    roles,
     samlPermissionMappingsInput,
     samlSigningMaterialsReady,
     scopesInput,

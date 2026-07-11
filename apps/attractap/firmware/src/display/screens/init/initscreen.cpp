@@ -1,4 +1,9 @@
 #include "initscreen.hpp"
+#include <string>
+#include <functional>
+
+#include <cstdio>
+#include "platform.hpp"
 
 void InitScreen::finalizeState(lv_obj_t *spinner, lv_obj_t *label, lv_color_t color)
 {
@@ -29,11 +34,11 @@ void InitScreen::markStateAsWarning(lv_obj_t *spinner, lv_obj_t *label)
    this->finalizeState(spinner, label, lv_color_hex(0xFFA500));
 }
 
-String InitScreen::formatIp(esp_ip4_addr_t ip)
+std::string InitScreen::formatIp(esp_ip4_addr_t ip)
 {
    char buf[16];
    snprintf(buf, sizeof(buf), IPSTR, IP2STR(&ip));
-   return String(buf);
+   return std::string(buf);
 }
 
 void InitScreen::resetState(lv_obj_t *spinner, lv_obj_t *label)
@@ -339,8 +344,9 @@ void InitScreen::loop()
 
    State::WebsocketState websocketState = State::getWebsocketState();
    bool networkUp = networkState.wifi_connected || networkState.ethernet_connected;
-   // A repeating cert sweep or remembered-cert retry is the "stuck" signal.
-   bool sweeping = websocketState.useSSL && (websocketState.certIndex > 0 || websocketState.rememberedRetryCount > 0);
+   // A repeating cert sweep is the "searching" signal; a locked cert never sweeps.
+   bool sweeping = websocketState.useSSL && !websocketState.certLocked &&
+                   (websocketState.certIndex > 0 || websocketState.rememberedRetryCount > 0);
    if (websocketState.connected)
    {
       setLabelTextIfChanged(this->apiConnectionLabel, "API verbunden");
@@ -363,25 +369,27 @@ void InitScreen::loop()
                     this->apiAuthenticationStage);
 
    // Server target line
-   if (websocketState.hostname.isEmpty() || websocketState.port == 0)
+   if (websocketState.hostname.empty() || websocketState.port == 0)
    {
       setLabelTextIfChanged(this->serverTargetLabel, "Server: nicht konfiguriert");
    }
    else
    {
-      String target = "Server: " + websocketState.hostname + ":" + String(websocketState.port) +
-                      (websocketState.useSSL ? "  (SSL)" : "  (kein SSL)");
+      std::string target = "Server: " + websocketState.hostname + ":" + std::to_string(websocketState.port) +
+                           (websocketState.useSSL ? "  (SSL)" : "  (kein SSL)");
       setLabelTextIfChanged(this->serverTargetLabel, target.c_str());
    }
 
    // Cert evaluation line (only relevant while connecting over SSL)
    if (websocketState.useSSL && !websocketState.connected && websocketState.certCount > 0)
    {
-      String cert = "CA: " + websocketState.certName + "  (" +
-                    String(websocketState.certIndex + 1) + "/" + String(websocketState.certCount) + ")";
+      std::string cert = "CA: " + websocketState.certName + "  " +
+                         (websocketState.certLocked
+                              ? "(fixiert)"
+                              : "(" + std::to_string(websocketState.certIndex + 1) + "/" + std::to_string(websocketState.certCount) + ")");
       if (websocketState.rememberedRetryCount > 0)
       {
-         cert += "  Wdh " + String(websocketState.rememberedRetryCount) + "/5";
+         cert += "  Wdh " + std::to_string(websocketState.rememberedRetryCount);
       }
       setLabelTextIfChanged(this->certLabel, cert.c_str());
       if (lv_obj_has_flag(this->certLabel, LV_OBJ_FLAG_HIDDEN))
@@ -409,14 +417,14 @@ void InitScreen::loop()
       phaseText = "INIT";
       break;
    }
-   String stateLine = String("Status: ") + phaseText;
+   std::string stateLine = std::string("Status: ") + phaseText;
    if (!networkUp)
    {
       stateLine += "  warte auf Netzwerk";
    }
    else if (!websocketState.connected && websocketState.secondsUntilNextAttempt > 0)
    {
-      stateLine += "  naechster Versuch in " + String(websocketState.secondsUntilNextAttempt) + "s";
+      stateLine += "  naechster Versuch in " + std::to_string(websocketState.secondsUntilNextAttempt) + "s";
    }
    setLabelTextIfChanged(this->connectionStateLabel, stateLine.c_str());
 }
@@ -426,7 +434,7 @@ void InitScreen::setOnOpenSettingsCallback(std::function<void()> onOpenSettingsC
    this->onOpenSettingsCallback = onOpenSettingsCallback;
 }
 
-String InitScreen::getName()
+std::string InitScreen::getName()
 {
    return "InitScreen";
 }

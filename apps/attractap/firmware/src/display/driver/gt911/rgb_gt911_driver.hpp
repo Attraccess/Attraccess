@@ -1,11 +1,11 @@
 #pragma once
 
-#include <Arduino.h>
-#include <Arduino_GFX_Library.h>
-#include <TouchDrvGT911.hpp>
-#include <Wire.h>
+#include <cstdint>
+#include "esp_lcd_panel_ops.h"
+#include "esp_lcd_panel_io.h"
 #include "../../../logger/logger.hpp"
 #include "../display_driver.hpp"
+#include "gt911_touch.hpp"
 
 #ifdef HAS_IO_EXPANDER
 class IOExpander;
@@ -32,12 +32,9 @@ private:
 #ifdef HAS_IO_EXPANDER
     IOExpander *ioExpander = nullptr;
 #endif
-    Arduino_DataBus *bus = nullptr;
-    Arduino_ESP32RGBPanel *rgbpanel = nullptr;
-    Arduino_RGB_Display *gfx = nullptr;
-    TouchDrvGT911 touch;
-    int16_t x[5] = {0};
-    int16_t y[5] = {0};
+    esp_lcd_panel_io_handle_t panelIo = nullptr;
+    esp_lcd_panel_handle_t panel = nullptr;
+    Gt911Touch touch;
     uint32_t screenWidth = 0;
     uint32_t screenHeight = 0;
     bool initialized = false;

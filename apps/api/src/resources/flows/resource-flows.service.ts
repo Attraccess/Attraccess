@@ -30,6 +30,7 @@ import {
   VariableChangedNodeDataSchema,
   CompanionLockNodeDataSchema,
   CompanionIdleActiveNodeDataSchema,
+  CompanionForegroundAppNodeDataSchema,
 } from '@attraccess/database-entities';
 import { ResourceNotFoundException } from '../../exceptions/resource.notFound.exception';
 import { ResourceFlowSaveDto, ResourceFlowResponseDto } from './dto';
@@ -479,6 +480,13 @@ export class ResourceFlowsService {
         case ResourceFlowNodeType.INPUT_COMPANION_IDLE:
         case ResourceFlowNodeType.INPUT_COMPANION_ACTIVE:
           schema.configSchema = z.toJSONSchema(CompanionIdleActiveNodeDataSchema, { io: 'input' });
+          schema.inputs = [];
+          schema.outputs = ['output'];
+          schema.supportedByResource = true;
+          break;
+
+        case ResourceFlowNodeType.INPUT_COMPANION_FOREGROUND_APP_CHANGED:
+          schema.configSchema = z.toJSONSchema(CompanionForegroundAppNodeDataSchema, { io: 'input' });
           schema.inputs = [];
           schema.outputs = ['output'];
           schema.supportedByResource = true;

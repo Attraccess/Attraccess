@@ -21,6 +21,7 @@ const mockMetricsService = {
 
 const mockRbacService = {
   assignRoleByKey: jest.fn().mockResolvedValue(undefined),
+  getRoles: jest.fn().mockResolvedValue([{ key: 'user', isDefault: true }]),
 };
 
 describe('UsersService', () => {

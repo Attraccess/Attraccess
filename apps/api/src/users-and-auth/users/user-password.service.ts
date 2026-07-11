@@ -74,7 +74,7 @@ export class UserPasswordService {
     const policyResult = await this.passwordPolicyService.validate(
       body.password,
       { username: user.username, email: user.email },
-      { userIdForHistory: user.id, role: this.passwordPolicyService.resolveRole(user) },
+      { userIdForHistory: user.id, role: await this.passwordPolicyService.resolveRole(user) },
     );
     if (!policyResult.ok) {
       throw new PasswordPolicyViolationException(policyResult.errors);
@@ -107,7 +107,7 @@ export class UserPasswordService {
     const policyResult = await this.passwordPolicyService.validate(
       body.password,
       { username: user.username, email: user.email },
-      { userIdForHistory: user.id, role: this.passwordPolicyService.resolveRole(user) },
+      { userIdForHistory: user.id, role: await this.passwordPolicyService.resolveRole(user) },
     );
     if (!policyResult.ok) {
       throw new PasswordPolicyViolationException(policyResult.errors);

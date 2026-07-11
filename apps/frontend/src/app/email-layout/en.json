@@ -21,13 +21,22 @@
     "cancel": "Cancel",
     "expand": "Expand editor",
     "close": "Close",
-    "backToTemplates": "Back to Templates"
+    "backToTemplates": "Back to Templates",
+    "resetToDefault": "Reset to Default"
   },
   "form": {
     "mjmlDocumentation": "MJML Documentation"
   },
   "toast": {
     "saveSuccess": "Global email layout saved successfully.",
-    "saveError": "Failed to save layout."
+    "saveError": "Failed to save layout.",
+    "resetSuccess": "Email layout reset to default.",
+    "resetError": "Failed to reset layout."
+  },
+  "resetConfirm": {
+    "title": "Reset layout to default?",
+    "message": "This will overwrite your customizations with the bundled default layout. This cannot be undone.",
+    "confirm": "Reset",
+    "cancel": "Cancel"
   }
 }

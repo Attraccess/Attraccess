@@ -1,5 +1,9 @@
 #pragma once
 
+#include <functional>
+
+#include <string>
+
 #include "../IScreen.hpp"
 #include "../../../logger/logger.hpp"
 #include "../../images/lockscreen_background_image.hpp"
@@ -34,7 +38,7 @@ public:
     void onScreenLeave();
     void loop() override;
     lv_obj_t *getScreen() override;
-    String getName() override;
+    std::string getName() override;
     void destroy() override;
 
     void setResourceAndUsageDetails(const API::ResourceBrief &resource);
@@ -44,7 +48,7 @@ public:
 
     struct UserDetails
     {
-        String username;
+        std::string username;
         bool canManageResource;
         bool hasIntroduction;
         bool isIntroducer;
@@ -60,7 +64,7 @@ public:
     };
     void setButtonClickCallback(std::function<void(ButtonClickEventData)> callback);
     void setProjectsPageRequestCallback(std::function<void(uint32_t)> callback);
-    void setProjectSelectionCallback(std::function<void(uint32_t, const String &)> callback);
+    void setProjectSelectionCallback(std::function<void(uint32_t, const std::string &)> callback);
     void setSelectedProject(uint32_t projectId, const char *projectName);
     void showFormsModal(const API::ResourceUsageFormRequest &meta);
     void renderFormField(const API::ResourceUsageFormFieldsPage &page, bool canGoBack, bool isLast, uint32_t fieldNumber, uint32_t totalFields);
@@ -81,7 +85,7 @@ private:
     Logger logger;
     lv_obj_t *screen = nullptr;
 
-    String loginUsernameCache;
+    std::string loginUsernameCache;
     lv_obj_t *loginUserLabel = nullptr;
 
     lv_obj_t *sessionDetailsContainer = nullptr;
@@ -103,7 +107,7 @@ private:
 
     API::ProjectsOfUserResponse projectsCache;
     uint32_t selectedProjectId = 0;
-    String selectedProjectName;
+    std::string selectedProjectName;
     uint32_t projectsCurrentPage = 1;
     uint32_t projectsTotalCount = 0;
     uint32_t projectsPageLimit = API::MAX_PROJECTS_PER_PAGE;
@@ -167,7 +171,7 @@ private:
         bool isRequired;
         lv_obj_t *input = nullptr;
         lv_obj_t *previewLabel = nullptr; // value preview inside the tap-to-edit box (text/number fields)
-        String textValue;                 // committed value for text/number fields (edited via the fullscreen editor)
+        std::string textValue;            // committed value for text/number fields (edited via the fullscreen editor)
         lv_obj_t *errorLabel = nullptr;
         const API::ResourceUsageFormField *definition = nullptr;
         uint8_t selectedOptionIndex = 0; // For SELECT: 0 = no selection, 1+ = option index
@@ -195,7 +199,7 @@ private:
 
     std::function<void(ButtonClickEventData)> buttonClickCallback;
     std::function<void(uint32_t)> projectsPageRequestCallback;
-    std::function<void(uint32_t, const String &)> projectSelectionCallback;
+    std::function<void(uint32_t, const std::string &)> projectSelectionCallback;
     static void onButtonClick(lv_event_t *e);
     static void onContainerDelete(lv_event_t *e);
     static void onToastDelete(lv_event_t *e);
@@ -223,7 +227,7 @@ private:
     lv_obj_t *maintenanceIntroducersLabel = nullptr;
     lv_obj_t *healthPanel = nullptr;
     lv_obj_t *healthReasonLabel = nullptr;
-    String buildIntroducersText(const API::ResourceBrief &resource);
+    std::string buildIntroducersText(const API::ResourceBrief &resource);
     void refreshAccessState();
 
     // overlay/toast state

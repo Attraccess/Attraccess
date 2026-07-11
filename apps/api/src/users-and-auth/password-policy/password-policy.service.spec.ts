@@ -15,6 +15,7 @@ import { DEFAULT_PASSWORD_POLICY } from '@attraccess/shared';
 import { PasswordPolicyService } from './password-policy.service';
 import { HibpClient } from './hibp.client';
 import { ZxcvbnService } from './zxcvbn.service';
+import { RbacService } from '../rbac/rbac.service';
 
 const buildOverride = (overrides: Partial<PasswordPolicyOverride>): PasswordPolicyOverride => ({
   role: PasswordPolicyRole.ADMIN,
@@ -137,6 +138,7 @@ describe('PasswordPolicyService', () => {
         { provide: DataSource, useValue: dataSource },
         { provide: HibpClient, useValue: hibp },
         { provide: ZxcvbnService, useValue: zxcvbn },
+        { provide: RbacService, useValue: { getEffectivePermissions: jest.fn(async () => new Set<string>()) } },
       ],
     }).compile();
     service = module.get(PasswordPolicyService);
@@ -346,15 +348,15 @@ describe('PasswordPolicyService', () => {
       await expect(service.deleteOverride(PasswordPolicyRole.ADMIN)).rejects.toThrow();
     });
 
-    it('resolveRole returns admin for users with system.settings.manage permission', () => {
-      const role = service.resolveRole({
+    it('resolveRole returns admin for users with system.settings.manage permission', async () => {
+      const role = await service.resolveRole({
         effectivePermissions: new Set(['system.settings.manage']),
       } as never);
       expect(role).toBe(PasswordPolicyRole.ADMIN);
     });
 
-    it('resolveRole returns undefined for plain users', () => {
-      const role = service.resolveRole({
+    it('resolveRole returns undefined for plain users', async () => {
+      const role = await service.resolveRole({
         effectivePermissions: new Set<string>(),
       } as never);
       expect(role).toBeUndefined();

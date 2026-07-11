@@ -23,6 +23,7 @@ import { ZxcvbnService } from './zxcvbn.service';
 import { PasswordPolicyViolationException } from './password-policy.errors';
 import { BruteForceProtectionService } from '../rate-limiting/brute-force.service';
 import { AuthAuditLogger } from '../rate-limiting/auth-audit.logger';
+import { RbacService } from '../rbac/rbac.service';
 
 const policyRow = (overrides: Partial<PasswordPolicy> = {}): PasswordPolicy => ({
   id: 1,
@@ -131,6 +132,7 @@ describe('Register flow + password policy (integration)', () => {
           },
         },
         { provide: AuthAuditLogger, useValue: { log: jest.fn() } },
+        { provide: RbacService, useValue: { getEffectivePermissions: jest.fn(async () => new Set<string>()) } },
       ],
     }).compile();
     service = module.get(UserRegistrationService);
@@ -212,6 +214,7 @@ describe('Register flow + password policy (integration)', () => {
           },
         },
         { provide: AuthAuditLogger, useValue: { log: jest.fn() } },
+        { provide: RbacService, useValue: { getEffectivePermissions: jest.fn(async () => new Set<string>()) } },
       ],
     }).compile();
     const ctrl = moduleRef.get(UserRegistrationService);

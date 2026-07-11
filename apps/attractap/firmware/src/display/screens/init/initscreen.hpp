@@ -3,7 +3,7 @@
 #include <lvgl.h>
 #include "../../images/logo_400w_png.hpp"
 #include "../IScreen.hpp"
-#include <Arduino.h>
+#include <string>
 #include <functional>
 #include "../../../state/state.hpp"
 
@@ -14,7 +14,7 @@ public:
     void onScreenLeave();
     lv_obj_t *getScreen() override;
     void loop() override;
-    String getName() override;
+    std::string getName() override;
     void destroy() override;
 
     void setOnOpenSettingsCallback(std::function<void()> onOpenSettingsCallback);
@@ -53,7 +53,7 @@ private:
 
     static void onOpenSettingsButtonEvent(lv_event_t *e);
 
-    static String formatIp(esp_ip4_addr_t ip);
+    static std::string formatIp(esp_ip4_addr_t ip);
 
     lv_obj_t *wifiSpinner = nullptr;
     lv_obj_t *wifiLabel = nullptr;

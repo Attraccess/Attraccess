@@ -1,7 +1,7 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Permission, Role, UserRole, UserRoleSource } from '@attraccess/database-entities';
+import { Permission, Role, User, UserRole, UserRoleSource } from '@attraccess/database-entities';
 
 @Injectable()
 export class RbacService {
@@ -13,6 +13,24 @@ export class RbacService {
     @InjectRepository(Permission)
     private readonly permissionRepository: Repository<Permission>,
   ) {}
+
+  async getUsersWithPermission(permissionKey: string): Promise<User[]> {
+    return this.userRoleRepository.manager
+      .getRepository(User)
+      .createQueryBuilder('user')
+      .where(
+        (qb) =>
+          `user.id IN ${qb
+            .subQuery()
+            .select('ur.userId')
+            .from('user_role', 'ur')
+            .innerJoin('role_permission', 'rp', 'rp.roleId = ur.roleId')
+            .where('rp.permissionKey = :permKey')
+            .getQuery()}`,
+      )
+      .setParameter('permKey', permissionKey)
+      .getMany();
+  }
 
   async getEffectivePermissions(userId: number): Promise<Set<string>> {
     const userRoles = await this.userRoleRepository.find({
@@ -96,15 +114,20 @@ export class RbacService {
 
     // last-owner guardrail: don't let the last owner lose the owner role
     if (role.key === 'owner') {
-      const ownerCount = await this.userRoleRepository.count({
-        where: { roleId, source: UserRoleSource.MANUAL },
-      });
+      const ownerCount = await this.userRoleRepository
+        .createQueryBuilder('ur')
+        .innerJoin('user', 'u', 'u.id = ur.userId AND u.deletedAt IS NULL')
+        .where('ur.roleId = :roleId', { roleId })
+        .getCount();
       if (ownerCount <= 1) {
         throw new ForbiddenException('Cannot remove the last owner from the system');
       }
     }
 
-    await this.userRoleRepository.delete({ userId, roleId, source: UserRoleSource.MANUAL });
+    const result = await this.userRoleRepository.delete({ userId, roleId, source: UserRoleSource.MANUAL });
+    if (!result.affected || result.affected === 0) {
+      throw new ForbiddenException('Role is SSO-managed and cannot be manually revoked');
+    }
   }
 
   async syncSsoRoles(
@@ -132,7 +155,7 @@ export class RbacService {
       const role = await this.roleRepository.findOne({ where: { key: roleKey } });
       if (!role) continue;
       const existing = await this.userRoleRepository.findOne({
-        where: { userId, roleId: role.id, source: UserRoleSource.SSO, ssoProviderType, ssoProviderId },
+        where: { userId, roleId: role.id, source: UserRoleSource.SSO },
       });
       if (!existing) {
         await this.userRoleRepository.save(

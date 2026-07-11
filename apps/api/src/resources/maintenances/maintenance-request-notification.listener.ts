@@ -8,6 +8,7 @@ import { Resource, ResourceIntroducer, ResourceMaintenanceRequest, User } from '
 import { ResourceMaintenanceRequestCreatedEvent } from './events/maintenance-request-created.event';
 import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../../notifications/notification-types';
+import { RbacService } from '../../users-and-auth/rbac/rbac.service';
 
 @Injectable()
 export class MaintenanceRequestNotificationListener {
@@ -20,8 +21,7 @@ export class MaintenanceRequestNotificationListener {
     private readonly resourceIntroducerRepository: Repository<ResourceIntroducer>,
     @InjectRepository(ResourceMaintenanceRequest)
     private readonly requestRepository: Repository<ResourceMaintenanceRequest>,
-    @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
+    private readonly rbacService: RbacService,
     private readonly notifications: NotificationDispatchService,
   ) {}
 
@@ -75,11 +75,7 @@ export class MaintenanceRequestNotificationListener {
   private async collectRecipients(resource: Resource): Promise<User[]> {
     const groupIds = (resource.groups ?? []).map((group) => group.id);
 
-    const admins = await this.userRepository
-      .createQueryBuilder('user')
-      .where((qb) => `user.id IN ${qb.subQuery().select('ur.userId').from('user_role', 'ur').innerJoin('role_permission', 'rp', 'rp.roleId = ur.roleId').where('rp.permissionKey = :permKey').getQuery()}`)
-      .setParameter('permKey', 'resources.maintenance.manage')
-      .getMany();
+    const admins = await this.rbacService.getUsersWithPermission('resources.maintenance.manage');
 
     const introducerWhere: Array<Record<string, unknown>> = [{ resourceId: resource.id }];
     if (groupIds.length > 0) {

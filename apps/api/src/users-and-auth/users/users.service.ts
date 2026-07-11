@@ -285,6 +285,13 @@ export class UsersService {
       await this.rbacService.assignRoleByKey(savedUser.id, 'owner');
     }
 
+    // Assign all default roles to every new user
+    const allRoles = await this.rbacService.getRoles();
+    const defaultRoles = allRoles.filter((r) => r.isDefault);
+    for (const role of defaultRoles) {
+      await this.rbacService.assignRoleByKey(savedUser.id, role.key);
+    }
+
     this.metricsService.usersRegisteredTotal.inc();
     this.metricsService.usersTotal.inc();
     this.metricsService.usersPerLocale.inc({ locale: savedUser.locale ?? 'en' });
@@ -618,6 +625,15 @@ export class UsersService {
       // Assign owner role to the first user when bootstrapping
       if (options?.grantAllPermissionsToFirst && totalExisting === 0 && saved.length > 0) {
         await this.rbacService.assignRoleByKey(saved[0].id, 'owner');
+      }
+
+      // Assign all default roles to every new user
+      const allRoles = await this.rbacService.getRoles();
+      const defaultRoles = allRoles.filter((r) => r.isDefault);
+      for (const user of saved) {
+        for (const role of defaultRoles) {
+          await this.rbacService.assignRoleByKey(user.id, role.key);
+        }
       }
 
       return saved;

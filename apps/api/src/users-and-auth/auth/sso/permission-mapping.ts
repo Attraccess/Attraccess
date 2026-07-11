@@ -6,9 +6,6 @@ export const normalizePermissionToken = (token: string): string => {
   return token.toLowerCase().replace(/[^a-z0-9]/g, '');
 };
 
-// Backward-compat fallback: IdP configurations that sent the old boolean permission names
-// as SSO role strings (e.g. Okta attribute "roles" = ["canManageResources"]) still resolve
-// to the corresponding RBAC role key when no explicit permissionMappings are configured.
 const LEGACY_SSO_NAME_TO_ROLE_KEY: Record<string, string> = {
   canmanageresources: 'resource-manager',
   canmanagesystemconfiguration: 'system-admin',
@@ -36,7 +33,6 @@ export const resolveRoleKeysFromSsoRoles = (
     return result;
   }
 
-  // Default: map legacy SSO role names to RBAC role keys
   for (const role of normalizedRoles) {
     const rbacKey = LEGACY_SSO_NAME_TO_ROLE_KEY[role];
     if (rbacKey) result.add(rbacKey);

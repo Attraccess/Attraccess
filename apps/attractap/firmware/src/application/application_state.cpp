@@ -2,6 +2,7 @@
 // FEATURE: application-state
 
 #include "application.hpp"
+#include "platform.hpp"
 
 void Application::processState() {
 #ifdef HAS_WS2812_LED
@@ -9,7 +10,7 @@ void Application::processState() {
 #endif
 
   AttraccessApiConfig attraccessApiConfig = Settings::getAttraccessApiConfig();
-  bool connectionIsConfigured = !attraccessApiConfig.hostname.isEmpty() &&
+  bool connectionIsConfigured = !attraccessApiConfig.hostname.empty() &&
                                 attraccessApiConfig.hostname != "" &&
                                 attraccessApiConfig.port > 0;
 
@@ -173,6 +174,19 @@ void Application::processState() {
     }
   }
 #endif
+
+  // A late or duplicate card-auth response (double-tap on the lockscreen sends
+  // two requests; the websocket task sets the trigger asynchronously) must not
+  // hijack the state machine while the user is already unlocked. Otherwise
+  // state flips to AUTHENTICATE_CARD with the resource-details screen still
+  // shown and the early-return below wedges the UI: buttons are guarded on
+  // state == UNLOCKED and the logout timeout is never evaluated (ATT-718).
+  if (this->externalState == EXTERNAL_STATE_AUTHENTICATE_CARD &&
+      this->unlocked) {
+    this->logger.debug(
+        "Dropping card-auth trigger while unlocked (stale/duplicate response)");
+    this->externalState = EXTERNAL_STATE_NONE;
+  }
 
   if (this->externalState == EXTERNAL_STATE_AUTHENTICATE_CARD) {
     if (this->state == APPLICATION_STATE_AUTHENTICATE_CARD) {
@@ -495,7 +509,7 @@ void Application::processEnrollment() {
     this->enrollErrorPending = false;
     this->beeper.errorBeep();
     Display::enrollmentScreen.setStatus(EnrollmentScreen::STATUS_ERROR);
-    Display::enrollmentScreen.setStatusMessage(String(this->enrollErrorMessage));
+    Display::enrollmentScreen.setStatusMessage(this->enrollErrorMessage);
     this->enrollPhase = ENROLL_PHASE_ERROR;
     this->enrollPhaseChangedMs = now;
     return;

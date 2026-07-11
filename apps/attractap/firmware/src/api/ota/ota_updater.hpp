@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include <string>
+
 #include <ArduinoJson.h>
 #include <functional>
 #include "esp_websocket_client.h"
@@ -16,7 +18,7 @@ public:
     OtaUpdater(Logger &logger,
                std::function<void(const char *, JsonObject)> send,
                std::function<void(int)> &progressCallback,
-               std::function<void(String)> &metaCallback,
+               std::function<void(std::string)> &metaCallback,
                std::function<void(const char *, const char *)> &errorCallback)
         : logger(logger), send(send), progressCallback(progressCallback), metaCallback(metaCallback), errorCallback(errorCallback) {}
 
@@ -39,7 +41,7 @@ private:
     Logger &logger;
     std::function<void(const char *, JsonObject)> send;
     std::function<void(int)> &progressCallback;
-    std::function<void(String)> &metaCallback;
+    std::function<void(std::string)> &metaCallback;
     std::function<void(const char *, const char *)> &errorCallback;
 
     bool readyForNextFirmwareChunk = false;

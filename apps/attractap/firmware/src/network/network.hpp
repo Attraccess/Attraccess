@@ -1,6 +1,7 @@
 #pragma once
 
-#include <Arduino.h>
+#include <string>
+
 #include "esp_netif.h"
 #include "wifi/wifi.hpp"
 #include "ethernet/ethernet.hpp"

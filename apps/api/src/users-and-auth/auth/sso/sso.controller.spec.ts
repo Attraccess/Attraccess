@@ -647,31 +647,6 @@ describe('SsoController', () => {
       expect(usersService.deleteOne).toHaveBeenCalledWith(77);
     });
 
-    it('syncs RBAC roles for oidc permission requests with legacy boolean fields', async () => {
-      const usersService = module.get<UsersService>(UsersService);
-      const rbacService = module.get<RbacService>(RbacService);
-
-      (usersService.findOneBySSO as jest.Mock).mockResolvedValue({ id: 88 });
-
-      const mockRequest = {
-        headers: { authorization: 'Bearer test-client-secret' },
-      } as unknown as AuthenticatedRequest;
-
-      const result = await controller.oidcUpdatePermissions('1', mockRequest as unknown as Request, {
-        subject: 'sub-3',
-        canManageUsers: true,
-        canManageBilling: true,
-      });
-
-      expect(result).toEqual({ OK: true });
-      expect(rbacService.syncSsoRoles).toHaveBeenCalledWith(
-        88,
-        expect.arrayContaining(['user-manager', 'billing-manager']),
-        SSOProviderType.OIDC,
-        1,
-      );
-    });
-
     it('maps role names using provider permission mappings', async () => {
       const usersService = module.get<UsersService>(UsersService);
       const rbacService = module.get<RbacService>(RbacService);

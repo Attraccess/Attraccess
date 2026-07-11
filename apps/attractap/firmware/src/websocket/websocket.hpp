@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Arduino.h>
+#include <string>
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/queue.h"
@@ -25,13 +25,17 @@ public:
     };
     void setup();
     void loop();
-    void sendMessage(const String &message);
+    void sendMessage(const std::string &message);
     void sendMessage(const char *message, size_t length);
     void setMessageCallbackRaw(std::function<void(const char *, size_t)> callback);
     void setBinaryDataCallback(std::function<void(esp_websocket_event_data_t)> callback);
 
     void enableConnectionAttempts();
     void disableConnectionAttempts();
+
+    // Clear the locked TLS certificate decision so the next connect sweeps the
+    // full CA list again (device settings "reset certificate" button).
+    void resetCertificateTrust();
 
 private:
     std::function<void(const char *, size_t)> messageCallbackRaw;
@@ -87,6 +91,16 @@ private:
     uint8_t consecutiveConnectFailures = 0;
     static constexpr uint8_t MAX_CONSECUTIVE_CONNECT_FAILURES = 5;
     void handleConnectFailure(const char *reason);
+
+    // Reboot when no connection could be established for this long even though
+    // network and server config are present (ATT-714).
+    static constexpr uint32_t CONNECT_WATCHDOG_TIMEOUT_MS = 90000;
+    uint32_t connectWatchdogStartMs = 0; // 0 = not waiting
+    // Cert index seen at the last watchdog check: an advancing sweep re-arms the
+    // watchdog, since a full sweep (certs x attempts x retry interval) takes far
+    // longer than one watchdog period and the sweep position only lives in RAM.
+    int connectWatchdogCertIndex = 0;
+    void checkConnectWatchdog(const AttraccessApiConfig &apiConfig);
 
     uint32_t lastInboundFrameTime = 0;
     const uint32_t INBOUND_LIVENESS_TIMEOUT_MS = 20000;

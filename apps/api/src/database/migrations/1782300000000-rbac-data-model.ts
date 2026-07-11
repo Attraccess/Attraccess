@@ -197,6 +197,21 @@ export class RbacDataModel1782300000000 implements MigrationInterface {
       );
     }
 
+    // Backfill: assign the 'owner' role to users who had ALL four admin boolean flags set
+    const ownerRoleRows = await queryRunner.query(`SELECT "id" FROM "role" WHERE "key" = ?`, ['owner']);
+    const ownerRoleId: number = ownerRoleRows[0].id;
+
+    await queryRunner.query(
+      `INSERT OR IGNORE INTO "user_role" ("userId", "roleId", "source")
+       SELECT "id", ?, 'manual' FROM "user"
+       WHERE "canManageResources" = 1
+         AND "canManageSystemConfiguration" = 1
+         AND "canManageUsers" = 1
+         AND "canManageBilling" = 1
+         AND "deletedAt" IS NULL`,
+      [ownerRoleId],
+    );
+
     // Assign the 'user' default role to all non-deleted users who don't already have it
     const userRoleRows = await queryRunner.query(`SELECT "id" FROM "role" WHERE "key" = ?`, ['user']);
     const userRoleId: number = userRoleRows[0].id;

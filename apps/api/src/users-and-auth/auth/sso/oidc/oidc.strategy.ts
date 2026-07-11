@@ -12,7 +12,7 @@ import { UsersService } from '../../../users/users.service';
 import { ModuleRef } from '@nestjs/core';
 import { AccountLinkingRequiredException } from './exceptions/account-linking-required.exception';
 import { AuthService } from '../../auth.service';
-import { resolveRoleKeysFromSsoRoles } from '../permission-mapping';
+import { hasConfiguredPermissionMapping, resolveRoleKeysFromSsoRoles } from '../permission-mapping';
 import { RbacService } from '../../../rbac/rbac.service';
 import { OidcCookieStateStore, OIDCAppState } from './oidc-cookie-state-store';
 import { MetricsService } from '../../../../metrics/metrics.service';
@@ -293,6 +293,13 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', true
     claimSources: unknown[],
   ): Promise<User> {
     const roleNames = this.resolveRoleNamesFromClaims(claimSources);
+
+    // Skip sync if no role claims resolved AND no mapping is configured:
+    // distinguishes "IdP didn't send groups claim" (skip) from "mapped but no groups matched" (sync empty = revoke)
+    if (roleNames.length === 0 && !hasConfiguredPermissionMapping(this.config.permissionMappings)) {
+      return user;
+    }
+
     const roleKeys = resolveRoleKeysFromSsoRoles(roleNames, this.config.permissionMappings);
     this.logger.debug(`RBAC role keys from SSO: ${JSON.stringify([...roleKeys])}`);
 

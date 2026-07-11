@@ -1,4 +1,8 @@
 #include "pinInputPage.hpp"
+#include <string>
+#include <functional>
+
+#include <cstring>
 
 lv_obj_t *PinInputPage::init(const char *title, lv_obj_t *parent)
 {
@@ -64,7 +68,7 @@ lv_obj_t *PinInputPage::init(const char *title, lv_obj_t *parent)
     return this->screen;
 }
 
-void PinInputPage::setOnConfirmCallback(std::function<bool(String)> onConfirmCallback)
+void PinInputPage::setOnConfirmCallback(std::function<bool(std::string)> onConfirmCallback)
 {
     this->onConfirmCallback = onConfirmCallback;
 }
@@ -87,7 +91,7 @@ void PinInputPage::onKeyboardEvent(lv_event_t *e)
     {
         self->logger.debug("Keyboard Confirm pressed");
         const char *text = lv_textarea_get_text(self->devicePin);
-        if (text != nullptr && String(text).length() >= 4)
+        if (text != nullptr && strlen(text) >= 4)
         {
             self->logger.debug("Text is not null and has at least 4 characters");
 
@@ -95,7 +99,7 @@ void PinInputPage::onKeyboardEvent(lv_event_t *e)
             if (self->onConfirmCallback)
             {
                 self->logger.debug("Calling onPinConfirmed");
-                success = self->onConfirmCallback(String(text));
+                success = self->onConfirmCallback(std::string(text));
                 lv_textarea_set_text(self->devicePin, "");
             }
 
@@ -131,7 +135,7 @@ void PinInputPage::onTextChanged(lv_event_t *e)
     }
 
     const char *text = lv_textarea_get_text(self->devicePin);
-    if (text != nullptr && String(text).length() >= 4)
+    if (text != nullptr && strlen(text) >= 4)
     {
         lv_obj_set_style_text_color(self->labelForDevicePin, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
     }

@@ -14,7 +14,7 @@ import { EncryptionService } from '../../../../encryption/encryption.service';
 import { SSOSamlRequest, SSOSamlRequestOptions } from './saml.types';
 import { MetricsService } from '../../../../metrics/metrics.service';
 import { classifySsoFailureReason, markSsoFailureMetricRecorded, recordSsoLoginFailure } from '../sso-metrics';
-import { resolveRoleKeysFromSsoRoles } from '../permission-mapping';
+import { hasConfiguredPermissionMapping, resolveRoleKeysFromSsoRoles } from '../permission-mapping';
 import { RbacService } from '../../../rbac/rbac.service';
 
 type StrategyCtor = new (...args: unknown[]) => Strategy;
@@ -294,6 +294,13 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
     config: SSOProviderSAMLConfiguration,
   ): Promise<User> {
     const roleNames = this.resolveRoleNamesFromClaims(profile);
+
+    // Skip sync if no role claims resolved AND no mapping is configured:
+    // distinguishes "IdP didn't send groups claim" (skip) from "mapped but no groups matched" (sync empty = revoke)
+    if (roleNames.length === 0 && !hasConfiguredPermissionMapping(config.permissionMappings)) {
+      return user;
+    }
+
     const roleKeys = resolveRoleKeysFromSsoRoles(roleNames, config.permissionMappings);
     this.logger.debug(`RBAC role keys from SAML: ${JSON.stringify([...roleKeys])}`);
 

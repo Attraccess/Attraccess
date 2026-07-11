@@ -5,12 +5,13 @@ import { ResourceUsageNoteNotificationListener } from './resource-usage-note-not
 import { ResourceUsageNoteAddedEvent } from './events/resource-usage.events';
 import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../../notifications/notification-types';
+import { RbacService } from '../../users-and-auth/rbac/rbac.service';
 
 describe('ResourceUsageNoteNotificationListener', () => {
   let listener: ResourceUsageNoteNotificationListener;
   let resourceRepository: { findOne: jest.Mock };
   let introducerRepository: { find: jest.Mock };
-  let userRepository: { createQueryBuilder: jest.Mock };
+  let rbacService: { getUsersWithPermission: jest.Mock };
   let notifications: { dispatch: jest.Mock };
 
   const RESOURCE_ID = 7;
@@ -28,26 +29,21 @@ describe('ResourceUsageNoteNotificationListener', () => {
     );
 
   const setAdmins = (admins: User[]) => {
-    userRepository.createQueryBuilder.mockReturnValue({
-      where: jest.fn().mockReturnThis(),
-      setParameter: jest.fn().mockReturnThis(),
-      getMany: jest.fn().mockResolvedValue(admins),
-    });
+    rbacService.getUsersWithPermission.mockResolvedValue(admins);
   };
 
   beforeEach(async () => {
     resourceRepository = { findOne: jest.fn().mockResolvedValue(buildResource()) };
     introducerRepository = { find: jest.fn().mockResolvedValue([]) };
-    userRepository = { createQueryBuilder: jest.fn() };
+    rbacService = { getUsersWithPermission: jest.fn().mockResolvedValue([]) };
     notifications = { dispatch: jest.fn().mockResolvedValue(undefined) };
-    setAdmins([]);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ResourceUsageNoteNotificationListener,
         { provide: getRepositoryToken(Resource), useValue: resourceRepository },
         { provide: getRepositoryToken(ResourceIntroducer), useValue: introducerRepository },
-        { provide: getRepositoryToken(User), useValue: userRepository },
+        { provide: RbacService, useValue: rbacService },
         { provide: NotificationDispatchService, useValue: notifications },
       ],
     }).compile();

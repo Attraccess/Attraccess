@@ -60,11 +60,41 @@ export class DropBooleanPermissions1782500000000 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    // Restore boolean columns (data cannot be recovered, all false)
+    // Restore boolean columns
     await queryRunner.query(`ALTER TABLE "user" ADD COLUMN "canManageResources" boolean NOT NULL DEFAULT (0)`);
     await queryRunner.query(`ALTER TABLE "user" ADD COLUMN "canManageSystemConfiguration" boolean NOT NULL DEFAULT (0)`);
     await queryRunner.query(`ALTER TABLE "user" ADD COLUMN "canManageUsers" boolean NOT NULL DEFAULT (0)`);
     await queryRunner.query(`ALTER TABLE "user" ADD COLUMN "canManageBilling" boolean NOT NULL DEFAULT (0)`);
+
+    // Restore boolean values from user_role assignments (manual source only)
+    await queryRunner.query(
+      `UPDATE "user" SET "canManageResources" = 1 WHERE "id" IN (
+        SELECT ur."userId" FROM "user_role" ur
+        INNER JOIN "role" r ON r."id" = ur."roleId"
+        WHERE r."key" = 'resource-manager' AND ur."source" = 'manual'
+      )`,
+    );
+    await queryRunner.query(
+      `UPDATE "user" SET "canManageSystemConfiguration" = 1 WHERE "id" IN (
+        SELECT ur."userId" FROM "user_role" ur
+        INNER JOIN "role" r ON r."id" = ur."roleId"
+        WHERE r."key" = 'system-admin' AND ur."source" = 'manual'
+      )`,
+    );
+    await queryRunner.query(
+      `UPDATE "user" SET "canManageUsers" = 1 WHERE "id" IN (
+        SELECT ur."userId" FROM "user_role" ur
+        INNER JOIN "role" r ON r."id" = ur."roleId"
+        WHERE r."key" = 'user-manager' AND ur."source" = 'manual'
+      )`,
+    );
+    await queryRunner.query(
+      `UPDATE "user" SET "canManageBilling" = 1 WHERE "id" IN (
+        SELECT ur."userId" FROM "user_role" ur
+        INNER JOIN "role" r ON r."id" = ur."roleId"
+        WHERE r."key" = 'billing-manager' AND ur."source" = 'manual'
+      )`,
+    );
 
     // Revert SSO provider OIDC permissionMappings JSON keys (RBAC role keys → legacy boolean names)
     const rbacToLegacy = Object.fromEntries(

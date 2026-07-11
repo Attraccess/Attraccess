@@ -1,8 +1,53 @@
 #include "utils.hpp"
+#include <string>
+#include <cstdio>
+#include <cstring>
+#include "driver/gpio.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
+#include "platform.hpp"
 
 static SemaphoreHandle_t s_i2cBusMutex = nullptr;
+static i2c_master_bus_handle_t s_i2cBus = nullptr;
+
+bool initSharedI2CBus(int sda, int scl)
+{
+    if (s_i2cBus)
+    {
+        return true;
+    }
+    i2c_master_bus_config_t cfg = {};
+    cfg.i2c_port = I2C_NUM_0;
+    cfg.sda_io_num = (gpio_num_t)sda;
+    cfg.scl_io_num = (gpio_num_t)scl;
+    cfg.clk_source = I2C_CLK_SRC_DEFAULT;
+    cfg.glitch_ignore_cnt = 7;
+    cfg.flags.enable_internal_pullup = true; // Wire.begin() default
+    return i2c_new_master_bus(&cfg, &s_i2cBus) == ESP_OK;
+}
+
+i2c_master_bus_handle_t getSharedI2CBus()
+{
+    return s_i2cBus;
+}
+
+i2c_master_dev_handle_t addSharedI2CDevice(uint8_t address7bit, uint32_t sclSpeedHz)
+{
+    if (!s_i2cBus)
+    {
+        return nullptr;
+    }
+    i2c_device_config_t devCfg = {};
+    devCfg.dev_addr_length = I2C_ADDR_BIT_LEN_7;
+    devCfg.device_address = address7bit;
+    devCfg.scl_speed_hz = sclSpeedHz;
+    i2c_master_dev_handle_t dev = nullptr;
+    if (i2c_master_bus_add_device(s_i2cBus, &devCfg, &dev) != ESP_OK)
+    {
+        return nullptr;
+    }
+    return dev;
+}
 
 void I2CBusLock::init()
 {
@@ -30,26 +75,32 @@ void I2CBusLock::unlock()
 
 void recoverI2CBus(int sda, int scl)
 {
-    pinMode(scl, OUTPUT);
-    pinMode(sda, INPUT_PULLUP); // sense SDA without driving it
+    gpio_num_t sdaPin = (gpio_num_t)sda;
+    gpio_num_t sclPin = (gpio_num_t)scl;
+
+    gpio_set_direction(sclPin, GPIO_MODE_OUTPUT);
+    gpio_set_direction(sdaPin, GPIO_MODE_INPUT); // sense SDA without driving it
+    gpio_set_pull_mode(sdaPin, GPIO_PULLUP_ONLY);
     for (int i = 0; i < 9; i++)
     {
-        digitalWrite(scl, LOW);
+        gpio_set_level(sclPin, 0);
         delayMicroseconds(10);
-        digitalWrite(scl, HIGH);
+        gpio_set_level(sclPin, 1);
         delayMicroseconds(10);
-        if (digitalRead(sda))
+        if (gpio_get_level(sdaPin))
             break; // slave released SDA — bus is free
     }
     // STOP condition: SDA LOW → SCL HIGH → SDA HIGH
-    pinMode(sda, OUTPUT);
-    digitalWrite(sda, LOW);
+    gpio_set_direction(sdaPin, GPIO_MODE_OUTPUT);
+    gpio_set_level(sdaPin, 0);
     delayMicroseconds(10);
-    digitalWrite(scl, HIGH);
+    gpio_set_level(sclPin, 1);
     delayMicroseconds(10);
-    digitalWrite(sda, HIGH);
+    gpio_set_level(sdaPin, 1);
     delayMicroseconds(10);
-    // Pins will be reclaimed by Wire.begin() immediately after
+    // Release the pads so the i2c_master driver can claim them right after
+    gpio_reset_pin(sdaPin);
+    gpio_reset_pin(sclPin);
 }
 
 static inline int8_t hexCharToNibble(char c)
@@ -69,36 +120,48 @@ static inline int8_t hexCharToNibble(char c)
     return -1;
 }
 
-String hexToString(uint8_t *uid, uint8_t uidLength)
+void trimString(std::string &s)
 {
-    String hexString = "";
+    const char *ws = " \t\r\n\f\v";
+    size_t start = s.find_first_not_of(ws);
+    if (start == std::string::npos)
+    {
+        s.clear();
+        return;
+    }
+    size_t end = s.find_last_not_of(ws);
+    s = s.substr(start, end - start + 1);
+}
+
+std::string hexToString(const uint8_t *uid, uint8_t uidLength)
+{
+    std::string hexString;
+    hexString.reserve(uidLength * 2);
+    char buf[3];
     for (uint8_t i = 0; i < uidLength; i++)
     {
-        // Always render two hex digits per byte (zero-padded)
-        if (uid[i] < 0x10)
-        {
-            hexString += "0";
-        }
-        hexString += String(uid[i], HEX);
+        // Always render two hex digits per byte (zero-padded, lowercase)
+        snprintf(buf, sizeof(buf), "%02x", uid[i]);
+        hexString += buf;
     }
     return hexString;
 }
 
-bool stringToHexArray(String hexString, uint8_t *array, uint8_t arrayLength)
+bool stringToHexArray(const std::string &hexString, uint8_t *array, uint8_t arrayLength)
 {
-    hexString.trim();
+    std::string trimmed = hexString;
+    trimString(trimmed);
 
-    uint8_t expectedLength = arrayLength * 2;
-    uint8_t hexLength = hexString.length();
-    if (hexLength != expectedLength)
+    size_t expectedLength = static_cast<size_t>(arrayLength) * 2;
+    if (trimmed.length() != expectedLength)
     {
         return false;
     }
 
     for (uint8_t i = 0; i < arrayLength; i++)
     {
-        char hiChar = hexString.charAt(i * 2);
-        char loChar = hexString.charAt((i * 2) + 1);
+        char hiChar = trimmed[i * 2];
+        char loChar = trimmed[(i * 2) + 1];
 
         int8_t hi = hexCharToNibble(hiChar);
         int8_t lo = hexCharToNibble(loChar);
@@ -113,70 +176,54 @@ bool stringToHexArray(String hexString, uint8_t *array, uint8_t arrayLength)
     return true;
 }
 
-String padWithZero(int value, int length)
-{
-    String s = String(value);
-    while (s.length() < length)
-    {
-        s = "0" + s;
-    }
-    return s;
-}
-
-String millisToTimeString(double millis)
+std::string millisToTimeString(double millis)
 {
     long hours = millis / 3600000;
     long minutes = (static_cast<long>(millis) % 3600000) / 60000;
     long seconds = (static_cast<long>(millis) % 60000) / 1000;
 
-    String minutesString = padWithZero(minutes, 2);
-    String secondsString = padWithZero(seconds, 2);
-
+    char buf[32];
     if (hours == 0)
     {
-        return minutesString + ":" + secondsString;
+        snprintf(buf, sizeof(buf), "%02ld:%02ld", minutes, seconds);
     }
-
-    String hoursString = padWithZero(hours, 2);
-    return hoursString + ":" + minutesString + ":" + secondsString;
+    else
+    {
+        snprintf(buf, sizeof(buf), "%02ld:%02ld:%02ld", hours, minutes, seconds);
+    }
+    return std::string(buf);
 }
 
-String timeToTimeString(time_t time, int utcOffsetMinutes)
+std::string timeToTimeString(time_t time, int utcOffsetMinutes)
 {
     // `time` is UTC. Shift by the server-provided offset, then render with gmtime so the
     // result is independent of the device's own (unset) timezone. Offset 0 -> UTC.
     time_t shifted = time + (time_t)utcOffsetMinutes * 60;
     struct tm tmInfo;
     gmtime_r(&shifted, &tmInfo);
-    struct tm *tm = &tmInfo;
-    int month = tm->tm_mon + 1;
-    int day = tm->tm_mday;
-    int hours = tm->tm_hour;
-    int minutes = tm->tm_min;
 
-    String hoursString = padWithZero(hours, 2);
-    String minutesString = padWithZero(minutes, 2);
-
-    return String(day) + "." + String(month) + ". " + hoursString + ":" + minutesString;
+    char buf[24];
+    snprintf(buf, sizeof(buf), "%d.%d. %02d:%02d", tmInfo.tm_mday, tmInfo.tm_mon + 1, tmInfo.tm_hour, tmInfo.tm_min);
+    return std::string(buf);
 }
 
-static bool parseTwoDigits(const String &s, int startIndex, int &out)
+static bool parseTwoDigits(const std::string &s, size_t startIndex, int &out)
 {
     if (startIndex + 1 >= s.length())
         return false;
-    char c0 = s.charAt(startIndex);
-    char c1 = s.charAt(startIndex + 1);
+    char c0 = s[startIndex];
+    char c1 = s[startIndex + 1];
     if (c0 < '0' || c0 > '9' || c1 < '0' || c1 > '9')
         return false;
     out = (c0 - '0') * 10 + (c1 - '0');
     return true;
 }
 
-static bool parseFourDigits(const String &s, int startIndex, int &out)
+static bool parseFourDigits(const std::string &s, size_t startIndex, int &out)
 {
     if (startIndex + 3 >= s.length())
         return false;
-    int d0, d1, d2, d3;
+    int d0, d2;
     if (!parseTwoDigits(s, startIndex, d0))
         return false;
     if (!parseTwoDigits(s, startIndex + 2, d2))
@@ -185,11 +232,10 @@ static bool parseFourDigits(const String &s, int startIndex, int &out)
     return true;
 }
 
-time_t parseIso8601ToTimeT(const String &iso8610)
+time_t parseIso8601ToTimeT(const std::string &iso8601)
 {
-    // Copy into a local C-string for strptime-like parsing we implement manually
-    String s = iso8610;
-    s.trim();
+    std::string s = iso8601;
+    trimString(s);
     // Expected base: YYYY-MM-DDTHH:MM:SS[.frac][Z|±HH:MM]
     // Minimal length: 19 (YYYY-MM-DDTHH:MM:SS)
     if (s.length() < 19)
@@ -198,36 +244,36 @@ time_t parseIso8601ToTimeT(const String &iso8610)
     int year, month, day, hour, minute, second;
     if (!parseFourDigits(s, 0, year))
         return (time_t)-1; // YYYY
-    if (s.charAt(4) != '-')
+    if (s[4] != '-')
         return (time_t)-1;
     if (!parseTwoDigits(s, 5, month))
         return (time_t)-1; // MM
-    if (s.charAt(7) != '-')
+    if (s[7] != '-')
         return (time_t)-1;
     if (!parseTwoDigits(s, 8, day))
         return (time_t)-1; // DD
-    char tSep = s.charAt(10);
+    char tSep = s[10];
     if (tSep != 'T' && tSep != 't' && tSep != ' ')
         return (time_t)-1;
     if (!parseTwoDigits(s, 11, hour))
         return (time_t)-1; // HH
-    if (s.charAt(13) != ':')
+    if (s[13] != ':')
         return (time_t)-1;
     if (!parseTwoDigits(s, 14, minute))
         return (time_t)-1; // MM
-    if (s.charAt(16) != ':')
+    if (s[16] != ':')
         return (time_t)-1;
     if (!parseTwoDigits(s, 17, second))
         return (time_t)-1; // SS
 
-    int index = 19;
+    size_t index = 19;
     // Optional fractional seconds: .sss...
-    if (index < s.length() && s.charAt(index) == '.')
+    if (index < s.length() && s[index] == '.')
     {
         index++;
         while (index < s.length())
         {
-            char c = s.charAt(index);
+            char c = s[index];
             if (c < '0' || c > '9')
                 break;
             index++;
@@ -240,7 +286,7 @@ time_t parseIso8601ToTimeT(const String &iso8610)
     int tzMinute = 0;
     if (index < s.length())
     {
-        char tz = s.charAt(index);
+        char tz = s[index];
         if (tz == 'Z' || tz == 'z')
         {
             index++;
@@ -251,7 +297,7 @@ time_t parseIso8601ToTimeT(const String &iso8610)
             // Expect HH:MM
             if (!parseTwoDigits(s, index + 1, tzHour))
                 return (time_t)-1;
-            if (s.charAt(index + 3) != ':')
+            if (index + 3 >= s.length() || s[index + 3] != ':')
                 return (time_t)-1;
             if (!parseTwoDigits(s, index + 4, tzMinute))
                 return (time_t)-1;
@@ -291,7 +337,7 @@ time_t parseIso8601ToTimeT(const String &iso8610)
     return t;
 }
 
-String translateReaderError(const String &errorKey)
+std::string translateReaderError(const std::string &errorKey)
 {
     // Card / enrollment errors
     if (errorKey == "USER_NOT_SET")
