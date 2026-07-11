@@ -1,11 +1,18 @@
 #include "wifi.hpp"
+#include "platform.hpp"
+
+#include <algorithm>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <string>
 
 bool Wifi::is_setup = false;
 esp_netif_t *Wifi::wifi_interface = NULL;
 Logger Wifi::logger("WiFi");
 
 Wifi::WifiState Wifi::_state = WIFI_STATE_INIT;
-String Wifi::_lastSSID;
+std::string Wifi::_lastSSID;
 
 uint8_t Wifi::current_reconnect_attempts_count = 0;
 uint32_t Wifi::last_reconnect_attempt_time_ms = 0;
@@ -17,11 +24,11 @@ bool Wifi::is_scanning = false;
 Wifi::WifiNetwork Wifi::knownWifiNetworks[MAX_KNOWN_WIFI_NETWORKS];
 uint8_t Wifi::knownWifiNetworksCount = 0;
 
-static String formatMac(const uint8_t *mac)
+static std::string formatMac(const uint8_t *mac)
 {
     char buf[18];
     snprintf(buf, sizeof(buf), "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-    return String(buf);
+    return std::string(buf);
 }
 
 const char *Wifi::getStateName(WifiState state)
@@ -127,7 +134,7 @@ void Wifi::setup()
         return;
     }
 
-    String hostname = Settings::getHostname() + "-wifi";
+    std::string hostname = Settings::getHostname() + "-wifi";
     esp_netif_set_hostname(wifi_interface, hostname.c_str());
     logger.infof("Hostname set to %s", hostname.c_str());
 
@@ -146,7 +153,7 @@ void Wifi::setup()
     esp_err_t wifi_init_result = esp_wifi_init(&cfg);
     if (wifi_init_result != ESP_OK)
     {
-        logger.error((String("Failed to initialize WiFi: ") + esp_err_to_name(wifi_init_result)).c_str());
+        logger.error((std::string("Failed to initialize WiFi: ") + esp_err_to_name(wifi_init_result)).c_str());
 
         logger.infof("Free internal heap before WiFi: %u", heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
         return;
@@ -156,14 +163,14 @@ void Wifi::setup()
     esp_err_t wifi_event_handler_result = esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifiEventHandler, NULL);
     if (wifi_event_handler_result != ESP_OK)
     {
-        logger.error((String("Failed to register WiFi event handler: ") + esp_err_to_name(wifi_event_handler_result)).c_str());
+        logger.error((std::string("Failed to register WiFi event handler: ") + esp_err_to_name(wifi_event_handler_result)).c_str());
         return;
     }
 
     esp_err_t ip_event_handler_result = esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &ipEventHandler, NULL);
     if (ip_event_handler_result != ESP_OK)
     {
-        logger.error((String("Failed to register IP event handler: ") + esp_err_to_name(ip_event_handler_result)).c_str());
+        logger.error((std::string("Failed to register IP event handler: ") + esp_err_to_name(ip_event_handler_result)).c_str());
         return;
     }
 
@@ -171,14 +178,14 @@ void Wifi::setup()
     esp_err_t wifi_set_mode_result = esp_wifi_set_mode(WIFI_MODE_STA);
     if (wifi_set_mode_result != ESP_OK)
     {
-        logger.error((String("Failed to set WiFi mode: ") + esp_err_to_name(wifi_set_mode_result)).c_str());
+        logger.error((std::string("Failed to set WiFi mode: ") + esp_err_to_name(wifi_set_mode_result)).c_str());
         return;
     }
 
     esp_err_t wifi_start_result = esp_wifi_start();
     if (wifi_start_result != ESP_OK)
     {
-        logger.error((String("Failed to start WiFi: ") + esp_err_to_name(wifi_start_result)).c_str());
+        logger.error((std::string("Failed to start WiFi: ") + esp_err_to_name(wifi_start_result)).c_str());
         return;
     }
 
@@ -196,7 +203,7 @@ void Wifi::wifiEventHandler(void *arg, esp_event_base_t event_base, int32_t even
     case WIFI_EVENT_STA_CONNECTED:
     {
         auto *ev = (wifi_event_sta_connected_t *)event_data;
-        String ssid = String(reinterpret_cast<const char *>(ev->ssid), ev->ssid_len);
+        std::string ssid(reinterpret_cast<const char *>(ev->ssid), ev->ssid_len);
         logger.infof("Associated with SSID '%s' BSSID %s on channel %d", ssid.c_str(), formatMac(ev->bssid).c_str(), ev->channel);
 
         if (_state != WIFI_STATE_CONNECTED)
@@ -332,8 +339,8 @@ void Wifi::tryAutoConnect()
         return;
     }
 
-    String savedSSID = Settings::getNetworkConfig().ssid;
-    String savedPassword = Settings::getNetworkConfig().password;
+    std::string savedSSID = Settings::getNetworkConfig().ssid;
+    std::string savedPassword = Settings::getNetworkConfig().password;
 
     logger.infof("Reconnect attempt #%u to '%s'", current_reconnect_attempts_count, savedSSID.c_str());
     connectToNetwork(savedSSID, savedPassword);
@@ -344,7 +351,7 @@ bool Wifi::hasSavedCredentials()
     return Settings::getNetworkConfig().ssid.length() > 0;
 }
 
-void Wifi::connectToNetwork(const String &ssid, const String &password)
+void Wifi::connectToNetwork(const std::string &ssid, const std::string &password)
 {
     logger.infof("Connecting to SSID '%s'", ssid.c_str());
 
@@ -385,7 +392,7 @@ void Wifi::connectToNetwork(const String &ssid, const String &password)
     esp_err_t wifi_set_config_result = esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
     if (wifi_set_config_result != ESP_OK)
     {
-        logger.error((String("Failed to set WiFi config: ") + esp_err_to_name(wifi_set_config_result)).c_str());
+        logger.error((std::string("Failed to set WiFi config: ") + esp_err_to_name(wifi_set_config_result)).c_str());
         setState(WIFI_STATE_CONNECT_FAILED);
         return;
     }
@@ -397,7 +404,7 @@ void Wifi::connectToNetwork(const String &ssid, const String &password)
 
     if (wifi_connect_result != ESP_OK)
     {
-        logger.error((String("Failed to start WiFi connection: ") + esp_err_to_name(wifi_connect_result)).c_str());
+        logger.error((std::string("Failed to start WiFi connection: ") + esp_err_to_name(wifi_connect_result)).c_str());
         setState(WIFI_STATE_CONNECT_FAILED);
         return;
     }
@@ -446,7 +453,7 @@ void Wifi::startScan()
     esp_err_t err = esp_wifi_scan_start(&scan_config, false);
     if (err != ESP_OK)
     {
-        logger.error((String("Failed to start scan: ") + esp_err_to_name(err)).c_str());
+        logger.error((std::string("Failed to start scan: ") + esp_err_to_name(err)).c_str());
         Wifi::is_scanning = false;
     }
     logger.debug("WiFi scan started");
@@ -465,7 +472,7 @@ void Wifi::handleScanComplete()
 
     if (err != ESP_OK)
     {
-        logger.error((String("Error getting scan count: ") + esp_err_to_name(err)).c_str());
+        logger.error((std::string("Error getting scan count: ") + esp_err_to_name(err)).c_str());
         knownWifiNetworksCount = 0;
         Wifi::is_scanning = false;
         return;
@@ -479,7 +486,7 @@ void Wifi::handleScanComplete()
         return;
     }
 
-    knownWifiNetworksCount = min((int)scan_count, (int)MAX_KNOWN_WIFI_NETWORKS);
+    knownWifiNetworksCount = std::min((int)scan_count, (int)MAX_KNOWN_WIFI_NETWORKS);
     logger.infof("Scan complete: %u networks", knownWifiNetworksCount);
 
     wifi_ap_record_t *ap_records = (wifi_ap_record_t *)malloc(scan_count * sizeof(wifi_ap_record_t));
@@ -496,7 +503,7 @@ void Wifi::handleScanComplete()
     err = esp_wifi_scan_get_ap_records(&scan_count, ap_records);
     if (err != ESP_OK)
     {
-        logger.error((String("Error getting scan records: ") + esp_err_to_name(err)).c_str());
+        logger.error((std::string("Error getting scan records: ") + esp_err_to_name(err)).c_str());
         free(ap_records);
         knownWifiNetworksCount = 0;
         Wifi::is_scanning = false;
@@ -521,7 +528,7 @@ void Wifi::handleScanComplete()
             memcpy(ssid_str, ap_records[i].ssid, ssid_len);
             ssid_str[ssid_len] = '\0'; // Ensure null termination
 
-            knownWifiNetworks[i].ssid = String(ssid_str);
+            knownWifiNetworks[i].ssid = std::string(ssid_str);
             knownWifiNetworks[i].rssi = ap_records[i].rssi;
             knownWifiNetworks[i].encryptionType = ap_records[i].authmode;
             knownWifiNetworks[i].isOpen = (ap_records[i].authmode == WIFI_AUTH_OPEN);

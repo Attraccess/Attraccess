@@ -1,6 +1,7 @@
 #pragma once
 
-#include <Arduino.h>
+#include <string>
+
 #include "esp_wifi.h"
 #include "esp_event.h"
 #include "esp_netif.h"
@@ -16,8 +17,8 @@ public:
     static const uint8_t MAX_KNOWN_WIFI_NETWORKS = 20;
     struct WifiCredentials
     {
-        String ssid;
-        String password;
+        std::string ssid;
+        std::string password;
     };
     enum WifiState
     {
@@ -30,7 +31,7 @@ public:
     };
     struct WifiNetwork
     {
-        String ssid;
+        std::string ssid;
         int32_t rssi;
         wifi_auth_mode_t encryptionType;
         bool isOpen;
@@ -43,7 +44,7 @@ public:
     };
 
     static void setup();
-    static void connectToNetwork(const String &ssid, const String &password);
+    static void connectToNetwork(const std::string &ssid, const std::string &password);
     static WifiState getState();
     static esp_ip4_addr_t getIPAddress();
     static void startScan();
@@ -66,7 +67,7 @@ private:
     static uint8_t knownWifiNetworksCount;
     static void handleScanComplete();
 
-    static String _lastSSID;
+    static std::string _lastSSID;
 
     static void setState(WifiState state);
     static void handleTimeout();

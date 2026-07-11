@@ -230,13 +230,53 @@ describe('SSO OIDC integration (e2e with testcontainers)', () => {
   });
 
   /**
+   * mock-oauth2-server 2.x shows a login form before redirecting.
+   * Follow redirects manually, submitting the login form when we hit a 200,
+   * until we reach the callback URL (http://localhost:0/...).
+   */
+  async function followOAuthFlowToCallback(startUrl: string): Promise<string> {
+    let currentUrl = startUrl;
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const resp = await fetch(currentUrl, { redirect: 'manual' });
+      const location = resp.headers.get('location');
+
+      if (location?.startsWith('http://localhost:0')) {
+        return location;
+      }
+
+      if (resp.status >= 300 && resp.status < 400 && location) {
+        currentUrl = new URL(location, currentUrl).toString();
+        continue;
+      }
+
+      if (resp.status === 200) {
+        const html = await resp.text();
+        const formActionMatch = html.match(/action="([^"]+)"/);
+        const postUrl = formActionMatch ? new URL(formActionMatch[1], currentUrl).toString() : currentUrl;
+        const loginResp = await fetch(postUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ username: 'testuser@example.com' }).toString(),
+          redirect: 'manual',
+        });
+        const nextLocation = loginResp.headers.get('location');
+        if (nextLocation?.startsWith('http://localhost:0')) return nextLocation;
+        if (nextLocation) {
+          currentUrl = new URL(nextLocation, currentUrl).toString();
+          continue;
+        }
+      }
+
+      throw new Error(`OAuth flow stuck: status ${resp.status} at ${currentUrl}`);
+    }
+    throw new Error('OAuth flow did not reach callback after 10 attempts');
+  }
+
+  /**
    * Drives the full OIDC authorization-code flow without a browser:
    *  1. Call strategy.authenticate() in "login" mode → captures the IdP redirect URL.
-   *  2. GET the IdP authorization URL → mock-oauth2-server immediately 302s back
-   *     to the callback URL with a real signed code + state.
-   *  3. Call strategy.authenticate() in "callback" mode → the strategy exchanges the
-   *     code for tokens (real HTTP call), validates the JWT via JWKS (real HTTP call),
-   *     fetches userinfo (real HTTP call), then calls validate().
+   *  2. Follow the IdP flow (handles mock-oauth2-server login form) → extracts code+state.
+   *  3. Call strategy.authenticate() in "callback" mode → exchanges code, validates JWT.
    */
   async function driveOidcFlow(strategy: SSOOIDCStrategy): Promise<User> {
     // ── Step 1: login initiation ───────────────────────────────────────────
@@ -262,14 +302,8 @@ describe('SSO OIDC integration (e2e with testcontainers)', () => {
 
     if (!capturedRedirectUrl) throw new Error('Strategy did not redirect to IdP');
 
-    // ── Step 2: follow IdP redirect (mock-oauth2-server returns code immediately)
-    const idpResponse = await fetch(capturedRedirectUrl, { redirect: 'manual' });
-    const callbackLocation = idpResponse.headers.get('location');
-    if (!callbackLocation) {
-      throw new Error(
-        `IdP did not redirect to callback. Status: ${idpResponse.status}, body: ${await idpResponse.text().catch(() => '')}`,
-      );
-    }
+    // ── Step 2: follow IdP flow (handles login form from mock-oauth2-server 2.x)
+    const callbackLocation = await followOAuthFlowToCallback(capturedRedirectUrl);
 
     const callbackUrl = new URL(callbackLocation);
     const code = callbackUrl.searchParams.get('code');

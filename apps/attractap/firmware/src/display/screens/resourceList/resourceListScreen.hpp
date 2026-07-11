@@ -4,6 +4,7 @@
 #include "../../images/lockscreen_background_image.hpp"
 #include <ArduinoJson.h>
 #include <functional>
+#include <string>
 #include "../../../logger/logger.hpp"
 #include "../../images/logo_40h.hpp"
 #include <map>
@@ -17,7 +18,7 @@ public:
     void onScreenLeave();
     void loop() override;
     lv_obj_t *getScreen() override;
-    String getName() override;
+    std::string getName() override;
     void destroy() override;
 
     void setResourceList(const API::ResourceList &resourceList);

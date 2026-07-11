@@ -1,4 +1,6 @@
 #include "setPinScreen.hpp"
+#include <string>
+#include <functional>
 #include <cstring>
 
 void SetPinScreen::init()
@@ -7,12 +9,12 @@ void SetPinScreen::init()
    {
       return;
    }
-   this->pinInputPage.setOnConfirmCallback([this](String pin)
+   this->pinInputPage.setOnConfirmCallback([this](std::string pin)
                                            { this->onPinConfirmed(pin); return true; });
    this->screen = this->pinInputPage.init("Geraete-PIN");
 }
 
-void SetPinScreen::setOnPinConfirmedCallback(std::function<void(String)> onPinConfirmed)
+void SetPinScreen::setOnPinConfirmedCallback(std::function<void(std::string)> onPinConfirmed)
 {
    this->onPinConfirmed = onPinConfirmed;
 }
@@ -26,7 +28,7 @@ lv_obj_t *SetPinScreen::getScreen()
    return this->screen;
 }
 
-String SetPinScreen::getName()
+std::string SetPinScreen::getName()
 {
    return "SetPinScreen";
 }

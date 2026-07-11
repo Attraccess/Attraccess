@@ -1,6 +1,7 @@
 #ifdef HAS_WS2812_LED
 
 #include "led.hpp"
+#include "../platform.hpp"
 #include "../settings/settings.hpp"
 
 #ifndef PIN_WS2812_DATA

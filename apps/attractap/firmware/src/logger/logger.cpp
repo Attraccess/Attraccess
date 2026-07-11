@@ -1,4 +1,8 @@
 #include "logger.hpp"
+#include <string>
+#include <cstdio>
+#include <cstring>
+#include <algorithm>
 #include <memory>
 #include <new>
 // Ensure we can safely convert macro values to strings
@@ -20,7 +24,7 @@ Logger::Logger(const char *name) : name(name)
         if (length >= 2 && macroValue[length - 1] == '"')
         {
             char trimmed[16];
-            size_t copyLength = min((size_t)14, length - 2); // leave room for null terminator
+            size_t copyLength = std::min((size_t)14, length - 2); // leave room for null terminator
             memcpy(trimmed, macroValue + 1, copyLength);
             trimmed[copyLength] = '\0';
             Logger::setLevel(getLogLevelFromString(trimmed));
@@ -107,7 +111,7 @@ void Logger::debugf(const char *message, ...)
 }
 #endif
 
-void Logger::setLogLevel(String level, bool saveToPreferences)
+void Logger::setLogLevel(const std::string &level, bool saveToPreferences)
 {
     Logger::setLevel(getLogLevelFromString(level.c_str()), saveToPreferences);
 }
@@ -117,7 +121,7 @@ void Logger::setLevel(LogLevel level, bool saveToPreferences)
     Logger::level = level;
 }
 
-String Logger::getLogLevelString(LogLevel level)
+const char *Logger::getLogLevelString(LogLevel level)
 {
     switch (level)
     {
@@ -162,12 +166,7 @@ void Logger::log(const char *message, LogLevel level)
         return;
     }
     // Use a safe, non-variadic path to avoid undefined behavior from a NULL va_list
-    Serial.print("[");
-    Serial.print(name);
-    Serial.print("] ");
-    Serial.print(getLogLevelString(level));
-    Serial.print(": ");
-    Serial.println(message);
+    printf("[%s] %s: %s\n", name, getLogLevelString(level), message);
 }
 
 void Logger::logf(const char *message, LogLevel level, va_list args)
@@ -196,12 +195,7 @@ void Logger::logf(const char *message, LogLevel level, va_list args)
         vsnprintf(heapBuffer.get(), bufferSize, message, formatArgs);
         va_end(formatArgs);
 
-        Serial.print("[");
-        Serial.print(name);
-        Serial.print("] ");
-        Serial.print(getLogLevelString(level));
-        Serial.print(": ");
-        Serial.println(heapBuffer.get());
+        printf("[%s] %s: %s\n", name, getLogLevelString(level), heapBuffer.get());
         return;
     }
 
@@ -212,10 +206,5 @@ void Logger::logf(const char *message, LogLevel level, va_list args)
     vsnprintf(fallback, sizeof(fallback), message, fallbackArgs);
     va_end(fallbackArgs);
 
-    Serial.print("[");
-    Serial.print(name);
-    Serial.print("] ");
-    Serial.print(getLogLevelString(level));
-    Serial.print(": ");
-    Serial.println(fallback);
+    printf("[%s] %s: %s\n", name, getLogLevelString(level), fallback);
 }

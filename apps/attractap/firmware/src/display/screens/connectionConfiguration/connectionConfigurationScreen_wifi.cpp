@@ -1,5 +1,7 @@
 #include "connectionConfigurationScreen.hpp"
+#include <string>
 #include "../../../network/wifi/wifi.hpp"
+#include "platform.hpp"
 
 // WiFi network scanning + dropdown population.
 
@@ -55,17 +57,17 @@ void ConnectionConfigurationScreen::populateWifiDropdown()
    }
 
    Wifi::WifiScanResult scan = Wifi::getKnownWifiNetworks();
-   String options = "";
-   String savedSSID = Settings::getNetworkConfig().ssid;
+   std::string options = "";
+   std::string savedSSID = Settings::getNetworkConfig().ssid;
    uint8_t selectedIndex = 0;
    bool selectedFound = false;
 
-   String uniqueSsids[Wifi::MAX_KNOWN_WIFI_NETWORKS];
+   std::string uniqueSsids[Wifi::MAX_KNOWN_WIFI_NETWORKS];
    uint8_t uniqueCount = 0;
 
    for (uint8_t i = 0; i < scan.count; i++)
    {
-      const String &ssid = scan.networks[i].ssid;
+      const std::string &ssid = scan.networks[i].ssid;
       if (ssid.length() == 0)
       {
          continue;

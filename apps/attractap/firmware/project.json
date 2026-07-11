@@ -11,12 +11,19 @@
         "command": "cd apps/attractap/firmware && python3 build_firmwares.py",
         "cwd": "."
       },
-      "outputs": ["{projectRoot}/firmware_output"],
+      "outputs": [
+        "{projectRoot}/firmware_output"
+      ],
       "inputs": [
-        "{projectRoot}/platformio.ini",
+        "{projectRoot}/CMakeLists.txt",
+        "{projectRoot}/main/**/*",
+        "{projectRoot}/variants/**/*",
+        "{projectRoot}/sdkconfig.defaults",
+        "{projectRoot}/version.txt",
+        "{projectRoot}/partitions.csv",
+        "{projectRoot}/include/**/*",
         "{projectRoot}/build_firmwares.py",
-        "{projectRoot}/src/**/*",
-        "{projectRoot}/.pio/**/*"
+        "{projectRoot}/src/**/*"
       ],
       "cache": true
     }

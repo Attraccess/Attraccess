@@ -2,10 +2,14 @@
 // FEATURE: api-core
 
 #include "api.hpp"
+#include <functional>
 #include "../utils.hpp"
+#include "platform.hpp"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include <cstring>
 #include <memory>
+#include <string>
 
 constexpr size_t API::MAX_PROJECTS_PER_PAGE;
 
@@ -36,7 +40,7 @@ void API::setFirmwareUpdateProgressCallback(std::function<void(int)> callback)
     this->firmwareUpdateProgressCallback = callback;
 }
 
-void API::setFirmwareUpdateMetaCallback(std::function<void(String availableVersion)> callback)
+void API::setFirmwareUpdateMetaCallback(std::function<void(std::string availableVersion)> callback)
 {
     this->firmwareUpdateMetaCallback = callback;
 }
@@ -62,7 +66,7 @@ void API::processIncomingMessage(const char *buf, size_t len)
     auto err = deserializeJson(inboundDoc, buf, len);
     if (err)
     {
-        logger.error((String("JSON parse error: ") + err.c_str()).c_str());
+        logger.error((std::string("JSON parse error: ") + err.c_str()).c_str());
         return;
     }
 
@@ -75,7 +79,7 @@ void API::processIncomingMessage(const char *buf, size_t len)
     const char *eventType = inboundDoc["data"]["type"].as<const char *>();
     if (!eventType)
     {
-        logger.error((String("Missing event type, payload: ") + String(buf, len)).c_str());
+        logger.error((std::string("Missing event type, payload: ") + std::string(buf, len)).c_str());
         return;
     }
 
@@ -102,9 +106,9 @@ void API::processIncomingMessage(const char *buf, size_t len)
         inboundDoc["data"]["payload"].is<JsonObject>())
     {
         JsonObject payload = inboundDoc["data"]["payload"].as<JsonObject>();
-        if (payload["error"].is<String>())
+        if (payload["error"].is<const char *>())
         {
-            String err = payload["error"].as<String>();
+            std::string err = payload["error"].as<std::string>();
             if (err.length() > 0)
             {
                 // Special-case insufficient balance: propagate sumUpEnabled flag if present
@@ -242,7 +246,7 @@ void API::processIncomingMessage(const char *buf, size_t len)
     }
     else
     {
-        logger.error((String("Unknown event type: ") + eventType).c_str());
+        logger.error((std::string("Unknown event type: ") + eventType).c_str());
     }
 }
 
@@ -263,7 +267,7 @@ void API::setInsufficientBalanceCallback(std::function<void(bool sumUpEnabled)> 
 
 void API::sendAck(const char *type)
 {
-    this->sendMessage(("ACK_" + String(type)).c_str());
+    this->sendMessage(("ACK_" + std::string(type)).c_str());
 }
 
 void API::sendMessage(const char *type)
@@ -296,7 +300,7 @@ void API::sendMessage(const char *type, JsonObject payload)
             this->logger.error("Failed to serialize event to buffer (small)");
             return;
         }
-        this->logger.info((String("sending message to websocket: ") + String(json)).c_str());
+        this->logger.info((std::string("sending message to websocket: ") + json).c_str());
         this->websocket.sendMessage(json, n);
         return;
     }
@@ -313,7 +317,7 @@ void API::sendMessage(const char *type, JsonObject payload)
         this->logger.error("Failed to serialize event to dynamically allocated buffer");
         return;
     }
-    this->logger.info((String("sending message to websocket: ") + String(json.get())).c_str());
+    this->logger.info((std::string("sending message to websocket: ") + json.get()).c_str());
     this->websocket.sendMessage(json.get(), n);
 }
 
@@ -340,7 +344,7 @@ void API::sendHeartbeat()
         this->logger.error("Failed to serialize heartbeat");
         return;
     }
-    this->logger.info((String("pushing heartbeat to websocket queue: ") + String(json)).c_str());
+    this->logger.info((std::string("pushing heartbeat to websocket queue: ") + json).c_str());
     this->websocket.sendMessage(json, n);
 
     this->heartbeat_sent_at = millis();
@@ -355,4 +359,9 @@ void API::disableConnectionAttempts()
 void API::enableConnectionAttempts()
 {
     this->websocket.enableConnectionAttempts();
+}
+
+void API::resetCertificateTrust()
+{
+    this->websocket.resetCertificateTrust();
 }

@@ -59,7 +59,17 @@
 
 #include "Adafruit_PN532_NTAG424.h"
 
-Arduino_CRC32 crc32; ///< Arduino CRC32 Class
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include "esp_random.h"
+#include "esp_rom_crc.h"
+#include "pn532_platform.hpp"
+
+// Serial-style debug port for the (mostly #ifdef'd) driver debug prints.
+// TU-local so no Arduino-named symbol leaks outside this vendored driver;
+// output lands on the same USB console as the logger.
+static Pn532DebugPort Serial;
 
 byte pn532ack[] = {0x00, 0x00, 0xFF,
                    0x00, 0xFF, 0x00}; ///< ACK message from PN532
@@ -84,73 +94,19 @@ byte pn532_packetbuffer[PN532_PACKBUFFSIZ]; ///< Packet buffer used in various
 
 /**************************************************************************/
 /*!
-    @brief  Instantiates a new PN532 class using software SPI.
+    @brief  Instantiates a new PN532 class using I2C on the shared bus.
 
-    @param  clk       SPI clock pin (SCK)
-    @param  miso      SPI MISO pin
-    @param  mosi      SPI MOSI pin
-    @param  ss        SPI chip select pin (CS/SSEL)
+    @param  i2cAddress  7-bit I2C address (default PN532_I2C_ADDRESS; V4
+                        hardware shifts it to 0x64 via the DFR1185 shifter)
+
+    @note   The IRQ line is not wired on any Attractap board (readiness is
+            polled via the I2C status byte) and RSTPD_N is not connected, so
+            neither pin exists anymore.
 */
 /**************************************************************************/
-Adafruit_PN532::Adafruit_PN532(uint8_t clk, uint8_t miso, uint8_t mosi,
-                               uint8_t ss)
+Adafruit_PN532::Adafruit_PN532(uint8_t i2cAddress)
 {
-  _cs = ss;
-  spi_dev = new Adafruit_SPIDevice(ss, clk, miso, mosi, 100000,
-                                   SPI_BITORDER_LSBFIRST, SPI_MODE0);
-}
-
-/**************************************************************************/
-/*!
-    @brief  Instantiates a new PN532 class using I2C.
-
-    @param  irq       Location of the IRQ pin
-    @param  reset     Location of the RSTPD_N pin
-    @param  theWire   pointer to I2C bus to use
-*/
-/**************************************************************************/
-Adafruit_PN532::Adafruit_PN532(uint8_t irq, uint8_t reset, TwoWire *theWire)
-    : _irq(irq), _reset(reset)
-{
-  pinMode(_irq, INPUT);
-  if (_reset != 0xFF) // 0xFF (cast of -1) is the "no pin" sentinel
-  {
-    pinMode(_reset, OUTPUT);
-  }
-  i2c_dev = new Adafruit_I2CDevice(PN532_I2C_ADDRESS, theWire);
-}
-
-/**************************************************************************/
-/*!
-    @brief  Instantiates a new PN532 class using hardware SPI.
-
-    @param  ss        SPI chip select pin (CS/SSEL)
-    @param  theSPI    pointer to the SPI bus to use
-*/
-/**************************************************************************/
-Adafruit_PN532::Adafruit_PN532(uint8_t ss, SPIClass *theSPI)
-{
-  _cs = ss;
-  spi_dev = new Adafruit_SPIDevice(ss, 1000000, SPI_BITORDER_LSBFIRST,
-                                   SPI_MODE0, theSPI);
-}
-
-/**************************************************************************/
-/*!
-    @brief  Instantiates a new PN532 class using hardware UART (HSU).
-
-    @param  reset     Location of the RSTPD_N pin
-    @param  theSer    pointer to HardWare Serial bus to use
-*/
-/**************************************************************************/
-Adafruit_PN532::Adafruit_PN532(uint8_t reset, HardwareSerial *theSer)
-    : _reset(reset)
-{
-  if (_reset != 0xFF) // 0xFF (cast of -1) is the "no pin" sentinel
-  {
-    pinMode(_reset, OUTPUT);
-  }
-  ser_dev = theSer;
+  i2c_dev = new Pn532I2cDevice(i2cAddress);
 }
 
 /**************************************************************************/
@@ -166,33 +122,14 @@ bool Adafruit_PN532::begin()
   Serial.println("NTAG424DEBUG: On");
   Serial.println("EncBuffer: 52");
 #endif
-  if (spi_dev)
+  if (!i2c_dev)
   {
-    // SPI initialization
-    if (!spi_dev->begin())
-    {
-      return false;
-    }
+    return false;
   }
-  else if (i2c_dev)
+  // I2C initialization
+  // PN532 will fail address check since its asleep, so suppress
+  if (!i2c_dev->begin(false))
   {
-    // I2C initialization
-    // PN532 will fail address check since its asleep, so suppress
-    if (!i2c_dev->begin(false))
-    {
-      return false;
-    }
-  }
-  else if (ser_dev)
-  {
-    ser_dev->begin(115200);
-    // clear out anything in read buffer
-    while (ser_dev->available())
-      ser_dev->read();
-  }
-  else
-  {
-    // no interface specified
     return false;
   }
   reset(); // HW reset - put in known state
@@ -208,14 +145,7 @@ bool Adafruit_PN532::begin()
 /**************************************************************************/
 void Adafruit_PN532::reset(void)
 {
-  // see Datasheet p.209, Fig.48 for timings
-  if (_reset != -1)
-  {
-    digitalWrite(_reset, LOW);
-    delay(1); // min 20ns
-    digitalWrite(_reset, HIGH);
-    delay(2); // max 2ms
-  }
+  // RSTPD_N is not wired on any Attractap board — power-on reset only.
 }
 
 /**************************************************************************/
@@ -225,20 +155,6 @@ void Adafruit_PN532::reset(void)
 /**************************************************************************/
 void Adafruit_PN532::wakeup(void)
 {
-  // interface specific wakeups - each one is unique!
-  if (spi_dev)
-  {
-    // hold CS low for 2ms
-    digitalWrite(_cs, LOW);
-    delay(2);
-  }
-  else if (ser_dev)
-  {
-    uint8_t w[3] = {0x55, 0x00, 0x00};
-    ser_dev->write(w, 3);
-    delay(2);
-  }
-
   // PN532 will clock stretch I2C during SAMConfig as a "wakeup"
 
   // need to config SAM to stay in Normal Mode
@@ -385,12 +301,6 @@ bool Adafruit_PN532::sendCommandCheckAck(uint8_t *cmd, uint8_t cmdlen,
     return false;
   }
 
-#ifdef PN532DEBUG
-  if (spi_dev == NULL)
-  {
-    PN532DEBUGPRINT.println(F("IRQ received"));
-  }
-#endif
 
   // read acknowledgement
   if (!readack())
@@ -1410,7 +1320,7 @@ void Adafruit_PN532::ntag424_random(uint8_t *output, uint8_t bytecount)
 {
   for (int i = 0; i < bytecount; i++)
   {
-    output[i] = random(256);
+    output[i] = (uint8_t)(esp_random() & 0xFF); // was Arduino random(256)
   }
 }
 
@@ -1441,7 +1351,7 @@ uint8_t Adafruit_PN532::ntag424_apdu_send(
 {
   Serial.print("cmd_counter: ");
   Serial.println(ntag424_Session.cmd_counter);
-  uint8_t apdusize = 8 + (7 + cmd_header_length + cmd_data_length + 2) & 0xff;
+  uint8_t apdusize = (8 + (7 + cmd_header_length + cmd_data_length + 2)) & 0xff;
   uint8_t apdu[apdusize];
   uint8_t offset = 0;
   apdu[0] = PN532_COMMAND_INDATAEXCHANGE;
@@ -1515,8 +1425,10 @@ uint8_t Adafruit_PN532::ntag424_apdu_send(
       Serial.println("IV-init:");
       Adafruit_PN532::PrintHex(iv, 16);
 #endif
+      // Only the first AES block is the IV; encrypting sizeof(iv)=32 bytes
+      // would overflow ive[16] and smash the stack (crashed changeKey on IDF).
       Adafruit_PN532::ntag424_encrypt(ntag424_Session.session_key_enc,
-                                      sizeof(iv), iv, ive);
+                                      sizeof(ive), iv, ive);
       // encrypt cmd_data using SesAuthENCKey
       // padded_payload_length
       // uint8_t payload_encrypted[32];
@@ -1679,8 +1591,9 @@ uint8_t Adafruit_PN532::ntag424_apdu_send(
     memset(ivd + 7, 0, 25);
     // Serial.println("IV-init:");
     // Adafruit_PN532::PrintHex(iv, 16);
+    // Same overflow as the command-IV path: only one block fits in ivde[16].
     Adafruit_PN532::ntag424_encrypt(ntag424_Session.session_key_enc,
-                                    sizeof(ivd), ivd, ivde);
+                                    sizeof(ivde), ivd, ivde);
     uint8_t *respplain = (uint8_t *)malloc(response_length - 10);
 #ifdef NTAG424DEBUG
     PN532DEBUGPRINT.println(F("Encrypted Response(pcd < picc)"));
@@ -2126,7 +2039,9 @@ void Adafruit_PN532::ntag424_derive_session_keys(uint8_t *key, uint8_t *RndA,
 uint32_t Adafruit_PN532::ntag424_crc32(uint8_t *data, uint8_t datalength)
 {
   Adafruit_PN532::PrintHexChar((uint8_t const *)data, datalength);
-  uint32_t const crc32_res = crc32.calc((uint8_t const *)data, datalength);
+  // Standard reflected CRC-32 (zlib polynomial) — matches the old
+  // Arduino_CRC32 library bit-for-bit (esp_rom_crc32_le inverts on entry/exit).
+  uint32_t const crc32_res = esp_rom_crc32_le(0, (uint8_t const *)data, datalength);
   Serial.println(crc32_res, HEX);
   return crc32_res;
 }
@@ -2368,8 +2283,10 @@ uint8_t Adafruit_PN532::ntag424_AuthenticateEV2First(uint8_t *key,
   uint8_t prefix[7] = {
       PN532_COMMAND_INDATAEXCHANGE, 0x01, 0x90, 0xaf, 0x00, 0x00, 0x20};
   uint8_t postfix[1] = {0x00};
-  int apdusize = sizeof(prefix) + sizeof(answer_enc) + sizeof(postfix);
-  uint8_t apdu[apdusize];
+  // Fixed-size (all sizeofs are compile-time constants) — the old VLA form
+  // trips GCC 14's -Werror=dangling-pointer analysis.
+  uint8_t apdu[sizeof(prefix) + sizeof(answer_enc) + sizeof(postfix)];
+  const int apdusize = sizeof(apdu);
   memcpy(&apdu[0], prefix, sizeof(prefix));
   memcpy(&apdu[sizeof(prefix)], answer_enc, sizeof(answer_enc));
   memcpy(&apdu[sizeof(prefix) + sizeof(answer_enc)], postfix, sizeof(postfix));
@@ -2947,13 +2864,9 @@ uint8_t Adafruit_PN532::ntag424_GetVersion()
   ntag424_VersionInfo.HWStorageSize = pn532_packetbuffer[13];
   ntag424_VersionInfo.HWProtocol = pn532_packetbuffer[14];
 
-  if (!pn532_packetbuffer[14] == 0xaf)
-  {
-#ifdef NTAG424DEBUG
-    PN532DEBUGPRINT.println(F("Missing additional frame request 1."));
-#endif
-    return 0;
-  }
+  // NOTE: upstream Adafruit code wrote `if (!pn532_packetbuffer[14] == 0xaf)`,
+  // which is always false — the additional-frame check was never active. Kept
+  // disabled for behavior parity with the shipped Arduino builds.
   pn532_packetbuffer[0] = PN532_COMMAND_INDATAEXCHANGE;
   pn532_packetbuffer[1] = 1; /* Card number */
   pn532_packetbuffer[2] = NTAG424_COM_CLA;
@@ -2978,13 +2891,7 @@ uint8_t Adafruit_PN532::ntag424_GetVersion()
   ntag424_VersionInfo.SWStorageSize = pn532_packetbuffer[13];
   ntag424_VersionInfo.SWProtocol = pn532_packetbuffer[14];
 
-  if (!pn532_packetbuffer[14] == 0xaf)
-  {
-#ifdef NTAG424DEBUG
-    PN532DEBUGPRINT.println(F("Missing additional frame request 2."));
-#endif
-    return 0;
-  }
+  // See note above: the upstream additional-frame check was never active.
   pn532_packetbuffer[0] = PN532_COMMAND_INDATAEXCHANGE;
   pn532_packetbuffer[1] = 1; /* Card number */
   pn532_packetbuffer[2] = NTAG424_COM_CLA;
@@ -3833,15 +3740,7 @@ bool Adafruit_PN532::readack()
 {
   uint8_t ackbuff[6];
 
-  if (spi_dev)
-  {
-    uint8_t cmd = PN532_SPI_DATAREAD;
-    spi_dev->write_then_read(&cmd, 1, ackbuff, 6);
-  }
-  else if (i2c_dev || ser_dev)
-  {
-    readdata(ackbuff, 6);
-  }
+  readdata(ackbuff, 6);
 
   return (0 == memcmp((char *)ackbuff, (char *)pn532ack, 6));
 }
@@ -3853,32 +3752,13 @@ bool Adafruit_PN532::readack()
 /**************************************************************************/
 bool Adafruit_PN532::isready()
 {
-  if (spi_dev)
+  // I2C ready check via reading RDY byte
+  uint8_t rdy[1];
+  if (!i2c_dev->read(rdy, 1))
   {
-    // SPI ready check via Status Request
-    uint8_t cmd = PN532_SPI_STATREAD;
-    uint8_t reply;
-    spi_dev->write_then_read(&cmd, 1, &reply, 1);
-    return reply == PN532_SPI_READY;
+    return false;
   }
-  else if (i2c_dev)
-  {
-    // I2C ready check via reading RDY byte
-    uint8_t rdy[1];
-    i2c_dev->read(rdy, 1);
-    return rdy[0] == PN532_I2C_READY;
-  }
-  else if (ser_dev)
-  {
-    // Serial ready check based on non-zero read buffer
-    return (ser_dev->available() != 0);
-  }
-  else if (_irq != -1)
-  {
-    uint8_t x = digitalRead(_irq);
-    return x == 0;
-  }
-  return false;
+  return rdy[0] == PN532_I2C_READY;
 }
 
 /**************************************************************************/
@@ -3919,26 +3799,12 @@ bool Adafruit_PN532::waitready(uint16_t timeout)
 /**************************************************************************/
 void Adafruit_PN532::readdata(uint8_t *buff, uint8_t n)
 {
-  if (spi_dev)
+  // I2C read
+  uint8_t rbuff[n + 1]; // +1 for leading RDY byte
+  i2c_dev->read(rbuff, n + 1);
+  for (uint8_t i = 0; i < n; i++)
   {
-    // SPI read
-    uint8_t cmd = PN532_SPI_DATAREAD;
-    spi_dev->write_then_read(&cmd, 1, buff, n);
-  }
-  else if (i2c_dev)
-  {
-    // I2C read
-    uint8_t rbuff[n + 1]; // +1 for leading RDY byte
-    i2c_dev->read(rbuff, n + 1);
-    for (uint8_t i = 0; i < n; i++)
-    {
-      buff[i] = rbuff[i + 1];
-    }
-  }
-  else if (ser_dev)
-  {
-    // Serial read
-    ser_dev->readBytes(buff, n);
+    buff[i] = rbuff[i + 1];
   }
 #ifdef PN532DEBUG
   PN532DEBUGPRINT.print(F("Reading: "));
@@ -4066,98 +3932,35 @@ uint8_t Adafruit_PN532::setDataTarget(uint8_t *cmd, uint8_t cmdlen)
 /**************************************************************************/
 void Adafruit_PN532::writecommand(uint8_t *cmd, uint8_t cmdlen)
 {
-  if (spi_dev)
+  // I2C command write.
+  uint8_t packet[8 + cmdlen];
+  uint8_t LEN = cmdlen + 1;
+
+  packet[0] = PN532_PREAMBLE;
+  packet[1] = PN532_STARTCODE1;
+  packet[2] = PN532_STARTCODE2;
+  packet[3] = LEN;
+  packet[4] = ~LEN + 1;
+  packet[5] = PN532_HOSTTOPN532;
+  uint8_t sum = 0;
+  for (uint8_t i = 0; i < cmdlen; i++)
   {
-    // SPI command write.
-    uint8_t checksum;
-    uint8_t packet[9 + cmdlen];
-    uint8_t *p = packet;
-    cmdlen++;
-
-    p[0] = PN532_SPI_DATAWRITE;
-    p++;
-
-    p[0] = PN532_PREAMBLE;
-    p++;
-    p[0] = PN532_STARTCODE1;
-    p++;
-    p[0] = PN532_STARTCODE2;
-    p++;
-    checksum = PN532_PREAMBLE + PN532_STARTCODE1 + PN532_STARTCODE2;
-
-    p[0] = cmdlen;
-    p++;
-    p[0] = ~cmdlen + 1;
-    p++;
-
-    p[0] = PN532_HOSTTOPN532;
-    p++;
-    checksum += PN532_HOSTTOPN532;
-
-    for (uint8_t i = 0; i < cmdlen - 1; i++)
-    {
-      p[0] = cmd[i];
-      p++;
-      checksum += cmd[i];
-    }
-
-    p[0] = ~checksum;
-    p++;
-    p[0] = PN532_POSTAMBLE;
-    p++;
+    packet[6 + i] = cmd[i];
+    sum += cmd[i];
+  }
+  packet[6 + cmdlen] = ~(PN532_HOSTTOPN532 + sum) + 1;
+  packet[7 + cmdlen] = PN532_POSTAMBLE;
 
 #ifdef PN532DEBUG
-    PN532DEBUGPRINT.print("Sending : ");
-    for (int i = 1; i < 8 + cmdlen; i++)
-    {
-      PN532DEBUGPRINT.print("0x");
-      PN532DEBUGPRINT.print(packet[i], HEX);
-      PN532DEBUGPRINT.print(", ");
-    }
-    PN532DEBUGPRINT.println();
-#endif
-
-    spi_dev->write(packet, 8 + cmdlen);
-  }
-  else if (i2c_dev || ser_dev)
+  Serial.print("Sending : ");
+  for (int i = 1; i < 8 + cmdlen; i++)
   {
-    // I2C or Serial command write.
-    uint8_t packet[8 + cmdlen];
-    uint8_t LEN = cmdlen + 1;
-
-    packet[0] = PN532_PREAMBLE;
-    packet[1] = PN532_STARTCODE1;
-    packet[2] = PN532_STARTCODE2;
-    packet[3] = LEN;
-    packet[4] = ~LEN + 1;
-    packet[5] = PN532_HOSTTOPN532;
-    uint8_t sum = 0;
-    for (uint8_t i = 0; i < cmdlen; i++)
-    {
-      packet[6 + i] = cmd[i];
-      sum += cmd[i];
-    }
-    packet[6 + cmdlen] = ~(PN532_HOSTTOPN532 + sum) + 1;
-    packet[7 + cmdlen] = PN532_POSTAMBLE;
-
-#ifdef PN532DEBUG
-    Serial.print("Sending : ");
-    for (int i = 1; i < 8 + cmdlen; i++)
-    {
-      Serial.print("0x");
-      Serial.print(packet[i], HEX);
-      Serial.print(", ");
-    }
-    Serial.println();
+    Serial.print("0x");
+    Serial.print(packet[i], HEX);
+    Serial.print(", ");
+  }
+  Serial.println();
 #endif
 
-    if (i2c_dev)
-    {
-      i2c_dev->write(packet, 8 + cmdlen);
-    }
-    else
-    {
-      ser_dev->write(packet, 8 + cmdlen);
-    }
-  }
+  i2c_dev->write(packet, 8 + cmdlen);
 }

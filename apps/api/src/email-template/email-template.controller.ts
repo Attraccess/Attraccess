@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param } from '@nestjs/common';
+import { Controller, Get, HttpCode, HttpStatus, Post, Body, Patch, Param } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiBody, ApiParam } from '@nestjs/swagger';
 import { Auth } from '@attraccess/plugins-backend-sdk';
 import { EmailTemplate, EmailTemplateType } from '@attraccess/database-entities';
@@ -64,5 +64,16 @@ export class EmailTemplateController {
     @Body() updateEmailTemplateDto: UpdateEmailTemplateDto,
   ): Promise<EmailTemplate> {
     return this.emailTemplateService.update(type, updateEmailTemplateDto);
+  }
+
+  @Post(':type/reset')
+  @HttpCode(HttpStatus.OK)
+  @Auth('system.settings.manage')
+  @ApiOperation({ summary: 'Reset an email template to its bundled default' })
+  @ApiParam({ name: 'type', enum: EmailTemplateType, enumName: 'EmailTemplateType', description: 'Template type/type' })
+  @ApiResponse({ status: 200, description: 'Template reset to default', type: EmailTemplate })
+  @ApiResponse({ status: 404, description: 'Template not found' })
+  resetToDefault(@Param('type') type: EmailTemplateType): Promise<EmailTemplate> {
+    return this.emailTemplateService.resetToDefault(type);
   }
 }

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, CardDescription, FieldError, Heading, Input, Label, TextField } from '@heroui/react';
+import { Button, CardDescription, FieldError, Heading, Input, Label, Switch, TextField } from '@heroui/react';
 import type { CompanionSettings } from '../types';
 
 interface Props {
@@ -10,6 +10,7 @@ interface Props {
 
 export function SettingsStep({ settings, onSave, onBack }: Props) {
   const [idleTimeout, setIdleTimeout] = useState(String(settings.idleTimeoutMinutes));
+  const [foregroundApp, setForegroundApp] = useState(settings.foregroundApp ?? true);
   const [error, setError] = useState('');
 
   function handleSave() {
@@ -19,7 +20,7 @@ export function SettingsStep({ settings, onSave, onBack }: Props) {
       return;
     }
     setError('');
-    onSave({ ...settings, idleTimeoutMinutes: val });
+    onSave({ ...settings, idleTimeoutMinutes: val, foregroundApp });
   }
 
   return (
@@ -39,6 +40,10 @@ export function SettingsStep({ settings, onSave, onBack }: Props) {
         <Input placeholder="15" />
         <FieldError>{error}</FieldError>
       </TextField>
+      <Switch isSelected={foregroundApp} onChange={setForegroundApp}>
+        <Switch.Control><Switch.Thumb /></Switch.Control>
+        <Switch.Content>Report foreground app to flow triggers</Switch.Content>
+      </Switch>
       <Button variant="primary" fullWidth onPress={handleSave}>
         Save
       </Button>

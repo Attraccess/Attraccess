@@ -1,4 +1,4 @@
-import { Controller, Get, Body, Patch, Post } from '@nestjs/common';
+import { Controller, Get, HttpCode, HttpStatus, Body, Patch, Post } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { Auth } from '@attraccess/plugins-backend-sdk';
 import { EmailLayoutService } from './email-layout.service';
@@ -36,5 +36,14 @@ export class EmailLayoutController {
   @ApiResponse({ status: 200, type: PreviewMjmlResponseDto })
   previewLayout(@Body() dto: PreviewEmailLayoutDto): Promise<PreviewMjmlResponseDto> {
     return this.emailLayoutService.previewLayout(dto.body);
+  }
+
+  @Post('reset')
+  @HttpCode(HttpStatus.OK)
+  @Auth('system.settings.manage')
+  @ApiOperation({ summary: 'Reset the global email layout to its bundled default' })
+  @ApiResponse({ status: 200, type: EmailLayoutResponseDto })
+  resetToDefault(): Promise<EmailLayoutResponseDto> {
+    return this.emailLayoutService.resetToDefault();
   }
 }
