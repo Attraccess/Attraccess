@@ -2,6 +2,7 @@
 #include <lvgl.h>
 #include <time.h>
 #include <stdio.h>
+#include "platform.hpp"
 
 void ResourceDetailsScreen::updateElapsedTimeDisplay()
 {

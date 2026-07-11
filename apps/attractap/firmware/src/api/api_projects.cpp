@@ -2,6 +2,8 @@
 // FEATURE: api-projects
 
 #include "api.hpp"
+#include <string>
+#include <functional>
 
 void API::requestProjectsOfUser(uint32_t page)
 {
@@ -51,7 +53,7 @@ void API::onProjectsOfUserResponse(JsonObject data)
     }
 
     ProjectsOfUserResponse &result = this->projectsOfUserResponseScratch;
-    // Don't use memset here because Project struct contains String objects!
+    // Don't use memset here because Project struct contains std::string objects!
     result.count = 0;
     result.page = payload["page"].is<uint32_t>() ? payload["page"].as<uint32_t>() : 1;
     result.limit = payload["limit"].is<uint32_t>() ? payload["limit"].as<uint32_t>() : MAX_PROJECTS_PER_PAGE;

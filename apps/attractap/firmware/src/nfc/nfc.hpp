@@ -1,9 +1,9 @@
 #pragma once
 
-#include <Arduino.h>
+#include <string>
+
 #include "../logger/logger.hpp"
 #include "Adafruit_PN532_NTAG424.h"
-#include <Wire.h>
 #include "../state/state.hpp"
 #include "../utils.hpp"
 #include <functional>
@@ -25,7 +25,7 @@ public:
         CARD_TYPE_DESFIRE,
     };
 
-    NFC() : logger("NFC"), pn532(PIN_PN532_IRQ, -1, &Wire)
+    NFC() : logger("NFC"), pn532(PN532_I2C_ADDRESS)
     {
     }
 

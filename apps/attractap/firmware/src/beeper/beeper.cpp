@@ -1,5 +1,10 @@
 #include "beeper.hpp"
 
+#include "../platform.hpp"
+#if defined(BEEPER_PIN) && !defined(HAS_IO_EXPANDER)
+#include "driver/gpio.h"
+#endif
+
 #ifdef HAS_IO_EXPANDER
 #include "../ioexpander/ioexpander.hpp"
 #endif
@@ -13,8 +18,11 @@ void Beeper::setup(IOExpander *expander)
 void Beeper::setup()
 {
 #ifdef BEEPER_PIN
-    pinMode(BEEPER_PIN, OUTPUT);
-    digitalWrite(BEEPER_PIN, LOW);
+    gpio_config_t cfg = {};
+    cfg.pin_bit_mask = 1ULL << BEEPER_PIN;
+    cfg.mode = GPIO_MODE_OUTPUT;
+    gpio_config(&cfg);
+    gpio_set_level((gpio_num_t)BEEPER_PIN, 0);
 #endif
 }
 #endif
@@ -59,7 +67,7 @@ void Beeper::singleBeep()
 #endif
 
 #if defined(BEEPER_PIN) && !defined(HAS_IO_EXPANDER)
-    digitalWrite(BEEPER_PIN, HIGH);
+    gpio_set_level((gpio_num_t)BEEPER_PIN, 1);
 #endif
 
     delay(100);
@@ -72,6 +80,6 @@ void Beeper::singleBeep()
 #endif
 
 #if defined(BEEPER_PIN) && !defined(HAS_IO_EXPANDER)
-    digitalWrite(BEEPER_PIN, LOW);
+    gpio_set_level((gpio_num_t)BEEPER_PIN, 0);
 #endif
 }

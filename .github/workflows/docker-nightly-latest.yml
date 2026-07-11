@@ -67,6 +67,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
+      # Firmware must be built on the runner: the Docker builder has no
+      # ESP-IDF, so the in-container build is skipped and the pre-built
+      # firmware_output/ from the build context is bundled instead.
+      - uses: ./.github/actions/build-attractap-firmware
+
       - name: Login to GitHub Container Registry
         uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef
         with:

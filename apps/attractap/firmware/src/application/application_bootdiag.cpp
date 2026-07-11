@@ -3,6 +3,7 @@
 
 #include "application.hpp"
 #include "../state/state.hpp"
+#include "platform.hpp"
 #ifdef ESP_PLATFORM
 #include "esp_heap_caps.h"
 #include "esp_system.h"

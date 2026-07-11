@@ -1,4 +1,5 @@
 #include "bootscreen.hpp"
+#include <string>
 
 void BootScreen::init()
 {
@@ -18,7 +19,7 @@ void BootScreen::init()
 
     // Firmware info
     lv_obj_t *firmware_label = lv_label_create(this->screen);
-    String firmware_info = String(FIRMWARE_FRIENDLY_NAME) + " v" + String(FIRMWARE_VERSION);
+    std::string firmware_info = std::string(FIRMWARE_FRIENDLY_NAME) + " v" + FIRMWARE_VERSION;
     lv_label_set_text(firmware_label, firmware_info.c_str());
     lv_obj_set_style_text_font(firmware_label, &lv_font_montserrat_18, 0);
     lv_obj_set_style_text_color(firmware_label, lv_color_white(), 0);
@@ -34,7 +35,7 @@ void BootScreen::loop()
 {
 }
 
-String BootScreen::getName()
+std::string BootScreen::getName()
 {
     return "BootScreen";
 }

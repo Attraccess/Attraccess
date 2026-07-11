@@ -36,6 +36,10 @@ jobs:
         with:
           ref: ${{ inputs.branch }}
 
+      # Balena's remote builder has no ESP-IDF; pre-build the firmware so
+      # `balena push` uploads firmware_output/ with the build context.
+      - uses: ./.github/actions/build-attractap-firmware
+
       - uses: ./.github/actions/balena-push
         with:
           version: ${{ inputs.version }}
