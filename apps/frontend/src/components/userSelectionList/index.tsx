@@ -105,7 +105,6 @@ export function UserSelectionList<TUser extends User = User>(props: Readonly<Pro
       <UserSearch
         wrapperProps={{ className: 'w-full' }}
         onSelectionChange={setUserSearchSelection}
-        autocompleteProps={{ size: 'sm' }}
         afterSelection={
           userSearchSelection && (
             <Button variant="primary" onPress={onAddUser} isPending={addToSelectionIsLoading} isIconOnly>

@@ -4,8 +4,12 @@
 import { HTMLAttributes, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Button,
+  Header,
   InputGroup,
   Label,
+  ListBox,
+  ListBoxItem,
+  ListBoxSection,
   Modal,
   ModalBackdrop,
   ModalBody,
@@ -29,7 +33,6 @@ interface UserSearchProps {
   label?: string;
   placeholder?: string;
   onSelectionChange?: (user: User | null) => void;
-  autocompleteProps?: { size?: 'sm' | 'md' | 'lg' };
   wrapperProps?: Omit<HTMLAttributes<HTMLDivElement>, 'children'>;
   afterAutocomplete?: React.ReactNode;
   afterSelection?: React.ReactNode;
@@ -38,7 +41,7 @@ interface UserSearchProps {
 const PAGE_SIZE = 50;
 const SEARCH_DEBOUNCE_MS = 300;
 
-function useDebouncedValue<T>(value: T, delayMs: number): T {
+export function useDebouncedValue<T>(value: T, delayMs: number): T {
   const [debounced, setDebounced] = useState(value);
   useEffect(() => {
     const id = setTimeout(() => setDebounced(value), delayMs);
@@ -47,8 +50,29 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
   return debounced;
 }
 
+export interface UserGroup {
+  letter: string;
+  users: User[];
+}
+
+// The API returns users sorted by username (ASC), so equal-letter runs are contiguous
+// and a single pass produces the address-book groups.
+export function groupUsersByLetter(users: User[]): UserGroup[] {
+  const out: UserGroup[] = [];
+  for (const user of users) {
+    const letter = (user.username?.[0] ?? '#').toUpperCase();
+    const last = out[out.length - 1];
+    if (last && last.letter === letter) {
+      last.users.push(user);
+    } else {
+      out.push({ letter, users: [user] });
+    }
+  }
+  return out;
+}
+
 export function UserSearch(props: Readonly<UserSearchProps>) {
-  const { label, onSelectionChange, afterAutocomplete, wrapperProps, afterSelection } = props;
+  const { label, placeholder, onSelectionChange, afterAutocomplete, wrapperProps, afterSelection } = props;
 
   const { t } = useTranslations({ en, de });
 
@@ -57,27 +81,20 @@ export function UserSearch(props: Readonly<UserSearchProps>) {
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search, SEARCH_DEBOUNCE_MS);
 
-  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } = useUsersServiceFindManyInfinite({
-    limit: PAGE_SIZE,
-    search: debouncedSearch || undefined,
-  });
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } = useUsersServiceFindManyInfinite(
+    { limit: PAGE_SIZE, search: debouncedSearch || undefined },
+    undefined,
+    {
+      // Only fetch while the picker is actually open. The generated options type
+      // requires the pagination params, so mirror the hook's own values.
+      enabled: isOpen,
+      initialPageParam: 1,
+      getNextPageParam: (lastPage) => (lastPage as unknown as { nextPage?: number }).nextPage,
+    },
+  );
 
   const users = useMemo(() => data?.pages.flatMap((page) => page.data) ?? [], [data]);
-
-  // The API returns users sorted by username (ASC), so groups are contiguous.
-  const groups = useMemo(() => {
-    const out: { letter: string; users: User[] }[] = [];
-    for (const user of users) {
-      const letter = (user.username?.[0] ?? '#').toUpperCase();
-      const last = out[out.length - 1];
-      if (last && last.letter === letter) {
-        last.users.push(user);
-      } else {
-        out.push({ letter, users: [user] });
-      }
-    }
-    return out;
-  }, [users]);
+  const groups = useMemo(() => groupUsersByLetter(users), [users]);
 
   useEffect(() => {
     onSelectionChange?.(selectedUser);
@@ -106,6 +123,9 @@ export function UserSearch(props: Readonly<UserSearchProps>) {
 
   // Infinite scroll: load more when the sentinel near the bottom of the scrollable
   // list becomes visible. The list itself is the scroll root (see inline style below).
+  // Re-observing when the group count changes is intentional: if a fetched page does
+  // not push the sentinel out of view, no intersection change fires, so the re-observe
+  // is what keeps consecutive pages loading.
   const listRef = useRef<HTMLDivElement | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -126,7 +146,7 @@ export function UserSearch(props: Readonly<UserSearchProps>) {
 
   return (
     <div {...wrapperProps}>
-      {label ? <Label className="mb-1 block">{label}</Label> : null}
+      <Label className="mb-1 block">{label ?? t('label')}</Label>
 
       <div className="flex gap-2 items-center">
         {selectedUser ? (
@@ -157,7 +177,7 @@ export function UserSearch(props: Readonly<UserSearchProps>) {
                       <InputGroup.Prefix>
                         <SearchIcon className="size-4 text-muted" />
                       </InputGroup.Prefix>
-                      <InputGroup.Input placeholder={t('searchPlaceholder')} autoComplete="off" />
+                      <InputGroup.Input placeholder={placeholder ?? t('searchPlaceholder')} autoComplete="off" />
                       {isLoading ? (
                         <InputGroup.Suffix>
                           <Spinner size="sm" />
@@ -176,24 +196,26 @@ export function UserSearch(props: Readonly<UserSearchProps>) {
                   {groups.length === 0 && !isLoading ? (
                     <div className="py-10 text-center text-sm text-muted">{t('empty')}</div>
                   ) : (
-                    groups.map((group) => (
-                      <div key={group.letter}>
-                        <div className="sticky top-0 z-10 bg-surface-secondary px-4 py-1 text-xs font-semibold text-muted">
-                          {group.letter}
-                        </div>
-                        {group.users.map((user) => (
-                          <button
-                            key={user.id}
-                            type="button"
-                            onClick={() => handleSelect(user)}
-                            className="flex w-full items-center px-4 py-2 text-left hover:bg-default-100"
-                            data-cy={`user-picker-item-${user.id}`}
-                          >
-                            <AttraccessUser user={user} interactive={false} />
-                          </button>
-                        ))}
-                      </div>
-                    ))
+                    <ListBox aria-label={t('modalTitle')} selectionMode="none">
+                      {groups.map((group) => (
+                        <ListBoxSection key={group.letter} id={group.letter}>
+                          <Header className="sticky top-0 z-10 bg-surface-secondary px-2 py-1 text-xs font-semibold text-muted">
+                            {group.letter}
+                          </Header>
+                          {group.users.map((user) => (
+                            <ListBoxItem
+                              key={user.id}
+                              id={String(user.id)}
+                              textValue={user.username}
+                              onAction={() => handleSelect(user)}
+                              data-cy={`user-picker-item-${user.id}`}
+                            >
+                              <AttraccessUser user={user} interactive={false} />
+                            </ListBoxItem>
+                          ))}
+                        </ListBoxSection>
+                      ))}
+                    </ListBox>
                   )}
                   <div ref={sentinelRef} />
                   {isFetchingNextPage ? (

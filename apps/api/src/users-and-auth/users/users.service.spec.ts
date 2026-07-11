@@ -415,6 +415,16 @@ describe('UsersService', () => {
       expect(userRepository.findAndCount).toHaveBeenCalled();
     });
 
+    it('should order users by username ascending', async () => {
+      userRepository.findAndCount.mockResolvedValue([[], 0]);
+
+      await service.findMany({ page: 1, limit: 10 });
+
+      expect(userRepository.findAndCount).toHaveBeenCalledWith(
+        expect.objectContaining({ order: { username: 'ASC' } }),
+      );
+    });
+
     it('should throw error for invalid pagination options', async () => {
       await expect(service.findMany({ page: 0, limit: 10 })).rejects.toThrow();
       await expect(service.findMany({ page: 1, limit: 0 })).rejects.toThrow();
