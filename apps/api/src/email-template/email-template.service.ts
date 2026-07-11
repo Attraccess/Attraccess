@@ -84,13 +84,15 @@ export class EmailTemplateService {
   }
 
   async setTranslations(type: EmailTemplateType, locale: string, data: Record<string, string>): Promise<void> {
-    await this.translationRepository.delete({ templateType: type, locale });
     const entities = Object.entries(data).map(([key, value]) =>
       this.translationRepository.create({ templateType: type, key, locale, value }),
     );
-    if (entities.length > 0) {
-      await this.translationRepository.insert(entities);
-    }
+    await this.translationRepository.manager.transaction(async (manager) => {
+      await manager.delete(EmailTemplateTranslation, { templateType: type, locale });
+      if (entities.length > 0) {
+        await manager.insert(EmailTemplateTranslation, entities);
+      }
+    });
   }
 
   async deleteTranslations(type: EmailTemplateType, locale: string): Promise<void> {

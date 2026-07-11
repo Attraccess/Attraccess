@@ -2,7 +2,11 @@
   <mj-column>
     <mj-text padding="0 0 12px 0">{{t 'greeting' 'Hello {name},' name=user.username}}</mj-text>
     <mj-text padding="0 0 12px 0">
-      {{t 'body' 'Resource <strong>{resource}</strong> {action}.' resource=resource.name action=health.bodyAction}}
+      {{#if health.isDegraded}}
+        {{t 'body_degraded' 'Resource <strong>{resource}</strong> has become degraded.' resource=resource.name}}
+      {{else}}
+        {{t 'body_recovered' 'Resource <strong>{resource}</strong> is healthy again.' resource=resource.name}}
+      {{/if}}
     </mj-text>
     {{#if health.identifier}}
     <mj-text font-size="14px" color="#4B5563" padding="0 0 4px 0">{{t 'subsystem_label' 'Subsystem: <strong>{subsystem}</strong>' subsystem=health.identifier}}</mj-text>

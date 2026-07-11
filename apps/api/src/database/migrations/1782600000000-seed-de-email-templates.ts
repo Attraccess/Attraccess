@@ -43,7 +43,8 @@ const DE: Translation[] = [
   { templateType: 'project-invitation', key: 'invitation_id', value: 'Einladungs-ID: {id}' },
   // resource-health-changed
   { templateType: 'resource-health-changed', key: 'greeting', value: 'Hallo {name},' },
-  { templateType: 'resource-health-changed', key: 'body', value: 'Ressource <strong>{resource}</strong> {action}.' },
+  { templateType: 'resource-health-changed', key: 'body_degraded', value: 'Ressource <strong>{resource}</strong> ist ausgefallen.' },
+  { templateType: 'resource-health-changed', key: 'body_recovered', value: 'Ressource <strong>{resource}</strong> ist wieder gesund.' },
   { templateType: 'resource-health-changed', key: 'subsystem_label', value: 'Subsystem: <strong>{subsystem}</strong>' },
   { templateType: 'resource-health-changed', key: 'previous_status', value: 'Vorheriger Status: <strong>{status}</strong>' },
   { templateType: 'resource-health-changed', key: 'new_status', value: 'Neuer Status: <strong>{status}</strong>' },
@@ -54,7 +55,9 @@ const DE: Translation[] = [
   // user-retraining-required
   { templateType: 'user-retraining-required', key: 'greeting', value: 'Hallo {name},' },
   { templateType: 'user-retraining-required', key: 'body', value: 'Deine Einweisung für <strong>{resource}</strong> muss erneuert werden.' },
-  { templateType: 'user-retraining-required', key: 'reason_label', value: 'Grund: {reason}' },
+  { templateType: 'user-retraining-required', key: 'reason_age', value: 'Deine Einweisung hat ihr maximales Alter erreicht und muss erneuert werden.' },
+  { templateType: 'user-retraining-required', key: 'reason_inactivity', value: 'Du hast diese Ressource längere Zeit nicht genutzt und musst neu eingewiesen werden.' },
+  { templateType: 'user-retraining-required', key: 'reason_default', value: 'Deine Einweisung muss erneuert werden.' },
   { templateType: 'user-retraining-required', key: 'blocks_access', value: 'Der Zugang zu dieser Ressource ist gesperrt, bis du von einem Einweiser neu eingewiesen wurdest.' },
   { templateType: 'user-retraining-required', key: 'button', value: 'Ressource öffnen' },
   { templateType: 'user-retraining-required', key: 'copy_link', value: COPY_LINK_DE },
@@ -68,7 +71,8 @@ const DE: Translation[] = [
   { templateType: 'maintenance-request-created', key: 'footer', value: 'Du erhältst diese E-Mail, weil du die Wartung für diese Ressource verwalten kannst.' },
   // resource-usage-note-added
   { templateType: 'resource-usage-note-added', key: 'greeting', value: 'Hallo {name},' },
-  { templateType: 'resource-usage-note-added', key: 'body', value: '<strong>{author}</strong> hat eine Notiz hinterlassen beim {phase} <strong>{resource}</strong>.' },
+  { templateType: 'resource-usage-note-added', key: 'body_start', value: '<strong>{author}</strong> hat eine Notiz hinterlassen beim Starten von <strong>{resource}</strong>.' },
+  { templateType: 'resource-usage-note-added', key: 'body_end', value: '<strong>{author}</strong> hat eine Notiz hinterlassen beim Beenden von <strong>{resource}</strong>.' },
   { templateType: 'resource-usage-note-added', key: 'button', value: 'Ressource ansehen' },
   { templateType: 'resource-usage-note-added', key: 'copy_link', value: COPY_LINK_DE },
   { templateType: 'resource-usage-note-added', key: 'footer', value: 'Du erhältst diese E-Mail, weil du Einweiser, Betreuer oder Administrator dieser Ressource bist.' },

@@ -72,7 +72,7 @@ export const EMAIL_TEMPLATE_DEFAULTS: Record<EmailTemplateType, EmailTemplateDef
     ],
   },
   [EmailTemplateType.RESOURCE_HEALTH_CHANGED]: {
-    subject: '{{health.headline}}: {{resource.name}}',
+    subject: 'Resource health update: {{resource.name}}',
     variables: [
       'user.username',
       'user.email',
@@ -86,9 +86,8 @@ export const EMAIL_TEMPLATE_DEFAULTS: Record<EmailTemplateType, EmailTemplateDef
       'health.previousStatus',
       'health.reason',
       'health.identifier',
-      'health.headline',
+      'health.isDegraded',
       'health.headerColor',
-      'health.bodyAction',
     ],
   },
   [EmailTemplateType.USER_RETRAINING_REQUIRED]: {
@@ -102,7 +101,8 @@ export const EMAIL_TEMPLATE_DEFAULTS: Record<EmailTemplateType, EmailTemplateDef
       'resource.id',
       'resource.name',
       'resource.url',
-      'retraining.reason',
+      'retraining.isAge',
+      'retraining.isInactivity',
       'retraining.blocksAccess',
     ],
   },
@@ -132,8 +132,7 @@ export const EMAIL_TEMPLATE_DEFAULTS: Record<EmailTemplateType, EmailTemplateDef
       'resource.url',
       'note.authorName',
       'note.content',
-      'note.phase',
-      'note.phaseAction',
+      'note.isStart',
     ],
   },
   [EmailTemplateType.RESOURCE_TAKEOVER]: {
