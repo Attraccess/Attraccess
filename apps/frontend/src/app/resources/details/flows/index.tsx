@@ -2,7 +2,7 @@ import { useParams } from 'react-router-dom';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { Background, BackgroundVariant, Controls, ReactFlow, Node, Panel, Edge, useReactFlow, SelectionMode } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { ButtonGroup } from '@heroui/react';
+import { ButtonGroup, Spinner } from '@heroui/react';
 import {
   ApiError,
   ResourceFlowEdgeDto,
@@ -118,7 +118,7 @@ function FlowsPageInner() {
     };
   }, [setPullToRefreshIsEnabled]);
 
-  const { data: originalFlowData } = useResourceFlowsServiceGetResourceFlow(
+  const { data: originalFlowData, isLoading: isFlowLoading } = useResourceFlowsServiceGetResourceFlow(
     { resourceId: Number(resourceId) },
     undefined,
     {
@@ -434,6 +434,12 @@ function FlowsPageInner() {
           >
             <Controls />
             <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
+
+            {isFlowLoading && (
+              <Panel position="top-left" className="w-full h-full flex items-center justify-center bg-background/60 backdrop-blur-sm pointer-events-none">
+                <Spinner size="lg" />
+              </Panel>
+            )}
 
             <Panel position="top-right" className="flex flex-row flex-wrap gap-2">
               <ButtonGroup>
