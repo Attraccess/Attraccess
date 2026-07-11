@@ -16,6 +16,7 @@
     },
     "copy-companion-into-assets": {
       "executor": "nx:run-commands",
+      "dependsOn": ["companion:build"],
       "cache": false,
       "options": {
         "command": "node {projectRoot}/copy-companion-into-assets.js"
