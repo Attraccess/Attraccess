@@ -1,4 +1,7 @@
 #include "lockscreen.hpp"
+#include <string>
+
+#include <cstring>
 
 void Lockscreen::init()
 {
@@ -82,7 +85,7 @@ void Lockscreen::loop()
 {
 }
 
-String Lockscreen::getName()
+std::string Lockscreen::getName()
 {
     return "Lockscreen";
 }
@@ -120,7 +123,7 @@ void Lockscreen::updateUsageInfo()
     // Status priority mirrors the web resource list: in use > maintenance > available.
     if (this->hasActiveUsage)
     {
-        String usageText = "In Verwendung: " + String(this->username);
+        std::string usageText = std::string("In Verwendung: ") + this->username;
         lv_label_set_text(this->usageInfoLabel, usageText.c_str());
         lv_obj_set_style_text_color(this->usageInfoLabel, lv_color_hex(0xF31260), LV_PART_MAIN | LV_STATE_DEFAULT);
     }

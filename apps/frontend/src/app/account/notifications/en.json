@@ -3,7 +3,8 @@
     "category": "Notification",
     "email": "Email",
     "push": "Push",
-    "toast": "In-app"
+    "toast": "In-app",
+    "all": "All"
   },
   "groups": {
     "general": {
@@ -72,6 +73,12 @@
     "errors": {
       "subscribeFailed": "Could not enable push notifications. Please check your browser notification permissions."
     }
+  },
+  "toggleAll": {
+    "label": "All notifications",
+    "description": "Enable or disable all notifications at once.",
+    "toggleGroup": "Toggle all notifications in",
+    "toggleChannel": "Toggle all"
   },
   "messages": {
     "updated": "Notification preferences updated"

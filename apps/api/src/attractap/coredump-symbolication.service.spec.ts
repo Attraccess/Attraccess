@@ -59,6 +59,15 @@ describe('CoredumpSymbolicationService', () => {
     return dir;
   }
 
+  beforeEach(() => {
+    // Nx loads the workspace .env into test runs; ambient tool overrides must
+    // not leak into tests that build their own fake tools on PATH.
+    delete process.env.ESP_COREDUMP_CMD;
+    delete process.env.ESP_COREDUMP_GDB;
+    delete process.env.ESP_COREDUMP_XTENSA_GDB;
+    delete process.env.ESP_COREDUMP_RISCV_GDB;
+  });
+
   afterEach(() => {
     if (originalCmd === undefined) {
       delete process.env.ESP_COREDUMP_CMD;
@@ -109,6 +118,11 @@ describe('CoredumpSymbolicationService', () => {
     it('extracts the truncated app ELF SHA256 from a coredump', () => {
       const service = makeService({});
       expect(service.extractBuildId(buildCoredumpFixture('f6899cb1067e5043'))).toBe('f6899cb1067e5043');
+    });
+
+    it('extracts idf 5.x default-length (9 hex chars) build ids', () => {
+      const service = makeService({});
+      expect(service.extractBuildId(buildCoredumpFixture('557a61f6f'))).toBe('557a61f6f');
     });
 
     it('normalizes the build id to lowercase', () => {

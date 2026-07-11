@@ -1,6 +1,8 @@
 #pragma once
 
-#include <Arduino.h>
+#include <functional>
+
+#include <string>
 #include "../../screens/IScreen.hpp"
 #include "../../../settings/settings.hpp"
 #include "../../shared/pinInput/pinInputPage.hpp"
@@ -12,26 +14,28 @@ public:
     void onScreenLeave();
     lv_obj_t *getScreen() override;
     void loop() override;
-    String getName() override;
+    std::string getName() override;
     void destroy() override;
 
     struct ConnectionConfig
     {
-        String ssid;
-        String password;
-        String host;
+        std::string ssid;
+        std::string password;
+        std::string host;
         bool useSSL;
-        String devicePin;
+        std::string devicePin;
         bool beeperEnabled;
     };
 
     void setOnSaveCallback(std::function<void(const ConnectionConfig &)> onSaveCallback);
     void setOnCancelPinLockCallback(std::function<void()> onCancelPinLockCallback);
+    void setOnResetCertificateCallback(std::function<void()> onResetCertificateCallback);
     void disablePinLock();
     void enablePinLock();
 
 private:
     std::function<void(const ConnectionConfig &)> onSaveCallback;
+    std::function<void()> onResetCertificateCallback;
 
     PinInputPage pinInputPage;
     lv_obj_t *screen = nullptr;
@@ -39,7 +43,7 @@ private:
     lv_obj_t *pinLockOverlay = nullptr;
     bool pinLockEnabled = true;
     std::function<void()> onCancelPinLockCallback;
-    bool onPinLockConfirmCallback(String pin);
+    bool onPinLockConfirmCallback(std::string pin);
 
     lv_obj_t *tabs = nullptr;
     lv_obj_t *keyboard = nullptr;
@@ -55,10 +59,13 @@ private:
     lv_obj_t *useSSLSwitch = nullptr;
     lv_obj_t *labelForUseSSLSwitch = nullptr;
     lv_color_t labelForUseSSLSwitchDefaultColor;
+    lv_obj_t *resetCertButton = nullptr;
+    lv_obj_t *resetCertLabel = nullptr;
 
     static void onTextAreaEvent(lv_event_t *e);
     static void onKeyboardEvent(lv_event_t *e);
     static void onSaveButtonEvent(lv_event_t *e);
+    static void onResetCertificateButtonEvent(lv_event_t *e);
     static void onWifiDropdownEvent(lv_event_t *e);
     void showKeyboardFor(lv_obj_t *targetTextArea);
     void hideKeyboardIfNoFocus();

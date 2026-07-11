@@ -7,6 +7,7 @@ export interface Permissions {
 
 export interface CompanionSettings {
   idleTimeoutMinutes: number;
+  foregroundApp: boolean;
 }
 
 export interface CompanionBridge {

@@ -1,6 +1,6 @@
 import { CompanionDevice } from '@attraccess/database-entities';
 import { ApiProperty } from '@nestjs/swagger';
-import { IsInt, IsNumber, IsOptional, IsString } from 'class-validator';
+import { IsInt, IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
 
 // ─── Client → Server DTOs ────────────────────────────────────────────────────
 
@@ -72,6 +72,22 @@ export class CompanionIdleDto {
   platform?: string;
 }
 
+export class CompanionForegroundAppDto {
+  @ApiProperty({ description: 'Application display name' })
+  @IsNotEmpty()
+  @IsString()
+  appName!: string;
+
+  @ApiProperty({ description: 'Bundle ID (macOS only)', required: false })
+  @IsOptional()
+  @IsString()
+  bundleId?: string;
+
+  @ApiProperty({ description: 'Process ID' })
+  @IsInt()
+  pid!: number;
+}
+
 // ─── Socket type ─────────────────────────────────────────────────────────────
 
 export enum CompanionEventType {
@@ -87,6 +103,7 @@ export enum CompanionEventType {
   COMPANION_IDLE = 'COMPANION_IDLE',
   COMPANION_ACTIVE = 'COMPANION_ACTIVE',
   COMPANION_DEVICE_RENAMED = 'COMPANION_DEVICE_RENAMED',
+  COMPANION_FOREGROUND_APP = 'COMPANION_FOREGROUND_APP',
 }
 
 export interface CompanionAuthenticatePayload {

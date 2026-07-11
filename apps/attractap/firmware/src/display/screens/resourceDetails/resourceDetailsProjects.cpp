@@ -1,4 +1,6 @@
 #include "resourceDetailsScreen.hpp"
+#include <string>
+#include <functional>
 #include <lvgl.h>
 #include <time.h>
 #include <stdio.h>
@@ -133,7 +135,7 @@ void ResourceDetailsScreen::setProjectsPageRequestCallback(std::function<void(ui
 {
    this->projectsPageRequestCallback = callback;
 }
-void ResourceDetailsScreen::setProjectSelectionCallback(std::function<void(uint32_t, const String &)> callback)
+void ResourceDetailsScreen::setProjectSelectionCallback(std::function<void(uint32_t, const std::string &)> callback)
 {
    this->projectSelectionCallback = callback;
 }
@@ -162,7 +164,7 @@ void ResourceDetailsScreen::refreshProjectsButtonLabel()
       return;
    }
 
-   String label = "Projekt waehlen";
+   std::string label = "Projekt waehlen";
    if (this->selectedProjectId != 0 && this->selectedProjectName.length() > 0)
    {
       label = "Projekt: " + this->selectedProjectName;
@@ -197,7 +199,7 @@ void ResourceDetailsScreen::clearSelectedProject()
 
    if (this->projectSelectionCallback)
    {
-      String empty;
+      std::string empty;
       this->projectSelectionCallback(0, empty);
    }
 }
@@ -417,7 +419,7 @@ void ResourceDetailsScreen::updateProjectsPaginationControls()
 
    if (this->projectsPaginationLabel)
    {
-      lv_label_set_text_fmt(this->projectsPaginationLabel, "Seite %u von %u", this->projectsCurrentPage, totalPages);
+      lv_label_set_text_fmt(this->projectsPaginationLabel, "Seite %u von %u", (unsigned)this->projectsCurrentPage, (unsigned)totalPages);
    }
 
    if (this->projectsPrevButton)

@@ -151,6 +151,19 @@
               "placeholder": "Gerät auswählen..."
             }
           }
+        },
+        "foreground_app_changed": {
+          "title": "Companion: Vordergrund-App geändert",
+          "description": "Wird ausgelöst, wenn sich die fokussierte Anwendung auf einem Companion-Gerät ändert. Payload enthält appName, bundleId (nur macOS) und pid.",
+          "outputs": {
+            "output": "Ausgabe"
+          },
+          "config": {
+            "deviceId": {
+              "label": "Companion-Gerät",
+              "placeholder": "Gerät auswählen..."
+            }
+          }
         }
       },
       "variable": {

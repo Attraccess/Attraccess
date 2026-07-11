@@ -1,7 +1,11 @@
 #include "display.hpp"
+#include <vector>
+#include <string>
+#include <functional>
 
-#include <Wire.h>
 #include "../utils.hpp"
+#include "platform.hpp"
+#include "esp_heap_caps.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -36,7 +40,7 @@ std::vector<IScreen *> Display::pendingDestroyScreens;
 uint32_t Display::transitionStartTime = 0;
 bool Display::transitionComplete = true;
 std::function<void()> Display::onTransitionComplete = nullptr;
-String Display::deviceNameInitValue = "Attractap";
+std::string Display::deviceNameInitValue = "Attractap";
 
 lv_obj_t *Display::deviceNameLabel = NULL;
 BootScreen Display::bootScreen;
@@ -149,14 +153,11 @@ void Display::setup()
         {
 #if defined(DISPLAY_DRIVER_GT911) && defined(PIN_TOUCH_I2C_SDA) && defined(PIN_TOUCH_I2C_SCL)
             {
-                // Bit-banging the pins + re-running Wire.begin() must not race
-                // other bus users (ATT-554).
+                // Resetting the bus must not race other bus users (ATT-554).
                 I2CBusGuard busGuard;
-                // Free any I2C slave stuck mid-transaction before the next attempt.
-                recoverI2CBus(PIN_TOUCH_I2C_SDA, PIN_TOUCH_I2C_SCL);
-                Wire.begin(PIN_TOUCH_I2C_SDA, PIN_TOUCH_I2C_SCL);
-                Wire.setTimeOut(50);
-                Wire.setClock(ATTRACTAP_I2C_CLOCK_HZ);
+                // Clear any I2C slave stuck mid-transaction before the next
+                // attempt (the driver toggles SCL until SDA releases).
+                i2c_master_bus_reset(getSharedI2CBus());
             }
 #endif
             delay(200);

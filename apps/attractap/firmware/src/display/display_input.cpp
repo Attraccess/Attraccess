@@ -1,4 +1,5 @@
 #include "display.hpp"
+#include <functional>
 
 // Input dispatch and frame flushing: bridges the display driver to LVGL's
 // flush/indev callbacks and forwards touch points to an optional consumer.

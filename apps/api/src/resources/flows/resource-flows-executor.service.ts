@@ -27,6 +27,7 @@ import {
   ResourceHealthSource,
   ResourceHealthStatus,
   CompanionIdleActiveNodeDataSchema,
+  CompanionForegroundAppNodeDataSchema,
 } from '@attraccess/database-entities';
 import { ResourceFlowVariablesService } from './resource-flow-variables.service';
 import { OnEvent } from '@nestjs/event-emitter';
@@ -212,6 +213,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
       [ResourceFlowNodeType.OUTPUT_COMPANION_UNLOCK_PC]: new CompanionUnlockPcExecutor(this.companionGatewayService),
       [ResourceFlowNodeType.INPUT_COMPANION_IDLE]: passthrough,
       [ResourceFlowNodeType.INPUT_COMPANION_ACTIVE]: passthrough,
+      [ResourceFlowNodeType.INPUT_COMPANION_FOREGROUND_APP_CHANGED]: passthrough,
     };
   }
 
@@ -872,19 +874,24 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
 
   @OnEvent('companion.idle')
   async handleCompanionIdle(event: { deviceId: number; payload: object }): Promise<void> {
-    await this.triggerCompanionEvent(event.deviceId, ResourceFlowNodeType.INPUT_COMPANION_IDLE, event.payload);
+    await this.triggerCompanionEvent(event.deviceId, ResourceFlowNodeType.INPUT_COMPANION_IDLE, event.payload, CompanionIdleActiveNodeDataSchema);
   }
 
   @OnEvent('companion.active')
   async handleCompanionActive(event: { deviceId: number; payload: object }): Promise<void> {
-    await this.triggerCompanionEvent(event.deviceId, ResourceFlowNodeType.INPUT_COMPANION_ACTIVE, event.payload);
+    await this.triggerCompanionEvent(event.deviceId, ResourceFlowNodeType.INPUT_COMPANION_ACTIVE, event.payload, CompanionIdleActiveNodeDataSchema);
   }
 
-  private async triggerCompanionEvent(deviceId: number, type: ResourceFlowNodeType, payload: object): Promise<void> {
+  @OnEvent('companion.foreground_app')
+  async handleCompanionForegroundApp(event: { deviceId: number; payload: object }): Promise<void> {
+    await this.triggerCompanionEvent(event.deviceId, ResourceFlowNodeType.INPUT_COMPANION_FOREGROUND_APP_CHANGED, event.payload, CompanionForegroundAppNodeDataSchema);
+  }
+
+  private async triggerCompanionEvent(deviceId: number, type: ResourceFlowNodeType, payload: object, schema: { safeParse: (d: unknown) => { success: boolean; data?: { deviceId: number } } }): Promise<void> {
     const allNodes = await this.flowNodeRepository.find({ where: { type } });
     const matching = allNodes.filter((node) => {
-      const parsed = CompanionIdleActiveNodeDataSchema.safeParse(node.data ?? {});
-      return parsed.success && parsed.data.deviceId === deviceId;
+      const parsed = schema.safeParse(node.data ?? {});
+      return parsed.success && parsed.data?.deviceId === deviceId;
     });
     if (matching.length === 0) return;
     await this.startFlow(matching, { payload });

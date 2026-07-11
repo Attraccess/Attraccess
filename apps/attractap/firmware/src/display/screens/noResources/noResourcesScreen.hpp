@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "../IScreen.hpp"
 #include "../../images/lockscreen_background_image.hpp"
 #include "../../../state/state.hpp"
@@ -11,7 +13,7 @@ public:
     void onScreenLeave();
     void loop() override;
     lv_obj_t *getScreen() override;
-    String getName() override;
+    std::string getName() override;
     void destroy() override;
 
 private:

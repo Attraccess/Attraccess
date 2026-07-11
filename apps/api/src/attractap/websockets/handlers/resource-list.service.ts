@@ -54,7 +54,7 @@ export class ResourceListService {
       throw new Error(`Reader not found: ${socket.readerId}`);
     }
 
-    const resources = reader.resources;
+    const resources = [...reader.resources].sort((a, b) => a.name.localeCompare(b.name));
 
     if (onlyIfResourceMatches?.resourceId) {
       if (!resources.some((resource) => resource.id === onlyIfResourceMatches.resourceId)) {

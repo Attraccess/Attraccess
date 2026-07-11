@@ -151,6 +151,19 @@
               "placeholder": "Select a device..."
             }
           }
+        },
+        "foreground_app_changed": {
+          "title": "Companion: foreground app changed",
+          "description": "Fires whenever the focused application changes on a companion device. Payload includes appName, bundleId (macOS only), and pid.",
+          "outputs": {
+            "output": "Output"
+          },
+          "config": {
+            "deviceId": {
+              "label": "Companion device",
+              "placeholder": "Select a device..."
+            }
+          }
         }
       },
       "variable": {

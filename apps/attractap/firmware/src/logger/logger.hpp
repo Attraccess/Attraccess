@@ -1,7 +1,7 @@
 #pragma once
 
-#include <Arduino.h>
 #include <cstdarg>
+#include <string>
 
 enum LogLevel
 {
@@ -50,14 +50,14 @@ public:
     void debugf(const char *, ...) {}
 #endif
 
-    static void setLogLevel(String level, bool saveToPreferences = true);
+    static void setLogLevel(const std::string &level, bool saveToPreferences = true);
     static void setLevel(LogLevel level, bool saveToPreferences = true);
 
 private:
     const char *name;
     static LogLevel level;
 
-    static String getLogLevelString(LogLevel level);
+    static const char *getLogLevelString(LogLevel level);
     static LogLevel getLogLevelFromString(const char *level);
 
     void log(const char *message, LogLevel level);

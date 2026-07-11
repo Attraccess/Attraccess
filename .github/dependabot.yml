@@ -9,3 +9,11 @@ updates:
     directory: '/' # Location of package manifests
     schedule:
       interval: 'weekly'
+    groups:
+      # Only bundle low-risk updates together. Major updates are excluded so
+      # each one gets its own PR and can be reviewed/migrated individually
+      # instead of silently riding along with unrelated patch bumps.
+      npm-minor-patch:
+        update-types:
+          - 'minor'
+          - 'patch'

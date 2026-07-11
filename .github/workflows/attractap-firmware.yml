@@ -1,0 +1,30 @@
+name: Attractap Firmware
+
+on:
+  pull_request:
+    paths:
+      - 'apps/attractap/firmware/**'
+      - '.github/workflows/attractap-firmware.yml'
+  push:
+    branches:
+      - 'claude/attractap-**'
+    paths:
+      - 'apps/attractap/firmware/**'
+      - '.github/workflows/attractap-firmware.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - uses: ./.github/actions/build-attractap-firmware
+
+      - name: Upload firmware artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: attractap-firmware
+          path: apps/attractap/firmware/firmware_output/
+          retention-days: 14

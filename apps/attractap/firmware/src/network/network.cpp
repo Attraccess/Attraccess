@@ -1,6 +1,9 @@
 #include "network.hpp"
+#include "platform.hpp"
 #include "esp_err.h"
 #include "esp_log.h"
+#include "esp_sntp.h"
+#include <string>
 #include <time.h>
 
 // Static member definitions
@@ -27,7 +30,10 @@ void Network::setup()
     Ethernet::setup();
 
     logger.info("Configuring SNTP time server...");
-    configTime(0, 0, "pool.ntp.org", "time.nist.gov");
+    esp_sntp_setoperatingmode(ESP_SNTP_OPMODE_POLL);
+    esp_sntp_setservername(0, "pool.ntp.org");
+    esp_sntp_setservername(1, "time.nist.gov");
+    esp_sntp_init();
 
     logger.info("initialization complete");
 }
@@ -46,7 +52,7 @@ void Network::initSharedComponents()
     esp_err_t ret = esp_netif_init();
     if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE)
     {
-        logger.error((String("Failed to initialize netif: ") + esp_err_to_name(ret)).c_str());
+        logger.error((std::string("Failed to initialize netif: ") + esp_err_to_name(ret)).c_str());
         return;
     }
 
@@ -54,7 +60,7 @@ void Network::initSharedComponents()
     ret = esp_event_loop_create_default();
     if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE)
     {
-        logger.error((String("Failed to create event loop: ") + esp_err_to_name(ret)).c_str());
+        logger.error((std::string("Failed to create event loop: ") + esp_err_to_name(ret)).c_str());
         return;
     }
 

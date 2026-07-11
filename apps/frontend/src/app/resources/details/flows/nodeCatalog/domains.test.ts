@@ -33,6 +33,7 @@ const cases: Array<[ResourceFlowNodeType, Domain]> = [
   [ResourceFlowNodeType.OUTPUT_COMPANION_UNLOCK_PC, 'companion'],
   [ResourceFlowNodeType.INPUT_COMPANION_IDLE, 'companion'],
   [ResourceFlowNodeType.INPUT_COMPANION_ACTIVE, 'companion'],
+  [ResourceFlowNodeType.INPUT_COMPANION_FOREGROUND_APP_CHANGED, 'companion'],
 ];
 
 describe('nodeTypeDomain', () => {

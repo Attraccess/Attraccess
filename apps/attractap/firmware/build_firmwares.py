@@ -1,11 +1,26 @@
 #!/usr/bin/env python3
-import os
+"""Build all shipped Attractap firmware variants with ESP-IDF (idf.py).
+
+Produces firmware_output/ with, per variant:
+  - {name}_{variant}.bin      merged image for the web serial flasher (offset 0x0)
+  - {name}_{variant}_ota.bin  app-only image streamed over the websocket OTA
+  - {name}_{variant}.elf      unstripped ELF for server-side coredump symbolication
+plus firmwares.json — the manifest consumed by the API/frontend. The manifest
+field set must stay stable; the flasher and OTA pipeline depend on it.
+"""
+import glob
 import json
-import subprocess
-import configparser
-import sys
-import shutil
+import os
 import re
+import shlex
+import shutil
+import subprocess
+import sys
+
+FIRMWARE_DIR = os.path.dirname(os.path.abspath(__file__))
+CHIP = "esp32s3"  # both boards are ESP32-S3
+BOARD_FAMILY = "ESP32-S3"
+
 
 def resolve_python_command():
     """Pick a Python executable with fallback."""
@@ -17,448 +32,287 @@ def resolve_python_command():
     return "python3"
 
 
-def resolve_platformio_python(platformio_home):
-    """Return PlatformIO penv Python if it exists (has pyserial for esptool), else None."""
-    if not platformio_home:
-        return None
-    # PlatformIO Core uses penv with dependencies (pyserial) for tool-esptoolpy
-    if sys.platform == "win32":
-        penv_python = os.path.join(platformio_home, "penv", "Scripts", "python.exe")
-    else:
-        penv_python = os.path.join(platformio_home, "penv", "bin", "python")
-    if os.path.exists(penv_python):
-        return penv_python
-    return None
+def resolve_esptool_command():
+    """Find a working esptool invocation without assuming pip-installed
+    packages in the system Python (which e.g. NixOS does not even ship pip
+    for). Preference order:
+      1. esptool on PATH (pip --user install, nixpkgs esptool, sourced IDF env)
+      2. ESP-IDF's own Python virtualenv — the IDF installer always bundles
+         esptool there ($IDF_PYTHON_ENV_PATH, or ~/.espressif/python_env/*)
+      3. the current interpreter (works when esptool is importable here)
+    """
+    for cmd in ("esptool.py", "esptool"):
+        if shutil.which(cmd):
+            return [cmd]
 
-def extract_define_value(flags, define_name):
-    """Extract a -D define value from build_flags"""
-    pattern = fr'-D\s*{define_name}=(["\']?)(.*?)\1(?:\s|$)'
-    match = re.search(pattern, flags)
-    if match:
-        value = match.group(2)
-        # Strip extra quotes if present
-        if (value.startswith('"') and value.endswith('"')) or (value.startswith("'") and value.endswith("'")):
-            value = value[1:-1]
-        return value
-    return None
+    idf_pythons = []
+    env_path = os.environ.get("IDF_PYTHON_ENV_PATH")
+    if env_path:
+        idf_pythons.append(os.path.join(env_path, "bin", "python"))
+    tools_path = os.environ.get("IDF_TOOLS_PATH", os.path.expanduser("~/.espressif"))
+    idf_pythons.extend(sorted(
+        glob.glob(os.path.join(tools_path, "python_env", "*", "bin", "python")),
+        reverse=True,  # prefer the newest IDF env
+    ))
+    for python in idf_pythons:
+        if os.path.exists(python):
+            return [python, "-m", "esptool"]
 
-def hex_to_int(hex_str):
-    """Convert hex string to integer"""
-    if isinstance(hex_str, str):
-        return int(hex_str, 16)
-    return hex_str
+    return [resolve_python_command(), "-m", "esptool"]
 
-def extract_build_id(firmware_bin_path, esptool_cmd, chip):
+
+def extract_cmake_value(content, variable):
+    """Extract `set(<variable> "<value>")` from a variant .cmake file."""
+    match = re.search(rf'set\(\s*{re.escape(variable)}\s+"([^"]*)"\s*\)', content)
+    return match.group(1) if match else None
+
+
+def extract_build_id(firmware_bin_path, esptool_cmd):
     """Best-effort: read app_elf_sha256 from the app image so the server can
     match the exact ELF to a coredump's build id. Returns lowercase hex or None."""
     if not os.path.exists(firmware_bin_path):
         return None
-    try:
-        info_cmd = [*esptool_cmd, '--chip', chip, 'image_info', '--version', '2', firmware_bin_path]
-        result = subprocess.run(info_cmd, capture_output=True, text=True)
-        output = (result.stdout or '') + '\n' + (result.stderr or '')
-        match = re.search(r'(?:ELF file SHA256|app_elf_sha256)[^0-9a-fA-F]*([0-9a-fA-F]{64})', output)
-        if not match:
-            # Older esptool output may not include the application-info block, but the
-            # validation hash is still better than leaving the manifest unindexed.
-            match = re.search(r'Validation hash[^0-9a-fA-F]*([0-9a-fA-F]{64})', output, re.IGNORECASE)
-        if match:
-            return match.group(1).lower()
-    except Exception as e:
-        print(f"Warning: Could not extract build id from {firmware_bin_path}: {e}")
+    # esptool v4 spells it `image_info --version 2`; v5 renamed the command and
+    # dropped the flag. Try both.
+    candidates = [
+        [*esptool_cmd, "--chip", CHIP, "image_info", "--version", "2", firmware_bin_path],
+        [*esptool_cmd, "--chip", CHIP, "image-info", firmware_bin_path],
+    ]
+    for info_cmd in candidates:
+        try:
+            result = subprocess.run(info_cmd, capture_output=True, text=True)
+            output = (result.stdout or "") + "\n" + (result.stderr or "")
+            match = re.search(r"(?:ELF file SHA256|app_elf_sha256)[^0-9a-fA-F]*([0-9a-fA-F]{64})", output)
+            if not match:
+                match = re.search(r"Validation hash[^0-9a-fA-F]*([0-9a-fA-F]{64})", output, re.IGNORECASE)
+            if match:
+                return match.group(1).lower()
+        except Exception as e:
+            print(f"Warning: build id extraction attempt failed: {e}")
+    print(f"Warning: Could not extract build id from {firmware_bin_path}")
     return None
 
+
+def run_merge_bin(esptool_cmd, out_path, flash_files):
+    """esptool merge_bin (v4) / merge-bin (v5)."""
+    for subcommand in ("merge_bin", "merge-bin"):
+        merge_cmd = [*esptool_cmd, "--chip", CHIP, subcommand, "-o", out_path]
+        for offset, path in flash_files:
+            merge_cmd.extend([offset, path])
+        print(f"Running: {' '.join(merge_cmd)}")
+        result = subprocess.run(merge_cmd, capture_output=True, text=True)
+        if result.returncode == 0:
+            return
+        print(f"esptool {subcommand} failed (rc={result.returncode})")
+        print(f"STDOUT: {result.stdout}")
+        print(f"STDERR: {result.stderr}")
+    print(f"Error: Failed to create merged firmware {out_path}")
+    sys.exit(1)
+
+
+def generate_certificates(python_cmd):
+    """Generate the adaptive-TLS CA certificate headers (src/certs/) before the
+    build — the successor of the old PlatformIO `extra_scripts pre:` hook."""
+    print("Generating CA certificates...")
+    script = os.path.join(FIRMWARE_DIR, "tools", "build_individual_ca_certs.py")
+    result = subprocess.run([python_cmd, script], cwd=FIRMWARE_DIR)
+    if result.returncode != 0:
+        print("Error: CA certificate generation failed")
+        sys.exit(1)
+
+
+def find_idf_export():
+    """Locate ESP-IDF's export.sh so the script can bootstrap the IDF
+    environment itself (nx invokes this script in a plain shell)."""
+    candidates = [
+        os.environ.get("IDF_PATH"),
+        os.path.expanduser("~/esp/esp-idf"),
+        os.path.expanduser("~/esp-idf"),
+        "/opt/esp/idf",
+    ]
+    for candidate in candidates:
+        if candidate and os.path.exists(os.path.join(candidate, "export.sh")):
+            return os.path.join(candidate, "export.sh")
+    return None
+
+
+def run_idf(args):
+    """Run idf.py, sourcing ESP-IDF's export.sh first when it is not on PATH.
+
+    idf.py refuses to run without cmake and ninja, but ESP-IDF's Linux
+    installer marks both "on_request" (tools.json) and never installs them,
+    assuming the system provides them — which e.g. NixOS does not. So when
+    they are missing after export.sh, fetch them into the IDF tool set
+    (~/.espressif) once and re-source.
+    """
+    if shutil.which("idf.py") and shutil.which("cmake") and shutil.which("ninja"):
+        return subprocess.run(["idf.py", *args]).returncode
+    export_script = find_idf_export()
+    if not export_script:
+        print("Error: idf.py needs cmake and ninja on PATH, and no ESP-IDF "
+              "export.sh was found to install them from")
+        return 1
+    source_export = "source " + shlex.quote(export_script) + " >/dev/null"
+    ensure_tools = (
+        "if ! command -v cmake >/dev/null 2>&1 || ! command -v ninja >/dev/null 2>&1; then "
+        'echo "cmake/ninja not found — installing them into the ESP-IDF tool set..."; '
+        'python "$IDF_PATH/tools/idf_tools.py" install cmake ninja && ' + source_export + "; "
+        "fi"
+    )
+    command = source_export + " && " + ensure_tools + " && idf.py " + " ".join(shlex.quote(a) for a in args)
+    return subprocess.run(["bash", "-c", command]).returncode
+
+
 def main():
-    if not shutil.which('platformio'):
-        print("Warning: platformio not found, skipping firmware build")
+    os.chdir(FIRMWARE_DIR)
+
+    if not shutil.which("idf.py") and not find_idf_export():
+        # Parity with the old platformio-missing branch: local environments
+        # without the toolchain skip the firmware build instead of failing
+        # the whole monorepo build.
+        print("Warning: ESP-IDF not found (idf.py not on PATH, no export.sh located), skipping firmware build")
         sys.exit(0)
 
-    # Load configuration
-    config = configparser.ConfigParser()
-    config.read('platformio.ini')
-    
-    # Override build_type to production for release builds
-    if 'env' not in config:
-        config.add_section('env')
-    
-    original_build_type = config['env'].get('build_type', 'debug')
-    print(f"Original build_type: {original_build_type}")
-    print("Overriding build_type to 'release' for release builds")
-    config['env']['build_type'] = 'release'
-    
-    # Override LOG_LEVEL to ERROR for production builds and add production flags
-    print("Overriding LOG_LEVEL to 'ERROR' for production builds")
-    for section_name in config.sections():
-        if section_name.startswith('env:'):
-            if 'build_flags' in config[section_name]:
-                build_flags = config[section_name]['build_flags']
-                # Replace existing LOG_LEVEL definition or add it if not present
-                if 'LOG_LEVEL=' in build_flags:
-                    # Replace existing LOG_LEVEL to ERROR (unquoted token)
-                    pattern = r'-D\s*LOG_LEVEL=["\']?[^"\'\s]*["\']?'
-                    build_flags = re.sub(pattern, '-D LOG_LEVEL=ERROR', build_flags)
-                else:
-                    # Add LOG_LEVEL if not present
-                    build_flags += '\n\t-D LOG_LEVEL=ERROR'
+    python_cmd = resolve_python_command()
+    esptool_cmd = resolve_esptool_command()
 
-                # Ensure additional production hardening flags are present
-                extra_flags = [
-                    '-D LOG_LEVEL_NUM=0',                 # compile-time numeric level (0=ERROR)
-                    '-D CORE_DEBUG_LEVEL=0',              # silence Arduino core
-                ]
+    with open("version.txt") as f:
+        firmware_version = f.read().strip().splitlines()[0]
+    print(f"Firmware version: {firmware_version}")
 
-                for flag in extra_flags:
-                    if flag not in build_flags:
-                        build_flags += f"\n\t{flag}"
-                config[section_name]['build_flags'] = build_flags
-    
-    # Write the modified config to a temporary file for the build process
-    temp_config_path = 'platformio_temp.ini'
-    try:
-        with open(temp_config_path, 'w') as temp_config_file:
-            config.write(temp_config_file)
-    except Exception as e:
-        print(f"Error: Failed to write temporary config file: {e}")
+    generate_certificates(python_cmd)
+
+    variant_files = sorted(glob.glob(os.path.join("variants", "*.cmake")))
+    variants = []
+    for path in variant_files:
+        name = os.path.splitext(os.path.basename(path))[0]
+        if name.endswith("-debug"):
+            print(f"Skipping development variant: {name}")
+            continue
+        variants.append((name, path))
+
+    if not variants:
+        print("Error: No variant files found in variants/")
         sys.exit(1)
-    
-    try:
-        # Find all environments first
-        environments = []
-        for section in config.sections():
-            if section.startswith('env:'):
-                env_name = section[4:]  # Remove 'env:' prefix
-                # '-debug' envs are local development variants (-Og + debug
-                # symbols), never shipped firmware
-                if env_name.endswith('-debug'):
-                    print(f"Skipping development environment: {env_name}")
-                    continue
-                environments.append(env_name)
-        
-        if not environments:
-            print("Error: No environments found in platformio.ini")
+    print(f"Found variants: {[v for v, _ in variants]}")
+
+    output_dir = os.path.abspath("firmware_output")
+    if os.path.exists(output_dir):
+        print(f"Cleaning output directory: {output_dir}")
+        shutil.rmtree(output_dir)
+    os.makedirs(output_dir, exist_ok=True)
+
+    firmware_info = []
+
+    for variant, variant_path in variants:
+        print(f"\n=== Building variant: {variant} ===")
+        with open(variant_path) as f:
+            content = f.read()
+
+        firmware_name = extract_cmake_value(content, "ATTRACTAP_FIRMWARE_NAME")
+        friendly_name = extract_cmake_value(content, "ATTRACTAP_FIRMWARE_FRIENDLY_NAME")
+        firmware_variant = extract_cmake_value(content, "ATTRACTAP_FIRMWARE_VARIANT")
+        variant_friendly_name = extract_cmake_value(content, "ATTRACTAP_FIRMWARE_VARIANT_FRIENDLY_NAME")
+
+        missing = [n for n, v in [
+            ("ATTRACTAP_FIRMWARE_NAME", firmware_name),
+            ("ATTRACTAP_FIRMWARE_FRIENDLY_NAME", friendly_name),
+            ("ATTRACTAP_FIRMWARE_VARIANT", firmware_variant),
+            ("ATTRACTAP_FIRMWARE_VARIANT_FRIENDLY_NAME", variant_friendly_name),
+        ] if not v]
+        if missing:
+            print(f"Error: {variant_path} does not set: {', '.join(missing)}")
             sys.exit(1)
-            
-        print(f"Found environments: {environments}")
-        
-        # Get base firmware information from [env] section and/or first environment
-        # Values can be in the base [env] section or in environment-specific sections
-        base_build_flags = config['env'].get('build_flags', '') if 'env' in config else ''
-        first_env_section = f'env:{environments[0]}'
-        first_env_build_flags = config[first_env_section].get('build_flags', '')
-        
-        # Combine flags for extraction (env-specific can override base)
-        combined_flags = base_build_flags + '\n' + first_env_build_flags
-        
-        firmware_name = extract_define_value(combined_flags, 'FIRMWARE_NAME')
-        firmware_friendly_name = extract_define_value(combined_flags, 'FIRMWARE_FRIENDLY_NAME')
-        firmware_version = extract_define_value(combined_flags, 'FIRMWARE_VERSION')
-        
-        if not firmware_name:
-            print(f"Error: FIRMWARE_NAME is not defined in build_flags of [env] or [{first_env_section}] section")
+
+        build_dir = os.path.join("build", variant)
+        # Per-variant sdkconfig, regenerated from sdkconfig.defaults on every
+        # build: an existing sdkconfig silently shadows the defaults file, so
+        # a stale one drops newly added CONFIG_ flags (bit us on ATT-717).
+        sdkconfig_path = os.path.abspath(os.path.join(build_dir, "sdkconfig"))
+        if os.path.exists(sdkconfig_path):
+            os.remove(sdkconfig_path)
+        build_args = [
+            "-B", build_dir,
+            f"-DSDKCONFIG={sdkconfig_path}",
+            f"-DATTRACTAP_VARIANT={variant}",
+            "-DATTRACTAP_LOG_LEVEL=ERROR",  # production runtime log level
+            "build",
+        ]
+        print(f"Running: idf.py {' '.join(build_args)}")
+        if run_idf(build_args) != 0:
+            print(f"Error: Build failed for variant '{variant}'")
             sys.exit(1)
-            
-        if not firmware_version:
-            print(f"Error: FIRMWARE_VERSION is not defined in build_flags of [env] or [{first_env_section}] section")
-            sys.exit(1)
-            
-        if not firmware_friendly_name:
-            print(f"Error: FIRMWARE_FRIENDLY_NAME is not defined in build_flags of [env] or [{first_env_section}] section")
-            sys.exit(1)
-            
-        print(f"Base firmware name: {firmware_name}")
-        print(f"Base firmware friendly name: {firmware_friendly_name}")
-        print(f"Firmware version: {firmware_version}")
-        
-        # Create output directory
-        output_dir = os.path.abspath("firmware_output")
-        
-        # Clean output directory if it exists
-        if os.path.exists(output_dir):
-            print(f"Cleaning output directory: {output_dir}")
-            shutil.rmtree(output_dir)
-        
-        # Create fresh output directory
-        os.makedirs(output_dir, exist_ok=True)
-        print(f"Created clean output directory: {output_dir}")
-        
-        # Build each environment and create manifest
-        firmware_info = []
-        
-        for env in environments:
-            print(f"Building environment: {env}")
-            
-            env_section = f'env:{env}'
-            
-            # Extract values from build flags (combine base [env] with environment-specific)
-            env_build_flags = config[env_section].get('build_flags', '')
-            combined_env_flags = base_build_flags + '\n' + env_build_flags
-            
-            # Extract firmware name for this specific environment (can override base)
-            env_firmware_name = extract_define_value(combined_env_flags, 'FIRMWARE_NAME')
-            env_firmware_friendly_name = extract_define_value(combined_env_flags, 'FIRMWARE_FRIENDLY_NAME')
-            
-            # Use environment-specific values if defined, otherwise fall back to base
-            current_firmware_name = env_firmware_name if env_firmware_name else firmware_name
-            current_firmware_friendly_name = env_firmware_friendly_name if env_firmware_friendly_name else firmware_friendly_name
-            
-            firmware_variant = extract_define_value(combined_env_flags, 'FIRMWARE_VARIANT')
-            firmware_variant_friendly_name = extract_define_value(combined_env_flags, 'FIRMWARE_VARIANT_FRIENDLY_NAME')
-            board_family = extract_define_value(combined_env_flags, 'BOARD_FAMILY')
 
-            if not firmware_variant:
-                print(f"Error: FIRMWARE_VARIANT is not defined in build_flags for environment '{env}'")
+        # Flash layout from flasher_args.json (bootloader, partition table,
+        # otadata initial image, app). The otadata image MUST be part of the
+        # merged bin or freshly flashed devices boot-loop on garbage otadata.
+        flasher_args_path = os.path.join(build_dir, "flasher_args.json")
+        with open(flasher_args_path) as f:
+            flasher_args = json.load(f)
+        flash_files = sorted(
+            ((offset, os.path.join(build_dir, rel_path))
+             for offset, rel_path in flasher_args["flash_files"].items()),
+            key=lambda item: int(item[0], 16),
+        )
+
+        print(f"Flash layout for {variant}:")
+        for offset, path in flash_files:
+            print(f"  {offset}: {os.path.relpath(path, build_dir)}")
+            if not os.path.exists(path):
+                print(f"Error: missing flash image {path}")
                 sys.exit(1)
 
-            if not firmware_variant_friendly_name:
-                print(f"Error: FIRMWARE_VARIANT_FRIENDLY_NAME is not defined in build_flags for environment '{env}'")
-                sys.exit(1)
+        app_bin = os.path.join(build_dir, flasher_args["app"]["file"])
+        elf_path = os.path.join(build_dir, "attractap.elf")
 
-            # Derive chip from the PlatformIO 'board' setting, not from BOARD_FAMILY define
-            board = config[env_section].get('board', '')
-            board_l = board.lower()
-            if 'esp32c3' in board_l or 'esp32-c3' in board_l or '_c3_' in board_l or '_c3' in board_l:
-                chip = 'esp32c3'
-                board_family_auto = 'ESP32-C3'
-            elif 'esp32-s3' in board_l or 'esp32s3' in board_l or '_s3_' in board_l or '_s3' in board_l:
-                chip = 'esp32s3'
-                board_family_auto = 'ESP32-S3'
-            elif 'esp32-s2' in board_l or 'esp32s2' in board_l or '_s2_' in board_l or '_s2' in board_l:
-                chip = 'esp32s2'
-                board_family_auto = 'ESP32-S2'
-            else:
-                chip = 'esp32'
-                board_family_auto = 'ESP32'
+        firmware_filename = f"{firmware_name}_{firmware_variant}.bin"
+        merged_bin_path = os.path.join(output_dir, firmware_filename)
+        print(f"Creating merged firmware for {variant}...")
+        run_merge_bin(esptool_cmd, merged_bin_path, flash_files)
+        print(f"Merged firmware created at: {merged_bin_path}")
 
-            print(f"  Firmware name: {current_firmware_name}")
-            print(f"  Firmware variant: {firmware_variant}")
-            print(f"  Firmware variant friendly name: {firmware_variant_friendly_name}")
-            print(f"  Firmware version: {firmware_version}")
-            print(f"  Board: {board} -> chip: {chip}")
-            if board_family:
-                print(f"  BOARD_FAMILY define: {board_family}")
-            
-            # Build firmware using temporary config with production build type
-            try:
-                subprocess.run(['platformio', 'run', '-c', temp_config_path, '-e', env], check=True)
-            except subprocess.CalledProcessError:
-                print(f"Error: Build failed for environment '{env}'")
-                sys.exit(1)
-            
-            # Check firmware files
-            firmware_path = f".pio/build/{env}/firmware.bin"
-            bootloader_path = f".pio/build/{env}/bootloader.bin"
-            partitions_path = f".pio/build/{env}/partitions.bin"
+        # Unstripped ELF so the server can symbolicate coredumps
+        elf_filename = f"{firmware_name}_{firmware_variant}.elf"
+        build_id = None
+        if os.path.exists(elf_path):
+            shutil.copyfile(elf_path, os.path.join(output_dir, elf_filename))
+            print(f"ELF copied to: {os.path.join(output_dir, elf_filename)}")
+            build_id = extract_build_id(app_bin, esptool_cmd)
+            print(f"  Build id: {build_id}")
+        else:
+            elf_filename = None
+            print(f"Warning: ELF not found at {elf_path}; symbolication will be unavailable for {variant}")
 
-            idedata_path = f".pio/build/{env}/idedata.json"
+        # App-only OTA image (no bootloader/partitions)
+        ota_filename = f"{firmware_name}_{firmware_variant}_ota.bin"
+        shutil.copyfile(app_bin, os.path.join(output_dir, ota_filename))
+        print(f"OTA app image copied to: {os.path.join(output_dir, ota_filename)}")
 
-            # Check if any file is missing
-            missing_files = []
-            for file_path in [firmware_path, bootloader_path, partitions_path]:
-                if not os.path.exists(file_path):
-                    missing_files.append(file_path)
-                    
-            if missing_files:
-                print(f"Error: The following files are missing for environment '{env}':")
-                for file_path in missing_files:
-                    print(f"  - {file_path}")
-                sys.exit(1)
+        firmware_info.append({
+            "name": firmware_name,
+            "friendlyName": friendly_name,
+            "variant": firmware_variant,
+            "variantFriendlyName": variant_friendly_name,
+            "version": firmware_version,
+            "boardFamily": BOARD_FAMILY,
+            "filename": firmware_filename,
+            "filenameOTA": ota_filename,
+            "elfFilename": elf_filename,
+            "buildId": build_id,
+            "chip": CHIP,
+            # Keep the historically conservative flasher parameters — the
+            # frontend esptool-js flasher behavior must not change.
+            "flashMode": "dio",
+            "flashFreq": "80m",
+            "flashSize": "16MB",
+        })
 
-            # Try to get idedata.json for more accurate offsets, but fall back to manual detection
-            flash_images = []
-            if os.path.exists(idedata_path):
-                try:
-                    with open(idedata_path, 'r') as f:
-                        idedata = json.load(f)
-                    
-                    # Collect flash images and offsets from idedata
-                    if 'extra' in idedata and 'flash_images' in idedata['extra']:
-                        for img in idedata['extra']['flash_images']:
-                            offset = img['offset']
-                            path = img['path']
-                            flash_images.append((hex_to_int(offset), offset, path))
-                    
-                    # Add application (main firmware) 
-                    app_offset = idedata['extra'].get('application_offset', '0x10000')
-                    flash_images.append((hex_to_int(app_offset), app_offset, firmware_path))
-                    
-                    print(f"Using idedata.json for flash layout")
-                except Exception as e:
-                    print(f"Warning: Failed to read idedata.json: {e}")
-                    flash_images = []
-            
-            # Fall back to simple, known-good offsets if idedata not available or failed
-            if not flash_images:
-                print(f"Falling back to default offsets for chip '{chip}'")
-                if chip in ("esp32s3", "esp32c3"):
-                    # S3/C3 bootloader at 0x0000
-                    flash_images = [
-                        (0x0, "0x0", bootloader_path),
-                        (0x8000, "0x8000", partitions_path),
-                        (0x10000, "0x10000", firmware_path),
-                    ]
-                else:
-                    # Classic ESP32 bootloader at 0x1000
-                    flash_images = [
-                        (0x1000, "0x1000", bootloader_path),
-                        (0x8000, "0x8000", partitions_path),
-                        (0x10000, "0x10000", firmware_path),
-                    ]
-            
-            # Sort by integer offset to ensure correct order
-            flash_images.sort(key=lambda x: x[0])
-            
-            print(f"Flash layout for {env}:")
-            for int_offset, hex_offset, path in flash_images:
-                print(f"  {hex_offset}: {os.path.basename(path)}")
+    with open(os.path.join(output_dir, "firmwares.json"), "w") as f:
+        json.dump({"firmwares": firmware_info}, f, indent=2)
 
-            # Check if any file is missing
-            missing_files = []
-            for _, _, file_path in flash_images:
-                if not os.path.exists(file_path):
-                    missing_files.append(file_path)
-            if missing_files:
-                print(f"Error: The following files are missing for environment '{env}':")
-                for file_path in missing_files:
-                    print(f"  - {file_path}")
-                sys.exit(1)
+    print(f"\nBuild completed. Output in {output_dir}")
+    print(f"Total variants built: {len(firmware_info)}")
 
-            # Create merged firmware bin using esptool
-            # Name the file after the firmware_name and variant
-            firmware_filename = f"{current_firmware_name}_{firmware_variant}.bin"
-            merged_bin_path = os.path.join(output_dir, firmware_filename)
-            try:
-                print(f"Creating merged firmware for {env}...")
-                python_cmd = resolve_python_command()
-                candidate_platformio_homes = [
-                    os.environ.get('PLATFORMIO_HOME_DIR'),
-                    os.path.join(os.path.expanduser('~'), '.platformio'),
-                    os.path.join(os.getcwd(), '.platformio'),
-                    '/home/ubuntu/.platformio',
-                    '/root/.platformio',
-                ]
-
-                # Use PlatformIO's bundled esptool. Prefer penv Python (has pyserial); else use current Python.
-                esptool_cmd = [python_cmd, '-m', 'esptool']
-                for platformio_home in dict.fromkeys(filter(None, candidate_platformio_homes)):
-                    esptool_script = os.path.join(platformio_home, 'packages', 'tool-esptoolpy', 'esptool.py')
-                    if os.path.exists(esptool_script):
-                        esptool_python = resolve_platformio_python(platformio_home) or python_cmd
-                        esptool_cmd = [esptool_python, esptool_script]
-                        break
-
-                merge_cmd = [
-                    *esptool_cmd,
-                    '--chip', chip, 'merge_bin',
-                    '-o', merged_bin_path,
-                ]
-                
-                # Add flash images in sorted order
-                for int_offset, hex_offset, path in flash_images:
-                    merge_cmd.extend([hex_offset, path])
-                    
-                print(f"Running: {' '.join(merge_cmd)}")
-                result = subprocess.run(merge_cmd, capture_output=True, text=True)
-                
-                if result.returncode != 0:
-                    print(f"Error: Failed to create merged firmware for environment '{env}'")
-                    print(f"Command: {' '.join(merge_cmd)}")
-                    print(f"Return code: {result.returncode}")
-                    print(f"STDOUT: {result.stdout}")
-                    print(f"STDERR: {result.stderr}")
-                    if result.stderr and "No module named 'serial'" in result.stderr:
-                        print(
-                            "Hint: esptool needs pyserial. Install it for the Python used above, e.g.: "
-                            "pip install pyserial   or   pip install esptool"
-                        )
-                    sys.exit(1)
-                
-                print(f"Merged firmware created at: {merged_bin_path}")
-            except Exception as e:
-                print(f"Error: Failed to create merged firmware for environment '{env}': {e}")
-                sys.exit(1)
-
-            # Also export the unstripped ELF so the server can symbolicate coredumps
-            elf_path = f".pio/build/{env}/firmware.elf"
-            elf_filename = f"{current_firmware_name}_{firmware_variant}.elf"
-            build_id = None
-            if os.path.exists(elf_path):
-                try:
-                    shutil.copyfile(elf_path, os.path.join(output_dir, elf_filename))
-                    print(f"ELF copied to: {os.path.join(output_dir, elf_filename)}")
-                    build_id = extract_build_id(firmware_path, esptool_cmd, chip)
-                    print(f"  Build id: {build_id}")
-                except Exception as e:
-                    print(f"Error: Failed to copy ELF for environment '{env}': {e}")
-                    sys.exit(1)
-            else:
-                elf_filename = None
-                print(f"Warning: ELF not found at {elf_path}; symbolication will be unavailable for {env}")
-
-            # Also export the app-only OTA image (do not merge bootloader/partitions)
-            ota_filename = f"{current_firmware_name}_{firmware_variant}_ota.bin"
-            ota_bin_path = os.path.join(output_dir, ota_filename)
-            try:
-                shutil.copyfile(firmware_path, ota_bin_path)
-                print(f"OTA app image copied to: {ota_bin_path}")
-            except Exception as e:
-                print(f"Error: Failed to copy OTA image for environment '{env}': {e}")
-                sys.exit(1)
-
-            # Determine flash parameters based on chip type and board configuration
-            # Default flash parameters for each chip type
-            if chip == 'esp32s3':
-                flash_mode = 'dio'  # DIO is safer/more compatible for ESP32-S3
-                flash_freq = '80m'
-                flash_size = '16MB'
-            elif chip == 'esp32s2':
-                flash_mode = 'dio'
-                flash_freq = '80m'
-                flash_size = '4MB'
-            elif chip == 'esp32c3':
-                flash_mode = 'dio'
-                flash_freq = '80m'
-                flash_size = '4MB'
-            else:  # esp32
-                flash_mode = 'dio'
-                flash_freq = '40m'
-                flash_size = '4MB'
-
-            firmware_info.append({
-                "name": current_firmware_name,
-                "friendlyName": current_firmware_friendly_name,
-                "variant": firmware_variant,
-                "variantFriendlyName": firmware_variant_friendly_name,
-                "version": firmware_version,
-                "boardFamily": board_family if board_family else board_family_auto,
-                "filename": firmware_filename,
-                "filenameOTA": ota_filename,
-                "elfFilename": elf_filename,
-                "buildId": build_id,
-                "chip": chip,
-                "flashMode": flash_mode,
-                "flashFreq": flash_freq,
-                "flashSize": flash_size
-            })
-        
-        # Create single consolidated firmware manifest
-        consolidated_manifest = {
-            "firmwares": firmware_info
-        }
-        
-        with open(os.path.join(output_dir, "firmwares.json"), 'w') as f:
-            json.dump(consolidated_manifest, f, indent=2)
-        
-        print(f"Build completed. Output in {output_dir}")
-        print(f"Total environments built: {len(firmware_info)}")
-        
-    finally:
-        # Clean up temporary config file
-        try:
-            if os.path.exists(temp_config_path):
-                os.remove(temp_config_path)
-                print(f"Cleaned up temporary config file: {temp_config_path}")
-        except Exception as e:
-            print(f"Warning: Could not remove temporary config file: {e}")
 
 if __name__ == "__main__":
     main()

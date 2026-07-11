@@ -33,6 +33,7 @@ export enum ResourceFlowNodeType {
   OUTPUT_COMPANION_UNLOCK_PC = 'output.companion.unlock-pc',
   INPUT_COMPANION_IDLE = 'input.companion.idle',
   INPUT_COMPANION_ACTIVE = 'input.companion.active',
+  INPUT_COMPANION_FOREGROUND_APP_CHANGED = 'input.companion.foreground_app_changed',
 }
 
 // Zod schemas for node data validation
@@ -232,6 +233,10 @@ export const CompanionIdleActiveNodeDataSchema = z.object({
   deviceId: CompanionDeviceIdSchema,
 });
 
+export const CompanionForegroundAppNodeDataSchema = z.object({
+  deviceId: CompanionDeviceIdSchema,
+});
+
 // Helper function to get the appropriate schema for a node type
 export function getNodeDataSchema(nodeType: ResourceFlowNodeType) {
   switch (nodeType) {
@@ -304,6 +309,9 @@ export function getNodeDataSchema(nodeType: ResourceFlowNodeType) {
     case ResourceFlowNodeType.INPUT_COMPANION_IDLE:
     case ResourceFlowNodeType.INPUT_COMPANION_ACTIVE:
       return CompanionIdleActiveNodeDataSchema;
+
+    case ResourceFlowNodeType.INPUT_COMPANION_FOREGROUND_APP_CHANGED:
+      return CompanionForegroundAppNodeDataSchema;
 
     default: {
       const exhaustiveCheck: never = nodeType;
