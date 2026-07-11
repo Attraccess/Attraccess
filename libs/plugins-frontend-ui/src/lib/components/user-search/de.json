@@ -1,10 +1,7 @@
 {
   "label": "Benutzer",
-  "placeholder": "Nach Benutzername oder E-Mail suchen",
   "chooseUser": "Benutzer auswählen",
   "modalTitle": "Benutzer auswählen",
   "searchPlaceholder": "Nach Benutzername oder E-Mail suchen",
-  "empty": "Keine Benutzer gefunden",
-  "noUsersFound": "Keine Benutzer gefunden",
-  "typeToSearch": "Tippen Sie, um nach Benutzern zu suchen"
+  "empty": "Keine Benutzer gefunden"
 }

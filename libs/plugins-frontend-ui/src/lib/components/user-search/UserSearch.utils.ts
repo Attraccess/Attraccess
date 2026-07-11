@@ -17,18 +17,22 @@ export interface UserGroup {
   users: User[];
 }
 
-// The API returns users sorted by username (ASC), so equal-letter runs are contiguous
-// and a single pass produces the address-book groups.
+// The API returns users sorted by username (ASC). Usernames are normalized to
+// lowercase on every write path, but merge by letter instead of relying on
+// contiguous runs so the grouping stays correct even for legacy mixed-case rows
+// or a case-sensitive database collation.
 export function groupUsersByLetter(users: User[]): UserGroup[] {
-  const out: UserGroup[] = [];
+  const byLetter = new Map<string, User[]>();
   for (const user of users) {
     const letter = (user.username?.[0] ?? '#').toUpperCase();
-    const last = out[out.length - 1];
-    if (last && last.letter === letter) {
-      last.users.push(user);
+    const group = byLetter.get(letter);
+    if (group) {
+      group.push(user);
     } else {
-      out.push({ letter, users: [user] });
+      byLetter.set(letter, [user]);
     }
   }
-  return out;
+  return [...byLetter.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([letter, groupedUsers]) => ({ letter, users: groupedUsers }));
 }

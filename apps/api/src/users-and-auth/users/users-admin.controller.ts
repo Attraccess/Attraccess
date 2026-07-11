@@ -28,6 +28,7 @@ import { ChangeUsernameDto } from './dtos/changeUsername.dto';
 import { ChangeEmailDto } from './dtos/changeEmail.dto';
 import { ChangeBillingFactorDto } from './dtos/changeBillingFactor.dto';
 import { mapEmailSendError } from './email-send-error.util';
+import { computeNextPage } from '../../types/response';
 
 @ApiTags('Users')
 @Controller('users')
@@ -118,7 +119,7 @@ export class UsersAdminController {
     this.logger.debug(`Found ${result.total} users total, returning ${result.data.length} users`);
     return {
       ...result,
-      nextPage: result.page * result.limit < result.total ? result.page + 1 : undefined,
+      nextPage: computeNextPage(result.page, result.limit, result.total),
     };
   }
 
