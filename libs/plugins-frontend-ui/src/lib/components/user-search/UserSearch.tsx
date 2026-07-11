@@ -146,7 +146,7 @@ export function UserSearch(props: Readonly<UserSearchProps>) {
       <Modal isOpen={isOpen} onOpenChange={handleOpenChange}>
         <ModalBackdrop>
           <ModalContainer size="md">
-            <ModalDialog className="bg-surface-secondary">
+            <ModalDialog className="bg-surface-secondary" aria-label={t('modalTitle')}>
               <ModalHeader>
                 <ModalHeading>{t('modalTitle')}</ModalHeading>
               </ModalHeader>
