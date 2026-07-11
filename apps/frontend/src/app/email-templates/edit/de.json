@@ -42,7 +42,7 @@
     "completionDetail": "Template-Variable"
   },
   "translations": {
-    "noKeys": "Keine {{t}}-Helfer-Aufrufe in dieser Vorlage gefunden. Verwenden Sie {{t \"key\" \"Standardtext\"}} im Vorlageninhalt oder Betreff, um übersetzbare Zeichenfolgen hinzuzufügen.",
+    "noKeys": "Keine \\{{t}}-Helfer-Aufrufe in dieser Vorlage gefunden. Verwenden Sie \\{{t \"key\" \"Standardtext\"}} im Vorlageninhalt oder Betreff, um übersetzbare Zeichenfolgen hinzuzufügen.",
     "keyColumn": "Schlüssel",
     "defaultColumn": "Standard (Englisch)",
     "translationColumn": "Übersetzung",

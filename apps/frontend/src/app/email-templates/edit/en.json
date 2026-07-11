@@ -42,7 +42,7 @@
     "completionDetail": "Template variable"
   },
   "translations": {
-    "noKeys": "No {{t}} helper calls found in this template. Use {{t \"key\" \"Default text\"}} in the template body or subject to add translatable strings.",
+    "noKeys": "No \\{{t}} helper calls found in this template. Use \\{{t \"key\" \"Default text\"}} in the template body or subject to add translatable strings.",
     "keyColumn": "Key",
     "defaultColumn": "Default (English)",
     "translationColumn": "Translation",

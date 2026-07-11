@@ -27,6 +27,9 @@
     "user-retraining-required": "User Retraining Required",
     "maintenance-request-created": "Maintenance Request Created",
     "message-received": "New Message (Offline Fallback)",
-    "resource-usage-note-added": "Resource Usage Note Added"
+    "resource-usage-note-added": "Resource Usage Note Added",
+    "resource-takeover": "Resource Takeover",
+    "access-change": "Access Change",
+    "resource-session-ended": "Resource Session Ended"
   }
 }
