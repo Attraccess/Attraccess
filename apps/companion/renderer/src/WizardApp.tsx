@@ -18,7 +18,7 @@ export function WizardApp() {
   const [connecting, setConnecting] = useState(false);
   const [deviceId, setDeviceId] = useState<number | null>(null);
   const [perms, setPerms] = useState<Permissions | null>(null);
-  const [pendingAction, setPendingAction] = useState<'settings' | 'quit' | null>(null);
+  const [pendingAction, setPendingAction] = useState<'settings' | 'quit' | 'admin-override' | null>(null);
   const [registered, setRegistered] = useState(false);
   const [connected, setConnected] = useState(false);
 
@@ -123,6 +123,8 @@ export function WizardApp() {
     setPinEntryError('');
     if (pendingAction === 'quit') {
       await window.companion.confirmQuit();
+    } else if (pendingAction === 'admin-override') {
+      await window.companion.enableAdminOverride();
     } else {
       setStep('url');
     }
@@ -179,11 +181,13 @@ export function WizardApp() {
           )}
           {step === 'pin-entry' && (
             <PinEntryStep
-              title={pendingAction === 'quit' ? 'Confirm quit' : 'Access settings'}
+              title={pendingAction === 'quit' ? 'Confirm quit' : pendingAction === 'admin-override' ? 'Admin override' : 'Access settings'}
               description={pendingAction === 'quit'
                 ? 'Enter your PIN to quit Attraccess Companion.'
-                : 'Enter your PIN to access settings.'}
-              submitLabel={pendingAction === 'quit' ? 'Quit' : 'Confirm'}
+                : pendingAction === 'admin-override'
+                  ? 'Enter your admin PIN to unlock the kiosk and ignore server commands.'
+                  : 'Enter your PIN to access settings.'}
+              submitLabel={pendingAction === 'quit' ? 'Quit' : pendingAction === 'admin-override' ? 'Enable override' : 'Confirm'}
               pinEntry={pinEntry}
               error={pinEntryError}
               onPinEntryChange={setPinEntry}

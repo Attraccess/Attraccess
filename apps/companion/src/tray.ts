@@ -18,6 +18,11 @@ function dotIcon(color: [number, number, number]): Electron.NativeImage {
 
 function buildTrayMenu(trayState: TrayState): Menu {
   return Menu.buildFromTemplate([
+    ...(state.adminOverride ? [
+      { label: 'Admin Override active', enabled: false },
+      { label: 'Disable Admin Override', click: () => state.onAdminOverrideDisable?.() },
+      { type: 'separator' as const },
+    ] : []),
     ...(trayState === 'unlocked'
       ? [{ type: 'separator' as const }]
       : [
@@ -42,6 +47,7 @@ export function setupTray(): void {
 }
 
 export function setTrayState(trayState: TrayState): void {
+  state.currentTrayState = trayState;
   state.tray?.setImage(dotIcon(TRAY_COLORS[trayState]));
   state.tray?.setContextMenu(buildTrayMenu(trayState));
   const resourceName = state.authenticatedPayload?.resources[0]?.name;

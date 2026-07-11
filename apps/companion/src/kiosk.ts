@@ -1,8 +1,9 @@
-import { BrowserWindow, session, screen, globalShortcut } from 'electron';
+import { BrowserWindow, Menu, session, screen, globalShortcut } from 'electron';
 import type { CompanionAuthenticatedDto } from '@attraccess/companion-ws-client';
 import { state } from './state';
 import { osAdapter } from './platform-adapter';
 import { attraccessLogoSvg } from './logo-svg';
+import { openWizardWindow } from './wizard-window';
 
 // ponytail: increment per new kiosk window so each open gets a fresh web session (sign-out on close)
 let _kioskSessionId = 0;
@@ -35,6 +36,13 @@ export function openKiosk(payload: CompanionAuthenticatedDto): void {
   win.loadURL(kioskUrl(payload));
   win.on('close', (event) => { if (state.kioskLocked) event.preventDefault(); });
   win.on('closed', () => { state.kioskWindow = null; });
+  win.webContents.on('context-menu', () => {
+    Menu.buildFromTemplate([
+      state.adminOverride
+        ? { label: 'Disable Admin Override', click: () => state.onAdminOverrideDisable?.() }
+        : { label: 'Admin Override…', click: () => openWizardWindow({ requirePin: 'admin-override' }) },
+    ]).popup({ window: win });
+  });
   state.kioskWindow = win;
 }
 

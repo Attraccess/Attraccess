@@ -36,6 +36,20 @@ function checkHealth(serverUrl: string): Promise<boolean> {
   });
 }
 
+// ─── Admin override ───────────────────────────────────────────────────────────
+
+function enableAdminOverride(): void {
+  state.adminOverride = true;
+  hideKioskOverlay();
+  setTrayState(state.currentTrayState);
+}
+
+function disableAdminOverride(): void {
+  state.adminOverride = false;
+  setTrayState(state.currentTrayState);
+  if (state.authenticatedPayload?.locked) lockComputer();
+}
+
 // ─── IPC ─────────────────────────────────────────────────────────────────────
 
 ipcMain.handle('get-permissions', () => osAdapter.permissionsStatus());
@@ -64,6 +78,11 @@ ipcMain.handle('save-pin', async (_evt, pin: string) => {
 ipcMain.handle('verify-pin', (_evt, pin: string) => {
   if (!state.pinHash) return false;
   return hashPin(pin) === state.pinHash;
+});
+
+ipcMain.handle('enable-admin-override', () => {
+  enableAdminOverride();
+  state.mainWindow?.close();
 });
 
 ipcMain.handle('confirm-quit', () => {
@@ -242,20 +261,24 @@ function startWsClient(serverUrl: string, firstRun: boolean): void {
     openKiosk(payload);
     // restore persisted lock state so a restart doesn't silently unlock
     setTrayState(payload.locked ? 'locked' : 'unlocked');
-    if (payload.locked) showKioskOverlay();
-    else hideKioskOverlay();
+    if (!state.adminOverride) {
+      if (payload.locked) showKioskOverlay();
+      else hideKioskOverlay();
+    }
     if (state.mainWindow && !state.mainWindow.isDestroyed()) {
       setTimeout(() => state.mainWindow?.close(), 1500);
     }
   });
 
   state.wsClient.on('lock_pc', () => {
+    if (state.adminOverride) return;
     setTrayState('locked');
     reloadKiosk();
     lockComputer();
   });
 
   state.wsClient.on('unlock_pc', () => {
+    if (state.adminOverride) return;
     setTrayState('unlocked');
     unlockComputer();
   });
@@ -291,6 +314,7 @@ function allPermissionsGranted(): boolean {
 app.whenReady().then(async () => {
   setupTray();
   state.settings = loadSettings();
+  state.onAdminOverrideDisable = disableAdminOverride;
 
   [state.creds, state.pinHash] = await Promise.all([loadCredentials(), loadPin()]);
 

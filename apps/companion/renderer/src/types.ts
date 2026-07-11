@@ -22,7 +22,8 @@ export interface CompanionBridge {
   disconnect: () => Promise<void>;
   getSettings: () => Promise<CompanionSettings>;
   saveSettings: (s: CompanionSettings) => Promise<void>;
-  onInit: (cb: (data: { serverUrl?: string; requirePin?: 'settings' | 'quit'; registered: boolean; connected: boolean }) => void) => void;
+  enableAdminOverride: () => Promise<void>;
+  onInit: (cb: (data: { serverUrl?: string; requirePin?: 'settings' | 'quit' | 'admin-override'; registered: boolean; connected: boolean }) => void) => void;
   onWsStatus: (cb: (status: 'connected' | 'disconnected') => void) => void;
   onRegistered: (cb: (data: { id: number }) => void) => void;
   onAuthenticated: (cb: (data: unknown) => void) => void;

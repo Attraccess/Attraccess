@@ -3,7 +3,7 @@ import * as path from 'path';
 import { state } from './state';
 
 export interface WizardOpts {
-  requirePin?: 'settings' | 'quit';
+  requirePin?: 'settings' | 'quit' | 'admin-override';
 }
 
 export function openWizardWindow(opts: WizardOpts = {}): void {
