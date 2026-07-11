@@ -14,7 +14,7 @@ import {
 } from '@heroui/react';
 import { Maximize, RotateCcw } from 'lucide-react';
 import { Button } from '../../components/button';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useDebounce, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../components/toastProvider';
 import { StandardDrawer } from '../../components/standardDrawer';
 import { StandardModal } from '../../components/standardModal';
@@ -25,7 +25,6 @@ import {
   useEmailLayoutServiceEmailLayoutControllerPreviewLayout,
   useEmailLayoutServiceEmailLayoutControllerResetToDefault as useResetLayoutToDefault,
 } from '@attraccess/react-query-client';
-import { useDebounce } from '../../hooks/useDebounce';
 
 import * as enFile from './en.json';
 import * as deFile from './de.json';

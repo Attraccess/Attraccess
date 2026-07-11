@@ -3,7 +3,8 @@ import { act, render, renderHook, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { User } from '@attraccess/react-query-client';
-import { groupUsersByLetter, useDebouncedValue } from './UserSearch.utils';
+import { useDebounce } from '../../hooks/useDebounce';
+import { groupUsersByLetter } from './UserSearch.utils';
 import { UserSearch } from './UserSearch';
 
 // Mock the generated api client: its sources do not exist in hermetic test runs,
@@ -49,7 +50,7 @@ describe('groupUsersByLetter', () => {
   });
 });
 
-describe('useDebouncedValue', () => {
+describe('useDebounce', () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -59,7 +60,7 @@ describe('useDebouncedValue', () => {
   });
 
   it('only exposes the new value after the delay has elapsed', () => {
-    const { result, rerender } = renderHook(({ value }) => useDebouncedValue(value, 300), {
+    const { result, rerender } = renderHook(({ value }) => useDebounce(value, 300), {
       initialProps: { value: 'a' },
     });
 
@@ -80,7 +81,7 @@ describe('useDebouncedValue', () => {
   });
 
   it('restarts the delay when the value keeps changing', () => {
-    const { result, rerender } = renderHook(({ value }) => useDebouncedValue(value, 300), {
+    const { result, rerender } = renderHook(({ value }) => useDebounce(value, 300), {
       initialProps: { value: 'a' },
     });
 

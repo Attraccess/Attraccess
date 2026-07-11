@@ -23,8 +23,9 @@ import {
 } from '@heroui/react';
 import { SearchIcon, UserPlusIcon } from 'lucide-react';
 import { useTranslations } from '../../i18n';
+import { useDebounce } from '../../hooks/useDebounce';
 import { AttraccessUser } from '../attraccess-user/AttraccessUser';
-import { groupUsersByLetter, useDebouncedValue } from './UserSearch.utils';
+import { groupUsersByLetter } from './UserSearch.utils';
 import { User, useUsersServiceFindManyInfinite } from '@attraccess/react-query-client';
 
 import en from './en.json';
@@ -42,6 +43,14 @@ interface UserSearchProps {
 const PAGE_SIZE = 50;
 const SEARCH_DEBOUNCE_MS = 300;
 
+// Mirrors the app's StandardModal chrome (bg-surface-secondary + field-contrast
+// vars) so fields inside this modal match every other modal in the app. The lib
+// cannot import the app-level StandardModal (apps depend on libs, not vice versa).
+const FIELD_CONTRAST_STYLE: React.CSSProperties = {
+  ['--field-border' as never]: 'var(--border-secondary)',
+  ['--border-width-field' as never]: '1px',
+};
+
 export function UserSearch(props: Readonly<UserSearchProps>) {
   const { label, placeholder, onSelectionChange, afterAutocomplete, wrapperProps, afterSelection } = props;
 
@@ -55,7 +64,7 @@ export function UserSearch(props: Readonly<UserSearchProps>) {
   const { isOpen, open, close } = useOverlayState();
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [search, setSearch] = useState('');
-  const debouncedSearch = useDebouncedValue(search, SEARCH_DEBOUNCE_MS);
+  const debouncedSearch = useDebounce(search, SEARCH_DEBOUNCE_MS);
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } = useUsersServiceFindManyInfinite(
     { limit: PAGE_SIZE, search: debouncedSearch.trim() || undefined },
@@ -161,7 +170,7 @@ export function UserSearch(props: Readonly<UserSearchProps>) {
       <Modal isOpen={isOpen} onOpenChange={handleOpenChange}>
         <ModalBackdrop>
           <ModalContainer size="md">
-            <ModalDialog className="bg-surface-secondary" aria-label={t('modalTitle')}>
+            <ModalDialog className="bg-surface-secondary" style={FIELD_CONTRAST_STYLE} aria-label={t('modalTitle')}>
               <ModalHeader>
                 <ModalHeading>{t('modalTitle')}</ModalHeading>
               </ModalHeader>
