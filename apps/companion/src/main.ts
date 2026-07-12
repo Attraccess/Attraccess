@@ -154,6 +154,22 @@ async function applyUpdate(serverUrl: string, downloadUrl: string, version: stri
     return;
   }
   const absUrl = downloadUrl.startsWith('http') ? downloadUrl : `${serverUrl}${downloadUrl}`;
+  // Reject downloads from a different origin than the configured server.
+  // The server always sends relative paths today, but defend against a future
+  // server bug or compromise that returns a redirect to a third-party host.
+  if (downloadUrl.startsWith('http')) {
+    try {
+      const expectedOrigin = new URL(serverUrl).origin;
+      const actualOrigin = new URL(absUrl).origin;
+      if (actualOrigin !== expectedOrigin) {
+        console.error(`[companion] refusing update from different origin: expected ${expectedOrigin}, got ${actualOrigin}`);
+        return;
+      }
+    } catch {
+      console.error('[companion] refusing update — could not parse server/download URL for origin check');
+      return;
+    }
+  }
   if (absUrl.startsWith('http:')) {
     console.warn('[companion] update download is using plain HTTP — no transport encryption');
   }

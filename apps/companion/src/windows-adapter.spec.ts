@@ -1,31 +1,40 @@
-import { WindowsAdapter } from './windows-adapter';
-import { app, shell } from 'electron';
-
+// jest.mock is hoisted before imports — keep it here.
+/* eslint-disable import/first */
 jest.mock('electron', () => ({
   app: { quit: jest.fn() },
-  shell: { openPath: jest.fn() },
 }));
 
-describe('WindowsAdapter.applyUpdate', () => {
-  beforeEach(() => jest.clearAllMocks());
+jest.mock('child_process', () => ({
+  spawn: jest.fn(),
+}));
 
-  it('calls allowQuit before app.quit on success', async () => {
+jest.mock('./windows-lock', () => ({
+  lockWorkStation: jest.fn(),
+  installAutostart: jest.fn(),
+}));
+
+import { WindowsAdapter } from './windows-adapter';
+import { app } from 'electron';
+import { spawn } from 'child_process';
+/* eslint-enable import/first */
+
+const mockUnref = jest.fn();
+const mockOn = jest.fn();
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  (spawn as jest.Mock).mockReturnValue({ unref: mockUnref, on: mockOn });
+});
+
+describe('WindowsAdapter.applyUpdate', () => {
+  it('spawns installer with /S flag and calls allowQuit before app.quit', async () => {
     const calls: string[] = [];
-    (shell.openPath as jest.Mock).mockResolvedValue('');
     (app.quit as jest.Mock).mockImplementation(() => calls.push('quit'));
 
     await new WindowsAdapter().applyUpdate('/tmp/update.exe', '2.0.0', () => calls.push('allowQuit'));
 
+    expect(spawn).toHaveBeenCalledWith('/tmp/update.exe', ['/S'], { detached: true, stdio: 'ignore' });
+    expect(mockUnref).toHaveBeenCalled();
     expect(calls).toEqual(['allowQuit', 'quit']);
-  });
-
-  it('does not call allowQuit or app.quit when shell.openPath fails', async () => {
-    (shell.openPath as jest.Mock).mockResolvedValue('some error message');
-
-    const allowQuit = jest.fn();
-    await new WindowsAdapter().applyUpdate('/tmp/update.exe', '2.0.0', allowQuit);
-
-    expect(allowQuit).not.toHaveBeenCalled();
-    expect(app.quit).not.toHaveBeenCalled();
   });
 });

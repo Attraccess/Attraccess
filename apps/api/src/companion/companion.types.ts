@@ -1,6 +1,6 @@
 import { CompanionDevice } from '@attraccess/database-entities';
 import { ApiProperty } from '@nestjs/swagger';
-import { IsInt, IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
+import { IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
 
 // ─── Client → Server DTOs ────────────────────────────────────────────────────
 
@@ -17,7 +17,7 @@ export class CompanionAuthenticateDto {
 
   @ApiProperty({ description: 'OS platform (e.g. linux, darwin, win32)', required: false })
   @IsOptional()
-  @IsString()
+  @IsIn(['linux', 'darwin', 'win32'])
   platform?: string;
 
   @ApiProperty({ description: 'CPU architecture (e.g. x64, arm64)', required: false })

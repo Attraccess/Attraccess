@@ -1,5 +1,6 @@
 import type { App } from 'electron';
-import { app, shell } from 'electron';
+import { app } from 'electron';
+import { spawn } from 'child_process';
 import type { OsAdapter } from './platform-adapter';
 import { lockWorkStation, installAutostart } from './windows-lock';
 
@@ -37,8 +38,12 @@ export class WindowsAdapter implements OsAdapter {
   }
 
   async applyUpdate(dest: string, _version: string, allowQuit: () => void): Promise<void> {
-    const errMsg = await shell.openPath(dest);
-    if (errMsg) { console.error('[companion] failed to launch Windows installer:', errMsg); return; }
+    // Spawn the NSIS installer silently (/S) as a detached process so it outlives
+    // this process. NSIS waits for the target app to fully exit before overwriting,
+    // so calling app.quit() immediately after is safe.
+    const child = spawn(dest, ['/S'], { detached: true, stdio: 'ignore' });
+    child.on('error', (err) => console.error('[companion] failed to launch Windows installer:', err));
+    child.unref();
     allowQuit();
     app.quit();
   }
