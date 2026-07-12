@@ -14,12 +14,14 @@ describe('AttractapAuthHandler', () => {
   let mockSocket: {
     id: string;
     readerId: number | null;
+    readerName: string | null;
     state: Record<string, unknown>;
     sendMessage: jest.Mock;
     sendBinaryData: jest.Mock;
   };
   let mockAttractapService: { createNewReader: jest.Mock; findReaderById: jest.Mock };
   let mockResourceListService: { sendResourceListToSocket: jest.Mock };
+  let mockMetricsService: { attractapReaderConnected: { set: jest.Mock } };
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -35,6 +37,7 @@ describe('AttractapAuthHandler', () => {
     mockSocket = {
       id: 'socket-1',
       readerId: null,
+      readerName: null,
       state: {},
       sendMessage: jest.fn().mockResolvedValue(undefined),
       sendBinaryData: jest.fn(),
@@ -49,8 +52,13 @@ describe('AttractapAuthHandler', () => {
       sendResourceListToSocket: jest.fn().mockResolvedValue(undefined),
     };
 
+    mockMetricsService = {
+      attractapReaderConnected: { set: jest.fn() },
+    };
+
     (handler as any).attractapService = mockAttractapService;
     (handler as any).resourceListService = mockResourceListService;
+    (handler as any).metricsService = mockMetricsService;
   });
 
   describe('handleReaderRegister', () => {
@@ -152,6 +160,11 @@ describe('AttractapAuthHandler', () => {
 
       expect(mockVerifyToken).toHaveBeenCalledWith('client-token', 'hashed');
       expect(mockSocket.readerId).toBe(42);
+      expect(mockSocket.readerName).toBe('Reader A');
+      expect(mockMetricsService.attractapReaderConnected.set).toHaveBeenCalledWith(
+        { reader_id: '42', reader_name: 'Reader A' },
+        1,
+      );
       expect(mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({

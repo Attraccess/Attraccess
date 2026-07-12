@@ -38,6 +38,7 @@ export class AttractapCrashReportHandler {
           `uptimeMs=${report.uptimeBeforeResetMs ?? 'n/a'} ws=${report.wsState ?? 'n/a'} wifi=${report.wifiState ?? 'n/a'}`,
       );
       this.metricsService.attractapCrashReportsTotal.inc({
+        reader_id: String(socket.readerId),
         reset_reason: this.normalizeResetReason(report.resetReason),
       });
       await socket.sendMessage(
