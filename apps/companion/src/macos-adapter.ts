@@ -1,6 +1,7 @@
 import type { App } from 'electron';
 import { app, dialog, shell } from 'electron';
 import { execFileSync } from 'child_process';
+import { randomBytes } from 'crypto';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -47,7 +48,7 @@ export class MacosAdapter implements OsAdapter {
   }
 
   async applyUpdate(dest: string, version: string, _allowQuit: () => void): Promise<void> {
-    const tmpMount = path.join(os.tmpdir(), `attraccess-update-${version}`);
+    const tmpMount = path.join(os.tmpdir(), `attraccess-update-${version}-${randomBytes(4).toString('hex')}`);
     try {
       // hdiutil requires the mountpoint directory to exist before attaching
       fs.mkdirSync(tmpMount, { recursive: true });
@@ -64,7 +65,8 @@ export class MacosAdapter implements OsAdapter {
       execFileSync('hdiutil', ['detach', tmpMount, '-quiet']);
       try { fs.unlinkSync(dest); } catch { /* best-effort cleanup */ }
       app.relaunch({ execPath: process.execPath });
-      app.exit(0); // app.exit bypasses before-quit — no need for allowQuit
+      _allowQuit();
+      app.quit();
     } catch (err) {
       console.error('[companion] macOS silent update failed, falling back to manual install:', err);
       try { execFileSync('hdiutil', ['detach', tmpMount, '-quiet']); } catch { /* best-effort */ }

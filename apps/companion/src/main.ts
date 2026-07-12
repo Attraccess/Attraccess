@@ -147,6 +147,12 @@ function computeSha256(filePath: string): Promise<string> {
 }
 
 async function applyUpdate(serverUrl: string, downloadUrl: string, version: string, sha256?: string): Promise<void> {
+  // Validate server-supplied version before using it in a filesystem path to prevent
+  // path traversal (e.g. version="../../../../etc/evil" escaping os.tmpdir()).
+  if (!/^\d+\.\d+\.\d+/.test(version)) {
+    console.error(`[companion] refusing update with invalid version string: ${JSON.stringify(version)}`);
+    return;
+  }
   const absUrl = downloadUrl.startsWith('http') ? downloadUrl : `${serverUrl}${downloadUrl}`;
   if (absUrl.startsWith('http:')) {
     console.warn('[companion] update download is using plain HTTP — no transport encryption');
@@ -167,7 +173,12 @@ async function applyUpdate(serverUrl: string, downloadUrl: string, version: stri
         return;
       }
     } else {
-      console.warn('[companion] update has no checksum — integrity unverified');
+      // Fail closed: refuse to auto-apply updates without a checksum. The server
+      // should always supply sha256 for builds produced by copy-companion-into-assets.js.
+      fs.unlink(dest, () => undefined);
+      console.error(`[companion] update v${version} has no checksum — refusing to apply`);
+      state.tray?.setToolTip(`Attraccess Companion — update v${version} missing checksum`);
+      return;
     }
   } catch (err) {
     console.error('[companion] update download failed:', err);
@@ -217,7 +228,7 @@ function startWsClient(serverUrl: string, firstRun: boolean): void {
     state.mainWindow?.webContents.send('registered', { id: payload.id });
     // server only sends AUTHENTICATED in reply to AUTHENTICATE; register alone
     // never authenticates, so do it now instead of waiting for a relaunch
-    state.wsClient?.sendAuthenticate({ id: payload.id, token: payload.token, platform: process.platform, appVersion: app.getVersion() });
+    state.wsClient?.sendAuthenticate({ id: payload.id, token: payload.token, platform: process.platform, arch: process.arch, appVersion: app.getVersion() });
 
     // install OS startup entry so the companion launches automatically after login
     osAdapter.installStartupEntry(app).catch((err) =>

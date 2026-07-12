@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import * as semver from 'semver';
 import { CompanionService } from './companion.service';
 import { CompanionGatewayService } from './companion-gateway.service';
 import { CompanionAuthenticatePayload, CompanionEventType, CompanionSocket } from './companion.types';
@@ -71,7 +72,9 @@ export class CompanionAuthHandler {
     if (!platform || !appVersion) return;
 
     const manifest = this.service.getManifest();
-    if (!manifest || manifest.version === appVersion) return;
+    // Use semver.gt so equal/newer-client versions and invalid strings all skip the update,
+    // preventing forced downgrades during rolling deploys.
+    if (!manifest || !semver.valid(appVersion) || !semver.gt(manifest.version, appVersion)) return;
 
     // Match by both platform and arch so Linux x64 and arm64 devices get the right binary.
     // Fall back to platform-only match for backwards compatibility with older clients.

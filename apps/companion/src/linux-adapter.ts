@@ -52,12 +52,16 @@ export class LinuxAdapter implements OsAdapter {
     ];
   }
 
-  async applyUpdate(dest: string, _version: string, _allowQuit: () => void): Promise<void> {
+  async applyUpdate(dest: string, _version: string, allowQuit: () => void): Promise<void> {
     const exePath = app.getPath('exe');
     try {
-      // Replace the installed AppImage in-place so the update survives reboots
-      fs.copyFileSync(dest, exePath);
-      fs.chmodSync(exePath, 0o755);
+      // Atomic in-place replace: write to a sibling temp file then rename so a crash
+      // mid-operation never leaves exePath truncated. rename(2) within the same
+      // filesystem is atomic, so the old binary or the new one is always fully in place.
+      const tmpDest = `${exePath}.tmp`;
+      fs.copyFileSync(dest, tmpDest);
+      fs.chmodSync(tmpDest, 0o755);
+      fs.renameSync(tmpDest, exePath);
       try { fs.unlinkSync(dest); } catch { /* best-effort cleanup */ }
       app.relaunch({ execPath: exePath });
     } catch (err) {
@@ -65,6 +69,7 @@ export class LinuxAdapter implements OsAdapter {
       try { fs.chmodSync(dest, 0o755); } catch { /* ignore */ }
       app.relaunch({ execPath: dest });
     }
-    app.exit(0); // app.exit bypasses before-quit — no need for allowQuit
+    allowQuit();
+    app.quit();
   }
 }
