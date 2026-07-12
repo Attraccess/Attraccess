@@ -5,6 +5,7 @@
   "collapse": "Einklappen",
   "expand": "Ausklappen",
   "empty": "Keine Knoten für diese Ressource verfügbar.",
+  "loading": "Knoten werden geladen…",
   "domains": {
     "manual": "Manuell",
     "resource": "Ressource",

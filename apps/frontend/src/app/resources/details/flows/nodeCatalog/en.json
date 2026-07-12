@@ -5,6 +5,7 @@
   "collapse": "Collapse",
   "expand": "Expand",
   "empty": "No nodes available for this resource.",
+  "loading": "Loading nodes…",
   "domains": {
     "manual": "Manual",
     "resource": "Resource",

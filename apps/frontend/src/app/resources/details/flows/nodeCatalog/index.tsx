@@ -29,6 +29,12 @@ export const NodeCatalogPanel = forwardRef<NodeCatalogHandle, Props>(function No
   const { groups, isLoading, collapsed, setCollapsed, isDomainExpanded, setDomainExpanded } = useNodeCatalog({ resourceId });
   const { isOpen, setOpen } = useOverlayState();
 
+  const loadingSpinner = isLoading ? (
+    <div className="flex items-center justify-center h-full" role="status" aria-label={t('loading')}>
+      <Spinner size="sm" />
+    </div>
+  ) : null;
+
   const openCatalog = useCallback(() => setOpen(true), [setOpen]);
   const closeCatalog = useCallback(() => setOpen(false), [setOpen]);
 
@@ -64,11 +70,7 @@ export const NodeCatalogPanel = forwardRef<NodeCatalogHandle, Props>(function No
           </Button>
         </div>
         <div className="flex-1 min-h-0 overflow-y-auto p-2">
-          {isLoading ? (
-            <div className="flex items-center justify-center h-full">
-              <Spinner size="sm" />
-            </div>
-          ) : collapsed ? (
+          {loadingSpinner ?? (collapsed ? (
             <ul className="flex flex-col items-center gap-1">
               {groups.map((group) => {
                 const def = DOMAINS[group.domain];
@@ -103,7 +105,7 @@ export const NodeCatalogPanel = forwardRef<NodeCatalogHandle, Props>(function No
               tCatalog={t}
               tNodeTranslations={tNodeTranslations}
             />
-          )}
+          ))}
         </div>
       </aside>
 
@@ -112,11 +114,7 @@ export const NodeCatalogPanel = forwardRef<NodeCatalogHandle, Props>(function No
           <h2 className="text-lg font-semibold">{t('title')}</h2>
         </DrawerHeader>
         <DrawerBody>
-          {isLoading ? (
-            <div className="flex items-center justify-center h-full">
-              <Spinner size="sm" />
-            </div>
-          ) : (
+          {loadingSpinner ?? (
             <CatalogContent
               groups={groups}
               isDomainExpanded={isDomainExpanded}

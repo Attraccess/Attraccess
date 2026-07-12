@@ -20,6 +20,7 @@ vi.mock('@attraccess/plugins-frontend-ui', () => ({
       'nodes.input.button.description': 'User-triggered start',
       'nodes.input.resource.door.locked.title': 'Door locked',
       'nodes.input.resource.door.locked.description': 'Fires on lock',
+      loading: 'Loading nodes…',
       toggleOpen: 'Open catalog',
       toggleClose: 'Close catalog',
       collapse: 'Collapse',
@@ -31,12 +32,15 @@ vi.mock('@attraccess/plugins-frontend-ui', () => ({
   },
 }));
 
+let mockIsLoading = false;
+
 vi.mock('@attraccess/react-query-client', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@attraccess/react-query-client')>();
   return {
     ...actual,
     useResourceFlowsServiceGetNodeSchemas: () => ({
-      data: [
+      isLoading: mockIsLoading,
+      data: mockIsLoading ? undefined : [
         { type: 'input.button', inputs: [], outputs: ['out'], isOutput: false, supportedByResource: true, configSchema: {} },
         { type: 'input.resource.door.locked', inputs: [], outputs: ['out'], isOutput: false, supportedByResource: true, configSchema: {} },
       ],
@@ -56,6 +60,7 @@ const tNodeTranslations = ((key: string) => {
 
 describe('NodeCatalogPanel', () => {
   beforeEach(() => {
+    mockIsLoading = false;
     window.localStorage.clear();
   });
 
@@ -81,6 +86,25 @@ describe('NodeCatalogPanel', () => {
 
     await user.click(manualButton);
     expect(window.localStorage.getItem('nodeCatalog.collapsed')).toBe('false');
+  });
+
+  it('shows spinner while loading in desktop sidebar', () => {
+    mockIsLoading = true;
+    render(
+      <NodeCatalogPanel resourceId={1} onSelect={vi.fn()} tNodeTranslations={tNodeTranslations} />,
+      { wrapper: TestWrapper },
+    );
+    expect(screen.getByRole('status')).toBeInTheDocument();
+    expect(screen.queryByText('Manual')).toBeNull();
+  });
+
+  it('shows content once loaded in desktop sidebar', () => {
+    render(
+      <NodeCatalogPanel resourceId={1} onSelect={vi.fn()} tNodeTranslations={tNodeTranslations} />,
+      { wrapper: TestWrapper },
+    );
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(screen.getAllByText('Manual').length).toBeGreaterThan(0);
   });
 
   it('opens mobile overlay via imperative ref and selects a node', async () => {

@@ -118,7 +118,7 @@ function FlowsPageInner() {
     };
   }, [setPullToRefreshIsEnabled]);
 
-  const { data: originalFlowData, isLoading: isFlowLoading } = useResourceFlowsServiceGetResourceFlow(
+  const { data: originalFlowData, isFetching: isFlowFetching } = useResourceFlowsServiceGetResourceFlow(
     { resourceId: Number(resourceId) },
     undefined,
     {
@@ -408,7 +408,7 @@ function FlowsPageInner() {
           tNodeTranslations={tNodeTranslations}
         />
         <div
-          className="flex-1 h-full"
+          className="flex-1 h-full relative"
           onMouseMove={(e) => {
             mousePosRef.current = { x: e.clientX, y: e.clientY };
           }}
@@ -434,12 +434,6 @@ function FlowsPageInner() {
           >
             <Controls />
             <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
-
-            {isFlowLoading && (
-              <Panel position="top-left" className="w-full h-full flex items-center justify-center bg-background/60 backdrop-blur-sm pointer-events-none">
-                <Spinner size="lg" />
-              </Panel>
-            )}
 
             <Panel position="top-right" className="flex flex-row flex-wrap gap-2">
               <ButtonGroup>
@@ -507,6 +501,17 @@ function FlowsPageInner() {
               </Button>
             </Panel>
           </ReactFlow>
+          {!originalFlowData && isFlowFetching && (
+            <div
+              className="absolute inset-0 z-10 flex items-center justify-center bg-background/60 backdrop-blur-sm"
+              role="status"
+              aria-live="polite"
+              aria-label={t('loading')}
+              aria-busy="true"
+            >
+              <Spinner size="lg" />
+            </div>
+          )}
         </div>
       </div>
     </div>
