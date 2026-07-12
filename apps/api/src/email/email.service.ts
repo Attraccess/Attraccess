@@ -46,8 +46,7 @@ export class EmailService {
   ) {
     const translationsMap = await this.emailTemplateService.getTranslationsMap(template.type, locale);
 
-    const hbs = Handlebars.create();
-    hbs.registerHelper('t', (key: string, defaultValue: string, options: Handlebars.HelperOptions) => {
+    const tHelper = (key: string, defaultValue: string, options: Handlebars.HelperOptions) => {
       const safeDefault = typeof defaultValue === 'string' ? defaultValue : '';
       const raw = translationsMap[key] ?? safeDefault;
       const hash = options?.hash ?? {};
@@ -55,14 +54,13 @@ export class EmailService {
         name in hash ? Handlebars.escapeExpression(String(hash[name] ?? '')) : `{${name}}`,
       );
       return new Handlebars.SafeString(result);
-    });
+    };
 
-    const subjectTemplate = hbs.compile(template.subject);
-    const subject = subjectTemplate(context);
+    const renderOpts = { helpers: { t: tHelper } };
+    const subject = Handlebars.compile(template.subject)(context, renderOpts);
 
     const bodyHtml = await this.emailLayoutService.renderWithTemplate(template);
-    const bodyTemplate = hbs.compile(bodyHtml);
-    const body = bodyTemplate(context);
+    const body = Handlebars.compile(bodyHtml)(context, renderOpts);
 
     return { subject, body };
   }
