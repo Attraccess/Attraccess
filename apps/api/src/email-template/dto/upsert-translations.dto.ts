@@ -5,7 +5,7 @@ function IsStringRecord(options?: ValidationOptions) {
   return (object: object, propertyName: string) =>
     registerDecorator({
       name: 'IsStringRecord',
-      target: (object as { constructor: Function }).constructor,
+      target: (object as { constructor: new (...args: unknown[]) => unknown }).constructor,
       propertyName,
       options: { message: 'translations values must all be strings', ...options },
       validator: {
