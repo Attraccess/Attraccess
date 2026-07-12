@@ -64,10 +64,15 @@ export function UserSelectionList<TUser extends User = User>(props: Readonly<Pro
   });
 
   const [userSearchSelection, setUserSearchSelection] = useState<User | null>(null);
+  const [pickerResetSignal, setPickerResetSignal] = useState(0);
 
   const onAddUser = useCallback(() => {
     if (userSearchSelection) {
       onAddToSelection(userSearchSelection);
+      // Clear the picker after adding so a repeat click cannot silently re-add
+      // the same user; matches the reset behavior of the drawer consumers.
+      setUserSearchSelection(null);
+      setPickerResetSignal((signal) => signal + 1);
     }
   }, [userSearchSelection, onAddToSelection]);
 
@@ -105,6 +110,7 @@ export function UserSelectionList<TUser extends User = User>(props: Readonly<Pro
       <UserSearch
         wrapperProps={{ className: 'w-full' }}
         size="sm"
+        resetSignal={pickerResetSignal}
         onSelectionChange={setUserSearchSelection}
         afterSelection={
           userSearchSelection && (
