@@ -2,6 +2,7 @@
   "title": "Flows for {{resourceName}}",
   "subtitle": "With flows you can automate workflows for your resources and for example control smart plugs or lamps.",
   "loading": "Loading flow…",
+  "loadError": "Failed to load flow. Please try again.",
   "actions": {
     "export": "Export",
     "import": "Import",

@@ -118,7 +118,7 @@ function FlowsPageInner() {
     };
   }, [setPullToRefreshIsEnabled]);
 
-  const { data: originalFlowData, isFetching: isFlowFetching } = useResourceFlowsServiceGetResourceFlow(
+  const { data: originalFlowData, isFetching: isFlowFetching, isError: isFlowError } = useResourceFlowsServiceGetResourceFlow(
     { resourceId: Number(resourceId) },
     undefined,
     {
@@ -503,15 +503,19 @@ function FlowsPageInner() {
               </Button>
             </Panel>
           </ReactFlow>
-          {isFlowLoading && (
+          {(isFlowLoading || (isFlowError && !originalFlowData)) && (
             <div
               className="absolute inset-0 z-10 flex items-center justify-center bg-background/60 backdrop-blur-sm"
-              role="status"
+              role={isFlowError ? 'alert' : 'status'}
               aria-live="polite"
-              aria-label={t('loading')}
-              aria-busy="true"
+              aria-label={isFlowError ? t('loadError') : t('loading')}
+              aria-busy={isFlowLoading}
             >
-              <Spinner size="lg" />
+              {isFlowError ? (
+                <p className="text-danger text-sm text-center px-4">{t('loadError')}</p>
+              ) : (
+                <Spinner size="lg" />
+              )}
             </div>
           )}
         </div>

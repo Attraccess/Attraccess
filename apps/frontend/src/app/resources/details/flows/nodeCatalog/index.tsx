@@ -26,13 +26,17 @@ export const NodeCatalogPanel = forwardRef<NodeCatalogHandle, Props>(function No
   ref,
 ) {
   const { t } = useTranslations({ de, en });
-  const { groups, isLoading, collapsed, setCollapsed, isDomainExpanded, setDomainExpanded } =
+  const { groups, isLoading, isError, collapsed, setCollapsed, isDomainExpanded, setDomainExpanded } =
     useNodeCatalog({ resourceId });
   const { isOpen, setOpen } = useOverlayState();
 
   const loadingSpinner = isLoading ? (
     <div className="flex items-center justify-center h-full" role="status" aria-label={t('loading')}>
       <Spinner size="sm" />
+    </div>
+  ) : isError ? (
+    <div className="flex items-center justify-center h-full p-2 text-center text-sm text-danger" role="alert">
+      {t('error')}
     </div>
   ) : null;
 
