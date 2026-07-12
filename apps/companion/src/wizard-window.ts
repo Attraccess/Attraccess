@@ -3,7 +3,7 @@ import * as path from 'path';
 import { state } from './state';
 
 export interface WizardOpts {
-  requirePin?: 'settings' | 'quit';
+  requirePin?: 'settings' | 'quit' | 'admin-override';
 }
 
 export function openWizardWindow(opts: WizardOpts = {}): void {
@@ -25,6 +25,7 @@ export function openWizardWindow(opts: WizardOpts = {}): void {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
+      devTools: false,
     },
   });
 
@@ -35,6 +36,11 @@ export function openWizardWindow(opts: WizardOpts = {}): void {
   } else {
     win.loadFile(path.join(__dirname, '../renderer/dist/index.html'));
   }
+  // Admin-override PIN dialog must appear above screen-saver-level kiosk overlays
+  if (opts.requirePin === 'admin-override') {
+    win.setAlwaysOnTop(true, 'screen-saver');
+  }
+
   win.webContents.on('did-finish-load', () => {
     win.webContents.send('init', {
       serverUrl: state.creds?.serverUrl,

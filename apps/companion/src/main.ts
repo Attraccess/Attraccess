@@ -4,6 +4,7 @@ import * as http from 'http';
 import * as fs from 'fs';
 import * as path from 'path';
 import { createHash, randomBytes } from 'crypto';
+import { hashPin, verifyPinHash } from './pin';
 import { CompanionWsClient, CompanionAuthenticatedDto, CompanionRegisterResponseDto } from '@attraccess/companion-ws-client';
 import { loadCredentials, saveCredentials, clearCredentials, loadPin, savePin } from './keychain';
 import { normalizeServerUrl } from './server-url';
@@ -15,12 +16,12 @@ import { startForegroundAppMonitoring, stopForegroundAppMonitoring } from './for
 import { openKiosk, reloadKiosk, lockComputer, unlockComputer, showKioskOverlay, hideKioskOverlay } from './kiosk';
 import { setupTray, setTrayState } from './tray';
 import { openWizardWindow } from './wizard-window';
-
-// ─── PIN helpers ──────────────────────────────────────────────────────────────
-
-function hashPin(pin: string): string {
-  return createHash('sha256').update(pin).digest('hex');
-}
+import {
+  enableAdminOverride as _enableAdminOverride,
+  disableAdminOverride as _disableAdminOverride,
+  handleLockPc,
+  handleUnlockPc,
+} from './admin-override';
 
 // ─── Health check ─────────────────────────────────────────────────────────────
 
@@ -34,6 +35,37 @@ function checkHealth(serverUrl: string): Promise<boolean> {
     req.on('error', () => resolve(false));
     req.setTimeout(5000, () => { req.destroy(); resolve(false); });
   });
+}
+
+// ─── PIN rate limiting ────────────────────────────────────────────────────────
+// ponytail: simple exponential backoff; resets on success. Doubles up to 30s.
+
+let _pinFailures = 0;
+let _pinBackoffUntil = 0;
+
+function pinAllowed(): boolean {
+  return Date.now() >= _pinBackoffUntil;
+}
+
+function recordPinFailure(): void {
+  _pinFailures++;
+  const backoffMs = Math.min(1000 * 2 ** (_pinFailures - 1), 30_000);
+  _pinBackoffUntil = Date.now() + backoffMs;
+}
+
+function recordPinSuccess(): void {
+  _pinFailures = 0;
+  _pinBackoffUntil = 0;
+}
+
+// ─── Admin override ───────────────────────────────────────────────────────────
+
+function enableAdminOverride(): void {
+  _enableAdminOverride(unlockComputer, setTrayState);
+}
+
+function disableAdminOverride(): void {
+  _disableAdminOverride(lockComputer, setTrayState);
 }
 
 // ─── IPC ─────────────────────────────────────────────────────────────────────
@@ -62,8 +94,19 @@ ipcMain.handle('save-pin', async (_evt, pin: string) => {
 });
 
 ipcMain.handle('verify-pin', (_evt, pin: string) => {
-  if (!state.pinHash) return false;
-  return hashPin(pin) === state.pinHash;
+  if (!pinAllowed()) return false;
+  const ok = verifyPinHash(pin, state.pinHash);
+  if (ok) recordPinSuccess(); else recordPinFailure();
+  return ok;
+});
+
+ipcMain.handle('enable-admin-override', (_evt, pin: string) => {
+  if (!pinAllowed()) return false;
+  if (!verifyPinHash(pin, state.pinHash)) { recordPinFailure(); return false; }
+  recordPinSuccess();
+  enableAdminOverride();
+  state.mainWindow?.close();
+  return true;
 });
 
 ipcMain.handle('confirm-quit', () => {
@@ -80,6 +123,8 @@ ipcMain.handle('disconnect', async () => {
   state.wsConnected = false;
   state.authenticatedPayload = null;
   state.kioskLocked = false;
+  state.adminOverride = false;
+  state.serverLocked = false;
   if (state.kioskWindow && !state.kioskWindow.isDestroyed()) state.kioskWindow.destroy();
   await clearCredentials();
   state.creds = null;
@@ -254,27 +299,23 @@ function startWsClient(serverUrl: string, firstRun: boolean): void {
 
   state.wsClient.on('authenticated', async (payload: CompanionAuthenticatedDto) => {
     state.authenticatedPayload = payload;
+    state.serverLocked = payload.locked;
     state.mainWindow?.webContents.send('authenticated', payload);
     openKiosk(payload);
     // restore persisted lock state so a restart doesn't silently unlock
-    setTrayState(payload.locked ? 'locked' : 'unlocked');
-    if (payload.locked) showKioskOverlay();
-    else hideKioskOverlay();
+    if (!state.adminOverride) setTrayState(payload.locked ? 'locked' : 'unlocked');
+    if (!state.adminOverride) {
+      if (payload.locked) showKioskOverlay();
+      else hideKioskOverlay();
+    }
     if (state.mainWindow && !state.mainWindow.isDestroyed()) {
       setTimeout(() => state.mainWindow?.close(), 1500);
     }
   });
 
-  state.wsClient.on('lock_pc', () => {
-    setTrayState('locked');
-    reloadKiosk();
-    lockComputer();
-  });
+  state.wsClient.on('lock_pc', () => handleLockPc(lockComputer, setTrayState, reloadKiosk));
 
-  state.wsClient.on('unlock_pc', () => {
-    setTrayState('unlocked');
-    unlockComputer();
-  });
+  state.wsClient.on('unlock_pc', () => handleUnlockPc(unlockComputer, setTrayState));
 
   state.wsClient.on('device_renamed', (payload) => {
     if (state.authenticatedPayload) {
@@ -307,6 +348,7 @@ function allPermissionsGranted(): boolean {
 app.whenReady().then(async () => {
   setupTray();
   state.settings = loadSettings();
+  state.onAdminOverrideDisable = disableAdminOverride;
 
   [state.creds, state.pinHash] = await Promise.all([loadCredentials(), loadPin()]);
 

@@ -18,12 +18,17 @@ function dotIcon(color: [number, number, number]): Electron.NativeImage {
 
 function buildTrayMenu(trayState: TrayState): Menu {
   return Menu.buildFromTemplate([
-    ...(trayState === 'unlocked'
-      ? [{ type: 'separator' as const }]
-      : [
+    ...(state.adminOverride ? [
+      { label: 'Admin Override active', enabled: false },
+      { label: 'Disable Admin Override', click: () => state.onAdminOverrideDisable?.() },
+      { type: 'separator' as const },
+    ] : []),
+    ...(trayState !== 'unlocked'
+      ? [
           { label: trayState === 'disconnected' ? 'Connecting…' : 'No active session', enabled: false },
           { type: 'separator' as const },
-        ]),
+        ]
+      : state.adminOverride ? [] : [{ type: 'separator' as const }]),
     { label: 'Open resource panel', enabled: !!state.authenticatedPayload, click: () => reopenKiosk() },
     { label: 'Settings', click: () => {
       if (state.pinHash) openWizardWindow({ requirePin: 'settings' });
@@ -42,11 +47,13 @@ export function setupTray(): void {
 }
 
 export function setTrayState(trayState: TrayState): void {
+  state.currentTrayState = trayState;
   state.tray?.setImage(dotIcon(TRAY_COLORS[trayState]));
   state.tray?.setContextMenu(buildTrayMenu(trayState));
   const resourceName = state.authenticatedPayload?.resources[0]?.name;
+  const overrideSuffix = state.adminOverride ? ' — override active' : '';
   const tooltip = resourceName
-    ? `Attraccess Companion — ${resourceName} (${trayState})`
-    : `Attraccess Companion — ${trayState}`;
+    ? `Attraccess Companion — ${resourceName} (${trayState})${overrideSuffix}`
+    : `Attraccess Companion — ${trayState}${overrideSuffix}`;
   state.tray?.setToolTip(tooltip);
 }
