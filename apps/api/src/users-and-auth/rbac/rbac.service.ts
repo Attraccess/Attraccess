@@ -1,7 +1,7 @@
 import { ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Permission, Role, User, UserRole, UserRoleSource } from '@attraccess/database-entities';
+import { QueryFailedError, Repository } from 'typeorm';
+import { Permission, Role, UserRole, UserRoleSource } from '@attraccess/database-entities';
 
 @Injectable()
 export class RbacService {
@@ -14,8 +14,6 @@ export class RbacService {
     private readonly roleRepository: Repository<Role>,
     @InjectRepository(Permission)
     private readonly permissionRepository: Repository<Permission>,
-    @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
   ) {}
 
   async getEffectivePermissions(userId: number): Promise<Set<string>> {
@@ -46,22 +44,6 @@ export class RbacService {
       where: { userId },
       relations: ['role'],
     });
-  }
-
-  async getUsersWithPermission(permissionKey: string): Promise<User[]> {
-    return this.userRepository
-      .createQueryBuilder('user')
-      .where((qb) =>
-        `user.id IN ${qb
-          .subQuery()
-          .select('ur.userId')
-          .from('user_role', 'ur')
-          .innerJoin('role_permission', 'rp', 'rp.roleId = ur.roleId')
-          .where('rp.permissionKey = :permKey')
-          .getQuery()}`,
-      )
-      .setParameter('permKey', permissionKey)
-      .getMany();
   }
 
   async assignRoleByKey(userId: number, roleKey: string): Promise<UserRole | null> {
@@ -202,9 +184,13 @@ export class RbacService {
           await this.userRoleRepository.save(
             this.userRoleRepository.create({ userId, roleId: role.id, source: UserRoleSource.SSO, ssoProviderType, ssoProviderId }),
           );
-        } catch {
-          // Another SSO provider already granted this role — unique(userId, roleId, source) violated; ignore
-          this.logger.debug(`syncSsoRoles: role ${roleKey} already held via another provider for user ${userId}`);
+        } catch (err) {
+          if (err instanceof QueryFailedError && (err as QueryFailedError & { code?: string }).code === '23505') {
+            // Another SSO provider already granted this role — unique(userId, roleId, source) violated; ignore
+            this.logger.debug(`syncSsoRoles: role ${roleKey} already held via another provider for user ${userId}`);
+          } else {
+            throw err;
+          }
         }
       }
     }

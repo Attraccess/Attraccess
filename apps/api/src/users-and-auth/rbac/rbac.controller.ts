@@ -1,7 +1,7 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Permission, Role } from '@attraccess/database-entities';
-import { Auth } from '@attraccess/plugins-backend-sdk';
+import { Auth, AuthAny } from '@attraccess/plugins-backend-sdk';
 import { RbacService } from './rbac.service';
 
 @ApiTags('RBAC')
@@ -10,7 +10,7 @@ export class RbacController {
   constructor(private readonly rbacService: RbacService) {}
 
   @Get('roles')
-  @Auth('users.roles.manage')
+  @AuthAny('users.roles.manage', 'system.sso.manage')
   @ApiOperation({ summary: 'List all roles', operationId: 'listRoles' })
   @ApiResponse({ status: 200, type: [Role] })
   listRoles(): Promise<Role[]> {

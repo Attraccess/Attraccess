@@ -36,10 +36,20 @@ export type SystemPermission =
   | 'billing.manage';
 
 const NeedsPermissions = Reflector.createDecorator<SystemPermission[]>();
+const NeedsAnyPermission = Reflector.createDecorator<SystemPermission[]>();
 
 export function Auth(...permissions: SystemPermission[]) {
   return applyDecorators(
     NeedsPermissions(permissions),
+    UseGuards(DualAuthGuard, EffectivePermissionsGuard),
+    ApiBearerAuth(),
+    ApiUnauthorizedResponse({ description: 'Unauthorized' }),
+  );
+}
+
+export function AuthAny(...permissions: SystemPermission[]) {
+  return applyDecorators(
+    NeedsAnyPermission(permissions),
     UseGuards(DualAuthGuard, EffectivePermissionsGuard),
     ApiBearerAuth(),
     ApiUnauthorizedResponse({ description: 'Unauthorized' }),
@@ -53,12 +63,16 @@ export class EffectivePermissionsGuard implements CanActivate {
   constructor(private reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean | Promise<boolean> | Observable<boolean> {
-    const requiredPermissions = this.reflector.getAllAndOverride(NeedsPermissions, [
+    const requiredAll = this.reflector.getAllAndOverride(NeedsPermissions, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    const requiredAny = this.reflector.getAllAndOverride(NeedsAnyPermission, [
       context.getHandler(),
       context.getClass(),
     ]);
 
-    if (!requiredPermissions || requiredPermissions.length === 0) {
+    if ((!requiredAll || requiredAll.length === 0) && (!requiredAny || requiredAny.length === 0)) {
       return true;
     }
 
@@ -70,15 +84,24 @@ export class EffectivePermissionsGuard implements CanActivate {
       throw new UnauthorizedException();
     }
 
-    const missing = requiredPermissions.filter((p) => !user.effectivePermissions?.has(p));
-    if (missing.length > 0) {
-      this.logger.debug(`User ${user.id} missing permissions: ${missing.join(', ')}`);
-      throw new ForbiddenException('Insufficient permissions');
+    if (requiredAll && requiredAll.length > 0) {
+      const missing = requiredAll.filter((p) => !user.effectivePermissions?.has(p));
+      if (missing.length > 0) {
+        this.logger.debug(`User ${user.id} missing permissions: ${missing.join(', ')}`);
+        throw new ForbiddenException('Insufficient permissions');
+      }
+    }
+
+    if (requiredAny && requiredAny.length > 0) {
+      const hasAny = requiredAny.some((p) => user.effectivePermissions?.has(p));
+      if (!hasAny) {
+        this.logger.debug(`User ${user.id} has none of the required permissions: ${requiredAny.join(', ')}`);
+        throw new ForbiddenException('Insufficient permissions');
+      }
     }
 
     return true;
   }
 }
 
-// ponytail: keep legacy export name so existing plugin code that imports SystemPermissionsGuard still compiles
 export const SystemPermissionsGuard = EffectivePermissionsGuard;
