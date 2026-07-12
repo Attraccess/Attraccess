@@ -18,4 +18,7 @@ export class PaginatedResponse<T> {
 
   @ApiProperty()
   limit: number;
+
+  @ApiProperty({ required: false })
+  nextPage?: number;
 }

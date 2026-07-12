@@ -9,5 +9,7 @@
     "one": "{{count}} user shown",
     "many": "{{count}} users shown"
   },
-  "empty": "No users found"
+  "empty": "No users found",
+  "loadError": "Users could not be loaded.",
+  "retry": "Try again"
 }

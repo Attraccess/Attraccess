@@ -9,5 +9,7 @@
     "one": "{{count}} Benutzer angezeigt",
     "many": "{{count}} Benutzer angezeigt"
   },
-  "empty": "Keine Benutzer gefunden"
+  "empty": "Keine Benutzer gefunden",
+  "loadError": "Benutzer konnten nicht geladen werden.",
+  "retry": "Erneut versuchen"
 }

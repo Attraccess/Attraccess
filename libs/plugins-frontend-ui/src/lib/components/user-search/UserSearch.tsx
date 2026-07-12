@@ -67,22 +67,23 @@ export function UserSearch(props: Readonly<UserSearchProps>) {
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, SEARCH_DEBOUNCE_MS);
 
-  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } = useUsersServiceFindManyInfinite(
-    // While closed, pin the search to unfiltered so a quick close+reopen within the
-    // debounce window cannot resurrect the previous filter from the query cache.
-    { limit: PAGE_SIZE, search: isOpen ? debouncedSearch.trim() || undefined : undefined },
-    undefined,
-    {
-      // Only fetch while the picker is actually open. The generated options type
-      // marks initialPageParam/getNextPageParam as required (they are not Omit-ed),
-      // so `enabled` cannot be passed alone — mirror the hook's own values verbatim.
-      // The cast matches the generated hook: at runtime lastPage is the raw
-      // PaginatedUsersResponseDto even though the type parameter says otherwise.
-      enabled: isOpen,
-      initialPageParam: 1,
-      getNextPageParam: (lastPage) => (lastPage as unknown as { nextPage?: number }).nextPage,
-    },
-  );
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, isError, refetch } =
+    useUsersServiceFindManyInfinite(
+      // While closed, pin the search to unfiltered so a quick close+reopen within the
+      // debounce window cannot resurrect the previous filter from the query cache.
+      { limit: PAGE_SIZE, search: isOpen ? debouncedSearch.trim() || undefined : undefined },
+      undefined,
+      {
+        // Only fetch while the picker is actually open. The generated options type
+        // marks initialPageParam/getNextPageParam as required (they are not Omit-ed),
+        // so `enabled` cannot be passed alone — mirror the hook's own values verbatim.
+        // The cast matches the generated hook: at runtime lastPage is the raw
+        // PaginatedUsersResponseDto even though the type parameter says otherwise.
+        enabled: isOpen,
+        initialPageParam: 1,
+        getNextPageParam: (lastPage) => (lastPage as unknown as { nextPage?: number }).nextPage,
+      },
+    );
 
   // De-duplicate by id: pagination is offset-based, so a user created or renamed
   // between page fetches can shift the window and repeat (or skip) a row.
@@ -232,7 +233,14 @@ export function UserSearch(props: Readonly<UserSearchProps>) {
                   style={{ maxHeight: '60vh', overflowY: 'auto' }}
                   data-cy="user-picker-list"
                 >
-                  {groups.length === 0 && !isLoading ? (
+                  {isError ? (
+                    <div className="flex flex-col items-center gap-3 py-10" data-cy="user-picker-error">
+                      <p className="text-sm text-muted">{t('loadError')}</p>
+                      <Button variant="secondary" size="sm" onPress={() => refetch()}>
+                        {t('retry')}
+                      </Button>
+                    </div>
+                  ) : groups.length === 0 && !isLoading ? (
                     <div className="py-10 text-center text-sm text-muted">{t('empty')}</div>
                   ) : (
                     <ListBox aria-label={t('usersListLabel')} selectionMode="none">
@@ -256,7 +264,7 @@ export function UserSearch(props: Readonly<UserSearchProps>) {
                       ))}
                     </ListBox>
                   )}
-                  <div ref={sentinelRef} />
+                  {isError ? null : <div ref={sentinelRef} />}
                   {isFetchingNextPage ? (
                     <div className="flex justify-center py-3">
                       <Spinner size="sm" />

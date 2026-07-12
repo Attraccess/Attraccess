@@ -85,6 +85,30 @@ describe('ProjectsController', () => {
         expect.objectContaining({ id: 11, logo: null }),
       ]);
     });
+
+    it('should expose the partially filled last page via nextPage', async () => {
+      // total 15 with limit 10 leaves 5 items on page 2; the previous inline
+      // formula hid that page ((page+1)*limit >= total), computeNextPage does not.
+      const req = { user: { id: 1 } };
+      const query = { page: 1, limit: 10 } as FindManyProjectsQueryDto;
+      projectsService.findMany.mockResolvedValueOnce([]);
+      projectsService.getTotalCount.mockResolvedValueOnce(15);
+
+      const result = await controller.findMany(req as AuthenticatedRequest, query);
+
+      expect(result.nextPage).toBe(2);
+    });
+
+    it('should not set nextPage when the last page ends exactly at the total', async () => {
+      const req = { user: { id: 1 } };
+      const query = { page: 2, limit: 10 } as FindManyProjectsQueryDto;
+      projectsService.findMany.mockResolvedValueOnce([]);
+      projectsService.getTotalCount.mockResolvedValueOnce(20);
+
+      const result = await controller.findMany(req as AuthenticatedRequest, query);
+
+      expect(result.nextPage).toBeUndefined();
+    });
   });
 
   describe('getOne', () => {

@@ -5,7 +5,4 @@ import { ApiProperty } from '@nestjs/swagger';
 export class PaginatedBillingTransactionsResponseDto extends PaginatedResponse<BillingTransaction> {
   @ApiProperty({ type: [BillingTransaction] })
   data: BillingTransaction[];
-
-  @ApiProperty({ required: false })
-  nextPage?: number;
 }

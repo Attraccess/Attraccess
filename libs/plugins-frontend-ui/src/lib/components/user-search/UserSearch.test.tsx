@@ -106,12 +106,15 @@ describe('useDebounce', () => {
 describe('UserSearch', () => {
   let intersectionCallback: IntersectionObserverCallback | null = null;
 
-  const infiniteQueryResult = (users: User[]) => ({
+  const infiniteQueryResult = (users: User[], overrides: Record<string, unknown> = {}) => ({
     data: { pages: [{ data: users, total: users.length, page: 1, limit: 50, nextPage: 2 }] },
     fetchNextPage: vi.fn(),
     hasNextPage: true,
     isFetchingNextPage: false,
     isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+    ...overrides,
   });
 
   beforeEach(() => {
@@ -192,5 +195,41 @@ describe('UserSearch', () => {
     });
 
     expect(result.fetchNextPage).toHaveBeenCalled();
+  });
+
+  it.each([
+    ['no further pages exist', { hasNextPage: false }],
+    ['a fetch is already in flight', { isFetchingNextPage: true }],
+  ])('does not fetch when %s', async (_label, overrides) => {
+    const result = infiniteQueryResult([user(1, 'alan')], overrides);
+    mocks.useUsersServiceFindManyInfinite.mockReturnValue(result);
+    const pointer = userEvent.setup();
+
+    render(<UserSearch />);
+    await pointer.click(screen.getByRole('button', { name: /choose user/i }));
+
+    act(() => {
+      intersectionCallback?.(
+        [{ isIntersecting: true } as IntersectionObserverEntry],
+        null as unknown as IntersectionObserver,
+      );
+    });
+
+    expect(result.fetchNextPage).not.toHaveBeenCalled();
+  });
+
+  it('shows a retry-able error state instead of the empty message when loading fails', async () => {
+    const result = infiniteQueryResult([], { isError: true });
+    mocks.useUsersServiceFindManyInfinite.mockReturnValue(result);
+    const pointer = userEvent.setup();
+
+    render(<UserSearch />);
+    await pointer.click(screen.getByRole('button', { name: /choose user/i }));
+
+    expect(screen.getByText('Users could not be loaded.')).toBeInTheDocument();
+    expect(screen.queryByText('No users found')).not.toBeInTheDocument();
+
+    await pointer.click(screen.getByRole('button', { name: /try again/i }));
+    expect(result.refetch).toHaveBeenCalled();
   });
 });
