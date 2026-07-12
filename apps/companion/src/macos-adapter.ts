@@ -49,9 +49,14 @@ export class MacosAdapter implements OsAdapter {
   async applyUpdate(dest: string, version: string, _allowQuit: () => void): Promise<void> {
     const tmpMount = path.join(os.tmpdir(), `attraccess-update-${version}`);
     try {
+      // hdiutil requires the mountpoint directory to exist before attaching
+      fs.mkdirSync(tmpMount, { recursive: true });
       execFileSync('hdiutil', ['attach', dest, '-nobrowse', '-quiet', '-mountpoint', tmpMount]);
-      const appInDmg = execFileSync('find', [tmpMount, '-maxdepth', '1', '-name', '*.app'], { encoding: 'utf8' }).trim();
-      if (!appInDmg) throw new Error('no .app bundle found in DMG');
+      const findOutput = execFileSync('find', [tmpMount, '-maxdepth', '1', '-name', '*.app'], { encoding: 'utf8' }).trim();
+      const appMatches = findOutput ? findOutput.split('\n') : [];
+      if (appMatches.length === 0) throw new Error('no .app bundle found in DMG');
+      if (appMatches.length > 1) throw new Error(`ambiguous DMG: ${appMatches.length} .app bundles found`);
+      const appInDmg = appMatches[0];
       // Derive the current .app bundle path from the running executable
       // e.g. /Applications/App.app/Contents/MacOS/App → /Applications/App.app
       const currentApp = process.execPath.replace(/\/Contents\/MacOS\/[^/]+$/, '');

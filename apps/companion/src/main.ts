@@ -3,7 +3,7 @@ import * as https from 'https';
 import * as http from 'http';
 import * as fs from 'fs';
 import * as path from 'path';
-import { createHash } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
 import { CompanionWsClient, CompanionAuthenticatedDto, CompanionRegisterResponseDto } from '@attraccess/companion-ws-client';
 import { loadCredentials, saveCredentials, clearCredentials, loadPin, savePin } from './keychain';
 import { normalizeServerUrl } from './server-url';
@@ -136,14 +136,39 @@ function downloadFile(url: string, dest: string): Promise<void> {
   });
 }
 
-async function applyUpdate(serverUrl: string, downloadUrl: string, version: string): Promise<void> {
+function computeSha256(filePath: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const hash = createHash('sha256');
+    fs.createReadStream(filePath)
+      .on('data', (d) => hash.update(d))
+      .on('end', () => resolve(hash.digest('hex')))
+      .on('error', reject);
+  });
+}
+
+async function applyUpdate(serverUrl: string, downloadUrl: string, version: string, sha256?: string): Promise<void> {
   const absUrl = downloadUrl.startsWith('http') ? downloadUrl : `${serverUrl}${downloadUrl}`;
+  if (absUrl.startsWith('http:')) {
+    console.warn('[companion] update download is using plain HTTP — no transport encryption');
+  }
   const ext = path.extname(absUrl.split('?')[0] ?? '') || osAdapter.updateExtension;
-  const dest = path.join(app.getPath('temp'), `attraccess-companion-update-${version}${ext}`);
+  // random suffix prevents predictable temp path (TOCTOU)
+  const dest = path.join(app.getPath('temp'), `attraccess-companion-update-${version}-${randomBytes(4).toString('hex')}${ext}`);
 
   console.info(`[companion] downloading update v${version} from ${absUrl}`);
   try {
     await downloadFile(absUrl, dest);
+    if (sha256) {
+      const actual = await computeSha256(dest);
+      if (actual !== sha256) {
+        fs.unlink(dest, () => undefined);
+        console.error(`[companion] update v${version} checksum mismatch — expected ${sha256}, got ${actual}`);
+        state.tray?.setToolTip(`Attraccess Companion — update v${version} checksum failed`);
+        return;
+      }
+    } else {
+      console.warn('[companion] update has no checksum — integrity unverified');
+    }
   } catch (err) {
     console.error('[companion] update download failed:', err);
     state.tray?.setToolTip(`Attraccess Companion — update v${version} download failed`);
@@ -232,7 +257,7 @@ function startWsClient(serverUrl: string, firstRun: boolean): void {
 
   state.wsClient.on('update_available', (payload) => {
     state.tray?.setToolTip(`Attraccess Companion — downloading update v${payload.version}…`);
-    applyUpdate(state.creds?.serverUrl ?? serverUrl, payload.downloadUrl, payload.version).catch((err) =>
+    applyUpdate(state.creds?.serverUrl ?? serverUrl, payload.downloadUrl, payload.version, payload.sha256).catch((err) =>
       console.error('[companion] applyUpdate error:', err),
     );
   });

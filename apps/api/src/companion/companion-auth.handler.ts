@@ -80,6 +80,7 @@ export class CompanionAuthHandler {
     socket.sendEvent(CompanionEventType.COMPANION_UPDATE_AVAILABLE, {
       version: manifest.version,
       downloadUrl,
+      ...(entry?.sha256 ? { sha256: entry.sha256 } : {}),
     });
   }
 }

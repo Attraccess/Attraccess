@@ -69,6 +69,9 @@ export class CompanionUpdateAvailableDto {
 
   @ApiProperty({ description: 'New version string' })
   version!: string;
+
+  @ApiProperty({ description: 'SHA-256 hex digest of the binary for integrity verification', required: false })
+  sha256?: string;
 }
 
 export class CompanionIdleDto {

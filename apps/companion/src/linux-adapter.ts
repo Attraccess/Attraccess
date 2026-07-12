@@ -53,8 +53,18 @@ export class LinuxAdapter implements OsAdapter {
   }
 
   async applyUpdate(dest: string, _version: string, _allowQuit: () => void): Promise<void> {
-    try { fs.chmodSync(dest, 0o755); } catch (err) { console.error('[companion] chmod failed:', err); }
-    app.relaunch({ execPath: dest });
+    const exePath = app.getPath('exe');
+    try {
+      // Replace the installed AppImage in-place so the update survives reboots
+      fs.copyFileSync(dest, exePath);
+      fs.chmodSync(exePath, 0o755);
+      try { fs.unlinkSync(dest); } catch { /* best-effort cleanup */ }
+      app.relaunch({ execPath: exePath });
+    } catch (err) {
+      console.error('[companion] failed to replace AppImage in-place, running from temp path:', err);
+      try { fs.chmodSync(dest, 0o755); } catch { /* ignore */ }
+      app.relaunch({ execPath: dest });
+    }
     app.exit(0); // app.exit bypasses before-quit — no need for allowQuit
   }
 }

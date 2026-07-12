@@ -9,6 +9,9 @@ export class CompanionPlatformEntry {
 
   @ApiProperty({ example: 'companion-linux-x64.AppImage' })
   filename: string;
+
+  @ApiProperty({ example: 'e3b0c44298fc1c149afb...', required: false, description: 'SHA-256 hex digest of the binary for integrity verification' })
+  sha256?: string;
 }
 
 export class CompanionManifestDto {
