@@ -3,5 +3,11 @@
   "chooseUser": "Benutzer auswählen",
   "modalTitle": "Benutzer auswählen",
   "searchPlaceholder": "Nach Benutzername oder E-Mail suchen",
+  "usersListLabel": "Benutzer",
+  "clear": "Auswahl entfernen",
+  "resultCount": {
+    "one": "{{count}} Benutzer angezeigt",
+    "many": "{{count}} Benutzer angezeigt"
+  },
   "empty": "Keine Benutzer gefunden"
 }

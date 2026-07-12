@@ -104,6 +104,7 @@ export function UserSelectionList<TUser extends User = User>(props: Readonly<Pro
     <div className="flex flex-col gap-2">
       <UserSearch
         wrapperProps={{ className: 'w-full' }}
+        size="sm"
         onSelectionChange={setUserSearchSelection}
         afterSelection={
           userSearchSelection && (

@@ -3,5 +3,11 @@
   "chooseUser": "Choose user",
   "modalTitle": "Choose a user",
   "searchPlaceholder": "Search by username or email",
+  "usersListLabel": "Users",
+  "clear": "Clear selection",
+  "resultCount": {
+    "one": "{{count}} user shown",
+    "many": "{{count}} users shown"
+  },
   "empty": "No users found"
 }

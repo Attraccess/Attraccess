@@ -21,7 +21,7 @@ import {
   TextField,
   useOverlayState,
 } from '@heroui/react';
-import { SearchIcon, UserPlusIcon } from 'lucide-react';
+import { SearchIcon, UserPlusIcon, XIcon } from 'lucide-react';
 import { useTranslations } from '../../i18n';
 import { useDebounce } from '../../hooks/useDebounce';
 import { AttraccessUser } from '../attraccess-user/AttraccessUser';
@@ -34,6 +34,7 @@ import de from './de.json';
 interface UserSearchProps {
   label?: string;
   placeholder?: string;
+  size?: 'sm' | 'md' | 'lg';
   onSelectionChange?: (user: User | null) => void;
   wrapperProps?: Omit<HTMLAttributes<HTMLDivElement>, 'children'>;
   afterAutocomplete?: React.ReactNode;
@@ -52,7 +53,7 @@ const FIELD_CONTRAST_STYLE: React.CSSProperties = {
 };
 
 export function UserSearch(props: Readonly<UserSearchProps>) {
-  const { label, placeholder, onSelectionChange, afterAutocomplete, wrapperProps, afterSelection } = props;
+  const { label, placeholder, size, onSelectionChange, afterAutocomplete, wrapperProps, afterSelection } = props;
 
   const { t } = useTranslations({ en, de });
 
@@ -67,7 +68,9 @@ export function UserSearch(props: Readonly<UserSearchProps>) {
   const debouncedSearch = useDebounce(search, SEARCH_DEBOUNCE_MS);
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } = useUsersServiceFindManyInfinite(
-    { limit: PAGE_SIZE, search: debouncedSearch.trim() || undefined },
+    // While closed, pin the search to unfiltered so a quick close+reopen within the
+    // debounce window cannot resurrect the previous filter from the query cache.
+    { limit: PAGE_SIZE, search: isOpen ? debouncedSearch.trim() || undefined : undefined },
     undefined,
     {
       // Only fetch while the picker is actually open. The generated options type
@@ -81,7 +84,17 @@ export function UserSearch(props: Readonly<UserSearchProps>) {
     },
   );
 
-  const users = useMemo(() => data?.pages.flatMap((page) => page.data) ?? [], [data]);
+  // De-duplicate by id: pagination is offset-based, so a user created or renamed
+  // between page fetches can shift the window and repeat (or skip) a row.
+  const users = useMemo(() => {
+    const seen = new Map<number, User>();
+    for (const page of data?.pages ?? []) {
+      for (const user of page.data) {
+        seen.set(user.id, user);
+      }
+    }
+    return [...seen.values()];
+  }, [data]);
   const groups = useMemo(() => groupUsersByLetter(users), [users]);
 
   useEffect(() => {
@@ -111,26 +124,30 @@ export function UserSearch(props: Readonly<UserSearchProps>) {
 
   // Infinite scroll: load more when the sentinel near the bottom of the scrollable
   // list becomes visible. The list itself is the scroll root (see inline style below).
-  // isFetchingNextPage toggling after each page recreates the observer, which re-fires
-  // the callback with the current intersection state and keeps consecutive pages
-  // loading even when the sentinel never leaves the viewport.
+  // A single observer lives for the whole time the picker is open; the fetch state is
+  // read through refs so pagination changes don't tear the observer down.
   const listRef = useRef<HTMLDivElement | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const pagingRef = useRef({ hasNextPage, isFetchingNextPage, fetchNextPage });
+  useEffect(() => {
+    pagingRef.current = { hasNextPage, isFetchingNextPage, fetchNextPage };
+  });
   useEffect(() => {
     const el = sentinelRef.current;
     const root = listRef.current;
     if (!el || !root || !isOpen) return;
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0]?.isIntersecting && hasNextPage && !isFetchingNextPage) {
-          fetchNextPage();
+        const paging = pagingRef.current;
+        if (entries[0]?.isIntersecting && paging.hasNextPage && !paging.isFetchingNextPage) {
+          paging.fetchNextPage();
         }
       },
       { root, rootMargin: '200px' },
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [isOpen, hasNextPage, isFetchingNextPage, fetchNextPage]);
+  }, [isOpen]);
 
   return (
     <div {...wrapperProps}>
@@ -140,19 +157,33 @@ export function UserSearch(props: Readonly<UserSearchProps>) {
 
       <div className="flex gap-2 items-center">
         {selectedUser ? (
-          <Button
-            variant="ghost"
-            onPress={open}
-            className="justify-start px-2"
-            id={triggerId}
-            aria-labelledby={`${labelId} ${triggerId}`}
-            data-cy="user-picker-selected"
-          >
-            <AttraccessUser user={selectedUser} interactive={false} />
-          </Button>
+          <>
+            <Button
+              variant="ghost"
+              size={size}
+              onPress={open}
+              className="justify-start px-2"
+              id={triggerId}
+              aria-labelledby={`${labelId} ${triggerId}`}
+              data-cy="user-picker-selected"
+            >
+              <AttraccessUser user={selectedUser} interactive={false} />
+            </Button>
+            <Button
+              variant="ghost"
+              size={size ?? 'sm'}
+              isIconOnly
+              onPress={() => setSelectedUser(null)}
+              aria-label={t('clear')}
+              data-cy="user-picker-clear"
+            >
+              <XIcon className="w-4 h-4" />
+            </Button>
+          </>
         ) : (
           <Button
             variant="secondary"
+            size={size}
             onPress={open}
             className="flex-1 justify-start"
             id={triggerId}
@@ -191,6 +222,10 @@ export function UserSearch(props: Readonly<UserSearchProps>) {
                   </TextField>
                 </div>
 
+                <div aria-live="polite" className="sr-only">
+                  {t('resultCount', { count: users.length })}
+                </div>
+
                 <div
                   ref={listRef}
                   className="mt-2"
@@ -200,7 +235,7 @@ export function UserSearch(props: Readonly<UserSearchProps>) {
                   {groups.length === 0 && !isLoading ? (
                     <div className="py-10 text-center text-sm text-muted">{t('empty')}</div>
                   ) : (
-                    <ListBox aria-label={t('modalTitle')} selectionMode="none">
+                    <ListBox aria-label={t('usersListLabel')} selectionMode="none">
                       {groups.map((group) => (
                         <ListBoxSection key={group.letter} id={group.letter}>
                           <Header className="sticky top-0 z-10 bg-surface-secondary px-2 py-1 text-xs font-semibold text-muted">
