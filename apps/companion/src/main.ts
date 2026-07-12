@@ -4,6 +4,7 @@ import * as http from 'http';
 import * as fs from 'fs';
 import * as path from 'path';
 import { createHash, randomBytes } from 'crypto';
+import { hashPin, verifyPinHash } from './pin';
 import { CompanionWsClient, CompanionAuthenticatedDto, CompanionRegisterResponseDto } from '@attraccess/companion-ws-client';
 import { loadCredentials, saveCredentials, clearCredentials, loadPin, savePin } from './keychain';
 import { normalizeServerUrl } from './server-url';
@@ -15,12 +16,6 @@ import { startForegroundAppMonitoring, stopForegroundAppMonitoring } from './for
 import { openKiosk, reloadKiosk, lockComputer, unlockComputer, showKioskOverlay, hideKioskOverlay } from './kiosk';
 import { setupTray, setTrayState } from './tray';
 import { openWizardWindow } from './wizard-window';
-
-// ─── PIN helpers ──────────────────────────────────────────────────────────────
-
-function hashPin(pin: string): string {
-  return createHash('sha256').update(pin).digest('hex');
-}
 
 // ─── Health check ─────────────────────────────────────────────────────────────
 
@@ -46,8 +41,8 @@ function enableAdminOverride(): void {
 
 function disableAdminOverride(): void {
   state.adminOverride = false;
-  setTrayState(state.currentTrayState);
-  if (state.authenticatedPayload?.locked) lockComputer();
+  setTrayState(state.serverLocked ? 'locked' : state.currentTrayState);
+  if (state.serverLocked) lockComputer();
 }
 
 // ─── IPC ─────────────────────────────────────────────────────────────────────
@@ -75,14 +70,13 @@ ipcMain.handle('save-pin', async (_evt, pin: string) => {
   }
 });
 
-ipcMain.handle('verify-pin', (_evt, pin: string) => {
-  if (!state.pinHash) return false;
-  return hashPin(pin) === state.pinHash;
-});
+ipcMain.handle('verify-pin', (_evt, pin: string) => verifyPinHash(pin, state.pinHash));
 
-ipcMain.handle('enable-admin-override', () => {
+ipcMain.handle('enable-admin-override', (_evt, pin: string) => {
+  if (!verifyPinHash(pin, state.pinHash)) return false;
   enableAdminOverride();
   state.mainWindow?.close();
+  return true;
 });
 
 ipcMain.handle('confirm-quit', () => {
@@ -99,6 +93,8 @@ ipcMain.handle('disconnect', async () => {
   state.wsConnected = false;
   state.authenticatedPayload = null;
   state.kioskLocked = false;
+  state.adminOverride = false;
+  state.serverLocked = false;
   if (state.kioskWindow && !state.kioskWindow.isDestroyed()) state.kioskWindow.destroy();
   await clearCredentials();
   state.creds = null;
@@ -257,6 +253,7 @@ function startWsClient(serverUrl: string, firstRun: boolean): void {
 
   state.wsClient.on('authenticated', async (payload: CompanionAuthenticatedDto) => {
     state.authenticatedPayload = payload;
+    state.serverLocked = payload.locked;
     state.mainWindow?.webContents.send('authenticated', payload);
     openKiosk(payload);
     // restore persisted lock state so a restart doesn't silently unlock
@@ -271,6 +268,7 @@ function startWsClient(serverUrl: string, firstRun: boolean): void {
   });
 
   state.wsClient.on('lock_pc', () => {
+    state.serverLocked = true;
     if (state.adminOverride) return;
     setTrayState('locked');
     reloadKiosk();
@@ -278,6 +276,7 @@ function startWsClient(serverUrl: string, firstRun: boolean): void {
   });
 
   state.wsClient.on('unlock_pc', () => {
+    state.serverLocked = false;
     if (state.adminOverride) return;
     setTrayState('unlocked');
     unlockComputer();

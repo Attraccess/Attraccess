@@ -13,7 +13,7 @@ contextBridge.exposeInMainWorld('companion', {
   disconnect: () => ipcRenderer.invoke('disconnect'),
   getSettings: () => ipcRenderer.invoke('get-settings'),
   saveSettings: (s: unknown) => ipcRenderer.invoke('save-settings', s),
-  enableAdminOverride: () => ipcRenderer.invoke('enable-admin-override'),
+  enableAdminOverride: (pin: string) => ipcRenderer.invoke('enable-admin-override', pin),
 
   onInit: (cb: (data: { serverUrl?: string }) => void) =>
     ipcRenderer.on('init', (_e, data) => cb(data)),

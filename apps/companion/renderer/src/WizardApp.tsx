@@ -115,6 +115,14 @@ export function WizardApp() {
   }
 
   async function handleVerifyPin() {
+    if (pendingAction === 'admin-override') {
+      // Main process re-verifies the PIN itself; treat a false return as wrong PIN
+      const ok = await window.companion.enableAdminOverride(pinEntry);
+      if (!ok) {
+        setPinEntryError('Incorrect PIN.');
+      }
+      return;
+    }
     const ok = await window.companion.verifyPin(pinEntry);
     if (!ok) {
       setPinEntryError('Incorrect PIN.');
@@ -123,8 +131,6 @@ export function WizardApp() {
     setPinEntryError('');
     if (pendingAction === 'quit') {
       await window.companion.confirmQuit();
-    } else if (pendingAction === 'admin-override') {
-      await window.companion.enableAdminOverride();
     } else {
       setStep('url');
     }
@@ -179,21 +185,24 @@ export function WizardApp() {
               onSubmit={handleSetPin}
             />
           )}
-          {step === 'pin-entry' && (
-            <PinEntryStep
-              title={pendingAction === 'quit' ? 'Confirm quit' : pendingAction === 'admin-override' ? 'Admin override' : 'Access settings'}
-              description={pendingAction === 'quit'
-                ? 'Enter your PIN to quit Attraccess Companion.'
-                : pendingAction === 'admin-override'
-                  ? 'Enter your admin PIN to unlock the kiosk and ignore server commands.'
-                  : 'Enter your PIN to access settings.'}
-              submitLabel={pendingAction === 'quit' ? 'Quit' : pendingAction === 'admin-override' ? 'Enable override' : 'Confirm'}
-              pinEntry={pinEntry}
-              error={pinEntryError}
-              onPinEntryChange={setPinEntry}
-              onSubmit={handleVerifyPin}
-            />
-          )}
+          {step === 'pin-entry' && (() => {
+            const pinCopy = {
+              quit: { title: 'Confirm quit', description: 'Enter your PIN to quit Attraccess Companion.', submitLabel: 'Quit' },
+              'admin-override': { title: 'Admin override', description: 'Enter your admin PIN to unlock the kiosk and ignore server commands.', submitLabel: 'Enable override' },
+              settings: { title: 'Access settings', description: 'Enter your PIN to access settings.', submitLabel: 'Confirm' },
+            }[pendingAction ?? 'settings'] ?? { title: 'Access settings', description: 'Enter your PIN to access settings.', submitLabel: 'Confirm' };
+            return (
+              <PinEntryStep
+                title={pinCopy.title}
+                description={pinCopy.description}
+                submitLabel={pinCopy.submitLabel}
+                pinEntry={pinEntry}
+                error={pinEntryError}
+                onPinEntryChange={setPinEntry}
+                onSubmit={handleVerifyPin}
+              />
+            );
+          })()}
           {step === 'url' && (
             <UrlStep
               serverUrl={serverUrl}

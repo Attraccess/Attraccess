@@ -35,6 +35,11 @@ export function openWizardWindow(opts: WizardOpts = {}): void {
   } else {
     win.loadFile(path.join(__dirname, '../renderer/dist/index.html'));
   }
+  // Admin-override PIN dialog must appear above screen-saver-level kiosk overlays
+  if (opts.requirePin === 'admin-override') {
+    win.setAlwaysOnTop(true, 'screen-saver');
+  }
+
   win.webContents.on('did-finish-load', () => {
     win.webContents.send('init', {
       serverUrl: state.creds?.serverUrl,
