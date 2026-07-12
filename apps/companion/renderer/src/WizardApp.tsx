@@ -120,6 +120,8 @@ export function WizardApp() {
       const ok = await window.companion.enableAdminOverride(pinEntry);
       if (!ok) {
         setPinEntryError('Incorrect PIN.');
+      } else {
+        setPinEntry(''); // clear plaintext PIN on success — window closes via main process
       }
       return;
     }
@@ -128,6 +130,7 @@ export function WizardApp() {
       setPinEntryError('Incorrect PIN.');
       return;
     }
+    setPinEntry(''); // clear plaintext PIN — settings path keeps the window open
     setPinEntryError('');
     if (pendingAction === 'quit') {
       await window.companion.confirmQuit();
