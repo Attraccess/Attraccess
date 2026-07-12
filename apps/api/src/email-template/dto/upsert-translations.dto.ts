@@ -1,5 +1,19 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsObject, IsString } from 'class-validator';
+import { registerDecorator, ValidationOptions, IsObject, IsString, Matches, MaxLength } from 'class-validator';
+
+function IsStringRecord(options?: ValidationOptions) {
+  return (object: object, propertyName: string) =>
+    registerDecorator({
+      name: 'IsStringRecord',
+      target: (object as { constructor: Function }).constructor,
+      propertyName,
+      options: { message: 'translations values must all be strings', ...options },
+      validator: {
+        validate: (value: unknown) =>
+          typeof value === 'object' && value !== null && Object.values(value).every((v) => typeof v === 'string'),
+      },
+    });
+}
 
 export class UpsertTranslationsDto {
   @ApiProperty({
@@ -9,9 +23,12 @@ export class UpsertTranslationsDto {
     additionalProperties: { type: 'string' },
   })
   @IsObject()
+  @IsStringRecord()
   translations!: Record<string, string>;
 
   @ApiProperty({ description: 'BCP 47 locale tag', example: 'de' })
   @IsString()
+  @MaxLength(10)
+  @Matches(/^[a-z]{2,3}(-[A-Z]{2,3})?$/, { message: 'locale must be a BCP 47 tag such as "de" or "en-US"' })
   locale!: string;
 }

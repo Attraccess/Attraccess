@@ -16,7 +16,7 @@ export class EmailTemplateTranslation {
   @PrimaryColumn({ type: 'varchar', length: 10 })
   locale!: string;
 
-  @ApiProperty({ description: 'Translated value', example: 'Hallo {{user.username}},' })
+  @ApiProperty({ description: 'Translated value', example: 'Hallo {name},' })
   @Column({ type: 'text' })
   value!: string;
 }

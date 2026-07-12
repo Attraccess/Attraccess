@@ -115,6 +115,27 @@ describe('EmailService', () => {
             body: '<mjml><mj-body><mj-section><mj-column><mj-text>Hello {{user.username}}</mj-text><mj-text>{{session.endedBy}} ended your session on {{resource.name}}.</mj-text><mj-text>{{resource.url}}</mj-text></mj-column></mj-section></mj-body></mjml>',
           });
         }
+        if (type === EmailTemplateType.RESOURCE_HEALTH_CHANGED) {
+          return Promise.resolve({
+            type,
+            subject: 'Resource health update: {{resource.name}}',
+            body: '<mjml><mj-body><mj-section><mj-column>{{#if health.isDegraded}}<mj-text>Degraded</mj-text>{{else}}<mj-text>Recovered</mj-text>{{/if}}<mj-text>{{health.status}}</mj-text><mj-text>{{health.identifier}}</mj-text><mj-text>{{resource.url}}</mj-text></mj-column></mj-section></mj-body></mjml>',
+          });
+        }
+        if (type === EmailTemplateType.USER_RETRAINING_REQUIRED) {
+          return Promise.resolve({
+            type,
+            subject: 'Retraining required for {{resource.name}}',
+            body: '<mjml><mj-body><mj-section><mj-column>{{#if retraining.isAge}}<mj-text>Age reason</mj-text>{{else if retraining.isInactivity}}<mj-text>Inactivity reason</mj-text>{{else}}<mj-text>Default reason</mj-text>{{/if}}{{#if retraining.blocksAccess}}<mj-text>Access blocked</mj-text>{{/if}}</mj-column></mj-section></mj-body></mjml>',
+          });
+        }
+        if (type === EmailTemplateType.RESOURCE_USAGE_NOTE_ADDED) {
+          return Promise.resolve({
+            type,
+            subject: 'Note added for {{resource.name}}',
+            body: '<mjml><mj-body><mj-section><mj-column>{{#if note.isStart}}<mj-text>Start note</mj-text>{{else}}<mj-text>End note</mj-text>{{/if}}<mj-text>{{note.content}}</mj-text><mj-text>{{note.authorName}}</mj-text></mj-column></mj-section></mj-body></mjml>',
+          });
+        }
         throw new Error('Unexpected template type');
       }),
       getTranslationsMap: jest.fn().mockResolvedValue({}),
@@ -314,6 +335,133 @@ describe('EmailService', () => {
     expect(callArg.html).toContain('Hello dana');
     expect(callArg.html).toContain('alice ended your session on Laser Cutter');
     expect(callArg.html).toContain('https://frontend.example/resources/3');
+  });
+
+  describe('sendResourceHealthChangedEmail', () => {
+    it('passes isDegraded=true and headerColor for unhealthy status', async () => {
+      const { service, sendMail } = setup();
+      const user = makeUser({ email: 'alice@example.com' });
+
+      await service.sendResourceHealthChangedEmail(user, { id: 1, name: 'Laser Cutter' }, {
+        status: 'UNHEALTHY' as never,
+        previousStatus: 'HEALTHY' as never,
+        reason: 'sensor offline',
+        identifier: 'laser.temperature',
+      });
+
+      const { html } = (sendMail as jest.Mock).mock.calls[0][0];
+      expect(html).toContain('Degraded');
+      expect(html).not.toContain('Recovered');
+      expect(html).toContain('UNHEALTHY');
+      expect(html).toContain('https://frontend.example/resources/1');
+    });
+
+    it('passes isDegraded=false for healthy status', async () => {
+      const { service, sendMail } = setup();
+      const user = makeUser({ email: 'alice@example.com' });
+
+      await service.sendResourceHealthChangedEmail(user, { id: 2, name: 'Laser Cutter' }, {
+        status: 'HEALTHY' as never,
+        previousStatus: 'UNHEALTHY' as never,
+        reason: null,
+        identifier: 'laser.temperature',
+      });
+
+      const { html } = (sendMail as jest.Mock).mock.calls[0][0];
+      expect(html).toContain('Recovered');
+      expect(html).not.toContain('Degraded');
+    });
+
+    it('skips send when user has no email', async () => {
+      const { service, sendMail } = setup();
+      await service.sendResourceHealthChangedEmail({ email: null } as never, { id: 1, name: 'X' }, {
+        status: 'UNHEALTHY' as never,
+        previousStatus: null,
+        reason: null,
+        identifier: 'x',
+      });
+      expect(sendMail).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('sendUserRetrainingEmail', () => {
+    it('sets isAge=true for age reason', async () => {
+      const { service, sendMail } = setup();
+      const user = makeUser({ email: 'bob@example.com' });
+
+      await service.sendUserRetrainingEmail(user, { id: 5, name: 'Printer', isGroup: false }, {
+        reason: 'age',
+        blocksAccess: true,
+      });
+
+      const { html } = (sendMail as jest.Mock).mock.calls[0][0];
+      expect(html).toContain('Age reason');
+      expect(html).not.toContain('Inactivity reason');
+      expect(html).toContain('Access blocked');
+      expect(html).toContain('https://frontend.example/resources/5');
+    });
+
+    it('sets isInactivity=true for inactivity reason', async () => {
+      const { service, sendMail } = setup();
+      const user = makeUser({ email: 'bob@example.com' });
+
+      await service.sendUserRetrainingEmail(user, { id: 3, name: 'Printer', isGroup: false }, {
+        reason: 'inactivity',
+        blocksAccess: false,
+      });
+
+      const { html } = (sendMail as jest.Mock).mock.calls[0][0];
+      expect(html).toContain('Inactivity reason');
+      expect(html).not.toContain('Age reason');
+      expect(html).not.toContain('Access blocked');
+    });
+
+    it('sets both flags false for null reason', async () => {
+      const { service, sendMail } = setup();
+      const user = makeUser({ email: 'bob@example.com' });
+
+      await service.sendUserRetrainingEmail(user, { id: 3, name: 'Printer', isGroup: false }, {
+        reason: null,
+        blocksAccess: false,
+      });
+
+      const { html } = (sendMail as jest.Mock).mock.calls[0][0];
+      expect(html).toContain('Default reason');
+    });
+  });
+
+  describe('sendResourceUsageNoteEmail', () => {
+    it('sets isStart=true for start phase', async () => {
+      const { service, sendMail } = setup();
+      const user = makeUser({ email: 'carol@example.com' });
+
+      await service.sendResourceUsageNoteEmail(user, { id: 7, name: 'CNC' }, {
+        content: 'Blade worn',
+        phase: 'start',
+        authorName: 'alice',
+      });
+
+      const { html } = (sendMail as jest.Mock).mock.calls[0][0];
+      expect(html).toContain('Start note');
+      expect(html).not.toContain('End note');
+      expect(html).toContain('Blade worn');
+      expect(html).toContain('alice');
+    });
+
+    it('sets isStart=false for end phase', async () => {
+      const { service, sendMail } = setup();
+      const user = makeUser({ email: 'carol@example.com' });
+
+      await service.sendResourceUsageNoteEmail(user, { id: 7, name: 'CNC' }, {
+        content: 'All good',
+        phase: 'end',
+        authorName: 'bob',
+      });
+
+      const { html } = (sendMail as jest.Mock).mock.calls[0][0];
+      expect(html).toContain('End note');
+      expect(html).not.toContain('Start note');
+    });
   });
 
   describe('{{t}} Handlebars helper', () => {

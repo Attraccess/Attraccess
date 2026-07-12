@@ -117,7 +117,7 @@ const DE: Translation[] = [
 ];
 
 function readTemplate(name: string): string {
-  return readFileSync(join(__dirname, 'assets', 'email-defaults', 'templates', `${name}.mjml`), 'utf-8').trim();
+  return readFileSync(join(__dirname, '..', '..', 'assets', 'email-defaults', 'templates', `${name}.mjml`), 'utf-8').trim();
 }
 
 export class SeedDeEmailTemplates1782600000000 implements MigrationInterface {
@@ -156,6 +156,11 @@ export class SeedDeEmailTemplates1782600000000 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`DELETE FROM "email_template_translations" WHERE "locale" = 'de'`);
+    for (const row of DE) {
+      await queryRunner.query(
+        `DELETE FROM "email_template_translations" WHERE "templateType" = ? AND "key" = ? AND "locale" = 'de'`,
+        [row.templateType, row.key],
+      );
+    }
   }
 }

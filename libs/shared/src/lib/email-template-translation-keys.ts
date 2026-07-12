@@ -4,14 +4,26 @@ export interface TranslationKey {
 }
 
 export function extractTranslationKeys(content: string): TranslationKey[] {
-  const regex = /\{\{t\s+["']([^"']+)["']\s+["']([^"']*)["']/g;
+  const all: Array<{ key: string; defaultValue: string; index: number }> = [];
+
+  let match: RegExpExecArray | null;
+  const dq = /\{\{t\s+"([^"]+)"\s+"([^"]*)"/g;
+  while ((match = dq.exec(content)) !== null) {
+    all.push({ key: match[1], defaultValue: match[2], index: match.index });
+  }
+  const sq = /\{\{t\s+'([^']+)'\s+'([^']*)'/g;
+  while ((match = sq.exec(content)) !== null) {
+    all.push({ key: match[1], defaultValue: match[2], index: match.index });
+  }
+
+  all.sort((a, b) => a.index - b.index);
+
   const seen = new Set<string>();
   const keys: TranslationKey[] = [];
-  let match: RegExpExecArray | null;
-  while ((match = regex.exec(content)) !== null) {
-    if (!seen.has(match[1])) {
-      seen.add(match[1]);
-      keys.push({ key: match[1], defaultValue: match[2] });
+  for (const { key, defaultValue } of all) {
+    if (!seen.has(key)) {
+      seen.add(key);
+      keys.push({ key, defaultValue });
     }
   }
   return keys;

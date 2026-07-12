@@ -84,11 +84,15 @@ export function TranslationsSection({ templateType, liveContent }: TranslationsS
 
   const handleDeleteConfirmed = async () => {
     if (!deleteTarget) return;
-    await deleteMutation.mutateAsync({ locale: deleteTarget, type: templateType });
-    if (selectedLocale === deleteTarget) {
-      setSelectedLocale(existingLocales.find((l) => l !== deleteTarget) ?? '');
+    try {
+      await deleteMutation.mutateAsync({ locale: deleteTarget, type: templateType });
+      if (selectedLocale === deleteTarget) {
+        setSelectedLocale(existingLocales.find((l) => l !== deleteTarget) ?? '');
+      }
+      setDeleteTarget(null);
+    } catch {
+      toast.error({ title: t('translations.deleteFailed') });
     }
-    setDeleteTarget(null);
   };
 
   const allLocales = useMemo(() => {

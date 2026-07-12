@@ -38,4 +38,10 @@ describe('extractTranslationKeys', () => {
   it('allows empty default value', () => {
     expect(extractTranslationKeys(`{{t 'key' ''}}`)).toEqual([{ key: 'key', defaultValue: '' }]);
   });
+
+  it("does not truncate defaultValue containing the other quote character", () => {
+    expect(extractTranslationKeys(`{{t "greeting" "it's fine"}}`)).toEqual([
+      { key: 'greeting', defaultValue: "it's fine" },
+    ]);
+  });
 });

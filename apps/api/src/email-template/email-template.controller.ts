@@ -58,7 +58,9 @@ export class EmailTemplateController {
   @Auth('canManageSystemConfiguration' as SystemPermission)
   @ApiOperation({ summary: 'Update an email template' })
   @ApiParam({ name: 'type', enum: EmailTemplateType, enumName: 'EmailTemplateType' })
+  @ApiBody({ type: UpdateEmailTemplateDto })
   @ApiResponse({ status: 200, type: EmailTemplate })
+  @ApiResponse({ status: 404, description: 'Template not found' })
   update(
     @Param('type') type: EmailTemplateType,
     @Body() updateEmailTemplateDto: UpdateEmailTemplateDto,

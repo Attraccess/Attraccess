@@ -54,6 +54,7 @@
     "saveFailed": "Failed to save translations",
     "saved": "Translations saved",
     "deleteLocale": "Delete locale",
+    "deleteFailed": "Failed to delete translations",
     "deleteConfirm": "Delete all translations for locale \"{{locale}}\"?",
     "deleteConfirmButton": "Delete",
     "emptyTranslation": "Falls back to default"

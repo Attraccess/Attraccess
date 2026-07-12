@@ -54,6 +54,7 @@
     "saveFailed": "Übersetzungen konnten nicht gespeichert werden",
     "saved": "Übersetzungen gespeichert",
     "deleteLocale": "Sprache löschen",
+    "deleteFailed": "Übersetzungen konnten nicht gelöscht werden",
     "deleteConfirm": "Alle Übersetzungen für die Sprache \"{{locale}}\" löschen?",
     "deleteConfirmButton": "Löschen",
     "emptyTranslation": "Fällt auf Standard zurück"
