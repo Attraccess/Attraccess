@@ -35,6 +35,9 @@ interface UserSearchProps {
   label?: string;
   placeholder?: string;
   size?: 'sm' | 'md' | 'lg';
+  /** Clears the current selection and search whenever this value changes identity
+   * (e.g. pass a drawer's isOpen so the picker resets on every open/close). */
+  resetSignal?: unknown;
   onSelectionChange?: (user: User | null) => void;
   wrapperProps?: Omit<HTMLAttributes<HTMLDivElement>, 'children'>;
   afterAutocomplete?: React.ReactNode;
@@ -53,7 +56,8 @@ const FIELD_CONTRAST_STYLE: React.CSSProperties = {
 };
 
 export function UserSearch(props: Readonly<UserSearchProps>) {
-  const { label, placeholder, size, onSelectionChange, afterAutocomplete, wrapperProps, afterSelection } = props;
+  const { label, placeholder, size, resetSignal, onSelectionChange, afterAutocomplete, wrapperProps, afterSelection } =
+    props;
 
   const { t } = useTranslations({ en, de });
 
@@ -67,11 +71,28 @@ export function UserSearch(props: Readonly<UserSearchProps>) {
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, SEARCH_DEBOUNCE_MS);
 
+  // Reset selection and search when the caller's reset signal changes (skipping the
+  // initial render), replacing the per-consumer key-remount workaround.
+  const isFirstRender = useRef(true);
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    setSelectedUser(null);
+    setSearch('');
+  }, [resetSignal]);
+
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, isError, refetch } =
     useUsersServiceFindManyInfinite(
-      // While closed, pin the search to unfiltered so a quick close+reopen within the
-      // debounce window cannot resurrect the previous filter from the query cache.
-      { limit: PAGE_SIZE, search: isOpen ? debouncedSearch.trim() || undefined : undefined },
+      // Gate on the picker being open AND the live input being non-empty: closing
+      // resets `search` synchronously while the debounced copy lags ~300ms, so
+      // without the live check a quick close+reopen could briefly refetch (or flash
+      // cached results for) the previous filter.
+      {
+        limit: PAGE_SIZE,
+        search: isOpen && search.trim() ? debouncedSearch.trim() || undefined : undefined,
+      },
       undefined,
       {
         // Only fetch while the picker is actually open. The generated options type
@@ -148,7 +169,9 @@ export function UserSearch(props: Readonly<UserSearchProps>) {
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [isOpen]);
+    // isError is a dependency because the sentinel unmounts while errored; when a
+    // retry clears the error, the effect must re-run to observe the fresh sentinel.
+  }, [isOpen, isError]);
 
   return (
     <div {...wrapperProps}>
@@ -196,7 +219,7 @@ export function UserSearch(props: Readonly<UserSearchProps>) {
           </Button>
         )}
         {afterAutocomplete}
-        {selectedUser ? afterSelection : null}
+        {afterSelection}
       </div>
 
       <Modal isOpen={isOpen} onOpenChange={handleOpenChange}>
@@ -233,7 +256,7 @@ export function UserSearch(props: Readonly<UserSearchProps>) {
                   style={{ maxHeight: '60vh', overflowY: 'auto' }}
                   data-cy="user-picker-list"
                 >
-                  {isError ? (
+                  {isError && users.length === 0 ? (
                     <div className="flex flex-col items-center gap-3 py-10" data-cy="user-picker-error">
                       <p className="text-sm text-muted">{t('loadError')}</p>
                       <Button variant="secondary" size="sm" onPress={() => refetch()}>
@@ -265,6 +288,16 @@ export function UserSearch(props: Readonly<UserSearchProps>) {
                     </ListBox>
                   )}
                   {isError ? null : <div ref={sentinelRef} />}
+                  {isError && users.length > 0 ? (
+                    // A later page failed: keep the loaded results and offer an inline
+                    // retry instead of discarding the list for the full error screen.
+                    <div className="flex items-center justify-center gap-3 py-3" data-cy="user-picker-load-more-error">
+                      <p className="text-sm text-muted">{t('loadError')}</p>
+                      <Button variant="secondary" size="sm" onPress={() => fetchNextPage()}>
+                        {t('retry')}
+                      </Button>
+                    </div>
+                  ) : null}
                   {isFetchingNextPage ? (
                     <div className="flex justify-center py-3">
                       <Spinner size="sm" />

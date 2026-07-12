@@ -105,6 +105,7 @@ describe('useDebounce', () => {
 
 describe('UserSearch', () => {
   let intersectionCallback: IntersectionObserverCallback | null = null;
+  let observerConstructions = 0;
 
   const infiniteQueryResult = (users: User[], overrides: Record<string, unknown> = {}) => ({
     data: { pages: [{ data: users, total: users.length, page: 1, limit: 50, nextPage: 2 }] },
@@ -119,9 +120,11 @@ describe('UserSearch', () => {
 
   beforeEach(() => {
     intersectionCallback = null;
+    observerConstructions = 0;
     class IntersectionObserverStub {
       constructor(cb: IntersectionObserverCallback) {
         intersectionCallback = cb;
+        observerConstructions += 1;
       }
       observe() {
         /* noop */
@@ -231,5 +234,62 @@ describe('UserSearch', () => {
 
     await pointer.click(screen.getByRole('button', { name: /try again/i }));
     expect(result.refetch).toHaveBeenCalled();
+  });
+
+  it('clears the selection when resetSignal changes identity', async () => {
+    mocks.useUsersServiceFindManyInfinite.mockReturnValue(infiniteQueryResult([user(1, 'alan')]));
+    const onSelectionChange = vi.fn();
+    const pointer = userEvent.setup();
+
+    const { rerender } = render(<UserSearch resetSignal={true} onSelectionChange={onSelectionChange} />);
+    await pointer.click(screen.getByRole('button', { name: /choose user/i }));
+    await pointer.click(screen.getByRole('option', { name: /alan/i }));
+    expect(screen.getByText('alan')).toBeInTheDocument();
+
+    rerender(<UserSearch resetSignal={false} onSelectionChange={onSelectionChange} />);
+
+    expect(onSelectionChange).toHaveBeenLastCalledWith(null);
+    expect(screen.queryByText('alan')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /choose user/i })).toBeInTheDocument();
+  });
+
+  it('keeps loaded users and offers an inline retry when a later page fails', async () => {
+    const result = infiniteQueryResult([user(1, 'alan'), user(2, 'bob')], { isError: true });
+    mocks.useUsersServiceFindManyInfinite.mockReturnValue(result);
+    const pointer = userEvent.setup();
+
+    render(<UserSearch />);
+    await pointer.click(screen.getByRole('button', { name: /choose user/i }));
+
+    // The already-loaded list survives the error; only an inline retry row is added.
+    expect(screen.getAllByRole('option')).toHaveLength(2);
+    expect(screen.getByText('Users could not be loaded.')).toBeInTheDocument();
+
+    await pointer.click(screen.getByRole('button', { name: /try again/i }));
+    expect(result.fetchNextPage).toHaveBeenCalled();
+    expect(result.refetch).not.toHaveBeenCalled();
+  });
+
+  it('re-observes the sentinel after a retried error clears', async () => {
+    mocks.useUsersServiceFindManyInfinite.mockReturnValue(infiniteQueryResult([user(1, 'alan')], { isError: true }));
+    const pointer = userEvent.setup();
+
+    const { rerender } = render(<UserSearch />);
+    await pointer.click(screen.getByRole('button', { name: /choose user/i }));
+    const constructionsWhileErrored = observerConstructions;
+
+    // Error clears (successful retry) -> a fresh sentinel mounts and must be observed again.
+    mocks.useUsersServiceFindManyInfinite.mockReturnValue(infiniteQueryResult([user(1, 'alan')]));
+    rerender(<UserSearch />);
+
+    expect(observerConstructions).toBeGreaterThan(constructionsWhileErrored);
+
+    act(() => {
+      intersectionCallback?.(
+        [{ isIntersecting: true } as IntersectionObserverEntry],
+        null as unknown as IntersectionObserver,
+      );
+    });
+    expect(mocks.useUsersServiceFindManyInfinite.mock.results.at(-1)?.value.fetchNextPage).toHaveBeenCalled();
   });
 });

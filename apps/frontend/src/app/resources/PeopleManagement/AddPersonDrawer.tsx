@@ -21,13 +21,9 @@ export function AddPersonDrawer(props: Readonly<AddPersonDrawerProps>) {
   const { t, isOpen, mode, comment, isPending, onCommentChange, onAdd, onClose } = props;
 
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  // UserSearch keeps its own selected-user state for its trigger chip; remount it on
-  // close so a previously picked user never lingers visually across drawer reopens.
-  const [pickerResetKey, setPickerResetKey] = useState(0);
 
   const handleClose = useCallback(() => {
     setSelectedUser(null);
-    setPickerResetKey((key) => key + 1);
     onClose();
   }, [onClose]);
 
@@ -65,7 +61,7 @@ export function AddPersonDrawer(props: Readonly<AddPersonDrawerProps>) {
             <TextArea />
           </TextField>
         )}
-        <UserSearch key={pickerResetKey} label={t('addModal.userLabel')} onSelectionChange={setSelectedUser} />
+        <UserSearch resetSignal={isOpen} label={t('addModal.userLabel')} onSelectionChange={setSelectedUser} />
       </DrawerBody>
       <DrawerFooter>
         <Button variant="ghost" onPress={handleClose} isDisabled={isPending} data-cy="people-add-cancel">

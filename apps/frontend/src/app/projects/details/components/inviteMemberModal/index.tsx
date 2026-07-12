@@ -35,9 +35,6 @@ export function InviteProjectMemberModal(props: Readonly<InviteProjectMemberModa
   const { isOpen, open, close } = useOverlayState();
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [role, setRole] = useState<ProjectMember['role']>(ProjectMemberRole.VIEWER);
-  // UserSearch keeps its own selected-user state for its trigger chip; remount it on
-  // reset so a previously picked user never lingers visually across drawer reopens.
-  const [pickerResetKey, setPickerResetKey] = useState(0);
   const queryClient = useQueryClient();
   const toast = useToastMessage();
   const { t, tExists } = useTranslations({
@@ -48,7 +45,6 @@ export function InviteProjectMemberModal(props: Readonly<InviteProjectMemberModa
   const resetState = useCallback(() => {
     setSelectedUser(null);
     setRole(ProjectMemberRole.VIEWER);
-    setPickerResetKey((key) => key + 1);
   }, []);
 
   const invalidateCollaboratorQueries = useCallback(async () => {
@@ -116,7 +112,7 @@ export function InviteProjectMemberModal(props: Readonly<InviteProjectMemberModa
         <DrawerBody className="flex flex-col gap-4">
           <p className="text-small text-default-500">{t('description')}</p>
           <UserSearch
-            key={pickerResetKey}
+            resetSignal={isOpen}
             label={t('inputs.user')}
             onSelectionChange={setSelectedUser}
             afterSelection={
