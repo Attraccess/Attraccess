@@ -38,9 +38,12 @@
         "commands": [
           "esbuild src/main.ts --bundle --platform=node --external:electron --external:keytar --external:usb --outfile=out/main.js --format=cjs --alias:@attraccess/companion-ws-client=../../libs/companion-ws-client/src/index.ts",
           "esbuild src/preload.ts --bundle --platform=node --external:electron --outfile=out/preload.js --format=cjs",
-          "CI=true electron-builder --config electron-builder.config.cjs"
+          "electron-builder --config electron-builder.config.cjs"
         ],
-        "parallel": false
+        "parallel": false,
+        "env": {
+          "CI": "true"
+        }
       }
     },
     "typecheck": {
