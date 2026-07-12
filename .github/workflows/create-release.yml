@@ -51,8 +51,11 @@ jobs:
           git config user.name "${{ steps.app-token.outputs.app-slug }}[bot]"
           git config user.email "${{ steps.bot-user.outputs.id }}+${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com"
 
+      - name: Lint and typecheck publishable libraries
+        run: pnpm nx run-many -t lint,typecheck --exclude=tag:scope:hardware
+
       - name: Build publishable libraries
-        run: pnpm nx run-many -t build,lint,typecheck --exclude=tag:scope:companion,tag:scope:hardware
+        run: pnpm nx run-many -t build --exclude=tag:scope:companion,tag:scope:hardware
 
       - name: Run NX Release (dry run)
         if: inputs.dry-run
