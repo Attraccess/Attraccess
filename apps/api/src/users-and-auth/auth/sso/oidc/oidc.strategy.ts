@@ -12,7 +12,7 @@ import { UsersService } from '../../../users/users.service';
 import { ModuleRef } from '@nestjs/core';
 import { AccountLinkingRequiredException } from './exceptions/account-linking-required.exception';
 import { AuthService } from '../../auth.service';
-import { resolveRoleKeysFromSsoRoles } from '../permission-mapping';
+import { hasConfiguredPermissionMapping, resolveRoleKeysFromSsoRoles } from '../permission-mapping';
 import { RbacService } from '../../../rbac/rbac.service';
 import { OidcCookieStateStore, OIDCAppState } from './oidc-cookie-state-store';
 import { MetricsService } from '../../../../metrics/metrics.service';
@@ -297,7 +297,9 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', true
     this.logger.debug(`RBAC role keys from SSO: ${JSON.stringify([...roleKeys])}`);
 
     const rbacService = this.moduleRef.get(RbacService, { strict: false });
-    if (rbacService) {
+    // Only sync when a mapping is configured; skip entirely if no mapping exists to avoid
+    // wiping SSO-granted roles when the token simply lacks a groups/roles claim.
+    if (rbacService && hasConfiguredPermissionMapping(this.config.permissionMappings)) {
       await rbacService.syncSsoRoles(
         user.id,
         [...roleKeys],

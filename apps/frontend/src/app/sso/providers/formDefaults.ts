@@ -1,9 +1,5 @@
 import { CreateSSOProviderDto, SSOProviderType } from '@attraccess/react-query-client';
 
-export const permissionKeys = ['resource-manager', 'system-admin', 'user-manager', 'billing-manager'] as const;
-
-export type PermissionKey = (typeof permissionKeys)[number];
-
 export const getDefaultOidcConfiguration = () => ({
   issuer: '',
   authorizationURL: '',
@@ -27,13 +23,6 @@ export const getDefaultSamlConfiguration = () => ({
   spSigningPrivateKey: '',
 });
 
-export const emptyPermissionMappingsInput: Record<PermissionKey, string> = {
-  'resource-manager': '',
-  'system-admin': '',
-  'user-manager': '',
-  'billing-manager': '',
-};
-
 export const defaultProviderValues: CreateSSOProviderDto = {
   name: '',
   type: SSOProviderType.OIDC,
@@ -49,19 +38,15 @@ export const ensureSamlConfiguration = (config?: CreateSSOProviderDto['samlConfi
 
 export const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+/** Build a flat string-input record from an existing server-side role mapping, keyed by role key. */
 export const buildPermissionMappingInputs = (
+  roleKeys: string[],
   mapping?: Record<string, string[]> | null,
-): Record<PermissionKey, string> => ({
-  'resource-manager': Array.isArray((mapping as Record<string, unknown>)?.['resource-manager'])
-    ? ((mapping as Record<string, string[]>)?.['resource-manager'] ?? []).join(', ')
-    : '',
-  'system-admin': Array.isArray((mapping as Record<string, unknown>)?.['system-admin'])
-    ? ((mapping as Record<string, string[]>)?.['system-admin'] ?? []).join(', ')
-    : '',
-  'user-manager': Array.isArray((mapping as Record<string, unknown>)?.['user-manager'])
-    ? ((mapping as Record<string, string[]>)?.['user-manager'] ?? []).join(', ')
-    : '',
-  'billing-manager': Array.isArray((mapping as Record<string, unknown>)?.['billing-manager'])
-    ? ((mapping as Record<string, string[]>)?.['billing-manager'] ?? []).join(', ')
-    : '',
-});
+): Record<string, string> => {
+  const result: Record<string, string> = {};
+  for (const key of roleKeys) {
+    const values = mapping?.[key];
+    result[key] = Array.isArray(values) ? values.join(', ') : '';
+  }
+  return result;
+};

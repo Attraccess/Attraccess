@@ -29,6 +29,7 @@ import { MaintenanceRequestController } from './maintenance-request.controller';
 import { MaintenanceRequestNotificationListener } from './maintenance-request-notification.listener';
 import { NotificationsModule } from '../../notifications/notifications.module';
 import { LicenseModule } from '../../license/license.module';
+import { RbacModule } from '../../users-and-auth/rbac/rbac.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { LicenseModule } from '../../license/license.module';
     ]),
     NotificationsModule,
     LicenseModule,
+    RbacModule,
   ],
   controllers: [ResourceMaintenanceController, MaintenanceScheduleController, MaintenanceRequestController],
   providers: [

@@ -6,6 +6,7 @@ import { ResourceMaintenanceService } from './maintenance.service';
 import { ResourceMaintenance, Resource, ResourceIntroducer } from '@attraccess/database-entities';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MetricsService } from '../../metrics/metrics.service';
+import { RbacService } from '../../users-and-auth/rbac/rbac.service';
 
 const mockMetricsService = {
   resourceMaintenanceTotal: { inc: jest.fn() },
@@ -76,6 +77,10 @@ describe('MaintenanceService', () => {
         {
           provide: MetricsService,
           useValue: mockMetricsService,
+        },
+        {
+          provide: RbacService,
+          useValue: { getEffectivePermissions: jest.fn().mockResolvedValue(new Set()) },
         },
       ],
     }).compile();

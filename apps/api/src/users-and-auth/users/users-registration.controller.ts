@@ -36,7 +36,7 @@ export class UsersRegistrationController {
   ) {}
 
   @Get('local-signup-domain-whitelist')
-  @Auth('system.settings.manage')
+  @Auth('system.settings.manage', 'users.create')
   @ApiOperation({ summary: 'Get the local signup domain whitelist', operationId: 'getLocalSignupDomainWhitelist' })
   @ApiResponse({
     status: 200,
@@ -48,7 +48,7 @@ export class UsersRegistrationController {
   }
 
   @Post('local-signup-domain-whitelist')
-  @Auth('system.settings.manage')
+  @Auth('system.settings.manage', 'users.create')
   @ApiOperation({ summary: 'Set the local signup domain whitelist', operationId: 'setLocalSignupDomainWhitelist' })
   @ApiResponse({
     status: 200,

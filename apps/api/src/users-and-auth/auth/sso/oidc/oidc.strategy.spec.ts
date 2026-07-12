@@ -182,7 +182,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
     );
   });
 
-  it('syncs RBAC roles from role claims when available', async () => {
+  it('does not sync RBAC roles when no permissionMappings configured', async () => {
     const existingUser = { id: 222, username: 'existing', email: 'existing@example.com' } as User;
 
     const usersService = {
@@ -203,18 +203,12 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
     const profile = {
       id: 'ext-roles',
       emails: [{ value: 'existing@example.com' }],
-      // legacy role names mapped by LEGACY_MAP: canManageUsers → user-manager, canManageBilling → billing-manager
-      _json: { roles: ['canManageUsers', 'canManageBilling'] },
+      _json: { roles: ['some-role'] },
     } as unknown as Profile;
 
     await strategy.validate('https://issuer', profile);
 
-    expect(rbacService.syncSsoRoles).toHaveBeenCalledWith(
-      existingUser.id,
-      expect.arrayContaining(['user-manager', 'billing-manager']),
-      SSOProviderType.OIDC,
-      1,
-    );
+    expect(rbacService.syncSsoRoles).not.toHaveBeenCalled();
   });
 
   it('honors configured permission mappings and revokes absent roles', async () => {

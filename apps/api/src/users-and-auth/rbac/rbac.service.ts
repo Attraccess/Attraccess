@@ -1,10 +1,12 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Permission, Role, UserRole, UserRoleSource } from '@attraccess/database-entities';
+import { Permission, Role, User, UserRole, UserRoleSource } from '@attraccess/database-entities';
 
 @Injectable()
 export class RbacService {
+  private readonly logger = new Logger(RbacService.name);
+
   constructor(
     @InjectRepository(UserRole)
     private readonly userRoleRepository: Repository<UserRole>,
@@ -12,6 +14,8 @@ export class RbacService {
     private readonly roleRepository: Repository<Role>,
     @InjectRepository(Permission)
     private readonly permissionRepository: Repository<Permission>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
   ) {}
 
   async getEffectivePermissions(userId: number): Promise<Set<string>> {
@@ -42,6 +46,22 @@ export class RbacService {
       where: { userId },
       relations: ['role'],
     });
+  }
+
+  async getUsersWithPermission(permissionKey: string): Promise<User[]> {
+    return this.userRepository
+      .createQueryBuilder('user')
+      .where((qb) =>
+        `user.id IN ${qb
+          .subQuery()
+          .select('ur.userId')
+          .from('user_role', 'ur')
+          .innerJoin('role_permission', 'rp', 'rp.roleId = ur.roleId')
+          .where('rp.permissionKey = :permKey')
+          .getQuery()}`,
+      )
+      .setParameter('permKey', permissionKey)
+      .getMany();
   }
 
   async assignRoleByKey(userId: number, roleKey: string): Promise<UserRole | null> {
@@ -119,19 +139,23 @@ export class RbacService {
     }
 
     // last-owner guardrail: don't let the last non-deleted owner lose the owner role
+    // Count ALL owner assignments regardless of source (MANUAL or SSO) so that SSO-provisioned
+    // owners are not invisible to this check.
     if (role.key === 'owner') {
       const ownerCount = await this.userRoleRepository
         .createQueryBuilder('ur')
         .innerJoin('ur.user', 'u', 'u.deletedAt IS NULL')
         .where('ur.roleId = :roleId', { roleId })
-        .andWhere('ur.source = :source', { source: UserRoleSource.MANUAL })
         .getCount();
       if (ownerCount <= 1) {
         throw new ForbiddenException('Cannot remove the last owner from the system');
       }
     }
 
-    await this.userRoleRepository.delete({ userId, roleId, source: UserRoleSource.MANUAL });
+    const result = await this.userRoleRepository.delete({ userId, roleId, source: UserRoleSource.MANUAL });
+    if (!result.affected) {
+      throw new ConflictException('Role is not manually assigned to this user and cannot be revoked via this endpoint');
+    }
   }
 
   async syncSsoRoles(
@@ -174,9 +198,14 @@ export class RbacService {
         where: { userId, roleId: role.id, source: UserRoleSource.SSO, ssoProviderType, ssoProviderId },
       });
       if (!existing) {
-        await this.userRoleRepository.save(
-          this.userRoleRepository.create({ userId, roleId: role.id, source: UserRoleSource.SSO, ssoProviderType, ssoProviderId }),
-        );
+        try {
+          await this.userRoleRepository.save(
+            this.userRoleRepository.create({ userId, roleId: role.id, source: UserRoleSource.SSO, ssoProviderType, ssoProviderId }),
+          );
+        } catch {
+          // Another SSO provider already granted this role — unique(userId, roleId, source) violated; ignore
+          this.logger.debug(`syncSsoRoles: role ${roleKey} already held via another provider for user ${userId}`);
+        }
       }
     }
   }

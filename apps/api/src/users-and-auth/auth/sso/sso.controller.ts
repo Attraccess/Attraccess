@@ -847,16 +847,6 @@ export class SSOController {
     return user;
   }
 
-  // Maps deprecated boolean provisioning fields to their RBAC role equivalents.
-  // Kept for backward compatibility with IdP configurations that still send the old boolean fields.
-  // New integrations should use `roles` + per-provider `permissionMappings` instead.
-  private static readonly DEPRECATED_BOOL_FIELD_TO_ROLE: Record<string, string> = {
-    canManageResources: 'resource-manager',
-    canManageSystemConfiguration: 'system-admin',
-    canManageUsers: 'user-manager',
-    canManageBilling: 'billing-manager',
-  };
-
   private async applyProvisioningPermissions(
     userId: number,
     provider: SSOProvider,
@@ -867,16 +857,12 @@ export class SSOController {
         ? provider.oidcConfiguration?.permissionMappings
         : provider.samlConfiguration?.permissionMappings;
 
-    const roleNames = (payload.roles ?? []).map((r) => r.trim()).filter((r) => r.length > 0);
-    const roleKeys = resolveRoleKeysFromSsoRoles(roleNames, mapping);
+    // If the payload contains no `roles` field at all, treat as "no permission info" and skip
+    // sync to avoid wiping SSO-granted roles on incremental provisioning calls.
+    if (payload.roles === undefined) return;
 
-    // Deprecated boolean fields: true → include the equivalent RBAC role.
-    // Absent/false fields are implicitly removed by syncSsoRoles.
-    for (const [field, roleKey] of Object.entries(SSOController.DEPRECATED_BOOL_FIELD_TO_ROLE)) {
-      if ((payload as Record<string, unknown>)[field] === true) {
-        roleKeys.add(roleKey);
-      }
-    }
+    const roleNames = payload.roles.map((r) => r.trim()).filter((r) => r.length > 0);
+    const roleKeys = resolveRoleKeysFromSsoRoles(roleNames, mapping);
 
     await this.rbacService.syncSsoRoles(userId, [...roleKeys], provider.type, provider.id);
   }

@@ -53,7 +53,10 @@ export class EffectivePermissionsGuard implements CanActivate {
   constructor(private reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean | Promise<boolean> | Observable<boolean> {
-    const requiredPermissions = this.reflector.get(NeedsPermissions, context.getHandler());
+    const requiredPermissions = this.reflector.getAllAndOverride(NeedsPermissions, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
 
     if (!requiredPermissions || requiredPermissions.length === 0) {
       return true;

@@ -14,7 +14,7 @@ import { EncryptionService } from '../../../../encryption/encryption.service';
 import { SSOSamlRequest, SSOSamlRequestOptions } from './saml.types';
 import { MetricsService } from '../../../../metrics/metrics.service';
 import { classifySsoFailureReason, markSsoFailureMetricRecorded, recordSsoLoginFailure } from '../sso-metrics';
-import { resolveRoleKeysFromSsoRoles } from '../permission-mapping';
+import { hasConfiguredPermissionMapping, resolveRoleKeysFromSsoRoles } from '../permission-mapping';
 import { RbacService } from '../../../rbac/rbac.service';
 
 type StrategyCtor = new (...args: unknown[]) => Strategy;
@@ -298,7 +298,7 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
     this.logger.debug(`RBAC role keys from SAML: ${JSON.stringify([...roleKeys])}`);
 
     const rbacService = this.moduleRef.get(RbacService, { strict: false });
-    if (rbacService) {
+    if (rbacService && hasConfiguredPermissionMapping(config.permissionMappings)) {
       await rbacService.syncSsoRoles(
         user.id,
         [...roleKeys],

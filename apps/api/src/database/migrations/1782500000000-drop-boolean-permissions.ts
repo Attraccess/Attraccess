@@ -57,14 +57,66 @@ export class DropBooleanPermissions1782500000000 implements MigrationInterface {
     await queryRunner.query(`ALTER TABLE "user" DROP COLUMN "canManageSystemConfiguration"`);
     await queryRunner.query(`ALTER TABLE "user" DROP COLUMN "canManageUsers"`);
     await queryRunner.query(`ALTER TABLE "user" DROP COLUMN "canManageBilling"`);
+
+    // Ensure at least one user holds the 'owner' role. On fresh installs the first user gets it
+    // automatically, but migrated instances that had no first-user bootstrap need one assigned.
+    const ownerRoleRows = await queryRunner.query(`SELECT "id" FROM "role" WHERE "key" = ?`, ['owner']);
+    if (ownerRoleRows.length > 0) {
+      const ownerRoleId: number = ownerRoleRows[0].id;
+      const existingOwners = await queryRunner.query(
+        `SELECT COUNT(*) as cnt FROM "user_role" WHERE "roleId" = ? AND "source" = 'manual'`,
+        [ownerRoleId],
+      );
+      if (existingOwners[0]?.cnt === 0 || existingOwners[0]?.cnt === '0') {
+        // Assign owner to the oldest non-deleted user who holds the system-admin role, or else the oldest user
+        const systemAdminRoleRows = await queryRunner.query(`SELECT "id" FROM "role" WHERE "key" = ?`, ['system-admin']);
+        let candidateUserId: number | null = null;
+        if (systemAdminRoleRows.length > 0) {
+          const rows = await queryRunner.query(
+            `SELECT ur."userId" FROM "user_role" ur INNER JOIN "user" u ON u.id = ur."userId"
+             WHERE ur."roleId" = ? AND u."deletedAt" IS NULL ORDER BY u."createdAt" ASC LIMIT 1`,
+            [systemAdminRoleRows[0].id],
+          );
+          candidateUserId = rows[0]?.userId ?? null;
+        }
+        if (!candidateUserId) {
+          const rows = await queryRunner.query(
+            `SELECT "id" FROM "user" WHERE "deletedAt" IS NULL ORDER BY "createdAt" ASC LIMIT 1`,
+          );
+          candidateUserId = rows[0]?.id ?? null;
+        }
+        if (candidateUserId) {
+          await queryRunner.query(
+            `INSERT OR IGNORE INTO "user_role" ("userId", "roleId", "source") VALUES (?, ?, 'manual')`,
+            [candidateUserId, ownerRoleId],
+          );
+        }
+      }
+    }
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    // Restore boolean columns (data cannot be recovered, all false)
+    // Restore boolean columns and recover data from user_role (which still exists at this point)
     await queryRunner.query(`ALTER TABLE "user" ADD COLUMN "canManageResources" boolean NOT NULL DEFAULT (0)`);
     await queryRunner.query(`ALTER TABLE "user" ADD COLUMN "canManageSystemConfiguration" boolean NOT NULL DEFAULT (0)`);
     await queryRunner.query(`ALTER TABLE "user" ADD COLUMN "canManageUsers" boolean NOT NULL DEFAULT (0)`);
     await queryRunner.query(`ALTER TABLE "user" ADD COLUMN "canManageBilling" boolean NOT NULL DEFAULT (0)`);
+
+    // Recover boolean values from user_role assignments
+    const roleMap = [
+      { column: 'canManageResources', roleKey: 'resource-manager' },
+      { column: 'canManageSystemConfiguration', roleKey: 'system-admin' },
+      { column: 'canManageUsers', roleKey: 'user-manager' },
+      { column: 'canManageBilling', roleKey: 'billing-manager' },
+    ];
+    for (const { column, roleKey } of roleMap) {
+      const rows = await queryRunner.query(`SELECT "id" FROM "role" WHERE "key" = ?`, [roleKey]);
+      if (!rows.length) continue;
+      await queryRunner.query(
+        `UPDATE "user" SET "${column}" = 1 WHERE "id" IN (SELECT "userId" FROM "user_role" WHERE "roleId" = ?)`,
+        [rows[0].id],
+      );
+    }
 
     // Revert SSO provider OIDC permissionMappings JSON keys (RBAC role keys → legacy boolean names)
     const rbacToLegacy = Object.fromEntries(

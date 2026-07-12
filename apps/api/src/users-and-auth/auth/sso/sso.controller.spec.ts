@@ -647,7 +647,7 @@ describe('SsoController', () => {
       expect(usersService.deleteOne).toHaveBeenCalledWith(77);
     });
 
-    it('syncs RBAC roles for oidc permission requests with legacy boolean fields', async () => {
+    it('does not sync RBAC roles when roles field is absent (incremental provisioning)', async () => {
       const usersService = module.get<UsersService>(UsersService);
       const rbacService = module.get<RbacService>(RbacService);
 
@@ -659,17 +659,10 @@ describe('SsoController', () => {
 
       const result = await controller.oidcUpdatePermissions('1', mockRequest as unknown as Request, {
         subject: 'sub-3',
-        canManageUsers: true,
-        canManageBilling: true,
       });
 
       expect(result).toEqual({ OK: true });
-      expect(rbacService.syncSsoRoles).toHaveBeenCalledWith(
-        88,
-        expect.arrayContaining(['user-manager', 'billing-manager']),
-        SSOProviderType.OIDC,
-        1,
-      );
+      expect(rbacService.syncSsoRoles).not.toHaveBeenCalled();
     });
 
     it('maps role names using provider permission mappings', async () => {
