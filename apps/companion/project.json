@@ -3,7 +3,7 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "apps/companion/src",
   "projectType": "application",
-  "tags": ["tag:scope:companion"],
+  "tags": ["scope:companion"],
   "targets": {
     "serve": {
       "executor": "nx:run-commands",
@@ -32,24 +32,18 @@
       "cache": true,
       "dependsOn": ["companion-ws-client:build", "build-renderer"],
       "inputs": ["production", "^production"],
-      "outputs": ["{workspaceRoot}/apps/companion/out"],
+      "outputs": ["{projectRoot}/out", "{projectRoot}/dist"],
       "options": {
         "cwd": "apps/companion",
         "commands": [
           "esbuild src/main.ts --bundle --platform=node --external:electron --external:keytar --external:usb --outfile=out/main.js --format=cjs --alias:@attraccess/companion-ws-client=../../libs/companion-ws-client/src/index.ts",
-          "esbuild src/preload.ts --bundle --platform=node --external:electron --outfile=out/preload.js --format=cjs"
+          "esbuild src/preload.ts --bundle --platform=node --external:electron --outfile=out/preload.js --format=cjs",
+          "electron-builder --config electron-builder.config.cjs"
         ],
-        "parallel": false
-      }
-    },
-    "package": {
-      "executor": "nx:run-commands",
-      "cache": true,
-      "dependsOn": ["build"],
-      "outputs": ["{workspaceRoot}/dist/apps/companion"],
-      "options": {
-        "cwd": "apps/companion",
-        "command": "CI=true electron-builder --config electron-builder.config.cjs --dir"
+        "parallel": false,
+        "env": {
+          "CI": "true"
+        }
       }
     },
     "typecheck": {

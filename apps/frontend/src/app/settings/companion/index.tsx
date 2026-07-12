@@ -234,14 +234,14 @@ export function CompanionSettingsPage() {
           <Card.Header className="flex flex-col items-start gap-1">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-base font-semibold">{t('download.title')}</span>
-              {manifest && !manifestLoading && (
+              {manifest && !manifestLoading && (manifest.platforms?.length ?? 0) > 0 && (
                 <Chip color="success" size="sm">{t('version.label', { version: manifest.version })}</Chip>
               )}
             </div>
             <span className="text-sm text-default-500">{t('download.subtitle')}</span>
           </Card.Header>
           <Card.Content>
-            {!manifest && !manifestLoading ? (
+            {(!manifest || (manifest.platforms?.length ?? 0) === 0) && !manifestLoading ? (
               <Alert color="default">
                 <AlertContent>
                   <AlertTitle>{t('download.noBinaries')}</AlertTitle>

@@ -12,7 +12,7 @@ const sourceDir = path.resolve(__dirname, '../companion/dist');
 const KNOWN_BINARIES = [
   { filename: 'companion_win_x64.exe', platform: 'win32', arch: 'x64' },
   { filename: 'companion_mac_universal.dmg', platform: 'darwin', arch: 'universal' },
-  { filename: 'companion_linux_x64.AppImage', platform: 'linux', arch: 'x64' },
+  { filename: 'companion_linux_x86_64.AppImage', platform: 'linux', arch: 'x64' },
   { filename: 'companion_linux_arm64.AppImage', platform: 'linux', arch: 'arm64' },
 ];
 
