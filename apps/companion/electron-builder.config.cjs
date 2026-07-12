@@ -11,7 +11,7 @@ module.exports = {
   extraMetadata: {
     main: 'out/main.js',
   },
-  // ponytail: companion has no native modules; skip pnpm production-install which trashes workspace dev-deps
+  // ponytail: keytar is external to the esbuild bundle; false skips pnpm production-install (which trashes workspace dev-deps) and relies on keytar's node-pre-gyp prebuilts being ABI-compatible with the bundled electron version
   npmRebuild: false,
   // artifactName pattern matches what copy-companion-into-assets.js and the CI expect
   artifactName: 'companion_${os}_${arch}.${ext}',
