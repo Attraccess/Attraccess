@@ -522,6 +522,7 @@ export class UsersService {
       take: limit,
       where: whereCondition,
       relations: ['authenticationDetails'],
+      order: { username: 'ASC' },
     });
 
     this.logger.debug(`Found ${total} total users, returning page ${page} with ${users.length} results`);
