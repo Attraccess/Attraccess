@@ -283,6 +283,8 @@ export class UsersService {
     if (isFirstUser) {
       this.logger.debug('First user in system - assigning owner role');
       await this.rbacService.assignRoleByKey(savedUser.id, 'owner');
+    } else {
+      await this.rbacService.assignDefaultRoles(savedUser.id);
     }
 
     this.metricsService.usersRegisteredTotal.inc();
@@ -615,9 +617,16 @@ export class UsersService {
 
       const saved = await repo.save(entities);
 
-      // Assign owner role to the first user when bootstrapping
+      // Assign owner role to the first user when bootstrapping; default roles for everyone else
       if (options?.grantAllPermissionsToFirst && totalExisting === 0 && saved.length > 0) {
         await this.rbacService.assignRoleByKey(saved[0].id, 'owner');
+        for (const u of saved.slice(1)) {
+          await this.rbacService.assignDefaultRoles(u.id);
+        }
+      } else {
+        for (const u of saved) {
+          await this.rbacService.assignDefaultRoles(u.id);
+        }
       }
 
       return saved;

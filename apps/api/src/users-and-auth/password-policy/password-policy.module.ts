@@ -15,6 +15,7 @@ import { PasswordPolicyController } from './password-policy.controller';
 import { AdminPasswordPolicyController } from './admin-password-policy.controller';
 import { HibpClient } from './hibp.client';
 import { ZxcvbnService } from './zxcvbn.service';
+import { RbacModule } from '../rbac/rbac.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { ZxcvbnService } from './zxcvbn.service';
       PasswordHistory,
       AuthenticationDetail,
     ]),
+    RbacModule,
   ],
   providers: [PasswordPolicyService, HibpClient, ZxcvbnService],
   controllers: [PasswordPolicyController, AdminPasswordPolicyController],

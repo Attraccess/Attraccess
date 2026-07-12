@@ -21,6 +21,7 @@ const mockMetricsService = {
 
 const mockRbacService = {
   assignRoleByKey: jest.fn().mockResolvedValue(undefined),
+  assignDefaultRoles: jest.fn().mockResolvedValue(undefined),
 };
 
 describe('UsersService', () => {
@@ -30,6 +31,7 @@ describe('UsersService', () => {
 
   beforeEach(async () => {
     mockRbacService.assignRoleByKey.mockClear();
+    mockRbacService.assignDefaultRoles.mockClear();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -157,7 +159,7 @@ describe('UsersService', () => {
       expect(mockRbacService.assignRoleByKey).toHaveBeenCalledWith(1, 'owner');
     });
 
-    it('the following created user should not have any permissions', async () => {
+    it('a subsequent user should be assigned default roles via RBAC', async () => {
       jest.spyOn(userRepository, 'findOne').mockResolvedValue(null);
       jest.spyOn(userRepository, 'save').mockImplementation(async (data) => {
         return { id: 1, ...data } as User;
@@ -172,6 +174,8 @@ describe('UsersService', () => {
         externalIdentifier: null,
         isEmailVerified: false,
       });
+      expect(mockRbacService.assignDefaultRoles).toHaveBeenCalledWith(1);
+      expect(mockRbacService.assignRoleByKey).not.toHaveBeenCalled();
     });
 
     it('should throw if email already exists', async () => {

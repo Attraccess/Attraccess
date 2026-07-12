@@ -84,10 +84,10 @@
   "permissionMappingsHint": "Geben Sie Rollen- oder Gruppennamen an, die die jeweilige Berechtigung vergeben (durch Komma getrennt).",
   "permissionMappingsPlaceholder": "attraccess_admin, attraccess_billing",
   "permissionMappingLabels": {
-    "canManageResources": "Rollen für Ressourcenverwaltung",
-    "canManageSystemConfiguration": "Rollen für Systemkonfiguration",
-    "canManageUsers": "Rollen für Benutzerverwaltung",
-    "canManageBilling": "Rollen für Abrechnung"
+    "resource-manager": "Rollen für Ressourcenverwaltung",
+    "system-admin": "Rollen für Systemkonfiguration",
+    "user-manager": "Rollen für Benutzerverwaltung",
+    "billing-manager": "Rollen für Abrechnung"
   },
   "cancel": "Abbrechen",
   "save": "Speichern",

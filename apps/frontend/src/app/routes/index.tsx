@@ -290,7 +290,7 @@ const coreRoutes: RouteConfig[] = [
         <UserSecurityPage />
       </Suspense>
     ),
-    authRequired: 'canManageSystemConfiguration',
+    authRequired: 'system.settings.manage',
   },
   {
     path: '/users/security/password-policy',
@@ -309,7 +309,7 @@ const coreRoutes: RouteConfig[] = [
         <MessagingSettingsPage />
       </Suspense>
     ),
-    authRequired: 'canManageSystemConfiguration',
+    authRequired: 'system.settings.manage',
   },
   // Monitoring
   {
@@ -319,7 +319,7 @@ const coreRoutes: RouteConfig[] = [
         <MonitoringPage />
       </Suspense>
     ),
-    authRequired: 'canManageSystemConfiguration',
+    authRequired: 'system.settings.manage',
   },
   {
     path: '/devices/companion',
@@ -339,7 +339,7 @@ const coreRoutes: RouteConfig[] = [
   {
     path: '/emails',
     element: <EmailsPage />,
-    authRequired: 'canManageSystemConfiguration',
+    authRequired: 'system.settings.manage',
   },
   {
     path: '/emails/templates',
@@ -358,7 +358,7 @@ const coreRoutes: RouteConfig[] = [
         <EmailLayoutPage />
       </Suspense>
     ),
-    authRequired: 'canManageSystemConfiguration',
+    authRequired: 'system.settings.manage',
   },
   {
     path: '/messages',

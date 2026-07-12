@@ -56,6 +56,20 @@ export class RbacService {
     );
   }
 
+  async assignDefaultRoles(userId: number): Promise<void> {
+    const defaultRoles = await this.roleRepository.find({ where: { isDefault: true } });
+    for (const role of defaultRoles) {
+      const existing = await this.userRoleRepository.findOne({
+        where: { userId, roleId: role.id, source: UserRoleSource.MANUAL },
+      });
+      if (!existing) {
+        await this.userRoleRepository.save(
+          this.userRoleRepository.create({ userId, roleId: role.id, source: UserRoleSource.MANUAL }),
+        );
+      }
+    }
+  }
+
   async assignRole(userId: number, roleId: number, actorPermissions: Set<string>): Promise<UserRole> {
     const role = await this.roleRepository.findOne({
       where: { id: roleId },
@@ -88,17 +102,30 @@ export class RbacService {
     return this.userRoleRepository.save(userRole);
   }
 
-  async revokeRole(userId: number, roleId: number): Promise<void> {
-    const role = await this.roleRepository.findOne({ where: { id: roleId } });
+  async revokeRole(userId: number, roleId: number, actorPermissions: Set<string>): Promise<void> {
+    const role = await this.roleRepository.findOne({
+      where: { id: roleId },
+      relations: ['rolePermissions'],
+    });
     if (!role) {
       throw new NotFoundException(`Role ${roleId} not found`);
     }
 
-    // last-owner guardrail: don't let the last owner lose the owner role
+    // cannot-revoke-what-you-don't-have: actor must hold every permission the role grants
+    const rolePermKeys = role.rolePermissions.map((rp) => rp.permissionKey);
+    const missing = rolePermKeys.filter((k) => !actorPermissions.has(k));
+    if (missing.length > 0) {
+      throw new ForbiddenException('You cannot revoke a role whose permissions exceed your own');
+    }
+
+    // last-owner guardrail: don't let the last non-deleted owner lose the owner role
     if (role.key === 'owner') {
-      const ownerCount = await this.userRoleRepository.count({
-        where: { roleId, source: UserRoleSource.MANUAL },
-      });
+      const ownerCount = await this.userRoleRepository
+        .createQueryBuilder('ur')
+        .innerJoin('ur.user', 'u', 'u.deletedAt IS NULL')
+        .where('ur.roleId = :roleId', { roleId })
+        .andWhere('ur.source = :source', { source: UserRoleSource.MANUAL })
+        .getCount();
       if (ownerCount <= 1) {
         throw new ForbiddenException('Cannot remove the last owner from the system');
       }
@@ -122,6 +149,18 @@ export class RbacService {
 
     for (const ur of currentSsoRoles) {
       if (!targetRoleKeys.has(ur.role.key)) {
+        // ponytail: last-owner guardrail — transient IdP claim omission must not silently strip the last owner
+        if (ur.role.key === 'owner') {
+          const otherOwnerCount = await this.userRoleRepository
+            .createQueryBuilder('ur2')
+            .innerJoin('ur2.user', 'u', 'u.deletedAt IS NULL')
+            .where('ur2.roleId = :roleId', { roleId: ur.roleId })
+            .andWhere('ur2.id != :id', { id: ur.id })
+            .getCount();
+          if (otherOwnerCount === 0) {
+            continue;
+          }
+        }
         await this.userRoleRepository.delete({ id: ur.id });
       }
     }

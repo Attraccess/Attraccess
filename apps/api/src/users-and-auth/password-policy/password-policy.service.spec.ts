@@ -15,6 +15,7 @@ import { DEFAULT_PASSWORD_POLICY } from '@attraccess/shared';
 import { PasswordPolicyService } from './password-policy.service';
 import { HibpClient } from './hibp.client';
 import { ZxcvbnService } from './zxcvbn.service';
+import { RbacService } from '../rbac/rbac.service';
 
 const buildOverride = (overrides: Partial<PasswordPolicyOverride>): PasswordPolicyOverride => ({
   role: PasswordPolicyRole.ADMIN,
@@ -78,6 +79,7 @@ describe('PasswordPolicyService', () => {
   let hibp: { check: jest.Mock };
   let zxcvbn: { evaluate: jest.Mock };
   let dataSource: { transaction: jest.Mock };
+  let rbacService: { getEffectivePermissions: jest.Mock };
 
   beforeEach(async () => {
     repo = {
@@ -125,6 +127,7 @@ describe('PasswordPolicyService', () => {
     dataSource = {
       transaction: jest.fn(async (cb: (mgr: typeof fakeManager) => Promise<unknown>) => cb(fakeManager)),
     };
+    rbacService = { getEffectivePermissions: jest.fn(async () => new Set<string>()) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -137,6 +140,7 @@ describe('PasswordPolicyService', () => {
         { provide: DataSource, useValue: dataSource },
         { provide: HibpClient, useValue: hibp },
         { provide: ZxcvbnService, useValue: zxcvbn },
+        { provide: RbacService, useValue: rbacService },
       ],
     }).compile();
     service = module.get(PasswordPolicyService);
@@ -346,17 +350,30 @@ describe('PasswordPolicyService', () => {
       await expect(service.deleteOverride(PasswordPolicyRole.ADMIN)).rejects.toThrow();
     });
 
-    it('resolveRole returns admin for users with system.settings.manage permission', () => {
-      const role = service.resolveRole({
+    it('resolveRole returns admin for request-bound users with system.settings.manage permission', async () => {
+      const role = await service.resolveRole({
         effectivePermissions: new Set(['system.settings.manage']),
       } as never);
       expect(role).toBe(PasswordPolicyRole.ADMIN);
     });
 
-    it('resolveRole returns undefined for plain users', () => {
-      const role = service.resolveRole({
+    it('resolveRole returns undefined for request-bound users without system.settings.manage', async () => {
+      const role = await service.resolveRole({
         effectivePermissions: new Set<string>(),
       } as never);
+      expect(role).toBeUndefined();
+    });
+
+    it('resolveRole queries DB for plain DB-loaded users and returns admin when they have the permission', async () => {
+      rbacService.getEffectivePermissions = jest.fn(async () => new Set(['system.settings.manage']));
+      const role = await service.resolveRole({ id: 42 } as never);
+      expect(rbacService.getEffectivePermissions).toHaveBeenCalledWith(42);
+      expect(role).toBe(PasswordPolicyRole.ADMIN);
+    });
+
+    it('resolveRole queries DB for plain DB-loaded users and returns undefined when they lack the permission', async () => {
+      rbacService.getEffectivePermissions = jest.fn(async () => new Set<string>());
+      const role = await service.resolveRole({ id: 42 } as never);
       expect(role).toBeUndefined();
     });
   });

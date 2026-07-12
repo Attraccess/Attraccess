@@ -52,11 +52,13 @@ export class RbacController {
   @Auth('users.roles.manage')
   @ApiOperation({ summary: 'Revoke a role from a user', operationId: 'revokeRole' })
   @ApiResponse({ status: 200, description: 'Role revoked' })
-  @ApiResponse({ status: 403, description: 'Cannot remove the last owner' })
+  @ApiResponse({ status: 403, description: 'Cannot remove the last owner or a role exceeding actor permissions' })
   async revokeRole(
     @Param('id', ParseIntPipe) id: number,
     @Param('roleId', ParseIntPipe) roleId: number,
+    @Req() request: AuthenticatedRequest,
   ): Promise<void> {
-    return this.rbacService.revokeRole(id, roleId);
+    const actor = request.user as AuthenticatedUser;
+    return this.rbacService.revokeRole(id, roleId, actor.effectivePermissions ?? new Set());
   }
 }

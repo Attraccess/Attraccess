@@ -53,7 +53,7 @@ export class UserPermissionsController {
     @Req() request: AuthenticatedRequest,
   ): Promise<void> {
     const actor = request.user as AuthenticatedUser;
-    await this.rbacService.revokeRole(id, roleId);
+    await this.rbacService.revokeRole(id, roleId, actor.effectivePermissions ?? new Set());
     const user = await this.usersService.findOne({ id });
     if (!user) throw new UserNotFoundException(id);
     this.permissionsService.notifyPermissionsChanged(user, actor.id);
