@@ -257,7 +257,7 @@ function startWsClient(serverUrl: string, firstRun: boolean): void {
     state.mainWindow?.webContents.send('authenticated', payload);
     openKiosk(payload);
     // restore persisted lock state so a restart doesn't silently unlock
-    setTrayState(payload.locked ? 'locked' : 'unlocked');
+    if (!state.adminOverride) setTrayState(payload.locked ? 'locked' : 'unlocked');
     if (!state.adminOverride) {
       if (payload.locked) showKioskOverlay();
       else hideKioskOverlay();

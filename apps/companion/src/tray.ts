@@ -23,12 +23,12 @@ function buildTrayMenu(trayState: TrayState): Menu {
       { label: 'Disable Admin Override', click: () => state.onAdminOverrideDisable?.() },
       { type: 'separator' as const },
     ] : []),
-    ...(trayState === 'unlocked'
-      ? [{ type: 'separator' as const }]
-      : [
+    ...(trayState !== 'unlocked'
+      ? [
           { label: trayState === 'disconnected' ? 'Connecting…' : 'No active session', enabled: false },
           { type: 'separator' as const },
-        ]),
+        ]
+      : state.adminOverride ? [] : [{ type: 'separator' as const }]),
     { label: 'Open resource panel', enabled: !!state.authenticatedPayload, click: () => reopenKiosk() },
     { label: 'Settings', click: () => {
       if (state.pinHash) openWizardWindow({ requirePin: 'settings' });
