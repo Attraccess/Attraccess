@@ -35,8 +35,8 @@ function checkHealth(serverUrl: string): Promise<boolean> {
 
 function enableAdminOverride(): void {
   state.adminOverride = true;
-  hideKioskOverlay();
-  setTrayState(state.currentTrayState);
+  unlockComputer(); // calls osAdapter.onUnlock?.() so Linux VT lock is released
+  setTrayState('unlocked');
 }
 
 function disableAdminOverride(): void {
