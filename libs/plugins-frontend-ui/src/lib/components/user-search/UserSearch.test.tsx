@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { act, render, renderHook, screen } from '@testing-library/react';
+import { act, render, renderHook, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { User } from '@attraccess/react-query-client';
@@ -112,6 +112,7 @@ describe('UserSearch', () => {
     fetchNextPage: vi.fn(),
     hasNextPage: true,
     isFetchingNextPage: false,
+    isFetching: false,
     isLoading: false,
     isError: false,
     refetch: vi.fn(),
@@ -268,6 +269,41 @@ describe('UserSearch', () => {
     await pointer.click(screen.getByRole('button', { name: /try again/i }));
     expect(result.fetchNextPage).toHaveBeenCalled();
     expect(result.refetch).not.toHaveBeenCalled();
+  });
+
+  it('sends the typed search to the query after the debounce, and never a stale one on quick reopen', async () => {
+    mocks.useUsersServiceFindManyInfinite.mockReturnValue(infiniteQueryResult([user(1, 'alice')]));
+    const pointer = userEvent.setup();
+
+    render(<UserSearch />);
+    await pointer.click(screen.getByRole('button', { name: /choose user/i }));
+    await pointer.type(screen.getByPlaceholderText(/search by username/i), 'ali');
+
+    // Debounce pending: still unfiltered right after typing
+    expect(mocks.useUsersServiceFindManyInfinite).toHaveBeenLastCalledWith(
+      expect.objectContaining({ search: undefined }),
+      undefined,
+      expect.anything(),
+    );
+
+    await waitFor(
+      () =>
+        expect(mocks.useUsersServiceFindManyInfinite).toHaveBeenLastCalledWith(
+          expect.objectContaining({ search: 'ali' }),
+          undefined,
+          expect.anything(),
+        ),
+      { timeout: 1500 },
+    );
+
+    // Close and reopen well within the debounce window: the stale filter must not leak
+    await pointer.keyboard('{Escape}');
+    await pointer.click(screen.getByRole('button', { name: /choose user/i }));
+    expect(mocks.useUsersServiceFindManyInfinite).toHaveBeenLastCalledWith(
+      expect.objectContaining({ search: undefined }),
+      undefined,
+      expect.objectContaining({ enabled: true }),
+    );
   });
 
   it('re-observes the sentinel after a retried error clears', async () => {

@@ -1,8 +1,8 @@
 import { ResourceUsage } from '@attraccess/database-entities';
-import { PaginatedResponse } from '../../types/response';
+import { PaginatedResponseWithNextPage } from '../../types/response';
 import { ApiProperty } from '@nestjs/swagger';
 
-export class PaginatedResourceUsageResponseDto extends PaginatedResponse<ResourceUsage> {
+export class PaginatedResourceUsageResponseDto extends PaginatedResponseWithNextPage<ResourceUsage> {
   @ApiProperty({ type: [ResourceUsage] })
   data: ResourceUsage[];
 }

@@ -83,7 +83,7 @@ export function UserSearch(props: Readonly<UserSearchProps>) {
     setSearch('');
   }, [resetSignal]);
 
-  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, isError, refetch } =
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isFetching, isLoading, isError, refetch } =
     useUsersServiceFindManyInfinite(
       // Gate on the picker being open AND the live input being non-empty: closing
       // resets `search` synchronously while the debounced copy lags ~300ms, so
@@ -259,7 +259,7 @@ export function UserSearch(props: Readonly<UserSearchProps>) {
                   {isError && users.length === 0 ? (
                     <div className="flex flex-col items-center gap-3 py-10" data-cy="user-picker-error">
                       <p className="text-sm text-muted">{t('loadError')}</p>
-                      <Button variant="secondary" size="sm" onPress={() => refetch()}>
+                      <Button variant="secondary" size="sm" isPending={isFetching} onPress={() => refetch()}>
                         {t('retry')}
                       </Button>
                     </div>
@@ -293,7 +293,7 @@ export function UserSearch(props: Readonly<UserSearchProps>) {
                     // retry instead of discarding the list for the full error screen.
                     <div className="flex items-center justify-center gap-3 py-3" data-cy="user-picker-load-more-error">
                       <p className="text-sm text-muted">{t('loadError')}</p>
-                      <Button variant="secondary" size="sm" onPress={() => fetchNextPage()}>
+                      <Button variant="secondary" size="sm" isPending={isFetchingNextPage} onPress={() => fetchNextPage()}>
                         {t('retry')}
                       </Button>
                     </div>
