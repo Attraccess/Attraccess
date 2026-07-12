@@ -16,6 +16,12 @@ import { startForegroundAppMonitoring, stopForegroundAppMonitoring } from './for
 import { openKiosk, reloadKiosk, lockComputer, unlockComputer, showKioskOverlay, hideKioskOverlay } from './kiosk';
 import { setupTray, setTrayState } from './tray';
 import { openWizardWindow } from './wizard-window';
+import {
+  enableAdminOverride as _enableAdminOverride,
+  disableAdminOverride as _disableAdminOverride,
+  handleLockPc,
+  handleUnlockPc,
+} from './admin-override';
 
 // ─── Health check ─────────────────────────────────────────────────────────────
 
@@ -31,18 +37,35 @@ function checkHealth(serverUrl: string): Promise<boolean> {
   });
 }
 
+// ─── PIN rate limiting ────────────────────────────────────────────────────────
+// ponytail: simple exponential backoff; resets on success. Doubles up to 30s.
+
+let _pinFailures = 0;
+let _pinBackoffUntil = 0;
+
+function pinAllowed(): boolean {
+  return Date.now() >= _pinBackoffUntil;
+}
+
+function recordPinFailure(): void {
+  _pinFailures++;
+  const backoffMs = Math.min(1000 * 2 ** (_pinFailures - 1), 30_000);
+  _pinBackoffUntil = Date.now() + backoffMs;
+}
+
+function recordPinSuccess(): void {
+  _pinFailures = 0;
+  _pinBackoffUntil = 0;
+}
+
 // ─── Admin override ───────────────────────────────────────────────────────────
 
 function enableAdminOverride(): void {
-  state.adminOverride = true;
-  unlockComputer(); // calls osAdapter.onUnlock?.() so Linux VT lock is released
-  setTrayState('unlocked');
+  _enableAdminOverride(unlockComputer, setTrayState);
 }
 
 function disableAdminOverride(): void {
-  state.adminOverride = false;
-  setTrayState(state.serverLocked ? 'locked' : state.currentTrayState);
-  if (state.serverLocked) lockComputer();
+  _disableAdminOverride(lockComputer, setTrayState);
 }
 
 // ─── IPC ─────────────────────────────────────────────────────────────────────
@@ -70,10 +93,17 @@ ipcMain.handle('save-pin', async (_evt, pin: string) => {
   }
 });
 
-ipcMain.handle('verify-pin', (_evt, pin: string) => verifyPinHash(pin, state.pinHash));
+ipcMain.handle('verify-pin', (_evt, pin: string) => {
+  if (!pinAllowed()) return false;
+  const ok = verifyPinHash(pin, state.pinHash);
+  if (ok) recordPinSuccess(); else recordPinFailure();
+  return ok;
+});
 
 ipcMain.handle('enable-admin-override', (_evt, pin: string) => {
-  if (!verifyPinHash(pin, state.pinHash)) return false;
+  if (!pinAllowed()) return false;
+  if (!verifyPinHash(pin, state.pinHash)) { recordPinFailure(); return false; }
+  recordPinSuccess();
   enableAdminOverride();
   state.mainWindow?.close();
   return true;
@@ -267,20 +297,9 @@ function startWsClient(serverUrl: string, firstRun: boolean): void {
     }
   });
 
-  state.wsClient.on('lock_pc', () => {
-    state.serverLocked = true;
-    if (state.adminOverride) return;
-    setTrayState('locked');
-    reloadKiosk();
-    lockComputer();
-  });
+  state.wsClient.on('lock_pc', () => handleLockPc(lockComputer, setTrayState, reloadKiosk));
 
-  state.wsClient.on('unlock_pc', () => {
-    state.serverLocked = false;
-    if (state.adminOverride) return;
-    setTrayState('unlocked');
-    unlockComputer();
-  });
+  state.wsClient.on('unlock_pc', () => handleUnlockPc(unlockComputer, setTrayState));
 
   state.wsClient.on('device_renamed', (payload) => {
     if (state.authenticatedPayload) {

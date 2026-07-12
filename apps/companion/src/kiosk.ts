@@ -37,11 +37,13 @@ export function openKiosk(payload: CompanionAuthenticatedDto): void {
   win.on('close', (event) => { if (state.kioskLocked) event.preventDefault(); });
   win.on('closed', () => { state.kioskWindow = null; });
   win.webContents.on('context-menu', () => {
-    Menu.buildFromTemplate([
-      state.adminOverride
-        ? { label: 'Disable Admin Override', click: () => state.onAdminOverrideDisable?.() }
-        : { label: 'Admin Override…', click: () => openWizardWindow({ requirePin: 'admin-override' }) },
-    ]).popup({ window: win });
+    // ponytail: isPinSet guard — no PIN means verifyPin always fails, skip rather than show a stuck dialog
+    const items = state.adminOverride
+      ? [{ label: 'Disable Admin Override', click: () => state.onAdminOverrideDisable?.() }]
+      : state.pinHash
+        ? [{ label: 'Admin Override…', click: () => openWizardWindow({ requirePin: 'admin-override' }) }]
+        : [];
+    if (items.length) Menu.buildFromTemplate(items).popup({ window: win });
   });
   state.kioskWindow = win;
 }

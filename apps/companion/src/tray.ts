@@ -51,8 +51,9 @@ export function setTrayState(trayState: TrayState): void {
   state.tray?.setImage(dotIcon(TRAY_COLORS[trayState]));
   state.tray?.setContextMenu(buildTrayMenu(trayState));
   const resourceName = state.authenticatedPayload?.resources[0]?.name;
+  const overrideSuffix = state.adminOverride ? ' — override active' : '';
   const tooltip = resourceName
-    ? `Attraccess Companion — ${resourceName} (${trayState})`
-    : `Attraccess Companion — ${trayState}`;
+    ? `Attraccess Companion — ${resourceName} (${trayState})${overrideSuffix}`
+    : `Attraccess Companion — ${trayState}${overrideSuffix}`;
   state.tray?.setToolTip(tooltip);
 }
