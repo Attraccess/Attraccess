@@ -187,11 +187,9 @@ export function CompanionSettingsPage() {
 
       {/* Registered Devices */}
       <Card>
-        <Card.Header>
-          <div className="flex flex-col gap-1">
-            <span className="text-base font-semibold">{t('devices.title')}</span>
-            <span className="text-sm text-default-500">{t('devices.subtitle')}</span>
-          </div>
+        <Card.Header className="flex flex-col items-start gap-1">
+          <span className="text-base font-semibold">{t('devices.title')}</span>
+          <span className="text-sm text-default-500">{t('devices.subtitle')}</span>
         </Card.Header>
         <Card.Content>
           {devicesLoading ? (
