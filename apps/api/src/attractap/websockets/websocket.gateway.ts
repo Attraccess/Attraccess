@@ -340,10 +340,17 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     const readerName = socket.readerName;
     if (readerId) {
       this.logger.log(`Client for reader ${readerId} disconnected.`);
-      this.metricsService.attractapReaderConnected.set(
-        { reader_id: String(readerId), reader_name: readerName ?? '' },
-        0,
+      // ponytail: only zero gauge when no other socket for this reader exists —
+      // prevents a stale-socket disconnect from marking a reconnected reader offline.
+      const hasOtherSocket = Array.from(this.websocketService.sockets.values()).some(
+        (other) => other.id !== socket.id && other.readerId === readerId,
       );
+      if (!hasOtherSocket) {
+        this.metricsService.attractapReaderConnected.set(
+          { reader_id: String(readerId), reader_name: readerName ?? '' },
+          0,
+        );
+      }
     } else {
       this.logger.log('An unidentified client disconnected.');
     }
