@@ -10,11 +10,13 @@ const OLD_MAPPINGS = {
   canManageResources: ['cn=resource-admins', 'cn=managers'],
   canManageUsers: ['cn=user-admins'],
   canManageSystemConfiguration: ['cn=sysadmins'],
+  canManageBilling: ['cn=billing-admins'],
 };
 const EXPECTED_NEW_MAPPINGS = {
   'resource-manager': ['cn=resource-admins', 'cn=managers'],
   'user-manager': ['cn=user-admins'],
   'system-admin': ['cn=sysadmins'],
+  'billing-manager': ['cn=billing-admins'],
 };
 
 describe('DropBooleanPermissions migration (e2e)', () => {

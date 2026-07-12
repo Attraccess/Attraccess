@@ -6,9 +6,14 @@ import {
   useTwoFactorAuthenticationServiceGetTwoFactorStatus,
   useUsersServiceGetCurrent,
   UseUsersServiceGetCurrentKeyFn,
+  type User,
 } from '@attraccess/react-query-client';
 import { useCallback, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+
+// The GET /users/me response includes effectivePermissions at runtime even though the
+// generated User type does not declare it (the field is added by the profile controller).
+type UserWithEffectivePermissions = User & { effectivePermissions?: string[] };
 
 interface LoginCredentials {
   username: string;
@@ -74,7 +79,7 @@ export function useAuth() {
     refetchInterval: 1000 * 60 * 20, // 20 minutes
     retry: false,
     enabled: isInitialized, // Only fetch when initialized
-  });
+  }) as { data: UserWithEffectivePermissions | undefined };
 
   const { data: twoFactorStatus, isLoading: isTwoFactorStatusLoading } =
     useTwoFactorAuthenticationServiceGetTwoFactorStatus(undefined, {
@@ -101,7 +106,7 @@ export function useAuth() {
     isTwoFactorStatusLoading,
     needsTwoFactorSetup: !!twoFactorStatus?.required && !twoFactorStatus?.enabled,
     hasPermission: (permission: string) => {
-      const effectivePermissions: string[] = (currentUser as any)?.effectivePermissions ?? [];
+      const effectivePermissions: string[] = currentUser?.effectivePermissions ?? [];
       return effectivePermissions.includes(permission);
     },
   };
