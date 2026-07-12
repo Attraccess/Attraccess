@@ -51,6 +51,7 @@
     "localePlaceholder": "z. B. de, fr, es",
     "save": "Übersetzungen speichern",
     "saving": "Speichern...",
+    "saveFailed": "Übersetzungen konnten nicht gespeichert werden",
     "saved": "Übersetzungen gespeichert",
     "deleteLocale": "Sprache löschen",
     "deleteConfirm": "Alle Übersetzungen für die Sprache \"{{locale}}\" löschen?",

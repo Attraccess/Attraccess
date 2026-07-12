@@ -78,7 +78,7 @@ export function TranslationsSection({ templateType, liveContent }: TranslationsS
       await saveMutation.mutateAsync({ requestBody: { locale: selectedLocale, translations: edited }, type: templateType });
       toast.success({ title: t('translations.saved') });
     } catch {
-      toast.error({ title: t('translations.saving') });
+      toast.error({ title: t('translations.saveFailed') });
     }
   };
 

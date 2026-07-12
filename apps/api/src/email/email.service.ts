@@ -48,7 +48,8 @@ export class EmailService {
 
     const hbs = Handlebars.create();
     hbs.registerHelper('t', (key: string, defaultValue: string, options: Handlebars.HelperOptions) => {
-      const raw = translationsMap[key] ?? defaultValue;
+      const safeDefault = typeof defaultValue === 'string' ? defaultValue : '';
+      const raw = translationsMap[key] ?? safeDefault;
       const hash = options?.hash ?? {};
       const result = raw.replace(/\{(\w+(?:\.\w+)*)\}/g, (_: string, name: string) =>
         name in hash ? Handlebars.escapeExpression(String(hash[name] ?? '')) : `{${name}}`,

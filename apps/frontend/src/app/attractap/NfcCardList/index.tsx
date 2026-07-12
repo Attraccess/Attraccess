@@ -1,8 +1,4 @@
 import {
-  Alert,
-  AlertContent,
-  AlertDescription,
-  AlertTitle,
   Button,
   DrawerBody,
   DrawerFooter,
@@ -41,7 +37,6 @@ import en from './en.json';
 import { NfcCardDeactivateModal } from './deactivate';
 import { NfcCardActivateModal } from './activate';
 import { CheckIcon, PlusIcon, ServerIcon, Trash2Icon, XIcon } from 'lucide-react';
-import { AlertStatusIcon } from '../../../components/AlertStatusIcon';
 import { PageAction, PageHeader } from '../../../components/pageHeader';
 import { useAuth } from '../../../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';

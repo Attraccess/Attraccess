@@ -20,20 +20,16 @@ import {
   ModalFooter,
   ModalHeader,
   ModalHeading,
-  Tab,
-  TabList,
-  Tabs,
   TextField,
   useTheme,
 } from '@heroui/react';
-import type { Key } from '@heroui/react';
 import { Button } from '../../../components/button';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../components/toastProvider';
 import { PageHeader } from '../../../components/pageHeader';
 import { StandardDrawer } from '../../../components/standardDrawer';
 import { StandardModal } from '../../../components/standardModal';
-import Editor, { type Monaco, type OnMount } from '@monaco-editor/react';
+import Editor, { type OnMount } from '@monaco-editor/react';
 import { Maximize, RotateCcw } from 'lucide-react';
 
 import * as enTranslationsFile from './en.json';

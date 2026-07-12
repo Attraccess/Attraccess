@@ -51,6 +51,7 @@
     "localePlaceholder": "e.g. de, fr, es",
     "save": "Save translations",
     "saving": "Saving...",
+    "saveFailed": "Failed to save translations",
     "saved": "Translations saved",
     "deleteLocale": "Delete locale",
     "deleteConfirm": "Delete all translations for locale \"{{locale}}\"?",
