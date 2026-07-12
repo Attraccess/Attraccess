@@ -1,11 +1,8 @@
 import { BillingTransaction } from '@attraccess/database-entities';
-import { PaginatedResponse } from '../../types/response';
+import { PaginatedResponseWithNextPage } from '../../types/response';
 import { ApiProperty } from '@nestjs/swagger';
 
-export class PaginatedBillingTransactionsResponseDto extends PaginatedResponse<BillingTransaction> {
+export class PaginatedBillingTransactionsResponseDto extends PaginatedResponseWithNextPage<BillingTransaction> {
   @ApiProperty({ type: [BillingTransaction] })
   data: BillingTransaction[];
-
-  @ApiProperty({ required: false })
-  nextPage?: number;
 }

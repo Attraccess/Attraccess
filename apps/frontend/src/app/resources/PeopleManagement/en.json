@@ -43,10 +43,8 @@
     },
     "userLabel": "User",
     "commentLabel": "Comment (optional)",
-    "hint": "Select a user from the list to add them instantly.",
     "submit": "Confirm",
-    "cancel": "Cancel",
-    "done": "Done"
+    "cancel": "Cancel"
   },
   "commentModal": {
     "title": "Add comment",

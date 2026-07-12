@@ -24,7 +24,7 @@ import {
   useTheme,
 } from '@heroui/react';
 import { Button } from '../../../components/button';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useDebounce, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../components/toastProvider';
 import { PageHeader } from '../../../components/pageHeader';
 import { StandardDrawer } from '../../../components/standardDrawer';
@@ -34,7 +34,6 @@ import { Maximize, RotateCcw } from 'lucide-react';
 
 import * as enTranslationsFile from './en.json';
 import * as deTranslationsFile from './de.json';
-import { useDebounce } from '../../../hooks/useDebounce';
 import { registerVariableProvider } from './registerVariableProvider';
 import { TranslationsSection } from './TranslationsSection';
 

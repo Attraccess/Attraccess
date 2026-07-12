@@ -1,4 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 
 type Translation = { templateType: string; key: string; value: string };
 
@@ -114,6 +116,10 @@ const DE: Translation[] = [
   { templateType: 'resource-session-ended', key: 'footer', value: 'Du erhältst diese E-Mail, weil Benachrichtigungen über beendete Ressourcensitzungen in deinen Einstellungen aktiviert sind.' },
 ];
 
+function readTemplate(name: string): string {
+  return readFileSync(join(__dirname, 'assets', 'email-defaults', 'templates', `${name}.mjml`), 'utf-8').trim();
+}
+
 export class SeedDeEmailTemplates1782600000000 implements MigrationInterface {
   name = 'SeedDeEmailTemplates1782600000000';
 
@@ -124,6 +130,29 @@ export class SeedDeEmailTemplates1782600000000 implements MigrationInterface {
         [row.templateType, row.key, 'de', row.value],
       );
     }
+
+    await queryRunner.query(
+      `UPDATE "email_templates" SET "body" = $1, "variables" = $2, "subject" = $3 WHERE "type" = 'resource-health-changed'`,
+      [
+        readTemplate('resource-health-changed'),
+        'user.username,user.email,user.id,host.frontend,host.backend,resource.id,resource.name,resource.url,health.status,health.previousStatus,health.reason,health.identifier,health.isDegraded,health.headerColor',
+        'Resource health update: {{resource.name}}',
+      ],
+    );
+    await queryRunner.query(
+      `UPDATE "email_templates" SET "body" = $1, "variables" = $2 WHERE "type" = 'user-retraining-required'`,
+      [
+        readTemplate('user-retraining-required'),
+        'user.username,user.email,user.id,host.frontend,host.backend,resource.id,resource.name,resource.url,retraining.isAge,retraining.isInactivity,retraining.blocksAccess',
+      ],
+    );
+    await queryRunner.query(
+      `UPDATE "email_templates" SET "body" = $1, "variables" = $2 WHERE "type" = 'resource-usage-note-added'`,
+      [
+        readTemplate('resource-usage-note-added'),
+        'user.username,user.email,user.id,host.frontend,host.backend,resource.id,resource.name,resource.url,note.authorName,note.content,note.isStart',
+      ],
+    );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
