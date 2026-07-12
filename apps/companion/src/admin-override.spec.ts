@@ -42,26 +42,32 @@ describe('enableAdminOverride', () => {
 describe('disableAdminOverride', () => {
   it('clears adminOverride', () => {
     state.adminOverride = true;
-    const { lock, tray } = makeOps();
-    disableAdminOverride(lock, tray);
+    const { lock, tray, reload } = makeOps();
+    disableAdminOverride(lock, tray, reload);
     expect(state.adminOverride).toBe(false);
   });
 
-  it('re-locks when serverLocked is true', () => {
+  it('re-locks when serverLocked is true and reloads kiosk first', () => {
     state.adminOverride = true;
     state.serverLocked = true;
-    const { lock, tray } = makeOps();
-    disableAdminOverride(lock, tray);
+    const { lock, tray, reload } = makeOps();
+    const callOrder: string[] = [];
+    reload.mockImplementation(() => callOrder.push('reload'));
+    lock.mockImplementation(() => callOrder.push('lock'));
+    disableAdminOverride(lock, tray, reload);
+    expect(reload).toHaveBeenCalledTimes(1);
     expect(lock).toHaveBeenCalledTimes(1);
     expect(tray).toHaveBeenCalledWith('locked');
+    expect(callOrder).toEqual(['reload', 'lock']);
   });
 
-  it('does NOT lock when serverLocked is false', () => {
+  it('does NOT lock or reload when serverLocked is false', () => {
     state.adminOverride = true;
     state.serverLocked = false;
-    const { lock, tray } = makeOps();
-    disableAdminOverride(lock, tray);
+    const { lock, tray, reload } = makeOps();
+    disableAdminOverride(lock, tray, reload);
     expect(lock).not.toHaveBeenCalled();
+    expect(reload).not.toHaveBeenCalled();
   });
 
   it('re-applies the *current* serverLocked state, not the stale authenticated payload', () => {
@@ -69,9 +75,10 @@ describe('disableAdminOverride', () => {
     // override was active (so serverLocked became true), then admin disables override.
     state.adminOverride = true;
     state.serverLocked = true; // updated by handleLockPc while override was active
-    const { lock, tray } = makeOps();
-    disableAdminOverride(lock, tray);
+    const { lock, tray, reload } = makeOps();
+    disableAdminOverride(lock, tray, reload);
     // Must lock — even though "authenticatedPayload.locked" would have been false
+    expect(reload).toHaveBeenCalled();
     expect(lock).toHaveBeenCalled();
     expect(tray).toHaveBeenCalledWith('locked');
   });

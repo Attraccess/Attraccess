@@ -1,38 +1,48 @@
 import { DrawerBody, DrawerFooter, DrawerHeader, Label, TextArea, TextField } from '@heroui/react';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Button } from '../../../components/button';
 import { TFunction, UserSearch } from '@attraccess/plugins-frontend-ui';
 import { User } from '@attraccess/react-query-client';
 import { StandardDrawer } from '../../../components/standardDrawer';
 import { AddMode } from './types';
 
-interface AddPersonModalProps {
+interface AddPersonDrawerProps {
   t: TFunction;
   isOpen: boolean;
   mode: AddMode | null;
   comment: string;
   isPending: boolean;
   onCommentChange: (comment: string) => void;
-  onAdd: (user: User) => void;
+  onAdd: (user: User) => Promise<void>;
   onClose: () => void;
 }
 
-export function AddPersonModal(props: Readonly<AddPersonModalProps>) {
+export function AddPersonDrawer(props: Readonly<AddPersonDrawerProps>) {
   const { t, isOpen, mode, comment, isPending, onCommentChange, onAdd, onClose } = props;
 
-  const [searchResetKey, setSearchResetKey] = useState(0);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
-  const handleSelectionChange = (user: User | null) => {
-    if (!user) return;
-    onAdd(user);
-    setSearchResetKey((key) => key + 1);
-  };
+  const handleClose = useCallback(() => {
+    setSelectedUser(null);
+    onClose();
+  }, [onClose]);
+
+  const handleConfirm = useCallback(async () => {
+    if (!selectedUser) return;
+    try {
+      await onAdd(selectedUser);
+    } catch {
+      // Mutation failed; error toast is shown by usePeopleMutations. Keep the drawer open.
+      return;
+    }
+    handleClose();
+  }, [selectedUser, onAdd, handleClose]);
 
   return (
     <StandardDrawer
       isOpen={isOpen}
       onOpenChange={(o) => {
-        if (!o) onClose();
+        if (!o) handleClose();
       }}
     >
       <DrawerHeader>
@@ -51,12 +61,20 @@ export function AddPersonModal(props: Readonly<AddPersonModalProps>) {
             <TextArea />
           </TextField>
         )}
-        <UserSearch key={searchResetKey} label={t('addModal.userLabel')} onSelectionChange={handleSelectionChange} />
-        <p className="text-sm text-foreground-500">{t('addModal.hint')}</p>
+        <UserSearch resetSignal={isOpen} label={t('addModal.userLabel')} onSelectionChange={setSelectedUser} />
       </DrawerBody>
       <DrawerFooter>
-        <Button variant="primary" onPress={onClose} isDisabled={isPending} data-cy="people-add-done">
-          {t('addModal.done')}
+        <Button variant="ghost" onPress={handleClose} isDisabled={isPending} data-cy="people-add-cancel">
+          {t('addModal.cancel')}
+        </Button>
+        <Button
+          variant="primary"
+          onPress={handleConfirm}
+          isDisabled={!selectedUser}
+          isPending={isPending}
+          data-cy="people-add-confirm"
+        >
+          {t('addModal.submit')}
         </Button>
       </DrawerFooter>
     </StandardDrawer>

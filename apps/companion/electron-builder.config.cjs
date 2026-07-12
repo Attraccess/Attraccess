@@ -5,32 +5,23 @@ module.exports = {
   // ponytail: resolved at build time so it stays in sync with the installed version
   electronVersion: require('../../node_modules/electron/package.json').version,
   directories: {
-    // gitignored via apps/companion/.gitignore; CI and copy-companion-into-assets.js both read from here
     output: 'dist',
   },
   files: ['out/**/*', 'src/**/*', 'renderer/dist/**/*'],
   extraMetadata: {
     main: 'out/main.js',
   },
-  // ponytail: companion has no native modules; skip pnpm production-install which trashes workspace dev-deps
+  // ponytail: keytar is external to the esbuild bundle; false skips pnpm production-install (which trashes workspace dev-deps) and relies on keytar's node-pre-gyp prebuilts being ABI-compatible with the bundled electron version
   npmRebuild: false,
+  // artifactName pattern matches what copy-companion-into-assets.js and the CI expect
+  artifactName: 'companion_${os}_${arch}.${ext}',
   mac: {
-    target: [{ target: 'dmg', arch: 'universal' }],
-    artifactName: 'companion_mac_universal.dmg',
+    target: [{ target: 'dmg', arch: ['universal'] }],
   },
   win: {
     target: [{ target: 'nsis', arch: ['x64'] }],
-    artifactName: 'companion_win_x64.exe',
   },
   linux: {
-    target: [
-      { target: 'AppImage', arch: ['x64'] },
-      { target: 'AppImage', arch: ['arm64'] },
-    ],
-    artifactName: 'companion_linux_${arch}.AppImage',
-  },
-  nsis: {
-    oneClick: true,
-    perMachine: false,
+    target: [{ target: 'AppImage', arch: ['x64', 'arm64'] }],
   },
 };

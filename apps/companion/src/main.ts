@@ -65,7 +65,7 @@ function enableAdminOverride(): void {
 }
 
 function disableAdminOverride(): void {
-  _disableAdminOverride(lockComputer, setTrayState);
+  _disableAdminOverride(lockComputer, setTrayState, reloadKiosk);
 }
 
 // ─── IPC ─────────────────────────────────────────────────────────────────────
@@ -194,7 +194,7 @@ function computeSha256(filePath: string): Promise<string> {
 async function applyUpdate(serverUrl: string, downloadUrl: string, version: string, sha256?: string): Promise<void> {
   // Validate server-supplied version before using it in a filesystem path to prevent
   // path traversal (e.g. version="../../../../etc/evil" escaping os.tmpdir()).
-  if (!/^\d+\.\d+\.\d+/.test(version)) {
+  if (!/^\d+\.\d+\.\d+$/.test(version)) {
     console.error(`[companion] refusing update with invalid version string: ${JSON.stringify(version)}`);
     return;
   }

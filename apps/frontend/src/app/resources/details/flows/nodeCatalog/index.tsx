@@ -1,7 +1,7 @@
 // NodeCatalogPanel: responsive container hosting CatalogContent in sidebar and mobile overlay
 // FEATURE: Node catalog redesign — top-level panel
 import { forwardRef, useCallback, useImperativeHandle } from 'react';
-import { DrawerBody, DrawerHeader, useOverlayState, Button } from '@heroui/react';
+import { DrawerBody, DrawerHeader, useOverlayState, Button, Spinner } from '@heroui/react';
 import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
 import { TFunction, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { StandardDrawer } from '../../../../../components/standardDrawer';
@@ -26,8 +26,19 @@ export const NodeCatalogPanel = forwardRef<NodeCatalogHandle, Props>(function No
   ref,
 ) {
   const { t } = useTranslations({ de, en });
-  const { groups, collapsed, setCollapsed, isDomainExpanded, setDomainExpanded } = useNodeCatalog({ resourceId });
+  const { groups, isLoading, isError, collapsed, setCollapsed, isDomainExpanded, setDomainExpanded } =
+    useNodeCatalog({ resourceId });
   const { isOpen, setOpen } = useOverlayState();
+
+  const loadingSpinner = isLoading ? (
+    <div className="flex items-center justify-center h-full" role="status" aria-label={t('loading')}>
+      <Spinner size="sm" />
+    </div>
+  ) : isError ? (
+    <div className="flex items-center justify-center h-full p-2 text-center text-sm text-danger" role="alert">
+      {t('error')}
+    </div>
+  ) : null;
 
   const openCatalog = useCallback(() => setOpen(true), [setOpen]);
   const closeCatalog = useCallback(() => setOpen(false), [setOpen]);
@@ -64,7 +75,7 @@ export const NodeCatalogPanel = forwardRef<NodeCatalogHandle, Props>(function No
           </Button>
         </div>
         <div className="flex-1 min-h-0 overflow-y-auto p-2">
-          {collapsed ? (
+          {loadingSpinner ?? (collapsed ? (
             <ul className="flex flex-col items-center gap-1">
               {groups.map((group) => {
                 const def = DOMAINS[group.domain];
@@ -99,7 +110,7 @@ export const NodeCatalogPanel = forwardRef<NodeCatalogHandle, Props>(function No
               tCatalog={t}
               tNodeTranslations={tNodeTranslations}
             />
-          )}
+          ))}
         </div>
       </aside>
 
@@ -108,14 +119,16 @@ export const NodeCatalogPanel = forwardRef<NodeCatalogHandle, Props>(function No
           <h2 className="text-lg font-semibold">{t('title')}</h2>
         </DrawerHeader>
         <DrawerBody>
-          <CatalogContent
-            groups={groups}
-            isDomainExpanded={isDomainExpanded}
-            setDomainExpanded={setDomainExpanded}
-            onSelect={handleSelectMobile}
-            tCatalog={t}
-            tNodeTranslations={tNodeTranslations}
-          />
+          {loadingSpinner ?? (
+            <CatalogContent
+              groups={groups}
+              isDomainExpanded={isDomainExpanded}
+              setDomainExpanded={setDomainExpanded}
+              onSelect={handleSelectMobile}
+              tCatalog={t}
+              tNodeTranslations={tNodeTranslations}
+            />
+          )}
         </DrawerBody>
       </StandardDrawer>
     </>

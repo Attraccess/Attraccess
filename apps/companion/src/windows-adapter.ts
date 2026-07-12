@@ -41,9 +41,14 @@ export class WindowsAdapter implements OsAdapter {
     // Spawn the NSIS installer silently (/S) as a detached process so it outlives
     // this process. NSIS waits for the target app to fully exit before overwriting,
     // so calling app.quit() immediately after is safe.
-    const child = spawn(dest, ['/S'], { detached: true, stdio: 'ignore' });
-    child.on('error', (err) => console.error('[companion] failed to launch Windows installer:', err));
-    child.unref();
+    // Only quit once the child process has successfully spawned — if spawn fails
+    // (e.g. file missing), propagate the error instead of quitting and creating a
+    // relaunch loop on an unattended kiosk.
+    await new Promise<void>((resolve, reject) => {
+      const child = spawn(dest, ['/S'], { detached: true, stdio: 'ignore' });
+      child.on('error', reject);
+      child.on('spawn', () => { child.unref(); resolve(); });
+    });
     allowQuit();
     app.quit();
   }

@@ -62,6 +62,10 @@ export class CompanionDownloadController {
     @Param('arch') arch: string,
     @Res() res: Response,
   ): Promise<void> {
+    // Normalise to known label values before writing to Prometheus — raw URL
+    // params would let unauthenticated callers inflate cardinality unboundedly.
+    const safePlatform = ['linux', 'darwin', 'win32'].includes(platform) ? platform : 'unknown';
+    const safeArch = ['x64', 'arm64', 'ia32'].includes(arch) ? arch : 'unknown';
     try {
       const { stream, size, filename } = this.service.getBinaryStream(platform, arch);
 
@@ -74,22 +78,22 @@ export class CompanionDownloadController {
 
       stream.on('error', (err) => {
         this.logger.error(`Stream error: ${err.message}`, err.stack);
-        this.metrics.companionDownloadsTotal.inc({ platform, arch, status: 'error' });
+        this.metrics.companionDownloadsTotal.inc({ platform: safePlatform, arch: safeArch, status: 'error' });
         if (!res.headersSent) {
           res.status(500).send('Stream error during download');
         }
       });
 
-      this.metrics.companionDownloadsTotal.inc({ platform, arch, status: 'success' });
+      this.metrics.companionDownloadsTotal.inc({ platform: safePlatform, arch: safeArch, status: 'success' });
       stream.pipe(res);
     } catch (err) {
       if (err instanceof NotFoundException) {
-        this.metrics.companionDownloadsTotal.inc({ platform, arch, status: 'not_found' });
+        this.metrics.companionDownloadsTotal.inc({ platform: safePlatform, arch: safeArch, status: 'not_found' });
         res.status(404).send(err.message);
         return;
       }
       this.logger.error(`Error serving companion binary: ${(err as Error).message}`);
-      this.metrics.companionDownloadsTotal.inc({ platform, arch, status: 'error' });
+      this.metrics.companionDownloadsTotal.inc({ platform: safePlatform, arch: safeArch, status: 'error' });
       res.status(500).send('Internal server error');
     }
   }

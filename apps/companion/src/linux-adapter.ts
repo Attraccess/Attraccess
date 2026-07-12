@@ -53,7 +53,10 @@ export class LinuxAdapter implements OsAdapter {
   }
 
   async applyUpdate(dest: string, _version: string, allowQuit: () => void): Promise<void> {
-    const exePath = app.getPath('exe');
+    // process.env.APPIMAGE is the path to the .AppImage file that was executed.
+    // app.getPath('exe') returns the Electron binary inside the read-only FUSE
+    // squashfs mount — writing there fails with EROFS. Always prefer APPIMAGE.
+    const exePath = process.env.APPIMAGE || app.getPath('exe');
     try {
       // Atomic in-place replace: write to a sibling temp file then rename so a crash
       // mid-operation never leaves exePath truncated. rename(2) within the same

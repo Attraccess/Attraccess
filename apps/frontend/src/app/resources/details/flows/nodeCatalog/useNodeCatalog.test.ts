@@ -5,12 +5,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useNodeCatalog } from './useNodeCatalog';
 
+let mockIsLoading = false;
+
 vi.mock('@attraccess/react-query-client', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@attraccess/react-query-client')>();
   return {
     ...actual,
     useResourceFlowsServiceGetNodeSchemas: () => ({
-      data: [
+      isLoading: mockIsLoading,
+      data: mockIsLoading ? undefined : [
         { type: 'input.button', inputs: [], outputs: ['output'], isOutput: false, supportedByResource: true, configSchema: {} },
         { type: 'input.resource.door.locked', inputs: [], outputs: ['output'], isOutput: false, supportedByResource: true, configSchema: {} },
         { type: 'output.http.sendRequest', inputs: ['input'], outputs: [], isOutput: true, supportedByResource: true, configSchema: {} },
@@ -23,6 +26,7 @@ vi.mock('@attraccess/react-query-client', async (importOriginal) => {
 
 describe('useNodeCatalog', () => {
   beforeEach(() => {
+    mockIsLoading = false;
     window.localStorage.clear();
   });
 
@@ -80,6 +84,19 @@ describe('useNodeCatalog', () => {
   it('returns at least one group when supported schemas exist', () => {
     const { result } = renderHook(() => useNodeCatalog({ resourceId: 1 }));
     expect(Array.isArray(result.current.groups)).toBe(true);
+    expect(result.current.groups.length).toBeGreaterThan(0);
+  });
+
+  it('surfaces isLoading from the query', () => {
+    mockIsLoading = true;
+    const { result } = renderHook(() => useNodeCatalog({ resourceId: 1 }));
+    expect(result.current.isLoading).toBe(true);
+    expect(result.current.groups).toHaveLength(0);
+  });
+
+  it('isLoading is false when schemas are available', () => {
+    const { result } = renderHook(() => useNodeCatalog({ resourceId: 1 }));
+    expect(result.current.isLoading).toBe(false);
     expect(result.current.groups.length).toBeGreaterThan(0);
   });
 });

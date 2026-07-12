@@ -27,10 +27,24 @@ import { app } from 'electron';
 import * as fs from 'fs';
 /* eslint-enable import/first */
 
-beforeEach(() => jest.clearAllMocks());
+beforeEach(() => {
+  jest.clearAllMocks();
+  delete process.env.APPIMAGE;
+});
 
 describe('LinuxAdapter.applyUpdate', () => {
-  it('replaces AppImage in-place atomically and relaunches', async () => {
+  it('uses process.env.APPIMAGE as the replace target when set', async () => {
+    process.env.APPIMAGE = '/run/user/1000/app/Attraccess.AppImage';
+    const allowQuit = jest.fn();
+    await new LinuxAdapter().applyUpdate('/tmp/update.AppImage', '2.0.0', allowQuit);
+
+    expect(fs.copyFileSync).toHaveBeenCalledWith('/tmp/update.AppImage', '/run/user/1000/app/Attraccess.AppImage.tmp');
+    expect(app.relaunch).toHaveBeenCalledWith({ execPath: '/run/user/1000/app/Attraccess.AppImage' });
+    expect(allowQuit).toHaveBeenCalled();
+    expect(app.quit).toHaveBeenCalled();
+  });
+
+  it('falls back to app.getPath("exe") when APPIMAGE env var is not set', async () => {
     const allowQuit = jest.fn();
     await new LinuxAdapter().applyUpdate('/tmp/update.AppImage', '2.0.0', allowQuit);
 

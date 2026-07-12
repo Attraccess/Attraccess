@@ -5,6 +5,7 @@ import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AnalyticsQueryDto } from './dtos/analyticsQuery.dto';
 import { PaginatedResourceUsageResponseDto } from './dtos/paginatedResourceUsageResponse.dto';
 import { PaginatedBillingTransactionsResponseDto } from './dtos/paginatedBillingTransactionsResponse.dto';
+import { computeNextPage } from '../types/response';
 
 @ApiTags('Analytics')
 @Controller('analytics')
@@ -27,7 +28,7 @@ export class AnalyticsController {
   ): Promise<PaginatedResourceUsageResponseDto> {
     const { start, end, page, limit } = query;
     const [data, total] = await this.analyticsService.getResourceUsageHoursInDateRange({ start, end }, page, limit);
-    return { data, total, page, limit, nextPage: page * limit < total ? page + 1 : undefined };
+    return { data, total, page, limit, nextPage: computeNextPage(page, limit, total) };
   }
 
   @Get('billing-transactions')
@@ -46,6 +47,6 @@ export class AnalyticsController {
   ): Promise<PaginatedBillingTransactionsResponseDto> {
     const { start, end, page, limit } = query;
     const [data, total] = await this.analyticsService.getBillingTransactionsInDateRange({ start, end }, page, limit);
-    return { data, total, page, limit, nextPage: page * limit < total ? page + 1 : undefined };
+    return { data, total, page, limit, nextPage: computeNextPage(page, limit, total) };
   }
 }

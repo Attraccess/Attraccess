@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { PageHeader, PageAction } from '../../components/pageHeader';
-import { AttraccessUser, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { AttraccessUser, useDebounce, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   Button,
   Chip,
@@ -41,7 +41,6 @@ import { EmptyState } from '../../components/emptyState';
 
 import en from './en.json';
 import de from './de.json';
-import { useDebounce } from '../../hooks/useDebounce';
 import { InviteUserModal } from './invite-user-modal';
 import { useNavigate } from 'react-router-dom';
 import { SimplePagination } from '../../components/simplePagination';
