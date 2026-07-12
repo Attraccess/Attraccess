@@ -126,7 +126,7 @@ describe('EmailService', () => {
           return Promise.resolve({
             type,
             subject: 'Retraining required for {{resource.name}}',
-            body: '<mjml><mj-body><mj-section><mj-column>{{#if retraining.isAge}}<mj-text>Age reason</mj-text>{{else if retraining.isInactivity}}<mj-text>Inactivity reason</mj-text>{{else}}<mj-text>Default reason</mj-text>{{/if}}{{#if retraining.blocksAccess}}<mj-text>Access blocked</mj-text>{{/if}}</mj-column></mj-section></mj-body></mjml>',
+            body: '<mjml><mj-body><mj-section><mj-column>{{#if retraining.isAge}}<mj-text>Age reason</mj-text>{{else if retraining.isInactivity}}<mj-text>Inactivity reason</mj-text>{{else}}<mj-text>Default reason</mj-text>{{/if}}{{#if retraining.blocksAccess}}<mj-text>Access blocked</mj-text>{{/if}}<mj-text>{{resource.url}}</mj-text></mj-column></mj-section></mj-body></mjml>',
           });
         }
         if (type === EmailTemplateType.RESOURCE_USAGE_NOTE_ADDED) {
@@ -343,8 +343,8 @@ describe('EmailService', () => {
       const user = makeUser({ email: 'alice@example.com' });
 
       await service.sendResourceHealthChangedEmail(user, { id: 1, name: 'Laser Cutter' }, {
-        status: 'UNHEALTHY' as never,
-        previousStatus: 'HEALTHY' as never,
+        status: 'unhealthy' as never,
+        previousStatus: 'healthy' as never,
         reason: 'sensor offline',
         identifier: 'laser.temperature',
       });
@@ -352,7 +352,7 @@ describe('EmailService', () => {
       const { html } = (sendMail as jest.Mock).mock.calls[0][0];
       expect(html).toContain('Degraded');
       expect(html).not.toContain('Recovered');
-      expect(html).toContain('UNHEALTHY');
+      expect(html).toContain('unhealthy');
       expect(html).toContain('https://frontend.example/resources/1');
     });
 
@@ -361,8 +361,8 @@ describe('EmailService', () => {
       const user = makeUser({ email: 'alice@example.com' });
 
       await service.sendResourceHealthChangedEmail(user, { id: 2, name: 'Laser Cutter' }, {
-        status: 'HEALTHY' as never,
-        previousStatus: 'UNHEALTHY' as never,
+        status: 'healthy' as never,
+        previousStatus: 'unhealthy' as never,
         reason: null,
         identifier: 'laser.temperature',
       });
@@ -375,7 +375,7 @@ describe('EmailService', () => {
     it('skips send when user has no email', async () => {
       const { service, sendMail } = setup();
       await service.sendResourceHealthChangedEmail({ email: null } as never, { id: 1, name: 'X' }, {
-        status: 'UNHEALTHY' as never,
+        status: 'unhealthy' as never,
         previousStatus: null,
         reason: null,
         identifier: 'x',
