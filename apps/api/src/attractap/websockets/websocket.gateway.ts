@@ -228,6 +228,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       id,
       messageCount,
       readerId: null,
+      readerName: null,
       sendMessage,
       sendBinaryData,
       state: {
@@ -336,8 +337,13 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     });
 
     const readerId = socket.readerId;
+    const readerName = socket.readerName;
     if (readerId) {
       this.logger.log(`Client for reader ${readerId} disconnected.`);
+      this.metricsService.attractapReaderConnected.set(
+        { reader_id: String(readerId), reader_name: readerName ?? '' },
+        0,
+      );
     } else {
       this.logger.log('An unidentified client disconnected.');
     }

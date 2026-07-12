@@ -94,6 +94,7 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
   messageCount: number;
   id: string;
   readerId: Attractap['id'] | null;
+  readerName: string | null;
   sendMessage: (message: AttractapMessage) => Promise<void>;
   sendBinaryData: (data: Buffer) => void;
   state: {

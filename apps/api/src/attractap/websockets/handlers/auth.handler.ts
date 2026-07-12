@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { AttractapService } from '../../attractap.service';
 import { verifyToken } from '../websocket.utils';
 import { ResourceListService } from './resource-list.service';
+import { MetricsService } from '../../../metrics/metrics.service';
 import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from '../websocket.types';
 
 @Injectable()
@@ -13,6 +14,9 @@ export class AttractapAuthHandler {
 
   @Inject(ResourceListService)
   private resourceListService: ResourceListService;
+
+  @Inject(MetricsService)
+  private metricsService: MetricsService;
 
   public async handleReaderRegister(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
     this.logger.debug('Received REGISTER event');
@@ -52,6 +56,11 @@ export class AttractapAuthHandler {
     }
 
     socket.readerId = reader.id;
+    socket.readerName = reader.name;
+    this.metricsService.attractapReaderConnected.set(
+      { reader_id: String(reader.id), reader_name: reader.name },
+      1,
+    );
 
     const authenticatedResponse = new AttractapEvent(AttractapEventType.READER_AUTHENTICATED, {
       name: reader.name,

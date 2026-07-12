@@ -252,7 +252,7 @@ export class AttractapCardHandler {
   }
 
   public async handleCardAuthenticationRequest(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
-    this.metricsService.attractapNfcTapsTotal.inc();
+    this.metricsService.attractapNfcTapsTotal.inc({ reader_id: String(socket.readerId) });
     const { uid, resourceId } = data.payload as { uid: string; resourceId: number };
 
     if (!uid || typeof uid !== 'string') {
