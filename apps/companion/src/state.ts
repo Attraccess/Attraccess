@@ -14,6 +14,7 @@ export const state = {
   authenticatedPayload: null as CompanionAuthenticatedDto | null,
   pinHash: null as string | null,
   allowQuit: false,
+  updateInProgress: false,
   kioskLocked: false,
   wsConnected: false,
   settings: { ...SETTINGS_DEFAULTS } as CompanionSettings,

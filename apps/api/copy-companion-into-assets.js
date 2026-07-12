@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { execSync } = require('child_process');
 
 /* eslint-disable no-console */
@@ -60,8 +61,9 @@ KNOWN_BINARIES.forEach(({ filename, platform, arch }) => {
   const dest = path.join(assetsDir, filename);
   fs.copyFileSync(src, dest);
   const size = fs.statSync(dest).size;
-  manifest.platforms.push({ platform, arch, filename, size });
-  console.log(`Copied: ${filename} (${size} bytes)`);
+  const sha256 = crypto.createHash('sha256').update(fs.readFileSync(dest)).digest('hex');
+  manifest.platforms.push({ platform, arch, filename, size, sha256 });
+  console.log(`Copied: ${filename} (${size} bytes, sha256: ${sha256.slice(0, 16)}…)`);
 });
 
 fs.writeFileSync(path.join(assetsDir, 'companions.json'), JSON.stringify(manifest, null, 2));

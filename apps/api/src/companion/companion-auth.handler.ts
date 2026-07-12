@@ -31,7 +31,7 @@ export class CompanionAuthHandler {
   }
 
   private async authenticateExistingDevice(socket: CompanionSocket, payload: CompanionAuthenticatePayload): Promise<void> {
-    const { id, token, platform, appVersion } = payload;
+    const { id, token, platform, arch, appVersion } = payload;
     this.logger.debug(`Authenticating companion device ${id}`);
 
     if (id === undefined || token === undefined) {
@@ -53,6 +53,7 @@ export class CompanionAuthHandler {
     await this.service.touchLastConnection(device, appVersion);
     socket.deviceId = device.id;
     socket.platform = platform ?? null;
+    socket.arch = arch ?? null;
 
     const resources = await this.gatewayService.getResourcesForDevice(device.id);
     socket.sendEvent(CompanionEventType.COMPANION_AUTHENTICATED, {
@@ -63,16 +64,19 @@ export class CompanionAuthHandler {
     });
 
     this.logger.log(`Companion device ${id} authenticated successfully`);
-    await this.maybeSendUpdateAvailable(socket, platform, appVersion);
+    await this.maybeSendUpdateAvailable(socket, platform, arch, appVersion);
   }
 
-  private async maybeSendUpdateAvailable(socket: CompanionSocket, platform: string | undefined, appVersion: string | undefined): Promise<void> {
+  private async maybeSendUpdateAvailable(socket: CompanionSocket, platform: string | undefined, arch: string | undefined, appVersion: string | undefined): Promise<void> {
     if (!platform || !appVersion) return;
 
     const manifest = this.service.getManifest();
     if (!manifest || manifest.version === appVersion) return;
 
-    const entry = manifest.platforms.find((p) => p.platform === platform);
+    // Match by both platform and arch so Linux x64 and arm64 devices get the right binary.
+    // Fall back to platform-only match for backwards compatibility with older clients.
+    const entry = manifest.platforms.find((p) => p.platform === platform && (!arch || p.arch === arch))
+      ?? manifest.platforms.find((p) => p.platform === platform);
     const downloadUrl = entry
       ? `/api/companion/download/${entry.platform}/${entry.arch}`
       : `/api/companion/download/${platform}/x64`;

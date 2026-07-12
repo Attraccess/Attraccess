@@ -205,7 +205,7 @@ function startWsClient(serverUrl: string, firstRun: boolean): void {
     if (firstRun || !state.creds?.id) {
       state.wsClient?.sendRegister();
     } else {
-      state.wsClient?.sendAuthenticate({ id: state.creds.id, token: state.creds.token, platform: process.platform, appVersion: app.getVersion() });
+      state.wsClient?.sendAuthenticate({ id: state.creds.id, token: state.creds.token, platform: process.platform, arch: process.arch, appVersion: app.getVersion() });
     }
   });
 
@@ -256,10 +256,15 @@ function startWsClient(serverUrl: string, firstRun: boolean): void {
   });
 
   state.wsClient.on('update_available', (payload) => {
+    if (state.updateInProgress) {
+      console.info(`[companion] update already in progress, ignoring update_available for v${payload.version}`);
+      return;
+    }
+    state.updateInProgress = true;
     state.tray?.setToolTip(`Attraccess Companion — downloading update v${payload.version}…`);
-    applyUpdate(state.creds?.serverUrl ?? serverUrl, payload.downloadUrl, payload.version, payload.sha256).catch((err) =>
-      console.error('[companion] applyUpdate error:', err),
-    );
+    applyUpdate(state.creds?.serverUrl ?? serverUrl, payload.downloadUrl, payload.version, payload.sha256)
+      .catch((err) => console.error('[companion] applyUpdate error:', err))
+      .finally(() => { state.updateInProgress = false; });
   });
 
   state.wsClient.connect();
