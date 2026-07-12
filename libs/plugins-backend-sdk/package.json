@@ -29,7 +29,6 @@
     "typeorm": "0.3.29",
     "@nestjs/swagger": "^11.2.0",
     "express": "4.22.1",
-    "@nestjs/passport": "^11.0.5",
-    "handlebars": "^4.7.9"
+    "@nestjs/passport": "^11.0.5"
   }
 }
