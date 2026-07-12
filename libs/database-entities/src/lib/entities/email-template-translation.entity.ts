@@ -13,7 +13,7 @@ export class EmailTemplateTranslation {
   key!: string;
 
   @ApiProperty({ description: 'BCP 47 locale tag', example: 'de' })
-  @PrimaryColumn({ type: 'varchar', length: 10 })
+  @PrimaryColumn({ type: 'varchar', length: 35 })
   locale!: string;
 
   @ApiProperty({ description: 'Translated value', example: 'Hallo {name},' })

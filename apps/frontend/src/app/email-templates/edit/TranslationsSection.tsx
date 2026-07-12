@@ -118,14 +118,20 @@ export function TranslationsSection({ templateType, liveContent }: TranslationsS
                 <Tab id={locale} key={locale}>
                   <div className="flex items-center gap-1">
                     {locale.toUpperCase()}
-                    <button
-                      type="button"
-                      className="text-default-400 hover:text-danger text-xs ml-1"
-                      onClick={(e) => { e.stopPropagation(); setDeleteTarget(locale); }}
-                      aria-label={t('translations.deleteLocale')}
-                    >
-                      ×
-                    </button>
+                    {/* stopPropagation on the native click prevents Tab selection */}
+                    <span onClick={(e) => e.stopPropagation()}>
+                      <Button
+                        size="sm"
+                        variant="light"
+                        color="danger"
+                        isIconOnly
+                        className="ml-1 min-w-unit-5 w-unit-5 h-unit-5"
+                        onPress={() => setDeleteTarget(locale)}
+                        aria-label={t('translations.deleteLocale')}
+                      >
+                        ×
+                      </Button>
+                    </span>
                   </div>
                 </Tab>
               ))}

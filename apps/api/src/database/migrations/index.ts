@@ -141,3 +141,4 @@ export * from './1782300000000-rbac-data-model';
 export * from './1782400000000-user-locale';
 export * from './1782500000000-email-templates-locale';
 export * from './1782600000000-seed-de-email-templates';
+export * from './1782700000000-email-template-translation-locale-length';

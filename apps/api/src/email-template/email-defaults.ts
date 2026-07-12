@@ -72,7 +72,7 @@ export const EMAIL_TEMPLATE_DEFAULTS: Record<EmailTemplateType, EmailTemplateDef
     ],
   },
   [EmailTemplateType.RESOURCE_HEALTH_CHANGED]: {
-    subject: 'Resource health update: {{resource.name}}',
+    subject: '{{#if health.isDegraded}}Resource degraded{{else}}Resource recovered{{/if}}: {{resource.name}}',
     variables: [
       'user.username',
       'user.email',

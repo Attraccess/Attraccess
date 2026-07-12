@@ -51,7 +51,7 @@ export class EmailService {
       const raw = translationsMap[key] ?? safeDefault;
       const hash = options?.hash ?? {};
       const result = raw.replace(/\{(\w+(?:\.\w+)*)\}/g, (_: string, name: string) =>
-        name in hash ? Handlebars.escapeExpression(String(hash[name] ?? '')) : `{${name}}`,
+        Object.hasOwn(hash, name) ? Handlebars.escapeExpression(String(hash[name] ?? '')) : `{${name}}`,
       );
       return new Handlebars.SafeString(result);
     };

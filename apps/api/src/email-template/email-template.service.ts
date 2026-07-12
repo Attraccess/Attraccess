@@ -66,7 +66,15 @@ export class EmailTemplateService {
 
   async getTranslationsMap(type: EmailTemplateType, locale: string): Promise<Record<string, string>> {
     const rows = await this.translationRepository.findBy({ templateType: type, locale });
-    return Object.fromEntries(rows.map((r) => [r.key, r.value]));
+    if (rows.length > 0) return Object.fromEntries(rows.map((r) => [r.key, r.value]));
+
+    // BCP 47 fallback: try base language (e.g. "de-CH" → "de")
+    const baseLocale = locale.split('-')[0];
+    if (baseLocale !== locale) {
+      const baseRows = await this.translationRepository.findBy({ templateType: type, locale: baseLocale });
+      return Object.fromEntries(baseRows.map((r) => [r.key, r.value]));
+    }
+    return {};
   }
 
   async getTranslations(type: EmailTemplateType): Promise<TemplateTranslations> {
@@ -84,6 +92,7 @@ export class EmailTemplateService {
   }
 
   async setTranslations(type: EmailTemplateType, locale: string, data: Record<string, string>): Promise<void> {
+    await this.findOne(type);
     const entities = Object.entries(data).map(([key, value]) =>
       this.translationRepository.create({ templateType: type, key, locale, value }),
     );
@@ -96,6 +105,7 @@ export class EmailTemplateService {
   }
 
   async deleteTranslations(type: EmailTemplateType, locale: string): Promise<void> {
+    await this.findOne(type);
     await this.translationRepository.delete({ templateType: type, locale });
   }
 }
