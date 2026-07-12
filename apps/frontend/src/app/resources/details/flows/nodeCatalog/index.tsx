@@ -26,7 +26,8 @@ export const NodeCatalogPanel = forwardRef<NodeCatalogHandle, Props>(function No
   ref,
 ) {
   const { t } = useTranslations({ de, en });
-  const { groups, isLoading, collapsed, setCollapsed, isDomainExpanded, setDomainExpanded } = useNodeCatalog({ resourceId });
+  const { groups, isLoading, collapsed, setCollapsed, isDomainExpanded, setDomainExpanded } =
+    useNodeCatalog({ resourceId });
   const { isOpen, setOpen } = useOverlayState();
 
   const loadingSpinner = isLoading ? (

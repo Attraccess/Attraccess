@@ -125,6 +125,7 @@ function FlowsPageInner() {
       enabled: !!resourceId,
     },
   );
+  const isFlowLoading = !originalFlowData && isFlowFetching;
 
   const toast = useToastMessage();
 
@@ -465,10 +466,10 @@ function FlowsPageInner() {
               >
                 <SaveIcon />
               </Button>
-              <Button isIconOnly onPress={handleImportClick} aria-label={t('actions.import')}>
+              <Button isIconOnly onPress={handleImportClick} aria-label={t('actions.import')} isDisabled={isFlowLoading}>
                 <UploadIcon />
               </Button>
-              <Button isIconOnly onPress={handleExport} aria-label={t('actions.export')}>
+              <Button isIconOnly onPress={handleExport} aria-label={t('actions.export')} isDisabled={isFlowLoading}>
                 <DownloadIcon />
               </Button>
               <LogViewer resourceId={Number(resourceId)}>
@@ -487,7 +488,7 @@ function FlowsPageInner() {
                 )}
               </VariablesModal>
 
-              <Button isIconOnly onPress={layout}>
+              <Button isIconOnly onPress={layout} isDisabled={isFlowLoading}>
                 <LayoutGridIcon />
               </Button>
               <Button
@@ -496,12 +497,13 @@ function FlowsPageInner() {
                 onPress={() => nodeCatalogRef.current?.open()}
                 aria-label={t('actions.addNode')}
                 className="md:hidden"
+                isDisabled={isFlowLoading}
               >
                 <PlusIcon />
               </Button>
             </Panel>
           </ReactFlow>
-          {!originalFlowData && isFlowFetching && (
+          {isFlowLoading && (
             <div
               className="absolute inset-0 z-10 flex items-center justify-center bg-background/60 backdrop-blur-sm"
               role="status"

@@ -107,6 +107,29 @@ describe('NodeCatalogPanel', () => {
     expect(screen.getAllByText('Manual').length).toBeGreaterThan(0);
   });
 
+  it('shows spinner in mobile drawer while loading', async () => {
+    mockIsLoading = true;
+    const ref = createRef<NodeCatalogHandle>();
+    render(
+      <NodeCatalogPanel ref={ref} resourceId={1} onSelect={vi.fn()} tNodeTranslations={tNodeTranslations} />,
+      { wrapper: TestWrapper },
+    );
+    act(() => { ref.current?.open(); });
+    const statuses = screen.getAllByRole('status');
+    expect(statuses.length).toBeGreaterThan(0);
+    expect(screen.queryByText('Manual')).toBeNull();
+  });
+
+  it('shows content in mobile drawer once loaded', async () => {
+    const ref = createRef<NodeCatalogHandle>();
+    render(
+      <NodeCatalogPanel ref={ref} resourceId={1} onSelect={vi.fn()} tNodeTranslations={tNodeTranslations} />,
+      { wrapper: TestWrapper },
+    );
+    act(() => { ref.current?.open(); });
+    expect(screen.getAllByText('Manual').length).toBeGreaterThan(0);
+  });
+
   it('opens mobile overlay via imperative ref and selects a node', async () => {
     const onSelect = vi.fn();
     const user = userEvent.setup();
