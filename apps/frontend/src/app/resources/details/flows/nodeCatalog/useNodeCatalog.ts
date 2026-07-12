@@ -22,6 +22,8 @@ interface UseNodeCatalogArgs {
 
 interface UseNodeCatalogResult {
   groups: CatalogGroup[];
+  isLoading: boolean;
+  isError: boolean;
   collapsed: boolean;
   setCollapsed: (next: boolean) => void;
   isDomainExpanded: (domain: Domain) => boolean;
@@ -82,7 +84,7 @@ function useExpandedSnapshot(): string {
 }
 
 export function useNodeCatalog({ resourceId }: UseNodeCatalogArgs): UseNodeCatalogResult {
-  const { data: schemas } = useResourceFlowsServiceGetNodeSchemas({ resourceId });
+  const { data: schemas, isLoading, isError } = useResourceFlowsServiceGetNodeSchemas({ resourceId });
 
   const groups = useMemo<CatalogGroup[]>(() => {
     const byDomain = new Map<Domain, CatalogNode[]>();
@@ -113,5 +115,5 @@ export function useNodeCatalog({ resourceId }: UseNodeCatalogArgs): UseNodeCatal
     writeBool(STORAGE_KEY_EXPANDED_PREFIX + domain, next);
   }, []);
 
-  return { groups, collapsed, setCollapsed, isDomainExpanded, setDomainExpanded };
+  return { groups, isLoading, isError, collapsed, setCollapsed, isDomainExpanded, setDomainExpanded };
 }
