@@ -205,17 +205,17 @@ const coreRoutes: RouteConfig[] = [
   {
     path: '/sso/providers',
     element: <SSOProvidersPage />,
-    authRequired: 'system.settings.manage',
+    authRequired: 'system.sso.manage',
   },
   {
     path: '/sso/providers/new',
     element: <SSOProviderFormPage />,
-    authRequired: 'system.settings.manage',
+    authRequired: 'system.sso.manage',
   },
   {
     path: '/sso/providers/:providerId',
     element: <SSOProviderFormPage />,
-    authRequired: 'system.settings.manage',
+    authRequired: 'system.sso.manage',
   },
   {
     path: '/balena',
@@ -275,7 +275,7 @@ const coreRoutes: RouteConfig[] = [
   {
     path: '/plugins',
     element: <PluginsList />,
-    authRequired: 'system.settings.manage',
+    authRequired: 'system.plugins.manage',
   },
   {
     path: '/settings',
