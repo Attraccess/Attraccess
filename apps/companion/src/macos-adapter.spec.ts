@@ -49,6 +49,21 @@ describe('MacosAdapter.applyUpdate', () => {
     expect(shell.openPath).not.toHaveBeenCalled();
   });
 
+  it('still relaunches when post-swap cleanup (rmSync/detach) throws', async () => {
+    (execFileSync as jest.Mock)
+      .mockReturnValueOnce(undefined)                  // hdiutil attach
+      .mockReturnValueOnce('/tmp/mnt/Attraccess.app')  // find
+      .mockReturnValueOnce(undefined)                  // ditto
+      .mockImplementationOnce(() => { throw new Error('device busy'); }); // hdiutil detach — post-swap failure
+
+    const allowQuit = jest.fn();
+    await new MacosAdapter().applyUpdate('/tmp/update.dmg', '2.0.0', allowQuit);
+
+    expect(app.relaunch).toHaveBeenCalled();
+    expect(app.quit).toHaveBeenCalled();
+    expect(shell.openPath).not.toHaveBeenCalled();
+  });
+
   it('falls back to manual DMG dialog when hdiutil fails', async () => {
     (execFileSync as jest.Mock).mockImplementation(() => { throw new Error('hdiutil: command not found'); });
 

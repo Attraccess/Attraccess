@@ -68,8 +68,9 @@ export class MacosAdapter implements OsAdapter {
       fs.rmSync(oldApp, { recursive: true, force: true });
       fs.renameSync(currentApp, oldApp);
       fs.renameSync(newApp, currentApp);
-      fs.rmSync(oldApp, { recursive: true, force: true });
-      execFileSync('hdiutil', ['detach', tmpMount, '-quiet']);
+      // Swap is complete — cleanup below must not divert into the manual-install fallback
+      try { fs.rmSync(oldApp, { recursive: true, force: true }); } catch { /* best-effort */ }
+      try { execFileSync('hdiutil', ['detach', tmpMount, '-quiet']); } catch { /* best-effort */ }
       try { fs.rmSync(tmpMount, { recursive: true, force: true }); } catch { /* best-effort */ }
       try { fs.unlinkSync(dest); } catch { /* best-effort cleanup */ }
       app.relaunch({ execPath: process.execPath });
