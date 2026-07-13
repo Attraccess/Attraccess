@@ -24,7 +24,8 @@
   },
   "sections": {
     "template": "Template",
-    "preview": "Preview"
+    "preview": "Preview",
+    "translations": "Translations"
   },
   "preview": {
     "iframeTitle": "Body Preview",
@@ -40,6 +41,24 @@
     "copyFailed": "Could not copy {{name}}",
     "completionDetail": "Template variable"
   },
+  "translations": {
+    "noKeys": "No \\{{t}} helper calls found in this template. Use \\{{t \"key\" \"Default text\"}} in the template body or subject to add translatable strings.",
+    "keyColumn": "Key",
+    "defaultColumn": "Default (English)",
+    "translationColumn": "Translation",
+    "locale": "Locale",
+    "addLocale": "Add",
+    "localePlaceholder": "e.g. de, fr, es",
+    "save": "Save translations",
+    "saving": "Saving...",
+    "saveFailed": "Failed to save translations",
+    "saved": "Translations saved",
+    "deleteLocale": "Delete locale",
+    "deleteFailed": "Failed to delete translations",
+    "deleteConfirm": "Delete all translations for locale \"{{locale}}\"?",
+    "deleteConfirmButton": "Delete",
+    "emptyTranslation": "Falls back to default"
+  },
   "actions": {
     "close": "Close",
     "cancel": "Cancel",
@@ -49,7 +68,7 @@
   },
   "resetConfirm": {
     "title": "Reset template to default?",
-    "message": "This will overwrite your customizations with the bundled default template. This cannot be undone.",
+    "message": "This will overwrite your customizations with the bundled default template and delete all saved translations. This cannot be undone.",
     "confirm": "Reset",
     "cancel": "Cancel"
   },

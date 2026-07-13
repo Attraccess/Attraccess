@@ -1,5 +1,6 @@
 // Import entities
 import { EmailTemplate } from './entities/email-template.entity';
+import { EmailTemplateTranslation } from './entities/email-template-translation.entity';
 import { AuthenticationDetail } from './entities/authenticationDetail.entity';
 import { MqttServer } from './entities/mqttServer.entity';
 import { NFCCard } from './entities/nfcCard.entity';
@@ -130,6 +131,7 @@ export {
   Attractap,
   AttractapCrashReport,
   EmailTemplate,
+  EmailTemplateTranslation,
   ResourceFlowNode,
   ResourceFlowNodeType,
   ResourceFlowEdge,
@@ -238,6 +240,7 @@ export const entities = {
   Attractap,
   AttractapCrashReport,
   EmailTemplate,
+  EmailTemplateTranslation,
   ResourceFlowNode,
   ResourceFlowEdge,
   ResourceFlowLog,
