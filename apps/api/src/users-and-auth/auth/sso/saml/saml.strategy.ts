@@ -258,12 +258,21 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
   private getPermissionClaimValues(profile: SamlProfile): unknown[] {
     const values: unknown[] = [];
     const profileRecord = profile as Record<string, unknown>;
+    const candidateKeys = ['roles', 'role', 'groups', 'group'];
+
+    // Check candidateKeys inside the SAML attributes bag (not all attributes — that would
+    // include email/displayName and make the empty-claims guard always true)
     const attributes = profileRecord.attributes;
     if (attributes && typeof attributes === 'object') {
-      values.push(...Object.values(attributes as Record<string, unknown>));
+      for (const key of candidateKeys) {
+        const value = (attributes as Record<string, unknown>)[key];
+        if (value !== undefined && value !== null) {
+          values.push(value);
+        }
+      }
     }
 
-    const candidateKeys = ['roles', 'role', 'groups', 'group'];
+    // Also check candidateKeys at the top level of the profile
     for (const key of candidateKeys) {
       const value = profileRecord[key];
       if (value !== undefined && value !== null) {

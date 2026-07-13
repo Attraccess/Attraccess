@@ -133,6 +133,35 @@ describe('SSOSamlStrategy', () => {
     expect(user.username).toBe('name.surname');
   });
 
+  it('does not sync roles when profile has no role/group attributes (only email, name, etc.)', async () => {
+    const rbacService = { syncSsoRoles: jest.fn().mockResolvedValue(undefined) };
+    const usersService = {
+      findOne: jest.fn().mockImplementation((query: Record<string, unknown>) => {
+        if ('externalIdentifier' in query) return Promise.resolve({ id: 44, externalIdentifier: 'saml-user' });
+        return Promise.resolve(null);
+      }),
+      updateOne: jest.fn(),
+    };
+    const moduleRef = {
+      get: jest.fn((token: unknown) => (token === RbacService ? rbacService : usersService)),
+    } as unknown as ModuleRef;
+
+    const strategy = new SSOSamlStrategy(moduleRef);
+    const request = buildRequest(30, 'email');
+    request.ssoSamlOptions.samlConfiguration.permissionMappings = { 'user-manager': ['attraccess_admin'] };
+
+    const profile = {
+      nameID: 'saml-user',
+      email: 'user@example.com',
+      // attributes contains only non-role fields — the old bug would have treated email/displayName as role names
+      attributes: { email: 'user@example.com', displayName: 'Test User' },
+    } as SamlProfile;
+
+    await strategy.validate(request, profile);
+
+    expect(rbacService.syncSsoRoles).not.toHaveBeenCalled();
+  });
+
   it('syncs RBAC roles from SAML role attributes', async () => {
     const rbacService = { syncSsoRoles: jest.fn().mockResolvedValue(undefined) };
 
