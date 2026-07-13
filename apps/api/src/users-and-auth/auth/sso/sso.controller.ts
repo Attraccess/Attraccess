@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   Query,
   HttpStatus,
@@ -19,7 +20,7 @@ import {
 } from '@nestjs/common';
 import { SSOOIDCGuard } from './oidc/oidc.guard';
 import { AuthenticationType, SSOProvider, SSOProviderType } from '@attraccess/database-entities';
-import { AuthenticatedRequest, Auth } from '@attraccess/plugins-backend-sdk';
+import { AuthenticatedRequest, Auth, AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { RequiresLicense, SkipLicenseCheck } from '../../../license/require-license.decorator';
 import { LicenseModuleType } from '../../../license/license.service';
 import { CreateSessionResponse } from '../auth.types';
@@ -230,7 +231,18 @@ export class SSOController {
     status: 404,
     description: 'Provider not found',
   })
-  async updateOne(@Param('id') id: string, @Body() updateDto: UpdateSSOProviderDto): Promise<SSOProvider> {
+  async updateOne(
+    @Param('id') id: string,
+    @Body() updateDto: UpdateSSOProviderDto,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<SSOProvider> {
+    // permissionMappings maps IdP claims → RBAC roles; setting it is equivalent to granting roles
+    if (updateDto.permissionMappings !== undefined) {
+      const actor = request.user as AuthenticatedUser;
+      if (!actor.effectivePermissions?.has('users.roles.manage')) {
+        throw new ForbiddenException('Configuring SSO permission mappings requires users.roles.manage');
+      }
+    }
     return this.ssoService.updateProvider(parseInt(id, 10), updateDto);
   }
 

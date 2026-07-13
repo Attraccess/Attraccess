@@ -207,7 +207,11 @@ export class TwoFactorService {
 
   private isPrivilegedUser(user: User): boolean {
     const effectivePerms = (user as AuthenticatedUser).effectivePermissions;
-    if (!effectivePerms || effectivePerms.size === 0) return false;
+    if (!effectivePerms) {
+      this.logger.warn(`isPrivilegedUser: effectivePermissions missing for user ${user.id} — treating as not privileged`);
+      return false;
+    }
+    if (effectivePerms.size === 0) return false;
     // privileged = more than just the default user-role grant
     return effectivePerms.size > 1 || !effectivePerms.has('resources.read');
   }

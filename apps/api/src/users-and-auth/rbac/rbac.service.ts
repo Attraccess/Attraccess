@@ -6,6 +6,8 @@ import { Permission, Role, UserRole, UserRoleSource } from '@attraccess/database
 @Injectable()
 export class RbacService {
   private readonly logger = new Logger(RbacService.name);
+  // ponytail: in-process cache; invalidated on every mutation; safe for single-process SQLite
+  private readonly permissionsCache = new Map<number, Set<string>>();
 
   constructor(
     @InjectRepository(UserRole)
@@ -17,17 +19,20 @@ export class RbacService {
   ) {}
 
   async getEffectivePermissions(userId: number): Promise<Set<string>> {
-    const userRoles = await this.userRoleRepository.find({
-      where: { userId },
-      relations: ['role', 'role.rolePermissions'],
-    });
+    const cached = this.permissionsCache.get(userId);
+    if (cached) return cached;
 
-    const permissions = new Set<string>();
-    for (const ur of userRoles) {
-      for (const rp of ur.role?.rolePermissions ?? []) {
-        permissions.add(rp.permissionKey);
-      }
-    }
+    const rows = await this.userRoleRepository
+      .createQueryBuilder('ur')
+      .innerJoin('ur.role', 'r')
+      .innerJoin('r.rolePermissions', 'rp')
+      .select('rp.permissionKey', 'permissionKey')
+      .distinct(true)
+      .where('ur.userId = :userId', { userId })
+      .getRawMany<{ permissionKey: string }>();
+
+    const permissions = new Set(rows.map((r) => r.permissionKey));
+    this.permissionsCache.set(userId, permissions);
     return permissions;
   }
 
@@ -53,9 +58,11 @@ export class RbacService {
       where: { userId, roleId: role.id, source: UserRoleSource.MANUAL },
     });
     if (existing) return existing;
-    return this.userRoleRepository.save(
+    const result = await this.userRoleRepository.save(
       this.userRoleRepository.create({ userId, roleId: role.id, source: UserRoleSource.MANUAL }),
     );
+    this.permissionsCache.delete(userId);
+    return result;
   }
 
   async assignDefaultRoles(userId: number): Promise<void> {
@@ -70,6 +77,7 @@ export class RbacService {
         );
       }
     }
+    this.permissionsCache.delete(userId);
   }
 
   async assignRole(userId: number, roleId: number, actorPermissions: Set<string>): Promise<UserRole> {
@@ -101,7 +109,9 @@ export class RbacService {
       roleId,
       source: UserRoleSource.MANUAL,
     });
-    return this.userRoleRepository.save(userRole);
+    const saved = await this.userRoleRepository.save(userRole);
+    this.permissionsCache.delete(userId);
+    return saved;
   }
 
   async revokeRole(userId: number, roleId: number, actorPermissions: Set<string>): Promise<void> {
@@ -138,6 +148,7 @@ export class RbacService {
     if (!result.affected) {
       throw new ConflictException('Role is not manually assigned to this user and cannot be revoked via this endpoint');
     }
+    this.permissionsCache.delete(userId);
   }
 
   async syncSsoRoles(
@@ -199,5 +210,6 @@ export class RbacService {
         }
       }
     }
+    this.permissionsCache.delete(userId);
   }
 }
