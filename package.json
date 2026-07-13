@@ -193,6 +193,7 @@
     "@types/w3c-web-serial": "^1.0.8",
     "@types/web-push": "^3.6.4",
     "@types/ws": "^8.18.1",
+    "@typescript/typescript6": "^6.0.0",
     "@vitejs/plugin-react": "^6.0.3",
     "@vitest/coverage-v8": "^4.1.10",
     "@vitest/ui": "^4.1.10",
@@ -230,7 +231,7 @@
     "ts-loader": "^9.6.2",
     "ts-morph": "^28.0.0",
     "ts-node": "10.9.2",
-    "typescript": "~6.0.3",
+    "typescript": "~7.0.0",
     "typescript-eslint": "8.63.0",
     "util": "^0.12.5",
     "verdaccio": "6.7.4",
@@ -250,6 +251,9 @@
   },
   "pnpm": {
     "overrides": {
+      "@swc-node/register>typescript": "npm:@typescript/typescript6@^6.0.0",
+      "ts-api-utils>typescript": "npm:@typescript/typescript6@^6.0.0",
+      "@typescript-eslint/typescript-estree>typescript": "npm:@typescript/typescript6@^6.0.0",
       "@internationalized/date": "3.12.2",
       "react": "19.2.7",
       "react-dom": "19.2.7",
@@ -286,7 +290,10 @@
       "typeorm"
     ],
     "patchedDependencies": {
-      "@nestjs/swagger@11.4.4": "patches/@nestjs__swagger@11.4.4.patch"
+      "@nestjs/swagger@11.4.4": "patches/@nestjs__swagger@11.4.4.patch",
+      "@swc-node/register@1.11.1": "patches/@swc-node__register@1.11.1.patch",
+      "ts-api-utils@2.5.0": "patches/ts-api-utils@2.5.0.patch",
+      "typescript@7.0.2": "patches/typescript@7.0.2.patch"
     }
   }
 }

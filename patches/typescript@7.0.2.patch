@@ -1,0 +1,13 @@
+diff --git a/lib/version.cjs b/lib/version.cjs
+index 5a2e8c8136857ff44838857e49862f16dd9db24c..9cae38fca23033dfc9a1f8df696598f0dcb74aff 100644
+--- a/lib/version.cjs
++++ b/lib/version.cjs
+@@ -1,3 +1,8 @@
+ const { version } = require("../package.json");
+ exports.version = version;
+ exports.versionMajorMinor = "7.0";
++// ponytail: re-export TS6 compiler API so tools that haven't migrated to TS7's new API keep working
++try {
++  const ts6 = require("@typescript/typescript6");
++  Object.assign(exports, ts6, { version: exports.version, versionMajorMinor: exports.versionMajorMinor });
++} catch (_) {}

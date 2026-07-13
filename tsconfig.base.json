@@ -4,7 +4,7 @@
     "rootDir": ".",
     "sourceMap": true,
     "declaration": false,
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "importHelpers": true,
@@ -18,43 +18,41 @@
     "skipDefaultLibCheck": true,
     "resolveJsonModule": true,
     "esModuleInterop": true,
-    "baseUrl": ".",
     "paths": {
       "@attraccess/api-client": [
-        "libs/api-client/src/index.ts"
+        "./libs/api-client/src/index.ts"
       ],
       "@attraccess/attracces": [
-        "tools/attracces/src/index.ts"
+        "./tools/attracces/src/index.ts"
       ],
       "@attraccess/database-entities": [
-        "libs/database-entities/src/index.ts"
+        "./libs/database-entities/src/index.ts"
       ],
       "@attraccess/env": [
-        "libs/env/src/index.ts"
+        "./libs/env/src/index.ts"
       ],
       "@attraccess/plugins-backend-sdk": [
-        "libs/plugins-backend-sdk/src/index.ts"
+        "./libs/plugins-backend-sdk/src/index.ts"
       ],
       "@attraccess/plugins-frontend-sdk": [
-        "libs/plugins-frontend-sdk/src/index.ts"
+        "./libs/plugins-frontend-sdk/src/index.ts"
       ],
       "@attraccess/plugins-frontend-ui": [
-        "libs/plugins-frontend-ui/src/index.ts"
+        "./libs/plugins-frontend-ui/src/index.ts"
       ],
       "@attraccess/react-query-client": [
-        "libs/react-query-client/src/index.ts"
+        "./libs/react-query-client/src/index.ts"
       ],
       "@attraccess/shared": [
-        "libs/shared/src/index.ts"
+        "./libs/shared/src/index.ts"
       ],
       "@attraccess/companion-ws-client": [
-        "libs/companion-ws-client/src/index.ts"
+        "./libs/companion-ws-client/src/index.ts"
       ],
       "@attraccess/ui": [
-        "libs/ui/src/index.ts"
+        "./libs/ui/src/index.ts"
       ]
     },
-    "ignoreDeprecations": "6.0",
     "strictPropertyInitialization": false,
     "strictNullChecks": false,
     "useUnknownInCatchVariables": false,
