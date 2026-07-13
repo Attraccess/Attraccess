@@ -388,6 +388,20 @@ describe('RbacService', () => {
       await expect(service.syncSsoRoles(10, ['editor'], SSO_TYPE, SSO_ID)).resolves.toBeUndefined();
     });
 
+    it('rethrows non-unique SQLITE_CONSTRAINT errors (e.g. FK violation)', async () => {
+      userRoleRepo.find.mockResolvedValue([]);
+      const newRole = makeRole({ id: 4, key: 'editor' });
+      roleRepo.findOne.mockResolvedValue(newRole);
+      userRoleRepo.findOne.mockResolvedValue(null);
+
+      const fkError = Object.assign(new QueryFailedError('', [], new Error('FOREIGN KEY constraint failed')), {
+        code: 'SQLITE_CONSTRAINT',
+      });
+      userRoleRepo.save.mockRejectedValue(fkError);
+
+      await expect(service.syncSsoRoles(10, ['editor'], SSO_TYPE, SSO_ID)).rejects.toThrow(QueryFailedError);
+    });
+
     it('rethrows non-unique-constraint errors', async () => {
       userRoleRepo.find.mockResolvedValue([]);
       const newRole = makeRole({ id: 4, key: 'editor' });

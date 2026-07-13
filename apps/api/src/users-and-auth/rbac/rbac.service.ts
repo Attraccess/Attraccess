@@ -185,9 +185,12 @@ export class RbacService {
             this.userRoleRepository.create({ userId, roleId: role.id, source: UserRoleSource.SSO, ssoProviderType, ssoProviderId }),
           );
         } catch (err) {
-          // ponytail: '23505' = Postgres unique violation; 'SQLITE_CONSTRAINT' = SQLite equivalent
+          // ponytail: '23505' = Postgres unique; SQLite reuses SQLITE_CONSTRAINT for FK/CHECK/NOT NULL too, so narrow by message
           const code = (err as QueryFailedError & { code?: string }).code;
-          if (err instanceof QueryFailedError && (code === '23505' || code === 'SQLITE_CONSTRAINT')) {
+          const isUniqueViolation =
+            err instanceof QueryFailedError &&
+            (code === '23505' || (code === 'SQLITE_CONSTRAINT' && err.message.includes('UNIQUE constraint failed')));
+          if (isUniqueViolation) {
             // Another SSO provider already granted this role — unique(userId, roleId, source) violated; ignore
             this.logger.debug(`syncSsoRoles: role ${roleKey} already held via another provider for user ${userId}`);
           } else {
