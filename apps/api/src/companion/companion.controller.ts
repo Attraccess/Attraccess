@@ -65,7 +65,7 @@ export class CompanionDownloadController {
     // Normalise to known label values before writing to Prometheus — raw URL
     // params would let unauthenticated callers inflate cardinality unboundedly.
     const safePlatform = ['linux', 'darwin', 'win32'].includes(platform) ? platform : 'unknown';
-    const safeArch = ['x64', 'arm64', 'ia32'].includes(arch) ? arch : 'unknown';
+    const safeArch = ['x64', 'arm64', 'universal'].includes(arch) ? arch : 'unknown';
     try {
       const { stream, size, filename } = this.service.getBinaryStream(platform, arch);
 

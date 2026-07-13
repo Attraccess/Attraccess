@@ -61,7 +61,15 @@ export class MacosAdapter implements OsAdapter {
       // Derive the current .app bundle path from the running executable
       // e.g. /Applications/App.app/Contents/MacOS/App → /Applications/App.app
       const currentApp = process.execPath.replace(/\/Contents\/MacOS\/[^/]+$/, '');
-      execFileSync('ditto', [appInDmg, currentApp]);
+      // ditto merges into an existing dst directory; remove first so the new bundle fully replaces the old one
+      const newApp = currentApp + '.update';
+      const oldApp = currentApp + '.old';
+      fs.rmSync(newApp, { recursive: true, force: true });
+      execFileSync('ditto', [appInDmg, newApp]);
+      fs.rmSync(oldApp, { recursive: true, force: true });
+      fs.renameSync(currentApp, oldApp);
+      fs.renameSync(newApp, currentApp);
+      fs.rmSync(oldApp, { recursive: true, force: true });
       execFileSync('hdiutil', ['detach', tmpMount, '-quiet']);
       try { fs.rmSync(tmpMount, { recursive: true, force: true }); } catch { /* best-effort */ }
       try { fs.unlinkSync(dest); } catch { /* best-effort cleanup */ }

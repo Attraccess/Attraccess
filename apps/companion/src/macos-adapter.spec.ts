@@ -12,6 +12,8 @@ jest.mock('child_process', () => ({
 
 jest.mock('fs', () => ({
   mkdirSync: jest.fn(),
+  rmSync: jest.fn(),
+  renameSync: jest.fn(),
   unlinkSync: jest.fn(),
 }));
 
@@ -32,10 +34,10 @@ beforeEach(() => jest.clearAllMocks());
 describe('MacosAdapter.applyUpdate', () => {
   it('mounts DMG, copies app bundle in-place via ditto, and relaunches', async () => {
     (execFileSync as jest.Mock)
-      .mockReturnValueOnce(undefined) // hdiutil attach
-      .mockReturnValueOnce('/tmp/mnt/Attraccess.app') // find
-      .mockReturnValueOnce(undefined) // ditto
-      .mockReturnValueOnce(undefined); // hdiutil detach
+      .mockReturnValueOnce(undefined)                  // hdiutil attach
+      .mockReturnValueOnce('/tmp/mnt/Attraccess.app')  // find
+      .mockReturnValueOnce(undefined)                  // ditto (copies to .update path)
+      .mockReturnValueOnce(undefined);                 // hdiutil detach (after atomic swap)
 
     const allowQuit = jest.fn();
     await new MacosAdapter().applyUpdate('/tmp/update.dmg', '2.0.0', allowQuit);
