@@ -1,93 +1,22 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
+import { EmailTemplateType } from '@attraccess/database-entities';
+import { EMAIL_TEMPLATE_DEFAULTS, readDefaultTemplateBody } from '../../email-template/email-defaults';
+import { DEFAULT_TEMPLATE_CONTENT } from './1782200000000-email-layout';
 
 type Translation = { templateType: string; key: string; value: string };
 
-const RESOURCE_HEALTH_CHANGED_MJML = `<mj-section background-color="#FFFFFF" padding="32px 20px 24px 20px">
-  <mj-column>
-    <mj-text padding="0 0 12px 0">{{t 'greeting' 'Hello {name},' name=user.username}}</mj-text>
-    <mj-text padding="0 0 12px 0">
-      {{#if health.isDegraded}}
-        {{t 'body_degraded' 'Resource <strong>{resource}</strong> has become degraded.' resource=resource.name}}
-      {{else}}
-        {{t 'body_recovered' 'Resource <strong>{resource}</strong> is healthy again.' resource=resource.name}}
-      {{/if}}
-    </mj-text>
-    {{#if health.identifier}}
-    <mj-text font-size="14px" color="#4B5563" padding="0 0 4px 0">{{t 'subsystem_label' 'Subsystem: <strong>{subsystem}</strong>' subsystem=health.identifier}}</mj-text>
-    {{/if}}
-    <mj-text font-size="14px" color="#4B5563" padding="0 0 12px 0">
-      {{t 'previous_status' 'Previous status: <strong>{status}</strong>' status=health.previousStatus}}<br/>
-      {{t 'new_status' 'New status: <strong>{status}</strong>' status=health.status}}
-    </mj-text>
-    {{#if health.reason}}
-    <mj-text font-size="14px" color="#4B5563" padding="0 0 12px 0">{{t 'reason_label' 'Reason: {reason}' reason=health.reason}}</mj-text>
-    {{/if}}
-    <mj-button href="{{resource.url}}" align="center">{{t 'button' 'Open Resource'}}</mj-button>
-    <mj-text font-size="13px" color="#6B7280" padding="20px 0 0 0">
-      {{t 'copy_link' 'Or copy this link into your browser:<br /><a href="{url}">{url}</a>' url=resource.url}}
-    </mj-text>
-    <mj-text font-size="12px" color="#9CA3AF" padding="16px 0 0 0">
-      {{t 'footer' 'You received this email because you can manage this resource.'}}
-    </mj-text>
-  </mj-column>
-</mj-section>`;
+// These templates gained new variables (boolean flags) in ATT-637, so their bodies,
+// variables and (for resource-health-changed) subject are updated unconditionally.
+const FORCE_UPDATED_TYPES = [
+  EmailTemplateType.RESOURCE_HEALTH_CHANGED,
+  EmailTemplateType.USER_RETRAINING_REQUIRED,
+  EmailTemplateType.RESOURCE_USAGE_NOTE_ADDED,
+];
 
-const USER_RETRAINING_REQUIRED_MJML = `<mj-section background-color="#FFFFFF" padding="32px 20px 24px 20px">
-  <mj-column>
-    <mj-text padding="0 0 12px 0">{{t 'greeting' 'Hello {name},' name=user.username}}</mj-text>
-    <mj-text padding="0 0 12px 0">
-      {{t 'body' 'Your training for <strong>{resource}</strong> is due for renewal.' resource=resource.name}}
-    </mj-text>
-    {{#if retraining.isAge}}
-    <mj-text font-size="14px" color="#4B5563" padding="0 0 12px 0">
-      {{t 'reason_age' 'Your training has reached its maximum age and must be renewed.'}}
-    </mj-text>
-    {{else if retraining.isInactivity}}
-    <mj-text font-size="14px" color="#4B5563" padding="0 0 12px 0">
-      {{t 'reason_inactivity' 'You have not used this resource for the configured period and must be retrained.'}}
-    </mj-text>
-    {{else}}
-    <mj-text font-size="14px" color="#4B5563" padding="0 0 12px 0">
-      {{t 'reason_default' 'Your training must be renewed.'}}
-    </mj-text>
-    {{/if}}
-    {{#if retraining.blocksAccess}}
-    <mj-text font-size="14px" color="#DC2626" padding="0 0 12px 0">
-      {{t 'blocks_access' 'Access to this resource is blocked until you have been retrained by an introducer.'}}
-    </mj-text>
-    {{/if}}
-    <mj-button href="{{resource.url}}" align="center">{{t 'button' 'Open Resource'}}</mj-button>
-    <mj-text font-size="13px" color="#6B7280" padding="20px 0 0 0">
-      {{t 'copy_link' 'Or copy this link into your browser:<br /><a href="{url}">{url}</a>' url=resource.url}}
-    </mj-text>
-    <mj-text font-size="12px" color="#9CA3AF" padding="16px 0 0 0">
-      {{t 'footer' 'You received this email because your training for this resource requires renewal.'}}
-    </mj-text>
-  </mj-column>
-</mj-section>`;
-
-const RESOURCE_USAGE_NOTE_ADDED_MJML = `<mj-section background-color="#FFFFFF" padding="32px 20px 24px 20px">
-  <mj-column>
-    <mj-text padding="0 0 12px 0">{{t 'greeting' 'Hello {name},' name=user.username}}</mj-text>
-    <mj-text padding="0 0 12px 0">
-      {{#if note.isStart}}
-        {{t 'body_start' '<strong>{author}</strong> left a note when starting <strong>{resource}</strong>.' author=note.authorName resource=resource.name}}
-      {{else}}
-        {{t 'body_end' '<strong>{author}</strong> left a note when finishing <strong>{resource}</strong>.' author=note.authorName resource=resource.name}}
-      {{/if}}
-    </mj-text>
-    <mj-text font-size="14px" color="#111827" padding="12px" container-background-color="#F8FAFC">
-      {{note.content}}
-    </mj-text>
-    <mj-button href="{{resource.url}}" align="center">{{t 'button' 'View Resource'}}</mj-button>
-    <mj-text font-size="13px" color="#6B7280" padding="20px 0 0 0">
-      {{t 'copy_link' 'Or copy this link into your browser:<br /><a href="{url}">{url}</a>' url=resource.url}}
-    </mj-text>
-    <mj-text font-size="12px" color="#9CA3AF" padding="16px 0 0 0">
-      {{t 'footer' 'You received this email because you are an introducer, maintainer or administrator for this resource.'}}
-    </mj-text>
-  </mj-column>
-</mj-section>`;
+// All other templates are only migrated to the {{t}}-based default body if the admin
+// never customised them, i.e. the body still equals the pre-ATT-637 default
+// (DEFAULT_TEMPLATE_CONTENT from the email-layout migration).
+const GUARDED_TYPES = Object.values(EmailTemplateType).filter((type) => !FORCE_UPDATED_TYPES.includes(type));
 
 const COPY_LINK_DE = 'Oder kopiere diesen Link in deinen Browser:<br /><a href="{url}">{url}</a>';
 
@@ -201,8 +130,8 @@ const DE: Translation[] = [
   { templateType: 'resource-session-ended', key: 'footer', value: 'Du erhältst diese E-Mail, weil Benachrichtigungen über beendete Ressourcensitzungen in deinen Einstellungen aktiviert sind.' },
 ];
 
-export class SeedDeEmailTemplates1782600000000 implements MigrationInterface {
-  name = 'SeedDeEmailTemplates1782600000000';
+export class SeedEmailTemplateTranslations1782600000000 implements MigrationInterface {
+  name = 'SeedEmailTemplateTranslations1782600000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     for (const row of DE) {
@@ -212,31 +141,36 @@ export class SeedDeEmailTemplates1782600000000 implements MigrationInterface {
       );
     }
 
-    await queryRunner.query(
-      `UPDATE "email_templates" SET "body" = $1, "variables" = $2, "subject" = $3 WHERE "type" = 'resource-health-changed'`,
-      [
-        RESOURCE_HEALTH_CHANGED_MJML,
-        'user.username,user.email,user.id,host.frontend,host.backend,resource.id,resource.name,resource.url,health.status,health.previousStatus,health.reason,health.identifier,health.isDegraded,health.headerColor',
-        '{{#if health.isDegraded}}Resource degraded{{else}}Resource recovered{{/if}}: {{resource.name}}',
-      ],
-    );
-    await queryRunner.query(
-      `UPDATE "email_templates" SET "body" = $1, "variables" = $2 WHERE "type" = 'user-retraining-required'`,
-      [
-        USER_RETRAINING_REQUIRED_MJML,
-        'user.username,user.email,user.id,host.frontend,host.backend,resource.id,resource.name,resource.url,retraining.isAge,retraining.isInactivity,retraining.blocksAccess',
-      ],
-    );
-    await queryRunner.query(
-      `UPDATE "email_templates" SET "body" = $1, "variables" = $2 WHERE "type" = 'resource-usage-note-added'`,
-      [
-        RESOURCE_USAGE_NOTE_ADDED_MJML,
-        'user.username,user.email,user.id,host.frontend,host.backend,resource.id,resource.name,resource.url,note.authorName,note.content,note.isStart',
-      ],
-    );
+    for (const type of FORCE_UPDATED_TYPES) {
+      await queryRunner.query(`UPDATE "email_templates" SET "body" = $1, "variables" = $2 WHERE "type" = $3`, [
+        readDefaultTemplateBody(type),
+        EMAIL_TEMPLATE_DEFAULTS[type].variables.join(','),
+        type,
+      ]);
+    }
+    await queryRunner.query(`UPDATE "email_templates" SET "subject" = $1 WHERE "type" = $2`, [
+      EMAIL_TEMPLATE_DEFAULTS[EmailTemplateType.RESOURCE_HEALTH_CHANGED].subject,
+      EmailTemplateType.RESOURCE_HEALTH_CHANGED,
+    ]);
+
+    for (const type of GUARDED_TYPES) {
+      await queryRunner.query(`UPDATE "email_templates" SET "body" = $1 WHERE "type" = $2 AND "body" = $3`, [
+        readDefaultTemplateBody(type),
+        type,
+        DEFAULT_TEMPLATE_CONTENT[type],
+      ]);
+    }
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    for (const type of GUARDED_TYPES) {
+      await queryRunner.query(`UPDATE "email_templates" SET "body" = $1 WHERE "type" = $2 AND "body" = $3`, [
+        DEFAULT_TEMPLATE_CONTENT[type],
+        type,
+        readDefaultTemplateBody(type),
+      ]);
+    }
+
     for (const row of DE) {
       await queryRunner.query(
         `DELETE FROM "email_template_translations" WHERE "templateType" = ? AND "key" = ? AND "locale" = 'de'`,

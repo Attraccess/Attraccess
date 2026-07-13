@@ -1,4 +1,4 @@
-import { readFileSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { EmailTemplateType } from '@attraccess/database-entities';
 
@@ -196,7 +196,11 @@ export const EMAIL_TEMPLATE_DEFAULTS: Record<EmailTemplateType, EmailTemplateDef
   },
 };
 
-const ASSETS_DIR = join(__dirname, 'assets', 'email-defaults');
+// In the webpack bundle __dirname is the dist root (assets copied next to main.js);
+// under jest the source layout applies and assets live one level up from this module.
+const ASSETS_DIR =
+  [join(__dirname, 'assets', 'email-defaults'), join(__dirname, '..', 'assets', 'email-defaults')].find(existsSync) ??
+  join(__dirname, 'assets', 'email-defaults');
 
 export function readDefaultTemplateBody(type: EmailTemplateType): string {
   return readFileSync(join(ASSETS_DIR, 'templates', `${type}.mjml`), 'utf-8').trim();
