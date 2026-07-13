@@ -374,6 +374,20 @@ describe('RbacService', () => {
       await expect(service.syncSsoRoles(10, ['editor'], SSO_TYPE, SSO_ID)).resolves.toBeUndefined();
     });
 
+    it('handles unique constraint violation (SQLITE_CONSTRAINT) gracefully when adding', async () => {
+      userRoleRepo.find.mockResolvedValue([]);
+      const newRole = makeRole({ id: 4, key: 'editor' });
+      roleRepo.findOne.mockResolvedValue(newRole);
+      userRoleRepo.findOne.mockResolvedValue(null);
+
+      const sqliteViolation = Object.assign(new QueryFailedError('', [], new Error('UNIQUE constraint failed')), {
+        code: 'SQLITE_CONSTRAINT',
+      });
+      userRoleRepo.save.mockRejectedValue(sqliteViolation);
+
+      await expect(service.syncSsoRoles(10, ['editor'], SSO_TYPE, SSO_ID)).resolves.toBeUndefined();
+    });
+
     it('rethrows non-unique-constraint errors', async () => {
       userRoleRepo.find.mockResolvedValue([]);
       const newRole = makeRole({ id: 4, key: 'editor' });
