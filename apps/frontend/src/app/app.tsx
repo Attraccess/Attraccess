@@ -29,7 +29,7 @@ import { KioskGuard } from './kiosk/KioskGuard';
 import { useLocaleSync } from '../hooks/useLocaleSync';
 
 function useRoutesWithAuthElements(routes: RouteConfig[]) {
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
 
   const routesWithAuthElements = useMemo(() => {
     return routes.map((route) => {
@@ -52,9 +52,8 @@ function useRoutesWithAuthElements(routes: RouteConfig[]) {
         Array.isArray(route.authRequired) ? route.authRequired : [route.authRequired]
       ) as string[];
 
-      const effectivePermissions: string[] = (user as any).effectivePermissions ?? [];
       const userHasAllRequiredPermissions = requiredPermissions.every(
-        (permission) => effectivePermissions.includes(permission),
+        (permission) => hasPermission(permission),
       );
 
       if (!userHasAllRequiredPermissions) {
@@ -66,7 +65,7 @@ function useRoutesWithAuthElements(routes: RouteConfig[]) {
 
       return route;
     });
-  }, [routes, user]);
+  }, [routes, user, hasPermission]);
 
   return useMemo(
     () =>

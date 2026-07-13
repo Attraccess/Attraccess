@@ -140,3 +140,5 @@ export * from './1782203000000-companion-device-app-version';
 export * from './1782300000000-rbac-data-model';
 export * from './1782400000000-user-locale';
 export * from './1782500000000-drop-boolean-permissions';
+export * from './1782500000000-email-templates-locale';
+export * from './1782600000000-seed-email-template-translations';

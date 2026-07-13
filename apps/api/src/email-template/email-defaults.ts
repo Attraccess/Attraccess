@@ -1,4 +1,4 @@
-import { readFileSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { EmailTemplateType } from '@attraccess/database-entities';
 
@@ -72,7 +72,7 @@ export const EMAIL_TEMPLATE_DEFAULTS: Record<EmailTemplateType, EmailTemplateDef
     ],
   },
   [EmailTemplateType.RESOURCE_HEALTH_CHANGED]: {
-    subject: '{{health.headline}}: {{resource.name}}',
+    subject: '{{#if health.isDegraded}}Resource degraded{{else}}Resource recovered{{/if}}: {{resource.name}}',
     variables: [
       'user.username',
       'user.email',
@@ -86,9 +86,8 @@ export const EMAIL_TEMPLATE_DEFAULTS: Record<EmailTemplateType, EmailTemplateDef
       'health.previousStatus',
       'health.reason',
       'health.identifier',
-      'health.headline',
+      'health.isDegraded',
       'health.headerColor',
-      'health.bodyAction',
     ],
   },
   [EmailTemplateType.USER_RETRAINING_REQUIRED]: {
@@ -102,7 +101,8 @@ export const EMAIL_TEMPLATE_DEFAULTS: Record<EmailTemplateType, EmailTemplateDef
       'resource.id',
       'resource.name',
       'resource.url',
-      'retraining.reason',
+      'retraining.isAge',
+      'retraining.isInactivity',
       'retraining.blocksAccess',
     ],
   },
@@ -132,8 +132,7 @@ export const EMAIL_TEMPLATE_DEFAULTS: Record<EmailTemplateType, EmailTemplateDef
       'resource.url',
       'note.authorName',
       'note.content',
-      'note.phase',
-      'note.phaseAction',
+      'note.isStart',
     ],
   },
   [EmailTemplateType.RESOURCE_TAKEOVER]: {
@@ -197,7 +196,11 @@ export const EMAIL_TEMPLATE_DEFAULTS: Record<EmailTemplateType, EmailTemplateDef
   },
 };
 
-const ASSETS_DIR = join(__dirname, 'assets', 'email-defaults');
+// In the webpack bundle __dirname is the dist root (assets copied next to main.js);
+// under jest the source layout applies and assets live one level up from this module.
+const ASSETS_DIR =
+  [join(__dirname, 'assets', 'email-defaults'), join(__dirname, '..', 'assets', 'email-defaults')].find(existsSync) ??
+  join(__dirname, 'assets', 'email-defaults');
 
 export function readDefaultTemplateBody(type: EmailTemplateType): string {
   return readFileSync(join(ASSETS_DIR, 'templates', `${type}.mjml`), 'utf-8').trim();

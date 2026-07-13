@@ -1,9 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Alert,
-  AlertContent,
-  AlertDescription,
-  AlertTitle,
   Button,
   Card,
   Chip,
@@ -18,7 +14,6 @@ import {
 } from '@heroui/react';
 import { ActivityIcon, ArrowRightIcon, CpuIcon, LogsIcon, PencilIcon, Trash2Icon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { AlertStatusIcon } from '../../../components/AlertStatusIcon';
 import { EmptyState } from '../../../components/emptyState';
 import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { AttractapEditor } from '../AttractapEditor/AttractapEditor';

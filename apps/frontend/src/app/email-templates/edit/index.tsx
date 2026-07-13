@@ -29,55 +29,13 @@ import { useToastMessage } from '../../../components/toastProvider';
 import { PageHeader } from '../../../components/pageHeader';
 import { StandardDrawer } from '../../../components/standardDrawer';
 import { StandardModal } from '../../../components/standardModal';
-import Editor, { type Monaco, type OnMount } from '@monaco-editor/react';
+import Editor, { type OnMount } from '@monaco-editor/react';
 import { Maximize, RotateCcw } from 'lucide-react';
 
 import * as enTranslationsFile from './en.json';
 import * as deTranslationsFile from './de.json';
-
-const VARIABLE_PROVIDER_FLAG = '__attraccessVariableProvider';
-
-function registerVariableProvider(
-  monaco: Monaco,
-  getVariables: () => string[],
-  getDetailLabel: () => string,
-) {
-  const monacoWithFlag = monaco as Monaco & { [VARIABLE_PROVIDER_FLAG]?: boolean };
-  if (monacoWithFlag[VARIABLE_PROVIDER_FLAG]) {
-    return;
-  }
-  monacoWithFlag[VARIABLE_PROVIDER_FLAG] = true;
-  if (!monaco.languages.getLanguages().some((lang) => lang.id === 'mjml')) {
-    monaco.languages.register({ id: 'mjml', extensions: ['.mjml'], aliases: ['MJML', 'mjml'] });
-  }
-  monaco.languages.registerCompletionItemProvider('mjml', {
-    triggerCharacters: ['{'],
-    provideCompletionItems: (model, position) => {
-      const word = model.getWordUntilPosition(position);
-      const lineContent = model.getLineContent(position.lineNumber);
-      let startColumn = word.startColumn;
-      while (startColumn > 1 && lineContent[startColumn - 2] === '{') {
-        startColumn -= 1;
-      }
-      const range = {
-        startLineNumber: position.lineNumber,
-        endLineNumber: position.lineNumber,
-        startColumn,
-        endColumn: word.endColumn,
-      };
-      const detail = getDetailLabel();
-      return {
-        suggestions: getVariables().map((name) => ({
-          label: name,
-          kind: monaco.languages.CompletionItemKind.Variable,
-          insertText: `{{${name}}}`,
-          detail,
-          range,
-        })),
-      };
-    },
-  });
-}
+import { registerVariableProvider } from './registerVariableProvider';
+import { TranslationsSection } from './TranslationsSection';
 
 export function EditEmailTemplatePage() {
   const navigate = useNavigate();
@@ -200,6 +158,8 @@ export function EditEmailTemplatePage() {
   }, [bodyIsEmpty, parsedBody, t, parseMjmlIsPending, parseMjmlisError, parseMjmlError]);
 
   const [editorIsExpanded, setEditorIsExpanded] = useState(false);
+
+  const debouncedTranslationsContent = useDebounce(subject + '\n' + body, 700);
 
   const editor = useMemo(() => {
     const variableList = (
@@ -352,6 +312,13 @@ export function EditEmailTemplatePage() {
             {t('actions.save')}
           </Button>
         </div>
+
+        {templateType && (
+          <TranslationsSection
+            templateType={templateType as EmailTemplateType}
+            liveContent={debouncedTranslationsContent}
+          />
+        )}
       </Form>
 
       <StandardModal isOpen={resetConfirmOpen} onOpenChange={setResetConfirmOpen} size="sm">

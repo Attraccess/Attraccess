@@ -39,7 +39,7 @@ export function useAutoLogoff(seconds: number | null): AutoLogoffState {
       setRemaining(remainingRef.current);
 
       if (remainingRef.current <= 0) {
-        clearInterval(timerRef.current!);
+        if (timerRef.current !== null) clearInterval(timerRef.current);
         endSession(undefined);
       }
     }, 1000);

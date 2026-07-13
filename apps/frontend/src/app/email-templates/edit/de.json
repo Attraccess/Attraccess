@@ -24,7 +24,8 @@
   },
   "sections": {
     "template": "Vorlage",
-    "preview": "Vorschau"
+    "preview": "Vorschau",
+    "translations": "Übersetzungen"
   },
   "preview": {
     "iframeTitle": "Körper-Vorschau",
@@ -40,6 +41,24 @@
     "copyFailed": "{{name}} konnte nicht kopiert werden",
     "completionDetail": "Template-Variable"
   },
+  "translations": {
+    "noKeys": "Keine \\{{t}}-Helfer-Aufrufe in dieser Vorlage gefunden. Verwenden Sie \\{{t \"key\" \"Standardtext\"}} im Vorlageninhalt oder Betreff, um übersetzbare Zeichenfolgen hinzuzufügen.",
+    "keyColumn": "Schlüssel",
+    "defaultColumn": "Standard (Englisch)",
+    "translationColumn": "Übersetzung",
+    "locale": "Sprache",
+    "addLocale": "Hinzufügen",
+    "localePlaceholder": "z. B. de, fr, es",
+    "save": "Übersetzungen speichern",
+    "saving": "Speichern...",
+    "saveFailed": "Übersetzungen konnten nicht gespeichert werden",
+    "saved": "Übersetzungen gespeichert",
+    "deleteLocale": "Sprache löschen",
+    "deleteFailed": "Übersetzungen konnten nicht gelöscht werden",
+    "deleteConfirm": "Alle Übersetzungen für die Sprache \"{{locale}}\" löschen?",
+    "deleteConfirmButton": "Löschen",
+    "emptyTranslation": "Fällt auf Standard zurück"
+  },
   "actions": {
     "close": "Schließen",
     "cancel": "Abbrechen",
@@ -49,7 +68,7 @@
   },
   "resetConfirm": {
     "title": "Vorlage auf Standard zurücksetzen?",
-    "message": "Dies überschreibt Ihre Anpassungen mit der Standard-Vorlage. Dies kann nicht rückgängig gemacht werden.",
+    "message": "Dies überschreibt Ihre Anpassungen mit der Standard-Vorlage und löscht alle gespeicherten Übersetzungen. Dies kann nicht rückgängig gemacht werden.",
     "confirm": "Zurücksetzen",
     "cancel": "Abbrechen"
   },

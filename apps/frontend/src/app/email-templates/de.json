@@ -27,6 +27,9 @@
     "user-retraining-required": "Nachschulung erforderlich",
     "maintenance-request-created": "Wartungsanfrage erstellt",
     "message-received": "Neue Nachricht (Offline-Fallback)",
-    "resource-usage-note-added": "Ressourcen-Nutzungsnotiz hinzugefügt"
+    "resource-usage-note-added": "Ressourcen-Nutzungsnotiz hinzugefügt",
+    "resource-takeover": "Ressourcenübernahme",
+    "access-change": "Zugriffsänderung",
+    "resource-session-ended": "Ressourcen-Sitzung beendet"
   }
 }
