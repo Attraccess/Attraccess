@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { ResourceIntroducer, ResourceIntroducerType } from '@attraccess/database-entities';
+import { ResourceIntroducer, ResourceIntroducerType, User } from '@attraccess/database-entities';
 import { ResourceIntroducersService } from './resourceIntroducers.service';
 import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../../notifications/notification-types';
@@ -169,18 +169,27 @@ describe('ResourceIntroducersService', () => {
         expect.objectContaining({
           category: NotificationCategory.ACCESS_CHANGES,
           recipients: [expect.objectContaining({ id: 2 })],
-          title: 'Your resource access changed',
-          body: 'You were made a maintainer for resource #1.',
+          title: expect.any(Function),
+          body: expect.any(Function),
           url: '/resources/1',
           sendEmail: expect.any(Function),
         }),
       );
       const request = notifications.dispatch.mock.calls[0][0];
-      await request.sendEmail({ id: 2, email: 'user@example.com' });
+      const enUser = { locale: 'en' } as User;
+      expect(request.title(enUser)).toBe('Your resource access changed');
+      expect(request.body(enUser)).toBe('You were made a maintainer for resource #1.');
+      await request.sendEmail({ id: 2, email: 'user@example.com', locale: 'en' } as User);
       expect(notifications.sendEmailTemplate).toHaveBeenCalledWith(
         expect.objectContaining({ id: 2 }),
         NotificationCategory.ACCESS_CHANGES,
-        { accessChange: { title: 'Your resource access changed', body: 'You were made a maintainer for resource #1.', url: '/resources/1' } },
+        {
+          accessChange: {
+            title: 'Your resource access changed',
+            body: 'You were made a maintainer for resource #1.',
+            url: '/resources/1',
+          },
+        },
       );
     });
 
@@ -196,11 +205,8 @@ describe('ResourceIntroducersService', () => {
         userId: 2,
         type: ResourceIntroducerType.INTRODUCER,
       });
-      expect(notifications.dispatch).toHaveBeenCalledWith(
-        expect.objectContaining({
-          body: 'You were made an introducer for resource #1.',
-        }),
-      );
+      const defaultsReq = notifications.dispatch.mock.calls[0][0];
+      expect(defaultsReq.body({ locale: 'en' } as User)).toBe('You were made an introducer for resource #1.');
     });
 
     it('upgrades an existing row to the requested type', async () => {
@@ -213,11 +219,8 @@ describe('ResourceIntroducersService', () => {
       expect(result.type).toBe(ResourceIntroducerType.INTRODUCER);
       expect(repository.save).toHaveBeenCalledWith(existing);
       expect(eventEmitter.emit).toHaveBeenCalled();
-      expect(notifications.dispatch).toHaveBeenCalledWith(
-        expect.objectContaining({
-          body: 'You were made an introducer for resource #1.',
-        }),
-      );
+      const upgradeReq = notifications.dispatch.mock.calls[0][0];
+      expect(upgradeReq.body({ locale: 'en' } as User)).toBe('You were made an introducer for resource #1.');
     });
 
     it('does not re-save when the existing row already matches', async () => {
@@ -239,14 +242,11 @@ describe('ResourceIntroducersService', () => {
 
       await service.revoke(1, 2);
 
-      expect(notifications.dispatch).toHaveBeenCalledWith(
-        expect.objectContaining({
-          category: NotificationCategory.ACCESS_CHANGES,
-          recipients: [expect.objectContaining({ id: 2 })],
-          body: 'Your maintainer status for resource #1 was revoked.',
-          url: '/resources/1',
-        }),
-      );
+      const revokeReq = notifications.dispatch.mock.calls[0][0];
+      expect(revokeReq.category).toBe(NotificationCategory.ACCESS_CHANGES);
+      expect(revokeReq.recipients).toEqual([expect.objectContaining({ id: 2 })]);
+      expect(revokeReq.url).toBe('/resources/1');
+      expect(revokeReq.body({ locale: 'en' } as User)).toBe('Your maintainer status for resource #1 was revoked.');
     });
   });
 });

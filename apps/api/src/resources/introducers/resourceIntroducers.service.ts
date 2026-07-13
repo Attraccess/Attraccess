@@ -6,6 +6,11 @@ import { EntityManager, Repository } from 'typeorm';
 import { ResourceIntroducerChangedEvent } from './events/resource-introducer-changed.event';
 import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../../notifications/notification-types';
+import { createTranslator } from '../../i18n/translate';
+import * as en from './resourceIntroducers.en.json';
+import * as de from './resourceIntroducers.de.json';
+
+const t = createTranslator({ en, de });
 
 @Injectable()
 export class ResourceIntroducersService {
@@ -20,23 +25,30 @@ export class ResourceIntroducersService {
   ) {}
 
   private notifyAccessChange(resourceId: number, userId: number, type: ResourceIntroducerType, granted: boolean): void {
-    const role = type === ResourceIntroducerType.MAINTAINER ? 'maintainer' : 'introducer';
-    const title = 'Your resource access changed';
-    const body = granted
-      ? `You were made an ${role} for resource #${resourceId}.`.replace('an maintainer', 'a maintainer')
-      : `Your ${role} status for resource #${resourceId} was revoked.`;
     const url = `/resources/${resourceId}`;
+    const bodyKey =
+      type === ResourceIntroducerType.MAINTAINER
+        ? granted
+          ? 'grantedMaintainer'
+          : 'revokedMaintainer'
+        : granted
+          ? 'grantedIntroducer'
+          : 'revokedIntroducer';
 
     void this.notifications.dispatch({
       category: NotificationCategory.ACCESS_CHANGES,
       recipients: [{ id: userId } as User],
-      title,
-      body,
+      title: (r) => t(r.locale, 'title'),
+      body: (r) => t(r.locale, bodyKey, { resourceId }),
       url,
-      dedupeKey: `resource-access-${resourceId}-${userId}-${role}-${granted ? 'granted' : 'revoked'}`,
-      sendEmail: (recipient) =>
-        this.notifications.sendEmailTemplate(recipient, NotificationCategory.ACCESS_CHANGES, {
-          accessChange: { title, body, url },
+      dedupeKey: `resource-access-${resourceId}-${userId}-${bodyKey}`,
+      sendEmail: (r) =>
+        this.notifications.sendEmailTemplate(r, NotificationCategory.ACCESS_CHANGES, {
+          accessChange: {
+            title: t(r.locale, 'title'),
+            body: t(r.locale, bodyKey, { resourceId }),
+            url,
+          },
         }),
     }).catch((error) => {
       this.logger.error(`Failed to notify user ${userId} about resource access changes: ${(error as Error).message}`);

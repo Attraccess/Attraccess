@@ -1,0 +1,5 @@
+{
+  "title": "Wartung angefordert für {resourceName}",
+  "body": "{requestedBy} hat Wartung angefordert: {reason}",
+  "fallbackUser": "Ein Benutzer"
+}
