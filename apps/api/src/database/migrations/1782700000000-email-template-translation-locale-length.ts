@@ -1,9 +1,10 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class EmailTemplateTranslationLocaleLength1782700000000 implements MigrationInterface {
-  // ponytail: SQLite stores all varchar as TEXT and does not enforce length constraints,
+  // SQLite stores all varchar as TEXT and does not enforce length constraints,
   // so widening locale from 10→35 requires only a table-recreation to update the DDL label.
-  // The entity uses length: 35; new installs get the correct DDL from 1782500000000 directly.
+  // The entity uses length: 35; this migration ensures existing installs (which ran 1782500000000
+  // with varchar(10)) are updated to match.
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
       CREATE TABLE "email_template_translations_new" (

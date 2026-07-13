@@ -116,33 +116,32 @@ export function TranslationsSection({ templateType, liveContent }: TranslationsS
 
       <div className="flex flex-row flex-wrap items-center gap-2">
         {allLocales.length > 0 && (
-          <Tabs
-            selectedKey={selectedLocale}
-            onSelectionChange={(key: Key) => setSelectedLocale(String(key))}
-          >
-            <TabList>
-              {allLocales.map((locale) => (
-                <Tab id={locale} key={locale}>
-                  <div className="flex items-center gap-1">
+          <div className="flex items-center gap-2">
+            <Tabs
+              selectedKey={selectedLocale}
+              onSelectionChange={(key: Key) => setSelectedLocale(String(key))}
+            >
+              <TabList>
+                {allLocales.map((locale) => (
+                  <Tab id={locale} key={locale}>
                     {locale.toUpperCase()}
-                    {/* stopPropagation on the native click prevents Tab selection */}
-                    <span onClick={(e) => e.stopPropagation()}>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        isIconOnly
-                        className="ml-1 min-w-unit-5 w-unit-5 h-unit-5 text-danger"
-                        onPress={() => setDeleteTarget(locale)}
-                        aria-label={t('translations.deleteLocale')}
-                      >
-                        ×
-                      </Button>
-                    </span>
-                  </div>
-                </Tab>
-              ))}
-            </TabList>
-          </Tabs>
+                  </Tab>
+                ))}
+              </TabList>
+            </Tabs>
+            {selectedLocale && (
+              <Button
+                size="sm"
+                variant="ghost"
+                isIconOnly
+                className="text-danger"
+                onPress={() => setDeleteTarget(selectedLocale)}
+                aria-label={t('translations.deleteLocale')}
+              >
+                ×
+              </Button>
+            )}
+          </div>
         )}
         <div className="flex gap-2 items-center ml-2">
           <TextField
