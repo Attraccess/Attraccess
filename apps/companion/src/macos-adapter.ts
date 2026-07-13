@@ -49,6 +49,10 @@ export class MacosAdapter implements OsAdapter {
 
   async applyUpdate(dest: string, version: string, _allowQuit: () => void): Promise<void> {
     const tmpMount = path.join(os.tmpdir(), `attraccess-update-${version}-${randomBytes(4).toString('hex')}`);
+    // Derive once so the catch block can reference them for rollback
+    const currentApp = process.execPath.replace(/\/Contents\/MacOS\/[^/]+$/, '');
+    const newApp = currentApp + '.update';
+    const oldApp = currentApp + '.old';
     try {
       // hdiutil requires the mountpoint directory to exist before attaching
       fs.mkdirSync(tmpMount, { recursive: true });
@@ -58,12 +62,7 @@ export class MacosAdapter implements OsAdapter {
       if (appMatches.length === 0) throw new Error('no .app bundle found in DMG');
       if (appMatches.length > 1) throw new Error(`ambiguous DMG: ${appMatches.length} .app bundles found`);
       const appInDmg = appMatches[0];
-      // Derive the current .app bundle path from the running executable
-      // e.g. /Applications/App.app/Contents/MacOS/App → /Applications/App.app
-      const currentApp = process.execPath.replace(/\/Contents\/MacOS\/[^/]+$/, '');
       // ditto merges into an existing dst directory; remove first so the new bundle fully replaces the old one
-      const newApp = currentApp + '.update';
-      const oldApp = currentApp + '.old';
       fs.rmSync(newApp, { recursive: true, force: true });
       execFileSync('ditto', [appInDmg, newApp]);
       fs.rmSync(oldApp, { recursive: true, force: true });
@@ -78,6 +77,8 @@ export class MacosAdapter implements OsAdapter {
       app.quit();
     } catch (err) {
       console.error('[companion] macOS silent update failed, falling back to manual install:', err);
+      // Restore the live bundle if it was moved aside before the failure
+      try { if (!fs.existsSync(currentApp) && fs.existsSync(oldApp)) fs.renameSync(oldApp, currentApp); } catch { /* best-effort rollback */ }
       try { execFileSync('hdiutil', ['detach', tmpMount, '-quiet']); } catch { /* best-effort */ }
       try { fs.rmSync(tmpMount, { recursive: true, force: true }); } catch { /* best-effort */ }
       const errMsg = await shell.openPath(dest);
