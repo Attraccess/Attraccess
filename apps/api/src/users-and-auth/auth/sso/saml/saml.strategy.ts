@@ -298,7 +298,10 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
     this.logger.debug(`RBAC role keys from SAML: ${JSON.stringify([...roleKeys])}`);
 
     const rbacService = this.moduleRef.get(RbacService, { strict: false });
-    if (rbacService && hasConfiguredPermissionMapping(config.permissionMappings)) {
+    // Only sync when a mapping is configured AND the token contained at least one role/group claim.
+    // Skipping on empty roleNames prevents a missing attribute or transient IdP omission from
+    // silently revoking all SSO-granted roles.
+    if (rbacService && hasConfiguredPermissionMapping(config.permissionMappings) && roleNames.length > 0) {
       await rbacService.syncSsoRoles(
         user.id,
         [...roleKeys],

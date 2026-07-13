@@ -207,9 +207,9 @@ export class TwoFactorService {
 
   private isPrivilegedUser(user: User): boolean {
     const effectivePerms = (user as AuthenticatedUser).effectivePermissions;
-    if (!effectivePerms) return false;
-    // Privileged = has any permission beyond the default 'resources.read' granted to all users
-    return [...effectivePerms].some((p) => p !== 'resources.read');
+    if (!effectivePerms || effectivePerms.size === 0) return false;
+    // privileged = more than just the default user-role grant
+    return effectivePerms.size > 1 || !effectivePerms.has('resources.read');
   }
 
   private async isCodeValid(secret: string, code: string): Promise<boolean> {

@@ -297,9 +297,10 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', true
     this.logger.debug(`RBAC role keys from SSO: ${JSON.stringify([...roleKeys])}`);
 
     const rbacService = this.moduleRef.get(RbacService, { strict: false });
-    // Only sync when a mapping is configured; skip entirely if no mapping exists to avoid
-    // wiping SSO-granted roles when the token simply lacks a groups/roles claim.
-    if (rbacService && hasConfiguredPermissionMapping(this.config.permissionMappings)) {
+    // Only sync when a mapping is configured AND the token contained at least one role/group claim.
+    // Skipping on empty roleNames prevents a missing scope or transient IdP omission from silently
+    // revoking all SSO-granted roles.
+    if (rbacService && hasConfiguredPermissionMapping(this.config.permissionMappings) && roleNames.length > 0) {
       await rbacService.syncSsoRoles(
         user.id,
         [...roleKeys],
