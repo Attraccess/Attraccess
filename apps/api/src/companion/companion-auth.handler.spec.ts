@@ -126,6 +126,48 @@ describe('CompanionAuthHandler', () => {
       const updateCall = calls.find((c) => c[0] === CompanionEventType.COMPANION_UPDATE_AVAILABLE);
       expect(updateCall).toBeDefined();
       expect(updateCall[1]).toMatchObject({ version: '2.0.0', downloadUrl: '/api/companion/download/linux/x64' });
+      expect(updateCall[1].sha256).toBeUndefined();
+    });
+
+    it('includes sha256 in COMPANION_UPDATE_AVAILABLE when manifest provides it', async () => {
+      mockService.findById.mockResolvedValue({ id: 5, name: 'PC', tokenHash: 'h' });
+      mockService.verifyToken.mockResolvedValue(true);
+      mockService.touchLastConnection.mockResolvedValue(undefined);
+      mockGatewayService.getResourcesForDevice.mockResolvedValue([]);
+      mockService.getManifest.mockReturnValue({
+        version: '2.0.0',
+        buildId: 'abc',
+        platforms: [{ platform: 'linux', arch: 'x64', filename: 'companion-linux-x64.AppImage', sha256: 'deadbeef1234' }],
+      });
+
+      const socket = makeSocket();
+      await handler.handleAuthenticate(socket, { id: 5, token: 'tok', platform: 'linux', appVersion: '1.0.0' });
+
+      const calls = (socket.sendEvent as jest.Mock).mock.calls;
+      const updateCall = calls.find((c) => c[0] === CompanionEventType.COMPANION_UPDATE_AVAILABLE);
+      expect(updateCall[1]).toMatchObject({ version: '2.0.0', sha256: 'deadbeef1234' });
+    });
+
+    it('serves arch-matched binary when arch is provided', async () => {
+      mockService.findById.mockResolvedValue({ id: 5, name: 'PC', tokenHash: 'h' });
+      mockService.verifyToken.mockResolvedValue(true);
+      mockService.touchLastConnection.mockResolvedValue(undefined);
+      mockGatewayService.getResourcesForDevice.mockResolvedValue([]);
+      mockService.getManifest.mockReturnValue({
+        version: '2.0.0',
+        buildId: 'abc',
+        platforms: [
+          { platform: 'linux', arch: 'x64', filename: 'companion-linux-x64.AppImage' },
+          { platform: 'linux', arch: 'arm64', filename: 'companion-linux-arm64.AppImage' },
+        ],
+      });
+
+      const socket = makeSocket();
+      await handler.handleAuthenticate(socket, { id: 5, token: 'tok', platform: 'linux', arch: 'arm64', appVersion: '1.0.0' });
+
+      const calls = (socket.sendEvent as jest.Mock).mock.calls;
+      const updateCall = calls.find((c) => c[0] === CompanionEventType.COMPANION_UPDATE_AVAILABLE);
+      expect(updateCall[1]).toMatchObject({ downloadUrl: '/api/companion/download/linux/arm64' });
     });
 
     it('does not send COMPANION_UPDATE_AVAILABLE when version is current', async () => {

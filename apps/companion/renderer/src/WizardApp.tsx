@@ -18,7 +18,7 @@ export function WizardApp() {
   const [connecting, setConnecting] = useState(false);
   const [deviceId, setDeviceId] = useState<number | null>(null);
   const [perms, setPerms] = useState<Permissions | null>(null);
-  const [pendingAction, setPendingAction] = useState<'settings' | 'quit' | null>(null);
+  const [pendingAction, setPendingAction] = useState<'settings' | 'quit' | 'admin-override' | null>(null);
   const [registered, setRegistered] = useState(false);
   const [connected, setConnected] = useState(false);
 
@@ -115,11 +115,22 @@ export function WizardApp() {
   }
 
   async function handleVerifyPin() {
+    if (pendingAction === 'admin-override') {
+      // Main process re-verifies the PIN itself; treat a false return as wrong PIN
+      const ok = await window.companion.enableAdminOverride(pinEntry);
+      if (!ok) {
+        setPinEntryError('Incorrect PIN.');
+      } else {
+        setPinEntry(''); // clear plaintext PIN on success — window closes via main process
+      }
+      return;
+    }
     const ok = await window.companion.verifyPin(pinEntry);
     if (!ok) {
       setPinEntryError('Incorrect PIN.');
       return;
     }
+    setPinEntry(''); // clear plaintext PIN — settings path keeps the window open
     setPinEntryError('');
     if (pendingAction === 'quit') {
       await window.companion.confirmQuit();
@@ -177,19 +188,24 @@ export function WizardApp() {
               onSubmit={handleSetPin}
             />
           )}
-          {step === 'pin-entry' && (
-            <PinEntryStep
-              title={pendingAction === 'quit' ? 'Confirm quit' : 'Access settings'}
-              description={pendingAction === 'quit'
-                ? 'Enter your PIN to quit Attraccess Companion.'
-                : 'Enter your PIN to access settings.'}
-              submitLabel={pendingAction === 'quit' ? 'Quit' : 'Confirm'}
-              pinEntry={pinEntry}
-              error={pinEntryError}
-              onPinEntryChange={setPinEntry}
-              onSubmit={handleVerifyPin}
-            />
-          )}
+          {step === 'pin-entry' && (() => {
+            const pinCopy = {
+              quit: { title: 'Confirm quit', description: 'Enter your PIN to quit Attraccess Companion.', submitLabel: 'Quit' },
+              'admin-override': { title: 'Admin override', description: 'Enter your admin PIN to unlock the kiosk and ignore server commands.', submitLabel: 'Enable override' },
+              settings: { title: 'Access settings', description: 'Enter your PIN to access settings.', submitLabel: 'Confirm' },
+            }[pendingAction ?? 'settings'] ?? { title: 'Access settings', description: 'Enter your PIN to access settings.', submitLabel: 'Confirm' };
+            return (
+              <PinEntryStep
+                title={pinCopy.title}
+                description={pinCopy.description}
+                submitLabel={pinCopy.submitLabel}
+                pinEntry={pinEntry}
+                error={pinEntryError}
+                onPinEntryChange={setPinEntry}
+                onSubmit={handleVerifyPin}
+              />
+            );
+          })()}
           {step === 'url' && (
             <UrlStep
               serverUrl={serverUrl}

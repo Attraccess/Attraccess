@@ -50,7 +50,7 @@ export class CompanionGateway implements OnGatewayConnection, OnGatewayDisconnec
       (client as unknown as { send: (d: string) => void }).send(JSON.stringify({ event: type, data: payload }));
     };
 
-    Object.assign(client, { id, deviceId: null, sendEvent });
+    Object.assign(client, { id, deviceId: null, platform: null, arch: null, sendEvent });
     this.gatewayService.sockets.set(id, client as unknown as CompanionSocket);
 
     this.logger.log(`Companion client connected: ${id}`);
@@ -183,11 +183,7 @@ export class CompanionGateway implements OnGatewayConnection, OnGatewayDisconnec
     message: { name: 'COMPANION_UPDATE_AVAILABLE', payload: CompanionUpdateAvailableDto },
     summary: 'Notifies the companion that a new version is available',
   })
-  public sendUpdateAvailable(deviceId: number, payload: CompanionUpdateAvailableDto): void {
-    for (const socket of [...this.gatewayService.sockets.values()].filter((s) => s.deviceId === deviceId)) {
-      socket.sendEvent(CompanionEventType.COMPANION_UPDATE_AVAILABLE, payload);
-    }
-  }
+  private _specUpdateAvailable() { /* emitted by CompanionAuthHandler.maybeSendUpdateAvailable on connect */ }
 
   @AsyncApiSub({
     channel: 'COMPANION_DEVICE_RENAMED',

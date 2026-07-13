@@ -1,8 +1,11 @@
 import type { App } from 'electron';
+import { app } from 'electron';
+import * as fs from 'fs';
 import type { OsAdapter } from './platform-adapter';
 import { tryLockSession, installDesktopAutostart, tryVtLock, releaseVtLock } from './linux-lock';
 
 export class LinuxAdapter implements OsAdapter {
+  readonly updateExtension = '';
   async tryOsLock(): Promise<boolean> {
     const [sessionLocked] = await Promise.all([
       tryLockSession(),
@@ -47,5 +50,29 @@ export class LinuxAdapter implements OsAdapter {
       'Control+Alt+F7', 'Control+Alt+F8', 'Control+Alt+F9',
       'Control+Alt+F10', 'Control+Alt+F11', 'Control+Alt+F12',
     ];
+  }
+
+  async applyUpdate(dest: string, _version: string, allowQuit: () => void): Promise<void> {
+    // process.env.APPIMAGE is the path to the .AppImage file that was executed.
+    // app.getPath('exe') returns the Electron binary inside the read-only FUSE
+    // squashfs mount — writing there fails with EROFS. Always prefer APPIMAGE.
+    const exePath = process.env.APPIMAGE || app.getPath('exe');
+    try {
+      // Atomic in-place replace: write to a sibling temp file then rename so a crash
+      // mid-operation never leaves exePath truncated. rename(2) within the same
+      // filesystem is atomic, so the old binary or the new one is always fully in place.
+      const tmpDest = `${exePath}.tmp`;
+      fs.copyFileSync(dest, tmpDest);
+      fs.chmodSync(tmpDest, 0o755);
+      fs.renameSync(tmpDest, exePath);
+      try { fs.unlinkSync(dest); } catch { /* best-effort cleanup */ }
+      app.relaunch({ execPath: exePath });
+    } catch (err) {
+      console.error('[companion] failed to replace AppImage in-place, running from temp path:', err);
+      try { fs.chmodSync(dest, 0o755); } catch { /* ignore */ }
+      app.relaunch({ execPath: dest });
+    }
+    allowQuit();
+    app.quit();
   }
 }

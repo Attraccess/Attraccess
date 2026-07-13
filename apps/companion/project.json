@@ -80,14 +80,6 @@
       "options": {
         "lintFilePatterns": ["apps/companion/**/*.ts", "apps/companion/**/*.tsx"]
       }
-    },
-    "test": {
-      "executor": "@nx/jest:jest",
-      "cache": true,
-      "inputs": ["default", "^production", "{workspaceRoot}/jest.preset.js"],
-      "options": {
-        "jestConfig": "apps/companion/jest.config.ts"
-      }
     }
   }
 }

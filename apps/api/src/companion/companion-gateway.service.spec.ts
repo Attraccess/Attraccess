@@ -9,6 +9,7 @@ function makeSocket(deviceId: number | null, overrides: Partial<CompanionSocket>
   return {
     id: `sock-${deviceId ?? 'x'}`,
     deviceId,
+    platform: null,
     sendEvent: jest.fn(),
     ...overrides,
   } as unknown as CompanionSocket;
@@ -34,6 +35,7 @@ describe('CompanionGatewayService', () => {
         { provide: getRepositoryToken(CompanionDevice), useValue: mockDeviceRepo },
         { provide: getRepositoryToken(ResourceFlowNode), useValue: mockFlowNodeRepo },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
+
       ],
     }).compile();
 
