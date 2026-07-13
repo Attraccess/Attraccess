@@ -51,7 +51,14 @@ describe('UsersService', () => {
         {
           provide: DataSource,
           useValue: {
-            transaction: jest.fn(),
+            // Call the callback with a mock EntityManager that delegates save() to
+            // userRepository.save so per-test mocks on the repository still apply.
+            transaction: jest.fn().mockImplementation(async (cb: (em: unknown) => Promise<unknown>) => {
+              const em = {
+                save: jest.fn().mockImplementation((entity: unknown) => userRepository.save(entity as User)),
+              };
+              return cb(em);
+            }),
           },
         },
         {
@@ -156,7 +163,7 @@ describe('UsersService', () => {
       jest.spyOn(userRepository, 'count').mockResolvedValue(0);
 
       await service.createOne({ username: 'test', email: 'test@example.com', externalIdentifier: null });
-      expect(mockRbacService.assignRoleByKey).toHaveBeenCalledWith(1, 'owner');
+      expect(mockRbacService.assignRoleByKey).toHaveBeenCalledWith(1, 'owner', expect.anything());
     });
 
     it('a subsequent user should be assigned default roles via RBAC', async () => {
@@ -174,7 +181,7 @@ describe('UsersService', () => {
         externalIdentifier: null,
         isEmailVerified: false,
       });
-      expect(mockRbacService.assignDefaultRoles).toHaveBeenCalledWith(1);
+      expect(mockRbacService.assignDefaultRoles).toHaveBeenCalledWith(1, expect.anything());
       expect(mockRbacService.assignRoleByKey).not.toHaveBeenCalled();
     });
 

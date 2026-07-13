@@ -10,9 +10,12 @@ import { RbacService } from './rbac.service';
 
 const createMockQueryBuilder = (overrides: Record<string, unknown> = {}) => ({
   innerJoin: jest.fn().mockReturnThis(),
+  select: jest.fn().mockReturnThis(),
+  distinct: jest.fn().mockReturnThis(),
   where: jest.fn().mockReturnThis(),
   andWhere: jest.fn().mockReturnThis(),
   getCount: jest.fn().mockResolvedValue(0),
+  getRawMany: jest.fn().mockResolvedValue([]),
   ...overrides,
 });
 
@@ -57,6 +60,14 @@ describe('RbacService', () => {
   beforeEach(async () => {
     const mockQb = createMockQueryBuilder();
 
+    // manager.transaction calls the callback with a mock EntityManager that proxies back
+    // to userRoleRepo so count/delete mocks still apply in the transactional path.
+    const mockManager = {
+      createQueryBuilder: jest.fn().mockReturnValue(mockQb),
+      delete: jest.fn(),
+    };
+    const mockTransaction = jest.fn().mockImplementation((cb: (em: unknown) => Promise<unknown>) => cb(mockManager));
+
     userRoleRepo = {
       find: jest.fn(),
       findOne: jest.fn(),
@@ -64,6 +75,7 @@ describe('RbacService', () => {
       delete: jest.fn(),
       create: jest.fn((data) => ({ ...data } as UserRole)),
       createQueryBuilder: jest.fn().mockReturnValue(mockQb),
+      manager: { transaction: mockTransaction },
     } as unknown as jest.Mocked<Repository<UserRole>>;
 
     roleRepo = {
@@ -95,7 +107,8 @@ describe('RbacService', () => {
 
   describe('getEffectivePermissions', () => {
     it('returns empty set when user has no roles', async () => {
-      userRoleRepo.find.mockResolvedValue([]);
+      const mockQb = createMockQueryBuilder({ getRawMany: jest.fn().mockResolvedValue([]) });
+      userRoleRepo.createQueryBuilder.mockReturnValue(mockQb as any);
 
       const perms = await service.getEffectivePermissions(10);
 
@@ -103,29 +116,9 @@ describe('RbacService', () => {
     });
 
     it('returns union of all permissions from all assigned roles', async () => {
-      const userRoles = [
-        makeUserRole({
-          roleId: 1,
-          role: makeRole({
-            id: 1,
-            key: 'reader',
-            rolePermissions: [{ permissionKey: 'resources.read' } as any],
-          }),
-        }),
-        makeUserRole({
-          id: 2,
-          roleId: 2,
-          role: makeRole({
-            id: 2,
-            key: 'manager',
-            rolePermissions: [
-              { permissionKey: 'resources.read' } as any,
-              { permissionKey: 'resources.write' } as any,
-            ],
-          }),
-        }),
-      ];
-      userRoleRepo.find.mockResolvedValue(userRoles);
+      const rows = [{ permissionKey: 'resources.read' }, { permissionKey: 'resources.write' }];
+      const mockQb = createMockQueryBuilder({ getRawMany: jest.fn().mockResolvedValue(rows) });
+      userRoleRepo.createQueryBuilder.mockReturnValue(mockQb as any);
 
       const perms = await service.getEffectivePermissions(10);
 
@@ -135,10 +128,8 @@ describe('RbacService', () => {
     });
 
     it('handles roles with no rolePermissions gracefully', async () => {
-      const userRoles = [
-        makeUserRole({ role: makeRole({ rolePermissions: undefined as any }) }),
-      ];
-      userRoleRepo.find.mockResolvedValue(userRoles);
+      const mockQb = createMockQueryBuilder({ getRawMany: jest.fn().mockResolvedValue([]) });
+      userRoleRepo.createQueryBuilder.mockReturnValue(mockQb as any);
 
       const perms = await service.getEffectivePermissions(10);
 
@@ -235,9 +226,13 @@ describe('RbacService', () => {
       });
       roleRepo.findOne.mockResolvedValue(ownerRole);
 
-      // Only one owner left
+      // The TOCTOU-safe path uses manager.transaction; mock the manager's QB to return count=1
       const mockQb = createMockQueryBuilder({ getCount: jest.fn().mockResolvedValue(1) });
-      userRoleRepo.createQueryBuilder.mockReturnValue(mockQb as any);
+      const mockManager = {
+        createQueryBuilder: jest.fn().mockReturnValue(mockQb),
+        delete: jest.fn(),
+      };
+      (userRoleRepo.manager as any).transaction = jest.fn().mockImplementation((cb: (em: unknown) => Promise<unknown>) => cb(mockManager));
 
       await expect(service.revokeRole(10, 1, new Set(['system.admin']))).rejects.toThrow(ForbiddenException);
     });
@@ -270,13 +265,16 @@ describe('RbacService', () => {
       });
       roleRepo.findOne.mockResolvedValue(ownerRole);
 
-      // Two owners exist
+      // The TOCTOU-safe path uses manager.transaction; mock the manager's QB to return count=2
       const mockQb = createMockQueryBuilder({ getCount: jest.fn().mockResolvedValue(2) });
-      userRoleRepo.createQueryBuilder.mockReturnValue(mockQb as any);
-      userRoleRepo.delete.mockResolvedValue({ affected: 1, raw: [] });
+      const mockManager = {
+        createQueryBuilder: jest.fn().mockReturnValue(mockQb),
+        delete: jest.fn().mockResolvedValue({ affected: 1, raw: [] }),
+      };
+      (userRoleRepo.manager as any).transaction = jest.fn().mockImplementation((cb: (em: unknown) => Promise<unknown>) => cb(mockManager));
 
       await expect(service.revokeRole(10, 1, new Set(['system.admin']))).resolves.toBeUndefined();
-      expect(userRoleRepo.delete).toHaveBeenCalled();
+      expect(mockManager.delete).toHaveBeenCalled();
     });
   });
 

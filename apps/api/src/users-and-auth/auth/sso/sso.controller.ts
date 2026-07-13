@@ -237,7 +237,10 @@ export class SSOController {
     @Req() request: AuthenticatedRequest,
   ): Promise<SSOProvider> {
     // permissionMappings maps IdP claims → RBAC roles; setting it is equivalent to granting roles
-    if (updateDto.permissionMappings !== undefined) {
+    const settingPermissionMappings =
+      updateDto.oidcConfiguration?.permissionMappings !== undefined ||
+      updateDto.samlConfiguration?.permissionMappings !== undefined;
+    if (settingPermissionMappings) {
       const actor = request.user as AuthenticatedUser;
       if (!actor.effectivePermissions?.has('users.roles.manage')) {
         throw new ForbiddenException('Configuring SSO permission mappings requires users.roles.manage');

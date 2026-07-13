@@ -109,11 +109,11 @@ export class SSOProviderSAMLConfiguration {
 
   @Column({ type: 'json', nullable: true })
   @ApiProperty({
-    description: 'Optional mapping between Attraccess permissions and SAML role attribute values',
+    description: 'Optional mapping between RBAC role keys and SAML role attribute values',
     required: false,
     example: {
-      canManageSystemConfiguration: ['attraccess_config_admin'],
-      canManageBilling: ['attraccess_billing'],
+      'system-admin': ['attraccess_config_admin'],
+      'billing-manager': ['attraccess_billing'],
     },
   })
   permissionMappings?: Record<string, string[]> | null;

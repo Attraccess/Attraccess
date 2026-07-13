@@ -84,22 +84,25 @@ export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({ user, ss
       return role && !selectedRoleIds.has(id);
     });
 
-    try {
-      await Promise.all([
-        ...toAssign.map((roleId) => assignRole({ id: user.id, requestBody: { roleId } })),
-        ...toRevoke.map((roleId) => revokeRole({ id: user.id, roleId })),
-      ]);
+    const results = await Promise.allSettled([
+      ...toAssign.map((roleId) => assignRole({ id: user.id, requestBody: { roleId } })),
+      ...toRevoke.map((roleId) => revokeRole({ id: user.id, roleId })),
+    ]);
 
-      await queryClient.invalidateQueries({ queryKey: [useUsersServiceGetUserRoleAssignmentsKey] });
-      toast.success({ title: t('messages.updated') });
-    } catch (error) {
+    // Always refetch so the UI reflects the true server state, even on partial failure.
+    await queryClient.invalidateQueries({ queryKey: [useUsersServiceGetUserRoleAssignmentsKey] });
+
+    const failures = results.filter((r) => r.status === 'rejected');
+    if (failures.length > 0) {
       toast.apiError({
-        error: error as ApiError,
+        error: (failures[0] as PromiseRejectedResult).reason as ApiError,
         t,
         tExists,
         baseTranslationKey: 'api',
         fallbackKey: 'generic',
       });
+    } else {
+      toast.success({ title: t('messages.updated') });
     }
   };
 

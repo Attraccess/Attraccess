@@ -48,7 +48,7 @@ import { ProjectsService } from '../../projects/projects.service';
 import { ResourceFormsService } from '../forms/forms.service';
 import { ResourceFormAction } from '@attraccess/database-entities';
 import { MetricsService } from '../../metrics/metrics.service';
-import { SystemEvent } from '@attraccess/plugins-backend-sdk';
+import { AuthenticatedUser, SystemEvent } from '@attraccess/plugins-backend-sdk';
 import { PluginEventsService } from '../../plugin-system/plugin-events.service';
 import { RbacService } from '../../users-and-auth/rbac/rbac.service';
 
@@ -138,7 +138,9 @@ export class ResourceUsageService {
     user: User,
     transactionalEntityManager?: EntityManager,
   ): Promise<boolean> {
-    const effectivePermissions = await this.rbacService.getEffectivePermissions(user.id);
+    // Prefer already-populated effectivePermissions on the request-bound user (set by SessionStrategy)
+    // to avoid a redundant DB query on every resource start/stop.
+    const effectivePermissions = (user as AuthenticatedUser).effectivePermissions ?? await this.rbacService.getEffectivePermissions(user.id);
     if (effectivePermissions.has('resources.update')) {
       return true;
     }
@@ -628,7 +630,8 @@ export class ResourceUsageService {
           throw new BadRequestException('No active session found');
         }
 
-        const userPermissions = await this.rbacService.getEffectivePermissions(user.id);
+        // Prefer already-populated effectivePermissions on the request-bound user (set by SessionStrategy)
+        const userPermissions = (user as AuthenticatedUser).effectivePermissions ?? await this.rbacService.getEffectivePermissions(user.id);
         const canUpdateResources = userPermissions.has('resources.update');
         const isSessionOwner = activeSession.user.id === user.id;
         // The supervisor of a supervised session may end it as well.

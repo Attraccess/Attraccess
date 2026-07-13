@@ -9,6 +9,7 @@ import { ChangeEmailDto } from './dtos/changeEmail.dto';
 import { DeleteAccountConfirmDto } from './dtos/deleteAccountConfirm.dto';
 import { UpdateLocaleDto } from './dtos/updateLocale.dto';
 import { mapEmailSendError } from './email-send-error.util';
+import { CurrentUserDto } from './dtos/current-user.dto';
 
 @ApiTags('Users')
 @Controller('users')
@@ -22,7 +23,7 @@ export class UserProfileController {
   @ApiResponse({
     status: 200,
     description: 'The current user.',
-    type: User,
+    type: CurrentUserDto,
   })
   @ApiResponse({
     status: 401,

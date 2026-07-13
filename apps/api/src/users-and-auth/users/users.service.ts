@@ -277,15 +277,19 @@ export class UsersService {
     const isFirstUser = totalUsers === 0;
 
     this.logger.debug('Saving new user to database');
-    const savedUser = await this.userRepository.save(user);
+    // Wrap save + role assignment in a single transaction so a role-assignment failure
+    // doesn't leave an ownerless account on a fresh install.
+    const savedUser = await this.dataSource.transaction(async (em) => {
+      const saved = await em.save(user);
+      if (isFirstUser) {
+        this.logger.debug('First user in system - assigning owner role');
+        await this.rbacService.assignRoleByKey(saved.id, 'owner', em);
+      } else {
+        await this.rbacService.assignDefaultRoles(saved.id, em);
+      }
+      return saved;
+    });
     this.logger.debug(`User saved with ID: ${savedUser.id}`);
-
-    if (isFirstUser) {
-      this.logger.debug('First user in system - assigning owner role');
-      await this.rbacService.assignRoleByKey(savedUser.id, 'owner');
-    } else {
-      await this.rbacService.assignDefaultRoles(savedUser.id);
-    }
 
     this.metricsService.usersRegisteredTotal.inc();
     this.metricsService.usersTotal.inc();
@@ -618,15 +622,16 @@ export class UsersService {
 
       const saved = await repo.save(entities);
 
-      // Assign owner role to the first user when bootstrapping; default roles for everyone else
+      // Assign owner role to the first user when bootstrapping; default roles for everyone else.
+      // Pass the transactional manager so role assignments are part of the same transaction.
       if (options?.grantAllPermissionsToFirst && totalExisting === 0 && saved.length > 0) {
-        await this.rbacService.assignRoleByKey(saved[0].id, 'owner');
+        await this.rbacService.assignRoleByKey(saved[0].id, 'owner', manager);
         for (const u of saved.slice(1)) {
-          await this.rbacService.assignDefaultRoles(u.id);
+          await this.rbacService.assignDefaultRoles(u.id, manager);
         }
       } else {
         for (const u of saved) {
-          await this.rbacService.assignDefaultRoles(u.id);
+          await this.rbacService.assignDefaultRoles(u.id, manager);
         }
       }
 

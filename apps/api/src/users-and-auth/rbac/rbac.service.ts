@@ -1,6 +1,6 @@
 import { ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { QueryFailedError, Repository } from 'typeorm';
+import { EntityManager, QueryFailedError, Repository } from 'typeorm';
 import { Permission, Role, UserRole, UserRoleSource } from '@attraccess/database-entities';
 
 @Injectable()
@@ -51,30 +51,34 @@ export class RbacService {
     });
   }
 
-  async assignRoleByKey(userId: number, roleKey: string): Promise<UserRole | null> {
-    const role = await this.roleRepository.findOne({ where: { key: roleKey } });
+  async assignRoleByKey(userId: number, roleKey: string, em?: EntityManager): Promise<UserRole | null> {
+    const roleRepo = em ? em.getRepository(Role) : this.roleRepository;
+    const urRepo = em ? em.getRepository(UserRole) : this.userRoleRepository;
+
+    const role = await roleRepo.findOne({ where: { key: roleKey } });
     if (!role) return null;
-    const existing = await this.userRoleRepository.findOne({
+    const existing = await urRepo.findOne({
       where: { userId, roleId: role.id, source: UserRoleSource.MANUAL },
     });
     if (existing) return existing;
-    const result = await this.userRoleRepository.save(
-      this.userRoleRepository.create({ userId, roleId: role.id, source: UserRoleSource.MANUAL }),
+    const result = await urRepo.save(
+      urRepo.create({ userId, roleId: role.id, source: UserRoleSource.MANUAL }),
     );
     this.permissionsCache.delete(userId);
     return result;
   }
 
-  async assignDefaultRoles(userId: number): Promise<void> {
-    const defaultRoles = await this.roleRepository.find({ where: { isDefault: true } });
+  async assignDefaultRoles(userId: number, em?: EntityManager): Promise<void> {
+    const roleRepo = em ? em.getRepository(Role) : this.roleRepository;
+    const urRepo = em ? em.getRepository(UserRole) : this.userRoleRepository;
+
+    const defaultRoles = await roleRepo.find({ where: { isDefault: true } });
     for (const role of defaultRoles) {
-      const existing = await this.userRoleRepository.findOne({
+      const existing = await urRepo.findOne({
         where: { userId, roleId: role.id, source: UserRoleSource.MANUAL },
       });
       if (!existing) {
-        await this.userRoleRepository.save(
-          this.userRoleRepository.create({ userId, roleId: role.id, source: UserRoleSource.MANUAL }),
-        );
+        await urRepo.save(urRepo.create({ userId, roleId: role.id, source: UserRoleSource.MANUAL }));
       }
     }
     this.permissionsCache.delete(userId);
@@ -130,18 +134,25 @@ export class RbacService {
       throw new ForbiddenException('You cannot revoke a role whose permissions exceed your own');
     }
 
-    // last-owner guardrail: don't let the last non-deleted owner lose the owner role
-    // Count ALL owner assignments regardless of source (MANUAL or SSO) so that SSO-provisioned
-    // owners are not invisible to this check.
     if (role.key === 'owner') {
-      const ownerCount = await this.userRoleRepository
-        .createQueryBuilder('ur')
-        .innerJoin('ur.user', 'u', 'u.deletedAt IS NULL')
-        .where('ur.roleId = :roleId', { roleId })
-        .getCount();
-      if (ownerCount <= 1) {
-        throw new ForbiddenException('Cannot remove the last owner from the system');
-      }
+      // ponytail: wrap count+delete in a transaction to close the TOCTOU race where two concurrent
+      // revocations could both see ownerCount=2, both pass the guard, and both proceed to delete
+      await this.userRoleRepository.manager.transaction(async (manager) => {
+        const ownerCount = await manager
+          .createQueryBuilder(UserRole, 'ur')
+          .innerJoin('ur.user', 'u', 'u.deletedAt IS NULL')
+          .where('ur.roleId = :roleId', { roleId })
+          .getCount();
+        if (ownerCount <= 1) {
+          throw new ForbiddenException('Cannot remove the last owner from the system');
+        }
+        const result = await manager.delete(UserRole, { userId, roleId, source: UserRoleSource.MANUAL });
+        if (!result.affected) {
+          throw new ConflictException('Role is not manually assigned to this user and cannot be revoked via this endpoint');
+        }
+      });
+      this.permissionsCache.delete(userId);
+      return;
     }
 
     const result = await this.userRoleRepository.delete({ userId, roleId, source: UserRoleSource.MANUAL });
