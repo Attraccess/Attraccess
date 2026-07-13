@@ -566,7 +566,7 @@ describe('AttractapCardHandler', () => {
       attractapService.getNFCCardByUID.mockResolvedValueOnce(activeCard);
       resourceUsageService.canControllResource.mockResolvedValueOnce(true);
       resourceIntroducersService.isIntroducer.mockResolvedValueOnce(true);
-      rbacService.getEffectivePermissions.mockResolvedValueOnce(new Set(['resources.access.manage']));
+      rbacService.getEffectivePermissions.mockResolvedValueOnce(new Set(['resources.update']));
       const data = { payload: { uid: 'abc', resourceId: 10 } } as AttractapEvent['data'];
 
       await handler.handleCardAuthenticationRequest(socket, data);

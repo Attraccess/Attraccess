@@ -82,7 +82,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
-  const { logout, user } = useAuth();
+  const { logout, user, hasPermission } = useAuth();
   const { t, language, setLanguage } = useTranslations({
     en,
     de,
@@ -130,14 +130,9 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
         Array.isArray(routeOfItem?.authRequired) ? routeOfItem?.authRequired : [routeOfItem?.authRequired]
       ) as string[];
 
-      const effectivePermissions: string[] = (user as any)?.effectivePermissions ?? [];
-      const userHasAllRequiredPermissions = requiredPermissions.every(
-        (permission) => effectivePermissions.includes(permission),
-      );
-
-      return userHasAllRequiredPermissions;
+      return requiredPermissions.every(hasPermission);
     },
-    [user, routes],
+    [user, hasPermission, routes],
   );
 
   // Get navigation items from routes that have sidebar config

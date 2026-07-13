@@ -8,13 +8,13 @@ export function ResourcePeopleTab() {
   const { id } = useParams<{ id: string }>();
   const resourceId = Number.parseInt(id ?? '', 10);
 
-  const { canUpdateResources, isIntroducer } = useResourceTabs(resourceId);
+  const { canUpdateResources, canManageAccess, isIntroducer } = useResourceTabs(resourceId);
 
   return (
     <PeopleManagement
       target={{ type: 'resource', id: resourceId }}
-      canManageIntroducers={canUpdateResources}
-      canManageIntroductions={isIntroducer || canUpdateResources}
+      canManageIntroducers={canManageAccess}
+      canManageIntroductions={isIntroducer || canManageAccess || canUpdateResources}
       flat
       hideHeader
       data-cy="manage-resource-people"

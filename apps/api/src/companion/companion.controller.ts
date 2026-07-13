@@ -160,7 +160,7 @@ export class CompanionController {
   }
 
   @Delete(':id')
-  @Auth('resources.update')
+  @Auth('resources.delete')
   @ApiOperation({ summary: 'Delete a companion device and kick its connection', operationId: 'deleteCompanionDevice' })
   @ApiParam({ name: 'id', type: Number })
   @ApiResponse({ status: 200 })

@@ -310,7 +310,7 @@ export class AttractapCardHandler {
         keyNo: nfcCard.keyNo,
         key: nfcCard.key,
         username: nfcCard.user.username,
-        canManageResource: (await this.rbacService.getEffectivePermissions(nfcCard.user.id)).has('resources.access.manage'),
+        canManageResource: (await this.rbacService.getEffectivePermissions(nfcCard.user.id)).has('resources.update'),
         hasIntroduction,
         isIntroducer,
         supervisionMode,

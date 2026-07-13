@@ -23,11 +23,13 @@ export interface ResourceTabDescriptor {
 export function useResourceTabs(resourceId: number): {
   tabs: ResourceTabDescriptor[];
   canUpdateResources: boolean;
+  canManageAccess: boolean;
   isIntroducer: boolean;
   canManageMaintenance: boolean;
 } {
   const { hasPermission, user } = useAuth();
   const canUpdateResources = hasPermission('resources.update');
+  const canManageAccess = hasPermission('resources.access.manage');
 
   const { data: introducerData } = useAccessControlServiceResourceIntroducersIsIntroducer(
     {
@@ -50,7 +52,7 @@ export function useResourceTabs(resourceId: number): {
       { key: 'history', path: 'history', translationKey: 'tabs.history' },
     ];
 
-    if (isIntroducer || canUpdateResources) {
+    if (isIntroducer || canManageAccess || canUpdateResources) {
       list.push({ key: 'people', path: 'people', translationKey: 'tabs.people' });
     }
     if (canUpdateResources) {
@@ -64,7 +66,7 @@ export function useResourceTabs(resourceId: number): {
       list.push({ key: 'forms', path: 'forms', translationKey: 'tabs.forms' });
     }
     return list;
-  }, [isIntroducer, canUpdateResources, canManageMaintenance]);
+  }, [isIntroducer, canManageAccess, canUpdateResources, canManageMaintenance]);
 
-  return { tabs, canUpdateResources, isIntroducer, canManageMaintenance };
+  return { tabs, canUpdateResources, canManageAccess, isIntroducer, canManageMaintenance };
 }
