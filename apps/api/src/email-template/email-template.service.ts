@@ -67,16 +67,25 @@ export class EmailTemplateService {
   }
 
   async getTranslationsMap(type: EmailTemplateType, locale: string): Promise<Record<string, string>> {
-    const rows = await this.translationRepository.findBy({ templateType: type, locale });
-    if (rows.length > 0) return Object.fromEntries(rows.map((r) => [r.key, r.value]));
-
-    // BCP 47 fallback: try base language (e.g. "de-CH" → "de")
     const baseLocale = locale.split('-')[0];
-    if (baseLocale !== locale) {
-      const baseRows = await this.translationRepository.findBy({ templateType: type, locale: baseLocale });
-      return Object.fromEntries(baseRows.map((r) => [r.key, r.value]));
+    const hasRegion = baseLocale !== locale;
+
+    if (!hasRegion) {
+      const rows = await this.translationRepository.findBy({ templateType: type, locale });
+      return Object.fromEntries(rows.map((r) => [r.key, r.value]));
     }
-    return {};
+
+    // BCP-47 merge: base translations first, then regional overrides per key.
+    // Skip empty regional values so they fall through to the base translation.
+    const [baseRows, regionalRows] = await Promise.all([
+      this.translationRepository.findBy({ templateType: type, locale: baseLocale }),
+      this.translationRepository.findBy({ templateType: type, locale }),
+    ]);
+    const base = Object.fromEntries(baseRows.map((r) => [r.key, r.value]));
+    for (const r of regionalRows) {
+      if (r.value !== '') base[r.key] = r.value;
+    }
+    return base;
   }
 
   async getTranslations(type: EmailTemplateType): Promise<TemplateTranslations> {

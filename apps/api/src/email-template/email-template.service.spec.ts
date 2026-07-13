@@ -48,19 +48,36 @@ describe('EmailTemplateService — translation CRUD', () => {
       expect(translationRepo.findBy).toHaveBeenCalledWith({ templateType: EmailTemplateType.VERIFY_EMAIL, locale: 'de' });
     });
 
-    it('falls back to base language when no exact match for regional locale', async () => {
+    it('merges base translations with regional overrides per key', async () => {
       const { service, translationRepo } = setup();
+      // Promise.all order: [findBy(base), findBy(regional)] → first mock = base, second = regional
       translationRepo.findBy
-        .mockResolvedValueOnce([]) // de-CH: no match
         .mockResolvedValueOnce([
           { key: 'greeting', value: 'Hallo', locale: 'de', templateType: EmailTemplateType.VERIFY_EMAIL },
-        ]); // de: match
+          { key: 'footer', value: 'Ignoriere diese E-Mail', locale: 'de', templateType: EmailTemplateType.VERIFY_EMAIL },
+        ]) // base rows (de)
+        .mockResolvedValueOnce([
+          { key: 'greeting', value: 'Grüezi', locale: 'de-CH', templateType: EmailTemplateType.VERIFY_EMAIL },
+          { key: 'footer', value: '', locale: 'de-CH', templateType: EmailTemplateType.VERIFY_EMAIL },
+        ]); // regional rows (de-CH)
+
+      const result = await service.getTranslationsMap(EmailTemplateType.VERIFY_EMAIL, 'de-CH');
+
+      // greeting from regional; footer from base (regional empty string skipped)
+      expect(result).toEqual({ greeting: 'Grüezi', footer: 'Ignoriere diese E-Mail' });
+    });
+
+    it('falls back entirely to base when regional locale has no rows', async () => {
+      const { service, translationRepo } = setup();
+      translationRepo.findBy
+        .mockResolvedValueOnce([
+          { key: 'greeting', value: 'Hallo', locale: 'de', templateType: EmailTemplateType.VERIFY_EMAIL },
+        ]) // base rows (de)
+        .mockResolvedValueOnce([]); // regional rows (de-CH): none
 
       const result = await service.getTranslationsMap(EmailTemplateType.VERIFY_EMAIL, 'de-CH');
 
       expect(result).toEqual({ greeting: 'Hallo' });
-      expect(translationRepo.findBy).toHaveBeenCalledTimes(2);
-      expect(translationRepo.findBy).toHaveBeenLastCalledWith({ templateType: EmailTemplateType.VERIFY_EMAIL, locale: 'de' });
     });
 
     it('returns empty map when no translations found', async () => {
