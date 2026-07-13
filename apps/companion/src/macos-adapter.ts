@@ -63,6 +63,7 @@ export class MacosAdapter implements OsAdapter {
       const currentApp = process.execPath.replace(/\/Contents\/MacOS\/[^/]+$/, '');
       execFileSync('ditto', [appInDmg, currentApp]);
       execFileSync('hdiutil', ['detach', tmpMount, '-quiet']);
+      try { fs.rmSync(tmpMount, { recursive: true, force: true }); } catch { /* best-effort */ }
       try { fs.unlinkSync(dest); } catch { /* best-effort cleanup */ }
       app.relaunch({ execPath: process.execPath });
       _allowQuit();
@@ -70,6 +71,7 @@ export class MacosAdapter implements OsAdapter {
     } catch (err) {
       console.error('[companion] macOS silent update failed, falling back to manual install:', err);
       try { execFileSync('hdiutil', ['detach', tmpMount, '-quiet']); } catch { /* best-effort */ }
+      try { fs.rmSync(tmpMount, { recursive: true, force: true }); } catch { /* best-effort */ }
       const errMsg = await shell.openPath(dest);
       if (errMsg) { console.error('[companion] failed to open macOS DMG:', errMsg); return; }
       await dialog.showMessageBox({
