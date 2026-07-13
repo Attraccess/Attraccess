@@ -1,22 +1,8 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 import { EmailTemplateType } from '@attraccess/database-entities';
 import { EMAIL_TEMPLATE_DEFAULTS, readDefaultTemplateBody } from '../../email-template/email-defaults';
-import { DEFAULT_TEMPLATE_CONTENT } from './1782200000000-email-layout';
 
 type Translation = { templateType: string; key: string; value: string };
-
-// These templates gained new variables (boolean flags) in ATT-637, so their bodies,
-// variables and (for resource-health-changed) subject are updated unconditionally.
-const FORCE_UPDATED_TYPES = [
-  EmailTemplateType.RESOURCE_HEALTH_CHANGED,
-  EmailTemplateType.USER_RETRAINING_REQUIRED,
-  EmailTemplateType.RESOURCE_USAGE_NOTE_ADDED,
-];
-
-// All other templates are only migrated to the {{t}}-based default body if the admin
-// never customised them, i.e. the body still equals the pre-ATT-637 default
-// (DEFAULT_TEMPLATE_CONTENT from the email-layout migration).
-const GUARDED_TYPES = Object.values(EmailTemplateType).filter((type) => !FORCE_UPDATED_TYPES.includes(type));
 
 const COPY_LINK_DE = 'Oder kopiere diesen Link in deinen Browser:<br /><a href="{url}">{url}</a>';
 
@@ -141,36 +127,22 @@ export class SeedEmailTemplateTranslations1782600000000 implements MigrationInte
       );
     }
 
-    for (const type of FORCE_UPDATED_TYPES) {
-      await queryRunner.query(`UPDATE "email_templates" SET "body" = $1, "variables" = $2 WHERE "type" = $3`, [
-        readDefaultTemplateBody(type),
-        EMAIL_TEMPLATE_DEFAULTS[type].variables.join(','),
-        type,
-      ]);
-    }
-    await queryRunner.query(`UPDATE "email_templates" SET "subject" = $1 WHERE "type" = $2`, [
-      EMAIL_TEMPLATE_DEFAULTS[EmailTemplateType.RESOURCE_HEALTH_CHANGED].subject,
-      EmailTemplateType.RESOURCE_HEALTH_CHANGED,
-    ]);
-
-    for (const type of GUARDED_TYPES) {
-      await queryRunner.query(`UPDATE "email_templates" SET "body" = $1 WHERE "type" = $2 AND "body" = $3`, [
-        readDefaultTemplateBody(type),
-        type,
-        DEFAULT_TEMPLATE_CONTENT[type],
-      ]);
+    // Replace every template with its {{t}}-based default from the .mjml asset files.
+    for (const type of Object.values(EmailTemplateType)) {
+      await queryRunner.query(
+        `UPDATE "email_templates" SET "body" = $1, "variables" = $2, "subject" = $3 WHERE "type" = $4`,
+        [
+          readDefaultTemplateBody(type),
+          EMAIL_TEMPLATE_DEFAULTS[type].variables.join(','),
+          EMAIL_TEMPLATE_DEFAULTS[type].subject,
+          type,
+        ],
+      );
     }
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    for (const type of GUARDED_TYPES) {
-      await queryRunner.query(`UPDATE "email_templates" SET "body" = $1 WHERE "type" = $2 AND "body" = $3`, [
-        DEFAULT_TEMPLATE_CONTENT[type],
-        type,
-        readDefaultTemplateBody(type),
-      ]);
-    }
-
+    // Template bodies are not reverted; only the seeded translations are removed.
     for (const row of DE) {
       await queryRunner.query(
         `DELETE FROM "email_template_translations" WHERE "templateType" = ? AND "key" = ? AND "locale" = 'de'`,

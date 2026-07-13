@@ -135,9 +135,7 @@ export * from './1782100000000-enable-all-email-defaults';
 export * from './1782200000000-companion-device';
 export * from './1782201000000-companion-device-unique-name';
 export * from './1782202000000-companion-device-locked';
-// named export: this module also exports DEFAULT_TEMPLATE_CONTENT, which must not
-// leak into Object.values(migrations) in the datasource
-export { EmailLayout1782200000000 } from './1782200000000-email-layout';
+export * from './1782200000000-email-layout';
 export * from './1782203000000-companion-device-app-version';
 export * from './1782300000000-rbac-data-model';
 export * from './1782400000000-user-locale';

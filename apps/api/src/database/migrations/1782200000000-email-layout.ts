@@ -64,7 +64,7 @@ const DEFAULT_GLOBAL_LAYOUT = `<mjml>
 
 // Content-only sections (injected into {{content}}) for each default template type.
 // These replace the old full-MJML bodies for templates that were never edited.
-export const DEFAULT_TEMPLATE_CONTENT: Record<string, string> = {
+const DEFAULT_TEMPLATE_CONTENT: Record<string, string> = {
   'verify-email': `<mj-section background-color="#FFFFFF" padding="32px 20px 24px 20px">
   <mj-column>
     <mj-text padding="0 0 12px 0">Hello {{user.username}},</mj-text>
