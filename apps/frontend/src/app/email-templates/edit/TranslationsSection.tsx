@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { EmailTemplateType } from '@attraccess/react-query-client';
 import {
   Input,
@@ -52,6 +52,10 @@ export function TranslationsSection({ templateType, liveContent }: TranslationsS
   const [edited, setEdited] = useState<Record<string, string>>({});
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
+  // Tracks which locale we've already loaded into `edited` so background refetches
+  // don't silently discard unsaved changes.
+  const editedForLocaleRef = useRef('');
+
   useEffect(() => {
     if (!selectedLocale && existingLocales.length > 0) {
       setSelectedLocale(existingLocales[0]);
@@ -59,13 +63,16 @@ export function TranslationsSection({ templateType, liveContent }: TranslationsS
   }, [existingLocales, selectedLocale]);
 
   useEffect(() => {
-    if (selectedLocale && query.data) {
-      setEdited((query.data.translations[selectedLocale] as Record<string, string>) ?? {});
-    }
+    if (!selectedLocale || !query.data) return;
+    if (editedForLocaleRef.current === selectedLocale) return;
+    editedForLocaleRef.current = selectedLocale;
+    setEdited((query.data.translations[selectedLocale] as Record<string, string>) ?? {});
   }, [selectedLocale, query.data]);
 
   const handleAddLocale = () => {
-    const locale = newLocale.trim().toLowerCase();
+    // BCP-47: language tag lowercase, optional region tag uppercase (e.g. de, de-DE)
+    const parts = newLocale.trim().split('-');
+    const locale = [parts[0].toLowerCase(), ...parts.slice(1).map((p) => p.toUpperCase())].join('-');
     if (!locale) return;
     setSelectedLocale(locale);
     setEdited({});
@@ -122,10 +129,9 @@ export function TranslationsSection({ templateType, liveContent }: TranslationsS
                     <span onClick={(e) => e.stopPropagation()}>
                       <Button
                         size="sm"
-                        variant="light"
-                        color="danger"
+                        variant="ghost"
                         isIconOnly
-                        className="ml-1 min-w-unit-5 w-unit-5 h-unit-5"
+                        className="ml-1 min-w-unit-5 w-unit-5 h-unit-5 text-danger"
                         onPress={() => setDeleteTarget(locale)}
                         aria-label={t('translations.deleteLocale')}
                       >

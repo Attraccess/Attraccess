@@ -525,5 +525,24 @@ describe('EmailService', () => {
       expect(html).toContain('<strong>alice</strong>');
       expect(html).not.toContain('&lt;strong&gt;');
     });
+
+    it('does not crash when called with one arg (no defaultValue)', async () => {
+      const { service, sendMail } = setupT(
+        {},
+        '<mjml><mj-body><mj-section><mj-column>' +
+          "<mj-text>{{t 'greeting'}}</mj-text>" +
+          '</mj-column></mj-section></mj-body></mjml>',
+      );
+      await expect(service.sendVerificationEmail(makeUser(), 'tok')).resolves.not.toThrow();
+      const html = (sendMail as jest.Mock).mock.calls[0][0].html;
+      expect(html).toBeDefined();
+    });
+
+    it('falls back to default when DB translation is an empty string', async () => {
+      const { service, sendMail } = setupT({ greeting: '' });
+      await service.sendVerificationEmail(makeUser({ username: 'alice', email: 'alice@example.com' }), 'tok');
+      const html = (sendMail as jest.Mock).mock.calls[0][0].html;
+      expect(html).toContain('Hello alice!');
+    });
   });
 });

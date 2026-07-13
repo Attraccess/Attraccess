@@ -48,7 +48,7 @@ export class EmailService {
 
     const tHelper = (key: string, defaultValue: string, options: Handlebars.HelperOptions) => {
       const safeDefault = typeof defaultValue === 'string' ? defaultValue : '';
-      const raw = translationsMap[key] ?? safeDefault;
+      const raw = translationsMap[key] || safeDefault;
       const hash = options?.hash ?? {};
       const result = raw.replace(/\{(\w+(?:\.\w+)*)\}/g, (_: string, name: string) =>
         Object.hasOwn(hash, name) ? Handlebars.escapeExpression(String(hash[name] ?? '')) : `{${name}}`,

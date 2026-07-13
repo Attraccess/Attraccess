@@ -217,7 +217,7 @@ export class SeedDeEmailTemplates1782600000000 implements MigrationInterface {
       [
         RESOURCE_HEALTH_CHANGED_MJML,
         'user.username,user.email,user.id,host.frontend,host.backend,resource.id,resource.name,resource.url,health.status,health.previousStatus,health.reason,health.identifier,health.isDegraded,health.headerColor',
-        'Resource health update: {{resource.name}}',
+        '{{#if health.isDegraded}}Resource degraded{{else}}Resource recovered{{/if}}: {{resource.name}}',
       ],
     );
     await queryRunner.query(
