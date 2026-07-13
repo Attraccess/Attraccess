@@ -3,6 +3,11 @@ import { EmailTemplateService } from './email-template.service';
 import { EmailTemplateType, EmailTemplateTranslation } from '@attraccess/database-entities';
 import { MjmlService } from './mjml.service';
 
+jest.mock('./email-defaults', () => ({
+  EMAIL_TEMPLATE_DEFAULTS: { 'verify-email': { subject: 'Default subject', variables: [] } },
+  readDefaultTemplateBody: jest.fn(() => '<mjml></mjml>'),
+}));
+
 const makeRepo = () => ({
   find: jest.fn(),
   findOneBy: jest.fn(),
@@ -111,6 +116,19 @@ describe('EmailTemplateService — translation CRUD', () => {
 
       expect(manager.delete).toHaveBeenCalled();
       expect(manager.insert).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('resetToDefault', () => {
+    it('deletes all translation rows for the template type', async () => {
+      const { service, emailTemplateRepo, translationRepo } = setup();
+      emailTemplateRepo.findOneBy.mockResolvedValue({ type: EmailTemplateType.VERIFY_EMAIL });
+      emailTemplateRepo.update.mockResolvedValue({});
+      translationRepo.delete.mockResolvedValue({ affected: 2 });
+
+      await service.resetToDefault(EmailTemplateType.VERIFY_EMAIL);
+
+      expect(translationRepo.delete).toHaveBeenCalledWith({ templateType: EmailTemplateType.VERIFY_EMAIL });
     });
   });
 

@@ -61,6 +61,8 @@ export class EmailTemplateService {
       { subject: defaults.subject, body, variables: defaults.variables },
     );
 
+    await this.translationRepository.delete({ templateType: type });
+
     return this.findOne(type);
   }
 
