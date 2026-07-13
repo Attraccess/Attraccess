@@ -51,6 +51,39 @@ describe('UsersAdminController', () => {
     expect(controller).toBeDefined();
   });
 
+  describe('findMany', () => {
+    const paginated = (page: number, limit: number, total: number) => ({
+      data: [] as User[],
+      total,
+      page,
+      limit,
+    });
+
+    it('should set nextPage when more pages exist', async () => {
+      jest.spyOn(usersService, 'findMany').mockResolvedValue(paginated(1, 10, 25));
+
+      const result = await controller.findMany({ page: 1, limit: 10 });
+
+      expect(result.nextPage).toBe(2);
+    });
+
+    it('should not set nextPage when the last page ends exactly at the total', async () => {
+      jest.spyOn(usersService, 'findMany').mockResolvedValue(paginated(2, 10, 20));
+
+      const result = await controller.findMany({ page: 2, limit: 10 });
+
+      expect(result.nextPage).toBeUndefined();
+    });
+
+    it('should not set nextPage on a partially filled last page', async () => {
+      jest.spyOn(usersService, 'findMany').mockResolvedValue(paginated(3, 10, 25));
+
+      const result = await controller.findMany({ page: 3, limit: 10 });
+
+      expect(result.nextPage).toBeUndefined();
+    });
+  });
+
   describe('getOneById', () => {
     it('should return a user by ID', async () => {
       const user = {

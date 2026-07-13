@@ -28,6 +28,7 @@ import { ChangeUsernameDto } from './dtos/changeUsername.dto';
 import { ChangeEmailDto } from './dtos/changeEmail.dto';
 import { ChangeBillingFactorDto } from './dtos/changeBillingFactor.dto';
 import { mapEmailSendError } from './email-send-error.util';
+import { computeNextPage } from '../../types/response';
 
 @ApiTags('Users')
 @Controller('users')
@@ -109,14 +110,17 @@ export class UsersAdminController {
     description: 'Forbidden - User does not have permission to manage users.',
   })
   async findMany(@Query() query: FindManyUsersQueryDto): Promise<PaginatedUsersResponseDto> {
-    const result = (await this.usersService.findMany({
+    const result = await this.usersService.findMany({
       page: query.page,
       limit: query.limit,
       search: query.search,
       ids: query.ids,
-    })) as PaginatedUsersResponseDto;
+    });
     this.logger.debug(`Found ${result.total} users total, returning ${result.data.length} users`);
-    return result;
+    return {
+      ...result,
+      nextPage: computeNextPage(result.page, result.limit, result.total),
+    };
   }
 
   @Post(':id/password')

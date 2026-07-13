@@ -37,6 +37,7 @@ export class MetricsService implements OnModuleInit {
   public readonly resourceMaintenanceOverdue: Gauge;
 
   public readonly attractapDevicesConnected: Gauge;
+  public readonly attractapReaderConnected: Gauge;
   public readonly attractapNfcTapsTotal: Counter;
   public readonly attractapFirmwareUpdatesTotal: Counter;
   public readonly attractapCrashReportsTotal: Counter;
@@ -191,22 +192,31 @@ export class MetricsService implements OnModuleInit {
       registers: [this.registry],
     });
 
+    this.attractapReaderConnected = new Gauge({
+      name: 'attraccess_attractap_reader_connected',
+      help: 'Connection state per Attractap reader (1 = connected, 0 = disconnected)',
+      labelNames: ['reader_id', 'reader_name'],
+      registers: [this.registry],
+    });
+
     this.attractapNfcTapsTotal = new Counter({
       name: 'attraccess_attractap_nfc_taps_total',
       help: 'Total number of NFC tap events',
+      labelNames: ['reader_id'],
       registers: [this.registry],
     });
 
     this.attractapFirmwareUpdatesTotal = new Counter({
       name: 'attraccess_attractap_firmware_updates_total',
       help: 'Total number of firmware update events',
+      labelNames: ['reader_id'],
       registers: [this.registry],
     });
 
     this.attractapCrashReportsTotal = new Counter({
       name: 'attraccess_attractap_crash_reports_total',
       help: 'Total number of crash reports received from Attractap readers',
-      labelNames: ['reset_reason'],
+      labelNames: ['reader_id', 'reset_reason'],
       registers: [this.registry],
     });
 

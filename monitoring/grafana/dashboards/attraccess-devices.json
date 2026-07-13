@@ -542,6 +542,297 @@
           "legendFormat": "p95"
         }
       ]
+    },
+    {
+      "title": "Per-Reader Deep Dive",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 40
+      },
+      "panels": []
+    },
+    {
+      "title": "Reader Connection Status",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 41
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "attraccess-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": 0
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": { "text": "Offline", "color": "red" },
+                "1": { "text": "Online", "color": "green" }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "attraccess_attractap_reader_connected{job=\"attraccess\",reader_id=~\"$reader\"}",
+          "legendFormat": "{{reader_name}} (id={{reader_id}})"
+        }
+      ]
+    },
+    {
+      "title": "NFC Taps per Reader (5m rate)",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 45
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "attraccess-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(attraccess_attractap_nfc_taps_total{job=\"attraccess\",reader_id=~\"$reader\"}[5m])",
+          "legendFormat": "reader {{reader_id}}"
+        }
+      ]
+    },
+    {
+      "title": "NFC Taps per Reader (total, 24h)",
+      "type": "bargauge",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 45
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "attraccess-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "displayMode": "gradient"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "increase(attraccess_attractap_nfc_taps_total{job=\"attraccess\",reader_id=~\"$reader\"}[24h])",
+          "legendFormat": "reader {{reader_id}}"
+        }
+      ]
+    },
+    {
+      "title": "Crash Reports per Reader (15m rate)",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 53
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "attraccess-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(attraccess_attractap_crash_reports_total{job=\"attraccess\",reader_id=~\"$reader\"}[15m])",
+          "legendFormat": "reader {{reader_id}} ({{reset_reason}})"
+        }
+      ]
+    },
+    {
+      "title": "Crash Reports per Reader (24h total, by reset reason)",
+      "type": "piechart",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 53
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "attraccess-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "right",
+          "showLegend": true
+        },
+        "pieType": "pie",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(reader_id, reset_reason)(increase(attraccess_attractap_crash_reports_total{job=\"attraccess\",reader_id=~\"$reader\"}[24h]))",
+          "legendFormat": "reader {{reader_id}}: {{reset_reason}}"
+        }
+      ]
+    },
+    {
+      "title": "Firmware Updates per Reader",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 61
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "attraccess-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(attraccess_attractap_firmware_updates_total{job=\"attraccess\",reader_id=~\"$reader\"}[1h])",
+          "legendFormat": "reader {{reader_id}}"
+        }
+      ]
     }
   ],
   "schemaVersion": 39,
@@ -550,7 +841,29 @@
     "devices"
   ],
   "templating": {
-    "list": []
+    "list": [
+      {
+        "name": "reader",
+        "type": "query",
+        "label": "Reader",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "attraccess-prometheus"
+        },
+        "query": {
+          "query": "label_values(attraccess_attractap_reader_connected{job=\"attraccess\"}, reader_id)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "includeAll": true,
+        "multi": true,
+        "allValue": null,
+        "current": {},
+        "options": [],
+        "hide": 0,
+        "sort": 1
+      }
+    ]
   },
   "time": {
     "from": "now-6h",

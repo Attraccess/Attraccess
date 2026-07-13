@@ -19,13 +19,15 @@ jobs:
         uses: actions/checkout@v6
 
       - uses: ./.github/actions/setup
+        with:
+          esp-idf: 'false'
 
       - name: Install Linux packaging dependencies
         run: sudo apt-get install -y fakeroot rpm
 
       - name: Build Linux companion (x64 + arm64)
         # The companion project.json must configure electron-builder to output:
-        #   apps/companion/dist/companion_linux_x64.AppImage
+        #   apps/companion/dist/companion_linux_x86_64.AppImage  (electron-builder remaps x64→x86_64 for AppImage)
         #   apps/companion/dist/companion_linux_arm64.AppImage
         run: pnpm nx run companion:build
 
@@ -34,7 +36,7 @@ jobs:
         with:
           name: companion-linux-${{ github.run_id }}
           path: |
-            apps/companion/dist/companion_linux_x64.AppImage
+            apps/companion/dist/companion_linux_x86_64.AppImage
             apps/companion/dist/companion_linux_arm64.AppImage
           if-no-files-found: warn
 
@@ -48,6 +50,8 @@ jobs:
         uses: actions/checkout@v6
 
       - uses: ./.github/actions/setup
+        with:
+          esp-idf: 'false'
 
       - name: Set up macOS code signing
         if: ${{ env.HAS_APPLE_CERT == 'true' }}
@@ -86,6 +90,8 @@ jobs:
         uses: actions/checkout@v6
 
       - uses: ./.github/actions/setup
+        with:
+          esp-idf: 'false'
 
       - name: Set up Windows code signing
         if: ${{ env.HAS_WINDOWS_CERT == 'true' }}

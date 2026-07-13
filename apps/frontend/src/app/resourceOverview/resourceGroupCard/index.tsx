@@ -10,9 +10,8 @@ import { ResourceListItem } from '../../../components/ResourceListItem';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CogIcon } from 'lucide-react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useDebounce, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useAuth } from '../../../hooks/useAuth';
-import { useDebounce } from '../../../hooks/useDebounce';
 import { FilterProps } from '../filterProps';
 
 import en from './en.json';

@@ -31,7 +31,7 @@ function mockLicense(modules: string[] | undefined) {
 
 function mockAuth(canManage: boolean) {
   vi.mocked(useAuth).mockReturnValue({
-    hasPermission: (p: string) => p === 'system.settings.manage' ? canManage : false,
+    hasPermission: (p: string) => p === 'system.sso.manage' ? canManage : false,
   } as ReturnType<typeof useAuth>);
 }
 
@@ -58,7 +58,7 @@ describe('SSOProvidersPage license gate', () => {
     expect(screen.getByRole('heading')).toBeInTheDocument();
   });
 
-  it('redirects when user lacks system.settings.manage permission', () => {
+  it('redirects when user lacks system.sso.manage permission', () => {
     mockAuth(false);
     mockLicense(['sso']);
     render(<SSOProvidersPage />);

@@ -32,6 +32,7 @@ import { ProjectAccessService } from './project-access.service';
 import { ProjectWithAccessDto } from './dto/project-access.dto';
 import { ProjectMembersResponseDto } from './dto/project-members-response.dto';
 import { CreateProjectInvitationDto } from './dto/create-project-invitation.dto';
+import { computeNextPage } from '../types/response';
 
 @ApiTags('Projects')
 @Controller('projects')
@@ -64,17 +65,12 @@ export class ProjectsController {
     const projects = await this.projectsService.findMany(req.user.id, query);
     const total = await this.projectsService.getTotalCount(req.user.id, query);
 
-    let nextPage: number | undefined = query.page + 1;
-    if (nextPage * query.limit >= total) {
-      nextPage = undefined;
-    }
-
     return {
       data: projects.map(this.transformProject.bind(this)),
       total,
       page: query.page,
       limit: query.limit,
-      nextPage,
+      nextPage: computeNextPage(query.page, query.limit, total),
     };
   }
 
