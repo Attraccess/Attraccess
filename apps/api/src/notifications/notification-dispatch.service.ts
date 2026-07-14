@@ -10,8 +10,9 @@ export interface NotificationDispatchRequest {
   category: NotificationCategory;
   recipients: User[];
   channels?: NotificationChannel[];
-  title: string;
-  body: string;
+  /** Static string, or a per-recipient resolver for locale-specific strings. */
+  title: string | ((recipient: User) => string);
+  body: string | ((recipient: User) => string);
   url?: string;
   actorId?: number;
   severity?: 'info' | 'warning';
@@ -56,10 +57,13 @@ export class NotificationDispatchService {
         : Promise.resolve(false),
     ]);
 
+    const title = typeof request.title === 'function' ? request.title(recipient) : request.title;
+    const body = typeof request.body === 'function' ? request.body(recipient) : request.body;
+
     await Promise.all([
       emailEnabled && request.sendEmail ? this.tryEmail(request, recipient) : Promise.resolve(),
-      pushEnabled ? this.tryPush(request, recipient) : Promise.resolve(),
-      toastEnabled ? this.tryToast(request, recipient) : Promise.resolve(),
+      pushEnabled ? this.tryPush(request, recipient, title, body) : Promise.resolve(),
+      toastEnabled ? this.tryToast(request, recipient, title, body) : Promise.resolve(),
     ]);
   }
 
@@ -74,23 +78,33 @@ export class NotificationDispatchService {
     }
   }
 
-  private async tryPush(request: NotificationDispatchRequest, recipient: User): Promise<void> {
+  private async tryPush(
+    request: NotificationDispatchRequest,
+    recipient: User,
+    title: string,
+    body: string,
+  ): Promise<void> {
     await this.pushService.sendToUser(recipient.id, {
-      title: request.title,
-      body: request.body,
+      title,
+      body,
       url: request.url,
       tag: request.dedupeKey ?? request.category,
     });
   }
 
-  private async tryToast(request: NotificationDispatchRequest, recipient: User): Promise<void> {
+  private async tryToast(
+    request: NotificationDispatchRequest,
+    recipient: User,
+    title: string,
+    body: string,
+  ): Promise<void> {
     if (!this.liveService.isUserPresent(recipient.id)) {
       return;
     }
     this.liveService.emitToUser(recipient.id, {
       category: request.category,
-      title: request.title,
-      body: request.body,
+      title,
+      body,
       url: request.url,
       severity: request.severity ?? 'info',
     });

@@ -72,11 +72,15 @@ describe('ResourceUsageNoteNotificationListener', () => {
     expect(notifications.dispatch).toHaveBeenCalledWith(
       expect.objectContaining({
         category: NotificationCategory.RESOURCE_USAGE_NOTES,
-        title: 'Usage note added for Laser Cutter',
-        body: 'alice: Bed needs leveling',
+        title: expect.any(Function),
+        body: expect.any(Function),
         url: '/resources/7/usage',
       }),
     );
+
+    const enUser = { locale: 'en' } as User;
+    expect(request.title(enUser)).toBe('Usage note added for Laser Cutter');
+    expect(request.body(enUser)).toBe('alice: Bed needs leveling');
   });
 
   it('skips users without an email', async () => {

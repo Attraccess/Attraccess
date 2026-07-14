@@ -8,6 +8,11 @@ import { Resource, ResourceIntroducer, ResourceMaintenanceRequest, User } from '
 import { ResourceMaintenanceRequestCreatedEvent } from './events/maintenance-request-created.event';
 import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../../notifications/notification-types';
+import { createTranslator } from '../../i18n/translate';
+import * as en from './maintenance-request-notification.en.json';
+import * as de from './maintenance-request-notification.de.json';
+
+const t = createTranslator({ en, de });
 
 @Injectable()
 export class MaintenanceRequestNotificationListener {
@@ -50,18 +55,25 @@ export class MaintenanceRequestNotificationListener {
         return;
       }
 
-      const requestedBy = request.createdByUser?.username ?? 'A user';
+      const requestedByUsername = request.createdByUser?.username;
 
       await this.notifications.dispatch({
         category: NotificationCategory.MAINTENANCE_REQUESTS,
         recipients,
-        title: `Maintenance requested for ${resource.name}`,
-        body: `${requestedBy} requested maintenance: ${request.reason}`,
+        title: (recipient) => t(recipient.locale, 'title', { resourceName: resource.name }),
+        body: (recipient) => {
+          const requestedBy = requestedByUsername ?? t(recipient.locale, 'fallbackUser');
+          return t(recipient.locale, 'body', { requestedBy, reason: request.reason });
+        },
         url: `/resources/${resource.id}/maintenance`,
         sendEmail: (recipient) =>
           this.notifications.sendEmailTemplate(recipient, NotificationCategory.MAINTENANCE_REQUESTS, {
             resource: { id: resource.id, name: resource.name },
-            request: { id: request.id, reason: request.reason, requestedBy },
+            request: {
+              id: request.id,
+              reason: request.reason,
+              requestedBy: requestedByUsername ?? t(recipient.locale, 'fallbackUser'),
+            },
           }),
       });
     } catch (error) {

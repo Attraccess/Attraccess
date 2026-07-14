@@ -26,12 +26,13 @@ describe('ResourceSessionNotificationListener', () => {
   });
 
   it('notifies the previous user when their resource session is taken over', async () => {
+    const bob = { id: 2, username: 'bob', locale: 'en' } as User;
     await listener.handleTakenOver(
       new ResourceUsageSessionTakenOverEvent(
         { id: 4, name: 'Laser cutter' } as Resource,
         new Date('2026-01-01T12:00:00.000Z'),
         { id: 1, username: 'alice' } as User,
-        { id: 2, username: 'bob' } as User,
+        bob,
       ),
     );
 
@@ -39,12 +40,16 @@ describe('ResourceSessionNotificationListener', () => {
       category: NotificationCategory.RESOURCE_TAKEOVER,
       recipients: [expect.objectContaining({ id: 2 })],
       actorId: 1,
-      title: 'Laser cutter was taken over',
-      body: 'alice took over your active resource session.',
+      title: expect.any(Function),
+      body: expect.any(Function),
       url: '/resources/4',
       severity: 'warning',
       sendEmail: expect.any(Function),
     });
+
+    const req = notifications.dispatch.mock.calls[0][0];
+    expect(req.title(bob)).toBe('Laser cutter was taken over');
+    expect(req.body(bob)).toBe('alice took over your active resource session.');
   });
 
   it('sends resource takeover email through the notification dispatcher callback', async () => {
@@ -71,7 +76,7 @@ describe('ResourceSessionNotificationListener', () => {
   });
 
   it('notifies the session owner when another actor ends their resource session', async () => {
-    const owner = { id: 2, username: 'bob', email: 'bob@example.com' } as User;
+    const owner = { id: 2, username: 'bob', email: 'bob@example.com', locale: 'en' } as User;
     const actor = { id: 1, username: 'alice' } as User;
     const resource = { id: 4, name: 'Laser cutter' } as Resource;
 
@@ -93,8 +98,8 @@ describe('ResourceSessionNotificationListener', () => {
       category: NotificationCategory.RESOURCE_SESSION_ENDED,
       recipients: [owner],
       actorId: actor.id,
-      title: 'Laser cutter session ended',
-      body: 'alice ended your active resource session.',
+      title: expect.any(Function),
+      body: expect.any(Function),
       url: '/resources/4',
       severity: 'warning',
       dedupeKey: 'resource_session_ended:10',
@@ -102,6 +107,8 @@ describe('ResourceSessionNotificationListener', () => {
     });
 
     const request = notifications.dispatch.mock.calls[0][0];
+    expect(request.title(owner)).toBe('Laser cutter session ended');
+    expect(request.body(owner)).toBe('alice ended your active resource session.');
     await request.sendEmail(owner);
     expect(notifications.sendEmailTemplate).toHaveBeenCalledWith(owner, NotificationCategory.RESOURCE_SESSION_ENDED, {
       resource: { id: 4, name: 'Laser cutter' },
@@ -131,7 +138,7 @@ describe('ResourceSessionNotificationListener', () => {
   });
 
   it('notifies when the system (null endedBy) ends the session', async () => {
-    const owner = { id: 2, username: 'bob', email: 'bob@example.com' } as User;
+    const owner = { id: 2, username: 'bob', email: 'bob@example.com', locale: 'en' } as User;
     const resource = { id: 4, name: 'Laser cutter' } as Resource;
 
     await listener.handleSessionEnded(
@@ -148,11 +155,8 @@ describe('ResourceSessionNotificationListener', () => {
       ),
     );
 
-    expect(notifications.dispatch).toHaveBeenCalledWith(
-      expect.objectContaining({
-        category: NotificationCategory.RESOURCE_SESSION_ENDED,
-        body: 'The system ended your active resource session.',
-      }),
-    );
+    const request = notifications.dispatch.mock.calls[0][0];
+    expect(request.category).toBe(NotificationCategory.RESOURCE_SESSION_ENDED);
+    expect(request.body(owner)).toBe('The system ended your active resource session.');
   });
 });

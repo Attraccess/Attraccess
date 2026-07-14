@@ -1,0 +1,7 @@
+{
+  "title": "Your resource access changed",
+  "grantedMaintainer": "You were made a maintainer for resource #{resourceId}.",
+  "grantedIntroducer": "You were made an introducer for resource #{resourceId}.",
+  "revokedMaintainer": "Your maintainer status for resource #{resourceId} was revoked.",
+  "revokedIntroducer": "Your introducer status for resource #{resourceId} was revoked."
+}

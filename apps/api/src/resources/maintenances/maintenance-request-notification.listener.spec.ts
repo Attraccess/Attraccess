@@ -54,10 +54,15 @@ describe('MaintenanceRequestNotificationListener', () => {
       expect.objectContaining({
         category: NotificationCategory.MAINTENANCE_REQUESTS,
         recipients: [expect.objectContaining({ id: 2 })],
-        title: 'Maintenance requested for Laser cutter',
-        body: 'alice requested maintenance: Broken lens',
+        title: expect.any(Function),
+        body: expect.any(Function),
         url: '/resources/4/maintenance',
       }),
     );
+
+    const req = dispatch.dispatch.mock.calls[0][0];
+    const enUser = { locale: 'en' } as User;
+    expect(req.title(enUser)).toBe('Maintenance requested for Laser cutter');
+    expect(req.body(enUser)).toBe('alice requested maintenance: Broken lens');
   });
 });

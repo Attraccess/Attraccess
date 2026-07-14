@@ -1,0 +1,6 @@
+{
+  "titleDegraded": "Ressource beeinträchtigt: {resourceName}",
+  "titleRecovered": "Ressource wiederhergestellt: {resourceName}",
+  "bodyStatusChanged": "{resourceName} wechselte von {previousStatus} zu {status}",
+  "statusUnknown": "unbekannt"
+}
