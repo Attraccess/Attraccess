@@ -3,6 +3,7 @@
   "version": "1.8.1",
   "type": "commonjs",
   "main": "./src/index.js",
+  "types": "./src/index.d.ts",
   "publishConfig": {
     "access": "public"
   },

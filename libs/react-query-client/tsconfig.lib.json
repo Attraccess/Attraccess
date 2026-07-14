@@ -2,10 +2,9 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "../../dist/api-client",
-    // ponytail: declaration disabled — TS7+bundler resolution traces @tanstack/react-query types to
-    // internal _tsup-dts-rollup.cjs (TS2883). Workspace consumers use path alias to source anyway.
-    // Re-enable with moduleResolution:node16 when @tanstack ships portable .d.cts exports.
-    "declaration": false,
+    "declaration": true,
+    "module": "node16",
+    "moduleResolution": "node16",
     "types": ["node", "vite/client"]
   },
   "include": ["src/**/*.ts"],
