@@ -42,6 +42,6 @@ export class IsResourceIntroducerGuard implements CanActivate {
 
     const isIntroducer = await this.resourceIntroducersService.isIntroducer(resourceId, user.id, true);
 
-    return isIntroducer || user.effectivePermissions?.has('resources.access.manage');
+    return isIntroducer || user.effectivePermissions?.has('resources.access.manage') === true;
   }
 }

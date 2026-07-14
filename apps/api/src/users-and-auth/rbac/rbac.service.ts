@@ -6,8 +6,10 @@ import { Permission, Role, UserRole, UserRoleSource } from '@attraccess/database
 @Injectable()
 export class RbacService {
   private readonly logger = new Logger(RbacService.name);
-  // ponytail: in-process cache; invalidated on every mutation; safe for single-process SQLite
-  private readonly permissionsCache = new Map<number, Set<string>>();
+  // ponytail: TTL cache — local invalidation keeps single-instance latency low; TTL bounds staleness
+  // in multi-instance Postgres deployments where a role change on another instance won't invalidate here.
+  private readonly CACHE_TTL_MS = 30_000;
+  private readonly permissionsCache = new Map<number, { permissions: Set<string>; ts: number }>();
 
   constructor(
     @InjectRepository(UserRole)
@@ -19,8 +21,8 @@ export class RbacService {
   ) {}
 
   async getEffectivePermissions(userId: number): Promise<Set<string>> {
-    const cached = this.permissionsCache.get(userId);
-    if (cached) return cached;
+    const entry = this.permissionsCache.get(userId);
+    if (entry && Date.now() - entry.ts < this.CACHE_TTL_MS) return new Set(entry.permissions);
 
     const rows = await this.userRoleRepository
       .createQueryBuilder('ur')
@@ -32,8 +34,8 @@ export class RbacService {
       .getRawMany<{ permissionKey: string }>();
 
     const permissions = new Set(rows.map((r) => r.permissionKey));
-    this.permissionsCache.set(userId, permissions);
-    return permissions;
+    this.permissionsCache.set(userId, { permissions, ts: Date.now() });
+    return new Set(permissions);
   }
 
   async getRoles(): Promise<Role[]> {

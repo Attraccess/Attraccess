@@ -258,25 +258,24 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
   private getPermissionClaimValues(profile: SamlProfile): unknown[] {
     const values: unknown[] = [];
     const profileRecord = profile as Record<string, unknown>;
+    // ponytail: lowercase-normalize both sides so Keycloak's "Role", ADFS URI-style names, etc. match
     const candidateKeys = ['roles', 'role', 'groups', 'group'];
 
     // Check candidateKeys inside the SAML attributes bag (not all attributes — that would
     // include email/displayName and make the empty-claims guard always true)
     const attributes = profileRecord.attributes;
     if (attributes && typeof attributes === 'object') {
-      for (const key of candidateKeys) {
-        const value = (attributes as Record<string, unknown>)[key];
-        if (value !== undefined && value !== null) {
-          values.push(value);
+      for (const [attrKey, attrVal] of Object.entries(attributes as Record<string, unknown>)) {
+        if (candidateKeys.includes(attrKey.toLowerCase()) && attrVal !== undefined && attrVal !== null) {
+          values.push(attrVal);
         }
       }
     }
 
     // Also check candidateKeys at the top level of the profile
-    for (const key of candidateKeys) {
-      const value = profileRecord[key];
-      if (value !== undefined && value !== null) {
-        values.push(value);
+    for (const [profileKey, profileVal] of Object.entries(profileRecord)) {
+      if (candidateKeys.includes(profileKey.toLowerCase()) && profileVal !== undefined && profileVal !== null) {
+        values.push(profileVal);
       }
     }
 
@@ -307,6 +306,9 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
     this.logger.debug(`RBAC role keys from SAML: ${JSON.stringify([...roleKeys])}`);
 
     const rbacService = this.moduleRef.get(RbacService, { strict: false });
+    if (!rbacService) {
+      this.logger.warn('RbacService not available via ModuleRef — SSO role sync skipped; existing roles preserved');
+    }
     // Only sync when a mapping is configured AND the token contained at least one role/group claim.
     // Skipping on empty roleNames prevents a missing attribute or transient IdP omission from
     // silently revoking all SSO-granted roles.
