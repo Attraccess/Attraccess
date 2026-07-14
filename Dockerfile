@@ -42,6 +42,13 @@ RUN node -e "const f = require('/app/dist/apps/api/assets/attractap-firmwares/fi
 # pnpm 10 only respects pnpm.overrides / pnpm.onlyBuiltDependencies at the workspace root.
 RUN node -e "for (const p of ['dist/apps/api/package.json','dist/apps/api-swagger/package.json']) { const fs = require('fs'); if (!fs.existsSync(p)) continue; const j = JSON.parse(fs.readFileSync(p, 'utf8')); delete j.pnpm; fs.writeFileSync(p, JSON.stringify(j, null, 2) + '\n'); }"
 
+# pnpm 10 errors on unused patches during deploy; @swc-node/register and
+# ts-api-utils are dev-only tools absent from the API's production dep tree.
+# Strip them from both pnpm-lock.yaml (patchedDependencies block) and from the
+# root package.json so pnpm deploy sees no stale patch declarations.
+RUN node -e "const fs=require('fs'); let l=fs.readFileSync('pnpm-lock.yaml','utf8'); const pivot='\nimporters:'; const [hdr,rest]=l.split(pivot); const cleaned=hdr.replace(/\n  '@swc-node\/register@[^']+':(?:\n    [^\n]+)*/g,'').replace(/\n  ts-api-utils@[^\n:]+:(?:\n    [^\n]+)*/g,''); fs.writeFileSync('pnpm-lock.yaml',cleaned+pivot+rest);" && \
+    node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('package.json','utf8')); delete p.pnpm.patchedDependencies['@swc-node/register@1.11.1']; delete p.pnpm.patchedDependencies['ts-api-utils@2.5.0']; fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n');"
+
 # pnpm 10's new deploy requires a workspace shared lockfile; --ignore-workspace
 # strips that, so use --legacy for the self-contained dist/apps/api package.
 RUN pnpm --ignore-workspace --filter ./dist/apps/api deploy --legacy --prod /app/deploy/api
