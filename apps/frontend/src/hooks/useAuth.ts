@@ -10,6 +10,7 @@ import {
 } from '@attraccess/react-query-client';
 import { useCallback, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { type SystemPermission } from '@attraccess/shared';
 
 // The GET /users/me response includes effectivePermissions at runtime even though the
 // generated User type does not declare it (the field is added by the profile controller).
@@ -105,7 +106,7 @@ export function useAuth() {
     twoFactorStatus,
     isTwoFactorStatusLoading,
     needsTwoFactorSetup: !!twoFactorStatus?.required && !twoFactorStatus?.enabled,
-    hasPermission: (permission: string) => {
+    hasPermission: (permission: SystemPermission) => {
       const effectivePermissions: string[] = currentUser?.effectivePermissions ?? [];
       return effectivePermissions.includes(permission);
     },

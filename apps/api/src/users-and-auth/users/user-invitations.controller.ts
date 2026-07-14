@@ -57,6 +57,6 @@ export class UserInvitationsController {
     @UploadedFile() file: FileUpload | undefined,
     @Body('config') rawConfig: string | CsvInviteConfigDto,
   ): Promise<User[]> {
-    return this.invitationService.inviteUsersFromCsv(file, rawConfig, request.user.locale);
+    return this.invitationService.inviteUsersFromCsv(file, rawConfig, request.user.locale, request.user.id);
   }
 }

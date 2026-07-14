@@ -11,6 +11,7 @@ import {
   AuthenticationDetail,
   AuthenticationType,
   ResourceUsage,
+  Role,
   Session,
   User,
   SSOProviderType,
@@ -588,7 +589,7 @@ export class UsersService {
 
   async createMany(
     users: Array<{ username: string; email: string; locale?: string; roleKey?: string }>,
-    options?: { grantAllPermissionsToFirst?: boolean; manager?: EntityManager },
+    options?: { grantAllPermissionsToFirst?: boolean; manager?: EntityManager; actorId?: number },
   ): Promise<User[]> {
     if (users.length === 0) {
       return [];
@@ -637,9 +638,32 @@ export class UsersService {
       }
 
       // Assign per-user role keys (from CSV column mapping), in addition to default roles.
+      // Privilege ceiling: if an actor is performing this import, they cannot grant a role whose
+      // permissions exceed their own (mirrors the check in RbacService.assignRole).
+      const anyHasRoleKey = normalized.some((n) => n.roleKey);
+      const actorPermissions =
+        anyHasRoleKey && options?.actorId != null
+          ? await this.rbacService.getEffectivePermissions(options.actorId)
+          : null;
+
+      const roleRepo = manager.getRepository(Role);
       for (let i = 0; i < saved.length; i++) {
         const roleKey = normalized[i]?.roleKey;
         if (roleKey) {
+          if (actorPermissions !== null) {
+            // Load role with permissions to perform ceiling check
+            const role = await roleRepo.findOne({
+              where: { key: roleKey },
+              relations: ['rolePermissions'],
+            });
+            if (role) {
+              const rolePermKeys = role.rolePermissions.map((rp) => rp.permissionKey);
+              const missing = rolePermKeys.filter((k) => !actorPermissions.has(k));
+              if (missing.length > 0) {
+                throw new ForbiddenException('You cannot grant a role whose permissions exceed your own');
+              }
+            }
+          }
           await this.rbacService.assignRoleByKey(saved[i].id, roleKey, manager);
         }
       }

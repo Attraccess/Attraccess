@@ -30,7 +30,7 @@ export class UserInvitationService {
 
   private async inviteUsersTransactional(
     candidates: Array<{ username: string; email: string; locale?: string; roleKey?: string }>,
-    options?: { grantAllPermissionsToFirst?: boolean },
+    options?: { grantAllPermissionsToFirst?: boolean; actorId?: number },
   ): Promise<User[]> {
     await this.usersService.ensureLicenseForNewUsers(candidates.length);
 
@@ -39,6 +39,7 @@ export class UserInvitationService {
         const createdUsers = await this.usersService.createMany(candidates, {
           grantAllPermissionsToFirst: options?.grantAllPermissionsToFirst ?? false,
           manager,
+          actorId: options?.actorId,
         });
 
         for (const user of createdUsers) {
@@ -213,6 +214,7 @@ export class UserInvitationService {
     file: FileUpload | undefined,
     rawConfig: string | CsvInviteConfigDto,
     adminLocale?: string,
+    actorId?: number,
   ): Promise<User[]> {
     let configPayload: CsvInviteConfigDto | string;
     try {
@@ -273,7 +275,7 @@ export class UserInvitationService {
     try {
       const invitedUsers = await this.inviteUsersTransactional(
         candidates.map((c) => ({ ...c, locale: adminLocale })),
-        { grantAllPermissionsToFirst: true },
+        { grantAllPermissionsToFirst: true, actorId },
       );
       return invitedUsers;
     } catch (error) {

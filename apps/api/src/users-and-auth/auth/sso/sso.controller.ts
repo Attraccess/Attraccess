@@ -249,21 +249,42 @@ export class SSOController {
     @Body() updateDto: UpdateSSOProviderDto,
     @Req() request: AuthenticatedRequest,
   ): Promise<SSOProvider> {
-    // permissionMappings maps IdP claims → RBAC roles; setting it is equivalent to granting roles
-    const settingPermissionMappings =
-      updateDto.oidcConfiguration?.permissionMappings !== undefined ||
-      updateDto.samlConfiguration?.permissionMappings !== undefined;
-    if (settingPermissionMappings) {
+    const providerId = parseInt(id, 10);
+
+    // Fetch the existing provider so we can compute the *effective* permission mappings
+    // (i.e. what will be active after the update, not just what is in the request body).
+    const existing = await this.ssoService.getProviderById(providerId);
+
+    // Effective mappings = update body's value if explicitly supplied, else the currently-stored value.
+    // This prevents bypassing the ceiling by omitting permissionMappings from the update body while
+    // the provider already has mappings pointing to high-privilege roles, OR by changing ssoProviderType
+    // to point at a different configuration that carries its own mappings.
+    const effectiveOidc =
+      updateDto.oidcConfiguration?.permissionMappings !== undefined
+        ? updateDto.oidcConfiguration.permissionMappings
+        : existing.oidcConfiguration?.permissionMappings;
+
+    const effectiveSaml =
+      updateDto.samlConfiguration?.permissionMappings !== undefined
+        ? updateDto.samlConfiguration.permissionMappings
+        : existing.samlConfiguration?.permissionMappings;
+
+    const hasEffectiveMappings =
+      (effectiveOidc !== undefined && Object.keys(effectiveOidc).length > 0) ||
+      (effectiveSaml !== undefined && Object.keys(effectiveSaml).length > 0);
+
+    if (hasEffectiveMappings) {
       const actor = request.user as AuthenticatedUser;
       if (!actor.effectivePermissions?.has('users.roles.manage')) {
         throw new ForbiddenException('Configuring SSO permission mappings requires users.roles.manage');
       }
       await this.assertPermissionMappingCeiling(
-        [updateDto.oidcConfiguration?.permissionMappings, updateDto.samlConfiguration?.permissionMappings],
+        [effectiveOidc, effectiveSaml],
         actor.effectivePermissions,
       );
     }
-    return this.ssoService.updateProvider(parseInt(id, 10), updateDto);
+
+    return this.ssoService.updateProvider(providerId, updateDto);
   }
 
   @Delete('providers/:id')

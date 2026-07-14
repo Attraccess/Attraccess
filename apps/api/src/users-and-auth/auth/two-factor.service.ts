@@ -212,8 +212,9 @@ export class TwoFactorService {
       return false;
     }
     if (effectivePerms.size === 0) return false;
-    // privileged = more than just the default user-role grant
-    return effectivePerms.size > 1 || !effectivePerms.has('resources.read');
+    // privileged = holds any permission outside the basic resources.* namespace
+    // (avoids coupling to seed-data assumptions about which permissions the default role carries)
+    return [...effectivePerms].some((p) => !p.startsWith('resources.'));
   }
 
   private async isCodeValid(secret: string, code: string): Promise<boolean> {

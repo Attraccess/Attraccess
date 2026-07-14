@@ -9,6 +9,7 @@ export class RbacService {
   // ponytail: TTL cache — local invalidation keeps single-instance latency low; TTL bounds staleness
   // in multi-instance Postgres deployments where a role change on another instance won't invalidate here.
   private readonly CACHE_TTL_MS = 30_000;
+  private readonly MAX_CACHE_SIZE = 1_000;
   private readonly permissionsCache = new Map<number, { permissions: Set<string>; ts: number }>();
 
   constructor(
@@ -34,6 +35,11 @@ export class RbacService {
       .getRawMany<{ permissionKey: string }>();
 
     const permissions = new Set(rows.map((r) => r.permissionKey));
+    // FIFO eviction: drop the oldest entry when the cache is full
+    if (this.permissionsCache.size >= this.MAX_CACHE_SIZE) {
+      const oldestKey = this.permissionsCache.keys().next().value;
+      this.permissionsCache.delete(oldestKey);
+    }
     this.permissionsCache.set(userId, { permissions, ts: Date.now() });
     return new Set(permissions);
   }

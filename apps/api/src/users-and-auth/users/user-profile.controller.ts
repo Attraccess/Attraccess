@@ -2,6 +2,7 @@ import { Body, Controller, Get, Patch, Post, Req, UseInterceptors } from '@nestj
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { User } from '@attraccess/database-entities';
 import { AuthenticatedRequest, Auth, AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
+import { plainToInstance } from 'class-transformer';
 import { AuthRateLimitInterceptor } from '../rate-limiting/auth-rate-limit.interceptor';
 import { UsersService } from './users.service';
 import { ChangeUsernameDto } from './dtos/changeUsername.dto';
@@ -29,12 +30,12 @@ export class UserProfileController {
     status: 401,
     description: 'User is not authenticated.',
   })
-  async getCurrent(@Req() request: AuthenticatedRequest) {
+  async getCurrent(@Req() request: AuthenticatedRequest): Promise<CurrentUserDto> {
     const user = request.user as AuthenticatedUser;
-    return {
+    return plainToInstance(CurrentUserDto, {
       ...user,
       effectivePermissions: user.effectivePermissions ? [...user.effectivePermissions] : [],
-    };
+    });
   }
 
   @Auth()

@@ -246,7 +246,14 @@ describe('SsoController', () => {
         name: 'Updated Provider',
       };
 
-      const result = await controller.updateOne('1', updateDto);
+      // Provider without permission mappings — no ceiling check triggered.
+      jest.spyOn(ssoService, 'getProviderById').mockResolvedValueOnce({
+        ...mockSSOProvider,
+        oidcConfiguration: { ...mockSSOProvider.oidcConfiguration, permissionMappings: {} },
+      } as SSOProvider);
+
+      const mockReq = { user: { id: 1, effectivePermissions: new Set(['users.roles.manage']) } } as unknown as AuthenticatedRequest;
+      const result = await controller.updateOne('1', updateDto, mockReq);
 
       expect(result).toEqual(mockSSOProvider);
       expect(ssoService.updateProvider).toHaveBeenCalledWith(1, updateDto);
