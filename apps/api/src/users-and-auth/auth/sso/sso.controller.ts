@@ -213,6 +213,10 @@ export class SSOController {
       if (!actor.effectivePermissions?.has('users.roles.manage')) {
         throw new ForbiddenException('Configuring SSO permission mappings requires users.roles.manage');
       }
+      await this.assertPermissionMappingCeiling(
+        [createDto.oidcConfiguration?.permissionMappings, createDto.samlConfiguration?.permissionMappings],
+        actor.effectivePermissions,
+      );
     }
     return this.ssoService.createProvider(createDto);
   }
@@ -254,6 +258,10 @@ export class SSOController {
       if (!actor.effectivePermissions?.has('users.roles.manage')) {
         throw new ForbiddenException('Configuring SSO permission mappings requires users.roles.manage');
       }
+      await this.assertPermissionMappingCeiling(
+        [updateDto.oidcConfiguration?.permissionMappings, updateDto.samlConfiguration?.permissionMappings],
+        actor.effectivePermissions,
+      );
     }
     return this.ssoService.updateProvider(parseInt(id, 10), updateDto);
   }
@@ -869,6 +877,29 @@ export class SSOController {
     }
 
     return user;
+  }
+
+  // Per-role ceiling: each mapped role must have permissions that are a subset of the actor's own
+  private async assertPermissionMappingCeiling(
+    mappings: Array<Record<string, string[]> | undefined>,
+    actorPermissions: Set<string>,
+  ): Promise<void> {
+    const roleKeys = new Set(mappings.flatMap((m) => Object.keys(m ?? {})));
+    if (roleKeys.size === 0) return;
+
+    const allRoles = await this.rbacService.getRoles();
+    const roleByKey = new Map(allRoles.map((r) => [r.key, r]));
+
+    for (const roleKey of roleKeys) {
+      const role = roleByKey.get(roleKey);
+      if (!role) continue;
+      const missing = role.rolePermissions.map((rp) => rp.permissionKey).filter((k) => !actorPermissions.has(k));
+      if (missing.length > 0) {
+        throw new ForbiddenException(
+          `Cannot map role '${roleKey}': it grants permissions you do not hold (${missing.join(', ')})`,
+        );
+      }
+    }
   }
 
   private async applyProvisioningPermissions(

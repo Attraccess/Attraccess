@@ -10,6 +10,13 @@ import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 
 const TWO_FACTOR_SETUP_ALLOWED_PREFIXES = ['/auth/two-factor', '/auth/session', '/users/me'];
 
+// ponytail: Set serializes as {} over JSON; this subclass emits an array so plugins/responses are safe
+class SerializablePermissionSet extends Set<string> {
+  toJSON() {
+    return [...this];
+  }
+}
+
 @Injectable()
 export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
   private readonly logger = new Logger(SessionStrategy.name);
@@ -38,7 +45,9 @@ export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
     }
 
     // Attach effectivePermissions before 2FA check so isPrivilegedUser() can use them
-    (user as AuthenticatedUser).effectivePermissions = await this.rbacService.getEffectivePermissions(user.id);
+    (user as AuthenticatedUser).effectivePermissions = new SerializablePermissionSet(
+      await this.rbacService.getEffectivePermissions(user.id),
+    );
 
     if (!this.isTwoFactorSetupAllowedPath(req)) {
       const status = await this.twoFactorService.getStatus(user);

@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Req, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Delete, ForbiddenException, Get, Param, ParseIntPipe, Post, Req, UseInterceptors } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { UserRole } from '@attraccess/database-entities';
 import { AuthenticatedRequest, Auth, AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
@@ -37,6 +37,9 @@ export class UserPermissionsController {
     @Req() request: AuthenticatedRequest,
   ): Promise<UserRole> {
     const actor = request.user as AuthenticatedUser;
+    if (actor.id === id) {
+      throw new ForbiddenException('You cannot modify your own roles');
+    }
     const result = await this.rbacService.assignRole(id, body.roleId, actor.effectivePermissions ?? new Set());
     const user = await this.usersService.findOne({ id });
     if (user) this.permissionsService.notifyPermissionsChanged(user, actor.id);
@@ -53,6 +56,9 @@ export class UserPermissionsController {
     @Req() request: AuthenticatedRequest,
   ): Promise<void> {
     const actor = request.user as AuthenticatedUser;
+    if (actor.id === id) {
+      throw new ForbiddenException('You cannot modify your own roles');
+    }
     await this.rbacService.revokeRole(id, roleId, actor.effectivePermissions ?? new Set());
     const user = await this.usersService.findOne({ id });
     if (!user) throw new UserNotFoundException(id);

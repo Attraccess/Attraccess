@@ -3,6 +3,12 @@ import { Request as BaseRequest } from 'express';
 
 export interface AuthenticatedUser extends User {
   jwtTokenId: string;
+  /**
+   * Effective permissions for this user. Stored as a Set for O(1) has() lookups.
+   * Note: A plain Set serializes as {} in JSON — spread to an array before including in any HTTP response.
+   * In practice the runtime value is a SerializableSet whose toJSON() emits an array,
+   * but callers should not rely on that implementation detail.
+   */
   effectivePermissions?: Set<string>;
 }
 
