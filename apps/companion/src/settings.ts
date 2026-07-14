@@ -5,9 +5,10 @@ import * as fs from 'fs';
 export interface CompanionSettings {
   idleTimeoutMinutes: number; // 0 = disabled
   foregroundApp: boolean;
+  usbDevices: boolean;
 }
 
-export const SETTINGS_DEFAULTS: CompanionSettings = { idleTimeoutMinutes: 15, foregroundApp: true };
+export const SETTINGS_DEFAULTS: CompanionSettings = { idleTimeoutMinutes: 15, foregroundApp: true, usbDevices: true };
 
 function settingsPath(): string {
   return path.join(app.getPath('userData'), 'settings.json');

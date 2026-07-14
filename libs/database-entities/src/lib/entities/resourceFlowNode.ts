@@ -34,6 +34,8 @@ export enum ResourceFlowNodeType {
   INPUT_COMPANION_IDLE = 'input.companion.idle',
   INPUT_COMPANION_ACTIVE = 'input.companion.active',
   INPUT_COMPANION_FOREGROUND_APP_CHANGED = 'input.companion.foreground_app_changed',
+  INPUT_COMPANION_USB_DEVICE_CONNECTED = 'input.companion.usb_device_connected',
+  INPUT_COMPANION_USB_DEVICE_DISCONNECTED = 'input.companion.usb_device_disconnected',
 }
 
 // Zod schemas for node data validation
@@ -237,6 +239,16 @@ export const CompanionForegroundAppNodeDataSchema = z.object({
   deviceId: CompanionDeviceIdSchema,
 });
 
+export const CompanionUsbDeviceNodeDataSchema = z.object({
+  deviceId: CompanionDeviceIdSchema,
+  vendorId: z.number().int().optional().meta({
+    helpText: 'Optional USB vendor ID filter (decimal). Leave empty to match any vendor.',
+  }),
+  productId: z.number().int().optional().meta({
+    helpText: 'Optional USB product ID filter (decimal). Leave empty to match any product.',
+  }),
+});
+
 // Helper function to get the appropriate schema for a node type
 export function getNodeDataSchema(nodeType: ResourceFlowNodeType) {
   switch (nodeType) {
@@ -312,6 +324,10 @@ export function getNodeDataSchema(nodeType: ResourceFlowNodeType) {
 
     case ResourceFlowNodeType.INPUT_COMPANION_FOREGROUND_APP_CHANGED:
       return CompanionForegroundAppNodeDataSchema;
+
+    case ResourceFlowNodeType.INPUT_COMPANION_USB_DEVICE_CONNECTED:
+    case ResourceFlowNodeType.INPUT_COMPANION_USB_DEVICE_DISCONNECTED:
+      return CompanionUsbDeviceNodeDataSchema;
 
     default: {
       const exhaustiveCheck: never = nodeType;

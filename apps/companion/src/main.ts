@@ -13,6 +13,7 @@ import { state } from './state';
 import { loadSettings, saveSettings, SETTINGS_DEFAULTS, CompanionSettings } from './settings';
 import { startIdleDetection, stopIdleDetection } from './idle-detection';
 import { startForegroundAppMonitoring, stopForegroundAppMonitoring } from './foreground-app';
+import { startUsbDevicesMonitoring, stopUsbDevicesMonitoring } from './usb-devices';
 import { openKiosk, reloadKiosk, lockComputer, unlockComputer, showKioskOverlay, hideKioskOverlay } from './kiosk';
 import { setupTray, setTrayState } from './tray';
 import { openWizardWindow } from './wizard-window';
@@ -157,6 +158,8 @@ ipcMain.handle('save-settings', (_evt, newSettings: CompanionSettings) => {
     startIdleDetection();
     stopForegroundAppMonitoring();
     startForegroundAppMonitoring();
+    stopUsbDevicesMonitoring();
+    startUsbDevicesMonitoring();
   }
 });
 
@@ -263,12 +266,14 @@ function startWsClient(serverUrl: string, firstRun: boolean): void {
     state.mainWindow?.webContents.send('ws-status', 'connected');
     startIdleDetection();
     startForegroundAppMonitoring();
+    startUsbDevicesMonitoring();
   });
 
   state.wsClient.on('disconnected', () => {
     state.wsConnected = false;
     stopIdleDetection();
     stopForegroundAppMonitoring();
+    stopUsbDevicesMonitoring();
     setTrayState('disconnected');
     state.mainWindow?.webContents.send('ws-status', 'disconnected');
   });
@@ -383,6 +388,7 @@ app.on('before-quit', (event) => {
   state.allowQuit = false;
   stopIdleDetection();
   stopForegroundAppMonitoring();
+  stopUsbDevicesMonitoring();
   hideKioskOverlay();
   state.wsClient?.stop();
 });

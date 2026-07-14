@@ -11,6 +11,7 @@ interface Props {
 export function SettingsStep({ settings, onSave, onBack }: Props) {
   const [idleTimeout, setIdleTimeout] = useState(String(settings.idleTimeoutMinutes));
   const [foregroundApp, setForegroundApp] = useState(settings.foregroundApp ?? true);
+  const [usbDevices, setUsbDevices] = useState(settings.usbDevices ?? true);
   const [error, setError] = useState('');
 
   function handleSave() {
@@ -20,7 +21,7 @@ export function SettingsStep({ settings, onSave, onBack }: Props) {
       return;
     }
     setError('');
-    onSave({ ...settings, idleTimeoutMinutes: val, foregroundApp });
+    onSave({ ...settings, idleTimeoutMinutes: val, foregroundApp, usbDevices });
   }
 
   return (
@@ -43,6 +44,10 @@ export function SettingsStep({ settings, onSave, onBack }: Props) {
       <Switch isSelected={foregroundApp} onChange={setForegroundApp}>
         <Switch.Control><Switch.Thumb /></Switch.Control>
         <Switch.Content>Report foreground app to flow triggers</Switch.Content>
+      </Switch>
+      <Switch isSelected={usbDevices} onChange={setUsbDevices}>
+        <Switch.Control><Switch.Thumb /></Switch.Control>
+        <Switch.Content>Report USB device connect/disconnect to flow triggers</Switch.Content>
       </Switch>
       <Button variant="primary" fullWidth onPress={handleSave}>
         Save
