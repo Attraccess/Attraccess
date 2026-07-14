@@ -44,9 +44,10 @@ RUN node -e "for (const p of ['dist/apps/api/package.json','dist/apps/api-swagge
 
 # pnpm 10 errors on unused patches during deploy; @swc-node/register and
 # ts-api-utils are dev-only tools absent from the API's production dep tree.
-# Only strip entries from the patchedDependencies block (before importers:) to
-# keep packages/snapshots sections intact.
-RUN node -e "const fs=require('fs'); let l=fs.readFileSync('pnpm-lock.yaml','utf8'); const pivot='\nimporters:'; const [hdr,rest]=l.split(pivot); const cleaned=hdr.replace(/\n  '@swc-node\/register@[^']+':(?:\n    [^\n]+)*/g,'').replace(/\n  ts-api-utils@[^\n:]+:(?:\n    [^\n]+)*/g,''); fs.writeFileSync('pnpm-lock.yaml',cleaned+pivot+rest);"
+# Strip them from both pnpm-lock.yaml (patchedDependencies block) and from the
+# root package.json so pnpm deploy sees no stale patch declarations.
+RUN node -e "const fs=require('fs'); let l=fs.readFileSync('pnpm-lock.yaml','utf8'); const pivot='\nimporters:'; const [hdr,rest]=l.split(pivot); const cleaned=hdr.replace(/\n  '@swc-node\/register@[^']+':(?:\n    [^\n]+)*/g,'').replace(/\n  ts-api-utils@[^\n:]+:(?:\n    [^\n]+)*/g,''); fs.writeFileSync('pnpm-lock.yaml',cleaned+pivot+rest);" && \
+    node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('package.json','utf8')); delete p.pnpm.patchedDependencies['@swc-node/register@1.11.1']; delete p.pnpm.patchedDependencies['ts-api-utils@2.5.0']; fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n');"
 
 # pnpm 10's new deploy requires a workspace shared lockfile; --ignore-workspace
 # strips that, so use --legacy for the self-contained dist/apps/api package.
