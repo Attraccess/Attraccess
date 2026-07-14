@@ -17,6 +17,10 @@ const ROLES = [
   { id: 4, key: 'billing-manager', label: 'Billing Manager' },
 ];
 
+// Stable reference — must not be inline in the mock factory; a new array on every hook
+// call makes userRoles change reference each render and causes an infinite useEffect loop.
+const USER_ROLE_ASSIGNMENTS = [{ roleId: 1 }, { roleId: 3 }];
+
 vi.mock('@attraccess/plugins-frontend-ui', () => ({
   useTranslations: () => {
     const translations: Record<string, string> = {
@@ -48,10 +52,24 @@ vi.mock('@attraccess/plugins-frontend-ui', () => ({
   },
 }));
 
+vi.mock('../../../../../components/labeledSwitch', () => ({
+  LabeledSwitch: ({ children, isSelected, isDisabled, onChange, ...props }: Record<string, unknown>) => (
+    <label {...props}>
+      <input
+        type="checkbox"
+        checked={Boolean(isSelected)}
+        disabled={Boolean(isDisabled)}
+        onChange={(e) => (onChange as (value: boolean) => void)?.(e.target.checked)}
+      />
+      {children as React.ReactNode}
+    </label>
+  ),
+}));
+
 vi.mock('@attraccess/react-query-client', () => ({
   useRbacServiceListRoles: () => ({ data: ROLES, isLoading: false }),
   useUsersServiceGetUserRoleAssignments: () => ({
-    data: [{ roleId: 1 }, { roleId: 3 }], // resource-manager and user-manager assigned
+    data: USER_ROLE_ASSIGNMENTS, // resource-manager and user-manager assigned
     isLoading: false,
   }),
   useUsersServiceAssignRoleToUser: () => ({ mutateAsync: assignRoleMock, isPending: false }),
