@@ -204,7 +204,16 @@ export class SSOController {
     status: 403,
     description: 'Forbidden - Insufficient permissions',
   })
-  async createOne(@Body() createDto: CreateSSOProviderDto): Promise<SSOProvider> {
+  async createOne(@Body() createDto: CreateSSOProviderDto, @Req() request: AuthenticatedRequest): Promise<SSOProvider> {
+    const settingPermissionMappings =
+      createDto.oidcConfiguration?.permissionMappings !== undefined ||
+      createDto.samlConfiguration?.permissionMappings !== undefined;
+    if (settingPermissionMappings) {
+      const actor = request.user as AuthenticatedUser;
+      if (!actor.effectivePermissions?.has('users.roles.manage')) {
+        throw new ForbiddenException('Configuring SSO permission mappings requires users.roles.manage');
+      }
+    }
     return this.ssoService.createProvider(createDto);
   }
 
