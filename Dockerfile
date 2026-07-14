@@ -44,7 +44,9 @@ RUN node -e "for (const p of ['dist/apps/api/package.json','dist/apps/api-swagge
 
 # pnpm 10 errors on unused patches during deploy; @swc-node/register and
 # ts-api-utils are dev-only tools absent from the API's production dep tree.
-RUN node -e "const fs=require('fs'); let l=fs.readFileSync('pnpm-lock.yaml','utf8'); l=l.replace(/\n  '@swc-node\/register@[^']+':(\n    [^\n]+)*/g,'').replace(/\n  ts-api-utils@[^:]+:(\n    [^\n]+)*/g,''); fs.writeFileSync('pnpm-lock.yaml',l);"
+# Only strip entries from the patchedDependencies block (before importers:) to
+# keep packages/snapshots sections intact.
+RUN node -e "const fs=require('fs'); let l=fs.readFileSync('pnpm-lock.yaml','utf8'); const pivot='\nimporters:'; const [hdr,rest]=l.split(pivot); const cleaned=hdr.replace(/\n  '@swc-node\/register@[^']+':(?:\n    [^\n]+)*/g,'').replace(/\n  ts-api-utils@[^\n:]+:(?:\n    [^\n]+)*/g,''); fs.writeFileSync('pnpm-lock.yaml',cleaned+pivot+rest);"
 
 # pnpm 10's new deploy requires a workspace shared lockfile; --ignore-workspace
 # strips that, so use --legacy for the self-contained dist/apps/api package.
