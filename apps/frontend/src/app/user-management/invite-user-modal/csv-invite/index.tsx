@@ -20,6 +20,7 @@ import {
   CsvInviteUploadDto,
   useUsersServiceInviteUsersFromCsv,
   ApiError,
+  useRbacServiceListRoles,
 } from '@attraccess/react-query-client';
 import { EmptyState } from '../../../../components/emptyState';
 import { useToastMessage } from '../../../../components/toastProvider';
@@ -54,6 +55,9 @@ export function CsvInvite({ onSuccess, onError }: Props) {
 
   const [emailKey, setEmailKey] = useState<string | undefined>(undefined);
   const [usernameKey, setUsernameKey] = useState<string | undefined>(undefined);
+  const [roleKeyColumn, setRoleKeyColumn] = useState<string | undefined>(undefined);
+
+  const { data: availableRoles } = useRbacServiceListRoles();
 
   const selectFile = useCallback(() => {
     const file = document.createElement('input') as HTMLInputElement;
@@ -152,8 +156,9 @@ export function CsvInvite({ onSuccess, onError }: Props) {
       emailKey: emailKey ?? '',
       usernameKey: usernameKey ?? '',
       ignoredRows: rowsToIgnore ?? ignoredRows,
+      ...(roleKeyColumn ? { roleKeyColumn } : {}),
     }),
-    [emailKey, usernameKey, ignoredRows],
+    [emailKey, usernameKey, ignoredRows, roleKeyColumn],
   );
 
   const { mutate: inviteUsers, isPending } = useUsersServiceInviteUsersFromCsv({
@@ -239,6 +244,18 @@ export function CsvInvite({ onSuccess, onError }: Props) {
         }))}
         isRequired
       />
+
+      {csvHeaders.length > 0 && (availableRoles ?? []).length > 0 && (
+        <Select
+          label={t('inputs.fieldMapping.roleKeyColumn')}
+          value={roleKeyColumn ?? ''}
+          onChange={(v) => setRoleKeyColumn(v || undefined)}
+          items={[
+            { label: '—', key: '' },
+            ...csvHeaders.map((header) => ({ label: header, key: header })),
+          ]}
+        />
+      )}
 
       <Table data-cy="csv-invite-table">
         <TableScrollContainer>

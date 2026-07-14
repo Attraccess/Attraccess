@@ -21,6 +21,15 @@ export class CsvInviteConfigDto {
   @IsInt({ each: true })
   @Min(1, { each: true })
   ignoredRows?: number[];
+
+  @ApiProperty({
+    required: false,
+    description: 'CSV column header whose value is an RBAC role key to assign to each invited user (in addition to default roles)',
+    example: 'role',
+  })
+  @IsOptional()
+  @IsString()
+  roleKeyColumn?: string;
 }
 
 export class CsvInviteRowErrorDto {

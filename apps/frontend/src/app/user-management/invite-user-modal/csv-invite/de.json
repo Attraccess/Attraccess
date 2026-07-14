@@ -3,7 +3,8 @@
     "file": "Datei auswählen",
     "fieldMapping": {
       "email": "E-Mail",
-      "username": "Benutzername"
+      "username": "Benutzername",
+      "roleKeyColumn": "Rollenspalte (optional)"
     }
   },
   "preview": {

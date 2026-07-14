@@ -29,7 +29,7 @@ export class UserInvitationService {
   ) {}
 
   private async inviteUsersTransactional(
-    candidates: Array<{ username: string; email: string; locale?: string }>,
+    candidates: Array<{ username: string; email: string; locale?: string; roleKey?: string }>,
     options?: { grantAllPermissionsToFirst?: boolean },
   ): Promise<User[]> {
     await this.usersService.ensureLicenseForNewUsers(candidates.length);
@@ -82,6 +82,7 @@ export class UserInvitationService {
       username: string;
       email: string;
       row: number;
+      roleKey?: string;
     }> = [];
     const errors: CsvInviteRowErrorDto[] = [];
     const ignoredRows = new Set(config.ignoredRows ?? []);
@@ -167,10 +168,12 @@ export class UserInvitationService {
           continue;
         }
 
+        const roleKey = config.roleKeyColumn ? (rowData[config.roleKeyColumn] ?? '').trim() || undefined : undefined;
         candidates.push({
           username: normalizedUsername,
           email,
           row: rowNumber,
+          roleKey,
         });
       }
     } catch (error) {

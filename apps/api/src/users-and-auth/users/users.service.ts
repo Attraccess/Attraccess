@@ -587,7 +587,7 @@ export class UsersService {
   }
 
   async createMany(
-    users: Array<{ username: string; email: string; locale?: string }>,
+    users: Array<{ username: string; email: string; locale?: string; roleKey?: string }>,
     options?: { grantAllPermissionsToFirst?: boolean; manager?: EntityManager },
   ): Promise<User[]> {
     if (users.length === 0) {
@@ -598,6 +598,7 @@ export class UsersService {
       username: this.cleanupUsername(userData.username),
       email: userData.email.trim(),
       locale: userData.locale,
+      roleKey: userData.roleKey,
     }));
 
     const run = async (manager: EntityManager) => {
@@ -632,6 +633,14 @@ export class UsersService {
       } else {
         for (const u of saved) {
           await this.rbacService.assignDefaultRoles(u.id, manager);
+        }
+      }
+
+      // Assign per-user role keys (from CSV column mapping), in addition to default roles.
+      for (let i = 0; i < saved.length; i++) {
+        const roleKey = normalized[i]?.roleKey;
+        if (roleKey) {
+          await this.rbacService.assignRoleByKey(saved[i].id, roleKey, manager);
         }
       }
 
