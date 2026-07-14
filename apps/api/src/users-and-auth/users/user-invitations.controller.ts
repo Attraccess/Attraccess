@@ -1,4 +1,4 @@
-import { Body, Controller, Post, Req, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Post, Req, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { ApiBody, ApiConsumes, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { User } from '@attraccess/database-entities';
@@ -57,6 +57,18 @@ export class UserInvitationsController {
     @UploadedFile() file: FileUpload | undefined,
     @Body('config') rawConfig: string | CsvInviteConfigDto,
   ): Promise<User[]> {
+    let hasRoleKeyColumn = false;
+    try {
+      const configObj = typeof rawConfig === 'string' ? JSON.parse(rawConfig) : rawConfig;
+      hasRoleKeyColumn = !!configObj?.roleKeyColumn;
+    } catch {
+      // invalid JSON — service will reject it with 400
+    }
+
+    if (hasRoleKeyColumn && !request.user.effectivePermissions?.has('users.roles.manage')) {
+      throw new ForbiddenException('users.roles.manage is required to assign roles via CSV import');
+    }
+
     return this.invitationService.inviteUsersFromCsv(file, rawConfig, request.user.locale, request.user.id);
   }
 }
