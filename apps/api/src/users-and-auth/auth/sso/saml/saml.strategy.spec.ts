@@ -162,6 +162,46 @@ describe('SSOSamlStrategy', () => {
     expect(rbacService.syncSsoRoles).not.toHaveBeenCalled();
   });
 
+  it('syncs RBAC roles from Azure AD URI-style group claims and memberOf', async () => {
+    const rbacService = { syncSsoRoles: jest.fn().mockResolvedValue(undefined) };
+    const usersService = {
+      findOne: jest.fn().mockImplementation((query: Record<string, unknown>) => {
+        if ('externalIdentifier' in query) {
+          return Promise.resolve({ id: 55, externalIdentifier: 'ad-user' });
+        }
+        return Promise.resolve(null);
+      }),
+      updateOne: jest.fn(),
+    };
+    const moduleRef = {
+      get: jest.fn((token: unknown) => (token === RbacService ? rbacService : usersService)),
+    } as unknown as ModuleRef;
+
+    const strategy = new SSOSamlStrategy(moduleRef);
+    const request = buildRequest(40, 'email');
+    request.ssoSamlOptions.samlConfiguration.permissionMappings = {
+      'user-manager': ['attraccess_admin'],
+    };
+
+    const profile = {
+      nameID: 'ad-user',
+      email: 'aduser@corp.example.com',
+      attributes: {
+        // Azure AD URI-style group claim — should be matched
+        'http://schemas.microsoft.com/ws/2008/06/identity/claims/groups': ['attraccess_admin'],
+      },
+    } as SamlProfile;
+
+    await strategy.validate(request, profile);
+
+    expect(rbacService.syncSsoRoles).toHaveBeenCalledWith(
+      55,
+      expect.arrayContaining(['user-manager']),
+      SSOProviderType.SAML,
+      40,
+    );
+  });
+
   it('syncs RBAC roles from SAML role attributes', async () => {
     const rbacService = { syncSsoRoles: jest.fn().mockResolvedValue(undefined) };
 

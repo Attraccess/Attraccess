@@ -258,8 +258,13 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
   private getPermissionClaimValues(profile: SamlProfile): unknown[] {
     const values: unknown[] = [];
     const profileRecord = profile as Record<string, unknown>;
-    // ponytail: lowercase-normalize both sides so Keycloak's "Role", ADFS URI-style names, etc. match
-    const candidateKeys = ['roles', 'role', 'groups', 'group'];
+    const candidateKeys = [
+      'roles', 'role', 'groups', 'group', 'memberof',
+      // Azure AD / ADFS URI-style claim names
+      'http://schemas.microsoft.com/ws/2008/06/identity/claims/groups',
+      'http://schemas.microsoft.com/ws/2008/06/identity/claims/role',
+      'http://schemas.xmlsoap.org/claims/group',
+    ];
 
     // Check candidateKeys inside the SAML attributes bag (not all attributes — that would
     // include email/displayName and make the empty-claims guard always true)
