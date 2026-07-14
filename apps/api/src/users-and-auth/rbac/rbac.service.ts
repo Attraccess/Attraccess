@@ -53,6 +53,16 @@ export class RbacService {
     });
   }
 
+  async getUserIdsWithPermission(permissionKey: string): Promise<number[]> {
+    const rows = await this.userRoleRepository
+      .createQueryBuilder('ur')
+      .innerJoin('role_permission', 'rp', 'rp.roleId = ur.roleId')
+      .select('DISTINCT ur.userId', 'userId')
+      .where('rp.permissionKey = :permKey', { permKey: permissionKey })
+      .getRawMany<{ userId: number }>();
+    return rows.map((r) => r.userId);
+  }
+
   async assignRoleByKey(userId: number, roleKey: string, em?: EntityManager): Promise<UserRole | null> {
     const roleRepo = em ? em.getRepository(Role) : this.roleRepository;
     const urRepo = em ? em.getRepository(UserRole) : this.userRoleRepository;

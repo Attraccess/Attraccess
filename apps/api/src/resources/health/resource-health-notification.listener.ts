@@ -8,6 +8,7 @@ import { Resource, ResourceHealthStatus, ResourceIntroducer, User } from '@attra
 import { ResourceHealthChangedEvent } from './events/resource-health-changed.event';
 import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../../notifications/notification-types';
+import { RbacService } from '../../users-and-auth/rbac/rbac.service';
 
 @Injectable()
 export class ResourceHealthNotificationListener {
@@ -21,6 +22,7 @@ export class ResourceHealthNotificationListener {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private readonly notifications: NotificationDispatchService,
+    private readonly rbacService: RbacService,
   ) {}
 
   @OnEvent(ResourceHealthChangedEvent.EVENT_NAME)
@@ -74,11 +76,8 @@ export class ResourceHealthNotificationListener {
   private async collectRecipients(resource: Resource): Promise<User[]> {
     const groupIds = (resource.groups ?? []).map((group) => group.id);
 
-    const admins = await this.userRepository
-      .createQueryBuilder('user')
-      .where((qb) => `user.id IN ${qb.subQuery().select('ur.userId').from('user_role', 'ur').innerJoin('role_permission', 'rp', 'rp.roleId = ur.roleId').where('rp.permissionKey = :permKey').getQuery()}`)
-      .setParameter('permKey', 'resources.maintenance.manage')
-      .getMany();
+    const adminIds = await this.rbacService.getUserIdsWithPermission('resources.maintenance.manage');
+    const admins = adminIds.length > 0 ? await this.userRepository.findBy({ id: In(adminIds) }) : [];
 
     const introducerWhere: Array<Record<string, unknown>> = [{ resourceId: resource.id }];
     if (groupIds.length > 0) {

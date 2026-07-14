@@ -5,24 +5,23 @@ import { MaintenanceRequestNotificationListener } from './maintenance-request-no
 import { ResourceMaintenanceRequestCreatedEvent } from './events/maintenance-request-created.event';
 import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../../notifications/notification-types';
+import { RbacService } from '../../users-and-auth/rbac/rbac.service';
 
 describe('MaintenanceRequestNotificationListener', () => {
   let listener: MaintenanceRequestNotificationListener;
   let requestRepository: { findOne: jest.Mock };
   let resourceRepository: { findOne: jest.Mock };
-  let userRepository: { createQueryBuilder: jest.Mock };
+  let userRepository: { findBy: jest.Mock };
   let introducerRepository: { find: jest.Mock };
   let dispatch: { dispatch: jest.Mock };
+  let rbacService: { getUserIdsWithPermission: jest.Mock };
 
   beforeEach(async () => {
     requestRepository = { findOne: jest.fn() };
     resourceRepository = { findOne: jest.fn() };
+    rbacService = { getUserIdsWithPermission: jest.fn().mockResolvedValue([2]) };
     userRepository = {
-      createQueryBuilder: jest.fn().mockReturnValue({
-        where: jest.fn().mockReturnThis(),
-        setParameter: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue([{ id: 2, email: 'admin@example.com' } as User]),
-      }),
+      findBy: jest.fn().mockResolvedValue([{ id: 2, email: 'admin@example.com' } as User]),
     };
     introducerRepository = { find: jest.fn().mockResolvedValue([]) };
     dispatch = { dispatch: jest.fn().mockResolvedValue(undefined) };
@@ -35,6 +34,7 @@ describe('MaintenanceRequestNotificationListener', () => {
         { provide: getRepositoryToken(ResourceMaintenanceRequest), useValue: requestRepository },
         { provide: getRepositoryToken(User), useValue: userRepository },
         { provide: NotificationDispatchService, useValue: dispatch },
+        { provide: RbacService, useValue: rbacService },
       ],
     }).compile();
 
