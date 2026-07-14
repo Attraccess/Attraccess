@@ -16,6 +16,7 @@ describe('ResourceIntroducersService', () => {
     remove: jest.Mock;
     createQueryBuilder: jest.Mock;
   };
+  let userRepository: { findOne: jest.Mock };
   let eventEmitter: { emit: jest.Mock };
   let notifications: { dispatch: jest.Mock; sendEmailTemplate: jest.Mock };
 
@@ -35,6 +36,7 @@ describe('ResourceIntroducersService', () => {
       remove: jest.fn(),
       createQueryBuilder: jest.fn().mockReturnValue(emptyGroupQuery),
     };
+    userRepository = { findOne: jest.fn().mockResolvedValue({ id: 2, locale: 'en' } as User) };
     eventEmitter = { emit: jest.fn() };
     notifications = { dispatch: jest.fn().mockResolvedValue(undefined), sendEmailTemplate: jest.fn() };
 
@@ -42,6 +44,7 @@ describe('ResourceIntroducersService', () => {
       providers: [
         ResourceIntroducersService,
         { provide: getRepositoryToken(ResourceIntroducer), useValue: repository },
+        { provide: getRepositoryToken(User), useValue: userRepository },
         { provide: EventEmitter2, useValue: eventEmitter },
         { provide: NotificationDispatchService, useValue: notifications },
       ],
@@ -157,6 +160,7 @@ describe('ResourceIntroducersService', () => {
       repository.save.mockImplementation(async (data) => data);
 
       const result = await service.grant(1, 2, ResourceIntroducerType.MAINTAINER);
+      await Promise.resolve(); // flush notification promise chain
 
       expect(repository.create).toHaveBeenCalledWith({
         resourceId: 1,
@@ -199,6 +203,7 @@ describe('ResourceIntroducersService', () => {
       repository.save.mockImplementation(async (data) => data);
 
       await service.grant(1, 2);
+      await Promise.resolve(); // flush notification promise chain
 
       expect(repository.create).toHaveBeenCalledWith({
         resourceId: 1,
@@ -215,6 +220,7 @@ describe('ResourceIntroducersService', () => {
       repository.save.mockImplementation(async (data) => data);
 
       const result = await service.grant(1, 2, ResourceIntroducerType.INTRODUCER);
+      await Promise.resolve(); // flush notification promise chain
 
       expect(result.type).toBe(ResourceIntroducerType.INTRODUCER);
       expect(repository.save).toHaveBeenCalledWith(existing);
@@ -241,6 +247,7 @@ describe('ResourceIntroducersService', () => {
       repository.remove.mockImplementation(async (data) => data);
 
       await service.revoke(1, 2);
+      await Promise.resolve(); // flush notification promise chain
 
       const revokeReq = notifications.dispatch.mock.calls[0][0];
       expect(revokeReq.category).toBe(NotificationCategory.ACCESS_CHANGES);

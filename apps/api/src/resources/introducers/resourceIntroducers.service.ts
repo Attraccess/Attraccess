@@ -19,6 +19,8 @@ export class ResourceIntroducersService {
   constructor(
     @InjectRepository(ResourceIntroducer)
     private readonly resourceIntroducerRepository: Repository<ResourceIntroducer>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
     @Inject(EventEmitter2)
     private readonly eventEmitter: EventEmitter2,
     private readonly notifications: NotificationDispatchService,
@@ -35,24 +37,30 @@ export class ResourceIntroducersService {
           ? 'grantedIntroducer'
           : 'revokedIntroducer';
 
-    void this.notifications.dispatch({
-      category: NotificationCategory.ACCESS_CHANGES,
-      recipients: [{ id: userId } as User],
-      title: (r) => t(r.locale, 'title'),
-      body: (r) => t(r.locale, bodyKey, { resourceId }),
-      url,
-      dedupeKey: `resource-access-${resourceId}-${userId}-${bodyKey}`,
-      sendEmail: (r) =>
-        this.notifications.sendEmailTemplate(r, NotificationCategory.ACCESS_CHANGES, {
-          accessChange: {
-            title: t(r.locale, 'title'),
-            body: t(r.locale, bodyKey, { resourceId }),
-            url,
-          },
-        }),
-    }).catch((error) => {
-      this.logger.error(`Failed to notify user ${userId} about resource access changes: ${(error as Error).message}`);
-    });
+    void this.userRepository
+      .findOne({ where: { id: userId }, select: ['id', 'locale'] })
+      .then((user) => {
+        const recipient = user ?? ({ id: userId } as User);
+        return this.notifications.dispatch({
+          category: NotificationCategory.ACCESS_CHANGES,
+          recipients: [recipient],
+          title: (r) => t(r.locale, 'title'),
+          body: (r) => t(r.locale, bodyKey, { resourceId }),
+          url,
+          dedupeKey: `resource-access-${resourceId}-${userId}-${bodyKey}`,
+          sendEmail: (r) =>
+            this.notifications.sendEmailTemplate(r, NotificationCategory.ACCESS_CHANGES, {
+              accessChange: {
+                title: t(r.locale, 'title'),
+                body: t(r.locale, bodyKey, { resourceId }),
+                url,
+              },
+            }),
+        });
+      })
+      .catch((error) => {
+        this.logger.error(`Failed to notify user ${userId} about resource access changes: ${(error as Error).message}`);
+      });
   }
 
   public async getMany(resourceId: number, type?: ResourceIntroducerType): Promise<ResourceIntroducer[]> {
