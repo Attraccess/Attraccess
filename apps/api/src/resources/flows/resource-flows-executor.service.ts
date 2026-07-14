@@ -73,6 +73,7 @@ import {
   topicMatches,
 } from './node-executors';
 import { CompanionGatewayService } from '../../companion/companion-gateway.service';
+import { CompanionUsbDeviceDto } from '../../companion/companion.types';
 
 // Handlebars helpers
 Handlebars.registerHelper('json', (value: unknown) => {
@@ -891,12 +892,12 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
   }
 
   @OnEvent('companion.usb_connected')
-  async handleCompanionUsbConnected(event: { deviceId: number; payload: { vendorId: number; productId: number } }): Promise<void> {
+  async handleCompanionUsbConnected(event: { deviceId: number; payload: CompanionUsbDeviceDto }): Promise<void> {
     await this.triggerUsbDeviceEvent(event.deviceId, ResourceFlowNodeType.INPUT_COMPANION_USB_DEVICE_CONNECTED, event.payload);
   }
 
   @OnEvent('companion.usb_disconnected')
-  async handleCompanionUsbDisconnected(event: { deviceId: number; payload: { vendorId: number; productId: number } }): Promise<void> {
+  async handleCompanionUsbDisconnected(event: { deviceId: number; payload: CompanionUsbDeviceDto }): Promise<void> {
     await this.triggerUsbDeviceEvent(event.deviceId, ResourceFlowNodeType.INPUT_COMPANION_USB_DEVICE_DISCONNECTED, event.payload);
   }
 
@@ -910,7 +911,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     await this.startFlow(matching, { payload });
   }
 
-  private async triggerUsbDeviceEvent(deviceId: number, type: ResourceFlowNodeType, payload: { vendorId: number; productId: number }): Promise<void> {
+  private async triggerUsbDeviceEvent(deviceId: number, type: ResourceFlowNodeType, payload: CompanionUsbDeviceDto): Promise<void> {
     const allNodes = await this.flowNodeRepository.find({ where: { type } });
     const matching = allNodes.filter((node) => {
       const parsed = CompanionUsbDeviceNodeDataSchema.safeParse(node.data ?? {});

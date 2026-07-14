@@ -1,27 +1,37 @@
-import { createMetricsAdapter, SystemMetricsAdapter } from './metrics';
+import { UsbDeviceInfo } from './metrics';
 import { state } from './state';
+import { sharedMetricsAdapter, acquireMetrics, releaseMetrics } from './shared-metrics';
 
-const metricsAdapter: SystemMetricsAdapter = createMetricsAdapter();
-let monitoringStarted = false;
+let listening = false;
+
+function onUsbDeviceAdded(device: UsbDeviceInfo): void {
+  if (!state.wsClient) return;
+  state.wsClient.sendUsbConnected(device);
+}
+
+function onUsbDeviceRemoved(device: UsbDeviceInfo): void {
+  if (!state.wsClient) return;
+  state.wsClient.sendUsbDisconnected(device);
+}
 
 export function startUsbDevicesMonitoring(): void {
-  if (monitoringStarted || !state.settings.usbDevices) return;
-  monitoringStarted = true;
-  metricsAdapter.on('usbDeviceAdded', (device) => {
-    if (!state.wsClient) return;
-    state.wsClient.sendUsbconnected(device);
+  if (listening || !state.settings.usbDevices) return;
+  listening = true;
+  sharedMetricsAdapter.on('usbDeviceAdded', onUsbDeviceAdded);
+  sharedMetricsAdapter.on('usbDeviceRemoved', onUsbDeviceRemoved);
+  acquireMetrics().catch((err) => {
+    console.warn('[companion] USB metrics adapter start failed:', err);
+    listening = false;
+    sharedMetricsAdapter.off('usbDeviceAdded', onUsbDeviceAdded);
+    sharedMetricsAdapter.off('usbDeviceRemoved', onUsbDeviceRemoved);
+    releaseMetrics();
   });
-  metricsAdapter.on('usbDeviceRemoved', (device) => {
-    if (!state.wsClient) return;
-    state.wsClient.sendUsbdisconnected(device);
-  });
-  metricsAdapter.start().catch((err) => console.warn('[companion] USB metrics adapter start failed:', err));
 }
 
 export function stopUsbDevicesMonitoring(): void {
-  if (!monitoringStarted) return;
-  monitoringStarted = false;
-  metricsAdapter.stop();
-  metricsAdapter.removeAllListeners('usbDeviceAdded');
-  metricsAdapter.removeAllListeners('usbDeviceRemoved');
+  if (!listening) return;
+  listening = false;
+  sharedMetricsAdapter.off('usbDeviceAdded', onUsbDeviceAdded);
+  sharedMetricsAdapter.off('usbDeviceRemoved', onUsbDeviceRemoved);
+  releaseMetrics();
 }

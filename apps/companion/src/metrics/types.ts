@@ -35,4 +35,12 @@ export abstract class SystemMetricsAdapter extends EventEmitter {
   on(event: string | symbol, listener: (...args: any[]) => void): this {
     return super.on(event, listener);
   }
+
+  off(event: 'foregroundAppChanged', listener: (app: ForegroundAppInfo | null) => void): this;
+  off(event: 'usbDeviceAdded', listener: (device: UsbDeviceInfo) => void): this;
+  off(event: 'usbDeviceRemoved', listener: (device: UsbDeviceInfo) => void): this;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  off(event: string | symbol, listener: (...args: any[]) => void): this {
+    return super.off(event, listener);
+  }
 }
