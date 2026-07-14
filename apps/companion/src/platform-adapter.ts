@@ -34,6 +34,12 @@ export interface OsAdapter {
    * grabbed resources (e.g. Linux VT lock) here.
    */
   onUnlock?(): void;
+
+  /** Fallback file extension for the update package (e.g. '.exe', '.dmg', ''). Used when the download URL has no extension. */
+  readonly updateExtension: string;
+
+  /** Apply the downloaded update file and restart/relaunch the app. Call allowQuit() before any app.quit() call. */
+  applyUpdate(dest: string, version: string, allowQuit: () => void): Promise<void>;
 }
 
 export const osAdapter: OsAdapter =

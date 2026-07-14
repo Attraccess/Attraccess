@@ -61,8 +61,6 @@ jobs:
           certificate-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
 
       - name: Build macOS companion (universal)
-        # The companion project.json must configure electron-builder to output:
-        #   apps/companion/dist/companion_mac_universal.dmg
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.APPLE_CERTIFICATE != '' && 'true' || 'false' }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
@@ -101,8 +99,6 @@ jobs:
           cert-password: ${{ secrets.WINDOWS_CERT_PASSWORD }}
 
       - name: Build Windows companion (x64)
-        # The companion project.json must configure electron-builder to output:
-        #   apps/companion/dist/companion_win_x64.exe
         shell: bash
         run: pnpm nx run companion:build
 

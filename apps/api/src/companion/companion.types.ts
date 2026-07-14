@@ -1,6 +1,6 @@
 import { CompanionDevice } from '@attraccess/database-entities';
 import { ApiProperty } from '@nestjs/swagger';
-import { IsInt, IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
+import { IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
 
 // ─── Client → Server DTOs ────────────────────────────────────────────────────
 
@@ -14,6 +14,21 @@ export class CompanionAuthenticateDto {
   @IsOptional()
   @IsString()
   token?: string;
+
+  @ApiProperty({ description: 'OS platform (e.g. linux, darwin, win32)', required: false })
+  @IsOptional()
+  @IsIn(['linux', 'darwin', 'win32'])
+  platform?: string;
+
+  @ApiProperty({ description: 'CPU architecture (e.g. x64, arm64)', required: false })
+  @IsOptional()
+  @IsString()
+  arch?: string;
+
+  @ApiProperty({ description: 'Companion app version', required: false })
+  @IsOptional()
+  @IsString()
+  appVersion?: string;
 }
 
 // ─── Server → Client DTOs ────────────────────────────────────────────────────
@@ -59,6 +74,9 @@ export class CompanionUpdateAvailableDto {
 
   @ApiProperty({ description: 'New version string' })
   version!: string;
+
+  @ApiProperty({ description: 'SHA-256 hex digest of the binary for integrity verification', required: false })
+  sha256?: string;
 }
 
 export class CompanionIdleDto {
@@ -110,12 +128,15 @@ export interface CompanionAuthenticatePayload {
   id?: number;
   token?: string;
   platform?: string;
+  arch?: string;
   appVersion?: string;
 }
 
 export interface CompanionSocket extends Omit<WebSocket, 'send'> {
   id: string;
   deviceId: CompanionDevice['id'] | null;
+  platform: string | null;
+  arch: string | null;
   send: (data: string) => void;
   sendEvent: (type: CompanionEventType, payload: unknown) => void;
 }

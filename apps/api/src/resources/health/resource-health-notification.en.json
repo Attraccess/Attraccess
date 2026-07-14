@@ -1,0 +1,6 @@
+{
+  "titleDegraded": "Resource degraded: {resourceName}",
+  "titleRecovered": "Resource recovered: {resourceName}",
+  "bodyStatusChanged": "{resourceName} changed from {previousStatus} to {status}",
+  "statusUnknown": "unknown"
+}

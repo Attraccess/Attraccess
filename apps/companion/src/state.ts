@@ -14,7 +14,12 @@ export const state = {
   authenticatedPayload: null as CompanionAuthenticatedDto | null,
   pinHash: null as string | null,
   allowQuit: false,
+  updateInProgress: false,
   kioskLocked: false,
   wsConnected: false,
+  adminOverride: false,
+  serverLocked: false,
+  currentTrayState: 'disconnected' as 'locked' | 'unlocked' | 'disconnected',
+  onAdminOverrideDisable: null as (() => void) | null,
   settings: { ...SETTINGS_DEFAULTS } as CompanionSettings,
 };
