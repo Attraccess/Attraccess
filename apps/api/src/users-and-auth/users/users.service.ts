@@ -650,18 +650,18 @@ export class UsersService {
       for (let i = 0; i < saved.length; i++) {
         const roleKey = normalized[i]?.roleKey;
         if (roleKey) {
+          const role = await roleRepo.findOne({
+            where: { key: roleKey },
+            relations: ['rolePermissions'],
+          });
+          if (!role) {
+            throw new BadRequestException(`Role with key '${roleKey}' not found`);
+          }
           if (actorPermissions !== null) {
-            // Load role with permissions to perform ceiling check
-            const role = await roleRepo.findOne({
-              where: { key: roleKey },
-              relations: ['rolePermissions'],
-            });
-            if (role) {
-              const rolePermKeys = role.rolePermissions.map((rp) => rp.permissionKey);
-              const missing = rolePermKeys.filter((k) => !actorPermissions.has(k));
-              if (missing.length > 0) {
-                throw new ForbiddenException('You cannot grant a role whose permissions exceed your own');
-              }
+            const rolePermKeys = role.rolePermissions.map((rp) => rp.permissionKey);
+            const missing = rolePermKeys.filter((k) => !actorPermissions.has(k));
+            if (missing.length > 0) {
+              throw new ForbiddenException('You cannot grant a role whose permissions exceed your own');
             }
           }
           await this.rbacService.assignRoleByKey(saved[i].id, roleKey, manager);

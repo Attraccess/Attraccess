@@ -9,6 +9,7 @@ import { ToastProvider } from '../components/toastProvider';
 import { I18nProvider, RouterProvider, Spinner, useTheme } from '@heroui/react';
 import { OpenAPI } from '@attraccess/react-query-client';
 import { RouteConfig } from '@attraccess/plugins-frontend-sdk';
+import { type SystemPermission } from '@attraccess/shared';
 import PullToRefresh from 'react-simple-pull-to-refresh';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -50,7 +51,7 @@ function useRoutesWithAuthElements(routes: RouteConfig[]) {
 
       const requiredPermissions = (
         Array.isArray(route.authRequired) ? route.authRequired : [route.authRequired]
-      ) as string[];
+      ) as SystemPermission[];
 
       const userHasAllRequiredPermissions = requiredPermissions.every(
         (permission) => hasPermission(permission),

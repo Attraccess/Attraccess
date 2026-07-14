@@ -380,7 +380,6 @@ describe('SSO OIDC integration (e2e with testcontainers)', () => {
     // so syncSsoRoles should revoke any previously-assigned SSO roles and assign none.
     const configWithMappings = {
       ...oidcConfig,
-      ssoProviderId: 3,
       permissionMappings: [{ ssoRole: 'admin', permissionKey: 'system-admin' }] as never,
     };
     const strategy = new SSOOIDCStrategy(mockModuleRef, configWithMappings, CALLBACK_URL, stateStore as never);

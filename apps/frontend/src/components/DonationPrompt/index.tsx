@@ -7,6 +7,7 @@ import { useAuth } from '../../hooks/useAuth';
 import en from './en.json';
 import de from './de.json';
 import { useLicenseServiceGetLicenseInformation } from '@attraccess/react-query-client';
+import { type SystemPermission } from '@attraccess/shared';
 
 const SNOOZE_KEY = 'donationPrompt:snoozedUntil';
 
@@ -38,7 +39,7 @@ export function DonationPrompt() {
   // Show donation prompt to users with any elevated role (i.e., any permission beyond the default resources.read)
   const isEligible = useMemo(
     () =>
-      ['resources.update', 'system.settings.manage', 'users.update', 'billing.manage', 'users.roles.manage'].some(
+      (['resources.update', 'system.settings.manage', 'users.update', 'billing.manage', 'users.roles.manage'] as SystemPermission[]).some(
         (p) => hasPermission(p),
       ),
     [hasPermission],
