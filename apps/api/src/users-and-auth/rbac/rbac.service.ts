@@ -62,13 +62,15 @@ export class RbacService {
     });
   }
 
-  async isLastOwner(userId: number): Promise<boolean> {
-    const ownerRole = await this.roleRepository.findOne({ where: { key: 'owner' } });
+  async isLastOwner(userId: number, manager?: EntityManager): Promise<boolean> {
+    const roleRepo = manager ? manager.getRepository(Role) : this.roleRepository;
+    const urRepo = manager ? manager.getRepository(UserRole) : this.userRoleRepository;
+    const ownerRole = await roleRepo.findOne({ where: { key: 'owner' } });
     if (!ownerRole) return false;
-    const isOwner = await this.userRoleRepository.findOne({ where: { userId, roleId: ownerRole.id } });
+    const isOwner = await urRepo.findOne({ where: { userId, roleId: ownerRole.id } });
     if (!isOwner) return false;
-    const otherOwnerCount = await this.userRoleRepository
-      .createQueryBuilder('ur')
+    const qb = manager ? manager.createQueryBuilder(UserRole, 'ur') : this.userRoleRepository.createQueryBuilder('ur');
+    const otherOwnerCount = await qb
       .innerJoin('ur.user', 'u', 'u.deletedAt IS NULL')
       .where('ur.roleId = :roleId', { roleId: ownerRole.id })
       .andWhere('ur.userId != :userId', { userId })

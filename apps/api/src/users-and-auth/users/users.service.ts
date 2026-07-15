@@ -735,56 +735,66 @@ export class UsersService {
   }
 
   private async anonymizeAndSoftDelete(id: number, manager?: EntityManager): Promise<void> {
-    if (await this.rbacService.isLastOwner(id)) {
-      throw new ForbiddenException('Cannot delete the last owner');
+    // ponytail: wrap check-then-delete in a transaction to close the TOCTOU race where two concurrent
+    // deletions of the last two owners could both pass the isLastOwner guard and both proceed
+    const run = async (em: EntityManager) => {
+      if (await this.rbacService.isLastOwner(id, em)) {
+        throw new ForbiddenException('Cannot delete the last owner');
+      }
+
+      const repo = em.getRepository(User);
+      const authRepo = em.getRepository(AuthenticationDetail);
+      const sessionRepo = em.getRepository(Session);
+      const usageRepo = em.getRepository(ResourceUsage);
+
+      const user = await repo.findOne({ where: { id }, withDeleted: true });
+      if (!user) {
+        throw new UserNotFoundException(id);
+      }
+
+      if (user.deletedAt) {
+        return;
+      }
+
+      const activeUsageSession = await usageRepo.findOne({
+        where: { userId: user.id, endTime: IsNull() },
+      });
+      if (activeUsageSession) {
+        throw new UserHasActiveUsageSessionsException();
+      }
+
+      const suffix = randomBytes(6).toString('base64url').slice(0, 8);
+      const anonymizedUsername = `deleted-user-${user.id}-${suffix}`;
+      const anonymizedEmail = `deleted-user-${user.id}-${suffix}@deleted.local`;
+
+      await authRepo.delete({ userId: user.id });
+      await sessionRepo.delete({ userId: user.id });
+
+      await repo.update(user.id, {
+        username: anonymizedUsername,
+        email: anonymizedEmail,
+        isEmailVerified: false,
+        emailVerificationToken: null,
+        emailVerificationTokenExpiresAt: null,
+        passwordResetToken: null,
+        passwordResetTokenExpiresAt: null,
+        externalIdentifier: null,
+        nfcKeySeedToken: null,
+        lastUsernameChangeAt: null,
+        deleteAccountToken: null,
+        deleteAccountTokenExpiresAt: null,
+        deleteAccountRequestedAt: null,
+      });
+
+      await repo.softDelete(user.id);
+      this.metricsService.usersPerLocale.dec({ locale: user.locale ?? 'en' });
+    };
+
+    if (manager) {
+      await run(manager);
+    } else {
+      await this.dataSource.transaction(run);
     }
-
-    const repo = manager ? manager.getRepository(User) : this.userRepository;
-    const authRepo = manager ? manager.getRepository(AuthenticationDetail) : this.authenticationDetailRepository;
-    const sessionRepo = manager ? manager.getRepository(Session) : this.sessionRepository;
-    const usageRepo = manager ? manager.getRepository(ResourceUsage) : this.resourceUsageRepository;
-
-    const user = await repo.findOne({ where: { id }, withDeleted: true });
-    if (!user) {
-      throw new UserNotFoundException(id);
-    }
-
-    if (user.deletedAt) {
-      return;
-    }
-
-    const activeUsageSession = await usageRepo.findOne({
-      where: { userId: user.id, endTime: IsNull() },
-    });
-    if (activeUsageSession) {
-      throw new UserHasActiveUsageSessionsException();
-    }
-
-    const suffix = randomBytes(6).toString('base64url').slice(0, 8);
-    const anonymizedUsername = `deleted-user-${user.id}-${suffix}`;
-    const anonymizedEmail = `deleted-user-${user.id}-${suffix}@deleted.local`;
-
-    await authRepo.delete({ userId: user.id });
-    await sessionRepo.delete({ userId: user.id });
-
-    await repo.update(user.id, {
-      username: anonymizedUsername,
-      email: anonymizedEmail,
-      isEmailVerified: false,
-      emailVerificationToken: null,
-      emailVerificationTokenExpiresAt: null,
-      passwordResetToken: null,
-      passwordResetTokenExpiresAt: null,
-      externalIdentifier: null,
-      nfcKeySeedToken: null,
-      lastUsernameChangeAt: null,
-      deleteAccountToken: null,
-      deleteAccountTokenExpiresAt: null,
-      deleteAccountRequestedAt: null,
-    });
-
-    await repo.softDelete(user.id);
-    this.metricsService.usersPerLocale.dec({ locale: user.locale ?? 'en' });
   }
 
   async updateLocale(userId: number, locale: string): Promise<User> {
