@@ -55,6 +55,9 @@ EnrollmentScreen Display::enrollmentScreen;
 ResetScreen Display::resetScreen;
 SupervisionScreen Display::supervisionScreen;
 FirmwareUpdateScreen Display::firmwareUpdateScreen;
+#ifdef DEMO_MODE
+DemoSettingsScreen Display::demoSettingsScreen;
+#endif
 
 std::function<void(int16_t, int16_t)> Display::touchCallback = nullptr;
 lv_obj_t *Display::activePopup = nullptr;

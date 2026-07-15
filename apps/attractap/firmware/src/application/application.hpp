@@ -3,6 +3,10 @@
 #include <string>
 #include "settings/kvstore.hpp"
 
+#ifdef DEMO_MODE
+#include "../demo/demo_store.hpp"
+#endif
+
 #include "../nfc/nfc.hpp"
 #include "../logger/logger.hpp"
 #include "settings/settings.hpp"
@@ -221,6 +225,13 @@ private:
     void beginSupervision();
     void processSupervision();
     void exitSupervision(bool unlockResource, bool autoStart);
+#endif
+
+#ifdef DEMO_MODE
+    // Demo-mode card scan for the settings screen (register card → role)
+    volatile bool demoPendingScanActive = false;
+    volatile bool demoPendingScanReady = false;
+    std::string demoScanUid;
 #endif
 
     API::CardAuthenticationDetailsResponse cardAuthenticationData;

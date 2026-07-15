@@ -186,7 +186,7 @@ def main():
     variants = []
     for path in variant_files:
         name = os.path.splitext(os.path.basename(path))[0]
-        if name.endswith("-debug"):
+        if name.endswith("-debug") or name.endswith("-demo"):
             print(f"Skipping development variant: {name}")
             continue
         variants.append((name, path))

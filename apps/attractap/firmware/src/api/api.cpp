@@ -32,8 +32,10 @@ void API::setup()
     this->websocket.setup();
     this->websocket.setMessageCallbackRaw([this](const char *buf, size_t len)
                                           { this->processIncomingMessage(buf, len); });
+#ifndef DEMO_MODE
     this->websocket.setBinaryDataCallback([this](esp_websocket_event_data_t data)
                                           { this->firmware.onChunk(data); });
+#endif
 }
 void API::setFirmwareUpdateProgressCallback(std::function<void(int)> callback)
 {

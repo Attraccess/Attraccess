@@ -7,7 +7,11 @@
 #include "../settings/settings.hpp"
 #include "state/state.hpp"
 #include "../logger/logger.hpp"
+#ifdef DEMO_MODE
+#include "demo_websocket.hpp"
+#else
 #include "../websocket/websocket.hpp"
+#endif
 #include "../utils.hpp"
 #include "ota/ota_updater.hpp"
 
@@ -312,7 +316,11 @@ public:
 
 private:
     Logger logger;
+#ifdef DEMO_MODE
+    DemoWebsocket websocket;
+#else
     Websocket websocket;
+#endif
 
     void updateSateInfo();
 
