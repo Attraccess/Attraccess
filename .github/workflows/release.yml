@@ -162,13 +162,15 @@ jobs:
           append_body: true
 
   balena:
-    needs: [lint, typecheck, test, build]
+    needs: [lint, typecheck, test, build, build-companion]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
 
       - uses: ./.github/actions/build-attractap-firmware
+
+      - uses: ./.github/actions/download-companion
 
       - uses: ./.github/actions/balena-push
         with:
