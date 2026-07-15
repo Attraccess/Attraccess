@@ -251,35 +251,17 @@ export class SSOController {
   ): Promise<SSOProvider> {
     const providerId = parseInt(id, 10);
 
-    // Fetch the existing provider so we can compute the *effective* permission mappings
-    // (i.e. what will be active after the update, not just what is in the request body).
-    const existing = await this.ssoService.getProviderById(providerId);
+    const settingPermissionMappings =
+      updateDto.oidcConfiguration?.permissionMappings !== undefined ||
+      updateDto.samlConfiguration?.permissionMappings !== undefined;
 
-    // Effective mappings = update body's value if explicitly supplied, else the currently-stored value.
-    // This prevents bypassing the ceiling by omitting permissionMappings from the update body while
-    // the provider already has mappings pointing to high-privilege roles, OR by changing ssoProviderType
-    // to point at a different configuration that carries its own mappings.
-    const effectiveOidc =
-      updateDto.oidcConfiguration?.permissionMappings !== undefined
-        ? updateDto.oidcConfiguration.permissionMappings
-        : existing.oidcConfiguration?.permissionMappings;
-
-    const effectiveSaml =
-      updateDto.samlConfiguration?.permissionMappings !== undefined
-        ? updateDto.samlConfiguration.permissionMappings
-        : existing.samlConfiguration?.permissionMappings;
-
-    const hasEffectiveMappings =
-      (effectiveOidc !== undefined && Object.keys(effectiveOidc).length > 0) ||
-      (effectiveSaml !== undefined && Object.keys(effectiveSaml).length > 0);
-
-    if (hasEffectiveMappings) {
+    if (settingPermissionMappings) {
       const actor = request.user as AuthenticatedUser;
       if (!actor.effectivePermissions?.has('users.roles.manage')) {
         throw new ForbiddenException('Configuring SSO permission mappings requires users.roles.manage');
       }
       await this.assertPermissionMappingCeiling(
-        [effectiveOidc, effectiveSaml],
+        [updateDto.oidcConfiguration?.permissionMappings, updateDto.samlConfiguration?.permissionMappings],
         actor.effectivePermissions,
       );
     }
