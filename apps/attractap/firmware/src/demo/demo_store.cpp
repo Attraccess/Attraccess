@@ -134,4 +134,14 @@ const char *DemoStore::roleName(UserRole role)
     }
 }
 
+std::string DemoStore::displayName(const DemoCard &card)
+{
+    if (card.label[0] != '\0')
+        return card.label;
+
+    std::string uid = card.uid;
+    std::string shortUid = uid.length() > 4 ? uid.substr(uid.length() - 4) : uid;
+    return std::string(roleName(card.role)) + " " + shortUid;
+}
+
 #endif // DEMO_MODE

@@ -47,6 +47,10 @@ public:
 
     static const char *roleName(UserRole role);
 
+    // Human-readable name for a card: its label if set, otherwise the role name
+    // plus a short UID suffix so same-role demo users stay distinguishable.
+    static std::string displayName(const DemoCard &card);
+
 private:
     static KVStore _prefs;
     static Logger _logger;

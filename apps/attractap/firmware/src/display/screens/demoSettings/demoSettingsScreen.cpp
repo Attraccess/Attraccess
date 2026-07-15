@@ -35,12 +35,16 @@ void DemoSettingsScreen::init()
     lv_obj_set_style_bg_color(_screen, lv_color_hex(DEMO_BG), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(_screen, 255, LV_PART_MAIN);
     lv_obj_set_style_pad_all(_screen, 16, LV_PART_MAIN);
+    // Flex column: title bar fixed height, list area grows to fill the rest.
+    // (Overlays added later are flagged IGNORE_LAYOUT so they float centered.)
+    lv_obj_set_flex_flow(_screen, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(_screen, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START);
+    lv_obj_set_style_pad_row(_screen, 12, LV_PART_MAIN);
 
     // Title bar
     lv_obj_t *titleBar = lv_obj_create(_screen);
     lv_obj_remove_flag(titleBar, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_size(titleBar, lv_pct(100), 56);
-    lv_obj_align(titleBar, LV_ALIGN_TOP_MID, 0, 0);
     lv_obj_set_style_bg_color(titleBar, lv_color_hex(DEMO_ACCENT), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(titleBar, 255, LV_PART_MAIN);
     lv_obj_set_style_border_width(titleBar, 0, LV_PART_MAIN);
@@ -67,10 +71,10 @@ void DemoSettingsScreen::init()
     lv_obj_set_style_text_color(addLbl, lv_color_hex(DEMO_TEXT), LV_PART_MAIN);
     lv_obj_set_style_text_font(addLbl, &lv_font_montserrat_16, LV_PART_MAIN);
 
-    // Scrollable card list area
+    // Scrollable card list area — grows to fill all space below the title bar.
     lv_obj_t *listArea = lv_obj_create(_screen);
-    lv_obj_set_size(listArea, lv_pct(100), lv_pct(100) - 80);
-    lv_obj_align(listArea, LV_ALIGN_BOTTOM_MID, 0, 0);
+    lv_obj_set_width(listArea, lv_pct(100));
+    lv_obj_set_flex_grow(listArea, 1);
     lv_obj_set_style_bg_color(listArea, lv_color_hex(DEMO_PANEL), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(listArea, 255, LV_PART_MAIN);
     lv_obj_set_style_border_width(listArea, 0, LV_PART_MAIN);
@@ -78,6 +82,11 @@ void DemoSettingsScreen::init()
     lv_obj_set_style_pad_all(listArea, 10, LV_PART_MAIN);
     lv_obj_set_style_pad_row(listArea, 8, LV_PART_MAIN);
     lv_obj_set_flex_flow(listArea, LV_FLEX_FLOW_COLUMN);
+    // Vertical scroll only. Without this the list defaults to LV_DIR_ALL and,
+    // once it overflows (3rd card), drifts horizontally with no way back short
+    // of a reboot — the whole screen appears shifted sideways.
+    lv_obj_set_scroll_dir(listArea, LV_DIR_VER);
+    lv_obj_set_scrollbar_mode(listArea, LV_SCROLLBAR_MODE_AUTO);
 
     _cardList = listArea;
     rebuildCardList();
@@ -124,6 +133,7 @@ void DemoSettingsScreen::rebuildCardList()
         return;
 
     lv_obj_clean(_cardList);
+    lv_obj_scroll_to_y(_cardList, 0, LV_ANIM_OFF); // self-heal any leftover scroll offset
 
     uint8_t count = DemoStore::getCardCount();
     if (count == 0)
@@ -162,9 +172,12 @@ void DemoSettingsScreen::rebuildCardList()
             snprintf(uidShort, sizeof(uidShort), "%s", uid);
 
         // Name / label column
+        // Name column grows to fill the space left of the delete button so the
+        // labels always have a defined width (no overflow pushing the button off).
         lv_obj_t *nameCol = lv_obj_create(row);
         lv_obj_remove_flag(nameCol, LV_OBJ_FLAG_SCROLLABLE);
-        lv_obj_set_size(nameCol, LV_SIZE_CONTENT, lv_pct(100));
+        lv_obj_set_height(nameCol, lv_pct(100));
+        lv_obj_set_flex_grow(nameCol, 1);
         lv_obj_set_style_bg_opa(nameCol, 0, LV_PART_MAIN);
         lv_obj_set_style_border_width(nameCol, 0, LV_PART_MAIN);
         lv_obj_set_style_pad_all(nameCol, 0, LV_PART_MAIN);
@@ -172,12 +185,15 @@ void DemoSettingsScreen::rebuildCardList()
         lv_obj_set_flex_align(nameCol, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
 
         lv_obj_t *nameLbl = lv_label_create(nameCol);
+        lv_obj_set_width(nameLbl, lv_pct(100));
         const char *displayName = (card.label[0] != '\0') ? card.label : uidShort;
         lv_label_set_text(nameLbl, displayName);
+        lv_label_set_long_mode(nameLbl, LV_LABEL_LONG_DOT);
         lv_obj_set_style_text_color(nameLbl, lv_color_hex(DEMO_TEXT), LV_PART_MAIN);
         lv_obj_set_style_text_font(nameLbl, &lv_font_montserrat_20, LV_PART_MAIN);
 
         lv_obj_t *roleLbl = lv_label_create(nameCol);
+        lv_obj_set_width(roleLbl, lv_pct(100));
         lv_label_set_text(roleLbl, DemoStore::roleName(card.role));
         uint32_t roleColor = DEMO_TITLE;
         switch (card.role) {
@@ -216,6 +232,7 @@ void DemoSettingsScreen::showScanOverlay()
         return;
 
     _scanOverlay = lv_obj_create(_screen);
+    lv_obj_add_flag(_scanOverlay, LV_OBJ_FLAG_IGNORE_LAYOUT);
     lv_obj_set_size(_scanOverlay, lv_pct(100), lv_pct(100));
     lv_obj_align(_scanOverlay, LV_ALIGN_CENTER, 0, 0);
     lv_obj_set_style_bg_color(_scanOverlay, lv_color_hex(0x000000), LV_PART_MAIN);
@@ -279,6 +296,7 @@ void DemoSettingsScreen::showRolePicker(const std::string &uid)
     }
 
     _rolePicker = lv_obj_create(_screen);
+    lv_obj_add_flag(_rolePicker, LV_OBJ_FLAG_IGNORE_LAYOUT);
     lv_obj_set_size(_rolePicker, lv_pct(90), LV_SIZE_CONTENT);
     lv_obj_align(_rolePicker, LV_ALIGN_CENTER, 0, 0);
     lv_obj_set_style_bg_color(_rolePicker, lv_color_hex(DEMO_PANEL), LV_PART_MAIN);
