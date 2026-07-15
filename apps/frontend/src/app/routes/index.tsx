@@ -225,12 +225,12 @@ const coreRoutes: RouteConfig[] = [
   {
     path: '/users',
     element: <UserManagementPage />,
-    authRequired: 'users.roles.manage',
+    authRequired: 'users.read',
   },
   {
     path: '/users/:id',
     element: <UserManagementDetailsPage />,
-    authRequired: 'users.roles.manage',
+    authRequired: 'users.read',
   },
   {
     path: '/attractap',
