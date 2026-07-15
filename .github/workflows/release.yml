@@ -91,135 +91,21 @@ jobs:
           files: dist/plugin-zips/*.zip
           fail_on_unmatched_files: true
 
-  check-companion:
-    runs-on: ubuntu-latest
-    outputs:
-      exists: ${{ steps.check.outputs.exists }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-      - id: check
-        run: |
-          if [ -f "apps/companion/project.json" ]; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-          fi
-
-  build-companion-linux:
-    needs: check-companion
-    if: needs.check-companion.outputs.exists == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-      - uses: ./.github/actions/setup
-      - name: Install Linux packaging dependencies
-        run: sudo apt-get install -y fakeroot rpm
-      - name: Build Linux companion (x64 + arm64)
-        run: pnpm nx run companion:build
-      - name: Upload Linux artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: companion-linux-${{ github.run_id }}
-          path: |
-            apps/companion/dist/companion_linux_x86_64.AppImage
-            apps/companion/dist/companion_linux_arm64.AppImage
-          if-no-files-found: warn
-
-  build-companion-macos:
-    needs: check-companion
-    if: needs.check-companion.outputs.exists == 'true'
-    runs-on: macos-latest
-    env:
-      # secrets are not allowed in step-level `if`, so expose presence as job env
-      HAS_APPLE_CERT: ${{ secrets.APPLE_CERTIFICATE != '' }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-      - uses: ./.github/actions/setup
-      - name: Set up macOS code signing
-        if: ${{ env.HAS_APPLE_CERT == 'true' }}
-        uses: ./.github/actions/macos-codesign-setup
-        with:
-          certificate: ${{ secrets.APPLE_CERTIFICATE }}
-          certificate-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-      - name: Build macOS companion (universal)
-        env:
-          CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.APPLE_CERTIFICATE != '' && 'true' || 'false' }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: pnpm nx run companion:build
-      - name: Clean up keychain
-        if: ${{ env.HAS_APPLE_CERT == 'true' && always() }}
-        run: '[ -n "$KEYCHAIN_PATH" ] && security delete-keychain "$KEYCHAIN_PATH" || true'
-      - name: Upload macOS artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: companion-macos-${{ github.run_id }}
-          path: apps/companion/dist/companion_mac_universal.dmg
-          if-no-files-found: warn
-
-  build-companion-windows:
-    needs: check-companion
-    if: needs.check-companion.outputs.exists == 'true'
-    runs-on: windows-latest
-    env:
-      HAS_WINDOWS_CERT: ${{ secrets.WINDOWS_CERT_BASE64 != '' }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-      - uses: ./.github/actions/setup
-      - name: Set up Windows code signing
-        if: ${{ env.HAS_WINDOWS_CERT == 'true' }}
-        uses: ./.github/actions/windows-codesign-setup
-        with:
-          cert-base64: ${{ secrets.WINDOWS_CERT_BASE64 }}
-          cert-password: ${{ secrets.WINDOWS_CERT_PASSWORD }}
-      - name: Build Windows companion (x64)
-        shell: bash
-        run: pnpm nx run companion:build
-      - name: Upload Windows artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: companion-windows-${{ github.run_id }}
-          path: apps/companion/dist/companion_win_x64.exe
-          if-no-files-found: warn
+  build-companion:
+    uses: ./.github/workflows/build-companion-binaries.yml
+    secrets: inherit
 
   containerize:
-    needs: [lint, typecheck, test, build, build-companion-linux, build-companion-macos, build-companion-windows]
+    needs: [lint, typecheck, test, build, build-companion]
     if: always() && !failure() && !cancelled()
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      # Firmware must be built on the runner: the Docker builder has no
-      # ESP-IDF, so the in-container build is skipped and the pre-built
-      # firmware_output/ from the build context is bundled instead.
       - uses: ./.github/actions/build-attractap-firmware
 
-      - name: Download companion Linux binaries
-        uses: actions/download-artifact@v4
-        continue-on-error: true
-        with:
-          name: companion-linux-${{ github.run_id }}
-          path: apps/companion/dist
-
-      - name: Download companion macOS binary
-        uses: actions/download-artifact@v4
-        continue-on-error: true
-        with:
-          name: companion-macos-${{ github.run_id }}
-          path: apps/companion/dist
-
-      - name: Download companion Windows binary
-        uses: actions/download-artifact@v4
-        continue-on-error: true
-        with:
-          name: companion-windows-${{ github.run_id }}
-          path: apps/companion/dist
+      - uses: ./.github/actions/download-companion
 
       - name: Get short SHA
         id: vars
@@ -282,8 +168,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      # Balena's remote builder has no ESP-IDF either; pre-build the firmware
-      # so `balena push` uploads firmware_output/ with the build context.
       - uses: ./.github/actions/build-attractap-firmware
 
       - uses: ./.github/actions/balena-push

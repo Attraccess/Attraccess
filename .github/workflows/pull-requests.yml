@@ -186,7 +186,13 @@ jobs:
       - name: Validate docker-compose.balena.yml with balena's parser
         run: node scripts/check-balena-compose.mjs
 
+  build-companion:
+    uses: ./.github/workflows/build-companion-binaries.yml
+    secrets: inherit
+
   containerize:
+    needs: [build-companion]
+    if: always() && !failure() && !cancelled()
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -195,6 +201,8 @@ jobs:
       # Pre-build the Attractap firmware on the runner: the Dockerfile has no
       # ESP-IDF and fails loudly if no firmware is bundled (ATT-715).
       - uses: ./.github/actions/build-attractap-firmware
+
+      - uses: ./.github/actions/download-companion
 
       - name: Get short SHA
         id: vars
