@@ -61,9 +61,9 @@ void DemoStore::save()
         obj["role"] = static_cast<uint8_t>(_cards[i].role);
         obj["label"] = _cards[i].label;
     }
-    char buf[2048];
-    serializeJson(doc, buf, sizeof(buf));
-    _prefs.putString("cards", buf);
+    std::string json;
+    serializeJson(doc, json);
+    _prefs.putString("cards", json.c_str());
 }
 
 uint8_t DemoStore::getCardCount() { return _cardCount; }

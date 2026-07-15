@@ -210,10 +210,8 @@ void DemoSettingsScreen::rebuildCardList()
         lv_obj_set_style_bg_color(delBtn, lv_color_hex(DEMO_BTN_DEL), LV_PART_MAIN);
         lv_obj_set_style_bg_opa(delBtn, 255, LV_PART_MAIN);
         lv_obj_set_style_radius(delBtn, 8, LV_PART_MAIN);
-        // Allocate payload on heap; freed in the event handler
-        struct DelPayload { DemoSettingsScreen *screen; uint8_t idx; };
-        DelPayload *dp = new DelPayload{this, i};
-        lv_obj_add_event_cb(delBtn, &DemoSettingsScreen::onDeleteCardBtn, LV_EVENT_CLICKED, dp);
+        _delPayloads[i] = {this, i};
+        lv_obj_add_event_cb(delBtn, &DemoSettingsScreen::onDeleteCardBtn, LV_EVENT_CLICKED, &_delPayloads[i]);
         lv_obj_t *delBtnInner = lv_label_create(delBtn);
         lv_label_set_text(delBtnInner, "Loeschen");
         lv_obj_set_align(delBtnInner, LV_ALIGN_CENTER);
@@ -278,12 +276,6 @@ void DemoSettingsScreen::hideScanOverlay()
 // Role picker (after card scanned)
 // ---------------------------------------------------------------------------
 
-struct RolePickerPayload
-{
-    DemoSettingsScreen *screen;
-    DemoStore::UserRole role;
-};
-
 void DemoSettingsScreen::showRolePicker(const std::string &uid)
 {
     _pendingUid = uid;
@@ -324,8 +316,9 @@ void DemoSettingsScreen::showRolePicker(const std::string &uid)
         { "Admin",        DemoStore::UserRole::ADMIN,         DEMO_YELLOW },
     };
 
-    for (const auto &entry : roles)
+    for (uint8_t j = 0; j < 3; j++)
     {
+        const auto &entry = roles[j];
         lv_obj_t *btn = lv_button_create(_rolePicker);
         lv_obj_set_width(btn, lv_pct(100));
         lv_obj_set_height(btn, 52);
@@ -333,9 +326,8 @@ void DemoSettingsScreen::showRolePicker(const std::string &uid)
         lv_obj_set_style_bg_opa(btn, 220, LV_PART_MAIN);
         lv_obj_set_style_radius(btn, 10, LV_PART_MAIN);
 
-        // Allocate payload on heap; freed in the event handler
-        RolePickerPayload *pl = new RolePickerPayload{this, entry.role};
-        lv_obj_add_event_cb(btn, &DemoSettingsScreen::onRolePickerBtn, LV_EVENT_CLICKED, pl);
+        _rolePayloads[j] = {this, entry.role};
+        lv_obj_add_event_cb(btn, &DemoSettingsScreen::onRolePickerBtn, LV_EVENT_CLICKED, &_rolePayloads[j]);
 
         lv_obj_t *lbl = lv_label_create(btn);
         lv_label_set_text(lbl, entry.label);
@@ -365,15 +357,11 @@ void DemoSettingsScreen::onDeleteCardBtn(lv_event_t *e)
 {
     if (lv_event_get_code(e) != LV_EVENT_CLICKED)
         return;
-    struct DelPayload { DemoSettingsScreen *screen; uint8_t idx; };
     DelPayload *pl = static_cast<DelPayload *>(lv_event_get_user_data(e));
     if (!pl)
         return;
-    DemoSettingsScreen *self = pl->screen;
-    uint8_t idx = pl->idx;
-    delete pl;
-    DemoStore::deleteCard(idx);
-    self->rebuildCardList();
+    DemoStore::deleteCard(pl->idx);
+    pl->screen->rebuildCardList();
 }
 
 void DemoSettingsScreen::onCancelScanBtn(lv_event_t *e)
@@ -396,12 +384,7 @@ void DemoSettingsScreen::onRolePickerBtn(lv_event_t *e)
     if (!pl)
         return;
     DemoSettingsScreen *self = pl->screen;
-    DemoStore::UserRole role = pl->role;
-    std::string uid = self->_pendingUid;
-    delete pl;
-
-    DemoStore::addCard(uid.c_str(), role);
-
+    DemoStore::addCard(self->_pendingUid.c_str(), pl->role);
     if (self->_rolePicker)
     {
         lv_obj_del(self->_rolePicker);

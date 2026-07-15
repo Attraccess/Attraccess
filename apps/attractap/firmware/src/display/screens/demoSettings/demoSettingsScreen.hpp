@@ -47,7 +47,13 @@ private:
     void showScanOverlay();
     void hideScanOverlay();
 
-    // Event callbacks (static, user_data = this)
+    // Pre-allocated callback payloads — avoids heap allocation and lifetime issues.
+    struct DelPayload { DemoSettingsScreen *screen; uint8_t idx; };
+    struct RolePickerPayload { DemoSettingsScreen *screen; DemoStore::UserRole role; };
+    DelPayload _delPayloads[DemoStore::MAX_CARDS];
+    RolePickerPayload _rolePayloads[3]; // one per role entry in showRolePicker
+
+    // Event callbacks (static)
     static void onAddCardBtn(lv_event_t *e);
     static void onDeleteCardBtn(lv_event_t *e);
     static void onCancelScanBtn(lv_event_t *e);

@@ -59,7 +59,6 @@ private:
 
     void enqueue(const std::string &msg);
     void processOutbound(const char *data, size_t len);
-    void handleClientMessage(const std::string &type, const std::string &rawPayload);
     void respondAuthenticated();
     void respondResourceList();
     void respondCardAuth(const std::string &uidHex, uint32_t resourceId);
