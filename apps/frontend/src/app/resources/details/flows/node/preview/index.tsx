@@ -159,6 +159,8 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
       case ResourceFlowNodeType.INPUT_COMPANION_IDLE:
       case ResourceFlowNodeType.INPUT_COMPANION_ACTIVE:
       case ResourceFlowNodeType.INPUT_COMPANION_FOREGROUND_APP_CHANGED:
+      case ResourceFlowNodeType.INPUT_COMPANION_USB_DEVICE_CONNECTED:
+      case ResourceFlowNodeType.INPUT_COMPANION_USB_DEVICE_DISCONNECTED:
         return [];
 
       case ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT:
