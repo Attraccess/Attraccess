@@ -18,6 +18,12 @@
     "provider": "Anbieter",
     "userId": "SSO-Benutzer-ID"
   },
+  "effectivePermissions": {
+    "title": "Effektive Berechtigungen",
+    "empty": "Keine Berechtigungen zugewiesen.",
+    "loading": "Berechtigungen werden geladen…",
+    "uncategorized": "Sonstige"
+  },
   "delete": {
     "title": "Benutzer löschen",
     "description": "Löscht den Benutzer und anonymisiert die persönlichen Daten. Dies kann nicht rückgängig gemacht werden.",

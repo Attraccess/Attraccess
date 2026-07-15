@@ -7,7 +7,7 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { User } from './user.entity';
 import { Role } from './role.entity';
 
@@ -73,5 +73,6 @@ export class UserRole {
 
   @ManyToOne(() => Role, (role) => role.userRoles, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'roleId' })
+  @ApiPropertyOptional({ type: () => Role, description: 'The role object, populated when loaded with relations' })
   role!: Role;
 }

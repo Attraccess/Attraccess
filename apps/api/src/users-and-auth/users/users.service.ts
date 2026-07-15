@@ -514,7 +514,7 @@ export class UsersService {
       skip,
       take: limit,
       where: whereCondition,
-      relations: ['authenticationDetails'],
+      relations: ['authenticationDetails', 'userRoles', 'userRoles.role'],
       order: { username: 'ASC' },
     });
 

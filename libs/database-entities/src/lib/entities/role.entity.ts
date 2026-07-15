@@ -3,6 +3,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { RolePermission } from './role-permission.entity';
 import { UserRole } from './user-role.entity';
 
+
 @Entity('role')
 export class Role {
   @PrimaryGeneratedColumn()
@@ -54,6 +55,7 @@ export class Role {
   updatedAt!: Date;
 
   @OneToMany(() => RolePermission, (rp) => rp.role, { onDelete: 'CASCADE' })
+  @ApiProperty({ type: [RolePermission], description: 'Permissions granted by this role', required: false })
   rolePermissions!: RolePermission[];
 
   @OneToMany(() => UserRole, (ur) => ur.role, { onDelete: 'CASCADE' })

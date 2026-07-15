@@ -21,7 +21,6 @@ import {
 import {
   KeyIcon,
   SearchIcon,
-  Settings2Icon,
   ShieldCheckIcon,
   ShieldOffIcon,
   UserPlusIcon,
@@ -31,6 +30,7 @@ import { TableToolbar } from '../../components/TableToolbar';
 import {
   SSOProvider,
   User,
+  UserRole,
   useAuthenticationServiceGetAllSsoProviders,
   useLicenseServiceGetLicenseInformation,
   useUsersServiceFindMany,
@@ -42,6 +42,9 @@ import de from './de.json';
 import { InviteUserModal } from './invite-user-modal';
 import { useNavigate } from 'react-router-dom';
 import { SimplePagination } from '../../components/simplePagination';
+
+// Role keys that are considered "default" and not worth showing in the list
+const DEFAULT_ROLE_KEYS = new Set(['user']);
 
 export const UserManagementPage: React.FC = () => {
   const { t } = useTranslations({ en, de });
@@ -135,6 +138,7 @@ export const UserManagementPage: React.FC = () => {
                 <TableColumn width="0">{t('table.columns.id')}</TableColumn>
                 <TableColumn isRowHeader>{t('table.columns.username')}</TableColumn>
                 <TableColumn className="hidden md:table-cell">{t('table.columns.externalIdentifier')}</TableColumn>
+                <TableColumn className="hidden lg:table-cell">{t('table.columns.roles')}</TableColumn>
                 <TableColumn width="0" className="text-center">
                   {t('table.columns.ssoLinked')}
                 </TableColumn>
@@ -163,6 +167,16 @@ export const UserManagementPage: React.FC = () => {
                     .join(', ');
                   const isSsoLinked = ssoDetails.length > 0;
 
+                  // Elevated roles (non-default) for display
+                  const elevatedRoles = ((user.userRoles ?? []) as UserRole[])
+                    .filter((ur) => ur.role && !DEFAULT_ROLE_KEYS.has(ur.role.key))
+                    .reduce<{ id: number; name: string; key: string }[]>((acc, ur) => {
+                      if (ur.role && !acc.some((r) => r.id === ur.role?.id)) {
+                        acc.push({ id: ur.role.id, name: ur.role.name, key: ur.role.key });
+                      }
+                      return acc;
+                    }, []);
+
                   return (
                     <TableRow
                       key={user.id}
@@ -178,6 +192,19 @@ export const UserManagementPage: React.FC = () => {
                         <AttraccessUser user={user} />
                       </TableCell>
                       <TableCell className="hidden md:table-cell">{user.externalIdentifier}</TableCell>
+                      <TableCell className="hidden lg:table-cell">
+                        {elevatedRoles.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {elevatedRoles.map((role) => (
+                              <Chip key={role.id} size="sm" color="accent" variant="secondary" data-cy={`user-role-chip-${role.key}`}>
+                                {role.name}
+                              </Chip>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-default-400">{t('table.noRoles')}</span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-center">
                         {isSsoLinked ? (
                           <Tooltip>

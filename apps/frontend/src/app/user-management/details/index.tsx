@@ -5,8 +5,11 @@ import {
   User,
   useAuthenticationServiceGetAllSsoProviders,
   useLicenseServiceGetLicenseInformation,
+  useRbacServiceListPermissions,
+  useRbacServiceListRoles,
   useUsersServiceDeleteUser,
   useUsersServiceGetOneUserById,
+  useUsersServiceGetUserRoleAssignments,
 } from '@attraccess/react-query-client';
 
 import { PageHeader } from '../../../components/pageHeader';
@@ -28,6 +31,64 @@ import API_ERROR_TRANSLATIONS_DE from '../../../global-translations/api-errors.d
 import { useAuth } from '../../../hooks/useAuth';
 import { useMemo } from 'react';
 import { getSsoManagedPermissionKeys, hasConfiguredPermissionMapping } from '@attraccess/shared';
+
+function EffectivePermissionsSection({ userId, t }: { userId: number; t: ReturnType<typeof useTranslations>['t'] }) {
+  const { data: allRoles, isLoading: isLoadingRoles } = useRbacServiceListRoles();
+  const { data: allPermissions, isLoading: isLoadingPerms } = useRbacServiceListPermissions();
+  const { data: userRoles, isLoading: isLoadingUserRoles } = useUsersServiceGetUserRoleAssignments({ id: userId });
+
+  const effectivePermKeys = useMemo(() => {
+    if (!allRoles || !userRoles) return new Set<string>();
+    const assignedRoleIds = new Set(userRoles.map((ur) => ur.roleId));
+    const keys = new Set<string>();
+    for (const role of allRoles) {
+      if (!assignedRoleIds.has(role.id)) continue;
+      for (const rp of role.rolePermissions ?? []) {
+        keys.add(rp.permissionKey);
+      }
+    }
+    return keys;
+  }, [allRoles, userRoles]);
+
+  // Group effective permissions by category using the full permission list
+  const permsByCategory = useMemo(() => {
+    const map = new Map<string, { key: string; label: string; description: string }[]>();
+    for (const perm of allPermissions ?? []) {
+      if (!effectivePermKeys.has(perm.key)) continue;
+      const cat = perm.category || t('effectivePermissions.uncategorized');
+      const bucket = map.get(cat) ?? [];
+      bucket.push(perm);
+      map.set(cat, bucket);
+    }
+    return map;
+  }, [allPermissions, effectivePermKeys, t]);
+
+  if (isLoadingRoles || isLoadingPerms || isLoadingUserRoles) {
+    return <p className="text-sm text-default-400">{t('effectivePermissions.loading')}</p>;
+  }
+
+  if (effectivePermKeys.size === 0) {
+    return <p className="text-sm text-default-400">{t('effectivePermissions.empty')}</p>;
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      {[...permsByCategory.entries()].map(([category, perms], idx, arr) => (
+        <div key={category} className="flex flex-col gap-1.5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-default-500">{category}</p>
+          <div className="flex flex-wrap gap-1">
+            {perms.map((p) => (
+              <Chip key={p.key} size="sm" color="accent" variant="secondary" title={p.description}>
+                {p.label}
+              </Chip>
+            ))}
+          </div>
+          {idx < arr.length - 1 ? <Separator className="mt-1" /> : null}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export function UserManagementDetailsPage() {
   const { id: idParam } = useParams<{ id: string }>();
@@ -167,7 +228,17 @@ export function UserManagementDetailsPage() {
                 user={user}
                 ssoManagedProviders={ssoManagedProviders}
                 ssoManagedPermissionKeys={ssoManagedPermissionKeys}
+                providersById={providersById}
               />
+            </Card.Content>
+          </Card>
+
+          <Card className="w-full" data-cy="user-details-effective-permissions-card">
+            <Card.Content className="flex flex-col gap-4">
+              <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
+                {t('effectivePermissions.title')}
+              </h3>
+              <EffectivePermissionsSection userId={id} t={t} />
             </Card.Content>
           </Card>
 
