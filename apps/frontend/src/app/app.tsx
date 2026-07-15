@@ -7,8 +7,9 @@ import { useAllRoutes } from './routes';
 import { VerifyEmail } from './verify-email';
 import { ToastProvider } from '../components/toastProvider';
 import { I18nProvider, RouterProvider, Spinner, useTheme } from '@heroui/react';
-import { OpenAPI, SystemPermissions } from '@attraccess/react-query-client';
+import { OpenAPI } from '@attraccess/react-query-client';
 import { RouteConfig } from '@attraccess/plugins-frontend-sdk';
+import { type SystemPermission } from '@attraccess/shared';
 import PullToRefresh from 'react-simple-pull-to-refresh';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -29,7 +30,7 @@ import { KioskGuard } from './kiosk/KioskGuard';
 import { useLocaleSync } from '../hooks/useLocaleSync';
 
 function useRoutesWithAuthElements(routes: RouteConfig[]) {
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
 
   const routesWithAuthElements = useMemo(() => {
     return routes.map((route) => {
@@ -50,10 +51,10 @@ function useRoutesWithAuthElements(routes: RouteConfig[]) {
 
       const requiredPermissions = (
         Array.isArray(route.authRequired) ? route.authRequired : [route.authRequired]
-      ) as (keyof SystemPermissions)[];
+      ) as SystemPermission[];
 
       const userHasAllRequiredPermissions = requiredPermissions.every(
-        (permission) => user.systemPermissions[permission] === true,
+        (permission) => hasPermission(permission),
       );
 
       if (!userHasAllRequiredPermissions) {
@@ -65,7 +66,7 @@ function useRoutesWithAuthElements(routes: RouteConfig[]) {
 
       return route;
     });
-  }, [routes, user]);
+  }, [routes, user, hasPermission]);
 
   return useMemo(
     () =>

@@ -1,7 +1,7 @@
 import { Controller, Delete, Get, HttpCode, HttpStatus, Post, Body, Patch, Param } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiBody, ApiParam } from '@nestjs/swagger';
 import { Auth } from '@attraccess/plugins-backend-sdk';
-import { SystemPermission, EmailTemplate, EmailTemplateType } from '@attraccess/database-entities';
+import { EmailTemplate, EmailTemplateType } from '@attraccess/database-entities';
 import { EmailTemplateService, TemplateTranslations } from './email-template.service';
 import { MjmlService } from './mjml.service';
 import { UpdateEmailTemplateDto } from './dto/update-email-template.dto';
@@ -21,7 +21,7 @@ export class EmailTemplateController {
   ) {}
 
   @Post('preview-mjml')
-  @Auth('canManageSystemConfiguration' as SystemPermission)
+  @Auth('system.settings.manage')
   @ApiOperation({ summary: 'Preview MJML template content as HTML, wrapped in the global email layout' })
   @ApiBody({ type: PreviewMjmlDto })
   @ApiResponse({ status: 200, description: 'MJML preview result', type: PreviewMjmlResponseDto })
@@ -37,7 +37,7 @@ export class EmailTemplateController {
   }
 
   @Get()
-  @Auth('canManageSystemConfiguration' as SystemPermission)
+  @Auth('system.settings.manage')
   @ApiOperation({ summary: 'List all email templates' })
   @ApiResponse({ status: 200, description: 'List of email templates', type: [EmailTemplate] })
   findAll(): Promise<EmailTemplate[]> {
@@ -45,7 +45,7 @@ export class EmailTemplateController {
   }
 
   @Get(':type')
-  @Auth('canManageSystemConfiguration' as SystemPermission)
+  @Auth('system.settings.manage')
   @ApiOperation({ summary: 'Get an email template by type' })
   @ApiParam({ name: 'type', enum: EmailTemplateType, enumName: 'EmailTemplateType' })
   @ApiResponse({ status: 200, type: EmailTemplate })
@@ -55,7 +55,7 @@ export class EmailTemplateController {
   }
 
   @Patch(':type')
-  @Auth('canManageSystemConfiguration' as SystemPermission)
+  @Auth('system.settings.manage')
   @ApiOperation({ summary: 'Update an email template' })
   @ApiParam({ name: 'type', enum: EmailTemplateType, enumName: 'EmailTemplateType' })
   @ApiBody({ type: UpdateEmailTemplateDto })
@@ -70,7 +70,7 @@ export class EmailTemplateController {
 
   @Post(':type/reset')
   @HttpCode(HttpStatus.OK)
-  @Auth('canManageSystemConfiguration' as SystemPermission)
+  @Auth('system.settings.manage')
   @ApiOperation({ summary: 'Reset an email template to its bundled default' })
   @ApiParam({ name: 'type', enum: EmailTemplateType, enumName: 'EmailTemplateType', description: 'Template type' })
   @ApiResponse({ status: 200, description: 'Template reset to default', type: EmailTemplate })
@@ -80,7 +80,7 @@ export class EmailTemplateController {
   }
 
   @Get(':type/translations')
-  @Auth('canManageSystemConfiguration' as SystemPermission)
+  @Auth('system.settings.manage')
   @ApiOperation({
     summary: 'Get all translations for a template — returns extracted keys with defaults and all stored locale values',
   })
@@ -91,7 +91,7 @@ export class EmailTemplateController {
   }
 
   @Post(':type/translations')
-  @Auth('canManageSystemConfiguration' as SystemPermission)
+  @Auth('system.settings.manage')
   @ApiOperation({ summary: 'Set translations for a locale (replaces all existing values for that locale)' })
   @ApiParam({ name: 'type', enum: EmailTemplateType, enumName: 'EmailTemplateType' })
   @ApiResponse({ status: 201, description: 'Translations saved' })
@@ -103,7 +103,7 @@ export class EmailTemplateController {
   }
 
   @Delete(':type/translations/:locale')
-  @Auth('canManageSystemConfiguration' as SystemPermission)
+  @Auth('system.settings.manage')
   @ApiOperation({ summary: 'Delete all translations for a locale' })
   @ApiParam({ name: 'type', enum: EmailTemplateType, enumName: 'EmailTemplateType' })
   @ApiParam({ name: 'locale', description: 'BCP 47 locale tag' })

@@ -1,7 +1,6 @@
 import { Controller, Get, HttpCode, HttpStatus, Body, Patch, Post } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { Auth } from '@attraccess/plugins-backend-sdk';
-import { SystemPermission } from '@attraccess/database-entities';
 import { EmailLayoutService } from './email-layout.service';
 import { UpdateEmailLayoutDto } from './dto/update-email-layout.dto';
 import { PreviewEmailLayoutDto } from './dto/preview-email-layout.dto';
@@ -15,7 +14,7 @@ export class EmailLayoutController {
   constructor(private readonly emailLayoutService: EmailLayoutService) {}
 
   @Get()
-  @Auth('canManageSystemConfiguration' as SystemPermission)
+  @Auth('system.settings.manage')
   @ApiOperation({ summary: 'Get the global email layout' })
   @ApiResponse({ status: 200, type: EmailLayoutResponseDto })
   findGlobal(): Promise<EmailLayoutResponseDto> {
@@ -23,7 +22,7 @@ export class EmailLayoutController {
   }
 
   @Patch()
-  @Auth('canManageSystemConfiguration' as SystemPermission)
+  @Auth('system.settings.manage')
   @ApiOperation({ summary: 'Update the global email layout' })
   @ApiResponse({ status: 200, type: EmailLayoutResponseDto })
   @ApiResponse({ status: 400, description: 'Invalid MJML content' })
@@ -32,7 +31,7 @@ export class EmailLayoutController {
   }
 
   @Post('preview')
-  @Auth('canManageSystemConfiguration' as SystemPermission)
+  @Auth('system.settings.manage')
   @ApiOperation({ summary: 'Preview the global email layout with sample content injected' })
   @ApiResponse({ status: 200, type: PreviewMjmlResponseDto })
   previewLayout(@Body() dto: PreviewEmailLayoutDto): Promise<PreviewMjmlResponseDto> {
@@ -41,7 +40,7 @@ export class EmailLayoutController {
 
   @Post('reset')
   @HttpCode(HttpStatus.OK)
-  @Auth('canManageSystemConfiguration' as SystemPermission)
+  @Auth('system.settings.manage')
   @ApiOperation({ summary: 'Reset the global email layout to its bundled default' })
   @ApiResponse({ status: 200, type: EmailLayoutResponseDto })
   resetToDefault(): Promise<EmailLayoutResponseDto> {

@@ -6,6 +6,7 @@ import { SessionService } from '../auth/session.service';
 import { TwoFactorService } from '../auth/two-factor.service';
 import { TwoFactorPolicy } from '../auth/two-factor.dto';
 import { User } from '@attraccess/database-entities';
+import { RbacService } from '../rbac/rbac.service';
 
 describe('SessionStrategy', () => {
   let strategy: SessionStrategy;
@@ -36,6 +37,10 @@ describe('SessionStrategy', () => {
         {
           provide: TwoFactorService,
           useValue: mockTwoFactorService,
+        },
+        {
+          provide: RbacService,
+          useValue: { getEffectivePermissions: jest.fn().mockResolvedValue(new Set<string>()) },
         },
       ],
     }).compile();

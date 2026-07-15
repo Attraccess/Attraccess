@@ -27,7 +27,7 @@ export function ResourceUsageHistory({ resourceId, hideHeader, ...rest }: Resour
   const { t } = useTranslations({ en, de });
   const { t: tHistoryTable } = useTranslations({ en: historyTableEn, de: historyTableDe });
   const { hasPermission } = useAuth();
-  const canManageResources = hasPermission('canManageResources');
+  const canUpdateResources = hasPermission('resources.update');
   const queryClient = useQueryClient();
   const toast = useToastMessage();
 
@@ -132,7 +132,7 @@ export function ResourceUsageHistory({ resourceId, hideHeader, ...rest }: Resour
     [resourceId, resolveProjectId, updateSessionProject],
   );
 
-  const showAllUsersToggle = canManageResources ? (
+  const showAllUsersToggle = canUpdateResources ? (
     <ShowAllUsersToggle showAllUsers={showAllUsers} setShowAllUsers={setShowAllUsers} />
   ) : undefined;
 
@@ -140,7 +140,7 @@ export function ResourceUsageHistory({ resourceId, hideHeader, ...rest }: Resour
     <HistoryTable
       resourceId={resourceId}
       showAllUsers={showAllUsers}
-      canManageResources={canManageResources}
+      canUpdateResources={canUpdateResources}
       onSessionClick={handleSessionClick}
       projectPlaceholder={projectPlaceholder}
       resolveProjectId={resolveProjectId}

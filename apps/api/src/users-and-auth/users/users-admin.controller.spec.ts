@@ -91,7 +91,6 @@ describe('UsersAdminController', () => {
         username: 'testuser',
         email: 'test@example.com',
         isEmailVerified: true,
-        systemPermissions: {},
         authenticationDetails: [],
       } as User;
 
@@ -101,6 +100,7 @@ describe('UsersAdminController', () => {
         user: {
           ...user,
           jwtTokenId: 'test-jwt-token-id',
+          effectivePermissions: new Set<string>(),
         },
         authInfo: { tokenId: 'test-token' },
         logout: jest.fn(),

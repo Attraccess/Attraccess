@@ -10,6 +10,7 @@ import { EmailService } from '../../email/email.service';
 import { SSOUsernameChangeForbiddenException } from './errors/ssoUsernameChangeForbidden.exception';
 import { TokenHashService } from '../../encryption/token-hash.service';
 import { MetricsService } from '../../metrics/metrics.service';
+import { RbacService } from '../rbac/rbac.service';
 
 const mockMetricsService = {
   usersRegisteredTotal: { inc: jest.fn() },
@@ -18,12 +19,23 @@ const mockMetricsService = {
   usersPerLocale: { inc: jest.fn(), dec: jest.fn(), set: jest.fn() },
 };
 
+const mockRbacService = {
+  assignRoleByKey: jest.fn().mockResolvedValue(undefined),
+  assignDefaultRoles: jest.fn().mockResolvedValue(undefined),
+  isLastOwner: jest.fn().mockResolvedValue(false),
+};
+
 describe('UsersService', () => {
   let service: UsersService;
   let userRepository: jest.Mocked<Repository<User>>;
   let emailService: { sendUsernameChangedEmail: jest.Mock };
 
   beforeEach(async () => {
+    mockRbacService.assignRoleByKey.mockClear();
+    mockRbacService.assignDefaultRoles.mockClear();
+    mockRbacService.isLastOwner.mockClear();
+    mockRbacService.isLastOwner.mockResolvedValue(false);
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UsersService,
@@ -42,7 +54,14 @@ describe('UsersService', () => {
         {
           provide: DataSource,
           useValue: {
-            transaction: jest.fn(),
+            // Call the callback with a mock EntityManager that delegates save() to
+            // userRepository.save so per-test mocks on the repository still apply.
+            transaction: jest.fn().mockImplementation(async (cb: (em: unknown) => Promise<unknown>) => {
+              const em = {
+                save: jest.fn().mockImplementation((entity: unknown) => userRepository.save(entity as User)),
+              };
+              return cb(em);
+            }),
           },
         },
         {
@@ -83,6 +102,10 @@ describe('UsersService', () => {
         {
           provide: MetricsService,
           useValue: mockMetricsService,
+        },
+        {
+          provide: RbacService,
+          useValue: mockRbacService,
         },
       ],
     }).compile();
@@ -131,49 +154,25 @@ describe('UsersService', () => {
   });
 
   describe('createOne', () => {
-    it('the first created user should have all permissions', async () => {
+    it('the first created user should be assigned the owner role via RBAC', async () => {
       jest.spyOn(userRepository, 'findOne').mockResolvedValue(null);
-      jest.spyOn(userRepository, 'save').mockImplementation(async (data) => {
-        return {
-          id: 1,
-          ...data,
-          systemPermissions: {
-            canManageResources: false,
-            canManageSystemConfiguration: false,
-            canManageUsers: false,
-            ...(data.systemPermissions || {}),
-          },
-        } as User;
-      });
-      jest.spyOn(userRepository, 'count').mockResolvedValue(0);
-
-      const result = await service.createOne({ username: 'test', email: 'test@example.com', externalIdentifier: null });
-      expect(result).toEqual({
+      jest.spyOn(userRepository, 'save').mockImplementation(async (data) => ({
         id: 1,
         username: 'test',
         email: 'test@example.com',
         externalIdentifier: null,
-        systemPermissions: {
-          canManageResources: true,
-          canManageSystemConfiguration: true,
-          canManageUsers: true,
-          canManageBilling: true,
-        },
-      });
+        ...data,
+      } as User));
+      jest.spyOn(userRepository, 'count').mockResolvedValue(0);
+
+      await service.createOne({ username: 'test', email: 'test@example.com', externalIdentifier: null });
+      expect(mockRbacService.assignRoleByKey).toHaveBeenCalledWith(1, 'owner', expect.anything());
     });
 
-    it('the following created user should not have any permissions', async () => {
+    it('a subsequent user should be assigned default roles via RBAC', async () => {
       jest.spyOn(userRepository, 'findOne').mockResolvedValue(null);
       jest.spyOn(userRepository, 'save').mockImplementation(async (data) => {
-        return {
-          id: 1,
-          ...data,
-          systemPermissions: {
-            canManageResources: false,
-            canManageSystemConfiguration: false,
-            ...(data.systemPermissions || {}),
-          },
-        } as User;
+        return { id: 1, ...data } as User;
       });
       jest.spyOn(userRepository, 'count').mockResolvedValue(1);
 
@@ -183,11 +182,10 @@ describe('UsersService', () => {
         username: 'test',
         email: 'test@example.com',
         externalIdentifier: null,
-        systemPermissions: {
-          canManageResources: false,
-          canManageSystemConfiguration: false,
-        },
+        isEmailVerified: false,
       });
+      expect(mockRbacService.assignDefaultRoles).toHaveBeenCalledWith(1, expect.anything());
+      expect(mockRbacService.assignRoleByKey).not.toHaveBeenCalled();
     });
 
     it('should throw if email already exists', async () => {
@@ -277,34 +275,6 @@ describe('UsersService', () => {
       await expect(service.updateOne(1, { externalIdentifier: 'value' })).rejects.toThrow(UserNotFoundException);
     });
 
-    it('should persist system permission updates', async () => {
-      const user = {
-        id: 1,
-        systemPermissions: {
-          canManageResources: true,
-          canManageSystemConfiguration: false,
-          canManageUsers: false,
-          canManageBilling: false,
-        },
-      } as User;
-      const permissionsUpdate = {
-        canManageResources: true,
-        canManageSystemConfiguration: true,
-        canManageUsers: false,
-        canManageBilling: false,
-      };
-      jest.spyOn(userRepository, 'update').mockResolvedValue({ affected: 1 } as UpdateResult);
-      jest.spyOn(userRepository, 'findOne').mockResolvedValue(user);
-
-      await service.updateOne(1, { systemPermissions: permissionsUpdate });
-
-      expect(userRepository.update).toHaveBeenCalledWith(
-        1,
-        expect.objectContaining({
-          systemPermissions: permissionsUpdate,
-        }),
-      );
-    });
   });
 
   describe('findMany', () => {
@@ -314,12 +284,6 @@ describe('UsersService', () => {
           id: 1,
           username: 'user1',
           email: 'user1@example.com',
-          systemPermissions: {
-            canManageResources: false,
-            canManageSystemConfiguration: false,
-            canManageUsers: false,
-            canManageBilling: false,
-          },
           createdAt: new Date(),
           updatedAt: new Date(),
           isEmailVerified: false,
@@ -360,12 +324,6 @@ describe('UsersService', () => {
           id: 2,
           username: 'user2',
           email: 'user2@example.com',
-          systemPermissions: {
-            canManageResources: false,
-            canManageSystemConfiguration: false,
-            canManageUsers: false,
-            canManageBilling: false,
-          },
           createdAt: new Date(),
           updatedAt: new Date(),
           isEmailVerified: false,
@@ -441,11 +399,7 @@ describe('UsersService', () => {
         id: 1,
         username: 'olduser',
         email: 'user@example.com',
-        systemPermissions: {
-          canManageResources: false,
-          canManageSystemConfiguration: false,
-          canManageUsers: false,
-        },
+
         createdAt: new Date(),
         updatedAt: new Date(),
         isEmailVerified: false,
@@ -512,13 +466,8 @@ describe('UsersService', () => {
       const target = baseUser({ id: 20, username: 'target', lastUsernameChangeAt: null });
       const admin = baseUser({
         id: 1,
-        systemPermissions: {
-          canManageResources: false,
-          canManageSystemConfiguration: false,
-          canManageUsers: true,
-          canManageBilling: false,
-        },
-      });
+        effectivePermissions: new Set(['users.update']),
+      } as never);
       const updated = { ...target, username: 'new_admin_set', lastUsernameChangeAt: null } as User;
       jest.spyOn(service, 'findOne').mockResolvedValueOnce(target).mockResolvedValueOnce(updated);
       const updateSpy = jest.spyOn(userRepository, 'update').mockResolvedValue({ affected: 1 } as UpdateResult);
@@ -593,6 +542,23 @@ describe('UsersService', () => {
 
     it('throws BadRequestException for empty locale', async () => {
       await expect(service.updateLocale(1, '   ')).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('confirmSelfDeletion', () => {
+    const futureDate = new Date(Date.now() + 86_400_000);
+
+    it('throws ForbiddenException when user is the last owner', async () => {
+      jest.spyOn(userRepository, 'findOne').mockResolvedValue({
+        id: 1,
+        email: 'owner@example.com',
+        deletedAt: null,
+        deleteAccountToken: 'hashed:tok',
+        deleteAccountTokenExpiresAt: futureDate,
+      } as unknown as User);
+      mockRbacService.isLastOwner.mockResolvedValue(true);
+
+      await expect(service.confirmSelfDeletion('owner@example.com', 'tok')).rejects.toThrow(ForbiddenException);
     });
   });
 });

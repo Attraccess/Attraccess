@@ -1,10 +1,10 @@
 {
   "title": "Berechtigungen",
   "permissions": {
-    "canManageResources": "Ressourcen verwalten",
-    "canManageSystemConfiguration": "Systemkonfiguration verwalten",
-    "canManageUsers": "Benutzer verwalten",
-    "canManageBilling": "Zahlungen verwalten"
+    "resource-manager": "Ressourcen verwalten",
+    "system-admin": "Systemkonfiguration verwalten",
+    "user-manager": "Benutzer verwalten",
+    "billing-manager": "Zahlungen verwalten"
   },
   "actions": {
     "save": "Speichern"

@@ -31,6 +31,9 @@ import type { Redis } from 'ioredis';
 import { LocalStrategy } from './strategies/local.strategy';
 import { SessionStrategy } from './strategies/session.strategy';
 
+import { RbacModule } from './rbac/rbac.module';
+import { RbacController } from './rbac/rbac.controller';
+
 // Constants and Entities
 
 import {
@@ -88,6 +91,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     SettingsModule,
     PasswordPolicyModule,
     NotificationsModule,
+    RbacModule,
   ],
   providers: [
     {
@@ -158,27 +162,17 @@ import { NotificationsModule } from '../notifications/notifications.module';
       inject: [ModuleRef, SettingsService, OidcCookieStateStore],
     },
   ],
-  // Controller order is load-bearing: NestJS registers routes per-controller in
-  // array order, and Express matches first-registered-wins. Controllers holding
-  // static GET/PATCH routes MUST precede the ones holding ':id'/':id/*' routes
-  // so those static paths are not shadowed by ':id'.
-  //
-  // Rule: within any group sharing the same @Controller(prefix), put controllers
-  // with static-only routes BEFORE controllers with :param routes of the same
-  // HTTP method and segment depth.
-  //
-  // UserPermissionsController (GET 'with-permission') MUST come before
-  // UsersAdminController (GET ':id') to keep 'with-permission' reachable.
   controllers: [
     UsersRegistrationController,
     UserInvitationsController,
     UserProfileController,
-    UserPermissionsController,
     UsersAdminController,
+    UserPermissionsController,
     AuthController,
     TwoFactorController,
     SSOController,
+    RbacController,
   ],
-  exports: [UsersService, AuthService, SessionService, BruteForceProtectionService, AuthAuditLogger],
+  exports: [UsersService, AuthService, SessionService, BruteForceProtectionService, AuthAuditLogger, RbacModule],
 })
 export class UsersAndAuthModule {}

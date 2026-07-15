@@ -25,6 +25,7 @@ export class UserRole {
   userId!: number;
 
   @Column({ type: 'integer' })
+  @ApiProperty({ description: 'ID of the assigned role' })
   roleId!: number;
 
   @Column({ type: 'text', default: UserRoleSource.MANUAL })

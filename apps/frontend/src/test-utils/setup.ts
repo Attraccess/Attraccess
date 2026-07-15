@@ -4,6 +4,15 @@ import { vi } from 'vitest';
 // Ensure React uses the non-production build in tests so act() is available
 process.env.NODE_ENV = 'test';
 
+// ponytail: suppress happy-dom's AbortError thrown during iframe/fetch teardown
+// on Node.js 26. The error originates inside happy-dom's DetachedWindowAPI.abort()
+// and is harmless — all tests have already completed by then — but it crashes the
+// vitest worker, making the entire test file appear to fail.
+process.on('uncaughtException', (err) => {
+  if (err instanceof DOMException && err.name === 'AbortError') return;
+  throw err;
+});
+
 function createStorageMock(): Storage {
   const store = new Map<string, string>();
 

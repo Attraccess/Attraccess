@@ -17,7 +17,7 @@ import de from './de.json';
 export const SSOProviderFormPage = () => {
   const { t } = useTranslations({ en, de });
   const { hasPermission } = useAuth();
-  const canManageSSO = hasPermission('canManageSystemConfiguration');
+  const canManageSSO = hasPermission('system.sso.manage');
   const { data: license } = useLicenseServiceGetLicenseInformation();
 
   const { providerId: providerIdParam } = useParams<{ providerId: string }>();

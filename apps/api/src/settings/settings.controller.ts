@@ -19,7 +19,7 @@ export class SettingsController {
   constructor(private readonly settingsService: SettingsService) {}
 
   @Get()
-  @Auth('canManageSystemConfiguration')
+  @Auth('system.settings.manage')
   @ApiOperation({ summary: 'Get system settings', operationId: 'getSystemSettings' })
   @ApiResponse({ status: 200, description: 'Current system settings.', type: SystemSettingsDto })
   async getSystemSettings(): Promise<SystemSettingsDto> {
@@ -27,7 +27,7 @@ export class SettingsController {
   }
 
   @Patch()
-  @Auth('canManageSystemConfiguration')
+  @Auth('system.settings.manage')
   @ApiOperation({ summary: 'Update system settings', operationId: 'updateSystemSettings' })
   @ApiResponse({ status: 200, description: 'System settings updated.', type: SystemSettingsDto })
   async updateSystemSettings(@Body() body: UpdateSystemSettingsDto): Promise<SystemSettingsDto> {
@@ -47,7 +47,7 @@ export class SettingsController {
   }
 
   @Get('metrics')
-  @Auth('canManageSystemConfiguration')
+  @Auth('system.settings.manage')
   @ApiOperation({ summary: 'Get metrics settings', operationId: 'getMetricsSettings' })
   @ApiResponse({ status: 200, description: 'Current metrics settings.', type: MetricsSettingsDto })
   async getMetricsSettings(): Promise<MetricsSettingsDto> {
@@ -55,7 +55,7 @@ export class SettingsController {
   }
 
   @Patch('metrics')
-  @Auth('canManageSystemConfiguration')
+  @Auth('system.settings.manage')
   @ApiOperation({ summary: 'Update metrics settings', operationId: 'updateMetricsSettings' })
   @ApiResponse({ status: 200, description: 'Metrics settings updated.', type: MetricsSettingsDto })
   async updateMetricsSettings(@Body() body: UpdateMetricsSettingsDto): Promise<MetricsSettingsDto> {
@@ -69,7 +69,7 @@ export class SettingsController {
   }
 
   @Post('metrics/generate-api-key')
-  @Auth('canManageSystemConfiguration')
+  @Auth('system.settings.manage')
   @ApiOperation({ summary: 'Generate a new metrics API key', operationId: 'generateMetricsApiKey' })
   @ApiResponse({ status: 201, description: 'Metrics API key generated.', type: GenerateMetricsApiKeyResponseDto })
   async generateMetricsApiKey(): Promise<GenerateMetricsApiKeyResponseDto> {
@@ -78,7 +78,7 @@ export class SettingsController {
   }
 
   @Delete('metrics/api-key')
-  @Auth('canManageSystemConfiguration')
+  @Auth('system.settings.manage')
   @ApiOperation({ summary: 'Remove the metrics API key', operationId: 'deleteMetricsApiKey' })
   @ApiResponse({ status: 200, description: 'Metrics API key removed.', type: MetricsSettingsDto })
   async deleteMetricsApiKey(): Promise<MetricsSettingsDto> {
@@ -96,7 +96,7 @@ export class SettingsController {
   }
 
   @Get('auth/rate-limit')
-  @Auth('canManageSystemConfiguration')
+  @Auth('system.settings.manage')
   @ApiOperation({ summary: 'Get auth rate-limit settings', operationId: 'getAuthRateLimitSettings' })
   @ApiResponse({ status: 200, description: 'Current auth rate-limit settings.', type: AuthRateLimitSettingsDto })
   async getAuthRateLimitSettings(): Promise<AuthRateLimitSettingsDto> {
@@ -104,7 +104,7 @@ export class SettingsController {
   }
 
   @Patch('auth/rate-limit')
-  @Auth('canManageSystemConfiguration')
+  @Auth('system.settings.manage')
   @ApiOperation({ summary: 'Update auth rate-limit settings', operationId: 'updateAuthRateLimitSettings' })
   @ApiResponse({ status: 200, description: 'Auth rate-limit settings updated.', type: AuthRateLimitSettingsDto })
   async updateAuthRateLimitSettings(
@@ -114,7 +114,7 @@ export class SettingsController {
   }
 
   @Get('messaging/rate-limit')
-  @Auth('canManageSystemConfiguration')
+  @Auth('system.settings.manage')
   @ApiOperation({ summary: 'Get messaging rate-limit settings', operationId: 'getMessagingRateLimitSettings' })
   @ApiResponse({ status: 200, description: 'Current messaging rate-limit settings.', type: MessagingRateLimitSettingsDto })
   async getMessagingRateLimitSettings(): Promise<MessagingRateLimitSettingsDto> {
@@ -122,7 +122,7 @@ export class SettingsController {
   }
 
   @Patch('messaging/rate-limit')
-  @Auth('canManageSystemConfiguration')
+  @Auth('system.settings.manage')
   @ApiOperation({ summary: 'Update messaging rate-limit settings', operationId: 'updateMessagingRateLimitSettings' })
   @ApiResponse({ status: 200, description: 'Messaging rate-limit settings updated.', type: MessagingRateLimitSettingsDto })
   async updateMessagingRateLimitSettings(

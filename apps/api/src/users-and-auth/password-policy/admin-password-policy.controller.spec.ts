@@ -25,7 +25,7 @@ describe('AdminPasswordPolicyController', () => {
   };
 
   const adminReq = {
-    user: { id: 1, username: 'root', systemPermissions: { canManageSystemConfiguration: true } },
+    user: { id: 1, username: 'root' },
     ip: '127.0.0.1',
     headers: { 'user-agent': 'jest', 'x-request-id': 'req-1' },
   } as never;

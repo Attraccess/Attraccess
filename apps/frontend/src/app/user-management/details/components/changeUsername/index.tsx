@@ -1,7 +1,6 @@
 import {
   useUsersServiceChangeUserUsername,
   useUsersServiceFindManyKey,
-  useUsersServiceGetAllWithPermissionKey,
   useUsersServiceGetOneUserById,
   useUsersServiceGetOneUserByIdKey,
 } from '@attraccess/react-query-client';
@@ -39,9 +38,6 @@ export function ChangeUsernameForm({ userId, ...divProps }: Props & Omit<HTMLAtt
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: [useUsersServiceGetOneUserByIdKey],
-      });
-      queryClient.invalidateQueries({
-        queryKey: [useUsersServiceGetAllWithPermissionKey],
       });
       queryClient.invalidateQueries({
         queryKey: [useUsersServiceFindManyKey],

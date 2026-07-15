@@ -36,7 +36,7 @@ export class AppController {
   }
 
   @Post('/balena/device/reboot')
-  @Auth('canManageSystemConfiguration')
+  @Auth('system.settings.manage')
   @ApiOperation({ summary: 'Reboot the host machine (only for balena devices)', operationId: 'rebootHost' })
   @ApiResponse({ status: 200, description: 'Host rebooted successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized - User is not authenticated' })
@@ -47,7 +47,7 @@ export class AppController {
   }
 
   @Post('/balena/device/shutdown')
-  @Auth('canManageSystemConfiguration')
+  @Auth('system.settings.manage')
   @ApiOperation({ summary: 'Shutdown the host machine (only for balena devices)', operationId: 'shutdownHost' })
   @ApiResponse({ status: 200, description: 'Host shutdown successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized - User is not authenticated' })

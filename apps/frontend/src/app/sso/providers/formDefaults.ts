@@ -1,13 +1,4 @@
-import { CreateSSOProviderDto, SSOPermissionMappingsDto, SSOProviderType } from '@attraccess/react-query-client';
-
-export const permissionKeys = [
-  'canManageResources',
-  'canManageSystemConfiguration',
-  'canManageUsers',
-  'canManageBilling',
-] as const;
-
-export type PermissionKey = (typeof permissionKeys)[number];
+import { CreateSSOProviderDto, SSOProviderType } from '@attraccess/react-query-client';
 
 export const getDefaultOidcConfiguration = () => ({
   issuer: '',
@@ -32,13 +23,6 @@ export const getDefaultSamlConfiguration = () => ({
   spSigningPrivateKey: '',
 });
 
-export const emptyPermissionMappingsInput: Record<PermissionKey, string> = {
-  canManageResources: '',
-  canManageSystemConfiguration: '',
-  canManageUsers: '',
-  canManageBilling: '',
-};
-
 export const defaultProviderValues: CreateSSOProviderDto = {
   name: '',
   type: SSOProviderType.OIDC,
@@ -54,13 +38,15 @@ export const ensureSamlConfiguration = (config?: CreateSSOProviderDto['samlConfi
 
 export const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+/** Build a flat string-input record from an existing server-side role mapping, keyed by role key. */
 export const buildPermissionMappingInputs = (
-  mapping?: SSOPermissionMappingsDto | null,
-): Record<PermissionKey, string> => ({
-  canManageResources: Array.isArray(mapping?.canManageResources) ? mapping?.canManageResources.join(', ') : '',
-  canManageSystemConfiguration: Array.isArray(mapping?.canManageSystemConfiguration)
-    ? mapping?.canManageSystemConfiguration.join(', ')
-    : '',
-  canManageUsers: Array.isArray(mapping?.canManageUsers) ? mapping?.canManageUsers.join(', ') : '',
-  canManageBilling: Array.isArray(mapping?.canManageBilling) ? mapping?.canManageBilling.join(', ') : '',
-});
+  roleKeys: string[],
+  mapping?: Record<string, string[]> | null,
+): Record<string, string> => {
+  const result: Record<string, string> = {};
+  for (const key of roleKeys) {
+    const values = mapping?.[key];
+    result[key] = Array.isArray(values) ? values.join(', ') : '';
+  }
+  return result;
+};

@@ -61,8 +61,8 @@ export class UsersAdminController {
   async getOneById(@Param('id', ParseIntPipe) id: number, @Req() request: AuthenticatedRequest): Promise<User> {
     const authenticatedUser = request.user;
 
-    // Allow access if the user is requesting their own data or has canManageUsers permission
-    if (authenticatedUser?.id !== id && !authenticatedUser.systemPermissions.canManageUsers) {
+    // Allow access if the user is requesting their own data or has users.read permission
+    if (authenticatedUser?.id !== id && !authenticatedUser.effectivePermissions?.has('users.read')) {
       this.logger.debug(
         `Access denied - User ID ${authenticatedUser.id} attempting to access user ID ${id} without required permissions`,
       );
@@ -79,7 +79,7 @@ export class UsersAdminController {
   }
 
   @Delete(':id')
-  @Auth('canManageUsers')
+  @Auth('users.delete')
   @ApiOperation({ summary: 'Delete a user', operationId: 'deleteUser' })
   @ApiResponse({
     status: 200,
@@ -154,7 +154,7 @@ export class UsersAdminController {
   }
 
   @Patch(':id/username')
-  @Auth('canManageUsers')
+  @Auth('users.update')
   @ApiOperation({ summary: "Admin: Change a user's username (no limit)", operationId: 'changeUserUsername' })
   @ApiResponse({ status: 200, description: 'Username changed.', type: User })
   async changeUserUsername(
@@ -166,7 +166,7 @@ export class UsersAdminController {
   }
 
   @Patch(':id/email')
-  @Auth('canManageUsers')
+  @Auth('users.update')
   @ApiOperation({ summary: "Admin: Change a user's email address", operationId: 'changeUserEmail' })
   @ApiResponse({ status: 200, description: 'Email changed.', type: User })
   async changeUserEmail(
@@ -182,7 +182,7 @@ export class UsersAdminController {
   }
 
   @Patch(':id/billing-factor')
-  @Auth('canManageBilling')
+  @Auth('billing.manage')
   @ApiOperation({ summary: "Change a user's billing factor", operationId: 'changeUserBillingFactor' })
   @ApiResponse({ status: 200, description: 'Billing factor changed.', type: User })
   async changeUserBillingFactor(

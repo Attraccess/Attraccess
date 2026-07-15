@@ -21,37 +21,6 @@ import { ProjectMember } from './project-member.entity';
 import { ProjectInvitation } from './project-invitation.entity';
 import { FormSubmission } from './form';
 
-export class SystemPermissions {
-  @Column({ default: false, type: 'boolean' })
-  @ApiProperty({
-    description: 'Whether the user can manage resources',
-    example: false,
-  })
-  canManageResources!: boolean;
-
-  @Column({ default: false, type: 'boolean' })
-  @ApiProperty({
-    description: 'Whether the user can manage system configuration',
-    example: false,
-  })
-  canManageSystemConfiguration!: boolean;
-
-  @Column({ default: false, type: 'boolean' })
-  @ApiProperty({
-    description: 'Whether the user can manage users',
-    example: false,
-  })
-  canManageUsers!: boolean;
-
-  @Column({ default: false, type: 'boolean' })
-  @ApiProperty({
-    description: 'Whether the user can manage billing',
-    example: false,
-  })
-  canManageBilling!: boolean;
-}
-
-export type SystemPermission = keyof SystemPermissions;
 
 @Entity()
 export class User {
@@ -105,17 +74,6 @@ export class User {
   @Column({ type: 'datetime', nullable: true })
   @Exclude()
   passwordResetTokenExpiresAt!: Date | null;
-
-  @Column(() => SystemPermissions, { prefix: '' })
-  @ApiProperty({
-    description: 'System-wide permissions for the user',
-    example: {
-      canManageResources: true,
-      canManageSystemConfiguration: false,
-      canManageUsers: false,
-    },
-  })
-  systemPermissions!: SystemPermissions;
 
   @CreateDateColumn()
   @ApiProperty({

@@ -1,51 +1,31 @@
-import { SystemPermission, SystemPermissions } from '@attraccess/database-entities';
 import { hasConfiguredPermissionMapping as hasConfiguredPermissionMappingShared } from '@attraccess/shared';
 
-export type SSOPermissionMapping = Partial<Record<SystemPermission, string[]>>;
-
-export const DEFAULT_PERMISSION_KEY_MAP: Record<string, SystemPermission> = {
-  canmanageresources: 'canManageResources',
-  canmanagesystemconfiguration: 'canManageSystemConfiguration',
-  canmanageusers: 'canManageUsers',
-  canmanagebilling: 'canManageBilling',
-};
+export type SsoRoleMapping = Record<string, string[]>;
 
 export const normalizePermissionToken = (token: string): string => {
   return token.toLowerCase().replace(/[^a-z0-9]/g, '');
 };
 
 export const hasConfiguredPermissionMapping = (
-  mapping?: SSOPermissionMapping | null,
-): boolean => hasConfiguredPermissionMappingShared(mapping);
+  mapping?: SsoRoleMapping | null,
+): boolean => hasConfiguredPermissionMappingShared(mapping as Record<string, unknown> | null | undefined);
 
-const normalizeRoleNames = (roleNames: string[]): Set<string> => {
-  return new Set(roleNames.map(normalizePermissionToken).filter((value) => value.length > 0));
-};
-
-export const resolvePermissionsFromRoles = (
+export const resolveRoleKeysFromSsoRoles = (
   roleNames: string[],
-  mapping?: SSOPermissionMapping | null,
-): Partial<SystemPermissions> => {
-  const normalizedRoles = normalizeRoleNames(roleNames);
-  const updates: Partial<SystemPermissions> = {};
+  mapping?: SsoRoleMapping | null,
+): Set<string> => {
+  const normalizedRoles = new Set(roleNames.map(normalizePermissionToken).filter((v) => v.length > 0));
+  const result = new Set<string>();
 
-  if (hasConfiguredPermissionMapping(mapping)) {
-    (Object.keys(mapping ?? {}) as Array<keyof SystemPermissions>).forEach((permissionKey) => {
-      const configuredRoles = mapping?.[permissionKey] ?? [];
-      if (!configuredRoles || configuredRoles.length === 0) {
-        return;
-      }
-      updates[permissionKey] = configuredRoles.some((role) => normalizedRoles.has(normalizePermissionToken(role)));
-    });
-    return updates;
+  if (!hasConfiguredPermissionMapping(mapping)) {
+    return result;
   }
 
-  normalizedRoles.forEach((role) => {
-    const permissionKey = DEFAULT_PERMISSION_KEY_MAP[role];
-    if (permissionKey) {
-      updates[permissionKey] = true;
+  for (const [roleKey, configuredRoles] of Object.entries(mapping ?? {})) {
+    if (!Array.isArray(configuredRoles)) continue;
+    if (configuredRoles.some((r) => normalizedRoles.has(normalizePermissionToken(r)))) {
+      result.add(roleKey);
     }
-  });
-
-  return updates;
+  }
+  return result;
 };

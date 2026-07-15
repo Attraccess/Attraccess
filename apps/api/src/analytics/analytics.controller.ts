@@ -13,7 +13,7 @@ export class AnalyticsController {
   public constructor(private readonly analyticsService: AnalyticsService) {}
 
   @Get('resource-usage-hours')
-  @Auth('canManageResources')
+  @Auth('resources.update')
   @ApiResponse({
     status: 200,
     description: 'The resource usage hours in the date range',
@@ -32,7 +32,7 @@ export class AnalyticsController {
   }
 
   @Get('billing-transactions')
-  @Auth('canManageResources')
+  @Auth('resources.update')
   @ApiResponse({
     status: 200,
     description: 'The billing transactions in the date range',

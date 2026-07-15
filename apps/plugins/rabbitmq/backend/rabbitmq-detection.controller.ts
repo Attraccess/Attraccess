@@ -8,7 +8,7 @@ import { Controller, Get, Inject, Param, ParseIntPipe, Query } from '@nestjs/com
 import { RabbitmqDetectionService } from './rabbitmq-detection.service';
 import type { RabbitmqDetectionResult } from './rabbitmq-detection.types';
 
-@Auth('canManageResources')
+@Auth('resources.update')
 @Controller('rabbitmq')
 export class RabbitmqDetectionController {
   // esbuild does not emit decorator metadata, so Nest cannot infer constructor

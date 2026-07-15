@@ -42,6 +42,11 @@ import { ProjectsService } from '../../projects/projects.service';
 import { ResourceFormsService } from '../forms/forms.service';
 import { MetricsService } from '../../metrics/metrics.service';
 import { PluginEventsService } from '../../plugin-system/plugin-events.service';
+import { RbacService } from '../../users-and-auth/rbac/rbac.service';
+
+const mockRbacService = {
+  getEffectivePermissions: jest.fn().mockResolvedValue(new Set<string>()),
+};
 
 const mockPluginEventsService = {
   emit: jest.fn(),
@@ -267,6 +272,10 @@ describe('ResourceUsageService', () => {
           provide: PluginEventsService,
           useValue: mockPluginEventsService,
         },
+        {
+          provide: RbacService,
+          useValue: mockRbacService,
+        },
       ],
     }).compile();
 
@@ -355,6 +364,7 @@ describe('ResourceUsageService', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+    mockRbacService.getEffectivePermissions.mockResolvedValue(new Set<string>());
   });
 
   describe('startSession', () => {
@@ -964,13 +974,14 @@ describe('ResourceUsageService', () => {
       expect(payload).toMatchObject({ resourceId: 1, userId: 1, supervisorUserId: 2 });
     });
 
-    it('accepts a supervisor authorized via canManageResources even without an introducer role', async () => {
+    it('accepts a supervisor authorized via resources.update permission even without an introducer role', async () => {
       const dto: StartUsageSessionDto = {};
-      const adminSupervisor = { id: 2, username: 'admin', systemPermissions: { canManageResources: true } } as User;
+      const adminSupervisor = { id: 2, username: 'admin' } as User;
       resourceRepository.findOne.mockResolvedValue(supervisedResource(SupervisionMode.SUPERVISION_ALLOWED));
       resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(false);
       userRepository.findOne.mockResolvedValue(adminSupervisor);
       resourceIntroducersService.canMaintain.mockResolvedValue(false);
+      mockRbacService.getEffectivePermissions.mockResolvedValue(new Set(['resources.update']));
 
       mockSuccessfulSessionCreation(2);
 
@@ -1116,8 +1127,8 @@ describe('ResourceUsageService', () => {
       const managerUser = {
         id: 88,
         username: 'manager',
-        systemPermissions: { canManageResources: true },
       } as User;
+      mockRbacService.getEffectivePermissions.mockResolvedValue(new Set(['resources.update']));
       const mockActiveSession = {
         id: 5,
         resourceId: 12,
@@ -1272,14 +1283,14 @@ describe('ResourceUsageService', () => {
       expect(billingService.chargeForResourceUsage).toHaveBeenCalledTimes(1);
     });
 
-    it('allows users with canManageResources to end sessions owned by others', async () => {
+    it('allows users with resources.update permission to end sessions owned by others', async () => {
       const dto: EndUsageSessionDto = { notes: 'Manual stop' };
       const sessionOwner = { id: 77, username: 'member' } as User;
       const managerUser = {
         id: 88,
         username: 'manager',
-        systemPermissions: { canManageResources: true },
       } as User;
+      mockRbacService.getEffectivePermissions.mockResolvedValue(new Set(['resources.update']));
       const mockActiveSession = {
         id: 5,
         resourceId: 12,

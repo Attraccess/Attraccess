@@ -31,12 +31,6 @@ describe('UserInvitationService – parseCsvFile', () => {
   const buildConfig = (overrides?: Partial<CsvInviteConfigDto>): CsvInviteConfigDto => ({
     emailKey: 'email',
     usernameKey: 'username',
-    permissions: {
-      canManageResources: { keyMapping: 'perm', yesValue: 'true' },
-      canManageSystemConfiguration: { keyMapping: 'perm', yesValue: 'true' },
-      canManageUsers: { keyMapping: 'perm', yesValue: 'true' },
-      canManageBilling: { keyMapping: 'perm', yesValue: 'true' },
-    },
     ...overrides,
   });
 
@@ -44,12 +38,6 @@ describe('UserInvitationService – parseCsvFile', () => {
     const csv = 'email,username,perm\n"john@example.com","user1","tr,ue"\nsecond@example.com,user2,tr,ue\n';
     const file: FileUpload = { buffer: Buffer.from(csv) } as FileUpload;
     const config = buildConfig({
-      permissions: {
-        canManageResources: { keyMapping: 'perm', yesValue: 'true' },
-        canManageSystemConfiguration: { keyMapping: 'perm', yesValue: 'true' },
-        canManageUsers: { keyMapping: 'perm', yesValue: 'tr,ue' },
-        canManageBilling: { keyMapping: 'perm', yesValue: 'true' },
-      },
       ignoredRows: [2],
     });
 
@@ -60,7 +48,6 @@ describe('UserInvitationService – parseCsvFile', () => {
       {
         email: 'john@example.com',
         username: 'user1',
-        systemPermissions: { canManageUsers: true },
         row: 1,
       },
     ]);

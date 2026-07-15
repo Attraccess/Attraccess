@@ -64,7 +64,7 @@ export class ResourceIntroducersController {
     description: 'Introduction permissions granted',
     type: ResourceIntroducer,
   })
-  @Auth('canManageResources')
+  @Auth('resources.access.manage')
   async grant(
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Param('userId', ParseIntPipe) userId: number,
@@ -82,7 +82,7 @@ export class ResourceIntroducersController {
     status: 200,
     description: 'Introduction permissions revoked',
   })
-  @Auth('canManageResources')
+  @Auth('resources.access.manage')
   async revoke(
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Param('userId', ParseIntPipe) userId: number

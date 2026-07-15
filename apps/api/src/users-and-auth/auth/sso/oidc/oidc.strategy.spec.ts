@@ -11,6 +11,7 @@ import {
   User,
 } from '@attraccess/database-entities';
 import { UsersService } from '../../../users/users.service';
+import { RbacService } from '../../../rbac/rbac.service';
 
 describe('SSOOIDCStrategy - claim path resolution', () => {
   const callbackURL = 'http://localhost/cb';
@@ -20,11 +21,13 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
     config: Partial<SSOProviderOIDCConfiguration>,
     usersServiceMock: Partial<UsersService>,
     authServiceMock: Partial<AuthService>,
+    rbacServiceMock?: Partial<RbacService>,
   ) {
     const moduleRef = {
-      get: jest.fn(async (token: unknown) => {
+      get: jest.fn((token: unknown) => {
         if (token === UsersService) return usersServiceMock;
         if (token === AuthService) return authServiceMock;
+        if (token === RbacService) return rbacServiceMock ?? { syncSsoRoles: jest.fn().mockResolvedValue(undefined) };
         throw new Error('Unexpected dependency request');
       }),
     } as unknown as ModuleRef;
@@ -179,25 +182,12 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
     );
   });
 
-  it('syncs permissions from role claims when available', async () => {
-    const existingUser = {
-      id: 222,
-      username: 'existing',
-      email: 'existing@example.com',
-      systemPermissions: {
-        canManageResources: false,
-        canManageSystemConfiguration: false,
-        canManageUsers: false,
-        canManageBilling: false,
-      },
-    } as unknown as User;
+  it('does not sync RBAC roles when no permissionMappings configured', async () => {
+    const existingUser = { id: 222, username: 'existing', email: 'existing@example.com' } as User;
 
     const usersService = {
       findOne: jest.fn(async () => existingUser),
-      updateOne: jest.fn(async (_id, update) => ({
-        ...existingUser,
-        systemPermissions: update.systemPermissions,
-      })),
+      updateOne: jest.fn(),
       createOne: jest.fn(),
     };
 
@@ -206,47 +196,27 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
       addAuthenticationDetails: jest.fn(),
     };
 
-    const strategy = createStrategy({}, usersService, authService);
+    const rbacService = { syncSsoRoles: jest.fn().mockResolvedValue(undefined) };
+
+    const strategy = createStrategy({}, usersService, authService, rbacService);
 
     const profile = {
       id: 'ext-roles',
       emails: [{ value: 'existing@example.com' }],
-      _json: { roles: ['canManageUsers', 'canManageBilling'] },
+      _json: { roles: ['some-role'] },
     } as unknown as Profile;
 
-    const user = await strategy.validate('https://issuer', profile);
+    await strategy.validate('https://issuer', profile);
 
-    expect(usersService.updateOne).toHaveBeenCalledWith(existingUser.id, {
-      systemPermissions: {
-        canManageResources: false,
-        canManageSystemConfiguration: false,
-        canManageUsers: true,
-        canManageBilling: true,
-      },
-    });
-    expect(user.systemPermissions.canManageUsers).toBe(true);
-    expect(user.systemPermissions.canManageBilling).toBe(true);
+    expect(rbacService.syncSsoRoles).not.toHaveBeenCalled();
   });
 
-  it('honors configured permission mappings and can revoke permissions', async () => {
-    const existingUser = {
-      id: 333,
-      username: 'existing',
-      email: 'existing@example.com',
-      systemPermissions: {
-        canManageResources: false,
-        canManageSystemConfiguration: false,
-        canManageUsers: true,
-        canManageBilling: false,
-      },
-    } as unknown as User;
+  it('honors configured permission mappings and revokes absent roles', async () => {
+    const existingUser = { id: 333, username: 'existing', email: 'existing@example.com' } as User;
 
     const usersService = {
       findOne: jest.fn(async () => existingUser),
-      updateOne: jest.fn(async (_id, update) => ({
-        ...existingUser,
-        systemPermissions: update.systemPermissions,
-      })),
+      updateOne: jest.fn(),
       createOne: jest.fn(),
     };
 
@@ -255,33 +225,27 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
       addAuthenticationDetails: jest.fn(),
     };
 
+    const rbacService = { syncSsoRoles: jest.fn().mockResolvedValue(undefined) };
+
     const strategy = createStrategy(
       {
-        permissionMappings: {
-          canManageUsers: ['attraccess_admin'],
-        },
-      },
+        permissionMappings: { 'user-manager': ['attraccess_admin'] },
+      } as Partial<SSOProviderOIDCConfiguration>,
       usersService,
       authService,
+      rbacService,
     );
 
     const profile = {
       id: 'ext-mapping',
       emails: [{ value: 'existing@example.com' }],
-      _json: { roles: ['other-role'] },
+      _json: { roles: ['other-role'] }, // 'other-role' not in mapping → no roles granted
     } as unknown as Profile;
 
-    const user = await strategy.validate('https://issuer', profile);
+    await strategy.validate('https://issuer', profile);
 
-    expect(usersService.updateOne).toHaveBeenCalledWith(existingUser.id, {
-      systemPermissions: {
-        canManageResources: false,
-        canManageSystemConfiguration: false,
-        canManageUsers: false,
-        canManageBilling: false,
-      },
-    });
-    expect(user.systemPermissions.canManageUsers).toBe(false);
+    // syncSsoRoles called with empty set; existing SSO roles will be revoked
+    expect(rbacService.syncSsoRoles).toHaveBeenCalledWith(existingUser.id, [], SSOProviderType.OIDC, 1);
   });
 
   describe('strategy options passed to passport-openidconnect', () => {

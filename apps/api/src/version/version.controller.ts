@@ -22,7 +22,7 @@ export class VersionController {
   }
 
   @Get('system-info')
-  @Auth('canManageSystemConfiguration')
+  @Auth('system.settings.manage')
   @ApiOperation({
     summary: 'Return system overview metrics',
     operationId: 'getSystemInfo',
@@ -36,7 +36,7 @@ export class VersionController {
   }
 
   @Get('updates')
-  @Auth('canManageSystemConfiguration')
+  @Auth('system.settings.manage')
   @ApiOperation({
     summary: 'Check whether a newer Attraccess release is available on GitHub',
     operationId: 'getUpdateStatus',

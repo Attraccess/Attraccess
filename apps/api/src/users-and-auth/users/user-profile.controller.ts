@@ -1,7 +1,8 @@
 import { Body, Controller, Get, Patch, Post, Req, UseInterceptors } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { User } from '@attraccess/database-entities';
-import { AuthenticatedRequest, Auth } from '@attraccess/plugins-backend-sdk';
+import { AuthenticatedRequest, Auth, AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
+import { plainToInstance } from 'class-transformer';
 import { AuthRateLimitInterceptor } from '../rate-limiting/auth-rate-limit.interceptor';
 import { UsersService } from './users.service';
 import { ChangeUsernameDto } from './dtos/changeUsername.dto';
@@ -9,6 +10,7 @@ import { ChangeEmailDto } from './dtos/changeEmail.dto';
 import { DeleteAccountConfirmDto } from './dtos/deleteAccountConfirm.dto';
 import { UpdateLocaleDto } from './dtos/updateLocale.dto';
 import { mapEmailSendError } from './email-send-error.util';
+import { CurrentUserDto } from './dtos/current-user.dto';
 
 @ApiTags('Users')
 @Controller('users')
@@ -22,14 +24,18 @@ export class UserProfileController {
   @ApiResponse({
     status: 200,
     description: 'The current user.',
-    type: User,
+    type: CurrentUserDto,
   })
   @ApiResponse({
     status: 401,
     description: 'User is not authenticated.',
   })
-  async getCurrent(@Req() request: AuthenticatedRequest) {
-    return request.user;
+  async getCurrent(@Req() request: AuthenticatedRequest): Promise<CurrentUserDto> {
+    const user = request.user as AuthenticatedUser;
+    return plainToInstance(CurrentUserDto, {
+      ...user,
+      effectivePermissions: user.effectivePermissions ? [...user.effectivePermissions] : [],
+    });
   }
 
   @Auth()

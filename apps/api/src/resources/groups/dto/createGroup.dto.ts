@@ -58,7 +58,7 @@ export class CreateResourceGroupDto {
 
   @ApiProperty({
     description:
-      'Whether to hide this group from users who are not part of it (introducer, maintainer or introduced). Users with the canManageResources permission always see hidden groups.',
+      'Whether to hide this group from users who are not part of it (introducer, maintainer or introduced). Users with the `resources.update` permission always see hidden groups.',
     required: false,
     default: false,
     example: false,

@@ -48,8 +48,9 @@ import { ProjectsService } from '../../projects/projects.service';
 import { ResourceFormsService } from '../forms/forms.service';
 import { ResourceFormAction } from '@attraccess/database-entities';
 import { MetricsService } from '../../metrics/metrics.service';
-import { SystemEvent } from '@attraccess/plugins-backend-sdk';
+import { AuthenticatedUser, SystemEvent } from '@attraccess/plugins-backend-sdk';
 import { PluginEventsService } from '../../plugin-system/plugin-events.service';
+import { RbacService } from '../../users-and-auth/rbac/rbac.service';
 
 export interface EndSessionOptions {
   /** Skip persisting required END-action form submissions (used by automated/flow paths). */
@@ -61,7 +62,7 @@ export interface EndSessionOptions {
 export interface StartSessionOptions {
   /**
    * When set, the session is started as a supervised session attributed to this supervisor.
-   * The supervisor is validated against the resource (introducer/maintainer or canManageResources).
+   * The supervisor is validated against the resource (introducer/maintainer or `resources.update` permission).
    */
   supervisorUserId?: number;
 }
@@ -114,6 +115,7 @@ export class ResourceUsageService {
     private readonly metricsService: MetricsService,
     private readonly resourceHealthService: ResourceHealthService,
     private readonly pluginEvents: PluginEventsService,
+    private readonly rbacService: RbacService,
   ) {}
 
   private emitSystemUsageEvent(
@@ -136,7 +138,10 @@ export class ResourceUsageService {
     user: User,
     transactionalEntityManager?: EntityManager,
   ): Promise<boolean> {
-    if (user.systemPermissions?.canManageResources) {
+    // Prefer already-populated effectivePermissions on the request-bound user (set by SessionStrategy)
+    // to avoid a redundant DB query on every resource start/stop.
+    const effectivePermissions = (user as AuthenticatedUser).effectivePermissions ?? await this.rbacService.getEffectivePermissions(user.id);
+    if (effectivePermissions.has('resources.update')) {
       return true;
     }
 
@@ -226,7 +231,8 @@ export class ResourceUsageService {
       throw new NotFoundException(`Supervisor with ID ${supervisorUserId} not found`);
     }
 
-    const supervisorCanManage = supervisor.systemPermissions?.canManageResources === true;
+    const supervisorPermissions = await this.rbacService.getEffectivePermissions(supervisor.id);
+    const supervisorCanManage = supervisorPermissions.has('resources.update');
     const supervisorCanMaintain = await this.resourceIntroducersService.canMaintain(
       resourceId,
       supervisorUserId,
@@ -342,7 +348,6 @@ export class ResourceUsageService {
           id: usageUser.id,
           username: usageUser.username,
           email: usageUser.email,
-          systemPermissions: usageUser.systemPermissions,
           createdAt: usageUser.createdAt,
           updatedAt: usageUser.updatedAt,
           billingFactor: usageUser.billingFactor,
@@ -625,12 +630,14 @@ export class ResourceUsageService {
           throw new BadRequestException('No active session found');
         }
 
-        const canManageResources = user.systemPermissions?.canManageResources || false;
+        // Prefer already-populated effectivePermissions on the request-bound user (set by SessionStrategy)
+        const userPermissions = (user as AuthenticatedUser).effectivePermissions ?? await this.rbacService.getEffectivePermissions(user.id);
+        const canUpdateResources = userPermissions.has('resources.update');
         const isSessionOwner = activeSession.user.id === user.id;
         // The supervisor of a supervised session may end it as well.
         const isSupervisor = activeSession.supervisorUserId != null && activeSession.supervisorUserId === user.id;
 
-        if (!isSessionOwner && !isSupervisor && !canManageResources) {
+        if (!isSessionOwner && !isSupervisor && !canUpdateResources) {
           const canMaintain = await this.resourceIntroducersService.canMaintain(activeSession.resourceId, user.id, true);
           if (!canMaintain) {
             this.logger.warn(

@@ -9,6 +9,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ResourceIntroducer, User } from '@attraccess/database-entities';
+import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 
 @Injectable()
 export class IsResourceGroupIntroducerGuard implements CanActivate {
@@ -29,7 +30,7 @@ export class IsResourceGroupIntroducerGuard implements CanActivate {
     }
 
     // Check if the user has system permissions to manage all resources
-    if (user.systemPermissions && user.systemPermissions.canManageResources === true) {
+    if ((user as unknown as AuthenticatedUser).effectivePermissions?.has('resources.access.manage') === true) {
       return true;
     }
 

@@ -8,6 +8,7 @@ import { UsersService } from '../../../users-and-auth/users/users.service';
 import { ResourceUsageService } from '../../../resources/usage/resourceUsage.service';
 import { ResourceIntroducersService } from '../../../resources/introducers/resourceIntroducers.service';
 import { MetricsService } from '../../../metrics/metrics.service';
+import { RbacService } from '../../../users-and-auth/rbac/rbac.service';
 import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from '../websocket.types';
 
 @Injectable()
@@ -31,6 +32,9 @@ export class AttractapCardHandler {
 
   @Inject(MetricsService)
   private metricsService: MetricsService;
+
+  @Inject(RbacService)
+  private rbacService: RbacService;
 
   @InjectRepository(Resource)
   private resourceRepository: Repository<Resource>;
@@ -306,7 +310,7 @@ export class AttractapCardHandler {
         keyNo: nfcCard.keyNo,
         key: nfcCard.key,
         username: nfcCard.user.username,
-        canManageResource: nfcCard.user.systemPermissions.canManageResources,
+        canManageResource: (await this.rbacService.getEffectivePermissions(nfcCard.user.id)).has('resources.update'),
         hasIntroduction,
         isIntroducer,
         supervisionMode,

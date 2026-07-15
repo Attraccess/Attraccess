@@ -93,7 +93,7 @@ export function RefundModal(props: Props) {
 
   const { data: configuration } = useBillingServiceGetBillingConfiguration();
 
-  if (!hasPermission('canManageBilling')) {
+  if (!hasPermission('billing.manage')) {
     return null;
   }
 

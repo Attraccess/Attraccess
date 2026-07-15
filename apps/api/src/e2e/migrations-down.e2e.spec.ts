@@ -103,19 +103,12 @@ const ensureEntity = async <T>(repo: Repository<T>, builder: () => DeepPartial<N
 const ensureUsers = async (dataSource: DataSource, seedTag: string) => {
   const userRepo = dataSource.getRepository(User);
   let users = await userRepo.find({ take: 2, order: { id: 'ASC' } });
-  const defaults = {
-    canManageResources: false,
-    canManageSystemConfiguration: false,
-    canManageUsers: false,
-    canManageBilling: false,
-  };
   const newUsers: DeepPartial<User>[] = [];
 
   if (users.length < 1) {
     newUsers.push({
       username: `seed_user_${seedTag}_1`,
       email: `seed_user_${seedTag}_1@example.com`,
-      systemPermissions: defaults,
     });
   }
 
@@ -123,7 +116,6 @@ const ensureUsers = async (dataSource: DataSource, seedTag: string) => {
     newUsers.push({
       username: `seed_user_${seedTag}_2`,
       email: `seed_user_${seedTag}_2@example.com`,
-      systemPermissions: defaults,
     });
   }
 

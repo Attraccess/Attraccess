@@ -23,7 +23,7 @@ export function buildUpdateDocsPath(language: string | undefined): string {
 export function UpdateNotificationBanner() {
   const { t, language } = useTranslations({ en, de });
   const { hasPermission } = useAuth();
-  const canSeeBanner = hasPermission('canManageSystemConfiguration');
+  const canSeeBanner = hasPermission('system.settings.manage');
   const updateDocsPath = buildUpdateDocsPath(language);
 
   const { data: updateStatus } = useSystemServiceGetUpdateStatus({}, undefined, {

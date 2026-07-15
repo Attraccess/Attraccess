@@ -1,15 +1,20 @@
 import { useNavigate } from 'react-router-dom';
 import {
   OpenAPI,
-  SystemPermissions,
   useAuthenticationServiceCreateSession,
   useAuthenticationServiceEndSession,
   useTwoFactorAuthenticationServiceGetTwoFactorStatus,
   useUsersServiceGetCurrent,
   UseUsersServiceGetCurrentKeyFn,
+  type User,
 } from '@attraccess/react-query-client';
 import { useCallback, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { type SystemPermission } from '@attraccess/shared';
+
+// The GET /users/me response includes effectivePermissions at runtime even though the
+// generated User type does not declare it (the field is added by the profile controller).
+type UserWithEffectivePermissions = User & { effectivePermissions?: string[] };
 
 interface LoginCredentials {
   username: string;
@@ -75,7 +80,7 @@ export function useAuth() {
     refetchInterval: 1000 * 60 * 20, // 20 minutes
     retry: false,
     enabled: isInitialized, // Only fetch when initialized
-  });
+  }) as { data: UserWithEffectivePermissions | undefined };
 
   const { data: twoFactorStatus, isLoading: isTwoFactorStatusLoading } =
     useTwoFactorAuthenticationServiceGetTwoFactorStatus(undefined, {
@@ -101,11 +106,9 @@ export function useAuth() {
     twoFactorStatus,
     isTwoFactorStatusLoading,
     needsTwoFactorSetup: !!twoFactorStatus?.required && !twoFactorStatus?.enabled,
-    hasPermission: (permission: keyof SystemPermissions) => {
-      if (!currentUser?.systemPermissions || typeof currentUser.systemPermissions !== 'object') {
-        return false;
-      }
-      return (currentUser.systemPermissions as SystemPermissions)[permission] ?? false;
+    hasPermission: (permission: SystemPermission) => {
+      const effectivePermissions: string[] = currentUser?.effectivePermissions ?? [];
+      return effectivePermissions.includes(permission);
     },
   };
 }

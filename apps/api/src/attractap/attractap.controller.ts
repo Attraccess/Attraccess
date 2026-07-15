@@ -94,7 +94,7 @@ export class AttractapController {
   }
 
   @Patch(':readerId')
-  @Auth('canManageResources')
+  @Auth('resources.update')
   @ApiOperation({ summary: 'Update reader name and connected resources', operationId: 'updateReader' })
   @ApiParam({ name: 'readerId', description: 'The ID of the reader to update', example: 1 })
   @ApiBody({ type: UpdateReaderDto })
@@ -151,7 +151,7 @@ export class AttractapController {
   }
 
   @Get(':readerId/crash-reports')
-  @Auth('canManageResources')
+  @Auth('resources.update')
   @ApiOperation({ summary: 'Get crash reports for a reader', operationId: 'getReaderCrashReports' })
   @ApiParam({ name: 'readerId', description: 'The ID of the reader', example: 1 })
   @ApiResponse({
@@ -164,7 +164,7 @@ export class AttractapController {
   }
 
   @Get(':readerId/crash-reports/:reportId/coredump')
-  @Auth('canManageResources')
+  @Auth('resources.update')
   @ApiOperation({
     summary: 'Download the coredump blob of a crash report',
     operationId: 'getReaderCrashReportCoredump',
@@ -191,7 +191,7 @@ export class AttractapController {
   }
 
   @Delete(':readerId')
-  @Auth('canManageResources')
+  @Auth('resources.delete')
   @ApiOperation({ summary: 'Delete a reader', operationId: 'deleteReader' })
   @ApiParam({ name: 'readerId', description: 'The ID of the reader to delete', example: 1 })
   @ApiResponse({ status: 200, description: 'Reader deleted successfully' })

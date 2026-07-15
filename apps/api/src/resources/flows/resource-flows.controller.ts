@@ -16,7 +16,7 @@ import { SseInstrumentation } from '../../metrics/instrumentation/sse/sse.helper
 
 @ApiTags('Resource Flows')
 @Controller('resources/:resourceId/flow')
-@Auth('canManageResources')
+@Auth('resources.update')
 export class ResourceFlowsController {
   private readonly logger = new Logger(ResourceFlowsController.name);
 

@@ -137,7 +137,7 @@ export class UserRegistrationService {
     const policyResult = await this.passwordPolicyService.validate(
       body.password,
       { username: user.username, email: user.email },
-      { role: this.passwordPolicyService.resolveRole(user) },
+      { role: await this.passwordPolicyService.resolveRole(user) },
     );
     if (!policyResult.ok) {
       throw new PasswordPolicyViolationException(policyResult.errors);

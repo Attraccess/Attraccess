@@ -34,6 +34,8 @@ export const SAMLConfigForm = ({ form }: SAMLConfigFormProps) => {
     setSamlPermissionMappingsInput,
     handleSamlToggleChange,
     providerDetails,
+    roles,
+    isLoadingRoles,
   } = form;
 
   return (
@@ -131,6 +133,8 @@ export const SAMLConfigForm = ({ form }: SAMLConfigFormProps) => {
 
       <PermissionMappingsSection
         variant="saml"
+        roles={roles}
+        isLoadingRoles={isLoadingRoles}
         values={samlPermissionMappingsInput}
         onChange={(key, value) => setSamlPermissionMappingsInput((prev) => ({ ...prev, [key]: value }))}
       />

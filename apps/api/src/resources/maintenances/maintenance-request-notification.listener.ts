@@ -8,6 +8,7 @@ import { Resource, ResourceIntroducer, ResourceMaintenanceRequest, User } from '
 import { ResourceMaintenanceRequestCreatedEvent } from './events/maintenance-request-created.event';
 import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../../notifications/notification-types';
+import { RbacService } from '../../users-and-auth/rbac/rbac.service';
 import { createTranslator } from '../../i18n/translate';
 import * as en from './maintenance-request-notification.en.json';
 import * as de from './maintenance-request-notification.de.json';
@@ -28,6 +29,7 @@ export class MaintenanceRequestNotificationListener {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private readonly notifications: NotificationDispatchService,
+    private readonly rbacService: RbacService,
   ) {}
 
   @OnEvent(ResourceMaintenanceRequestCreatedEvent.EVENT_NAME)
@@ -87,10 +89,8 @@ export class MaintenanceRequestNotificationListener {
   private async collectRecipients(resource: Resource): Promise<User[]> {
     const groupIds = (resource.groups ?? []).map((group) => group.id);
 
-    const admins = await this.userRepository
-      .createQueryBuilder('user')
-      .where('user.canManageResources = :value', { value: true })
-      .getMany();
+    const adminIds = await this.rbacService.getUserIdsWithPermission('resources.maintenance.manage');
+    const admins = adminIds.length > 0 ? await this.userRepository.findBy({ id: In(adminIds) }) : [];
 
     const introducerWhere: Array<Record<string, unknown>> = [{ resourceId: resource.id }];
     if (groupIds.length > 0) {

@@ -10,7 +10,6 @@ import {
 import { ApiProperty } from '@nestjs/swagger';
 import { Exclude } from 'class-transformer';
 import { SSOProvider } from './ssoProvider.entity';
-import { SystemPermission } from './user.entity';
 
 @Entity()
 export class SSOProviderOIDCConfiguration {
@@ -99,14 +98,14 @@ export class SSOProviderOIDCConfiguration {
 
   @Column({ type: 'json', nullable: true })
   @ApiProperty({
-    description: 'Optional mapping between Attraccess permissions and role names',
+    description: 'Optional mapping between RBAC role keys and IdP role/group claim values',
     required: false,
     example: {
-      canManageResources: ['attraccess_resources'],
-      canManageUsers: ['attraccess_admin'],
+      'resource-manager': ['attraccess_resources'],
+      'user-manager': ['attraccess_admin'],
     },
   })
-  permissionMappings?: Partial<Record<SystemPermission, string[]>> | null;
+  permissionMappings?: Record<string, string[]> | null;
 
   @CreateDateColumn()
   @ApiProperty({

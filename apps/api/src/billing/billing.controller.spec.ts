@@ -18,13 +18,10 @@ import { SseInstrumentation } from '../metrics/instrumentation/sse/sse.helper';
 import { Observable, Subject } from 'rxjs';
 import { LicenseService } from '../license/license.service';
 
-const baseReq = (userOverrides: DeepPartial<User> = {}) =>
+const baseReq = (userOverrides: DeepPartial<User> & { effectivePermissions?: Set<string> } = {}) =>
   ({
     user: {
       id: 1,
-      systemPermissions: {
-        canManageBilling: false,
-      },
       ...userOverrides,
     },
   }) as AuthenticatedRequest;
@@ -131,7 +128,7 @@ describe('BillingController', () => {
 
     it('allows when has canManageBilling', async () => {
       service.getBalance.mockResolvedValue(12);
-      const req = baseReq({ systemPermissions: { canManageBilling: true } });
+      const req = baseReq({ effectivePermissions: new Set(['billing.manage']) });
       const res = await controller.getBillingBalance(2, req);
       expect(res).toEqual({ value: 12 });
     });
@@ -155,7 +152,7 @@ describe('BillingController', () => {
     it('allows when has canManageBilling', async () => {
       const data = { data: [{ id: 1 }], total: 1, page: 1, limit: 10 } as TransactionsDto;
       service.getHistory.mockResolvedValue(data);
-      const req = baseReq({ systemPermissions: { canManageBilling: true } });
+      const req = baseReq({ effectivePermissions: new Set(['billing.manage']) });
       const res = await controller.getBillingTransactions(2, { page: 1, limit: 10 }, req);
       expect(res).toBe(data);
     });

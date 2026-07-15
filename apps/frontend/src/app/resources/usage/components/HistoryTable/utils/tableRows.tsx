@@ -14,13 +14,13 @@ export function generateRowCells(
   t: TFunction,
   resource: Resource,
   showAllUsers: boolean,
-  canManageResources: boolean,
+  canUpdateResources: boolean,
   projectCellRenderer?: (session: ResourceUsage) => ReactElement,
 ): TableRowProps<ResourceUsage>['children'] {
   const cells: ReactElement<TableCellProps>[] = [];
 
-  // Only show user cell if we're showing all users (requires canManageResources)
-  if (canManageResources && showAllUsers) {
+  // Only show user cell if we're showing all users (requires canUpdateResources)
+  if (canUpdateResources && showAllUsers) {
     cells.push(
       <TableCell key={`user-${session.id}`}>
         <AttraccessUser user={session.user} />

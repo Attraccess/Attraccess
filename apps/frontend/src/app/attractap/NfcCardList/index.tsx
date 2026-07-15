@@ -318,7 +318,7 @@ export function NfcCardList() {
               key: 'readers',
               label: t('readers'),
               icon: <ServerIcon />,
-              isHidden: !hasPermission('canManageResources'),
+              isHidden: !hasPermission('resources.update'),
               onPress: () => navigate('/attractap/readers'),
             },
           ] satisfies PageAction[]

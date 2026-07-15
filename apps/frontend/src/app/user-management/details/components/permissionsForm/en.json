@@ -1,10 +1,10 @@
 {
   "title": "Permissions",
   "permissions": {
-    "canManageResources": "Manage resources",
-    "canManageSystemConfiguration": "Manage system configuration",
-    "canManageUsers": "Manage users",
-    "canManageBilling": "Manage billing"
+    "resource-manager": "Manage resources",
+    "system-admin": "Manage system configuration",
+    "user-manager": "Manage users",
+    "billing-manager": "Manage billing"
   },
   "actions": {
     "save": "Save"

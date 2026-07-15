@@ -21,7 +21,6 @@ import {
 } from '@heroui/react';
 import { buttonVariants } from '@heroui/styles';
 import { useAllRoutes } from '../routes';
-import { SystemPermissions } from '@attraccess/react-query-client';
 import de from './sidebar.de.json';
 import en from './sidebar.en.json';
 import { Logo } from '../../components/logo';
@@ -83,7 +82,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
-  const { logout, user } = useAuth();
+  const { logout, user, hasPermission } = useAuth();
   const { t, language, setLanguage } = useTranslations({
     en,
     de,
@@ -129,15 +128,11 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
 
       const requiredPermissions = (
         Array.isArray(routeOfItem?.authRequired) ? routeOfItem?.authRequired : [routeOfItem?.authRequired]
-      ) as (keyof SystemPermissions)[];
+      ) as string[];
 
-      const userHasAllRequiredPermissions = requiredPermissions.every(
-        (permission) => user.systemPermissions[permission] === true,
-      );
-
-      return userHasAllRequiredPermissions;
+      return requiredPermissions.every(hasPermission);
     },
-    [user, routes],
+    [user, hasPermission, routes],
   );
 
   // Get navigation items from routes that have sidebar config

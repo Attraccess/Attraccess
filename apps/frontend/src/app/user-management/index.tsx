@@ -19,7 +19,6 @@ import {
   TooltipTrigger,
 } from '@heroui/react';
 import {
-  CreditCardIcon,
   KeyIcon,
   SearchIcon,
   Settings2Icon,
@@ -27,7 +26,6 @@ import {
   ShieldOffIcon,
   UserPlusIcon,
   Users,
-  WrenchIcon,
 } from 'lucide-react';
 import { TableToolbar } from '../../components/TableToolbar';
 import {
@@ -140,7 +138,6 @@ export const UserManagementPage: React.FC = () => {
                 <TableColumn width="0" className="text-center">
                   {t('table.columns.ssoLinked')}
                 </TableColumn>
-                <TableColumn className="text-center">{t('table.columns.permissions')}</TableColumn>
               </TableHeader>
 
               <TableBody items={searchResult?.data ?? []} renderEmptyState={() => <EmptyState />}>
@@ -196,60 +193,6 @@ export const UserManagementPage: React.FC = () => {
                         ) : (
                           <span className="text-default-300">-</span>
                         )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1 justify-center">
-                          {[
-                            {
-                              key: 'canManageResources',
-                              enabled: user.systemPermissions?.canManageResources,
-                              label: t('table.columns.canManageResources'),
-                              icon: <WrenchIcon className="w-3.5 h-3.5" />,
-                            },
-                            {
-                              key: 'canManageSystemConfiguration',
-                              enabled: user.systemPermissions?.canManageSystemConfiguration,
-                              label: t('table.columns.canManageSystemConfiguration'),
-                              icon: <Settings2Icon className="w-3.5 h-3.5" />,
-                            },
-                            {
-                              key: 'canManageUsers',
-                              enabled: user.systemPermissions?.canManageUsers,
-                              label: t('table.columns.canManageUsers'),
-                              icon: <Users className="w-3.5 h-3.5" />,
-                            },
-                            {
-                              key: 'canManageBilling',
-                              enabled: user.systemPermissions?.canManageBilling,
-                              label: t('table.columns.canManageBilling'),
-                              icon: <CreditCardIcon className="w-3.5 h-3.5" />,
-                            },
-                          ]
-                            .filter((permission) => permission.enabled)
-                            .map((permission) => (
-                              <Tooltip key={permission.key}>
-                                <TooltipTrigger tabIndex={0}>
-                                  <Chip
-                                    variant="soft"
-                                    color="accent"
-                                    className="min-w-0 px-2"
-                                    data-cy={`user-permission-chip-${permission.key}`}
-                                  >
-                                    {permission.icon}
-                                  </Chip>
-                                </TooltipTrigger>
-                                <TooltipContent showArrow>{permission.label}</TooltipContent>
-                              </Tooltip>
-                            ))}
-                          {![
-                            user.systemPermissions?.canManageResources,
-                            user.systemPermissions?.canManageSystemConfiguration,
-                            user.systemPermissions?.canManageUsers,
-                            user.systemPermissions?.canManageBilling,
-                          ].some(Boolean) && (
-                            <span className="text-default-400 text-sm">{t('table.noPermissions')}</span>
-                          )}
-                        </div>
                       </TableCell>
                     </TableRow>
                   );

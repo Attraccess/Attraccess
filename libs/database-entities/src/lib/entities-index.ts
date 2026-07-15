@@ -18,7 +18,7 @@ import { SupervisionMode, AutoIntroductionTarget } from './entities/resource.sup
 import { SSOProvider, SSOProviderType } from './entities/ssoProvider.entity';
 import { SSOProviderOIDCConfiguration } from './entities/ssoProvider.oidc';
 import { SSOProviderSAMLConfiguration } from './entities/ssoProvider.saml';
-import { User, SystemPermissions, type SystemPermission } from './entities/user.entity';
+import { User } from './entities/user.entity';
 import { Session } from './entities/session.entity';
 import { Attractap, AttractapFirmwareVersion } from './entities/attractap.entity';
 import { AttractapCrashReport } from './entities/attractapCrashReport.entity';
@@ -125,8 +125,6 @@ export {
   SSOProviderOIDCConfiguration,
   SSOProviderSAMLConfiguration,
   User,
-  SystemPermissions,
-  SystemPermission,
   Session,
   NFCCard,
   Attractap,

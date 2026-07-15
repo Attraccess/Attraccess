@@ -11,7 +11,7 @@ import de from './de.json';
 
 export const SSOProvidersPage: React.FC = () => {
   const { hasPermission } = useAuth();
-  const canManageSSO = hasPermission('canManageSystemConfiguration');
+  const canManageSSO = hasPermission('system.sso.manage');
   const { t } = useTranslations({ en, de });
   const navigate = useNavigate();
   const { data: license } = useLicenseServiceGetLicenseInformation();
