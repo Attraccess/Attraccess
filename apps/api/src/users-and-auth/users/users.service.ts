@@ -300,9 +300,6 @@ export class UsersService {
 
   async deleteOne(id: number): Promise<void> {
     this.logger.debug(`Deleting user with ID: ${id}`);
-    if (await this.rbacService.isLastOwner(id)) {
-      throw new ForbiddenException('Cannot delete the last owner');
-    }
     await this.anonymizeAndSoftDelete(id);
     this.metricsService.usersTotal.dec();
     this.logger.debug(`User deleted with ID: ${id}`);
@@ -738,6 +735,10 @@ export class UsersService {
   }
 
   private async anonymizeAndSoftDelete(id: number, manager?: EntityManager): Promise<void> {
+    if (await this.rbacService.isLastOwner(id)) {
+      throw new ForbiddenException('Cannot delete the last owner');
+    }
+
     const repo = manager ? manager.getRepository(User) : this.userRepository;
     const authRepo = manager ? manager.getRepository(AuthenticationDetail) : this.authenticationDetailRepository;
     const sessionRepo = manager ? manager.getRepository(Session) : this.sessionRepository;

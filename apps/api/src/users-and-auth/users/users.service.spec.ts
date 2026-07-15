@@ -22,6 +22,7 @@ const mockMetricsService = {
 const mockRbacService = {
   assignRoleByKey: jest.fn().mockResolvedValue(undefined),
   assignDefaultRoles: jest.fn().mockResolvedValue(undefined),
+  isLastOwner: jest.fn().mockResolvedValue(false),
 };
 
 describe('UsersService', () => {
@@ -32,6 +33,8 @@ describe('UsersService', () => {
   beforeEach(async () => {
     mockRbacService.assignRoleByKey.mockClear();
     mockRbacService.assignDefaultRoles.mockClear();
+    mockRbacService.isLastOwner.mockClear();
+    mockRbacService.isLastOwner.mockResolvedValue(false);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -539,6 +542,23 @@ describe('UsersService', () => {
 
     it('throws BadRequestException for empty locale', async () => {
       await expect(service.updateLocale(1, '   ')).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('confirmSelfDeletion', () => {
+    const futureDate = new Date(Date.now() + 86_400_000);
+
+    it('throws ForbiddenException when user is the last owner', async () => {
+      jest.spyOn(userRepository, 'findOne').mockResolvedValue({
+        id: 1,
+        email: 'owner@example.com',
+        deletedAt: null,
+        deleteAccountToken: 'hashed:tok',
+        deleteAccountTokenExpiresAt: futureDate,
+      } as unknown as User);
+      mockRbacService.isLastOwner.mockResolvedValue(true);
+
+      await expect(service.confirmSelfDeletion('owner@example.com', 'tok')).rejects.toThrow(ForbiddenException);
     });
   });
 });
