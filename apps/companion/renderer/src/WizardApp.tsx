@@ -29,7 +29,7 @@ export function WizardApp() {
   const [pinEntry, setPinEntry] = useState('');
   const [pinEntryError, setPinEntryError] = useState('');
 
-  const [appSettings, setAppSettings] = useState<CompanionSettings>({ idleTimeoutMinutes: 15, foregroundApp: true });
+  const [appSettings, setAppSettings] = useState<CompanionSettings>({ idleTimeoutMinutes: 15, foregroundApp: true, usbDevices: true });
 
   useEffect(() => {
     window.companion.onInit(async ({ serverUrl: saved, requirePin, registered: reg, connected: conn }) => {

@@ -920,8 +920,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
       const hasVendorFilter = vendorId !== undefined;
       const hasProductFilter = productId !== undefined;
       if (hasVendorFilter && hasProductFilter) {
-        // ponytail: OR match when both filters set — matches any device with either vendorId or productId
-        return vendorId === payload.vendorId || productId === payload.productId;
+        return vendorId === payload.vendorId && productId === payload.productId;
       }
       if (hasVendorFilter) return vendorId === payload.vendorId;
       if (hasProductFilter) return productId === payload.productId;

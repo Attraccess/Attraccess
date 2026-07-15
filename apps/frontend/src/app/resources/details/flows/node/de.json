@@ -186,7 +186,7 @@
         },
         "usb_device_disconnected": {
           "title": "Companion: USB-Gerät getrennt",
-          "description": "Wird ausgelöst, wenn ein USB-Gerät von einem Companion-Gerät getrennt wird. Payload enthält vendorId, productId, manufacturer, product und serialNumber.",
+          "description": "Wird ausgelöst, wenn ein USB-Gerät von einem Companion-Gerät getrennt wird. Payload enthält vendorId und productId.",
           "outputs": {
             "output": "Ausgabe"
           },

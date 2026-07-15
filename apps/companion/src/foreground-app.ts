@@ -17,6 +17,7 @@ export function startForegroundAppMonitoring(): void {
     console.warn('[companion] metrics adapter start failed:', err);
     listening = false;
     sharedMetricsAdapter.off('foregroundAppChanged', onForegroundAppChanged);
+    releaseMetrics();
   });
 }
 

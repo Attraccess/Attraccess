@@ -186,7 +186,7 @@
         },
         "usb_device_disconnected": {
           "title": "Companion: USB device disconnected",
-          "description": "Fires when a USB device is disconnected from a companion device. Payload includes vendorId, productId, manufacturer, product and serialNumber.",
+          "description": "Fires when a USB device is disconnected from a companion device. Payload includes vendorId and productId.",
           "outputs": {
             "output": "Output"
           },
