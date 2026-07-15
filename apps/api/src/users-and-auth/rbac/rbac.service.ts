@@ -1,7 +1,8 @@
 import { ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, QueryFailedError, Repository } from 'typeorm';
-import { Permission, Role, UserRole, UserRoleSource } from '@attraccess/database-entities';
+import { Permission, Role, User, UserRole, UserRoleSource } from '@attraccess/database-entities';
+import { UserNotFoundException } from '../../exceptions/user.notFound.exception';
 
 @Injectable()
 export class RbacService {
@@ -19,6 +20,8 @@ export class RbacService {
     private readonly roleRepository: Repository<Role>,
     @InjectRepository(Permission)
     private readonly permissionRepository: Repository<Permission>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
   ) {}
 
   async getEffectivePermissions(userId: number): Promise<Set<string>> {
@@ -117,6 +120,9 @@ export class RbacService {
   }
 
   async assignRole(userId: number, roleId: number, actorPermissions: Set<string>): Promise<UserRole> {
+    const userExists = await this.userRepository.existsBy({ id: userId });
+    if (!userExists) throw new UserNotFoundException(userId);
+
     const role = await this.roleRepository.findOne({
       where: { id: roleId },
       relations: ['rolePermissions'],
@@ -151,6 +157,9 @@ export class RbacService {
   }
 
   async revokeRole(userId: number, roleId: number, actorPermissions: Set<string>): Promise<void> {
+    const userExists = await this.userRepository.existsBy({ id: userId });
+    if (!userExists) throw new UserNotFoundException(userId);
+
     const role = await this.roleRepository.findOne({
       where: { id: roleId },
       relations: ['rolePermissions'],

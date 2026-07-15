@@ -3,8 +3,9 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { QueryFailedError, Repository } from 'typeorm';
-import { Permission, Role, UserRole, UserRoleSource } from '@attraccess/database-entities';
+import { Permission, Role, User, UserRole, UserRoleSource } from '@attraccess/database-entities';
 import { RbacService } from './rbac.service';
+import { UserNotFoundException } from '../../exceptions/user.notFound.exception';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -56,6 +57,7 @@ describe('RbacService', () => {
   let userRoleRepo: jest.Mocked<Repository<UserRole>>;
   let roleRepo: jest.Mocked<Repository<Role>>;
   let permissionRepo: jest.Mocked<Repository<Permission>>;
+  let userRepo: jest.Mocked<Repository<User>>;
 
   beforeEach(async () => {
     const mockQb = createMockQueryBuilder();
@@ -87,12 +89,17 @@ describe('RbacService', () => {
       find: jest.fn(),
     } as unknown as jest.Mocked<Repository<Permission>>;
 
+    userRepo = {
+      existsBy: jest.fn().mockResolvedValue(true),
+    } as unknown as jest.Mocked<Repository<User>>;
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         RbacService,
         { provide: getRepositoryToken(UserRole), useValue: userRoleRepo },
         { provide: getRepositoryToken(Role), useValue: roleRepo },
         { provide: getRepositoryToken(Permission), useValue: permissionRepo },
+        { provide: getRepositoryToken(User), useValue: userRepo },
       ],
     }).compile();
 
@@ -140,6 +147,12 @@ describe('RbacService', () => {
   // ───────────────────────────── assignRole ──────────────────────────────────
 
   describe('assignRole', () => {
+    it('throws UserNotFoundException when user does not exist', async () => {
+      userRepo.existsBy.mockResolvedValue(false);
+
+      await expect(service.assignRole(99, 1, new Set())).rejects.toThrow(UserNotFoundException);
+    });
+
     it('throws NotFoundException when role does not exist', async () => {
       roleRepo.findOne.mockResolvedValue(null);
 
@@ -204,6 +217,12 @@ describe('RbacService', () => {
   // ───────────────────────────── revokeRole ──────────────────────────────────
 
   describe('revokeRole', () => {
+    it('throws UserNotFoundException when user does not exist', async () => {
+      userRepo.existsBy.mockResolvedValue(false);
+
+      await expect(service.revokeRole(99, 1, new Set())).rejects.toThrow(UserNotFoundException);
+    });
+
     it('throws NotFoundException when role does not exist', async () => {
       roleRepo.findOne.mockResolvedValue(null);
 
