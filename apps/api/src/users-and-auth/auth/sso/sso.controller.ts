@@ -913,7 +913,9 @@ export class SSOController {
 
     for (const roleKey of roleKeys) {
       const role = roleByKey.get(roleKey);
-      if (!role) continue;
+      if (!role) {
+        throw new ForbiddenException(`Cannot map unknown role '${roleKey}'`);
+      }
       const missing = role.rolePermissions.map((rp) => rp.permissionKey).filter((k) => !actorPermissions.has(k));
       if (missing.length > 0) {
         throw new ForbiddenException(

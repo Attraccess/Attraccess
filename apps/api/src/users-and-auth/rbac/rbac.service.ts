@@ -59,6 +59,20 @@ export class RbacService {
     });
   }
 
+  async isLastOwner(userId: number): Promise<boolean> {
+    const ownerRole = await this.roleRepository.findOne({ where: { key: 'owner' } });
+    if (!ownerRole) return false;
+    const isOwner = await this.userRoleRepository.findOne({ where: { userId, roleId: ownerRole.id } });
+    if (!isOwner) return false;
+    const otherOwnerCount = await this.userRoleRepository
+      .createQueryBuilder('ur')
+      .innerJoin('ur.user', 'u', 'u.deletedAt IS NULL')
+      .where('ur.roleId = :roleId', { roleId: ownerRole.id })
+      .andWhere('ur.userId != :userId', { userId })
+      .getCount();
+    return otherOwnerCount === 0;
+  }
+
   async getUserIdsWithPermission(permissionKey: string): Promise<number[]> {
     const rows = await this.userRoleRepository
       .createQueryBuilder('ur')

@@ -131,7 +131,6 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
       'mail',
       'Email',
       'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress',
-      'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name',
       'urn:oid:1.2.840.113549.1.9.1',
     ];
     const customCandidates = Array.isArray(config.emailAttributeKeys)

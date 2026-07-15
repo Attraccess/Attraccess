@@ -300,6 +300,9 @@ export class UsersService {
 
   async deleteOne(id: number): Promise<void> {
     this.logger.debug(`Deleting user with ID: ${id}`);
+    if (await this.rbacService.isLastOwner(id)) {
+      throw new ForbiddenException('Cannot delete the last owner');
+    }
     await this.anonymizeAndSoftDelete(id);
     this.metricsService.usersTotal.dec();
     this.logger.debug(`User deleted with ID: ${id}`);
