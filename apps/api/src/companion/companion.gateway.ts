@@ -23,6 +23,7 @@ import {
   CompanionAuthenticatePayload,
   CompanionIdleDto,
   CompanionForegroundAppDto,
+  CompanionUsbDeviceDto,
   CompanionSocket,
   CompanionEventType,
 } from './companion.types';
@@ -131,6 +132,36 @@ export class CompanionGateway implements OnGatewayConnection, OnGatewayDisconnec
     @ConnectedSocket() socket: CompanionSocket,
   ): void {
     this.gatewayService.handleForegroundAppEvent(socket.deviceId as number, body);
+  }
+
+  @SubscribeMessage('COMPANION_USB_CONNECTED')
+  @CompanionAuthenticated()
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
+  @AsyncApiPub({
+    channel: 'COMPANION_USB_CONNECTED',
+    message: { name: 'COMPANION_USB_CONNECTED', payload: CompanionUsbDeviceDto },
+    summary: 'Companion reports that a USB device was connected',
+  })
+  onUsbConnected(
+    @MessageBody() body: CompanionUsbDeviceDto,
+    @ConnectedSocket() socket: CompanionSocket,
+  ): void {
+    this.gatewayService.handleUsbConnectedEvent(socket.deviceId as number, body);
+  }
+
+  @SubscribeMessage('COMPANION_USB_DISCONNECTED')
+  @CompanionAuthenticated()
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
+  @AsyncApiPub({
+    channel: 'COMPANION_USB_DISCONNECTED',
+    message: { name: 'COMPANION_USB_DISCONNECTED', payload: CompanionUsbDeviceDto },
+    summary: 'Companion reports that a USB device was disconnected',
+  })
+  onUsbDisconnected(
+    @MessageBody() body: CompanionUsbDeviceDto,
+    @ConnectedSocket() socket: CompanionSocket,
+  ): void {
+    this.gatewayService.handleUsbDisconnectedEvent(socket.deviceId as number, body);
   }
 
   // ─── Server → Client ─────────────────────────────────────────────────────

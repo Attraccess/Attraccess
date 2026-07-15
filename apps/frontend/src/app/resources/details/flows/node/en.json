@@ -164,6 +164,44 @@
               "placeholder": "Select a device..."
             }
           }
+        },
+        "usb_device_connected": {
+          "title": "Companion: USB device connected",
+          "description": "Fires when a USB device is connected to a companion device. Payload includes vendorId, productId, manufacturer, product and serialNumber.",
+          "outputs": {
+            "output": "Output"
+          },
+          "config": {
+            "deviceId": {
+              "label": "Companion device",
+              "placeholder": "Select a device..."
+            },
+            "vendorId": {
+              "label": "Vendor ID filter (optional, decimal)"
+            },
+            "productId": {
+              "label": "Product ID filter (optional, decimal)"
+            }
+          }
+        },
+        "usb_device_disconnected": {
+          "title": "Companion: USB device disconnected",
+          "description": "Fires when a USB device is disconnected from a companion device. Payload includes vendorId and productId.",
+          "outputs": {
+            "output": "Output"
+          },
+          "config": {
+            "deviceId": {
+              "label": "Companion device",
+              "placeholder": "Select a device..."
+            },
+            "vendorId": {
+              "label": "Vendor ID filter (optional, decimal)"
+            },
+            "productId": {
+              "label": "Product ID filter (optional, decimal)"
+            }
+          }
         }
       },
       "variable": {

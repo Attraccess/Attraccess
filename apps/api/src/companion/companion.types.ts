@@ -106,6 +106,31 @@ export class CompanionForegroundAppDto {
   pid!: number;
 }
 
+export class CompanionUsbDeviceDto {
+  @ApiProperty({ description: 'USB vendor ID (decimal)' })
+  @IsInt()
+  vendorId!: number;
+
+  @ApiProperty({ description: 'USB product ID (decimal)' })
+  @IsInt()
+  productId!: number;
+
+  @ApiProperty({ description: 'Manufacturer string from device descriptor', required: false })
+  @IsOptional()
+  @IsString()
+  manufacturer?: string;
+
+  @ApiProperty({ description: 'Product string from device descriptor', required: false })
+  @IsOptional()
+  @IsString()
+  product?: string;
+
+  @ApiProperty({ description: 'Serial number string from device descriptor', required: false })
+  @IsOptional()
+  @IsString()
+  serialNumber?: string;
+}
+
 // ─── Socket type ─────────────────────────────────────────────────────────────
 
 export enum CompanionEventType {
@@ -122,6 +147,8 @@ export enum CompanionEventType {
   COMPANION_ACTIVE = 'COMPANION_ACTIVE',
   COMPANION_DEVICE_RENAMED = 'COMPANION_DEVICE_RENAMED',
   COMPANION_FOREGROUND_APP = 'COMPANION_FOREGROUND_APP',
+  COMPANION_USB_CONNECTED = 'COMPANION_USB_CONNECTED',
+  COMPANION_USB_DISCONNECTED = 'COMPANION_USB_DISCONNECTED',
 }
 
 export interface CompanionAuthenticatePayload {

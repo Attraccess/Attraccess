@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CompanionDevice, ResourceFlowNode } from '@attraccess/database-entities';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { CompanionEventType, CompanionForegroundAppDto, CompanionIdleDto, CompanionSocket } from './companion.types';
+import { CompanionEventType, CompanionForegroundAppDto, CompanionIdleDto, CompanionUsbDeviceDto, CompanionSocket } from './companion.types';
 
 @Injectable()
 export class CompanionGatewayService {
@@ -79,6 +79,14 @@ export class CompanionGatewayService {
 
   public handleForegroundAppEvent(deviceId: number, payload: CompanionForegroundAppDto): void {
     this.eventEmitter.emit('companion.foreground_app', { deviceId, payload });
+  }
+
+  public handleUsbConnectedEvent(deviceId: number, payload: CompanionUsbDeviceDto): void {
+    this.eventEmitter.emit('companion.usb_connected', { deviceId, payload });
+  }
+
+  public handleUsbDisconnectedEvent(deviceId: number, payload: CompanionUsbDeviceDto): void {
+    this.eventEmitter.emit('companion.usb_disconnected', { deviceId, payload });
   }
 
   private sendCommandToDevice(deviceId: number, type: CompanionEventType, payload: unknown = {}): boolean {

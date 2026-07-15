@@ -28,6 +28,7 @@ import {
   ResourceHealthStatus,
   CompanionIdleActiveNodeDataSchema,
   CompanionForegroundAppNodeDataSchema,
+  CompanionUsbDeviceNodeDataSchema,
 } from '@attraccess/database-entities';
 import { ResourceFlowVariablesService } from './resource-flow-variables.service';
 import { OnEvent } from '@nestjs/event-emitter';
@@ -72,6 +73,7 @@ import {
   topicMatches,
 } from './node-executors';
 import { CompanionGatewayService } from '../../companion/companion-gateway.service';
+import { CompanionUsbDeviceDto } from '../../companion/companion.types';
 
 // Handlebars helpers
 Handlebars.registerHelper('json', (value: unknown) => {
@@ -214,6 +216,8 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
       [ResourceFlowNodeType.INPUT_COMPANION_IDLE]: passthrough,
       [ResourceFlowNodeType.INPUT_COMPANION_ACTIVE]: passthrough,
       [ResourceFlowNodeType.INPUT_COMPANION_FOREGROUND_APP_CHANGED]: passthrough,
+      [ResourceFlowNodeType.INPUT_COMPANION_USB_DEVICE_CONNECTED]: passthrough,
+      [ResourceFlowNodeType.INPUT_COMPANION_USB_DEVICE_DISCONNECTED]: passthrough,
     };
   }
 
@@ -887,11 +891,40 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     await this.triggerCompanionEvent(event.deviceId, ResourceFlowNodeType.INPUT_COMPANION_FOREGROUND_APP_CHANGED, event.payload, CompanionForegroundAppNodeDataSchema);
   }
 
+  @OnEvent('companion.usb_connected')
+  async handleCompanionUsbConnected(event: { deviceId: number; payload: CompanionUsbDeviceDto }): Promise<void> {
+    await this.triggerUsbDeviceEvent(event.deviceId, ResourceFlowNodeType.INPUT_COMPANION_USB_DEVICE_CONNECTED, event.payload);
+  }
+
+  @OnEvent('companion.usb_disconnected')
+  async handleCompanionUsbDisconnected(event: { deviceId: number; payload: CompanionUsbDeviceDto }): Promise<void> {
+    await this.triggerUsbDeviceEvent(event.deviceId, ResourceFlowNodeType.INPUT_COMPANION_USB_DEVICE_DISCONNECTED, event.payload);
+  }
+
   private async triggerCompanionEvent(deviceId: number, type: ResourceFlowNodeType, payload: object, schema: { safeParse: (d: unknown) => { success: boolean; data?: { deviceId: number } } }): Promise<void> {
     const allNodes = await this.flowNodeRepository.find({ where: { type } });
     const matching = allNodes.filter((node) => {
       const parsed = schema.safeParse(node.data ?? {});
       return parsed.success && parsed.data?.deviceId === deviceId;
+    });
+    if (matching.length === 0) return;
+    await this.startFlow(matching, { payload });
+  }
+
+  private async triggerUsbDeviceEvent(deviceId: number, type: ResourceFlowNodeType, payload: CompanionUsbDeviceDto): Promise<void> {
+    const allNodes = await this.flowNodeRepository.find({ where: { type } });
+    const matching = allNodes.filter((node) => {
+      const parsed = CompanionUsbDeviceNodeDataSchema.safeParse(node.data ?? {});
+      if (!parsed.success || parsed.data.deviceId !== deviceId) return false;
+      const { vendorId, productId } = parsed.data;
+      const hasVendorFilter = vendorId !== undefined;
+      const hasProductFilter = productId !== undefined;
+      if (hasVendorFilter && hasProductFilter) {
+        return vendorId === payload.vendorId && productId === payload.productId;
+      }
+      if (hasVendorFilter) return vendorId === payload.vendorId;
+      if (hasProductFilter) return productId === payload.productId;
+      return true;
     });
     if (matching.length === 0) return;
     await this.startFlow(matching, { payload });

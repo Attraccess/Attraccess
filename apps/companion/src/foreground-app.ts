@@ -1,22 +1,29 @@
-import { createMetricsAdapter, SystemMetricsAdapter } from './metrics';
+import { ForegroundAppInfo } from './metrics';
 import { state } from './state';
+import { sharedMetricsAdapter, acquireMetrics, releaseMetrics } from './shared-metrics';
 
-const metricsAdapter: SystemMetricsAdapter = createMetricsAdapter();
-let metricsStarted = false;
+let listening = false;
+
+function onForegroundAppChanged(app: ForegroundAppInfo | null): void {
+  if (!state.wsClient || !app) return;
+  state.wsClient.sendForegroundApp({ appName: app.name, bundleId: app.bundleId, pid: app.pid });
+}
 
 export function startForegroundAppMonitoring(): void {
-  if (metricsStarted || !state.settings.foregroundApp) return;
-  metricsStarted = true;
-  metricsAdapter.on('foregroundAppChanged', (app) => {
-    if (!state.wsClient || !app) return;
-    state.wsClient.sendForegroundapp({ appName: app.name, bundleId: app.bundleId, pid: app.pid });
+  if (listening || !state.settings.foregroundApp) return;
+  listening = true;
+  sharedMetricsAdapter.on('foregroundAppChanged', onForegroundAppChanged);
+  acquireMetrics().catch((err) => {
+    console.warn('[companion] metrics adapter start failed:', err);
+    listening = false;
+    sharedMetricsAdapter.off('foregroundAppChanged', onForegroundAppChanged);
+    releaseMetrics();
   });
-  metricsAdapter.start().catch((err) => console.warn('[companion] metrics adapter start failed:', err));
 }
 
 export function stopForegroundAppMonitoring(): void {
-  if (!metricsStarted) return;
-  metricsStarted = false;
-  metricsAdapter.stop();
-  metricsAdapter.removeAllListeners('foregroundAppChanged');
+  if (!listening) return;
+  listening = false;
+  sharedMetricsAdapter.off('foregroundAppChanged', onForegroundAppChanged);
+  releaseMetrics();
 }

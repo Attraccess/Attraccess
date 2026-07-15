@@ -31,6 +31,7 @@ import {
   CompanionLockNodeDataSchema,
   CompanionIdleActiveNodeDataSchema,
   CompanionForegroundAppNodeDataSchema,
+  CompanionUsbDeviceNodeDataSchema,
 } from '@attraccess/database-entities';
 import { ResourceNotFoundException } from '../../exceptions/resource.notFound.exception';
 import { ResourceFlowSaveDto, ResourceFlowResponseDto } from './dto';
@@ -487,6 +488,14 @@ export class ResourceFlowsService {
 
         case ResourceFlowNodeType.INPUT_COMPANION_FOREGROUND_APP_CHANGED:
           schema.configSchema = z.toJSONSchema(CompanionForegroundAppNodeDataSchema, { io: 'input' });
+          schema.inputs = [];
+          schema.outputs = ['output'];
+          schema.supportedByResource = true;
+          break;
+
+        case ResourceFlowNodeType.INPUT_COMPANION_USB_DEVICE_CONNECTED:
+        case ResourceFlowNodeType.INPUT_COMPANION_USB_DEVICE_DISCONNECTED:
+          schema.configSchema = z.toJSONSchema(CompanionUsbDeviceNodeDataSchema, { io: 'input' });
           schema.inputs = [];
           schema.outputs = ['output'];
           schema.supportedByResource = true;

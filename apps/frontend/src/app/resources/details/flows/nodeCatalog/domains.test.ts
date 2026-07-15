@@ -34,6 +34,8 @@ const cases: Array<[ResourceFlowNodeType, Domain]> = [
   [ResourceFlowNodeType.INPUT_COMPANION_IDLE, 'companion'],
   [ResourceFlowNodeType.INPUT_COMPANION_ACTIVE, 'companion'],
   [ResourceFlowNodeType.INPUT_COMPANION_FOREGROUND_APP_CHANGED, 'companion'],
+  [ResourceFlowNodeType.INPUT_COMPANION_USB_DEVICE_CONNECTED, 'companion'],
+  [ResourceFlowNodeType.INPUT_COMPANION_USB_DEVICE_DISCONNECTED, 'companion'],
 ];
 
 describe('nodeTypeDomain', () => {

@@ -164,6 +164,44 @@
               "placeholder": "Gerät auswählen..."
             }
           }
+        },
+        "usb_device_connected": {
+          "title": "Companion: USB-Gerät verbunden",
+          "description": "Wird ausgelöst, wenn ein USB-Gerät mit einem Companion-Gerät verbunden wird. Payload enthält vendorId, productId, manufacturer, product und serialNumber.",
+          "outputs": {
+            "output": "Ausgabe"
+          },
+          "config": {
+            "deviceId": {
+              "label": "Companion-Gerät",
+              "placeholder": "Gerät auswählen..."
+            },
+            "vendorId": {
+              "label": "Hersteller-ID Filter (optional, dezimal)"
+            },
+            "productId": {
+              "label": "Produkt-ID Filter (optional, dezimal)"
+            }
+          }
+        },
+        "usb_device_disconnected": {
+          "title": "Companion: USB-Gerät getrennt",
+          "description": "Wird ausgelöst, wenn ein USB-Gerät von einem Companion-Gerät getrennt wird. Payload enthält vendorId und productId.",
+          "outputs": {
+            "output": "Ausgabe"
+          },
+          "config": {
+            "deviceId": {
+              "label": "Companion-Gerät",
+              "placeholder": "Gerät auswählen..."
+            },
+            "vendorId": {
+              "label": "Hersteller-ID Filter (optional, dezimal)"
+            },
+            "productId": {
+              "label": "Produkt-ID Filter (optional, dezimal)"
+            }
+          }
         }
       },
       "variable": {

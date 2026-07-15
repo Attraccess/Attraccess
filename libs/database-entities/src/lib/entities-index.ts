@@ -50,6 +50,7 @@ import {
   CompanionLockNodeDataSchema,
   CompanionIdleActiveNodeDataSchema,
   CompanionForegroundAppNodeDataSchema,
+  CompanionUsbDeviceNodeDataSchema,
 } from './entities/resourceFlowNode';
 import {
   ResourceHealthState,
@@ -197,6 +198,7 @@ export {
   CompanionLockNodeDataSchema,
   CompanionIdleActiveNodeDataSchema,
   CompanionForegroundAppNodeDataSchema,
+  CompanionUsbDeviceNodeDataSchema,
   PasswordPolicy,
   PASSWORD_POLICY_SINGLETON_ID,
   PasswordHistory,
