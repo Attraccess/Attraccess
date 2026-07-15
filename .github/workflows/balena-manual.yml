@@ -28,7 +28,12 @@ env:
   DOCKER_BUILDKIT: 1
 
 jobs:
+  build-companion:
+    uses: ./.github/workflows/build-companion-binaries.yml
+    secrets: inherit
+
   balena:
+    needs: build-companion
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -39,6 +44,8 @@ jobs:
       # Balena's remote builder has no ESP-IDF; pre-build the firmware so
       # `balena push` uploads firmware_output/ with the build context.
       - uses: ./.github/actions/build-attractap-firmware
+
+      - uses: ./.github/actions/download-companion
 
       - uses: ./.github/actions/balena-push
         with:

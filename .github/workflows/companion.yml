@@ -6,111 +6,19 @@ on:
     paths:
       - 'apps/companion/**'
       - '.github/workflows/companion.yml'
+      - '.github/workflows/build-companion-binaries.yml'
 
 permissions:
   contents: read
   pull-requests: write
 
 jobs:
-  build-linux:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-
-      - uses: ./.github/actions/setup
-        with:
-          esp-idf: 'false'
-
-      - name: Install Linux packaging dependencies
-        run: sudo apt-get install -y fakeroot rpm
-
-      - name: Build Linux companion (x64 + arm64)
-        # The companion project.json must configure electron-builder to output:
-        #   apps/companion/dist/companion_linux_x86_64.AppImage  (electron-builder remaps x64→x86_64 for AppImage)
-        #   apps/companion/dist/companion_linux_arm64.AppImage
-        run: pnpm nx run companion:build
-
-      - name: Upload Linux artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: companion-linux-${{ github.run_id }}
-          path: |
-            apps/companion/dist/companion_linux_x86_64.AppImage
-            apps/companion/dist/companion_linux_arm64.AppImage
-          if-no-files-found: warn
-
-  build-macos:
-    runs-on: macos-latest
-    env:
-      # secrets are not allowed in step-level `if`, so expose presence as job env
-      HAS_APPLE_CERT: ${{ secrets.APPLE_CERTIFICATE != '' }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-
-      - uses: ./.github/actions/setup
-        with:
-          esp-idf: 'false'
-
-      - name: Set up macOS code signing
-        if: ${{ env.HAS_APPLE_CERT == 'true' }}
-        uses: ./.github/actions/macos-codesign-setup
-        with:
-          certificate: ${{ secrets.APPLE_CERTIFICATE }}
-          certificate-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-
-      - name: Build macOS companion (universal)
-        env:
-          CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.APPLE_CERTIFICATE != '' && 'true' || 'false' }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: pnpm nx run companion:build
-
-      - name: Clean up keychain
-        if: ${{ env.HAS_APPLE_CERT == 'true' && always() }}
-        run: '[ -n "$KEYCHAIN_PATH" ] && security delete-keychain "$KEYCHAIN_PATH" || true'
-
-      - name: Upload macOS artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: companion-macos-${{ github.run_id }}
-          path: apps/companion/dist/companion_mac_universal.dmg
-          if-no-files-found: warn
-
-  build-windows:
-    runs-on: windows-latest
-    env:
-      HAS_WINDOWS_CERT: ${{ secrets.WINDOWS_CERT_BASE64 != '' }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-
-      - uses: ./.github/actions/setup
-        with:
-          esp-idf: 'false'
-
-      - name: Set up Windows code signing
-        if: ${{ env.HAS_WINDOWS_CERT == 'true' }}
-        uses: ./.github/actions/windows-codesign-setup
-        with:
-          cert-base64: ${{ secrets.WINDOWS_CERT_BASE64 }}
-          cert-password: ${{ secrets.WINDOWS_CERT_PASSWORD }}
-
-      - name: Build Windows companion (x64)
-        shell: bash
-        run: pnpm nx run companion:build
-
-      - name: Upload Windows artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: companion-windows-${{ github.run_id }}
-          path: apps/companion/dist/companion_win_x64.exe
-          if-no-files-found: warn
+  build-companion:
+    uses: ./.github/workflows/build-companion-binaries.yml
+    secrets: inherit
 
   pr-comment:
-    needs: [build-linux, build-macos, build-windows]
+    needs: [build-companion]
     runs-on: ubuntu-latest
     steps:
       - name: Build PR comment body
