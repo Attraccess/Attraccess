@@ -228,6 +228,7 @@ export function RoleFormDrawer({ isOpen, onOpenChange, role }: Props) {
               selectionMode="multiple"
               value={[...selectedKeys]}
               onChange={(keys) => applySelection(keys as Key[])}
+              disabledKeys={nonGrantableKeys}
               aria-label={t('permissions.title')}
               data-cy="role-form-drawer-permission-picker"
             >
@@ -278,7 +279,6 @@ export function RoleFormDrawer({ isOpen, onOpenChange, role }: Props) {
                   ) : null}
                   <ListBox
                     aria-label={t('permissions.title')}
-                    disabledKeys={nonGrantableKeys}
                     renderEmptyState={() => <EmptyState>{t('permissions.noResults')}</EmptyState>}
                   >
                     {permissionsByCategory.map(({ category, permissions: categoryPermissions }) => (
