@@ -1,8 +1,10 @@
 {
   "title": "Delete role",
   "message": "Are you sure you want to delete the role \"{{roleName}}\"?",
-  "impact": "{{count}} user is currently assigned to this role.",
-  "impact_other": "{{count}} users are currently assigned to this role.",
+  "impact": {
+    "one": "{{count}} user is currently assigned to this role.",
+    "many": "{{count}} users are currently assigned to this role."
+  },
   "noImpact": "No users are currently assigned to this role.",
   "options": {
     "remove": {

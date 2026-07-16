@@ -180,9 +180,9 @@ export function RoleFormDrawer({ isOpen, onOpenChange, role }: Props) {
                     isDisabled={isReadOnly || !canGrant}
                     data-cy={`role-form-drawer-permission-${permission.key}`}
                   >
-                    <span className="flex flex-col">
-                      <span className="text-sm">{permission.label}</span>
-                      <span className="text-xs text-default-400">{permission.description}</span>
+                    <span className="flex flex-col gap-1">
+                      <span className="text-sm font-medium">{permission.label}</span>
+                      <span className="text-xs text-default-500">{permission.description}</span>
                     </span>
                   </LabeledSwitch>
                 );

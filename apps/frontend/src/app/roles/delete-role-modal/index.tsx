@@ -117,9 +117,9 @@ export function DeleteRoleModal({ isOpen, onClose, role, allRoles }: Props) {
                         <Radio.Control>
                           <Radio.Indicator />
                         </Radio.Control>
-                        <Radio.Content>
+                        <Radio.Content className="flex flex-col">
                           <span className="text-small">{t(`options.${option}.label`)}</span>
-                          <span className="block text-xs text-default-400">{t(`options.${option}.description`)}</span>
+                          <span className="text-xs text-default-400">{t(`options.${option}.description`)}</span>
                         </Radio.Content>
                       </Radio>
                     ))}

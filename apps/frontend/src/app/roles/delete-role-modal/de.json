@@ -1,8 +1,10 @@
 {
   "title": "Rolle löschen",
   "message": "Möchtest du die Rolle \"{{roleName}}\" wirklich löschen?",
-  "impact": "{{count}} Benutzer ist dieser Rolle aktuell zugewiesen.",
-  "impact_other": "{{count}} Benutzer sind dieser Rolle aktuell zugewiesen.",
+  "impact": {
+    "one": "{{count}} Benutzer ist dieser Rolle aktuell zugewiesen.",
+    "many": "{{count}} Benutzer sind dieser Rolle aktuell zugewiesen."
+  },
   "noImpact": "Dieser Rolle sind aktuell keine Benutzer zugewiesen.",
   "options": {
     "remove": {
