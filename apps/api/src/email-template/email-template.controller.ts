@@ -3,38 +3,15 @@ import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiBody, ApiParam } 
 import { Auth } from '@attraccess/plugins-backend-sdk';
 import { EmailTemplate, EmailTemplateType } from '@attraccess/database-entities';
 import { EmailTemplateService, TemplateTranslations } from './email-template.service';
-import { MjmlService } from './mjml.service';
 import { UpdateEmailTemplateDto } from './dto/update-email-template.dto';
-import { PreviewMjmlDto, PreviewMjmlResponseDto } from './dto/preview-mjml.dto';
 import { UpsertTranslationsDto } from './dto/upsert-translations.dto';
 import { GetTranslationsResponseDto } from './dto/get-translations-response.dto';
-import { EmailLayoutService } from '../email-layout/email-layout.service';
 
 @ApiTags('Email Templates')
 @ApiBearerAuth()
 @Controller('email-templates')
 export class EmailTemplateController {
-  constructor(
-    private readonly emailTemplateService: EmailTemplateService,
-    private readonly mjmlService: MjmlService,
-    private readonly emailLayoutService: EmailLayoutService,
-  ) {}
-
-  @Post('preview-mjml')
-  @Auth('system.settings.manage')
-  @ApiOperation({ summary: 'Preview MJML template content as HTML, wrapped in the global email layout' })
-  @ApiBody({ type: PreviewMjmlDto })
-  @ApiResponse({ status: 200, description: 'MJML preview result', type: PreviewMjmlResponseDto })
-  @ApiResponse({ status: 400, description: 'Invalid MJML content' })
-  async previewMjml(@Body() previewMjmlDto: PreviewMjmlDto): Promise<PreviewMjmlResponseDto> {
-    const isFullMjmlDocument = /^\s*<mjml[\s>]/i.test(previewMjmlDto.mjmlContent);
-    if (isFullMjmlDocument) {
-      return this.mjmlService.convertToHtml(previewMjmlDto.mjmlContent);
-    }
-    const layout = await this.emailLayoutService.findGlobal();
-    const fullMjml = this.emailLayoutService.injectContentIntoLayout(layout.body, previewMjmlDto.mjmlContent);
-    return this.mjmlService.convertToHtml(fullMjml);
-  }
+  constructor(private readonly emailTemplateService: EmailTemplateService) {}
 
   @Get()
   @Auth('system.settings.manage')

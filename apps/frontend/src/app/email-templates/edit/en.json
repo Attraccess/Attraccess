@@ -1,5 +1,4 @@
 {
-  "subtitle": "Modify the subject and body (MJML) content of the template.",
   "templateType": {
     "verify-email": "Email Verification",
     "reset-password": "Password Reset",
@@ -19,27 +18,15 @@
     "access-change": "Access Change"
   },
   "form": {
-    "subject": "Subject",
-    "mjmlDocumentation": "MJML Documentation"
+    "subject": "Subject"
   },
   "sections": {
-    "template": "Template",
-    "preview": "Preview",
     "translations": "Translations"
   },
-  "preview": {
-    "iframeTitle": "Body Preview",
-    "loading": "Loading...",
-    "errorPrefix": "Error loading preview.",
-    "emptyPlaceholder": "Start editing the MJML body to see a preview."
-  },
   "variables": {
-    "title": "Available variables",
-    "hint": "Click a chip to copy the variable to your clipboard.",
-    "empty": "No variables for this template.",
+    "title": "Variables",
     "copied": "Copied {{name}}",
-    "copyFailed": "Could not copy {{name}}",
-    "completionDetail": "Template variable"
+    "copyFailed": "Could not copy {{name}}"
   },
   "translations": {
     "noKeys": "No \\{{t}} helper calls found in this template. Use \\{{t \"key\" \"Default text\"}} in the template body or subject to add translatable strings.",
@@ -60,10 +47,11 @@
     "emptyTranslation": "Falls back to default"
   },
   "actions": {
+    "back": "Back to templates",
     "close": "Close",
     "cancel": "Cancel",
-    "save": "Save Changes",
-    "expand": "Expand editor",
+    "save": "Save",
+    "translations": "Translations",
     "resetToDefault": "Reset to Default"
   },
   "resetConfirm": {
@@ -73,6 +61,8 @@
     "cancel": "Cancel"
   },
   "toast": {
+    "saveSuccess": "Template saved.",
+    "saveError": "Failed to save template.",
     "resetSuccess": "Template reset to default.",
     "resetError": "Failed to reset template."
   }

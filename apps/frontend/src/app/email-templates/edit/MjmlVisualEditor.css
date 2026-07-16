@@ -1,0 +1,23 @@
+/* GrapesJS sizes its views panel at 15% of the editor, which gets unusably
+   narrow below desktop widths; pin it to a fixed width, and drop it entirely
+   on phones where the canvas needs every pixel (inline text editing still
+   works there). */
+.mjml-visual-editor .gjs-pn-views-container,
+.mjml-visual-editor .gjs-pn-views {
+  width: 200px;
+}
+
+.mjml-visual-editor .gjs-cv-canvas {
+  width: calc(100% - 200px);
+}
+
+@media (max-width: 767px) {
+  .mjml-visual-editor .gjs-pn-views-container,
+  .mjml-visual-editor .gjs-pn-views {
+    display: none;
+  }
+
+  .mjml-visual-editor .gjs-cv-canvas {
+    width: 100%;
+  }
+}

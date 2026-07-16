@@ -110,10 +110,6 @@ export function TranslationsSection({ templateType, liveContent }: TranslationsS
 
   return (
     <section className="w-full flex flex-col gap-4" data-cy="translations-section">
-      <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
-        {t('sections.translations')}
-      </h3>
-
       <div className="flex flex-row flex-wrap items-center gap-2">
         {allLocales.length > 0 && (
           <div className="flex items-center gap-2">

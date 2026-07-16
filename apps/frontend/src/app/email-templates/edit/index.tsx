@@ -1,75 +1,110 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   useEmailTemplatesServiceEmailTemplateControllerFindOne as useFindOneEmailTemplate,
   useEmailTemplatesServiceEmailTemplateControllerUpdate as useUpdateEmailTemplate,
-  useEmailTemplatesServiceEmailTemplateControllerPreviewMjml,
   useEmailTemplatesServiceEmailTemplateControllerResetToDefault as useResetTemplateToDefault,
   EmailTemplateType,
 } from '@attraccess/react-query-client';
 import {
-  Chip,
   DrawerBody,
   DrawerFooter,
   DrawerHeader,
-  Form,
+  Dropdown,
+  DropdownItem,
+  DropdownMenu,
+  DropdownPopover,
+  DropdownTrigger,
   Input,
-  Label,
-  Link,
   ModalBody,
   ModalFooter,
   ModalHeader,
   ModalHeading,
+  Spinner,
   TextField,
-  useTheme,
 } from '@heroui/react';
+import { ArrowLeft, Braces, Languages, RotateCcw } from 'lucide-react';
+import { buttonVariants } from '@heroui/styles';
 import { Button } from '../../../components/button';
-import { useDebounce, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../components/toastProvider';
-import { PageHeader } from '../../../components/pageHeader';
 import { StandardDrawer } from '../../../components/standardDrawer';
 import { StandardModal } from '../../../components/standardModal';
-import Editor, { type OnMount } from '@monaco-editor/react';
-import { Maximize, RotateCcw } from 'lucide-react';
+import { MjmlVisualEditor } from './MjmlVisualEditor';
+import { TranslationsSection } from './TranslationsSection';
 
 import * as enTranslationsFile from './en.json';
 import * as deTranslationsFile from './de.json';
-import { registerVariableProvider } from './registerVariableProvider';
-import { TranslationsSection } from './TranslationsSection';
 
 export function EditEmailTemplatePage() {
   const navigate = useNavigate();
-  const { t } = useTranslations({ en: enTranslationsFile, de: deTranslationsFile });
-
+  const { t, language } = useTranslations({ en: enTranslationsFile, de: deTranslationsFile });
   const { type: templateType } = useParams<{ type: EmailTemplateType }>();
-
-  const { theme } = useTheme();
+  const toast = useToastMessage();
 
   const template = useFindOneEmailTemplate({ type: templateType as EmailTemplateType }, undefined, {
     enabled: !!templateType,
   });
 
-  const toast = useToastMessage();
-  const variables = useMemo(() => template.data?.variables ?? [], [template.data]);
+  // The GrapesJS canvas is uncontrolled: it reads its initial value once on
+  // mount and reports edits into a ref, so typing never re-renders this page
+  // and background refetches never clobber unsaved work. `editorSeed` only
+  // changes when we deliberately want a fresh canvas (first load, reset).
+  const [subject, setSubject] = useState('');
+  const bodyRef = useRef('');
+  const initialBodyRef = useRef<string | null>(null);
+  const [editorSeed, setEditorSeed] = useState(0);
 
-  const variablesRef = useRef<string[]>([]);
   useEffect(() => {
-    variablesRef.current = variables;
-  }, [variables]);
-
-  const detailLabelRef = useRef<string>('');
-  useEffect(() => {
-    detailLabelRef.current = t('variables.completionDetail');
-  }, [t]);
-
-  const handleEditorMount = useCallback<OnMount>((editor, monaco) => {
-    registerVariableProvider(monaco, () => variablesRef.current, () => detailLabelRef.current);
-    const model = editor.getModel();
-    if (model && model.getLanguageId() !== 'mjml') {
-      monaco.editor.setModelLanguage(model, 'mjml');
+    if (template.data && initialBodyRef.current === null) {
+      initialBodyRef.current = template.data.body;
+      bodyRef.current = template.data.body;
+      setSubject(template.data.subject);
+      setEditorSeed((seed) => seed + 1);
     }
+  }, [template.data]);
+
+  const handleBodyChange = useCallback((mjml: string) => {
+    bodyRef.current = mjml;
   }, []);
 
+  const updateTemplate = useUpdateEmailTemplate();
+  const onSave = useCallback(() => {
+    if (!templateType) return;
+    updateTemplate.mutate(
+      { type: templateType, requestBody: { subject, body: bodyRef.current } },
+      {
+        onSuccess: () => toast.success({ title: t('toast.saveSuccess') }),
+        onError: (error) => {
+          const body = (error as { body?: { message?: string | string[] } })?.body;
+          const message = Array.isArray(body?.message) ? body?.message[0] : body?.message;
+          toast.error({ title: t('toast.saveError'), description: message });
+        },
+      },
+    );
+  }, [updateTemplate, subject, templateType, toast, t]);
+
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+  const resetTemplate = useResetTemplateToDefault();
+  const onResetConfirm = useCallback(() => {
+    if (!templateType) return;
+    resetTemplate.mutate(
+      { type: templateType },
+      {
+        onSuccess: (data) => {
+          initialBodyRef.current = data.body;
+          bodyRef.current = data.body;
+          setSubject(data.subject);
+          setEditorSeed((seed) => seed + 1);
+          setResetConfirmOpen(false);
+          toast.success({ title: t('toast.resetSuccess') });
+        },
+        onError: () => toast.error({ title: t('toast.resetError') }),
+      },
+    );
+  }, [resetTemplate, templateType, toast, t]);
+
+  const variables = template.data?.variables ?? [];
   const copyVariable = useCallback(
     (name: string) => {
       const token = `{{${name}}}`;
@@ -81,245 +116,124 @@ export function EditEmailTemplatePage() {
     [t, toast],
   );
 
-  const [subject, setSubject] = useState<string>('');
-  const [body, setBody] = useState<string>('');
-
-  useEffect(() => {
-    if (template.data) {
-      setSubject(template.data.subject);
-      setBody(template.data.body);
-    }
-  }, [template.data]);
-
-  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
-  const resetTemplate = useResetTemplateToDefault();
-
-  const onResetConfirm = useCallback(() => {
-    if (!templateType) return;
-    resetTemplate.mutate(
-      { type: templateType },
-      {
-        onSuccess: (data) => {
-          setSubject(data.subject);
-          setBody(data.body);
-          setResetConfirmOpen(false);
-          toast.success({ title: t('toast.resetSuccess') });
-        },
-        onError: () => {
-          toast.error({ title: t('toast.resetError') });
-        },
-      },
-    );
-  }, [resetTemplate, templateType, toast, t]);
-
-  const updateTemplate = useUpdateEmailTemplate();
-  const {
-    mutate: parseMjml,
-    data: parsedBody,
-    isPending: parseMjmlIsPending,
-    isError: parseMjmlisError,
-    error: parseMjmlError,
-  } = useEmailTemplatesServiceEmailTemplateControllerPreviewMjml();
-
-  const debouncedBody = useDebounce(body, 500);
-  const bodyIsEmpty = !debouncedBody.trim();
-
-  useEffect(() => {
-    if (bodyIsEmpty) {
-      return;
-    }
-
-    parseMjml({
-      requestBody: {
-        mjmlContent: debouncedBody,
-      },
-    });
-  }, [bodyIsEmpty, debouncedBody, parseMjml]);
-
-  const previewHtml = useMemo(() => {
-    if (bodyIsEmpty) {
-      return `<p style="text-align:center; color: #64748b; padding-top: 20px;">${t('preview.emptyPlaceholder')}</p>`;
-    }
-
-    if (parseMjmlIsPending) {
-      return `<p style="text-align:center; color: #00f; padding-top: 20px;">${t('preview.loading')}</p>`;
-    }
-
-    if (parsedBody?.error) {
-      return `<p style="text-align:center; color: #f00; padding-top: 20px;">${parsedBody.error}</p>`;
-    }
-
-    if (parseMjmlisError) {
-      const errorMessage = parseMjmlError instanceof Error ? parseMjmlError.message : String(parseMjmlError);
-      return `<p style="text-align:center; color: #f00; padding-top: 20px;">${t('preview.errorPrefix')} ${errorMessage}</p>`;
-    }
-
-    return parsedBody?.html;
-  }, [bodyIsEmpty, parsedBody, t, parseMjmlIsPending, parseMjmlisError, parseMjmlError]);
-
-  const [editorIsExpanded, setEditorIsExpanded] = useState(false);
-
-  const debouncedTranslationsContent = useDebounce(subject + '\n' + body, 700);
-
-  const editor = useMemo(() => {
-    const variableList = (
-      <div className="flex flex-col gap-2">
-        <span className="text-sm font-medium">{t('variables.title')}</span>
-        {variables.length === 0 ? (
-          <span className="text-sm text-default-500">{t('variables.empty')}</span>
-        ) : (
-          <>
-            <span className="text-xs text-default-500">{t('variables.hint')}</span>
-            <div className="flex flex-row flex-wrap gap-2">
-              {variables.map((name) => (
-                <Chip
-                  key={name}
-                  variant="soft"
-                  color="accent"
-                  className="cursor-pointer"
-                  onClick={() => copyVariable(name)}
-                >
-                  {name}
-                </Chip>
-              ))}
-            </div>
-          </>
-        )}
-      </div>
-    );
-
-    return (
-      <>
-        {variableList}
-        <TextField value={subject} onChange={setSubject}>
-          <Label>{t('form.subject')}</Label>
-          <Input />
-        </TextField>
-        <div className="h-[300px] md:h-[60vh]">
-          <Editor
-            theme={theme === 'dark' ? 'vs-dark' : 'vs-light'}
-            defaultLanguage="mjml"
-            value={body}
-            onChange={(value) => setBody(value ?? '')}
-            onMount={handleEditorMount}
-          />
-        </div>
-        <Link href="https://documentation.mjml.io/">{t('form.mjmlDocumentation')}</Link>
-      </>
-    );
-  }, [body, theme, subject, t, variables, copyVariable, handleEditorMount]);
-
-  const onSubmit = useCallback(
-    (e: React.FormEvent<HTMLFormElement>) => {
-      e.preventDefault();
-
-      if (!templateType) {
-        return;
-      }
-
-      updateTemplate.mutate({
-        requestBody: {
-          subject,
-          body,
-        },
-        type: templateType,
-      });
-    },
-    [updateTemplate, subject, body, templateType],
-  );
+  // Snapshot taken when the drawer opens; extracting {{t}} keys on every
+  // canvas edit would force the page re-renders the ref setup exists to avoid.
+  const [translationsOpen, setTranslationsOpen] = useState(false);
+  const [translationsContent, setTranslationsContent] = useState('');
+  const openTranslations = useCallback(() => {
+    setTranslationsContent(subject + '\n' + bodyRef.current);
+    setTranslationsOpen(true);
+  }, [subject]);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8" data-cy="edit-email-template-page">
-      <PageHeader title={t('templateType.' + templateType)} subtitle={t('subtitle')} backTo="/emails/templates" />
-      <Form onSubmit={onSubmit} className="gap-8" data-cy="edit-email-template-form">
-        <div className="flex flex-col flex-wrap gap-8 w-full lg:flex-row lg:gap-6">
-          <section
-            className="flex-1 min-w-0 w-full flex flex-col gap-4"
-            data-cy="edit-email-template-section-template"
-          >
-            <div className="flex flex-row items-center justify-between">
-              <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
-                {t('sections.template')}
-              </h3>
-              <Button
-                isIconOnly
-                variant="ghost"
-                size="sm"
-                onPress={() => setEditorIsExpanded(true)}
-                aria-label={t('actions.expand')}
-                data-cy="edit-email-template-expand-button"
+    <div className="h-full flex flex-col gap-3" data-cy="edit-email-template-page">
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          isIconOnly
+          variant="ghost"
+          size="sm"
+          onPress={() => navigate('/emails/templates')}
+          aria-label={t('actions.back')}
+          data-cy="edit-email-template-back-button"
+        >
+          <ArrowLeft size={18} />
+        </Button>
+        <h1 className="text-base font-semibold whitespace-nowrap">{t('templateType.' + templateType)}</h1>
+
+        <TextField
+          value={subject}
+          onChange={setSubject}
+          aria-label={t('form.subject')}
+          className="flex-1 min-w-48 order-last md:order-none w-full md:w-auto"
+        >
+          <Input placeholder={t('form.subject')} data-cy="edit-email-template-subject-input" />
+        </TextField>
+
+        <div className="flex items-center gap-2 ml-auto">
+          {variables.length > 0 && (
+            <Dropdown>
+              <DropdownTrigger
+                className={`${buttonVariants({ variant: 'ghost', size: 'sm' })} inline-flex items-center gap-2`}
+                aria-label={t('variables.title')}
+                data-cy="edit-email-template-variables-button"
               >
-                <Maximize size={16} />
-              </Button>
-            </div>
-            {editor}
-
-            <StandardDrawer
-              isOpen={editorIsExpanded}
-              onOpenChange={setEditorIsExpanded}
-              dialogProps={{ className: 'md:max-w-5xl' }}
-            >
-              <DrawerHeader>
-                <h2 className="text-lg font-semibold">{t('templateType.' + templateType)}</h2>
-              </DrawerHeader>
-              <DrawerBody>
-                <div className="flex flex-col gap-4 h-full min-h-[60vh]">{editor}</div>
-              </DrawerBody>
-              <DrawerFooter>
-                <Button onPress={() => setEditorIsExpanded(false)}>{t('actions.close')}</Button>
-              </DrawerFooter>
-            </StandardDrawer>
-          </section>
-
-          <section
-            className="flex-1 min-w-0 w-full flex flex-col gap-4"
-            data-cy="edit-email-template-section-preview"
-          >
-            <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
-              {t('sections.preview')}
-            </h3>
-            <iframe
-              srcDoc={previewHtml}
-              title={t('preview.iframeTitle')}
-              className="w-full h-full min-h-[435px] border-0 rounded-md bg-default-50"
-              sandbox="allow-same-origin"
-            />
-          </section>
-        </div>
-
-        <div className="flex flex-row gap-4 w-full justify-end mt-4">
+                <Braces size={16} />
+                <span className="hidden sm:inline">{t('variables.title')}</span>
+              </DropdownTrigger>
+              <DropdownPopover>
+                <DropdownMenu aria-label={t('variables.title')}>
+                  {variables.map((name) => (
+                    <DropdownItem key={name} id={name} onPress={() => copyVariable(name)}>
+                      {`{{${name}}}`}
+                    </DropdownItem>
+                  ))}
+                </DropdownMenu>
+              </DropdownPopover>
+            </Dropdown>
+          )}
           <Button
             variant="ghost"
-            onPress={() => navigate('/emails/templates')}
-            data-cy="edit-email-template-cancel-button"
+            size="sm"
+            onPress={openTranslations}
+            data-cy="edit-email-template-translations-button"
           >
-            {t('actions.cancel')}
+            <Languages size={16} />
+            <span className="hidden sm:inline">{t('actions.translations')}</span>
           </Button>
           <Button
+            isIconOnly
             variant="ghost"
+            size="sm"
             onPress={() => setResetConfirmOpen(true)}
+            aria-label={t('actions.resetToDefault')}
             data-cy="edit-email-template-reset-button"
           >
             <RotateCcw size={16} />
-            {t('actions.resetToDefault')}
           </Button>
           <Button
             variant="primary"
-            type="submit"
+            size="sm"
+            onPress={onSave}
             isPending={updateTemplate.isPending}
             data-cy="edit-email-template-save-button"
           >
             {t('actions.save')}
           </Button>
         </div>
+      </div>
 
-        {templateType && (
-          <TranslationsSection
-            templateType={templateType as EmailTemplateType}
-            liveContent={debouncedTranslationsContent}
+      <div className="flex-1 min-h-0 rounded-md overflow-hidden border border-default-200">
+        {initialBodyRef.current === null || editorSeed === 0 ? (
+          <div className="h-full flex items-center justify-center">
+            <Spinner size="sm" />
+          </div>
+        ) : (
+          <MjmlVisualEditor
+            key={editorSeed}
+            initialValue={initialBodyRef.current}
+            onChange={handleBodyChange}
+            language={language}
           />
         )}
-      </Form>
+      </div>
+
+      <StandardDrawer
+        isOpen={translationsOpen}
+        onOpenChange={setTranslationsOpen}
+        dialogProps={{ className: 'md:max-w-4xl' }}
+      >
+        <DrawerHeader>
+          <h2 className="text-lg font-semibold">{t('sections.translations')}</h2>
+        </DrawerHeader>
+        <DrawerBody>
+          {templateType && (
+            <TranslationsSection templateType={templateType as EmailTemplateType} liveContent={translationsContent} />
+          )}
+        </DrawerBody>
+        <DrawerFooter>
+          <Button onPress={() => setTranslationsOpen(false)}>{t('actions.close')}</Button>
+        </DrawerFooter>
+      </StandardDrawer>
 
       <StandardModal isOpen={resetConfirmOpen} onOpenChange={setResetConfirmOpen} size="sm">
         {({ close }) => (
@@ -344,3 +258,5 @@ export function EditEmailTemplatePage() {
     </div>
   );
 }
+
+export default EditEmailTemplatePage;

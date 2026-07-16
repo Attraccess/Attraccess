@@ -23,7 +23,6 @@ import { NfcCardList } from '../attractap/NfcCardList';
 import { CsvExport } from '../csv-export';
 import { DocumentationEditor, DocumentationView } from '../resources/documentation';
 import { EmailTemplatesPage } from '../email-templates/EmailTemplatesPage';
-import { EditEmailTemplatePage } from '../email-templates/edit';
 import { EmailsPage } from '../emails/EmailsPage';
 import { ResourceGroupEditPage } from '../resource-groups';
 import { ResourceOverview } from '../resourceOverview';
@@ -50,6 +49,8 @@ import { UnauthorizedLayout } from '../unauthorized/unauthorized-layout/layout';
 const PasswordPolicySettingsPage = lazy(() => import('../settings/password-policy'));
 const CompanionSettingsPage = lazy(() => import('../settings/companion'));
 const EmailLayoutPage = lazy(() => import('../email-layout/EmailLayoutPage'));
+// GrapesJS is heavy — keep the visual template editor out of the main bundle
+const EditEmailTemplatePage = lazy(() => import('../email-templates/edit'));
 const UserSecurityPage = lazy(() => import('../user-management/security'));
 const MessagingSettingsPage = lazy(() => import('../messaging/settings'));
 const MonitoringPage = lazy(() => import('../monitoring'));
@@ -348,7 +349,11 @@ const coreRoutes: RouteConfig[] = [
   },
   {
     path: '/emails/templates/:type',
-    element: <EditEmailTemplatePage />,
+    element: (
+      <Suspense fallback={<div className="flex items-center justify-center p-8"><Spinner size="sm" /></div>}>
+        <EditEmailTemplatePage />
+      </Suspense>
+    ),
     authRequired: 'system.settings.manage',
   },
   {
