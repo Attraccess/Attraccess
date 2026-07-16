@@ -3,7 +3,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { QueryFailedError, Repository } from 'typeorm';
-import { Permission, Role, User, UserRole, UserRoleSource } from '@attraccess/database-entities';
+import { BadRequestException } from '@nestjs/common';
+import { Permission, Role, RolePermission, User, UserRole, UserRoleSource } from '@attraccess/database-entities';
 import { RbacService } from './rbac.service';
 import { UserNotFoundException } from '../../exceptions/user.notFound.exception';
 
@@ -12,9 +13,12 @@ import { UserNotFoundException } from '../../exceptions/user.notFound.exception'
 const createMockQueryBuilder = (overrides: Record<string, unknown> = {}) => ({
   innerJoin: jest.fn().mockReturnThis(),
   select: jest.fn().mockReturnThis(),
+  addSelect: jest.fn().mockReturnThis(),
   distinct: jest.fn().mockReturnThis(),
   where: jest.fn().mockReturnThis(),
   andWhere: jest.fn().mockReturnThis(),
+  groupBy: jest.fn().mockReturnThis(),
+  having: jest.fn().mockReturnThis(),
   getCount: jest.fn().mockResolvedValue(0),
   getRawMany: jest.fn().mockResolvedValue([]),
   ...overrides,
@@ -58,6 +62,14 @@ describe('RbacService', () => {
   let roleRepo: jest.Mocked<Repository<Role>>;
   let permissionRepo: jest.Mocked<Repository<Permission>>;
   let userRepo: jest.Mocked<Repository<User>>;
+  let rolePermissionRepo: jest.Mocked<Repository<RolePermission>>;
+  let roleManager: {
+    save: jest.Mock;
+    delete: jest.Mock;
+    find: jest.Mock;
+    findOne: jest.Mock;
+    create: jest.Mock;
+  };
 
   beforeEach(async () => {
     const mockQb = createMockQueryBuilder();
@@ -80,18 +92,38 @@ describe('RbacService', () => {
       manager: { transaction: mockTransaction },
     } as unknown as jest.Mocked<Repository<UserRole>>;
 
+    roleManager = {
+      save: jest.fn(),
+      delete: jest.fn(),
+      find: jest.fn().mockResolvedValue([]),
+      findOne: jest.fn().mockResolvedValue(null),
+      create: jest.fn((_entity, data) => ({ ...data })),
+    };
+
     roleRepo = {
       find: jest.fn(),
       findOne: jest.fn(),
+      save: jest.fn((data) => Promise.resolve({ id: 42, ...data } as Role)),
+      create: jest.fn((data) => ({ ...data } as Role)),
+      existsBy: jest.fn().mockResolvedValue(false),
+      manager: {
+        transaction: jest.fn().mockImplementation((cb: (em: unknown) => Promise<unknown>) => cb(roleManager)),
+      },
     } as unknown as jest.Mocked<Repository<Role>>;
 
     permissionRepo = {
       find: jest.fn(),
+      count: jest.fn().mockResolvedValue(0),
     } as unknown as jest.Mocked<Repository<Permission>>;
 
     userRepo = {
       existsBy: jest.fn().mockResolvedValue(true),
     } as unknown as jest.Mocked<Repository<User>>;
+
+    rolePermissionRepo = {
+      save: jest.fn(),
+      create: jest.fn((data) => ({ ...data } as RolePermission)),
+    } as unknown as jest.Mocked<Repository<RolePermission>>;
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -100,6 +132,7 @@ describe('RbacService', () => {
         { provide: getRepositoryToken(Role), useValue: roleRepo },
         { provide: getRepositoryToken(Permission), useValue: permissionRepo },
         { provide: getRepositoryToken(User), useValue: userRepo },
+        { provide: getRepositoryToken(RolePermission), useValue: rolePermissionRepo },
       ],
     }).compile();
 
@@ -476,6 +509,204 @@ describe('RbacService', () => {
       await service.assignDefaultRoles(10);
 
       expect(userRoleRepo.save).not.toHaveBeenCalled();
+    });
+  });
+
+  // ───────────────────────── role CRUD (ATT-728) ─────────────────────────────
+
+  const makePermission = (key: string): Permission =>
+    ({ key, label: key, description: key, category: key.split('.')[0], createdAt: new Date(), updatedAt: new Date() }) as Permission;
+
+  describe('getRolesWithUsage', () => {
+    it('merges user counts into roles', async () => {
+      roleRepo.find.mockResolvedValue([makeRole({ id: 1 }), makeRole({ id: 2, key: 'other' })]);
+      const mockQb = createMockQueryBuilder({
+        getRawMany: jest.fn().mockResolvedValue([{ roleId: 1, userCount: '3' }]),
+      });
+      userRoleRepo.createQueryBuilder.mockReturnValue(mockQb as any);
+
+      const result = await service.getRolesWithUsage();
+
+      expect(result.find((r) => r.id === 1)?.userCount).toBe(3);
+      expect(result.find((r) => r.id === 2)?.userCount).toBe(0);
+    });
+  });
+
+  describe('createRole', () => {
+    it('creates a custom role with a slugified key and permissions', async () => {
+      permissionRepo.find.mockResolvedValue([makePermission('resources.read')]);
+      roleRepo.findOne.mockResolvedValue(makeRole({ id: 42, key: 'workshop-supervisor' }));
+
+      await service.createRole(
+        { name: 'Workshop Supervisor!', description: 'desc', permissionKeys: ['resources.read'] },
+        new Set(['resources.read']),
+      );
+
+      expect(roleRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ key: 'workshop-supervisor', name: 'Workshop Supervisor!', isSystemManaged: false }),
+      );
+      expect(rolePermissionRepo.save).toHaveBeenCalledWith([
+        expect.objectContaining({ roleId: 42, permissionKey: 'resources.read' }),
+      ]);
+    });
+
+    it('appends a numeric suffix when the key is already taken', async () => {
+      permissionRepo.find.mockResolvedValue([]);
+      (roleRepo.existsBy as jest.Mock).mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+      roleRepo.findOne.mockResolvedValue(makeRole({ id: 42 }));
+
+      await service.createRole({ name: 'User' }, new Set());
+
+      expect(roleRepo.create).toHaveBeenCalledWith(expect.objectContaining({ key: 'user-2' }));
+    });
+
+    it('rejects unknown permission keys', async () => {
+      permissionRepo.find.mockResolvedValue([]);
+
+      await expect(
+        service.createRole({ name: 'X', permissionKeys: ['not.a.permission'] }, new Set(['not.a.permission'])),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('rejects granting permissions the actor does not have', async () => {
+      permissionRepo.find.mockResolvedValue([makePermission('billing.manage')]);
+
+      await expect(
+        service.createRole({ name: 'X', permissionKeys: ['billing.manage'] }, new Set(['resources.read'])),
+      ).rejects.toThrow(ForbiddenException);
+      expect(roleRepo.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('updateRole', () => {
+    it('throws NotFoundException for a missing role', async () => {
+      roleRepo.findOne.mockResolvedValue(null);
+
+      await expect(service.updateRole(99, { name: 'X' }, new Set())).rejects.toThrow(NotFoundException);
+    });
+
+    it('rejects modification of system-managed roles', async () => {
+      roleRepo.findOne.mockResolvedValue(makeRole({ isSystemManaged: true }));
+
+      await expect(service.updateRole(1, { name: 'X' }, new Set())).rejects.toThrow(ForbiddenException);
+    });
+
+    it('updates name and description without touching permissions', async () => {
+      roleRepo.findOne.mockResolvedValue(makeRole({ id: 5 }));
+
+      await service.updateRole(5, { name: ' New Name ', description: 'new desc' }, new Set());
+
+      expect(roleRepo.save).toHaveBeenCalledWith({ id: 5, name: 'New Name', description: 'new desc' });
+      expect(roleRepo.manager.transaction).not.toHaveBeenCalled();
+    });
+
+    it('rejects adding permissions the actor does not have', async () => {
+      roleRepo.findOne.mockResolvedValue(makeRole({ id: 5, rolePermissions: [] }));
+      permissionRepo.find.mockResolvedValue([makePermission('billing.manage')]);
+
+      await expect(
+        service.updateRole(5, { permissionKeys: ['billing.manage'] }, new Set(['resources.read'])),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('rejects removing permissions the actor does not have', async () => {
+      roleRepo.findOne.mockResolvedValue(
+        makeRole({ id: 5, rolePermissions: [{ roleId: 5, permissionKey: 'billing.manage' } as RolePermission] }),
+      );
+      permissionRepo.find.mockResolvedValue([]);
+
+      await expect(service.updateRole(5, { permissionKeys: [] }, new Set(['resources.read']))).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+
+    it('applies permission set changes in a transaction', async () => {
+      roleRepo.findOne.mockResolvedValue(
+        makeRole({ id: 5, rolePermissions: [{ roleId: 5, permissionKey: 'resources.read' } as RolePermission] }),
+      );
+      permissionRepo.find.mockResolvedValue([makePermission('users.read')]);
+
+      await service.updateRole(5, { permissionKeys: ['users.read'] }, new Set(['users.read', 'resources.read']));
+
+      expect(roleManager.delete).toHaveBeenCalledWith(RolePermission, expect.objectContaining({ roleId: 5 }));
+      expect(roleManager.save).toHaveBeenCalledWith(
+        RolePermission,
+        expect.objectContaining({ roleId: 5, permissionKey: 'users.read' }),
+      );
+    });
+  });
+
+  describe('deleteRole', () => {
+    const setOwnerEquivalentCounts = (withoutRole: number, total: number) => {
+      // countOwnerEquivalentUsers is called twice: first excluding the role, then overall
+      permissionRepo.count.mockResolvedValue(16);
+      const rows = (n: number) => Array.from({ length: n }, (_, i) => ({ userId: i + 1 }));
+      const qb1 = createMockQueryBuilder({ getRawMany: jest.fn().mockResolvedValue(rows(withoutRole)) });
+      const qb2 = createMockQueryBuilder({ getRawMany: jest.fn().mockResolvedValue(rows(total)) });
+      userRoleRepo.createQueryBuilder.mockReturnValueOnce(qb1 as any).mockReturnValueOnce(qb2 as any);
+    };
+
+    it('throws NotFoundException for a missing role', async () => {
+      roleRepo.findOne.mockResolvedValue(null);
+
+      await expect(service.deleteRole(99, new Set())).rejects.toThrow(NotFoundException);
+    });
+
+    it('rejects deletion of system-managed roles', async () => {
+      roleRepo.findOne.mockResolvedValue(makeRole({ isSystemManaged: true }));
+
+      await expect(service.deleteRole(1, new Set())).rejects.toThrow(ForbiddenException);
+    });
+
+    it('rejects reassigning to the role being deleted', async () => {
+      roleRepo.findOne.mockResolvedValue(makeRole({ id: 5 }));
+
+      await expect(service.deleteRole(5, new Set(), 5)).rejects.toThrow(BadRequestException);
+    });
+
+    it('rejects reassignment to a role whose permissions exceed the actor', async () => {
+      roleRepo.findOne
+        .mockResolvedValueOnce(makeRole({ id: 5 }))
+        .mockResolvedValueOnce(
+          makeRole({ id: 6, rolePermissions: [{ roleId: 6, permissionKey: 'billing.manage' } as RolePermission] }),
+        );
+
+      await expect(service.deleteRole(5, new Set(['resources.read']), 6)).rejects.toThrow(ForbiddenException);
+    });
+
+    it('blocks deletion that would leave no owner-equivalent user', async () => {
+      roleRepo.findOne.mockResolvedValue(makeRole({ id: 5 }));
+      setOwnerEquivalentCounts(0, 1);
+
+      await expect(service.deleteRole(5, new Set())).rejects.toThrow(ForbiddenException);
+      expect(roleManager.delete).not.toHaveBeenCalled();
+    });
+
+    it('deletes a custom role when owner-equivalence is preserved', async () => {
+      roleRepo.findOne.mockResolvedValue(makeRole({ id: 5 }));
+      setOwnerEquivalentCounts(1, 1);
+
+      await service.deleteRole(5, new Set());
+
+      expect(roleManager.delete).toHaveBeenCalledWith(Role, { id: 5 });
+    });
+
+    it('reassigns affected users to the target role before deleting', async () => {
+      roleRepo.findOne
+        .mockResolvedValueOnce(makeRole({ id: 5 }))
+        .mockResolvedValueOnce(makeRole({ id: 6, rolePermissions: [] }));
+      setOwnerEquivalentCounts(1, 1);
+      roleManager.find.mockResolvedValue([makeUserRole({ userId: 10, roleId: 5 }), makeUserRole({ id: 2, userId: 11, roleId: 5 })]);
+      roleManager.findOne.mockResolvedValue(null);
+
+      await service.deleteRole(5, new Set(), 6);
+
+      expect(roleManager.save).toHaveBeenCalledTimes(2);
+      expect(roleManager.save).toHaveBeenCalledWith(
+        UserRole,
+        expect.objectContaining({ userId: 10, roleId: 6, source: UserRoleSource.MANUAL }),
+      );
+      expect(roleManager.delete).toHaveBeenCalledWith(Role, { id: 5 });
     });
   });
 });

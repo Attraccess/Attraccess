@@ -1,0 +1,27 @@
+{
+  "title": "Roles",
+  "subtitle": "Manage roles and their permission sets",
+  "actions": {
+    "createRole": "Create role"
+  },
+  "table": {
+    "ariaLabel": "Roles",
+    "columns": {
+      "name": "Name",
+      "source": "Source",
+      "permissions": "Permissions",
+      "users": "Users",
+      "actions": "Actions"
+    },
+    "source": {
+      "system": "System",
+      "custom": "Custom"
+    },
+    "systemRoleTooltip": "System roles are managed by Attraccess and cannot be modified",
+    "actions": {
+      "edit": "Edit role",
+      "view": "View role",
+      "delete": "Delete role"
+    }
+  }
+}
