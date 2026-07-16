@@ -1,5 +1,7 @@
 {
   "logout": "Logout",
+  "collapseSidebar": "Collapse sidebar",
+  "expandSidebar": "Expand sidebar",
   "language": "Language",
   "languages": {
     "en": "English",
