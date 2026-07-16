@@ -48,7 +48,7 @@ describe('SsoController', () => {
       userInfoURL: 'https://test-issuer.com/userinfo',
       clientId: 'test-client-id',
       clientSecret: 'test-client-secret',
-      permissionMappings: {
+      roleMappings: {
         'user-manager': ['attraccess_admin'],
       },
       createdAt: new Date(),
@@ -74,7 +74,7 @@ describe('SsoController', () => {
       wantAuthnResponseSigned: true,
       forceAuthn: false,
       provisioningSecret: 'saml-secret',
-      permissionMappings: {
+      roleMappings: {
         'billing-manager': ['billing-role'],
       },
       createdAt: new Date(),
@@ -249,7 +249,7 @@ describe('SsoController', () => {
       // Provider without permission mappings — no ceiling check triggered.
       jest.spyOn(ssoService, 'getProviderById').mockResolvedValueOnce({
         ...mockSSOProvider,
-        oidcConfiguration: { ...mockSSOProvider.oidcConfiguration, permissionMappings: {} },
+        oidcConfiguration: { ...mockSSOProvider.oidcConfiguration, roleMappings: {} },
       } as SSOProvider);
 
       const mockReq = { user: { id: 1, effectivePermissions: new Set(['users.roles.manage']) } } as unknown as AuthenticatedRequest;
@@ -691,7 +691,7 @@ describe('SsoController', () => {
       // 'attraccess_admin' → 'user-manager' via provider's permissionMappings
       expect(rbacService.syncSsoRoles).toHaveBeenCalledWith(
         99,
-        expect.arrayContaining(['user-manager']),
+        expect.arrayContaining([expect.objectContaining({ roleKey: 'user-manager' })]),
         SSOProviderType.OIDC,
         1,
       );
@@ -762,7 +762,7 @@ describe('SsoController', () => {
       // 'billing-role' → 'billing-manager' via SAML provider's permissionMappings
       expect(rbacService.syncSsoRoles).toHaveBeenCalledWith(
         103,
-        expect.arrayContaining(['billing-manager']),
+        expect.arrayContaining([expect.objectContaining({ roleKey: 'billing-manager' })]),
         SSOProviderType.SAML,
         2,
       );

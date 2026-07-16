@@ -151,9 +151,9 @@ export function UserManagementDetailsPage() {
 
       const permissionMappings =
         detail.providerType === SSOProviderType.OIDC
-          ? provider.oidcConfiguration?.permissionMappings
+          ? provider.oidcConfiguration?.roleMappings ?? provider.oidcConfiguration?.permissionMappings
           : detail.providerType === SSOProviderType.SAML
-            ? provider.samlConfiguration?.permissionMappings
+            ? provider.samlConfiguration?.roleMappings ?? provider.samlConfiguration?.permissionMappings
             : undefined;
 
       if (hasConfiguredPermissionMapping(permissionMappings)) {
@@ -179,9 +179,9 @@ export function UserManagementDetailsPage() {
 
       const permissionMappings =
         detail.providerType === SSOProviderType.OIDC
-          ? provider.oidcConfiguration?.permissionMappings
+          ? provider.oidcConfiguration?.roleMappings ?? provider.oidcConfiguration?.permissionMappings
           : detail.providerType === SSOProviderType.SAML
-            ? provider.samlConfiguration?.permissionMappings
+            ? provider.samlConfiguration?.roleMappings ?? provider.samlConfiguration?.permissionMappings
             : undefined;
 
       getSsoManagedPermissionKeys(permissionMappings).forEach((key) => keys.add(key));

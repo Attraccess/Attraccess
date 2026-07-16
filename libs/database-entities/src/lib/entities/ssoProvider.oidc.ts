@@ -8,7 +8,7 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
-import { Exclude } from 'class-transformer';
+import { Exclude, Expose } from 'class-transformer';
 import { SSOProvider } from './ssoProvider.entity';
 
 @Entity()
@@ -96,16 +96,27 @@ export class SSOProviderOIDCConfiguration {
   })
   emailClaimPaths!: string[] | null;
 
-  @Column({ type: 'json', nullable: true })
+  // ponytail: keeps the legacy 'permissionMappings' DB column — renaming it would need a migration for zero gain
+  @Column({ type: 'json', nullable: true, name: 'permissionMappings' })
   @ApiProperty({
-    description: 'Optional mapping between RBAC role keys and IdP role/group claim values',
+    description: 'Mapping between Attraccess role keys and IdP role/group claim values',
     required: false,
     example: {
       'resource-manager': ['attraccess_resources'],
       'user-manager': ['attraccess_admin'],
     },
   })
-  permissionMappings?: Record<string, string[]> | null;
+  roleMappings?: Record<string, string[]> | null;
+
+  @Expose()
+  @ApiProperty({
+    description: 'Deprecated alias of roleMappings, kept during the migration window',
+    required: false,
+    deprecated: true,
+  })
+  get permissionMappings(): Record<string, string[]> | null | undefined {
+    return this.roleMappings;
+  }
 
   @CreateDateColumn()
   @ApiProperty({

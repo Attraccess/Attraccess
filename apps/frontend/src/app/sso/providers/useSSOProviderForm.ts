@@ -144,7 +144,9 @@ export const useSSOProviderForm = (providerId?: number) => {
       setOidcPermissionMappingsInput(
         buildPermissionMappingInputs(
           roleKeys,
-          (extendedProvider.oidcConfiguration.permissionMappings ?? undefined) as Record<string, string[]> | undefined,
+          (extendedProvider.oidcConfiguration.roleMappings ??
+            extendedProvider.oidcConfiguration.permissionMappings ??
+            undefined) as Record<string, string[]> | undefined,
         ),
       );
     } else {
@@ -176,7 +178,9 @@ export const useSSOProviderForm = (providerId?: number) => {
       setSamlPermissionMappingsInput(
         buildPermissionMappingInputs(
           roleKeys,
-          (extendedProvider.samlConfiguration.permissionMappings ?? undefined) as Record<string, string[]> | undefined,
+          (extendedProvider.samlConfiguration.roleMappings ??
+            extendedProvider.samlConfiguration.permissionMappings ??
+            undefined) as Record<string, string[]> | undefined,
         ),
       );
     } else {
@@ -269,7 +273,7 @@ export const useSSOProviderForm = (providerId?: number) => {
 
       const sanitizeOptional = (value?: string) => (value && value.trim().length > 0 ? value.trim() : undefined);
 
-      const buildPermissionMappings = (inputs: Record<string, string>) => {
+      const buildRoleMappings = (inputs: Record<string, string>) => {
         const mappings: Record<string, string[]> = {};
         for (const key of roleKeys) {
           const parsed = parseList(inputs[key] ?? '');
@@ -300,8 +304,8 @@ export const useSSOProviderForm = (providerId?: number) => {
         if (scopesInput.trim().length > 0) payload.scopes = parseList(scopesInput);
         if (usernameClaimPathsInput.trim().length > 0) payload.usernameClaimPaths = parseList(usernameClaimPathsInput);
         if (emailClaimPathsInput.trim().length > 0) payload.emailClaimPaths = parseList(emailClaimPathsInput);
-        const permissionMappings = buildPermissionMappings(oidcPermissionMappingsInput);
-        if (permissionMappings) payload.permissionMappings = permissionMappings;
+        const roleMappings = buildRoleMappings(oidcPermissionMappingsInput);
+        if (roleMappings) payload.roleMappings = roleMappings;
 
         return payload;
       };
@@ -338,11 +342,11 @@ export const useSSOProviderForm = (providerId?: number) => {
           delete payload.provisioningSecret;
         }
 
-        const permissionMappings = buildPermissionMappings(samlPermissionMappingsInput);
-        if (permissionMappings) {
-          payload.permissionMappings = permissionMappings;
+        const roleMappings = buildRoleMappings(samlPermissionMappingsInput);
+        if (roleMappings) {
+          payload.roleMappings = roleMappings;
         } else {
-          delete payload.permissionMappings;
+          delete payload.roleMappings;
         }
         return payload;
       };

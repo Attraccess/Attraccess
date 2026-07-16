@@ -17,7 +17,7 @@ import { Button } from '../../../../components/button';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { AuthentikDiscoveryDialog } from '../discovery/authentik';
 import { KeycloakDiscoveryDialog } from '../discovery/keycloak';
-import { PermissionMappingsSection } from './PermissionMappingsSection';
+import { RoleMappingsSection } from './RoleMappingsSection';
 import { SSOProviderFormApi } from '../useSSOProviderForm';
 import en from '../en.json';
 import de from '../de.json';
@@ -193,7 +193,7 @@ export const OIDCConfigForm = ({ form }: OIDCConfigFormProps) => {
         </TextField>
       </section>
 
-      <PermissionMappingsSection
+      <RoleMappingsSection
         variant="oidc"
         roles={roles}
         isLoadingRoles={isLoadingRoles}

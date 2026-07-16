@@ -45,7 +45,7 @@ import { SSOLinkTokenService } from './link-token.service';
 import { timingSafeEqual } from 'crypto';
 import { SSOProvisioningPermissionsDto, SSOProvisioningUserDto } from './dto/sso-provisioning.dto';
 import { InvalidSSOProviderIdException, SSOProviderNotFoundException } from './errors';
-import { resolveRoleKeysFromSsoRoles } from './permission-mapping';
+import { resolveSsoRoleAssignments } from './permission-mapping';
 import { RbacService } from '../../rbac/rbac.service';
 import { MetricsService } from '../../../metrics/metrics.service';
 @ApiTags('Authentication')
@@ -205,18 +205,14 @@ export class SSOController {
     description: 'Forbidden - Insufficient permissions',
   })
   async createOne(@Body() createDto: CreateSSOProviderDto, @Req() request: AuthenticatedRequest): Promise<SSOProvider> {
-    const settingPermissionMappings =
-      createDto.oidcConfiguration?.permissionMappings !== undefined ||
-      createDto.samlConfiguration?.permissionMappings !== undefined;
-    if (settingPermissionMappings) {
+    const oidcMappings = createDto.oidcConfiguration?.roleMappings ?? createDto.oidcConfiguration?.permissionMappings;
+    const samlMappings = createDto.samlConfiguration?.roleMappings ?? createDto.samlConfiguration?.permissionMappings;
+    if (oidcMappings !== undefined || samlMappings !== undefined) {
       const actor = request.user as AuthenticatedUser;
       if (!actor.effectivePermissions?.has('users.roles.manage')) {
-        throw new ForbiddenException('Configuring SSO permission mappings requires users.roles.manage');
+        throw new ForbiddenException('Configuring SSO role mappings requires users.roles.manage');
       }
-      await this.assertPermissionMappingCeiling(
-        [createDto.oidcConfiguration?.permissionMappings, createDto.samlConfiguration?.permissionMappings],
-        actor.effectivePermissions,
-      );
+      await this.assertPermissionMappingCeiling([oidcMappings, samlMappings], actor.effectivePermissions);
     }
     return this.ssoService.createProvider(createDto);
   }
@@ -251,19 +247,15 @@ export class SSOController {
   ): Promise<SSOProvider> {
     const providerId = parseInt(id, 10);
 
-    const settingPermissionMappings =
-      updateDto.oidcConfiguration?.permissionMappings !== undefined ||
-      updateDto.samlConfiguration?.permissionMappings !== undefined;
+    const oidcMappings = updateDto.oidcConfiguration?.roleMappings ?? updateDto.oidcConfiguration?.permissionMappings;
+    const samlMappings = updateDto.samlConfiguration?.roleMappings ?? updateDto.samlConfiguration?.permissionMappings;
 
-    if (settingPermissionMappings) {
+    if (oidcMappings !== undefined || samlMappings !== undefined) {
       const actor = request.user as AuthenticatedUser;
       if (!actor.effectivePermissions?.has('users.roles.manage')) {
-        throw new ForbiddenException('Configuring SSO permission mappings requires users.roles.manage');
+        throw new ForbiddenException('Configuring SSO role mappings requires users.roles.manage');
       }
-      await this.assertPermissionMappingCeiling(
-        [updateDto.oidcConfiguration?.permissionMappings, updateDto.samlConfiguration?.permissionMappings],
-        actor.effectivePermissions,
-      );
+      await this.assertPermissionMappingCeiling([oidcMappings, samlMappings], actor.effectivePermissions);
     }
 
     return this.ssoService.updateProvider(providerId, updateDto);
@@ -914,16 +906,16 @@ export class SSOController {
   ): Promise<void> {
     const mapping =
       provider.type === SSOProviderType.OIDC
-        ? provider.oidcConfiguration?.permissionMappings
-        : provider.samlConfiguration?.permissionMappings;
+        ? provider.oidcConfiguration?.roleMappings
+        : provider.samlConfiguration?.roleMappings;
 
     // If the payload contains no `roles` field at all, treat as "no permission info" and skip
     // sync to avoid wiping SSO-granted roles on incremental provisioning calls.
     if (payload.roles === undefined) return;
 
     const roleNames = payload.roles.map((r) => r.trim()).filter((r) => r.length > 0);
-    const roleKeys = resolveRoleKeysFromSsoRoles(roleNames, mapping);
+    const roleAssignments = resolveSsoRoleAssignments(roleNames, mapping);
 
-    await this.rbacService.syncSsoRoles(userId, [...roleKeys], provider.type, provider.id);
+    await this.rbacService.syncSsoRoles(userId, roleAssignments, provider.type, provider.id);
   }
 }

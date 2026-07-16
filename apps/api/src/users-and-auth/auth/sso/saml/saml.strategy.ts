@@ -14,7 +14,7 @@ import { EncryptionService } from '../../../../encryption/encryption.service';
 import { SSOSamlRequest, SSOSamlRequestOptions } from './saml.types';
 import { MetricsService } from '../../../../metrics/metrics.service';
 import { classifySsoFailureReason, markSsoFailureMetricRecorded, recordSsoLoginFailure } from '../sso-metrics';
-import { hasConfiguredPermissionMapping, resolveRoleKeysFromSsoRoles } from '../permission-mapping';
+import { hasConfiguredPermissionMapping, resolveSsoRoleAssignments } from '../permission-mapping';
 import { RbacService } from '../../../rbac/rbac.service';
 
 type StrategyCtor = new (...args: unknown[]) => Strategy;
@@ -286,9 +286,9 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
     return values;
   }
 
-  private resolveRoleNamesFromClaims(profile: SamlProfile): string[] {
+  private resolveRoleNamesFromClaims(claimValues: unknown[]): string[] {
     const roleNames: string[] = [];
-    for (const value of this.getPermissionClaimValues(profile)) {
+    for (const value of claimValues) {
       if (Array.isArray(value)) {
         for (const entry of value) {
           if (typeof entry === 'string') roleNames.push(entry);
@@ -305,21 +305,23 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
     profile: SamlProfile,
     config: SSOProviderSAMLConfiguration,
   ): Promise<User> {
-    const roleNames = this.resolveRoleNamesFromClaims(profile);
-    const roleKeys = resolveRoleKeysFromSsoRoles(roleNames, config.permissionMappings);
-    this.logger.debug(`RBAC role keys from SAML: ${JSON.stringify([...roleKeys])}`);
+    const claimValues = this.getPermissionClaimValues(profile);
+    const roleNames = this.resolveRoleNamesFromClaims(claimValues);
+    const roleAssignments = resolveSsoRoleAssignments(roleNames, config.roleMappings);
+    this.logger.debug(`RBAC role keys from SAML: ${JSON.stringify(roleAssignments.map((r) => r.roleKey))}`);
 
     const rbacService = this.moduleRef.get(RbacService, { strict: false });
     if (!rbacService) {
       this.logger.warn('RbacService not available via ModuleRef — SSO role sync skipped; existing roles preserved');
     }
-    // Only sync when a mapping is configured AND the token contained at least one role/group claim.
-    // Skipping on empty roleNames prevents a missing attribute or transient IdP omission from
-    // silently revoking all SSO-granted roles.
-    if (rbacService && hasConfiguredPermissionMapping(config.permissionMappings) && roleNames.length > 0) {
+    // Only sync when a mapping is configured AND the assertion contained at least one role/group
+    // attribute key. A present-but-empty attribute is authoritative and revokes this provider's
+    // SSO-managed roles; a wholly absent attribute (IdP misconfiguration, transient omission) must
+    // not silently revoke anything.
+    if (rbacService && hasConfiguredPermissionMapping(config.roleMappings) && claimValues.length > 0) {
       await rbacService.syncSsoRoles(
         user.id,
-        [...roleKeys],
+        roleAssignments,
         SSOProviderType.SAML,
         config.ssoProviderId,
       );
