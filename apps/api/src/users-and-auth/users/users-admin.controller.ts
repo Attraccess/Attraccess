@@ -98,7 +98,7 @@ export class UsersAdminController {
   }
 
   @Get()
-  @Auth()
+  @Auth('users.read')
   @ApiOperation({ summary: 'Get a paginated list of users', operationId: 'findMany' })
   @ApiResponse({
     status: 200,
