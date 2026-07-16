@@ -140,7 +140,7 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
-    "@babel/core": "^7.29.7",
+    "@babel/core": "^8.0.0",
     "@babel/preset-react": "^7.29.7",
     "@balena/compose-parser": "^0.2.6",
     "@commitlint/cli": "^19.6.1",
