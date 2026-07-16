@@ -61,6 +61,7 @@ export const UserManagementPage: React.FC = () => {
     limit,
     page,
     search: debouncedSearch,
+    includeRoles: true,
   });
 
   const totalPages = useMemo(() => {
