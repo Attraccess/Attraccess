@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { ForbiddenException } from '@nestjs/common';
 import { UsersAdminController } from './users-admin.controller';
 import { UsersService } from './users.service';
 import { UserPasswordService } from './user-password.service';
@@ -59,10 +60,21 @@ describe('UsersAdminController', () => {
       limit,
     });
 
+    const makeRequest = (permissions: string[] = []): AuthenticatedRequest =>
+      ({
+        user: {
+          id: 99,
+          jwtTokenId: 'tok',
+          effectivePermissions: new Set<string>(permissions),
+        },
+        authInfo: { tokenId: 'tok' },
+        logout: jest.fn(),
+      }) as unknown as AuthenticatedRequest;
+
     it('should set nextPage when more pages exist', async () => {
       jest.spyOn(usersService, 'findMany').mockResolvedValue(paginated(1, 10, 25));
 
-      const result = await controller.findMany({ page: 1, limit: 10 });
+      const result = await controller.findMany({ page: 1, limit: 10 }, makeRequest());
 
       expect(result.nextPage).toBe(2);
     });
@@ -70,7 +82,7 @@ describe('UsersAdminController', () => {
     it('should not set nextPage when the last page ends exactly at the total', async () => {
       jest.spyOn(usersService, 'findMany').mockResolvedValue(paginated(2, 10, 20));
 
-      const result = await controller.findMany({ page: 2, limit: 10 });
+      const result = await controller.findMany({ page: 2, limit: 10 }, makeRequest());
 
       expect(result.nextPage).toBeUndefined();
     });
@@ -78,9 +90,24 @@ describe('UsersAdminController', () => {
     it('should not set nextPage on a partially filled last page', async () => {
       jest.spyOn(usersService, 'findMany').mockResolvedValue(paginated(3, 10, 25));
 
-      const result = await controller.findMany({ page: 3, limit: 10 });
+      const result = await controller.findMany({ page: 3, limit: 10 }, makeRequest());
 
       expect(result.nextPage).toBeUndefined();
+    });
+
+    it('should return roles when includeRoles=true and caller has users.read', async () => {
+      jest.spyOn(usersService, 'findMany').mockResolvedValue(paginated(1, 10, 1));
+
+      const result = await controller.findMany({ page: 1, limit: 10, includeRoles: true }, makeRequest(['users.read']));
+
+      expect(usersService.findMany).toHaveBeenCalledWith(expect.objectContaining({ includeRoles: true }));
+      expect(result).toBeDefined();
+    });
+
+    it('should throw ForbiddenException when includeRoles=true without users.read', async () => {
+      await expect(
+        controller.findMany({ page: 1, limit: 10, includeRoles: true }, makeRequest()),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 

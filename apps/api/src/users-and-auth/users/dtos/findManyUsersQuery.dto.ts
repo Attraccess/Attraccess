@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type, Transform } from 'class-transformer';
 import { IsNumber, Min, Max, IsOptional, IsString, IsArray, IsBoolean } from 'class-validator';
+import { ToBoolean } from '../../../common/request-transformers';
 
 export class FindManyUsersQueryDto {
   @ApiProperty({
@@ -52,7 +53,7 @@ export class FindManyUsersQueryDto {
     required: false,
     type: Boolean,
   })
-  @Transform(({ value }) => value === 'true' || value === true)
+  @ToBoolean()
   @IsBoolean()
   @IsOptional()
   includeRoles?: boolean;
