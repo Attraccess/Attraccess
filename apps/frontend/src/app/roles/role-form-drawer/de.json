@@ -19,7 +19,10 @@
   "permissions": {
     "title": "Berechtigungen",
     "selectedCount": "{{selected}} von {{total}} ausgewählt",
-    "cannotGrantTooltip": "Du kannst keine Berechtigungen vergeben, die du selbst nicht besitzt"
+    "pickerPlaceholder": "Berechtigungen auswählen",
+    "searchPlaceholder": "Berechtigungen durchsuchen...",
+    "noResults": "Keine Berechtigungen gefunden",
+    "cannotGrantHint": "Gesperrte Berechtigungen besitzt du selbst nicht und kannst sie nicht vergeben."
   },
   "categories": {
     "resources": "Ressourcen",

@@ -1,16 +1,24 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
+  Autocomplete,
   Button,
+  Chip,
+  Description,
   DrawerBody,
   DrawerFooter,
   DrawerHeader,
+  EmptyState,
+  Header,
   Input,
   Label,
+  ListBox,
+  SearchField,
+  Tag,
+  TagGroup,
   TextArea,
   TextField,
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
+  useFilter,
+  type Key,
 } from '@heroui/react';
 import { LockIcon } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -26,7 +34,6 @@ import {
   useRbacServiceUpdateRole,
 } from '@attraccess/react-query-client';
 import { StandardDrawer } from '../../../components/standardDrawer';
-import { LabeledSwitch } from '../../../components/labeledSwitch';
 import { useToastMessage } from '../../../components/toastProvider';
 import { useAuth } from '../../../hooks/useAuth';
 import en from './en.json';
@@ -51,6 +58,7 @@ export function RoleFormDrawer({ isOpen, onOpenChange, role }: Props) {
   const toast = useToastMessage();
   const queryClient = useQueryClient();
   const { hasPermission } = useAuth();
+  const { contains } = useFilter({ sensitivity: 'base' });
 
   const isReadOnly = !!role?.isSystemManaged;
   const mode = role === null ? 'create' : isReadOnly ? 'view' : 'edit';
@@ -68,6 +76,8 @@ export function RoleFormDrawer({ isOpen, onOpenChange, role }: Props) {
     setSelectedKeys(new Set((role?.rolePermissions ?? []).map((rp) => rp.permissionKey)));
   }, [isOpen, role]);
 
+  const permissionByKey = useMemo(() => new Map((permissions ?? []).map((p) => [p.key, p])), [permissions]);
+
   const permissionsByCategory = useMemo(() => {
     const groups = new Map<string, Permission[]>();
     for (const permission of permissions ?? []) {
@@ -82,6 +92,37 @@ export function RoleFormDrawer({ isOpen, onOpenChange, role }: Props) {
     });
     return categories.map((category) => ({ category, permissions: groups.get(category) as Permission[] }));
   }, [permissions]);
+
+  // Permissions the acting user does not hold: visible but locked (grant safety)
+  const nonGrantableKeys = useMemo(
+    () => (permissions ?? []).filter((p) => !hasPermission(p.key as SystemPermission)).map((p) => p.key),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [permissions, hasPermission],
+  );
+
+  const categoryLabel = (category: string) => (tExists(`categories.${category}`) ? t(`categories.${category}`) : category);
+
+  // Locked keys can be neither added nor removed, no matter how the change was triggered
+  const applySelection = (keys: Iterable<Key>) => {
+    setSelectedKeys((prev) => {
+      const next = new Set([...keys].map(String));
+      for (const key of nonGrantableKeys) {
+        if (prev.has(key)) next.add(key);
+        else next.delete(key);
+      }
+      return next;
+    });
+  };
+
+  const handleRemoveTags = (keys: Set<Key>) => {
+    setSelectedKeys((prev) => {
+      const next = new Set(prev);
+      for (const key of keys) {
+        if (!nonGrantableKeys.includes(String(key))) next.delete(String(key));
+      }
+      return next;
+    });
+  };
 
   const close = () => onOpenChange(false);
 
@@ -104,15 +145,6 @@ export function RoleFormDrawer({ isOpen, onOpenChange, role }: Props) {
     onError: onMutationError,
   });
   const isSaving = isCreating || isUpdating;
-
-  const handleToggle = (permissionKey: string) => (checked: boolean) => {
-    setSelectedKeys((prev) => {
-      const next = new Set(prev);
-      if (checked) next.add(permissionKey);
-      else next.delete(permissionKey);
-      return next;
-    });
-  };
 
   const handleSave = () => {
     const requestBody = {
@@ -166,40 +198,116 @@ export function RoleFormDrawer({ isOpen, onOpenChange, role }: Props) {
             </span>
           </div>
 
-          {permissionsByCategory.map(({ category, permissions: categoryPermissions }) => (
-            <div key={category} className="flex flex-col gap-2">
-              <p className="text-xs font-semibold text-default-500 uppercase tracking-wide">
-                {tExists(`categories.${category}`) ? t(`categories.${category}`) : category}
-              </p>
-              {categoryPermissions.map((permission) => {
-                const canGrant = hasPermission(permission.key as SystemPermission);
-                const permissionSwitch = (
-                  <LabeledSwitch
-                    isSelected={selectedKeys.has(permission.key)}
-                    onChange={handleToggle(permission.key)}
-                    isDisabled={isReadOnly || !canGrant}
-                    data-cy={`role-form-drawer-permission-${permission.key}`}
-                  >
-                    <span className="flex flex-col gap-1">
-                      <span className="text-sm font-medium">{permission.label}</span>
-                      <span className="text-xs text-default-500">{permission.description}</span>
-                    </span>
-                  </LabeledSwitch>
-                );
-                if (!canGrant && !isReadOnly) {
-                  return (
-                    <Tooltip key={permission.key}>
-                      <TooltipTrigger tabIndex={0} className="self-start">
-                        {permissionSwitch}
-                      </TooltipTrigger>
-                      <TooltipContent showArrow>{t('permissions.cannotGrantTooltip')}</TooltipContent>
-                    </Tooltip>
-                  );
-                }
-                return <div key={permission.key}>{permissionSwitch}</div>;
-              })}
+          {isReadOnly ? (
+            <div className="flex flex-col gap-3" data-cy="role-form-drawer-readonly-permissions">
+              {permissionsByCategory
+                .map(({ category, permissions: categoryPermissions }) => ({
+                  category,
+                  selected: categoryPermissions.filter((p) => selectedKeys.has(p.key)),
+                }))
+                .filter(({ selected }) => selected.length > 0)
+                .map(({ category, selected }) => (
+                  <div key={category} className="flex flex-col gap-1.5">
+                    <p className="text-xs font-semibold text-default-500 uppercase tracking-wide">
+                      {categoryLabel(category)}
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {selected.map((permission) => (
+                        <Chip key={permission.key} size="sm" variant="secondary">
+                          {permission.label}
+                        </Chip>
+                      ))}
+                    </div>
+                  </div>
+                ))}
             </div>
-          ))}
+          ) : (
+            <Autocomplete
+              fullWidth
+              placeholder={t('permissions.pickerPlaceholder')}
+              selectionMode="multiple"
+              value={[...selectedKeys]}
+              onChange={(keys) => applySelection(keys as Key[])}
+              aria-label={t('permissions.title')}
+              data-cy="role-form-drawer-permission-picker"
+            >
+              <Autocomplete.Trigger>
+                <Autocomplete.Value>
+                  {({ defaultChildren, isPlaceholder, state }) => {
+                    if (isPlaceholder || state.selectedItems.length === 0) {
+                      return defaultChildren;
+                    }
+                    return (
+                      <TagGroup
+                        size="sm"
+                        aria-label={t('permissions.title')}
+                        disabledKeys={nonGrantableKeys}
+                        onRemove={handleRemoveTags}
+                      >
+                        <TagGroup.List>
+                          {[...selectedKeys].map((key) => (
+                            <Tag key={key} id={key} textValue={permissionByKey.get(key)?.label ?? key}>
+                              {nonGrantableKeys.includes(key) ? <LockIcon className="w-3 h-3" /> : null}
+                              {permissionByKey.get(key)?.label ?? key}
+                            </Tag>
+                          ))}
+                        </TagGroup.List>
+                      </TagGroup>
+                    );
+                  }}
+                </Autocomplete.Value>
+                <Autocomplete.Indicator />
+              </Autocomplete.Trigger>
+              <Autocomplete.Popover>
+                <Autocomplete.Filter filter={contains}>
+                  <SearchField autoFocus name="permission-search" variant="secondary">
+                    <SearchField.Group>
+                      <SearchField.SearchIcon />
+                      <SearchField.Input
+                        placeholder={t('permissions.searchPlaceholder')}
+                        data-cy="role-form-drawer-permission-search"
+                      />
+                      <SearchField.ClearButton />
+                    </SearchField.Group>
+                  </SearchField>
+                  {nonGrantableKeys.length > 0 ? (
+                    <p className="flex items-center gap-1 px-2 py-1 text-xs text-default-400">
+                      <LockIcon className="w-3 h-3 shrink-0" />
+                      {t('permissions.cannotGrantHint')}
+                    </p>
+                  ) : null}
+                  <ListBox
+                    aria-label={t('permissions.title')}
+                    disabledKeys={nonGrantableKeys}
+                    renderEmptyState={() => <EmptyState>{t('permissions.noResults')}</EmptyState>}
+                  >
+                    {permissionsByCategory.map(({ category, permissions: categoryPermissions }) => (
+                      <ListBox.Section key={category} id={category}>
+                        <Header>{categoryLabel(category)}</Header>
+                        {categoryPermissions.map((permission) => (
+                          <ListBox.Item
+                            key={permission.key}
+                            id={permission.key}
+                            textValue={permission.label}
+                            data-cy={`role-form-drawer-permission-${permission.key}`}
+                          >
+                            <div className="flex flex-col">
+                              <Label>{permission.label}</Label>
+                              <Description>{permission.description}</Description>
+                            </div>
+                            {nonGrantableKeys.includes(permission.key) ? (
+                              <LockIcon className="w-3.5 h-3.5 text-default-400 shrink-0" />
+                            ) : null}
+                            <ListBox.ItemIndicator />
+                          </ListBox.Item>
+                        ))}
+                      </ListBox.Section>
+                    ))}
+                  </ListBox>
+                </Autocomplete.Filter>
+              </Autocomplete.Popover>
+            </Autocomplete>
+          )}
         </div>
       </DrawerBody>
       <DrawerFooter>
