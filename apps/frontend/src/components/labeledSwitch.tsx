@@ -10,10 +10,14 @@ export interface LabeledSwitchProps extends Omit<SwitchProps, 'children'> {
 export function LabeledSwitch({ children, ...rest }: LabeledSwitchProps) {
   return (
     <Switch {...rest}>
-      <Switch.Control>
-        <Switch.Thumb />
-      </Switch.Control>
-      {children != null && children !== false ? <Switch.Content>{children}</Switch.Content> : null}
+      {/* HeroUI >= 3.1: only Switch.Content (a SwitchButton) is interactive, so the
+          control must live inside it — otherwise clicking the track does nothing. */}
+      <Switch.Content>
+        <Switch.Control>
+          <Switch.Thumb />
+        </Switch.Control>
+        {children}
+      </Switch.Content>
     </Switch>
   );
 }
