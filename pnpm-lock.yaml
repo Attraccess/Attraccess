@@ -128,7 +128,7 @@ importers:
         version: 11.1.28(@nestjs/common@11.1.28(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28)(@nestjs/platform-express@11.1.28)
       '@nestjs/typeorm':
         specifier: ^11.0.3
-        version: 11.0.3(@nestjs/common@11.1.28(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@0.3.29(babel-plugin-macros@3.1.0)(ioredis@5.11.1)(pg@8.15.6)(sql.js@1.13.0)(sqlite3@5.1.7)(ts-node@10.9.2(@swc/core@1.15.43(@swc/helpers@0.5.23))(@types/node@25.9.1)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))
+        version: 11.0.3(@nestjs/common@11.1.28(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.1.0(babel-plugin-macros@3.1.0)(ioredis@5.11.1)(pg@8.15.6)(sql.js@1.13.0)(ts-node@10.9.2(@swc/core@1.15.43(@swc/helpers@0.5.23))(@types/node@25.9.1)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))
       '@nestjs/websockets':
         specifier: ^11.1.28
         version: 11.1.28(@nestjs/common@11.1.28(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28)(@nestjs/platform-socket.io@11.0.20)(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -385,8 +385,8 @@ importers:
         specifier: ^1.4.0
         version: 1.4.0
       typeorm:
-        specifier: 0.3.29
-        version: 0.3.29(babel-plugin-macros@3.1.0)(ioredis@5.11.1)(pg@8.15.6)(sql.js@1.13.0)(sqlite3@5.1.7)(ts-node@10.9.2(@swc/core@1.15.43(@swc/helpers@0.5.23))(@types/node@25.9.1)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))
+        specifier: 1.1.0
+        version: 1.1.0(babel-plugin-macros@3.1.0)(ioredis@5.11.1)(pg@8.15.6)(sql.js@1.13.0)(ts-node@10.9.2(@swc/core@1.15.43(@swc/helpers@0.5.23))(@types/node@25.9.1)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))
       usb:
         specifier: ^2.18.0
         version: 2.18.0
@@ -7672,11 +7672,11 @@ packages:
   '@volar/typescript@2.4.28':
     resolution: {integrity: sha512-Ja6yvWrbis2QtN4ClAKreeUZPVYMARDYZl9LMEv1iQ1QdepB6wn0jTRxA9MftYmYa4DQ4k/DaSZpFPUfxl8giw==}
 
-  '@vue/compiler-core@3.5.39':
-    resolution: {integrity: sha512-16KBTEXAJCpDr0mwlw+AZyhu8iyC7R3S2vBwsI7QnWJU6X3WKc9VKeNEZpiMdZ569qWhz9574L3vV55qRL0Vtw==}
+  '@vue/compiler-core@3.5.40':
+    resolution: {integrity: sha512-39E8IgOhTbVDnoJFMKc2DvYnypcZwUqgUhQkccva/0m6FUwtIKSGV7n1hpVmYcFaoRAwf9pBcwnKlCEsN63ZEQ==}
 
-  '@vue/compiler-dom@3.5.39':
-    resolution: {integrity: sha512-oQPigALqYbNxTNPvNgSOe+czwVExfbVF02lz8jP0S3AXJiu3jxYDygNUiqSep4ezzW8XgnubqH63My2A7JR/vg==}
+  '@vue/compiler-dom@3.5.40':
+    resolution: {integrity: sha512-pwkx4vqlqOspFstrcmzwkKLePVMD3PT65imRzLhanU2V1Fj4K13g6OXjanOyzw3aTAuRk84BOmY8f3rEHqPaVA==}
 
   '@vue/language-core@1.8.27':
     resolution: {integrity: sha512-L8Kc27VdQserNaCUNiSFdDl9LWT24ly8Hpwf1ECy3aFb9m6bDhBGQYOujDm21N7EW3moKIOKEanQwe1q5BK+mA==}
@@ -7686,8 +7686,8 @@ packages:
       typescript:
         optional: true
 
-  '@vue/shared@3.5.39':
-    resolution: {integrity: sha512-l1rrBtBfTnmxvtsvdQDXltUUy8S1Y+ZaqdfUzmAnJkTd8Z8rv5v/ytW+TKiqEOWyHPoqtPlNFSs0lhRmYVSHVA==}
+  '@vue/shared@3.5.40':
+    resolution: {integrity: sha512-WxnBtruIqOoV3rA4jeKDWzrYI5h7Cp4+pjwDi8kWGHz+IslhiN+wguLVVhtv2l8VoU02rzDCVfDjgCl1lNpZVg==}
 
   '@webassemblyjs/ast@1.14.1':
     resolution: {integrity: sha512-nuBEDgQfm1ccRp/8bCQrx1frohyufl4JlbMMZ4P1wpeOfDhF6FQkxZJ1b/e+PLwr6X1Nhw6OLme5usuBWYBvuQ==}
@@ -8051,8 +8051,8 @@ packages:
     resolution: {integrity: sha512-4Dj6M28JB+oAH8kFkTLUo+a2jwOFkuqb3yucU0CANcRRUbxS0cP0nZYCGjcc3BNXwRIsUVmDGgzawme7zvJHvg==}
     engines: {node: '>=12'}
 
-  ansis@4.2.0:
-    resolution: {integrity: sha512-HqZ5rWlFjGiV0tDm3UxxgNRqsOTniqoKZu0pIAfh7TZQMGuZK+hH0drySty0si0QXj1ieop4+SkSfPZBPPkHig==}
+  ansis@4.3.1:
+    resolution: {integrity: sha512-BJ8/l4R5LRE7hW9WdSuGYrLSHi2ynxeFpDFbH0K/CgNeY/tyhk+vO6TYxXC5r5CpUhNVX310xzPsN/H9lCdfOA==}
     engines: {node: '>=14'}
 
   any-promise@1.3.0:
@@ -8078,10 +8078,6 @@ packages:
     peerDependencies:
       dmg-builder: 25.1.8
       electron-builder-squirrel-windows: 25.1.8
-
-  app-root-path@3.1.0:
-    resolution: {integrity: sha512-biN3PwB2gUtjaYy/isrU3aNWI5w+fAfvHkSvCKeQGxhmYpwKFUxudR3Yya+KqVRHBmEDYh+/lTozYCFbmzX4nA==}
-    engines: {node: '>= 6.0.0'}
 
   append-field@1.0.0:
     resolution: {integrity: sha512-klpgFSWLW1ZEs8svjfb7g4qWY0YS5imI82dTg+QahUvJ8YqAY0P10Uk8tTyh9ZGuYEZEMaeJYCF5BFuX552hsw==}
@@ -9797,9 +9793,6 @@ packages:
   dayjs@1.11.18:
     resolution: {integrity: sha512-zFBQ7WFRvVRhKcWoUh+ZA1g2HVgUbsZm9sbddh8EC5iv93sui8DVVz1Npvz+r6meo9VKfa8NyLWBsQK1VvIKPA==}
 
-  dayjs@1.11.20:
-    resolution: {integrity: sha512-YbwwqR/uYpeoP4pu043q+LTDLFBLApUP6VxRihdfNTqu4ubqMlGDLd6ErXhEgsyvY0K6nCs7nggYumAN+9uEuQ==}
-
   dayjs@1.11.21:
     resolution: {integrity: sha512-98IT+HOahAisibz/yjKbzuOBwYcjJ7BCLPzARyHiyEBmRz4fatF+KPJszEHXsGYjUG234aH/cOjW1wwTbKUZlA==}
 
@@ -10222,8 +10215,8 @@ packages:
   eecircuit-engine@1.7.0:
     resolution: {integrity: sha512-ZDpr/w/H81uCH3n2vjf0vohxOQqQ4NCsvaXkoYwcH+LCxIGKpBdvAIvGN5IdozW6AFJ8tojquKvDya3337yjSQ==}
 
-  effect@3.21.4:
-    resolution: {integrity: sha512-B89v/xSgPbl1J2Ai2u18jxq3odpFauU1rC6/eSs4FeNHi72kwKdJp12VGigvRV2lK+kRnx+OOz41XV8guZd4gQ==}
+  effect@3.22.0:
+    resolution: {integrity: sha512-jhYFe0zTlIRqYFrKTS+6luhmS/Tm0f+JLo0K9KUxvtFab1SUGEszQi2ehOP6QzAZvy831lDmTwwzvVDZSPNz3g==}
 
   ejs@3.1.10:
     resolution: {integrity: sha512-UeJmFfOrAQS8OJWPZ4qtgHyWExa088/MtK5UEyoJGFH67cDEXkZSviOiKRCZ4Xij0zxI3JECgYs3oKx+AizQBA==}
@@ -17462,27 +17455,26 @@ packages:
   typedarray@0.0.6:
     resolution: {integrity: sha512-/aCDEGatGvZ2BIk+HmLf4ifCJFwvKFNb9/JeZPMulfgFracn9QFcAf5GO8B/mweUjSoblS5In0cWhqpfs/5PQA==}
 
-  typeorm@0.3.29:
-    resolution: {integrity: sha512-wwPEX/df4l72gCmOsrs0otJZYLGA9lLQkUZCkukbsymEycV4zXv2KM7wU7v2r8L01TaCgY9ApSSqHQWBOUhEoQ==}
-    engines: {node: '>=16.13.0'}
+  typeorm@1.1.0:
+    resolution: {integrity: sha512-iX/kvsV42/htCNAQUyElGW87E4Z12neZc6YUFBTEu0BnLiREYDNT5Wfw3wRqZw9vyOEC36zUBAY6Qvywoig06Q==}
+    engines: {node: ^20.19.0 || ^22.13.0 || >=24.11.0}
     hasBin: true
     peerDependencies:
-      '@google-cloud/spanner': ^5.18.0 || ^6.0.0 || ^7.0.0 || ^8.0.0
+      '@google-cloud/spanner': ^8.0.0
       '@sap/hana-client': ^2.14.22
-      better-sqlite3: ^8.0.0 || ^9.0.0 || ^10.0.0 || ^11.0.0 || ^12.0.0
+      better-sqlite3: ^12.0.0
       ioredis: ^5.0.4
-      mongodb: ^5.8.0 || ^6.0.0
-      mssql: ^9.1.1 || ^10.0.0 || ^11.0.0 || ^12.0.0
-      mysql2: ^2.2.5 || ^3.0.1
-      oracledb: ^6.3.0
+      mongodb: ^7.0.0
+      mssql: ^12.0.0
+      mysql2: ^3.15.3
+      oracledb: ^6.3.0 || ^7.0.0
       pg: ^8.5.1
       pg-native: ^3.0.0
       pg-query-stream: ^4.0.0
-      redis: ^3.1.1 || ^4.0.0 || ^5.0.14
+      redis: ^5.0.0 || ^6.0.0
       sql.js: ^1.4.0
-      sqlite3: ^5.0.3
-      ts-node: ^10.7.0
-      typeorm-aurora-data-api-driver: ^2.0.0 || ^3.0.0
+      ts-node: ^10.9.2
+      typeorm-aurora-data-api-driver: ^3.0.0
     peerDependenciesMeta:
       '@google-cloud/spanner':
         optional: true
@@ -17509,8 +17501,6 @@ packages:
       redis:
         optional: true
       sql.js:
-        optional: true
-      sqlite3:
         optional: true
       ts-node:
         optional: true
@@ -17816,10 +17806,6 @@ packages:
   uuid@10.0.0:
     resolution: {integrity: sha512-8XkAphELsDnEGrDxUOHB3RGvXz6TeuYSGEZBOjtTtPm2lwhGBjLgOzLHB63IUWfBpNucQjND6d3AOudO+H3RWQ==}
     deprecated: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
-    hasBin: true
-
-  uuid@11.1.1:
-    resolution: {integrity: sha512-vIYxrBCC/N/K+Js3qSN88go7kIfNPssr/hHCesKCQNAjmgvYS2oqr69kIufEG+O4+PfezOH4EbIeHCfFov8ZgQ==}
     hasBin: true
 
   uuid@13.0.2:
@@ -22842,7 +22828,7 @@ snapshots:
       ast-types: 0.14.2
       cli-high: 0.4.3
       diff: 5.2.2
-      effect: 3.21.4
+      effect: 3.22.0
       nanoid: 5.1.16
       recast: 0.23.12
       xycolors: 0.1.2
@@ -23391,13 +23377,13 @@ snapshots:
     optionalDependencies:
       '@nestjs/platform-express': 11.1.28(@nestjs/common@11.1.28(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28)
 
-  '@nestjs/typeorm@11.0.3(@nestjs/common@11.1.28(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@0.3.29(babel-plugin-macros@3.1.0)(ioredis@5.11.1)(pg@8.15.6)(sql.js@1.13.0)(sqlite3@5.1.7)(ts-node@10.9.2(@swc/core@1.15.43(@swc/helpers@0.5.23))(@types/node@25.9.1)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))':
+  '@nestjs/typeorm@11.0.3(@nestjs/common@11.1.28(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.1.0(babel-plugin-macros@3.1.0)(ioredis@5.11.1)(pg@8.15.6)(sql.js@1.13.0)(ts-node@10.9.2(@swc/core@1.15.43(@swc/helpers@0.5.23))(@types/node@25.9.1)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))':
     dependencies:
       '@nestjs/common': 11.1.28(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/core': 11.1.28(@nestjs/common@11.1.28(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@11.1.28)(@nestjs/websockets@11.1.28)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       reflect-metadata: 0.2.2
       rxjs: 7.8.2
-      typeorm: 0.3.29(babel-plugin-macros@3.1.0)(ioredis@5.11.1)(pg@8.15.6)(sql.js@1.13.0)(sqlite3@5.1.7)(ts-node@10.9.2(@swc/core@1.15.43(@swc/helpers@0.5.23))(@types/node@25.9.1)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))
+      typeorm: 1.1.0(babel-plugin-macros@3.1.0)(ioredis@5.11.1)(pg@8.15.6)(sql.js@1.13.0)(ts-node@10.9.2(@swc/core@1.15.43(@swc/helpers@0.5.23))(@types/node@25.9.1)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))
 
   '@nestjs/websockets@11.1.28(@nestjs/common@11.1.28(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28)(@nestjs/platform-socket.io@11.0.20)(reflect-metadata@0.2.2)(rxjs@7.8.2)':
     dependencies:
@@ -25831,7 +25817,7 @@ snapshots:
 
   '@stoplight/json-ref-resolver@3.1.6':
     dependencies:
-      '@stoplight/json': 3.21.0
+      '@stoplight/json': 3.21.7
       '@stoplight/path': 1.3.2
       '@stoplight/types': 13.20.0
       '@types/urijs': 1.19.26
@@ -25971,7 +25957,7 @@ snapshots:
 
   '@stoplight/spectral-parsers@1.0.5':
     dependencies:
-      '@stoplight/json': 3.21.0
+      '@stoplight/json': 3.21.7
       '@stoplight/types': 14.1.1
       '@stoplight/yaml': 4.3.0
       tslib: 2.8.1
@@ -27692,27 +27678,27 @@ snapshots:
       path-browserify: 1.0.1
       vscode-uri: 3.1.0
 
-  '@vue/compiler-core@3.5.39':
+  '@vue/compiler-core@3.5.40':
     dependencies:
       '@babel/parser': 7.29.7
-      '@vue/shared': 3.5.39
+      '@vue/shared': 3.5.40
       entities: 7.0.1
       estree-walker: 2.0.2
       source-map-js: 1.2.1
     optional: true
 
-  '@vue/compiler-dom@3.5.39':
+  '@vue/compiler-dom@3.5.40':
     dependencies:
-      '@vue/compiler-core': 3.5.39
-      '@vue/shared': 3.5.39
+      '@vue/compiler-core': 3.5.40
+      '@vue/shared': 3.5.40
     optional: true
 
   '@vue/language-core@1.8.27(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))':
     dependencies:
       '@volar/language-core': 1.11.1
       '@volar/source-map': 1.11.1
-      '@vue/compiler-dom': 3.5.39
-      '@vue/shared': 3.5.39
+      '@vue/compiler-dom': 3.5.40
+      '@vue/shared': 3.5.40
       computeds: 0.0.1
       minimatch: 9.0.9
       muggle-string: 0.3.1
@@ -27722,7 +27708,7 @@ snapshots:
       typescript: 7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)
     optional: true
 
-  '@vue/shared@3.5.39':
+  '@vue/shared@3.5.40':
     optional: true
 
   '@webassemblyjs/ast@1.14.1':
@@ -28176,7 +28162,7 @@ snapshots:
 
   ansi-styles@6.2.3: {}
 
-  ansis@4.2.0: {}
+  ansis@4.3.1: {}
 
   any-promise@1.3.0: {}
 
@@ -28230,8 +28216,6 @@ snapshots:
     transitivePeerDependencies:
       - bluebird
       - supports-color
-
-  app-root-path@3.1.0: {}
 
   append-field@1.0.0: {}
 
@@ -30371,8 +30355,6 @@ snapshots:
 
   dayjs@1.11.18: {}
 
-  dayjs@1.11.20: {}
-
   dayjs@1.11.21: {}
 
   de-indent@1.0.2:
@@ -30809,7 +30791,7 @@ snapshots:
 
   eecircuit-engine@1.7.0: {}
 
-  effect@3.21.4:
+  effect@3.22.0:
     dependencies:
       '@standard-schema/spec': 1.1.0
       fast-check: 3.23.2
@@ -39110,6 +39092,7 @@ snapshots:
       inherits: 2.0.4
       safe-buffer: 5.2.1
       to-buffer: 1.2.2
+    optional: true
 
   shallow-clone@3.0.1:
     dependencies:
@@ -40699,28 +40682,22 @@ snapshots:
 
   typedarray@0.0.6: {}
 
-  typeorm@0.3.29(babel-plugin-macros@3.1.0)(ioredis@5.11.1)(pg@8.15.6)(sql.js@1.13.0)(sqlite3@5.1.7)(ts-node@10.9.2(@swc/core@1.15.43(@swc/helpers@0.5.23))(@types/node@25.9.1)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))):
+  typeorm@1.1.0(babel-plugin-macros@3.1.0)(ioredis@5.11.1)(pg@8.15.6)(sql.js@1.13.0)(ts-node@10.9.2(@swc/core@1.15.43(@swc/helpers@0.5.23))(@types/node@25.9.1)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))):
     dependencies:
       '@sqltools/formatter': 1.2.5
-      ansis: 4.2.0
-      app-root-path: 3.1.0
-      buffer: 6.0.3
-      dayjs: 1.11.20
+      ansis: 4.3.1
+      dayjs: 1.11.21
       debug: 4.4.3
       dedent: 1.7.2(babel-plugin-macros@3.1.0)
-      dotenv: 16.6.1
-      glob: 10.5.0
       reflect-metadata: 0.2.2
-      sha.js: 2.4.12
       sql-highlight: 6.1.0
+      tinyglobby: 0.2.17
       tslib: 2.8.1
-      uuid: 11.1.1
-      yargs: 17.7.2
+      yargs: 18.0.0
     optionalDependencies:
       ioredis: 5.11.1
       pg: 8.15.6
       sql.js: 1.13.0
-      sqlite3: 5.1.7
       ts-node: 10.9.2(@swc/core@1.15.43(@swc/helpers@0.5.23))(@types/node@25.9.1)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
     transitivePeerDependencies:
       - babel-plugin-macros
@@ -41072,8 +41049,6 @@ snapshots:
   utils-merge@1.0.1: {}
 
   uuid@10.0.0: {}
-
-  uuid@11.1.1: {}
 
   uuid@13.0.2: {}
 
