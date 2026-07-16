@@ -42,12 +42,16 @@ export function SettingsStep({ settings, onSave, onBack }: Props) {
         <FieldError>{error}</FieldError>
       </TextField>
       <Switch isSelected={foregroundApp} onChange={setForegroundApp}>
-        <Switch.Control><Switch.Thumb /></Switch.Control>
-        <Switch.Content>Report foreground app to flow triggers</Switch.Content>
+        <Switch.Content>
+          <Switch.Control><Switch.Thumb /></Switch.Control>
+          Report foreground app to flow triggers
+        </Switch.Content>
       </Switch>
       <Switch isSelected={usbDevices} onChange={setUsbDevices}>
-        <Switch.Control><Switch.Thumb /></Switch.Control>
-        <Switch.Content>Report USB device connect/disconnect to flow triggers</Switch.Content>
+        <Switch.Content>
+          <Switch.Control><Switch.Thumb /></Switch.Control>
+          Report USB device connect/disconnect to flow triggers
+        </Switch.Content>
       </Switch>
       <Button variant="primary" fullWidth onPress={handleSave}>
         Save
