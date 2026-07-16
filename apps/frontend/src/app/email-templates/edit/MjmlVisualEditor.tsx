@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import grapesjs from 'grapesjs';
+import grapesjs, { type Component } from 'grapesjs';
 import grapesJSMJMLModule from 'grapesjs-mjml';
 import grapesjsDeModule from 'grapesjs/locale/de';
 import grapesjsMjmlDeModule from 'grapesjs-mjml/locale/de';
@@ -18,6 +18,15 @@ interface MjmlVisualEditorProps {
   initialValue: string;
   onChange: (mjml: string) => void;
   language: string;
+  /**
+   * mj-head fragment (e.g. "<mj-head><mj-attributes>...</mj-attributes></mj-head>") injected into the
+   * per-component MJML compile so global styles render in the canvas. Not editable, never exported.
+   */
+  headMjml?: string;
+  /** Components whose css-class contains this become inert: visible but not selectable/editable/removable. */
+  lockClass?: string;
+  /** Report the full <mjml> document (incl. mj-body attributes) from onChange instead of the body fragment. */
+  exportFullDocument?: boolean;
 }
 
 const wrapFragment = (value: string) =>
@@ -63,6 +72,11 @@ export function MjmlVisualEditor(props: MjmlVisualEditorProps) {
       fromElement: false,
       height: '100%',
       storageManager: false,
+      // Text edits are re-parsed on commit, and the browser re-encodes nbsp & co.
+      // as HTML-only entities the XML parser rejects — without this, an edit next
+      // to an &nbsp; injects a literal <parsererror> element into the component
+      // tree, which then gets exported and saved. Decode before every parse.
+      parser: { optionsHtml: { preParser: decodeHtmlOnlyEntities } },
       i18n: {
         locale: propsRef.current.language,
         messages: { de: grapesjsDe },
@@ -90,15 +104,62 @@ export function MjmlVisualEditor(props: MjmlVisualEditorProps) {
       }
     });
 
+    // grapesjs-mjml renders each component by compiling a standalone
+    // "<mjml><mj-body>...</mj-body></mjml>" mini-document, so mj-head styles
+    // (mj-attributes, mj-style) never apply in the canvas. Splice the head
+    // into every mini-document so the canvas matches the final email.
+    const headMjml = propsRef.current.headMjml;
+    if (headMjml) {
+      editor.Components.getTypes().forEach((type) => {
+        const viewProto = editor.Components.getType(type.id)?.view?.prototype as
+          | { getMjmlTemplate?: () => { start: string; end: string } }
+          | undefined;
+        const original = viewProto?.getMjmlTemplate;
+        if (viewProto && original) {
+          viewProto.getMjmlTemplate = function () {
+            const tpl = original.call(this);
+            return { ...tpl, start: tpl.start.replace('<mjml>', `<mjml>${headMjml}`) };
+          };
+        }
+      });
+    }
+
     editor.setComponents(initialMjml);
+
+    const lockClass = propsRef.current.lockClass;
+    if (lockClass) {
+      editor.getWrapper()?.onAll((component) => {
+        const isLocked = (c: Component | undefined): boolean =>
+          !!c && (String(c.getAttributes()['css-class'] ?? '').includes(lockClass) || isLocked(c.parent()));
+        if (isLocked(component)) {
+          component.set({
+            locked: true,
+            selectable: false,
+            hoverable: false,
+            editable: false,
+            draggable: false,
+            droppable: false,
+            copyable: false,
+            removable: false,
+            highlightable: false,
+          });
+        }
+      });
+    }
 
     editor.onReady(() => {
       // ponytail: listener attached after initial parse settles, so load-time
       // normalization never clobbers untouched templates — only user edits do.
       setTimeout(() => {
-        editor.on('update', () => propsRef.current.onChange(unwrapFragment(editor.getHtml())));
+        editor.on('update', () => {
+          const mjml = editor.getHtml();
+          propsRef.current.onChange(propsRef.current.exportFullDocument ? mjml : unwrapFragment(mjml));
+        });
       }, 0);
     });
+
+    // Handle for e2e tests and debugging (the canvas is otherwise unreachable from outside).
+    (container as HTMLDivElement & { __grapesEditor?: unknown }).__grapesEditor = editor;
 
     return () => editor.destroy();
   }, []);
