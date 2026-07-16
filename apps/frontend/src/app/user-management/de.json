@@ -12,14 +12,10 @@
       "username": "Benutzername",
       "externalIdentifier": "Externe ID",
       "ssoLinked": "SSO",
-      "permissions": "Berechtigungen",
-      "canManageResources": "Ressourcen konfigurieren",
-      "canManageSystemConfiguration": "System konfigurieren",
-      "canManageUsers": "Benutzerkonfiguration",
-      "canManageBilling": "Abrechnung verwalten"
+      "roles": "Rollen"
     },
     "ssoLinked": "SSO verknüpft ({{providers}})",
-    "noPermissions": "Keine Berechtigungen"
+    "noRoles": "Keine erhöhten Rollen"
   },
   "actions": {
     "menu": "Einstellungen",

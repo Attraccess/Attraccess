@@ -20,6 +20,7 @@ import { Project } from './project';
 import { ProjectMember } from './project-member.entity';
 import { ProjectInvitation } from './project-invitation.entity';
 import { FormSubmission } from './form';
+import { UserRole } from './user-role.entity';
 
 
 @Entity()
@@ -215,4 +216,8 @@ export class User {
     onDelete: 'CASCADE',
   })
   formSubmissions!: FormSubmission[];
+
+  @OneToMany(() => UserRole, (ur) => ur.user, { onDelete: 'CASCADE' })
+  @ApiProperty({ type: [UserRole], description: 'Role assignments for this user', required: false })
+  userRoles!: UserRole[];
 }

@@ -11,30 +11,49 @@ const assignRoleMock = vi.fn().mockResolvedValue(undefined);
 const revokeRoleMock = vi.fn().mockResolvedValue(undefined);
 
 const ROLES = [
-  { id: 1, key: 'resource-manager', label: 'Resource Manager' },
-  { id: 2, key: 'system-admin', label: 'System Admin' },
-  { id: 3, key: 'user-manager', label: 'User Manager' },
-  { id: 4, key: 'billing-manager', label: 'Billing Manager' },
+  { id: 1, key: 'resource-manager', name: 'Resource Manager', rolePermissions: [] },
+  { id: 2, key: 'system-admin', name: 'System Admin', rolePermissions: [] },
+  { id: 3, key: 'user-manager', name: 'User Manager', rolePermissions: [] },
+  { id: 4, key: 'billing-manager', name: 'Billing Manager', rolePermissions: [] },
+  { id: 5, key: 'owner', name: 'Owner', rolePermissions: [] },
 ];
 
 // Stable reference — must not be inline in the mock factory; a new array on every hook
 // call makes userRoles change reference each render and causes an infinite useEffect loop.
-const USER_ROLE_ASSIGNMENTS = [{ roleId: 1 }, { roleId: 3 }];
+const USER_ROLE_ASSIGNMENTS_MANUAL = [
+  { roleId: 1, source: 'manual', role: ROLES[0] },
+  { roleId: 3, source: 'manual', role: ROLES[2] },
+];
+
+const USER_ROLE_ASSIGNMENTS_WITH_SSO = [
+  { roleId: 1, source: 'manual', role: ROLES[0] },
+  { roleId: 2, source: 'sso', ssoProviderId: 10, ssoProviderType: 'oidc', externalValue: 'admins', role: ROLES[1] },
+  // owner via SSO — not in manageable list
+  { roleId: 5, source: 'sso', ssoProviderId: 10, ssoProviderType: 'oidc', externalValue: 'owners', role: ROLES[4] },
+];
+
+let currentUserRoles: typeof USER_ROLE_ASSIGNMENTS_MANUAL | typeof USER_ROLE_ASSIGNMENTS_WITH_SSO =
+  USER_ROLE_ASSIGNMENTS_MANUAL;
 
 vi.mock('@attraccess/plugins-frontend-ui', () => ({
   useTranslations: () => {
     const translations: Record<string, string> = {
-      title: 'Permissions',
+      title: 'Roles & Permissions',
       'permissions.resource-manager': 'Manage resources',
       'permissions.system-admin': 'Manage system configuration',
       'permissions.user-manager': 'Manage users',
       'permissions.billing-manager': 'Manage billing',
       'actions.save': 'Save',
-      'messages.updated': 'Permissions updated',
+      'messages.updated': 'Roles updated',
       'ssoManaged.title': 'Managed by SSO',
       'ssoManaged.description':
-        'Permissions are managed by {{providers}} and cannot be edited here. Update the SSO permission mappings to change them.',
+        'Some roles are managed by {{providers}} and cannot be edited here.',
       'ssoManaged.providerFallback': 'the SSO provider',
+      'ssoAssignment.assignedBy': 'Via SSO',
+      'ssoAssignment.provider': 'Provider: {{name}}',
+      'ssoAssignment.externalValue': 'Group: {{value}}',
+      'ssoOnlyRoles.title': 'SSO-managed roles',
+      'ssoOnlyRoles.subtitle': 'These roles are controlled entirely by SSO.',
     };
 
     const t = (key: string, vars?: Record<string, unknown>) => {
@@ -69,7 +88,7 @@ vi.mock('../../../../../components/labeledSwitch', () => ({
 vi.mock('@attraccess/react-query-client', () => ({
   useRbacServiceListRoles: () => ({ data: ROLES, isLoading: false }),
   useUsersServiceGetUserRoleAssignments: () => ({
-    data: USER_ROLE_ASSIGNMENTS, // resource-manager and user-manager assigned
+    data: currentUserRoles,
     isLoading: false,
   }),
   useUsersServiceAssignRoleToUser: () => ({ mutateAsync: assignRoleMock, isPending: false }),
@@ -82,6 +101,7 @@ describe('UserPermissionForm', () => {
   beforeEach(() => {
     assignRoleMock.mockClear();
     revokeRoleMock.mockClear();
+    currentUserRoles = USER_ROLE_ASSIGNMENTS_MANUAL;
   });
 
   it('disables role editing when managed by SSO', async () => {
@@ -117,6 +137,53 @@ describe('UserPermissionForm', () => {
     await waitFor(() => {
       expect(assignRoleMock).toHaveBeenCalledWith({ id: user.id, requestBody: { roleId: 4 } });
       expect(revokeRoleMock).toHaveBeenCalledWith({ id: user.id, roleId: 1 });
+    });
+  });
+
+  it('shows SSO badge with external value for SSO-assigned manageable roles', async () => {
+    currentUserRoles = USER_ROLE_ASSIGNMENTS_WITH_SSO;
+    const user = { id: 5 } as User;
+    render(<UserPermissionForm user={user} ssoManagedProviders={['MyOIDC']} ssoManagedPermissionKeys={new Set(['system-admin'])} />, {
+      wrapper: TestWrapper,
+    });
+
+    // system-admin is SSO-managed: should show the badge
+    await waitFor(() =>
+      expect(screen.getByText(/Via SSO: #10 · admins/)).toBeInTheDocument()
+    );
+  });
+
+  it('shows SSO-only roles section for non-manageable SSO roles', async () => {
+    currentUserRoles = USER_ROLE_ASSIGNMENTS_WITH_SSO;
+    const user = { id: 5 } as User;
+    render(<UserPermissionForm user={user} ssoManagedProviders={['MyOIDC']} />, { wrapper: TestWrapper });
+
+    await waitFor(() =>
+      expect(screen.getByTestId !== undefined
+        ? screen.getByText('SSO-managed roles')
+        : true
+      ).toBeTruthy()
+    );
+
+    // Owner role should appear in the SSO-only section
+    await waitFor(() => expect(screen.getByText('Owner')).toBeInTheDocument());
+  });
+
+  it('disables toggle for SSO-managed role keys', async () => {
+    currentUserRoles = USER_ROLE_ASSIGNMENTS_WITH_SSO;
+    const user = { id: 5 } as User;
+    render(
+      <UserPermissionForm
+        user={user}
+        ssoManagedProviders={['MyOIDC']}
+        ssoManagedPermissionKeys={new Set(['system-admin'])}
+      />,
+      { wrapper: TestWrapper },
+    );
+
+    await waitFor(() => {
+      const systemAdminCheckbox = screen.getByLabelText('Manage system configuration');
+      expect(systemAdminCheckbox).toBeDisabled();
     });
   });
 });
