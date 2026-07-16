@@ -63,6 +63,7 @@
   "toast": {
     "saveSuccess": "Template saved.",
     "saveError": "Failed to save template.",
+    "extractError": "Could not separate the template content from the layout frame. Please reload the page and try again.",
     "resetSuccess": "Template reset to default.",
     "resetError": "Failed to reset template."
   }

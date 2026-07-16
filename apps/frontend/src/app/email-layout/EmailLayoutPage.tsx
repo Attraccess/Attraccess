@@ -19,6 +19,7 @@ import { useToastMessage } from '../../components/toastProvider';
 import { StandardDrawer } from '../../components/standardDrawer';
 import { StandardModal } from '../../components/standardModal';
 import { MjmlVisualEditor } from '../email-templates/edit/MjmlVisualEditor';
+import { CONTENT_PLACEHOLDER, splitHead } from '../email-templates/edit/mjmlLayout';
 import {
   useEmailLayoutServiceEmailLayoutControllerFindGlobal,
   useEmailLayoutServiceEmailLayoutControllerUpdate,
@@ -28,7 +29,6 @@ import {
 import en from './en.json';
 import de from './de.json';
 
-const CONTENT_PLACEHOLDER = '{{content}}';
 const PLACEHOLDER_CLASS = 'layout-content-placeholder';
 
 // The stored layout is a full <mjml> document with a raw {{content}} token in
@@ -36,11 +36,6 @@ const PLACEHOLDER_CLASS = 'layout-content-placeholder';
 // for a locked, visibly-marked section and swap back on save. The mj-head is
 // split off too (GrapesJS has no mj-attributes component) and carried through
 // verbatim; MjmlVisualEditor injects it into the canvas so styles still render.
-const splitHead = (doc: string) => {
-  const match = doc.match(/<mj-head[\s\S]*?<\/mj-head>/);
-  return { head: match?.[0] ?? '', body: match ? doc.replace(match[0], '') : doc };
-};
-
 const placeholderSection = (label: string) =>
   `<mj-section css-class="${PLACEHOLDER_CLASS}" background-color="#F1F5F9" border="2px dashed #94A3B8">` +
   `<mj-column><mj-text align="center" color="#64748B" font-size="14px">${label}</mj-text></mj-column>` +

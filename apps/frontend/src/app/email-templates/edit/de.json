@@ -63,6 +63,7 @@
   "toast": {
     "saveSuccess": "Vorlage gespeichert.",
     "saveError": "Vorlage konnte nicht gespeichert werden.",
+    "extractError": "Der Vorlageninhalt konnte nicht vom Layout-Rahmen getrennt werden. Bitte Seite neu laden und erneut versuchen.",
     "resetSuccess": "Vorlage auf Standard zurückgesetzt.",
     "resetError": "Vorlage konnte nicht zurückgesetzt werden."
   }

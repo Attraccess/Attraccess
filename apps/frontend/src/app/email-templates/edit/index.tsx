@@ -4,6 +4,7 @@ import {
   useEmailTemplatesServiceEmailTemplateControllerFindOne as useFindOneEmailTemplate,
   useEmailTemplatesServiceEmailTemplateControllerUpdate as useUpdateEmailTemplate,
   useEmailTemplatesServiceEmailTemplateControllerResetToDefault as useResetTemplateToDefault,
+  useEmailLayoutServiceEmailLayoutControllerFindGlobal as useFindGlobalEmailLayout,
   EmailTemplateType,
 } from '@attraccess/react-query-client';
 import {
@@ -32,6 +33,7 @@ import { StandardDrawer } from '../../../components/standardDrawer';
 import { StandardModal } from '../../../components/standardModal';
 import { MjmlVisualEditor } from './MjmlVisualEditor';
 import { TranslationsSection } from './TranslationsSection';
+import { CHROME_CLASS, extractTemplateFragment, splitHead, wrapInLayoutChrome } from './mjmlLayout';
 
 import * as enTranslationsFile from './en.json';
 import * as deTranslationsFile from './de.json';
@@ -45,24 +47,44 @@ export function EditEmailTemplatePage() {
   const template = useFindOneEmailTemplate({ type: templateType as EmailTemplateType }, undefined, {
     enabled: !!templateType,
   });
+  const layout = useFindGlobalEmailLayout();
 
   // The GrapesJS canvas is uncontrolled: it reads its initial value once on
   // mount and reports edits into a ref, so typing never re-renders this page
   // and background refetches never clobber unsaved work. `editorSeed` only
   // changes when we deliberately want a fresh canvas (first load, reset).
+  //
+  // The canvas shows the template wrapped in the global layout: the layout's
+  // chrome (header/footer) is rendered locked around the editable content and
+  // stripped again on save; the layout's mj-head is injected into the canvas
+  // rendering so global styles apply. If the layout is unavailable or shaped
+  // unexpectedly, the editor falls back to plain fragment editing.
   const [subject, setSubject] = useState('');
   const bodyRef = useRef('');
   const initialBodyRef = useRef<string | null>(null);
+  const headMjmlRef = useRef('');
+  const isWrappedRef = useRef(false);
+  const layoutBodyRef = useRef('');
   const [editorSeed, setEditorSeed] = useState(0);
 
+  const seedEditor = useCallback((fragment: string) => {
+    const { head, body: layoutBody } = splitHead(layoutBodyRef.current);
+    const wrapped = layoutBody ? wrapInLayoutChrome(layoutBody, fragment) : null;
+    headMjmlRef.current = wrapped ? head : '';
+    isWrappedRef.current = wrapped !== null;
+    initialBodyRef.current = wrapped ?? fragment;
+    bodyRef.current = wrapped ?? fragment;
+    setEditorSeed((seed) => seed + 1);
+  }, []);
+
+  const layoutSettled = layout.isSuccess || layout.isError;
   useEffect(() => {
-    if (template.data && initialBodyRef.current === null) {
-      initialBodyRef.current = template.data.body;
-      bodyRef.current = template.data.body;
+    if (template.data && layoutSettled && initialBodyRef.current === null) {
+      layoutBodyRef.current = layout.data?.body ?? '';
       setSubject(template.data.subject);
-      setEditorSeed((seed) => seed + 1);
+      seedEditor(template.data.body);
     }
-  }, [template.data]);
+  }, [template.data, layoutSettled, layout.data, seedEditor]);
 
   const handleBodyChange = useCallback((mjml: string) => {
     bodyRef.current = mjml;
@@ -71,13 +93,18 @@ export function EditEmailTemplatePage() {
   const updateTemplate = useUpdateEmailTemplate();
   const onSave = useCallback(() => {
     if (!templateType) return;
+    const body = isWrappedRef.current ? extractTemplateFragment(bodyRef.current) : bodyRef.current;
+    if (body === null) {
+      toast.error({ title: t('toast.saveError'), description: t('toast.extractError') });
+      return;
+    }
     updateTemplate.mutate(
-      { type: templateType, requestBody: { subject, body: bodyRef.current } },
+      { type: templateType, requestBody: { subject, body } },
       {
         onSuccess: () => toast.success({ title: t('toast.saveSuccess') }),
         onError: (error) => {
-          const body = (error as { body?: { message?: string | string[] } })?.body;
-          const message = Array.isArray(body?.message) ? body?.message[0] : body?.message;
+          const responseBody = (error as { body?: { message?: string | string[] } })?.body;
+          const message = Array.isArray(responseBody?.message) ? responseBody?.message[0] : responseBody?.message;
           toast.error({ title: t('toast.saveError'), description: message });
         },
       },
@@ -92,17 +119,15 @@ export function EditEmailTemplatePage() {
       { type: templateType },
       {
         onSuccess: (data) => {
-          initialBodyRef.current = data.body;
-          bodyRef.current = data.body;
           setSubject(data.subject);
-          setEditorSeed((seed) => seed + 1);
+          seedEditor(data.body);
           setResetConfirmOpen(false);
           toast.success({ title: t('toast.resetSuccess') });
         },
         onError: () => toast.error({ title: t('toast.resetError') }),
       },
     );
-  }, [resetTemplate, templateType, toast, t]);
+  }, [resetTemplate, templateType, seedEditor, toast, t]);
 
   const variables = template.data?.variables ?? [];
   const copyVariable = useCallback(
@@ -121,7 +146,8 @@ export function EditEmailTemplatePage() {
   const [translationsOpen, setTranslationsOpen] = useState(false);
   const [translationsContent, setTranslationsContent] = useState('');
   const openTranslations = useCallback(() => {
-    setTranslationsContent(subject + '\n' + bodyRef.current);
+    const body = (isWrappedRef.current ? extractTemplateFragment(bodyRef.current) : null) ?? bodyRef.current;
+    setTranslationsContent(subject + '\n' + body);
     setTranslationsOpen(true);
   }, [subject]);
 
@@ -213,6 +239,9 @@ export function EditEmailTemplatePage() {
             initialValue={initialBodyRef.current}
             onChange={handleBodyChange}
             language={language}
+            headMjml={headMjmlRef.current || undefined}
+            lockClass={isWrappedRef.current ? CHROME_CLASS : undefined}
+            exportFullDocument={isWrappedRef.current}
           />
         )}
       </div>

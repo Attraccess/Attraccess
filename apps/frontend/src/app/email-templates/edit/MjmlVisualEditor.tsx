@@ -5,6 +5,7 @@ import grapesjsDeModule from 'grapesjs/locale/de';
 import grapesjsMjmlDeModule from 'grapesjs-mjml/locale/de';
 import 'grapesjs/dist/css/grapes.min.css';
 import './MjmlVisualEditor.css';
+import { decodeHtmlOnlyEntities } from './mjmlLayout';
 
 // grapesjs-mjml and the locale files ship as CJS; depending on the bundler's
 // interop the callable/plain export is either the module itself or `.default`.
@@ -35,17 +36,6 @@ const wrapFragment = (value: string) =>
 const unwrapFragment = (mjml: string) => {
   const match = mjml.match(/<mj-body[^>]*>([\s\S]*)<\/mj-body>/);
   return (match ? match[1] : mjml).trim();
-};
-
-// The plugin's XML parser mode is the only one that keeps raw HTML inside
-// mj-table intact, but it chokes on HTML-only named entities like &nbsp;.
-// Decode those to plain characters so XML mode works for realistic content.
-const decodeHtmlOnlyEntities = (value: string) => {
-  const decoder = document.createElement('textarea');
-  return value.replace(/&(?!(?:amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);)\w+;/g, (entity) => {
-    decoder.innerHTML = entity;
-    return decoder.value;
-  });
 };
 
 // If the content still isn't well-formed XML, fall back to the HTML parser —
