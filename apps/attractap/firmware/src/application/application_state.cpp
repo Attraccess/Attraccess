@@ -9,6 +9,21 @@ void Application::processState() {
   this->updateLedState();
 #endif
 
+#ifdef DEMO_MODE
+  // In demo mode, handle a pending card scan for the settings screen.
+  if (this->demoPendingScanReady) {
+    this->demoPendingScanReady = false;
+    this->nfc.disableCardDetection();
+    Display::demoSettingsScreen.onCardScanned(this->demoScanUid);
+    this->demoScanUid.clear();
+    return;
+  }
+  // In demo mode the settings screen is always accessible and connection
+  // config / PIN prompts are suppressed.
+  if (this->state == APPLICATION_STATE_CONFIGURATION_REQUIRED) {
+    return;
+  }
+#else
   AttraccessApiConfig attraccessApiConfig = Settings::getAttraccessApiConfig();
   bool connectionIsConfigured = !attraccessApiConfig.hostname.empty() &&
                                 attraccessApiConfig.hostname != "" &&
@@ -34,6 +49,7 @@ void Application::processState() {
     {
         return;
     }
+#endif // DEMO_MODE
 
 #ifdef HAS_LVGL_DISPLAY
   if (!this->bootDone &&
@@ -46,6 +62,7 @@ void Application::processState() {
     return;
   }
 
+#ifndef DEMO_MODE
   bool pinIsSet = Settings::getDeviceConfig().passCode != "0000";
   if (!pinIsSet) {
     if (this->state == APPLICATION_STATE_PIN_NOT_SET) {
@@ -58,7 +75,8 @@ void Application::processState() {
     Display::transitionToScreen(&Display::setPinScreen);
     return;
   }
-#endif
+#endif // !DEMO_MODE
+#endif // HAS_LVGL_DISPLAY
 
   State::ApiState apiState = State::getApiState();
   State::NetworkState networkState = State::getNetworkState();
