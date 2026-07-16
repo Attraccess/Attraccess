@@ -215,6 +215,8 @@ describe('Node.js version consistency', () => {
 
     const workflowsWithDocker = [
       'docker-nightly-latest.yml',
+      'pull-requests.yml',
+      'release.yml',
     ];
 
     workflowsWithDocker.forEach((workflowFile) => {
