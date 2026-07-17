@@ -205,8 +205,15 @@ export class SSOController {
     description: 'Forbidden - Insufficient permissions',
   })
   async createOne(@Body() createDto: CreateSSOProviderDto, @Req() request: AuthenticatedRequest): Promise<SSOProvider> {
-    const oidcMappings = createDto.oidcConfiguration?.roleMappings ?? createDto.oidcConfiguration?.permissionMappings;
-    const samlMappings = createDto.samlConfiguration?.roleMappings ?? createDto.samlConfiguration?.permissionMappings;
+    // !== undefined precedence so an explicit null on the canonical field is still gated (matches the service write)
+    const oidcMappings =
+      createDto.oidcConfiguration?.roleMappings !== undefined
+        ? createDto.oidcConfiguration.roleMappings
+        : createDto.oidcConfiguration?.permissionMappings;
+    const samlMappings =
+      createDto.samlConfiguration?.roleMappings !== undefined
+        ? createDto.samlConfiguration.roleMappings
+        : createDto.samlConfiguration?.permissionMappings;
     if (oidcMappings !== undefined || samlMappings !== undefined) {
       const actor = request.user as AuthenticatedUser;
       if (!actor.effectivePermissions?.has('users.roles.manage')) {
@@ -247,8 +254,15 @@ export class SSOController {
   ): Promise<SSOProvider> {
     const providerId = parseInt(id, 10);
 
-    const oidcMappings = updateDto.oidcConfiguration?.roleMappings ?? updateDto.oidcConfiguration?.permissionMappings;
-    const samlMappings = updateDto.samlConfiguration?.roleMappings ?? updateDto.samlConfiguration?.permissionMappings;
+    // !== undefined precedence so an explicit null on the canonical field is still gated (matches the service write)
+    const oidcMappings =
+      updateDto.oidcConfiguration?.roleMappings !== undefined
+        ? updateDto.oidcConfiguration.roleMappings
+        : updateDto.oidcConfiguration?.permissionMappings;
+    const samlMappings =
+      updateDto.samlConfiguration?.roleMappings !== undefined
+        ? updateDto.samlConfiguration.roleMappings
+        : updateDto.samlConfiguration?.permissionMappings;
 
     if (oidcMappings !== undefined || samlMappings !== undefined) {
       const actor = request.user as AuthenticatedUser;

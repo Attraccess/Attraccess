@@ -204,7 +204,10 @@ export class SSOService {
       payload.emailClaimPaths = updateConfig.emailClaimPaths;
     }
     if (typeof updateConfig.roleMappings !== 'undefined' || typeof updateConfig.permissionMappings !== 'undefined') {
-      payload.roleMappings = (updateConfig.roleMappings ?? updateConfig.permissionMappings) as Record<string, string[]>;
+      // explicit null clears the column; !== undefined so null on the canonical field isn't swallowed by the alias
+      payload.roleMappings = ((updateConfig.roleMappings !== undefined
+        ? updateConfig.roleMappings
+        : updateConfig.permissionMappings) ?? null) as Record<string, string[]>;
     }
 
     await this.oidcConfigRepository.update({ ssoProviderId: providerId }, payload);
@@ -297,7 +300,9 @@ export class SSOService {
       payload.provisioningSecret = trimmed ? this.encryptionService.encrypt(trimmed) : null;
     }
     if (typeof config.roleMappings !== 'undefined' || typeof config.permissionMappings !== 'undefined') {
-      payload.roleMappings = (config.roleMappings ?? config.permissionMappings) as Record<string, string[]>;
+      // explicit null clears the column; !== undefined so null on the canonical field isn't swallowed by the alias
+      payload.roleMappings = ((config.roleMappings !== undefined ? config.roleMappings : config.permissionMappings) ??
+        null) as Record<string, string[]>;
     }
     if (typeof config.spSigningCertificate !== 'undefined') {
       payload.spSigningCertificate = config.spSigningCertificate

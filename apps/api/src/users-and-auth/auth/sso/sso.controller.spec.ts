@@ -4,7 +4,7 @@ import { SSOService } from './sso.service';
 import { AuthService } from '../auth.service';
 import { SessionService } from '../session.service';
 import { AuthenticationDetail, AuthenticationType, SSOProvider, SSOProviderType } from '@attraccess/database-entities';
-import { BadRequestException, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { CreateSSOProviderDto } from './dto/create-sso-provider.dto';
 import { UpdateSSOProviderDto } from './dto/update-sso-provider.dto';
@@ -257,6 +257,17 @@ describe('SsoController', () => {
 
       expect(result).toEqual(mockSSOProvider);
       expect(ssoService.updateProvider).toHaveBeenCalledWith(1, updateDto);
+    });
+
+    it('gates explicit null roleMappings behind users.roles.manage', async () => {
+      const updateDto = {
+        oidcConfiguration: { roleMappings: null },
+      } as unknown as UpdateSSOProviderDto;
+
+      const mockReq = { user: { id: 1, effectivePermissions: new Set<string>() } } as unknown as AuthenticatedRequest;
+
+      await expect(controller.updateOne('1', updateDto, mockReq)).rejects.toThrow(ForbiddenException);
+      expect(ssoService.updateProvider).not.toHaveBeenCalled();
     });
   });
 

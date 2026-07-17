@@ -279,6 +279,11 @@ export const useSSOProviderForm = (providerId?: number) => {
         return;
       }
 
+      const hasStoredMappings = (config?: {
+        roleMappings?: Record<string, unknown> | null;
+        permissionMappings?: Record<string, unknown> | null;
+      }) => Object.keys(config?.roleMappings ?? config?.permissionMappings ?? {}).length > 0;
+
       const buildOidcPayload = () => {
         const base = ensureOidcConfiguration(formValues.oidcConfiguration);
         const payload: CreateOIDCConfigurationDto = {
@@ -294,7 +299,13 @@ export const useSSOProviderForm = (providerId?: number) => {
         if (usernameClaimPathsInput.trim().length > 0) payload.usernameClaimPaths = parseList(usernameClaimPathsInput);
         if (emailClaimPathsInput.trim().length > 0) payload.emailClaimPaths = parseList(emailClaimPathsInput);
         const roleMappings = buildRoleMappingsPayload(oidcRoleMappingEntries);
-        if (roleMappings) payload.roleMappings = roleMappings;
+        if (roleMappings) {
+          payload.roleMappings = roleMappings;
+        } else if (isEditing && hasStoredMappings(providerDetails?.oidcConfiguration)) {
+          // emptied table must clear stored mappings; only sent when the provider had
+          // some, so plain edits by users without users.roles.manage keep working
+          payload.roleMappings = {};
+        }
 
         return payload;
       };
@@ -334,6 +345,10 @@ export const useSSOProviderForm = (providerId?: number) => {
         const roleMappings = buildRoleMappingsPayload(samlRoleMappingEntries);
         if (roleMappings) {
           payload.roleMappings = roleMappings;
+        } else if (isEditing && hasStoredMappings(providerDetails?.samlConfiguration)) {
+          // emptied table must clear stored mappings; only sent when the provider had
+          // some, so plain edits by users without users.roles.manage keep working
+          payload.roleMappings = {};
         } else {
           delete payload.roleMappings;
         }
@@ -397,6 +412,7 @@ export const useSSOProviderForm = (providerId?: number) => {
     isEditing,
     navigate,
     oidcRoleMappingEntries,
+    providerDetails,
     providerId,
     samlRoleMappingEntries,
     samlSigningMaterialsReady,
