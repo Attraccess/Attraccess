@@ -1,0 +1,30 @@
+{
+  "title": "Rolle löschen",
+  "message": "Möchtest du die Rolle \"{{roleName}}\" wirklich löschen?",
+  "impact": {
+    "one": "{{count}} Benutzer ist dieser Rolle aktuell zugewiesen.",
+    "many": "{{count}} Benutzer sind dieser Rolle aktuell zugewiesen."
+  },
+  "noImpact": "Dieser Rolle sind aktuell keine Benutzer zugewiesen.",
+  "options": {
+    "remove": {
+      "label": "Zuweisungen entfernen",
+      "description": "Betroffene Benutzer verlieren diese Rolle ersatzlos"
+    },
+    "reassign": {
+      "label": "Andere Rolle zuweisen",
+      "description": "Betroffene Benutzer erhalten stattdessen die ausgewählte Rolle"
+    }
+  },
+  "reassignSelect": {
+    "label": "Benutzer zuweisen zu",
+    "placeholder": "Rolle auswählen"
+  },
+  "actions": {
+    "cancel": "Abbrechen",
+    "delete": "Rolle löschen"
+  },
+  "messages": {
+    "deleted": "Rolle gelöscht"
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "title": {
+    "create": "Rolle erstellen",
+    "edit": "Rolle bearbeiten",
+    "view": "Rolle ansehen"
+  },
+  "systemRoleBanner": {
+    "title": "Systemrolle",
+    "description": "Diese Rolle wird von Attraccess verwaltet. Name, Beschreibung und Berechtigungen können nicht geändert werden."
+  },
+  "inputs": {
+    "name": {
+      "label": "Name"
+    },
+    "description": {
+      "label": "Beschreibung"
+    }
+  },
+  "permissions": {
+    "title": "Berechtigungen",
+    "selectedCount": "{{selected}} von {{total}} ausgewählt",
+    "pickerPlaceholder": "Berechtigungen auswählen",
+    "searchPlaceholder": "Berechtigungen durchsuchen...",
+    "noResults": "Keine Berechtigungen gefunden",
+    "cannotGrantHint": "Gesperrte Berechtigungen besitzt du selbst nicht und kannst sie nicht vergeben."
+  },
+  "categories": {
+    "resources": "Ressourcen",
+    "users": "Benutzer",
+    "system": "System",
+    "billing": "Abrechnung"
+  },
+  "actions": {
+    "cancel": "Abbrechen",
+    "close": "Schließen",
+    "save": "Speichern",
+    "create": "Erstellen"
+  },
+  "messages": {
+    "created": "Rolle erstellt",
+    "updated": "Rolle aktualisiert"
+  }
+}

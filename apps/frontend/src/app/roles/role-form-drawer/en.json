@@ -1,0 +1,43 @@
+{
+  "title": {
+    "create": "Create role",
+    "edit": "Edit role",
+    "view": "View role"
+  },
+  "systemRoleBanner": {
+    "title": "System role",
+    "description": "This role is managed by Attraccess. Its name, description, and permissions cannot be changed."
+  },
+  "inputs": {
+    "name": {
+      "label": "Name"
+    },
+    "description": {
+      "label": "Description"
+    }
+  },
+  "permissions": {
+    "title": "Permissions",
+    "selectedCount": "{{selected}} of {{total}} selected",
+    "pickerPlaceholder": "Select permissions",
+    "searchPlaceholder": "Search permissions...",
+    "noResults": "No permissions found",
+    "cannotGrantHint": "Locked permissions are ones you do not hold yourself and cannot grant."
+  },
+  "categories": {
+    "resources": "Resources",
+    "users": "Users",
+    "system": "System",
+    "billing": "Billing"
+  },
+  "actions": {
+    "cancel": "Cancel",
+    "close": "Close",
+    "save": "Save",
+    "create": "Create"
+  },
+  "messages": {
+    "created": "Role created",
+    "updated": "Role updated"
+  }
+}
