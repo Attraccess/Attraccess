@@ -153,12 +153,20 @@ export class RbacService {
       this.assertActorHolds(actorPermissions, removed, 'revoke');
 
       await this.roleRepository.manager.transaction(async (manager) => {
+        const ownersBefore = removed.length > 0 ? await this.countOwnerEquivalentUsers(undefined, manager) : 0;
         await manager.save(Role, { id: role.id, name: role.name, description: role.description });
         if (removed.length > 0) {
           await manager.delete(RolePermission, { roleId: role.id, permissionKey: In(removed) });
         }
         for (const permissionKey of added) {
           await manager.save(RolePermission, manager.create(RolePermission, { roleId: role.id, permissionKey }));
+        }
+        // same lockout guard as deleteRole: a permission removal must not drop the
+        // owner-equivalent user count from >0 to 0 (rolls back via the thrown exception)
+        if (ownersBefore > 0 && (await this.countOwnerEquivalentUsers(undefined, manager)) === 0) {
+          throw new ForbiddenException(
+            'Updating this role would leave no active user with full administrative permissions',
+          );
         }
       });
       // a role's permission set changed — every user holding it is affected
@@ -171,11 +179,12 @@ export class RbacService {
     return updated as Role;
   }
 
-  private async countOwnerEquivalentUsers(excludeRoleId?: number): Promise<number> {
+  // pass `manager` to count against uncommitted in-transaction state (permissions table itself is never
+  // modified by role CRUD, so the total always comes from the plain repository)
+  private async countOwnerEquivalentUsers(excludeRoleId?: number, manager?: EntityManager): Promise<number> {
     const totalPermissions = await this.permissionRepository.count();
     if (totalPermissions === 0) return 0;
-    const qb = this.userRoleRepository
-      .createQueryBuilder('ur')
+    const qb = (manager ? manager.createQueryBuilder(UserRole, 'ur') : this.userRoleRepository.createQueryBuilder('ur'))
       .innerJoin('ur.user', 'u', 'u.deletedAt IS NULL')
       .innerJoin('role_permission', 'rp', 'rp.roleId = ur.roleId')
       .select('ur.userId', 'userId')
@@ -189,11 +198,18 @@ export class RbacService {
   }
 
   async deleteRole(roleId: number, actorPermissions: Set<string>, reassignToRoleId?: number): Promise<void> {
-    const role = await this.roleRepository.findOne({ where: { id: roleId } });
+    const role = await this.roleRepository.findOne({ where: { id: roleId }, relations: ['rolePermissions'] });
     if (!role) throw new NotFoundException(`Role ${roleId} not found`);
     if (role.isSystemManaged) {
       throw new ForbiddenException('System-managed roles cannot be deleted');
     }
+
+    // deleting a role revokes its permissions from every assigned user — same rule as updateRole/revokeRole
+    this.assertActorHolds(
+      actorPermissions,
+      role.rolePermissions.map((rp) => rp.permissionKey),
+      'revoke',
+    );
 
     let reassignTo: Role | null = null;
     if (reassignToRoleId !== undefined) {

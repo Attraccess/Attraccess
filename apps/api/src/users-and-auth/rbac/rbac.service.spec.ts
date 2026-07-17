@@ -69,6 +69,7 @@ describe('RbacService', () => {
     find: jest.Mock;
     findOne: jest.Mock;
     create: jest.Mock;
+    createQueryBuilder: jest.Mock;
   };
 
   beforeEach(async () => {
@@ -98,6 +99,7 @@ describe('RbacService', () => {
       find: jest.fn().mockResolvedValue([]),
       findOne: jest.fn().mockResolvedValue(null),
       create: jest.fn((_entity, data) => ({ ...data })),
+      createQueryBuilder: jest.fn().mockReturnValue(createMockQueryBuilder()),
     };
 
     roleRepo = {
@@ -620,6 +622,34 @@ describe('RbacService', () => {
       );
     });
 
+    it('blocks a permission removal that would leave no owner-equivalent user', async () => {
+      roleRepo.findOne.mockResolvedValue(
+        makeRole({ id: 5, rolePermissions: [{ roleId: 5, permissionKey: 'resources.read' } as RolePermission] }),
+      );
+      permissionRepo.count.mockResolvedValue(16);
+      const qbBefore = createMockQueryBuilder({ getRawMany: jest.fn().mockResolvedValue([{ userId: 1 }]) });
+      const qbAfter = createMockQueryBuilder({ getRawMany: jest.fn().mockResolvedValue([]) });
+      roleManager.createQueryBuilder.mockReturnValueOnce(qbBefore as any).mockReturnValueOnce(qbAfter as any);
+
+      await expect(service.updateRole(5, { permissionKeys: [] }, new Set(['resources.read']))).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+
+    it('allows a permission removal when owner-equivalence is preserved', async () => {
+      roleRepo.findOne.mockResolvedValue(
+        makeRole({ id: 5, rolePermissions: [{ roleId: 5, permissionKey: 'resources.read' } as RolePermission] }),
+      );
+      permissionRepo.count.mockResolvedValue(16);
+      const qbBefore = createMockQueryBuilder({ getRawMany: jest.fn().mockResolvedValue([{ userId: 1 }]) });
+      const qbAfter = createMockQueryBuilder({ getRawMany: jest.fn().mockResolvedValue([{ userId: 1 }]) });
+      roleManager.createQueryBuilder.mockReturnValueOnce(qbBefore as any).mockReturnValueOnce(qbAfter as any);
+
+      await service.updateRole(5, { permissionKeys: [] }, new Set(['resources.read']));
+
+      expect(roleManager.delete).toHaveBeenCalledWith(RolePermission, expect.objectContaining({ roleId: 5 }));
+    });
+
     it('applies permission set changes in a transaction', async () => {
       roleRepo.findOne.mockResolvedValue(
         makeRole({ id: 5, rolePermissions: [{ roleId: 5, permissionKey: 'resources.read' } as RolePermission] }),
@@ -656,6 +686,15 @@ describe('RbacService', () => {
       roleRepo.findOne.mockResolvedValue(makeRole({ isSystemManaged: true }));
 
       await expect(service.deleteRole(1, new Set())).rejects.toThrow(ForbiddenException);
+    });
+
+    it('rejects deleting a role whose permissions exceed the actor', async () => {
+      roleRepo.findOne.mockResolvedValue(
+        makeRole({ id: 5, rolePermissions: [{ roleId: 5, permissionKey: 'billing.manage' } as RolePermission] }),
+      );
+
+      await expect(service.deleteRole(5, new Set(['resources.read']))).rejects.toThrow(ForbiddenException);
+      expect(roleManager.delete).not.toHaveBeenCalled();
     });
 
     it('rejects reassigning to the role being deleted', async () => {
