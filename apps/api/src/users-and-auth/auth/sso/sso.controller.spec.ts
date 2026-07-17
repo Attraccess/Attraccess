@@ -699,7 +699,7 @@ describe('SsoController', () => {
       });
 
       expect(result).toEqual({ OK: true });
-      // 'attraccess_admin' → 'user-manager' via provider's permissionMappings
+      // 'attraccess_admin' → 'user-manager' via provider's roleMappings
       expect(rbacService.syncSsoRoles).toHaveBeenCalledWith(
         99,
         expect.arrayContaining([expect.objectContaining({ roleKey: 'user-manager' })]),
@@ -770,7 +770,7 @@ describe('SsoController', () => {
       });
 
       expect(result).toEqual({ OK: true });
-      // 'billing-role' → 'billing-manager' via SAML provider's permissionMappings
+      // 'billing-role' → 'billing-manager' via SAML provider's roleMappings
       expect(rbacService.syncSsoRoles).toHaveBeenCalledWith(
         103,
         expect.arrayContaining([expect.objectContaining({ roleKey: 'billing-manager' })]),

@@ -154,11 +154,8 @@ export class SSOService {
     config: CreateOIDCConfigurationDto,
   ): Promise<SSOProviderOIDCConfiguration> {
     const encryptedSecret = this.encryptionService.encrypt(config.clientSecret);
-    // permissionMappings is a deprecated write alias of roleMappings (migration window)
-    const { permissionMappings: legacyMappings, roleMappings, ...persistableConfig } = config;
     const newConfig = this.oidcConfigRepository.create({
-      ...persistableConfig,
-      roleMappings: (roleMappings ?? legacyMappings) as Record<string, string[]>,
+      ...config,
       clientSecret: encryptedSecret,
       ssoProviderId: providerId,
     });
@@ -203,11 +200,9 @@ export class SSOService {
     if (typeof updateConfig.emailClaimPaths !== 'undefined') {
       payload.emailClaimPaths = updateConfig.emailClaimPaths;
     }
-    if (typeof updateConfig.roleMappings !== 'undefined' || typeof updateConfig.permissionMappings !== 'undefined') {
-      // explicit null clears the column; !== undefined so null on the canonical field isn't swallowed by the alias
-      payload.roleMappings = ((updateConfig.roleMappings !== undefined
-        ? updateConfig.roleMappings
-        : updateConfig.permissionMappings) ?? null) as Record<string, string[]>;
+    if (typeof updateConfig.roleMappings !== 'undefined') {
+      // explicit null clears the column
+      payload.roleMappings = updateConfig.roleMappings;
     }
 
     await this.oidcConfigRepository.update({ ssoProviderId: providerId }, payload);
@@ -229,14 +224,7 @@ export class SSOService {
 
     this.ensureSigningMaterialAvailability(shouldSignRequests, normalizedSpSigningCertificate, encryptedPrivateKey);
 
-    const {
-      spSigningCertificate: unusedSpCert,
-      spSigningPrivateKey: unusedSpKey,
-      // permissionMappings is a deprecated write alias of roleMappings (migration window)
-      permissionMappings: legacyMappings,
-      roleMappings,
-      ...persistableConfig
-    } = config;
+    const { spSigningCertificate: unusedSpCert, spSigningPrivateKey: unusedSpKey, ...persistableConfig } = config;
     void unusedSpCert;
     void unusedSpKey;
 
@@ -244,7 +232,6 @@ export class SSOService {
 
     const newConfig = this.samlConfigRepository.create({
       ...persistableConfig,
-      roleMappings: (roleMappings ?? legacyMappings) as Record<string, string[]>,
       certificate: normalizedCertificate,
       provisioningSecret: encryptedProvisioningSecret,
       spSigningCertificate: normalizedSpSigningCertificate,
@@ -299,10 +286,9 @@ export class SSOService {
       const trimmed = config.provisioningSecret?.trim();
       payload.provisioningSecret = trimmed ? this.encryptionService.encrypt(trimmed) : null;
     }
-    if (typeof config.roleMappings !== 'undefined' || typeof config.permissionMappings !== 'undefined') {
-      // explicit null clears the column; !== undefined so null on the canonical field isn't swallowed by the alias
-      payload.roleMappings = ((config.roleMappings !== undefined ? config.roleMappings : config.permissionMappings) ??
-        null) as Record<string, string[]>;
+    if (typeof config.roleMappings !== 'undefined') {
+      // explicit null clears the column
+      payload.roleMappings = config.roleMappings;
     }
     if (typeof config.spSigningCertificate !== 'undefined') {
       payload.spSigningCertificate = config.spSigningCertificate

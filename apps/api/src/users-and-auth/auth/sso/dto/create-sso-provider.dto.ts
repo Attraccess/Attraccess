@@ -94,17 +94,6 @@ export class CreateOIDCConfigurationDto {
   @IsOptional()
   @IsStringArrayRecord()
   roleMappings?: Record<string, string[]>;
-
-  @ApiProperty({
-    description: 'Deprecated alias of roleMappings, accepted during the migration window. Ignored when roleMappings is set.',
-    required: false,
-    deprecated: true,
-    type: Object,
-    additionalProperties: { type: 'array', items: { type: 'string' } },
-  })
-  @IsOptional()
-  @IsStringArrayRecord()
-  permissionMappings?: Record<string, string[]>;
 }
 
 export class CreateSAMLConfigurationDto {
@@ -203,17 +192,6 @@ export class CreateSAMLConfigurationDto {
   @IsOptional()
   @IsStringArrayRecord()
   roleMappings?: Record<string, string[]>;
-
-  @ApiProperty({
-    description: 'Deprecated alias of roleMappings, accepted during the migration window. Ignored when roleMappings is set.',
-    required: false,
-    deprecated: true,
-    type: Object,
-    additionalProperties: { type: 'array', items: { type: 'string' } },
-  })
-  @IsOptional()
-  @IsStringArrayRecord()
-  permissionMappings?: Record<string, string[]>;
 
   @ApiProperty({
     description: 'PEM encoded Service Provider certificate used when signing requests',

@@ -205,15 +205,8 @@ export class SSOController {
     description: 'Forbidden - Insufficient permissions',
   })
   async createOne(@Body() createDto: CreateSSOProviderDto, @Req() request: AuthenticatedRequest): Promise<SSOProvider> {
-    // !== undefined precedence so an explicit null on the canonical field is still gated (matches the service write)
-    const oidcMappings =
-      createDto.oidcConfiguration?.roleMappings !== undefined
-        ? createDto.oidcConfiguration.roleMappings
-        : createDto.oidcConfiguration?.permissionMappings;
-    const samlMappings =
-      createDto.samlConfiguration?.roleMappings !== undefined
-        ? createDto.samlConfiguration.roleMappings
-        : createDto.samlConfiguration?.permissionMappings;
+    const oidcMappings = createDto.oidcConfiguration?.roleMappings;
+    const samlMappings = createDto.samlConfiguration?.roleMappings;
     if (oidcMappings !== undefined || samlMappings !== undefined) {
       const actor = request.user as AuthenticatedUser;
       if (!actor.effectivePermissions?.has('users.roles.manage')) {
@@ -254,15 +247,8 @@ export class SSOController {
   ): Promise<SSOProvider> {
     const providerId = parseInt(id, 10);
 
-    // !== undefined precedence so an explicit null on the canonical field is still gated (matches the service write)
-    const oidcMappings =
-      updateDto.oidcConfiguration?.roleMappings !== undefined
-        ? updateDto.oidcConfiguration.roleMappings
-        : updateDto.oidcConfiguration?.permissionMappings;
-    const samlMappings =
-      updateDto.samlConfiguration?.roleMappings !== undefined
-        ? updateDto.samlConfiguration.roleMappings
-        : updateDto.samlConfiguration?.permissionMappings;
+    const oidcMappings = updateDto.oidcConfiguration?.roleMappings;
+    const samlMappings = updateDto.samlConfiguration?.roleMappings;
 
     if (oidcMappings !== undefined || samlMappings !== undefined) {
       const actor = request.user as AuthenticatedUser;

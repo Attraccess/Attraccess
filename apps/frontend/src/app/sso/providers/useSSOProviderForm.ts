@@ -144,9 +144,7 @@ export const useSSOProviderForm = (providerId?: number) => {
       );
       setOidcRoleMappingEntries(
         buildRoleMappingEntries(
-          (extendedProvider.oidcConfiguration.roleMappings ??
-            extendedProvider.oidcConfiguration.permissionMappings ??
-            undefined) as Record<string, string[]> | undefined,
+          (extendedProvider.oidcConfiguration.roleMappings ?? undefined) as Record<string, string[]> | undefined,
         ),
       );
     } else {
@@ -177,9 +175,7 @@ export const useSSOProviderForm = (providerId?: number) => {
       );
       setSamlRoleMappingEntries(
         buildRoleMappingEntries(
-          (extendedProvider.samlConfiguration.roleMappings ??
-            extendedProvider.samlConfiguration.permissionMappings ??
-            undefined) as Record<string, string[]> | undefined,
+          (extendedProvider.samlConfiguration.roleMappings ?? undefined) as Record<string, string[]> | undefined,
         ),
       );
     } else {
@@ -279,10 +275,8 @@ export const useSSOProviderForm = (providerId?: number) => {
         return;
       }
 
-      const hasStoredMappings = (config?: {
-        roleMappings?: Record<string, unknown> | null;
-        permissionMappings?: Record<string, unknown> | null;
-      }) => Object.keys(config?.roleMappings ?? config?.permissionMappings ?? {}).length > 0;
+      const hasStoredMappings = (config?: { roleMappings?: Record<string, unknown> | null }) =>
+        Object.keys(config?.roleMappings ?? {}).length > 0;
 
       const buildOidcPayload = () => {
         const base = ensureOidcConfiguration(formValues.oidcConfiguration);

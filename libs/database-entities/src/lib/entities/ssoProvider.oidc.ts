@@ -8,7 +8,7 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
-import { Exclude, Expose } from 'class-transformer';
+import { Exclude } from 'class-transformer';
 import { SSOProvider } from './ssoProvider.entity';
 
 @Entity()
@@ -107,16 +107,6 @@ export class SSOProviderOIDCConfiguration {
     },
   })
   roleMappings?: Record<string, string[]> | null;
-
-  @Expose()
-  @ApiProperty({
-    description: 'Deprecated alias of roleMappings, kept during the migration window',
-    required: false,
-    deprecated: true,
-  })
-  get permissionMappings(): Record<string, string[]> | null | undefined {
-    return this.roleMappings;
-  }
 
   @CreateDateColumn()
   @ApiProperty({

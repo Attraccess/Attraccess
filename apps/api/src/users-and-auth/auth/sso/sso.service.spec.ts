@@ -271,28 +271,6 @@ describe('SsoService', () => {
       expect(updateCall[1]).toHaveProperty('roleMappings', null);
     });
 
-    it('prefers explicit null on roleMappings over the deprecated alias', async () => {
-      await service.updateProvider(1, {
-        oidcConfiguration: {
-          ...baseOidcUpdate,
-          roleMappings: asMappings(null),
-          permissionMappings: { 'user-manager': ['attraccess_admin'] },
-        },
-      });
-
-      const updateCall = (oidcConfigRepository.update as jest.Mock).mock.calls[0];
-      expect(updateCall[1]).toHaveProperty('roleMappings', null);
-    });
-
-    it('persists explicit null on the deprecated permissionMappings alias', async () => {
-      await service.updateProvider(1, {
-        oidcConfiguration: { ...baseOidcUpdate, permissionMappings: asMappings(null) },
-      });
-
-      const updateCall = (oidcConfigRepository.update as jest.Mock).mock.calls[0];
-      expect(updateCall[1]).toHaveProperty('roleMappings', null);
-    });
-
     it('persists an empty object (emptied mapping table)', async () => {
       await service.updateProvider(1, {
         oidcConfiguration: { ...baseOidcUpdate, roleMappings: {} },
@@ -303,7 +281,7 @@ describe('SsoService', () => {
       expect(updateCall[1].roleMappings).toEqual({});
     });
 
-    it('leaves roleMappings untouched when both fields are omitted', async () => {
+    it('leaves roleMappings untouched when the field is omitted', async () => {
       await service.updateProvider(1, {
         oidcConfiguration: { ...baseOidcUpdate },
       });
