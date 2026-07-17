@@ -167,6 +167,11 @@ export function useSidebarItems(): (SidebarItem | SidebarItemGroup)[] {
           icon: Settings2Icon,
         },
         {
+          path: '/settings/roles',
+          translationKey: 'roles',
+          icon: ShieldIcon,
+        },
+        {
           path: '/monitoring',
           translationKey: 'monitoring',
           icon: ActivityIcon,
