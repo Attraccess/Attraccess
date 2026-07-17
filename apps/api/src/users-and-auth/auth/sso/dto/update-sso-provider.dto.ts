@@ -89,7 +89,8 @@ export class UpdateOIDCConfigurationDto {
   emailClaimPaths?: string[];
 
   @ApiProperty({
-    description: 'Maps any RBAC role key (system-provided or user-defined) to the SSO role names that should grant it.',
+    description:
+      'Maps any Attraccess role key (system-provided or user-defined) to the IdP role/group claim values that should grant it.',
     required: false,
     type: Object,
     additionalProperties: { type: 'array', items: { type: 'string' } },
@@ -97,7 +98,7 @@ export class UpdateOIDCConfigurationDto {
   })
   @IsOptional()
   @IsStringArrayRecord()
-  permissionMappings?: Record<string, string[]>;
+  roleMappings?: Record<string, string[]>;
 }
 
 export class UpdateSAMLConfigurationDto {
@@ -195,7 +196,8 @@ export class UpdateSAMLConfigurationDto {
   provisioningSecret?: string;
 
   @ApiProperty({
-    description: 'Maps any RBAC role key (system-provided or user-defined) to the SAML role values that should grant it.',
+    description:
+      'Maps any Attraccess role key (system-provided or user-defined) to the SAML role/group attribute values that should grant it.',
     required: false,
     type: Object,
     additionalProperties: { type: 'array', items: { type: 'string' } },
@@ -203,7 +205,7 @@ export class UpdateSAMLConfigurationDto {
   })
   @IsOptional()
   @IsStringArrayRecord()
-  permissionMappings?: Record<string, string[]>;
+  roleMappings?: Record<string, string[]>;
 
   @ApiProperty({
     description: 'PEM encoded Service Provider certificate used when signing requests',

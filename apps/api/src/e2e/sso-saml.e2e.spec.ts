@@ -77,7 +77,7 @@ function makeSamlConfig(overrides: Partial<SSOProviderSAMLConfiguration> = {}): 
     emailAttributeKeys: ['email'],
     spSigningCertificate: null,
     spSigningKeyEncrypted: null,
-    permissionMappings: null,
+    roleMappings: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     ssoProvider: null as unknown as SSOProviderSAMLConfiguration['ssoProvider'],
@@ -276,7 +276,7 @@ describe('SSO SAML strategy — validate() integration (e2e)', () => {
   it('syncs SSO roles when permission mappings match token roles', async () => {
     const config = makeSamlConfig({
       ssoProviderId: 30,
-      permissionMappings: [{ ssoRole: 'admin-group', permissionKey: 'system-admin' }] as never,
+      roleMappings: { 'system-admin': ['admin-group'] },
     });
     const req = makeSamlRequest(config, 30);
     const profile = makeSamlProfile({

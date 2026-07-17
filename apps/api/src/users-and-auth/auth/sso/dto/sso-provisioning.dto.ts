@@ -25,7 +25,7 @@ export class SSOProvisioningPermissionsDto extends SSOProvisioningUserDto {
   @ApiProperty({
     description:
       'Role or group names to evaluate against the configured RBAC role mappings. ' +
-      'Values are matched against the `permissionMappings` configured on the SSO provider.',
+      'Values are matched against the `roleMappings` configured on the SSO provider.',
     required: false,
     isArray: true,
     type: String,

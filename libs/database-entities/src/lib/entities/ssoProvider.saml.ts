@@ -107,16 +107,17 @@ export class SSOProviderSAMLConfiguration {
   @Exclude()
   provisioningSecret?: string | null;
 
-  @Column({ type: 'json', nullable: true })
+  // ponytail: keeps the legacy 'permissionMappings' DB column — renaming it would need a migration for zero gain
+  @Column({ type: 'json', nullable: true, name: 'permissionMappings' })
   @ApiProperty({
-    description: 'Optional mapping between RBAC role keys and SAML role attribute values',
+    description: 'Mapping between Attraccess role keys and SAML role/group attribute values',
     required: false,
     example: {
       'system-admin': ['attraccess_config_admin'],
       'billing-manager': ['attraccess_billing'],
     },
   })
-  permissionMappings?: Record<string, string[]> | null;
+  roleMappings?: Record<string, string[]> | null;
 
   @Column({ type: 'text', nullable: true })
   @ApiProperty({

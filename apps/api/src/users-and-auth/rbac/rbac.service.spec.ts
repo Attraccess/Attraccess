@@ -87,6 +87,7 @@ describe('RbacService', () => {
       find: jest.fn(),
       findOne: jest.fn(),
       save: jest.fn(),
+      update: jest.fn(),
       delete: jest.fn(),
       create: jest.fn((data) => ({ ...data } as UserRole)),
       createQueryBuilder: jest.fn().mockReturnValue(mockQb),
@@ -394,9 +395,25 @@ describe('RbacService', () => {
       const saved = makeUserRole({ roleId: 3, source: UserRoleSource.SSO });
       userRoleRepo.save.mockResolvedValue(saved);
 
-      await service.syncSsoRoles(10, ['manager'], SSO_TYPE, SSO_ID);
+      await service.syncSsoRoles(10, [{ roleKey: 'manager', externalValue: 'idp_manager' }], SSO_TYPE, SSO_ID);
 
+      expect(userRoleRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ roleId: 3, source: UserRoleSource.SSO, externalValue: 'idp_manager' }),
+      );
       expect(userRoleRepo.save).toHaveBeenCalled();
+    });
+
+    it('refreshes externalValue on an existing SSO assignment when it changes', async () => {
+      const existingRole = makeRole({ key: 'manager' });
+      const currentSsoRoles = [
+        makeUserRole({ id: 9, source: UserRoleSource.SSO, role: existingRole, externalValue: 'old_group' }),
+      ];
+      userRoleRepo.find.mockResolvedValue(currentSsoRoles);
+
+      await service.syncSsoRoles(10, [{ roleKey: 'manager', externalValue: 'new_group' }], SSO_TYPE, SSO_ID);
+
+      expect(userRoleRepo.update).toHaveBeenCalledWith({ id: 9 }, { externalValue: 'new_group' });
+      expect(userRoleRepo.save).not.toHaveBeenCalled();
     });
 
     it('skips adding a role when already present in currentSsoRoles', async () => {
@@ -406,7 +423,7 @@ describe('RbacService', () => {
       ];
       userRoleRepo.find.mockResolvedValue(currentSsoRoles);
 
-      await service.syncSsoRoles(10, ['manager'], SSO_TYPE, SSO_ID);
+      await service.syncSsoRoles(10, [{ roleKey: 'manager', externalValue: 'idp_manager' }], SSO_TYPE, SSO_ID);
 
       expect(userRoleRepo.save).not.toHaveBeenCalled();
     });
@@ -423,7 +440,7 @@ describe('RbacService', () => {
       userRoleRepo.save.mockRejectedValue(uniqueViolation);
 
       // Should NOT throw
-      await expect(service.syncSsoRoles(10, ['editor'], SSO_TYPE, SSO_ID)).resolves.toBeUndefined();
+      await expect(service.syncSsoRoles(10, [{ roleKey: 'editor' }], SSO_TYPE, SSO_ID)).resolves.toBeUndefined();
     });
 
     it('handles unique constraint violation (SQLITE_CONSTRAINT) gracefully when adding', async () => {
@@ -437,7 +454,7 @@ describe('RbacService', () => {
       });
       userRoleRepo.save.mockRejectedValue(sqliteViolation);
 
-      await expect(service.syncSsoRoles(10, ['editor'], SSO_TYPE, SSO_ID)).resolves.toBeUndefined();
+      await expect(service.syncSsoRoles(10, [{ roleKey: 'editor' }], SSO_TYPE, SSO_ID)).resolves.toBeUndefined();
     });
 
     it('rethrows non-unique SQLITE_CONSTRAINT errors (e.g. FK violation)', async () => {
@@ -451,7 +468,7 @@ describe('RbacService', () => {
       });
       userRoleRepo.save.mockRejectedValue(fkError);
 
-      await expect(service.syncSsoRoles(10, ['editor'], SSO_TYPE, SSO_ID)).rejects.toThrow(QueryFailedError);
+      await expect(service.syncSsoRoles(10, [{ roleKey: 'editor' }], SSO_TYPE, SSO_ID)).rejects.toThrow(QueryFailedError);
     });
 
     it('rethrows non-unique-constraint errors', async () => {
@@ -465,14 +482,14 @@ describe('RbacService', () => {
       });
       userRoleRepo.save.mockRejectedValue(otherError);
 
-      await expect(service.syncSsoRoles(10, ['editor'], SSO_TYPE, SSO_ID)).rejects.toThrow(QueryFailedError);
+      await expect(service.syncSsoRoles(10, [{ roleKey: 'editor' }], SSO_TYPE, SSO_ID)).rejects.toThrow(QueryFailedError);
     });
 
     it('silently skips roles that do not exist in the database', async () => {
       userRoleRepo.find.mockResolvedValue([]);
       roleRepo.findOne.mockResolvedValue(null); // unknown role key
 
-      await expect(service.syncSsoRoles(10, ['unknown-role'], SSO_TYPE, SSO_ID)).resolves.toBeUndefined();
+      await expect(service.syncSsoRoles(10, [{ roleKey: 'unknown-role' }], SSO_TYPE, SSO_ID)).resolves.toBeUndefined();
       expect(userRoleRepo.save).not.toHaveBeenCalled();
     });
   });

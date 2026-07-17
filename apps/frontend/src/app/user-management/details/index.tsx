@@ -149,14 +149,14 @@ export function UserManagementDetailsPage() {
         return;
       }
 
-      const permissionMappings =
+      const roleMappings =
         detail.providerType === SSOProviderType.OIDC
-          ? provider.oidcConfiguration?.permissionMappings
+          ? provider.oidcConfiguration?.roleMappings
           : detail.providerType === SSOProviderType.SAML
-            ? provider.samlConfiguration?.permissionMappings
+            ? provider.samlConfiguration?.roleMappings
             : undefined;
 
-      if (hasConfiguredPermissionMapping(permissionMappings)) {
+      if (hasConfiguredPermissionMapping(roleMappings)) {
         labels.add(provider.name ?? `${detail.providerType} #${detail.providerId}`);
       }
     });
@@ -177,14 +177,14 @@ export function UserManagementDetailsPage() {
         return;
       }
 
-      const permissionMappings =
+      const roleMappings =
         detail.providerType === SSOProviderType.OIDC
-          ? provider.oidcConfiguration?.permissionMappings
+          ? provider.oidcConfiguration?.roleMappings
           : detail.providerType === SSOProviderType.SAML
-            ? provider.samlConfiguration?.permissionMappings
+            ? provider.samlConfiguration?.roleMappings
             : undefined;
 
-      getSsoManagedPermissionKeys(permissionMappings).forEach((key) => keys.add(key));
+      getSsoManagedPermissionKeys(roleMappings).forEach((key) => keys.add(key));
     });
 
     return keys;
