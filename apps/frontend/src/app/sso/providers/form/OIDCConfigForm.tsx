@@ -40,8 +40,8 @@ export const OIDCConfigForm = ({ form }: OIDCConfigFormProps) => {
     showClientSecret,
     setShowClientSecret,
     onAutoDiscovery,
-    oidcPermissionMappingsInput,
-    setOidcPermissionMappingsInput,
+    oidcRoleMappingEntries,
+    setOidcRoleMappingEntries,
     roles,
     isLoadingRoles,
   } = form;
@@ -197,8 +197,8 @@ export const OIDCConfigForm = ({ form }: OIDCConfigFormProps) => {
         variant="oidc"
         roles={roles}
         isLoadingRoles={isLoadingRoles}
-        values={oidcPermissionMappingsInput}
-        onChange={(key, value) => setOidcPermissionMappingsInput((prev) => ({ ...prev, [key]: value }))}
+        entries={oidcRoleMappingEntries}
+        onChange={setOidcRoleMappingEntries}
       />
     </>
   );

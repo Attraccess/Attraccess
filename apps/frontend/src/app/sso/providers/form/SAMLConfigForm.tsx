@@ -30,8 +30,8 @@ export const SAMLConfigForm = ({ form }: SAMLConfigFormProps) => {
     setEmailAttributeKeysInput,
     showSamlProvisioningSecret,
     setShowSamlProvisioningSecret,
-    samlPermissionMappingsInput,
-    setSamlPermissionMappingsInput,
+    samlRoleMappingEntries,
+    setSamlRoleMappingEntries,
     handleSamlToggleChange,
     providerDetails,
     roles,
@@ -135,8 +135,8 @@ export const SAMLConfigForm = ({ form }: SAMLConfigFormProps) => {
         variant="saml"
         roles={roles}
         isLoadingRoles={isLoadingRoles}
-        values={samlPermissionMappingsInput}
-        onChange={(key, value) => setSamlPermissionMappingsInput((prev) => ({ ...prev, [key]: value }))}
+        entries={samlRoleMappingEntries}
+        onChange={setSamlRoleMappingEntries}
       />
 
       <section className="w-full flex flex-col gap-4 pt-6 border-t border-default-200 first:pt-0 first:border-t-0">

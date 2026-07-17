@@ -18,12 +18,14 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { OpenIDConfiguration } from './discovery/OpenIDC.data';
 import { hasRequiredSamlSigningMaterial } from './signingMaterial';
 import {
-  buildPermissionMappingInputs,
+  buildRoleMappingEntries,
+  buildRoleMappingsPayload,
   defaultProviderValues,
   ensureOidcConfiguration,
   ensureSamlConfiguration,
   getDefaultOidcConfiguration,
   getDefaultSamlConfiguration,
+  RoleMappingEntry,
 } from './formDefaults';
 import en from './en.json';
 import de from './de.json';
@@ -41,11 +43,10 @@ export const useSSOProviderForm = (providerId?: number) => {
   const [usernameClaimPathsInput, setUsernameClaimPathsInput] = useState('');
   const [emailClaimPathsInput, setEmailClaimPathsInput] = useState('');
   const [emailAttributeKeysInput, setEmailAttributeKeysInput] = useState('');
-  const [oidcPermissionMappingsInput, setOidcPermissionMappingsInput] = useState<Record<string, string>>({});
-  const [samlPermissionMappingsInput, setSamlPermissionMappingsInput] = useState<Record<string, string>>({});
+  const [oidcRoleMappingEntries, setOidcRoleMappingEntries] = useState<RoleMappingEntry[]>([]);
+  const [samlRoleMappingEntries, setSamlRoleMappingEntries] = useState<RoleMappingEntry[]>([]);
   const queryClient = useQueryClient();
   const { data: roles, isLoading: isLoadingRoles } = useRbacServiceListRoles();
-  const roleKeys = (roles ?? []).map((r) => r.key);
 
   const { success, error: showError } = useToastMessage();
   const createSSOProvider = useAuthenticationServiceCreateOneSsoProvider({
@@ -141,9 +142,8 @@ export const useSSOProviderForm = (providerId?: number) => {
           ? extendedProvider.oidcConfiguration.emailClaimPaths.join(', ')
           : '',
       );
-      setOidcPermissionMappingsInput(
-        buildPermissionMappingInputs(
-          roleKeys,
+      setOidcRoleMappingEntries(
+        buildRoleMappingEntries(
           (extendedProvider.oidcConfiguration.roleMappings ??
             extendedProvider.oidcConfiguration.permissionMappings ??
             undefined) as Record<string, string[]> | undefined,
@@ -153,7 +153,7 @@ export const useSSOProviderForm = (providerId?: number) => {
       setScopesInput('');
       setUsernameClaimPathsInput('');
       setEmailClaimPathsInput('');
-      setOidcPermissionMappingsInput(buildPermissionMappingInputs(roleKeys));
+      setOidcRoleMappingEntries([]);
     }
 
     if (extendedProvider.type === SSOProviderType.SAML && extendedProvider.samlConfiguration) {
@@ -175,9 +175,8 @@ export const useSSOProviderForm = (providerId?: number) => {
           ? extendedProvider.samlConfiguration.emailAttributeKeys.join(', ')
           : '',
       );
-      setSamlPermissionMappingsInput(
-        buildPermissionMappingInputs(
-          roleKeys,
+      setSamlRoleMappingEntries(
+        buildRoleMappingEntries(
           (extendedProvider.samlConfiguration.roleMappings ??
             extendedProvider.samlConfiguration.permissionMappings ??
             undefined) as Record<string, string[]> | undefined,
@@ -185,12 +184,11 @@ export const useSSOProviderForm = (providerId?: number) => {
       );
     } else {
       setEmailAttributeKeysInput('');
-      setSamlPermissionMappingsInput(buildPermissionMappingInputs(roleKeys));
+      setSamlRoleMappingEntries([]);
     }
 
     setFormValues(updatedFormValues);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [providerDetails, roleKeys.join(',')]);
+  }, [providerDetails]);
 
   const setOidc = useCallback((field: keyof NonNullable<CreateSSOProviderDto['oidcConfiguration']>, value: string) => {
     setFormValues((prev) => ({
@@ -273,15 +271,6 @@ export const useSSOProviderForm = (providerId?: number) => {
 
       const sanitizeOptional = (value?: string) => (value && value.trim().length > 0 ? value.trim() : undefined);
 
-      const buildRoleMappings = (inputs: Record<string, string>) => {
-        const mappings: Record<string, string[]> = {};
-        for (const key of roleKeys) {
-          const parsed = parseList(inputs[key] ?? '');
-          if (parsed.length > 0) mappings[key] = parsed;
-        }
-        return Object.keys(mappings).length > 0 ? mappings : undefined;
-      };
-
       if (!samlSigningMaterialsReady) {
         showError({
           title: t('errorGeneric'),
@@ -304,7 +293,7 @@ export const useSSOProviderForm = (providerId?: number) => {
         if (scopesInput.trim().length > 0) payload.scopes = parseList(scopesInput);
         if (usernameClaimPathsInput.trim().length > 0) payload.usernameClaimPaths = parseList(usernameClaimPathsInput);
         if (emailClaimPathsInput.trim().length > 0) payload.emailClaimPaths = parseList(emailClaimPathsInput);
-        const roleMappings = buildRoleMappings(oidcPermissionMappingsInput);
+        const roleMappings = buildRoleMappingsPayload(oidcRoleMappingEntries);
         if (roleMappings) payload.roleMappings = roleMappings;
 
         return payload;
@@ -342,7 +331,7 @@ export const useSSOProviderForm = (providerId?: number) => {
           delete payload.provisioningSecret;
         }
 
-        const roleMappings = buildRoleMappings(samlPermissionMappingsInput);
+        const roleMappings = buildRoleMappingsPayload(samlRoleMappingEntries);
         if (roleMappings) {
           payload.roleMappings = roleMappings;
         } else {
@@ -407,10 +396,9 @@ export const useSSOProviderForm = (providerId?: number) => {
     formValues,
     isEditing,
     navigate,
-    oidcPermissionMappingsInput,
+    oidcRoleMappingEntries,
     providerId,
-    roleKeys,
-    samlPermissionMappingsInput,
+    samlRoleMappingEntries,
     samlSigningMaterialsReady,
     scopesInput,
     showError,
@@ -443,10 +431,10 @@ export const useSSOProviderForm = (providerId?: number) => {
     setEmailAttributeKeysInput,
     roles,
     isLoadingRoles,
-    oidcPermissionMappingsInput,
-    setOidcPermissionMappingsInput,
-    samlPermissionMappingsInput,
-    setSamlPermissionMappingsInput,
+    oidcRoleMappingEntries,
+    setOidcRoleMappingEntries,
+    samlRoleMappingEntries,
+    setSamlRoleMappingEntries,
     // derived
     isSamlProvider,
     isMutationPending,
