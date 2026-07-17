@@ -542,30 +542,36 @@ void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, v
     }
 }
 
-void Websocket::sendMessage(const std::string &message)
+void Websocket::forceReconnect(const char *reason)
+{
+    logger.errorf("Forcing websocket reconnect: %s", reason);
+    setState(INIT); // loop() initiates a fresh connection from INIT
+}
+
+bool Websocket::sendMessage(const std::string &message)
 {
     this->logger.debug(("sendMessage: " + message).c_str());
-    enqueueMessage(message.c_str(), message.length());
+    return enqueueMessage(message.c_str(), message.length());
 }
 
-void Websocket::sendMessage(const char *message, size_t length)
+bool Websocket::sendMessage(const char *message, size_t length)
 {
-    enqueueMessage(message, length);
+    return enqueueMessage(message, length);
 }
 
-void Websocket::enqueueMessage(const char *data, size_t length)
+bool Websocket::enqueueMessage(const char *data, size_t length)
 {
     if (!tx_queue)
     {
         logger.error("enqueueMessage: tx_queue not initialized");
-        return;
+        return false;
     }
 
     char *copy = (char *)malloc(length);
     if (!copy)
     {
         logger.error("enqueueMessage: allocation failed");
-        return;
+        return false;
     }
     memcpy(copy, data, length);
 
@@ -574,7 +580,9 @@ void Websocket::enqueueMessage(const char *data, size_t length)
     {
         logger.error("enqueueMessage: tx queue full, dropping message");
         free(copy);
+        return false;
     }
+    return true;
 }
 
 void Websocket::txTaskEntry(void *arg)

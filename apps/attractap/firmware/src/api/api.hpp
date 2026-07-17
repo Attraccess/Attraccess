@@ -22,7 +22,9 @@ public:
             firmware(
                 logger,
                 [this](const char *type, JsonObject payload)
-                { this->sendMessage(type, payload); },
+                { return this->sendMessage(type, payload); },
+                [this](const char *reason)
+                { this->websocket.forceReconnect(reason); },
                 firmwareUpdateProgressCallback,
                 firmwareUpdateMetaCallback,
                 errorCallback) {}
@@ -346,7 +348,7 @@ private:
 
     void sendAck(const char *type);
     void sendMessage(const char *type);
-    void sendMessage(const char *type, JsonObject payload);
+    bool sendMessage(const char *type, JsonObject payload);
     static constexpr size_t JSON_INBUF = 4608;
     static constexpr size_t JSON_OUTBUF_SMALL = 256;
     static constexpr size_t JSON_OUTBUF_AUTH = 1024;

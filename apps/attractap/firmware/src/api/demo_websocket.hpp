@@ -19,12 +19,13 @@ public:
 
     void setup();
     void loop();
-    void sendMessage(const std::string &message);
-    void sendMessage(const char *message, size_t length);
+    bool sendMessage(const std::string &message);
+    bool sendMessage(const char *message, size_t length);
     void setMessageCallbackRaw(std::function<void(const char *, size_t)> callback);
 
     void enableConnectionAttempts() {}
     void disableConnectionAttempts() {}
+    void forceReconnect(const char *) {}
     void resetCertificateTrust() {}
 
 private:

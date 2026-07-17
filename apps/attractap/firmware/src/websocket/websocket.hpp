@@ -25,13 +25,17 @@ public:
     };
     void setup();
     void loop();
-    void sendMessage(const std::string &message);
-    void sendMessage(const char *message, size_t length);
+    bool sendMessage(const std::string &message);
+    bool sendMessage(const char *message, size_t length);
     void setMessageCallbackRaw(std::function<void(const char *, size_t)> callback);
     void setBinaryDataCallback(std::function<void(esp_websocket_event_data_t)> callback);
 
     void enableConnectionAttempts();
     void disableConnectionAttempts();
+
+    // Tear down the current connection and reconnect (same mechanism as the
+    // inbound-liveness watchdog). Must be called from the main-loop task.
+    void forceReconnect(const char *reason);
 
     // Clear the locked TLS certificate decision so the next connect sweeps the
     // full CA list again (device settings "reset certificate" button).
@@ -135,7 +139,7 @@ private:
     TaskHandle_t tx_task = nullptr;
     static void txTaskEntry(void *arg);
     void txTaskLoop();
-    void enqueueMessage(const char *data, size_t length);
+    bool enqueueMessage(const char *data, size_t length);
     void drainTxQueue();
 
     static void websocket_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data);
