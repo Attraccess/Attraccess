@@ -93,14 +93,15 @@ void DemoWebsocket::loop()
 // Outbound (API → mock)
 // ---------------------------------------------------------------------------
 
-void DemoWebsocket::sendMessage(const std::string &msg)
+bool DemoWebsocket::sendMessage(const std::string &msg)
 {
-    sendMessage(msg.c_str(), msg.size());
+    return sendMessage(msg.c_str(), msg.size());
 }
 
-void DemoWebsocket::sendMessage(const char *data, size_t len)
+bool DemoWebsocket::sendMessage(const char *data, size_t len)
 {
     processOutbound(data, len);
+    return true;
 }
 
 void DemoWebsocket::setMessageCallbackRaw(std::function<void(const char *, size_t)> cb)

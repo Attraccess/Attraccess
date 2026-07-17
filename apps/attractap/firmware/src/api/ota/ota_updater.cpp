@@ -8,9 +8,25 @@
 
 void OtaUpdater::begin(JsonObject firmwareMeta)
 {
+    std::string availableVersion = firmwareMeta["version"].as<std::string>();
+
     if (this->ota.inProgress)
     {
-        this->logger.error("Firmware update already in progress");
+        if (this->firmwareUpdateFailedTimeMs != 0)
+        {
+            return; // update already failed, reboot pending
+        }
+        if (availableVersion == this->ota.version)
+        {
+            // Server re-offered the same update, e.g. after a websocket reconnect.
+            // Chunk reads are stateless on the server, so resume at bytesWritten
+            // instead of aborting and restarting the whole transfer from 0.
+            this->logger.errorf("Resuming OTA update at %u/%u bytes", this->ota.bytesWritten, this->ota.totalSize);
+            this->consecutiveChunkFailures = 0;
+            this->readyForNextFirmwareChunk = true;
+            return;
+        }
+        this->abortFirmwareUpdate("Different firmware version offered mid-update");
         return;
     }
 
@@ -47,8 +63,10 @@ void OtaUpdater::begin(JsonObject firmwareMeta)
         return;
     }
     this->ota.lastReportedPercent = -1;
+    this->ota.version = availableVersion;
+    this->consecutiveChunkFailures = 0;
+    this->lastChunkRequestSendFailed = false;
 
-    std::string availableVersion = firmwareMeta["version"].as<std::string>();
     if (this->metaCallback)
     {
         this->logger.debugf("Firmware update available: %s > %s", FIRMWARE_VERSION, availableVersion.c_str());
@@ -76,7 +94,13 @@ void OtaUpdater::requestNextFirmwareChunk()
     payload["length"] = len;
 
     this->lastFirmwareChunkRequestTimeMs = millis();
-    this->send("FIRMWARE_REQUEST_CHUNK", payload);
+    this->lastChunkRequestSendFailed = !this->send("FIRMWARE_REQUEST_CHUNK", payload);
+    if (this->lastChunkRequestSendFailed)
+    {
+        // Request never left the device (tx queue full / alloc failure); tick()
+        // retries after a short delay instead of waiting out the response timeout.
+        this->logger.error("Failed to enqueue firmware chunk request, will retry");
+    }
 }
 
 void OtaUpdater::onChunk(esp_websocket_event_data_t data)
@@ -174,31 +198,44 @@ void OtaUpdater::onChunk(esp_websocket_event_data_t data)
 
 void OtaUpdater::tick()
 {
-    if (this->lastFirmwareChunkRequestTimeMs != 0 && this->firmwareUpdateFailedTimeMs == 0)
-    {
-        uint32_t now = millis();
-        if (now - this->lastFirmwareChunkRequestTimeMs > this->FIRMWARE_CHUNK_REQUEST_RESPONSE_TIMEOUT_MS)
-        {
-            this->logger.error("Firmware chunk request timeout reached");
-            this->abortFirmwareUpdate("Firmware chunk request timeout");
-            return;
-        }
-    }
-
     if (this->firmwareUpdateFailedTimeMs != 0)
     {
-        uint32_t now = millis();
-        if (now - this->firmwareUpdateFailedTimeMs > 3000)
+        if (millis() - this->firmwareUpdateFailedTimeMs > 3000)
         {
             esp_restart();
-            return;
         }
+        return;
     }
 
     if (this->readyForNextFirmwareChunk)
     {
+        // A chunk arrived (or a resume was accepted), so the link works again
+        this->consecutiveChunkFailures = 0;
         this->requestNextFirmwareChunk();
         return;
+    }
+
+    if (this->lastFirmwareChunkRequestTimeMs != 0)
+    {
+        const uint32_t waitMs = this->lastChunkRequestSendFailed
+                                    ? this->FIRMWARE_CHUNK_SEND_RETRY_DELAY_MS
+                                    : this->FIRMWARE_CHUNK_REQUEST_RESPONSE_TIMEOUT_MS;
+        if (millis() - this->lastFirmwareChunkRequestTimeMs > waitMs)
+        {
+            if (this->consecutiveChunkFailures >= MAX_CONSECUTIVE_CHUNK_FAILURES)
+            {
+                this->abortFirmwareUpdate("Firmware chunk request timeout");
+                return;
+            }
+            this->consecutiveChunkFailures++;
+            // Re-request the same offset: chunk requests/responses can be lost
+            // (tx queue drop, ws hiccup) and the server serves any offset statelessly.
+            this->logger.errorf("Firmware chunk timeout at offset %u, retry %u/%u",
+                                (unsigned)this->ota.bytesWritten,
+                                (unsigned)this->consecutiveChunkFailures,
+                                (unsigned)MAX_CONSECUTIVE_CHUNK_FAILURES);
+            this->requestNextFirmwareChunk();
+        }
     }
 }
 
