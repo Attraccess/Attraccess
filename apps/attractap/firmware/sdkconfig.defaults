@@ -52,7 +52,12 @@ CONFIG_MBEDTLS_KEY_EXCHANGE_ECDHE_RSA=y
 CONFIG_MBEDTLS_KEY_EXCHANGE_ECDHE_ECDSA=y
 CONFIG_MBEDTLS_PEM_PARSE_C=y
 CONFIG_MBEDTLS_PEM_WRITE_C=y
-CONFIG_MBEDTLS_SSL_IN_CONTENT_LEN=4096
+# TLS record (rx) buffer: must hold the server's whole Certificate handshake
+# message in one piece. Let's Encrypt now serves a 3-cert chain (~4.3 KB) that
+# overflowed the old 4096 buffer, aborting the handshake with a fatal alert
+# even though the cert verified — 8192 gives headroom for longer future chains.
+# tx stays 4096 (ASYMMETRIC_CONTENT_LEN=y): our client flight is tiny.
+CONFIG_MBEDTLS_SSL_IN_CONTENT_LEN=8192
 CONFIG_MBEDTLS_SSL_OUT_CONTENT_LEN=4096
 # AES-CMAC for NTAG424 authentication (nfc/mbedtlscmac.c)
 CONFIG_MBEDTLS_CMAC_C=y
