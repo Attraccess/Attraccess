@@ -285,4 +285,41 @@ describe('SSOSamlStrategy', () => {
 
     expect(rbacService.syncSsoRoles).toHaveBeenCalledWith(44, [], SSOProviderType.SAML, 30);
   });
+
+  it('revokes previously granted SSO roles after the mapping has been cleared', async () => {
+    const rbacService = { syncSsoRoles: jest.fn().mockResolvedValue(undefined) };
+
+    const usersService = {
+      findOne: jest.fn().mockImplementation((query: Record<string, unknown>) => {
+        if ('externalIdentifier' in query) {
+          return Promise.resolve({ id: 45, externalIdentifier: 'saml-user' });
+        }
+        return Promise.resolve(null);
+      }),
+      updateOne: jest.fn(),
+    };
+
+    const moduleRef = {
+      get: jest.fn((token: unknown) => {
+        if (token === RbacService) return rbacService;
+        return usersService;
+      }),
+    } as unknown as ModuleRef;
+
+    const strategy = new SSOSamlStrategy(moduleRef);
+    const request = buildRequest(31, 'email');
+    // Admin emptied the mapping table → stored config is {} — sync must still run so roles
+    // granted under the old mapping get revoked at next login.
+    request.ssoSamlOptions.samlConfiguration.roleMappings = {};
+
+    const profile = {
+      nameID: 'saml-user',
+      email: 'user@example.com',
+      attributes: { roles: ['attraccess_admin'] },
+    } as SamlProfile;
+
+    await strategy.validate(request, profile);
+
+    expect(rbacService.syncSsoRoles).toHaveBeenCalledWith(45, [], SSOProviderType.SAML, 31);
+  });
 });

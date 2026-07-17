@@ -12,7 +12,7 @@ import { UsersService } from '../../../users/users.service';
 import { ModuleRef } from '@nestjs/core';
 import { AccountLinkingRequiredException } from './exceptions/account-linking-required.exception';
 import { AuthService } from '../../auth.service';
-import { hasConfiguredPermissionMapping, resolveSsoRoleAssignments } from '../permission-mapping';
+import { resolveSsoRoleAssignments } from '../permission-mapping';
 import { RbacService } from '../../../rbac/rbac.service';
 import { OidcCookieStateStore, OIDCAppState } from './oidc-cookie-state-store';
 import { MetricsService } from '../../../../metrics/metrics.service';
@@ -299,11 +299,12 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', true
     const rbacService = this.moduleRef.get(RbacService, { strict: false });
     if (!rbacService) {
       this.logger.warn('RbacService not available via ModuleRef — SSO role sync skipped; existing roles preserved');
-    } else if (hasConfiguredPermissionMapping(this.config.roleMappings) && claimValues.length > 0) {
-      // Only sync when a mapping is configured AND the token contained at least one role/group claim
-      // key. A present-but-empty claim (e.g. groups: []) is authoritative and revokes this provider's
-      // SSO-managed roles; a wholly absent claim (missing scope, transient IdP omission) must not
-      // silently revoke anything.
+    } else if (claimValues.length > 0) {
+      // Only sync when the token contained at least one role/group claim key. A present-but-empty
+      // claim (e.g. groups: []) is authoritative and revokes this provider's SSO-managed roles; a
+      // wholly absent claim (missing scope, transient IdP omission) must not silently revoke
+      // anything. Intentionally not gated on a configured mapping: a cleared mapping must still
+      // sync (with zero assignments) so roles granted under the old mapping get revoked.
       await rbacService.syncSsoRoles(
         user.id,
         roleAssignments,

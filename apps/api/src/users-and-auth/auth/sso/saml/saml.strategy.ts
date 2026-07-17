@@ -14,7 +14,7 @@ import { EncryptionService } from '../../../../encryption/encryption.service';
 import { SSOSamlRequest, SSOSamlRequestOptions } from './saml.types';
 import { MetricsService } from '../../../../metrics/metrics.service';
 import { classifySsoFailureReason, markSsoFailureMetricRecorded, recordSsoLoginFailure } from '../sso-metrics';
-import { hasConfiguredPermissionMapping, resolveSsoRoleAssignments } from '../permission-mapping';
+import { resolveSsoRoleAssignments } from '../permission-mapping';
 import { RbacService } from '../../../rbac/rbac.service';
 
 type StrategyCtor = new (...args: unknown[]) => Strategy;
@@ -314,11 +314,12 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
     if (!rbacService) {
       this.logger.warn('RbacService not available via ModuleRef — SSO role sync skipped; existing roles preserved');
     }
-    // Only sync when a mapping is configured AND the assertion contained at least one role/group
-    // attribute key. A present-but-empty attribute is authoritative and revokes this provider's
-    // SSO-managed roles; a wholly absent attribute (IdP misconfiguration, transient omission) must
-    // not silently revoke anything.
-    if (rbacService && hasConfiguredPermissionMapping(config.roleMappings) && claimValues.length > 0) {
+    // Only sync when the assertion contained at least one role/group attribute key. A
+    // present-but-empty attribute is authoritative and revokes this provider's SSO-managed roles;
+    // a wholly absent attribute (IdP misconfiguration, transient omission) must not silently
+    // revoke anything. Intentionally not gated on a configured mapping: a cleared mapping must
+    // still sync (with zero assignments) so roles granted under the old mapping get revoked.
+    if (rbacService && claimValues.length > 0) {
       await rbacService.syncSsoRoles(
         user.id,
         roleAssignments,

@@ -182,7 +182,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
     );
   });
 
-  it('does not sync RBAC roles when no roleMappings configured', async () => {
+  it('syncs with zero assignments when no roleMappings configured (no-op for fresh providers)', async () => {
     const existingUser = { id: 222, username: 'existing', email: 'existing@example.com' } as User;
 
     const usersService = {
@@ -208,7 +208,43 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
 
     await strategy.validate('https://issuer', profile);
 
-    expect(rbacService.syncSsoRoles).not.toHaveBeenCalled();
+    expect(rbacService.syncSsoRoles).toHaveBeenCalledWith(existingUser.id, [], SSOProviderType.OIDC, 1);
+  });
+
+  it('revokes previously granted SSO roles after the mapping has been cleared', async () => {
+    const existingUser = { id: 223, username: 'existing', email: 'existing@example.com' } as User;
+
+    const usersService = {
+      findOne: jest.fn(async () => existingUser),
+      updateOne: jest.fn(),
+      createOne: jest.fn(),
+    };
+
+    const authService = {
+      findUserIdBySSO: jest.fn(async () => existingUser.id),
+      addAuthenticationDetails: jest.fn(),
+    };
+
+    const rbacService = { syncSsoRoles: jest.fn().mockResolvedValue(undefined) };
+
+    // Admin emptied the mapping table → stored config is {} — sync must still run so roles
+    // granted under the old mapping get revoked at next login.
+    const strategy = createStrategy(
+      { roleMappings: {} } as Partial<SSOProviderOIDCConfiguration>,
+      usersService,
+      authService,
+      rbacService,
+    );
+
+    const profile = {
+      id: 'ext-cleared',
+      emails: [{ value: 'existing@example.com' }],
+      _json: { roles: ['attraccess_admin'] },
+    } as unknown as Profile;
+
+    await strategy.validate('https://issuer', profile);
+
+    expect(rbacService.syncSsoRoles).toHaveBeenCalledWith(existingUser.id, [], SSOProviderType.OIDC, 1);
   });
 
   it('honors configured permission mappings and revokes absent roles', async () => {
