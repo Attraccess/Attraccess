@@ -182,7 +182,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
     );
   });
 
-  it('does not sync RBAC roles when no permissionMappings configured', async () => {
+  it('does not sync RBAC roles when no roleMappings configured', async () => {
     const existingUser = { id: 222, username: 'existing', email: 'existing@example.com' } as User;
 
     const usersService = {
@@ -229,7 +229,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
 
     const strategy = createStrategy(
       {
-        permissionMappings: { 'user-manager': ['attraccess_admin'] },
+        roleMappings: { 'user-manager': ['attraccess_admin'] },
       } as Partial<SSOProviderOIDCConfiguration>,
       usersService,
       authService,
@@ -246,6 +246,86 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
 
     // syncSsoRoles called with empty set; existing SSO roles will be revoked
     expect(rbacService.syncSsoRoles).toHaveBeenCalledWith(existingUser.id, [], SSOProviderType.OIDC, 1);
+  });
+
+  it('passes the external claim value that granted each role to the sync', async () => {
+    const existingUser = { id: 334, username: 'existing', email: 'existing@example.com' } as User;
+
+    const usersService = { findOne: jest.fn(async () => existingUser), updateOne: jest.fn(), createOne: jest.fn() };
+    const authService = { findUserIdBySSO: jest.fn(async () => existingUser.id), addAuthenticationDetails: jest.fn() };
+    const rbacService = { syncSsoRoles: jest.fn().mockResolvedValue(undefined) };
+
+    const strategy = createStrategy(
+      { roleMappings: { 'user-manager': ['attraccess_admin'] } } as Partial<SSOProviderOIDCConfiguration>,
+      usersService,
+      authService,
+      rbacService,
+    );
+
+    const profile = {
+      id: 'ext-external-value',
+      emails: [{ value: 'existing@example.com' }],
+      _json: { groups: ['Attraccess Admin'] }, // matches 'attraccess_admin' after normalization
+    } as unknown as Profile;
+
+    await strategy.validate('https://issuer', profile);
+
+    expect(rbacService.syncSsoRoles).toHaveBeenCalledWith(
+      existingUser.id,
+      [{ roleKey: 'user-manager', externalValue: 'Attraccess Admin' }],
+      SSOProviderType.OIDC,
+      1,
+    );
+  });
+
+  it('revokes provider roles when the token contains an explicitly empty role claim', async () => {
+    const existingUser = { id: 335, username: 'existing', email: 'existing@example.com' } as User;
+
+    const usersService = { findOne: jest.fn(async () => existingUser), updateOne: jest.fn(), createOne: jest.fn() };
+    const authService = { findUserIdBySSO: jest.fn(async () => existingUser.id), addAuthenticationDetails: jest.fn() };
+    const rbacService = { syncSsoRoles: jest.fn().mockResolvedValue(undefined) };
+
+    const strategy = createStrategy(
+      { roleMappings: { 'user-manager': ['attraccess_admin'] } } as Partial<SSOProviderOIDCConfiguration>,
+      usersService,
+      authService,
+      rbacService,
+    );
+
+    const profile = {
+      id: 'ext-empty-groups',
+      emails: [{ value: 'existing@example.com' }],
+      _json: { groups: [] }, // claim key present but empty → authoritative, revoke
+    } as unknown as Profile;
+
+    await strategy.validate('https://issuer', profile);
+
+    expect(rbacService.syncSsoRoles).toHaveBeenCalledWith(existingUser.id, [], SSOProviderType.OIDC, 1);
+  });
+
+  it('does not sync when the token contains no role/group claims at all', async () => {
+    const existingUser = { id: 336, username: 'existing', email: 'existing@example.com' } as User;
+
+    const usersService = { findOne: jest.fn(async () => existingUser), updateOne: jest.fn(), createOne: jest.fn() };
+    const authService = { findUserIdBySSO: jest.fn(async () => existingUser.id), addAuthenticationDetails: jest.fn() };
+    const rbacService = { syncSsoRoles: jest.fn().mockResolvedValue(undefined) };
+
+    const strategy = createStrategy(
+      { roleMappings: { 'user-manager': ['attraccess_admin'] } } as Partial<SSOProviderOIDCConfiguration>,
+      usersService,
+      authService,
+      rbacService,
+    );
+
+    const profile = {
+      id: 'ext-no-claims',
+      emails: [{ value: 'existing@example.com' }],
+      _json: { email: 'existing@example.com' }, // no roles/groups keys → missing scope, do not revoke
+    } as unknown as Profile;
+
+    await strategy.validate('https://issuer', profile);
+
+    expect(rbacService.syncSsoRoles).not.toHaveBeenCalled();
   });
 
   describe('strategy options passed to passport-openidconnect', () => {

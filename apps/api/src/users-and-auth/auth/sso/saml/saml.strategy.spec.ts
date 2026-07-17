@@ -148,7 +148,7 @@ describe('SSOSamlStrategy', () => {
 
     const strategy = new SSOSamlStrategy(moduleRef);
     const request = buildRequest(30, 'email');
-    request.ssoSamlOptions.samlConfiguration.permissionMappings = { 'user-manager': ['attraccess_admin'] };
+    request.ssoSamlOptions.samlConfiguration.roleMappings = { 'user-manager': ['attraccess_admin'] };
 
     const profile = {
       nameID: 'saml-user',
@@ -179,7 +179,7 @@ describe('SSOSamlStrategy', () => {
 
     const strategy = new SSOSamlStrategy(moduleRef);
     const request = buildRequest(40, 'email');
-    request.ssoSamlOptions.samlConfiguration.permissionMappings = {
+    request.ssoSamlOptions.samlConfiguration.roleMappings = {
       'user-manager': ['attraccess_admin'],
     };
 
@@ -196,7 +196,7 @@ describe('SSOSamlStrategy', () => {
 
     expect(rbacService.syncSsoRoles).toHaveBeenCalledWith(
       55,
-      expect.arrayContaining(['user-manager']),
+      expect.arrayContaining([expect.objectContaining({ roleKey: 'user-manager' })]),
       SSOProviderType.SAML,
       40,
     );
@@ -224,7 +224,7 @@ describe('SSOSamlStrategy', () => {
 
     const strategy = new SSOSamlStrategy(moduleRef);
     const request = buildRequest(30, 'email');
-    request.ssoSamlOptions.samlConfiguration.permissionMappings = {
+    request.ssoSamlOptions.samlConfiguration.roleMappings = {
       'user-manager': ['attraccess_admin'],
       'billing-manager': ['billing-role'],
     };
@@ -241,9 +241,48 @@ describe('SSOSamlStrategy', () => {
 
     expect(rbacService.syncSsoRoles).toHaveBeenCalledWith(
       44,
-      expect.arrayContaining(['user-manager', 'billing-manager']),
+      expect.arrayContaining([
+        expect.objectContaining({ roleKey: 'user-manager' }),
+        expect.objectContaining({ roleKey: 'billing-manager' }),
+      ]),
       SSOProviderType.SAML,
       30,
     );
+  });
+
+  it('revokes provider roles when a role attribute is present but empty', async () => {
+    const rbacService = { syncSsoRoles: jest.fn().mockResolvedValue(undefined) };
+
+    const usersService = {
+      findOne: jest.fn().mockImplementation((query: Record<string, unknown>) => {
+        if ('externalIdentifier' in query) {
+          return Promise.resolve({ id: 44, externalIdentifier: 'saml-user' });
+        }
+        return Promise.resolve(null);
+      }),
+      updateOne: jest.fn(),
+    };
+
+    const moduleRef = {
+      get: jest.fn((token: unknown) => {
+        if (token === RbacService) return rbacService;
+        return usersService;
+      }),
+    } as unknown as ModuleRef;
+
+    const strategy = new SSOSamlStrategy(moduleRef);
+    const request = buildRequest(30, 'email');
+    request.ssoSamlOptions.samlConfiguration.roleMappings = { 'user-manager': ['attraccess_admin'] };
+
+    const profile = {
+      nameID: 'saml-user',
+      email: 'user@example.com',
+      // roles attribute present but empty → authoritative, revoke this provider's SSO roles
+      attributes: { roles: [] },
+    } as SamlProfile;
+
+    await strategy.validate(request, profile);
+
+    expect(rbacService.syncSsoRoles).toHaveBeenCalledWith(44, [], SSOProviderType.SAML, 30);
   });
 });

@@ -413,11 +413,12 @@ export class RbacService {
 
   async syncSsoRoles(
     userId: number,
-    roleKeys: string[],
+    roles: Array<{ roleKey: string; externalValue?: string | null }>,
     ssoProviderType: string,
     ssoProviderId: number,
   ): Promise<void> {
-    const targetRoleKeys = new Set(roleKeys);
+    // roleKey -> external claim value that granted it (source metadata for the UI)
+    const targetByKey = new Map(roles.map((r) => [r.roleKey, r.externalValue ?? null]));
 
     const currentSsoRoles = await this.userRoleRepository.find({
       where: { userId, source: UserRoleSource.SSO, ssoProviderType, ssoProviderId },
@@ -425,7 +426,7 @@ export class RbacService {
     });
 
     for (const ur of currentSsoRoles) {
-      if (!targetRoleKeys.has(ur.role.key)) {
+      if (!targetByKey.has(ur.role.key)) {
         // ponytail: last-owner guardrail — transient IdP claim omission must not silently strip the last owner
         if (ur.role.key === 'owner') {
           const otherOwnerCount = await this.userRoleRepository
@@ -442,9 +443,15 @@ export class RbacService {
       }
     }
 
-    const currentRoleKeys = new Set(currentSsoRoles.map((ur) => ur.role.key));
-    for (const roleKey of targetRoleKeys) {
-      if (currentRoleKeys.has(roleKey)) continue;
+    const currentByKey = new Map(currentSsoRoles.map((ur) => [ur.role.key, ur]));
+    for (const [roleKey, externalValue] of targetByKey) {
+      const current = currentByKey.get(roleKey);
+      if (current) {
+        if ((current.externalValue ?? null) !== externalValue) {
+          await this.userRoleRepository.update({ id: current.id }, { externalValue });
+        }
+        continue;
+      }
       const role = await this.roleRepository.findOne({ where: { key: roleKey } });
       if (!role) continue;
       const existing = await this.userRoleRepository.findOne({
@@ -453,7 +460,14 @@ export class RbacService {
       if (!existing) {
         try {
           await this.userRoleRepository.save(
-            this.userRoleRepository.create({ userId, roleId: role.id, source: UserRoleSource.SSO, ssoProviderType, ssoProviderId }),
+            this.userRoleRepository.create({
+              userId,
+              roleId: role.id,
+              source: UserRoleSource.SSO,
+              ssoProviderType,
+              ssoProviderId,
+              externalValue,
+            }),
           );
         } catch (err) {
           // ponytail: '23505' = Postgres unique; SQLite reuses SQLITE_CONSTRAINT for FK/CHECK/NOT NULL too, so narrow by message

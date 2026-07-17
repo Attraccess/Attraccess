@@ -12,7 +12,7 @@ import { Eye, EyeOff } from 'lucide-react';
 import { Button } from '../../../../components/button';
 import { LabeledSwitch } from '../../../../components/labeledSwitch';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { PermissionMappingsSection } from './PermissionMappingsSection';
+import { RoleMappingsSection } from './RoleMappingsSection';
 import { SSOProviderFormApi } from '../useSSOProviderForm';
 import en from '../en.json';
 import de from '../de.json';
@@ -30,8 +30,8 @@ export const SAMLConfigForm = ({ form }: SAMLConfigFormProps) => {
     setEmailAttributeKeysInput,
     showSamlProvisioningSecret,
     setShowSamlProvisioningSecret,
-    samlPermissionMappingsInput,
-    setSamlPermissionMappingsInput,
+    samlRoleMappingEntries,
+    setSamlRoleMappingEntries,
     handleSamlToggleChange,
     providerDetails,
     roles,
@@ -131,12 +131,12 @@ export const SAMLConfigForm = ({ form }: SAMLConfigFormProps) => {
         </TextField>
       </section>
 
-      <PermissionMappingsSection
+      <RoleMappingsSection
         variant="saml"
         roles={roles}
         isLoadingRoles={isLoadingRoles}
-        values={samlPermissionMappingsInput}
-        onChange={(key, value) => setSamlPermissionMappingsInput((prev) => ({ ...prev, [key]: value }))}
+        entries={samlRoleMappingEntries}
+        onChange={setSamlRoleMappingEntries}
       />
 
       <section className="w-full flex flex-col gap-4 pt-6 border-t border-default-200 first:pt-0 first:border-t-0">

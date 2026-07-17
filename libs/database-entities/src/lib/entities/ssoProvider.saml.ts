@@ -8,7 +8,7 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
-import { Exclude } from 'class-transformer';
+import { Exclude, Expose } from 'class-transformer';
 import { SSOProvider } from './ssoProvider.entity';
 
 @Entity()
@@ -107,16 +107,27 @@ export class SSOProviderSAMLConfiguration {
   @Exclude()
   provisioningSecret?: string | null;
 
-  @Column({ type: 'json', nullable: true })
+  // ponytail: keeps the legacy 'permissionMappings' DB column — renaming it would need a migration for zero gain
+  @Column({ type: 'json', nullable: true, name: 'permissionMappings' })
   @ApiProperty({
-    description: 'Optional mapping between RBAC role keys and SAML role attribute values',
+    description: 'Mapping between Attraccess role keys and SAML role/group attribute values',
     required: false,
     example: {
       'system-admin': ['attraccess_config_admin'],
       'billing-manager': ['attraccess_billing'],
     },
   })
-  permissionMappings?: Record<string, string[]> | null;
+  roleMappings?: Record<string, string[]> | null;
+
+  @Expose()
+  @ApiProperty({
+    description: 'Deprecated alias of roleMappings, kept during the migration window',
+    required: false,
+    deprecated: true,
+  })
+  get permissionMappings(): Record<string, string[]> | null | undefined {
+    return this.roleMappings;
+  }
 
   @Column({ type: 'text', nullable: true })
   @ApiProperty({

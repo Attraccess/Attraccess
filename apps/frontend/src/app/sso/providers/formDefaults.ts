@@ -38,15 +38,25 @@ export const ensureSamlConfiguration = (config?: CreateSSOProviderDto['samlConfi
 
 export const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-/** Build a flat string-input record from an existing server-side role mapping, keyed by role key. */
-export const buildPermissionMappingInputs = (
-  roleKeys: string[],
-  mapping?: Record<string, string[]> | null,
-): Record<string, string> => {
-  const result: Record<string, string> = {};
-  for (const key of roleKeys) {
-    const values = mapping?.[key];
-    result[key] = Array.isArray(values) ? values.join(', ') : '';
+export interface RoleMappingEntry {
+  roleKey: string;
+  ssoRole: string;
+}
+
+/** Flatten a server-side role mapping (role key → SSO role names) into table entries. */
+export const buildRoleMappingEntries = (mapping?: Record<string, string[]> | null): RoleMappingEntry[] =>
+  Object.entries(mapping ?? {}).flatMap(([roleKey, ssoRoles]) =>
+    (Array.isArray(ssoRoles) ? ssoRoles : []).map((ssoRole) => ({ roleKey, ssoRole })),
+  );
+
+/** Group table entries back into the server-side role mapping shape. */
+export const buildRoleMappingsPayload = (entries: RoleMappingEntry[]): Record<string, string[]> | undefined => {
+  const mappings: Record<string, string[]> = {};
+  for (const { roleKey, ssoRole } of entries) {
+    const value = ssoRole.trim();
+    if (!value) continue;
+    mappings[roleKey] = mappings[roleKey] ?? [];
+    if (!mappings[roleKey].includes(value)) mappings[roleKey].push(value);
   }
-  return result;
+  return Object.keys(mappings).length > 0 ? mappings : undefined;
 };

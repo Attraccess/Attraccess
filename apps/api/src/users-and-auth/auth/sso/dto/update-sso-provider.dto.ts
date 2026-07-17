@@ -89,11 +89,23 @@ export class UpdateOIDCConfigurationDto {
   emailClaimPaths?: string[];
 
   @ApiProperty({
-    description: 'Maps any RBAC role key (system-provided or user-defined) to the SSO role names that should grant it.',
+    description:
+      'Maps any Attraccess role key (system-provided or user-defined) to the IdP role/group claim values that should grant it.',
     required: false,
     type: Object,
     additionalProperties: { type: 'array', items: { type: 'string' } },
     example: { 'resource-manager': ['attraccess_resources'], 'my-custom-role': ['my_sso_group'] },
+  })
+  @IsOptional()
+  @IsStringArrayRecord()
+  roleMappings?: Record<string, string[]>;
+
+  @ApiProperty({
+    description: 'Deprecated alias of roleMappings, accepted during the migration window. Ignored when roleMappings is set.',
+    required: false,
+    deprecated: true,
+    type: Object,
+    additionalProperties: { type: 'array', items: { type: 'string' } },
   })
   @IsOptional()
   @IsStringArrayRecord()
@@ -195,11 +207,23 @@ export class UpdateSAMLConfigurationDto {
   provisioningSecret?: string;
 
   @ApiProperty({
-    description: 'Maps any RBAC role key (system-provided or user-defined) to the SAML role values that should grant it.',
+    description:
+      'Maps any Attraccess role key (system-provided or user-defined) to the SAML role/group attribute values that should grant it.',
     required: false,
     type: Object,
     additionalProperties: { type: 'array', items: { type: 'string' } },
     example: { 'resource-manager': ['attraccess_resources'], 'my-custom-role': ['my_sso_group'] },
+  })
+  @IsOptional()
+  @IsStringArrayRecord()
+  roleMappings?: Record<string, string[]>;
+
+  @ApiProperty({
+    description: 'Deprecated alias of roleMappings, accepted during the migration window. Ignored when roleMappings is set.',
+    required: false,
+    deprecated: true,
+    type: Object,
+    additionalProperties: { type: 'array', items: { type: 'string' } },
   })
   @IsOptional()
   @IsStringArrayRecord()
