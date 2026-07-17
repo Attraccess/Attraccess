@@ -17,10 +17,11 @@ class OtaUpdater
 public:
     OtaUpdater(Logger &logger,
                std::function<bool(const char *, JsonObject)> send,
+               std::function<void(const char *)> forceReconnect,
                std::function<void(int)> &progressCallback,
                std::function<void(std::string)> &metaCallback,
                std::function<void(const char *, const char *)> &errorCallback)
-        : logger(logger), send(send), progressCallback(progressCallback), metaCallback(metaCallback), errorCallback(errorCallback) {}
+        : logger(logger), send(send), forceReconnect(forceReconnect), progressCallback(progressCallback), metaCallback(metaCallback), errorCallback(errorCallback) {}
 
     void begin(JsonObject firmwareMeta);
     void onChunk(esp_websocket_event_data_t data);
@@ -41,6 +42,7 @@ private:
 
     Logger &logger;
     std::function<bool(const char *, JsonObject)> send;
+    std::function<void(const char *)> forceReconnect;
     std::function<void(int)> &progressCallback;
     std::function<void(std::string)> &metaCallback;
     std::function<void(const char *, const char *)> &errorCallback;

@@ -33,6 +33,10 @@ public:
     void enableConnectionAttempts();
     void disableConnectionAttempts();
 
+    // Tear down the current connection and reconnect (same mechanism as the
+    // inbound-liveness watchdog). Must be called from the main-loop task.
+    void forceReconnect(const char *reason);
+
     // Clear the locked TLS certificate decision so the next connect sweeps the
     // full CA list again (device settings "reset certificate" button).
     void resetCertificateTrust();

@@ -542,6 +542,12 @@ void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, v
     }
 }
 
+void Websocket::forceReconnect(const char *reason)
+{
+    logger.errorf("Forcing websocket reconnect: %s", reason);
+    setState(INIT); // loop() initiates a fresh connection from INIT
+}
+
 bool Websocket::sendMessage(const std::string &message)
 {
     this->logger.debug(("sendMessage: " + message).c_str());

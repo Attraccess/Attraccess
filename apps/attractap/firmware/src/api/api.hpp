@@ -23,6 +23,8 @@ public:
                 logger,
                 [this](const char *type, JsonObject payload)
                 { return this->sendMessage(type, payload); },
+                [this](const char *reason)
+                { this->websocket.forceReconnect(reason); },
                 firmwareUpdateProgressCallback,
                 firmwareUpdateMetaCallback,
                 errorCallback) {}

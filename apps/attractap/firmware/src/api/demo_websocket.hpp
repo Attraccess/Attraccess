@@ -25,6 +25,7 @@ public:
 
     void enableConnectionAttempts() {}
     void disableConnectionAttempts() {}
+    void forceReconnect(const char *) {}
     void resetCertificateTrust() {}
 
 private:

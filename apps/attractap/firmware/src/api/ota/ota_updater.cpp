@@ -9,6 +9,7 @@
 void OtaUpdater::begin(JsonObject firmwareMeta)
 {
     std::string availableVersion = firmwareMeta["version"].as<std::string>();
+    uint32_t offeredSize = firmwareMeta["totalSize"].is<uint32_t>() ? firmwareMeta["totalSize"].as<uint32_t>() : 0;
 
     if (this->ota.inProgress)
     {
@@ -16,17 +17,23 @@ void OtaUpdater::begin(JsonObject firmwareMeta)
         {
             return; // update already failed, reboot pending
         }
-        if (availableVersion == this->ota.version)
+        // totalSize must match too: the binary can change under the same version
+        // string (nightly rebuilds); splicing two different binaries would only
+        // fail at esp_ota_end after transferring the whole rest of the image.
+        if (availableVersion == this->ota.version && offeredSize == this->ota.totalSize)
         {
             // Server re-offered the same update, e.g. after a websocket reconnect.
             // Chunk reads are stateless on the server, so resume at bytesWritten
             // instead of aborting and restarting the whole transfer from 0.
+            // consecutiveChunkFailures is intentionally NOT reset here - only real
+            // chunk data (onChunk) counts as progress, so reconnect cycles that
+            // never deliver a byte still hit the abort backstop.
             this->logger.errorf("Resuming OTA update at %u/%u bytes", this->ota.bytesWritten, this->ota.totalSize);
-            this->consecutiveChunkFailures = 0;
+            this->lastChunkRequestSendFailed = false;
             this->readyForNextFirmwareChunk = true;
             return;
         }
-        this->abortFirmwareUpdate("Different firmware version offered mid-update");
+        this->abortFirmwareUpdate("Different firmware offered mid-update");
         return;
     }
 
@@ -109,6 +116,12 @@ void OtaUpdater::onChunk(esp_websocket_event_data_t data)
     {
         return; // ignore unexpected binary frames
     }
+
+    // Fragment arrival is real progress: re-arm the response watchdog so a
+    // slowly trickling chunk is never interrupted mid-delivery, and clear the
+    // failure streak.
+    this->lastFirmwareChunkRequestTimeMs = millis();
+    this->consecutiveChunkFailures = 0;
 
     // The ESP websocket client may deliver a single server send across multiple callbacks
     // Use payload_len (total message size) and payload_offset (offset within message) to write contiguously
@@ -228,13 +241,27 @@ void OtaUpdater::tick()
                 return;
             }
             this->consecutiveChunkFailures++;
-            // Re-request the same offset: chunk requests/responses can be lost
-            // (tx queue drop, ws hiccup) and the server serves any offset statelessly.
-            this->logger.errorf("Firmware chunk timeout at offset %u, retry %u/%u",
-                                (unsigned)this->ota.bytesWritten,
-                                (unsigned)this->consecutiveChunkFailures,
-                                (unsigned)MAX_CONSECUTIVE_CHUNK_FAILURES);
-            this->requestNextFirmwareChunk();
+            if (this->lastChunkRequestSendFailed)
+            {
+                // TX failed (queue full/alloc): re-request on the same socket
+                this->logger.errorf("Firmware chunk send failed at offset %u, retry %u/%u",
+                                    (unsigned)this->ota.bytesWritten,
+                                    (unsigned)this->consecutiveChunkFailures,
+                                    (unsigned)MAX_CONSECUTIVE_CHUNK_FAILURES);
+                this->requestNextFirmwareChunk();
+            }
+            else
+            {
+                // Response timeout: force a fresh socket so any stale in-flight
+                // response from the previous request cannot arrive and be written
+                // out-of-sequence. begin() resumes from bytesWritten after re-auth.
+                this->logger.errorf("Firmware chunk timeout at offset %u, reconnecting (retry %u/%u)",
+                                    (unsigned)this->ota.bytesWritten,
+                                    (unsigned)this->consecutiveChunkFailures,
+                                    (unsigned)MAX_CONSECUTIVE_CHUNK_FAILURES);
+                this->lastFirmwareChunkRequestTimeMs = millis(); // give reconnect time to complete
+                this->forceReconnect("OTA chunk timeout");
+            }
         }
     }
 }
