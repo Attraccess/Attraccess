@@ -222,8 +222,9 @@ void OtaUpdater::tick()
 
     if (this->readyForNextFirmwareChunk)
     {
-        // A chunk arrived (or a resume was accepted), so the link works again
-        this->consecutiveChunkFailures = 0;
+        // consecutiveChunkFailures is NOT reset here: onChunk() already clears it
+        // per fragment, and the resume-accepted path must keep counting so reconnect
+        // cycles that never deliver a byte still hit the abort backstop.
         this->requestNextFirmwareChunk();
         return;
     }
