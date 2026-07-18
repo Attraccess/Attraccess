@@ -31,8 +31,8 @@ export class BruteForceProtectionService {
     private readonly settingsService: SettingsService,
   ) {}
 
-  async assertIpAllowed(scope: RateLimitScope, ip: string): Promise<void> {
-    const key = ipKey(scope, ip);
+  async assertIpAllowed(scope: RateLimitScope, ip: string, username: string | null = null): Promise<void> {
+    const key = ipKey(scope, ip, username);
     const entry = this.ipCounters.get(key);
     if (!entry) return;
     const remaining = this.remainingLockoutSeconds(entry);
@@ -53,14 +53,14 @@ export class BruteForceProtectionService {
     }
   }
 
-  async recordFailure(scope: RateLimitScope, ip: string, userId: number | null): Promise<void> {
+  async recordFailure(scope: RateLimitScope, ip: string, userId: number | null, username: string | null = null): Promise<void> {
     const policy = await this.settingsService.getRateLimitPolicy();
     const windowMs = policy.windowSeconds * 1000;
     const now = this.nowFn();
 
     this.evictStale(now, windowMs);
 
-    const ipEntry = this.upsertCounter(this.ipCounters, ipKey(scope, ip), now, windowMs);
+    const ipEntry = this.upsertCounter(this.ipCounters, ipKey(scope, ip, username), now, windowMs);
     if (ipEntry.count >= policy.maxAttempts) {
       const durationMs = computeLockoutMs(policy, ipEntry.lockoutCount);
       ipEntry.lockoutUntil = now + durationMs;
@@ -101,8 +101,8 @@ export class BruteForceProtectionService {
     );
   }
 
-  async recordSuccess(scope: RateLimitScope, ip: string, userId: number | null): Promise<void> {
-    this.ipCounters.delete(ipKey(scope, ip));
+  async recordSuccess(scope: RateLimitScope, ip: string, userId: number | null, username: string | null = null): Promise<void> {
+    this.ipCounters.delete(ipKey(scope, ip, username));
     if (userId == null) {
       return;
     }
@@ -174,8 +174,8 @@ function isStale(entry: CounterEntry, now: number, windowMs: number): boolean {
   return now - entry.firstAt > windowMs;
 }
 
-function ipKey(scope: RateLimitScope, ip: string): string {
-  return `${scope}:${ip}`;
+function ipKey(scope: RateLimitScope, ip: string, username: string | null = null): string {
+  return `${scope}:${ip}:${username ?? ''}`;
 }
 
 function computeLockoutMs(
