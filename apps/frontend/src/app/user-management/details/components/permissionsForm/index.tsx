@@ -22,8 +22,8 @@ import de from './de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../../global-translations/api-errors.en.json';
 import API_ERROR_TRANSLATIONS_DE from '../../../../../global-translations/api-errors.de.json';
 
-// Roles shown as editable toggles (default 'user' and 'owner' are excluded)
-const MANAGEABLE_ROLE_KEYS = ['resource-manager', 'system-admin', 'user-manager', 'billing-manager'];
+// 'user' is auto-assigned to all users; 'owner' is the initial system owner — neither should be toggled manually
+const NON_MANAGEABLE_ROLE_KEYS = ['user', 'owner'];
 
 interface UserPermissionFormProps {
   user: User;
@@ -88,7 +88,7 @@ export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({
   const { mutateAsync: revokeRole, isPending: isRevoking } = useUsersServiceRevokeRoleFromUser();
   const isSaving = isAssigning || isRevoking;
 
-  const manageableRoles = (allRoles ?? []).filter((r) => MANAGEABLE_ROLE_KEYS.includes(r.key));
+  const manageableRoles = (allRoles ?? []).filter((r) => !NON_MANAGEABLE_ROLE_KEYS.includes(r.key));
   const manageableRoleIds = new Set(manageableRoles.map((r) => r.id));
 
   const [selectedRoleIds, setSelectedRoleIds] = useState<Set<number>>(new Set());
@@ -199,7 +199,7 @@ export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({
                 isDisabled={isRoleSsoManaged(role.key)}
                 data-cy={`user-permission-form-${role.key}-checkbox`}
               >
-                {t(`permissions.${role.key}`)}
+                {tExists(`permissions.${role.key}`) ? t(`permissions.${role.key}`) : role.name}
               </LabeledSwitch>
               <SsoAssignmentBadges assignments={ssoAssignments} providersById={providersById} t={t} />
             </div>

@@ -16,6 +16,8 @@ const ROLES = [
   { id: 3, key: 'user-manager', name: 'User Manager', rolePermissions: [] },
   { id: 4, key: 'billing-manager', name: 'Billing Manager', rolePermissions: [] },
   { id: 5, key: 'owner', name: 'Owner', rolePermissions: [] },
+  { id: 6, key: 'user', name: 'User', rolePermissions: [] },
+  { id: 7, key: 'my-custom-role', name: 'My Custom Role', rolePermissions: [] },
 ];
 
 // Stable reference — must not be inline in the mock factory; a new array on every hook
@@ -185,5 +187,22 @@ describe('UserPermissionForm', () => {
       const systemAdminCheckbox = screen.getByLabelText('Manage system configuration');
       expect(systemAdminCheckbox).toBeDisabled();
     });
+  });
+
+  it('excludes the user role from the manageable list', async () => {
+    const user = { id: 7 } as User;
+    render(<UserPermissionForm user={user} ssoManagedProviders={[]} />, { wrapper: TestWrapper });
+
+    await waitFor(() => expect(screen.getByLabelText('Manage resources')).toBeInTheDocument());
+    // 'user' is in NON_MANAGEABLE_ROLE_KEYS — no toggle should be rendered for it
+    expect(screen.queryByLabelText('User')).not.toBeInTheDocument();
+  });
+
+  it('shows a custom role using role.name as label when no translation key exists', async () => {
+    const user = { id: 7 } as User;
+    render(<UserPermissionForm user={user} ssoManagedProviders={[]} />, { wrapper: TestWrapper });
+
+    // Custom role has no translation entry — must fall back to role.name
+    await waitFor(() => expect(screen.getByLabelText('My Custom Role')).toBeInTheDocument());
   });
 });
