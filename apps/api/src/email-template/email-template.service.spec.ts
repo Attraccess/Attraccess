@@ -141,17 +141,18 @@ describe('EmailTemplateService — translation CRUD', () => {
   });
 
   describe('resetToDefault', () => {
-    it('deletes all translation rows then re-seeds shipped translations', async () => {
+    it('deletes and re-seeds shipped translations inside a transaction', async () => {
       const { service, emailTemplateRepo, translationRepo } = setup();
       emailTemplateRepo.findOneBy.mockResolvedValue({ type: EmailTemplateType.VERIFY_EMAIL });
       emailTemplateRepo.update.mockResolvedValue({});
-      translationRepo.delete.mockResolvedValue({ affected: 2 });
-      translationRepo.insert.mockResolvedValue({});
+      const manager = { delete: jest.fn(), insert: jest.fn(), create: jest.fn().mockImplementation((_, e) => e) };
+      translationRepo.manager.transaction.mockImplementation(async (fn: (m: typeof manager) => Promise<void>) => fn(manager));
 
       await service.resetToDefault(EmailTemplateType.VERIFY_EMAIL);
 
-      expect(translationRepo.delete).toHaveBeenCalledWith({ templateType: EmailTemplateType.VERIFY_EMAIL });
-      expect(translationRepo.insert).toHaveBeenCalledWith([
+      expect(translationRepo.manager.transaction).toHaveBeenCalled();
+      expect(manager.delete).toHaveBeenCalledWith(EmailTemplateTranslation, { templateType: EmailTemplateType.VERIFY_EMAIL });
+      expect(manager.insert).toHaveBeenCalledWith(EmailTemplateTranslation, [
         { templateType: 'verify-email', locale: 'de', key: 'greeting', value: 'Hallo {name},' },
       ]);
     });

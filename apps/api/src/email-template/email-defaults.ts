@@ -205,6 +205,8 @@ export interface ShippedTranslation {
 
 const COPY_LINK_DE = 'Oder kopiere diesen Link in deinen Browser:<br /><a href="{url}">{url}</a>';
 
+// ponytail: seed migration 1782600000000 references this constant — adding rows here only affects fresh installs.
+// Existing installs receive new rows only when an admin resets a template, or via a new migration.
 export const SHIPPED_TRANSLATIONS: ShippedTranslation[] = [
   // verify-email
   { templateType: EmailTemplateType.VERIFY_EMAIL, locale: 'de', key: 'greeting', value: 'Hallo {name},' },

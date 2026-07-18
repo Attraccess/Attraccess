@@ -61,14 +61,16 @@ export class EmailTemplateService {
       { subject: defaults.subject, body, variables: defaults.variables },
     );
 
-    await this.translationRepository.delete({ templateType: type });
-
-    const shipped = SHIPPED_TRANSLATIONS.filter((t) => t.templateType === type);
-    if (shipped.length > 0) {
-      await this.translationRepository.insert(
-        shipped.map((t) => this.translationRepository.create({ templateType: t.templateType, locale: t.locale, key: t.key, value: t.value })),
-      );
-    }
+    await this.translationRepository.manager.transaction(async (manager) => {
+      await manager.delete(EmailTemplateTranslation, { templateType: type });
+      const shipped = SHIPPED_TRANSLATIONS.filter((t) => t.templateType === type);
+      if (shipped.length > 0) {
+        await manager.insert(
+          EmailTemplateTranslation,
+          shipped.map((t) => manager.create(EmailTemplateTranslation, { templateType: t.templateType, locale: t.locale, key: t.key, value: t.value })),
+        );
+      }
+    });
 
     return this.findOne(type);
   }
