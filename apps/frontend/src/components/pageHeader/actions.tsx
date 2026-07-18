@@ -150,10 +150,8 @@ export function PageHeaderActions({ actions, maxVisible = DEFAULT_MAX_VISIBLE, m
       {inline.map(renderInlineAction)}
       {hasOverflow && (
         <Dropdown>
-          <DropdownTrigger>
-            <Button variant="outline" size="sm" isIconOnly aria-label={triggerLabel} data-cy="page-header-overflow-trigger">
-              <MoreVerticalIcon className="w-4 h-4" />
-            </Button>
+          <DropdownTrigger variant="outline" size="sm" isIconOnly aria-label={triggerLabel} data-cy="page-header-overflow-trigger">
+            <MoreVerticalIcon className="w-4 h-4" />
           </DropdownTrigger>
           <DropdownPopover>
             <DropdownMenu aria-label={triggerLabel}>
