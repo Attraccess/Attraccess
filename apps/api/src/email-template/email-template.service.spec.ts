@@ -6,6 +6,9 @@ import { MjmlService } from './mjml.service';
 jest.mock('./email-defaults', () => ({
   EMAIL_TEMPLATE_DEFAULTS: { 'verify-email': { subject: 'Default subject', variables: [] } },
   readDefaultTemplateBody: jest.fn(() => '<mjml></mjml>'),
+  SHIPPED_TRANSLATIONS: [
+    { templateType: 'verify-email', locale: 'de', key: 'greeting', value: 'Hallo {name},' },
+  ],
 }));
 
 const makeRepo = () => ({
@@ -13,8 +16,9 @@ const makeRepo = () => ({
   findOneBy: jest.fn(),
   findBy: jest.fn(),
   update: jest.fn(),
-  create: jest.fn(),
+  create: jest.fn().mockImplementation((e) => e),
   delete: jest.fn(),
+  insert: jest.fn(),
   manager: {
     transaction: jest.fn(),
   },
@@ -137,15 +141,19 @@ describe('EmailTemplateService — translation CRUD', () => {
   });
 
   describe('resetToDefault', () => {
-    it('deletes all translation rows for the template type', async () => {
+    it('deletes all translation rows then re-seeds shipped translations', async () => {
       const { service, emailTemplateRepo, translationRepo } = setup();
       emailTemplateRepo.findOneBy.mockResolvedValue({ type: EmailTemplateType.VERIFY_EMAIL });
       emailTemplateRepo.update.mockResolvedValue({});
       translationRepo.delete.mockResolvedValue({ affected: 2 });
+      translationRepo.insert.mockResolvedValue({});
 
       await service.resetToDefault(EmailTemplateType.VERIFY_EMAIL);
 
       expect(translationRepo.delete).toHaveBeenCalledWith({ templateType: EmailTemplateType.VERIFY_EMAIL });
+      expect(translationRepo.insert).toHaveBeenCalledWith([
+        { templateType: 'verify-email', locale: 'de', key: 'greeting', value: 'Hallo {name},' },
+      ]);
     });
   });
 
