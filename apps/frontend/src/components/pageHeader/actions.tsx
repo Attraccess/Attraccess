@@ -6,6 +6,7 @@ import {
   DropdownPopover,
   DropdownTrigger,
 } from '@heroui/react';
+import { buttonVariants } from '@heroui/styles';
 import { Button } from '../button';
 import { MoreVerticalIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -150,7 +151,11 @@ export function PageHeaderActions({ actions, maxVisible = DEFAULT_MAX_VISIBLE, m
       {inline.map(renderInlineAction)}
       {hasOverflow && (
         <Dropdown>
-          <DropdownTrigger variant="outline" size="sm" isIconOnly aria-label={triggerLabel} data-cy="page-header-overflow-trigger">
+          <DropdownTrigger
+            className={buttonVariants({ variant: 'outline', size: 'sm', isIconOnly: true })}
+            aria-label={triggerLabel}
+            data-cy="page-header-overflow-trigger"
+          >
             <MoreVerticalIcon className="w-4 h-4" />
           </DropdownTrigger>
           <DropdownPopover>
