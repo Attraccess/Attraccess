@@ -13,6 +13,10 @@ export function useSSE<TPacket>(props: Props<TPacket>) {
 
   const abortController = useRef<AbortController | null>(null);
 
+  // Use a ref so onUpdate changes don't force reconnects
+  const onUpdateRef = useRef(onUpdate);
+  onUpdateRef.current = onUpdate;
+
   const connect = useCallback(async () => {
     if (!enabled) {
       return;
@@ -50,7 +54,7 @@ export function useSSE<TPacket>(props: Props<TPacket>) {
             continue;
           }
 
-          onUpdate(nextPacket);
+          onUpdateRef.current(nextPacket);
         } catch (parseError) {
           console.error('[FlowContext] Error parsing event data:', parseError, event);
         }
@@ -61,11 +65,10 @@ export function useSSE<TPacket>(props: Props<TPacket>) {
         console.error('[SSE] Connection error:', error);
       }
     }
-  }, [onUpdate, path, enabled]);
+  }, [path, enabled]); // onUpdate removed: always reads latest via ref
 
   useEffect(() => {
     if (!enabled) {
-      // Abort any existing connection when disabled
       if (abortController.current) {
         abortController.current.abort();
         abortController.current = null;
@@ -73,10 +76,16 @@ export function useSSE<TPacket>(props: Props<TPacket>) {
       return;
     }
 
-    if (abortController.current) {
-      return;
+    if (!abortController.current) {
+      connect();
     }
-    connect();
+
+    return () => {
+      if (abortController.current) {
+        abortController.current.abort();
+        abortController.current = null;
+      }
+    };
   }, [connect, enabled]);
 
   return {
