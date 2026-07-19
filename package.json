@@ -146,7 +146,7 @@
     "@commitlint/cli": "^19.6.1",
     "@commitlint/config-conventional": "^21.2.0",
     "@cyclonedx/cdxgen": "^12.7.1",
-    "@nx/esbuild": "22.7.4",
+    "@nx/esbuild": "23.1.0",
     "@nx/eslint": "22.7.4",
     "@nx/eslint-plugin": "22.7.4",
     "@nx/jest": "22.7.4",
