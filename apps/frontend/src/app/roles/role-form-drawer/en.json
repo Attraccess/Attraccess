@@ -23,7 +23,8 @@
     "searchPlaceholder": "Search permissions...",
     "noResults": "No permissions found",
     "cannotGrantHint": "Locked permissions are ones you do not hold yourself and cannot grant.",
-    "locked": "Locked permissions"
+    "locked": "Locked permissions",
+    "lockedTagIndicator": "(locked)"
   },
   "categories": {
     "resources": "Resources",

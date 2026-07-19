@@ -99,6 +99,17 @@ export function RoleFormDrawer({ isOpen, onOpenChange, role }: Props) {
     [permissions, hasPermission],
   );
 
+  // Pre-computed outside the Autocomplete render prop to avoid recomputing on every render
+  const selectedTagItems = useMemo(
+    () =>
+      [...selectedKeys].map((k) => ({
+        key: k,
+        label: permissionByKey.get(k)?.label ?? k,
+        isLocked: nonGrantableKeys.includes(k),
+      })),
+    [selectedKeys, permissionByKey, nonGrantableKeys],
+  );
+
   const categoryLabel = (category: string) => (tExists(`categories.${category}`) ? t(`categories.${category}`) : category);
 
   // Locked keys can be neither added nor removed, no matter how the change was triggered
@@ -237,33 +248,27 @@ export function RoleFormDrawer({ isOpen, onOpenChange, role }: Props) {
                     if (isPlaceholder || state.selectedItems.length === 0) {
                       return defaultChildren;
                     }
-                    const grantableSelected = [...selectedKeys].filter((k) => !nonGrantableKeys.includes(k));
-                    const lockedSelected = [...selectedKeys].filter((k) => nonGrantableKeys.includes(k));
                     return (
                       <div className="flex flex-wrap gap-1">
-                        {grantableSelected.length > 0 && (
-                          <TagGroup size="sm" aria-label={t('permissions.title')} onRemove={handleRemoveTags}>
-                            <TagGroup.List>
-                              {grantableSelected.map((key) => (
-                                <Tag key={key} id={key} textValue={permissionByKey.get(key)?.label ?? key}>
-                                  {permissionByKey.get(key)?.label ?? key}
-                                </Tag>
-                              ))}
-                            </TagGroup.List>
-                          </TagGroup>
-                        )}
-                        {lockedSelected.length > 0 && (
-                          <TagGroup size="sm" aria-label={t('permissions.locked')}>
-                            <TagGroup.List>
-                              {lockedSelected.map((key) => (
-                                <Tag key={key} id={key} textValue={permissionByKey.get(key)?.label ?? key}>
-                                  <LockIcon className="w-3 h-3" />
-                                  {permissionByKey.get(key)?.label ?? key}
-                                </Tag>
-                              ))}
-                            </TagGroup.List>
-                          </TagGroup>
-                        )}
+                        <TagGroup size="sm" aria-label={t('permissions.title')} onRemove={handleRemoveTags}>
+                          <TagGroup.List>
+                            {selectedTagItems.map(({ key, label, isLocked }) => (
+                              <Tag
+                                key={key}
+                                id={key}
+                                textValue={isLocked ? `${label} ${t('permissions.lockedTagIndicator')}` : label}
+                              >
+                                {(renderProps) => (
+                                  <>
+                                    {isLocked && <LockIcon className="w-3 h-3" aria-hidden="true" />}
+                                    {label}
+                                    {renderProps.allowsRemoving && !isLocked && <Tag.RemoveButton />}
+                                  </>
+                                )}
+                              </Tag>
+                            ))}
+                          </TagGroup.List>
+                        </TagGroup>
                       </div>
                     );
                   }}
