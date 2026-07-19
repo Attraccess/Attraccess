@@ -249,27 +249,25 @@ export function RoleFormDrawer({ isOpen, onOpenChange, role }: Props) {
                       return defaultChildren;
                     }
                     return (
-                      <div className="flex flex-wrap gap-1">
-                        <TagGroup size="sm" aria-label={t('permissions.title')} onRemove={handleRemoveTags}>
-                          <TagGroup.List>
-                            {selectedTagItems.map(({ key, label, isLocked }) => (
-                              <Tag
-                                key={key}
-                                id={key}
-                                textValue={isLocked ? `${label} ${t('permissions.lockedTagIndicator')}` : label}
-                              >
-                                {(renderProps) => (
-                                  <>
-                                    {isLocked && <LockIcon className="w-3 h-3" aria-hidden="true" />}
-                                    {label}
-                                    {renderProps.allowsRemoving && !isLocked && <Tag.RemoveButton />}
-                                  </>
-                                )}
-                              </Tag>
-                            ))}
-                          </TagGroup.List>
-                        </TagGroup>
-                      </div>
+                      <TagGroup size="sm" aria-label={t('permissions.title')} onRemove={handleRemoveTags}>
+                        <TagGroup.List>
+                          {selectedTagItems.map(({ key, label, isLocked }) => (
+                            <Tag
+                              key={key}
+                              id={key}
+                              textValue={isLocked ? `${label} ${t('permissions.lockedTagIndicator')}` : label}
+                            >
+                              {(renderProps) => (
+                                <>
+                                  {isLocked && <LockIcon className="w-3 h-3" aria-hidden="true" />}
+                                  {label}
+                                  {renderProps.allowsRemoving && !isLocked && <Tag.RemoveButton />}
+                                </>
+                              )}
+                            </Tag>
+                          ))}
+                        </TagGroup.List>
+                      </TagGroup>
                     );
                   }}
                 </Autocomplete.Value>

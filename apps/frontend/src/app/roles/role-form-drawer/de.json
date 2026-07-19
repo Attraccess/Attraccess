@@ -23,7 +23,6 @@
     "searchPlaceholder": "Berechtigungen durchsuchen...",
     "noResults": "Keine Berechtigungen gefunden",
     "cannotGrantHint": "Gesperrte Berechtigungen besitzt du selbst nicht und kannst sie nicht vergeben.",
-    "locked": "Gesperrte Berechtigungen",
     "lockedTagIndicator": "(gesperrt)"
   },
   "categories": {
