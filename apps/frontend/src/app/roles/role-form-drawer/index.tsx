@@ -96,8 +96,18 @@ export function RoleFormDrawer({ isOpen, onOpenChange, role }: Props) {
   // Permissions the acting user does not hold: visible but locked (grant safety)
   const nonGrantableKeys = useMemo(
     () => (permissions ?? []).filter((p) => !hasPermission(p.key as SystemPermission)).map((p) => p.key),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [permissions, hasPermission],
+  );
+
+  // Pre-computed outside the Autocomplete render prop to avoid recomputing on every render
+  const selectedTagItems = useMemo(
+    () =>
+      [...selectedKeys].map((k) => ({
+        key: k,
+        label: permissionByKey.get(k)?.label ?? k,
+        isLocked: nonGrantableKeys.includes(k),
+      })),
+    [selectedKeys, permissionByKey, nonGrantableKeys],
   );
 
   const categoryLabel = (category: string) => (tExists(`categories.${category}`) ? t(`categories.${category}`) : category);
@@ -239,17 +249,21 @@ export function RoleFormDrawer({ isOpen, onOpenChange, role }: Props) {
                       return defaultChildren;
                     }
                     return (
-                      <TagGroup
-                        size="sm"
-                        aria-label={t('permissions.title')}
-                        disabledKeys={nonGrantableKeys}
-                        onRemove={handleRemoveTags}
-                      >
+                      <TagGroup size="sm" aria-label={t('permissions.title')} onRemove={handleRemoveTags}>
                         <TagGroup.List>
-                          {[...selectedKeys].map((key) => (
-                            <Tag key={key} id={key} textValue={permissionByKey.get(key)?.label ?? key}>
-                              {nonGrantableKeys.includes(key) ? <LockIcon className="w-3 h-3" /> : null}
-                              {permissionByKey.get(key)?.label ?? key}
+                          {selectedTagItems.map(({ key, label, isLocked }) => (
+                            <Tag
+                              key={key}
+                              id={key}
+                              textValue={isLocked ? `${label} ${t('permissions.lockedTagIndicator')}` : label}
+                            >
+                              {(renderProps) => (
+                                <>
+                                  {isLocked && <LockIcon className="w-3 h-3" aria-hidden="true" />}
+                                  {label}
+                                  {renderProps.allowsRemoving && !isLocked && <Tag.RemoveButton />}
+                                </>
+                              )}
                             </Tag>
                           ))}
                         </TagGroup.List>
