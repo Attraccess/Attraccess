@@ -23,9 +23,10 @@ interface LayoutProps {
 const SIDEBAR_COLLAPSED_STORAGE_KEY = 'attraccess.sidebar-collapsed';
 
 export function Layout({ children }: LayoutProps) {
-  // Initialize with closed sidebar on mobile, open on desktop
-  const [isOpen, setIsOpen] = useState(false);
-  const [isDesktop, setIsDesktop] = useState(false);
+  // Initialize synchronously from the viewport so the first paint is correct —
+  // a false initial value would animate the sidebar open/collapsed on every load.
+  const [isOpen, setIsOpen] = useState(() => window.innerWidth >= 768);
+  const [isDesktop, setIsDesktop] = useState(() => window.innerWidth >= 768);
 
   // Set the initial sidebar state based on screen size
   useEffect(() => {

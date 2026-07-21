@@ -5,7 +5,7 @@ import { EntityManager, Repository } from 'typeorm';
 import { UpdateEmailTemplateDto } from './dto/update-email-template.dto';
 import { MjmlService } from './mjml.service';
 import { EMAIL_TEMPLATE_DEFAULTS, readDefaultTemplateBody } from './email-defaults';
-import { extractTranslationKeys, TranslationKey } from '@attraccess/shared';
+import { extractTranslationKeys, isFullMjmlDocument, TranslationKey } from '@attraccess/shared';
 
 export interface TemplateTranslations {
   keys: TranslationKey[];
@@ -41,7 +41,7 @@ export class EmailTemplateService {
     if (updateEmailTemplateDto.body) {
       // Bodies are MJML fragments injected into the global layout at send time;
       // a full <mjml> document would nest invalidly when the email is rendered.
-      if (/^\s*<mjml[\s>]/i.test(updateEmailTemplateDto.body)) {
+      if (isFullMjmlDocument(updateEmailTemplateDto.body)) {
         throw new BadRequestException('Template body must be an MJML fragment without an <mjml> root element');
       }
       await this.mjmlService.validateAndConvert(`<mjml><mj-body>${updateEmailTemplateDto.body}</mj-body></mjml>`);

@@ -23,6 +23,10 @@
     "resetSuccess": "E-Mail-Layout auf Standard zurückgesetzt.",
     "resetError": "Layout konnte nicht zurückgesetzt werden."
   },
+  "error": {
+    "loadFailed": "Das E-Mail-Layout konnte nicht geladen werden.",
+    "retry": "Erneut versuchen"
+  },
   "resetConfirm": {
     "title": "Layout auf Standard zurücksetzen?",
     "message": "Dies überschreibt Ihre Anpassungen mit dem Standard-Layout. Dies kann nicht rückgängig gemacht werden.",

@@ -23,6 +23,10 @@
     "resetSuccess": "Email layout reset to default.",
     "resetError": "Layout could not be reset."
   },
+  "error": {
+    "loadFailed": "The email layout could not be loaded.",
+    "retry": "Retry"
+  },
   "resetConfirm": {
     "title": "Reset layout to default?",
     "message": "This will overwrite your customizations with the bundled default layout. This cannot be undone.",

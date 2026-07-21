@@ -235,7 +235,7 @@ export function EditEmailTemplatePage() {
           </div>
         ) : (
           <MjmlVisualEditor
-            key={editorSeed}
+            key={`${editorSeed}-${language}`}
             initialValue={initialBodyRef.current}
             onChange={handleBodyChange}
             language={language}

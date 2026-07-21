@@ -45,7 +45,14 @@
     "deleteFailed": "Failed to delete translations",
     "deleteConfirm": "Remove {{language}} and delete all of its saved translations?",
     "deleteConfirmButton": "Remove",
-    "emptyTranslation": "Falls back to default"
+    "emptyTranslation": "Falls back to default",
+    "loadFailed": "Existing translations could not be loaded.",
+    "retry": "Retry",
+    "customLocale": "Other language…",
+    "customLocaleTitle": "Add another language",
+    "customLocaleHint": "Enter a language tag such as \"de-CH\", \"en-GB\" or \"sw\". Regional tags override the base language for recipients in that region.",
+    "customLocaleInvalid": "Must be a lowercase language code, optionally with an uppercase region (e.g. \"de\" or \"de-CH\").",
+    "customLocaleAdd": "Add"
   },
   "actions": {
     "back": "Back to templates",

@@ -1,11 +1,14 @@
-import { useEffect, useRef } from 'react';
-import grapesjs, { type Component } from 'grapesjs';
+import { useEffect, useMemo, useRef } from 'react';
+import grapesjs from 'grapesjs';
+import type { Component } from 'grapesjs';
 import grapesJSMJMLModule from 'grapesjs-mjml';
 import grapesjsDeModule from 'grapesjs/locale/de';
 import grapesjsMjmlDeModule from 'grapesjs-mjml/locale/de';
 import 'grapesjs/dist/css/grapes.min.css';
 import './MjmlVisualEditor.css';
-import { decodeHtmlOnlyEntities } from './mjmlLayout';
+import { isFullMjmlDocument } from '@attraccess/shared';
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { decodeHtmlOnlyEntities, isWellFormedXml, splitHead, unwrapFragment, wrapFragment } from './mjmlLayout';
 
 // grapesjs-mjml and the locale files ship as CJS; depending on the bundler's
 // interop the callable/plain export is either the module itself or `.default`.
@@ -13,6 +16,21 @@ const unwrapDefault = <T,>(mod: T): T => (mod as { default?: T })?.default ?? mo
 const grapesJSMJML = unwrapDefault(grapesJSMJMLModule);
 const grapesjsDe = unwrapDefault(grapesjsDeModule);
 const grapesjsMjmlDe = unwrapDefault(grapesjsMjmlDeModule);
+
+const warningTranslations = {
+  en: {
+    htmlParserFallback:
+      'This template is not well-formed XML, so a lossier parser is used: raw HTML table markup may be reformatted by visual edits. Fix the markup in the code editor to avoid this.',
+    headDropped:
+      'This template contains document-level styles (<mj-head>) that the visual editor cannot keep. Saving will remove them; the global layout styles apply instead.',
+  },
+  de: {
+    htmlParserFallback:
+      'Diese Vorlage ist kein wohlgeformtes XML, daher wird ein verlustbehafteter Parser verwendet: rohes HTML-Tabellen-Markup kann durch visuelle Bearbeitungen umformatiert werden. Korrigiere das Markup im Code-Editor, um das zu vermeiden.',
+    headDropped:
+      'Diese Vorlage enthält Dokument-Styles (<mj-head>), die der visuelle Editor nicht übernehmen kann. Beim Speichern werden sie entfernt; stattdessen gelten die Styles des globalen Layouts.',
+  },
+};
 
 interface MjmlVisualEditorProps {
   /** MJML fragment (mj-section...) or full <mjml> document. Read once on mount — remount (key) to reload. */
@@ -30,24 +48,23 @@ interface MjmlVisualEditorProps {
   exportFullDocument?: boolean;
 }
 
-const wrapFragment = (value: string) =>
-  value.trimStart().startsWith('<mjml') ? value : `<mjml><mj-body>${value}</mj-body></mjml>`;
-
-const unwrapFragment = (mjml: string) => {
-  const match = mjml.match(/<mj-body[^>]*>([\s\S]*)<\/mj-body>/);
-  return (match ? match[1] : mjml).trim();
+// Pure analysis of the initial value, shared between the mount effect (parser
+// selection) and render (warning banners).
+const analyzeInitialValue = (initialValue: string) => {
+  const raw = decodeHtmlOnlyEntities(initialValue);
+  const { head, body } = isFullMjmlDocument(raw) ? splitHead(raw) : { head: '', body: raw };
+  const initialMjml = wrapFragment(body);
+  return { initialMjml, droppedHead: head, useXmlParser: isWellFormedXml(initialMjml) };
 };
 
-// If the content still isn't well-formed XML, fall back to the HTML parser —
-// it mangles raw table markup but never truncates the document.
-const isWellFormedXml = (value: string) =>
-  !new DOMParser().parseFromString(value, 'text/xml').querySelector('parsererror');
-
 export function MjmlVisualEditor(props: MjmlVisualEditorProps) {
+  const { t } = useTranslations(warningTranslations);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const propsRef = useRef(props);
   propsRef.current = props;
+
+  const analysis = useMemo(() => analyzeInitialValue(props.initialValue), [props.initialValue]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -55,7 +72,7 @@ export function MjmlVisualEditor(props: MjmlVisualEditorProps) {
       return;
     }
 
-    const initialMjml = wrapFragment(decodeHtmlOnlyEntities(propsRef.current.initialValue));
+    const { initialMjml, droppedHead, useXmlParser } = analyzeInitialValue(propsRef.current.initialValue);
 
     const editor = grapesjs.init({
       container,
@@ -74,7 +91,7 @@ export function MjmlVisualEditor(props: MjmlVisualEditorProps) {
       plugins: [
         (instance) =>
           grapesJSMJML(instance, {
-            useXmlParser: isWellFormedXml(initialMjml),
+            useXmlParser,
             i18n: { de: grapesjsMjmlDe },
           }),
       ],
@@ -84,21 +101,26 @@ export function MjmlVisualEditor(props: MjmlVisualEditorProps) {
     // into its attributes on import and strips matching attributes on export.
     // Our layout overrides those defaults via mj-attributes, so stripping e.g.
     // font-size="13px" silently changes the rendered email. Empty the
-    // 'style-default' maps so imported attributes round-trip verbatim.
+    // 'style-default' maps so imported attributes round-trip verbatim. The rest
+    // of the type's defaults is spread back in so this stays correct whether
+    // addType merges or replaces the previous defaults object (traits, drag
+    // flags etc. must survive).
     editor.Components.getTypes().forEach((type) => {
       const proto = editor.Components.getType(type.id)?.model?.prototype as
         | { defaults?: Record<string, unknown> }
         | undefined;
       if (proto?.defaults?.['style-default']) {
-        editor.Components.addType(type.id, { model: { defaults: { 'style-default': {} } } });
+        editor.Components.addType(type.id, { model: { defaults: { ...proto.defaults, 'style-default': {} } } });
       }
     });
 
     // grapesjs-mjml renders each component by compiling a standalone
     // "<mjml><mj-body>...</mj-body></mjml>" mini-document, so mj-head styles
     // (mj-attributes, mj-style) never apply in the canvas. Splice the head
-    // into every mini-document so the canvas matches the final email.
-    const headMjml = propsRef.current.headMjml;
+    // into every mini-document so the canvas matches the final email. For a
+    // legacy full-document template its own head is used, so the canvas shows
+    // the styles the warning banner says will be dropped on save.
+    const headMjml = propsRef.current.headMjml || droppedHead;
     if (headMjml) {
       editor.Components.getTypes().forEach((type) => {
         const viewProto = editor.Components.getType(type.id)?.view?.prototype as
@@ -137,11 +159,18 @@ export function MjmlVisualEditor(props: MjmlVisualEditorProps) {
       });
     }
 
+    // Attach the update listener only after the initial parse settles, so
+    // load-time normalization never clobbers untouched templates — only user
+    // edits do. Neither grapesjs nor grapesjs-mjml emits an explicit
+    // "initial parse complete" event, so onReady plus one macrotask is the
+    // closest available signal; if a late normalization update slips past it,
+    // the impact is limited to the user's next explicit save.
+    let cancelled = false;
     editor.onReady(() => {
-      // ponytail: listener attached after initial parse settles, so load-time
-      // normalization never clobbers untouched templates — only user edits do.
       setTimeout(() => {
+        if (cancelled) return;
         editor.on('update', () => {
+          if (cancelled) return;
           const mjml = editor.getHtml();
           propsRef.current.onChange(propsRef.current.exportFullDocument ? mjml : unwrapFragment(mjml));
         });
@@ -151,8 +180,29 @@ export function MjmlVisualEditor(props: MjmlVisualEditorProps) {
     // Handle for e2e tests and debugging (the canvas is otherwise unreachable from outside).
     (container as HTMLDivElement & { __grapesEditor?: unknown }).__grapesEditor = editor;
 
-    return () => editor.destroy();
+    return () => {
+      cancelled = true;
+      editor.destroy();
+    };
   }, []);
 
-  return <div ref={containerRef} className="mjml-visual-editor h-full w-full" data-cy="mjml-visual-editor" />;
+  const warnings = [
+    !analysis.useXmlParser && { key: 'parser', text: t('htmlParserFallback') },
+    !props.exportFullDocument && analysis.droppedHead && { key: 'head', text: t('headDropped') },
+  ].filter(Boolean) as { key: string; text: string }[];
+
+  return (
+    <div className="h-full w-full flex flex-col">
+      {warnings.map((warning) => (
+        <p
+          key={warning.key}
+          className="px-3 py-2 text-xs bg-warning-100 text-warning-800 border-b border-warning-200"
+          data-cy={`mjml-visual-editor-warning-${warning.key}`}
+        >
+          {warning.text}
+        </p>
+      ))}
+      <div ref={containerRef} className="mjml-visual-editor flex-1 min-h-0 w-full" data-cy="mjml-visual-editor" />
+    </div>
+  );
 }

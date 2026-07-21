@@ -47,7 +47,9 @@ const toEditable = (body: string, label: string) =>
 const toStorable = (editedDoc: string, head: string) =>
   editedDoc
     .replace(new RegExp(`<mj-section[^>]*css-class="[^"]*${PLACEHOLDER_CLASS}[^"]*"[\\s\\S]*?</mj-section>`), () => CONTENT_PLACEHOLDER)
-    .replace('<mjml>', () => `<mjml>${head}`);
+    // Tolerate attributes on the root tag (<mjml owa="desktop" lang="de">…) —
+    // a literal '<mjml>' match would silently drop the head for such layouts.
+    .replace(/<mjml([^>]*)>/, (_match, attrs) => `<mjml${attrs}>${head}`);
 
 export function EmailLayoutPage() {
   const navigate = useNavigate();
@@ -192,13 +194,20 @@ export function EmailLayoutPage() {
       </div>
 
       <div className="flex-1 min-h-0 rounded-md overflow-hidden border border-default-200">
-        {docRef.current === null || editorSeed === 0 ? (
+        {layout.isError && docRef.current === null ? (
+          <div className="h-full flex flex-col items-center justify-center gap-3" data-cy="email-layout-load-error">
+            <p className="text-sm text-danger">{t('error.loadFailed')}</p>
+            <Button variant="ghost" size="sm" onPress={() => layout.refetch()}>
+              {t('error.retry')}
+            </Button>
+          </div>
+        ) : docRef.current === null || editorSeed === 0 ? (
           <div className="h-full flex items-center justify-center">
             <Spinner size="sm" />
           </div>
         ) : (
           <MjmlVisualEditor
-            key={editorSeed}
+            key={`${editorSeed}-${language}`}
             initialValue={docRef.current}
             onChange={handleDocChange}
             language={language}

@@ -19,6 +19,7 @@ import {
   TableHeader,
   TableRow,
   TableScrollContainer,
+  Spinner,
   Tab,
   TabList,
   Tabs,
@@ -37,12 +38,16 @@ import { useTemplateTranslations } from './useTemplateTranslations';
 import * as enTranslationsFile from './en.json';
 import * as deTranslationsFile from './de.json';
 
-// ponytail: curated list instead of a free-text locale input; extend when someone needs more
+// Curated dropdown list; anything else (rarer languages, regional overrides
+// like fr-CA) can be added via the validated "Other language…" input below.
 const COMMON_LOCALES = [
-  'en', 'de', 'fr', 'es', 'it', 'nl', 'pt', 'pt-BR', 'pl', 'cs', 'sk', 'da', 'sv', 'nb', 'fi',
-  'ru', 'uk', 'tr', 'ar', 'he', 'ja', 'ko', 'zh', 'zh-TW', 'hi', 'el', 'hu', 'ro', 'bg', 'hr',
-  'sl', 'sr', 'lt', 'lv', 'et', 'ca', 'eu', 'ga', 'id', 'th', 'vi',
+  'en', 'en-GB', 'en-US', 'de', 'de-AT', 'de-CH', 'fr', 'fr-CA', 'es', 'it', 'nl', 'pt', 'pt-BR',
+  'pl', 'cs', 'sk', 'da', 'sv', 'nb', 'fi', 'ru', 'uk', 'tr', 'ar', 'he', 'ja', 'ko', 'zh', 'zh-TW',
+  'hi', 'el', 'hu', 'ro', 'bg', 'hr', 'sl', 'sr', 'lt', 'lv', 'et', 'ca', 'eu', 'ga', 'id', 'th', 'vi',
 ];
+
+// Mirrors the backend DTO validation for translation locales.
+const LOCALE_PATTERN = /^[a-z]{2,3}(-[A-Z]{2,3})?$/;
 
 type LocaleValues = Record<string, string>;
 
@@ -93,6 +98,8 @@ export function TranslationsSection({ templateType, liveContent }: TranslationsS
   // Local edits per language, so switching tabs never discards unsaved work.
   const [editedByLocale, setEditedByLocale] = useState<Record<string, LocaleValues>>({});
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [customLocaleOpen, setCustomLocaleOpen] = useState(false);
+  const [customLocale, setCustomLocale] = useState('');
 
   const allLocales = useMemo(() => {
     const set = new Set([...existingLocales, ...addedLocales]);
@@ -182,17 +189,30 @@ export function TranslationsSection({ templateType, liveContent }: TranslationsS
       </DropdownTrigger>
       <DropdownPopover className="max-h-72 overflow-y-auto">
         <DropdownMenu aria-label={t('translations.addLanguage')}>
-          {availableLocales.map((locale) => (
+          {[
+            ...availableLocales.map((locale) => (
+              <DropdownItem
+                key={locale}
+                id={locale}
+                onPress={() => handleAddLanguage(locale)}
+                data-cy={`translations-add-language-${locale}`}
+              >
+                {displayName(locale)}
+                <span className="ml-2 text-xs text-default-400 uppercase">{locale}</span>
+              </DropdownItem>
+            )),
             <DropdownItem
-              key={locale}
-              id={locale}
-              onPress={() => handleAddLanguage(locale)}
-              data-cy={`translations-add-language-${locale}`}
+              key="__custom"
+              id="__custom"
+              onPress={() => {
+                setCustomLocale('');
+                setCustomLocaleOpen(true);
+              }}
+              data-cy="translations-add-language-custom"
             >
-              {displayName(locale)}
-              <span className="ml-2 text-xs text-default-400 uppercase">{locale}</span>
-            </DropdownItem>
-          ))}
+              {t('translations.customLocale')}
+            </DropdownItem>,
+          ]}
         </DropdownMenu>
       </DropdownPopover>
     </Dropdown>
@@ -202,6 +222,27 @@ export function TranslationsSection({ templateType, liveContent }: TranslationsS
     return (
       <section className="w-full" data-cy="translations-section">
         <p className="text-sm text-default-500">{t('translations.noKeys')}</p>
+      </section>
+    );
+  }
+
+  // Until the server's languages are known, don't render the add/edit UI: the
+  // empty state would be factually wrong, and re-adding a not-yet-listed
+  // language could silently overwrite its existing translations on save.
+  if (query.isLoading) {
+    return (
+      <section className="w-full flex justify-center py-10" data-cy="translations-section">
+        <Spinner size="sm" />
+      </section>
+    );
+  }
+  if (query.isError) {
+    return (
+      <section className="w-full flex flex-col items-center gap-3 py-10" data-cy="translations-section">
+        <p className="text-sm text-danger">{t('translations.loadFailed')}</p>
+        <Button variant="ghost" size="sm" onPress={() => query.refetch()}>
+          {t('translations.retry')}
+        </Button>
       </section>
     );
   }
@@ -308,6 +349,58 @@ export function TranslationsSection({ templateType, liveContent }: TranslationsS
           </div>
         </>
       )}
+
+      <StandardModal isOpen={customLocaleOpen} onOpenChange={setCustomLocaleOpen} size="sm">
+        {({ close }) => {
+          const trimmed = customLocale.trim();
+          const isValid = LOCALE_PATTERN.test(trimmed);
+          const addCustomLocale = () => {
+            if (!isValid) return;
+            handleAddLanguage(trimmed);
+            close();
+          };
+          return (
+            <>
+              <ModalHeader>
+                <ModalHeading>{t('translations.customLocaleTitle')}</ModalHeading>
+              </ModalHeader>
+              <ModalBody>
+                <div className="flex flex-col gap-2">
+                  <p className="text-sm text-default-500">{t('translations.customLocaleHint')}</p>
+                  <TextField
+                    value={customLocale}
+                    onChange={setCustomLocale}
+                    isInvalid={trimmed !== '' && !isValid}
+                    aria-label={t('translations.customLocaleTitle')}
+                  >
+                    <Input
+                      placeholder="de-CH"
+                      data-cy="translations-custom-locale-input"
+                      onKeyDown={(e) => e.key === 'Enter' && addCustomLocale()}
+                    />
+                  </TextField>
+                  {trimmed !== '' && !isValid && (
+                    <p className="text-xs text-danger">{t('translations.customLocaleInvalid')}</p>
+                  )}
+                </div>
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="ghost" onPress={close}>
+                  {t('actions.cancel')}
+                </Button>
+                <Button
+                  variant="primary"
+                  isDisabled={!isValid}
+                  onPress={addCustomLocale}
+                  data-cy="translations-custom-locale-add"
+                >
+                  {t('translations.customLocaleAdd')}
+                </Button>
+              </ModalFooter>
+            </>
+          );
+        }}
+      </StandardModal>
 
       <StandardModal isOpen={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)} size="sm">
         {({ close }) => (

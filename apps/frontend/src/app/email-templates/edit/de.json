@@ -45,7 +45,14 @@
     "deleteFailed": "Übersetzungen konnten nicht gelöscht werden",
     "deleteConfirm": "{{language}} entfernen und alle gespeicherten Übersetzungen löschen?",
     "deleteConfirmButton": "Entfernen",
-    "emptyTranslation": "Fällt auf Standard zurück"
+    "emptyTranslation": "Fällt auf Standard zurück",
+    "loadFailed": "Vorhandene Übersetzungen konnten nicht geladen werden.",
+    "retry": "Erneut versuchen",
+    "customLocale": "Andere Sprache…",
+    "customLocaleTitle": "Weitere Sprache hinzufügen",
+    "customLocaleHint": "Sprachkennung eingeben, z. B. \"de-CH\", \"en-GB\" oder \"sw\". Regionale Kennungen überschreiben die Basissprache für Empfänger in dieser Region.",
+    "customLocaleInvalid": "Muss ein kleingeschriebener Sprachcode sein, optional mit großgeschriebener Region (z. B. \"de\" oder \"de-CH\").",
+    "customLocaleAdd": "Hinzufügen"
   },
   "actions": {
     "back": "Zurück zu den Vorlagen",
