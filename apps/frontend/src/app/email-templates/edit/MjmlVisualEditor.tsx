@@ -19,12 +19,16 @@ const warningTranslations = {
       'This template is not well-formed XML, so a lossier parser is used: raw HTML table markup may be reformatted by visual edits. Fix the markup in the code editor to avoid this.',
     headDropped:
       'This template contains document-level styles (<mj-head>) that the visual editor cannot keep. Saving will remove them; the global layout styles apply instead.',
+    scriptsStripped:
+      'This template contains <script> tags that have been removed from the visual preview. Switch to the code editor to edit templates with scripts.',
   },
   de: {
     htmlParserFallback:
       'Diese Vorlage ist kein wohlgeformtes XML, daher wird ein verlustbehafteter Parser verwendet: rohes HTML-Tabellen-Markup kann durch visuelle Bearbeitungen umformatiert werden. Korrigiere das Markup im Code-Editor, um das zu vermeiden.',
     headDropped:
       'Diese Vorlage enthält Dokument-Styles (<mj-head>), die der visuelle Editor nicht übernehmen kann. Beim Speichern werden sie entfernt; stattdessen gelten die Styles des globalen Layouts.',
+    scriptsStripped:
+      'Diese Vorlage enthält <script>-Tags, die aus der visuellen Vorschau entfernt wurden. Wechsle zum Code-Editor, um Vorlagen mit Skripten zu bearbeiten.',
   },
 };
 
@@ -44,13 +48,22 @@ interface MjmlVisualEditorProps {
   exportFullDocument?: boolean;
 }
 
+// GrapesJS canvases are unsandboxed iframes; script tags in mj-raw content
+// would execute in the editing admin's browser session. Strip them from the
+// canvas seed so the visual editor is safe regardless of template content.
+// Templates that rely on scripts must use the code editor tab.
+const SCRIPT_TAG_RE = /<script\b[^>]*>[\s\S]*?<\/script>/gi;
+const stripScripts = (mjml: string) => mjml.replace(SCRIPT_TAG_RE, '');
+
 // Pure analysis of the initial value, shared between the mount effect (parser
 // selection) and render (warning banners).
 const analyzeInitialValue = (initialValue: string) => {
   const raw = decodeHtmlOnlyEntities(initialValue);
   const { head, body } = isFullMjmlDocument(raw) ? splitHead(raw) : { head: '', body: raw };
-  const initialMjml = wrapFragment(body);
-  return { initialMjml, droppedHead: head, useXmlParser: isWellFormedXml(initialMjml) };
+  const wrapped = wrapFragment(body);
+  const initialMjml = stripScripts(wrapped);
+  const scriptsStripped = initialMjml !== wrapped;
+  return { initialMjml, droppedHead: head, useXmlParser: isWellFormedXml(initialMjml), scriptsStripped };
 };
 
 export function MjmlVisualEditor(props: MjmlVisualEditorProps) {
@@ -85,8 +98,6 @@ export function MjmlVisualEditor(props: MjmlVisualEditorProps) {
 
       if (cancelled) return;
 
-      // ponytail: the GrapesJS canvas is an unsandboxed iframe (grapesjs-internal);
-      // mj-raw script content can execute there. Acceptable: this UI is admin-only.
       editor = grapesjs.init({
         container,
         fromElement: false,
@@ -172,26 +183,23 @@ export function MjmlVisualEditor(props: MjmlVisualEditorProps) {
       });
     }
 
-    // Attach the update listener only after the initial parse settles, so
-    // load-time normalization never clobbers untouched templates — only user
-    // edits do. Neither grapesjs nor grapesjs-mjml emits an explicit
-    // "initial parse complete" event, so onReady plus one macrotask is the
-    // closest available signal; if a late normalization update slips past it,
-    // the impact is limited to the user's next explicit save.
+    // Attach inside onReady: grapesjs-mjml fires its initial normalization
+    // 'update' events synchronously during setComponents() — before onReady
+    // signals that the canvas is ready. Any 'update' received here is therefore
+    // from a user edit, not load-time parsing. The 300ms debounce also absorbs
+    // any rare late-firing plugin event without silently overwriting user work.
     const e = editor;
     e.onReady(() => {
-      setTimeout(() => {
+      if (cancelled) return;
+      e.on('update', () => {
         if (cancelled) return;
-        e.on('update', () => {
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
           if (cancelled) return;
-          if (debounceTimer) clearTimeout(debounceTimer);
-          debounceTimer = setTimeout(() => {
-            if (cancelled) return;
-            const mjml = e.getHtml();
-            propsRef.current.onChange(propsRef.current.exportFullDocument ? mjml : unwrapFragment(mjml));
-          }, 300);
-        });
-      }, 0);
+          const mjml = e.getHtml();
+          propsRef.current.onChange(propsRef.current.exportFullDocument ? mjml : unwrapFragment(mjml));
+        }, 300);
+      });
     });
 
     // Handle for e2e tests and debugging (the canvas is otherwise unreachable from outside).
@@ -210,6 +218,7 @@ export function MjmlVisualEditor(props: MjmlVisualEditorProps) {
   const warnings = [
     !analysis.useXmlParser && { key: 'parser', text: t('htmlParserFallback') },
     !props.exportFullDocument && analysis.droppedHead && { key: 'head', text: t('headDropped') },
+    analysis.scriptsStripped && { key: 'scripts', text: t('scriptsStripped') },
   ].filter(Boolean) as { key: string; text: string }[];
 
   return (
