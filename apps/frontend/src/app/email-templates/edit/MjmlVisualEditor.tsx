@@ -2,8 +2,6 @@ import { useEffect, useMemo, useRef } from 'react';
 import grapesjs from 'grapesjs';
 import type { Component } from 'grapesjs';
 import grapesJSMJMLModule from 'grapesjs-mjml';
-import grapesjsDeModule from 'grapesjs/locale/de';
-import grapesjsMjmlDeModule from 'grapesjs-mjml/locale/de';
 import 'grapesjs/dist/css/grapes.min.css';
 import './MjmlVisualEditor.css';
 import { isFullMjmlDocument } from '@attraccess/shared';
@@ -14,8 +12,6 @@ import { decodeHtmlOnlyEntities, isWellFormedXml, splitHead, unwrapFragment, wra
 // interop the callable/plain export is either the module itself or `.default`.
 const unwrapDefault = <T,>(mod: T): T => (mod as { default?: T })?.default ?? mod;
 const grapesJSMJML = unwrapDefault(grapesJSMJMLModule);
-const grapesjsDe = unwrapDefault(grapesjsDeModule);
-const grapesjsMjmlDe = unwrapDefault(grapesjsMjmlDeModule);
 
 const warningTranslations = {
   en: {
@@ -68,34 +64,51 @@ export function MjmlVisualEditor(props: MjmlVisualEditorProps) {
 
   useEffect(() => {
     const container = containerRef.current;
-    if (!container) {
-      return;
-    }
+    if (!container) return;
 
-    const { initialMjml, droppedHead, useXmlParser } = analyzeInitialValue(propsRef.current.initialValue);
+    let cancelled = false;
+    let editor: ReturnType<typeof grapesjs.init> | null = null;
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
-    const editor = grapesjs.init({
-      container,
-      fromElement: false,
-      height: '100%',
-      storageManager: false,
-      // Text edits are re-parsed on commit, and the browser re-encodes nbsp & co.
-      // as HTML-only entities the XML parser rejects — without this, an edit next
-      // to an &nbsp; injects a literal <parsererror> element into the component
-      // tree, which then gets exported and saved. Decode before every parse.
-      parser: { optionsHtml: { preParser: decodeHtmlOnlyEntities } },
-      i18n: {
-        locale: propsRef.current.language,
-        messages: { de: grapesjsDe },
-      },
-      plugins: [
-        (instance) =>
-          grapesJSMJML(instance, {
-            useXmlParser,
-            i18n: { de: grapesjsMjmlDe },
-          }),
-      ],
-    });
+    const run = async () => {
+      const { initialMjml, droppedHead, useXmlParser } = analyzeInitialValue(propsRef.current.initialValue);
+
+      // Load de locale bundles only for German users — English users shouldn't pay for them.
+      const language = propsRef.current.language;
+      const [grapesjsDe, grapesjsMjmlDe] =
+        language === 'de'
+          ? await Promise.all([
+              import('grapesjs/locale/de').then(unwrapDefault),
+              import('grapesjs-mjml/locale/de').then(unwrapDefault),
+            ])
+          : [undefined, undefined];
+
+      if (cancelled) return;
+
+      // ponytail: the GrapesJS canvas is an unsandboxed iframe (grapesjs-internal);
+      // mj-raw script content can execute there. Acceptable: this UI is admin-only.
+      editor = grapesjs.init({
+        container,
+        fromElement: false,
+        height: '100%',
+        storageManager: false,
+        // Text edits are re-parsed on commit, and the browser re-encodes nbsp & co.
+        // as HTML-only entities the XML parser rejects — without this, an edit next
+        // to an &nbsp; injects a literal <parsererror> element into the component
+        // tree, which then gets exported and saved. Decode before every parse.
+        parser: { optionsHtml: { preParser: decodeHtmlOnlyEntities } },
+        i18n: {
+          locale: language,
+          ...(grapesjsDe ? { messages: { de: grapesjsDe } } : {}),
+        },
+        plugins: [
+          (instance) =>
+            grapesJSMJML(instance, {
+              useXmlParser,
+              ...(grapesjsMjmlDe ? { i18n: { de: grapesjsMjmlDe } } : {}),
+            }),
+        ],
+      });
 
     // grapesjs-mjml merges each component's 'style-default' (MJML spec defaults)
     // into its attributes on import and strips matching attributes on export.
@@ -165,24 +178,32 @@ export function MjmlVisualEditor(props: MjmlVisualEditorProps) {
     // "initial parse complete" event, so onReady plus one macrotask is the
     // closest available signal; if a late normalization update slips past it,
     // the impact is limited to the user's next explicit save.
-    let cancelled = false;
-    editor.onReady(() => {
+    const e = editor;
+    e.onReady(() => {
       setTimeout(() => {
         if (cancelled) return;
-        editor.on('update', () => {
+        e.on('update', () => {
           if (cancelled) return;
-          const mjml = editor.getHtml();
-          propsRef.current.onChange(propsRef.current.exportFullDocument ? mjml : unwrapFragment(mjml));
+          if (debounceTimer) clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(() => {
+            if (cancelled) return;
+            const mjml = e.getHtml();
+            propsRef.current.onChange(propsRef.current.exportFullDocument ? mjml : unwrapFragment(mjml));
+          }, 300);
         });
       }, 0);
     });
 
     // Handle for e2e tests and debugging (the canvas is otherwise unreachable from outside).
     (container as HTMLDivElement & { __grapesEditor?: unknown }).__grapesEditor = editor;
+    };
+
+    void run();
 
     return () => {
       cancelled = true;
-      editor.destroy();
+      if (debounceTimer) clearTimeout(debounceTimer);
+      editor?.destroy();
     };
   }, []);
 
