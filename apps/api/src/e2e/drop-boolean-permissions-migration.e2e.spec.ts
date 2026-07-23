@@ -120,10 +120,16 @@ describe('DropBooleanPermissions migration (e2e)', () => {
     dataSource = new DataSource({ ...(dataSourceConfig as DataSourceOptions), migrationsRun: false });
     await dataSource.initialize();
 
-    // Apply every migration, then step back one — landing in the
-    // pre-DropBooleanPermissions state where boolean columns still exist.
+    // Apply every migration, then undo until we reach the pre-DropBooleanPermissions
+    // state where boolean columns still exist. We loop instead of calling
+    // undoLastMigration once because later migrations may have been added after
+    // DropBooleanPermissions, meaning undoLastMigration would undo the wrong one.
     await dataSource.runMigrations();
-    await dataSource.undoLastMigration();
+    let setupCols: { name: string }[] = await dataSource.manager.query('PRAGMA table_info("user")');
+    while (!setupCols.some((c) => c.name === 'canManageResources')) {
+      await dataSource.undoLastMigration();
+      setupCols = await dataSource.manager.query('PRAGMA table_info("user")');
+    }
   });
 
   // Insert test data while the schema still has old-format permissionMappings
@@ -184,7 +190,12 @@ describe('DropBooleanPermissions migration (e2e)', () => {
 
   describe('after DOWN migration', () => {
     beforeAll(async () => {
-      await dataSource.undoLastMigration();
+      // Undo until boolean columns are restored — same reasoning as setup beforeAll.
+      let downCols: { name: string }[] = await dataSource.manager.query('PRAGMA table_info("user")');
+      while (!downCols.some((c) => c.name === 'canManageResources')) {
+        await dataSource.undoLastMigration();
+        downCols = await dataSource.manager.query('PRAGMA table_info("user")');
+      }
     });
 
     it('restores boolean permission columns on user table', async () => {
