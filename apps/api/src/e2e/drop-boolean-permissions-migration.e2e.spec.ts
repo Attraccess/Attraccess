@@ -1,7 +1,7 @@
 import { promises as fs } from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import type { DataSource } from 'typeorm';
+import type { DataSource, DataSourceOptions } from 'typeorm';
 
 jest.setTimeout(600_000);
 
@@ -111,17 +111,25 @@ describe('DropBooleanPermissions migration (e2e)', () => {
     process.env.STORAGE_ROOT = tmpRoot;
     process.env.AUTH_SESSION_SECRET = process.env.AUTH_SESSION_SECRET || 'migration-test-secret';
 
-    const dsModule = await import('../database/datasource');
-    dataSource = (dsModule as unknown as { default: DataSource }).default;
+    // Import the shared config (computed from STORAGE_ROOT set above) but create a dedicated
+    // DataSource with migrationsRun: false so initialize() does NOT auto-run migrations.
+    // The shared datasource has migrationsRun: true which leaves internal TypeORM connection
+    // state that can prevent subsequently inserted rows from being visible inside runMigrations().
+    const { DataSource } = await import('typeorm');
+    const { dataSourceConfig } = await import('../database/datasource');
+    dataSource = new DataSource({ ...(dataSourceConfig as DataSourceOptions), migrationsRun: false });
+    await dataSource.initialize();
 
-    if (!dataSource.isInitialized) {
-      await dataSource.initialize();
-    }
-
-    // Apply every migration, then step back one — landing in the
-    // pre-DropBooleanPermissions state where boolean columns still exist.
+    // Apply every migration, then undo until we reach the pre-DropBooleanPermissions
+    // state where boolean columns still exist. We loop instead of calling
+    // undoLastMigration once because later migrations may have been added after
+    // DropBooleanPermissions, meaning undoLastMigration would undo the wrong one.
     await dataSource.runMigrations();
-    await dataSource.undoLastMigration();
+    let setupCols: { name: string }[] = await dataSource.manager.query('PRAGMA table_info("user")');
+    while (!setupCols.some((c) => c.name === 'canManageResources')) {
+      await dataSource.undoLastMigration();
+      setupCols = await dataSource.manager.query('PRAGMA table_info("user")');
+    }
   });
 
   // Insert test data while the schema still has old-format permissionMappings
@@ -182,7 +190,12 @@ describe('DropBooleanPermissions migration (e2e)', () => {
 
   describe('after DOWN migration', () => {
     beforeAll(async () => {
-      await dataSource.undoLastMigration();
+      // Undo until boolean columns are restored — same reasoning as setup beforeAll.
+      let downCols: { name: string }[] = await dataSource.manager.query('PRAGMA table_info("user")');
+      while (!downCols.some((c) => c.name === 'canManageResources')) {
+        await dataSource.undoLastMigration();
+        downCols = await dataSource.manager.query('PRAGMA table_info("user")');
+      }
     });
 
     it('restores boolean permission columns on user table', async () => {

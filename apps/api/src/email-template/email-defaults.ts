@@ -9,19 +9,19 @@ export interface EmailTemplateDefault {
 
 export const EMAIL_TEMPLATE_DEFAULTS: Record<EmailTemplateType, EmailTemplateDefault> = {
   [EmailTemplateType.VERIFY_EMAIL]: {
-    subject: 'Verify your email address',
+    subject: '{{t "subject" "Verify your email address"}}',
     variables: ['user.username', 'user.email', 'user.id', 'host.frontend', 'host.backend', 'url'],
   },
   [EmailTemplateType.RESET_PASSWORD]: {
-    subject: 'Reset your password',
+    subject: '{{t "subject" "Reset your password"}}',
     variables: ['user.username', 'user.email', 'user.id', 'host.frontend', 'host.backend', 'url'],
   },
   [EmailTemplateType.USER_INVITATION]: {
-    subject: 'You have been invited to join Attraccess!',
+    subject: '{{t "subject" "You have been invited to join Attraccess!"}}',
     variables: ['user.username', 'user.email', 'user.id', 'host.frontend', 'host.backend', 'url'],
   },
   [EmailTemplateType.USERNAME_CHANGED]: {
-    subject: 'Your username has been changed',
+    subject: '{{t "subject" "Your username has been changed"}}',
     variables: [
       'user.username',
       'user.email',
@@ -34,15 +34,15 @@ export const EMAIL_TEMPLATE_DEFAULTS: Record<EmailTemplateType, EmailTemplateDef
     ],
   },
   [EmailTemplateType.PASSWORD_CHANGED]: {
-    subject: 'Your password has been changed',
+    subject: '{{t "subject" "Your password has been changed"}}',
     variables: ['user.username', 'user.email', 'user.id', 'host.frontend', 'host.backend'],
   },
   [EmailTemplateType.DELETE_ACCOUNT_CONFIRMATION]: {
-    subject: 'Confirm account deletion',
+    subject: '{{t "subject" "Confirm account deletion"}}',
     variables: ['user.username', 'user.email', 'user.id', 'host.frontend', 'host.backend', 'url'],
   },
   [EmailTemplateType.PROJECT_INVITATION]: {
-    subject: 'You have been invited to {{project.name}}',
+    subject: '{{t "subject" "You have been invited to {project}" project=project.name}}',
     variables: [
       'user.username',
       'project.name',
@@ -54,7 +54,7 @@ export const EMAIL_TEMPLATE_DEFAULTS: Record<EmailTemplateType, EmailTemplateDef
     ],
   },
   [EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY]: {
-    subject: 'Your usage receipt for {{resource.name}}',
+    subject: '{{t "subject" "Your usage receipt for {resource}" resource=resource.name}}',
     variables: [
       'user.username',
       'user.email',
@@ -72,7 +72,8 @@ export const EMAIL_TEMPLATE_DEFAULTS: Record<EmailTemplateType, EmailTemplateDef
     ],
   },
   [EmailTemplateType.RESOURCE_HEALTH_CHANGED]: {
-    subject: '{{#if health.isDegraded}}Resource degraded{{else}}Resource recovered{{/if}}: {{resource.name}}',
+    subject:
+      '{{#if health.isDegraded}}{{t "subject_degraded" "Resource degraded: {resource}" resource=resource.name}}{{else}}{{t "subject_recovered" "Resource recovered: {resource}" resource=resource.name}}{{/if}}',
     variables: [
       'user.username',
       'user.email',
@@ -91,7 +92,7 @@ export const EMAIL_TEMPLATE_DEFAULTS: Record<EmailTemplateType, EmailTemplateDef
     ],
   },
   [EmailTemplateType.USER_RETRAINING_REQUIRED]: {
-    subject: 'Retraining required: {{resource.name}}',
+    subject: '{{t "subject" "Retraining required: {resource}" resource=resource.name}}',
     variables: [
       'user.username',
       'user.email',
@@ -107,7 +108,7 @@ export const EMAIL_TEMPLATE_DEFAULTS: Record<EmailTemplateType, EmailTemplateDef
     ],
   },
   [EmailTemplateType.MESSAGE_RECEIVED]: {
-    subject: 'New message from {{message.senderName}}',
+    subject: '{{t "subject" "New message from {sender}" sender=message.senderName}}',
     variables: [
       'user.username',
       'user.email',
@@ -120,7 +121,7 @@ export const EMAIL_TEMPLATE_DEFAULTS: Record<EmailTemplateType, EmailTemplateDef
     ],
   },
   [EmailTemplateType.RESOURCE_USAGE_NOTE_ADDED]: {
-    subject: 'New usage note: {{resource.name}}',
+    subject: '{{t "subject" "New usage note: {resource}" resource=resource.name}}',
     variables: [
       'user.username',
       'user.email',
@@ -136,7 +137,7 @@ export const EMAIL_TEMPLATE_DEFAULTS: Record<EmailTemplateType, EmailTemplateDef
     ],
   },
   [EmailTemplateType.RESOURCE_TAKEOVER]: {
-    subject: '{{resource.name}} was taken over',
+    subject: '{{t "subject" "{resource} was taken over" resource=resource.name}}',
     variables: [
       'user.username',
       'user.email',
@@ -150,7 +151,7 @@ export const EMAIL_TEMPLATE_DEFAULTS: Record<EmailTemplateType, EmailTemplateDef
     ],
   },
   [EmailTemplateType.RESOURCE_SESSION_ENDED]: {
-    subject: '{{resource.name}} session ended',
+    subject: '{{t "subject" "{resource} session ended" resource=resource.name}}',
     variables: [
       'user.username',
       'user.email',
@@ -179,7 +180,7 @@ export const EMAIL_TEMPLATE_DEFAULTS: Record<EmailTemplateType, EmailTemplateDef
     ],
   },
   [EmailTemplateType.MAINTENANCE_REQUEST_CREATED]: {
-    subject: 'Maintenance requested: {{resource.name}}',
+    subject: '{{t "subject" "Maintenance requested: {resource}" resource=resource.name}}',
     variables: [
       'user.username',
       'user.email',
@@ -315,6 +316,23 @@ export const SHIPPED_TRANSLATIONS: ShippedTranslation[] = [
   { templateType: EmailTemplateType.RESOURCE_SESSION_ENDED, locale: 'de', key: 'button', value: 'Ressource ansehen' },
   { templateType: EmailTemplateType.RESOURCE_SESSION_ENDED, locale: 'de', key: 'copy_link', value: COPY_LINK_DE },
   { templateType: EmailTemplateType.RESOURCE_SESSION_ENDED, locale: 'de', key: 'footer', value: 'Du erhältst diese E-Mail, weil Benachrichtigungen über beendete Ressourcensitzungen in deinen Einstellungen aktiviert sind.' },
+  // subjects (English defaults are baked into the {{t "subject" …}} calls above; ACCESS_CHANGE has no static subject to translate)
+  { templateType: EmailTemplateType.VERIFY_EMAIL, locale: 'de', key: 'subject', value: 'Bestätige deine E-Mail-Adresse' },
+  { templateType: EmailTemplateType.RESET_PASSWORD, locale: 'de', key: 'subject', value: 'Setze dein Passwort zurück' },
+  { templateType: EmailTemplateType.USER_INVITATION, locale: 'de', key: 'subject', value: 'Du wurdest zu Attraccess eingeladen!' },
+  { templateType: EmailTemplateType.USERNAME_CHANGED, locale: 'de', key: 'subject', value: 'Dein Benutzername wurde geändert' },
+  { templateType: EmailTemplateType.PASSWORD_CHANGED, locale: 'de', key: 'subject', value: 'Dein Passwort wurde geändert' },
+  { templateType: EmailTemplateType.DELETE_ACCOUNT_CONFIRMATION, locale: 'de', key: 'subject', value: 'Kontolöschung bestätigen' },
+  { templateType: EmailTemplateType.PROJECT_INVITATION, locale: 'de', key: 'subject', value: 'Du wurdest zu {project} eingeladen' },
+  { templateType: EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY, locale: 'de', key: 'subject', value: 'Dein Nutzungsbeleg für {resource}' },
+  { templateType: EmailTemplateType.RESOURCE_HEALTH_CHANGED, locale: 'de', key: 'subject_degraded', value: 'Ressource ausgefallen: {resource}' },
+  { templateType: EmailTemplateType.RESOURCE_HEALTH_CHANGED, locale: 'de', key: 'subject_recovered', value: 'Ressource wiederhergestellt: {resource}' },
+  { templateType: EmailTemplateType.USER_RETRAINING_REQUIRED, locale: 'de', key: 'subject', value: 'Einweisung erforderlich: {resource}' },
+  { templateType: EmailTemplateType.MESSAGE_RECEIVED, locale: 'de', key: 'subject', value: 'Neue Nachricht von {sender}' },
+  { templateType: EmailTemplateType.RESOURCE_USAGE_NOTE_ADDED, locale: 'de', key: 'subject', value: 'Neue Nutzungsnotiz: {resource}' },
+  { templateType: EmailTemplateType.RESOURCE_TAKEOVER, locale: 'de', key: 'subject', value: '{resource} wurde übernommen' },
+  { templateType: EmailTemplateType.RESOURCE_SESSION_ENDED, locale: 'de', key: 'subject', value: 'Sitzung auf {resource} beendet' },
+  { templateType: EmailTemplateType.MAINTENANCE_REQUEST_CREATED, locale: 'de', key: 'subject', value: 'Wartung angefordert: {resource}' },
 ];
 
 // In the webpack bundle __dirname is the dist root (assets copied next to main.js);

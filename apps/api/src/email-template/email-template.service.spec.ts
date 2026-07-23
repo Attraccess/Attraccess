@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { EmailTemplateService } from './email-template.service';
 import { EmailTemplateType, EmailTemplateTranslation } from '@attraccess/database-entities';
 import { MjmlService } from './mjml.service';
@@ -35,7 +35,7 @@ const setup = () => {
     mjmlService,
   );
 
-  return { service, emailTemplateRepo, translationRepo };
+  return { service, emailTemplateRepo, translationRepo, mjmlService };
 };
 
 describe('EmailTemplateService — translation CRUD', () => {
@@ -179,6 +179,51 @@ describe('EmailTemplateService — translation CRUD', () => {
         templateType: EmailTemplateType.VERIFY_EMAIL,
         locale: 'de',
       });
+    });
+  });
+
+  describe('update', () => {
+    const FRAGMENT = '<mj-section><mj-column><mj-text>Hi</mj-text></mj-column></mj-section>';
+
+    it('validates fragment bodies wrapped in an <mjml><mj-body> shell', async () => {
+      const { service, emailTemplateRepo, mjmlService } = setup();
+      emailTemplateRepo.findOneBy.mockResolvedValue({ type: EmailTemplateType.VERIFY_EMAIL });
+      emailTemplateRepo.update.mockResolvedValue({});
+
+      await service.update(EmailTemplateType.VERIFY_EMAIL, { subject: 'S', body: FRAGMENT });
+
+      expect(mjmlService.validateAndConvert).toHaveBeenCalledWith(`<mjml><mj-body>${FRAGMENT}</mj-body></mjml>`);
+      expect(emailTemplateRepo.update).toHaveBeenCalledWith(
+        { type: EmailTemplateType.VERIFY_EMAIL },
+        { subject: 'S', body: FRAGMENT },
+      );
+    });
+
+    it('rejects full <mjml> documents — the send pipeline expects fragments', async () => {
+      const { service, emailTemplateRepo, mjmlService } = setup();
+      emailTemplateRepo.findOneBy.mockResolvedValue({ type: EmailTemplateType.VERIFY_EMAIL });
+
+      await expect(
+        service.update(EmailTemplateType.VERIFY_EMAIL, {
+          subject: 'S',
+          body: `<mjml><mj-body>${FRAGMENT}</mj-body></mjml>`,
+        }),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(mjmlService.validateAndConvert).not.toHaveBeenCalled();
+      expect(emailTemplateRepo.update).not.toHaveBeenCalled();
+    });
+
+    it('propagates MJML validation failures without persisting', async () => {
+      const { service, emailTemplateRepo, mjmlService } = setup();
+      emailTemplateRepo.findOneBy.mockResolvedValue({ type: EmailTemplateType.VERIFY_EMAIL });
+      (mjmlService.validateAndConvert as jest.Mock).mockRejectedValue(new BadRequestException('bad mjml'));
+
+      await expect(
+        service.update(EmailTemplateType.VERIFY_EMAIL, { subject: 'S', body: '<mj-bogus>' }),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(emailTemplateRepo.update).not.toHaveBeenCalled();
     });
   });
 });

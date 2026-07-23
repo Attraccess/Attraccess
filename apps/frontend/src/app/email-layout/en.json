@@ -1,37 +1,31 @@
 {
   "title": "Global Email Layout",
-  "subtitle": "Edit the MJML layout that wraps all email templates. Use {{{content}}} where template content should appear.",
-  "sections": {
-    "editor": "Layout Editor",
-    "preview": "Preview"
-  },
+  "subtitle": "The frame around every email: header, footer and global styles.",
   "placeholder": {
-    "hint": "Required placeholder",
-    "description": "Insert {{{content}}} in your layout where individual template body sections will be injected.",
-    "copy": "Copy {{{content}}}"
+    "canvasLabel": "Template content is inserted here"
   },
-  "preview": {
-    "iframeTitle": "Layout Preview",
-    "loading": "Loading preview...",
-    "errorPrefix": "Preview error:",
-    "emptyPlaceholder": "Start editing the MJML layout to see a preview."
+  "styles": {
+    "title": "Global styles (mj-head)",
+    "description": "Fonts, colors and other defaults applied to all emails, as MJML mj-head markup (mj-attributes, mj-style, mj-font). Applied to the canvas immediately, persisted when you save the layout."
   },
   "actions": {
-    "save": "Save Layout",
+    "back": "Back to emails",
+    "save": "Save",
     "cancel": "Cancel",
-    "expand": "Expand editor",
-    "close": "Close",
-    "backToTemplates": "Back to Templates",
+    "apply": "Apply",
+    "styles": "Styles",
     "resetToDefault": "Reset to Default"
-  },
-  "form": {
-    "mjmlDocumentation": "MJML Documentation"
   },
   "toast": {
     "saveSuccess": "Global email layout saved successfully.",
     "saveError": "Failed to save layout.",
+    "missingPlaceholder": "The layout is missing the content placeholder.",
     "resetSuccess": "Email layout reset to default.",
-    "resetError": "Failed to reset layout."
+    "resetError": "Layout could not be reset."
+  },
+  "error": {
+    "loadFailed": "The email layout could not be loaded.",
+    "retry": "Retry"
   },
   "resetConfirm": {
     "title": "Reset layout to default?",

@@ -4,3 +4,4 @@ export * from './lib/system-permissions';
 export * from './lib/update-check';
 export * from './lib/password-policy';
 export * from './lib/email-template-translation-keys';
+export * from './lib/mjml';

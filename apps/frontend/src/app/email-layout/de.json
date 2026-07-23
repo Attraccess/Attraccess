@@ -1,37 +1,31 @@
 {
   "title": "Globales E-Mail-Layout",
-  "subtitle": "Bearbeite das MJML-Layout, das alle E-Mail-Vorlagen umschließt. Verwende {{{content}}}, wo der Vorlageninhalt erscheinen soll.",
-  "sections": {
-    "editor": "Layout-Editor",
-    "preview": "Vorschau"
-  },
+  "subtitle": "Der Rahmen um jede E-Mail: Kopfbereich, Fußbereich und globale Stile.",
   "placeholder": {
-    "hint": "Erforderlicher Platzhalter",
-    "description": "Füge {{{content}}} in dein Layout ein, wo die Inhalte der einzelnen E-Mail-Vorlagen eingefügt werden sollen.",
-    "copy": "{{{content}}} kopieren"
+    "canvasLabel": "Hier wird der Vorlageninhalt eingefügt"
   },
-  "preview": {
-    "iframeTitle": "Layout-Vorschau",
-    "loading": "Vorschau wird geladen...",
-    "errorPrefix": "Vorschaufehler:",
-    "emptyPlaceholder": "Beginne mit der Bearbeitung des MJML-Layouts, um eine Vorschau zu sehen."
+  "styles": {
+    "title": "Globale Stile (mj-head)",
+    "description": "Schriften, Farben und andere Standards für alle E-Mails, als MJML-mj-head-Markup (mj-attributes, mj-style, mj-font). Wird sofort auf die Vorschau angewendet, gespeichert erst beim Speichern des Layouts."
   },
   "actions": {
-    "save": "Layout speichern",
+    "back": "Zurück zu E-Mails",
+    "save": "Speichern",
     "cancel": "Abbrechen",
-    "expand": "Editor erweitern",
-    "close": "Schließen",
-    "backToTemplates": "Zurück zu Vorlagen",
+    "apply": "Übernehmen",
+    "styles": "Stile",
     "resetToDefault": "Standard wiederherstellen"
-  },
-  "form": {
-    "mjmlDocumentation": "MJML-Dokumentation"
   },
   "toast": {
     "saveSuccess": "Globales E-Mail-Layout erfolgreich gespeichert.",
     "saveError": "Layout konnte nicht gespeichert werden.",
+    "missingPlaceholder": "Im Layout fehlt der Inhalts-Platzhalter.",
     "resetSuccess": "E-Mail-Layout auf Standard zurückgesetzt.",
     "resetError": "Layout konnte nicht zurückgesetzt werden."
+  },
+  "error": {
+    "loadFailed": "Das E-Mail-Layout konnte nicht geladen werden.",
+    "retry": "Erneut versuchen"
   },
   "resetConfirm": {
     "title": "Layout auf Standard zurücksetzen?",

@@ -20,14 +20,20 @@ interface LayoutProps {
   children: React.ReactNode;
 }
 
+const SIDEBAR_COLLAPSED_STORAGE_KEY = 'attraccess.sidebar-collapsed';
+
 export function Layout({ children }: LayoutProps) {
-  // Initialize with closed sidebar on mobile, open on desktop
-  const [isOpen, setIsOpen] = useState(false);
+  // Initialize synchronously from the viewport so the first paint is correct —
+  // a false initial value would animate the sidebar open/collapsed on every load.
+  const [isOpen, setIsOpen] = useState(() => window.innerWidth >= 768);
+  const [isDesktop, setIsDesktop] = useState(() => window.innerWidth >= 768);
 
   // Set the initial sidebar state based on screen size
   useEffect(() => {
     const handleResize = () => {
-      setIsOpen(window.innerWidth >= 768); // 768px is the md breakpoint in Tailwind
+      const desktop = window.innerWidth >= 768; // 768px is the md breakpoint in Tailwind
+      setIsOpen(desktop);
+      setIsDesktop(desktop);
     };
 
     // Set initial state
@@ -41,6 +47,17 @@ export function Layout({ children }: LayoutProps) {
   const toggleSidebar = () => {
     setIsOpen(!isOpen);
   };
+
+  // Desktop-only: collapse the sidebar to an icon rail for more content space
+  const [isCollapsed, setIsCollapsed] = useState(
+    () => localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === 'true',
+  );
+  const toggleCollapsed = useCallback(() => {
+    setIsCollapsed((prev) => {
+      localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, String(!prev));
+      return !prev;
+    });
+  }, []);
 
   const location = useLocation();
   const isFirstRender = useRef(true);
@@ -81,7 +98,12 @@ export function Layout({ children }: LayoutProps) {
   return (
     <div className="flex h-screen min-h-0 bg-background">
       {/* Sidebar */}
-      <Sidebar isOpen={isOpen} toggleSidebar={toggleSidebar} />
+      <Sidebar
+        isOpen={isOpen}
+        toggleSidebar={toggleSidebar}
+        isCollapsed={isDesktop && isCollapsed}
+        toggleCollapsed={toggleCollapsed}
+      />
 
       {/* Main Content */}
       <div className="flex-1 min-h-0 flex flex-col overflow-hidden">

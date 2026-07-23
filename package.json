@@ -77,6 +77,8 @@
     "express-session": "^1.19.0",
     "fetch-event-stream": "^0.1.6",
     "glob": "^13.0.6",
+    "grapesjs": "^0.23.2",
+    "grapesjs-mjml": "^1.0.8",
     "handlebars": "^4.7.9",
     "identity-obj-proxy": "^3.0.0",
     "intl-pluralrules": "^2.0.1",

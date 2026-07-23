@@ -1,5 +1,7 @@
 {
   "logout": "Abmelden",
+  "collapseSidebar": "Seitenleiste minimieren",
+  "expandSidebar": "Seitenleiste ausklappen",
   "language": "Sprache",
   "languages": {
     "en": "Englisch",

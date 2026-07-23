@@ -116,7 +116,8 @@ export class EmailService {
         frontend: url,
         backend: url,
         notificationPreferencesUrl: `${url}/account`,
-        logoUrl: `${url}/logo.png`,
+        // ponytail: /api is the fixed global prefix (also what the frontend proxies); no need to plumb GLOBAL_PREFIX here
+        logoUrl: `${url}/api/logo.png`,
       },
       url,
     } as const;
