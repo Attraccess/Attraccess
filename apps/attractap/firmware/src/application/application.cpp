@@ -50,7 +50,15 @@ void Application::setup() {
   Settings::setup();
   this->setupBootDiagnostics();
   SerialCommandHandler::setup();
+#ifndef DEMO_MODE
   Network::setup();
+#else
+  DemoStore::setup();
+  // Preset a non-empty hostname so processState() skips the "not configured" branch
+  Settings::saveAttraccessApiConfig("demo-local", 80, false);
+  // Skip PIN screen
+  Settings::setDevicePin("demo");
+#endif
 
 #ifdef HAS_IO_EXPANDER
     this->ioExpander.setup();
@@ -306,20 +314,41 @@ void Application::setup() {
       [this]() { this->api.resetCertificateTrust(); });
 
   Display::initScreen.setOnOpenSettingsCallback([this]() {
+#ifdef DEMO_MODE
+    Display::transitionToScreen(&Display::demoSettingsScreen);
+#else
     this->state = APPLICATION_STATE_CONFIGURATION_REQUIRED;
     this->api.disableConnectionAttempts();
     Display::connectionConfigurationScreen.enablePinLock();
     Display::transitionToScreen(&Display::connectionConfigurationScreen);
+#endif
   });
 
-  // Hidden maintenance drawer (pull down from the top edge) reuses the same
-  // settings entry as the init screen, including the PIN lock.
+  // Hidden maintenance drawer (pull down from the top edge)
   Display::setOnOpenSettingsCallback([this]() {
+#ifdef DEMO_MODE
+    Display::transitionToScreen(&Display::demoSettingsScreen);
+#else
     this->state = APPLICATION_STATE_CONFIGURATION_REQUIRED;
     this->api.disableConnectionAttempts();
     Display::connectionConfigurationScreen.enablePinLock();
     Display::transitionToScreen(&Display::connectionConfigurationScreen);
+#endif
   });
+
+#ifdef DEMO_MODE
+  Display::demoSettingsScreen.setStartScanCallback([this]() {
+    this->demoPendingScanActive = true;
+    this->demoPendingScanReady = false;
+    this->nfc.resetCardPresence();
+    this->nfc.enableCardDetection();
+  });
+  Display::demoSettingsScreen.setCancelScanCallback([this]() {
+    this->demoPendingScanActive = false;
+    this->demoPendingScanReady = false;
+    this->nfc.disableCardDetection();
+  });
+#endif
 
   Display::resourceListScreen.setResourceSelectionCallback(
       [this](const API::ResourceBrief &resource) {
@@ -517,6 +546,15 @@ void Application::setup() {
     this->logger.infof("Card detected: %s",
                        hexToString(uid, uidLength).c_str());
 
+#ifdef DEMO_MODE
+    if (this->demoPendingScanActive) {
+        this->demoScanUid = hexToString(uid, uidLength);
+        this->demoPendingScanActive = false;
+        this->demoPendingScanReady = true;
+        return;
+    }
+#endif
+
 #ifndef HAS_LVGL_DISPLAY
     this->cardDetected = true;
     this->cardRemoved = false;
@@ -587,8 +625,10 @@ void Application::setup() {
   });
 #endif
 
+#ifndef DEMO_MODE
   xTaskCreate(Application::networkTask, "NetworkTask", 4096, nullptr,
               tskIDLE_PRIORITY, nullptr);
+#endif
 
 #ifdef ESP_PLATFORM
   esp_task_wdt_add(NULL);

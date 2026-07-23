@@ -5,12 +5,16 @@ FROM node:${NODE_VERSION}-${NODE_VERSION_NAME} AS builder
 
 # System deps required for native Node modules and tooling
 # - python3/py3-pip: node-gyp and Python-based tooling
+# - python3-setuptools: provides the distutils shim on Python 3.12+; sqlite3's
+#   pinned node-gyp 8 imports distutils when compiling from source (the
+#   fallback when the prebuild download fails)
 # - build-base (make, g++, etc.): compile native deps when prebuilds are unavailable
 # - libstdc++: runtime for some native modules (e.g., sharp)
 RUN apt-get update && apt-get install -y \
     python3 \
     python3-venv \
     python3-pip \
+    python3-setuptools \
     build-essential \
     libstdc++6 \
     git \

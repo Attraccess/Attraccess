@@ -4,7 +4,7 @@ import { SSOService } from './sso.service';
 import { AuthService } from '../auth.service';
 import { SessionService } from '../session.service';
 import { AuthenticationDetail, AuthenticationType, SSOProvider, SSOProviderType } from '@attraccess/database-entities';
-import { BadRequestException, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { CreateSSOProviderDto } from './dto/create-sso-provider.dto';
 import { UpdateSSOProviderDto } from './dto/update-sso-provider.dto';
@@ -48,7 +48,7 @@ describe('SsoController', () => {
       userInfoURL: 'https://test-issuer.com/userinfo',
       clientId: 'test-client-id',
       clientSecret: 'test-client-secret',
-      permissionMappings: {
+      roleMappings: {
         'user-manager': ['attraccess_admin'],
       },
       createdAt: new Date(),
@@ -74,7 +74,7 @@ describe('SsoController', () => {
       wantAuthnResponseSigned: true,
       forceAuthn: false,
       provisioningSecret: 'saml-secret',
-      permissionMappings: {
+      roleMappings: {
         'billing-manager': ['billing-role'],
       },
       createdAt: new Date(),
@@ -249,7 +249,7 @@ describe('SsoController', () => {
       // Provider without permission mappings — no ceiling check triggered.
       jest.spyOn(ssoService, 'getProviderById').mockResolvedValueOnce({
         ...mockSSOProvider,
-        oidcConfiguration: { ...mockSSOProvider.oidcConfiguration, permissionMappings: {} },
+        oidcConfiguration: { ...mockSSOProvider.oidcConfiguration, roleMappings: {} },
       } as SSOProvider);
 
       const mockReq = { user: { id: 1, effectivePermissions: new Set(['users.roles.manage']) } } as unknown as AuthenticatedRequest;
@@ -257,6 +257,17 @@ describe('SsoController', () => {
 
       expect(result).toEqual(mockSSOProvider);
       expect(ssoService.updateProvider).toHaveBeenCalledWith(1, updateDto);
+    });
+
+    it('gates explicit null roleMappings behind users.roles.manage', async () => {
+      const updateDto = {
+        oidcConfiguration: { roleMappings: null },
+      } as unknown as UpdateSSOProviderDto;
+
+      const mockReq = { user: { id: 1, effectivePermissions: new Set<string>() } } as unknown as AuthenticatedRequest;
+
+      await expect(controller.updateOne('1', updateDto, mockReq)).rejects.toThrow(ForbiddenException);
+      expect(ssoService.updateProvider).not.toHaveBeenCalled();
     });
   });
 
@@ -688,10 +699,10 @@ describe('SsoController', () => {
       });
 
       expect(result).toEqual({ OK: true });
-      // 'attraccess_admin' → 'user-manager' via provider's permissionMappings
+      // 'attraccess_admin' → 'user-manager' via provider's roleMappings
       expect(rbacService.syncSsoRoles).toHaveBeenCalledWith(
         99,
-        expect.arrayContaining(['user-manager']),
+        expect.arrayContaining([expect.objectContaining({ roleKey: 'user-manager' })]),
         SSOProviderType.OIDC,
         1,
       );
@@ -759,10 +770,10 @@ describe('SsoController', () => {
       });
 
       expect(result).toEqual({ OK: true });
-      // 'billing-role' → 'billing-manager' via SAML provider's permissionMappings
+      // 'billing-role' → 'billing-manager' via SAML provider's roleMappings
       expect(rbacService.syncSsoRoles).toHaveBeenCalledWith(
         103,
-        expect.arrayContaining(['billing-manager']),
+        expect.arrayContaining([expect.objectContaining({ roleKey: 'billing-manager' })]),
         SSOProviderType.SAML,
         2,
       );

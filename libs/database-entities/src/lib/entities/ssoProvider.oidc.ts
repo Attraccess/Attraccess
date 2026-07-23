@@ -96,16 +96,17 @@ export class SSOProviderOIDCConfiguration {
   })
   emailClaimPaths!: string[] | null;
 
-  @Column({ type: 'json', nullable: true })
+  // ponytail: keeps the legacy 'permissionMappings' DB column — renaming it would need a migration for zero gain
+  @Column({ type: 'json', nullable: true, name: 'permissionMappings' })
   @ApiProperty({
-    description: 'Optional mapping between RBAC role keys and IdP role/group claim values',
+    description: 'Mapping between Attraccess role keys and IdP role/group claim values',
     required: false,
     example: {
       'resource-manager': ['attraccess_resources'],
       'user-manager': ['attraccess_admin'],
     },
   })
-  permissionMappings?: Record<string, string[]> | null;
+  roleMappings?: Record<string, string[]> | null;
 
   @CreateDateColumn()
   @ApiProperty({

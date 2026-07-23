@@ -156,7 +156,6 @@ export class SSOService {
     const encryptedSecret = this.encryptionService.encrypt(config.clientSecret);
     const newConfig = this.oidcConfigRepository.create({
       ...config,
-      permissionMappings: config.permissionMappings as unknown as Record<string, string[]>,
       clientSecret: encryptedSecret,
       ssoProviderId: providerId,
     });
@@ -201,8 +200,9 @@ export class SSOService {
     if (typeof updateConfig.emailClaimPaths !== 'undefined') {
       payload.emailClaimPaths = updateConfig.emailClaimPaths;
     }
-    if (typeof updateConfig.permissionMappings !== 'undefined') {
-      payload.permissionMappings = updateConfig.permissionMappings as unknown as Record<string, string[]>;
+    if (typeof updateConfig.roleMappings !== 'undefined') {
+      // explicit null clears the column
+      payload.roleMappings = updateConfig.roleMappings;
     }
 
     await this.oidcConfigRepository.update({ ssoProviderId: providerId }, payload);
@@ -286,8 +286,9 @@ export class SSOService {
       const trimmed = config.provisioningSecret?.trim();
       payload.provisioningSecret = trimmed ? this.encryptionService.encrypt(trimmed) : null;
     }
-    if (typeof config.permissionMappings !== 'undefined') {
-      payload.permissionMappings = config.permissionMappings as unknown as Record<string, string[]>;
+    if (typeof config.roleMappings !== 'undefined') {
+      // explicit null clears the column
+      payload.roleMappings = config.roleMappings;
     }
     if (typeof config.spSigningCertificate !== 'undefined') {
       payload.spSigningCertificate = config.spSigningCertificate

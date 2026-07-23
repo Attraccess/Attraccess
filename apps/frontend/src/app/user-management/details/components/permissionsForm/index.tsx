@@ -5,7 +5,9 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../../../components/toastProvider';
 import {
   ApiError,
+  SSOProvider,
   User,
+  UserRole,
   useRbacServiceListRoles,
   useUsersServiceGetUserRoleAssignments,
   useUsersServiceAssignRoleToUser,
@@ -13,22 +15,56 @@ import {
   useUsersServiceGetUserRoleAssignmentsKey,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
+import { Chip, Separator } from '@heroui/react';
 
 import en from './en.json';
 import de from './de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../../global-translations/api-errors.en.json';
 import API_ERROR_TRANSLATIONS_DE from '../../../../../global-translations/api-errors.de.json';
 
-// Roles shown in the permissions form (default 'user' and 'owner' are excluded)
-const MANAGEABLE_ROLE_KEYS = ['resource-manager', 'system-admin', 'user-manager', 'billing-manager'];
+// 'user' is auto-assigned to all users; 'owner' is the initial system owner — neither should be toggled manually
+const NON_MANAGEABLE_ROLE_KEYS = ['user', 'owner'];
 
 interface UserPermissionFormProps {
   user: User;
   ssoManagedProviders?: string[];
   ssoManagedPermissionKeys?: Set<string>;
+  providersById?: Map<number, SSOProvider>;
 }
 
-export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({ user, ssoManagedProviders, ssoManagedPermissionKeys }) => {
+function SsoAssignmentBadges({
+  assignments,
+  providersById,
+  t,
+}: {
+  assignments: UserRole[];
+  providersById?: Map<number, SSOProvider>;
+  t: ReturnType<typeof useTranslations>['t'];
+}) {
+  if (assignments.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-1 mt-1 ml-1">
+      {assignments.map((ur) => {
+        const providerName = ur.ssoProviderId ? (providersById?.get(ur.ssoProviderId)?.name ?? `#${ur.ssoProviderId}`) : ur.ssoProviderType ?? 'SSO';
+        const label = ur.externalValue
+          ? `${providerName} · ${ur.externalValue}`
+          : providerName;
+        return (
+          <Chip key={`${ur.ssoProviderId}-${ur.externalValue}`} size="sm" color="warning" variant="soft">
+            {t('ssoAssignment.assignedBy')}: {label}
+          </Chip>
+        );
+      })}
+    </div>
+  );
+}
+
+export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({
+  user,
+  ssoManagedProviders,
+  ssoManagedPermissionKeys,
+  providersById,
+}) => {
   const { t, tExists } = useTranslations({
     en: { ...en, api: API_ERROR_TRANSLATIONS_EN },
     de: { ...de, api: API_ERROR_TRANSLATIONS_DE },
@@ -52,7 +88,8 @@ export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({ user, ss
   const { mutateAsync: revokeRole, isPending: isRevoking } = useUsersServiceRevokeRoleFromUser();
   const isSaving = isAssigning || isRevoking;
 
-  const manageableRoles = (allRoles ?? []).filter((r) => MANAGEABLE_ROLE_KEYS.includes(r.key));
+  const manageableRoles = (allRoles ?? []).filter((r) => !NON_MANAGEABLE_ROLE_KEYS.includes(r.key));
+  const manageableRoleIds = new Set(manageableRoles.map((r) => r.id));
 
   const [selectedRoleIds, setSelectedRoleIds] = useState<Set<number>>(new Set());
 
@@ -61,6 +98,28 @@ export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({ user, ss
       setSelectedRoleIds(new Set(userRoles.map((ur) => ur.roleId)));
     }
   }, [userRoles]);
+
+  // SSO assignments grouped by role ID for quick lookup
+  const ssoAssignmentsByRoleId = new Map<number, UserRole[]>();
+  for (const ur of userRoles ?? []) {
+    if (ur.source !== 'sso') continue;
+    const existing = ssoAssignmentsByRoleId.get(ur.roleId) ?? [];
+    existing.push(ur);
+    ssoAssignmentsByRoleId.set(ur.roleId, existing);
+  }
+
+  // Roles that are SSO-assigned but NOT in the manageable list (e.g. owner, user)
+  const ssoOnlyRoles = (userRoles ?? [])
+    .filter((ur) => ur.source === 'sso' && !manageableRoleIds.has(ur.roleId))
+    .reduce<{ role: UserRole['role']; assignments: UserRole[] }[]>((acc, ur) => {
+      const existing = acc.find((e) => e.role?.id === ur.roleId);
+      if (existing) {
+        existing.assignments.push(ur);
+      } else {
+        acc.push({ role: ur.role, assignments: [ur] });
+      }
+      return acc;
+    }, []);
 
   const allManageableSsoManaged = isSsoManaged && manageableRoles.every((r) => isRoleSsoManaged(r.key));
 
@@ -117,6 +176,7 @@ export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({ user, ss
   return (
     <section className="w-full flex flex-col gap-4" data-cy="user-permission-form-section">
       <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">{t('title')}</h3>
+
       {isSsoManaged ? (
         <div
           className="rounded-md border border-warning-200 bg-warning-50 px-3 py-2 text-warning-700"
@@ -126,19 +186,49 @@ export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({ user, ss
           <p className="text-sm">{t('ssoManaged.description', { providers: ssoProvidersLabel })}</p>
         </div>
       ) : null}
-      <div className="flex flex-col gap-2">
-        {manageableRoles.map((role) => (
-          <LabeledSwitch
-            key={role.id}
-            isSelected={selectedRoleIds.has(role.id)}
-            onChange={handleRoleToggle(role.id)}
-            isDisabled={isRoleSsoManaged(role.key)}
-            data-cy={`user-permission-form-${role.key}-checkbox`}
-          >
-            {t(`permissions.${role.key}`)}
-          </LabeledSwitch>
-        ))}
+
+      {/* Manageable roles */}
+      <div className="flex flex-col gap-3">
+        {manageableRoles.map((role) => {
+          const ssoAssignments = ssoAssignmentsByRoleId.get(role.id) ?? [];
+          return (
+            <div key={role.id} className="flex flex-col">
+              <LabeledSwitch
+                isSelected={selectedRoleIds.has(role.id)}
+                onChange={handleRoleToggle(role.id)}
+                isDisabled={isRoleSsoManaged(role.key)}
+                data-cy={`user-permission-form-${role.key}-checkbox`}
+              >
+                {tExists(`permissions.${role.key}`) ? t(`permissions.${role.key}`) : role.name}
+              </LabeledSwitch>
+              <SsoAssignmentBadges assignments={ssoAssignments} providersById={providersById} t={t} />
+            </div>
+          );
+        })}
       </div>
+
+      {/* SSO-only roles (not in manageable list) */}
+      {ssoOnlyRoles.length > 0 ? (
+        <>
+          <Separator />
+          <div className="flex flex-col gap-2" data-cy="user-permission-form-sso-only-roles">
+            <p className="text-xs font-semibold text-default-500 uppercase tracking-wide">
+              {t('ssoOnlyRoles.title')}
+            </p>
+            <p className="text-xs text-default-400">{t('ssoOnlyRoles.subtitle')}</p>
+            {ssoOnlyRoles.map(({ role, assignments }) => {
+              const roleName = role?.name ?? role?.key ?? `Role #${assignments[0]?.roleId}`;
+              return (
+                <div key={role?.id ?? assignments[0]?.roleId} className="flex flex-col gap-1">
+                  <span className="text-sm text-default-700 font-medium">{roleName}</span>
+                  <SsoAssignmentBadges assignments={assignments} providersById={providersById} t={t} />
+                </div>
+              );
+            })}
+          </div>
+        </>
+      ) : null}
+
       <div className="flex w-full justify-end">
         <Button
           variant="primary"

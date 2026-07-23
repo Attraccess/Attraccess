@@ -42,7 +42,8 @@
         "csvExport": "CSV Export",
         "balena": "Balena",
         "settings": "Settings",
-        "monitoring": "Monitoring"
+        "monitoring": "Monitoring",
+        "roles": "Roles"
       }
     }
   },

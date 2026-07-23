@@ -18,6 +18,12 @@
     "provider": "Provider",
     "userId": "SSO user ID"
   },
+  "effectivePermissions": {
+    "title": "Effective Permissions",
+    "empty": "No permissions assigned.",
+    "loading": "Loading permissions…",
+    "uncategorized": "Other"
+  },
   "delete": {
     "title": "Delete user",
     "description": "Deletes the user and anonymizes their personal data. This cannot be undone.",

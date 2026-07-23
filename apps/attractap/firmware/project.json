@@ -26,6 +26,14 @@
         "{projectRoot}/src/**/*"
       ],
       "cache": true
+    },
+    "flash": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "cd apps/attractap/firmware && python3 flash_firmware.py",
+        "cwd": "."
+      },
+      "cache": false
     }
   }
 }

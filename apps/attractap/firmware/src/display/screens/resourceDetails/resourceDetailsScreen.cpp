@@ -141,7 +141,7 @@ void ResourceDetailsScreen::init()
 
    lv_obj_t *sessionStartTimeContainer = lv_obj_create(this->sessionDetailsContainer);
    lv_obj_remove_style_all(sessionStartTimeContainer);
-   lv_obj_set_width(sessionStartTimeContainer, lv_pct(33));
+   lv_obj_set_width(sessionStartTimeContainer, LV_SIZE_CONTENT);
    lv_obj_set_height(sessionStartTimeContainer, LV_SIZE_CONTENT);
    lv_obj_set_align(sessionStartTimeContainer, LV_ALIGN_CENTER);
    lv_obj_set_flex_flow(sessionStartTimeContainer, LV_FLEX_FLOW_COLUMN);
@@ -167,7 +167,9 @@ void ResourceDetailsScreen::init()
 
    lv_obj_t *currentUserContainer = lv_obj_create(this->sessionDetailsContainer);
    lv_obj_remove_style_all(currentUserContainer);
-   lv_obj_set_width(currentUserContainer, lv_pct(33));
+   lv_obj_set_flex_grow(currentUserContainer, 1);
+   lv_obj_set_style_pad_left(currentUserContainer, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_right(currentUserContainer, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_height(currentUserContainer, LV_SIZE_CONTENT);
    lv_obj_set_align(currentUserContainer, LV_ALIGN_CENTER);
    lv_obj_set_flex_flow(currentUserContainer, LV_FLEX_FLOW_COLUMN);
@@ -186,16 +188,18 @@ void ResourceDetailsScreen::init()
    lv_obj_set_style_text_opa(labelForCurrentUser, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->currentUser = lv_label_create(currentUserContainer);
-   lv_obj_set_width(this->currentUser, LV_SIZE_CONTENT);
+   lv_obj_set_width(this->currentUser, lv_pct(100));
    lv_obj_set_height(this->currentUser, LV_SIZE_CONTENT);
    lv_obj_set_align(this->currentUser, LV_ALIGN_CENTER);
+   lv_label_set_long_mode(this->currentUser, LV_LABEL_LONG_SCROLL_CIRCULAR);
+   lv_obj_set_style_text_align(this->currentUser, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_label_set_text(this->currentUser, "JappyJan");
    lv_obj_set_style_text_font(this->currentUser, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_color(this->currentUser, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
 
    lv_obj_t *elapsedTimeContainer = lv_obj_create(this->sessionDetailsContainer);
    lv_obj_remove_style_all(elapsedTimeContainer);
-   lv_obj_set_width(elapsedTimeContainer, lv_pct(33));
+   lv_obj_set_width(elapsedTimeContainer, LV_SIZE_CONTENT);
    lv_obj_set_height(elapsedTimeContainer, LV_SIZE_CONTENT);
    lv_obj_set_align(elapsedTimeContainer, LV_ALIGN_CENTER);
    lv_obj_set_flex_flow(elapsedTimeContainer, LV_FLEX_FLOW_COLUMN);

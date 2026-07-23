@@ -18,10 +18,13 @@ interface CounterEntry extends WindowCounterEntry {
 }
 
 const MAX_COUNTER_ENTRIES = 10_000;
+// ponytail: coarse per-IP threshold = maxAttempts * 10; prevents username-spray bypass; tune multiplier if needed
+const COARSE_IP_MULTIPLIER = 10;
 
 @Injectable()
 export class BruteForceProtectionService {
   private readonly ipCounters = new FixedWindowCounterStore<string, CounterEntry>(MAX_COUNTER_ENTRIES);
+  private readonly ipCoarseCounters = new FixedWindowCounterStore<string, CounterEntry>(MAX_COUNTER_ENTRIES);
   private readonly accountCounters = new FixedWindowCounterStore<number, CounterEntry>(MAX_COUNTER_ENTRIES);
   private readonly nowFn: () => number = () => Date.now();
 
@@ -31,9 +34,16 @@ export class BruteForceProtectionService {
     private readonly settingsService: SettingsService,
   ) {}
 
-  async assertIpAllowed(scope: RateLimitScope, ip: string): Promise<void> {
-    const key = ipKey(scope, ip);
-    const entry = this.ipCounters.get(key);
+  async assertIpAllowed(scope: RateLimitScope, ip: string, username: string | null = null): Promise<void> {
+    const coarseEntry = this.ipCoarseCounters.get(ipCoarseKey(scope, ip));
+    if (coarseEntry) {
+      const remaining = this.remainingLockoutSeconds(coarseEntry);
+      if (remaining > 0) {
+        throw new TooManyAuthAttemptsException(remaining);
+      }
+    }
+
+    const entry = this.ipCounters.get(ipKey(scope, ip, username));
     if (!entry) return;
     const remaining = this.remainingLockoutSeconds(entry);
     if (remaining > 0) {
@@ -53,20 +63,29 @@ export class BruteForceProtectionService {
     }
   }
 
-  async recordFailure(scope: RateLimitScope, ip: string, userId: number | null): Promise<void> {
+  async recordFailure(scope: RateLimitScope, ip: string, userId: number | null, username: string | null = null): Promise<void> {
     const policy = await this.settingsService.getRateLimitPolicy();
     const windowMs = policy.windowSeconds * 1000;
     const now = this.nowFn();
 
     this.evictStale(now, windowMs);
 
-    const ipEntry = this.upsertCounter(this.ipCounters, ipKey(scope, ip), now, windowMs);
+    const ipEntry = this.upsertCounter(this.ipCounters, ipKey(scope, ip, username), now, windowMs);
     if (ipEntry.count >= policy.maxAttempts) {
       const durationMs = computeLockoutMs(policy, ipEntry.lockoutCount);
       ipEntry.lockoutUntil = now + durationMs;
       ipEntry.lockoutCount += 1;
       ipEntry.count = 0;
       ipEntry.firstAt = now;
+    }
+
+    const coarseEntry = this.upsertCounter(this.ipCoarseCounters, ipCoarseKey(scope, ip), now, windowMs);
+    if (coarseEntry.count >= policy.maxAttempts * COARSE_IP_MULTIPLIER) {
+      const durationMs = computeLockoutMs(policy, coarseEntry.lockoutCount);
+      coarseEntry.lockoutUntil = now + durationMs;
+      coarseEntry.lockoutCount += 1;
+      coarseEntry.count = 0;
+      coarseEntry.firstAt = now;
     }
 
     if (userId == null) {
@@ -101,8 +120,8 @@ export class BruteForceProtectionService {
     );
   }
 
-  async recordSuccess(scope: RateLimitScope, ip: string, userId: number | null): Promise<void> {
-    this.ipCounters.delete(ipKey(scope, ip));
+  async recordSuccess(scope: RateLimitScope, ip: string, userId: number | null, username: string | null = null): Promise<void> {
+    this.ipCounters.delete(ipKey(scope, ip, username));
     if (userId == null) {
       return;
     }
@@ -165,6 +184,7 @@ export class BruteForceProtectionService {
 
   private evictStale(now: number, windowMs: number): void {
     this.ipCounters.evict((entry) => isStale(entry, now, windowMs));
+    this.ipCoarseCounters.evict((entry) => isStale(entry, now, windowMs));
     this.accountCounters.evict((entry) => isStale(entry, now, windowMs));
   }
 }
@@ -174,7 +194,11 @@ function isStale(entry: CounterEntry, now: number, windowMs: number): boolean {
   return now - entry.firstAt > windowMs;
 }
 
-function ipKey(scope: RateLimitScope, ip: string): string {
+function ipKey(scope: RateLimitScope, ip: string, username: string | null = null): string {
+  return `${scope}:${ip}:${username ?? ''}`;
+}
+
+function ipCoarseKey(scope: RateLimitScope, ip: string): string {
   return `${scope}:${ip}`;
 }
 

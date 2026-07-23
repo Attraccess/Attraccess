@@ -42,7 +42,8 @@
         "csvExport": "CSV-Export",
         "balena": "Balena",
         "settings": "Einstellungen",
-        "monitoring": "Überwachung"
+        "monitoring": "Überwachung",
+        "roles": "Rollen"
       }
     }
   },

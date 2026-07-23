@@ -215,7 +215,7 @@ describe('SSO OIDC integration (e2e with testcontainers)', () => {
       // Fall back to sub if the mock server doesn't populate email.
       emailClaimPaths: ['email', 'sub'],
       usernameClaimPaths: ['preferred_username', 'email', 'sub'],
-      permissionMappings: null,
+      roleMappings: null,
       createdAt: new Date(),
       updatedAt: new Date(),
       ssoProvider: null as unknown as SSOProviderOIDCConfiguration['ssoProvider'],
@@ -380,7 +380,7 @@ describe('SSO OIDC integration (e2e with testcontainers)', () => {
     // so syncSsoRoles should revoke any previously-assigned SSO roles and assign none.
     const configWithMappings = {
       ...oidcConfig,
-      permissionMappings: [{ ssoRole: 'admin', permissionKey: 'system-admin' }] as never,
+      roleMappings: { 'system-admin': ['admin'] },
     };
     const strategy = new SSOOIDCStrategy(mockModuleRef, configWithMappings, CALLBACK_URL, stateStore as never);
 

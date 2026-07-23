@@ -479,7 +479,7 @@ export class UsersService {
     }
   }
 
-  async findMany(options: PaginationOptions & { search?: string; ids?: number[] }): Promise<PaginatedResponse<User>> {
+  async findMany(options: PaginationOptions & { search?: string; ids?: number[]; includeRoles?: boolean }): Promise<PaginatedResponse<User>> {
     this.logger.debug(`Finding all users with options: ${JSON.stringify(options)}`);
     const paginationOptions = PaginationOptionsSchema.parse(options);
     const { search } = options;
@@ -514,7 +514,7 @@ export class UsersService {
       skip,
       take: limit,
       where: whereCondition,
-      relations: ['authenticationDetails'],
+      relations: options.includeRoles ? ['authenticationDetails', 'userRoles', 'userRoles.role'] : ['authenticationDetails'],
       order: { username: 'ASC' },
     });
 

@@ -32,8 +32,10 @@ void API::setup()
     this->websocket.setup();
     this->websocket.setMessageCallbackRaw([this](const char *buf, size_t len)
                                           { this->processIncomingMessage(buf, len); });
+#ifndef DEMO_MODE
     this->websocket.setBinaryDataCallback([this](esp_websocket_event_data_t data)
                                           { this->firmware.onChunk(data); });
+#endif
 }
 void API::setFirmwareUpdateProgressCallback(std::function<void(int)> callback)
 {
@@ -277,7 +279,7 @@ void API::sendMessage(const char *type)
     this->sendMessage(type, payload);
 }
 
-void API::sendMessage(const char *type, JsonObject payload)
+bool API::sendMessage(const char *type, JsonObject payload)
 {
     JsonDocument event;
     event["event"] = "EVENT";
@@ -298,27 +300,26 @@ void API::sendMessage(const char *type, JsonObject payload)
         if (n == 0)
         {
             this->logger.error("Failed to serialize event to buffer (small)");
-            return;
+            return false;
         }
         this->logger.info((std::string("sending message to websocket: ") + json).c_str());
-        this->websocket.sendMessage(json, n);
-        return;
+        return this->websocket.sendMessage(json, n);
     }
 
     std::unique_ptr<char[]> json(new (std::nothrow) char[requiredBytes]);
     if (!json)
     {
         this->logger.error("Failed to allocate buffer for outgoing event");
-        return;
+        return false;
     }
     size_t n = serializeJson(event, json.get(), requiredBytes);
     if (n == 0)
     {
         this->logger.error("Failed to serialize event to dynamically allocated buffer");
-        return;
+        return false;
     }
     this->logger.info((std::string("sending message to websocket: ") + json.get()).c_str());
-    this->websocket.sendMessage(json.get(), n);
+    return this->websocket.sendMessage(json.get(), n);
 }
 
 void API::sendHeartbeat()

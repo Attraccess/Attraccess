@@ -64,7 +64,7 @@
   },
   "resetConfirm": {
     "title": "Reset template to default?",
-    "message": "This will overwrite your customizations with the bundled default template and delete all saved translations. This cannot be undone.",
+    "message": "This will overwrite your customizations with the bundled default template. Custom translations will be removed; shipped translations (e.g. German) will be restored. This cannot be undone.",
     "confirm": "Reset",
     "cancel": "Cancel"
   },

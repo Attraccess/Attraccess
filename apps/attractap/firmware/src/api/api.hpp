@@ -7,7 +7,11 @@
 #include "../settings/settings.hpp"
 #include "state/state.hpp"
 #include "../logger/logger.hpp"
+#ifdef DEMO_MODE
+#include "demo_websocket.hpp"
+#else
 #include "../websocket/websocket.hpp"
+#endif
 #include "../utils.hpp"
 #include "ota/ota_updater.hpp"
 
@@ -18,7 +22,9 @@ public:
             firmware(
                 logger,
                 [this](const char *type, JsonObject payload)
-                { this->sendMessage(type, payload); },
+                { return this->sendMessage(type, payload); },
+                [this](const char *reason)
+                { this->websocket.forceReconnect(reason); },
                 firmwareUpdateProgressCallback,
                 firmwareUpdateMetaCallback,
                 errorCallback) {}
@@ -312,7 +318,11 @@ public:
 
 private:
     Logger logger;
+#ifdef DEMO_MODE
+    DemoWebsocket websocket;
+#else
     Websocket websocket;
+#endif
 
     void updateSateInfo();
 
@@ -338,7 +348,7 @@ private:
 
     void sendAck(const char *type);
     void sendMessage(const char *type);
-    void sendMessage(const char *type, JsonObject payload);
+    bool sendMessage(const char *type, JsonObject payload);
     static constexpr size_t JSON_INBUF = 4608;
     static constexpr size_t JSON_OUTBUF_SMALL = 256;
     static constexpr size_t JSON_OUTBUF_AUTH = 1024;

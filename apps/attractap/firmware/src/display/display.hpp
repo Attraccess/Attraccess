@@ -22,6 +22,9 @@
 #include "screens/reset/resetScreen.hpp"
 #include "screens/supervision/supervisionScreen.hpp"
 #include "screens/firmwareUpdate/firmwareUpdateScreen.hpp"
+#ifdef DEMO_MODE
+#include "screens/demoSettings/demoSettingsScreen.hpp"
+#endif
 #include "driver/display_driver.hpp"
 
 #ifdef HAS_IO_EXPANDER
@@ -53,6 +56,9 @@ public:
     static ResetScreen resetScreen;
     static SupervisionScreen supervisionScreen;
     static FirmwareUpdateScreen firmwareUpdateScreen;
+#ifdef DEMO_MODE
+    static DemoSettingsScreen demoSettingsScreen;
+#endif
 
     static void setTouchCallback(std::function<void(int16_t, int16_t)> callback);
     static void setDeviceName(std::string deviceName);

@@ -107,14 +107,19 @@ export class UsersAdminController {
   })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - User does not have permission to manage users.',
+    description: 'Forbidden - includeRoles requires users.read permission.',
   })
-  async findMany(@Query() query: FindManyUsersQueryDto): Promise<PaginatedUsersResponseDto> {
+  async findMany(@Query() query: FindManyUsersQueryDto, @Req() request: AuthenticatedRequest): Promise<PaginatedUsersResponseDto> {
+    // ponytail: role data is sensitive; only expose it to users.read holders
+    if (query.includeRoles && !request.user.effectivePermissions?.has('users.read')) {
+      throw new ForbiddenException();
+    }
     const result = await this.usersService.findMany({
       page: query.page,
       limit: query.limit,
       search: query.search,
       ids: query.ids,
+      includeRoles: query.includeRoles,
     });
     this.logger.debug(`Found ${result.total} users total, returning ${result.data.length} users`);
     return {

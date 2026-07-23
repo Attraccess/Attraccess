@@ -64,7 +64,7 @@
   },
   "resetConfirm": {
     "title": "Vorlage auf Standard zurücksetzen?",
-    "message": "Dies überschreibt Ihre Anpassungen mit der Standard-Vorlage und löscht alle gespeicherten Übersetzungen. Dies kann nicht rückgängig gemacht werden.",
+    "message": "Dies überschreibt Ihre Anpassungen mit der Standard-Vorlage. Eigene Übersetzungen werden entfernt; mitgelieferte Übersetzungen (z. B. Deutsch) werden wiederhergestellt. Dies kann nicht rückgängig gemacht werden.",
     "confirm": "Zurücksetzen",
     "cancel": "Abbrechen"
   },
