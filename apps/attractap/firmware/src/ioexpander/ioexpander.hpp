@@ -48,10 +48,13 @@
 // XIO10 (P1.2) = 0 — reserved / unused
 // XIO11 (P1.3) = 1 — CAN standby released (active-low standby, so 1 = running)
 // XIO12 (P1.4) = 1 — IMU power / enable
-// XIO13 (P1.5) = 1 — RTC INTB released / SD card power enable
+// XIO13 (P1.5) = 1 — SYS_EN power-hold latch (see IOEXP_BIT_SYS_EN below):
+//                    empirically confirmed — clearing this bit cuts battery
+//                    power. (Earlier speculation labelled it "RTC INTB / SD
+//                    card power enable"; that was wrong.)
 // XIO14 (P1.6) = 0 — reserved / unused
 // XIO15 (P1.7) = 0 — reserved / unused
-// TODO: verify each assignment against the Waveshare ESP32-S3-Touch-LCD-4 V4 schematic
+// TODO: verify the remaining assignments against the Waveshare ESP32-S3-Touch-LCD-4 V4 schematic
 #define IOEXP_PORT1_DEFAULT 0x3A
 #else
 // TCA9554 register map (V3 hardware)

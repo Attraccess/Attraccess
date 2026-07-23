@@ -86,6 +86,7 @@ void IOExpander::powerOff()
 #ifdef IO_EXPANDER_16BIT
     if (!initialized)
     {
+        logger.warn("powerOff: called before init — ignoring power-off request");
         return;
     }
     logger.info("Power off: driving SYS_EN low (reg 0x03 bit 5)");

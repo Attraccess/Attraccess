@@ -451,6 +451,9 @@ void DemoSettingsScreen::showPowerConfirm()
 
     _powerConfirm = lv_obj_create(_screen);
     lv_obj_add_flag(_powerConfirm, LV_OBJ_FLAG_IGNORE_LAYOUT);
+    // Modal: full-screen and clickable so taps can't fall through to the
+    // settings screen behind the dimmed backdrop.
+    lv_obj_add_flag(_powerConfirm, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_set_size(_powerConfirm, lv_pct(100), lv_pct(100));
     lv_obj_align(_powerConfirm, LV_ALIGN_CENTER, 0, 0);
     lv_obj_set_style_bg_color(_powerConfirm, lv_color_hex(0x000000), LV_PART_MAIN);
@@ -533,8 +536,13 @@ void DemoSettingsScreen::onPowerConfirmBtn(lv_event_t *e)
     if (lv_event_get_code(e) != LV_EVENT_CLICKED)
         return;
     DemoSettingsScreen *self = static_cast<DemoSettingsScreen *>(lv_event_get_user_data(e));
-    if (self && self->_powerOffCb)
+    if (!self)
+        return;
+    if (self->_powerOffCb)
         self->_powerOffCb(); // cuts SYS_EN — board powers down if on battery
+    // On battery the board is already dead here; on USB/DC power SYS_EN has no
+    // effect, so dismiss the dialog instead of leaving the UI stuck.
+    self->hidePowerConfirm();
 }
 
 #endif // HAS_POWER_BUTTON
