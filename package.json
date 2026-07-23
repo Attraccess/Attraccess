@@ -254,6 +254,7 @@
   },
   "pnpm": {
     "overrides": {
+      "node-gyp": "13.0.1",
       "@swc-node/register>typescript": "npm:@typescript/typescript6@^6.0.0",
       "ts-api-utils>typescript": "npm:@typescript/typescript6@^6.0.0",
       "@typescript-eslint/typescript-estree>typescript": "npm:@typescript/typescript6@^6.0.0",
