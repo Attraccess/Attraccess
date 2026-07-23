@@ -11,18 +11,11 @@ import {
   ModalFooter,
   ModalHeader,
   ModalHeading,
-  Table,
-  TableBody,
-  TableCell,
-  TableColumn,
-  TableContent,
-  TableHeader,
-  TableRow,
-  TableScrollContainer,
   Spinner,
   Tab,
   TabList,
   Tabs,
+  TextArea,
   TextField,
 } from '@heroui/react';
 import type { Key } from '@heroui/react';
@@ -301,39 +294,35 @@ export function TranslationsSection({ templateType, liveContent }: TranslationsS
             </p>
           )}
 
-          <Table aria-label={t('sections.translations')}>
-            <TableScrollContainer>
-              <TableContent>
-                <TableHeader>
-                  <TableColumn className="hidden md:table-cell">{t('translations.keyColumn')}</TableColumn>
-                  <TableColumn isRowHeader>{t('translations.defaultColumn')}</TableColumn>
-                  <TableColumn>
-                    {t('translations.translationColumn', { language: displayName(selectedLocale) })}
-                  </TableColumn>
-                </TableHeader>
-                <TableBody>
-                  {extractedKeys.map(({ key, defaultValue }) => (
-                    <TableRow key={key}>
-                      <TableCell className="hidden md:table-cell font-mono text-xs text-default-500 align-top">
-                        {key}
-                      </TableCell>
-                      <TableCell className="text-default-600 align-top">{defaultValue}</TableCell>
-                      <TableCell>
-                        <TextField
-                          value={valuesFor(selectedLocale)[key] ?? ''}
-                          onChange={(value) => handleEdit(key, value)}
-                          isDisabled={!selectedLocale}
-                          aria-label={key}
-                        >
-                          <Input placeholder={t('translations.emptyTranslation')} data-cy={`translation-input-${key}`} />
-                        </TextField>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </TableContent>
-            </TableScrollContainer>
-          </Table>
+          <div className="flex flex-col gap-3" data-cy="translations-list">
+            {extractedKeys.map(({ key, defaultValue }) => (
+              <div key={key} className="flex flex-col gap-1.5 rounded-lg border border-default-200 p-3">
+                <div className="flex gap-4">
+                  <div className="flex flex-col gap-0.5 shrink-0">
+                    <span className="text-xs uppercase tracking-wide text-default-400">
+                      {t('translations.keyColumn')}
+                    </span>
+                    <span className="font-mono text-sm font-semibold text-default-600 whitespace-pre-wrap">{key}</span>
+                  </div>
+                  <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+                    <span className="text-xs uppercase tracking-wide text-default-400">
+                      {t('translations.defaultColumn')}
+                    </span>
+                    <span className="text-sm text-default-600 whitespace-pre-wrap">{defaultValue}</span>
+                  </div>
+                </div>
+                <TextArea
+                  value={valuesFor(selectedLocale)[key] ?? ''}
+                  onChange={(e) => handleEdit(key, e.target.value)}
+                  disabled={!selectedLocale}
+                  aria-label={t('translations.translationColumn', { language: displayName(selectedLocale) })}
+                  placeholder={t('translations.emptyTranslation')}
+                  rows={2}
+                  data-cy={`translation-input-${key}`}
+                />
+              </div>
+            ))}
+          </div>
 
           <div className="flex justify-end">
             <Button

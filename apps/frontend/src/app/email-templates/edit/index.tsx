@@ -16,13 +16,11 @@ import {
   DropdownMenu,
   DropdownPopover,
   DropdownTrigger,
-  Input,
   ModalBody,
   ModalFooter,
   ModalHeader,
   ModalHeading,
   Spinner,
-  TextField,
 } from '@heroui/react';
 import { ArrowLeft, Braces, Languages, RotateCcw } from 'lucide-react';
 import { buttonVariants } from '@heroui/styles';
@@ -166,15 +164,7 @@ export function EditEmailTemplatePage() {
         </Button>
         <h1 className="text-base font-semibold whitespace-nowrap">{t('templateType.' + templateType)}</h1>
 
-        <TextField
-          value={subject}
-          onChange={setSubject}
-          aria-label={t('form.subject')}
-          className="flex-1 min-w-48 order-last md:order-none w-full md:w-auto"
-        >
-          <Input placeholder={t('form.subject')} data-cy="edit-email-template-subject-input" />
-        </TextField>
-
+        {/* Subject is edited (and translated) in the translations drawer; it still round-trips through save via `subject` state. */}
         <div className="flex items-center gap-2 ml-auto">
           {variables.length > 0 && (
             <Dropdown>
