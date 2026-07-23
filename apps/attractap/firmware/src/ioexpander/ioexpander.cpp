@@ -81,6 +81,21 @@ void IOExpander::resetTouchPanel()
     logger.info("Touch panel reset complete");
 }
 
+void IOExpander::powerOff()
+{
+#ifdef IO_EXPANDER_16BIT
+    if (!initialized)
+    {
+        return;
+    }
+    logger.info("Power off: driving SYS_EN low (reg 0x03 bit 5)");
+    outputState1 &= ~(uint8_t(1 << IOEXP_BIT_SYS_EN));
+    writeRegister(IOEXP_REG_OUTPUT_1, outputState1);
+#else
+    logger.warn("powerOff: no SYS_EN latch on this hardware — ignoring");
+#endif
+}
+
 void IOExpander::beeperOn()
 {
     setPin(IOEXP_BIT_BEEPER, true);

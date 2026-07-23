@@ -19,6 +19,12 @@
 #define IOEXP_BIT_BEEPER (5)
 #endif
 
+// SYS_EN power-hold latch (16-bit V4 hardware only). Bit 5 of the second output
+// register (reg 0x03) — the MCU holds it HIGH to keep the board powered; driving
+// it LOW disconnects battery power. Matches Waveshare WS_CH32_IO PIN_SYS_EN
+// (1 << 5) on the ESP32-S3-Touch-LCD-4. Set high in IOEXP_PORT1_DEFAULT (0x3A).
+#define IOEXP_BIT_SYS_EN (5)
+
 #ifdef IO_EXPANDER_16BIT
 // XL9555 / PCA9555-compatible register map (V4 hardware)
 // 16-bit expander with two 8-bit ports.
@@ -63,6 +69,10 @@ public:
     void beeperOff();
     void setDisplayBacklight(bool on);
     void resetTouchPanel();
+    // Cut battery power by driving the SYS_EN latch low (16-bit V4 hardware only;
+    // no-op elsewhere). Only powers the board off when running on battery — with
+    // USB/DC connected the supply is maintained regardless.
+    void powerOff();
     // Set a single pin on port 0 (bits 0–7). On the 16-bit expander, port 1 pins
     // (bits 8–15) cannot be set individually — they are only written during setup().
     void setPin(uint8_t bit, bool high);
