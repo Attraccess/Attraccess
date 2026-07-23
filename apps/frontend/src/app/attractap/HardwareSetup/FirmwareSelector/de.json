@@ -1,0 +1,6 @@
+{
+  "demo": {
+    "title": "Demo-Firmware",
+    "description": "Läuft mit lokalem Mock ohne Server — nur für Demos und Tests."
+  }
+}
