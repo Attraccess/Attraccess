@@ -28,6 +28,12 @@ public:
     void setStartScanCallback(std::function<void()> cb) { _startScanCb = cb; }
     void setCancelScanCallback(std::function<void()> cb) { _cancelScanCb = cb; }
 
+#ifdef HAS_POWER_BUTTON
+    // Application wires this to IOExpander::powerOff(). Invoked after the user
+    // confirms the power-off dialog.
+    void setPowerOffCallback(std::function<void()> cb) { _powerOffCb = cb; }
+#endif
+
     // True while waiting for a card to be scanned for the add-card flow.
     bool isWaitingForCard() const { return _waitingForCard; }
 
@@ -46,6 +52,16 @@ private:
     void showRolePicker(const std::string &uid);
     void showScanOverlay();
     void hideScanOverlay();
+
+#ifdef HAS_POWER_BUTTON
+    std::function<void()> _powerOffCb;
+    lv_obj_t *_powerConfirm = nullptr;
+    void showPowerConfirm();
+    void hidePowerConfirm();
+    static void onPowerBtn(lv_event_t *e);
+    static void onPowerConfirmBtn(lv_event_t *e);
+    static void onPowerCancelBtn(lv_event_t *e);
+#endif
 
     // Pre-allocated callback payloads — avoids heap allocation and lifetime issues.
     struct DelPayload { DemoSettingsScreen *screen; uint8_t idx; };

@@ -2,7 +2,8 @@
 # PCA9555 IO expander @0x24, PN532 behind the DFR1185 address shifter @0x64),
 # but with a local mock API (no network/WebSocket) and a card-registration
 # settings screen.
-# Excluded from production/docker builds — build_firmwares.py skips -demo variants.
+# Ships in production/docker builds, hidden behind an expandable "demo" section
+# in the frontend flasher (variant "demo"). Only -debug variants are skipped.
 set(ATTRACTAP_FIRMWARE_NAME "attractap_touch_v2_demo")
 set(ATTRACTAP_FIRMWARE_FRIENDLY_NAME "Attractap Touch V2 Demo")
 set(ATTRACTAP_FIRMWARE_VARIANT "demo")
@@ -17,6 +18,10 @@ set(ATTRACTAP_DEFINES
     LOGGER_LEVEL_NUM=3
 
     DEMO_MODE=1
+
+    # Show the "power off" button in demo settings — drives SYS_EN low to cut
+    # battery power. V2-demo (V4 hardware with SYS_EN latch) only.
+    HAS_POWER_BUTTON=1
 
     PIN_NFC_I2C_SDA=15
     PIN_NFC_I2C_SCL=7

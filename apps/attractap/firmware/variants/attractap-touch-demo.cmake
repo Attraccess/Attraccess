@@ -1,6 +1,7 @@
 # Attractap Touch Demo: same hardware as attractap-touch, but with a local mock
 # API (no network/WebSocket) and a card-registration settings screen.
-# Excluded from production/docker builds — build_firmwares.py skips -demo variants.
+# Ships in production/docker builds, hidden behind an expandable "demo" section
+# in the frontend flasher (variant "demo"). Only -debug variants are skipped.
 set(ATTRACTAP_FIRMWARE_NAME "attractap_touch_demo")
 set(ATTRACTAP_FIRMWARE_FRIENDLY_NAME "Attractap Touch Demo")
 set(ATTRACTAP_FIRMWARE_VARIANT "demo")

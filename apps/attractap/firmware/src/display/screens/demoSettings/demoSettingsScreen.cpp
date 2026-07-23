@@ -58,8 +58,19 @@ void DemoSettingsScreen::init()
     lv_obj_set_style_text_color(title, lv_color_hex(DEMO_TEXT), LV_PART_MAIN);
     lv_obj_set_style_text_font(title, &lv_font_montserrat_24, LV_PART_MAIN);
 
-    // "Add card" button in title bar
-    lv_obj_t *addBtn = lv_button_create(titleBar);
+    // Right-aligned action button group (add card, + power off on V4 demo).
+    lv_obj_t *actions = lv_obj_create(titleBar);
+    lv_obj_remove_flag(actions, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_size(actions, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_opa(actions, 0, LV_PART_MAIN);
+    lv_obj_set_style_border_width(actions, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(actions, 0, LV_PART_MAIN);
+    lv_obj_set_flex_flow(actions, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(actions, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_column(actions, 10, LV_PART_MAIN);
+
+    // "Add card" button
+    lv_obj_t *addBtn = lv_button_create(actions);
     lv_obj_set_size(addBtn, 160, 40);
     lv_obj_set_style_bg_color(addBtn, lv_color_hex(DEMO_BTN_ADD), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(addBtn, 255, LV_PART_MAIN);
@@ -70,6 +81,21 @@ void DemoSettingsScreen::init()
     lv_obj_set_align(addLbl, LV_ALIGN_CENTER);
     lv_obj_set_style_text_color(addLbl, lv_color_hex(DEMO_TEXT), LV_PART_MAIN);
     lv_obj_set_style_text_font(addLbl, &lv_font_montserrat_16, LV_PART_MAIN);
+
+#ifdef HAS_POWER_BUTTON
+    // Power-off button (V4 demo hardware with SYS_EN latch only).
+    lv_obj_t *powerBtn = lv_button_create(actions);
+    lv_obj_set_size(powerBtn, 56, 40);
+    lv_obj_set_style_bg_color(powerBtn, lv_color_hex(DEMO_BTN_DEL), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(powerBtn, 255, LV_PART_MAIN);
+    lv_obj_set_style_radius(powerBtn, 8, LV_PART_MAIN);
+    lv_obj_add_event_cb(powerBtn, &DemoSettingsScreen::onPowerBtn, LV_EVENT_CLICKED, this);
+    lv_obj_t *powerLbl = lv_label_create(powerBtn);
+    lv_label_set_text(powerLbl, LV_SYMBOL_POWER);
+    lv_obj_set_align(powerLbl, LV_ALIGN_CENTER);
+    lv_obj_set_style_text_color(powerLbl, lv_color_hex(DEMO_TEXT), LV_PART_MAIN);
+    lv_obj_set_style_text_font(powerLbl, &lv_font_montserrat_20, LV_PART_MAIN);
+#endif
 
     // Scrollable card list area — grows to fill all space below the title bar.
     lv_obj_t *listArea = lv_obj_create(_screen);
@@ -95,6 +121,9 @@ void DemoSettingsScreen::init()
 void DemoSettingsScreen::onScreenLeave()
 {
     hideScanOverlay();
+#ifdef HAS_POWER_BUTTON
+    hidePowerConfirm();
+#endif
 }
 
 void DemoSettingsScreen::loop()
@@ -121,6 +150,9 @@ void DemoSettingsScreen::destroy()
     _cardList = nullptr;
     _scanOverlay = nullptr;
     _rolePicker = nullptr;
+#ifdef HAS_POWER_BUTTON
+    _powerConfirm = nullptr;
+#endif
 }
 
 // ---------------------------------------------------------------------------
@@ -405,5 +437,114 @@ void DemoSettingsScreen::onCardScanned(const std::string &uid)
         _cancelScanCb(); // let application disable NFC detection
     showRolePicker(uid);
 }
+
+// ---------------------------------------------------------------------------
+// Power off (V4 demo hardware only)
+// ---------------------------------------------------------------------------
+
+#ifdef HAS_POWER_BUTTON
+
+void DemoSettingsScreen::showPowerConfirm()
+{
+    if (_powerConfirm)
+        return;
+
+    _powerConfirm = lv_obj_create(_screen);
+    lv_obj_add_flag(_powerConfirm, LV_OBJ_FLAG_IGNORE_LAYOUT);
+    // Modal: full-screen and clickable so taps can't fall through to the
+    // settings screen behind the dimmed backdrop.
+    lv_obj_add_flag(_powerConfirm, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_size(_powerConfirm, lv_pct(100), lv_pct(100));
+    lv_obj_align(_powerConfirm, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_set_style_bg_color(_powerConfirm, lv_color_hex(0x000000), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(_powerConfirm, 200, LV_PART_MAIN);
+    lv_obj_set_style_border_width(_powerConfirm, 0, LV_PART_MAIN);
+    lv_obj_set_style_radius(_powerConfirm, 0, LV_PART_MAIN);
+    lv_obj_set_flex_flow(_powerConfirm, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(_powerConfirm, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_row(_powerConfirm, 24, LV_PART_MAIN);
+
+    lv_obj_t *lbl = lv_label_create(_powerConfirm);
+    lv_label_set_text(lbl, "Geraet ausschalten?");
+    lv_obj_set_style_text_color(lbl, lv_color_hex(DEMO_TEXT), LV_PART_MAIN);
+    lv_obj_set_style_text_font(lbl, &lv_font_montserrat_24, LV_PART_MAIN);
+    lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+
+    lv_obj_t *row = lv_obj_create(_powerConfirm);
+    lv_obj_remove_flag(row, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_size(row, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_opa(row, 0, LV_PART_MAIN);
+    lv_obj_set_style_border_width(row, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(row, 0, LV_PART_MAIN);
+    lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_style_pad_column(row, 16, LV_PART_MAIN);
+
+    lv_obj_t *cancelBtn = lv_button_create(row);
+    lv_obj_set_size(cancelBtn, 180, 52);
+    lv_obj_set_style_bg_color(cancelBtn, lv_color_hex(DEMO_BTN_SCAN), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(cancelBtn, 255, LV_PART_MAIN);
+    lv_obj_set_style_radius(cancelBtn, 10, LV_PART_MAIN);
+    lv_obj_add_event_cb(cancelBtn, &DemoSettingsScreen::onPowerCancelBtn, LV_EVENT_CLICKED, this);
+    lv_obj_t *cancelLbl = lv_label_create(cancelBtn);
+    lv_label_set_text(cancelLbl, "Abbrechen");
+    lv_obj_set_align(cancelLbl, LV_ALIGN_CENTER);
+    lv_obj_set_style_text_color(cancelLbl, lv_color_hex(DEMO_TEXT), LV_PART_MAIN);
+    lv_obj_set_style_text_font(cancelLbl, &lv_font_montserrat_20, LV_PART_MAIN);
+
+    lv_obj_t *confirmBtn = lv_button_create(row);
+    lv_obj_set_size(confirmBtn, 180, 52);
+    lv_obj_set_style_bg_color(confirmBtn, lv_color_hex(DEMO_BTN_DEL), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(confirmBtn, 255, LV_PART_MAIN);
+    lv_obj_set_style_radius(confirmBtn, 10, LV_PART_MAIN);
+    lv_obj_add_event_cb(confirmBtn, &DemoSettingsScreen::onPowerConfirmBtn, LV_EVENT_CLICKED, this);
+    lv_obj_t *confirmLbl = lv_label_create(confirmBtn);
+    lv_label_set_text(confirmLbl, LV_SYMBOL_POWER "  Ausschalten");
+    lv_obj_set_align(confirmLbl, LV_ALIGN_CENTER);
+    lv_obj_set_style_text_color(confirmLbl, lv_color_hex(DEMO_TEXT), LV_PART_MAIN);
+    lv_obj_set_style_text_font(confirmLbl, &lv_font_montserrat_20, LV_PART_MAIN);
+}
+
+void DemoSettingsScreen::hidePowerConfirm()
+{
+    if (_powerConfirm)
+    {
+        lv_obj_del(_powerConfirm);
+        _powerConfirm = nullptr;
+    }
+}
+
+void DemoSettingsScreen::onPowerBtn(lv_event_t *e)
+{
+    if (lv_event_get_code(e) != LV_EVENT_CLICKED)
+        return;
+    DemoSettingsScreen *self = static_cast<DemoSettingsScreen *>(lv_event_get_user_data(e));
+    if (self)
+        self->showPowerConfirm();
+}
+
+void DemoSettingsScreen::onPowerCancelBtn(lv_event_t *e)
+{
+    if (lv_event_get_code(e) != LV_EVENT_CLICKED)
+        return;
+    DemoSettingsScreen *self = static_cast<DemoSettingsScreen *>(lv_event_get_user_data(e));
+    if (self)
+        self->hidePowerConfirm();
+}
+
+void DemoSettingsScreen::onPowerConfirmBtn(lv_event_t *e)
+{
+    if (lv_event_get_code(e) != LV_EVENT_CLICKED)
+        return;
+    DemoSettingsScreen *self = static_cast<DemoSettingsScreen *>(lv_event_get_user_data(e));
+    if (!self)
+        return;
+    if (self->_powerOffCb)
+        self->_powerOffCb(); // cuts SYS_EN — board powers down if on battery
+    // On battery the board is already dead here; on USB/DC power SYS_EN has no
+    // effect, so dismiss the dialog instead of leaving the UI stuck.
+    self->hidePowerConfirm();
+}
+
+#endif // HAS_POWER_BUTTON
 
 #endif // DEMO_MODE

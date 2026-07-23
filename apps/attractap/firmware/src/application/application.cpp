@@ -348,6 +348,10 @@ void Application::setup() {
     this->demoPendingScanReady = false;
     this->nfc.disableCardDetection();
   });
+#ifdef HAS_POWER_BUTTON
+  Display::demoSettingsScreen.setPowerOffCallback(
+      [this]() { this->ioExpander.powerOff(); });
+#endif
 #endif
 
   Display::resourceListScreen.setResourceSelectionCallback(
