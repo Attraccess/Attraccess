@@ -1,3 +1,91 @@
+## 1.9.0 (2026-07-25)
+
+### 🚀 Features
+
+- **ATT-130:** full-page GrapesJS WYSIWYG editor for email templates with integrated translations ([#1482](https://github.com/Attraccess/Attraccess/pull/1482))
+- **ATT-22:** version info and system metrics on admin settings page ([#1463](https://github.com/Attraccess/Attraccess/pull/1463))
+- **ATT-563:** RBAC data model, default roles, and migration ([#1420](https://github.com/Attraccess/Attraccess/pull/1420))
+- **ATT-564:** SSO role mappings and login sync ([#1516](https://github.com/Attraccess/Attraccess/pull/1516))
+- **ATT-565:** user management roles API and UI ([#1510](https://github.com/Attraccess/Attraccess/pull/1510))
+- **ATT-566:** RBAC effective-permission resolver, backend guard integration, and frontend migration ([#1470](https://github.com/Attraccess/Attraccess/pull/1470))
+- **ATT-574:** refactor email templates into global layout and content sections ([#1387](https://github.com/Attraccess/Attraccess/pull/1387))
+- **ATT-583:** add pagination to analytics resource usage endpoints ([#1468](https://github.com/Attraccess/Attraccess/pull/1468))
+- **ATT-605:** Electron companion app scaffold ([#1444](https://github.com/Attraccess/Attraccess/pull/1444))
+- **ATT-606:** companion device self-registration and WebSocket gateway ([#1441](https://github.com/Attraccess/Attraccess/pull/1441))
+- **ATT-609:** companion app lockscreen & input blocking — Windows ([#1456](https://github.com/Attraccess/Attraccess/pull/1456))
+- **ATT-610:** kiosk-mode frontend routes for companion app lockscreen webview ([#1451](https://github.com/Attraccess/Attraccess/pull/1451))
+- **ATT-611:** companion app lockscreen & input blocking — Linux (X11 + Wayland) ([#1458](https://github.com/Attraccess/Attraccess/pull/1458))
+- **ATT-612:** companion idle/active flow trigger nodes ([#1457](https://github.com/Attraccess/Attraccess/pull/1457))
+- **ATT-614:** companion app binary download endpoint ([#1452](https://github.com/Attraccess/Attraccess/pull/1452))
+- **ATT-615:** companion app settings page — device management, downloads, setup guide ([#1454](https://github.com/Attraccess/Attraccess/pull/1454))
+- **ATT-620:** Lock PC and Unlock PC flow output nodes ([#1443](https://github.com/Attraccess/Attraccess/pull/1443))
+- **ATT-621:** companion app — API WebSocket gateway and Electron client with first-run wizard ([#1442](https://github.com/Attraccess/Attraccess/pull/1442))
+- **ATT-623:** companion WebSocket AsyncAPI spec + auto-generated TypeScript client ([#1449](https://github.com/Attraccess/Attraccess/pull/1449))
+- **ATT-625:** shared UI library — HeroUI v3 + Tailwind CSS v4 + React companion wizard ([#1448](https://github.com/Attraccess/Attraccess/pull/1448))
+- **ATT-626:** macOS lockscreen & input blocking for companion app ([#1450](https://github.com/Attraccess/Attraccess/pull/1450), [#1453](https://github.com/Attraccess/Attraccess/issues/1453))
+- **ATT-628:** track companion app version per device ([#1461](https://github.com/Attraccess/Attraccess/pull/1461))
+- **ATT-629:** replace polling with SSE-triggered refetch for resource usage session ([#1455](https://github.com/Attraccess/Attraccess/pull/1455))
+- **ATT-630:** manage registered companion devices — rename in drawer ([#1462](https://github.com/Attraccess/Attraccess/pull/1462))
+- **ATT-631:** companion app OS adapter layer for system metrics ([#1465](https://github.com/Attraccess/Attraccess/pull/1465))
+- **ATT-632:** companion app foreground app flow trigger ([#1479](https://github.com/Attraccess/Attraccess/pull/1479))
+- **ATT-633:** companion app USB device connect/disconnect flow triggers ([#1507](https://github.com/Attraccess/Attraccess/pull/1507))
+- **ATT-634:** companion app auto-update devices from the server ([#1467](https://github.com/Attraccess/Attraccess/pull/1467), [#1501](https://github.com/Attraccess/Attraccess/issues/1501))
+- **ATT-635:** split and restructure settings into contextual pages ([#1469](https://github.com/Attraccess/Attraccess/pull/1469))
+- **ATT-636:** persist user locale preference ([#1464](https://github.com/Attraccess/Attraccess/pull/1464))
+- **ATT-637:** {{t}} Handlebars helper for email templates with DB-backed translations ([#1478](https://github.com/Attraccess/Attraccess/pull/1478))
+- **ATT-643:** extract email templates/layout defaults to bundled files and add reset functionality ([#1475](https://github.com/Attraccess/Attraccess/pull/1475))
+- **ATT-647:** add toggle-all controls to notification settings ([#1484](https://github.com/Attraccess/Attraccess/pull/1484))
+- **ATT-716:** per-reader Prometheus metrics and Grafana deep-dive dashboard ([#1504](https://github.com/Attraccess/Attraccess/pull/1504))
+- **ATT-721:** loading states for flow editor ([#1500](https://github.com/Attraccess/Attraccess/pull/1500))
+- **ATT-724:** translate push/toast notification titles and bodies to user locale ([#1506](https://github.com/Attraccess/Attraccess/pull/1506))
+- **ATT-726:** Attractap demo firmware target ([#1508](https://github.com/Attraccess/Attraccess/pull/1508))
+- **ATT-728:** role management API and UI ([#1514](https://github.com/Attraccess/Attraccess/pull/1514))
+- **attractap:** power-off button in touch-v2 demo settings ([#1535](https://github.com/Attraccess/Attraccess/pull/1535))
+- **users:** replace user picker with address-book modal ([#1499](https://github.com/Attraccess/Attraccess/pull/1499))
+
+### 🩹 Fixes
+
+- balena compose depends_on (short-form) so balena push succeeds ([#1440](https://github.com/Attraccess/Attraccess/pull/1440))
+- update node-version-consistency spec for docker-build-push composite action ([#1517](https://github.com/Attraccess/Attraccess/pull/1517))
+- **ATT-436:** generate fresh IDs when importing a flow ([#1481](https://github.com/Attraccess/Attraccess/pull/1481))
+- **ATT-534:** route-shadow guard mishandles multiple controllers per file ([#1459](https://github.com/Attraccess/Attraccess/pull/1459))
+- **ATT-581:** prune SSE resource subjects when no subscribers remain ([#1466](https://github.com/Attraccess/Attraccess/pull/1466))
+- **ATT-598:** add DB index and skip SSE from HTTP duration metrics ([#1436](https://github.com/Attraccess/Attraccess/pull/1436))
+- **ATT-603:** remove chat bubble and make AttraccessUser component obviously clickable ([#1438](https://github.com/Attraccess/Attraccess/pull/1438))
+- **ATT-604:** build companion binaries in nightly Docker workflow ([#1509](https://github.com/Attraccess/Attraccess/pull/1509))
+- **ATT-613:** bundle companion binaries into existing Attraccess Docker image ([#1447](https://github.com/Attraccess/Attraccess/pull/1447))
+- **ATT-641:** use Handlebars {{count}} syntax in push notification i18n strings ([#1472](https://github.com/Attraccess/Attraccess/pull/1472))
+- **ATT-642:** remove MetricsSettingsCard wrapper, render MetricsSettingsForm directly on MonitoringPage ([#1474](https://github.com/Attraccess/Attraccess/pull/1474))
+- **ATT-648:** sort resources by name for web UI and Attractap NFC readers ([#1483](https://github.com/Attraccess/Attraccess/pull/1483))
+- **ATT-709:** make usage billing idempotent ([#1491](https://github.com/Attraccess/Attraccess/pull/1491))
+- **ATT-714:** lock Attractap certificate after first success, add reset button and 90s connect watchdog ([#1492](https://github.com/Attraccess/Attraccess/pull/1492))
+- **ATT-715:** bundle attractap firmware into docker/balena images again ([#1494](https://github.com/Attraccess/Attraccess/pull/1494), [#1485](https://github.com/Attraccess/Attraccess/issues/1485))
+- **ATT-717:** resync RGB panel every VBlank to stop permanent screen shift ([#1495](https://github.com/Attraccess/Attraccess/pull/1495), [#1485](https://github.com/Attraccess/Attraccess/issues/1485))
+- **ATT-718:** drop stale card-auth trigger while unlocked to prevent stuck UI ([#1498](https://github.com/Attraccess/Attraccess/pull/1498))
+- **ATT-719:** correctly bundle and list companion download files ([#1502](https://github.com/Attraccess/Attraccess/pull/1502))
+- **ATT-729:** nest switch control inside interactive Switch.Content ([#1515](https://github.com/Attraccess/Attraccess/pull/1515))
+- **ATT-730:** retry lost OTA chunks and resume after reconnect instead of aborting ([#1519](https://github.com/Attraccess/Attraccess/pull/1519))
+- **ATT-733:** show all roles (custom + system) in user permission form ([#1521](https://github.com/Attraccess/Attraccess/pull/1521))
+- **ATT-747:** remove nested <button> in PageHeaderActions overflow trigger ([#1522](https://github.com/Attraccess/Attraccess/pull/1522))
+- **ATT-748:** abort SSE connections on unmount to stop post-logout console errors ([#1523](https://github.com/Attraccess/Attraccess/pull/1523))
+- **ATT-761:** hide × remove button on locked permission tags ([#1526](https://github.com/Attraccess/Attraccess/pull/1526))
+- **ATT-771:** key brute-force counter on IP+username and add coarse per-IP spray guard ([#1524](https://github.com/Attraccess/Attraccess/pull/1524))
+- **ATT-775:** re-seed shipped translations on email template reset ([#1525](https://github.com/Attraccess/Attraccess/pull/1525))
+- **attractap:** raise TLS rx buffer to fit Let's Encrypt cert chain ([#1520](https://github.com/Attraccess/Attraccess/pull/1520))
+- **ci:** stop using secrets context in step-level if conditions ([#1496](https://github.com/Attraccess/Attraccess/pull/1496), [#1447](https://github.com/Attraccess/Attraccess/issues/1447))
+- **ci:** override node-gyp to 13.0.1 so native builds work on VS 2026 runners ([#1536](https://github.com/Attraccess/Attraccess/pull/1536))
+- **companion:** stop macOS companion relaunching itself on quit ([#1460](https://github.com/Attraccess/Attraccess/pull/1460))
+- **docker:** install python3-setuptools so sqlite3 source builds work on Python 3.13 ([#1532](https://github.com/Attraccess/Attraccess/pull/1532))
+
+### ❤️ Thank You
+
+- Claude
+- Claude Fable 5
+- Claude Opus 4.8
+- Claude Opus 4.8 (1M context)
+- Giesela-Bot @Giesela-Bot
+- Jan Jaap @jappyjan
+
 ## 1.8.1 (2026-06-21)
 
 ### 🚀 Features
