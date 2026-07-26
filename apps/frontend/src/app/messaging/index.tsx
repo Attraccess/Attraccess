@@ -86,21 +86,26 @@ export function MessagesPage() {
     [setSearchParams],
   );
 
+  // Fills the scroll container exactly rather than guessing viewport math, so the
+  // composer stays on screen when the mobile keyboard shrinks the visible area.
   return (
-    <div>
-      <PageHeader
-        title={t('title')}
-        subtitle={t('subtitle')}
-        icon={<MailIcon />}
-        actions={
-          hasPermission('system.settings.manage')
-            ? [{ key: 'settings', label: t('settingsButton'), icon: <Settings2Icon size={16} />, onPress: () => navigate('/messages/settings') }]
-            : undefined
-        }
-      />
+    <div className="flex h-full min-h-0 flex-col">
+      {/* On phones an open thread needs every pixel — the keyboard leaves ~430px. */}
+      <div className={cn(selectedConversationId ? 'hidden lg:block' : 'block')}>
+        <PageHeader
+          title={t('title')}
+          subtitle={t('subtitle')}
+          icon={<MailIcon />}
+          actions={
+            hasPermission('system.settings.manage')
+              ? [{ key: 'settings', label: t('settingsButton'), icon: <Settings2Icon size={16} />, onPress: () => navigate('/messages/settings') }]
+              : undefined
+          }
+        />
+      </div>
 
-      <Card className="overflow-hidden">
-        <div className="grid h-[calc(100vh-13rem)] min-h-[28rem] grid-cols-1 lg:h-[70vh] lg:grid-cols-[320px_1fr]">
+      <Card className="min-h-0 flex-1 overflow-hidden">
+        <div className="grid h-full grid-cols-1 lg:grid-cols-[320px_1fr]">
           <div
             className={cn(
               'overflow-y-auto border-zinc-200 dark:border-zinc-700 lg:border-r',

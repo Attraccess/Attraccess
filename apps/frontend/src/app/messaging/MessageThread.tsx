@@ -93,6 +93,18 @@ export function MessageThread(props: Props) {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages.length]);
 
+  // The mobile keyboard shrinks the thread without moving its scroll position,
+  // which would strand the newest message off screen.
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) {
+      return;
+    }
+    const scrollToBottom = () => bottomRef.current?.scrollIntoView({ block: 'end' });
+    viewport.addEventListener('resize', scrollToBottom);
+    return () => viewport.removeEventListener('resize', scrollToBottom);
+  }, []);
+
   return (
     <div className="flex h-full flex-col">
       <div className="flex-1 overflow-y-auto p-4">

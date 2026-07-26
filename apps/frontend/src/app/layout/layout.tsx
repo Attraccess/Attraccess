@@ -88,15 +88,17 @@ export function Layout({ children }: LayoutProps) {
 
   if (!isAuthenticated) {
     return (
-      <div className="bg-background h-screen min-h-0 flex flex-col overflow-y-auto app-scroll-container">
+      <div className="bg-background h-[var(--vvh,100dvh)] min-h-0 flex flex-col overflow-y-auto app-scroll-container">
         <ServerNotAvailable />
         {children}
       </div>
     );
   }
 
+  // --vvh tracks the visually-visible height, so the shell shrinks when the mobile
+  // keyboard opens instead of leaving bottom-anchored UI underneath it.
   return (
-    <div className="flex h-screen min-h-0 bg-background">
+    <div className="flex h-[var(--vvh,100dvh)] min-h-0 bg-background">
       {/* Sidebar */}
       <Sidebar
         isOpen={isOpen}
