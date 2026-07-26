@@ -1,0 +1,44 @@
+name: Retag Docker Latest
+
+# Manually point the :latest tags on GHCR and Docker Hub at an existing
+# release tag, without rebuilding. Recovery tool for releases where the
+# latest push was skipped or failed.
+
+on:
+  workflow_dispatch:
+    inputs:
+      source-tag:
+        description: 'Existing image tag to point :latest at (e.g. v1.9.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  retag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Retag latest
+        run: |
+          set -euo pipefail
+          docker buildx imagetools create \
+            -t "ghcr.io/${{ vars.GHCR_IMAGE_NAME }}:latest" \
+            "ghcr.io/${{ vars.GHCR_IMAGE_NAME }}:${{ inputs.source-tag }}"
+          docker buildx imagetools create \
+            -t "${{ vars.DOCKERHUB_IMAGE_NAME }}:latest" \
+            "${{ vars.DOCKERHUB_IMAGE_NAME }}:${{ inputs.source-tag }}"
