@@ -288,7 +288,7 @@ importers:
         version: 5.15.2
       nanoid:
         specifier: ^3.3.12
-        version: 3.3.12
+        version: 3.3.16
       nestjs-asyncapi:
         specifier: ^1.4.0
         version: 1.4.0(@nestjs/common@11.1.28(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28)(@nestjs/swagger@11.4.4(patch_hash=2450957ec85b7ba521cd4a4129c04e947666b2d9ca42cd1f8fc3dde1d55e51bb)(@nestjs/common@11.1.28(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2))(@nestjs/websockets@11.1.28)(@swc/core@1.15.46(@swc/helpers@0.5.23))(@types/babel__core@7.20.5)(@types/node@25.9.1)(encoding@0.1.13)
@@ -13756,18 +13756,13 @@ packages:
   nan@2.28.0:
     resolution: {integrity: sha512-fTsDz99OTq2sVePhGdp4qQhggZFtKr64ZNVyVajRKtMOkJxYekplBh577PiJB12v/D3s2E5cGtOI45LWp6rnLQ==}
 
-  nanoid@3.3.12:
-    resolution: {integrity: sha512-ZB9RH/39qpq5Vu6Y+NmUaFhQR6pp+M2Xt76XBnEwDaGcVAqhlvxrl3B2bKS5D3NH3QR76v3aSrKaF/Kiy7lEtQ==}
+  nanoid@3.3.16:
+    resolution: {integrity: sha512-bzlKTyNJ7+LdGIIwy8ijFpIqEQIvafahV7eYykJ8Cvh42EdJeODoJ6gUJXpQJvej1BddH8OqTXZNE/KfbWAu8Q==}
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
     hasBin: true
 
   nanoid@5.1.16:
     resolution: {integrity: sha512-kVrnsrJqMR8+oLJnGEmSWw9BivK5mt7H3FZatVRjrc5wGqFYuBxX1yG7+A7Gi5AefkX6t/oCkizcQgpu0cY1dQ==}
-    engines: {node: ^18 || >=20}
-    hasBin: true
-
-  nanoid@5.1.9:
-    resolution: {integrity: sha512-ZUvP7KeBLe3OZ1ypw6dI/TzYJuvHP77IM4Ry73waSQTLn8/g8rpdjfyVAh7t1/+FjBtG4lCP42MEbDxOsRpBMw==}
     engines: {node: ^18 || >=20}
     hasBin: true
 
@@ -22698,7 +22693,7 @@ snapshots:
       cli-high: 0.4.3
       diff: 5.2.2
       effect: 3.22.0
-      nanoid: 5.1.9
+      nanoid: 5.1.16
       recast: 0.23.12
       xycolors: 0.1.2
 
@@ -22717,7 +22712,7 @@ snapshots:
       faster-babel-types: 0.1.0(@babel/types@7.26.0)
       hono: 4.12.21
       isomorphic-fetch: 3.0.0(encoding@0.1.13)
-      nanoid: 5.1.9
+      nanoid: 5.1.16
       ohash: 1.1.4
       pako: 2.1.0
       pathe: 1.1.2
@@ -35556,11 +35551,9 @@ snapshots:
   nan@2.28.0:
     optional: true
 
-  nanoid@3.3.12: {}
+  nanoid@3.3.16: {}
 
   nanoid@5.1.16: {}
-
-  nanoid@5.1.9: {}
 
   napi-build-utils@2.0.0: {}
 
@@ -37049,13 +37042,13 @@ snapshots:
 
   postcss@8.5.15:
     dependencies:
-      nanoid: 3.3.12
+      nanoid: 3.3.16
       picocolors: 1.1.1
       source-map-js: 1.2.1
 
   postcss@8.5.19:
     dependencies:
-      nanoid: 3.3.12
+      nanoid: 3.3.16
       picocolors: 1.1.1
       source-map-js: 1.2.1
 
