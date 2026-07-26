@@ -118,7 +118,9 @@ jobs:
           TAGS="${TAGS},${{ env.DOCKERHUB_IMAGE_NAME }}:${{ env.RELEASE_VERSION }}"
           TAGS="${TAGS},ghcr.io/${{ env.GHCR_IMAGE_NAME }}:${{ env.RELEASE_VERSION }}-${{ steps.vars.outputs.SHORT_SHA }}"
           TAGS="${TAGS},${{ env.DOCKERHUB_IMAGE_NAME }}:${{ env.RELEASE_VERSION }}-${{ steps.vars.outputs.SHORT_SHA }}"
-          if [[ "${{ github.event.release.prerelease }}" == "false" && "${{ github.event.release.target_commitish }}" == "main" ]]; then
+          # nx release sets target_commitish to a commit SHA (not "main"), so
+          # also accept the release's own commit — it was just pushed to main.
+          if [[ "${{ github.event.release.prerelease }}" == "false" && ("${{ github.event.release.target_commitish }}" == "main" || "${{ github.event.release.target_commitish }}" == "${{ github.sha }}") ]]; then
             TAGS="${TAGS},ghcr.io/${{ env.GHCR_IMAGE_NAME }}:latest"
             TAGS="${TAGS},${{ env.DOCKERHUB_IMAGE_NAME }}:latest"
           fi
