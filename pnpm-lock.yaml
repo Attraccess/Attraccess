@@ -438,8 +438,8 @@ importers:
         specifier: ^7.29.7
         version: 7.29.7(@babel/core@7.29.7)
       '@balena/compose-parser':
-        specifier: ^0.2.6
-        version: 0.2.6
+        specifier: ^0.3.0
+        version: 0.3.0
       '@commitlint/cli':
         specifier: ^19.6.1
         version: 19.8.1(@types/node@25.9.1)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
@@ -2062,8 +2062,8 @@ packages:
     peerDependencies:
       '@balena/sbvr-types': ^7.1.0 || ^8.0.0 || ^9.0.0 || ^10.0.0 || ^11.0.0
 
-  '@balena/compose-parser@0.2.6':
-    resolution: {integrity: sha512-eIkD7xw9/IELDl1dg8LiL7VTAEaH4ZlVhVO6Xuq0qDSWchhV6frTHegcu0OaXR1krpiMFGV7O4sgAQ5QLaTV6Q==}
+  '@balena/compose-parser@0.3.0':
+    resolution: {integrity: sha512-Q7ThmKiIhFnJVra0OGeiCXwjDzV8F6cu7CS/Bjk7VQyEyiU27x87P6lOvOOk5SE0NT71hH5QrrEgXzn0PPvd2w==}
     engines: {node: '>= 22.14.0', npm: '>= 11.5.1'}
 
   '@balena/dockerignore@1.0.2':
@@ -16814,10 +16814,6 @@ packages:
     engines: {node: '>=10'}
     deprecated: Old versions of tar are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
 
-  tar@7.5.13:
-    resolution: {integrity: sha512-tOG/7GyXpFevhXVh8jOPJrmtRpOTsYqUIkVdVooZYJS/z8WhfQUX8RJILmeuJNinGAMSu1veBr4asSHFt5/hng==}
-    engines: {node: '>=18'}
-
   tar@7.5.17:
     resolution: {integrity: sha512-wPEBwzapC+2PaTYPH6e2L+cNOEE227S47wUYFqlegcs8zlLLmeb9Fcff1HVZY4Fwku/1Eyv38n7GYwB2aaS71g==}
     engines: {node: '>=18'}
@@ -20952,10 +20948,10 @@ snapshots:
       '@types/node': 20.19.43
       common-tags: 1.8.2
 
-  '@balena/compose-parser@0.2.6':
+  '@balena/compose-parser@0.3.0':
     dependencies:
       semver: 7.8.5
-      tar: 7.5.13
+      tar: 7.5.17
       typed-error: 3.2.3
 
   '@balena/dockerignore@1.0.2': {}
@@ -25737,7 +25733,7 @@ snapshots:
     dependencies:
       '@scarf/scarf': 1.4.0
       '@stoplight/better-ajv-errors': 1.0.3(ajv@8.20.0)
-      '@stoplight/json': 3.21.0
+      '@stoplight/json': 3.21.7
       '@stoplight/path': 1.3.2
       '@stoplight/spectral-parsers': 1.0.5
       '@stoplight/spectral-ref-resolver': 1.0.5(encoding@0.1.13)
@@ -25772,7 +25768,7 @@ snapshots:
   '@stoplight/spectral-formats@1.8.5(encoding@0.1.13)':
     dependencies:
       '@scarf/scarf': 1.4.0
-      '@stoplight/json': 3.21.0
+      '@stoplight/json': 3.21.7
       '@stoplight/spectral-core': 1.23.1(encoding@0.1.13)
       '@types/json-schema': 7.0.15
       tslib: 2.8.1
@@ -25799,7 +25795,7 @@ snapshots:
     dependencies:
       '@scarf/scarf': 1.4.0
       '@stoplight/better-ajv-errors': 1.0.3(ajv@8.20.0)
-      '@stoplight/json': 3.21.0
+      '@stoplight/json': 3.21.7
       '@stoplight/spectral-core': 1.23.1(encoding@0.1.13)
       '@stoplight/spectral-formats': 1.8.5(encoding@0.1.13)
       '@stoplight/spectral-runtime': 1.1.6(encoding@0.1.13)
@@ -39472,14 +39468,6 @@ snapshots:
       minizlib: 2.1.2
       mkdirp: 1.0.4
       yallist: 4.0.0
-
-  tar@7.5.13:
-    dependencies:
-      '@isaacs/fs-minipass': 4.0.1
-      chownr: 3.0.0
-      minipass: 7.1.3
-      minizlib: 3.1.0
-      yallist: 5.0.0
 
   tar@7.5.17:
     dependencies:
