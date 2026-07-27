@@ -182,7 +182,7 @@
     "@types/lodash": "^4.17.24",
     "@types/lodash-es": "^4.17.12",
     "@types/mjml": "^5.0.0",
-    "@types/node": "25.9.1",
+    "@types/node": "25.9.5",
     "@types/nodemailer": "^8.0.1",
     "@types/passport-jwt": "^4.0.1",
     "@types/passport-local": "^1.0.38",
