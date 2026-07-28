@@ -106,6 +106,7 @@ export function ResourceOverview() {
             onClearFilterAndSearch={() => {
               setFilterByOnlyInUseByMe(false);
               setFilterByOnlyWithPermissions(false);
+              setFilterByHideEmptyResourceGroups(false);
               setSearchValue('');
             }}
           />
