@@ -5,7 +5,8 @@
     "connection": "Connection",
     "authentication": "Authentication",
     "publishDefaults": "Publish defaults",
-    "subscribeDefaults": "Subscribe defaults"
+    "subscribeDefaults": "Subscribe defaults",
+    "tls": "TLS"
   },
   "nameLabel": "Name",
   "namePlaceholder": "My MQTT Server",
@@ -35,5 +36,14 @@
   "serverUpdatedDesc": "The MQTT server has been successfully updated.",
   "errorGeneric": "Error",
   "errorLoading": "Error loading MQTT server details.",
-  "failedToUpdate": "Failed to update MQTT server."
+  "failedToUpdate": "Failed to update MQTT server.",
+  "caCertLabel": "CA Certificate (Optional)",
+  "caCertPlaceholder": "-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----",
+  "caCertDescription": "PEM-encoded CA certificate used to verify the broker. Needed for brokers with a private or self-signed certificate.",
+  "tlsServernameLabel": "Certificate Hostname (Optional)",
+  "tlsServernamePlaceholder": "mqtt.example.com",
+  "tlsServernameDescription": "Hostname to verify the certificate against. Use this when connecting by IP but the certificate was issued for a hostname.",
+  "tlsInsecureLabel": "Skip certificate verification",
+  "tlsInsecureWarning": "Certificate verification is disabled for this server. The connection is encrypted but not protected against man-in-the-middle attacks. Only use this on a trusted network.",
+  "tlsInsecureWarningTitle": "Unsafe configuration"
 }

@@ -90,6 +90,21 @@ export class MqttClientService implements OnModuleDestroy {
         options.password = password;
       }
 
+      if (server.useTls) {
+        if (server.caCert) {
+          options.ca = server.caCert;
+        }
+        if (server.tlsServername) {
+          options.servername = server.tlsServername;
+        }
+        if (server.tlsInsecure) {
+          options.rejectUnauthorized = false;
+          this.logger.warn(
+            `TLS certificate verification is disabled for MQTT server ${server.name} (${url}) - connection is not protected against man-in-the-middle attacks`,
+          );
+        }
+      }
+
       const client = mqtt.connect(url, options);
 
       client.on('message', (topic, payloadBuffer) => {

@@ -1,5 +1,6 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Checkbox, Form, Input, Label, TextField } from '@heroui/react';
+import { Form, Input, Label, TextField } from '@heroui/react';
+import { TlsSection } from './TlsSection';
 import { Button } from '../../../components/button';
 import { Select } from '../../../components/select';
 import { LabeledSwitch } from '../../../components/labeledSwitch';
@@ -35,6 +36,9 @@ export function CreateMqttServerForm(props?: Readonly<CreateMqttServerFormProps>
     username: '',
     password: '',
     useTls: false,
+    caCert: '',
+    tlsInsecure: false,
+    tlsServername: '',
     defaultPublishQos: 0,
     defaultPublishRetain: false,
     defaultSubscribeQos: 0,
@@ -164,16 +168,14 @@ export function CreateMqttServerForm(props?: Readonly<CreateMqttServerFormProps>
           />
         </div>
 
-        <Checkbox
-          id="useTls"
-          name="useTls"
-          isSelected={formValues.useTls}
-          onChange={(checked) => setFormValues((prev) => ({ ...prev, useTls: checked }))}
-          data-cy="create-mqtt-server-form-use-tls-checkbox"
-        >
-          {t('useTls')}
-        </Checkbox>
       </section>
+
+      <TlsSection
+        values={formValues}
+        onChange={(patch) => setFormValues((prev) => ({ ...prev, ...patch }))}
+        t={t}
+        dataCyPrefix="create-mqtt-server-form"
+      />
 
       <section className="w-full flex flex-col gap-4 pt-6 border-t border-default-200 first:pt-0 first:border-t-0">
         <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
