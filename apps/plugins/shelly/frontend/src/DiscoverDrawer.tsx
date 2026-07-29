@@ -6,7 +6,7 @@
 // is the container bridge, so the operator names their LAN CIDR here.
 import { Button, Chip, DrawerBody, DrawerHeader, Form, Spinner } from '@heroui/react';
 import { SearchIcon, XIcon } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { discoverDevices, type DiscoveryResult } from './api';
 import { StandardDrawer, TextFieldRow } from './drawer';
 import { StatusAlert } from './StatusAlert';
@@ -70,7 +70,13 @@ export function DiscoverDrawer({
 
   const close = useCallback(() => onOpenChange(false), [onOpenChange]);
 
+  // The button is both type="submit" and onPress={submit}, so one click can call
+  // this twice; a ref (not the state) because both calls land in the same tick.
+  const inFlight = useRef(false);
+
   const submit = useCallback(async () => {
+    if (inFlight.current) return;
+    inFlight.current = true;
     setRunning(true);
     setError(null);
     setResult(null);
@@ -83,6 +89,7 @@ export function DiscoverDrawer({
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
+      inFlight.current = false;
       setRunning(false);
     }
   }, [cidr, onDiscovered]);

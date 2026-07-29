@@ -91,6 +91,17 @@ describe('DiscoveryService', () => {
     ]);
   });
 
+  it('ignores mDNS replies pointing at a public address', async () => {
+    mdnsMock.mockResolvedValue(['8.8.8.8', '192.168.9.1']);
+    const registry = makeRegistry();
+    const probe = makeProbe({ '8.8.8.8': { generation: 2, model: 'not-really-a-shelly' } });
+
+    const result = await build(registry, probe).discover('192.168.9.0/30');
+
+    expect(probe.probe.mock.calls.map(([ip]) => ip)).not.toContain('8.8.8.8');
+    expect(result.devices).toEqual([]);
+  });
+
   it('rejects a subnet it must not scan', async () => {
     const service = build(makeRegistry(), makeProbe({}));
     await expect(service.discover('8.8.8.0/24')).rejects.toThrow(/only private networks/);

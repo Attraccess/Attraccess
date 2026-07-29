@@ -16,6 +16,12 @@ import { networkInterfaces } from 'node:os';
 /** Smallest prefix length (i.e. largest subnet) we are willing to enumerate. */
 export const MIN_PREFIX_LENGTH = 22;
 
+/**
+ * Thrown by expandCidr for input the operator can fix. Lets the controller map
+ * these to 400 while genuine failures (probe, registry) still surface as 500.
+ */
+export class InvalidCidrError extends Error {}
+
 const CIDR_PATTERN = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\/(\d{1,2})$/;
 
 function toInt(octets: number[]): number {
@@ -50,16 +56,18 @@ export function isPrivateIpv4(ip: string): boolean {
 export function expandCidr(cidr: string): string[] {
   const match = CIDR_PATTERN.exec(cidr.trim());
   if (!match) {
-    throw new Error(`"${cidr}" is not a valid IPv4 CIDR (expected e.g. 192.168.1.0/24)`);
+    throw new InvalidCidrError(`"${cidr}" is not a valid IPv4 CIDR (expected e.g. 192.168.1.0/24)`);
   }
 
   const octets = match.slice(1, 5).map(Number);
   const prefix = Number(match[5]);
   if (octets.some((o) => o > 255) || prefix > 32) {
-    throw new Error(`"${cidr}" is not a valid IPv4 CIDR (expected e.g. 192.168.1.0/24)`);
+    throw new InvalidCidrError(`"${cidr}" is not a valid IPv4 CIDR (expected e.g. 192.168.1.0/24)`);
   }
   if (prefix < MIN_PREFIX_LENGTH) {
-    throw new Error(`subnet ${cidr} is too large to scan — use /${MIN_PREFIX_LENGTH} or smaller`);
+    throw new InvalidCidrError(
+      `subnet ${cidr} is too large to scan — use a prefix of /${MIN_PREFIX_LENGTH} or longer (e.g. /24)`
+    );
   }
 
   const address = toInt(octets);
@@ -68,7 +76,9 @@ export function expandCidr(cidr: string): string[] {
   const broadcast = (network | (~mask >>> 0)) >>> 0;
 
   if (!isPrivateIpv4(toIp(network))) {
-    throw new Error(`refusing to scan ${cidr}: only private networks (10/8, 172.16/12, 192.168/16) may be scanned`);
+    throw new InvalidCidrError(
+      `refusing to scan ${cidr}: only private networks (10/8, 172.16/12, 192.168/16, 169.254/16) may be scanned`
+    );
   }
 
   const first = prefix >= 31 ? network : network + 1;

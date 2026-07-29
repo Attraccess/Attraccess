@@ -1,7 +1,7 @@
 // Manual "add a device by IP" drawer (ATT-496).
 import { Button, DrawerBody, DrawerHeader, Form } from '@heroui/react';
 import { PlusIcon, XIcon } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { addDevice } from './api';
 import { StandardDrawer, TextFieldRow } from './drawer';
 import { StatusAlert } from './StatusAlert';
@@ -22,12 +22,18 @@ export function AddDeviceDrawer({
 
   const close = useCallback(() => onOpenChange(false), [onOpenChange]);
 
+  // The button is both type="submit" and onPress={submit}, so one click can call
+  // this twice; a ref (not the state) because both calls land in the same tick.
+  const inFlight = useRef(false);
+
   const submit = useCallback(async () => {
+    if (inFlight.current) return;
     const ip = ipAddress.trim();
     if (!ip) {
       setError('IP address is required.');
       return;
     }
+    inFlight.current = true;
     setSubmitting(true);
     setError(null);
     try {
@@ -39,6 +45,7 @@ export function AddDeviceDrawer({
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
+      inFlight.current = false;
       setSubmitting(false);
     }
   }, [ipAddress, name, onAdded, close]);

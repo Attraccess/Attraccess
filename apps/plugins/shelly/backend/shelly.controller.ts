@@ -16,6 +16,7 @@ import {
 import { Auth } from '@attraccess/plugins-backend-sdk';
 import { DeviceRegistryService } from './device-registry.service';
 import { DiscoveryService, type DiscoveryResult } from './discovery.service';
+import { InvalidCidrError } from './network-scan';
 import { ShellyProbeService } from './shelly-probe.service';
 import { ShellyDevice } from './shelly-device.entity';
 import type { ProbeResult } from './types';
@@ -56,8 +57,12 @@ export class ShellyController {
     try {
       return await this.discovery.discover(cidr);
     } catch (err) {
-      // expandCidr rejects malformed, oversized and public CIDRs — operator error.
-      throw new BadRequestException(err instanceof Error ? err.message : String(err));
+      // Only a bad CIDR is operator error; anything else is a real failure and
+      // should not be dressed up as a 400.
+      if (err instanceof InvalidCidrError) {
+        throw new BadRequestException(err.message);
+      }
+      throw err;
     }
   }
 

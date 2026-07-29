@@ -17,7 +17,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { DeviceRegistryService } from './device-registry.service';
 import { discoverViaMdns } from './mdns-discovery';
-import { expandCidr, localScanTargets } from './network-scan';
+import { expandCidr, isPrivateIpv4, localScanTargets } from './network-scan';
 import { SCAN_PROBE_TIMEOUT_MS, ShellyProbeService } from './shelly-probe.service';
 import type { AuthState } from './types';
 
@@ -79,7 +79,10 @@ export class DiscoveryService {
     // so the operator gets the reason instead of a silent empty result.
     const scanTargets = subnets.flatMap((subnet) => expandCidr(subnet));
 
-    const mdnsAddresses = await discoverViaMdns();
+    // A record in an mDNS reply is attacker-controllable, so it gets the same
+    // private-range check the scan path enforces — otherwise a rogue responder
+    // could point our probe at any address it likes.
+    const mdnsAddresses = (await discoverViaMdns()).filter(isPrivateIpv4);
     const seen = new Set(mdnsAddresses);
     const candidates: { ipAddress: string; source: 'mdns' | 'scan' }[] = mdnsAddresses.map((ipAddress) => ({
       ipAddress,

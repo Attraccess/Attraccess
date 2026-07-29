@@ -1,4 +1,4 @@
-import { expandCidr, isPrivateIpv4, localScanTargets } from './network-scan';
+import { expandCidr, InvalidCidrError, isPrivateIpv4, localScanTargets } from './network-scan';
 
 describe('expandCidr', () => {
   it('enumerates hosts without the network and broadcast addresses', () => {
@@ -31,6 +31,13 @@ describe('expandCidr', () => {
   it('rejects malformed input', () => {
     expect(() => expandCidr('192.168.1.0')).toThrow(/not a valid IPv4 CIDR/);
     expect(() => expandCidr('192.168.1.999/24')).toThrow(/not a valid IPv4 CIDR/);
+  });
+
+  // The controller maps this type to 400 and rethrows everything else as-is.
+  it('flags every rejection as operator error', () => {
+    for (const bad of ['nope', '8.8.8.0/24', '10.0.0.0/16']) {
+      expect(() => expandCidr(bad)).toThrow(InvalidCidrError);
+    }
   });
 });
 
