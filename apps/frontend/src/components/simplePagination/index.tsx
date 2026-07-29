@@ -2,6 +2,8 @@
 // FEATURE: Pagination utility component for HeroUI v3 migration
 import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPreviousIcon, PaginationPrevious, PaginationNextIcon } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import en from './en.json';
+import de from './de.json';
 
 interface SimplePaginationProps {
   page: number;
@@ -14,8 +16,8 @@ interface SimplePaginationProps {
 
 export function SimplePagination({ page, total, onChange, showControls, className, 'aria-label': ariaLabel }: SimplePaginationProps) {
   const { t } = useTranslations({
-    en: { previous: 'Previous page', next: 'Next page' },
-    de: { previous: 'Vorherige Seite', next: 'Nächste Seite' },
+    en,
+    de,
   });
 
   if (total <= 1) return null;
