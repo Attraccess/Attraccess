@@ -144,3 +144,4 @@ export * from './1782600000000-seed-email-template-translations';
 export * from './1782700000000-drop-boolean-permissions';
 export * from './1782800000000-translate-email-subjects';
 export * from './1782900000000-mqtt-server-tls-trust';
+export * from './1782901000000-fix-if-node-operand-order';
