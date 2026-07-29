@@ -280,13 +280,10 @@ export function CsvInvite({ onSuccess, onError }: Props) {
 
       {rowErrors.length > 0 && (
         <div className="flex flex-col gap-2 border border-default-200 rounded-medium p-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center">
             <Badge color="danger" variant="soft">
               {t('errors.title')} ({rowErrors.length})
             </Badge>
-            <Button variant="ghost" onPress={() => submit({ ignoreFailed: true })}>
-              {t('actions.inviteIgnore')}
-            </Button>
           </div>
 
           <Table>
