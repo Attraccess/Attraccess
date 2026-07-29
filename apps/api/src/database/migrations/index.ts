@@ -143,3 +143,4 @@ export * from './1782500000000-email-templates-locale';
 export * from './1782600000000-seed-email-template-translations';
 export * from './1782700000000-drop-boolean-permissions';
 export * from './1782800000000-translate-email-subjects';
+export * from './1782900000000-fix-if-node-operand-order';
