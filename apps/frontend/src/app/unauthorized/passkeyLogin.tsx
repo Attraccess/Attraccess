@@ -6,18 +6,28 @@ import type { PublicKeyCredentialRequestOptionsJSON } from '@simplewebauthn/brow
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useQueryClient } from '@tanstack/react-query';
 import {
+  ApiError,
   PasskeysService,
   UseUsersServiceGetCurrentKeyFn,
 } from '@attraccess/react-query-client';
 import { Button } from '../../components/button';
+import API_ERROR_TRANSLATIONS_DE from '../../global-translations/api-errors.de.json';
+import API_ERROR_TRANSLATIONS_EN from '../../global-translations/api-errors.en.json';
+import { getTranslationKeyForApiError } from '../../utils/apiError';
 import en from './passkeyLogin.en.json';
 import de from './passkeyLogin.de.json';
 
 export function PasskeyLogin() {
-  const { t } = useTranslations({ en, de });
+  // `api.generic` is the fallback the helper picks when the server message has no translation,
+  // so pointing it at the passkey copy keeps browser/unknown failures on the passkey wording
+  // while a known error like UserEmailNotVerifiedException explains itself.
+  const { t, tExists } = useTranslations({
+    en: { ...en, api: { ...API_ERROR_TRANSLATIONS_EN, generic: en.error } },
+    de: { ...de, api: { ...API_ERROR_TRANSLATIONS_DE, generic: de.error } },
+  });
   const queryClient = useQueryClient();
   const [isPending, setIsPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ title: string; description: string } | null>(null);
 
   const signIn = useCallback(async () => {
     setIsPending(true);
@@ -39,11 +49,18 @@ export function PasskeyLogin() {
       if (caught instanceof Error && (caught.name === 'NotAllowedError' || caught.name === 'AbortError')) {
         return;
       }
-      setError(t('error.description'));
+      const { key } = getTranslationKeyForApiError({
+        error: caught as ApiError,
+        t,
+        tExists,
+        baseTranslationKey: 'api',
+        fallbackKey: 'generic',
+      });
+      setError({ title: t(key + '.title'), description: t(key + '.description', { error: caught }) });
     } finally {
       setIsPending(false);
     }
-  }, [queryClient, t]);
+  }, [queryClient, t, tExists]);
 
   if (!browserSupportsWebAuthn()) {
     return null;
@@ -66,8 +83,8 @@ export function PasskeyLogin() {
       {error && (
         <Alert status="danger" data-cy="passkey-login-error-alert">
           <AlertContent>
-            <AlertTitle>{t('error.title')}</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
+            <AlertTitle>{error.title}</AlertTitle>
+            <AlertDescription>{error.description}</AlertDescription>
           </AlertContent>
         </Alert>
       )}

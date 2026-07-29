@@ -4,6 +4,7 @@ import { BadRequestException, NotFoundException, UnauthorizedException } from '@
 import { Passkey, PasskeyChallenge, User } from '@attraccess/database-entities';
 import { PasskeyService } from './passkey.service';
 import { SettingsService } from '../../../settings/settings.service';
+import { UserEmailNotVerifiedException } from '../errors/userEmailNotVerified.exception';
 
 const verifyAuthenticationResponse = jest.fn();
 jest.mock('@simplewebauthn/server', () => ({
@@ -47,7 +48,9 @@ describe('PasskeyService', () => {
       delete: jest.fn().mockResolvedValue({ affected: 1 }),
       findOneBy: jest.fn().mockResolvedValue(null),
     };
-    userRepo = { findOneBy: jest.fn().mockResolvedValue({ id: 42, username: 'maker' } as User) };
+    userRepo = {
+      findOneBy: jest.fn().mockResolvedValue({ id: 42, username: 'maker', isEmailVerified: true } as User),
+    };
     getUrl = jest.fn().mockResolvedValue('https://make.example.com');
 
     const module: TestingModule = await Test.createTestingModule({
@@ -159,6 +162,13 @@ describe('PasskeyService', () => {
       verifyAuthenticationResponse.mockResolvedValue({ verified: false, authenticationInfo: {} });
 
       await expect(service.verifyAuthentication(response as never)).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('refuses a user whose email is not verified, so a passkey cannot skip re-verification', async () => {
+      issueChallenge();
+      userRepo.findOneBy.mockResolvedValue({ id: 42, username: 'maker', isEmailVerified: false } as User);
+
+      await expect(service.verifyAuthentication(response as never)).rejects.toThrow(UserEmailNotVerifiedException);
     });
   });
 

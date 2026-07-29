@@ -16,6 +16,7 @@ import type {
 } from '@simplewebauthn/server';
 import { Passkey, PasskeyChallenge, User } from '@attraccess/database-entities';
 import { SettingsService } from '../../../settings/settings.service';
+import { UserEmailNotVerifiedException } from '../errors/userEmailNotVerified.exception';
 
 const CHALLENGE_TTL_MS = 5 * 60 * 1000;
 const RP_NAME = 'Attraccess';
@@ -194,6 +195,12 @@ export class PasskeyService {
     const user = await this.userRepository.findOneBy({ id: passkey.userId });
     if (!user) {
       throw new UnauthorizedException('PasskeyUnknownCredential');
+    }
+
+    // Password login refuses an unverified address, and changeEmail clears the flag - so a passkey
+    // registered before the change must not be a way around the re-verification gate.
+    if (!user.isEmailVerified) {
+      throw new UserEmailNotVerifiedException();
     }
 
     this.logger.log(`User ${user.id} (${user.username}) signed in with passkey ${passkey.id}`);
