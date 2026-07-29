@@ -25,6 +25,7 @@ import { PluginSandboxService } from './plugin-sandbox.service';
 import { PluginEventsService } from './plugin-events.service';
 import { PluginController } from './plugin.controller';
 import { loadPluginEntryExports } from './plugin-loader';
+import { registerPluginFlowNodes } from './plugin-flow-node-registry';
 import { join } from 'path';
 
 @Global()
@@ -111,6 +112,13 @@ export class PluginModule {
     // owned by the plugin's migrations — this only makes the entity metadata
     // resolvable so the plugin can use context.getRepository(Entity).
     PluginModule.registerPluginEntities(manifest, (exported as PluginBackendModule)?.entities);
+
+    // Register any custom flow nodes contributed by this plugin.
+    const pluginFlowNodes = (exported as PluginBackendModule)?.flowNodes;
+    if (pluginFlowNodes?.length) {
+      registerPluginFlowNodes(pluginFlowNodes);
+      this.logger.log(`Registered ${pluginFlowNodes.length} flow node(s) from plugin ${manifest.name}`);
+    }
 
     if (typeof (exported as PluginBackendModule)?.register !== 'function') {
       this.logger.warn(

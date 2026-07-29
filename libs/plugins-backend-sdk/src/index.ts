@@ -1,4 +1,5 @@
 export * from './lib/plugin.interface';
+export * from './lib/plugin-flow-node';
 export * from './lib/plugin-context';
 export * from './lib/plugin-migrations';
 export * from './lib/entity';

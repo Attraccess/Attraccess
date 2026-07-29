@@ -41,6 +41,7 @@ import { z } from 'zod';
 import { MqttClientService } from '../../mqtt/mqtt-client.service';
 import { ResourceFlowChangedEvent } from './events/resource-flow-changed.event';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { getRegisteredPluginFlowNodes } from '../../plugin-system/plugin-flow-node-registry';
 
 export interface ValidationError {
   nodeId: string;
@@ -96,11 +97,16 @@ export class ResourceFlowsService {
     return { nodes, edges };
   }
 
-  private validateNodeData(nodeData: { id: string; type: ResourceFlowNodeType; data: unknown }): ValidationError[] {
+  private validateNodeData(nodeData: { id: string; type: string; data: unknown }): ValidationError[] {
     const errors: ValidationError[] = [];
 
+    // Plugin node types are not in the core enum — the plugin is responsible for its own data.
+    if (!Object.values(ResourceFlowNodeType).includes(nodeData.type as ResourceFlowNodeType)) {
+      return errors;
+    }
+
     try {
-      const schema = getNodeDataSchema(nodeData.type);
+      const schema = getNodeDataSchema(nodeData.type as ResourceFlowNodeType);
       schema.parse(nodeData.data);
     } catch (error) {
       // Handle Zod validation errors
@@ -319,7 +325,7 @@ export class ResourceFlowsService {
       throw new ResourceNotFoundException(resourceId);
     }
 
-    return Object.values(ResourceFlowNodeType).map((type) => {
+    const coreSchemas = Object.values(ResourceFlowNodeType).map((type) => {
       const schema: ResourceFlowNodeSchemaDto = {
         type,
         configSchema: {},
@@ -509,5 +515,19 @@ export class ResourceFlowsService {
 
       return schema;
     });
+
+    // Append plugin-contributed node schemas.
+    const pluginSchemas: ResourceFlowNodeSchemaDto[] = getRegisteredPluginFlowNodes().map((def) => ({
+      type: def.type,
+      label: def.label,
+      description: def.description,
+      configSchema: def.configSchema,
+      inputs: def.inputs,
+      outputs: def.outputs,
+      supportedByResource: def.supportedByAllResources !== false,
+      isOutput: def.isOutput ?? false,
+    }));
+
+    return [...coreSchemas, ...pluginSchemas];
   }
 }
