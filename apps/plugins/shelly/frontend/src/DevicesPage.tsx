@@ -1,35 +1,68 @@
 // Shelly device registry UI. Laid out like the host's other management pages
-// (e.g. MQTT servers): a page header with a primary action that opens an add
-// form in a modal, and the devices rendered in a Table — not nested cards.
+// (e.g. MQTT servers): a page header with a primary action, the devices in a
+// compact single-line Table, and drawers for add / info / admin password.
 // Built from the host's shared HeroUI kit so it inherits the app theme.
 import {
   Alert,
   AlertContent,
   AlertDescription,
+  AlertIndicator,
   Button,
+  Card,
   Chip,
+  Description,
   DrawerBackdrop,
   DrawerBody,
   DrawerContent,
   DrawerDialog,
+  DrawerFooter,
   DrawerHeader,
+  Dropdown,
+  DropdownItem,
+  DropdownMenu,
+  DropdownPopover,
+  DropdownTrigger,
   Form,
   Input,
+  InputGroup,
   Label,
-  Spinner,
+  Modal,
+  ModalBackdrop,
+  ModalBody,
+  ModalContainer,
+  ModalDialog,
+  ModalFooter,
+  ModalHeader,
+  ModalHeading,
+  Skeleton,
   Table,
   TableBody,
-  TextField,
   TableCell,
   TableColumn,
   TableContent,
   TableHeader,
   TableRow,
   TableScrollContainer,
+  TextField,
+  Tooltip,
   useOverlayState,
 } from '@heroui/react';
-import { InfoIcon, KeyRoundIcon, MehIcon, PlusIcon, RefreshCwIcon, Trash2Icon, WifiIcon, XIcon } from 'lucide-react';
-import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import {
+  AlertCircleIcon,
+  EyeIcon,
+  EyeOffIcon,
+  InfoIcon,
+  KeyRoundIcon,
+  MehIcon,
+  MoreVerticalIcon,
+  PlusIcon,
+  RefreshCwIcon,
+  Trash2Icon,
+  TriangleAlertIcon,
+  WifiIcon,
+  XIcon,
+} from 'lucide-react';
+import { useCallback, useEffect, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
 import {
   addDevice,
   deleteDevice,
@@ -55,7 +88,7 @@ function AuthChip({ state }: { state: AuthState }) {
   };
   const { color, label } = map[state];
   return (
-    <Chip variant="soft" color={color} className="whitespace-nowrap">
+    <Chip variant="soft" color={color} size="sm" className="whitespace-nowrap">
       {label}
     </Chip>
   );
@@ -94,31 +127,6 @@ function formatUptime(seconds: unknown): string {
   return `${minutes}m`;
 }
 
-function DetailCard({ title, rows }: { title: string; rows: Array<{ label: string; value: string }> }) {
-  return (
-    <section className="rounded-xl border border-default-200 bg-surface p-4">
-      <h3 className="text-sm font-semibold text-default-800">{title}</h3>
-      <dl className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {rows.map((row) => (
-          <div key={row.label} className="min-w-0">
-            <dt className="text-xs font-medium uppercase tracking-wide text-default-500">{row.label}</dt>
-            <dd className="mt-1 truncate text-sm text-default-800" title={row.value}>{row.value}</dd>
-          </div>
-        ))}
-      </dl>
-    </section>
-  );
-}
-
-function EmptyDevices() {
-  return (
-    <div className="flex flex-col items-center justify-center gap-2 px-4 py-10">
-      <MehIcon size={36} className="text-default-300" />
-      <p className="text-sm text-default-500">No devices yet. Add one by IP to get started.</p>
-    </div>
-  );
-}
-
 // Mirror of the host's StandardDrawer (apps/frontend/src/components/standardDrawer.tsx),
 // replicated here because host components aren't shared with plugins over module
 // federation — only @heroui/react primitives are.
@@ -148,6 +156,76 @@ function StandardDrawer({
   );
 }
 
+// Mirror of the host's <Alert status="danger"> + AlertStatusIcon pairing.
+function ErrorAlert({ children, dataCy }: { children: ReactNode; dataCy?: string }) {
+  return (
+    <Alert status="danger">
+      <AlertIndicator>
+        <AlertCircleIcon />
+      </AlertIndicator>
+      <AlertContent>
+        <AlertDescription data-cy={dataCy}>{children}</AlertDescription>
+      </AlertContent>
+    </Alert>
+  );
+}
+
+function DrawerTitle({ title, subtitle, onClose }: { title: string; subtitle?: ReactNode; onClose: () => void }) {
+  return (
+    <div className="flex w-full items-start justify-between gap-3">
+      <div className="flex min-w-0 flex-col gap-1">
+        <h2 className="truncate text-lg font-semibold">{title}</h2>
+        {subtitle && <div className="text-sm text-default-500">{subtitle}</div>}
+      </div>
+      <Button isIconOnly variant="ghost" aria-label="Close" onPress={onClose}>
+        <XIcon size={16} />
+      </Button>
+    </div>
+  );
+}
+
+// Mirror of the host's PasswordInput (visibility toggle in an InputGroup suffix);
+// not importable across the federation boundary.
+function PasswordField({
+  label,
+  value,
+  onChange,
+  description,
+  required,
+  autoComplete = 'off',
+  dataCy,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  description?: string;
+  required?: boolean;
+  autoComplete?: string;
+  dataCy?: string;
+}) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <TextField value={value} onChange={onChange} isRequired={required} className="w-full">
+      <Label>{label}</Label>
+      <InputGroup>
+        <InputGroup.Input type={visible ? 'text' : 'password'} autoComplete={autoComplete} data-cy={dataCy} />
+        <InputGroup.Suffix>
+          <Button
+            isIconOnly
+            size="sm"
+            variant="ghost"
+            aria-label={visible ? 'Hide password' : 'Show password'}
+            onPress={() => setVisible((v) => !v)}
+          >
+            {visible ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}
+          </Button>
+        </InputGroup.Suffix>
+      </InputGroup>
+      {description && <Description>{description}</Description>}
+    </TextField>
+  );
+}
+
 function AddDeviceDrawer({
   isOpen,
   onOpenChange,
@@ -162,6 +240,14 @@ function AddDeviceDrawer({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (isOpen) {
+      setIpAddress('');
+      setName('');
+      setError(null);
+    }
+  }, [isOpen]);
+
   const close = useCallback(() => onOpenChange(false), [onOpenChange]);
 
   const submit = useCallback(async () => {
@@ -174,8 +260,6 @@ function AddDeviceDrawer({
     setError(null);
     try {
       await addDevice({ ipAddress: ip, name: name.trim() || undefined });
-      setIpAddress('');
-      setName('');
       onAdded();
       close();
     } catch (err) {
@@ -185,69 +269,60 @@ function AddDeviceDrawer({
     }
   }, [ipAddress, name, onAdded, close]);
 
+  const onSubmit = useCallback(
+    (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      void submit();
+    },
+    [submit]
+  );
+
   return (
     <StandardDrawer isOpen={isOpen} onOpenChange={onOpenChange}>
       <DrawerHeader>
-        <div className="flex w-full items-start justify-between gap-3">
-          <div className="flex flex-col gap-1">
-            <h2 className="text-lg font-semibold">Add a device</h2>
-            <p className="text-sm text-default-500">
-              Enter the device's IP address. We probe <code>GET /shelly</code> to detect its generation and model.
-            </p>
-          </div>
-          <Button isIconOnly variant="ghost" aria-label="Close" onPress={close}>
-            <XIcon size={16} />
-          </Button>
-        </div>
+        <DrawerTitle title="Add a device" subtitle="Register a Shelly relay or dimmer by its IP address." onClose={close} />
       </DrawerHeader>
       <DrawerBody>
-        <Form onSubmit={submit} className="flex flex-col gap-4">
-          <TextFieldRow label="IP address" value={ipAddress} onChange={setIpAddress} placeholder="192.168.1.42" required dataCy="shelly-add-ip" />
-          <TextFieldRow label="Name (optional)" value={name} onChange={setName} placeholder="Workshop light" dataCy="shelly-add-name" />
-          {error && (
-            <Alert status="danger">
-              <AlertContent>
-                <AlertDescription data-cy="shelly-add-error">{error}</AlertDescription>
-              </AlertContent>
-            </Alert>
-          )}
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="secondary" onPress={close}>
-              Cancel
-            </Button>
-            <Button variant="primary" type="submit" isPending={submitting} onPress={submit} data-cy="shelly-add-submit">
-              <PlusIcon className="h-4 w-4" /> Add device
-            </Button>
-          </div>
+        <Form onSubmit={onSubmit} className="flex flex-col gap-4">
+          <TextField value={ipAddress} onChange={setIpAddress} isRequired className="w-full">
+            <Label>IP address</Label>
+            <Input placeholder="192.168.1.42" autoComplete="off" data-cy="shelly-add-ip" />
+            <Description>We probe the device to detect its generation and model.</Description>
+          </TextField>
+          <TextField value={name} onChange={setName} className="w-full">
+            <Label>Name</Label>
+            <Input placeholder="Workshop light" autoComplete="off" data-cy="shelly-add-name" />
+            <Description>Optional — defaults to the name reported by the device.</Description>
+          </TextField>
+          {error && <ErrorAlert dataCy="shelly-add-error">{error}</ErrorAlert>}
           <input type="submit" hidden />
         </Form>
       </DrawerBody>
+      <DrawerFooter>
+        <Button variant="secondary" onPress={close}>
+          Cancel
+        </Button>
+        <Button variant="primary" isPending={submitting} onPress={submit} data-cy="shelly-add-submit">
+          <PlusIcon className="h-4 w-4" /> Add device
+        </Button>
+      </DrawerFooter>
     </StandardDrawer>
   );
 }
 
-function TextFieldRow({
-  label,
-  value,
-  onChange,
-  placeholder,
-  required,
-  dataCy,
-  type = 'text',
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  required?: boolean;
-  dataCy?: string;
-  type?: string;
-}) {
+function DeviceChips({ device }: { device: ShellyDevice }) {
   return (
-    <TextField value={value} onChange={onChange} isRequired={required}>
-      <Label>{label}</Label>
-      <Input type={type} placeholder={placeholder} autoComplete="off" data-cy={dataCy} />
-    </TextField>
+    <div className="flex flex-wrap items-center gap-1.5">
+      <Chip variant="soft" size="sm" className="whitespace-nowrap">
+        {generationLabel(device.generation)}
+      </Chip>
+      {device.model && (
+        <Chip variant="soft" size="sm" className="max-w-40 truncate">
+          {device.model}
+        </Chip>
+      )}
+      <AuthChip state={device.authState} />
+    </div>
   );
 }
 
@@ -256,6 +331,14 @@ function InfoDrawer({ device, onOpenChange }: { device: ShellyDevice | null; onO
   const [currentPassword, setCurrentPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (device) {
+      setInfo(null);
+      setCurrentPassword('');
+      setError(null);
+    }
+  }, [device]);
 
   const close = useCallback(() => onOpenChange(false), [onOpenChange]);
   const load = useCallback(async () => {
@@ -271,57 +354,96 @@ function InfoDrawer({ device, onOpenChange }: { device: ShellyDevice | null; onO
     }
   }, [device, currentPassword]);
 
+  // Auto-load only when the drawer opens for a device that doesn't need a
+  // password (a protected fetch without credentials is guaranteed to fail).
+  // Deliberately not keyed on `load`, which changes on every password
+  // keystroke; manual refresh covers the rest.
   useEffect(() => {
-    if (device) void load();
-  }, [device, load]);
+    if (device && device.authState !== 'required') void load();
+  }, [device]);
 
   return (
     <StandardDrawer isOpen={!!device} onOpenChange={onOpenChange}>
       <DrawerHeader>
-        <div className="flex w-full items-start justify-between gap-3">
-          <div className="flex flex-col gap-1">
-            <h2 className="text-lg font-semibold">Device info</h2>
-            <p className="text-sm text-default-500">Live status and config from {device?.ipAddress}.</p>
-          </div>
-          <Button isIconOnly variant="ghost" aria-label="Close" onPress={close}>
-            <XIcon size={16} />
-          </Button>
-        </div>
+        <DrawerTitle
+          title={device?.name ?? 'Device info'}
+          subtitle={device && <div className="flex flex-col gap-2"><span>{device.ipAddress}</span><DeviceChips device={device} /></div>}
+          onClose={close}
+        />
       </DrawerHeader>
       <DrawerBody>
         <div className="flex flex-col gap-4">
           {device?.authState === 'required' && (
-            <div className="flex flex-col gap-3 rounded-lg border border-warning-200 bg-warning-50 p-3">
-              <p className="text-sm text-warning-700">This device requires authentication. Enter the current admin password to refresh protected info.</p>
-              <TextFieldRow label="Current password" value={currentPassword} onChange={setCurrentPassword} type="password" dataCy="shelly-info-current-password" />
-            </div>
+            <Card className="border-l-4 border-l-warning bg-warning/5">
+              <Card.Content className="p-4">
+                <Form
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void load();
+                  }}
+                  className="flex flex-col gap-3"
+                >
+                  <p className="text-sm">
+                    This device requires authentication. Enter its admin password to read protected info.
+                  </p>
+                  <PasswordField
+                    label="Admin password"
+                    value={currentPassword}
+                    onChange={setCurrentPassword}
+                    autoComplete="current-password"
+                    dataCy="shelly-info-current-password"
+                  />
+                  <div className="flex justify-end">
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      isPending={loading}
+                      onPress={() => void load()}
+                      data-cy="shelly-info-unlock"
+                    >
+                      Load info
+                    </Button>
+                  </div>
+                  <input type="submit" hidden />
+                </Form>
+              </Card.Content>
+            </Card>
           )}
-          {error && (
-            <Alert status="danger">
-              <AlertContent>
-                <AlertDescription>{error}</AlertDescription>
-              </AlertContent>
-            </Alert>
-          )}
-          <div className="flex justify-end">
-            <Button variant="secondary" onPress={load} isPending={loading} data-cy="shelly-info-refresh">
-              <RefreshCwIcon className="h-4 w-4" /> Refresh info
-            </Button>
-          </div>
+          {error && <ErrorAlert>{error}</ErrorAlert>}
           {loading && !info ? (
-            <div className="flex items-center justify-center p-6">
-              <Spinner color="accent" />
+            <div className="flex flex-col gap-4" aria-hidden="true">
+              <Skeleton className="h-32 w-full rounded-xl" />
+              <Skeleton className="h-32 w-full rounded-xl" />
+              <Skeleton className="h-32 w-full rounded-xl" />
             </div>
           ) : (
             <DeviceInfoDetails info={info} />
           )}
         </div>
       </DrawerBody>
+      <DrawerFooter>
+        <div className="flex w-full items-center justify-between gap-3">
+          <span className="text-xs text-default-500">
+            {info ? `Updated ${new Date(info.fetchedAt).toLocaleTimeString()}` : ''}
+          </span>
+          <Button variant="secondary" onPress={load} isPending={loading} data-cy="shelly-info-refresh">
+            <RefreshCwIcon className="h-4 w-4" /> Refresh
+          </Button>
+        </div>
+      </DrawerFooter>
     </StandardDrawer>
   );
 }
 
-function AuthDrawer({ device, onOpenChange, onSaved }: { device: ShellyDevice | null; onOpenChange: (open: boolean) => void; onSaved: () => void }) {
+function AuthDrawer({
+  device,
+  onOpenChange,
+  onSaved,
+}: {
+  device: ShellyDevice | null;
+  onOpenChange: (open: boolean) => void;
+  onSaved: () => void;
+}) {
   const [currentPassword, setCurrentPassword] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -356,50 +478,67 @@ function AuthDrawer({ device, onOpenChange, onSaved }: { device: ShellyDevice | 
     }
   }, [close, currentPassword, device, onSaved, password]);
 
+  const onSubmit = useCallback(
+    (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      void submit();
+    },
+    [submit]
+  );
+
   return (
     <StandardDrawer isOpen={!!device} onOpenChange={onOpenChange}>
       <DrawerHeader>
-        <div className="flex w-full items-start justify-between gap-3">
-          <div className="flex flex-col gap-1">
-            <h2 className="text-lg font-semibold">Admin password</h2>
-            <p className="text-sm text-default-500">Set or change the Shelly admin password for {device?.name}.</p>
-          </div>
-          <Button isIconOnly variant="ghost" aria-label="Close" onPress={close}>
-            <XIcon size={16} />
-          </Button>
-        </div>
+        <DrawerTitle
+          title="Admin password"
+          subtitle={device ? `Set or change the admin password of ${device.name} (${device.ipAddress}).` : undefined}
+          onClose={close}
+        />
       </DrawerHeader>
       <DrawerBody>
-        <Form onSubmit={submit} className="flex flex-col gap-4">
+        <Form onSubmit={onSubmit} className="flex flex-col gap-4">
           {device?.authState === 'required' && (
-            <TextFieldRow label="Current password" value={currentPassword} onChange={setCurrentPassword} type="password" dataCy="shelly-auth-current-password" />
+            <PasswordField
+              label="Current password"
+              value={currentPassword}
+              onChange={setCurrentPassword}
+              description="Required because this device already has authentication enabled."
+              autoComplete="current-password"
+              dataCy="shelly-auth-current-password"
+            />
           )}
-          <TextFieldRow label="New admin password" value={password} onChange={setPassword} type="password" required dataCy="shelly-auth-password" />
-          {error && (
-            <Alert status="danger">
-              <AlertContent>
-                <AlertDescription data-cy="shelly-auth-error">{error}</AlertDescription>
-              </AlertContent>
-            </Alert>
-          )}
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="secondary" onPress={close}>
-              Cancel
-            </Button>
-            <Button variant="primary" type="submit" isPending={submitting} onPress={submit} data-cy="shelly-auth-submit">
-              <KeyRoundIcon className="h-4 w-4" /> Save password
-            </Button>
-          </div>
+          <PasswordField
+            label="New admin password"
+            value={password}
+            onChange={setPassword}
+            description="Protects the device's local web interface and API."
+            required
+            autoComplete="new-password"
+            dataCy="shelly-auth-password"
+          />
+          {error && <ErrorAlert dataCy="shelly-auth-error">{error}</ErrorAlert>}
           <input type="submit" hidden />
         </Form>
       </DrawerBody>
+      <DrawerFooter>
+        <Button variant="secondary" onPress={close}>
+          Cancel
+        </Button>
+        <Button variant="primary" isPending={submitting} onPress={submit} data-cy="shelly-auth-submit">
+          <KeyRoundIcon className="h-4 w-4" /> Save password
+        </Button>
+      </DrawerFooter>
     </StandardDrawer>
   );
 }
 
 export function DeviceInfoDetails({ info }: { info: ShellyDeviceInfo | null }) {
   if (!info) {
-    return <div className="rounded-xl border border-dashed border-default-300 p-4 text-sm text-default-500">No device info loaded yet.</div>;
+    return (
+      <div className="rounded-xl border border-dashed border-default-300 p-4 text-sm text-default-500">
+        No device info loaded yet.
+      </div>
+    );
   }
 
   const status = info.status;
@@ -409,35 +548,56 @@ export function DeviceInfoDetails({ info }: { info: ShellyDeviceInfo | null }) {
   const voltage = firstValue(status, ['switch_0.voltage', 'meters.0.voltage']);
   const current = firstValue(status, ['switch_0.current', 'meters.0.current']);
 
+  const cards: Array<{ title: string; rows: Array<{ label: string; value: string }> }> = [
+    {
+      title: 'Device',
+      rows: [
+        { label: 'Name', value: formatValue(firstValue(config, ['sys.device.name', 'name', 'device.name'])) },
+        { label: 'Generation', value: generationLabel(info.generation) },
+        { label: 'Timezone', value: formatValue(firstValue(config, ['sys.location.tz', 'timezone'])) },
+        { label: 'Uptime', value: formatUptime(firstValue(status, ['sys.uptime', 'uptime'])) },
+      ],
+    },
+    {
+      title: 'Network',
+      rows: [
+        { label: 'IP address', value: formatValue(firstValue(status, ['wifi.sta_ip', 'wifi_sta.ip', 'sta_ip'])) },
+        { label: 'Wi-Fi network', value: formatValue(firstValue(status, ['wifi.ssid', 'wifi_sta.ssid', 'ssid'])) },
+        { label: 'Signal', value: formatValue(firstValue(status, ['wifi.rssi', 'wifi_sta.rssi']), ' dBm') },
+      ],
+    },
+    {
+      title: 'Output',
+      rows: [
+        { label: 'State', value: formatValue(output) },
+        { label: 'Power', value: formatValue(power, ' W') },
+        { label: 'Voltage', value: formatValue(voltage, ' V') },
+        { label: 'Current', value: formatValue(current, ' A') },
+      ],
+    },
+  ];
+
   return (
     <div className="grid gap-4">
-      <DetailCard
-        title="Device"
-        rows={[
-          { label: 'Name', value: formatValue(firstValue(config, ['sys.device.name', 'name', 'device.name'])) },
-          { label: 'Generation', value: generationLabel(info.generation) },
-          { label: 'Fetched', value: new Date(info.fetchedAt).toLocaleString() },
-          { label: 'Timezone', value: formatValue(firstValue(config, ['sys.location.tz', 'timezone'])) },
-        ]}
-      />
-      <DetailCard
-        title="Network"
-        rows={[
-          { label: 'IP address', value: formatValue(firstValue(status, ['wifi.sta_ip', 'wifi_sta.ip', 'sta_ip'])) },
-          { label: 'Wi-Fi network', value: formatValue(firstValue(status, ['wifi.ssid', 'wifi_sta.ssid', 'ssid'])) },
-          { label: 'Signal', value: formatValue(firstValue(status, ['wifi.rssi', 'wifi_sta.rssi']), ' dBm') },
-          { label: 'Uptime', value: formatUptime(firstValue(status, ['sys.uptime', 'uptime'])) },
-        ]}
-      />
-      <DetailCard
-        title="Output"
-        rows={[
-          { label: 'State', value: formatValue(output) },
-          { label: 'Power', value: formatValue(power, ' W') },
-          { label: 'Voltage', value: formatValue(voltage, ' V') },
-          { label: 'Current', value: formatValue(current, ' A') },
-        ]}
-      />
+      {cards.map((card) => (
+        <Card key={card.title}>
+          <Card.Header className="pb-0">
+            <span className="text-sm font-semibold">{card.title}</span>
+          </Card.Header>
+          <Card.Content>
+            <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {card.rows.map((row) => (
+                <div key={row.label} className="min-w-0">
+                  <dt className="text-xs font-medium uppercase tracking-wide text-default-500">{row.label}</dt>
+                  <dd className="mt-1 truncate text-sm text-default-800" title={row.value}>
+                    {row.value}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </Card.Content>
+        </Card>
+      ))}
     </div>
   );
 }
@@ -458,18 +618,81 @@ export function RowActions({
   onDelete: () => void;
 }) {
   return (
-    <div className="flex flex-row justify-end gap-0 whitespace-nowrap">
-      <Button variant="ghost" size="sm" isIconOnly className="h-7 w-7 min-w-7" aria-label="View device info" isDisabled={isBusy} onPress={onInfo} data-cy={`shelly-device-info-${deviceId}`}>
-        <InfoIcon className="h-4 w-4" />
-      </Button>
-      <Button variant="ghost" size="sm" isIconOnly className="h-7 w-7 min-w-7" aria-label="Set admin password" isDisabled={isBusy} onPress={onAuth} data-cy={`shelly-device-auth-${deviceId}`}>
-        <KeyRoundIcon className="h-4 w-4" />
-      </Button>
-      <Button variant="ghost" size="sm" isIconOnly className="h-7 w-7 min-w-7" aria-label="Re-probe device" isDisabled={isBusy} onPress={onReprobe} data-cy={`shelly-device-reprobe-${deviceId}`}>
-        <RefreshCwIcon className="h-4 w-4" />
-      </Button>
-      <Button variant="danger-soft" size="sm" isIconOnly className="h-7 w-7 min-w-7" aria-label="Delete device" isDisabled={isBusy} onPress={onDelete} data-cy={`shelly-device-delete-${deviceId}`}>
-        <Trash2Icon className="h-4 w-4" />
+    <div className="flex flex-row items-center justify-end gap-1 whitespace-nowrap">
+      <Tooltip>
+        <Tooltip.Trigger>
+          <Button
+            variant="ghost"
+            size="sm"
+            isIconOnly
+            aria-label="View device info"
+            isDisabled={isBusy}
+            onPress={onInfo}
+            data-cy={`shelly-device-info-${deviceId}`}
+          >
+            <InfoIcon className="h-4 w-4" />
+          </Button>
+        </Tooltip.Trigger>
+        <Tooltip.Content>View device info</Tooltip.Content>
+      </Tooltip>
+      <Dropdown>
+        <DropdownTrigger>
+          <Button
+            variant="ghost"
+            size="sm"
+            isIconOnly
+            aria-label="More actions"
+            isPending={isBusy}
+            data-cy={`shelly-device-menu-${deviceId}`}
+          >
+            <MoreVerticalIcon className="h-4 w-4" />
+          </Button>
+        </DropdownTrigger>
+        <DropdownPopover>
+          <DropdownMenu aria-label="Device actions">
+            <DropdownItem id="auth" onPress={onAuth} data-cy={`shelly-device-auth-${deviceId}`}>
+              <KeyRoundIcon className="mr-2 inline h-4 w-4" /> Set admin password
+            </DropdownItem>
+            <DropdownItem id="reprobe" onPress={onReprobe} data-cy={`shelly-device-reprobe-${deviceId}`}>
+              <RefreshCwIcon className="mr-2 inline h-4 w-4" /> Re-probe device
+            </DropdownItem>
+            <DropdownItem id="delete" onPress={onDelete} className="text-danger" data-cy={`shelly-device-delete-${deviceId}`}>
+              <Trash2Icon className="mr-2 inline h-4 w-4" /> Delete device
+            </DropdownItem>
+          </DropdownMenu>
+        </DropdownPopover>
+      </Dropdown>
+    </div>
+  );
+}
+
+function ProbeErrorIndicator({ message }: { message: string }) {
+  return (
+    <Tooltip>
+      <Tooltip.Trigger>
+        <Button
+          variant="ghost"
+          size="sm"
+          isIconOnly
+          aria-label={`Probe failed: ${message}`}
+          className="h-6 w-6 min-w-6 text-warning"
+          data-cy="shelly-device-probe-error"
+        >
+          <TriangleAlertIcon className="h-4 w-4" />
+        </Button>
+      </Tooltip.Trigger>
+      <Tooltip.Content>Probe failed: {message}</Tooltip.Content>
+    </Tooltip>
+  );
+}
+
+function EmptyDevices({ onAdd }: { onAdd: () => void }) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-3 px-4 py-12">
+      <MehIcon size={36} className="text-default-300" />
+      <p className="text-sm text-default-500">No devices yet. Add your first Shelly by its IP address.</p>
+      <Button variant="secondary" size="sm" onPress={onAdd} data-cy="shelly-add-open-empty">
+        <PlusIcon className="h-4 w-4" /> Add device
       </Button>
     </div>
   );
@@ -478,18 +701,20 @@ export function RowActions({
 export function DevicesPage() {
   const [devices, setDevices] = useState<ShellyDevice[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [pageError, setPageError] = useState<string | null>(null);
   const [rowBusyId, setRowBusyId] = useState<number | null>(null);
   const [infoDevice, setInfoDevice] = useState<ShellyDevice | null>(null);
   const [authDevice, setAuthDevice] = useState<ShellyDevice | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ShellyDevice | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const { isOpen, open, setOpen } = useOverlayState();
 
   const refresh = useCallback(async () => {
     try {
       setDevices(await listDevices());
-      setLoadError(null);
+      setPageError(null);
     } catch (err) {
-      setLoadError(err instanceof Error ? err.message : String(err));
+      setPageError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
     }
@@ -506,7 +731,7 @@ export function DevicesPage() {
         await action();
         await refresh();
       } catch (err) {
-        setLoadError(err instanceof Error ? err.message : String(err));
+        setPageError(err instanceof Error ? err.message : String(err));
       } finally {
         setRowBusyId(null);
       }
@@ -514,9 +739,24 @@ export function DevicesPage() {
     [refresh]
   );
 
+  const confirmDelete = useCallback(async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await deleteDevice(deleteTarget.id);
+      await refresh();
+      setDeleteTarget(null);
+    } catch (err) {
+      setPageError(err instanceof Error ? err.message : String(err));
+      setDeleteTarget(null);
+    } finally {
+      setDeleting(false);
+    }
+  }, [deleteTarget, refresh]);
+
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-6 p-6">
-      <div className="mb-2 flex w-full flex-wrap items-center justify-between gap-y-4">
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 md:p-6">
+      <div className="flex w-full flex-wrap items-center justify-between gap-y-4">
         <div className="flex items-center gap-3">
           <WifiIcon className="h-6 w-6 text-primary" />
           <div>
@@ -529,47 +769,54 @@ export function DevicesPage() {
         </Button>
       </div>
 
-      {loadError && (
-        <Alert status="danger">
-          <AlertContent>
-            <AlertDescription>Failed to load devices: {loadError}</AlertDescription>
-          </AlertContent>
-        </Alert>
-      )}
+      {pageError && <ErrorAlert>{pageError}</ErrorAlert>}
 
       {loading ? (
-        <div className="flex items-center justify-center p-6">
-          <Spinner color="accent" />
+        <div className="flex flex-col gap-2" aria-hidden="true">
+          <Skeleton className="h-12 w-full rounded-lg" />
+          <Skeleton className="h-12 w-full rounded-lg" />
+          <Skeleton className="h-12 w-full rounded-lg" />
         </div>
       ) : (
         <Table data-cy="shelly-device-table">
           <TableScrollContainer>
             <TableContent aria-label="Shelly devices">
               <TableHeader>
-                <TableColumn isRowHeader>Name</TableColumn>
-                <TableColumn className="hidden md:table-cell">Address</TableColumn>
-                <TableColumn className="hidden md:table-cell">Generation</TableColumn>
-                <TableColumn className="hidden md:table-cell">Model</TableColumn>
-                <TableColumn className="hidden md:table-cell">Auth</TableColumn>
-                <TableColumn>Actions</TableColumn>
+                <TableColumn isRowHeader>Device</TableColumn>
+                {/* The sidebar appears at md and reclaims ~256px, so the content area is
+                    narrower at md than at sm — the Address column ducks out again there. */}
+                <TableColumn className="hidden sm:table-cell md:hidden lg:table-cell">Address</TableColumn>
+                <TableColumn className="hidden lg:table-cell">Model</TableColumn>
+                <TableColumn className="hidden sm:table-cell">Auth</TableColumn>
+                <TableColumn className="text-end">Actions</TableColumn>
               </TableHeader>
-              <TableBody items={devices} renderEmptyState={() => <EmptyDevices />}>
+              <TableBody items={devices} renderEmptyState={() => <EmptyDevices onAdd={open} />}>
                 {(device) => (
                   <TableRow key={device.id} id={device.id} data-cy={`shelly-device-row-${device.id}`}>
                     <TableCell className="whitespace-nowrap">
-                      <div className="max-w-48 truncate font-medium text-default-800" title={device.name}>{device.name}</div>
-                      {device.lastProbeError && (
-                        <div className="max-w-48 truncate text-xs text-danger" title={device.lastProbeError} data-cy="shelly-device-probe-error">
-                          Probe failed: {device.lastProbeError}
-                        </div>
-                      )}
+                      <div className="flex items-center gap-1">
+                        <span className="max-w-36 truncate font-medium text-default-800 sm:max-w-48" title={device.name}>
+                          {device.name}
+                        </span>
+                        {device.lastProbeError && <ProbeErrorIndicator message={device.lastProbeError} />}
+                      </div>
+                      {/* Where the Address column is hidden, surface the IP here instead. */}
+                      <div className="text-xs text-default-500 sm:hidden md:block lg:hidden">{device.ipAddress}</div>
                     </TableCell>
-                    <TableCell className="hidden whitespace-nowrap md:table-cell">{device.ipAddress}</TableCell>
-                    <TableCell className="hidden whitespace-nowrap md:table-cell">{generationLabel(device.generation)}</TableCell>
-                    <TableCell className="hidden whitespace-nowrap md:table-cell">
-                      <span className="block max-w-36 truncate" title={device.model ?? undefined}>{device.model ?? '—'}</span>
+                    <TableCell className="hidden whitespace-nowrap text-default-600 sm:table-cell md:hidden lg:table-cell">
+                      {device.ipAddress}
                     </TableCell>
-                    <TableCell className="hidden whitespace-nowrap md:table-cell">
+                    <TableCell className="hidden whitespace-nowrap lg:table-cell">
+                      <div className="flex items-center gap-1.5">
+                        <span className="max-w-36 truncate" title={device.model ?? undefined}>
+                          {device.model ?? '—'}
+                        </span>
+                        <Chip variant="soft" size="sm" className="whitespace-nowrap">
+                          {generationLabel(device.generation)}
+                        </Chip>
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden whitespace-nowrap sm:table-cell">
                       <AuthChip state={device.authState} />
                     </TableCell>
                     <TableCell className="whitespace-nowrap">
@@ -579,7 +826,7 @@ export function DevicesPage() {
                         onInfo={() => setInfoDevice(device)}
                         onAuth={() => setAuthDevice(device)}
                         onReprobe={() => withRowBusy(device.id, () => reprobeDevice(device.id))}
-                        onDelete={() => withRowBusy(device.id, () => deleteDevice(device.id))}
+                        onDelete={() => setDeleteTarget(device)}
                       />
                     </TableCell>
                   </TableRow>
@@ -593,6 +840,38 @@ export function DevicesPage() {
       <AddDeviceDrawer isOpen={isOpen} onOpenChange={setOpen} onAdded={refresh} />
       <InfoDrawer device={infoDevice} onOpenChange={(openInfo) => !openInfo && setInfoDevice(null)} />
       <AuthDrawer device={authDevice} onOpenChange={(openAuth) => !openAuth && setAuthDevice(null)} onSaved={refresh} />
+
+      <Modal
+        isOpen={!!deleteTarget}
+        onOpenChange={(openModal) => {
+          if (!openModal) setDeleteTarget(null);
+        }}
+        data-cy="shelly-delete-confirmation-modal"
+      >
+        <ModalBackdrop>
+          <ModalContainer size="sm">
+            <ModalDialog>
+              <ModalHeader>
+                <ModalHeading>Delete device</ModalHeading>
+              </ModalHeader>
+              <ModalBody>
+                <p>
+                  Remove <span className="font-semibold">{deleteTarget?.name}</span> ({deleteTarget?.ipAddress}) from the
+                  registry? The device itself is not changed.
+                </p>
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="secondary" onPress={() => setDeleteTarget(null)} data-cy="shelly-delete-cancel">
+                  Cancel
+                </Button>
+                <Button variant="danger" onPress={confirmDelete} isPending={deleting} data-cy="shelly-delete-confirm">
+                  <Trash2Icon className="h-4 w-4" /> Delete
+                </Button>
+              </ModalFooter>
+            </ModalDialog>
+          </ModalContainer>
+        </ModalBackdrop>
+      </Modal>
     </div>
   );
 }

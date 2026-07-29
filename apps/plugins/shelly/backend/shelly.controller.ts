@@ -2,6 +2,7 @@
 // `/shelly`. Gated behind `canManageResources` — the same access level as the
 // host MQTT servers settings (device management is an admin-ish capability).
 import {
+  BadGatewayException,
   BadRequestException,
   Body,
   ConflictException,
@@ -112,12 +113,16 @@ export class ShellyController {
   @Get('devices/:id/info')
   async info(@Param('id', ParseIntPipe) id: number, @Query() query: DeviceInfoQuery): Promise<ShellyDeviceInfo> {
     const device = await this.requireDeviceWithGeneration(id);
-    return this.deviceApi.getDeviceInfo({
-      ipAddress: device.ipAddress,
-      generation: device.generation,
-      username: query.username,
-      currentPassword: query.currentPassword,
-    });
+    try {
+      return await this.deviceApi.getDeviceInfo({
+        ipAddress: device.ipAddress,
+        generation: device.generation,
+        username: query.username,
+        currentPassword: query.currentPassword,
+      });
+    } catch (err) {
+      throw toDeviceCommunicationException(err);
+    }
   }
 
   @Post('devices/:id/auth')
@@ -127,13 +132,17 @@ export class ShellyController {
       throw new BadRequestException('password is required');
     }
     const device = await this.requireDeviceWithGeneration(id);
-    await this.deviceApi.setAdminPassword({
-      ipAddress: device.ipAddress,
-      generation: device.generation,
-      username: body.username,
-      currentPassword: body.currentPassword,
-      password,
-    });
+    try {
+      await this.deviceApi.setAdminPassword({
+        ipAddress: device.ipAddress,
+        generation: device.generation,
+        username: body.username,
+        currentPassword: body.currentPassword,
+        password,
+      });
+    } catch (err) {
+      throw toDeviceCommunicationException(err);
+    }
     await this.registry.updateAuthState(id, 'required');
     const updated = await this.registry.findById(id);
     if (!updated) {
@@ -186,4 +195,12 @@ export class ShellyController {
       return { result: null, error: err instanceof Error ? err.message : String(err), at };
     }
   }
+}
+
+/**
+ * Talking to the device failed (unreachable, rejected credentials, …). Surface
+ * the reason as a 502 instead of letting it bubble up as an opaque 500.
+ */
+function toDeviceCommunicationException(err: unknown): BadGatewayException {
+  return new BadGatewayException(err instanceof Error ? err.message : String(err));
 }

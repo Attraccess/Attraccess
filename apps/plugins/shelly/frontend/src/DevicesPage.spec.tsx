@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DeviceInfoDetails, RowActions } from './DevicesPage';
 
@@ -42,21 +43,30 @@ describe('DeviceInfoDetails', () => {
 });
 
 describe('RowActions', () => {
-  it('uses icon-only actions with accessible names', () => {
+  it('shows an icon-only info action and collapses the rest into an overflow menu', async () => {
+    const user = userEvent.setup();
+    const onAuth = vi.fn();
+
     render(
       <RowActions
         deviceId={1}
         isBusy={false}
         onInfo={() => undefined}
-        onAuth={() => undefined}
+        onAuth={onAuth}
         onReprobe={() => undefined}
         onDelete={() => undefined}
       />
     );
 
     expect(screen.getByRole('button', { name: 'View device info' })).toHaveTextContent('');
-    expect(screen.getByRole('button', { name: 'Set admin password' })).toHaveTextContent('');
-    expect(screen.getByRole('button', { name: 'Re-probe device' })).toHaveTextContent('');
-    expect(screen.getByRole('button', { name: 'Delete device' })).toHaveTextContent('');
+
+    await user.click(screen.getByRole('button', { name: 'More actions' }));
+
+    const authItem = await screen.findByRole('menuitem', { name: /Set admin password/ });
+    expect(screen.getByRole('menuitem', { name: /Re-probe device/ })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: /Delete device/ })).toBeInTheDocument();
+
+    await user.click(authItem);
+    expect(onAuth).toHaveBeenCalledTimes(1);
   });
 });
