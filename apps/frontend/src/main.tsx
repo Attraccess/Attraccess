@@ -10,8 +10,10 @@ import { PluginProvider } from './app/plugins/plugin-provider';
 import { PWAInstall } from './components/pwaInstall';
 import { registerSW } from 'virtual:pwa-register';
 import { detectAndSetLanguage } from '@attraccess/plugins-frontend-ui';
+import { trackVisualViewportHeight } from './viewport-height';
 
 detectAndSetLanguage();
+trackVisualViewportHeight();
 
 const oneMinute = 60 * 1000;
 const serviceWorkerUpdateIntervalMs = 15 * oneMinute;
