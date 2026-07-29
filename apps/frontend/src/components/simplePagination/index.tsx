@@ -1,6 +1,9 @@
 // Simple pagination wrapper that provides page/total/onChange API over v3 compound
 // FEATURE: Pagination utility component for HeroUI v3 migration
 import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPreviousIcon, PaginationPrevious, PaginationNextIcon } from '@heroui/react';
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import en from './en.json';
+import de from './de.json';
 
 interface SimplePaginationProps {
   page: number;
@@ -12,6 +15,11 @@ interface SimplePaginationProps {
 }
 
 export function SimplePagination({ page, total, onChange, showControls, className, 'aria-label': ariaLabel }: SimplePaginationProps) {
+  const { t } = useTranslations({
+    en,
+    de,
+  });
+
   if (total <= 1) return null;
 
   const getPageNumbers = () => {
@@ -33,7 +41,7 @@ export function SimplePagination({ page, total, onChange, showControls, classNam
       <PaginationContent>
         {showControls && (
           <PaginationItem>
-            <PaginationPrevious isDisabled={page <= 1} onPress={() => onChange(page - 1)}>
+            <PaginationPrevious aria-label={t('previous')} isDisabled={page <= 1} onPress={() => onChange(page - 1)}>
               <PaginationPreviousIcon />
             </PaginationPrevious>
           </PaginationItem>
@@ -53,7 +61,7 @@ export function SimplePagination({ page, total, onChange, showControls, classNam
         )}
         {showControls && (
           <PaginationItem>
-            <PaginationNext isDisabled={page >= total} onPress={() => onChange(page + 1)}>
+            <PaginationNext aria-label={t('next')} isDisabled={page >= total} onPress={() => onChange(page + 1)}>
               <PaginationNextIcon />
             </PaginationNext>
           </PaginationItem>
