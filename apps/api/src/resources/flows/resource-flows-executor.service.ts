@@ -47,7 +47,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResourceHealthService } from '../health/resource-health.service';
 import { CronTimer } from '../../metrics/instrumentation/cron/cron.helper';
 import { FlowTimer } from '../../metrics/instrumentation/flow/flow.helper';
-import { getRegisteredPluginFlowNodes } from '../../plugin-system/plugin-flow-node-registry';
+import { getPluginFlowNode } from '../../plugin-system/plugin-flow-node-registry';
 import {
   ActivityTrackExecutor,
   BillingSetAdditionalItemsExecutor,
@@ -618,7 +618,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     }
 
     // Plugin-contributed node types fall through to the plugin registry.
-    const pluginNode = getRegisteredPluginFlowNodes().find((d) => d.type === node.type);
+    const pluginNode = getPluginFlowNode(node.type);
     if (pluginNode) {
       return pluginNode.execute(
         { id: node.id, type: node.type, data: node.data as Record<string, unknown> },

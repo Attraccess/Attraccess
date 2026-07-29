@@ -41,7 +41,7 @@ import { z } from 'zod';
 import { MqttClientService } from '../../mqtt/mqtt-client.service';
 import { ResourceFlowChangedEvent } from './events/resource-flow-changed.event';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { getRegisteredPluginFlowNodes } from '../../plugin-system/plugin-flow-node-registry';
+import { getPluginFlowNode, getRegisteredPluginFlowNodes } from '../../plugin-system/plugin-flow-node-registry';
 
 export interface ValidationError {
   nodeId: string;
@@ -100,8 +100,17 @@ export class ResourceFlowsService {
   private validateNodeData(nodeData: { id: string; type: string; data: unknown }): ValidationError[] {
     const errors: ValidationError[] = [];
 
-    // Plugin node types are not in the core enum — the plugin is responsible for its own data.
+    // Non-core types must belong to a registered plugin; reject unknown types at save time.
     if (!Object.values(ResourceFlowNodeType).includes(nodeData.type as ResourceFlowNodeType)) {
+      if (!getPluginFlowNode(nodeData.type)) {
+        errors.push({
+          nodeId: nodeData.id,
+          nodeType: nodeData.type,
+          field: 'type',
+          message: `Unknown node type: ${nodeData.type}`,
+        });
+      }
+      // Plugin owns its own data validation — skip core schema check regardless.
       return errors;
     }
 
@@ -201,7 +210,7 @@ export class ResourceFlowsService {
       const newNodes = flowData.nodes.map((nodeData) => {
         const node = new ResourceFlowNode();
         node.id = nodeData.id;
-        node.type = nodeData.type;
+        node.type = nodeData.type as ResourceFlowNodeType;
         node.position = {
           x: nodeData.position.x,
           y: nodeData.position.y,

@@ -13,9 +13,10 @@ import {
   ShuffleIcon,
 } from 'lucide-react';
 
-export type Domain = 'manual' | 'resource' | 'door' | 'mqtt' | 'http' | 'logic' | 'health' | 'companion' | 'plugin';
+// Static (core) domains only — plugin domains are derived at runtime from node types.
+export type Domain = 'manual' | 'resource' | 'door' | 'mqtt' | 'http' | 'logic' | 'health' | 'companion';
 
-export const DOMAIN_ORDER: Domain[] = ['manual', 'resource', 'door', 'mqtt', 'http', 'logic', 'health', 'companion', 'plugin'];
+export const DOMAIN_ORDER: Domain[] = ['manual', 'resource', 'door', 'mqtt', 'http', 'logic', 'health', 'companion'];
 
 interface DomainDef {
   color: string;
@@ -33,12 +34,42 @@ export const DOMAINS: Record<Domain, DomainDef> = {
   logic:    { color: 'slate',  iconBg: 'bg-slate-100 dark:bg-slate-800',       iconFg: 'text-slate-700 dark:text-slate-300',   icon: ShuffleIcon },
   health:   { color: 'rose',   iconBg: 'bg-rose-100 dark:bg-rose-900/30',      iconFg: 'text-rose-700 dark:text-rose-300',     icon: HeartPulseIcon },
   companion:{ color: 'indigo', iconBg: 'bg-indigo-100 dark:bg-indigo-900/30',  iconFg: 'text-indigo-700 dark:text-indigo-300', icon: MonitorIcon },
-  plugin:   { color: 'orange', iconBg: 'bg-orange-100 dark:bg-orange-900/30',  iconFg: 'text-orange-700 dark:text-orange-300', icon: PuzzleIcon },
 };
 
-export function nodeTypeDomain(nodeType: string): Domain {
+// ponytail: all plugin.* domains share one visual style; no per-plugin config needed.
+const PLUGIN_DEF: DomainDef = {
+  color: 'orange',
+  iconBg: 'bg-orange-100 dark:bg-orange-900/30',
+  iconFg: 'text-orange-700 dark:text-orange-300',
+  icon: PuzzleIcon,
+};
+
+/** Returns the DomainDef for any domain key, including dynamic plugin.{name} domains. */
+export function getDomainDef(domain: string): DomainDef {
+  return (DOMAINS as Record<string, DomainDef>)[domain] ?? PLUGIN_DEF;
+}
+
+/**
+ * For plugin domains (e.g. "plugin.shelly") returns a capitalised label ("Shelly").
+ * Returns null for static core domains — let the caller use its translation key instead.
+ */
+export function getPluginDomainLabel(domain: string): string | null {
+  if (!domain.startsWith('plugin.')) return null;
+  const name = domain.slice('plugin.'.length);
+  return name.charAt(0).toUpperCase() + name.slice(1);
+}
+
+/**
+ * Maps a node type string to its catalog domain key.
+ * Plugin nodes map to "plugin.{pluginName}" so each plugin gets its own catalog section.
+ */
+export function nodeTypeDomain(nodeType: string): string {
   if (nodeType === 'input.button') return 'manual';
-  if (nodeType.startsWith('plugin.')) return 'plugin';
+  if (nodeType.startsWith('plugin.')) {
+    // plugin.shelly.send-on → 'plugin.shelly'
+    const parts = nodeType.split('.');
+    return parts.length >= 2 ? `plugin.${parts[1]}` : 'plugin';
+  }
   if (nodeType.includes('.companion.')) return 'companion';
   if (nodeType.includes('.door.')) return 'door';
   if (nodeType.includes('.health.')) return 'health';

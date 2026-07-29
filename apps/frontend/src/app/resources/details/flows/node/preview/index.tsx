@@ -267,10 +267,9 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
         ];
       }
 
-      default: {
-        const exhaustiveCheck: never = schema.type;
-        throw new Error(`Unknown node type: ${exhaustiveCheck}`);
-      }
+      default:
+        // Plugin-contributed node types have no core preview rows.
+        return [];
     }
   }, [schema, t, nodeData]);
 }
