@@ -1,9 +1,9 @@
 // Shelly management plugin — backend half.
 //
-// Part 1 of the Shelly management feature (ATT-496): a persisted device registry
-// with a manual add-by-IP flow and a generation/model probe. Built as a
-// first-class nx app (tag type:plugin); see apps/plugins/scripts for the shared
-// esbuild/Vite/zip recipe.
+// A persisted device registry with a manual add-by-IP flow and a
+// generation/model probe (ATT-496), plus mDNS + subnet-scan auto-discovery that
+// populates it (ATT-497). Built as a first-class nx app (tag type:plugin); see
+// apps/plugins/scripts for the shared esbuild/Vite/zip recipe.
 //
 // The plugin registers a NestJS module whose controller is mounted into the host
 // API and whose services share the host's TypeORM connection via a real
@@ -13,6 +13,7 @@
 import type { PluginBackendModule, PluginContext } from '@attraccess/plugins-backend-sdk';
 import { DynamicModule } from '@nestjs/common';
 import { DeviceRegistryService } from './device-registry.service';
+import { DiscoveryService } from './discovery.service';
 import { ShellyDevice } from './shelly-device.entity';
 import { ShellyProbeService } from './shelly-probe.service';
 import { ShellyController } from './shelly.controller';
@@ -37,6 +38,7 @@ const plugin: PluginBackendModule = {
         { provide: PLUGIN_CONTEXT, useValue: context },
         DeviceRegistryService,
         ShellyProbeService,
+        DiscoveryService,
       ],
     };
   },

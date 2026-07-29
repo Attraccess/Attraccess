@@ -73,3 +73,30 @@ export function reprobeDevice(id: number): Promise<ShellyDevice> {
 export function deleteDevice(id: number): Promise<{ deleted: boolean }> {
   return request<{ deleted: boolean }>(`/devices/${id}`, { method: 'DELETE' });
 }
+
+export interface DiscoveredDevice {
+  deviceId: number;
+  ipAddress: string;
+  name: string;
+  generation: number;
+  model: string | null;
+  authState: AuthState;
+  /** True when this run added the device; false when it was already registered. */
+  isNew: boolean;
+  source: 'mdns' | 'scan';
+}
+
+export interface DiscoveryResult {
+  subnets: string[];
+  probed: number;
+  devices: DiscoveredDevice[];
+}
+
+/**
+ * Runs discovery on the server (mDNS + subnet scan) and returns what it found.
+ * Slow by nature — a /24 scan takes a few seconds — so callers must show a
+ * pending state.
+ */
+export function discoverDevices(input: { cidr?: string } = {}): Promise<DiscoveryResult> {
+  return request<DiscoveryResult>('/discovery', { method: 'POST', body: input });
+}

@@ -15,6 +15,7 @@ import {
 } from '@nestjs/common';
 import { Auth } from '@attraccess/plugins-backend-sdk';
 import { DeviceRegistryService } from './device-registry.service';
+import { DiscoveryService, type DiscoveryResult } from './discovery.service';
 import { ShellyProbeService } from './shelly-probe.service';
 import { ShellyDevice } from './shelly-device.entity';
 import type { ProbeResult } from './types';
@@ -22,6 +23,11 @@ import type { ProbeResult } from './types';
 interface AddDeviceBody {
   ipAddress?: string;
   name?: string;
+}
+
+interface DiscoverBody {
+  /** Subnet to scan, e.g. `192.168.1.0/24`. Omitted: the host's own networks. */
+  cidr?: string;
 }
 
 interface ProbeOutcome {
@@ -37,8 +43,23 @@ export class ShellyController {
   // types for injection — always inject by an explicit token.
   constructor(
     @Inject(DeviceRegistryService) private readonly registry: DeviceRegistryService,
-    @Inject(ShellyProbeService) private readonly probe: ShellyProbeService
+    @Inject(ShellyProbeService) private readonly probe: ShellyProbeService,
+    @Inject(DiscoveryService) private readonly discovery: DiscoveryService
   ) {}
+
+  // Runs inline rather than as a background job: a /24 is ~250 probes at a 1s
+  // timeout and 64 in flight, so a few seconds. Larger subnets are rejected by
+  // expandCidr instead of being made asynchronous.
+  @Post('discovery')
+  async discover(@Body() body: DiscoverBody): Promise<DiscoveryResult> {
+    const cidr = (body?.cidr ?? '').trim() || undefined;
+    try {
+      return await this.discovery.discover(cidr);
+    } catch (err) {
+      // expandCidr rejects malformed, oversized and public CIDRs — operator error.
+      throw new BadRequestException(err instanceof Error ? err.message : String(err));
+    }
+  }
 
   @Get('devices')
   list(): Promise<ShellyDevice[]> {

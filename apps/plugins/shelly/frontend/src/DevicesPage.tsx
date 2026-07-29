@@ -1,25 +1,13 @@
 // Shelly device registry UI. Laid out like the host's other management pages
-// (e.g. MQTT servers): a page header with a primary action that opens an add
-// form in a modal, and the devices rendered in a Table — not nested cards.
+// (e.g. MQTT servers): a page header with the primary actions that open drawers,
+// and the devices rendered in a Table — not nested cards.
 // Built from the host's shared HeroUI kit so it inherits the app theme.
 import {
-  Alert,
-  AlertContent,
-  AlertDescription,
   Button,
   Chip,
-  DrawerBackdrop,
-  DrawerBody,
-  DrawerContent,
-  DrawerDialog,
-  DrawerHeader,
-  Form,
-  Input,
-  Label,
   Spinner,
   Table,
   TableBody,
-  TextField,
   TableCell,
   TableColumn,
   TableContent,
@@ -28,9 +16,12 @@ import {
   TableScrollContainer,
   useOverlayState,
 } from '@heroui/react';
-import { MehIcon, PlusIcon, RefreshCwIcon, Trash2Icon, WifiIcon, XIcon } from 'lucide-react';
-import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
-import { addDevice, deleteDevice, listDevices, reprobeDevice, type AuthState, type ShellyDevice } from './api';
+import { MehIcon, PlusIcon, RefreshCwIcon, SearchIcon, Trash2Icon, WifiIcon } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { AddDeviceDrawer } from './AddDeviceDrawer';
+import { DiscoverDrawer } from './DiscoverDrawer';
+import { StatusAlert } from './StatusAlert';
+import { deleteDevice, listDevices, reprobeDevice, type AuthState, type ShellyDevice } from './api';
 
 function generationLabel(generation: number | null): string {
   if (generation === null) return 'Unknown';
@@ -54,139 +45,9 @@ function AuthChip({ state }: { state: AuthState }) {
 function EmptyDevices() {
   return (
     <div className="flex flex-col items-center justify-center gap-2 px-4 py-10">
-      <MehIcon size={36} className="text-default-300" />
-      <p className="text-sm text-default-500">No devices yet. Add one by IP to get started.</p>
+      <MehIcon size={36} className="text-muted" />
+      <p className="text-sm text-muted">No devices yet. Run discovery, or add one by IP.</p>
     </div>
-  );
-}
-
-// Mirror of the host's StandardDrawer (apps/frontend/src/components/standardDrawer.tsx),
-// replicated here because host components aren't shared with plugins over module
-// federation — only @heroui/react primitives are.
-const DRAWER_DIALOG_CLASSNAME = 'md:max-w-2xl md:mx-auto bg-surface-secondary';
-const FIELD_CONTRAST_STYLE: CSSProperties = {
-  ['--field-border' as never]: 'var(--border-secondary)',
-  ['--border-width-field' as never]: '1px',
-};
-
-function StandardDrawer({
-  isOpen,
-  onOpenChange,
-  children,
-}: {
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-  children: ReactNode;
-}) {
-  return (
-    <DrawerBackdrop isOpen={isOpen} onOpenChange={onOpenChange}>
-      <DrawerContent>
-        <DrawerDialog className={DRAWER_DIALOG_CLASSNAME} style={FIELD_CONTRAST_STYLE}>
-          {children}
-        </DrawerDialog>
-      </DrawerContent>
-    </DrawerBackdrop>
-  );
-}
-
-function AddDeviceDrawer({
-  isOpen,
-  onOpenChange,
-  onAdded,
-}: {
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-  onAdded: () => void;
-}) {
-  const [ipAddress, setIpAddress] = useState('');
-  const [name, setName] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const close = useCallback(() => onOpenChange(false), [onOpenChange]);
-
-  const submit = useCallback(async () => {
-    const ip = ipAddress.trim();
-    if (!ip) {
-      setError('IP address is required.');
-      return;
-    }
-    setSubmitting(true);
-    setError(null);
-    try {
-      await addDevice({ ipAddress: ip, name: name.trim() || undefined });
-      setIpAddress('');
-      setName('');
-      onAdded();
-      close();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setSubmitting(false);
-    }
-  }, [ipAddress, name, onAdded, close]);
-
-  return (
-    <StandardDrawer isOpen={isOpen} onOpenChange={onOpenChange}>
-      <DrawerHeader>
-        <div className="flex w-full items-start justify-between gap-3">
-          <div className="flex flex-col gap-1">
-            <h2 className="text-lg font-semibold">Add a device</h2>
-            <p className="text-sm text-default-500">
-              Enter the device's IP address. We probe <code>GET /shelly</code> to detect its generation and model.
-            </p>
-          </div>
-          <Button isIconOnly variant="ghost" aria-label="Close" onPress={close}>
-            <XIcon size={16} />
-          </Button>
-        </div>
-      </DrawerHeader>
-      <DrawerBody>
-        <Form onSubmit={submit} className="flex flex-col gap-4">
-          <TextFieldRow label="IP address" value={ipAddress} onChange={setIpAddress} placeholder="192.168.1.42" required dataCy="shelly-add-ip" />
-          <TextFieldRow label="Name (optional)" value={name} onChange={setName} placeholder="Workshop light" dataCy="shelly-add-name" />
-          {error && (
-            <Alert status="danger">
-              <AlertContent>
-                <AlertDescription data-cy="shelly-add-error">{error}</AlertDescription>
-              </AlertContent>
-            </Alert>
-          )}
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="secondary" onPress={close}>
-              Cancel
-            </Button>
-            <Button variant="primary" type="submit" isPending={submitting} onPress={submit} data-cy="shelly-add-submit">
-              <PlusIcon className="h-4 w-4" /> Add device
-            </Button>
-          </div>
-          <input type="submit" hidden />
-        </Form>
-      </DrawerBody>
-    </StandardDrawer>
-  );
-}
-
-function TextFieldRow({
-  label,
-  value,
-  onChange,
-  placeholder,
-  required,
-  dataCy,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  required?: boolean;
-  dataCy?: string;
-}) {
-  return (
-    <TextField value={value} onChange={onChange} isRequired={required}>
-      <Label>{label}</Label>
-      <Input placeholder={placeholder} autoComplete="off" data-cy={dataCy} />
-    </TextField>
   );
 }
 
@@ -195,7 +56,8 @@ export function DevicesPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [rowBusyId, setRowBusyId] = useState<number | null>(null);
-  const { isOpen, open, setOpen } = useOverlayState();
+  const addDrawer = useOverlayState();
+  const discoverDrawer = useOverlayState();
 
   const refresh = useCallback(async () => {
     try {
@@ -231,23 +93,26 @@ export function DevicesPage() {
     <div className="mx-auto flex max-w-5xl flex-col gap-6 p-6">
       <div className="mb-2 flex w-full flex-wrap items-center justify-between gap-y-4">
         <div className="flex items-center gap-3">
-          <WifiIcon className="h-6 w-6 text-primary" />
+          <WifiIcon className="h-6 w-6 text-accent-soft-foreground" />
           <div>
             <h1 className="text-2xl font-bold">Shelly Devices</h1>
-            <p className="mt-1 text-sm text-foreground-500">Discovered and manually added Shelly devices.</p>
+            <p className="mt-1 text-sm text-muted">Discovered and manually added Shelly devices.</p>
           </div>
         </div>
-        <Button variant="primary" onPress={open} data-cy="shelly-add-open">
-          <PlusIcon className="h-4 w-4" /> Add device
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" onPress={discoverDrawer.open} data-cy="shelly-discover-open">
+            <SearchIcon className="h-4 w-4" /> Discover
+          </Button>
+          <Button variant="primary" onPress={addDrawer.open} data-cy="shelly-add-open">
+            <PlusIcon className="h-4 w-4" /> Add device
+          </Button>
+        </div>
       </div>
 
       {loadError && (
-        <Alert status="danger">
-          <AlertContent>
-            <AlertDescription>Failed to load devices: {loadError}</AlertDescription>
-          </AlertContent>
-        </Alert>
+        <StatusAlert status="danger" title="Failed to load devices">
+          {loadError}
+        </StatusAlert>
       )}
 
       {loading ? (
@@ -270,7 +135,7 @@ export function DevicesPage() {
                 {(device) => (
                   <TableRow key={device.id} id={device.id} data-cy={`shelly-device-row-${device.id}`}>
                     <TableCell>
-                      <div className="font-medium text-default-800">{device.name}</div>
+                      <div className="font-medium text-foreground">{device.name}</div>
                       {device.lastProbeError && (
                         <div className="text-xs text-danger" data-cy="shelly-device-probe-error">
                           Probe failed: {device.lastProbeError}
@@ -311,7 +176,12 @@ export function DevicesPage() {
         </Table>
       )}
 
-      <AddDeviceDrawer isOpen={isOpen} onOpenChange={setOpen} onAdded={refresh} />
+      <AddDeviceDrawer isOpen={addDrawer.isOpen} onOpenChange={addDrawer.setOpen} onAdded={refresh} />
+      <DiscoverDrawer
+        isOpen={discoverDrawer.isOpen}
+        onOpenChange={discoverDrawer.setOpen}
+        onDiscovered={refresh}
+      />
     </div>
   );
 }

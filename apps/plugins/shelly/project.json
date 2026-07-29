@@ -19,6 +19,16 @@
         "command": "eslint backend frontend/src"
       }
     },
+    "test": {
+      "executor": "@nx/jest:jest",
+      "cache": true,
+      "inputs": ["default", "^production", "{workspaceRoot}/jest.preset.js", { "externalDependencies": ["jest"] }],
+      "outputs": ["{workspaceRoot}/coverage/apps/plugins/shelly"],
+      "options": {
+        "jestConfig": "apps/plugins/shelly/jest.config.ts",
+        "passWithNoTests": true
+      }
+    },
     "build-backend": {
       "executor": "nx:run-commands",
       "cache": true,
