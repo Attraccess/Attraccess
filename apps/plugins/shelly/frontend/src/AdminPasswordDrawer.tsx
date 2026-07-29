@@ -27,7 +27,7 @@ function PasswordFieldRow({
   const [visible, setVisible] = useState(false);
 
   return (
-    <div className="relative">
+    <div className="sh:relative">
       <TextFieldRow
         label={label}
         value={visible ? value : value.replace(/./g, '•')}
@@ -44,10 +44,10 @@ function PasswordFieldRow({
         variant="ghost"
         size="sm"
         aria-label={visible ? 'Hide password' : 'Show password'}
-        className="absolute right-1 top-6"
+        className="sh:absolute sh:right-1 sh:top-6"
         onPress={() => setVisible((v) => !v)}
       >
-        {visible ? <EyeOffIcon className="h-4 w-4" /> : <EyeIcon className="h-4 w-4" />}
+        {visible ? <EyeOffIcon className="sh:h-4 sh:w-4" /> : <EyeIcon className="sh:h-4 sh:w-4" />}
       </Button>
       {/* Feed the actual (unmasked) value into the form for submission. */}
       <input
@@ -55,7 +55,7 @@ function PasswordFieldRow({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         autoComplete={autoComplete}
-        className="sr-only"
+        className="sh:sr-only"
         aria-hidden="true"
         tabIndex={-1}
       />
@@ -118,14 +118,14 @@ export function AdminPasswordDrawer({
   return (
     <StandardDrawer isOpen={!!device} onOpenChange={onOpenChange}>
       <DrawerHeader>
-        <div className="flex w-full items-start justify-between gap-3">
-          <div className="flex min-w-0 flex-col gap-1">
-            <div className="flex items-center gap-2">
-              <KeyRoundIcon className="h-5 w-5 shrink-0 text-accent-soft-foreground" />
-              <h2 className="text-lg font-semibold">Admin password</h2>
+        <div className="sh:flex sh:w-full sh:items-start sh:justify-between sh:gap-3">
+          <div className="sh:flex sh:min-w-0 sh:flex-col sh:gap-1">
+            <div className="sh:flex sh:items-center sh:gap-2">
+              <KeyRoundIcon className="sh:h-5 sh:w-5 sh:shrink-0 sh:text-accent-soft-foreground" />
+              <h2 className="sh:text-lg sh:font-semibold">Admin password</h2>
             </div>
             {device && (
-              <p className="text-sm text-muted">
+              <p className="sh:text-sm sh:text-muted">
                 Set or change the admin password of {device.name} ({device.ipAddress}).
               </p>
             )}
@@ -136,7 +136,7 @@ export function AdminPasswordDrawer({
         </div>
       </DrawerHeader>
       <DrawerBody>
-        <Form onSubmit={onSubmit} className="flex flex-col gap-4">
+        <Form onSubmit={onSubmit} className="sh:flex sh:flex-col sh:gap-4">
           {device?.authState === 'required' && (
             <PasswordFieldRow
               label="Current password"
@@ -169,7 +169,7 @@ export function AdminPasswordDrawer({
           Cancel
         </Button>
         <Button variant="primary" isPending={submitting} onPress={() => void submit()} data-cy="shelly-auth-submit">
-          <KeyRoundIcon className="h-4 w-4" /> Save password
+          <KeyRoundIcon className="sh:h-4 sh:w-4" /> Save password
         </Button>
       </DrawerFooter>
     </StandardDrawer>

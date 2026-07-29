@@ -11,16 +11,16 @@ import { useDetection } from './detection';
 
 function StatusRow({ ok, label, value }: { ok: boolean; label: string; value: ReactNode }) {
   return (
-    <div className="flex items-center justify-between gap-3 py-1.5">
-      <div className="flex items-center gap-2">
+    <div className="rmq:flex rmq:items-center rmq:justify-between rmq:gap-3 rmq:py-1.5">
+      <div className="rmq:flex rmq:items-center rmq:gap-2">
         {ok ? (
-          <CheckCircle2Icon className="w-4 h-4 text-success" />
+          <CheckCircle2Icon className="rmq:w-4 rmq:h-4 rmq:text-success" />
         ) : (
-          <XCircleIcon className="w-4 h-4 text-danger" />
+          <XCircleIcon className="rmq:w-4 rmq:h-4 rmq:text-danger" />
         )}
-        <span className="text-sm text-default-600">{label}</span>
+        <span className="rmq:text-sm rmq:text-default-600">{label}</span>
       </div>
-      <span className="text-sm font-medium text-default-700">{value}</span>
+      <span className="rmq:text-sm rmq:font-medium rmq:text-default-700">{value}</span>
     </div>
   );
 }
@@ -38,12 +38,12 @@ export function RabbitmqStatusPanel({ mqttServerId }: { mqttServerId: number }) 
   return (
     <Card
       data-cy={`rabbitmq-status-panel-${mqttServerId}`}
-      className="w-full border border-default-200 dark:border-default-100"
+      className="rmq:w-full rmq:border rmq:border-default-200 rmq:dark:border-default-100"
     >
-      <Card.Header className="flex flex-row items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <RabbitIcon className="w-5 h-5 text-primary" />
-          <p className="text-base font-semibold text-default-700">RabbitMQ</p>
+      <Card.Header className="rmq:flex rmq:flex-row rmq:items-center rmq:justify-between rmq:gap-2">
+        <div className="rmq:flex rmq:items-center rmq:gap-2">
+          <RabbitIcon className="rmq:w-5 rmq:h-5 rmq:text-primary" />
+          <p className="rmq:text-base rmq:font-semibold rmq:text-default-700">RabbitMQ</p>
           <Chip color="accent" variant="soft" size="sm">
             detected
           </Chip>
@@ -57,27 +57,27 @@ export function RabbitmqStatusPanel({ mqttServerId }: { mqttServerId: number }) 
           onPress={refresh}
           isDisabled={loading}
         >
-          {loading ? <Spinner size="sm" /> : <RefreshCwIcon className="w-4 h-4" />}
+          {loading ? <Spinner size="sm" /> : <RefreshCwIcon className="rmq:w-4 rmq:h-4" />}
         </Button>
       </Card.Header>
-      <Card.Content className="flex flex-col gap-1">
+      <Card.Content className="rmq:flex rmq:flex-col rmq:gap-1">
         <StatusRow ok={result.reachable} label="Management API reachable" value={result.reachable ? 'Yes' : 'No'} />
         <StatusRow ok={result.authOk} label="Authentication" value={result.authOk ? 'OK' : 'Failed'} />
-        <div className="flex items-center justify-between gap-3 py-1.5">
-          <span className="text-sm text-default-600">Management API version</span>
-          <span className="text-sm font-medium text-default-700">{result.managementVersion ?? '—'}</span>
+        <div className="rmq:flex rmq:items-center rmq:justify-between rmq:gap-3 rmq:py-1.5">
+          <span className="rmq:text-sm rmq:text-default-600">Management API version</span>
+          <span className="rmq:text-sm rmq:font-medium rmq:text-default-700">{result.managementVersion ?? '—'}</span>
         </div>
-        <div className="flex items-center justify-between gap-3 py-1.5">
-          <span className="text-sm text-default-600">RabbitMQ version</span>
-          <span className="text-sm font-medium text-default-700">{result.rabbitmqVersion ?? '—'}</span>
+        <div className="rmq:flex rmq:items-center rmq:justify-between rmq:gap-3 rmq:py-1.5">
+          <span className="rmq:text-sm rmq:text-default-600">RabbitMQ version</span>
+          <span className="rmq:text-sm rmq:font-medium rmq:text-default-700">{result.rabbitmqVersion ?? '—'}</span>
         </div>
-        <div className="flex items-center justify-between gap-3 py-1.5">
-          <span className="text-sm text-default-600">Management API</span>
-          <code className="text-xs text-default-500">{result.managementApi || '—'}</code>
+        <div className="rmq:flex rmq:items-center rmq:justify-between rmq:gap-3 rmq:py-1.5">
+          <span className="rmq:text-sm rmq:text-default-600">Management API</span>
+          <code className="rmq:text-xs rmq:text-default-500">{result.managementApi || '—'}</code>
         </div>
 
         {result.error && (
-          <Alert status={result.reachable ? 'warning' : 'danger'} className="mt-2">
+          <Alert status={result.reachable ? 'warning' : 'danger'} className="rmq:mt-2">
             <AlertContent>
               <AlertDescription>{result.error}</AlertDescription>
             </AlertContent>

@@ -63,7 +63,7 @@ function AuthChip({ state }: { state: AuthState }) {
   };
   const { color, label } = map[state];
   return (
-    <Chip variant="soft" color={color} size="sm" className="whitespace-nowrap">
+    <Chip variant="soft" color={color} size="sm" className="sh:whitespace-nowrap">
       {label}
     </Chip>
   );
@@ -78,10 +78,10 @@ function ProbeErrorIndicator({ message }: { message: string }) {
           size="sm"
           isIconOnly
           aria-label={`Probe failed: ${message}`}
-          className="h-6 w-6 min-w-6 text-warning"
+          className="sh:h-6 sh:w-6 sh:min-w-6 sh:text-warning"
           data-cy="shelly-device-probe-error"
         >
-          <TriangleAlertIcon className="h-4 w-4" />
+          <TriangleAlertIcon className="sh:h-4 sh:w-4" />
         </Button>
       </Tooltip.Trigger>
       <Tooltip.Content>Probe failed: {message}</Tooltip.Content>
@@ -105,7 +105,7 @@ function RowActions({
   onDelete: () => void;
 }) {
   return (
-    <div className="flex flex-row items-center justify-end gap-1 whitespace-nowrap">
+    <div className="sh:flex sh:flex-row sh:items-center sh:justify-end sh:gap-1 sh:whitespace-nowrap">
       <Tooltip>
         <Tooltip.Trigger>
           <Button
@@ -117,7 +117,7 @@ function RowActions({
             onPress={onInfo}
             data-cy={`shelly-device-info-${deviceId}`}
           >
-            <InfoIcon className="h-4 w-4" />
+            <InfoIcon className="sh:h-4 sh:w-4" />
           </Button>
         </Tooltip.Trigger>
         <Tooltip.Content>View device info</Tooltip.Content>
@@ -132,19 +132,19 @@ function RowActions({
             isPending={isBusy}
             data-cy={`shelly-device-menu-${deviceId}`}
           >
-            <MoreVerticalIcon className="h-4 w-4" />
+            <MoreVerticalIcon className="sh:h-4 sh:w-4" />
           </Button>
         </DropdownTrigger>
         <DropdownPopover>
           <DropdownMenu aria-label="Device actions">
             <DropdownItem id="auth" onPress={onAuth} data-cy={`shelly-device-auth-${deviceId}`}>
-              <KeyRoundIcon className="mr-2 inline h-4 w-4" /> Set admin password
+              <KeyRoundIcon className="sh:mr-2 sh:inline sh:h-4 sh:w-4" /> Set admin password
             </DropdownItem>
             <DropdownItem id="reprobe" onPress={onReprobe} data-cy={`shelly-device-reprobe-${deviceId}`}>
-              <RefreshCwIcon className="mr-2 inline h-4 w-4" /> Re-probe device
+              <RefreshCwIcon className="sh:mr-2 sh:inline sh:h-4 sh:w-4" /> Re-probe device
             </DropdownItem>
-            <DropdownItem id="delete" onPress={onDelete} className="text-danger" data-cy={`shelly-device-delete-${deviceId}`}>
-              <Trash2Icon className="mr-2 inline h-4 w-4" /> Delete device
+            <DropdownItem id="delete" onPress={onDelete} className="sh:text-danger" data-cy={`shelly-device-delete-${deviceId}`}>
+              <Trash2Icon className="sh:mr-2 sh:inline sh:h-4 sh:w-4" /> Delete device
             </DropdownItem>
           </DropdownMenu>
         </DropdownPopover>
@@ -155,11 +155,11 @@ function RowActions({
 
 function EmptyDevices({ onAdd }: { onAdd: () => void }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-3 px-4 py-12">
-      <MehIcon size={36} className="text-default-300" />
-      <p className="text-sm text-default-500">No devices yet. Run discovery, or add your first Shelly by its IP.</p>
+    <div className="sh:flex sh:flex-col sh:items-center sh:justify-center sh:gap-3 sh:px-4 sh:py-12">
+      <MehIcon size={36} className="sh:text-default-300" />
+      <p className="sh:text-sm sh:text-default-500">No devices yet. Run discovery, or add your first Shelly by its IP.</p>
       <Button variant="secondary" size="sm" onPress={onAdd} data-cy="shelly-add-open-empty">
-        <PlusIcon className="h-4 w-4" /> Add device
+        <PlusIcon className="sh:h-4 sh:w-4" /> Add device
       </Button>
     </div>
   );
@@ -223,21 +223,21 @@ export function DevicesPage() {
   }, [deleteTarget, refresh]);
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 md:p-6">
-      <div className="flex w-full flex-wrap items-center justify-between gap-y-4">
-        <div className="flex items-center gap-3">
-          <WifiIcon className="h-6 w-6 text-accent-soft-foreground" />
+    <div className="sh:mx-auto sh:flex sh:w-full sh:max-w-5xl sh:flex-col sh:gap-6 sh:p-4 sh:md:p-6">
+      <div className="sh:flex sh:w-full sh:flex-wrap sh:items-center sh:justify-between sh:gap-y-4">
+        <div className="sh:flex sh:items-center sh:gap-3">
+          <WifiIcon className="sh:h-6 sh:w-6 sh:text-accent-soft-foreground" />
           <div>
-            <h1 className="text-2xl font-bold">Shelly Devices</h1>
-            <p className="mt-1 text-sm text-muted">Discovered and manually added Shelly devices.</p>
+            <h1 className="sh:text-2xl sh:font-bold">Shelly Devices</h1>
+            <p className="sh:mt-1 sh:text-sm sh:text-muted">Discovered and manually added Shelly devices.</p>
           </div>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="sh:flex sh:flex-wrap sh:gap-2">
           <Button variant="secondary" onPress={discoverDrawer.open} data-cy="shelly-discover-open">
-            <SearchIcon className="h-4 w-4" /> Discover
+            <SearchIcon className="sh:h-4 sh:w-4" /> Discover
           </Button>
           <Button variant="primary" onPress={addDrawer.open} data-cy="shelly-add-open">
-            <PlusIcon className="h-4 w-4" /> Add device
+            <PlusIcon className="sh:h-4 sh:w-4" /> Add device
           </Button>
         </div>
       </div>
@@ -249,7 +249,7 @@ export function DevicesPage() {
       )}
 
       {loading ? (
-        <div className="flex items-center justify-center p-6">
+        <div className="sh:flex sh:items-center sh:justify-center sh:p-6">
           <Spinner color="accent" />
         </div>
       ) : (
@@ -258,40 +258,40 @@ export function DevicesPage() {
             <TableContent aria-label="Shelly devices">
               <TableHeader>
                 <TableColumn isRowHeader>Device</TableColumn>
-                <TableColumn className="hidden sm:table-cell md:hidden lg:table-cell">Address</TableColumn>
-                <TableColumn className="hidden lg:table-cell">Model</TableColumn>
-                <TableColumn className="hidden sm:table-cell">Auth</TableColumn>
-                <TableColumn className="text-end">Actions</TableColumn>
+                <TableColumn className="sh:hidden sh:sm:table-cell sh:md:hidden sh:lg:table-cell">Address</TableColumn>
+                <TableColumn className="sh:hidden sh:lg:table-cell">Model</TableColumn>
+                <TableColumn className="sh:hidden sh:sm:table-cell">Auth</TableColumn>
+                <TableColumn className="sh:text-end">Actions</TableColumn>
               </TableHeader>
               <TableBody items={devices} renderEmptyState={() => <EmptyDevices onAdd={addDrawer.open} />}>
                 {(device) => (
                   <TableRow key={device.id} id={device.id} data-cy={`shelly-device-row-${device.id}`}>
-                    <TableCell className="whitespace-nowrap">
-                      <div className="flex items-center gap-1">
-                        <span className="max-w-36 truncate font-medium text-default-800 sm:max-w-48" title={device.name}>
+                    <TableCell className="sh:whitespace-nowrap">
+                      <div className="sh:flex sh:items-center sh:gap-1">
+                        <span className="sh:max-w-36 sh:truncate sh:font-medium sh:text-default-800 sh:sm:max-w-48" title={device.name}>
                           {device.name}
                         </span>
                         {device.lastProbeError && <ProbeErrorIndicator message={device.lastProbeError} />}
                       </div>
-                      <div className="text-xs text-default-500 sm:hidden md:block lg:hidden">{device.ipAddress}</div>
+                      <div className="sh:text-xs sh:text-default-500 sh:sm:hidden sh:md:block sh:lg:hidden">{device.ipAddress}</div>
                     </TableCell>
-                    <TableCell className="hidden whitespace-nowrap text-default-600 sm:table-cell md:hidden lg:table-cell">
+                    <TableCell className="sh:hidden sh:whitespace-nowrap sh:text-default-600 sh:sm:table-cell sh:md:hidden sh:lg:table-cell">
                       {device.ipAddress}
                     </TableCell>
-                    <TableCell className="hidden whitespace-nowrap lg:table-cell">
-                      <div className="flex items-center gap-1.5">
-                        <span className="max-w-36 truncate" title={device.model ?? undefined}>
+                    <TableCell className="sh:hidden sh:whitespace-nowrap sh:lg:table-cell">
+                      <div className="sh:flex sh:items-center sh:gap-1.5">
+                        <span className="sh:max-w-36 sh:truncate" title={device.model ?? undefined}>
                           {device.model ?? '—'}
                         </span>
-                        <Chip variant="soft" size="sm" className="whitespace-nowrap">
+                        <Chip variant="soft" size="sm" className="sh:whitespace-nowrap">
                           {generationLabel(device.generation)}
                         </Chip>
                       </div>
                     </TableCell>
-                    <TableCell className="hidden whitespace-nowrap sm:table-cell">
+                    <TableCell className="sh:hidden sh:whitespace-nowrap sh:sm:table-cell">
                       <AuthChip state={device.authState} />
                     </TableCell>
-                    <TableCell className="whitespace-nowrap">
+                    <TableCell className="sh:whitespace-nowrap">
                       <RowActions
                         deviceId={device.id}
                         isBusy={rowBusyId === device.id}
@@ -333,7 +333,7 @@ export function DevicesPage() {
               </ModalHeader>
               <ModalBody>
                 <p>
-                  Remove <span className="font-semibold">{deleteTarget?.name}</span> ({deleteTarget?.ipAddress}) from the
+                  Remove <span className="sh:font-semibold">{deleteTarget?.name}</span> ({deleteTarget?.ipAddress}) from the
                   registry? The device itself is not changed.
                 </p>
               </ModalBody>
@@ -342,7 +342,7 @@ export function DevicesPage() {
                   Cancel
                 </Button>
                 <Button variant="danger" onPress={confirmDelete} isPending={deleting} data-cy="shelly-delete-confirm">
-                  <Trash2Icon className="h-4 w-4" /> Delete
+                  <Trash2Icon className="sh:h-4 sh:w-4" /> Delete
                 </Button>
               </ModalFooter>
             </ModalDialog>

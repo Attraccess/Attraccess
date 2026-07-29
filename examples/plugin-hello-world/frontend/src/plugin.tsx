@@ -13,6 +13,7 @@
 // federation — see ../vite.config.ts. Importing them here means the host serves
 // the single copy it already ships, so the plugin bundle stays tiny and every
 // HeroUI component picks up the host's active theme automatically.
+import './styles.css';
 import {
   Alert,
   AlertContent,
@@ -52,12 +53,12 @@ const GREETINGS_ENDPOINT = '/api/hello-world/greetings';
 // spacing and colours match the rest of the app in both light and dark mode.
 function PluginShell({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-6 p-6 max-w-4xl mx-auto">
-      <div className="flex items-center gap-3">
-        <HandIcon className="w-6 h-6 text-primary" />
-        <h1 className="text-2xl font-semibold text-default-800">{title}</h1>
+    <div className="hw:flex hw:flex-col hw:gap-6 hw:p-6 hw:max-w-4xl hw:mx-auto">
+      <div className="hw:flex hw:items-center hw:gap-3">
+        <HandIcon className="hw:w-6 hw:h-6 hw:text-primary" />
+        <h1 className="hw:text-2xl hw:font-semibold hw:text-default-800">{title}</h1>
       </div>
-      <nav className="flex gap-2">
+      <nav className="hw:flex hw:gap-2">
         <Button as={Link} to="/hello-world" variant="ghost" size="sm" data-cy="hello-world-nav-greetings">
           Greetings
         </Button>
@@ -93,17 +94,17 @@ function HelloWorldPage() {
 
   return (
     <PluginShell title="Hello World">
-      <Card data-cy="hello-world-plugin-page" className="border border-default-200 dark:border-default-100">
-        <Card.Header className="flex flex-col items-start gap-1">
-          <p className="text-base font-semibold text-default-700">Greetings from the backend</p>
-          <p className="text-sm text-default-500">
+      <Card data-cy="hello-world-plugin-page" className="hw:border hw:border-default-200 hw:dark:border-default-100">
+        <Card.Header className="hw:flex hw:flex-col hw:items-start hw:gap-1">
+          <p className="hw:text-base hw:font-semibold hw:text-default-700">Greetings from the backend</p>
+          <p className="hw:text-sm hw:text-default-500">
             Served by the plugin's NestJS controller at <code>GET /hello-world/greetings</code>, which reads host
             users through an injected repository (needs the <code>READ_USERS</code> permission).
           </p>
         </Card.Header>
         <Card.Content>
           {loading && (
-            <div className="flex items-center gap-2 text-default-500">
+            <div className="hw:flex hw:items-center hw:gap-2 hw:text-default-500">
               <Spinner size="sm" /> Loading…
             </div>
           )}
@@ -115,7 +116,7 @@ function HelloWorldPage() {
             </Alert>
           )}
           {!loading && !error && (
-            <ul data-cy="hello-world-greetings" className="flex flex-col gap-2">
+            <ul data-cy="hello-world-greetings" className="hw:flex hw:flex-col hw:gap-2">
               {greetings.map((greeting) => (
                 <li key={greeting}>
                   <Chip color="accent" variant="soft">
@@ -162,16 +163,16 @@ function CapabilitiesPage() {
     <PluginShell title="Hello World — Capabilities">
       <div
         data-cy="hello-world-capabilities-page"
-        className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
+        className="hw:grid hw:gap-4 hw:sm:grid-cols-2 hw:xl:grid-cols-3"
       >
         {items.map((item) => (
-          <Card key={item.title} className="border border-default-200 dark:border-default-100">
-            <Card.Header className="flex flex-row items-center gap-2">
-              <item.icon className="w-5 h-5 text-primary" />
-              <p className="text-base font-semibold text-default-700">{item.title}</p>
+          <Card key={item.title} className="hw:border hw:border-default-200 hw:dark:border-default-100">
+            <Card.Header className="hw:flex hw:flex-row hw:items-center hw:gap-2">
+              <item.icon className="hw:w-5 hw:h-5 hw:text-primary" />
+              <p className="hw:text-base hw:font-semibold hw:text-default-700">{item.title}</p>
             </Card.Header>
             <Card.Content>
-              <p className="text-sm text-default-500">{item.body}</p>
+              <p className="hw:text-sm hw:text-default-500">{item.body}</p>
             </Card.Content>
           </Card>
         ))}
@@ -201,14 +202,14 @@ function MqttServerDetailExtension({ mqttServerId }: { mqttServerId: number }) {
   return (
     <Card
       data-cy="hello-world-mqtt-detail-slot"
-      className="w-full border border-default-200 dark:border-default-100"
+      className="hw:w-full hw:border hw:border-default-200 hw:dark:border-default-100"
     >
-      <Card.Header className="flex flex-row items-center gap-2">
-        <PlugIcon className="w-5 h-5 text-primary" />
-        <p className="text-base font-semibold text-default-700">Hello World plugin extension</p>
+      <Card.Header className="hw:flex hw:flex-row hw:items-center hw:gap-2">
+        <PlugIcon className="hw:w-5 hw:h-5 hw:text-primary" />
+        <p className="hw:text-base hw:font-semibold hw:text-default-700">Hello World plugin extension</p>
       </Card.Header>
       <Card.Content>
-        <p className="text-sm text-default-500">
+        <p className="hw:text-sm hw:text-default-500">
           This card is injected into the MQTT server detail slot via{' '}
           <code>getSlotContributions()</code> — no core code knows about it. It is scoped to server{' '}
           <Chip color="accent" variant="soft">
@@ -225,7 +226,7 @@ function MqttServerDetailExtension({ mqttServerId }: { mqttServerId: number }) {
 function MqttServerListBadge({ mqttServerId }: { mqttServerId: number }) {
   return (
     <Chip data-cy={`hello-world-mqtt-list-slot-${mqttServerId}`} color="accent" variant="soft">
-      <PlugIcon className="w-3.5 h-3.5" />
+      <PlugIcon className="hw:w-3.5 hw:h-3.5" />
       plugin
     </Chip>
   );
@@ -289,7 +290,7 @@ export default class HelloWorldPlugin implements AttraccessFrontendPlugin {
       {
         label: 'Hello World',
         path: '/hello-world',
-        icon: <HandIcon className="w-5 h-5" />,
+        icon: <HandIcon className="hw:w-5 hw:h-5" />,
       },
     ];
   }

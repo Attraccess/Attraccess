@@ -52,6 +52,19 @@ describe('PluginController', () => {
       expect(controller.getFrontendPluginFile('streamed', 'index.js')).toBeInstanceOf(StreamableFile);
     });
 
+    it.each([
+      ['index.js', 'application/javascript'],
+      ['style.css', 'text/css'],
+    ])('serves %s with content type %s', (fileName, contentType) => {
+      const plugin = frontendPlugin('typed');
+      jest.spyOn(PluginService, 'getPlugins').mockReturnValue([plugin]);
+      mkdirSync(join(root, 'typed', 'frontend'), { recursive: true });
+      writeFileSync(join(root, 'typed', 'frontend', fileName), '/* content */');
+
+      const file = controller.getFrontendPluginFile('typed', fileName);
+      expect(file.options.type).toBe(contentType);
+    });
+
     it('throws when the plugin is unknown', () => {
       jest.spyOn(PluginService, 'getPlugins').mockReturnValue([]);
       expect(() => controller.getFrontendPluginFile('ghost', 'index.js')).toThrow(NotFoundException);

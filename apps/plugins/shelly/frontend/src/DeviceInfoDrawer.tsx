@@ -74,19 +74,19 @@ function AuthProtectedForm({
   if (authState !== 'required') return null;
 
   return (
-    <Card className="border-l-4 border-l-warning bg-warning/5">
-      <Card.Content className="p-4">
+    <Card className="sh:border-l-4 sh:border-l-warning sh:bg-warning/5">
+      <Card.Content className="sh:p-4">
         <Form
           onSubmit={(e) => {
             e.preventDefault();
             onLoad();
           }}
-          className="flex flex-col gap-3"
+          className="sh:flex sh:flex-col sh:gap-3"
         >
-          <p className="text-sm">
+          <p className="sh:text-sm">
             This device requires authentication. Enter its admin password to read protected info.
           </p>
-          <div className="relative">
+          <div className="sh:relative">
             <TextFieldRow
               label="Admin password"
               value={currentPassword}
@@ -99,13 +99,13 @@ function AuthProtectedForm({
               variant="ghost"
               size="sm"
               aria-label={visible ? 'Hide password' : 'Show password'}
-              className="absolute right-1 top-6"
+              className="sh:absolute sh:right-1 sh:top-6"
               onPress={() => setVisible((v) => !v)}
             >
-              {visible ? <EyeOffIcon className="h-4 w-4" /> : <EyeIcon className="h-4 w-4" />}
+              {visible ? <EyeOffIcon className="sh:h-4 sh:w-4" /> : <EyeIcon className="sh:h-4 sh:w-4" />}
             </Button>
           </div>
-          <div className="flex justify-end">
+          <div className="sh:flex sh:justify-end">
             <Button
               variant="primary"
               size="sm"
@@ -161,18 +161,18 @@ function DeviceInfoCards({ info }: { info: ShellyDeviceInfo }) {
   ];
 
   return (
-    <div className="grid gap-4">
+    <div className="sh:grid sh:gap-4">
       {cards.map((card) => (
         <Card key={card.title}>
-          <Card.Header className="pb-0">
-            <span className="text-sm font-semibold">{card.title}</span>
+          <Card.Header className="sh:pb-0">
+            <span className="sh:text-sm sh:font-semibold">{card.title}</span>
           </Card.Header>
           <Card.Content>
-            <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <dl className="sh:grid sh:grid-cols-1 sh:gap-3 sh:sm:grid-cols-2">
               {card.rows.map((row) => (
-                <div key={row.label} className="min-w-0">
-                  <dt className="text-xs font-medium uppercase tracking-wide text-default-500">{row.label}</dt>
-                  <dd className="mt-1 truncate text-sm text-default-800" title={row.value}>
+                <div key={row.label} className="sh:min-w-0">
+                  <dt className="sh:text-xs sh:font-medium sh:uppercase sh:tracking-wide sh:text-default-500">{row.label}</dt>
+                  <dd className="sh:mt-1 sh:truncate sh:text-sm sh:text-default-800" title={row.value}>
                     {row.value}
                   </dd>
                 </div>
@@ -229,14 +229,14 @@ export function DeviceInfoDrawer({
   return (
     <StandardDrawer isOpen={!!device} onOpenChange={onOpenChange}>
       <DrawerHeader>
-        <div className="flex w-full items-start justify-between gap-3">
-          <div className="flex min-w-0 flex-col gap-1">
-            <div className="flex items-center gap-2">
-              <InfoIcon className="h-5 w-5 shrink-0 text-accent-soft-foreground" />
-              <h2 className="text-lg font-semibold">{device?.name ?? 'Device info'}</h2>
+        <div className="sh:flex sh:w-full sh:items-start sh:justify-between sh:gap-3">
+          <div className="sh:flex sh:min-w-0 sh:flex-col sh:gap-1">
+            <div className="sh:flex sh:items-center sh:gap-2">
+              <InfoIcon className="sh:h-5 sh:w-5 sh:shrink-0 sh:text-accent-soft-foreground" />
+              <h2 className="sh:text-lg sh:font-semibold">{device?.name ?? 'Device info'}</h2>
             </div>
             {device && (
-              <p className="text-sm text-muted">{device.ipAddress}</p>
+              <p className="sh:text-sm sh:text-muted">{device.ipAddress}</p>
             )}
           </div>
           <Button isIconOnly variant="ghost" aria-label="Close" onPress={close}>
@@ -245,7 +245,7 @@ export function DeviceInfoDrawer({
         </div>
       </DrawerHeader>
       <DrawerBody>
-        <div className="flex flex-col gap-4">
+        <div className="sh:flex sh:flex-col sh:gap-4">
           <AuthProtectedForm
             authState={device?.authState ?? 'unknown'}
             currentPassword={currentPassword}
@@ -259,10 +259,10 @@ export function DeviceInfoDrawer({
             </StatusAlert>
           )}
           {loading && !info ? (
-            <div className="flex flex-col gap-4" aria-hidden="true">
-              <Skeleton className="h-32 w-full rounded-xl" />
-              <Skeleton className="h-32 w-full rounded-xl" />
-              <Skeleton className="h-32 w-full rounded-xl" />
+            <div className="sh:flex sh:flex-col sh:gap-4" aria-hidden="true">
+              <Skeleton className="sh:h-32 sh:w-full sh:rounded-xl" />
+              <Skeleton className="sh:h-32 sh:w-full sh:rounded-xl" />
+              <Skeleton className="sh:h-32 sh:w-full sh:rounded-xl" />
             </div>
           ) : info ? (
             <DeviceInfoCards info={info} />
@@ -270,12 +270,12 @@ export function DeviceInfoDrawer({
         </div>
       </DrawerBody>
       <DrawerFooter>
-        <div className="flex w-full items-center justify-between gap-3">
-          <span className="text-xs text-default-500">
+        <div className="sh:flex sh:w-full sh:items-center sh:justify-between sh:gap-3">
+          <span className="sh:text-xs sh:text-default-500">
             {info ? `Updated ${new Date(info.fetchedAt).toLocaleTimeString()}` : ''}
           </span>
           <Button variant="secondary" onPress={() => void load()} isPending={loading} data-cy="shelly-info-refresh">
-            <RefreshCwIcon className="h-4 w-4" /> Refresh
+            <RefreshCwIcon className="sh:h-4 sh:w-4" /> Refresh
           </Button>
         </div>
       </DrawerFooter>

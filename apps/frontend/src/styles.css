@@ -1,8 +1,5 @@
 @import "@heroui/styles";
 @plugin "@tailwindcss/typography";
-/* In-repo plugin frontends ship no CSS of their own — they rely on the host's
-   Tailwind utilities. Scan their sources so the classes they use are emitted. */
-@source "../../plugins/*/frontend/src/**/*.{ts,tsx}";
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {

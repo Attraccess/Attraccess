@@ -73,6 +73,20 @@ export function PluginProvider(props: PropsWithChildren) {
           const baseUrl = getBaseUrl();
           const remoteUrl = `${baseUrl}/api/plugins/${pluginManifest.name}/frontend/module-federation/${entryPointFile}`;
 
+          // Plugins bundle their own CSS (e.g. their Tailwind utilities); the
+          // federation remote only carries JS, so inject the stylesheet here.
+          const stylesFile = pluginManifest.main.frontend?.styles;
+          if (stylesFile) {
+            const linkId = `plugin-styles-${pluginManifest.name}`;
+            if (!document.getElementById(linkId)) {
+              const link = document.createElement('link');
+              link.id = linkId;
+              link.rel = 'stylesheet';
+              link.href = `${baseUrl}/api/plugins/${pluginManifest.name}/frontend/module-federation/${stylesFile}`;
+              document.head.appendChild(link);
+            }
+          }
+
           __federation_method_setRemote(pluginManifest.name, {
             url: () => Promise.resolve(remoteUrl),
             format: 'esm',
