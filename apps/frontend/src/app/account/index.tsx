@@ -11,6 +11,7 @@ import { EmailForm } from './email';
 import { SetPasswordForm } from '../user-management/details/components/setPasswordForm';
 import { useAuth } from '../../hooks/useAuth';
 import { TwoFactorCard } from './two-factor';
+import { PasskeysCard } from './passkeys';
 import { NotificationPreferencesForm } from './notifications';
 import { useUsersServiceRequestDeleteAccount, ApiError } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../components/toastProvider';
@@ -62,6 +63,7 @@ export default function AccountPage() {
           <div className="flex flex-col gap-6">
             {me && <SetPasswordForm userId={me.id} username={me.username} />}
             {me && <TwoFactorCard />}
+            {me && <PasskeysCard />}
           </div>
         </FlatSection>
 

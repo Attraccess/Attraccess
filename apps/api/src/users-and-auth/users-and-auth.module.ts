@@ -45,6 +45,8 @@ import {
   Session,
   ResourceUsage,
   Setting,
+  Passkey,
+  PasskeyChallenge,
 } from '@attraccess/database-entities';
 import { EmailModule } from '../email/email.module';
 import { SSOService } from './auth/sso/sso.service';
@@ -63,6 +65,8 @@ import { EncryptionModule } from '../encryption/encryption.module';
 import { SSOLinkTokenService } from './auth/sso/link-token.service';
 import { AccountLinkingExceptionFilter } from './auth/sso/oidc/account-linking.exception-filter';
 import { TwoFactorService } from './auth/two-factor.service';
+import { PasskeyService } from './auth/passkey/passkey.service';
+import { PasskeyController } from './auth/passkey/passkey.controller';
 import { SettingsModule } from '../settings/settings.module';
 import { SettingsService } from '../settings/settings.service';
 import { BruteForceProtectionService } from './rate-limiting/brute-force.service';
@@ -83,6 +87,8 @@ import { NotificationsModule } from '../notifications/notifications.module';
       Session,
       ResourceUsage,
       Setting,
+      Passkey,
+      PasskeyChallenge,
     ]),
     PassportModule,
     EmailModule,
@@ -123,6 +129,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     AuthService,
     SessionService,
     TwoFactorService,
+    PasskeyService,
     LocalStrategy,
     SessionStrategy,
     SSOService,
@@ -170,6 +177,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     UserPermissionsController,
     AuthController,
     TwoFactorController,
+    PasskeyController,
     SSOController,
     RbacController,
   ],
