@@ -49,7 +49,14 @@ describe('PluginController', () => {
       mkdirSync(join(root, 'streamed', 'frontend'), { recursive: true });
       writeFileSync(join(root, 'streamed', 'frontend', 'index.js'), 'console.log(1)');
 
-      expect(controller.getFrontendPluginFile('streamed', 'index.js')).toBeInstanceOf(StreamableFile);
+      const streamable = controller.getFrontendPluginFile('streamed', 'index.js');
+      expect(streamable).toBeInstanceOf(StreamableFile);
+      // the stream opens lazily, so afterEach's rmSync races it into an ENOENT 'error' event.
+      // Unhandled, that kills the whole jest worker — swallow it and close the fd.
+      streamable
+        .getStream()
+        .on('error', () => undefined)
+        .destroy();
     });
 
     it('throws when the plugin is unknown', () => {
