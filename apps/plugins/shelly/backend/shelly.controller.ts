@@ -14,7 +14,6 @@ import {
   Param,
   ParseIntPipe,
   Post,
-  Query,
 } from '@nestjs/common';
 import { Auth } from '@attraccess/plugins-backend-sdk';
 import { DeviceRegistryService } from './device-registry.service';
@@ -28,7 +27,7 @@ interface AddDeviceBody {
   name?: string;
 }
 
-interface DeviceInfoQuery {
+interface DeviceInfoBody {
   username?: string;
   currentPassword?: string;
 }
@@ -110,15 +109,17 @@ export class ShellyController {
     return updated;
   }
 
-  @Get('devices/:id/info')
-  async info(@Param('id', ParseIntPipe) id: number, @Query() query: DeviceInfoQuery): Promise<ShellyDeviceInfo> {
+  // POST rather than GET: the request can carry the device admin password, and a
+  // query string would leak it into access logs and browser history.
+  @Post('devices/:id/info')
+  async info(@Param('id', ParseIntPipe) id: number, @Body() body: DeviceInfoBody): Promise<ShellyDeviceInfo> {
     const device = await this.requireDeviceWithGeneration(id);
     try {
       return await this.deviceApi.getDeviceInfo({
         ipAddress: device.ipAddress,
         generation: device.generation,
-        username: query.username,
-        currentPassword: query.currentPassword,
+        username: body?.username,
+        currentPassword: body?.currentPassword,
       });
     } catch (err) {
       throw toDeviceCommunicationException(err);

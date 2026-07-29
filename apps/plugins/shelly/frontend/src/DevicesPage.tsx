@@ -99,7 +99,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function readPath(source: unknown, path: string): unknown {
-  return path.split('.').reduce<unknown>((value, key) => (isRecord(value) ? value[key] : undefined), source);
+  return path.split('.').reduce<unknown>((value, key) => {
+    if (Array.isArray(value)) return value[Number(key)];
+    return isRecord(value) ? value[key] : undefined;
+  }, source);
 }
 
 function firstValue(source: unknown, paths: string[]): unknown {
@@ -543,10 +546,10 @@ export function DeviceInfoDetails({ info }: { info: ShellyDeviceInfo | null }) {
 
   const status = info.status;
   const config = info.config;
-  const output = firstValue(status, ['switch_0.output', 'relays.0.ison', 'lights.0.ison']);
-  const power = firstValue(status, ['switch_0.apower', 'meters.0.power', 'lights.0.power']);
-  const voltage = firstValue(status, ['switch_0.voltage', 'meters.0.voltage']);
-  const current = firstValue(status, ['switch_0.current', 'meters.0.current']);
+  const output = firstValue(status, ['switch:0.output', 'relays.0.ison', 'lights.0.ison']);
+  const power = firstValue(status, ['switch:0.apower', 'meters.0.power', 'lights.0.power']);
+  const voltage = firstValue(status, ['switch:0.voltage', 'meters.0.voltage']);
+  const current = firstValue(status, ['switch:0.current', 'meters.0.current']);
 
   const cards: Array<{ title: string; rows: Array<{ label: string; value: string }> }> = [
     {

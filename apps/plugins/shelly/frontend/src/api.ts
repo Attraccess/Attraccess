@@ -81,12 +81,9 @@ export function deleteDevice(id: number): Promise<{ deleted: boolean }> {
   return request<{ deleted: boolean }>(`/devices/${id}`, { method: 'DELETE' });
 }
 
+// POST so the optional device admin password travels in the body, not the URL.
 export function getDeviceInfo(id: number, input?: { username?: string; currentPassword?: string }): Promise<ShellyDeviceInfo> {
-  const params = new URLSearchParams();
-  if (input?.username) params.set('username', input.username);
-  if (input?.currentPassword) params.set('currentPassword', input.currentPassword);
-  const query = params.size ? `?${params.toString()}` : '';
-  return request<ShellyDeviceInfo>(`/devices/${id}/info${query}`);
+  return request<ShellyDeviceInfo>(`/devices/${id}/info`, { method: 'POST', body: input ?? {} });
 }
 
 export function setAdminPassword(

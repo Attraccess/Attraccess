@@ -18,7 +18,7 @@ describe('DeviceInfoDetails', () => {
           fetchedAt: '2026-06-12T15:00:00.000Z',
           status: {
             wifi: { sta_ip: '192.168.1.50', ssid: 'Workshop WiFi', rssi: -58 },
-            switch_0: { output: true, apower: 42.5, voltage: 231.2, current: 0.18 },
+            'switch:0': { output: true, apower: 42.5, voltage: 231.2, current: 0.18 },
             sys: { uptime: 12345, ram_free: 103424 },
           },
           config: {
@@ -32,7 +32,26 @@ describe('DeviceInfoDetails', () => {
     expect(screen.getByText('192.168.1.50')).toBeInTheDocument();
     expect(screen.getByText('On')).toBeInTheDocument();
     expect(screen.getByText('42.5 W')).toBeInTheDocument();
-    expect(screen.queryByDisplayValue(/switch_0/)).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue(/switch:0/)).not.toBeInTheDocument();
+  });
+
+  it('reads Gen1 status through arrays (relays/meters)', () => {
+    render(
+      <DeviceInfoDetails
+        info={{
+          generation: 1,
+          fetchedAt: '2026-06-12T15:00:00.000Z',
+          status: {
+            relays: [{ ison: true }],
+            meters: [{ power: 12.3 }],
+          },
+          config: {},
+        }}
+      />
+    );
+
+    expect(screen.getAllByText('On').length).toBeGreaterThan(0);
+    expect(screen.getByText('12.3 W')).toBeInTheDocument();
   });
 
   it('shows an empty state before info is loaded', () => {
