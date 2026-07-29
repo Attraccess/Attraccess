@@ -4,7 +4,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route, Link } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AttraccessFrontendPlugin } from '@attraccess/plugins-frontend-sdk';
+import { getApiBaseUrl, type AttraccessFrontendPlugin } from '@attraccess/plugins-frontend-sdk';
 import { PluginProvider } from './plugin-provider';
 import usePluginState from './plugin.state';
 
@@ -150,6 +150,26 @@ describe('PluginProvider', () => {
     expect(instance.onApiAuthStateChange).toHaveBeenCalledWith(
       expect.objectContaining({ authToken: '', user: hoisted.user })
     );
+  });
+
+  // The SDK's preconfigured client reads the origin off `window`, so it has to
+  // be published before a plugin bundle can run a module-level request.
+  it('publishes the API base URL before loading plugin bundles', async () => {
+    const { name } = primeManifest();
+    let baseUrlDuringLoad: string | undefined;
+    hoisted.getRemoteMock.mockImplementation(() => {
+      baseUrlDuringLoad = getApiBaseUrl();
+      return Promise.resolve({
+        default: function () {
+          return createFakePlugin(name);
+        },
+      });
+    });
+
+    render(<PluginProvider />);
+
+    await waitFor(() => expect(usePluginState.getState().plugins).toHaveLength(1));
+    expect(baseUrlDuringLoad).toBe('http://test.local');
   });
 
   it('isolates a failing remote load without crashing the app shell', async () => {

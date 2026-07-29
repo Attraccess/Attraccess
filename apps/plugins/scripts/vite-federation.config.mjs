@@ -8,6 +8,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import federation from '@originjs/vite-plugin-federation';
+import { nxViteTsPaths } from '@nx/vite/plugins/nx-tsconfig-paths.plugin';
 import { join } from 'node:path';
 
 // Every host singleton a plugin may import at runtime. Sharing them keeps the
@@ -30,6 +31,10 @@ export function createPluginFederationConfig({ name, dir }) {
     root: join(dir, 'frontend'),
     plugins: [
       react(),
+      // In-repo plugins import `@attraccess/plugins-frontend-sdk` (for the API
+      // client, not just types) from the workspace source rather than the
+      // published package — resolve the tsconfig path aliases so that works.
+      nxViteTsPaths(),
       federation({
         name: `plugin-${name}`,
         filename: 'remoteEntry.js',

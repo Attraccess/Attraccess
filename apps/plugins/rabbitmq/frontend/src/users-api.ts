@@ -4,6 +4,7 @@
 // `/rabbitmq/users/...` in the host API. Shapes are restated here (the backend
 // and frontend are separate bundles with no shared module), mirroring
 // backend/rabbitmq-users.types.ts.
+import { createPluginApiClient } from '@attraccess/plugins-frontend-sdk';
 
 export interface RabbitmqPermission {
   vhost: string;
@@ -38,48 +39,20 @@ export const DEFAULT_MQTT_PERMISSIONS = {
   read: '^(amq\\.topic|mqtt-subscription-.*)$',
 } as const;
 
-// Host mounts plugin controllers under `/api`; cookies carry the session.
-const BASE = '/api/rabbitmq/users';
-
-// The backend wraps upstream failures in HTTP exceptions whose `message`
-// explains what went wrong (broker unreachable, missing management
-// privileges, …) — surface that text instead of a bare status code.
-async function parseError(res: Response): Promise<Error> {
-  try {
-    const body = (await res.json()) as { message?: string | string[] };
-    const message = Array.isArray(body.message) ? body.message.join(', ') : body.message;
-    if (message) {
-      return new Error(message);
-    }
-  } catch {
-    // Non-JSON error body — fall through to the generic message.
-  }
-  return new Error(`Request failed (HTTP ${res.status}).`);
-}
-
-async function request<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, { credentials: 'include', ...init });
-  if (!res.ok) {
-    throw await parseError(res);
-  }
-  const text = await res.text();
-  return (text.length > 0 ? JSON.parse(text) : null) as T;
-}
+// Host mounts plugin controllers under `/api`; the SDK client supplies the
+// origin, session cookie and JSON/error handling.
+const api = createPluginApiClient('/api/rabbitmq/users');
 
 export function fetchUsers(mqttServerId: number): Promise<RabbitmqUserList> {
-  return request<RabbitmqUserList>(`${BASE}/${mqttServerId}`);
+  return api.request<RabbitmqUserList>(`/${mqttServerId}`);
 }
 
 export function upsertUser(mqttServerId: number, username: string, body: UpsertRabbitmqUserBody): Promise<void> {
-  return request<void>(`${BASE}/${mqttServerId}/${encodeURIComponent(username)}`, {
-    method: 'PUT',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  return api.request<void>(`/${mqttServerId}/${encodeURIComponent(username)}`, { method: 'PUT', body });
 }
 
 export function deleteUser(mqttServerId: number, username: string): Promise<void> {
-  return request<void>(`${BASE}/${mqttServerId}/${encodeURIComponent(username)}`, { method: 'DELETE' });
+  return api.request<void>(`/${mqttServerId}/${encodeURIComponent(username)}`, { method: 'DELETE' });
 }
 
 export function setPermissions(
@@ -87,16 +60,15 @@ export function setPermissions(
   username: string,
   permission: RabbitmqPermission
 ): Promise<void> {
-  return request<void>(`${BASE}/${mqttServerId}/${encodeURIComponent(username)}/permissions`, {
+  return api.request<void>(`/${mqttServerId}/${encodeURIComponent(username)}/permissions`, {
     method: 'PUT',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(permission),
+    body: permission,
   });
 }
 
 export function clearPermissions(mqttServerId: number, username: string, vhost: string): Promise<void> {
-  return request<void>(
-    `${BASE}/${mqttServerId}/${encodeURIComponent(username)}/permissions?vhost=${encodeURIComponent(vhost)}`,
-    { method: 'DELETE' }
-  );
+  return api.request<void>(`/${mqttServerId}/${encodeURIComponent(username)}/permissions`, {
+    method: 'DELETE',
+    query: { vhost },
+  });
 }
