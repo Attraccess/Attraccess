@@ -15,8 +15,8 @@ const INVERTED_OPERATOR: Record<string, string> = {
   '<=': '>=',
 };
 
-export class FixIfNodeOperandOrder1782900000000 implements MigrationInterface {
-  name = 'FixIfNodeOperandOrder1782900000000';
+export class FixIfNodeOperandOrder1782901000000 implements MigrationInterface {
+  name = 'FixIfNodeOperandOrder1782901000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await this.invertRelationalOperators(queryRunner);

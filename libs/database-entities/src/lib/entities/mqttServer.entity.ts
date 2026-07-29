@@ -65,6 +65,30 @@ export class MqttServer {
   })
   useTls!: boolean;
 
+  // ponytail: CA certs are public material, so no EncryptionService round-trip like `password`.
+  @Column({ nullable: true, type: 'text' })
+  @ApiProperty({
+    description: 'Optional PEM-encoded CA certificate used to verify the broker (for private/self-signed CAs)',
+    example: '-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----',
+    required: false,
+  })
+  caCert!: string | null;
+
+  @Column({ default: false, type: 'boolean' })
+  @ApiProperty({
+    description: 'Skip TLS certificate verification for this server. Unsafe - only for trusted networks.',
+    example: false,
+  })
+  tlsInsecure!: boolean;
+
+  @Column({ nullable: true, type: 'text' })
+  @ApiProperty({
+    description: 'Optional TLS SNI/hostname to verify against, for brokers reached by IP',
+    example: 'mqtt.example.com',
+    required: false,
+  })
+  tlsServername!: string | null;
+
   @Column({ type: 'integer', default: 0 })
   @ApiProperty({
     description: 'Default QoS level for publish operations (0, 1, or 2)',

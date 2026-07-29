@@ -155,6 +155,55 @@ describe('MqttClientService', () => {
     expect(mockMetricsService.mqttServersHealthy.set).toHaveBeenCalledWith(1);
   });
 
+  describe('TLS options', () => {
+    // Restores the real getOrCreateClient so createClient actually builds mqtt.connect options.
+    const connectWith = async (serverOverrides: Partial<typeof mockServer> & Record<string, unknown>) => {
+      jest.restoreAllMocks();
+      jest.spyOn(Logger.prototype, 'log').mockImplementation(jest.fn());
+      jest.spyOn(Logger.prototype, 'warn').mockImplementation(jest.fn());
+      (mockRepository.findOneBy as jest.Mock).mockResolvedValue({ ...mockServer, ...serverOverrides });
+
+      await (service as unknown as MqttClientServicePrivate).getOrCreateClient(1);
+
+      const connectMock = mqtt.connect as jest.Mock;
+      return {
+        url: connectMock.mock.calls.at(-1)?.[0] as string,
+        options: connectMock.mock.calls.at(-1)?.[1] as mqtt.IClientOptions,
+      };
+    };
+
+    it('passes CA cert, servername and rejectUnauthorized=false when TLS trust options are set', async () => {
+      const { url, options } = await connectWith({
+        useTls: true,
+        port: 8883,
+        caCert: '-----BEGIN CERTIFICATE-----\nfake\n-----END CERTIFICATE-----',
+        tlsServername: 'broker.example.com',
+        tlsInsecure: true,
+      });
+
+      expect(url).toBe('mqtts://localhost:8883');
+      expect(options.ca).toContain('BEGIN CERTIFICATE');
+      expect(options.servername).toBe('broker.example.com');
+      expect(options.rejectUnauthorized).toBe(false);
+    });
+
+    it('keeps default certificate verification when TLS trust options are unset', async () => {
+      const { options } = await connectWith({ useTls: true, port: 8883 });
+
+      expect(options.ca).toBeUndefined();
+      expect(options.servername).toBeUndefined();
+      expect(options.rejectUnauthorized).toBeUndefined();
+    });
+
+    it('ignores TLS trust options when TLS is disabled', async () => {
+      const { url, options } = await connectWith({ useTls: false, caCert: 'ignored', tlsInsecure: true });
+
+      expect(url).toBe('mqtt://localhost:1883');
+      expect(options.ca).toBeUndefined();
+      expect(options.rejectUnauthorized).toBeUndefined();
+    });
+  });
+
   describe('publish', () => {
     it('should successfully publish a message', async () => {
       // Arrange - mock the internal methods to avoid actual connections

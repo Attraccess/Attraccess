@@ -1,8 +1,8 @@
 import { DataSource, QueryRunner } from 'typeorm';
-import { FixIfNodeOperandOrder1782900000000 } from './1782900000000-fix-if-node-operand-order';
+import { FixIfNodeOperandOrder1782901000000 } from './1782901000000-fix-if-node-operand-order';
 
-describe('FixIfNodeOperandOrder1782900000000', () => {
-  const migration = new FixIfNodeOperandOrder1782900000000();
+describe('FixIfNodeOperandOrder1782901000000', () => {
+  const migration = new FixIfNodeOperandOrder1782901000000();
 
   let dataSource: DataSource;
   let queryRunner: QueryRunner;
