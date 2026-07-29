@@ -429,6 +429,11 @@ function FlowsPageInner() {
             multiSelectionKeyCode="Shift"
             colorMode={theme === 'dark' ? 'dark' : 'light'}
             fitView
+            // ponytail: fixed floor, derive it from the graph bounding box if 0.02 ever bites.
+            // React Flow's default minZoom of 0.5 clamps fitView on flows taller than the pane,
+            // which then centres on the bounding box and parks the viewport in a gap between
+            // nodes - the canvas looks empty even though every node is rendered.
+            minZoom={0.02}
             defaultEdgeOptions={{ style: { strokeWidth: 4 } }}
             nodeTypes={flowNodeTypes}
             edgeTypes={edgeTypes}
