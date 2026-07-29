@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./renderer/dist",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "target": "es2022",
+    "jsx": "react-jsx",
+    "types": ["vite/client"],
+    "composite": false,
+    "noEmit": true
+  },
+  "include": ["renderer/**/*.ts", "renderer/**/*.tsx"],
+  "exclude": ["node_modules", "renderer/dist"]
+}

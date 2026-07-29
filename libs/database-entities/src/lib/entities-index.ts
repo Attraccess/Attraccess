@@ -1,5 +1,6 @@
 // Import entities
 import { EmailTemplate } from './entities/email-template.entity';
+import { EmailTemplateTranslation } from './entities/email-template-translation.entity';
 import { AuthenticationDetail } from './entities/authenticationDetail.entity';
 import { MqttServer } from './entities/mqttServer.entity';
 import { NFCCard } from './entities/nfcCard.entity';
@@ -17,7 +18,7 @@ import { SupervisionMode, AutoIntroductionTarget } from './entities/resource.sup
 import { SSOProvider, SSOProviderType } from './entities/ssoProvider.entity';
 import { SSOProviderOIDCConfiguration } from './entities/ssoProvider.oidc';
 import { SSOProviderSAMLConfiguration } from './entities/ssoProvider.saml';
-import { User, SystemPermissions, type SystemPermission } from './entities/user.entity';
+import { User } from './entities/user.entity';
 import { Session } from './entities/session.entity';
 import { Attractap, AttractapFirmwareVersion } from './entities/attractap.entity';
 import { AttractapCrashReport } from './entities/attractapCrashReport.entity';
@@ -46,6 +47,10 @@ import {
   GetVariablesNodeDataSchema,
   VariableChangedNodeDataSchema,
   VariableScopeSchema,
+  CompanionLockNodeDataSchema,
+  CompanionIdleActiveNodeDataSchema,
+  CompanionForegroundAppNodeDataSchema,
+  CompanionUsbDeviceNodeDataSchema,
 } from './entities/resourceFlowNode';
 import {
   ResourceHealthState,
@@ -95,6 +100,13 @@ import { Conversation } from './entities/conversation.entity';
 import { ConversationParticipant } from './entities/conversation-participant.entity';
 import { Message, MessageReferenceType } from './entities/message.entity';
 import { NotificationPreference } from './entities/notification-preference.entity';
+import { PushSubscription } from './entities/push-subscription.entity';
+import { CompanionDevice } from './entities/companion-device.entity';
+import { EmailLayout, EMAIL_LAYOUT_SINGLETON_ID } from './entities/email-layout.entity';
+import { Permission } from './entities/permission.entity';
+import { Role } from './entities/role.entity';
+import { RolePermission } from './entities/role-permission.entity';
+import { UserRole, UserRoleSource } from './entities/user-role.entity';
 
 // Export all entities individually
 export {
@@ -113,13 +125,12 @@ export {
   SSOProviderOIDCConfiguration,
   SSOProviderSAMLConfiguration,
   User,
-  SystemPermissions,
-  SystemPermission,
   Session,
   NFCCard,
   Attractap,
   AttractapCrashReport,
   EmailTemplate,
+  EmailTemplateTranslation,
   ResourceFlowNode,
   ResourceFlowNodeType,
   ResourceFlowEdge,
@@ -182,6 +193,10 @@ export {
   GetVariablesNodeDataSchema,
   VariableChangedNodeDataSchema,
   VariableScopeSchema,
+  CompanionLockNodeDataSchema,
+  CompanionIdleActiveNodeDataSchema,
+  CompanionForegroundAppNodeDataSchema,
+  CompanionUsbDeviceNodeDataSchema,
   PasswordPolicy,
   PASSWORD_POLICY_SINGLETON_ID,
   PasswordHistory,
@@ -195,6 +210,15 @@ export {
   Message,
   MessageReferenceType,
   NotificationPreference,
+  PushSubscription,
+  CompanionDevice,
+  EmailLayout,
+  EMAIL_LAYOUT_SINGLETON_ID,
+  Permission,
+  Role,
+  RolePermission,
+  UserRole,
+  UserRoleSource,
 };
 
 // Export the entities object
@@ -216,6 +240,7 @@ export const entities = {
   Attractap,
   AttractapCrashReport,
   EmailTemplate,
+  EmailTemplateTranslation,
   ResourceFlowNode,
   ResourceFlowEdge,
   ResourceFlowLog,
@@ -245,4 +270,10 @@ export const entities = {
   ConversationParticipant,
   Message,
   NotificationPreference,
+  PushSubscription,
+  CompanionDevice,
+  Permission,
+  Role,
+  RolePermission,
+  UserRole,
 };

@@ -1,23 +1,32 @@
 {
-  "title": "Permissions",
+  "title": "Roles & Permissions",
   "permissions": {
-    "canManageResources": "Manage resources",
-    "canManageSystemConfiguration": "Manage system configuration",
-    "canManageUsers": "Manage users",
-    "canManageBilling": "Manage billing"
+    "resource-manager": "Manage resources",
+    "system-admin": "Manage system configuration",
+    "user-manager": "Manage users",
+    "billing-manager": "Manage billing"
   },
   "actions": {
     "save": "Save"
   },
   "messages": {
-    "updated": "Permissions updated"
+    "updated": "Roles updated"
   },
   "ssoManaged": {
     "title": "Managed by SSO",
-    "description": "Permissions are managed by {{providers}} and cannot be edited here. Update the SSO permission mappings to change them.",
+    "description": "Some roles are managed by {{providers}} and cannot be edited here.",
     "providerFallback": "the SSO provider"
   },
+  "ssoAssignment": {
+    "assignedBy": "Via SSO",
+    "provider": "Provider: {{name}}",
+    "externalValue": "Group: {{value}}"
+  },
+  "ssoOnlyRoles": {
+    "title": "SSO-managed roles",
+    "subtitle": "These roles are controlled entirely by SSO and cannot be changed here."
+  },
   "errors": {
-    "updateFailed": "Unable to update permissions"
+    "updateFailed": "Unable to update roles"
   }
 }

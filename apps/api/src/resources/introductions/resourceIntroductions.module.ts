@@ -8,11 +8,13 @@ import {
 } from '@attraccess/database-entities';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ResourceIntroducersModule } from '../introducers/resourceIntroducers.module';
+import { NotificationsModule } from '../../notifications/notifications.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([ResourceIntroduction, ResourceIntroducer, ResourceIntroductionHistoryItem]),
     ResourceIntroducersModule,
+    NotificationsModule,
   ],
   controllers: [ResourceIntroductionsController],
   providers: [ResourceIntroductionsService],

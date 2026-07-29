@@ -1,23 +1,32 @@
 {
-  "title": "Berechtigungen",
+  "title": "Rollen & Berechtigungen",
   "permissions": {
-    "canManageResources": "Ressourcen verwalten",
-    "canManageSystemConfiguration": "Systemkonfiguration verwalten",
-    "canManageUsers": "Benutzer verwalten",
-    "canManageBilling": "Zahlungen verwalten"
+    "resource-manager": "Ressourcen verwalten",
+    "system-admin": "Systemkonfiguration verwalten",
+    "user-manager": "Benutzer verwalten",
+    "billing-manager": "Zahlungen verwalten"
   },
   "actions": {
     "save": "Speichern"
   },
   "messages": {
-    "updated": "Berechtigungen aktualisiert"
+    "updated": "Rollen aktualisiert"
   },
   "ssoManaged": {
     "title": "Durch SSO verwaltet",
-    "description": "Diese Berechtigungen werden von {{providers}} verwaltet und können hier nicht geändert werden. Aktualisieren Sie die SSO-Berechtigungszuordnungen, um sie zu ändern.",
+    "description": "Einige Rollen werden von {{providers}} verwaltet und können hier nicht geändert werden.",
     "providerFallback": "dem SSO-Anbieter"
   },
+  "ssoAssignment": {
+    "assignedBy": "Via SSO",
+    "provider": "Anbieter: {{name}}",
+    "externalValue": "Gruppe: {{value}}"
+  },
+  "ssoOnlyRoles": {
+    "title": "SSO-verwaltete Rollen",
+    "subtitle": "Diese Rollen werden vollständig durch SSO gesteuert und können hier nicht geändert werden."
+  },
   "errors": {
-    "updateFailed": "Berechtigungen konnten nicht aktualisiert werden"
+    "updateFailed": "Rollen konnten nicht aktualisiert werden"
   }
 }

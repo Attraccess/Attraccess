@@ -1,6 +1,3 @@
-// Async MJML-to-HTML conversion service wrapping mjml v5 async API
-// FEATURE: Email template rendering with MJML
-
 import { Injectable, BadRequestException } from '@nestjs/common';
 import mjml2html from 'mjml';
 

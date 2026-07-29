@@ -62,3 +62,21 @@ git commit --no-verify -m "anything"
 ```
 
 This skips the local hook but **CI still validates** all commits in the PR range when you open or update the pull request.
+
+## GitHub Secrets
+
+### Companion App Code Signing
+
+The `.github/workflows/companion.yml` workflow signs binaries on releases. The following secrets must be configured in the repository settings:
+
+| Secret | Description |
+| --- | --- |
+| `WINDOWS_CERT_BASE64` | Base64-encoded PFX file for Authenticode EV signing (`base64 certificate.pfx`) |
+| `WINDOWS_CERT_PASSWORD` | Password for the PFX file |
+| `APPLE_CERTIFICATE` | Base64-encoded `.p12` Apple Developer ID certificate (`base64 certificate.p12`) |
+| `APPLE_CERTIFICATE_PASSWORD` | Password for the `.p12` file |
+| `APPLE_ID` | Apple ID used for notarization (e.g. `developer@example.com`) |
+| `APPLE_ID_PASSWORD` | App-specific password for the Apple ID ([create one here](https://appleid.apple.com/account/manage)) |
+| `APPLE_TEAM_ID` | Apple Developer Team ID (10-character string, found in the Developer portal) |
+
+PR builds skip code signing entirely — only release builds require these secrets. Without them, release builds will fail at the signing step.

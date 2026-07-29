@@ -8,7 +8,6 @@ import {
   ConversationParticipant,
   Message,
   MessageReferenceType,
-  NotificationPreference,
   Resource,
   User,
 } from '@attraccess/database-entities';
@@ -32,7 +31,6 @@ describe('MessagingService', () => {
   };
   let userRepository: { findOne: jest.Mock };
   let resourceRepository: { findOne: jest.Mock };
-  let notificationPreferenceRepository: { findOne: jest.Mock; create: jest.Mock; save: jest.Mock };
   let dataSource: { transaction: jest.Mock };
   let resourceUsageService: { getActiveSession: jest.Mock };
   let eventEmitter: { emit: jest.Mock };
@@ -69,11 +67,6 @@ describe('MessagingService', () => {
     };
     userRepository = { findOne: jest.fn() };
     resourceRepository = { findOne: jest.fn() };
-    notificationPreferenceRepository = {
-      findOne: jest.fn(),
-      create: jest.fn().mockImplementation((data) => ({ ...data })),
-      save: jest.fn().mockImplementation(async (data) => data),
-    };
     dataSource = { transaction: jest.fn() };
     resourceUsageService = { getActiveSession: jest.fn() };
     eventEmitter = { emit: jest.fn() };
@@ -88,7 +81,6 @@ describe('MessagingService', () => {
         { provide: getRepositoryToken(Message), useValue: messageRepository },
         { provide: getRepositoryToken(User), useValue: userRepository },
         { provide: getRepositoryToken(Resource), useValue: resourceRepository },
-        { provide: getRepositoryToken(NotificationPreference), useValue: notificationPreferenceRepository },
         { provide: DataSource, useValue: dataSource },
         { provide: ResourceUsageService, useValue: resourceUsageService },
         { provide: EventEmitter2, useValue: eventEmitter },
@@ -205,32 +197,6 @@ describe('MessagingService', () => {
       const result = await service.listMessages(1, 5, 2, 10);
 
       expect(result).toEqual({ data: [{ id: 1 }], total: 1, page: 2, limit: 10 });
-    });
-  });
-
-  describe('notification preferences', () => {
-    it('defaults messagesEmailOnOffline to true when no row exists', async () => {
-      notificationPreferenceRepository.findOne.mockResolvedValue(null);
-      await expect(service.getNotificationPreference(5)).resolves.toEqual({ messagesEmailOnOffline: true });
-    });
-
-    it('returns the stored preference value', async () => {
-      notificationPreferenceRepository.findOne.mockResolvedValue({ messagesEmailOnOffline: false });
-      await expect(service.getNotificationPreference(5)).resolves.toEqual({ messagesEmailOnOffline: false });
-    });
-
-    it('creates a row and applies the update when none exists', async () => {
-      notificationPreferenceRepository.findOne.mockResolvedValue(null);
-
-      const result = await service.updateNotificationPreference(5, { messagesEmailOnOffline: false });
-
-      expect(notificationPreferenceRepository.create).toHaveBeenCalledWith({ userId: 5, messagesEmailOnOffline: true });
-      expect(result).toEqual({ messagesEmailOnOffline: false });
-    });
-
-    it('shouldEmailMessageOnOffline reflects the stored flag', async () => {
-      notificationPreferenceRepository.findOne.mockResolvedValue({ messagesEmailOnOffline: false });
-      await expect(service.shouldEmailMessageOnOffline(5)).resolves.toBe(false);
     });
   });
 

@@ -1,4 +1,4 @@
-import { Entity, Column, CreateDateColumn, ManyToOne, JoinColumn, PrimaryGeneratedColumn } from 'typeorm';
+import { Entity, Column, CreateDateColumn, ManyToOne, JoinColumn, PrimaryGeneratedColumn, Index } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { Resource } from './resource.entity';
 
@@ -11,6 +11,7 @@ export enum ResourceFlowLogType {
 }
 
 @Entity()
+@Index('IDX_resource_flow_log_resource_created', ['resourceId', 'createdAt'])
 export class ResourceFlowLog {
   @PrimaryGeneratedColumn()
   @ApiProperty({

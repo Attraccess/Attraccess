@@ -11,6 +11,8 @@ Einweisungen folgen einem einfachen Modell:
 
 Ein Benutzer, der nicht eingewiesen wurde, kann keine Nutzungssitzung an der Ressource starten.
 
+Einige Ressourcen können außerdem **beaufsichtigte Nutzung** erlauben oder erfordern. In einer beaufsichtigten Sitzung startet der Benutzer die Sitzung, während eine qualifizierte **Aufsicht** anwesend ist. Die Aufsicht muss Einweiser, Wartender oder Ressourcenverwalter für die Ressource sein. Beaufsichtigung ist hilfreich für Trainings, erste Versuche oder Ressourcen, bei denen eine zweite anwesende Person vorgeschrieben ist.
+
 ## Rollen
 
 | Rolle | Berechtigungen |
@@ -19,6 +21,8 @@ Ein Benutzer, der nicht eingewiesen wurde, kann keine Nutzungssitzung an der Res
 | **Wartender** | Ressource nutzen und steuern sowie Wartungen verwalten — kann jedoch keine Einweisungen erteilen |
 | **Einweiser** | Alles, was ein Wartender darf, plus Einweisungen für andere Benutzer erteilen und entziehen |
 | **Ressourcenverwalter** | Alle oben genannten Rechte, plus Einweiser/Wartende verwalten und Ressourceneinstellungen anpassen |
+
+Bei beaufsichtigten Sitzungen ist die Aufsicht der Einweiser, Wartende oder Ressourcenverwalter, der die Sitzung bestätigt und für die Beaufsichtigung verantwortlich bleibt.
 
 > [!NOTE]
 > **Einweiser vs. Wartender:** Beide können die Maschine bedienen und in den Wartungsmodus versetzen (oder daraus entfernen). Der Unterschied: Nur ein **Einweiser** kann anderen Benutzern Einweisungen erteilen. Verwende **Wartender** für Personen, die die Maschine warten, aber nicht über den Zugang anderer entscheiden sollen.
@@ -67,6 +71,29 @@ Das ist praktisch, wenn Sie mehrere ähnliche Ressourcen haben, zum Beispiel all
 
 > [!NOTE]
 > Wenn ein Benutzer über eine Gruppe eingewiesen ist, behält er den Zugang zu allen Ressourcen der Gruppe, bis die Gruppeneinweisung entzogen wird. Das Entfernen einer Ressource aus der Gruppe entzieht dem Benutzer ebenfalls den Zugang zu dieser Ressource (sofern der Zugang nur über die Gruppe erteilt wurde).
+
+## Beaufsichtigungsmodus
+
+Ressourcenverwalter können für jede Ressource festlegen, wie Einweisungen und Beaufsichtigung zusammenwirken:
+
+| Modus | Bedeutung |
+|-------|-----------|
+| **Einweisung erforderlich** | Nur eingewiesene Benutzer dürfen eine Sitzung starten. Dies ist das Standardverhalten. |
+| **Beaufsichtigung erlaubt** | Eingewiesene Benutzer dürfen selbst starten. Nicht eingewiesene Benutzer dürfen eine beaufsichtigte Sitzung starten, wenn eine Aufsicht anwesend ist. |
+| **Beaufsichtigung erforderlich** | Jede Sitzung erfordert eine anwesende Aufsicht, auch für eingewiesene Benutzer. |
+
+Beaufsichtigte Sitzungen werden im Nutzungsverlauf mit der Aufsicht gespeichert. Dadurch ist sichtbar, wer die Sitzung beaufsichtigt hat, und beaufsichtigte Trainings- oder Probenutzungen lassen sich von regulären selbstständigen Nutzungen unterscheiden.
+
+## Automatische Einweisung
+
+Eine Ressource kann automatisch eine Einweisung erteilen, nachdem ein Benutzer genügend beaufsichtigte Sitzungen abgeschlossen hat. Ressourcenverwalter konfigurieren:
+
+- **Beaufsichtigte Sitzungen bis zur Einweisung**: die Anzahl abgeschlossener beaufsichtigter Sitzungen, nach der der Benutzer automatisch eingewiesen wird
+- **Einweisung erteilen für**: ob die automatische Einweisung für diese Ressource oder für eine ausgewählte Ressourcengruppe gilt
+
+Wenn das Ziel **diese Ressource** ist, zählen nur beaufsichtigte Sitzungen an dieser Ressource. Wenn das Ziel **eine Ressourcengruppe** ist, zählen beaufsichtigte Sitzungen über Ressourcen dieser Gruppe hinweg, und der Benutzer erhält beim Erreichen des Schwellenwerts eine Gruppeneinweisung.
+
+Die automatische Einweisung kann deaktiviert werden, indem der Schwellenwert leer bleibt.
 
 ## Protokoll (Audit Trail)
 

@@ -1,8 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { ResourceIntroducer, ResourceIntroducerType } from '@attraccess/database-entities';
+import { ResourceIntroducer, ResourceIntroducerType, User } from '@attraccess/database-entities';
 import { ResourceIntroducersService } from './resourceIntroducers.service';
+import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
+import { NotificationCategory } from '../../notifications/notification-types';
 
 describe('ResourceIntroducersService', () => {
   let service: ResourceIntroducersService;
@@ -14,7 +16,9 @@ describe('ResourceIntroducersService', () => {
     remove: jest.Mock;
     createQueryBuilder: jest.Mock;
   };
+  let userRepository: { findOne: jest.Mock };
   let eventEmitter: { emit: jest.Mock };
+  let notifications: { dispatch: jest.Mock; sendEmailTemplate: jest.Mock };
 
   const emptyGroupQuery = {
     leftJoin: jest.fn().mockReturnThis(),
@@ -32,13 +36,17 @@ describe('ResourceIntroducersService', () => {
       remove: jest.fn(),
       createQueryBuilder: jest.fn().mockReturnValue(emptyGroupQuery),
     };
+    userRepository = { findOne: jest.fn().mockResolvedValue({ id: 2, locale: 'en' } as User) };
     eventEmitter = { emit: jest.fn() };
+    notifications = { dispatch: jest.fn().mockResolvedValue(undefined), sendEmailTemplate: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ResourceIntroducersService,
         { provide: getRepositoryToken(ResourceIntroducer), useValue: repository },
+        { provide: getRepositoryToken(User), useValue: userRepository },
         { provide: EventEmitter2, useValue: eventEmitter },
+        { provide: NotificationDispatchService, useValue: notifications },
       ],
     }).compile();
 
@@ -152,6 +160,7 @@ describe('ResourceIntroducersService', () => {
       repository.save.mockImplementation(async (data) => data);
 
       const result = await service.grant(1, 2, ResourceIntroducerType.MAINTAINER);
+      await Promise.resolve(); // flush notification promise chain
 
       expect(repository.create).toHaveBeenCalledWith({
         resourceId: 1,
@@ -160,6 +169,32 @@ describe('ResourceIntroducersService', () => {
       });
       expect(result.type).toBe(ResourceIntroducerType.MAINTAINER);
       expect(eventEmitter.emit).toHaveBeenCalled();
+      expect(notifications.dispatch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          category: NotificationCategory.ACCESS_CHANGES,
+          recipients: [expect.objectContaining({ id: 2 })],
+          title: expect.any(Function),
+          body: expect.any(Function),
+          url: '/resources/1',
+          sendEmail: expect.any(Function),
+        }),
+      );
+      const request = notifications.dispatch.mock.calls[0][0];
+      const enUser = { locale: 'en' } as User;
+      expect(request.title(enUser)).toBe('Your resource access changed');
+      expect(request.body(enUser)).toBe('You were made a maintainer for resource #1.');
+      await request.sendEmail({ id: 2, email: 'user@example.com', locale: 'en' } as User);
+      expect(notifications.sendEmailTemplate).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 2 }),
+        NotificationCategory.ACCESS_CHANGES,
+        {
+          accessChange: {
+            title: 'Your resource access changed',
+            body: 'You were made a maintainer for resource #1.',
+            url: '/resources/1',
+          },
+        },
+      );
     });
 
     it('defaults to introducer when no type is provided', async () => {
@@ -168,12 +203,15 @@ describe('ResourceIntroducersService', () => {
       repository.save.mockImplementation(async (data) => data);
 
       await service.grant(1, 2);
+      await Promise.resolve(); // flush notification promise chain
 
       expect(repository.create).toHaveBeenCalledWith({
         resourceId: 1,
         userId: 2,
         type: ResourceIntroducerType.INTRODUCER,
       });
+      const defaultsReq = notifications.dispatch.mock.calls[0][0];
+      expect(defaultsReq.body({ locale: 'en' } as User)).toBe('You were made an introducer for resource #1.');
     });
 
     it('upgrades an existing row to the requested type', async () => {
@@ -182,10 +220,13 @@ describe('ResourceIntroducersService', () => {
       repository.save.mockImplementation(async (data) => data);
 
       const result = await service.grant(1, 2, ResourceIntroducerType.INTRODUCER);
+      await Promise.resolve(); // flush notification promise chain
 
       expect(result.type).toBe(ResourceIntroducerType.INTRODUCER);
       expect(repository.save).toHaveBeenCalledWith(existing);
       expect(eventEmitter.emit).toHaveBeenCalled();
+      const upgradeReq = notifications.dispatch.mock.calls[0][0];
+      expect(upgradeReq.body({ locale: 'en' } as User)).toBe('You were made an introducer for resource #1.');
     });
 
     it('does not re-save when the existing row already matches', async () => {
@@ -196,6 +237,23 @@ describe('ResourceIntroducersService', () => {
 
       expect(repository.save).not.toHaveBeenCalled();
       expect(eventEmitter.emit).not.toHaveBeenCalled();
+      expect(notifications.dispatch).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('revoke', () => {
+    it('notifies the user when resource introducer or maintainer access is revoked', async () => {
+      repository.findOne.mockResolvedValue({ userId: 2, type: ResourceIntroducerType.MAINTAINER } as ResourceIntroducer);
+      repository.remove.mockImplementation(async (data) => data);
+
+      await service.revoke(1, 2);
+      await Promise.resolve(); // flush notification promise chain
+
+      const revokeReq = notifications.dispatch.mock.calls[0][0];
+      expect(revokeReq.category).toBe(NotificationCategory.ACCESS_CHANGES);
+      expect(revokeReq.recipients).toEqual([expect.objectContaining({ id: 2 })]);
+      expect(revokeReq.url).toBe('/resources/1');
+      expect(revokeReq.body({ locale: 'en' } as User)).toBe('Your maintainer status for resource #1 was revoked.');
     });
   });
 });

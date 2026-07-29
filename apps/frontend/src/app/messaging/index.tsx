@@ -1,15 +1,14 @@
 // Inbox page combining conversation list, thread view and live SSE updates
 // FEATURE: Messaging inbox page
 import {
-  Message,
   useMessagingServiceMessagingListConversations,
   useMessagingServiceMessagingMarkConversationRead,
 } from '@attraccess/react-query-client';
 import { Card, cn } from '@heroui/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { MailIcon, ArrowLeftIcon } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { MailIcon, ArrowLeftIcon, Settings2Icon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
@@ -18,15 +17,15 @@ import { Button } from '../../components/button';
 import { useAuth } from '../../hooks/useAuth';
 import { ConversationList } from './ConversationList';
 import { MessageThread } from './MessageThread';
-import { useMessagingLive } from './useMessagingLive';
-import { applyIncomingMessage, markConversationReadInCache } from './messageCache';
+import { markConversationReadInCache } from './messageCache';
 
 export function MessagesPage() {
   const { t } = useTranslations({ en, de });
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const conversationParam = Number(searchParams.get('conversation'));
   const [selectedConversationId, setSelectedConversationId] = useState<number | null>(
     Number.isInteger(conversationParam) && conversationParam > 0 ? conversationParam : null,
@@ -69,24 +68,44 @@ export function MessagesPage() {
     }
   }, [selectedConversationId, user, markRead]);
 
-  const handleLiveMessage = useCallback(
-    (message: Message) => {
-      applyIncomingMessage(queryClient, message, user?.id ?? -1);
-      if (message.conversationId === selectedConversationId) {
-        markRead(message.conversationId);
-      }
+  const selectConversation = useCallback(
+    (conversationId: number | null) => {
+      setSelectedConversationId(conversationId);
+      setSearchParams((current) => {
+        const next = new URLSearchParams(current);
+        if (conversationId) {
+          next.set('conversation', String(conversationId));
+          next.delete('resourceRef');
+        } else {
+          next.delete('conversation');
+          next.delete('resourceRef');
+        }
+        return next;
+      });
     },
-    [queryClient, selectedConversationId, markRead, user?.id],
+    [setSearchParams],
   );
 
-  useMessagingLive({ onMessage: handleLiveMessage });
-
+  // Fills the scroll container exactly rather than guessing viewport math, so the
+  // composer stays on screen when the mobile keyboard shrinks the visible area.
   return (
-    <div>
-      <PageHeader title={t('title')} subtitle={t('subtitle')} icon={<MailIcon />} />
+    <div className="flex h-full min-h-0 flex-col">
+      {/* On phones an open thread needs every pixel — the keyboard leaves ~430px. */}
+      <div className={cn(selectedConversationId ? 'hidden lg:block' : 'block')}>
+        <PageHeader
+          title={t('title')}
+          subtitle={t('subtitle')}
+          icon={<MailIcon />}
+          actions={
+            hasPermission('system.settings.manage')
+              ? [{ key: 'settings', label: t('settingsButton'), icon: <Settings2Icon size={16} />, onPress: () => navigate('/messages/settings') }]
+              : undefined
+          }
+        />
+      </div>
 
-      <Card className="overflow-hidden">
-        <div className="grid h-[calc(100vh-13rem)] min-h-[28rem] grid-cols-1 lg:h-[70vh] lg:grid-cols-[320px_1fr]">
+      <Card className="min-h-0 flex-1 overflow-hidden">
+        <div className="grid h-full grid-cols-1 lg:grid-cols-[320px_1fr]">
           <div
             className={cn(
               'overflow-y-auto border-zinc-200 dark:border-zinc-700 lg:border-r',
@@ -97,7 +116,7 @@ export function MessagesPage() {
               conversations={conversations}
               isLoading={isLoading}
               selectedConversationId={selectedConversationId}
-              onSelect={setSelectedConversationId}
+              onSelect={selectConversation}
             />
           </div>
 
@@ -110,7 +129,7 @@ export function MessagesPage() {
                     size="sm"
                     isIconOnly
                     className="lg:hidden"
-                    onPress={() => setSelectedConversationId(null)}
+                    onPress={() => selectConversation(null)}
                     aria-label={t('thread.back')}
                     data-cy="thread-back-button"
                   >

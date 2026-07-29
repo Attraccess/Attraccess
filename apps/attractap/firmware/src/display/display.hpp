@@ -1,6 +1,9 @@
 #pragma once
 
-#include <Arduino.h>
+#include <functional>
+
+#include <string>
+
 #include <vector>
 #include <lvgl.h>
 #include "lv_conf.h"
@@ -17,7 +20,11 @@
 #include "screens/resourceDetails/resourceDetailsScreen.hpp"
 #include "screens/enrollment/enrollmentScreen.hpp"
 #include "screens/reset/resetScreen.hpp"
+#include "screens/supervision/supervisionScreen.hpp"
 #include "screens/firmwareUpdate/firmwareUpdateScreen.hpp"
+#ifdef DEMO_MODE
+#include "screens/demoSettings/demoSettingsScreen.hpp"
+#endif
 #include "driver/display_driver.hpp"
 
 #ifdef HAS_IO_EXPANDER
@@ -47,17 +54,21 @@ public:
     static ResourceDetailsScreen resourceDetailsScreen;
     static EnrollmentScreen enrollmentScreen;
     static ResetScreen resetScreen;
+    static SupervisionScreen supervisionScreen;
     static FirmwareUpdateScreen firmwareUpdateScreen;
+#ifdef DEMO_MODE
+    static DemoSettingsScreen demoSettingsScreen;
+#endif
 
     static void setTouchCallback(std::function<void(int16_t, int16_t)> callback);
-    static void setDeviceName(String deviceName);
+    static void setDeviceName(std::string deviceName);
     static void logFromLvgl(lv_log_level_t level, const char *buf);
 
     // Returns false if the display driver reported that touch hardware was not found at init.
     static bool hasTouchInput();
 
     // Global error popup helpers
-    static void showErrorPopup(const String &title, const String &message);
+    static void showErrorPopup(const std::string &title, const std::string &message);
     static void showInsufficientBalancePopup(std::function<void(uint32_t amountCents)> onStart, std::function<void()> onCancel);
     static void hidePopup();
 
@@ -66,7 +77,19 @@ public:
     // application; reboot is handled internally (esp_restart after a confirm).
     static void setOnOpenSettingsCallback(std::function<void()> callback);
 
+    /**
+     * Thread-safe lv_async_call: takes lv_lock() around the timer-list
+     * manipulation. Use this instead of raw lv_async_call from any task other
+     * than the LVGL render task (e.g. websocket callbacks) - rendering runs on
+     * its own task now (ATT-554 item 7).
+     */
+    static void asyncCall(lv_async_cb_t cb, void *user_data);
+
 private:
+    // Dedicated LVGL task (ATT-554 item 7): runs lv_timer_handler (rendering +
+    // indev/touch reads; self-locking via lv_lock) so UI refresh no longer
+    // shares the main application loop with blocking work.
+    static void renderTask(void *parameter);
     static std::function<void(int16_t, int16_t)> touchCallback;
     static const int TRANSITION_DURATION = 500;
     // static const int TRANSITION_DURATION = 50;
@@ -91,7 +114,7 @@ private:
 
     static void initDeviceOverlay();
     static lv_obj_t *deviceNameLabel;
-    static String deviceNameInitValue;
+    static std::string deviceNameInitValue;
 
     static lv_obj_t *activePopup;
     static lv_timer_t *popupAutoCloseTimer;

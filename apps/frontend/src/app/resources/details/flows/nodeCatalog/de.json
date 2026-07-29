@@ -5,6 +5,8 @@
   "collapse": "Einklappen",
   "expand": "Ausklappen",
   "empty": "Keine Knoten für diese Ressource verfügbar.",
+  "loading": "Knoten werden geladen…",
+  "error": "Knoten konnten nicht geladen werden. Bitte versuche es erneut.",
   "domains": {
     "manual": "Manuell",
     "resource": "Ressource",
@@ -12,6 +14,7 @@
     "mqtt": "MQTT",
     "http": "HTTP",
     "logic": "Logik",
-    "health": "Gesundheit"
+    "health": "Gesundheit",
+    "companion": "Companion"
   }
 }

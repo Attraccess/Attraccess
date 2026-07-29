@@ -6,59 +6,85 @@ import {
   UseGuards,
   applyDecorators,
   Logger,
+  ForbiddenException,
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { Reflector } from '@nestjs/core';
-import { SystemPermission, User } from '@attraccess/database-entities';
 
 import { ApiBearerAuth, ApiUnauthorizedResponse } from '@nestjs/swagger';
 import { DualAuthGuard } from './dual-auth.guard';
+import { AuthenticatedUser } from './auth.types';
+import { SystemPermission } from '@attraccess/shared';
 
-const NeedsSystemPermissions = Reflector.createDecorator<SystemPermission[]>();
+export type { SystemPermission };
+
+const NeedsPermissions = Reflector.createDecorator<SystemPermission[]>();
+const NeedsAnyPermission = Reflector.createDecorator<SystemPermission[]>();
 
 export function Auth(...permissions: SystemPermission[]) {
   return applyDecorators(
-    NeedsSystemPermissions(permissions),
-    UseGuards(DualAuthGuard, SystemPermissionsGuard),
+    NeedsPermissions(permissions),
+    UseGuards(DualAuthGuard, EffectivePermissionsGuard),
+    ApiBearerAuth(),
+    ApiUnauthorizedResponse({ description: 'Unauthorized' }),
+  );
+}
+
+export function AuthAny(...permissions: SystemPermission[]) {
+  return applyDecorators(
+    NeedsAnyPermission(permissions),
+    UseGuards(DualAuthGuard, EffectivePermissionsGuard),
     ApiBearerAuth(),
     ApiUnauthorizedResponse({ description: 'Unauthorized' }),
   );
 }
 
 @Injectable()
-export class SystemPermissionsGuard implements CanActivate {
-  private readonly logger = new Logger(SystemPermissionsGuard.name);
+export class EffectivePermissionsGuard implements CanActivate {
+  private readonly logger = new Logger(EffectivePermissionsGuard.name);
 
   constructor(private reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean | Promise<boolean> | Observable<boolean> {
-    const requiredPermissions = this.reflector.get(NeedsSystemPermissions, context.getHandler());
+    const requiredAll = this.reflector.getAllAndOverride(NeedsPermissions, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    const requiredAny = this.reflector.getAllAndOverride(NeedsAnyPermission, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
 
-    if (!requiredPermissions || requiredPermissions.length === 0) {
+    if ((!requiredAll || requiredAll.length === 0) && (!requiredAny || requiredAny.length === 0)) {
       return true;
     }
 
     const request = context.switchToHttp().getRequest();
-    const user = request.user;
+    const user = request.user as AuthenticatedUser;
 
     if (!user) {
       this.logger.warn('Auth check - No user found in request');
       throw new UnauthorizedException();
     }
 
-    return this.matchPermissions(requiredPermissions, user);
-  }
+    if (requiredAll && requiredAll.length > 0) {
+      const missing = requiredAll.filter((p) => !user.effectivePermissions?.has(p));
+      if (missing.length > 0) {
+        this.logger.debug(`User ${user.id} missing permissions: ${missing.join(', ')}`);
+        throw new ForbiddenException('Insufficient permissions');
+      }
+    }
 
-  private matchPermissions(requiredPermissions: SystemPermission | SystemPermission[], user: User): boolean {
-    // Convert single permission to array if it's not already an array
-    const permissionsArray = Array.isArray(requiredPermissions) ? requiredPermissions : [requiredPermissions];
+    if (requiredAny && requiredAny.length > 0) {
+      const hasAny = requiredAny.some((p) => user.effectivePermissions?.has(p));
+      if (!hasAny) {
+        this.logger.debug(`User ${user.id} has none of the required permissions: ${requiredAny.join(', ')}`);
+        throw new ForbiddenException('Insufficient permissions');
+      }
+    }
 
-    // Check each permission individually and log the result
-    const results = permissionsArray.map((permission) => {
-      const hasPermission = user.systemPermissions[permission] === true;
-      return hasPermission;
-    });
-
-    return results.every((result) => result === true);
+    return true;
   }
 }
+
+export const SystemPermissionsGuard = EffectivePermissionsGuard;

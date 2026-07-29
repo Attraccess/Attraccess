@@ -1,8 +1,8 @@
-import { Body, Controller, Post, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Post, Req, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { ApiBody, ApiConsumes, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { User } from '@attraccess/database-entities';
-import { Auth } from '@attraccess/plugins-backend-sdk';
+import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { AuthRateLimitInterceptor } from '../rate-limiting/auth-rate-limit.interceptor';
 import { InviteUserDto } from './dtos/inviteUser.dto';
 import {
@@ -30,13 +30,13 @@ export class UserInvitationsController {
     status: 400,
     description: 'Invalid input data.',
   })
-  @Auth('canManageUsers')
-  async inviteUser(@Body() body: InviteUserDto): Promise<User> {
-    return this.invitationService.inviteUser(body);
+  @Auth('users.create')
+  async inviteUser(@Req() request: AuthenticatedRequest, @Body() body: InviteUserDto): Promise<User> {
+    return this.invitationService.inviteUser(body, request.user.locale);
   }
 
   @Post('/invite-csv')
-  @Auth('canManageUsers')
+  @Auth('users.create')
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Invite multiple users from a CSV file', operationId: 'inviteUsersFromCsv' })
@@ -53,9 +53,22 @@ export class UserInvitationsController {
     type: CsvInviteErrorResponseDto,
   })
   async inviteUsersFromCsv(
+    @Req() request: AuthenticatedRequest,
     @UploadedFile() file: FileUpload | undefined,
     @Body('config') rawConfig: string | CsvInviteConfigDto,
   ): Promise<User[]> {
-    return this.invitationService.inviteUsersFromCsv(file, rawConfig);
+    let hasRoleKeyColumn = false;
+    try {
+      const configObj = typeof rawConfig === 'string' ? JSON.parse(rawConfig) : rawConfig;
+      hasRoleKeyColumn = !!configObj?.roleKeyColumn;
+    } catch {
+      // invalid JSON — service will reject it with 400
+    }
+
+    if (hasRoleKeyColumn && !request.user.effectivePermissions?.has('users.roles.manage')) {
+      throw new ForbiddenException('users.roles.manage is required to assign roles via CSV import');
+    }
+
+    return this.invitationService.inviteUsersFromCsv(file, rawConfig, request.user.locale, request.user.id);
   }
 }

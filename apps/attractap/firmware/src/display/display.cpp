@@ -1,7 +1,13 @@
 #include "display.hpp"
+#include <vector>
+#include <string>
+#include <functional>
 
-#include <Wire.h>
 #include "../utils.hpp"
+#include "platform.hpp"
+#include "esp_heap_caps.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 #ifdef HAS_IO_EXPANDER
 #include "../ioexpander/ioexpander.hpp"
@@ -34,7 +40,7 @@ std::vector<IScreen *> Display::pendingDestroyScreens;
 uint32_t Display::transitionStartTime = 0;
 bool Display::transitionComplete = true;
 std::function<void()> Display::onTransitionComplete = nullptr;
-String Display::deviceNameInitValue = "Attractap";
+std::string Display::deviceNameInitValue = "Attractap";
 
 lv_obj_t *Display::deviceNameLabel = NULL;
 BootScreen Display::bootScreen;
@@ -47,7 +53,11 @@ ResourceListScreen Display::resourceListScreen;
 ResourceDetailsScreen Display::resourceDetailsScreen;
 EnrollmentScreen Display::enrollmentScreen;
 ResetScreen Display::resetScreen;
+SupervisionScreen Display::supervisionScreen;
 FirmwareUpdateScreen Display::firmwareUpdateScreen;
+#ifdef DEMO_MODE
+DemoSettingsScreen Display::demoSettingsScreen;
+#endif
 
 std::function<void(int16_t, int16_t)> Display::touchCallback = nullptr;
 lv_obj_t *Display::activePopup = nullptr;
@@ -145,10 +155,13 @@ void Display::setup()
         if (attempt < MAX_DISPLAY_INIT_ATTEMPTS)
         {
 #if defined(DISPLAY_DRIVER_GT911) && defined(PIN_TOUCH_I2C_SDA) && defined(PIN_TOUCH_I2C_SCL)
-            // Free any I2C slave stuck mid-transaction before the next attempt.
-            recoverI2CBus(PIN_TOUCH_I2C_SDA, PIN_TOUCH_I2C_SCL);
-            Wire.begin(PIN_TOUCH_I2C_SDA, PIN_TOUCH_I2C_SCL);
-            Wire.setTimeOut(50);
+            {
+                // Resetting the bus must not race other bus users (ATT-554).
+                I2CBusGuard busGuard;
+                // Clear any I2C slave stuck mid-transaction before the next
+                // attempt (the driver toggles SCL until SDA releases).
+                i2c_master_bus_reset(getSharedI2CBus());
+            }
 #endif
             delay(200);
         }
@@ -229,7 +242,44 @@ void Display::setup()
         s_touchWarningPending = true;
     }
 
+    // Rendering + touch sampling on a dedicated task (ATT-554 item 7), pinned to
+    // core 1 (away from the WiFi/LwIP core) at priority 4: above the app loop,
+    // NFC task (1) and websocket client (3), so input/refresh never wait behind
+    // blocking application work.
+    xTaskCreatePinnedToCore(Display::renderTask, "LvglTask", 8192, nullptr, 4, nullptr, 1);
+
     Display::logger.info("Setup done");
+}
+
+void Display::renderTask(void *parameter)
+{
+    (void)parameter;
+    while (true)
+    {
+        // lv_timer_handler self-locks via lv_lock() (LV_USE_OS LV_OS_FREERTOS)
+        // and returns the time until the next ready timer.
+        uint32_t delayMs = lv_timer_handler();
+        if (delayMs == LV_NO_TIMER_READY)
+        {
+            delayMs = LV_DEF_REFR_PERIOD;
+        }
+        if (delayMs < 1)
+        {
+            delayMs = 1;
+        }
+        else if (delayMs > LV_DEF_REFR_PERIOD)
+        {
+            delayMs = LV_DEF_REFR_PERIOD;
+        }
+        vTaskDelay(pdMS_TO_TICKS(delayMs));
+    }
+}
+
+void Display::asyncCall(lv_async_cb_t cb, void *user_data)
+{
+    lv_lock();
+    lv_async_call(cb, user_data);
+    lv_unlock();
 }
 
 bool Display::hasTouchInput()
@@ -239,6 +289,11 @@ bool Display::hasTouchInput()
 
 void Display::loop()
 {
+    // Runs on the main application loop; rendering itself lives on LvglTask
+    // (renderTask). Everything below mutates LVGL objects, so hold lv_lock for
+    // the duration (recursive FreeRTOS mutex, also taken by lv_timer_handler).
+    lv_lock();
+
     if (s_touchWarningPending)
     {
         s_touchWarningPending = false;
@@ -246,7 +301,6 @@ void Display::loop()
                                 "Touch panel not detected.\nCheck hardware and reboot.");
     }
 
-    lv_timer_handler(); /* let the GUI do its work */
     if (Display::activeScreen)
     {
         Display::activeScreen->loop();
@@ -283,4 +337,6 @@ void Display::loop()
             }
         }
     }
+
+    lv_unlock();
 }

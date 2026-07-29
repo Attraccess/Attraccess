@@ -6,7 +6,14 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Resource, ResourceIntroducer, User } from '@attraccess/database-entities';
 import { ResourceUsageNoteAddedEvent } from './events/resource-usage.events';
-import { EmailService } from '../../email/email.service';
+import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
+import { NotificationCategory } from '../../notifications/notification-types';
+import { RbacService } from '../../users-and-auth/rbac/rbac.service';
+import { createTranslator } from '../../i18n/translate';
+import * as en from './resource-usage-note-notification.en.json';
+import * as de from './resource-usage-note-notification.de.json';
+
+const t = createTranslator({ en, de });
 
 @Injectable()
 export class ResourceUsageNoteNotificationListener {
@@ -19,7 +26,8 @@ export class ResourceUsageNoteNotificationListener {
     private readonly resourceIntroducerRepository: Repository<ResourceIntroducer>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
-    private readonly emailService: EmailService,
+    private readonly notifications: NotificationDispatchService,
+    private readonly rbacService: RbacService,
   ) {}
 
   @OnEvent(ResourceUsageNoteAddedEvent.EVENT_NAME)
@@ -39,26 +47,27 @@ export class ResourceUsageNoteNotificationListener {
         return;
       }
 
-      this.logger.log(
-        `Dispatching usage-note emails to ${recipients.length} user(s) for resource ${resource.id}`,
-      );
-
-      await Promise.all(
-        recipients.map((recipient) =>
-          this.emailService
-            .sendResourceUsageNoteEmail(
-              recipient,
-              { id: resource.id, name: resource.name },
-              { content: event.note, phase: event.phase, authorName: event.author.username ?? 'A user' },
-            )
-            .catch((error) => {
-              this.logger.error(
-                `Failed to send usage-note email to user ${recipient.id} for resource ${resource.id}: ${error.message}`,
-                error.stack,
-              );
-            }),
-        ),
-      );
+      const authorUsername = event.author.username;
+      await this.notifications.dispatch({
+        category: NotificationCategory.RESOURCE_USAGE_NOTES,
+        recipients,
+        actorId: event.author.id,
+        title: (recipient) => t(recipient.locale, 'title', { resourceName: resource.name }),
+        body: (recipient) => {
+          const authorName = authorUsername ?? t(recipient.locale, 'fallbackUser');
+          return t(recipient.locale, 'body', { authorName, note: event.note });
+        },
+        url: `/resources/${resource.id}/usage`,
+        sendEmail: (recipient) =>
+          this.notifications.sendEmailTemplate(recipient, NotificationCategory.RESOURCE_USAGE_NOTES, {
+            resource: { id: resource.id, name: resource.name },
+            note: {
+              content: event.note,
+              phase: event.phase,
+              authorName: authorUsername ?? t(recipient.locale, 'fallbackUser'),
+            },
+          }),
+      });
     } catch (error) {
       this.logger.error(
         `Failed to process usage-note notification for resource ${event.resourceId}: ${error.message}`,
@@ -71,10 +80,8 @@ export class ResourceUsageNoteNotificationListener {
   private async collectRecipients(resource: Resource, authorId: number): Promise<User[]> {
     const groupIds = (resource.groups ?? []).map((group) => group.id);
 
-    const admins = await this.userRepository
-      .createQueryBuilder('user')
-      .where('user.canManageResources = :value', { value: true })
-      .getMany();
+    const adminIds = await this.rbacService.getUserIdsWithPermission('resources.maintenance.manage');
+    const admins = adminIds.length > 0 ? await this.userRepository.findBy({ id: In(adminIds) }) : [];
 
     const introducerWhere: Array<Record<string, unknown>> = [{ resourceId: resource.id }];
     if (groupIds.length > 0) {

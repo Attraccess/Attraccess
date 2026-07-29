@@ -1,17 +1,56 @@
-// RabbitMQ management plugin — frontend half (scaffold).
+// RabbitMQ management plugin — frontend half.
 //
-// Foundation bootstrap (ATT-526): a minimal frontend remote that registers one
-// route and a sidebar entry so the federation build is exercised end to end. The
-// actual management UI lands in ATT-521+.
+// ATT-526 bootstrapped this remote with one route + sidebar entry. ATT-521 adds
+// the MQTT slot contributions: a "RabbitMQ" badge in the MQTT server list and a
+// connection-status panel in the MQTT server detail view, both driven by the
+// plugin's backend detection endpoint. The host stays RabbitMQ-agnostic — it
+// only exposes the generic slots and renders whatever we contribute.
 import { Card } from '@heroui/react';
 import { RabbitIcon } from 'lucide-react';
 import type {
   AttraccessFrontendPlugin,
   AttraccessFrontendPluginAuthData,
   PluginSidebarItem,
+  PluginSlotContribution,
   RouteConfig,
 } from '@attraccess/plugins-frontend-sdk';
 import type { IPluginStore } from 'react-pluggable';
+import { useDetection } from './detection';
+import { RabbitmqListBadge } from './RabbitmqListBadge';
+import { RabbitmqStatusPanel } from './RabbitmqStatusPanel';
+import { RabbitmqUserPanel } from './RabbitmqUserPanel';
+
+// Host slot ids exposed by the MQTT UI. The SDK is vendor-agnostic and does not
+// export them, and the host owns them in apps/frontend (which a plugin cannot
+// import) — so a plugin restates them, exactly like it restates a route `path`
+// it links to. Both slots receive `{ mqttServerId }`.
+const MQTT_SERVER_DETAIL_SLOT = 'mqtt.server.detail';
+const MQTT_SERVER_LIST_ROW_SLOT = 'mqtt.server.list.row';
+
+// The context shape the host documents for both MQTT slots.
+interface MqttServerSlotContext {
+  mqttServerId: number;
+  [key: string]: unknown;
+}
+
+// Everything the plugin contributes to the MQTT server detail view: the
+// connection-status panel (ATT-521) plus the user-management panel (ATT-522).
+// Returns null (no wrapper element) for non-RabbitMQ servers so the host
+// layout is unchanged unless a RabbitMQ broker is positively detected.
+function RabbitmqDetailSlot({ mqttServerId }: { mqttServerId: number }) {
+  const { result } = useDetection(mqttServerId);
+
+  if (!result?.isRabbitMQ) {
+    return null;
+  }
+
+  return (
+    <div className="flex flex-col gap-4 w-full">
+      <RabbitmqStatusPanel mqttServerId={mqttServerId} />
+      <RabbitmqUserPanel mqttServerId={mqttServerId} />
+    </div>
+  );
+}
 
 function RabbitmqPage() {
   return (
@@ -23,7 +62,9 @@ function RabbitmqPage() {
       <Card className="border border-default-200 dark:border-default-100">
         <Card.Content>
           <p className="text-sm text-default-500">
-            RabbitMQ management plugin scaffold. Management features are coming soon.
+            RabbitMQ management plugin. RabbitMQ MQTT servers show a detection badge and connection-status panel in
+            the MQTT settings, and broker users can be managed (create, edit, permissions, delete) from the MQTT
+            server detail view.
           </p>
         </Card.Content>
       </Card>
@@ -41,7 +82,7 @@ export default class RabbitmqPlugin implements AttraccessFrontendPlugin {
   }
 
   init(_store: IPluginStore): void {
-    // No setup needed for the scaffold.
+    // No setup needed.
   }
 
   activate(): void {
@@ -53,7 +94,7 @@ export default class RabbitmqPlugin implements AttraccessFrontendPlugin {
   }
 
   onApiAuthStateChange(_authData: null | AttraccessFrontendPluginAuthData): void {
-    // no-op
+    // no-op — detection is read via relative `/api` URLs with session cookies.
   }
 
   onApiEndpointChange(_endpoint: string): void {
@@ -62,7 +103,7 @@ export default class RabbitmqPlugin implements AttraccessFrontendPlugin {
 
   getRoutes(): RouteConfig[] {
     // Same access level as the host MQTT servers settings page.
-    return [{ path: '/rabbitmq', authRequired: 'canManageResources', element: <RabbitmqPage /> }];
+    return [{ path: '/rabbitmq', authRequired: 'resources.update', element: <RabbitmqPage /> }];
   }
 
   getSidebarItems(): PluginSidebarItem[] {
@@ -73,5 +114,27 @@ export default class RabbitmqPlugin implements AttraccessFrontendPlugin {
         icon: <RabbitIcon className="w-5 h-5" />,
       },
     ];
+  }
+
+  // Contribute UI into the host's generic MQTT slots. Each contribution is
+  // scoped to one server via the host-supplied `{ mqttServerId }` context and
+  // renders nothing unless that server is detected as RabbitMQ.
+  getSlotContributions(): PluginSlotContribution[] {
+    const contributions: PluginSlotContribution<MqttServerSlotContext>[] = [
+      {
+        slotId: MQTT_SERVER_DETAIL_SLOT,
+        key: 'rabbitmq-mqtt-detail',
+        // Status first, user management below it (ATT-522). The wrapper
+        // renders nothing unless the server is detected as RabbitMQ, so the
+        // detail view keeps its layout for other brokers.
+        render: (context) => <RabbitmqDetailSlot mqttServerId={context.mqttServerId} />,
+      },
+      {
+        slotId: MQTT_SERVER_LIST_ROW_SLOT,
+        key: 'rabbitmq-mqtt-list-row',
+        render: (context) => <RabbitmqListBadge mqttServerId={context.mqttServerId} />,
+      },
+    ];
+    return contributions;
   }
 }

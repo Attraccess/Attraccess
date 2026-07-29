@@ -45,6 +45,10 @@ function symbolicationChipColor(status: string | null | undefined): 'success' | 
   }
 }
 
+function mismatchChipColor(matches: boolean | null | undefined): 'danger' | 'default' {
+  return matches === false ? 'danger' : 'default';
+}
+
 export function AttractapDiagnostics(props: Readonly<Props>) {
   const { t } = useTranslations({ de, en });
   const toast = useToastMessage();
@@ -183,6 +187,11 @@ export function AttractapDiagnostics(props: Readonly<Props>) {
                       {t(`symbolication.${report.symbolicationStatus}`)}
                     </Chip>
                   )}
+                  {report.firmwareMatchesLatestServer === false && (
+                    <Chip color="danger" variant="soft" size="sm" data-cy="attractap-diagnostics-firmware-mismatch">
+                      {t('firmwareMismatch')}
+                    </Chip>
+                  )}
                 </div>
                 <span className="text-xs text-default-400">{new Date(report.createdAt).toLocaleString()}</span>
               </div>
@@ -203,20 +212,42 @@ export function AttractapDiagnostics(props: Readonly<Props>) {
                   {t('fields.wifiState')}: {report.wifiState ?? fallback}
                 </span>
                 <span className="text-default-500">
-                  {t('fields.firmware')}: {report.firmwareVersion ?? fallback}
+                  {t('fields.crashFirmware')}: {report.firmwareVersion ?? fallback}
+                </span>
+                <span className="text-default-500">
+                  {t('fields.currentReaderFirmware')}:{' '}
+                  <span className={report.firmwareMatchesCurrentReader === false ? 'text-danger' : undefined}>
+                    {report.currentReaderFirmwareVersion ?? fallback}
+                  </span>
+                </span>
+                <span className="text-default-500">
+                  {t('fields.latestServerFirmware')}:{' '}
+                  <span className={report.firmwareMatchesLatestServer === false ? 'text-danger' : undefined}>
+                    {report.latestServerFirmwareVersion ?? fallback}
+                  </span>
                 </span>
               </div>
+              {report.coredumpBuildId && (
+                <div className="flex items-center gap-2 flex-wrap text-sm">
+                  <span className="font-mono text-xs text-default-500">
+                    {t('buildId')}: {report.coredumpBuildId}
+                  </span>
+                  {report.coredumpBuildIdKnown !== null && report.coredumpBuildIdKnown !== undefined && (
+                    <Chip
+                      color={mismatchChipColor(report.coredumpBuildIdKnown)}
+                      variant="soft"
+                      size="sm"
+                      data-cy="attractap-diagnostics-build-id-known"
+                    >
+                      {report.coredumpBuildIdKnown ? t('buildIdKnown') : t('buildIdMissing')}
+                    </Chip>
+                  )}
+                </div>
+              )}
               {report.symbolizedBacktrace && (
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <span className="text-sm font-medium">
-                      {t('backtrace')}
-                      {report.coredumpBuildId ? (
-                        <span className="ml-2 font-mono text-xs text-default-400">
-                          {t('buildId')}: {report.coredumpBuildId}
-                        </span>
-                      ) : null}
-                    </span>
+                    <span className="text-sm font-medium">{t('backtrace')}</span>
                     <Button
                       variant="secondary"
                       size="sm"

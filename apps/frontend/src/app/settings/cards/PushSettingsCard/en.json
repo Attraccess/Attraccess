@@ -1,0 +1,5 @@
+{
+  "title": "Push notifications",
+  "subscriptionCount": "{{count}} active subscriptions",
+  "description": "VAPID keys are generated automatically on first use and stored in the database. Users enable push per device in their account settings."
+}

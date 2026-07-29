@@ -3,30 +3,15 @@ import {
   useResourcesServiceGetAllResources,
   useResourcesServiceResourceGroupsGetOne,
 } from '@attraccess/react-query-client';
-import {
-  Button,
-  Card,
-  CardProps,
-  Skeleton,
-  Table,
-  TableBody,
-  TableCell,
-  TableColumn,
-  TableContent,
-  TableHeader,
-  TableRow,
-  TableScrollContainer,
-} from '@heroui/react';
+import { Button, Card, CardProps, Skeleton } from '@heroui/react';
 import { EmptyState } from '../../../components/emptyState';
 import { PageHeader } from '../../../components/pageHeader';
+import { ResourceListItem } from '../../../components/ResourceListItem';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { filenameToUrl } from '../../../api';
-import { StatusChip } from './statusChip';
-import { ChevronRightIcon, CogIcon, ShapesIcon } from 'lucide-react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { CogIcon } from 'lucide-react';
+import { useDebounce, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useAuth } from '../../../hooks/useAuth';
-import { useDebounce } from '../../../hooks/useDebounce';
 import { FilterProps } from '../filterProps';
 
 import en from './en.json';
@@ -79,7 +64,7 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
     return Math.ceil(resources.total / perPage);
   }, [resources, perPage]);
 
-  const canManageResources = hasPermission('canManageResources');
+  const canUpdateResources = hasPermission('resources.update');
 
   const { data: introductionStatus } = useAccessControlServiceResourceGroupIntroducersIsIntroducer(
     {
@@ -93,8 +78,8 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
   );
 
   const hasAccessToGroupSettings = useMemo(() => {
-    return canManageResources || introductionStatus?.isIntroducer;
-  }, [introductionStatus, canManageResources]);
+    return canUpdateResources || introductionStatus?.isIntroducer;
+  }, [introductionStatus, canUpdateResources]);
 
   const title = useMemo(() => {
     if (groupId === 'none') {
@@ -115,7 +100,6 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
   }, [groupId, group, t]);
 
   const accessibleTitle = title?.trim() ? title : t('accessibility.unknownGroup');
-  const tableAriaLabel = t('accessibility.tableLabel', { group: accessibleTitle });
 
   const groupIsFetched = useMemo(() => {
     return groupId === 'none' || fetchStatusGroup === 'success';
@@ -146,59 +130,19 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
       </Card.Header>
 
       <Card.Content>
-        <Table>
-          <TableScrollContainer>
-            <TableContent aria-label={tableAriaLabel}>
-              <TableHeader>
-                <TableColumn width="0">{t('columns.image')}</TableColumn>
-                <TableColumn isRowHeader>{t('columns.name')}</TableColumn>
-                <TableColumn width="0" className="text-left">
-                  {t('columns.status')}
-                </TableColumn>
-                <TableColumn width="0">{''}</TableColumn>
-              </TableHeader>
-              <TableBody items={resources?.data ?? []} renderEmptyState={() => <EmptyState />}>
-                {(resource) => (
-                  <TableRow
-                    key={resource.id}
-                    id={resource.id}
-                    className="cursor-pointer hover:bg-primary-50 transition-bg duration-300"
-                    onAction={() => navigate(`/resources/${resource.id}`)}
-                  >
-                    <TableCell>
-                      {resource.imageFilename ? (
-                        <img
-                          height={48}
-                          width={48}
-                          src={filenameToUrl(resource.imageFilename)}
-                          alt=""
-                          aria-hidden="true"
-                          className="object-contain"
-                          style={{ height: 48, width: 48 }}
-                        />
-                      ) : (
-                        <div
-                          className="flex items-center justify-center text-default-400"
-                          style={{ height: 48, width: 48 }}
-                          aria-hidden="true"
-                        >
-                          <ShapesIcon className="w-6 h-6" />
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell>{resource.name}</TableCell>
-                    <TableCell className="text-right">
-                      <StatusChip resourceId={resource.id} />
-                    </TableCell>
-                    <TableCell>
-                      <ChevronRightIcon />
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </TableContent>
-          </TableScrollContainer>
-        </Table>
+        {resources?.data.length === 0 ? (
+          <EmptyState />
+        ) : (
+          <div className="space-y-2">
+            {(resources?.data ?? []).map((resource) => (
+              <ResourceListItem
+                key={resource.id}
+                resource={resource}
+                onPress={() => navigate(`/resources/${resource.id}`)}
+              />
+            ))}
+          </div>
+        )}
       </Card.Content>
 
       <Card.Footer className="flex w-full justify-center">

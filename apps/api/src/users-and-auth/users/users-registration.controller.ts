@@ -5,8 +5,10 @@ import {
   Param,
   ParseIntPipe,
   Post,
+  Req,
   UseInterceptors,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { User } from '@attraccess/database-entities';
 import { AuthRateLimitInterceptor } from '../rate-limiting/auth-rate-limit.interceptor';
@@ -34,7 +36,7 @@ export class UsersRegistrationController {
   ) {}
 
   @Get('local-signup-domain-whitelist')
-  @Auth('canManageUsers', 'canManageSystemConfiguration')
+  @Auth('system.settings.manage', 'users.create')
   @ApiOperation({ summary: 'Get the local signup domain whitelist', operationId: 'getLocalSignupDomainWhitelist' })
   @ApiResponse({
     status: 200,
@@ -46,7 +48,7 @@ export class UsersRegistrationController {
   }
 
   @Post('local-signup-domain-whitelist')
-  @Auth('canManageUsers', 'canManageSystemConfiguration')
+  @Auth('system.settings.manage', 'users.create')
   @ApiOperation({ summary: 'Set the local signup domain whitelist', operationId: 'setLocalSignupDomainWhitelist' })
   @ApiResponse({
     status: 200,
@@ -76,8 +78,13 @@ export class UsersRegistrationController {
     status: 403,
     description: 'First-time setup is already complete (only relevant when overwriteFirstTimeAdmin is true).',
   })
-  async createOne(@Body() body: CreateUserDto): Promise<User> {
-    return this.registrationService.createOne(body);
+  async createOne(
+    @Body() body: CreateUserDto,
+    @Req() req: Request,
+  ): Promise<User> {
+    const acceptLanguage = req.headers['accept-language'];
+    const locale = (acceptLanguage?.split(',')[0]?.split(';')[0] ?? '').trim() || 'en';
+    return this.registrationService.createOne(body, locale);
   }
 
   @Get('local-signup-enabled')

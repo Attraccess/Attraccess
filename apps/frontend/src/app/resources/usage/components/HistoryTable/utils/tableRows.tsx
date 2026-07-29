@@ -14,13 +14,13 @@ export function generateRowCells(
   t: TFunction,
   resource: Resource,
   showAllUsers: boolean,
-  canManageResources: boolean,
+  canUpdateResources: boolean,
   projectCellRenderer?: (session: ResourceUsage) => ReactElement,
 ): TableRowProps<ResourceUsage>['children'] {
   const cells: ReactElement<TableCellProps>[] = [];
 
-  // Only show user cell if we're showing all users (requires canManageResources)
-  if (canManageResources && showAllUsers) {
+  // Only show user cell if we're showing all users (requires canUpdateResources)
+  if (canUpdateResources && showAllUsers) {
     cells.push(
       <TableCell key={`user-${session.id}`}>
         <AttraccessUser user={session.user} />
@@ -35,7 +35,7 @@ export function generateRowCells(
       <TableCell key={`start-${session.id}`} className="whitespace-nowrap">
         <DateTimeDisplay date={session.startTime} />
       </TableCell>,
-      <TableCell key={`end-${session.id}`} className="hidden md:table-cell whitespace-nowrap">
+      <TableCell key={`end-${session.id}`} className="hidden lg:table-cell whitespace-nowrap">
         <DateTimeDisplay date={session.endTime} />
       </TableCell>,
       <TableCell key={`duration-${session.id}`} className="whitespace-nowrap">
@@ -56,9 +56,9 @@ export function generateRowCells(
       <TableCell key={`project-${session.id}`} className="hidden 2xl:table-cell">
         {projectCellRenderer ? projectCellRenderer(session) : session.project?.name}
       </TableCell>,
-      <TableCell key={`supervisor-${session.id}`} className="hidden xl:table-cell">
+      <TableCell key={`supervisor-${session.id}`} className="hidden md:table-cell">
         {session.supervisorUser ? (
-          <AttraccessUser user={session.supervisorUser} />
+          <AttraccessUser user={session.supervisorUser} variant="mini" />
         ) : (
           <span className="text-gray-400 dark:text-gray-500">—</span>
         )}

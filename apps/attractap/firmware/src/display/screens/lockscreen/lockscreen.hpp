@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Arduino.h>
+#include <string>
 #include <lvgl.h>
 #include "../../images/lockscreen_background_image.hpp"
 #include "../../images/logo_40h.hpp"
@@ -14,11 +14,11 @@ public:
     void onScreenLeave();
     lv_obj_t *getScreen() override;
     void loop() override;
-    String getName() override;
+    std::string getName() override;
     void destroy() override;
 
     void setResourceName(const char *resourceName);
-    void setUsageInfo(bool hasActiveUsage, const char *username);
+    void setUsageInfo(bool hasActiveUsage, const char *username, bool isUnderMaintenance);
 
 private:
     lv_obj_t *screen = nullptr;
@@ -29,6 +29,7 @@ private:
     char resourceName[API::MAX_RESOURCE_NAME_LEN];
     char username[API::MAX_USERNAME_LEN];
     bool hasActiveUsage;
+    bool isUnderMaintenance;
 
     void updateUsageInfo();
 };

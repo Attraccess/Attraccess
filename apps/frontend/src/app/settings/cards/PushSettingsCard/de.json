@@ -1,0 +1,5 @@
+{
+  "title": "Push-Benachrichtigungen",
+  "subscriptionCount": "{{count}} aktive Abonnements",
+  "description": "VAPID-Schlüssel werden bei der ersten Nutzung automatisch erzeugt und in der Datenbank gespeichert. Nutzer aktivieren Push pro Gerät in ihren Kontoeinstellungen."
+}

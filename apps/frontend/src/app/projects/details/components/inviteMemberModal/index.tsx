@@ -112,7 +112,9 @@ export function InviteProjectMemberModal(props: Readonly<InviteProjectMemberModa
         <DrawerBody className="flex flex-col gap-4">
           <p className="text-small text-default-500">{t('description')}</p>
           <UserSearch
+            resetSignal={isOpen}
             label={t('inputs.user')}
+            onSelectionChange={setSelectedUser}
             afterSelection={
               selectedUser ? (
                 <span className="text-tiny text-default-500">{selectedUser.username}</span>

@@ -1,6 +1,3 @@
-// Tests for async MJML service wrapping mjml v5 Promise-based API
-// FEATURE: Email template rendering with MJML
-
 import { Test } from '@nestjs/testing';
 import { BadRequestException } from '@nestjs/common';
 import { MjmlService } from './mjml.service';

@@ -2,6 +2,7 @@ import {
   IntroductionHistoryAction,
   ResourceIntroduction,
   ResourceIntroductionHistoryItem,
+  User,
 } from '@attraccess/database-entities';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -10,6 +11,8 @@ import { UpdateResourceIntroductionDto } from './dtos/update.request.dto';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResourceIntroductionChangedEvent } from './events/resource-introduction-changed.event';
 import { MetricsService } from '../../metrics/metrics.service';
+import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
+import { NotificationCategory } from '../../notifications/notification-types';
 
 @Injectable()
 export class ResourceIntroductionsService {
@@ -23,7 +26,31 @@ export class ResourceIntroductionsService {
     @Inject(EventEmitter2)
     private readonly eventEmitter: EventEmitter2,
     private readonly metricsService: MetricsService,
+    private readonly notifications: NotificationDispatchService,
   ) {}
+
+  private notifyIntroductionChange(resourceId: number, userId: number, granted: boolean): void {
+    const title = 'Your resource access changed';
+    const body = granted
+      ? `You received an introduction for resource #${resourceId}.`
+      : `Your introduction for resource #${resourceId} was revoked.`;
+    const url = `/resources/${resourceId}`;
+
+    void this.notifications.dispatch({
+      category: NotificationCategory.ACCESS_CHANGES,
+      recipients: [{ id: userId } as User],
+      title,
+      body,
+      url,
+      dedupeKey: `resource-introduction-${resourceId}-${userId}-${granted ? 'granted' : 'revoked'}`,
+      sendEmail: (recipient) =>
+        this.notifications.sendEmailTemplate(recipient, NotificationCategory.ACCESS_CHANGES, {
+          accessChange: { title, body, url },
+        }),
+    }).catch((error) => {
+      this.logger.error(`Failed to notify user ${userId} about resource introduction changes: ${(error as Error).message}`);
+    });
+  }
 
   private async getIntroductionOfUser(
     resourceId: number,
@@ -91,11 +118,12 @@ export class ResourceIntroductionsService {
     return historyItem;
   }
 
-  private async createOne(resourceId: number, userId: number): Promise<ResourceIntroduction> {
+  private async createOne(resourceId: number, userId: number, tutorUserId?: number): Promise<ResourceIntroduction> {
     this.logger.debug(`Creating new introduction for resourceId: ${resourceId}, userId: ${userId}`);
     const introduction = this.resourceIntroductionRepository.create({
       resource: { id: resourceId },
       receiverUser: { id: userId },
+      ...(tutorUserId != null ? { tutorUser: { id: tutorUserId } } : {}),
     });
 
     const savedIntroduction = await this.resourceIntroductionRepository.save(introduction);
@@ -109,14 +137,21 @@ export class ResourceIntroductionsService {
     userId: number,
     nextStatus: IntroductionHistoryAction,
     data?: UpdateResourceIntroductionDto,
+    tutorUserId?: number,
   ) {
     this.logger.debug(`Updating introduction status to ${nextStatus} for resourceId: ${resourceId}, userId: ${userId}`);
     let resourceIntroduction = await this.getIntroductionOfUser(resourceId, userId);
 
     if (!resourceIntroduction) {
       this.logger.debug('No existing introduction found, creating new one');
-      resourceIntroduction = await this.createOne(resourceId, userId);
+      resourceIntroduction = await this.createOne(resourceId, userId, tutorUserId);
+    } else if (tutorUserId != null && resourceIntroduction.tutorUserId !== tutorUserId) {
+      await this.resourceIntroductionRepository.update(resourceIntroduction.id, { tutorUserId });
+      // Keep the in-memory entity in sync so subsequent history/logging sees the updated tutor.
+      resourceIntroduction.tutorUserId = tutorUserId;
     }
+
+    const previousHistoryItem = await this.getLastHistoryItemOfIntroduction(resourceIntroduction.id);
 
     this.logger.debug(`Creating new history item with action: ${nextStatus}`);
     const historyItem = this.resourceIntroductionHistoryItemRepository.create({
@@ -133,6 +168,9 @@ export class ResourceIntroductionsService {
       ResourceIntroductionChangedEvent.EVENT_NAME,
       new ResourceIntroductionChangedEvent(resourceIntroduction.id),
     );
+    if (previousHistoryItem?.action !== nextStatus && (previousHistoryItem || nextStatus === IntroductionHistoryAction.GRANT)) {
+      this.notifyIntroductionChange(resourceId, userId, nextStatus === IntroductionHistoryAction.GRANT);
+    }
 
     return savedHistoryItem;
   }
@@ -166,9 +204,16 @@ export class ResourceIntroductionsService {
     resourceId: number,
     userId: number,
     data?: UpdateResourceIntroductionDto,
+    options?: { tutorUserId?: number },
   ): Promise<ResourceIntroductionHistoryItem> {
     this.logger.debug(`Granting introduction for resourceId: ${resourceId}, userId: ${userId}`);
-    const result = await this.updateIntroductionStatus(resourceId, userId, IntroductionHistoryAction.GRANT, data);
+    const result = await this.updateIntroductionStatus(
+      resourceId,
+      userId,
+      IntroductionHistoryAction.GRANT,
+      data,
+      options?.tutorUserId,
+    );
     this.metricsService.resourceIntroductionsTotal.inc();
     this.logger.debug(`Grant operation completed for resourceId: ${resourceId}, userId: ${userId}`);
     return result;

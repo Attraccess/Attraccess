@@ -1,10 +1,14 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Resource, SupervisionMode } from '@attraccess/database-entities';
 import { WebsocketService } from '../websocket.service';
 import { AttractapService } from '../../attractap.service';
 import { UsersService } from '../../../users-and-auth/users/users.service';
 import { ResourceUsageService } from '../../../resources/usage/resourceUsage.service';
 import { ResourceIntroducersService } from '../../../resources/introducers/resourceIntroducers.service';
 import { MetricsService } from '../../../metrics/metrics.service';
+import { RbacService } from '../../../users-and-auth/rbac/rbac.service';
 import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from '../websocket.types';
 
 @Injectable()
@@ -28,6 +32,12 @@ export class AttractapCardHandler {
 
   @Inject(MetricsService)
   private metricsService: MetricsService;
+
+  @Inject(RbacService)
+  private rbacService: RbacService;
+
+  @InjectRepository(Resource)
+  private resourceRepository: Repository<Resource>;
 
   public async startEnrollOfNewNfcCard(data: { readerId: number; userId: number }) {
     const reader = await this.attractapService.findReaderById(data.readerId);
@@ -246,7 +256,7 @@ export class AttractapCardHandler {
   }
 
   public async handleCardAuthenticationRequest(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
-    this.metricsService.attractapNfcTapsTotal.inc();
+    this.metricsService.attractapNfcTapsTotal.inc({ reader_id: String(socket.readerId) });
     const { uid, resourceId } = data.payload as { uid: string; resourceId: number };
 
     if (!uid || typeof uid !== 'string') {
@@ -283,14 +293,28 @@ export class AttractapCardHandler {
     const hasIntroduction = await this.resourceUsageService.canControllResource(resourceId, nfcCard.user);
     const isIntroducer = await this.resourceIntroducersService.isIntroducer(resourceId, nfcCard.user.id, true);
 
+    const resource = await this.resourceRepository.findOne({ where: { id: resourceId } });
+    const supervisionMode = resource?.supervisionMode ?? SupervisionMode.INTRODUCTION_REQUIRED;
+
+    // Whether this tap must be authorised by a supervisor before a session can start (ATT-493):
+    // - SUPERVISION_REQUIRED: always, even for introduced users (mirrors the solo-start guard).
+    // - SUPERVISION_ALLOWED: only when the user is not (yet) introduced.
+    // INTRODUCTION_REQUIRED never allows a supervised start, so the reader falls back to its
+    // existing "no introduction" handling.
+    const requiresSupervisor =
+      supervisionMode === SupervisionMode.SUPERVISION_REQUIRED ||
+      (supervisionMode === SupervisionMode.SUPERVISION_ALLOWED && !hasIntroduction);
+
     await socket.sendMessage(
       new AttractapEvent(AttractapEventType.CARD_AUTHENTICATION_DATA, {
         keyNo: nfcCard.keyNo,
         key: nfcCard.key,
         username: nfcCard.user.username,
-        canManageResource: nfcCard.user.systemPermissions.canManageResources,
+        canManageResource: (await this.rbacService.getEffectivePermissions(nfcCard.user.id)).has('resources.update'),
         hasIntroduction,
         isIntroducer,
+        supervisionMode,
+        requiresSupervisor,
       }),
     );
   }

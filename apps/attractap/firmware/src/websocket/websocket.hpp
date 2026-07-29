@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Arduino.h>
+#include <string>
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/queue.h"
@@ -25,13 +25,21 @@ public:
     };
     void setup();
     void loop();
-    void sendMessage(const String &message);
-    void sendMessage(const char *message, size_t length);
+    bool sendMessage(const std::string &message);
+    bool sendMessage(const char *message, size_t length);
     void setMessageCallbackRaw(std::function<void(const char *, size_t)> callback);
     void setBinaryDataCallback(std::function<void(esp_websocket_event_data_t)> callback);
 
     void enableConnectionAttempts();
     void disableConnectionAttempts();
+
+    // Tear down the current connection and reconnect (same mechanism as the
+    // inbound-liveness watchdog). Must be called from the main-loop task.
+    void forceReconnect(const char *reason);
+
+    // Clear the locked TLS certificate decision so the next connect sweeps the
+    // full CA list again (device settings "reset certificate" button).
+    void resetCertificateTrust();
 
 private:
     std::function<void(const char *, size_t)> messageCallbackRaw;
@@ -44,8 +52,24 @@ private:
     void updateInfoFromAppState();
     void publishConnectionStatus();
     void connectWebSocket();
+    void connectWebSocketLocked();
     bool shouldReconnect();
     uint32_t lastReconnectAttemptTime = 0;
+
+    // (Re)connects run on a dedicated low-priority task (ATT-554 item 7):
+    // esp_websocket_client_stop()/start() block for up to the network timeout,
+    // which used to stall the UI-driving main loop on every reconnect attempt.
+    // loop() only signals the task via a task notification (coalescing).
+    static constexpr uint32_t CONNECT_TASK_STACK = 8192;
+    static constexpr UBaseType_t CONNECT_TASK_PRIORITY = 2;
+    TaskHandle_t connect_task = nullptr;
+    static void connectTaskEntry(void *arg);
+    void connectTaskLoop();
+    void requestConnect();
+    // Serializes connectWebSocket (connect task) against the client teardown in
+    // disableConnectionAttempts (main loop) so the client handle cannot be
+    // destroyed mid-connect.
+    SemaphoreHandle_t connect_lifecycle_mutex = nullptr;
 
     const uint32_t CERT_ITERATION_INTERVAL_MS = 10000;
     const uint32_t RECONNECT_BACKOFF_BASE_MS = 10000;
@@ -71,6 +95,16 @@ private:
     uint8_t consecutiveConnectFailures = 0;
     static constexpr uint8_t MAX_CONSECUTIVE_CONNECT_FAILURES = 5;
     void handleConnectFailure(const char *reason);
+
+    // Reboot when no connection could be established for this long even though
+    // network and server config are present (ATT-714).
+    static constexpr uint32_t CONNECT_WATCHDOG_TIMEOUT_MS = 90000;
+    uint32_t connectWatchdogStartMs = 0; // 0 = not waiting
+    // Cert index seen at the last watchdog check: an advancing sweep re-arms the
+    // watchdog, since a full sweep (certs x attempts x retry interval) takes far
+    // longer than one watchdog period and the sweep position only lives in RAM.
+    int connectWatchdogCertIndex = 0;
+    void checkConnectWatchdog(const AttraccessApiConfig &apiConfig);
 
     uint32_t lastInboundFrameTime = 0;
     const uint32_t INBOUND_LIVENESS_TIMEOUT_MS = 20000;
@@ -105,7 +139,7 @@ private:
     TaskHandle_t tx_task = nullptr;
     static void txTaskEntry(void *arg);
     void txTaskLoop();
-    void enqueueMessage(const char *data, size_t length);
+    bool enqueueMessage(const char *data, size_t length);
     void drainTxQueue();
 
     static void websocket_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data);

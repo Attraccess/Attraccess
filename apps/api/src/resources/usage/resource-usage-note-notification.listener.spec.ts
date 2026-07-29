@@ -3,14 +3,17 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Resource, ResourceIntroducer, User } from '@attraccess/database-entities';
 import { ResourceUsageNoteNotificationListener } from './resource-usage-note-notification.listener';
 import { ResourceUsageNoteAddedEvent } from './events/resource-usage.events';
-import { EmailService } from '../../email/email.service';
+import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
+import { NotificationCategory } from '../../notifications/notification-types';
+import { RbacService } from '../../users-and-auth/rbac/rbac.service';
 
 describe('ResourceUsageNoteNotificationListener', () => {
   let listener: ResourceUsageNoteNotificationListener;
   let resourceRepository: { findOne: jest.Mock };
   let introducerRepository: { find: jest.Mock };
-  let userRepository: { createQueryBuilder: jest.Mock };
-  let emailService: { sendResourceUsageNoteEmail: jest.Mock };
+  let userRepository: { findBy: jest.Mock };
+  let notifications: { dispatch: jest.Mock };
+  let rbacService: { getUserIdsWithPermission: jest.Mock };
 
   const RESOURCE_ID = 7;
   const AUTHOR_ID = 1;
@@ -27,18 +30,17 @@ describe('ResourceUsageNoteNotificationListener', () => {
     );
 
   const setAdmins = (admins: User[]) => {
-    userRepository.createQueryBuilder.mockReturnValue({
-      where: jest.fn().mockReturnThis(),
-      getMany: jest.fn().mockResolvedValue(admins),
-    });
+    const ids = admins.map((u) => u.id);
+    rbacService.getUserIdsWithPermission.mockResolvedValue(ids);
+    userRepository.findBy.mockResolvedValue(admins);
   };
 
   beforeEach(async () => {
     resourceRepository = { findOne: jest.fn().mockResolvedValue(buildResource()) };
     introducerRepository = { find: jest.fn().mockResolvedValue([]) };
-    userRepository = { createQueryBuilder: jest.fn() };
-    emailService = { sendResourceUsageNoteEmail: jest.fn().mockResolvedValue(undefined) };
-    setAdmins([]);
+    rbacService = { getUserIdsWithPermission: jest.fn().mockResolvedValue([]) };
+    userRepository = { findBy: jest.fn().mockResolvedValue([]) };
+    notifications = { dispatch: jest.fn().mockResolvedValue(undefined) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -46,7 +48,8 @@ describe('ResourceUsageNoteNotificationListener', () => {
         { provide: getRepositoryToken(Resource), useValue: resourceRepository },
         { provide: getRepositoryToken(ResourceIntroducer), useValue: introducerRepository },
         { provide: getRepositoryToken(User), useValue: userRepository },
-        { provide: EmailService, useValue: emailService },
+        { provide: NotificationDispatchService, useValue: notifications },
+        { provide: RbacService, useValue: rbacService },
       ],
     }).compile();
 
@@ -65,14 +68,21 @@ describe('ResourceUsageNoteNotificationListener', () => {
 
     await listener.handleNoteAdded(buildEvent());
 
-    const ids = emailService.sendResourceUsageNoteEmail.mock.calls.map((c) => c[0].id).sort();
+    const request = notifications.dispatch.mock.calls[0][0];
+    const ids = request.recipients.map((user: User) => user.id).sort();
     expect(ids).toEqual([2, 3]);
-    expect(emailService.sendResourceUsageNoteEmail).toHaveBeenCalledTimes(2);
-    expect(emailService.sendResourceUsageNoteEmail).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 2 }),
-      { id: RESOURCE_ID, name: 'Laser Cutter' },
-      { content: 'Bed needs leveling', phase: 'end', authorName: 'alice' },
+    expect(notifications.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        category: NotificationCategory.RESOURCE_USAGE_NOTES,
+        title: expect.any(Function),
+        body: expect.any(Function),
+        url: '/resources/7/usage',
+      }),
     );
+
+    const enUser = { locale: 'en' } as User;
+    expect(request.title(enUser)).toBe('Usage note added for Laser Cutter');
+    expect(request.body(enUser)).toBe('alice: Bed needs leveling');
   });
 
   it('skips users without an email', async () => {
@@ -80,7 +90,7 @@ describe('ResourceUsageNoteNotificationListener', () => {
 
     await listener.handleNoteAdded(buildEvent());
 
-    expect(emailService.sendResourceUsageNoteEmail).not.toHaveBeenCalled();
+    expect(notifications.dispatch).not.toHaveBeenCalled();
   });
 
   it('does nothing when the resource is missing', async () => {
@@ -88,7 +98,7 @@ describe('ResourceUsageNoteNotificationListener', () => {
 
     await listener.handleNoteAdded(buildEvent());
 
-    expect(emailService.sendResourceUsageNoteEmail).not.toHaveBeenCalled();
+    expect(notifications.dispatch).not.toHaveBeenCalled();
   });
 
   it('includes group introducers when the resource belongs to groups', async () => {
@@ -99,6 +109,6 @@ describe('ResourceUsageNoteNotificationListener', () => {
 
     const whereArg = introducerRepository.find.mock.calls[0][0].where;
     expect(whereArg).toEqual(expect.arrayContaining([{ resourceId: RESOURCE_ID }]));
-    expect(emailService.sendResourceUsageNoteEmail).toHaveBeenCalledTimes(1);
+    expect(notifications.dispatch).toHaveBeenCalledTimes(1);
   });
 });

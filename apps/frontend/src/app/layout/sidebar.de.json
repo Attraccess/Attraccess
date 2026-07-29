@@ -1,5 +1,7 @@
 {
   "logout": "Abmelden",
+  "collapseSidebar": "Seitenleiste minimieren",
+  "expandSidebar": "Seitenleiste ausklappen",
   "language": "Sprache",
   "languages": {
     "en": "Englisch",
@@ -13,19 +15,35 @@
         "projects": "Projekte",
         "messages": "Nachrichten",
         "billing": "Zahlungen",
-        "attractap": "NFC-Karten",
-        "userManagement": "Benutzerverwaltung"
+        "attractap": "NFC-Karten"
+      }
+    },
+    "users": {
+      "label": "Benutzer",
+      "items": {
+        "userList": "Benutzerliste",
+        "userSecurity": "Sicherheit",
+        "sso": "Single Sign-On"
+      }
+    },
+    "devices": {
+      "label": "Geräte",
+      "items": {
+        "mqttServers": "MQTT-Server",
+        "companion": "Companion-App"
       }
     },
     "system": {
       "label": "System",
       "items": {
         "plugins": "Plugins",
-        "emailTemplates": "E-Mail-Vorlagen",
-        "mqttServers": "MQTT-Server",
+        "emails": "E-Mails",
+        "messagingSettings": "Nachrichteneinstellungen",
         "csvExport": "CSV-Export",
         "balena": "Balena",
-        "settings": "Einstellungen"
+        "settings": "Einstellungen",
+        "monitoring": "Überwachung",
+        "roles": "Rollen"
       }
     }
   },

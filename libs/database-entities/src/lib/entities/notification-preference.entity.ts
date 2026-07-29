@@ -22,6 +22,23 @@ export class NotificationPreference {
   })
   messagesEmailOnOffline!: boolean;
 
+  @Column({ type: 'boolean', default: true })
+  @ApiProperty({
+    description:
+      'Whether to send a browser push notification when a direct message arrives while the user is offline. Defaults to true (opt-out).',
+    example: true,
+    default: true,
+  })
+  messagesPushEnabled!: boolean;
+
+  @Column({ type: 'text', nullable: true })
+  @ApiProperty({
+    description: 'JSON map of notification categories to enabled channels.',
+    required: false,
+    nullable: true,
+  })
+  categoryChannels!: string | null;
+
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'userId' })
   @ApiProperty({ description: 'The user these preferences belong to', type: () => User })

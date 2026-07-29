@@ -10,7 +10,6 @@ import {
 import { ApiProperty } from '@nestjs/swagger';
 import { Exclude } from 'class-transformer';
 import { SSOProvider } from './ssoProvider.entity';
-import { SystemPermission } from './user.entity';
 
 @Entity()
 export class SSOProviderOIDCConfiguration {
@@ -97,16 +96,17 @@ export class SSOProviderOIDCConfiguration {
   })
   emailClaimPaths!: string[] | null;
 
-  @Column({ type: 'json', nullable: true })
+  // ponytail: keeps the legacy 'permissionMappings' DB column — renaming it would need a migration for zero gain
+  @Column({ type: 'json', nullable: true, name: 'permissionMappings' })
   @ApiProperty({
-    description: 'Optional mapping between Attraccess permissions and role names',
+    description: 'Mapping between Attraccess role keys and IdP role/group claim values',
     required: false,
     example: {
-      canManageResources: ['attraccess_resources'],
-      canManageUsers: ['attraccess_admin'],
+      'resource-manager': ['attraccess_resources'],
+      'user-manager': ['attraccess_admin'],
     },
   })
-  permissionMappings?: Partial<Record<SystemPermission, string[]>> | null;
+  roleMappings?: Record<string, string[]> | null;
 
   @CreateDateColumn()
   @ApiProperty({

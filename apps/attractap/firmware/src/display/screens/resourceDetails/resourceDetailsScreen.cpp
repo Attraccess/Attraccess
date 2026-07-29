@@ -1,7 +1,10 @@
 #include "resourceDetailsScreen.hpp"
+#include <string>
+#include <functional>
 #include <lvgl.h>
 #include <time.h>
 #include <stdio.h>
+#include <string.h>
 
 static const char *MAINTENANCE_INFO_TEXT = "Diese Ressource ist wegen Wartungsarbeiten nicht verfuegbar. Wartungsarbeiten duerfen nur von den unten aufgefuehrten Personen durchgefuehrt werden.";
 
@@ -138,7 +141,7 @@ void ResourceDetailsScreen::init()
 
    lv_obj_t *sessionStartTimeContainer = lv_obj_create(this->sessionDetailsContainer);
    lv_obj_remove_style_all(sessionStartTimeContainer);
-   lv_obj_set_width(sessionStartTimeContainer, lv_pct(33));
+   lv_obj_set_width(sessionStartTimeContainer, LV_SIZE_CONTENT);
    lv_obj_set_height(sessionStartTimeContainer, LV_SIZE_CONTENT);
    lv_obj_set_align(sessionStartTimeContainer, LV_ALIGN_CENTER);
    lv_obj_set_flex_flow(sessionStartTimeContainer, LV_FLEX_FLOW_COLUMN);
@@ -164,7 +167,9 @@ void ResourceDetailsScreen::init()
 
    lv_obj_t *currentUserContainer = lv_obj_create(this->sessionDetailsContainer);
    lv_obj_remove_style_all(currentUserContainer);
-   lv_obj_set_width(currentUserContainer, lv_pct(33));
+   lv_obj_set_flex_grow(currentUserContainer, 1);
+   lv_obj_set_style_pad_left(currentUserContainer, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_right(currentUserContainer, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_height(currentUserContainer, LV_SIZE_CONTENT);
    lv_obj_set_align(currentUserContainer, LV_ALIGN_CENTER);
    lv_obj_set_flex_flow(currentUserContainer, LV_FLEX_FLOW_COLUMN);
@@ -183,16 +188,18 @@ void ResourceDetailsScreen::init()
    lv_obj_set_style_text_opa(labelForCurrentUser, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->currentUser = lv_label_create(currentUserContainer);
-   lv_obj_set_width(this->currentUser, LV_SIZE_CONTENT);
+   lv_obj_set_width(this->currentUser, lv_pct(100));
    lv_obj_set_height(this->currentUser, LV_SIZE_CONTENT);
    lv_obj_set_align(this->currentUser, LV_ALIGN_CENTER);
+   lv_label_set_long_mode(this->currentUser, LV_LABEL_LONG_SCROLL_CIRCULAR);
+   lv_obj_set_style_text_align(this->currentUser, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_label_set_text(this->currentUser, "JappyJan");
    lv_obj_set_style_text_font(this->currentUser, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_color(this->currentUser, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
 
    lv_obj_t *elapsedTimeContainer = lv_obj_create(this->sessionDetailsContainer);
    lv_obj_remove_style_all(elapsedTimeContainer);
-   lv_obj_set_width(elapsedTimeContainer, lv_pct(33));
+   lv_obj_set_width(elapsedTimeContainer, LV_SIZE_CONTENT);
    lv_obj_set_height(elapsedTimeContainer, LV_SIZE_CONTENT);
    lv_obj_set_align(elapsedTimeContainer, LV_ALIGN_CENTER);
    lv_obj_set_flex_flow(elapsedTimeContainer, LV_FLEX_FLOW_COLUMN);
@@ -245,6 +252,8 @@ void ResourceDetailsScreen::init()
    lv_obj_set_flex_grow(this->projectsButton, 1);
    lv_obj_add_flag(this->projectsButton, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
    lv_obj_remove_flag(this->projectsButton, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_set_style_bg_color(this->projectsButton, lv_color_hex(0x006FEE), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_bg_opa(this->projectsButton, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_add_event_cb(this->projectsButton, &ResourceDetailsScreen::onProjectsButtonClick, LV_EVENT_CLICKED, this);
 
    this->projectsButtonLabel = lv_label_create(this->projectsButton);
@@ -272,14 +281,25 @@ void ResourceDetailsScreen::init()
    lv_obj_set_align(this->startSessionButton, LV_ALIGN_CENTER);
    lv_obj_add_flag(this->startSessionButton, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
    lv_obj_remove_flag(this->startSessionButton, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_set_style_bg_color(this->startSessionButton, lv_color_hex(0x17C964), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_bg_opa(this->startSessionButton, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_add_flag(this->startSessionButton, LV_OBJ_FLAG_HIDDEN);
    lv_obj_add_event_cb(this->startSessionButton, &ResourceDetailsScreen::onButtonClick, LV_EVENT_CLICKED, new ButtonClickEventData{this, BUTTON_CLICK_TYPE_START_SESSION});
 
-   lv_obj_t *labelForSessionToggleButton = lv_label_create(this->startSessionButton);
-   lv_obj_set_width(labelForSessionToggleButton, LV_SIZE_CONTENT);
-   lv_obj_set_height(labelForSessionToggleButton, LV_SIZE_CONTENT);
-   lv_obj_set_align(labelForSessionToggleButton, LV_ALIGN_CENTER);
-   lv_label_set_text(labelForSessionToggleButton, "Ressource verwenden");
+   this->startSessionButtonLabel = lv_label_create(this->startSessionButton);
+   lv_obj_set_width(this->startSessionButtonLabel, LV_SIZE_CONTENT);
+   lv_obj_set_height(this->startSessionButtonLabel, LV_SIZE_CONTENT);
+   lv_obj_set_align(this->startSessionButtonLabel, LV_ALIGN_CENTER);
+   lv_label_set_text(this->startSessionButtonLabel, "Ressource verwenden");
+
+   this->stopOtherUserNote = lv_label_create(this->sessionControls);
+   lv_obj_set_width(this->stopOtherUserNote, lv_pct(100));
+   lv_obj_set_height(this->stopOtherUserNote, LV_SIZE_CONTENT);
+   lv_label_set_long_mode(this->stopOtherUserNote, LV_LABEL_LONG_WRAP);
+   lv_label_set_text(this->stopOtherUserNote, "Achtung: Sie beenden die laufende Sitzung eines anderen Nutzers.");
+   lv_obj_set_style_text_color(this->stopOtherUserNote, lv_color_hex(0xF5A524), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_font(this->stopOtherUserNote, &lv_font_montserrat_10, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_add_flag(this->stopOtherUserNote, LV_OBJ_FLAG_HIDDEN);
 
    this->stopSessionButton = lv_button_create(this->sessionControls);
    lv_obj_set_height(this->stopSessionButton, 50);
@@ -292,11 +312,11 @@ void ResourceDetailsScreen::init()
    lv_obj_add_flag(this->stopSessionButton, LV_OBJ_FLAG_HIDDEN);
    lv_obj_add_event_cb(this->stopSessionButton, &ResourceDetailsScreen::onButtonClick, LV_EVENT_CLICKED, new ButtonClickEventData{this, BUTTON_CLICK_TYPE_STOP_SESSION});
 
-   lv_obj_t *labelForStopSessionButton = lv_label_create(this->stopSessionButton);
-   lv_obj_set_width(labelForStopSessionButton, LV_SIZE_CONTENT);
-   lv_obj_set_height(labelForStopSessionButton, LV_SIZE_CONTENT);
-   lv_obj_set_align(labelForStopSessionButton, LV_ALIGN_CENTER);
-   lv_label_set_text(labelForStopSessionButton, "Sitzung beenden");
+   this->stopSessionButtonLabel = lv_label_create(this->stopSessionButton);
+   lv_obj_set_width(this->stopSessionButtonLabel, LV_SIZE_CONTENT);
+   lv_obj_set_height(this->stopSessionButtonLabel, LV_SIZE_CONTENT);
+   lv_obj_set_align(this->stopSessionButtonLabel, LV_ALIGN_CENTER);
+   lv_label_set_text(this->stopSessionButtonLabel, "Sitzung beenden");
 
    this->doorControls = lv_obj_create(this->sessionControls);
    lv_obj_remove_style_all(this->doorControls);
@@ -331,6 +351,8 @@ void ResourceDetailsScreen::init()
    lv_obj_set_align(unlockDoorButton, LV_ALIGN_CENTER);
    lv_obj_add_flag(unlockDoorButton, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
    lv_obj_remove_flag(unlockDoorButton, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_set_style_bg_color(unlockDoorButton, lv_color_hex(0x17C964), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_bg_opa(unlockDoorButton, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_add_event_cb(unlockDoorButton, &ResourceDetailsScreen::onButtonClick, LV_EVENT_CLICKED, new ButtonClickEventData{this, BUTTON_CLICK_TYPE_UNLOCK_DOOR});
 
    lv_obj_t *labelForUnlockDoorButton = lv_label_create(unlockDoorButton);
@@ -463,7 +485,7 @@ void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief 
    lv_label_set_text(this->resourceDescription, resource.description);
 
    // Update introducer/maintainer panel lists (same set of allowed users)
-   String introducersText = this->buildIntroducersText(resource);
+   std::string introducersText = this->buildIntroducersText(resource);
    if (this->introducersListLabel)
    {
       lv_label_set_text(this->introducersListLabel, introducersText.c_str());
@@ -492,13 +514,13 @@ void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief 
    }
 
    lv_obj_set_flag(this->sessionDetailsContainer, LV_OBJ_FLAG_HIDDEN, !resource.hasActiveUsage);
-   lv_obj_set_flag(this->flowButtonsContainer, LV_OBJ_FLAG_HIDDEN, !resource.hasActiveUsage);
+   // ponytail: always hide here; refreshAccessState() reveals it only to the session owner
+   lv_obj_add_flag(this->flowButtonsContainer, LV_OBJ_FLAG_HIDDEN);
 
    switch (resourceType)
    {
    case RESOURCE_TYPE_MACHINE:
-      lv_obj_set_flag(this->startSessionButton, LV_OBJ_FLAG_HIDDEN, resource.hasActiveUsage);
-      lv_obj_set_flag(this->stopSessionButton, LV_OBJ_FLAG_HIDDEN, !resource.hasActiveUsage);
+      // Start/stop button visibility is determined in refreshAccessState() with full user context
       lv_obj_add_flag(this->doorControls, LV_OBJ_FLAG_HIDDEN);
       break;
    case RESOURCE_TYPE_DOOR:
@@ -532,7 +554,7 @@ void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief 
       lv_obj_set_align(flowButton, LV_ALIGN_CENTER);
       lv_obj_add_flag(flowButton, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
       lv_obj_remove_flag(flowButton, LV_OBJ_FLAG_SCROLLABLE);
-      lv_obj_set_style_bg_color(flowButton, lv_color_hex(0x5B5B5B), LV_PART_MAIN | LV_STATE_DEFAULT);
+      lv_obj_set_style_bg_color(flowButton, lv_color_hex(0x006FEE), LV_PART_MAIN | LV_STATE_DEFAULT);
       lv_obj_set_style_bg_opa(flowButton, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
 
       ButtonClickEventData *evt = new ButtonClickEventData{this, BUTTON_CLICK_TYPE_FLOW_BUTTON};
@@ -550,9 +572,9 @@ void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief 
    this->updateElapsedTimeDisplay();
    this->refreshAccessState();
 }
-String ResourceDetailsScreen::buildIntroducersText(const API::ResourceBrief &resource)
+std::string ResourceDetailsScreen::buildIntroducersText(const API::ResourceBrief &resource)
 {
-   String list;
+   std::string list;
    for (uint8_t i = 0; i < resource.introducerCount; ++i)
    {
       if (i > 0)
@@ -593,15 +615,23 @@ void ResourceDetailsScreen::refreshAccessState()
    // Resource is blocked when it is under maintenance or reporting an unhealthy state.
    bool blocked = underMaintenance || isUnhealthy;
 
-   // No-introduction panel is shown only when the user is missing an introduction
-   // and the resource is not blocked (maintenance/health panels take priority).
+   bool ownsActiveUsage = this->resourceCacheValid && this->resourceCache.hasActiveUsage &&
+                          strcmp(this->resourceCache.activeUser, user.username.c_str()) == 0;
+   bool supervisedStartAvailable = user.requiresSupervisor && this->resourceCacheValid &&
+                                   !this->resourceCache.hasActiveUsage;
+
+   // No-introduction panel is shown only when the user is missing an introduction and has no
+   // supervised start/current-session action available (maintenance/health panels take priority).
    if (this->noIntroductionPanel)
    {
-      lv_obj_set_flag(this->noIntroductionPanel, LV_OBJ_FLAG_HIDDEN, user.hasIntroduction || blocked);
+      lv_obj_set_flag(this->noIntroductionPanel, LV_OBJ_FLAG_HIDDEN,
+                      user.hasIntroduction || supervisedStartAvailable || ownsActiveUsage || blocked);
    }
 
-   // Session controls require access; while blocked only maintainers may use the resource.
-   bool canUse = user.hasIntroduction || user.isIntroducer || user.canManageResource;
+   // Session controls require access, an available supervised start, or ownership of the active
+   // supervised session; while blocked only maintainers may use the resource.
+   bool canUse = user.hasIntroduction || user.isIntroducer || user.canManageResource ||
+                 supervisedStartAvailable || ownsActiveUsage;
    if (blocked)
    {
       canUse = isMaintainer;
@@ -609,6 +639,79 @@ void ResourceDetailsScreen::refreshAccessState()
    if (this->sessionControls)
    {
       lv_obj_set_flag(this->sessionControls, LV_OBJ_FLAG_HIDDEN, !canUse);
+   }
+
+   // Machine-type: determine which action buttons to show based on user permissions and session owner
+   if (this->resourceCacheValid)
+   {
+      resource_type_t resourceType = (this->resourceCache.type == 1) ? RESOURCE_TYPE_DOOR : RESOURCE_TYPE_MACHINE;
+      if (resourceType == RESOURCE_TYPE_MACHINE && this->startSessionButton && this->stopSessionButton)
+      {
+         bool showStart = false;
+         bool showStop = false;
+         bool isTakeover = false;
+
+         if (!this->resourceCache.hasActiveUsage)
+         {
+            // No active session: show start button
+            showStart = true;
+         }
+         else if (ownsActiveUsage)
+         {
+            // Current user owns the session: show stop button
+            showStop = true;
+         }
+         else
+         {
+            // Another user has an active session
+            bool canTakeOver = this->resourceCache.allowTakeOver &&
+                               (user.hasIntroduction || user.isIntroducer || user.canManageResource);
+            if (canTakeOver)
+            {
+               showStart = true;
+               isTakeover = true;
+            }
+            // Introducers and resource managers can force-stop another user's session
+            // (mirrors the web frontend's canStopOtherUserSession). Not gated on allowTakeOver:
+            // an introducer can both take over and force-stop.
+            showStop = user.isIntroducer || user.canManageResource;
+         }
+
+         lv_obj_set_flag(this->startSessionButton, LV_OBJ_FLAG_HIDDEN, !showStart);
+         lv_obj_set_flag(this->stopSessionButton, LV_OBJ_FLAG_HIDDEN, !showStop);
+
+         // Differentiate stopping your own session from force-stopping someone else's:
+         // - own session: solid danger red, full prominence, plain label, no note
+         // - foreign session: softened/darker red, warning label + orange note
+         bool isForeignStop = showStop && !ownsActiveUsage;
+         if (this->stopOtherUserNote)
+         {
+            lv_obj_set_flag(this->stopOtherUserNote, LV_OBJ_FLAG_HIDDEN, !isForeignStop);
+         }
+         lv_color_t stopBgColor = isForeignStop ? lv_color_hex(0x920B3A) : lv_color_hex(0xF31260);
+         lv_obj_set_style_bg_color(this->stopSessionButton, stopBgColor, LV_PART_MAIN | LV_STATE_DEFAULT);
+         lv_obj_set_style_bg_opa(this->stopSessionButton, isForeignStop ? 200 : 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+         if (this->stopSessionButtonLabel)
+         {
+            lv_label_set_text(this->stopSessionButtonLabel,
+                              isForeignStop ? "Fremde Sitzung beenden" : "Sitzung beenden");
+         }
+
+         if (this->startSessionButtonLabel)
+         {
+            lv_label_set_text(this->startSessionButtonLabel,
+                              isTakeover ? "Uebernehmen" : "Ressource verwenden");
+         }
+         // Takeover = warning orange (danger-soft on web), normal start = success green
+         lv_color_t startBgColor = isTakeover ? lv_color_hex(0xF5A524) : lv_color_hex(0x17C964);
+         lv_obj_set_style_bg_color(this->startSessionButton, startBgColor, LV_PART_MAIN | LV_STATE_DEFAULT);
+      }
+   }
+
+   // Flow node buttons are only relevant to the person who owns the active session.
+   if (this->flowButtonsContainer)
+   {
+      lv_obj_set_flag(this->flowButtonsContainer, LV_OBJ_FLAG_HIDDEN, !ownsActiveUsage);
    }
 }
 void ResourceDetailsScreen::loop()
@@ -646,7 +749,10 @@ void ResourceDetailsScreen::destroy()
    this->projectsPrevButton = nullptr;
    this->projectsNextButton = nullptr;
    this->startSessionButton = nullptr;
+   this->startSessionButtonLabel = nullptr;
    this->stopSessionButton = nullptr;
+   this->stopSessionButtonLabel = nullptr;
+   this->stopOtherUserNote = nullptr;
    this->doorControls = nullptr;
    this->flowButtonsContainer = nullptr;
    this->formsModalPanel = nullptr;
@@ -654,7 +760,11 @@ void ResourceDetailsScreen::destroy()
    this->formsModalList = nullptr;
    this->formsModalErrorLabel = nullptr;
    this->formsModalProgressLabel = nullptr;
-   this->formsKeyboard = nullptr;
+   this->formsEditorOverlay = nullptr;
+   this->formsEditorTitleLabel = nullptr;
+   this->formsEditorTextarea = nullptr;
+   this->formsEditorSpacer = nullptr;
+   this->formsEditorKeyboard = nullptr;
    this->formsBackButton = nullptr;
    this->formsNextButton = nullptr;
    this->formsNextLabel = nullptr;
@@ -726,7 +836,7 @@ void ResourceDetailsScreen::onContainerDelete(lv_event_t *e)
       delete evt;
    }
 }
-String ResourceDetailsScreen::getName()
+std::string ResourceDetailsScreen::getName()
 {
    return "ResourceDetailsScreen";
 }

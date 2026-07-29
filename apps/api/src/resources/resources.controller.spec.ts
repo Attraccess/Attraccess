@@ -71,8 +71,10 @@ describe('ResourcesController', () => {
 
       jest.spyOn(service, 'listResources').mockResolvedValue(paginatedResponse);
 
+      // Permission check is the RBAC guard's responsibility; unit tests bypass guards,
+      // so only the fields the controller itself uses (user.id) are needed here.
       const result = await controller.getAll({ page: 1, limit: 10 }, {
-        user: { id: 1, systemPermissions: { canManageResources: true } },
+        user: { id: 1 },
       } as AuthenticatedRequest);
 
       expect(result).toEqual({

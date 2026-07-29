@@ -2,6 +2,9 @@
 // FEATURE: api-resources
 
 #include "api.hpp"
+#include <functional>
+#include <string.h>
+#include <string>
 
 void API::onResourceList(JsonObject data)
 {
@@ -13,10 +16,10 @@ void API::onResourceList(JsonObject data)
     }
     this->resourceListMessageCounter = messageCounter;
 
-    if (data["payload"]["readerName"].is<String>())
+    if (data["payload"]["readerName"].is<const char *>())
     {
         this->logger.info("Received updated reader name");
-        String readerName = data["payload"]["readerName"].as<String>();
+        std::string readerName = data["payload"]["readerName"].as<std::string>();
 
         if (this->deviceNameCallback != nullptr)
         {
@@ -200,7 +203,7 @@ void API::setResourceListUpdateCallback(std::function<void(const ResourceList &)
     this->resourceListUpdateCallback = callback;
 }
 
-void API::startResourceUsageSession(uint32_t resourceId, uint32_t projectId)
+void API::startResourceUsageSession(uint32_t resourceId, uint32_t projectId, bool forceTakeOver)
 {
     this->logger.info("Starting resource usage session");
     JsonDocument doc;
@@ -209,6 +212,10 @@ void API::startResourceUsageSession(uint32_t resourceId, uint32_t projectId)
     if (projectId != 0)
     {
         payload["projectId"] = projectId;
+    }
+    if (forceTakeOver)
+    {
+        payload["forceTakeOver"] = true;
     }
     this->sendMessage("START_RESOURCE_USAGE_SESSION", payload);
 }

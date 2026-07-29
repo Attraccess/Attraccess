@@ -12,7 +12,7 @@ import { ExternalCallTimer } from '../metrics/instrumentation/external/external.
 
 // Interface to access private members for testing
 interface MqttClientServicePrivate {
-  getOrCreateClient: (serverId: number) => Promise<mqtt.MqttClient>;
+  getOrCreateClient: (serverId: number, keepTryingToConnect?: boolean) => Promise<mqtt.MqttClient>;
   clients: Map<number, mqtt.MqttClient>;
 }
 
@@ -53,6 +53,7 @@ describe('MqttClientService', () => {
   let service: MqttClientService;
   let moduleRef: TestingModule;
   let mockRepository: Partial<Repository<MqttServer>>;
+  let mockMetricsService: { mqttServersHealthy: { set: jest.Mock } };
 
   const mockServer = {
     id: 1,
@@ -81,6 +82,10 @@ describe('MqttClientService', () => {
       emit: jest.fn(),
     };
 
+    mockMetricsService = {
+      mqttServersHealthy: { set: jest.fn() },
+    };
+
     moduleRef = await Test.createTestingModule({
       providers: [
         MqttClientService,
@@ -102,9 +107,7 @@ describe('MqttClientService', () => {
         },
         {
           provide: MetricsService,
-          useValue: {
-            mqttServersHealthy: { set: jest.fn() },
-          },
+          useValue: mockMetricsService,
         },
         {
           provide: ExternalCallTimer,
@@ -132,6 +135,73 @@ describe('MqttClientService', () => {
 
   it('should be defined', () => {
     expect(service).toBeDefined();
+  });
+
+  it('updates the healthy server metric after registering a connected client', async () => {
+    // Arrange
+    jest.restoreAllMocks();
+    jest.spyOn(Logger.prototype, 'log').mockImplementation(jest.fn());
+    jest.spyOn(Logger.prototype, 'error').mockImplementation(jest.fn());
+    jest.spyOn(Logger.prototype, 'debug').mockImplementation(jest.fn());
+    jest.spyOn(Logger.prototype, 'warn').mockImplementation(jest.fn());
+
+    const servicePrivate = service as unknown as MqttClientServicePrivate;
+
+    // Act
+    await servicePrivate.getOrCreateClient(1);
+
+    // Assert
+    expect(servicePrivate.clients.get(1)?.connected).toBe(true);
+    expect(mockMetricsService.mqttServersHealthy.set).toHaveBeenCalledWith(1);
+  });
+
+  describe('TLS options', () => {
+    // Restores the real getOrCreateClient so createClient actually builds mqtt.connect options.
+    const connectWith = async (serverOverrides: Partial<typeof mockServer> & Record<string, unknown>) => {
+      jest.restoreAllMocks();
+      jest.spyOn(Logger.prototype, 'log').mockImplementation(jest.fn());
+      jest.spyOn(Logger.prototype, 'warn').mockImplementation(jest.fn());
+      (mockRepository.findOneBy as jest.Mock).mockResolvedValue({ ...mockServer, ...serverOverrides });
+
+      await (service as unknown as MqttClientServicePrivate).getOrCreateClient(1);
+
+      const connectMock = mqtt.connect as jest.Mock;
+      return {
+        url: connectMock.mock.calls.at(-1)?.[0] as string,
+        options: connectMock.mock.calls.at(-1)?.[1] as mqtt.IClientOptions,
+      };
+    };
+
+    it('passes CA cert, servername and rejectUnauthorized=false when TLS trust options are set', async () => {
+      const { url, options } = await connectWith({
+        useTls: true,
+        port: 8883,
+        caCert: '-----BEGIN CERTIFICATE-----\nfake\n-----END CERTIFICATE-----',
+        tlsServername: 'broker.example.com',
+        tlsInsecure: true,
+      });
+
+      expect(url).toBe('mqtts://localhost:8883');
+      expect(options.ca).toContain('BEGIN CERTIFICATE');
+      expect(options.servername).toBe('broker.example.com');
+      expect(options.rejectUnauthorized).toBe(false);
+    });
+
+    it('keeps default certificate verification when TLS trust options are unset', async () => {
+      const { options } = await connectWith({ useTls: true, port: 8883 });
+
+      expect(options.ca).toBeUndefined();
+      expect(options.servername).toBeUndefined();
+      expect(options.rejectUnauthorized).toBeUndefined();
+    });
+
+    it('ignores TLS trust options when TLS is disabled', async () => {
+      const { url, options } = await connectWith({ useTls: false, caCert: 'ignored', tlsInsecure: true });
+
+      expect(url).toBe('mqtt://localhost:1883');
+      expect(options.ca).toBeUndefined();
+      expect(options.rejectUnauthorized).toBeUndefined();
+    });
   });
 
   describe('publish', () => {

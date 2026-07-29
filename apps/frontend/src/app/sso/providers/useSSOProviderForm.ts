@@ -11,21 +11,21 @@ import {
   useAuthenticationServiceUpdateOneSsoProvider,
   useAuthenticationServiceGetAllSsoProvidersKey,
   useAuthenticationServiceGetOneSsoProviderByIdKey,
+  useRbacServiceListRoles,
 } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../components/toastProvider';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { OpenIDConfiguration } from './discovery/OpenIDC.data';
 import { hasRequiredSamlSigningMaterial } from './signingMaterial';
 import {
-  PermissionKey,
-  buildPermissionMappingInputs,
+  buildRoleMappingEntries,
+  buildRoleMappingsPayload,
   defaultProviderValues,
-  emptyPermissionMappingsInput,
   ensureOidcConfiguration,
   ensureSamlConfiguration,
   getDefaultOidcConfiguration,
   getDefaultSamlConfiguration,
-  permissionKeys,
+  RoleMappingEntry,
 } from './formDefaults';
 import en from './en.json';
 import de from './de.json';
@@ -43,11 +43,10 @@ export const useSSOProviderForm = (providerId?: number) => {
   const [usernameClaimPathsInput, setUsernameClaimPathsInput] = useState('');
   const [emailClaimPathsInput, setEmailClaimPathsInput] = useState('');
   const [emailAttributeKeysInput, setEmailAttributeKeysInput] = useState('');
-  const [oidcPermissionMappingsInput, setOidcPermissionMappingsInput] =
-    useState<Record<PermissionKey, string>>(emptyPermissionMappingsInput);
-  const [samlPermissionMappingsInput, setSamlPermissionMappingsInput] =
-    useState<Record<PermissionKey, string>>(emptyPermissionMappingsInput);
+  const [oidcRoleMappingEntries, setOidcRoleMappingEntries] = useState<RoleMappingEntry[]>([]);
+  const [samlRoleMappingEntries, setSamlRoleMappingEntries] = useState<RoleMappingEntry[]>([]);
   const queryClient = useQueryClient();
+  const { data: roles, isLoading: isLoadingRoles } = useRbacServiceListRoles();
 
   const { success, error: showError } = useToastMessage();
   const createSSOProvider = useAuthenticationServiceCreateOneSsoProvider({
@@ -143,18 +142,16 @@ export const useSSOProviderForm = (providerId?: number) => {
           ? extendedProvider.oidcConfiguration.emailClaimPaths.join(', ')
           : '',
       );
-      setOidcPermissionMappingsInput(
-        buildPermissionMappingInputs(
-          (extendedProvider.oidcConfiguration.permissionMappings ?? undefined) as
-            | Partial<Record<PermissionKey, string[]>>
-            | undefined,
+      setOidcRoleMappingEntries(
+        buildRoleMappingEntries(
+          (extendedProvider.oidcConfiguration.roleMappings ?? undefined) as Record<string, string[]> | undefined,
         ),
       );
     } else {
       setScopesInput('');
       setUsernameClaimPathsInput('');
       setEmailClaimPathsInput('');
-      setOidcPermissionMappingsInput(emptyPermissionMappingsInput);
+      setOidcRoleMappingEntries([]);
     }
 
     if (extendedProvider.type === SSOProviderType.SAML && extendedProvider.samlConfiguration) {
@@ -176,16 +173,14 @@ export const useSSOProviderForm = (providerId?: number) => {
           ? extendedProvider.samlConfiguration.emailAttributeKeys.join(', ')
           : '',
       );
-      setSamlPermissionMappingsInput(
-        buildPermissionMappingInputs(
-          (extendedProvider.samlConfiguration.permissionMappings ?? undefined) as
-            | Partial<Record<PermissionKey, string[]>>
-            | undefined,
+      setSamlRoleMappingEntries(
+        buildRoleMappingEntries(
+          (extendedProvider.samlConfiguration.roleMappings ?? undefined) as Record<string, string[]> | undefined,
         ),
       );
     } else {
       setEmailAttributeKeysInput('');
-      setSamlPermissionMappingsInput(emptyPermissionMappingsInput);
+      setSamlRoleMappingEntries([]);
     }
 
     setFormValues(updatedFormValues);
@@ -272,17 +267,6 @@ export const useSSOProviderForm = (providerId?: number) => {
 
       const sanitizeOptional = (value?: string) => (value && value.trim().length > 0 ? value.trim() : undefined);
 
-      const buildPermissionMappings = (inputs: Record<PermissionKey, string>) => {
-        const mappings: Partial<Record<PermissionKey, string[]>> = {};
-        permissionKeys.forEach((key) => {
-          const parsed = parseList(inputs[key] ?? '');
-          if (parsed.length > 0) {
-            mappings[key] = parsed;
-          }
-        });
-        return Object.keys(mappings).length > 0 ? mappings : undefined;
-      };
-
       if (!samlSigningMaterialsReady) {
         showError({
           title: t('errorGeneric'),
@@ -290,6 +274,9 @@ export const useSSOProviderForm = (providerId?: number) => {
         });
         return;
       }
+
+      const hasStoredMappings = (config?: { roleMappings?: Record<string, unknown> | null }) =>
+        Object.keys(config?.roleMappings ?? {}).length > 0;
 
       const buildOidcPayload = () => {
         const base = ensureOidcConfiguration(formValues.oidcConfiguration);
@@ -305,8 +292,14 @@ export const useSSOProviderForm = (providerId?: number) => {
         if (scopesInput.trim().length > 0) payload.scopes = parseList(scopesInput);
         if (usernameClaimPathsInput.trim().length > 0) payload.usernameClaimPaths = parseList(usernameClaimPathsInput);
         if (emailClaimPathsInput.trim().length > 0) payload.emailClaimPaths = parseList(emailClaimPathsInput);
-        const permissionMappings = buildPermissionMappings(oidcPermissionMappingsInput);
-        if (permissionMappings) payload.permissionMappings = permissionMappings;
+        const roleMappings = buildRoleMappingsPayload(oidcRoleMappingEntries);
+        if (roleMappings) {
+          payload.roleMappings = roleMappings;
+        } else if (isEditing && hasStoredMappings(providerDetails?.oidcConfiguration)) {
+          // emptied table must clear stored mappings; only sent when the provider had
+          // some, so plain edits by users without users.roles.manage keep working
+          payload.roleMappings = {};
+        }
 
         return payload;
       };
@@ -343,11 +336,15 @@ export const useSSOProviderForm = (providerId?: number) => {
           delete payload.provisioningSecret;
         }
 
-        const permissionMappings = buildPermissionMappings(samlPermissionMappingsInput);
-        if (permissionMappings) {
-          payload.permissionMappings = permissionMappings;
+        const roleMappings = buildRoleMappingsPayload(samlRoleMappingEntries);
+        if (roleMappings) {
+          payload.roleMappings = roleMappings;
+        } else if (isEditing && hasStoredMappings(providerDetails?.samlConfiguration)) {
+          // emptied table must clear stored mappings; only sent when the provider had
+          // some, so plain edits by users without users.roles.manage keep working
+          payload.roleMappings = {};
         } else {
-          delete payload.permissionMappings;
+          delete payload.roleMappings;
         }
         return payload;
       };
@@ -408,9 +405,10 @@ export const useSSOProviderForm = (providerId?: number) => {
     formValues,
     isEditing,
     navigate,
-    oidcPermissionMappingsInput,
+    oidcRoleMappingEntries,
+    providerDetails,
     providerId,
-    samlPermissionMappingsInput,
+    samlRoleMappingEntries,
     samlSigningMaterialsReady,
     scopesInput,
     showError,
@@ -441,10 +439,12 @@ export const useSSOProviderForm = (providerId?: number) => {
     setEmailClaimPathsInput,
     emailAttributeKeysInput,
     setEmailAttributeKeysInput,
-    oidcPermissionMappingsInput,
-    setOidcPermissionMappingsInput,
-    samlPermissionMappingsInput,
-    setSamlPermissionMappingsInput,
+    roles,
+    isLoadingRoles,
+    oidcRoleMappingEntries,
+    setOidcRoleMappingEntries,
+    samlRoleMappingEntries,
+    setSamlRoleMappingEntries,
     // derived
     isSamlProvider,
     isMutationPending,

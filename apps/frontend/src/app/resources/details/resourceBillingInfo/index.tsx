@@ -106,7 +106,7 @@ export function ResourceBillingInfo(props: Props) {
     if (!license?.modules.includes('billing')) return false;
     if (!resourceBillingConfiguration) return false;
     if (resource?.type !== 'machine') return false;
-    if (isFree && !hasPermission('canManageBilling')) return false;
+    if (isFree && !hasPermission('billing.manage')) return false;
     return true;
   }, [license, resourceBillingConfiguration, resource, isFree, hasPermission]);
 
@@ -130,7 +130,7 @@ export function ResourceBillingInfo(props: Props) {
     return <Skeleton className="h-10 w-full" />;
   }
 
-  if (isFree && !hasPermission('canManageBilling')) {
+  if (isFree && !hasPermission('billing.manage')) {
     return null;
   }
 

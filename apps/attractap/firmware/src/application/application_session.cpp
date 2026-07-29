@@ -2,21 +2,29 @@
 // FEATURE: application-session
 
 #include "application.hpp"
+#include "platform.hpp"
+#include <cstdlib>
+#include <cstring>
+#include <string>
 
 #ifdef HAS_LVGL_DISPLAY
 void Application::handleConnectionConfigurationSave(
     const ConnectionConfigurationScreen::ConnectionConfig &cfg) {
   // split cfg.host into hostname and port (if no port present, use 443)
-  String hostname = cfg.host;
-  String port = "443";
-  if (cfg.host.indexOf(":") != -1) {
-    hostname = cfg.host.substring(0, cfg.host.indexOf(":"));
-    port = cfg.host.substring(cfg.host.indexOf(":") + 1);
+  std::string host = cfg.host;
+  std::string hostname = host;
+  std::string port = "443";
+  size_t colonPos = host.find(":");
+  if (colonPos != std::string::npos) {
+    hostname = host.substr(0, colonPos);
+    port = host.substr(colonPos + 1);
   }
-  Settings::saveNetworkConfig(cfg.ssid, cfg.password);
-  Settings::saveAttraccessApiConfig(hostname, port.toInt(), cfg.useSSL);
+  Settings::saveNetworkConfig(std::string(cfg.ssid.c_str()),
+                              std::string(cfg.password.c_str()));
+  Settings::saveAttraccessApiConfig(
+      hostname, (uint16_t)strtol(port.c_str(), nullptr, 10), cfg.useSSL);
 
-    Settings::setDevicePin(cfg.devicePin);
+    Settings::setDevicePin(std::string(cfg.devicePin.c_str()));
     Settings::setBeeperEnabled(cfg.beeperEnabled);
 
     this->state = APPLICATION_STATE_INIT;
@@ -77,11 +85,16 @@ void Application::clearProjectSelection() {
   this->projectsOfUserResponse.limit = API::MAX_PROJECTS_PER_PAGE;
   this->projectsOfUserResponse.hasMore = false;
   this->projectsOfUserResponseUpdated = true;
+  // Reached from the websocket task (card auth response) as well as from LVGL
+  // event callbacks; rendering runs on its own task now, so guard the LVGL
+  // mutation explicitly (lv_lock is recursive).
+  lv_lock();
   Display::resourceDetailsScreen.setSelectedProject(0, nullptr);
+  lv_unlock();
 }
 
 void Application::handleProjectSelection(uint32_t projectId,
-                                         const String &projectName) {
+                                         const std::string &projectName) {
   this->selectedProjectId = projectId;
   this->selectedProjectName = projectName;
   Display::resourceDetailsScreen.setSelectedProject(projectId,
@@ -112,16 +125,37 @@ void Application::handleResourceDetailsButtonClick(
   }
 
   switch (evt.buttonClickType) {
-  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_START_SESSION:
-    Display::resourceDetailsScreen.showActionProgress("Starte Sitzung");
+  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_START_SESSION: {
+    // Detect takeover: another user has an active session and the resource allows it
+    bool isTakeover = false;
+    for (uint16_t i = 0; i < this->resourceList.count; ++i) {
+      if (this->resourceList.items[i].id == this->selectedResourceId) {
+        const auto &res = this->resourceList.items[i];
+        isTakeover = res.hasActiveUsage && res.allowTakeOver &&
+                     strcmp(res.activeUser,
+                            this->cardAuthenticationData.username.c_str()) != 0;
+        break;
+      }
+    }
+
+    if (this->cardAuthenticationData.requiresSupervisor && !isTakeover) {
+      this->beginSupervision();
+      break;
+    }
+
+    Display::resourceDetailsScreen.showActionProgress(
+        isTakeover ? "Uebernehme Sitzung" : "Starte Sitzung");
     this->beginActionPause();
     this->pendingActionType = PENDING_ACTION_START_SESSION;
     this->pendingActionResourceId = this->selectedResourceId;
-    this->pendingActionProjectId = this->selectedProjectId;
+    this->pendingActionProjectId = isTakeover ? 0 : this->selectedProjectId;
     this->hasPendingFormRequest = false;
+    this->formFlowSubmitted = false;
     this->api.startResourceUsageSession(this->selectedResourceId,
-                                        this->selectedProjectId);
+                                        isTakeover ? 0 : this->selectedProjectId,
+                                        isTakeover);
     break;
+  }
   case ResourceDetailsScreen::BUTTON_CLICK_TYPE_STOP_SESSION:
     Display::resourceDetailsScreen.showActionProgress("Beende Sitzung");
     this->beginActionPause();
@@ -129,6 +163,7 @@ void Application::handleResourceDetailsButtonClick(
     this->pendingActionResourceId = this->selectedResourceId;
     this->pendingActionProjectId = 0;
     this->hasPendingFormRequest = false;
+    this->formFlowSubmitted = false;
     this->api.stopResourceUsageSession(this->selectedResourceId);
     break;
   case ResourceDetailsScreen::BUTTON_CLICK_TYPE_LOCK_DOOR:
@@ -160,6 +195,7 @@ void Application::handleResourceDetailsButtonClick(
     this->clearProjectSelection();
     this->pendingActionType = PENDING_ACTION_NONE;
     this->hasPendingFormRequest = false;
+    this->formFlowSubmitted = false;
     Display::resourceDetailsScreen.hideFormsModal();
     break;
   }

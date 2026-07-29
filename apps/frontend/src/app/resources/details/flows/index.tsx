@@ -2,7 +2,7 @@ import { useParams } from 'react-router-dom';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { Background, BackgroundVariant, Controls, ReactFlow, Node, Panel, Edge, useReactFlow, SelectionMode } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { ButtonGroup } from '@heroui/react';
+import { ButtonGroup, Spinner } from '@heroui/react';
 import {
   ApiError,
   ResourceFlowEdgeDto,
@@ -118,13 +118,14 @@ function FlowsPageInner() {
     };
   }, [setPullToRefreshIsEnabled]);
 
-  const { data: originalFlowData } = useResourceFlowsServiceGetResourceFlow(
+  const { data: originalFlowData, isFetching: isFlowFetching, isError: isFlowError } = useResourceFlowsServiceGetResourceFlow(
     { resourceId: Number(resourceId) },
     undefined,
     {
       enabled: !!resourceId,
     },
   );
+  const isFlowLoading = !originalFlowData && isFlowFetching;
 
   const toast = useToastMessage();
 
@@ -408,7 +409,7 @@ function FlowsPageInner() {
           tNodeTranslations={tNodeTranslations}
         />
         <div
-          className="flex-1 h-full"
+          className="flex-1 h-full relative"
           onMouseMove={(e) => {
             mousePosRef.current = { x: e.clientX, y: e.clientY };
           }}
@@ -428,6 +429,11 @@ function FlowsPageInner() {
             multiSelectionKeyCode="Shift"
             colorMode={theme === 'dark' ? 'dark' : 'light'}
             fitView
+            // ponytail: fixed floor, derive it from the graph bounding box if 0.02 ever bites.
+            // React Flow's default minZoom of 0.5 clamps fitView on flows taller than the pane,
+            // which then centres on the bounding box and parks the viewport in a gap between
+            // nodes - the canvas looks empty even though every node is rendered.
+            minZoom={0.02}
             defaultEdgeOptions={{ style: { strokeWidth: 4 } }}
             nodeTypes={flowNodeTypes}
             edgeTypes={edgeTypes}
@@ -465,10 +471,10 @@ function FlowsPageInner() {
               >
                 <SaveIcon />
               </Button>
-              <Button isIconOnly onPress={handleImportClick} aria-label={t('actions.import')}>
+              <Button isIconOnly onPress={handleImportClick} aria-label={t('actions.import')} isDisabled={isFlowLoading}>
                 <UploadIcon />
               </Button>
-              <Button isIconOnly onPress={handleExport} aria-label={t('actions.export')}>
+              <Button isIconOnly onPress={handleExport} aria-label={t('actions.export')} isDisabled={isFlowLoading}>
                 <DownloadIcon />
               </Button>
               <LogViewer resourceId={Number(resourceId)}>
@@ -487,7 +493,7 @@ function FlowsPageInner() {
                 )}
               </VariablesModal>
 
-              <Button isIconOnly onPress={layout}>
+              <Button isIconOnly onPress={layout} isDisabled={isFlowLoading}>
                 <LayoutGridIcon />
               </Button>
               <Button
@@ -496,11 +502,27 @@ function FlowsPageInner() {
                 onPress={() => nodeCatalogRef.current?.open()}
                 aria-label={t('actions.addNode')}
                 className="md:hidden"
+                isDisabled={isFlowLoading}
               >
                 <PlusIcon />
               </Button>
             </Panel>
           </ReactFlow>
+          {(isFlowLoading || (isFlowError && !originalFlowData)) && (
+            <div
+              className="absolute inset-0 z-10 flex items-center justify-center bg-background/60 backdrop-blur-sm"
+              role={isFlowError ? 'alert' : 'status'}
+              aria-live="polite"
+              aria-label={isFlowError ? t('loadError') : t('loading')}
+              aria-busy={isFlowLoading}
+            >
+              {isFlowError ? (
+                <p className="text-danger text-sm text-center px-4">{t('loadError')}</p>
+              ) : (
+                <Spinner size="lg" />
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -6,7 +6,7 @@ import { IsResourceIntroducerGuard } from './isIntroducerGuard';
 /**
  * Decorator to protect routes that require permission to introduce users to a resource.
  * User must either be an introducer for the resource (from URL path parameter 'resourceId')
- * or have the 'canManageResources' system permission.
+ * or hold the `resources.access.manage` RBAC permission.
  *
  * Usage: @IsResourceIntroducer()
  */

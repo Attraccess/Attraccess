@@ -1,17 +1,9 @@
 import {
-  Alert,
-  AlertContent,
-  AlertDescription,
-  AlertTitle,
   Button,
   DrawerBody,
   DrawerFooter,
   DrawerHeader,
-  Modal,
-  ModalBackdrop,
   ModalBody,
-  ModalContainer,
-  ModalDialog,
   ModalFooter,
   ModalHeader,
   Table,
@@ -25,6 +17,7 @@ import {
   cn,
 } from '@heroui/react';
 import { StandardDrawer } from '../../../components/standardDrawer';
+import { StandardModal } from '../../../components/standardModal';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AttraccessUser, DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
@@ -33,6 +26,7 @@ import {
   NFCCard,
   useAttractapServiceEnrollNfcCard,
   useUsersServiceGetOneUserById,
+  useLicenseServiceGetLicenseInformation,
 } from '@attraccess/react-query-client';
 import { AttractapSelect } from '../AttractapSelect';
 import { useToastMessage } from '../../../components/toastProvider';
@@ -43,7 +37,6 @@ import en from './en.json';
 import { NfcCardDeactivateModal } from './deactivate';
 import { NfcCardActivateModal } from './activate';
 import { CheckIcon, PlusIcon, ServerIcon, Trash2Icon, XIcon } from 'lucide-react';
-import { AlertStatusIcon } from '../../../components/AlertStatusIcon';
 import { PageAction, PageHeader } from '../../../components/pageHeader';
 import { useAuth } from '../../../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
@@ -73,45 +66,40 @@ const NfcCardDeleteModal = (props: DeleteModalProps) => {
   }, [props.cardId, resetNfcCard, readerId]);
 
   return (
-    <Modal
+    <StandardModal
       isOpen={props.show}
       onOpenChange={(open) => {
         if (!open) props.close();
       }}
       data-cy="nfc-card-delete-modal"
+      size="md"
     >
-      <ModalBackdrop>
-        <ModalContainer size="md">
-          <ModalDialog>
-            {({ close }) => (
-              <>
-                <ModalHeader>
-                  <h1>{t('nfcCardsTable.deleteModal.title')}</h1>
-                </ModalHeader>
-                <ModalBody>
-                  <p>{t('nfcCardsTable.deleteModal.description', { id: props.cardId })}</p>
-                  <AttractapSelect
-                    label={t('nfcCardsTable.deleteModal.readerLabel')}
-                    placeholder={t('nfcCardsTable.deleteModal.readerPlaceholder')}
-                    selection={readerId}
-                    onSelectionChange={(readerId) => setReaderId(readerId ?? null)}
-                    data-cy="nfc-card-delete-modal-reader-select"
-                  />
-                </ModalBody>
-                <ModalFooter>
-                  <Button onPress={close} data-cy="nfc-card-delete-modal-cancel-button">
-                    {t('nfcCardsTable.deleteModal.cancel')}
-                  </Button>
-                  <Button isDisabled={!readerId} onPress={deleteCard} data-cy="nfc-card-delete-modal-delete-button">
-                    {t('nfcCardsTable.deleteModal.delete')} ID: {!readerId ? 'null' : readerId}
-                  </Button>
-                </ModalFooter>
-              </>
-            )}
-          </ModalDialog>
-        </ModalContainer>
-      </ModalBackdrop>
-    </Modal>
+      {({ close }) => (
+        <>
+          <ModalHeader>
+            <h1>{t('nfcCardsTable.deleteModal.title')}</h1>
+          </ModalHeader>
+          <ModalBody>
+            <p>{t('nfcCardsTable.deleteModal.description', { id: props.cardId })}</p>
+            <AttractapSelect
+              label={t('nfcCardsTable.deleteModal.readerLabel')}
+              placeholder={t('nfcCardsTable.deleteModal.readerPlaceholder')}
+              selection={readerId}
+              onSelectionChange={(readerId) => setReaderId(readerId ?? null)}
+              data-cy="nfc-card-delete-modal-reader-select"
+            />
+          </ModalBody>
+          <ModalFooter>
+            <Button onPress={close} data-cy="nfc-card-delete-modal-cancel-button">
+              {t('nfcCardsTable.deleteModal.cancel')}
+            </Button>
+            <Button isDisabled={!readerId} onPress={deleteCard} data-cy="nfc-card-delete-modal-delete-button">
+              {t('nfcCardsTable.deleteModal.delete')} ID: {!readerId ? 'null' : readerId}
+            </Button>
+          </ModalFooter>
+        </>
+      )}
+    </StandardModal>
   );
 };
 
@@ -154,7 +142,6 @@ const NfcCardTableCell = (props: NfcCardTableCellProps) => {
                 onPress={onOpen}
                 data-cy={`nfc-card-table-cell-deactivate-button-${props.card.id}`}
               >
-                <CheckIcon />
                 <XIcon />
                 {t('nfcCardsTable.actions.deactivate')}
               </Button>
@@ -168,7 +155,6 @@ const NfcCardTableCell = (props: NfcCardTableCellProps) => {
                 onPress={onOpen}
                 data-cy={`nfc-card-table-cell-activate-button-${props.card.id}`}
               >
-                <XIcon />
                 <CheckIcon />
                 {t('nfcCardsTable.actions.activate')}
               </Button>
@@ -280,6 +266,8 @@ export function NfcCardList() {
     en,
   });
 
+  const { data: license } = useLicenseServiceGetLicenseInformation();
+
   const { data: cards, error: cardsError } = useAttractapServiceGetAllCards(undefined, {
     refetchInterval: 5000,
   });
@@ -306,6 +294,10 @@ export function NfcCardList() {
   const { hasPermission } = useAuth();
   const navigate = useNavigate();
 
+  if (license && !license.modules.includes('attractap')) {
+    return null;
+  }
+
   return (
     <>
       <PageHeader
@@ -326,20 +318,12 @@ export function NfcCardList() {
               key: 'readers',
               label: t('readers'),
               icon: <ServerIcon />,
-              isHidden: !hasPermission('canManageResources'),
+              isHidden: !hasPermission('resources.update'),
               onPress: () => navigate('/attractap/readers'),
             },
           ] satisfies PageAction[]
         }
       />
-
-      <Alert status="warning" className="mb-4">
-        <AlertStatusIcon status="warning" />
-        <AlertContent>
-          <AlertTitle>{t('workInProgressTitle')}</AlertTitle>
-          <AlertDescription>{t('workInProgress')}</AlertDescription>
-        </AlertContent>
-      </Alert>
 
       <NfcCardDeleteModal
         show={cardToDeleteId !== null}

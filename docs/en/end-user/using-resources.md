@@ -36,6 +36,28 @@ Before you can use most resources, you need a safety introduction (also called a
 > [!NOTE]
 > Not all resources require an introduction. Some resources may be available to all users without a briefing.
 
+## Start a Supervised Session
+
+Some resources allow or require supervised usage. In a supervised session, you start the resource while a qualified supervisor is present. A supervisor can be an introducer, maintainer or resource manager for that resource.
+
+You may need a supervised session when:
+
+- You are not introduced yet, but the resource allows supervised usage
+- The resource requires supervision for every session
+- An introducer or maintainer wants to supervise your training or first usage attempts
+
+To start a supervised session:
+
+1. Open the resource detail page
+2. Choose the supervised start option, or tap your NFC card on a reader that asks for supervision
+3. Ask the supervisor to confirm the session when Attraccess prompts them
+4. Fill in any required form information
+5. Start the session once supervision has been confirmed
+
+The supervisor sees the pending supervision request and the resource you want to use. When the session is active, the usage history records the supervisor together with the session. The supervisor can also end the supervised session.
+
+After you complete enough supervised sessions, Attraccess may automatically grant you an introduction for the resource or for a configured resource group. If this is enabled, the required number of supervised sessions is configured by the resource manager.
+
 ## Start a Usage Session
 
 Once you are introduced to a resource, you can start a usage session:

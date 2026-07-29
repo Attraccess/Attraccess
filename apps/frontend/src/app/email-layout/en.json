@@ -1,0 +1,36 @@
+{
+  "title": "Global Email Layout",
+  "subtitle": "The frame around every email: header, footer and global styles.",
+  "placeholder": {
+    "canvasLabel": "Template content is inserted here"
+  },
+  "styles": {
+    "title": "Global styles (mj-head)",
+    "description": "Fonts, colors and other defaults applied to all emails, as MJML mj-head markup (mj-attributes, mj-style, mj-font). Applied to the canvas immediately, persisted when you save the layout."
+  },
+  "actions": {
+    "back": "Back to emails",
+    "save": "Save",
+    "cancel": "Cancel",
+    "apply": "Apply",
+    "styles": "Styles",
+    "resetToDefault": "Reset to Default"
+  },
+  "toast": {
+    "saveSuccess": "Global email layout saved successfully.",
+    "saveError": "Failed to save layout.",
+    "missingPlaceholder": "The layout is missing the content placeholder.",
+    "resetSuccess": "Email layout reset to default.",
+    "resetError": "Layout could not be reset."
+  },
+  "error": {
+    "loadFailed": "The email layout could not be loaded.",
+    "retry": "Retry"
+  },
+  "resetConfirm": {
+    "title": "Reset layout to default?",
+    "message": "This will overwrite your customizations with the bundled default layout. This cannot be undone.",
+    "confirm": "Reset",
+    "cancel": "Cancel"
+  }
+}

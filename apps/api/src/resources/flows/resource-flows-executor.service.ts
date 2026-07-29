@@ -26,10 +26,13 @@ import {
   ResourceHealthHeartbeatNodeDataSchema,
   ResourceHealthSource,
   ResourceHealthStatus,
+  CompanionIdleActiveNodeDataSchema,
+  CompanionForegroundAppNodeDataSchema,
+  CompanionUsbDeviceNodeDataSchema,
 } from '@attraccess/database-entities';
 import { ResourceFlowVariablesService } from './resource-flow-variables.service';
 import { OnEvent } from '@nestjs/event-emitter';
-import { ResourceUsageEvent } from '../usage/events/resource-usage.events';
+import { ResourceSessionStartedEvent } from '../usage/events/resource-usage.events';
 import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { FlowConfigType } from './flow.config';
@@ -47,6 +50,8 @@ import { FlowTimer } from '../../metrics/instrumentation/flow/flow.helper';
 import {
   ActivityTrackExecutor,
   BillingSetAdditionalItemsExecutor,
+  CompanionLockPcExecutor,
+  CompanionUnlockPcExecutor,
   EndUsageSessionExecutor,
   ErrorExecutor,
   GetVariablesExecutor,
@@ -67,6 +72,8 @@ import {
   heartbeatKey,
   topicMatches,
 } from './node-executors';
+import { CompanionGatewayService } from '../../companion/companion-gateway.service';
+import { CompanionUsbDeviceDto } from '../../companion/companion.types';
 
 // Handlebars helpers
 Handlebars.registerHelper('json', (value: unknown) => {
@@ -151,6 +158,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     private readonly variablesService: ResourceFlowVariablesService,
     private readonly cronTimer: CronTimer,
     private readonly flowTimer: FlowTimer,
+    private readonly companionGatewayService: CompanionGatewayService,
   ) {
     const flowConfig = this.configService.get<FlowConfigType>('flow');
     this.logTTLDays = flowConfig.FLOW_LOG_TTL_DAYS;
@@ -202,6 +210,14 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
       [ResourceFlowNodeType.PROCESSING_ERROR]: new ErrorExecutor(),
       [ResourceFlowNodeType.PROCESSING_SET_VARIABLES]: new SetVariablesExecutor(this.variablesService),
       [ResourceFlowNodeType.PROCESSING_GET_VARIABLES]: new GetVariablesExecutor(this.variablesService),
+
+      [ResourceFlowNodeType.OUTPUT_COMPANION_LOCK_PC]: new CompanionLockPcExecutor(this.companionGatewayService),
+      [ResourceFlowNodeType.OUTPUT_COMPANION_UNLOCK_PC]: new CompanionUnlockPcExecutor(this.companionGatewayService),
+      [ResourceFlowNodeType.INPUT_COMPANION_IDLE]: passthrough,
+      [ResourceFlowNodeType.INPUT_COMPANION_ACTIVE]: passthrough,
+      [ResourceFlowNodeType.INPUT_COMPANION_FOREGROUND_APP_CHANGED]: passthrough,
+      [ResourceFlowNodeType.INPUT_COMPANION_USB_DEVICE_CONNECTED]: passthrough,
+      [ResourceFlowNodeType.INPUT_COMPANION_USB_DEVICE_DISCONNECTED]: passthrough,
     };
   }
 
@@ -383,8 +399,8 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     });
   }
 
-  @OnEvent(ResourceUsageEvent.EVENT_NAME)
-  async handleResourceUsageEvent(event: ResourceUsageEvent) {
+  @OnEvent(ResourceSessionStartedEvent.EVENT_NAME)
+  async handleResourceSessionStartedEvent(event: ResourceSessionStartedEvent) {
     try {
       const { usage } = event;
 
@@ -858,6 +874,60 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     const dataWithVariables = variables ? { ...data, variables } : data;
     const compiledTemplate = Handlebars.compile(template);
     return compiledTemplate(dataWithVariables);
+  }
+
+  @OnEvent('companion.idle')
+  async handleCompanionIdle(event: { deviceId: number; payload: object }): Promise<void> {
+    await this.triggerCompanionEvent(event.deviceId, ResourceFlowNodeType.INPUT_COMPANION_IDLE, event.payload, CompanionIdleActiveNodeDataSchema);
+  }
+
+  @OnEvent('companion.active')
+  async handleCompanionActive(event: { deviceId: number; payload: object }): Promise<void> {
+    await this.triggerCompanionEvent(event.deviceId, ResourceFlowNodeType.INPUT_COMPANION_ACTIVE, event.payload, CompanionIdleActiveNodeDataSchema);
+  }
+
+  @OnEvent('companion.foreground_app')
+  async handleCompanionForegroundApp(event: { deviceId: number; payload: object }): Promise<void> {
+    await this.triggerCompanionEvent(event.deviceId, ResourceFlowNodeType.INPUT_COMPANION_FOREGROUND_APP_CHANGED, event.payload, CompanionForegroundAppNodeDataSchema);
+  }
+
+  @OnEvent('companion.usb_connected')
+  async handleCompanionUsbConnected(event: { deviceId: number; payload: CompanionUsbDeviceDto }): Promise<void> {
+    await this.triggerUsbDeviceEvent(event.deviceId, ResourceFlowNodeType.INPUT_COMPANION_USB_DEVICE_CONNECTED, event.payload);
+  }
+
+  @OnEvent('companion.usb_disconnected')
+  async handleCompanionUsbDisconnected(event: { deviceId: number; payload: CompanionUsbDeviceDto }): Promise<void> {
+    await this.triggerUsbDeviceEvent(event.deviceId, ResourceFlowNodeType.INPUT_COMPANION_USB_DEVICE_DISCONNECTED, event.payload);
+  }
+
+  private async triggerCompanionEvent(deviceId: number, type: ResourceFlowNodeType, payload: object, schema: { safeParse: (d: unknown) => { success: boolean; data?: { deviceId: number } } }): Promise<void> {
+    const allNodes = await this.flowNodeRepository.find({ where: { type } });
+    const matching = allNodes.filter((node) => {
+      const parsed = schema.safeParse(node.data ?? {});
+      return parsed.success && parsed.data?.deviceId === deviceId;
+    });
+    if (matching.length === 0) return;
+    await this.startFlow(matching, { payload });
+  }
+
+  private async triggerUsbDeviceEvent(deviceId: number, type: ResourceFlowNodeType, payload: CompanionUsbDeviceDto): Promise<void> {
+    const allNodes = await this.flowNodeRepository.find({ where: { type } });
+    const matching = allNodes.filter((node) => {
+      const parsed = CompanionUsbDeviceNodeDataSchema.safeParse(node.data ?? {});
+      if (!parsed.success || parsed.data.deviceId !== deviceId) return false;
+      const { vendorId, productId } = parsed.data;
+      const hasVendorFilter = vendorId !== undefined;
+      const hasProductFilter = productId !== undefined;
+      if (hasVendorFilter && hasProductFilter) {
+        return vendorId === payload.vendorId && productId === payload.productId;
+      }
+      if (hasVendorFilter) return vendorId === payload.vendorId;
+      if (hasProductFilter) return productId === payload.productId;
+      return true;
+    });
+    if (matching.length === 0) return;
+    await this.startFlow(matching, { payload });
   }
 
   public async pressButton(resourceId: number, buttonId: string, executingUserId: number) {

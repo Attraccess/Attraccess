@@ -44,7 +44,9 @@ private:
     static esp_netif_t *eth_netif;
     static esp_eth_handle_t eth_handle;
     static esp_eth_netif_glue_handle_t eth_netif_glue;
-    static spi_device_handle_t spi_handle;
+    static spi_host_device_t spi_host;
+    static spi_device_interface_config_t spi_devcfg;
+    static bool spi_ready;
     static uint32_t retry_count;
     static uint32_t last_retry_time;
     static uint32_t dhcp_start_time;

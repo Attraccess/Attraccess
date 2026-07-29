@@ -1,5 +1,6 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Checkbox, Form, Input, Label, Spinner, TextField } from '@heroui/react';
+import { Form, Input, Label, Spinner, TextField } from '@heroui/react';
+import { TlsSection } from './TlsSection';
 import { Button } from '../../../components/button';
 import { Select } from '../../../components/select';
 import { LabeledSwitch } from '../../../components/labeledSwitch';
@@ -17,6 +18,8 @@ import {
   useMqttServiceMqttServersGetAllKey,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
+import { PluginSlot } from '../../plugins/PluginSlot';
+import { MQTT_SERVER_DETAIL_SLOT, MqttServerSlotContext } from '../mqtt.slots';
 
 export function EditMqttServerPage() {
   const { serverId } = useParams<{ serverId: string }>();
@@ -33,6 +36,9 @@ export function EditMqttServerPage() {
     username: '',
     password: '',
     useTls: false,
+    caCert: '',
+    tlsInsecure: false,
+    tlsServername: '',
     defaultPublishQos: 0,
     defaultPublishRetain: false,
     defaultSubscribeQos: 0,
@@ -54,6 +60,9 @@ export function EditMqttServerPage() {
         username: server.username ?? '',
         password: server.password ?? '',
         useTls: server.useTls,
+        caCert: server.caCert ?? '',
+        tlsInsecure: server.tlsInsecure ?? false,
+        tlsServername: server.tlsServername ?? '',
         defaultPublishQos: server.defaultPublishQos ?? 0,
         defaultPublishRetain: server.defaultPublishRetain ?? false,
         defaultSubscribeQos: server.defaultSubscribeQos ?? 0,
@@ -70,7 +79,7 @@ export function EditMqttServerPage() {
       queryClient.invalidateQueries({
         queryKey: [useMqttServiceMqttServersGetAllKey],
       });
-      navigate('/mqtt/servers');
+      navigate('/devices/mqtt/servers');
     },
     onError: (err: Error) => {
       showError({
@@ -93,7 +102,7 @@ export function EditMqttServerPage() {
   };
 
   const handleCancel = () => {
-    navigate('/mqtt/servers');
+    navigate('/devices/mqtt/servers');
   };
 
   if (isLoadingServer) {
@@ -109,7 +118,7 @@ export function EditMqttServerPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8" data-cy="edit-mqtt-server-page">
+    <div className="max-w-7xl mx-auto px-4 py-8 flex flex-col gap-8" data-cy="edit-mqtt-server-page">
       <PageHeader title={t('editMqttServer')} onBack={handleCancel} />
 
       <Form onSubmit={handleSubmit} className="gap-8" data-cy="edit-mqtt-server-form">
@@ -209,16 +218,14 @@ export function EditMqttServerPage() {
             />
           </div>
 
-          <Checkbox
-            id="useTls"
-            name="useTls"
-            isSelected={formValues.useTls}
-            onChange={(checked) => setFormValues((prev) => ({ ...prev, useTls: checked }))}
-            data-cy="edit-mqtt-server-form-use-tls-checkbox"
-          >
-            {t('useTls')}
-          </Checkbox>
         </section>
+
+        <TlsSection
+          values={formValues}
+          onChange={(patch) => setFormValues((prev) => ({ ...prev, ...patch }))}
+          t={t}
+          dataCyPrefix="edit-mqtt-server-form"
+        />
 
         <section className="w-full flex flex-col gap-4 pt-6 border-t border-default-200 first:pt-0 first:border-t-0">
           <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
@@ -274,6 +281,11 @@ export function EditMqttServerPage() {
           </Button>
         </div>
       </Form>
+
+      <PluginSlot<MqttServerSlotContext>
+        slotId={MQTT_SERVER_DETAIL_SLOT}
+        context={{ mqttServerId: server.id }}
+      />
     </div>
   );
 }

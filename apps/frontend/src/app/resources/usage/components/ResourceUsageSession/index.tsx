@@ -1,4 +1,4 @@
-import { HTMLAttributes, useMemo } from 'react';
+import { HTMLAttributes, useCallback, useMemo } from 'react';
 import { Spinner } from '@heroui/react';
 import { Clock } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -11,17 +11,24 @@ import { StartSessionControls } from '../StartSessionControls';
 import {
   useAccessControlServiceResourceIntroducersGetMany,
   useResourcesServiceResourceUsageGetActiveSession,
+  useResourcesServiceResourceUsageGetActiveSessionKey,
+  useResourcesServiceResourceUsageCanControlKey,
   Resource,
   useResourcesServiceResourceUsageCanControl,
   useResourceMaintenancesServiceFindMaintenances,
   SupervisionMode,
 } from '@attraccess/react-query-client';
+import { useQueryClient } from '@tanstack/react-query';
+import { useSSE } from '../../../../../utils/sse';
 import en from './translations/en.json';
 import de from './translations/de.json';
 import { MaintenanceInProgressDisplay } from './maintenance';
 import { FlatSection } from '../../../../../components/flatSection';
 import { RequestMaintenanceButton } from '../../../details/maintenance-management/request';
 import { InstantMaintenanceButton } from '../../../details/maintenance-management/instant';
+
+// ponytail: only these 3 events affect session/control state; health and other events don't need a refetch
+const SESSION_EVENTS = new Set(['resource.usage.session_started', 'resource.usage.session_ended', 'resource.usage.session_taken_over']);
 
 type ResourceUsageSessionProps = Omit<HTMLAttributes<HTMLElement>, 'children' | 'resource'> & {
   resourceId: number;
@@ -37,14 +44,26 @@ export function ResourceUsageSession({
 }: ResourceUsageSessionProps) {
   const { t } = useTranslations({ en, de });
   const { hasPermission, user } = useAuth();
-  const canManageResources = hasPermission('canManageResources');
+  const canUpdateResources = hasPermission('resources.update');
+  const queryClient = useQueryClient();
+
+  const invalidateSessionQueries = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: [useResourcesServiceResourceUsageGetActiveSessionKey] });
+    queryClient.invalidateQueries({ queryKey: [useResourcesServiceResourceUsageCanControlKey] });
+  }, [queryClient]);
+
+  useSSE({
+    path: `/api/resources/${resourceId}/events`,
+    onUpdate: (data: { eventType?: string; inUse?: boolean }) => {
+      if (data.eventType && SESSION_EVENTS.has(data.eventType)) {
+        invalidateSessionQueries();
+      }
+    },
+  });
 
   const { data: access, isLoading: isLoadingIntroStatus } = useResourcesServiceResourceUsageCanControl(
     { resourceId },
     undefined,
-    {
-      refetchInterval: 3000,
-    },
   );
 
   const { data: introducers, isLoading: isLoadingIntroducers } = useAccessControlServiceResourceIntroducersGetMany({
@@ -54,9 +73,6 @@ export function ResourceUsageSession({
   const { data: activeSessionResponse, isLoading: isLoadingSession } = useResourcesServiceResourceUsageGetActiveSession(
     { resourceId },
     undefined,
-    {
-      refetchInterval: 3000,
-    },
   );
 
   const activeSession = useMemo(() => activeSessionResponse?.usage, [activeSessionResponse]);
@@ -67,7 +83,7 @@ export function ResourceUsageSession({
     return introducers?.some((introducer) => introducer.userId === user?.id);
   }, [introducers, user]);
 
-  const canStartSession = canManageResources || access?.canControl || isIntroducer;
+  const canStartSession = canUpdateResources || access?.canControl || isIntroducer;
 
   // A not-introduced user may still start via a supervisor when the resource allows it.
   const supervisionEnabled =

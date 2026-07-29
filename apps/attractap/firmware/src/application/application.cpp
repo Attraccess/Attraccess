@@ -3,6 +3,9 @@
 
 #include "application.hpp"
 #include "../serial/serialCommandHandler.hpp"
+#include "platform.hpp"
+#include <cstring>
+#include <string>
 #ifdef ESP_PLATFORM
 #include "esp_heap_caps.h"
 #include "esp_task_wdt.h"
@@ -47,7 +50,15 @@ void Application::setup() {
   Settings::setup();
   this->setupBootDiagnostics();
   SerialCommandHandler::setup();
+#ifndef DEMO_MODE
   Network::setup();
+#else
+  DemoStore::setup();
+  // Preset a non-empty hostname so processState() skips the "not configured" branch
+  Settings::saveAttraccessApiConfig("demo-local", 80, false);
+  // Skip PIN screen
+  Settings::setDevicePin("demo");
+#endif
 
 #ifdef HAS_IO_EXPANDER
     this->ioExpander.setup();
@@ -74,7 +85,7 @@ void Application::setup() {
 
 #ifdef HAS_LVGL_DISPLAY
   this->api.onDeviceName(
-      [this](String deviceName) { Display::setDeviceName(deviceName); });
+      [this](std::string deviceName) { Display::setDeviceName(deviceName); });
 #endif
   this->api.setResourceListUpdateCallback(
       [this](const API::ResourceList &resourceList) {
@@ -141,7 +152,7 @@ void Application::setup() {
     Payload *pl = new Payload{this, sumUpEnabled};
     if (!pl)
       return;
-    lv_async_call(
+    Display::asyncCall(
         [](void *u) {
           auto *p = (Payload *)u;
           if (!p || !p->self) {
@@ -183,16 +194,16 @@ void Application::setup() {
     // Ensure UI operations on LVGL thread
     struct ErrPayload {
       Application *self;
-      String t;
-      String m;
+      std::string t;
+      std::string m;
     };
     ErrPayload *p = new ErrPayload();
     if (!p)
       return;
     p->self = this;
-    p->t = String(title);
-    p->m = String(message);
-    lv_async_call(
+    p->t = title;
+    p->m = message;
+    Display::asyncCall(
         [](void *u) {
           auto *pl = (ErrPayload *)u;
           if (!pl || !pl->self) {
@@ -206,6 +217,7 @@ void Application::setup() {
           if (pl && pl->self) {
             pl->self->pendingActionType = PENDING_ACTION_NONE;
             pl->self->hasPendingFormRequest = false;
+            pl->self->formFlowSubmitted = false;
             Display::resourceDetailsScreen.hideFormsModal();
           }
           delete pl;
@@ -220,7 +232,7 @@ void Application::setup() {
     struct ActionResultPayload {
       Application *self;
       bool ok;
-      String eventType;
+      std::string eventType;
     };
     ActionResultPayload *p = new ActionResultPayload();
     if (!p) {
@@ -229,9 +241,9 @@ void Application::setup() {
     p->self = this;
     p->ok = success;
     if (type) {
-      p->eventType = String(type);
+      p->eventType = type;
     }
-    lv_async_call(
+    Display::asyncCall(
         [](void *u) {
           ActionResultPayload *pl = static_cast<ActionResultPayload *>(u);
           if (pl && pl->self) {
@@ -252,9 +264,9 @@ void Application::setup() {
   });
 #endif
 
-  this->api.setFirmwareUpdateMetaCallback([this](String availableVersion) {
+  this->api.setFirmwareUpdateMetaCallback([this](std::string availableVersion) {
     this->externalState = EXTERNAL_STATE_FIRMWARE_UPDATE;
-    this->availableFirmwareVersion = String(availableVersion);
+    this->availableFirmwareVersion = availableVersion;
   });
 
   this->api.setFirmwareUpdateProgressCallback([this](int percent) {
@@ -272,7 +284,7 @@ void Application::setup() {
   Display::resourceDetailsScreen.setProjectsPageRequestCallback(
       [this](uint32_t page) { this->requestProjectsPage(page); });
   Display::resourceDetailsScreen.setProjectSelectionCallback(
-      [this](uint32_t projectId, const String &projectName) {
+      [this](uint32_t projectId, const std::string &projectName) {
         this->handleProjectSelection(projectId, projectName);
       });
   Display::resourceDetailsScreen.setFormPageNextCallback(
@@ -285,7 +297,7 @@ void Application::setup() {
       [this]() { this->handleFormsCancel(); });
 
   Display::setPinScreen.setOnPinConfirmedCallback(
-      [this](String pin) { Settings::setDevicePin(pin); });
+      [this](std::string pin) { Settings::setDevicePin(pin); });
 
   Display::connectionConfigurationScreen.setOnCancelPinLockCallback([this]() {
     Display::transitionToScreen(&Display::initScreen);
@@ -298,21 +310,49 @@ void Application::setup() {
         this->handleConnectionConfigurationSave(cfg);
       });
 
+  Display::connectionConfigurationScreen.setOnResetCertificateCallback(
+      [this]() { this->api.resetCertificateTrust(); });
+
   Display::initScreen.setOnOpenSettingsCallback([this]() {
+#ifdef DEMO_MODE
+    Display::transitionToScreen(&Display::demoSettingsScreen);
+#else
     this->state = APPLICATION_STATE_CONFIGURATION_REQUIRED;
     this->api.disableConnectionAttempts();
     Display::connectionConfigurationScreen.enablePinLock();
     Display::transitionToScreen(&Display::connectionConfigurationScreen);
+#endif
   });
 
-  // Hidden maintenance drawer (pull down from the top edge) reuses the same
-  // settings entry as the init screen, including the PIN lock.
+  // Hidden maintenance drawer (pull down from the top edge)
   Display::setOnOpenSettingsCallback([this]() {
+#ifdef DEMO_MODE
+    Display::transitionToScreen(&Display::demoSettingsScreen);
+#else
     this->state = APPLICATION_STATE_CONFIGURATION_REQUIRED;
     this->api.disableConnectionAttempts();
     Display::connectionConfigurationScreen.enablePinLock();
     Display::transitionToScreen(&Display::connectionConfigurationScreen);
+#endif
   });
+
+#ifdef DEMO_MODE
+  Display::demoSettingsScreen.setStartScanCallback([this]() {
+    this->demoPendingScanActive = true;
+    this->demoPendingScanReady = false;
+    this->nfc.resetCardPresence();
+    this->nfc.enableCardDetection();
+  });
+  Display::demoSettingsScreen.setCancelScanCallback([this]() {
+    this->demoPendingScanActive = false;
+    this->demoPendingScanReady = false;
+    this->nfc.disableCardDetection();
+  });
+#ifdef HAS_POWER_BUTTON
+  Display::demoSettingsScreen.setPowerOffCallback(
+      [this]() { this->ioExpander.powerOff(); });
+#endif
+#endif
 
   Display::resourceListScreen.setResourceSelectionCallback(
       [this](const API::ResourceBrief &resource) {
@@ -322,14 +362,14 @@ void Application::setup() {
   Display::setTouchCallback(
       [this](int16_t x, int16_t y) { this->handleTouch(x, y); });
 
-  this->api.setEnrollNewCardGetAvailableKeyNoCallback([this](String username) {
+  this->api.setEnrollNewCardGetAvailableKeyNoCallback([this](std::string username) {
     this->apiEnrollNewCardGetAvailableKeyNoData = {
         username = username,
     };
     this->externalState = EXTERNAL_STATE_ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO;
   });
 
-  this->api.setEnrollNewCardCallback([this](uint8_t keyNo, String key) {
+  this->api.setEnrollNewCardCallback([this](uint8_t keyNo, std::string key) {
     uint8_t keyBytes[16] = {0};
     stringToHexArray(key, keyBytes, 16);
 
@@ -342,7 +382,7 @@ void Application::setup() {
     this->enrollKeyMaterialReady = true;
   });
 
-  this->api.setEnrollNewCardErrorCallback([this](String error) {
+  this->api.setEnrollNewCardErrorCallback([this](std::string error) {
     // Runs on the websocket task. Copy into the fixed buffer, then publish via
     // the volatile flag (set last) so the main loop reads a complete message.
     if (error == "CARD_ALREADY_ENROLLED") {
@@ -359,7 +399,7 @@ void Application::setup() {
       [this]() { this->enrollCancelRequested = true; });
 
   this->api.setResetNfcCardCallback(
-      [this](String username, uint8_t keyNo, String key) {
+      [this](std::string username, uint8_t keyNo, std::string key) {
         uint8_t keyBytes[16] = {0};
         stringToHexArray(key, keyBytes, 16);
 
@@ -374,6 +414,73 @@ void Application::setup() {
 
   Display::resetScreen.setOnCancelCallback(
       [this]() { this->resetCancelRequested = true; });
+
+  // --- Two-card supervision (ATT-493) ---------------------------------------
+  Display::supervisionScreen.setOnCancelCallback(
+      [this]() { this->supervisionCancelRequested = true; });
+
+  this->api.setSupervisionRequestResultCallback(
+      [this](API::SupervisionRequestResult result) {
+        if (!result.success) {
+          // No eligible supervisor / resource doesn't support supervision: abort the flow.
+          strlcpy(this->supervisionErrorMessage,
+                  result.error == "NO_SUPERVISORS_AVAILABLE"
+                      ? "Kein Tutor verfuegbar"
+                      : translateReaderError(result.error).c_str(),
+                  sizeof(this->supervisionErrorMessage));
+          this->supervisionFailed = true;
+          return;
+        }
+
+        // Build the secondary hint: who may approve + the web fallback note. Runs on the websocket
+        // task, so write the fixed buffer and publish via the volatile flag (set last).
+        std::string hint = "Tutor-Karte auflegen oder per\nApp/Web bestaetigen";
+        if (result.supervisorCount > 0) {
+          hint += "\n";
+          for (uint8_t i = 0; i < result.supervisorCount; i++) {
+            if (i > 0) {
+              hint += ", ";
+            }
+            hint += result.supervisorNames[i];
+          }
+        }
+        strlcpy(this->supervisionHintMessage, hint.c_str(),
+                sizeof(this->supervisionHintMessage));
+        this->supervisionHintReady = true;
+      });
+
+  this->api.setSupervisorCardAuthenticationResponseCallback(
+      [this](API::SupervisorCardAuthenticationResponse response) {
+        if (response.error.length() > 0 || response.keyLen != 16) {
+          strlcpy(this->supervisionErrorMessage,
+                  response.error == "SUPERVISOR_NOT_AUTHORIZED"
+                      ? "Karte nicht als Tutor\nberechtigt"
+                      : translateReaderError(response.error).c_str(),
+                  sizeof(this->supervisionErrorMessage));
+          this->supervisionCardRejected = true;
+          return;
+        }
+
+        this->apiSupervisorCardData.keyNo = response.keyNo;
+        memset(this->apiSupervisorCardData.keyBytes, 0, 16);
+        memcpy(this->apiSupervisorCardData.keyBytes, response.keyBytes, 16);
+        // Flag readiness; processSupervision() performs the on-card crypto auth on the main loop.
+        this->supervisionKeyReady = true;
+      });
+
+  this->api.setSupervisionResolvedCallback(
+      [this](API::SupervisionResolvedResult result) {
+        if (result.success) {
+          // The supervisor approved from the web; the session is already started server-side.
+          this->supervisionResolvedByWeb = true;
+        } else {
+          strlcpy(this->supervisionErrorMessage,
+                  result.error.length() > 0 ? translateReaderError(result.error).c_str()
+                                            : "Aufsicht abgelehnt",
+                  sizeof(this->supervisionErrorMessage));
+          this->supervisionFailed = true;
+        }
+      });
 
   this->api.setProjectsOfUserResponseCallback(
       [this](const API::ProjectsOfUserResponse &projectsOfUserResponse) {
@@ -392,7 +499,7 @@ void Application::setup() {
         (void)request; // The data is in api.getFormRequestScratch()
         this->pendingFormRequestReady = true;
         // Schedule the copy + UI update on LVGL thread
-        lv_async_call(
+        Display::asyncCall(
             [](void *u) {
               auto *self = static_cast<Application *>(u);
               if (self && self->pendingFormRequestReady) {
@@ -410,7 +517,7 @@ void Application::setup() {
       [this](const API::ResourceUsageFormFieldsPage &page) {
         (void)page; // The data is in api.getFormFieldsScratch()
         this->pendingFormFieldsReady = true;
-        lv_async_call(
+        Display::asyncCall(
             [](void *u) {
               auto *self = static_cast<Application *>(u);
               if (self && self->pendingFormFieldsReady) {
@@ -426,7 +533,7 @@ void Application::setup() {
       [this](const API::ResourceUsageFormPageResult &result) {
         (void)result; // The data is in api.getFormPageResultScratch()
         this->pendingFormPageResultReady = true;
-        lv_async_call(
+        Display::asyncCall(
             [](void *u) {
               auto *self = static_cast<Application *>(u);
               if (self && self->pendingFormPageResultReady) {
@@ -442,6 +549,15 @@ void Application::setup() {
   auto cardDetectionCallback = [this](uint8_t *uid, uint8_t uidLength) {
     this->logger.infof("Card detected: %s",
                        hexToString(uid, uidLength).c_str());
+
+#ifdef DEMO_MODE
+    if (this->demoPendingScanActive) {
+        this->demoScanUid = hexToString(uid, uidLength);
+        this->demoPendingScanActive = false;
+        this->demoPendingScanReady = true;
+        return;
+    }
+#endif
 
 #ifndef HAS_LVGL_DISPLAY
     this->cardDetected = true;
@@ -478,6 +594,18 @@ void Application::setup() {
       this->resetCardDetected = true;
       return;
     }
+
+    if (this->state == APPLICATION_STATE_SUPERVISION) {
+      // A supervisor card entered the field. Capture its UID and flag it; the
+      // supervision state machine validates + authenticates it on the main loop.
+      uint8_t copyLen = uidLength > sizeof(this->supervisionCardUid)
+                            ? sizeof(this->supervisionCardUid)
+                            : uidLength;
+      memcpy(this->supervisionCardUid, uid, copyLen);
+      this->supervisionCardUidLength = copyLen;
+      this->supervisionCardDetected = true;
+      return;
+    }
 #endif
 
     if (this->state == APPLICATION_STATE_AUTHENTICATE_CARD) {
@@ -501,8 +629,10 @@ void Application::setup() {
   });
 #endif
 
+#ifndef DEMO_MODE
   xTaskCreate(Application::networkTask, "NetworkTask", 4096, nullptr,
               tskIDLE_PRIORITY, nullptr);
+#endif
 
 #ifdef ESP_PLATFORM
   esp_task_wdt_add(NULL);
@@ -528,11 +658,23 @@ void Application::loop() {
   Display::loop();
 #endif
 
-    nfc.loop();
+  // NFC polling back on the main loop (ATT-554 item 6 reverted for isolation:
+  // the dedicated NFC task + concurrent bus use is the prime suspect for the
+  // field I2C wedge). Blocking PN532 time costs only this loop — rendering and
+  // touch live on LvglTask.
+  this->nfc.loop();
 
-    this->api.loop();
+  this->api.loop();
 
+#ifdef HAS_LVGL_DISPLAY
+  // processState mutates LVGL (screen transitions, popups, screen setters);
+  // rendering runs on LvglTask, so serialize with lv_lock (recursive).
+  lv_lock();
   this->processState();
+  lv_unlock();
+#else
+  this->processState();
+#endif
 
 #ifdef ESP_PLATFORM
   vTaskDelay(pdMS_TO_TICKS(1));

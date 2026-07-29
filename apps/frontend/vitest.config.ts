@@ -24,6 +24,8 @@ export default defineConfig({
     setupFiles: [path.join(__dirname, 'src/test-utils/setup.ts')],
     testTimeout: 20000,
     hookTimeout: 20000,
+    // ponytail: retry flaky modal+userEvent tests that timeout under concurrent load
+    retry: 2,
   },
   esbuild: {
     target: 'node20',

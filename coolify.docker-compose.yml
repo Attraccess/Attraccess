@@ -23,6 +23,7 @@ services:
       - ATTRACCESS_URL=$SERVICE_URL_ATTRACCESS
       - ATTRACCESS_PUBLIC_INTERNET_URL=${ATTRACCESS_PUBLIC_INTERNET_URL:-$SERVICE_URL_ATTRACCESS}
       - AUTH_SESSION_SECRET=$SERVICE_BASE64_64_AUTHSESSION
+      - VALKEY_URL=redis://valkey:6379
       - TZ=${TZ:-UTC}
       - LOG_LEVELS=${LOG_LEVELS:-error,warn,log}
     volumes:
@@ -40,6 +41,20 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
+      valkey:
+        condition: service_healthy
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    restart: unless-stopped
+    volumes:
+      - valkey-data:/data
+    command: valkey-server --save 60 1 --loglevel warning
+    healthcheck:
+      test: ['CMD', 'valkey-cli', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 3
 
   rabbitmq:
     image: rabbitmq:4.3.0-management
@@ -91,6 +106,11 @@ services:
       - PROMETHEUS_METRICS_API_KEY=${PROMETHEUS_METRICS_API_KEY:-}
       # Pushover alerting is opt-in: prepare-provisioning.sh strips the
       # secret-requiring contact point + policy when these are unset (ATT-539).
+      # The script call below is guarded with `[ -f ... ]` because Coolify pulls
+      # the image (ATTRACCESS_IMAGE, default :latest) independently of this
+      # compose file, so an older image may predate the script. Such an image
+      # also lacks the secret-requiring files, so skipping the strip is safe and
+      # init must not hard-fail (ATT-549).
       - PUSHOVER_API_TOKEN=${PUSHOVER_API_TOKEN:-}
       - PUSHOVER_USER_KEY=${PUSHOVER_USER_KEY:-}
     command:
@@ -100,9 +120,16 @@ services:
         if [ -n "$$PROMETHEUS_METRICS_API_KEY" ]; then
           sed -i "s|# bearer_token: '<your-metrics-api-key>'|bearer_token: '$$PROMETHEUS_METRICS_API_KEY'|" /prometheus-config/prometheus.yml;
         fi &&
-        cp -rT /app/share/monitoring/grafana/provisioning /grafana-provisioning &&
-        cp -rT /app/share/monitoring/grafana/dashboards /grafana-dashboards &&
-        sh /app/share/monitoring/grafana/prepare-provisioning.sh /grafana-provisioning
+        if [ -f /app/share/monitoring/grafana/sync-managed-files.sh ]; then
+          sh /app/share/monitoring/grafana/sync-managed-files.sh /app/share/monitoring/grafana/provisioning /grafana-provisioning /app/share/monitoring/grafana/dashboards /grafana-dashboards;
+        else
+          rm -rf /grafana-provisioning/* /grafana-provisioning/.[!.]* /grafana-provisioning/..?* /grafana-dashboards/* /grafana-dashboards/.[!.]* /grafana-dashboards/..?* 2>/dev/null || true;
+          cp -rT /app/share/monitoring/grafana/provisioning /grafana-provisioning;
+          cp -rT /app/share/monitoring/grafana/dashboards /grafana-dashboards;
+        fi &&
+        if [ -f /app/share/monitoring/grafana/prepare-provisioning.sh ]; then
+          sh /app/share/monitoring/grafana/prepare-provisioning.sh /grafana-provisioning;
+        fi
     volumes:
       - prometheus-config:/prometheus-config
       - grafana-provisioning:/grafana-provisioning
@@ -125,6 +152,29 @@ services:
         condition: service_completed_successfully
       attraccess:
         condition: service_healthy
+
+  node-exporter:
+    image: prom/node-exporter:v1.9.1
+    restart: unless-stopped
+    command:
+      - '--path.rootfs=/host'
+      - '--collector.filesystem.mount-points-exclude=^/(dev|proc|sys|run/credentials/.+|var/lib/docker/.+)($$|/)'
+      - '--collector.filesystem.fs-types-exclude=^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs)$$'
+    volumes:
+      - /:/host:ro,rslave
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.52.1
+    restart: unless-stopped
+    privileged: true
+    command:
+      - '--docker_only=true'
+      - '--store_container_labels=true'
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
 
   grafana:
     image: grafana/grafana:13.0.1
@@ -149,6 +199,7 @@ services:
 
 volumes:
   attraccess-storage:
+  valkey-data:
   rabbitmq-data:
   zigbee2mqtt-data:
   prometheus-data:

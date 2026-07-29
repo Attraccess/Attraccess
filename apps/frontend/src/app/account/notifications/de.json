@@ -1,7 +1,84 @@
 {
+  "columns": {
+    "category": "Benachrichtigung",
+    "email": "E-Mail",
+    "push": "Push",
+    "toast": "In-App",
+    "all": "Alle"
+  },
+  "groups": {
+    "general": {
+      "label": "Alle Nutzer",
+      "description": "Benachrichtigungen, die alle Nutzer erhalten können."
+    },
+    "resourceManagers": {
+      "label": "Einweiser und Wartende",
+      "description": "Benachrichtigungen für Nutzer, die Ressourcen verwalten oder beaufsichtigen."
+    },
+    "admins": {
+      "label": "Admins",
+      "description": "Benachrichtigungen zu systemweiten oder zugriffsbezogenen Berechtigungen."
+    }
+  },
+  "categories": {
+    "messages": {
+      "label": "Nachrichten",
+      "description": "Benachrichtigungen zu Direktnachrichten."
+    },
+    "maintenance_requests": {
+      "label": "Wartungsanfragen",
+      "description": "Neue Wartungsanfragen und Aktualisierungen."
+    },
+    "resource_usage_notes": {
+      "label": "Nutzungsnotizen",
+      "description": "Notizen zu Ressourcennutzungen."
+    },
+    "resource_health": {
+      "label": "Ressourcenzustand",
+      "description": "Änderungen am Zustand von Ressourcen."
+    },
+    "resource_takeover": {
+      "label": "Ressourcenübernahme",
+      "description": "Wenn deine aktive Ressourcennutzung übernommen wird."
+    },
+    "resource_session_ended": {
+      "label": "Ressourcennutzung fremdbeendet",
+      "description": "Wenn jemand anderes oder das System deine aktive Ressourcennutzung beendet (nicht wenn du sie selbst beendest)."
+    },
+    "nfc_cards": {
+      "label": "NFC-Karten",
+      "description": "Wenn eine deiner NFC-Karten registriert, aktiviert, deaktiviert oder gelöscht wird."
+    },
+    "project_invitations": {
+      "label": "Projekteinladungen",
+      "description": "Einladungen zu Projekten."
+    },
+    "access_changes": {
+      "label": "Zugriffsänderungen",
+      "description": "Änderungen an deinen Berechtigungen, Einweisungen, Einweiser- oder Wartendenstatus."
+    }
+  },
+  "description": {
+    "push": "Push-Einstellungen werden für dein Konto gespeichert. Unterstützte Browser werden automatisch abonniert, wenn du die App nutzt."
+  },
   "messagesEmailOnOffline": {
     "label": "Benachrichtige mich per E-Mail über Nachrichten, wenn ich offline bin",
     "description": "Wenn du eine Direktnachricht erhältst, während du nicht online bist, senden wir dir eine E-Mail, damit du sie nicht verpasst."
+  },
+  "messagesPush": {
+    "label": "Push-Benachrichtigungen für Nachrichten",
+    "description": "Wenn du eine Direktnachricht erhältst, während du nicht online bist, zeigt dieses Gerät eine Push-Benachrichtigung an.",
+    "unsupported": "Dein Browser unterstützt keine Push-Benachrichtigungen.",
+    "permissionDenied": "Benachrichtigungen sind für diese Seite blockiert. Erlaube sie in deinen Browser-Einstellungen, um Push-Benachrichtigungen zu aktivieren.",
+    "errors": {
+      "subscribeFailed": "Push-Benachrichtigungen konnten nicht aktiviert werden. Bitte prüfe die Benachrichtigungs-Berechtigungen deines Browsers."
+    }
+  },
+  "toggleAll": {
+    "label": "Alle Benachrichtigungen",
+    "description": "Alle Benachrichtigungen auf einmal aktivieren oder deaktivieren.",
+    "toggleGroup": "Alle Benachrichtigungen in",
+    "toggleChannel": "Alle umschalten"
   },
   "messages": {
     "updated": "Benachrichtigungseinstellungen aktualisiert"

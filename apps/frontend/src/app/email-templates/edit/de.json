@@ -1,5 +1,4 @@
 {
-  "subtitle": "Ändern Sie Betreff und Inhalt (MJML) der Vorlage.",
   "templateType": {
     "verify-email": "E-Mail Verifizierung",
     "reset-password": "Passwort Zurücksetzen",
@@ -7,34 +6,73 @@
     "password-changed": "Passwort geändert",
     "resource-usage-billing-transaction-summary": "Ressourcennutzung Kostenübersicht",
     "user-invitation": "Benutzereinladung",
-    "project-invitation": "Projekteinladung"
+    "project-invitation": "Projekteinladung",
+    "delete-account-confirmation": "Kontolöschung Bestätigung",
+    "resource-health-changed": "Ressourcen-Gesundheitsstatus geändert",
+    "user-retraining-required": "Nachschulung erforderlich",
+    "maintenance-request-created": "Wartungsanfrage erstellt",
+    "message-received": "Neue Nachricht (Offline-Fallback)",
+    "resource-usage-note-added": "Ressourcen-Nutzungsnotiz hinzugefügt",
+    "resource-takeover": "Ressourcenübernahme",
+    "resource-session-ended": "Ressourcen-Sitzung beendet",
+    "access-change": "Zugriffsänderung"
   },
   "form": {
-    "subject": "Betreff",
-    "mjmlDocumentation": "MJML Dokumentation"
+    "subject": "Betreff"
   },
   "sections": {
-    "template": "Vorlage",
-    "preview": "Vorschau"
-  },
-  "preview": {
-    "iframeTitle": "Körper-Vorschau",
-    "loading": "Laden...",
-    "errorPrefix": "Fehler beim Laden der Vorschau.",
-    "emptyPlaceholder": "Beginnen Sie mit dem Bearbeiten des MJML-Inhalts, um eine Vorschau zu sehen."
+    "translations": "Übersetzungen"
   },
   "variables": {
-    "title": "Verfügbare Variablen",
-    "hint": "Klicken Sie auf einen Chip, um die Variable in die Zwischenablage zu kopieren.",
-    "empty": "Keine Variablen für diese Vorlage.",
+    "title": "Variablen",
     "copied": "{{name}} kopiert",
-    "copyFailed": "{{name}} konnte nicht kopiert werden",
-    "completionDetail": "Template-Variable"
+    "copyFailed": "{{name}} konnte nicht kopiert werden"
+  },
+  "translations": {
+    "noKeys": "Keine \\{{t}}-Helfer-Aufrufe in dieser Vorlage gefunden. Verwenden Sie \\{{t \"key\" \"Standardtext\"}} im Vorlageninhalt oder Betreff, um übersetzbare Zeichenfolgen hinzuzufügen.",
+    "explainer": "Empfänger erhalten die Übersetzung passend zu ihrer Sprache. Ist ein Text nicht übersetzt, wird der Standardtext aus der Vorlage verwendet.",
+    "emptyTitle": "Noch keine Sprachen hinzugefügt",
+    "emptyHint": "Diese Vorlage wird nur mit ihrem Standardtext versendet. Fügen Sie eine Sprache hinzu, um sie für Empfänger mit dieser Sprache zu übersetzen.",
+    "addLanguage": "Sprache hinzufügen",
+    "unsavedLanguageHint": "{{language}} ist noch nicht gespeichert — Übersetzungen ausfüllen und auf \"Übersetzungen speichern\" klicken.",
+    "keyColumn": "Schlüssel",
+    "defaultColumn": "Standardtext",
+    "translationColumn": "Übersetzung ({{language}})",
+    "save": "Übersetzungen speichern",
+    "saveFailed": "Übersetzungen konnten nicht gespeichert werden",
+    "saved": "Übersetzungen gespeichert",
+    "removeLanguage": "{{language}} entfernen",
+    "deleteFailed": "Übersetzungen konnten nicht gelöscht werden",
+    "deleteConfirm": "{{language}} entfernen und alle gespeicherten Übersetzungen löschen?",
+    "deleteConfirmButton": "Entfernen",
+    "emptyTranslation": "Fällt auf Standard zurück",
+    "loadFailed": "Vorhandene Übersetzungen konnten nicht geladen werden.",
+    "retry": "Erneut versuchen",
+    "customLocale": "Andere Sprache…",
+    "customLocaleTitle": "Weitere Sprache hinzufügen",
+    "customLocaleHint": "Sprachkennung eingeben, z. B. \"de-CH\", \"en-GB\" oder \"sw\". Regionale Kennungen überschreiben die Basissprache für Empfänger in dieser Region.",
+    "customLocaleInvalid": "Muss ein kleingeschriebener Sprachcode sein, optional mit großgeschriebener Region (z. B. \"de\" oder \"de-CH\").",
+    "customLocaleAdd": "Hinzufügen"
   },
   "actions": {
+    "back": "Zurück zu den Vorlagen",
     "close": "Schließen",
     "cancel": "Abbrechen",
-    "save": "Änderungen speichern",
-    "expand": "Editor vergrößern"
+    "save": "Speichern",
+    "translations": "Übersetzungen",
+    "resetToDefault": "Standard wiederherstellen"
+  },
+  "resetConfirm": {
+    "title": "Vorlage auf Standard zurücksetzen?",
+    "message": "Dies überschreibt Ihre Anpassungen mit der Standard-Vorlage. Eigene Übersetzungen werden entfernt; mitgelieferte Übersetzungen (z. B. Deutsch) werden wiederhergestellt. Dies kann nicht rückgängig gemacht werden.",
+    "confirm": "Zurücksetzen",
+    "cancel": "Abbrechen"
+  },
+  "toast": {
+    "saveSuccess": "Vorlage gespeichert.",
+    "saveError": "Vorlage konnte nicht gespeichert werden.",
+    "extractError": "Der Vorlageninhalt konnte nicht vom Layout-Rahmen getrennt werden. Bitte Seite neu laden und erneut versuchen.",
+    "resetSuccess": "Vorlage auf Standard zurückgesetzt.",
+    "resetError": "Vorlage konnte nicht zurückgesetzt werden."
   }
 }

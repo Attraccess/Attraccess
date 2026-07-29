@@ -1,6 +1,7 @@
-import { Alert, AlertContent, AlertDescription, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading } from '@heroui/react';
+import { Alert, AlertContent, AlertDescription, ModalBody, ModalFooter, ModalHeader, ModalHeading } from '@heroui/react';
 import { Button } from '../../../components/button';
 import { AlertStatusIcon } from '../../../components/AlertStatusIcon';
+import { StandardModal } from '../../../components/standardModal';
 import { useTranslations, useUrlQuery } from '@attraccess/plugins-frontend-ui';
 import { PasswordInput } from '../../../components/PasswordInput';
 import { useToastMessage } from '../../../components/toastProvider';
@@ -98,40 +99,37 @@ export function SSOLinkingRequiredModal(props: Props) {
   }, [linkToken, linkMutation, password]);
 
   return (
-    <Modal isOpen={show}>
-      <ModalBackdrop isDismissable={false} />
-      <ModalContainer size="md">
-        <ModalDialog>
-          {() => (<>
-        <ModalHeader>
-          <ModalHeading>{t('title')}</ModalHeading>
-          <p className="text-sm text-muted">{t('subtitle')}</p>
-        </ModalHeader>
+    <StandardModal isOpen={show} size="md" backdropProps={{ isDismissable: false }}>
+      {() => (
+        <>
+          <ModalHeader>
+            <ModalHeading>{t('title')}</ModalHeading>
+            <p className="text-sm text-muted">{t('subtitle')}</p>
+          </ModalHeader>
 
-        <ModalBody>
-          <Alert status="warning">
-            <AlertStatusIcon status="warning" />
-            <AlertContent>
-              <AlertDescription>{t('description', { email })}</AlertDescription>
-            </AlertContent>
-          </Alert>
+          <ModalBody>
+            <Alert status="warning">
+              <AlertStatusIcon status="warning" />
+              <AlertContent>
+                <AlertDescription>{t('description', { email })}</AlertDescription>
+              </AlertContent>
+            </Alert>
 
-          <PasswordInput
-            label={t('inputs.password.label')}
-            value={password}
-            onChange={(setPassword)}
-            autoComplete="current-password"
-          />
-        </ModalBody>
+            <PasswordInput
+              label={t('inputs.password.label')}
+              value={password}
+              onChange={setPassword}
+              autoComplete="current-password"
+            />
+          </ModalBody>
 
-        <ModalFooter>
-          <Button variant="primary" onPress={linkUser} isPending={linkingIsLoading}>
-            {t('actions.link')}
-          </Button>
-        </ModalFooter>
-          </>)}
-        </ModalDialog>
-      </ModalContainer>
-    </Modal>
+          <ModalFooter>
+            <Button variant="primary" onPress={linkUser} isPending={linkingIsLoading}>
+              {t('actions.link')}
+            </Button>
+          </ModalFooter>
+        </>
+      )}
+    </StandardModal>
   );
 }

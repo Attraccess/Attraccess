@@ -1,0 +1,7 @@
+{
+  "title": "Dein Ressourcenzugriff hat sich geändert",
+  "grantedMaintainer": "Du wurdest zum Betreuer für Ressource #{resourceId} ernannt.",
+  "grantedIntroducer": "Du wurdest zum Einweiser für Ressource #{resourceId} ernannt.",
+  "revokedMaintainer": "Dein Betreuer-Status für Ressource #{resourceId} wurde entzogen.",
+  "revokedIntroducer": "Dein Einweiser-Status für Ressource #{resourceId} wurde entzogen."
+}

@@ -1,19 +1,70 @@
-CONFIG_SPIRAM_SUPPORT=y
+# Shared sdkconfig for all Attractap variants (ESP-IDF v5.5).
+# Everything the Arduino core used to configure implicitly is explicit here.
+
+# --- Target / board (both boards: ESP32-S3, 16 MB QIO flash, octal PSRAM) ---
+CONFIG_IDF_TARGET="esp32s3"
+CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
+CONFIG_ESPTOOLPY_FLASHFREQ_80M=y
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
+
+# --- PSRAM ---
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_OCT=y
+CONFIG_SPIRAM_SPEED_80M=y
 CONFIG_SPIRAM_USE_MALLOC=y
 CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y
-CONFIG_MBEDTLS_SSL_IN_CONTENT_LEN=4096
-CONFIG_MBEDTLS_SSL_OUT_CONTENT_LEN=4096
 
+# --- Partition table (dual-OTA 16 MB layout, byte-identical to fielded devices) ---
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+CONFIG_PARTITION_TABLE_OFFSET=0x8000
+
+# --- Runtime parity with the Arduino core ---
+# Arduino ran FreeRTOS at 1 kHz; all ms-based timing in the firmware assumes it.
+CONFIG_FREERTOS_HZ=1000
+# app_main task = the old Arduino loopTask: 16 KB stack, pinned to core 1
+# (keeps the UI-driving loop off the WiFi core).
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=16384
+CONFIG_ESP_MAIN_TASK_AFFINITY_CPU1=y
+
+# --- Console over USB-Serial-JTAG (both boards route USB D+/D- to the S3) ---
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+
+# --- Optimization: production firmware is CPU-bound (LVGL software rendering) ---
+CONFIG_COMPILER_OPTIMIZATION_PERF=y
+
+# --- RGB LCD anti-drift (ATT-717) ---
+# The Touch RGB panels free-run from a PSRAM framebuffer with no bounce buffers.
+# When flash/PSRAM bus contention (WiFi bring-up, NVS writes) underruns the LCD
+# GDMA, the frame shifts permanently. Restarting the GDMA channel every VBlank
+# resyncs within one frame instead.
+CONFIG_LCD_RGB_RESTART_IN_VSYNC=y
+
+# --- Ethernet (W5500 over SPI; wifi-only variants gate it at runtime) ---
+CONFIG_ETH_USE_SPI_ETHERNET=y
+CONFIG_ETH_SPI_ETHERNET_W5500=y
+
+# --- mbedTLS / TLS ---
 CONFIG_MBEDTLS_TLS_ENABLED=y
 CONFIG_MBEDTLS_SSL_PROTO_TLS1_2=y
-CONFIG_MBEDTLS_KEY_EXCHANGE_ECDHE_RSA_ENABLED=y
-CONFIG_MBEDTLS_KEY_EXCHANGE_ECDHE_ECDSA_ENABLED=y
+CONFIG_MBEDTLS_KEY_EXCHANGE_ECDHE_RSA=y
+CONFIG_MBEDTLS_KEY_EXCHANGE_ECDHE_ECDSA=y
 CONFIG_MBEDTLS_PEM_PARSE_C=y
 CONFIG_MBEDTLS_PEM_WRITE_C=y
+# TLS record (rx) buffer: must hold the server's whole Certificate handshake
+# message in one piece. Let's Encrypt now serves a 3-cert chain (~4.3 KB) that
+# overflowed the old 4096 buffer, aborting the handshake with a fatal alert
+# even though the cert verified — 8192 gives headroom for longer future chains.
+# tx stays 4096 (ASYMMETRIC_CONTENT_LEN=y): our client flight is tiny.
+CONFIG_MBEDTLS_SSL_IN_CONTENT_LEN=8192
+CONFIG_MBEDTLS_SSL_OUT_CONTENT_LEN=4096
+# AES-CMAC for NTAG424 authentication (nfc/mbedtlscmac.c)
+CONFIG_MBEDTLS_CMAC_C=y
 
 # Disable legacy/unused ones
-# CONFIG_MBEDTLS_KEY_EXCHANGE_RSA_ENABLED is not set
-# CONFIG_MBEDTLS_KEY_EXCHANGE_DHE_RSA_ENABLED is not set
+# CONFIG_MBEDTLS_KEY_EXCHANGE_RSA is not set
+# CONFIG_MBEDTLS_KEY_EXCHANGE_DHE_RSA is not set
 
 # Core dump to flash: panic backtrace survives a power cycle, readable over serial
 CONFIG_ESP_COREDUMP_ENABLE=y
@@ -22,7 +73,7 @@ CONFIG_ESP_COREDUMP_DATA_FORMAT_ELF=y
 CONFIG_ESP_COREDUMP_CHECKSUM_CRC32=y
 CONFIG_ESP_COREDUMP_CHECK_BOOT=y
 CONFIG_ESP_COREDUMP_MAX_TASKS_NUM=32
-CONFIG_ESP_COREDUMP_STACK_SIZE=1024
+CONFIG_ESP_COREDUMP_STACK_SIZE=1792
 # CONFIG_ESP_COREDUMP_ENABLE_TO_NONE is not set
 
 # Task Watchdog: watch both idle tasks and panic (coredump + backtrace) on a stall
@@ -33,8 +84,6 @@ CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU0=y
 CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU1=y
 CONFIG_ESP_TASK_WDT_PANIC=y
 
-# TCP keepalive defaults to detect half-open connections after silent drops
-CONFIG_LWIP_TCP_KEEPALIVE=y
-CONFIG_LWIP_TCP_KEEPIDLE_DEFAULT=5000
-CONFIG_LWIP_TCP_KEEPINTVL_DEFAULT=5000
-CONFIG_LWIP_TCP_KEEPCNT_DEFAULT=3
+# TCP keepalive: LWIP_TCP_KEEPALIVE is hardcoded on in IDF 5.x lwipopts.h and
+# the old *_DEFAULT Kconfig knobs no longer exist; the websocket client sets
+# its keepalive parameters explicitly (websocket.cpp: 5s idle/5s interval/3).

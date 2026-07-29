@@ -1,4 +1,12 @@
-import { Injectable, BadRequestException, ForbiddenException, Logger, NotFoundException, Inject, forwardRef } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  ForbiddenException,
+  Logger,
+  NotFoundException,
+  Inject,
+  forwardRef,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull, FindOneOptions, EntityManager } from 'typeorm';
 import {
@@ -20,10 +28,12 @@ import { ResourceUnhealthyException } from '../../exceptions/resource.unhealthy.
 import { ResourceHealthService } from '../health/resource-health.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
-  ResourceUsageEvent,
-  ResourceUsageTakenOverEvent,
+  ResourceSessionStartedEvent,
+  ResourceUsageSessionTakenOverEvent,
+  ResourceUsageSessionEndedEvent,
   ResourceUsageNoteAddedEvent,
-  SupervisedUsageStartedEvent,
+  ResourceSupervisedUsageStartedEvent,
+  ResourceSupervisedUsageEndedEvent,
 } from './events/resource-usage.events';
 import { ResourceIntroductionsService } from '../introductions/resouceIntroductions.service';
 import { ResourceIntroducersService } from '../introducers/resourceIntroducers.service';
@@ -38,8 +48,9 @@ import { ProjectsService } from '../../projects/projects.service';
 import { ResourceFormsService } from '../forms/forms.service';
 import { ResourceFormAction } from '@attraccess/database-entities';
 import { MetricsService } from '../../metrics/metrics.service';
-import { SystemEvent } from '@attraccess/plugins-backend-sdk';
+import { AuthenticatedUser, SystemEvent } from '@attraccess/plugins-backend-sdk';
 import { PluginEventsService } from '../../plugin-system/plugin-events.service';
+import { RbacService } from '../../users-and-auth/rbac/rbac.service';
 
 export interface EndSessionOptions {
   /** Skip persisting required END-action form submissions (used by automated/flow paths). */
@@ -51,7 +62,7 @@ export interface EndSessionOptions {
 export interface StartSessionOptions {
   /**
    * When set, the session is started as a supervised session attributed to this supervisor.
-   * The supervisor is validated against the resource (introducer/maintainer or canManageResources).
+   * The supervisor is validated against the resource (introducer/maintainer or `resources.update` permission).
    */
   supervisorUserId?: number;
 }
@@ -104,6 +115,7 @@ export class ResourceUsageService {
     private readonly metricsService: MetricsService,
     private readonly resourceHealthService: ResourceHealthService,
     private readonly pluginEvents: PluginEventsService,
+    private readonly rbacService: RbacService,
   ) {}
 
   private emitSystemUsageEvent(
@@ -126,7 +138,10 @@ export class ResourceUsageService {
     user: User,
     transactionalEntityManager?: EntityManager,
   ): Promise<boolean> {
-    if (user.systemPermissions?.canManageResources) {
+    // Prefer already-populated effectivePermissions on the request-bound user (set by SessionStrategy)
+    // to avoid a redundant DB query on every resource start/stop.
+    const effectivePermissions = (user as AuthenticatedUser).effectivePermissions ?? await this.rbacService.getEffectivePermissions(user.id);
+    if (effectivePermissions.has('resources.update')) {
       return true;
     }
 
@@ -216,7 +231,8 @@ export class ResourceUsageService {
       throw new NotFoundException(`Supervisor with ID ${supervisorUserId} not found`);
     }
 
-    const supervisorCanManage = supervisor.systemPermissions?.canManageResources === true;
+    const supervisorPermissions = await this.rbacService.getEffectivePermissions(supervisor.id);
+    const supervisorCanManage = supervisorPermissions.has('resources.update');
     const supervisorCanMaintain = await this.resourceIntroducersService.canMaintain(
       resourceId,
       supervisorUserId,
@@ -284,9 +300,7 @@ export class ResourceUsageService {
           transactionalEntityManager,
         );
         if (!canManageMaintenance) {
-          this.logger.warn(
-            `User ${user.id} blocked from resource ${resourceId} because it is currently unhealthy`,
-          );
+          this.logger.warn(`User ${user.id} blocked from resource ${resourceId} because it is currently unhealthy`);
           throw new ResourceUnhealthyException(resourceId);
         }
         this.logger.debug(
@@ -334,7 +348,6 @@ export class ResourceUsageService {
           id: usageUser.id,
           username: usageUser.username,
           email: usageUser.email,
-          systemPermissions: usageUser.systemPermissions,
           createdAt: usageUser.createdAt,
           updatedAt: usageUser.updatedAt,
           billingFactor: usageUser.billingFactor,
@@ -395,9 +408,7 @@ export class ResourceUsageService {
           throw new BadRequestException('You must complete the resource introduction before using it');
         }
         if (resource.supervisionMode === SupervisionMode.SUPERVISION_REQUIRED) {
-          throw new BadRequestException(
-            'This resource requires a supervisor; request a supervised session instead',
-          );
+          throw new BadRequestException('This resource requires a supervisor; request a supervised session instead');
         }
       } else {
         await this.validateSupervisedStart(resourceId, user, supervisorUserId, transactionalEntityManager, resource);
@@ -530,8 +541,8 @@ export class ResourceUsageService {
 
         // Emit event for the takeover
         this.eventEmitter.emit(
-          ResourceUsageTakenOverEvent.EVENT_NAME,
-          new ResourceUsageTakenOverEvent(resource, now, user, existingActiveSession.user),
+          ResourceUsageSessionTakenOverEvent.EVENT_NAME,
+          new ResourceUsageSessionTakenOverEvent(resource, now, user, existingActiveSession.user),
         );
       } else {
         // Defer event for the newly started session until after commit
@@ -576,8 +587,8 @@ export class ResourceUsageService {
     // session start is counted there to decide when to auto-create an introduction for the user.
     if (supervisorUserId !== null && newSession?.id) {
       this.eventEmitter.emit(
-        SupervisedUsageStartedEvent.EVENT_NAME,
-        new SupervisedUsageStartedEvent(resourceId, user.id, supervisorUserId, newSession.id),
+        ResourceSupervisedUsageStartedEvent.EVENT_NAME,
+        new ResourceSupervisedUsageStartedEvent(resourceId, user.id, supervisorUserId, newSession.id),
       );
     }
 
@@ -608,43 +619,42 @@ export class ResourceUsageService {
 
     this.logger.debug(`Ending session for resource ${resourceId} by user ${user.id}`, { dto });
 
-    // Find active session
-    const activeSession = await this.getActiveSession(resourceId, true);
-    if (!activeSession) {
-      throw new BadRequestException('No active session found');
-    }
-
-    // Check if the user is authorized to end the session
-    const canManageResources = user.systemPermissions?.canManageResources || false;
-    const isSessionOwner = activeSession.user.id === user.id;
-    // The supervisor of a supervised session may end it as well.
-    const isSupervisor = activeSession.supervisorUserId != null && activeSession.supervisorUserId === user.id;
-
-    if (!isSessionOwner && !isSupervisor && !canManageResources) {
-      const canMaintain = await this.resourceIntroducersService.canMaintain(activeSession.resourceId, user.id, true);
-      if (!canMaintain) {
-        this.logger.warn(
-          `User ${user.id} not authorized to end session ${activeSession.id} owned by user ${activeSession.user.id}`,
-        );
-        throw new ForbiddenException('You are not authorized to end this session');
-      }
-    }
-
-    const endTime = new Date();
-
-    this.logger.debug(`Ending session ${activeSession.id} at ${endTime.toISOString()}`);
-
-    let endNotes = dto.notes;
-
-    if (!isSessionOwner) {
-      endNotes = `[By #${user.id} - ${user.username}] ${endNotes ?? ''}`;
-    }
-
     // Defer event emission until after the transaction commits to avoid stale reads in listeners
+    let activeSession: ResourceUsage | null = null;
     let endedUsageIdToEmit: number | null = null;
     let formSubmissions: FormSubmission[] = [];
     const executeEndSession = async () =>
       await this.resourceUsageRepository.manager.transaction(async (transactionalEntityManager) => {
+        activeSession = await this.getActiveSession(resourceId, true, transactionalEntityManager);
+        if (!activeSession) {
+          throw new BadRequestException('No active session found');
+        }
+
+        // Prefer already-populated effectivePermissions on the request-bound user (set by SessionStrategy)
+        const userPermissions = (user as AuthenticatedUser).effectivePermissions ?? await this.rbacService.getEffectivePermissions(user.id);
+        const canUpdateResources = userPermissions.has('resources.update');
+        const isSessionOwner = activeSession.user.id === user.id;
+        // The supervisor of a supervised session may end it as well.
+        const isSupervisor = activeSession.supervisorUserId != null && activeSession.supervisorUserId === user.id;
+
+        if (!isSessionOwner && !isSupervisor && !canUpdateResources) {
+          const canMaintain = await this.resourceIntroducersService.canMaintain(activeSession.resourceId, user.id, true);
+          if (!canMaintain) {
+            this.logger.warn(
+              `User ${user.id} not authorized to end session ${activeSession.id} owned by user ${activeSession.user.id}`,
+            );
+            throw new ForbiddenException('You are not authorized to end this session');
+          }
+        }
+
+        const endTime = new Date();
+        let endNotes = dto.notes;
+        if (!isSessionOwner) {
+          endNotes = `[By #${user.id} - ${user.username}] ${endNotes ?? ''}`;
+        }
+
+        this.logger.debug(`Ending session ${activeSession.id} at ${endTime.toISOString()}`);
+
         const updateData = {
           endTime,
           endNotes,
@@ -707,6 +717,30 @@ export class ResourceUsageService {
     }
 
     this.emitSystemUsageEvent(SystemEvent.RESOURCE_USAGE_ENDED, updatedUsage?.resource, updatedUsage?.user);
+
+    if (updatedUsage?.user?.id && (updatedUsage.user.id !== user.id || skipNoteNotification)) {
+      this.eventEmitter.emit(
+        ResourceUsageSessionEndedEvent.EVENT_NAME,
+        new ResourceUsageSessionEndedEvent(
+          updatedUsage,
+          skipNoteNotification ? null : { id: user.id, username: user.username },
+        ),
+      );
+    }
+
+    // Counter signal for supervised-usage auto-promotion (ATT-488): every completed supervised session
+    // is counted by the listener to decide when to auto-create an introduction for the supervised user.
+    if (activeSession?.supervisorUserId != null && activeSession.user?.id != null) {
+      this.eventEmitter.emit(
+        ResourceSupervisedUsageEndedEvent.EVENT_NAME,
+        new ResourceSupervisedUsageEndedEvent(
+          resourceId,
+          activeSession.user.id,
+          activeSession.supervisorUserId,
+          activeSession.id,
+        ),
+      );
+    }
 
     this.metricsService.resourceUsageSessionsTotal.inc({ action: 'end' });
     this.metricsService.resourceUsageSessionsActive.dec();
@@ -790,7 +824,7 @@ export class ResourceUsageService {
       where: { id: usageId },
       relations: ['resource', 'user'],
     });
-    await this.eventEmitter.emitAsync(ResourceUsageEvent.EVENT_NAME, new ResourceUsageEvent(usage));
+    await this.eventEmitter.emitAsync(ResourceSessionStartedEvent.EVENT_NAME, new ResourceSessionStartedEvent(usage));
   }
 
   private async handleDoorAction(resourceId: number, user: User, action: ResourceUsageAction): Promise<ResourceUsage> {
@@ -888,7 +922,14 @@ export class ResourceUsageService {
       skip: (page - 1) * limit,
       take: limit,
       order: { startTime: 'DESC' },
-      relations: ['user', 'project', 'supervisorUser', 'formSubmissions', 'formSubmissions.form', 'formSubmissions.user'],
+      relations: [
+        'user',
+        'project',
+        'supervisorUser',
+        'formSubmissions',
+        'formSubmissions.form',
+        'formSubmissions.user',
+      ],
     });
 
     this.logger.debug(`Found ${data.length} usage records out of ${total} total for resource ${resourceId}`);

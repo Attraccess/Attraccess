@@ -1,0 +1,37 @@
+export type Step = 'loading' | 'permissions' | 'pin-setup' | 'pin-entry' | 'url' | 'register' | 'done' | 'settings';
+
+export interface Permissions {
+  needed: boolean;
+  accessibility: boolean;
+}
+
+export interface CompanionSettings {
+  idleTimeoutMinutes: number;
+  foregroundApp: boolean;
+  usbDevices: boolean;
+}
+
+export interface CompanionBridge {
+  checkHealth: (url: string) => Promise<boolean>;
+  register: (url: string) => Promise<void>;
+  getPermissions: () => Promise<Permissions>;
+  requestPermission: (name: 'accessibility') => Promise<Permissions>;
+  isPinSet: () => Promise<boolean>;
+  savePin: (pin: string) => Promise<void>;
+  verifyPin: (pin: string) => Promise<boolean>;
+  confirmQuit: () => Promise<void>;
+  disconnect: () => Promise<void>;
+  getSettings: () => Promise<CompanionSettings>;
+  saveSettings: (s: CompanionSettings) => Promise<void>;
+  enableAdminOverride: (pin: string) => Promise<boolean>;
+  onInit: (cb: (data: { serverUrl?: string; requirePin?: 'settings' | 'quit' | 'admin-override'; registered: boolean; connected: boolean }) => void) => void;
+  onWsStatus: (cb: (status: 'connected' | 'disconnected') => void) => void;
+  onRegistered: (cb: (data: { id: number }) => void) => void;
+  onAuthenticated: (cb: (data: unknown) => void) => void;
+}
+
+declare global {
+  interface Window {
+    companion: CompanionBridge;
+  }
+}

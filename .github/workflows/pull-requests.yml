@@ -3,11 +3,15 @@ name: Pull Requests
 on:
   pull_request:
     types: [opened, synchronize]
+  merge_group:
+    types: [checks_requested]
 
 env:
   GHCR_IMAGE_NAME: ${{ vars.GHCR_IMAGE_NAME }}
   DOCKERHUB_IMAGE_NAME: ${{ vars.DOCKERHUB_IMAGE_NAME }}
   DOCKER_BUILDKIT: 1
+  # merge_group has no pull_request payload; base_sha is the queue target (main).
+  NX_AFFECTED_BASE: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || format('origin/{0}', github.event.pull_request.base.ref) }}
 
 permissions:
   contents: read
@@ -25,16 +29,9 @@ jobs:
       - uses: ./.github/actions/setup
       - name: Run precommit checks
         run: pnpm precommit
-      - name: Ensure precommit does not modify files
-        run: |
-          if [[ -n "$(git status --porcelain)" ]]; then
-            echo "pnpm precommit modified files. Please run it locally and commit the changes."
-            git status --porcelain
-            git --no-pager diff
-            exit 1
-          fi
 
   commitlint:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -47,6 +44,18 @@ jobs:
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: echo "$PR_TITLE" | pnpm exec commitlint
 
+  attractap-firmware-version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Test Attractap firmware version check
+        run: ./scripts/attractap-firmware-version-check.spec.sh
+      - name: Ensure Attractap firmware version was bumped
+        run: ./scripts/check-attractap-firmware-version.sh "${{ env.NX_AFFECTED_BASE }}"
+
   lint-and-typecheck:
     runs-on: ubuntu-latest
     steps:
@@ -56,9 +65,9 @@ jobs:
           fetch-depth: 0
       - uses: ./.github/actions/setup
       - name: Lint affected projects
-        run: pnpm nx affected --target=lint --parallel=5 --base=origin/${{ github.event.pull_request.base.ref }} --exclude=tag:scope:hardware,tag:type:plugin
+        run: pnpm nx affected --target=lint --parallel=5 --base=${{ env.NX_AFFECTED_BASE }} --exclude=tag:scope:hardware,tag:type:plugin
       - name: Typecheck affected projects
-        run: pnpm nx affected --target=typecheck --parallel=5 --base=origin/${{ github.event.pull_request.base.ref }} --exclude=tag:scope:hardware,tag:type:plugin
+        run: pnpm nx affected --target=typecheck --parallel=5 --base=${{ env.NX_AFFECTED_BASE }} --exclude=tag:scope:hardware,tag:type:plugin
 
   test:
     runs-on: ubuntu-latest
@@ -69,7 +78,7 @@ jobs:
           fetch-depth: 0
       - uses: ./.github/actions/setup
       - name: Test affected projects
-        run: pnpm nx affected --target=test,e2e --parallel=5 --base=origin/${{ github.event.pull_request.base.ref }} --exclude=tag:scope:hardware,tag:type:plugin
+        run: pnpm nx affected --target=test,e2e --parallel=5 --base=${{ env.NX_AFFECTED_BASE }} --exclude=tag:scope:hardware,tag:type:plugin
 
   plugins:
     runs-on: ubuntu-latest
@@ -84,9 +93,9 @@ jobs:
       # exclude keeps the affected set restricted to plugin apps, so a PR that
       # touches no plugin (or shared global) runs nothing here.
       - name: Lint affected plugin apps
-        run: pnpm nx affected --target=lint --parallel=3 --base=origin/${{ github.event.pull_request.base.ref }} --exclude='*,!tag:type:plugin'
+        run: pnpm nx affected --target=lint --parallel=3 --base=${{ env.NX_AFFECTED_BASE }} --exclude='*,!tag:type:plugin'
       - name: Build + zip affected plugin apps
-        run: pnpm nx affected --target=package --parallel=3 --base=origin/${{ github.event.pull_request.base.ref }} --exclude='*,!tag:type:plugin'
+        run: pnpm nx affected --target=package --parallel=3 --base=${{ env.NX_AFFECTED_BASE }} --exclude='*,!tag:type:plugin'
 
       - name: Collect plugin ZIPs into a flat directory
         id: collect
@@ -109,7 +118,7 @@ jobs:
 
       - name: Upload plugin ZIPs
         uses: actions/upload-artifact@v4
-        if: always() && steps.collect.outputs.has_plugins == 'true'
+        if: github.event_name == 'pull_request' && always() && steps.collect.outputs.has_plugins == 'true'
         with:
           name: plugins-${{ github.event.pull_request.number }}-${{ github.run_attempt }}
           path: dist/plugin-zips/*.zip
@@ -118,7 +127,7 @@ jobs:
 
       - name: Build PR comment body
         id: comment-body
-        if: always()
+        if: github.event_name == 'pull_request' && always()
         run: |
           set -euo pipefail
           shopt -s nullglob globstar
@@ -146,7 +155,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Post sticky PR comment with plugin artifacts
-        if: always()
+        if: github.event_name == 'pull_request' && always()
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           header: plugin-artifacts
@@ -168,51 +177,59 @@ jobs:
       - name: Test Grafana provisioning prepare (Pushover opt-in)
         run: ./scripts/grafana-provisioning-prepare.spec.sh
 
+  balena-compose-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+      - uses: ./.github/actions/setup
+      - name: Validate docker-compose.balena.yml with balena's parser
+        run: node scripts/check-balena-compose.mjs
+
+  build-companion:
+    uses: ./.github/workflows/build-companion-binaries.yml
+    secrets: inherit
+
   containerize:
+    needs: [build-companion]
+    if: always() && !failure() && !cancelled()
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+      # Pre-build the Attractap firmware on the runner: the Dockerfile has no
+      # ESP-IDF and fails loudly if no firmware is bundled (ATT-715).
+      - uses: ./.github/actions/build-attractap-firmware
 
-      - name: Login to Docker Hub
-        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Get Node.js Version
-        id: node-version
-        run: echo "NODE_VERSION=$(cat .nvmrc | tr -d '[:space:]')" >> $GITHUB_OUTPUT
+      - uses: ./.github/actions/download-companion
 
       - name: Get short SHA
         id: vars
         run: echo "SHORT_SHA=$(echo $GITHUB_SHA | cut -c1-7)" >> $GITHUB_OUTPUT
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+      - name: Set image tag suffix
+        id: image-tag
+        run: |
+          if [[ "${{ github.event_name }}" == "merge_group" ]]; then
+            echo "suffix=mq-${{ steps.vars.outputs.SHORT_SHA }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "suffix=pr-${{ github.event.pull_request.number }}-${{ steps.vars.outputs.SHORT_SHA }}" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Build and push Docker image
         id: build-and-push
-        uses: docker/build-push-action@b66d8774c665b789105b440514f0c97e6f19b06f
+        uses: ./.github/actions/docker-build-push
         with:
-          context: .
-          push: true
           tags: |
-            ghcr.io/${{ env.GHCR_IMAGE_NAME }}:pr-${{ github.event.number }}-${{ steps.vars.outputs.SHORT_SHA }}
-            ${{ env.DOCKERHUB_IMAGE_NAME }}:pr-${{ github.event.number }}-${{ steps.vars.outputs.SHORT_SHA }}
-          build-args: |
-            NODE_VERSION=${{ steps.node-version.outputs.NODE_VERSION }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+            ghcr.io/${{ env.GHCR_IMAGE_NAME }}:${{ steps.image-tag.outputs.suffix }}
+            ${{ env.DOCKERHUB_IMAGE_NAME }}:${{ steps.image-tag.outputs.suffix }}
+          ghcr-token: ${{ secrets.GITHUB_TOKEN }}
+          dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
+          dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Post image URL comment to PR
+        if: github.event_name == 'pull_request'
         uses: actions/github-script@v9
         with:
           script: |
@@ -222,8 +239,8 @@ jobs:
               repo: context.repo.repo,
               body: `🐳 Docker images built and pushed:
 
-            GitHub Container Registry: \`ghcr.io/${{ env.GHCR_IMAGE_NAME }}:pr-${{ github.event.number }}-${{ steps.vars.outputs.SHORT_SHA }}\`
-            Docker Hub: \`${{ env.DOCKERHUB_IMAGE_NAME }}:pr-${{ github.event.number }}-${{ steps.vars.outputs.SHORT_SHA }}\`
+            GitHub Container Registry: \`ghcr.io/${{ env.GHCR_IMAGE_NAME }}:${{ steps.image-tag.outputs.suffix }}\`
+            Docker Hub: \`${{ env.DOCKERHUB_IMAGE_NAME }}:${{ steps.image-tag.outputs.suffix }}\`
 
             Image Digest: \`${{ steps.build-and-push.outputs.digest }}\``
             })

@@ -11,6 +11,8 @@ Introductions follow a simple model:
 
 A user who has not been introduced cannot start a usage session on the resource.
 
+Some resources can also allow or require **supervised usage**. In a supervised session, the user starts the session while a qualified **supervisor** is present. The supervisor must be an introducer, maintainer or resource manager for the resource. Supervision is useful for training, first attempts, or resources where policy requires a second person to be present.
+
 ## Roles
 
 | Role | Can Do |
@@ -19,6 +21,8 @@ A user who has not been introduced cannot start a usage session on the resource.
 | **Maintainer** | Use and control the resource, and manage its maintenance — but cannot grant introductions |
 | **Introducer** | Everything a maintainer can do, plus grant and revoke introductions for other users |
 | **Resource Manager** | All of the above, plus manage introducers/maintainers and resource settings |
+
+For supervised sessions, the supervisor is the introducer, maintainer or resource manager who confirms the session and remains responsible for supervising it.
 
 > [!NOTE]
 > **Introducer vs Maintainer:** Both can operate the machine and put it into (or take it out of) maintenance. The difference is that only an **introducer** can grant introductions to other users. Use **maintainer** for people who service the machine but should not decide who else gets access.
@@ -67,6 +71,29 @@ This is useful when you have multiple similar resources, for example all 3D prin
 
 > [!NOTE]
 > If a user is introduced through a group, they will keep access to all resources in the group until the group introduction is revoked. Removing a resource from the group will also remove that user's access to the removed resource (if it was granted through the group only).
+
+## Supervision Mode
+
+Resource managers can choose how introductions and supervision interact for each resource:
+
+| Mode | Meaning |
+|------|---------|
+| **Introduction required** | Only introduced users may start a session. This is the default behavior. |
+| **Supervision allowed** | Introduced users may start alone. Users without an introduction may start a supervised session while a supervisor is present. |
+| **Supervision required** | Every session requires a present supervisor, even for introduced users. |
+
+Supervised sessions are recorded in the usage history with the supervisor. This makes it visible who supervised the session and helps distinguish supervised training or trial usage from regular solo usage.
+
+## Auto-promotion to Introduction
+
+A resource can automatically grant an introduction after a user has completed enough supervised sessions. Resource managers configure:
+
+- **Supervised sessions until introduction**: the number of completed supervised sessions required before the user is introduced automatically
+- **Grant introduction for**: whether the automatic introduction applies to this resource or to a selected resource group
+
+If the target is **this resource**, only supervised sessions on this resource count. If the target is **a resource group**, supervised sessions across resources in that group count toward the threshold, and the user receives a group introduction when the threshold is reached.
+
+Auto-promotion can be disabled by leaving the threshold empty.
 
 ## Audit Trail
 

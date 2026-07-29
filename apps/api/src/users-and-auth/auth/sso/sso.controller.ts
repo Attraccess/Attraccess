@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   Query,
   HttpStatus,
@@ -18,9 +19,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { SSOOIDCGuard } from './oidc/oidc.guard';
-import { AuthGuard } from '@nestjs/passport';
-import { AuthenticationType, SSOProvider, SSOProviderType, SystemPermissions } from '@attraccess/database-entities';
-import { AuthenticatedRequest, Auth } from '@attraccess/plugins-backend-sdk';
+import { AuthenticationType, SSOProvider, SSOProviderType } from '@attraccess/database-entities';
+import { AuthenticatedRequest, Auth, AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
+import { RequiresLicense, SkipLicenseCheck } from '../../../license/require-license.decorator';
+import { LicenseModuleType } from '../../../license/license.service';
 import { CreateSessionResponse } from '../auth.types';
 import { AuthService } from '../auth.service';
 import { SessionService } from '../session.service';
@@ -32,6 +34,8 @@ import { Request, Response } from 'express';
 import { LinkUserToExternalAccountRequestDto } from './dto/link-user-to-external-account-request.dto';
 import { UsersService } from '../../users/users.service';
 import { AccountLinkingExceptionFilter } from './oidc/account-linking.exception-filter';
+import { SSOOIDCPassportGuard } from './oidc/oidc-passport.guard';
+import { SSOSamlPassportGuard } from './saml/saml-passport.guard';
 import { getRedirectToFromRequest } from './oidc/oidc-cookie-state-store';
 import { CookieConfigService } from '../../../common/services/cookie-config.service';
 import { ApiBadRequestResponse } from '@nestjs/swagger';
@@ -41,10 +45,12 @@ import { SSOLinkTokenService } from './link-token.service';
 import { timingSafeEqual } from 'crypto';
 import { SSOProvisioningPermissionsDto, SSOProvisioningUserDto } from './dto/sso-provisioning.dto';
 import { InvalidSSOProviderIdException, SSOProviderNotFoundException } from './errors';
-import { resolvePermissionsFromRoles } from './permission-mapping';
+import { resolveSsoRoleAssignments } from './permission-mapping';
+import { RbacService } from '../../rbac/rbac.service';
 import { MetricsService } from '../../../metrics/metrics.service';
 @ApiTags('Authentication')
 @Controller('auth/sso')
+@RequiresLicense(LicenseModuleType.SSO)
 export class SSOController {
   private readonly logger = new Logger(SSOController.name);
 
@@ -57,9 +63,11 @@ export class SSOController {
     private readonly linkTokenService: SSOLinkTokenService,
     private readonly settingsService: SettingsService,
     private readonly metricsService: MetricsService,
+    private readonly rbacService: RbacService,
   ) {}
 
   @Get('providers')
+  @SkipLicenseCheck()
   @ApiOperation({ summary: 'Get all SSO providers', operationId: 'getAllSSOProviders' })
   @ApiResponse({
     status: 200,
@@ -72,6 +80,7 @@ export class SSOController {
   }
 
   @Post('/link-account')
+  @SkipLicenseCheck()
   @ApiOperation({
     summary: 'Link an account to an SSO identity via a signed token',
     operationId: 'linkUserToExternalAccount',
@@ -149,7 +158,8 @@ export class SSOController {
   }
 
   @Get('providers/:id')
-  @Auth('canManageSystemConfiguration')
+  @Auth('system.sso.manage')
+
   @ApiOperation({ summary: 'Get SSO provider by ID with full configuration', operationId: 'getOneSSOProviderById' })
   @ApiParam({
     name: 'id',
@@ -181,7 +191,8 @@ export class SSOController {
   }
 
   @Post('providers')
-  @Auth('canManageSystemConfiguration')
+  @Auth('system.sso.manage')
+
   @ApiOperation({ summary: 'Create a new SSO provider', operationId: 'createOneSsoProvider' })
   @ApiBody({ type: CreateSSOProviderDto })
   @ApiResponse({
@@ -193,12 +204,22 @@ export class SSOController {
     status: 403,
     description: 'Forbidden - Insufficient permissions',
   })
-  async createOne(@Body() createDto: CreateSSOProviderDto): Promise<SSOProvider> {
+  async createOne(@Body() createDto: CreateSSOProviderDto, @Req() request: AuthenticatedRequest): Promise<SSOProvider> {
+    const oidcMappings = createDto.oidcConfiguration?.roleMappings;
+    const samlMappings = createDto.samlConfiguration?.roleMappings;
+    if (oidcMappings !== undefined || samlMappings !== undefined) {
+      const actor = request.user as AuthenticatedUser;
+      if (!actor.effectivePermissions?.has('users.roles.manage')) {
+        throw new ForbiddenException('Configuring SSO role mappings requires users.roles.manage');
+      }
+      await this.assertPermissionMappingCeiling([oidcMappings, samlMappings], actor.effectivePermissions);
+    }
     return this.ssoService.createProvider(createDto);
   }
 
   @Put('providers/:id')
-  @Auth('canManageSystemConfiguration')
+  @Auth('system.sso.manage')
+
   @ApiOperation({ summary: 'Update an existing SSO provider', operationId: 'updateOneSSOProvider' })
   @ApiParam({
     name: 'id',
@@ -219,12 +240,30 @@ export class SSOController {
     status: 404,
     description: 'Provider not found',
   })
-  async updateOne(@Param('id') id: string, @Body() updateDto: UpdateSSOProviderDto): Promise<SSOProvider> {
-    return this.ssoService.updateProvider(parseInt(id, 10), updateDto);
+  async updateOne(
+    @Param('id') id: string,
+    @Body() updateDto: UpdateSSOProviderDto,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<SSOProvider> {
+    const providerId = parseInt(id, 10);
+
+    const oidcMappings = updateDto.oidcConfiguration?.roleMappings;
+    const samlMappings = updateDto.samlConfiguration?.roleMappings;
+
+    if (oidcMappings !== undefined || samlMappings !== undefined) {
+      const actor = request.user as AuthenticatedUser;
+      if (!actor.effectivePermissions?.has('users.roles.manage')) {
+        throw new ForbiddenException('Configuring SSO role mappings requires users.roles.manage');
+      }
+      await this.assertPermissionMappingCeiling([oidcMappings, samlMappings], actor.effectivePermissions);
+    }
+
+    return this.ssoService.updateProvider(providerId, updateDto);
   }
 
   @Delete('providers/:id')
-  @Auth('canManageSystemConfiguration')
+  @Auth('system.sso.manage')
+
   @ApiOperation({ summary: 'Delete an SSO provider', operationId: 'deleteOneSSOProvider' })
   @ApiParam({
     name: 'id',
@@ -248,7 +287,8 @@ export class SSOController {
   }
 
   @Get('discovery/authentik')
-  @Auth('canManageSystemConfiguration')
+  @Auth('system.sso.manage')
+
   @ApiOperation({ summary: 'Proxy Authentik OIDC well-known discovery', operationId: 'discoverAuthentikOidc' })
   @ApiQuery({ name: 'host', required: true, description: 'Authentik host, e.g. http://localhost:9000' })
   @ApiQuery({ name: 'applicationName', required: true, description: 'Authentik application slug' })
@@ -276,7 +316,8 @@ export class SSOController {
   }
 
   @Get('discovery/keycloak')
-  @Auth('canManageSystemConfiguration')
+  @Auth('system.sso.manage')
+
   @ApiOperation({ summary: 'Proxy Keycloak OIDC well-known discovery', operationId: 'discoverKeycloakOidc' })
   @ApiQuery({ name: 'host', required: true, description: 'Keycloak host, e.g. http://localhost:8080' })
   @ApiQuery({ name: 'realm', required: true, description: 'Keycloak realm name' })
@@ -304,6 +345,7 @@ export class SSOController {
   }
 
   @Post(`/${SSOProviderType.OIDC}/:providerId/logout`)
+
   @ApiOperation({ summary: 'SSO-initiated logout', operationId: 'ssoOidcLogout' })
   @ApiParam({
     name: 'providerId',
@@ -347,6 +389,7 @@ export class SSOController {
   }
 
   @Post(`/${SSOProviderType.SAML}/:providerId/logout`)
+
   @ApiOperation({ summary: 'SAML-initiated logout', operationId: 'ssoSamlLogout' })
   @ApiParam({
     name: 'providerId',
@@ -390,6 +433,7 @@ export class SSOController {
   }
 
   @Post(`/${SSOProviderType.OIDC}/:providerId/users/delete`)
+
   @ApiOperation({ summary: 'SSO-initiated user deletion', operationId: 'ssoOidcDeleteUser' })
   @ApiParam({
     name: 'providerId',
@@ -433,6 +477,7 @@ export class SSOController {
   }
 
   @Post(`/${SSOProviderType.SAML}/:providerId/users/delete`)
+
   @ApiOperation({ summary: 'SAML-initiated user deletion', operationId: 'ssoSamlDeleteUser' })
   @ApiParam({
     name: 'providerId',
@@ -476,6 +521,7 @@ export class SSOController {
   }
 
   @Post(`/${SSOProviderType.OIDC}/:providerId/users/permissions`)
+
   @ApiOperation({ summary: 'SSO-initiated permission update', operationId: 'ssoOidcUpdatePermissions' })
   @ApiParam({
     name: 'providerId',
@@ -513,16 +559,13 @@ export class SSOController {
     this.assertProvisioningAuthorized(provider, request);
 
     const user = await this.resolveProvisioningUser(SSOProviderType.OIDC, parsedProviderId, body);
-    const updates = this.buildPermissionUpdates(provider, body);
-    if (Object.keys(updates).length > 0) {
-      const mergedPermissions = { ...(user.systemPermissions ?? {}), ...updates };
-      await this.usersService.updateOne(user.id, { systemPermissions: mergedPermissions });
-    }
+    await this.applyProvisioningPermissions(user.id, provider, body);
 
     return { OK: true };
   }
 
   @Post(`/${SSOProviderType.SAML}/:providerId/users/permissions`)
+
   @ApiOperation({ summary: 'SAML-initiated permission update', operationId: 'ssoSamlUpdatePermissions' })
   @ApiParam({
     name: 'providerId',
@@ -560,11 +603,7 @@ export class SSOController {
     this.assertProvisioningAuthorized(provider, request);
 
     const user = await this.resolveProvisioningUser(SSOProviderType.SAML, parsedProviderId, body);
-    const updates = this.buildPermissionUpdates(provider, body);
-    if (Object.keys(updates).length > 0) {
-      const mergedPermissions = { ...(user.systemPermissions ?? {}), ...updates };
-      await this.usersService.updateOne(user.id, { systemPermissions: mergedPermissions });
-    }
+    await this.applyProvisioningPermissions(user.id, provider, body);
 
     return { OK: true };
   }
@@ -595,7 +634,7 @@ export class SSOController {
     type: 'string',
     description: 'The ID of the SSO provider',
   })
-  @UseGuards(SSOOIDCGuard, AuthGuard('sso-oidc'))
+  @UseGuards(SSOOIDCGuard, SSOOIDCPassportGuard)
   async loginWithOidc(): Promise<HttpStatus.OK> {
     return HttpStatus.OK;
   }
@@ -628,7 +667,7 @@ export class SSOController {
     name: 'code',
     required: true,
   })
-  @UseGuards(SSOOIDCGuard, AuthGuard('sso-oidc'))
+  @UseGuards(SSOOIDCGuard, SSOOIDCPassportGuard)
   @UseFilters(AccountLinkingExceptionFilter)
   async oidcLoginCallback(
     @Req() request: AuthenticatedRequest,
@@ -664,7 +703,7 @@ export class SSOController {
     type: 'string',
     description: 'The ID of the SSO provider',
   })
-  @UseGuards(SSOSamlGuard, AuthGuard('sso-saml'))
+  @UseGuards(SSOSamlGuard, SSOSamlPassportGuard)
   async loginWithSaml(): Promise<HttpStatus.OK> {
     return HttpStatus.OK;
   }
@@ -681,7 +720,7 @@ export class SSOController {
     type: 'string',
     description: 'The ID of the SSO provider',
   })
-  @UseGuards(SSOSamlGuard, AuthGuard('sso-saml'))
+  @UseGuards(SSOSamlGuard, SSOSamlPassportGuard)
   @UseFilters(AccountLinkingExceptionFilter)
   async samlLoginCallback(
     @Req() request: AuthenticatedRequest,
@@ -835,49 +874,48 @@ export class SSOController {
     return user;
   }
 
-  private extractPermissionUpdates(payload: SSOProvisioningPermissionsDto): Partial<SystemPermissions> {
-    const updates: Partial<SystemPermissions> = {};
+  // Per-role ceiling: each mapped role must have permissions that are a subset of the actor's own
+  private async assertPermissionMappingCeiling(
+    mappings: Array<Record<string, string[]> | undefined>,
+    actorPermissions: Set<string>,
+  ): Promise<void> {
+    const roleKeys = new Set(mappings.flatMap((m) => Object.keys(m ?? {})));
+    if (roleKeys.size === 0) return;
 
-    if (payload.canManageResources !== undefined) {
-      updates.canManageResources = payload.canManageResources;
-    }
-    if (payload.canManageSystemConfiguration !== undefined) {
-      updates.canManageSystemConfiguration = payload.canManageSystemConfiguration;
-    }
-    if (payload.canManageUsers !== undefined) {
-      updates.canManageUsers = payload.canManageUsers;
-    }
-    if (payload.canManageBilling !== undefined) {
-      updates.canManageBilling = payload.canManageBilling;
-    }
+    const allRoles = await this.rbacService.getRoles();
+    const roleByKey = new Map(allRoles.map((r) => [r.key, r]));
 
-    return updates as {
-      canManageResources?: boolean;
-      canManageSystemConfiguration?: boolean;
-      canManageUsers?: boolean;
-      canManageBilling?: boolean;
-    };
+    for (const roleKey of roleKeys) {
+      const role = roleByKey.get(roleKey);
+      if (!role) {
+        throw new ForbiddenException(`Cannot map unknown role '${roleKey}'`);
+      }
+      const missing = role.rolePermissions.map((rp) => rp.permissionKey).filter((k) => !actorPermissions.has(k));
+      if (missing.length > 0) {
+        throw new ForbiddenException(
+          `Cannot map role '${roleKey}': it grants permissions you do not hold (${missing.join(', ')})`,
+        );
+      }
+    }
   }
 
-  private buildPermissionUpdates(
+  private async applyProvisioningPermissions(
+    userId: number,
     provider: SSOProvider,
     payload: SSOProvisioningPermissionsDto,
-  ): Partial<SystemPermissions> {
-    const updates = this.extractPermissionUpdates(payload);
-    const roleNames = payload.roles?.map((role) => role.trim()).filter((role) => role.length > 0) ?? [];
-    if (roleNames.length === 0) {
-      return updates;
-    }
-
+  ): Promise<void> {
     const mapping =
       provider.type === SSOProviderType.OIDC
-        ? provider.oidcConfiguration?.permissionMappings
-        : provider.samlConfiguration?.permissionMappings;
-    const roleUpdates = resolvePermissionsFromRoles(roleNames, mapping);
+        ? provider.oidcConfiguration?.roleMappings
+        : provider.samlConfiguration?.roleMappings;
 
-    return {
-      ...roleUpdates,
-      ...updates,
-    };
+    // If the payload contains no `roles` field at all, treat as "no permission info" and skip
+    // sync to avoid wiping SSO-granted roles on incremental provisioning calls.
+    if (payload.roles === undefined) return;
+
+    const roleNames = payload.roles.map((r) => r.trim()).filter((r) => r.length > 0);
+    const roleAssignments = resolveSsoRoleAssignments(roleNames, mapping);
+
+    await this.rbacService.syncSsoRoles(userId, roleAssignments, provider.type, provider.id);
   }
 }

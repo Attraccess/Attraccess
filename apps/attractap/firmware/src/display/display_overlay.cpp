@@ -1,5 +1,9 @@
 #include "display.hpp"
 
+#include <cstdlib>
+#include <cstring>
+#include <string>
+
 // Persistent device-info overlay drawn on the LVGL top layer: a bottom bar
 // showing the device name and firmware version, present across all screens.
 
@@ -43,13 +47,13 @@ void Display::initDeviceOverlay()
     lv_obj_set_width(firmwareLabel, LV_SIZE_CONTENT);
     lv_obj_set_height(firmwareLabel, LV_SIZE_CONTENT);
     lv_obj_set_align(firmwareLabel, LV_ALIGN_CENTER);
-    lv_label_set_text(firmwareLabel, (String(FIRMWARE_FRIENDLY_NAME) + " v" + String(FIRMWARE_VERSION)).c_str());
+    lv_label_set_text(firmwareLabel, (std::string(FIRMWARE_FRIENDLY_NAME) + " v" + FIRMWARE_VERSION).c_str());
     lv_obj_set_style_text_color(firmwareLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(firmwareLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(firmwareLabel, &lv_font_montserrat_10, LV_PART_MAIN | LV_STATE_DEFAULT);
 }
 
-void Display::setDeviceName(String deviceName)
+void Display::setDeviceName(std::string deviceName)
 {
     if (!Display::deviceNameLabel)
     {
@@ -64,7 +68,7 @@ void Display::setDeviceName(String deviceName)
         return;
     }
     strcpy(text, deviceName.c_str());
-    lv_async_call(
+    Display::asyncCall(
         [](void *p)
         {
             if (Display::deviceNameLabel)

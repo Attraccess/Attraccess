@@ -1,4 +1,4 @@
-import { Route, Routes, useNavigate } from 'react-router-dom';
+import { Outlet, Route, Routes, useNavigate } from 'react-router-dom';
 import { Unauthorized } from './unauthorized/unauthorized';
 import { PropsWithChildren, useEffect, useMemo, useState } from 'react';
 import { Layout } from './layout/layout';
@@ -7,8 +7,9 @@ import { useAllRoutes } from './routes';
 import { VerifyEmail } from './verify-email';
 import { ToastProvider } from '../components/toastProvider';
 import { I18nProvider, RouterProvider, Spinner, useTheme } from '@heroui/react';
-import { OpenAPI, SystemPermissions } from '@attraccess/react-query-client';
+import { OpenAPI } from '@attraccess/react-query-client';
 import { RouteConfig } from '@attraccess/plugins-frontend-sdk';
+import { type SystemPermission } from '@attraccess/shared';
 import PullToRefresh from 'react-simple-pull-to-refresh';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -25,9 +26,11 @@ import { AcceptInvitation } from './accept-invitation';
 import { TwoFactorGate } from './two-factor-gate';
 import { AttraccessUserActionsBridge } from '../components/attraccessUserActionsBridge';
 import { SupervisorApprovalListener } from '../components/supervisorApproval/SupervisorApprovalListener';
+import { KioskGuard } from './kiosk/KioskGuard';
+import { useLocaleSync } from '../hooks/useLocaleSync';
 
 function useRoutesWithAuthElements(routes: RouteConfig[]) {
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
 
   const routesWithAuthElements = useMemo(() => {
     return routes.map((route) => {
@@ -48,10 +51,10 @@ function useRoutesWithAuthElements(routes: RouteConfig[]) {
 
       const requiredPermissions = (
         Array.isArray(route.authRequired) ? route.authRequired : [route.authRequired]
-      ) as (keyof SystemPermissions)[];
+      ) as SystemPermission[];
 
       const userHasAllRequiredPermissions = requiredPermissions.every(
-        (permission) => user.systemPermissions[permission] === true,
+        (permission) => hasPermission(permission),
       );
 
       if (!userHasAllRequiredPermissions) {
@@ -63,11 +66,11 @@ function useRoutesWithAuthElements(routes: RouteConfig[]) {
 
       return route;
     });
-  }, [routes, user]);
+  }, [routes, user, hasPermission]);
 
   return useMemo(
     () =>
-      routesWithAuthElements.map((route: RouteConfig, index) => (
+      routesWithAuthElements.map((route: RouteConfig) => (
         <Route key={route.path} path={route.path} element={route.element} />
       )),
     [routesWithAuthElements],
@@ -101,34 +104,46 @@ function AppLayout(props: PropsWithChildren) {
 
   const { pullToRefreshIsEnabled } = usePtrStore();
   const isTouchDevice = useIsTouchDevice();
+  const isPullToRefreshActive = pullToRefreshIsEnabled && isTouchDevice;
+
+  const content = (
+    <RouterProvider navigate={navigate}>
+      <I18nProvider locale={language}>
+        <ToastProvider>
+          <ReactFlowProvider>
+            <AttraccessUserActionsBridge>
+              {props.children}
+              {isAuthenticated && <SupervisorApprovalListener />}
+            </AttraccessUserActionsBridge>
+          </ReactFlowProvider>
+        </ToastProvider>
+      </I18nProvider>
+    </RouterProvider>
+  );
+
+  if (!isPullToRefreshActive) {
+    return content;
+  }
 
   return (
     <PullToRefresh
+      className="[&_.ptr__pull-down]:z-10"
       onRefresh={() => queryClient.invalidateQueries()}
       pullDownThreshold={90}
-      refreshingContent={<Spinner />}
-      pullingContent={
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', padding: '8px' }}>
-          <div style={{ fontSize: '14px' }}>{t('pullToRefresh')}</div>
-          <div style={{ fontSize: '24px' }}>↓</div>
+      refreshingContent={
+        <div className="flex h-[90px] items-center justify-center pt-[env(safe-area-inset-top)]">
+          <Spinner size="sm" />
         </div>
       }
-      isPullable={pullToRefreshIsEnabled && isTouchDevice}
+      pullingContent={
+        <div className="flex flex-col items-center gap-2 p-2">
+          <div className="text-sm">{t('pullToRefresh')}</div>
+          <div className="text-2xl leading-none">↓</div>
+        </div>
+      }
+      isPullable
     >
-      <RouterProvider navigate={navigate}>
-        <I18nProvider locale={language}>
-          <ToastProvider>
-            <ReactFlowProvider>
-              <AttraccessUserActionsBridge>
-                <Layout noLayout={!isAuthenticated}>
-                  {props.children}
-                </Layout>
-                {isAuthenticated && <SupervisorApprovalListener />}
-              </AttraccessUserActionsBridge>
-            </ReactFlowProvider>
-          </ToastProvider>
-        </I18nProvider>
-      </RouterProvider>
+      {content}
     </PullToRefresh>
   );
 }
@@ -136,10 +151,16 @@ function AppLayout(props: PropsWithChildren) {
 function AppContent() {
   const { isAuthenticated } = useAuth();
   const allRoutes = useAllRoutes();
-  const routesWithAuthElements = useRoutesWithAuthElements(allRoutes);
+
+  const bareRoutes = useMemo(() => allRoutes.filter((r) => r.noLayout), [allRoutes]);
+  const layoutRoutes = useMemo(() => allRoutes.filter((r) => !r.noLayout), [allRoutes]);
+
+  const bareRouteElements = useRoutesWithAuthElements(bareRoutes);
+  const layoutRouteElements = useRoutesWithAuthElements(layoutRoutes);
 
   return (
     <TwoFactorGate>
+      <KioskGuard />
       <Routes>
         <Route path="/verify-email" element={<VerifyEmail />} />
         <Route
@@ -159,9 +180,12 @@ function AppContent() {
           }
         />
 
-        {routesWithAuthElements}
+        {bareRouteElements}
 
-        {!isAuthenticated && <Route path="*" element={<Unauthorized />} />}
+        <Route element={<Layout><Outlet /></Layout>}>
+          {layoutRouteElements}
+          {!isAuthenticated && <Route path="*" element={<Unauthorized />} />}
+        </Route>
       </Routes>
     </TwoFactorGate>
   );
@@ -170,6 +194,7 @@ function AppContent() {
 export function App() {
   const { isInitialized } = useAuth();
   const { setTheme } = useTheme();
+  useLocaleSync();
 
   useEffect(() => {
     const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';

@@ -4,20 +4,29 @@
 
 import { Resource, ResourceUsage, User } from '@attraccess/database-entities';
 
-export class ResourceUsageEvent {
-  public static readonly EVENT_NAME = 'resource.usage';
+export class ResourceSessionStartedEvent {
+  public static readonly EVENT_NAME = 'resource.usage.session_started';
 
   constructor(public readonly usage: ResourceUsage) {}
 }
 
-export class ResourceUsageTakenOverEvent {
-  public static readonly EVENT_NAME = 'resource.usage.taken_over';
+export class ResourceUsageSessionTakenOverEvent {
+  public static readonly EVENT_NAME = 'resource.usage.session_taken_over';
 
   constructor(
     public readonly resource: Pick<Resource, 'id' | 'name'>,
     public readonly takeoverTime: Date,
     public readonly newUser: User,
-    public readonly previousUser: User | null // Previous user might not exist if resource was free
+    public readonly previousUser: User | null, // Previous user might not exist if resource was free
+  ) {}
+}
+
+export class ResourceUsageSessionEndedEvent {
+  public static readonly EVENT_NAME = 'resource.usage.session_ended';
+
+  constructor(
+    public readonly usage: ResourceUsage,
+    public readonly endedBy: Pick<User, 'id' | 'username'> | null,
   ) {}
 }
 
@@ -32,7 +41,7 @@ export class ResourceUsageNoteAddedEvent {
     public readonly resourceId: number,
     public readonly note: string,
     public readonly phase: 'start' | 'end',
-    public readonly author: Pick<User, 'id' | 'username'>
+    public readonly author: Pick<User, 'id' | 'username'>,
   ) {}
 }
 
@@ -41,13 +50,29 @@ export class ResourceUsageNoteAddedEvent {
  * supervised-usage auto-promotion follow-up (ATT-486), which decides when to auto-create an
  * introduction for the supervised user.
  */
-export class SupervisedUsageStartedEvent {
+export class ResourceSupervisedUsageStartedEvent {
   public static readonly EVENT_NAME = 'resource.usage.supervised_started';
 
   constructor(
     public readonly resourceId: number,
     public readonly userId: number,
     public readonly supervisorUserId: number,
-    public readonly usageId: number
+    public readonly usageId: number,
+  ) {}
+}
+
+/**
+ * Emitted whenever a supervised usage session ends successfully. Consumed by the supervised-usage
+ * auto-promotion listener (ATT-488), which counts the user's completed supervised sessions and
+ * auto-creates an introduction once the configured threshold is reached.
+ */
+export class ResourceSupervisedUsageEndedEvent {
+  public static readonly EVENT_NAME = 'resource.usage.supervised_ended';
+
+  constructor(
+    public readonly resourceId: number,
+    public readonly userId: number,
+    public readonly supervisorUserId: number,
+    public readonly usageId: number,
   ) {}
 }

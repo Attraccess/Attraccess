@@ -252,6 +252,45 @@ describe('SsoService', () => {
     });
   });
 
+  describe('updateOIDCConfiguration roleMappings handling', () => {
+    const baseOidcUpdate = {
+      issuer: 'https://test-issuer.com',
+      authorizationURL: 'https://test-issuer.com/auth',
+      tokenURL: 'https://test-issuer.com/token',
+      userInfoURL: 'https://test-issuer.com/userinfo',
+      clientId: 'test-client-id',
+    };
+    const asMappings = (value: unknown) => value as Record<string, string[]>;
+
+    it('persists explicit null on roleMappings to clear mappings', async () => {
+      await service.updateProvider(1, {
+        oidcConfiguration: { ...baseOidcUpdate, roleMappings: asMappings(null) },
+      });
+
+      const updateCall = (oidcConfigRepository.update as jest.Mock).mock.calls[0];
+      expect(updateCall[1]).toHaveProperty('roleMappings', null);
+    });
+
+    it('persists an empty object (emptied mapping table)', async () => {
+      await service.updateProvider(1, {
+        oidcConfiguration: { ...baseOidcUpdate, roleMappings: {} },
+      });
+
+      const updateCall = (oidcConfigRepository.update as jest.Mock).mock.calls[0];
+      expect(updateCall[1]).toHaveProperty('roleMappings');
+      expect(updateCall[1].roleMappings).toEqual({});
+    });
+
+    it('leaves roleMappings untouched when the field is omitted', async () => {
+      await service.updateProvider(1, {
+        oidcConfiguration: { ...baseOidcUpdate },
+      });
+
+      const updateCall = (oidcConfigRepository.update as jest.Mock).mock.calls[0];
+      expect(updateCall[1]).not.toHaveProperty('roleMappings');
+    });
+  });
+
   describe('deleteProvider', () => {
     it('should delete a provider and its OIDC configuration', async () => {
       await service.deleteProvider(1);

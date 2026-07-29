@@ -2,8 +2,8 @@
 
 #ifdef HAS_WS2812_LED
 
-#include <Arduino.h>
-#include <Adafruit_NeoPixel.h>
+#include <cstdint>
+#include "ws2812_strip.hpp"
 
 class LedController
 {
@@ -18,7 +18,7 @@ public:
         LED_STATE_FIRMWARE_UPDATE,
     };
 
-    LedController() : _strip(WS2812_LED_COUNT, PIN_WS2812_DATA, NEO_GRB + NEO_KHZ800) {}
+    LedController() : _strip(WS2812_LED_COUNT, PIN_WS2812_DATA) {}
     void setup();
     void loop();
 
@@ -55,7 +55,7 @@ private:
 
     bool _firmwarePatternSet = false;
     uint8_t _globalBrightness = 255;
-    Adafruit_NeoPixel _strip;
+    Ws2812Strip _strip;
 
     static constexpr uint32_t ANIM_INTERVAL_MS = 50;
     static constexpr uint32_t TRIGGER_DURATION_MS = 400;

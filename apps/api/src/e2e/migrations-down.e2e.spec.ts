@@ -5,6 +5,7 @@ import type { DataSource, DeepPartial, Repository } from 'typeorm';
 import {
   Attractap,
   AttractapCrashReport,
+  CompanionDevice,
   AuthenticationDetail,
   AuthenticationType,
   BillingTransaction,
@@ -33,6 +34,7 @@ import {
   ProjectInvitationStatus,
   ProjectMember,
   ProjectMemberRole,
+  PushSubscription,
   Resource,
   ResourceBillingConfiguration,
   ResourceFlowEdge,
@@ -70,6 +72,9 @@ import {
   User,
   entities,
   UsageDurationUnit,
+  Role,
+  UserRole,
+  UserRoleSource,
 } from '@attraccess/database-entities';
 
 jest.setTimeout(120_000);
@@ -98,19 +103,12 @@ const ensureEntity = async <T>(repo: Repository<T>, builder: () => DeepPartial<N
 const ensureUsers = async (dataSource: DataSource, seedTag: string) => {
   const userRepo = dataSource.getRepository(User);
   let users = await userRepo.find({ take: 2, order: { id: 'ASC' } });
-  const defaults = {
-    canManageResources: false,
-    canManageSystemConfiguration: false,
-    canManageUsers: false,
-    canManageBilling: false,
-  };
   const newUsers: DeepPartial<User>[] = [];
 
   if (users.length < 1) {
     newUsers.push({
       username: `seed_user_${seedTag}_1`,
       email: `seed_user_${seedTag}_1@example.com`,
-      systemPermissions: defaults,
     });
   }
 
@@ -118,7 +116,6 @@ const ensureUsers = async (dataSource: DataSource, seedTag: string) => {
     newUsers.push({
       username: `seed_user_${seedTag}_2`,
       email: `seed_user_${seedTag}_2@example.com`,
-      systemPermissions: defaults,
     });
   }
 
@@ -185,6 +182,8 @@ const seedDatabase = async (dataSource: DataSource) => {
   const conversationParticipantRepo = dataSource.getRepository(ConversationParticipant);
   const messageRepo = dataSource.getRepository(Message);
   const notificationPreferenceRepo = dataSource.getRepository(NotificationPreference);
+  const pushSubscriptionRepo = dataSource.getRepository(PushSubscription);
+  const companionDeviceRepo = dataSource.getRepository(CompanionDevice);
 
   const resourceGroup = await ensureEntity(resourceGroupRepo, () => ({
     name: `Seed Group ${seedTag}`,
@@ -572,7 +571,36 @@ const seedDatabase = async (dataSource: DataSource) => {
   await ensureEntity(notificationPreferenceRepo, () => ({
     userId: primaryUser.id,
     messagesEmailOnOffline: true,
+    messagesPushEnabled: true,
   }));
+
+  await ensureEntity(pushSubscriptionRepo, () => ({
+    userId: primaryUser.id,
+    endpoint: `https://push.example.com/seed-${seedTag}`,
+    p256dh: 'seed-p256dh-key',
+    auth: 'seed-auth-secret',
+    userAgent: 'Seed Browser/1.0',
+    lastSeenAt: null,
+  }));
+
+  await ensureEntity(companionDeviceRepo, () => ({
+    name: `Seed Companion ${seedTag}`,
+    tokenHash: '$2b$10$seed.hash.placeholder.for.migration.testing.only',
+  }));
+
+  const roleRepo = dataSource.getRepository(Role);
+  const userRoleRepo = dataSource.getRepository(UserRole);
+  const userRole = await roleRepo.findOne({ where: { key: 'user' } });
+  if (userRole) {
+    await ensureEntity(userRoleRepo, () => ({
+      userId: primaryUser.id,
+      roleId: userRole.id,
+      source: UserRoleSource.MANUAL,
+      ssoProviderType: null,
+      ssoProviderId: null,
+      externalValue: null,
+    }));
+  }
 };
 
 const assertAllEntitiesHaveRows = async (dataSource: DataSource) => {

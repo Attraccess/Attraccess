@@ -2,6 +2,8 @@ import { Injectable, Logger, BadRequestException, NotFoundException, Inject } fr
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, EntityManager } from 'typeorm';
 import { ResourceMaintenance, ResourceMaintenanceSchedule, Resource, ResourceIntroducer, User } from '@attraccess/database-entities';
+import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
+import { RbacService } from '../../users-and-auth/rbac/rbac.service';
 import { CreateMaintenanceDto } from './dtos/createMaintenance.dto';
 import { ListMaintenancesDto } from './dtos/listMaintenances.dto';
 import { PaginatedMaintenanceResponse } from './dtos/paginatedMaintenanceResponse.dto';
@@ -23,6 +25,7 @@ export class ResourceMaintenanceService {
     @Inject(EventEmitter2)
     private readonly eventEmitter: EventEmitter2,
     private readonly metricsService: MetricsService,
+    private readonly rbacService: RbacService,
   ) { }
 
   /**
@@ -275,12 +278,16 @@ export class ResourceMaintenanceService {
    * Check if a user can manage maintenance for a specific resource
    */
   async canManageMaintenance(
-    user: User,
+    user: User | AuthenticatedUser,
     resourceId: number,
     transactionalEntityManager?: EntityManager,
   ): Promise<boolean> {
-    // Check if the user has system permissions to manage all resources
-    if (user.systemPermissions && user.systemPermissions.canManageResources === true) {
+    // Check if the user has system permissions to manage all resources.
+    // Fall back to a DB lookup when the entity came from a WebSocket/card path (no effectivePermissions attached).
+    const effectivePermissions =
+      (user as AuthenticatedUser).effectivePermissions ??
+      (await this.rbacService.getEffectivePermissions(user.id));
+    if (effectivePermissions.has('resources.maintenance.manage')) {
       return true;
     }
 

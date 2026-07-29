@@ -5,15 +5,14 @@ import {
   FindOneOptions as TypeormFindOneOptions,
   FindOptionsWhere,
   In,
-  DeepPartial,
   EntityManager,
 } from 'typeorm';
 import {
   AuthenticationDetail,
   AuthenticationType,
   ResourceUsage,
+  Role,
   Session,
-  SystemPermissions,
   User,
   SSOProviderType,
 } from '@attraccess/database-entities';
@@ -31,6 +30,8 @@ import { addDays } from 'date-fns';
 import { randomBytes } from 'crypto';
 import { TokenHashService } from '../../encryption/token-hash.service';
 import { MetricsService } from '../../metrics/metrics.service';
+import { RbacService } from '../rbac/rbac.service';
+import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 
 class DeleteAccountTokenInvalidException extends BadRequestException {
   constructor() {
@@ -62,9 +63,7 @@ type UpdateUserData = Partial<
     | 'lockedUntil'
     | 'failedLoginAttempts'
     | 'firstFailedLoginAt'
-  > & {
-    systemPermissions: Partial<SystemPermissions>;
-  }
+  >
 >;
 
 const FindOneOptionsSchema = z
@@ -99,6 +98,7 @@ export class UsersService {
     private dataSource: DataSource,
     private readonly tokenHashService: TokenHashService,
     private readonly metricsService: MetricsService,
+    private readonly rbacService: RbacService,
   ) {}
 
   public validateUsernameOrThrow(username: string): void {
@@ -217,6 +217,7 @@ export class UsersService {
     externalIdentifier: string | null;
     isEmailVerified?: boolean;
     skipUsernameSanitization?: boolean;
+    locale?: string;
   }): Promise<User> {
     const data = {
       username: this.cleanupUsername(userData.username),
@@ -266,30 +267,34 @@ export class UsersService {
     user.username = data.username;
     user.email = data.email;
     user.externalIdentifier = data.externalIdentifier;
+    user.isEmailVerified = data.isEmailVerified;
+    if (userData.locale) {
+      user.locale = userData.locale.trim() || 'en';
+    }
 
     // Check if this is the first user in the system
     this.logger.debug('Checking if this is the first user in the system');
     const totalUsers = await this.userRepository.count();
-    if (totalUsers === 0) {
-      this.logger.debug('First user in system - granting all system permissions');
-      // This is the first user, grant all system permissions
-      type permissionKeys = keyof SystemPermissions;
-
-      const permissions: Record<permissionKeys, true> = {
-        canManageResources: true,
-        canManageSystemConfiguration: true,
-        canManageUsers: true,
-        canManageBilling: true,
-      };
-
-      user.systemPermissions = permissions;
-    }
+    const isFirstUser = totalUsers === 0;
 
     this.logger.debug('Saving new user to database');
-    const savedUser = await this.userRepository.save(user);
+    // Wrap save + role assignment in a single transaction so a role-assignment failure
+    // doesn't leave an ownerless account on a fresh install.
+    const savedUser = await this.dataSource.transaction(async (em) => {
+      const saved = await em.save(user);
+      if (isFirstUser) {
+        this.logger.debug('First user in system - assigning owner role');
+        await this.rbacService.assignRoleByKey(saved.id, 'owner', em);
+      } else {
+        await this.rbacService.assignDefaultRoles(saved.id, em);
+      }
+      return saved;
+    });
     this.logger.debug(`User saved with ID: ${savedUser.id}`);
+
     this.metricsService.usersRegisteredTotal.inc();
     this.metricsService.usersTotal.inc();
+    this.metricsService.usersPerLocale.inc({ locale: savedUser.locale ?? 'en' });
     return savedUser;
   }
 
@@ -332,18 +337,11 @@ export class UsersService {
       isEmailVerified: updateData.isEmailVerified ?? undefined,
       passwordResetToken: updateData.passwordResetToken?.trim() ?? undefined,
       passwordResetTokenExpiresAt: updateData.passwordResetTokenExpiresAt ?? undefined,
-      systemPermissions: updateData.systemPermissions ?? undefined,
       lockedUntil: 'lockedUntil' in updateData ? updateData.lockedUntil : undefined,
       failedLoginAttempts: updateData.failedLoginAttempts ?? undefined,
       firstFailedLoginAt: 'firstFailedLoginAt' in updateData ? updateData.firstFailedLoginAt : undefined,
     };
     this.logger.debug(`Updating user with ID: ${id}, updates: ${JSON.stringify(updates)}`);
-
-    if (updateData.systemPermissions !== undefined) {
-      updates.systemPermissions = {
-        ...updateData.systemPermissions,
-      } as DeepPartial<SystemPermissions>;
-    }
 
     // If email is being updated, check for uniqueness
     const userRepo = manager ? manager.getRepository(User) : this.userRepository;
@@ -381,14 +379,14 @@ export class UsersService {
     this.validateUsernameOrThrow(newUsername);
 
     const isSelf = executingUser.id === targetUserId;
-    const canManageUsers = !!executingUser.systemPermissions?.canManageUsers;
+    const canUpdateUsers = !!(executingUser as AuthenticatedUser).effectivePermissions?.has('users.update');
 
-    if (!isSelf && !canManageUsers) {
+    if (!isSelf && !canUpdateUsers) {
       throw new ForbiddenException("You do not have permission to change this user's username");
     }
 
     // Apply once-per-day restriction only when changing own username
-    if (isSelf && !canManageUsers) {
+    if (isSelf && !canUpdateUsers) {
       const now = new Date();
       if (targetUser.lastUsernameChangeAt) {
         const msSince = now.getTime() - new Date(targetUser.lastUsernameChangeAt).getTime();
@@ -436,9 +434,9 @@ export class UsersService {
     }
 
     const isSelf = executingUser.id === targetUserId;
-    const canManageUsers = !!executingUser.systemPermissions?.canManageUsers;
+    const canUpdateUsers = !!(executingUser as AuthenticatedUser).effectivePermissions?.has('users.update');
 
-    if (!isSelf && !canManageUsers) {
+    if (!isSelf && !canUpdateUsers) {
       throw new ForbiddenException("You do not have permission to change this user's email");
     }
 
@@ -481,7 +479,7 @@ export class UsersService {
     }
   }
 
-  async findMany(options: PaginationOptions & { search?: string; ids?: number[] }): Promise<PaginatedResponse<User>> {
+  async findMany(options: PaginationOptions & { search?: string; ids?: number[]; includeRoles?: boolean }): Promise<PaginatedResponse<User>> {
     this.logger.debug(`Finding all users with options: ${JSON.stringify(options)}`);
     const paginationOptions = PaginationOptionsSchema.parse(options);
     const { search } = options;
@@ -516,54 +514,11 @@ export class UsersService {
       skip,
       take: limit,
       where: whereCondition,
-      relations: ['authenticationDetails'],
+      relations: options.includeRoles ? ['authenticationDetails', 'userRoles', 'userRoles.role'] : ['authenticationDetails'],
+      order: { username: 'ASC' },
     });
 
     this.logger.debug(`Found ${total} total users, returning page ${page} with ${users.length} results`);
-    return {
-      data: users,
-      total,
-      page: paginationOptions.page,
-      limit: paginationOptions.limit,
-    };
-  }
-
-  async findByPermission(
-    permission: keyof SystemPermissions,
-    options: PaginationOptions & { search?: string },
-  ): Promise<PaginatedResponse<User>> {
-    this.logger.debug(`Finding users with permission "${permission}" and options: ${JSON.stringify(options)}`);
-    const paginationOptions = PaginationOptionsSchema.parse(options);
-    const { search } = options;
-    const { page, limit } = paginationOptions;
-    const skip = (page - 1) * limit;
-
-    // Create a query to find users with the specified permission
-    const query = this.userRepository.createQueryBuilder('user');
-
-    // Add where clause for the specific permission = true
-    query.where(`user.systemPermissions${permission.charAt(0).toUpperCase() + permission.slice(1)} = :value`, {
-      value: true,
-    });
-
-    // Add search clause if provided
-    if (search) {
-      this.logger.debug(`Searching for users with query: ${search}`);
-      query.andWhere('(user.username LIKE :search OR user.email LIKE :search)', {
-        search: `%${search}%`,
-      });
-    }
-
-    // Add pagination
-    query.skip(skip).take(limit);
-
-    // Execute the query
-    this.logger.debug(`Executing query for users with permission "${permission}"`);
-    const [users, total] = await query.getManyAndCount();
-
-    this.logger.debug(
-      `Found ${total} total users with permission "${permission}", returning page ${page} with ${users.length} results`,
-    );
     return {
       data: users,
       total,
@@ -633,8 +588,8 @@ export class UsersService {
   }
 
   async createMany(
-    users: Array<{ username: string; email: string; systemPermissions: Partial<SystemPermissions> }>,
-    options?: { grantAllPermissionsToFirst?: boolean; manager?: EntityManager },
+    users: Array<{ username: string; email: string; locale?: string; roleKey?: string }>,
+    options?: { grantAllPermissionsToFirst?: boolean; manager?: EntityManager; actorId?: number },
   ): Promise<User[]> {
     if (users.length === 0) {
       return [];
@@ -643,14 +598,15 @@ export class UsersService {
     const normalized = users.map((userData) => ({
       username: this.cleanupUsername(userData.username),
       email: userData.email.trim(),
-      systemPermissions: userData.systemPermissions ?? {},
+      locale: userData.locale,
+      roleKey: userData.roleKey,
     }));
 
     const run = async (manager: EntityManager) => {
       const repo = manager.getRepository(User);
       const totalExisting = await repo.count();
 
-      const entities = normalized.map((data, index) => {
+      const entities = normalized.map((data) => {
         this.validateUsernameOrThrow(data.username);
         if (!data.email) {
           throw new BadRequestException('Email is required');
@@ -660,33 +616,66 @@ export class UsersService {
         user.username = data.username;
         user.email = data.email;
         user.externalIdentifier = null;
-
-        const systemPermissions: SystemPermissions = {
-          canManageResources: data.systemPermissions.canManageResources ?? false,
-          canManageSystemConfiguration: data.systemPermissions.canManageSystemConfiguration ?? false,
-          canManageUsers: data.systemPermissions.canManageUsers ?? false,
-          canManageBilling: data.systemPermissions.canManageBilling ?? false,
-        };
-
-        if (options?.grantAllPermissionsToFirst && totalExisting === 0 && index === 0) {
-          systemPermissions.canManageResources = true;
-          systemPermissions.canManageSystemConfiguration = true;
-          systemPermissions.canManageUsers = true;
-          systemPermissions.canManageBilling = true;
+        if (data.locale) {
+          user.locale = data.locale.trim() || 'en';
         }
-
-        user.systemPermissions = systemPermissions;
         return user;
       });
 
-      return repo.save(entities);
+      const saved = await repo.save(entities);
+
+      // Assign owner role to the first user when bootstrapping; default roles for everyone else.
+      // Pass the transactional manager so role assignments are part of the same transaction.
+      if (options?.grantAllPermissionsToFirst && totalExisting === 0 && saved.length > 0) {
+        await this.rbacService.assignRoleByKey(saved[0].id, 'owner', manager);
+        for (const u of saved.slice(1)) {
+          await this.rbacService.assignDefaultRoles(u.id, manager);
+        }
+      } else {
+        for (const u of saved) {
+          await this.rbacService.assignDefaultRoles(u.id, manager);
+        }
+      }
+
+      // Assign per-user role keys (from CSV column mapping), in addition to default roles.
+      // Privilege ceiling: if an actor is performing this import, they cannot grant a role whose
+      // permissions exceed their own (mirrors the check in RbacService.assignRole).
+      const anyHasRoleKey = normalized.some((n) => n.roleKey);
+      const actorPermissions =
+        anyHasRoleKey && options?.actorId != null
+          ? await this.rbacService.getEffectivePermissions(options.actorId)
+          : null;
+
+      const roleRepo = manager.getRepository(Role);
+      for (let i = 0; i < saved.length; i++) {
+        const roleKey = normalized[i]?.roleKey;
+        if (roleKey) {
+          const role = await roleRepo.findOne({
+            where: { key: roleKey },
+            relations: ['rolePermissions'],
+          });
+          if (!role) {
+            throw new BadRequestException(`Role with key '${roleKey}' not found`);
+          }
+          if (actorPermissions !== null) {
+            const rolePermKeys = role.rolePermissions.map((rp) => rp.permissionKey);
+            const missing = rolePermKeys.filter((k) => !actorPermissions.has(k));
+            if (missing.length > 0) {
+              throw new ForbiddenException('You cannot grant a role whose permissions exceed your own');
+            }
+          }
+          await this.rbacService.assignRoleByKey(saved[i].id, roleKey, manager);
+        }
+      }
+
+      return saved;
     };
 
-    if (options?.manager) {
-      return run(options.manager);
+    const savedUsers = await (options?.manager ? run(options.manager) : this.userRepository.manager.transaction(run));
+    for (const u of savedUsers) {
+      this.metricsService.usersPerLocale.inc({ locale: u.locale ?? 'en' });
     }
-
-    return this.userRepository.manager.transaction(run);
+    return savedUsers;
   }
 
   async deleteMany(ids: number[]): Promise<void> {
@@ -746,51 +735,90 @@ export class UsersService {
   }
 
   private async anonymizeAndSoftDelete(id: number, manager?: EntityManager): Promise<void> {
-    const repo = manager ? manager.getRepository(User) : this.userRepository;
-    const authRepo = manager ? manager.getRepository(AuthenticationDetail) : this.authenticationDetailRepository;
-    const sessionRepo = manager ? manager.getRepository(Session) : this.sessionRepository;
-    const usageRepo = manager ? manager.getRepository(ResourceUsage) : this.resourceUsageRepository;
+    // ponytail: wrap check-then-delete in a transaction to close the TOCTOU race where two concurrent
+    // deletions of the last two owners could both pass the isLastOwner guard and both proceed
+    const run = async (em: EntityManager) => {
+      if (await this.rbacService.isLastOwner(id, em)) {
+        throw new ForbiddenException('Cannot delete the last owner');
+      }
 
-    const user = await repo.findOne({ where: { id }, withDeleted: true });
-    if (!user) {
-      throw new UserNotFoundException(id);
+      const repo = em.getRepository(User);
+      const authRepo = em.getRepository(AuthenticationDetail);
+      const sessionRepo = em.getRepository(Session);
+      const usageRepo = em.getRepository(ResourceUsage);
+
+      const user = await repo.findOne({ where: { id }, withDeleted: true });
+      if (!user) {
+        throw new UserNotFoundException(id);
+      }
+
+      if (user.deletedAt) {
+        return;
+      }
+
+      const activeUsageSession = await usageRepo.findOne({
+        where: { userId: user.id, endTime: IsNull() },
+      });
+      if (activeUsageSession) {
+        throw new UserHasActiveUsageSessionsException();
+      }
+
+      const suffix = randomBytes(6).toString('base64url').slice(0, 8);
+      const anonymizedUsername = `deleted-user-${user.id}-${suffix}`;
+      const anonymizedEmail = `deleted-user-${user.id}-${suffix}@deleted.local`;
+
+      await authRepo.delete({ userId: user.id });
+      await sessionRepo.delete({ userId: user.id });
+
+      await repo.update(user.id, {
+        username: anonymizedUsername,
+        email: anonymizedEmail,
+        isEmailVerified: false,
+        emailVerificationToken: null,
+        emailVerificationTokenExpiresAt: null,
+        passwordResetToken: null,
+        passwordResetTokenExpiresAt: null,
+        externalIdentifier: null,
+        nfcKeySeedToken: null,
+        lastUsernameChangeAt: null,
+        deleteAccountToken: null,
+        deleteAccountTokenExpiresAt: null,
+        deleteAccountRequestedAt: null,
+      });
+
+      await repo.softDelete(user.id);
+      this.metricsService.usersPerLocale.dec({ locale: user.locale ?? 'en' });
+    };
+
+    if (manager) {
+      await run(manager);
+    } else {
+      await this.dataSource.transaction(run);
+    }
+  }
+
+  async updateLocale(userId: number, locale: string): Promise<User> {
+    const cleaned = locale.trim();
+    if (!cleaned) {
+      throw new BadRequestException('Locale cannot be empty');
     }
 
-    if (user.deletedAt) {
-      return;
+    const existing = await this.findOne({ id: userId });
+    if (!existing) {
+      throw new UserNotFoundException(userId);
     }
+    const oldLocale = existing.locale ?? 'en';
 
-    const activeUsageSession = await usageRepo.findOne({
-      where: { userId: user.id, endTime: IsNull() },
-    });
-    if (activeUsageSession) {
-      throw new UserHasActiveUsageSessionsException();
+    await this.userRepository.update(userId, { locale: cleaned });
+    this.metricsService.usersLocaleSyncsTotal.inc({ locale: cleaned });
+    this.metricsService.usersPerLocale.dec({ locale: oldLocale });
+    this.metricsService.usersPerLocale.inc({ locale: cleaned });
+
+    const updated = await this.findOne({ id: userId });
+    if (!updated) {
+      throw new UserNotFoundException(userId);
     }
-
-    const suffix = randomBytes(6).toString('base64url').slice(0, 8);
-    const anonymizedUsername = `deleted-user-${user.id}-${suffix}`;
-    const anonymizedEmail = `deleted-user-${user.id}-${suffix}@deleted.local`;
-
-    await authRepo.delete({ userId: user.id });
-    await sessionRepo.delete({ userId: user.id });
-
-    await repo.update(user.id, {
-      username: anonymizedUsername,
-      email: anonymizedEmail,
-      isEmailVerified: false,
-      emailVerificationToken: null,
-      emailVerificationTokenExpiresAt: null,
-      passwordResetToken: null,
-      passwordResetTokenExpiresAt: null,
-      externalIdentifier: null,
-      nfcKeySeedToken: null,
-      lastUsernameChangeAt: null,
-      deleteAccountToken: null,
-      deleteAccountTokenExpiresAt: null,
-      deleteAccountRequestedAt: null,
-    });
-
-    await repo.softDelete(user.id);
+    return updated;
   }
 
   async withTransaction<T>(handler: (manager: EntityManager) => Promise<T>): Promise<T> {

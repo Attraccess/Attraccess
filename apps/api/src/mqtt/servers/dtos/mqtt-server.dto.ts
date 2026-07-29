@@ -57,6 +57,32 @@ export class CreateMqttServerDto {
   })
   useTls?: boolean;
 
+  @IsString()
+  @IsOptional()
+  @ApiProperty({
+    description: 'PEM-encoded CA certificate used to verify the broker (for private/self-signed CAs)',
+    required: false,
+  })
+  caCert?: string;
+
+  @IsBoolean()
+  @ToBoolean()
+  @IsOptional()
+  @ApiProperty({
+    description: 'Skip TLS certificate verification for this server. Unsafe - only for trusted networks.',
+    required: false,
+    default: false,
+  })
+  tlsInsecure?: boolean;
+
+  @IsString()
+  @IsOptional()
+  @ApiProperty({
+    description: 'TLS SNI/hostname to verify against, for brokers reached by IP',
+    required: false,
+  })
+  tlsServername?: string;
+
   @IsOptional()
   @Type(() => Number)
   @IsNumber()

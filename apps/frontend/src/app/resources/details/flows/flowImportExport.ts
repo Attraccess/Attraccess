@@ -75,6 +75,8 @@ function parseFlowImport(raw: unknown): { nodes: ResourceFlowNodeDto[]; edges: R
     throw new Error(INVALID_STRUCTURE_ERROR);
   }
 
+  const idMap = new Map<string, string>();
+
   const nodes = flowData.nodes.map((node) => {
     if (!isRecord(node)) {
       throw new Error(INVALID_STRUCTURE_ERROR);
@@ -92,9 +94,11 @@ function parseFlowImport(raw: unknown): { nodes: ResourceFlowNodeDto[]; edges: R
     }
 
     const data = isRecord(node.data) ? node.data : {};
+    const newId = crypto.randomUUID();
+    idMap.set(id, newId);
 
     return {
-      id,
+      id: newId,
       type: type as ResourceFlowNodeDto['type'],
       position: { x, y },
       data,
@@ -118,10 +122,16 @@ function parseFlowImport(raw: unknown): { nodes: ResourceFlowNodeDto[]; edges: R
       throw new Error(INVALID_STRUCTURE_ERROR);
     }
 
+    const newSource = idMap.get(source);
+    const newTarget = idMap.get(target);
+    if (!newSource || !newTarget) {
+      throw new Error(INVALID_STRUCTURE_ERROR);
+    }
+
     return {
-      id,
-      source,
-      target,
+      id: crypto.randomUUID(),
+      source: newSource,
+      target: newTarget,
       sourceHandle: (sourceHandle as string | null | undefined) ?? null,
       targetHandle: (targetHandle as string | null | undefined) ?? null,
     };

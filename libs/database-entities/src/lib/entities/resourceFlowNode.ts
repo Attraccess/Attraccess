@@ -29,6 +29,13 @@ export enum ResourceFlowNodeType {
   PROCESSING_GET_VARIABLES = 'processing.variables.get',
   OUTPUT_RESOURCE_HEALTH_HEARTBEAT = 'output.resource.health.heartbeat',
   OUTPUT_RESOURCE_HEALTH_SET = 'output.resource.health.set',
+  OUTPUT_COMPANION_LOCK_PC = 'output.companion.lock-pc',
+  OUTPUT_COMPANION_UNLOCK_PC = 'output.companion.unlock-pc',
+  INPUT_COMPANION_IDLE = 'input.companion.idle',
+  INPUT_COMPANION_ACTIVE = 'input.companion.active',
+  INPUT_COMPANION_FOREGROUND_APP_CHANGED = 'input.companion.foreground_app_changed',
+  INPUT_COMPANION_USB_DEVICE_CONNECTED = 'input.companion.usb_device_connected',
+  INPUT_COMPANION_USB_DEVICE_DISCONNECTED = 'input.companion.usb_device_disconnected',
 }
 
 // Zod schemas for node data validation
@@ -215,6 +222,33 @@ export const ResourceHealthSetNodeDataSchema = z.object({
   }),
 });
 
+const CompanionDeviceIdSchema = z.number().int().positive().meta({
+  selectFromEntity: 'companionDevice',
+  entityProperty: 'id',
+});
+
+export const CompanionLockNodeDataSchema = z.object({
+  deviceId: CompanionDeviceIdSchema,
+});
+
+export const CompanionIdleActiveNodeDataSchema = z.object({
+  deviceId: CompanionDeviceIdSchema,
+});
+
+export const CompanionForegroundAppNodeDataSchema = z.object({
+  deviceId: CompanionDeviceIdSchema,
+});
+
+export const CompanionUsbDeviceNodeDataSchema = z.object({
+  deviceId: CompanionDeviceIdSchema,
+  vendorId: z.number().int().optional().meta({
+    helpText: 'Optional USB vendor ID filter (decimal). Leave empty to match any vendor.',
+  }),
+  productId: z.number().int().optional().meta({
+    helpText: 'Optional USB product ID filter (decimal). Leave empty to match any product.',
+  }),
+});
+
 // Helper function to get the appropriate schema for a node type
 export function getNodeDataSchema(nodeType: ResourceFlowNodeType) {
   switch (nodeType) {
@@ -279,6 +313,21 @@ export function getNodeDataSchema(nodeType: ResourceFlowNodeType) {
 
     case ResourceFlowNodeType.INPUT_VARIABLE_CHANGED:
       return VariableChangedNodeDataSchema;
+
+    case ResourceFlowNodeType.OUTPUT_COMPANION_LOCK_PC:
+    case ResourceFlowNodeType.OUTPUT_COMPANION_UNLOCK_PC:
+      return CompanionLockNodeDataSchema;
+
+    case ResourceFlowNodeType.INPUT_COMPANION_IDLE:
+    case ResourceFlowNodeType.INPUT_COMPANION_ACTIVE:
+      return CompanionIdleActiveNodeDataSchema;
+
+    case ResourceFlowNodeType.INPUT_COMPANION_FOREGROUND_APP_CHANGED:
+      return CompanionForegroundAppNodeDataSchema;
+
+    case ResourceFlowNodeType.INPUT_COMPANION_USB_DEVICE_CONNECTED:
+    case ResourceFlowNodeType.INPUT_COMPANION_USB_DEVICE_DISCONNECTED:
+      return CompanionUsbDeviceNodeDataSchema;
 
     default: {
       const exhaustiveCheck: never = nodeType;

@@ -4,7 +4,8 @@
     "connection": "Verbindung",
     "authentication": "Authentifizierung",
     "publishDefaults": "Standards für Veröffentlichungen",
-    "subscribeDefaults": "Standards für Abonnements"
+    "subscribeDefaults": "Standards für Abonnements",
+    "tls": "TLS"
   },
   "nameLabel": "Name",
   "namePlaceholder": "Mein MQTT-Server",
@@ -33,5 +34,14 @@
   "serverCreated": "MQTT-Server erstellt",
   "serverCreatedDesc": "Ein neuer MQTT-Server wurde erfolgreich erstellt.",
   "errorGeneric": "Fehler",
-  "failedToCreate": "Fehler beim Erstellen des MQTT-Servers."
+  "failedToCreate": "Fehler beim Erstellen des MQTT-Servers.",
+  "caCertLabel": "CA-Zertifikat (Optional)",
+  "caCertPlaceholder": "-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----",
+  "caCertDescription": "PEM-kodiertes CA-Zertifikat zur Überprüfung des Brokers. Wird für Broker mit privatem oder selbstsigniertem Zertifikat benötigt.",
+  "tlsServernameLabel": "Zertifikats-Hostname (Optional)",
+  "tlsServernamePlaceholder": "mqtt.beispiel.com",
+  "tlsServernameDescription": "Hostname, gegen den das Zertifikat geprüft wird. Nutze dies, wenn du per IP verbindest, das Zertifikat aber auf einen Hostnamen ausgestellt ist.",
+  "tlsInsecureLabel": "Zertifikatsprüfung überspringen",
+  "tlsInsecureWarning": "Die Zertifikatsprüfung ist für diesen Server deaktiviert. Die Verbindung ist verschlüsselt, aber nicht gegen Man-in-the-Middle-Angriffe geschützt. Nutze dies nur in einem vertrauenswürdigen Netzwerk.",
+  "tlsInsecureWarningTitle": "Unsichere Konfiguration"
 }

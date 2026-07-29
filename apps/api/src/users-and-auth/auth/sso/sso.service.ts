@@ -117,6 +117,7 @@ export class SSOService {
   }
 
   public async updateProvider(id: number, updateDto: UpdateSSOProviderDto): Promise<SSOProvider> {
+    await this.licenseService.verifyLicense({ modules: [LicenseModuleType.SSO] });
     const provider = await this.getProviderById(id);
 
     if (provider.type === SSOProviderType.OIDC && updateDto.oidcConfiguration) {
@@ -137,6 +138,7 @@ export class SSOService {
   }
 
   public async deleteProvider(id: number): Promise<void> {
+    await this.licenseService.verifyLicense({ modules: [LicenseModuleType.SSO] });
     const provider = await this.getProviderById(id);
     if (provider.oidcConfiguration) {
       await this.oidcConfigRepository.delete(provider.oidcConfiguration.id);
@@ -198,8 +200,9 @@ export class SSOService {
     if (typeof updateConfig.emailClaimPaths !== 'undefined') {
       payload.emailClaimPaths = updateConfig.emailClaimPaths;
     }
-    if (typeof updateConfig.permissionMappings !== 'undefined') {
-      payload.permissionMappings = updateConfig.permissionMappings;
+    if (typeof updateConfig.roleMappings !== 'undefined') {
+      // explicit null clears the column
+      payload.roleMappings = updateConfig.roleMappings;
     }
 
     await this.oidcConfigRepository.update({ ssoProviderId: providerId }, payload);
@@ -283,8 +286,9 @@ export class SSOService {
       const trimmed = config.provisioningSecret?.trim();
       payload.provisioningSecret = trimmed ? this.encryptionService.encrypt(trimmed) : null;
     }
-    if (typeof config.permissionMappings !== 'undefined') {
-      payload.permissionMappings = config.permissionMappings;
+    if (typeof config.roleMappings !== 'undefined') {
+      // explicit null clears the column
+      payload.roleMappings = config.roleMappings;
     }
     if (typeof config.spSigningCertificate !== 'undefined') {
       payload.spSigningCertificate = config.spSigningCertificate

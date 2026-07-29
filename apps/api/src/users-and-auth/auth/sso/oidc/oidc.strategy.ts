@@ -6,19 +6,17 @@ import {
   AuthenticationType,
   SSOProviderOIDCConfiguration,
   SSOProviderType,
-  SystemPermissions,
   User,
 } from '@attraccess/database-entities';
 import { UsersService } from '../../../users/users.service';
 import { ModuleRef } from '@nestjs/core';
 import { AccountLinkingRequiredException } from './exceptions/account-linking-required.exception';
 import { AuthService } from '../../auth.service';
-import {
-  DEFAULT_PERMISSION_KEY_MAP,
-  normalizePermissionToken,
-  resolvePermissionsFromRoles,
-} from '../permission-mapping';
+import { resolveSsoRoleAssignments } from '../permission-mapping';
+import { RbacService } from '../../../rbac/rbac.service';
 import { OidcCookieStateStore, OIDCAppState } from './oidc-cookie-state-store';
+import { MetricsService } from '../../../../metrics/metrics.service';
+import { classifySsoFailureReason, markSsoFailureMetricRecorded, recordSsoLoginFailure } from '../sso-metrics';
 
 /** Request key set by SSOOIDCGuard so the strategy uses the per-request callback URL (current settings, no restart needed). */
 export const SSO_OIDC_CALLBACK_URL_REQUEST_KEY = '_ssoOidcCallbackUrl';
@@ -99,6 +97,18 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', true
     return undefined;
   }
 
+  private recordFailure(error: unknown): void {
+    try {
+      const metricsService = this.moduleRef.get(MetricsService, { strict: false });
+      recordSsoLoginFailure(metricsService, SSOProviderType.OIDC, classifySsoFailureReason(error), this.logger);
+      markSsoFailureMetricRecorded(error);
+    } catch (metricsError) {
+      this.logger.warn(
+        `Failed to resolve MetricsService for SSO login failure metric: ${metricsError instanceof Error ? metricsError.message : String(metricsError)}`,
+      );
+    }
+  }
+
   private parseIdTokenClaims(idToken?: string): Record<string, unknown> | undefined {
     if (!idToken) {
       return undefined;
@@ -128,7 +138,9 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', true
 
     if (!oidcUserId) {
       this.logger.error('No user ID found in SSO profile');
-      throw new BadRequestException('No user ID found in SSO profile');
+      const error = new BadRequestException('No user ID found in SSO profile');
+      this.recordFailure(error);
+      throw error;
     }
 
     const usersService = await this.moduleRef.get(UsersService, { strict: false });
@@ -153,7 +165,9 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', true
     }
     if (!email) {
       this.logger.error('No email could be resolved from SSO profile');
-      throw new BadRequestException('No email found in SSO profile');
+      const error = new BadRequestException('No email found in SSO profile');
+      this.recordFailure(error);
+      throw error;
     }
 
     // Step 1: Check if user exists by SSO auth detail
@@ -167,7 +181,7 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', true
 
     if (user) {
       this.logger.log(`Found existing user with SSO binding: ${oidcUserId}`);
-      return await this.syncPermissionsFromClaims(user, claimSources, usersService);
+      return await this.syncPermissionsFromClaims(user, claimSources);
     }
 
     // Step 2: No user found by external ID, check by email
@@ -177,12 +191,13 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', true
     if (user) {
       // Step 3: User exists with email but no SSO binding - require linking flow
       this.logger.log(`Found user with email ${email} but no SSO binding. Account linking required.`);
-      throw new AccountLinkingRequiredException({
+      const error = new AccountLinkingRequiredException({
         email,
         externalId: oidcUserId,
         providerId: this.config.ssoProviderId,
         providerType: SSOProviderType.OIDC,
       });
+      throw error;
     }
 
     // Step 4: No user exists, create new user with external ID
@@ -204,7 +219,9 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', true
 
     if (!user) {
       this.logger.error('Failed to create user after SSO authentication');
-      throw new UnauthorizedException();
+      const error = new UnauthorizedException();
+      this.recordFailure(error);
+      throw error;
     }
 
     await authService.addAuthenticationDetails(user.id, {
@@ -217,11 +234,11 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', true
     });
 
     this.logger.log(`New user (ID: ${user.id}) created successfully with SSO subject: ${oidcUserId}`);
-    return await this.syncPermissionsFromClaims(user, claimSources, usersService);
+    return await this.syncPermissionsFromClaims(user, claimSources);
   }
 
   private getPermissionClaimValues(claimSources: unknown[]): unknown[] {
-    const paths = ['systemPermissions', 'permissions', 'roles', 'groups', 'realm_access.roles'];
+    const paths = ['permissions', 'roles', 'groups', 'realm_access.roles'];
     if (this.config.clientId) {
       paths.push(`resource_access.${this.config.clientId}.roles`);
     }
@@ -239,93 +256,62 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', true
     return values;
   }
 
-  private resolvePermissionUpdates(claimSources: unknown[]): Partial<SystemPermissions> {
-    const directUpdates: Partial<SystemPermissions> = {};
+  private resolveRoleNamesFromClaims(claimValues: unknown[]): string[] {
     const roleNames: string[] = [];
-
-    const claimValues = this.getPermissionClaimValues(claimSources);
-    this.logger.debug(`Permission claim values: ${JSON.stringify(claimValues)}`);
 
     for (const value of claimValues) {
       if (Array.isArray(value)) {
         for (const entry of value) {
-          if (typeof entry === 'string') {
-            roleNames.push(entry);
-          }
+          if (typeof entry === 'string') roleNames.push(entry);
         }
         continue;
       }
-
       if (typeof value === 'string') {
         roleNames.push(value);
         continue;
       }
-
       if (value && typeof value === 'object') {
-        for (const [key, entry] of Object.entries(value)) {
-          const normalizedKey = normalizePermissionToken(key);
-          const permissionKey = DEFAULT_PERMISSION_KEY_MAP[normalizedKey];
-          if (permissionKey && typeof entry === 'boolean') {
-            directUpdates[permissionKey] = entry;
-            continue;
-          }
-
-          if (Array.isArray(entry)) {
+        for (const entry of Object.values(value)) {
+          if (typeof entry === 'string') roleNames.push(entry);
+          else if (Array.isArray(entry)) {
             for (const item of entry) {
-              if (typeof item === 'string') {
-                roleNames.push(item);
-              }
+              if (typeof item === 'string') roleNames.push(item);
             }
-            continue;
-          }
-
-          if (typeof entry === 'string') {
-            roleNames.push(entry);
           }
         }
       }
     }
 
-    this.logger.debug(`Resolved role names: ${JSON.stringify(roleNames)}`);
-    this.logger.debug(`Direct permission updates: ${JSON.stringify(directUpdates)}`);
-    const roleBasedUpdates = resolvePermissionsFromRoles(roleNames, this.config.permissionMappings);
-    this.logger.debug(`Role-based updates: ${JSON.stringify(roleBasedUpdates)}`);
-    return {
-      ...roleBasedUpdates,
-      ...directUpdates,
-    };
-  }
-
-  private buildDefaultPermissions(): SystemPermissions {
-    return {
-      canManageResources: false,
-      canManageSystemConfiguration: false,
-      canManageUsers: false,
-      canManageBilling: false,
-    };
+    this.logger.debug(`Resolved SSO role names: ${JSON.stringify(roleNames)}`);
+    return roleNames;
   }
 
   private async syncPermissionsFromClaims(
     user: User,
     claimSources: unknown[],
-    usersService: UsersService,
   ): Promise<User> {
-    const updates = this.resolvePermissionUpdates(claimSources);
-    if (Object.keys(updates).length === 0) {
-      this.logger.debug('No permission updates resolved from SSO claims');
-      return user;
-    }
+    const claimValues = this.getPermissionClaimValues(claimSources);
+    this.logger.debug(`Permission claim values: ${JSON.stringify(claimValues)}`);
+    const roleNames = this.resolveRoleNamesFromClaims(claimValues);
+    const roleAssignments = resolveSsoRoleAssignments(roleNames, this.config.roleMappings);
+    this.logger.debug(`RBAC role keys from SSO: ${JSON.stringify(roleAssignments.map((r) => r.roleKey))}`);
 
-    const current = user.systemPermissions ?? this.buildDefaultPermissions();
-    const merged = { ...current, ...updates };
-    const shouldUpdate = Object.keys(updates).some(
-      (key) => merged[key as keyof SystemPermissions] !== current[key as keyof SystemPermissions],
-    );
-    if (!shouldUpdate) {
-      return user;
+    const rbacService = this.moduleRef.get(RbacService, { strict: false });
+    if (!rbacService) {
+      this.logger.warn('RbacService not available via ModuleRef — SSO role sync skipped; existing roles preserved');
+    } else if (claimValues.length > 0) {
+      // Only sync when the token contained at least one role/group claim key. A present-but-empty
+      // claim (e.g. groups: []) is authoritative and revokes this provider's SSO-managed roles; a
+      // wholly absent claim (missing scope, transient IdP omission) must not silently revoke
+      // anything. Intentionally not gated on a configured mapping: a cleared mapping must still
+      // sync (with zero assignments) so roles granted under the old mapping get revoked.
+      await rbacService.syncSsoRoles(
+        user.id,
+        roleAssignments,
+        SSOProviderType.OIDC,
+        this.config.ssoProviderId,
+      );
     }
-
-    this.logger.debug(`Updating permissions for user ${user.id} from SSO claims`);
-    return await usersService.updateOne(user.id, { systemPermissions: merged });
+    return user;
   }
 }

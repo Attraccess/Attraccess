@@ -1,0 +1,38 @@
+{
+  "loading": "Loading push configuration...",
+  "publicKeyLabel": "VAPID public key",
+  "copyButton": "Copy",
+  "copied": {
+    "title": "Copied",
+    "description": "The public key was copied to your clipboard."
+  },
+  "copyFailed": {
+    "title": "Copy failed",
+    "description": "Could not copy to the clipboard."
+  },
+  "regenerateButton": "Regenerate keys",
+  "overrideTitle": "Use custom keys",
+  "overrideDescription": "Paste a key pair generated with `npx web-push generate-vapid-keys`. Both keys are required.",
+  "publicKeyInputLabel": "Custom public key",
+  "privateKeyInputLabel": "Custom private key",
+  "applyCustomButton": "Apply custom keys",
+  "keysReplaced": {
+    "title": "VAPID keys updated",
+    "description": "Removed {{count}} push subscription(s) bound to the old key. Affected users must re-enable push on their devices."
+  },
+  "errors": {
+    "replaceFailed": "Could not update the VAPID keys."
+  },
+  "confirmWarning": {
+    "title": "Replace VAPID keys?",
+    "description": "This deletes all {{count}} push subscription(s). Every user must re-enable push notifications on each device.",
+    "continue": "Continue",
+    "cancel": "Cancel"
+  },
+  "confirmFinal": {
+    "title": "Are you sure?",
+    "description": "This cannot be undone. Users will stop receiving push notifications until they turn the toggle back on.",
+    "confirm": "Replace keys",
+    "cancel": "Go back"
+  }
+}

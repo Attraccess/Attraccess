@@ -17,7 +17,7 @@ import { Button } from '../../../../components/button';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { AuthentikDiscoveryDialog } from '../discovery/authentik';
 import { KeycloakDiscoveryDialog } from '../discovery/keycloak';
-import { PermissionMappingsSection } from './PermissionMappingsSection';
+import { RoleMappingsSection } from './RoleMappingsSection';
 import { SSOProviderFormApi } from '../useSSOProviderForm';
 import en from '../en.json';
 import de from '../de.json';
@@ -40,8 +40,10 @@ export const OIDCConfigForm = ({ form }: OIDCConfigFormProps) => {
     showClientSecret,
     setShowClientSecret,
     onAutoDiscovery,
-    oidcPermissionMappingsInput,
-    setOidcPermissionMappingsInput,
+    oidcRoleMappingEntries,
+    setOidcRoleMappingEntries,
+    roles,
+    isLoadingRoles,
   } = form;
 
   return (
@@ -191,10 +193,12 @@ export const OIDCConfigForm = ({ form }: OIDCConfigFormProps) => {
         </TextField>
       </section>
 
-      <PermissionMappingsSection
+      <RoleMappingsSection
         variant="oidc"
-        values={oidcPermissionMappingsInput}
-        onChange={(key, value) => setOidcPermissionMappingsInput((prev) => ({ ...prev, [key]: value }))}
+        roles={roles}
+        isLoadingRoles={isLoadingRoles}
+        entries={oidcRoleMappingEntries}
+        onChange={setOidcRoleMappingEntries}
       />
     </>
   );

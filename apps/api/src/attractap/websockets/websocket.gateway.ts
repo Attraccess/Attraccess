@@ -35,6 +35,7 @@ import { AttractapFormsHandler } from './handlers/forms.handler';
 import { AttractapSessionHandler } from './handlers/session.handler';
 import { AttractapBillingHandler } from './handlers/billing.handler';
 import { AttractapProjectsHandler } from './handlers/projects.handler';
+import { AttractapSupervisionHandler } from './handlers/supervision.handler';
 
 @WebSocketGateway({ path: '/api/attractap/websocket' })
 @UseInterceptors(WsMetricsInterceptor)
@@ -89,6 +90,9 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
   @Inject(AttractapProjectsHandler)
   private projectsHandler: AttractapProjectsHandler;
+
+  @Inject(AttractapSupervisionHandler)
+  private supervisionHandler: AttractapSupervisionHandler;
 
   private readonly connectedAt = new WeakMap<object, bigint>();
 
@@ -224,6 +228,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       id,
       messageCount,
       readerId: null,
+      readerName: null,
       sendMessage,
       sendBinaryData,
       state: {
@@ -231,6 +236,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
         enrollNewCardData: null,
         resetNfcCardData: null,
         ota: null,
+        supervisionFlow: null,
       },
     });
 
@@ -331,10 +337,27 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     });
 
     const readerId = socket.readerId;
+    const readerName = socket.readerName;
     if (readerId) {
       this.logger.log(`Client for reader ${readerId} disconnected.`);
+      // ponytail: only zero gauge when no other socket for this reader exists —
+      // prevents a stale-socket disconnect from marking a reconnected reader offline.
+      const hasOtherSocket = Array.from(this.websocketService.sockets.values()).some(
+        (other) => other.id !== socket.id && other.readerId === readerId,
+      );
+      if (!hasOtherSocket) {
+        this.metricsService.attractapReaderConnected.set(
+          { reader_id: String(readerId), reader_name: readerName ?? '' },
+          0,
+        );
+      }
     } else {
       this.logger.log('An unidentified client disconnected.');
+    }
+
+    // Tear down any in-progress two-card supervision so the supervisor's web popup doesn't linger.
+    if (socket.state?.supervisionFlow) {
+      this.supervisionHandler.cancelForSocket(socket);
     }
 
     // Clean up OTA file descriptor if present
@@ -408,6 +431,15 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       case AttractapEventType.REQUEST_CARD_AUTHENTICATION_DATA:
         await this.cardHandler.handleCardAuthenticationRequest(socket, eventData);
         break;
+      case AttractapEventType.SUPERVISION_REQUEST:
+        await this.supervisionHandler.handleSupervisionRequest(socket, eventData);
+        break;
+      case AttractapEventType.REQUEST_SUPERVISOR_CARD_AUTHENTICATION_DATA:
+        await this.supervisionHandler.handleSupervisorCardAuthRequest(socket, eventData);
+        break;
+      case AttractapEventType.SUPERVISION_CANCEL:
+        await this.supervisionHandler.handleSupervisionCancel(socket);
+        break;
       case AttractapEventType.START_RESOURCE_USAGE_SESSION:
         await this.sessionHandler.handleStartResourceUsageSession(socket, eventData);
         break;
@@ -470,6 +502,8 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       case AttractapEventType.READER_REQUEST_AUTHENTICATION:
       case AttractapEventType.READER_AUTHENTICATED:
       case AttractapEventType.CARD_AUTHENTICATION_DATA:
+      case AttractapEventType.SUPERVISOR_CARD_AUTHENTICATION_DATA:
+      case AttractapEventType.SUPERVISION_RESOLVED:
       case AttractapEventType.ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO:
       case AttractapEventType.RESOURCE_USAGE_FORM_REQUEST:
       case AttractapEventType.RESOURCE_USAGE_FORM_FIELDS:

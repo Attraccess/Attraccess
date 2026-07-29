@@ -14,7 +14,7 @@ export class ResourceGroupsController {
   private getVisibilityContext(req: AuthenticatedRequest): GroupVisibilityContext {
     return {
       userId: req.user.id,
-      canManageResources: req.user.systemPermissions.canManageResources === true,
+      canUpdateResources: req.user.effectivePermissions?.has('resources.update') === true,
     };
   }
 
@@ -25,7 +25,7 @@ export class ResourceGroupsController {
     description: 'The resource group has been successfully created.',
     type: ResourceGroup,
   })
-  @Auth('canManageResources')
+  @Auth('resources.update')
   async createOne(@Body() createDto: CreateResourceGroupDto): Promise<ResourceGroup> {
     return await this.resourceGroupsService.createOne(createDto);
   }
@@ -60,7 +60,7 @@ export class ResourceGroupsController {
   }
 
   @Put(':id')
-  @Auth('canManageResources')
+  @Auth('resources.update')
   @ApiOperation({ summary: 'Update a resource group by ID', operationId: 'resourceGroupsUpdateOne' })
   @ApiParam({ name: 'id', description: 'The ID of the resource group', type: Number })
   @ApiResponse({
@@ -80,7 +80,7 @@ export class ResourceGroupsController {
   }
 
   @Post(':groupId/resources/:resourceId')
-  @Auth('canManageResources')
+  @Auth('resources.update')
   @ApiOperation({ summary: 'Add a resource to a resource group', operationId: 'resourceGroupsAddResource' })
   @ApiParam({ name: 'groupId', description: 'The ID of the resource group', type: Number })
   @ApiParam({ name: 'resourceId', description: 'The ID of the resource', type: Number })
@@ -96,7 +96,7 @@ export class ResourceGroupsController {
   }
 
   @Delete(':groupId/resources/:resourceId')
-  @Auth('canManageResources')
+  @Auth('resources.update')
   @ApiOperation({ summary: 'Remove a resource from a resource group', operationId: 'resourceGroupsRemoveResource' })
   @ApiParam({ name: 'groupId', description: 'The ID of the resource group', type: Number })
   @ApiParam({ name: 'resourceId', description: 'The ID of the resource', type: Number })
@@ -112,7 +112,7 @@ export class ResourceGroupsController {
   }
 
   @Delete(':groupId')
-  @Auth('canManageResources')
+  @Auth('resources.update')
   @ApiOperation({ summary: 'Delete a resource group by ID', operationId: 'resourceGroupsDeleteOne' })
   @ApiParam({ name: 'groupId', description: 'The ID of the resource group', type: Number })
   @ApiResponse({

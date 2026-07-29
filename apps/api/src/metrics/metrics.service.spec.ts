@@ -6,7 +6,16 @@ import { User, Resource, Project, ResourceGroup, MqttServer, ResourceUsage, Sess
 describe('MetricsService', () => {
   let service: MetricsService;
 
-  const mockUserRepo = { count: jest.fn().mockResolvedValue(10) };
+  const mockQueryBuilder = {
+    select: jest.fn().mockReturnThis(),
+    addSelect: jest.fn().mockReturnThis(),
+    groupBy: jest.fn().mockReturnThis(),
+    getRawMany: jest.fn().mockResolvedValue([{ locale: 'en', count: '10' }]),
+  };
+  const mockUserRepo = {
+    count: jest.fn().mockResolvedValue(10),
+    createQueryBuilder: jest.fn().mockReturnValue(mockQueryBuilder),
+  };
   const mockResourceRepo = { count: jest.fn().mockResolvedValue(5) };
   const mockProjectRepo = { count: jest.fn().mockResolvedValue(3) };
   const mockResourceGroupRepo = { count: jest.fn().mockResolvedValue(2) };
@@ -81,6 +90,18 @@ describe('MetricsService', () => {
         where: { expiresAt: expect.anything() },
       });
     });
+
+    it('seeds usersPerLocale gauge from locale GROUP BY query', async () => {
+      mockQueryBuilder.getRawMany.mockResolvedValueOnce([
+        { locale: 'en', count: '8' },
+        { locale: 'de-DE', count: '2' },
+      ]);
+      await service.onModuleInit();
+
+      const metricsOutput = await service.getMetrics();
+      expect(metricsOutput).toContain('attraccess_users_per_locale{locale="en"} 8');
+      expect(metricsOutput).toContain('attraccess_users_per_locale{locale="de-DE"} 2');
+    });
   });
 
   describe('getMetrics', () => {
@@ -111,6 +132,13 @@ describe('MetricsService', () => {
       expect(service.auth2faUsageTotal).toBeDefined();
     });
 
+    it('authSsoLoginFailuresTotal counter is defined with provider type and reason labels', async () => {
+      service.authSsoLoginFailuresTotal.inc({ provider_type: 'oidc', reason: 'invalid_assertion' });
+
+      const metrics = await service.getMetrics();
+      expect(metrics).toContain('attraccess_auth_sso_login_failures_total{provider_type="oidc",reason="invalid_assertion"} 1');
+    });
+
     it('attractapFirmwareUpdatesTotal counter is defined', () => {
       expect(service.attractapFirmwareUpdatesTotal).toBeDefined();
     });
@@ -124,6 +152,26 @@ describe('MetricsService', () => {
     it('does not expose a websocketConnectionsActive metric', async () => {
       const metrics = await service.getMetrics();
       expect(metrics).not.toContain('websocket_connections_active');
+    });
+  });
+
+  describe('companion download metrics (ATT-614)', () => {
+    it('companionDownloadsTotal counter is defined', () => {
+      expect(service.companionDownloadsTotal).toBeDefined();
+    });
+
+    it('companionDownloadsTotal appears in prometheus output with platform/arch/status labels', async () => {
+      service.companionDownloadsTotal.inc({ platform: 'linux', arch: 'x64', status: 'success' });
+      service.companionDownloadsTotal.inc({ platform: 'linux', arch: 'x64', status: 'not_found' });
+
+      const metrics = await service.getMetrics();
+      expect(metrics).toContain('attraccess_companion_downloads_total{platform="linux",arch="x64",status="success"} 1');
+      expect(metrics).toContain('attraccess_companion_downloads_total{platform="linux",arch="x64",status="not_found"} 1');
+    });
+
+    it('uses attraccess_ prefix (consistent with naming convention)', async () => {
+      const metrics = await service.getMetrics();
+      expect(metrics).toContain('attraccess_companion_downloads_total');
     });
   });
 });

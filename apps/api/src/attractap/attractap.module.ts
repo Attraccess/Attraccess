@@ -18,6 +18,7 @@ import { AttractapFormsHandler } from './websockets/handlers/forms.handler';
 import { AttractapSessionHandler } from './websockets/handlers/session.handler';
 import { AttractapBillingHandler } from './websockets/handlers/billing.handler';
 import { AttractapProjectsHandler } from './websockets/handlers/projects.handler';
+import { AttractapSupervisionHandler } from './websockets/handlers/supervision.handler';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { Attractap, AttractapCrashReport, NFCCard, Resource, User } from '@attraccess/database-entities';
 import { UsersAndAuthModule } from '../users-and-auth/users-and-auth.module';
@@ -35,6 +36,8 @@ import { ResourceFlowsModule } from '../resources/flows/resource-flows.module';
 import { BillingModule } from '../billing/billing.module';
 import { ProjectsModule } from '../projects/projects.module';
 import { ResourceFormsModule } from '../resources/forms/forms.module';
+import { SupervisionModule } from '../resources/supervision/supervision.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -52,6 +55,8 @@ import { ResourceFormsModule } from '../resources/forms/forms.module';
     BillingModule,
     ProjectsModule,
     ResourceFormsModule,
+    SupervisionModule,
+    NotificationsModule,
   ],
   providers: [
     AttractapService,
@@ -70,6 +75,7 @@ import { ResourceFormsModule } from '../resources/forms/forms.module';
     AttractapSessionHandler,
     AttractapBillingHandler,
     AttractapProjectsHandler,
+    AttractapSupervisionHandler,
   ],
   controllers: [AttractapController, AttractapNfcCardsController, AttractapFirmwareController],
 })

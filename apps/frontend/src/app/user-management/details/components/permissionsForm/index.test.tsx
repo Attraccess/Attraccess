@@ -7,28 +7,55 @@ import { UserPermissionForm } from './index';
 import { TestWrapper } from '../../../../../test-utils/wrappers';
 import type { User } from '@attraccess/react-query-client';
 
-const mutateAsyncMock = vi.fn().mockResolvedValue(undefined);
-const permissionsFixture = {
-  canManageResources: true,
-  canManageSystemConfiguration: false,
-  canManageUsers: true,
-  canManageBilling: false,
-};
+const assignRoleMock = vi.fn().mockResolvedValue(undefined);
+const revokeRoleMock = vi.fn().mockResolvedValue(undefined);
+
+const ROLES = [
+  { id: 1, key: 'resource-manager', name: 'Resource Manager', rolePermissions: [] },
+  { id: 2, key: 'system-admin', name: 'System Admin', rolePermissions: [] },
+  { id: 3, key: 'user-manager', name: 'User Manager', rolePermissions: [] },
+  { id: 4, key: 'billing-manager', name: 'Billing Manager', rolePermissions: [] },
+  { id: 5, key: 'owner', name: 'Owner', rolePermissions: [] },
+  { id: 6, key: 'user', name: 'User', rolePermissions: [] },
+  { id: 7, key: 'my-custom-role', name: 'My Custom Role', rolePermissions: [] },
+];
+
+// Stable reference — must not be inline in the mock factory; a new array on every hook
+// call makes userRoles change reference each render and causes an infinite useEffect loop.
+const USER_ROLE_ASSIGNMENTS_MANUAL = [
+  { roleId: 1, source: 'manual', role: ROLES[0] },
+  { roleId: 3, source: 'manual', role: ROLES[2] },
+];
+
+const USER_ROLE_ASSIGNMENTS_WITH_SSO = [
+  { roleId: 1, source: 'manual', role: ROLES[0] },
+  { roleId: 2, source: 'sso', ssoProviderId: 10, ssoProviderType: 'oidc', externalValue: 'admins', role: ROLES[1] },
+  // owner via SSO — not in manageable list
+  { roleId: 5, source: 'sso', ssoProviderId: 10, ssoProviderType: 'oidc', externalValue: 'owners', role: ROLES[4] },
+];
+
+let currentUserRoles: typeof USER_ROLE_ASSIGNMENTS_MANUAL | typeof USER_ROLE_ASSIGNMENTS_WITH_SSO =
+  USER_ROLE_ASSIGNMENTS_MANUAL;
 
 vi.mock('@attraccess/plugins-frontend-ui', () => ({
   useTranslations: () => {
     const translations: Record<string, string> = {
-      title: 'Permissions',
-      'permissions.canManageResources': 'Manage resources',
-      'permissions.canManageSystemConfiguration': 'Manage system configuration',
-      'permissions.canManageUsers': 'Manage users',
-      'permissions.canManageBilling': 'Manage billing',
+      title: 'Roles & Permissions',
+      'permissions.resource-manager': 'Manage resources',
+      'permissions.system-admin': 'Manage system configuration',
+      'permissions.user-manager': 'Manage users',
+      'permissions.billing-manager': 'Manage billing',
       'actions.save': 'Save',
-      'messages.updated': 'Permissions updated',
+      'messages.updated': 'Roles updated',
       'ssoManaged.title': 'Managed by SSO',
       'ssoManaged.description':
-        'Permissions are managed by {{providers}} and cannot be edited here. Update the SSO permission mappings to change them.',
+        'Some roles are managed by {{providers}} and cannot be edited here.',
       'ssoManaged.providerFallback': 'the SSO provider',
+      'ssoAssignment.assignedBy': 'Via SSO',
+      'ssoAssignment.provider': 'Provider: {{name}}',
+      'ssoAssignment.externalValue': 'Group: {{value}}',
+      'ssoOnlyRoles.title': 'SSO-managed roles',
+      'ssoOnlyRoles.subtitle': 'These roles are controlled entirely by SSO.',
     };
 
     const t = (key: string, vars?: Record<string, unknown>) => {
@@ -42,53 +69,140 @@ vi.mock('@attraccess/plugins-frontend-ui', () => ({
     };
 
     const tExists = (key: string) => Boolean(translations[key]);
-
     return { t, tExists };
   },
 }));
 
+vi.mock('../../../../../components/labeledSwitch', () => ({
+  LabeledSwitch: ({ children, isSelected, isDisabled, onChange, ...props }: Record<string, unknown>) => (
+    <label {...props}>
+      <input
+        type="checkbox"
+        checked={Boolean(isSelected)}
+        disabled={Boolean(isDisabled)}
+        onChange={(e) => (onChange as (value: boolean) => void)?.(e.target.checked)}
+      />
+      {children as React.ReactNode}
+    </label>
+  ),
+}));
+
 vi.mock('@attraccess/react-query-client', () => ({
-  useUsersServiceGetPermissions: () => ({
-    data: permissionsFixture,
+  useRbacServiceListRoles: () => ({ data: ROLES, isLoading: false }),
+  useUsersServiceGetUserRoleAssignments: () => ({
+    data: currentUserRoles,
     isLoading: false,
   }),
-  useUsersServiceUpdatePermissions: () => ({
-    mutateAsync: mutateAsyncMock,
-    isPending: false,
-  }),
-  UseUsersServiceFindManyKeyFn: () => ['users'],
+  useUsersServiceAssignRoleToUser: () => ({ mutateAsync: assignRoleMock, isPending: false }),
+  useUsersServiceRevokeRoleFromUser: () => ({ mutateAsync: revokeRoleMock, isPending: false }),
+  useUsersServiceGetUserRoleAssignmentsKey: 'useUsersServiceGetUserRoleAssignmentsKey',
   ApiError: class ApiError extends Error {},
 }));
 
 describe('UserPermissionForm', () => {
   beforeEach(() => {
-    mutateAsyncMock.mockClear();
+    assignRoleMock.mockClear();
+    revokeRoleMock.mockClear();
+    currentUserRoles = USER_ROLE_ASSIGNMENTS_MANUAL;
   });
 
-  it('disables permission editing when managed by SSO', async () => {
+  it('disables role editing when managed by SSO', async () => {
     const user = { id: 1 } as User;
     render(<UserPermissionForm user={user} ssoManagedProviders={['Okta']} />, { wrapper: TestWrapper });
 
     expect(screen.getByText('Managed by SSO')).toBeInTheDocument();
     expect(screen.getByText(/Okta/)).toBeInTheDocument();
-
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
-    expect(screen.getByLabelText('Manage resources')).toBeDisabled();
-
-    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
-    expect(mutateAsyncMock).not.toHaveBeenCalled();
   });
 
-  it('submits permission updates when not SSO-managed', async () => {
+  it('shows current role assignments as checked', async () => {
     const user = { id: 7 } as User;
     render(<UserPermissionForm user={user} ssoManagedProviders={[]} />, { wrapper: TestWrapper });
 
     await waitFor(() => expect(screen.getByLabelText('Manage resources')).toBeChecked());
+    expect(screen.getByLabelText('Manage users')).toBeChecked();
+    expect(screen.getByLabelText('Manage system configuration')).not.toBeChecked();
+    expect(screen.getByLabelText('Manage billing')).not.toBeChecked();
+  });
+
+  it('calls assignRole and revokeRole on save', async () => {
+    const user = { id: 7 } as User;
+    render(<UserPermissionForm user={user} ssoManagedProviders={[]} />, { wrapper: TestWrapper });
+
+    // Toggle: uncheck resource-manager (id=1), check billing-manager (id=4)
+    await waitFor(() => expect(screen.getByLabelText('Manage resources')).toBeInTheDocument());
+    await userEvent.click(screen.getByLabelText('Manage resources'));
+    await userEvent.click(screen.getByLabelText('Manage billing'));
+
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
-    expect(mutateAsyncMock).toHaveBeenCalledWith({
-      id: user.id,
-      requestBody: permissionsFixture,
+    await waitFor(() => {
+      expect(assignRoleMock).toHaveBeenCalledWith({ id: user.id, requestBody: { roleId: 4 } });
+      expect(revokeRoleMock).toHaveBeenCalledWith({ id: user.id, roleId: 1 });
     });
+  });
+
+  it('shows SSO badge with external value for SSO-assigned manageable roles', async () => {
+    currentUserRoles = USER_ROLE_ASSIGNMENTS_WITH_SSO;
+    const user = { id: 5 } as User;
+    render(<UserPermissionForm user={user} ssoManagedProviders={['MyOIDC']} ssoManagedPermissionKeys={new Set(['system-admin'])} />, {
+      wrapper: TestWrapper,
+    });
+
+    // system-admin is SSO-managed: should show the badge
+    await waitFor(() =>
+      expect(screen.getByText(/Via SSO: #10 · admins/)).toBeInTheDocument()
+    );
+  });
+
+  it('shows SSO-only roles section for non-manageable SSO roles', async () => {
+    currentUserRoles = USER_ROLE_ASSIGNMENTS_WITH_SSO;
+    const user = { id: 5 } as User;
+    render(<UserPermissionForm user={user} ssoManagedProviders={['MyOIDC']} />, { wrapper: TestWrapper });
+
+    await waitFor(() =>
+      expect(screen.getByTestId !== undefined
+        ? screen.getByText('SSO-managed roles')
+        : true
+      ).toBeTruthy()
+    );
+
+    // Owner role should appear in the SSO-only section
+    await waitFor(() => expect(screen.getByText('Owner')).toBeInTheDocument());
+  });
+
+  it('disables toggle for SSO-managed role keys', async () => {
+    currentUserRoles = USER_ROLE_ASSIGNMENTS_WITH_SSO;
+    const user = { id: 5 } as User;
+    render(
+      <UserPermissionForm
+        user={user}
+        ssoManagedProviders={['MyOIDC']}
+        ssoManagedPermissionKeys={new Set(['system-admin'])}
+      />,
+      { wrapper: TestWrapper },
+    );
+
+    await waitFor(() => {
+      const systemAdminCheckbox = screen.getByLabelText('Manage system configuration');
+      expect(systemAdminCheckbox).toBeDisabled();
+    });
+  });
+
+  it('excludes the user role from the manageable list', async () => {
+    const user = { id: 7 } as User;
+    render(<UserPermissionForm user={user} ssoManagedProviders={[]} />, { wrapper: TestWrapper });
+
+    await waitFor(() => expect(screen.getByLabelText('Manage resources')).toBeInTheDocument());
+    // 'user' is in NON_MANAGEABLE_ROLE_KEYS — no toggle should be rendered for it
+    expect(screen.queryByLabelText('User')).not.toBeInTheDocument();
+  });
+
+  it('shows a custom role using role.name as label when no translation key exists', async () => {
+    const user = { id: 7 } as User;
+    render(<UserPermissionForm user={user} ssoManagedProviders={[]} />, { wrapper: TestWrapper });
+
+    // Custom role has no translation entry — must fall back to role.name
+    await waitFor(() => expect(screen.getByLabelText('My Custom Role')).toBeInTheDocument());
   });
 });

@@ -1,0 +1,5 @@
+{
+  "title": "Nutzungsnotiz hinzugefügt für {resourceName}",
+  "body": "{authorName}: {note}",
+  "fallbackUser": "Ein Benutzer"
+}

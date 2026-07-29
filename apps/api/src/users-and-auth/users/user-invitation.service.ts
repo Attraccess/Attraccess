@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
-import { SystemPermissions, User } from '@attraccess/database-entities';
+import { User } from '@attraccess/database-entities';
 import { EntityManager } from 'typeorm';
 import { parse as parseCsv } from 'csv-parse';
 import { Readable } from 'stream';
@@ -29,8 +29,8 @@ export class UserInvitationService {
   ) {}
 
   private async inviteUsersTransactional(
-    candidates: Array<{ username: string; email: string; systemPermissions: Partial<SystemPermissions> }>,
-    options?: { grantAllPermissionsToFirst?: boolean },
+    candidates: Array<{ username: string; email: string; locale?: string; roleKey?: string }>,
+    options?: { grantAllPermissionsToFirst?: boolean; actorId?: number },
   ): Promise<User[]> {
     await this.usersService.ensureLicenseForNewUsers(candidates.length);
 
@@ -39,6 +39,7 @@ export class UserInvitationService {
         const createdUsers = await this.usersService.createMany(candidates, {
           grantAllPermissionsToFirst: options?.grantAllPermissionsToFirst ?? false,
           manager,
+          actorId: options?.actorId,
         });
 
         for (const user of createdUsers) {
@@ -55,7 +56,7 @@ export class UserInvitationService {
     file: FileUpload | undefined,
     config: CsvInviteConfigDto,
   ): Promise<{
-    candidates: Array<{ username: string; email: string; systemPermissions: Partial<SystemPermissions>; row: number }>;
+    candidates: Array<{ username: string; email: string; row: number }>;
     errors: CsvInviteRowErrorDto[];
     emailRowMap: Map<string, number[]>;
     usernameRowMap: Map<string, number[]>;
@@ -81,8 +82,8 @@ export class UserInvitationService {
     const candidates: Array<{
       username: string;
       email: string;
-      systemPermissions: Partial<SystemPermissions>;
       row: number;
+      roleKey?: string;
     }> = [];
     const errors: CsvInviteRowErrorDto[] = [];
     const ignoredRows = new Set(config.ignoredRows ?? []);
@@ -163,31 +164,17 @@ export class UserInvitationService {
           usernameRowMap.set(normalizedUsername, [...(usernameRowMap.get(normalizedUsername) ?? []), rowNumber]);
         }
 
-        const systemPermissions: Partial<SystemPermissions> = {};
-        (
-          Object.entries(config.permissions ?? {}) as [
-            keyof SystemPermissions,
-            { keyMapping: string; yesValue: string },
-          ][]
-        )
-          .filter(([, mapping]) => !!mapping?.keyMapping)
-          .forEach(([permissionKey, mapping]) => {
-            const value = (rowData[mapping.keyMapping] ?? '').trim();
-            if (value === mapping.yesValue) {
-              systemPermissions[permissionKey] = true;
-            }
-          });
-
         if (rowErrors.length) {
           errors.push(...rowErrors);
           continue;
         }
 
+        const roleKey = config.roleKeyColumn ? (rowData[config.roleKeyColumn] ?? '').trim() || undefined : undefined;
         candidates.push({
           username: normalizedUsername,
           email,
-          systemPermissions,
           row: rowNumber,
+          roleKey,
         });
       }
     } catch (error) {
@@ -210,16 +197,10 @@ export class UserInvitationService {
     return { candidates, errors, emailRowMap, usernameRowMap };
   }
 
-  public async inviteUser(body: InviteUserDto): Promise<User> {
+  public async inviteUser(body: InviteUserDto, adminLocale?: string): Promise<User> {
     try {
       const [invited] = await this.inviteUsersTransactional(
-        [
-          {
-            username: body.username,
-            email: body.email,
-            systemPermissions: {},
-          },
-        ],
+        [{ username: body.username, email: body.email, locale: adminLocale }],
         { grantAllPermissionsToFirst: true },
       );
 
@@ -232,6 +213,8 @@ export class UserInvitationService {
   public async inviteUsersFromCsv(
     file: FileUpload | undefined,
     rawConfig: string | CsvInviteConfigDto,
+    adminLocale?: string,
+    actorId?: number,
   ): Promise<User[]> {
     let configPayload: CsvInviteConfigDto | string;
     try {
@@ -290,7 +273,10 @@ export class UserInvitationService {
     }
 
     try {
-      const invitedUsers = await this.inviteUsersTransactional(candidates, { grantAllPermissionsToFirst: true });
+      const invitedUsers = await this.inviteUsersTransactional(
+        candidates.map((c) => ({ ...c, locale: adminLocale })),
+        { grantAllPermissionsToFirst: true, actorId },
+      );
       return invitedUsers;
     } catch (error) {
       throw mapEmailSendError(error);

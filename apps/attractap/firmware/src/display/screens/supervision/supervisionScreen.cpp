@@ -1,0 +1,269 @@
+#include "supervisionScreen.hpp"
+#include <string>
+#include <functional>
+
+#include "platform.hpp"
+
+// Palette — shared with Enrollment/Reset screens for visual consistency (ATT-506).
+#define SUPERVISION_COLOR_BG 0x14142A
+#define SUPERVISION_COLOR_TEXT 0xFFFFFF
+#define SUPERVISION_COLOR_TITLE 0xB9B9D6
+#define SUPERVISION_COLOR_HINT 0x9A9AC0
+#define SUPERVISION_COLOR_ACCENT 0x7C4DFF
+#define SUPERVISION_COLOR_BAR_BG 0x2A2A40
+#define SUPERVISION_COLOR_WAITING 0xE6E6F0
+#define SUPERVISION_COLOR_VERIFYING 0xFFC107
+#define SUPERVISION_COLOR_SUCCESS 0x4CD964
+#define SUPERVISION_COLOR_ERROR 0xFF5252
+#define SUPERVISION_COLOR_CANCEL_BG 0x3A3A57
+
+void SupervisionScreen::init()
+{
+   if (this->screen)
+   {
+      return;
+   }
+
+   this->screen = lv_obj_create(NULL);
+   lv_obj_remove_flag(this->screen, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_set_flex_flow(this->screen, LV_FLEX_FLOW_COLUMN);
+   lv_obj_set_flex_align(this->screen, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+   lv_obj_set_style_bg_color(this->screen, lv_color_hex(SUPERVISION_COLOR_BG), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_bg_opa(this->screen, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_left(this->screen, 24, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_right(this->screen, 24, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_top(this->screen, 18, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_bottom(this->screen, 18, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_row(this->screen, 14, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   // Countdown bar — full width.
+   this->timeoutBar = lv_bar_create(this->screen);
+   lv_bar_set_range(this->timeoutBar, 0, 30);
+   lv_bar_set_value(this->timeoutBar, 30, LV_ANIM_OFF);
+   lv_obj_set_height(this->timeoutBar, 12);
+   lv_obj_set_width(this->timeoutBar, lv_pct(100));
+   lv_obj_set_style_radius(this->timeoutBar, 6, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_bg_color(this->timeoutBar, lv_color_hex(SUPERVISION_COLOR_BAR_BG), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_bg_opa(this->timeoutBar, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_bg_color(this->timeoutBar, lv_color_hex(SUPERVISION_COLOR_ACCENT), LV_PART_INDICATOR | LV_STATE_DEFAULT);
+   lv_obj_set_style_bg_opa(this->timeoutBar, 255, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+   lv_obj_set_style_radius(this->timeoutBar, 6, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+
+   // Title
+   lv_obj_t *title = lv_label_create(this->screen);
+   lv_obj_set_width(title, lv_pct(100));
+   lv_obj_set_height(title, LV_SIZE_CONTENT);
+   lv_label_set_text(title, "Aufsicht erforderlich");
+   lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(title, lv_color_hex(SUPERVISION_COLOR_TITLE), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_font(title, &lv_font_montserrat_28, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   // Requester — the person who wants to use the resource. Most prominent line.
+   this->requesterNameLabel = lv_label_create(this->screen);
+   lv_obj_set_width(this->requesterNameLabel, lv_pct(100));
+   lv_obj_set_height(this->requesterNameLabel, LV_SIZE_CONTENT);
+   lv_label_set_long_mode(this->requesterNameLabel, LV_LABEL_LONG_WRAP);
+   const char *initialName = this->requesterNameCache.length() > 0 ? this->requesterNameCache.c_str() : "...";
+   lv_label_set_text(this->requesterNameLabel, initialName);
+   lv_obj_set_style_text_align(this->requesterNameLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(this->requesterNameLabel, lv_color_hex(SUPERVISION_COLOR_TEXT), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_font(this->requesterNameLabel, &lv_font_montserrat_36, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   // Status line — colour + text reflect the current supervision phase.
+   this->statusLabel = lv_label_create(this->screen);
+   lv_obj_set_width(this->statusLabel, lv_pct(100));
+   lv_obj_set_height(this->statusLabel, LV_SIZE_CONTENT);
+   lv_label_set_long_mode(this->statusLabel, LV_LABEL_LONG_WRAP);
+   lv_obj_set_style_text_align(this->statusLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_font(this->statusLabel, &lv_font_montserrat_28, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   // Secondary hint — who may approve + the web fallback note.
+   this->hintLabel = lv_label_create(this->screen);
+   lv_obj_set_width(this->hintLabel, lv_pct(100));
+   lv_obj_set_height(this->hintLabel, LV_SIZE_CONTENT);
+   lv_label_set_long_mode(this->hintLabel, LV_LABEL_LONG_WRAP);
+   lv_label_set_text(this->hintLabel, this->hintCache.c_str());
+   lv_obj_set_style_text_align(this->hintLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(this->hintLabel, lv_color_hex(SUPERVISION_COLOR_HINT), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_font(this->hintLabel, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   // Cancel button — lets the user abort the supervised start.
+   this->cancelButton = lv_button_create(this->screen);
+   lv_obj_set_width(this->cancelButton, lv_pct(80));
+   lv_obj_set_height(this->cancelButton, 56);
+   lv_obj_remove_flag(this->cancelButton, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_set_style_bg_color(this->cancelButton, lv_color_hex(SUPERVISION_COLOR_CANCEL_BG), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_bg_opa(this->cancelButton, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_radius(this->cancelButton, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_add_event_cb(this->cancelButton, &SupervisionScreen::onCancelButtonEvent, LV_EVENT_CLICKED, this);
+
+   lv_obj_t *cancelLabel = lv_label_create(this->cancelButton);
+   lv_obj_set_align(cancelLabel, LV_ALIGN_CENTER);
+   lv_label_set_text(cancelLabel, "Abbrechen");
+   lv_obj_set_style_text_color(cancelLabel, lv_color_hex(SUPERVISION_COLOR_TEXT), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_font(cancelLabel, &lv_font_montserrat_24, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   this->updateTimeoutBar();
+   this->applyStatus();
+}
+
+void SupervisionScreen::loop()
+{
+   this->updateTimeoutBar();
+}
+
+void SupervisionScreen::updateTimeoutBar()
+{
+   if (!this->timeoutBar)
+   {
+      return;
+   }
+   uint32_t now = millis();
+   int32_t remainingSeconds = 0;
+   if (this->timeoutTime > now)
+   {
+      remainingSeconds = (int32_t)((this->timeoutTime - now) / 1000);
+   }
+   if (remainingSeconds > 30)
+   {
+      remainingSeconds = 30;
+   }
+   lv_bar_set_value(this->timeoutBar, remainingSeconds, LV_ANIM_ON);
+}
+
+void SupervisionScreen::applyStatus()
+{
+   if (!this->statusLabel)
+   {
+      return;
+   }
+
+   const char *text = "";
+   uint32_t color = SUPERVISION_COLOR_WAITING;
+   switch (this->status)
+   {
+   case STATUS_WAITING:
+      text = "Tutor-Karte auflegen";
+      color = SUPERVISION_COLOR_WAITING;
+      break;
+   case STATUS_VERIFYING:
+      text = "Karte gelesen...\nbitte nicht bewegen";
+      color = SUPERVISION_COLOR_VERIFYING;
+      break;
+   case STATUS_SUCCESS:
+      text = "Freigegeben!";
+      color = SUPERVISION_COLOR_SUCCESS;
+      break;
+   case STATUS_ERROR:
+      text = this->statusMessageOverride.length() > 0 ? this->statusMessageOverride.c_str() : "Fehler";
+      color = SUPERVISION_COLOR_ERROR;
+      break;
+   }
+
+   lv_label_set_text(this->statusLabel, text);
+   lv_obj_set_style_text_color(this->statusLabel, lv_color_hex(color), LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   // Hide the cancel button once approved — nothing left to cancel.
+   if (this->cancelButton)
+   {
+      if (this->status == STATUS_SUCCESS)
+      {
+         lv_obj_add_flag(this->cancelButton, LV_OBJ_FLAG_HIDDEN);
+      }
+      else
+      {
+         lv_obj_remove_flag(this->cancelButton, LV_OBJ_FLAG_HIDDEN);
+      }
+   }
+}
+
+lv_obj_t *SupervisionScreen::getScreen()
+{
+   return this->screen;
+}
+
+void SupervisionScreen::setTimeoutTime(uint32_t timeoutTime)
+{
+   this->timeoutTime = timeoutTime;
+   this->updateTimeoutBar();
+}
+
+void SupervisionScreen::setRequesterName(std::string requesterName)
+{
+   this->requesterNameCache = requesterName;
+   if (this->requesterNameLabel)
+   {
+      lv_label_set_text(this->requesterNameLabel, requesterName.c_str());
+   }
+}
+
+void SupervisionScreen::setStatus(Status status)
+{
+   this->status = status;
+   if (status != STATUS_ERROR)
+   {
+      this->statusMessageOverride = "";
+   }
+   this->applyStatus();
+}
+
+void SupervisionScreen::setStatusMessage(const std::string &message)
+{
+   this->statusMessageOverride = message;
+   this->applyStatus();
+}
+
+void SupervisionScreen::setSupervisorHint(const std::string &hint)
+{
+   this->hintCache = hint;
+   if (this->hintLabel)
+   {
+      lv_label_set_text(this->hintLabel, hint.c_str());
+   }
+}
+
+void SupervisionScreen::setOnCancelCallback(std::function<void()> callback)
+{
+   this->onCancelCallback = callback;
+}
+
+void SupervisionScreen::onCancelButtonEvent(lv_event_t *e)
+{
+   SupervisionScreen *self = static_cast<SupervisionScreen *>(lv_event_get_user_data(e));
+   if (!self)
+   {
+      return;
+   }
+   if (lv_event_get_code(e) != LV_EVENT_CLICKED)
+   {
+      return;
+   }
+   if (self->onCancelCallback)
+   {
+      self->onCancelCallback();
+   }
+}
+
+std::string SupervisionScreen::getName()
+{
+   return "SupervisionScreen";
+}
+
+void SupervisionScreen::onScreenLeave()
+{
+}
+
+void SupervisionScreen::destroy()
+{
+   if (!this->screen)
+   {
+      return;
+   }
+   lv_obj_del(this->screen);
+   this->screen = nullptr;
+   this->timeoutBar = nullptr;
+   this->requesterNameLabel = nullptr;
+   this->statusLabel = nullptr;
+   this->hintLabel = nullptr;
+   this->cancelButton = nullptr;
+}

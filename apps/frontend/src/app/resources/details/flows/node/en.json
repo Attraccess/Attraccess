@@ -125,6 +125,85 @@
           }
         }
       },
+      "companion": {
+        "idle": {
+          "title": "Companion: machine idle",
+          "description": "Fires when a companion device's machine has been idle for the configured threshold.",
+          "outputs": {
+            "output": "Output"
+          },
+          "config": {
+            "deviceId": {
+              "label": "Companion device",
+              "placeholder": "Select a device..."
+            }
+          }
+        },
+        "active": {
+          "title": "Companion: machine active",
+          "description": "Fires when a companion device's machine returns from idle.",
+          "outputs": {
+            "output": "Output"
+          },
+          "config": {
+            "deviceId": {
+              "label": "Companion device",
+              "placeholder": "Select a device..."
+            }
+          }
+        },
+        "foreground_app_changed": {
+          "title": "Companion: foreground app changed",
+          "description": "Fires whenever the focused application changes on a companion device. Payload includes appName, bundleId (macOS only), and pid.",
+          "outputs": {
+            "output": "Output"
+          },
+          "config": {
+            "deviceId": {
+              "label": "Companion device",
+              "placeholder": "Select a device..."
+            }
+          }
+        },
+        "usb_device_connected": {
+          "title": "Companion: USB device connected",
+          "description": "Fires when a USB device is connected to a companion device. Payload includes vendorId, productId, manufacturer, product and serialNumber.",
+          "outputs": {
+            "output": "Output"
+          },
+          "config": {
+            "deviceId": {
+              "label": "Companion device",
+              "placeholder": "Select a device..."
+            },
+            "vendorId": {
+              "label": "Vendor ID filter (optional, decimal)"
+            },
+            "productId": {
+              "label": "Product ID filter (optional, decimal)"
+            }
+          }
+        },
+        "usb_device_disconnected": {
+          "title": "Companion: USB device disconnected",
+          "description": "Fires when a USB device is disconnected from a companion device. Payload includes vendorId and productId.",
+          "outputs": {
+            "output": "Output"
+          },
+          "config": {
+            "deviceId": {
+              "label": "Companion device",
+              "placeholder": "Select a device..."
+            },
+            "vendorId": {
+              "label": "Vendor ID filter (optional, decimal)"
+            },
+            "productId": {
+              "label": "Product ID filter (optional, decimal)"
+            }
+          }
+        }
+      },
       "variable": {
         "changed": {
           "title": "Variable changed",
@@ -445,6 +524,32 @@
               }
             },
             "retain": { "label": "Retain message" }
+          }
+        }
+      },
+      "companion": {
+        "lock-pc": {
+          "title": "Lock PC",
+          "description": "Locks the screen on a registered companion device.",
+          "inputs": { "input": "Input" },
+          "outputs": { "output": "Output" },
+          "config": {
+            "deviceId": {
+              "label": "Companion device",
+              "placeholder": "Select a device..."
+            }
+          }
+        },
+        "unlock-pc": {
+          "title": "Unlock PC",
+          "description": "Unlocks the screen on a registered companion device.",
+          "inputs": { "input": "Input" },
+          "outputs": { "output": "Output" },
+          "config": {
+            "deviceId": {
+              "label": "Companion device",
+              "placeholder": "Select a device..."
+            }
           }
         }
       },

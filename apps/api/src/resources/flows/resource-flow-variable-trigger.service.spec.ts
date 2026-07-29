@@ -6,7 +6,7 @@ import {
   ResourceFlowNodeType,
   ResourceFlowVariableScope,
 } from '@attraccess/database-entities';
-import { FlowVariableChangedEvent } from './events/flow-variable-changed.event';
+import { ResourceFlowVariableChangedEvent } from './events/flow-variable-changed.event';
 import { ResourceFlowVariableTriggerService } from './resource-flow-variable-trigger.service';
 import { ResourceFlowsExecutorService } from './resource-flows-executor.service';
 import { ResourceFlowVariablesService } from './resource-flow-variables.service';
@@ -56,7 +56,7 @@ describe('ResourceFlowVariableTriggerService', () => {
     ]);
 
     await triggerService.handle(
-      new FlowVariableChangedEvent(ResourceFlowVariableScope.RESOURCE, 7, 'a', 0, 1, new Date(), 7),
+      new ResourceFlowVariableChangedEvent(ResourceFlowVariableScope.RESOURCE, 7, 'a', 0, 1, new Date(), 7),
     );
 
     expect(executor.startFlow).toHaveBeenCalledTimes(1);
@@ -69,7 +69,7 @@ describe('ResourceFlowVariableTriggerService', () => {
     ]);
 
     await triggerService.handle(
-      new FlowVariableChangedEvent(ResourceFlowVariableScope.GLOBAL, null, 'k', 0, 1, new Date(), 7),
+      new ResourceFlowVariableChangedEvent(ResourceFlowVariableScope.GLOBAL, null, 'k', 0, 1, new Date(), 7),
     );
 
     expect(executor.startFlow).not.toHaveBeenCalled();
@@ -80,7 +80,7 @@ describe('ResourceFlowVariableTriggerService', () => {
     const changedAt = new Date();
 
     await triggerService.handle(
-      new FlowVariableChangedEvent(ResourceFlowVariableScope.GLOBAL, null, 'k', 0, 9, changedAt, 8),
+      new ResourceFlowVariableChangedEvent(ResourceFlowVariableScope.GLOBAL, null, 'k', 0, 9, changedAt, 8),
     );
 
     const [, input] = executor.startFlow.mock.calls[0];

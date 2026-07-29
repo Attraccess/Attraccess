@@ -10,7 +10,6 @@ import {
 import { ApiProperty } from '@nestjs/swagger';
 import { Exclude } from 'class-transformer';
 import { SSOProvider } from './ssoProvider.entity';
-import { SystemPermission } from './user.entity';
 
 @Entity()
 export class SSOProviderSAMLConfiguration {
@@ -108,16 +107,17 @@ export class SSOProviderSAMLConfiguration {
   @Exclude()
   provisioningSecret?: string | null;
 
-  @Column({ type: 'json', nullable: true })
+  // ponytail: keeps the legacy 'permissionMappings' DB column — renaming it would need a migration for zero gain
+  @Column({ type: 'json', nullable: true, name: 'permissionMappings' })
   @ApiProperty({
-    description: 'Optional mapping between Attraccess permissions and SAML role attribute values',
+    description: 'Mapping between Attraccess role keys and SAML role/group attribute values',
     required: false,
     example: {
-      canManageSystemConfiguration: ['attraccess_config_admin'],
-      canManageBilling: ['attraccess_billing'],
+      'system-admin': ['attraccess_config_admin'],
+      'billing-manager': ['attraccess_billing'],
     },
   })
-  permissionMappings?: Partial<Record<SystemPermission, string[]>> | null;
+  roleMappings?: Record<string, string[]> | null;
 
   @Column({ type: 'text', nullable: true })
   @ApiProperty({

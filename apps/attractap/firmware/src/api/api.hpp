@@ -1,10 +1,17 @@
 #pragma once
 
+#include <functional>
+
 #include <ArduinoJson.h>
+#include <string>
 #include "../settings/settings.hpp"
 #include "state/state.hpp"
 #include "../logger/logger.hpp"
+#ifdef DEMO_MODE
+#include "demo_websocket.hpp"
+#else
 #include "../websocket/websocket.hpp"
+#endif
 #include "../utils.hpp"
 #include "ota/ota_updater.hpp"
 
@@ -15,7 +22,9 @@ public:
             firmware(
                 logger,
                 [this](const char *type, JsonObject payload)
-                { this->sendMessage(type, payload); },
+                { return this->sendMessage(type, payload); },
+                [this](const char *reason)
+                { this->websocket.forceReconnect(reason); },
                 firmwareUpdateProgressCallback,
                 firmwareUpdateMetaCallback,
                 errorCallback) {}
@@ -70,7 +79,7 @@ public:
     struct Project
     {
         uint32_t id;
-        String name;
+        std::string name;
     };
     struct ProjectsOfUserResponse
     {
@@ -104,7 +113,7 @@ public:
         struct
         {
             bool hasPlaceholder = false;
-            String placeholder;
+            std::string placeholder;
             bool multiline = false;
         } text;
         struct
@@ -119,7 +128,7 @@ public:
         struct
         {
             uint8_t count = 0;
-            String values[MAX_SELECT_OPTIONS];
+            std::string values[MAX_SELECT_OPTIONS];
         } select;
     };
 
@@ -128,17 +137,17 @@ public:
         uint32_t id = 0;
         ResourceUsageFormFieldType type = ResourceUsageFormFieldType::UNKNOWN;
         bool isRequired = false;
-        String name;
-        String description;
+        std::string name;
+        std::string description;
         ResourceUsageFormFieldOptions options;
         bool hasValue = false;
-        String value;
+        std::string value;
     };
 
     struct ResourceUsageFormMeta
     {
         uint32_t id = 0;
-        String name;
+        std::string name;
         uint32_t fieldCount = 0;
     };
 
@@ -146,7 +155,7 @@ public:
     {
         uint32_t resourceId = 0;
         ResourceUsageFormActionType action = ResourceUsageFormActionType::UNKNOWN;
-        String resourceName;
+        std::string resourceName;
         uint8_t formCount = 0;
         ResourceUsageFormMeta forms[MAX_FORMS_PER_REQUEST];
     };
@@ -171,7 +180,7 @@ public:
             NUMBER,
             BOOLEAN,
         } type = ValueType::STRING;
-        String stringValue;
+        std::string stringValue;
         double numberValue = 0;
         bool boolValue = false;
     };
@@ -195,7 +204,7 @@ public:
         struct Error
         {
             uint32_t fieldId = 0;
-            String message;
+            std::string message;
         } errors[MAX_FORM_PAGE_ERRORS];
     };
 
@@ -207,17 +216,56 @@ public:
         uint8_t keyNo;
         uint8_t keyBytes[16];
         uint8_t keyLen;
-        String error;
-        String username;
+        std::string error;
+        std::string username;
         bool canManageResource;
         bool hasIntroduction;
         bool isIntroducer;
+        // Two-card supervision (ATT-493). supervisionMode is the resource policy; requiresSupervisor
+        // is the server's verdict for this user (true => starting a session requires supervisor
+        // approval; authentication itself still unlocks the resource details screen).
+        std::string supervisionMode;
+        bool requiresSupervisor;
     };
     void setCardAuthenticationDetailsResponseCallback(std::function<void(CardAuthenticationDetailsResponse)> callback);
 
-    void setEnrollNewCardGetAvailableKeyNoCallback(std::function<void(String username)> callback);
-    void setEnrollNewCardCallback(std::function<void(uint8_t keyNo, String key)> callback);
-    void setEnrollNewCardErrorCallback(std::function<void(String error)> callback);
+    // --- Two-card supervision (ATT-493) -------------------------------------------------------
+    // After a non-introduced user authenticates, the reader asks the server to open a supervision
+    // request. The request is broadcast to eligible supervisors over the web (SSE) while the reader
+    // simultaneously waits for one of them to tap their card. Either channel resolves the request.
+    struct SupervisionRequestResult
+    {
+        bool success = false;
+        std::string error;
+        uint32_t timeoutMs = 0;
+        uint8_t supervisorCount = 0;
+        std::string supervisorNames[MAX_INTRODUCERS];
+    };
+    struct SupervisorCardAuthenticationResponse
+    {
+        uint8_t keyNo = 0;
+        uint8_t keyBytes[16] = {0};
+        uint8_t keyLen = 0;
+        std::string error;
+        std::string username;
+    };
+    struct SupervisionResolvedResult
+    {
+        bool success = false;
+        std::string error;
+        std::string supervisorUsername;
+    };
+
+    void requestSupervision(uint32_t resourceId);
+    void requestSupervisorCardAuthenticationData(uint8_t *uid, uint8_t uidLength, uint32_t resourceId);
+    void cancelSupervision();
+    void setSupervisionRequestResultCallback(std::function<void(SupervisionRequestResult)> callback);
+    void setSupervisorCardAuthenticationResponseCallback(std::function<void(SupervisorCardAuthenticationResponse)> callback);
+    void setSupervisionResolvedCallback(std::function<void(SupervisionResolvedResult)> callback);
+
+    void setEnrollNewCardGetAvailableKeyNoCallback(std::function<void(std::string username)> callback);
+    void setEnrollNewCardCallback(std::function<void(uint8_t keyNo, std::string key)> callback);
+    void setEnrollNewCardErrorCallback(std::function<void(std::string error)> callback);
 
     void sendEnrollNewCardAvailableKeyNo(uint8_t *uid, uint8_t uidLength, uint8_t keyNo);
     void sendEnrollNewCard(bool success);
@@ -226,11 +274,11 @@ public:
     // Card reset/deletion. The server already knows the card's stored key + slot
     // (it is being deleted from the DB), so it hands them to the reader in a
     // single RESET_NFC_CARD event — no key round-trip like enrollment.
-    void setResetNfcCardCallback(std::function<void(String username, uint8_t keyNo, String key)> callback);
+    void setResetNfcCardCallback(std::function<void(std::string username, uint8_t keyNo, std::string key)> callback);
     void sendResetNfcCard(bool success);
     void sendResetNfcCardCancel();
 
-    void startResourceUsageSession(uint32_t resourceId, uint32_t projectId = 0);
+    void startResourceUsageSession(uint32_t resourceId, uint32_t projectId = 0, bool forceTakeOver = false);
     void stopResourceUsageSession(uint32_t resourceId);
     void requestFormFields(uint32_t resourceId, ResourceUsageFormActionType action, uint32_t formId, uint32_t offset, uint32_t limit);
     void submitFormPage(uint32_t resourceId, ResourceUsageFormActionType action, const FormPageSubmission &page);
@@ -241,11 +289,14 @@ public:
 
     void requestBillingTopup(uint32_t amountCents);
 
-    void onDeviceName(std::function<void(String)> callback);
+    void onDeviceName(std::function<void(std::string)> callback);
     void setLedBrightnessChangedCallback(std::function<void(uint8_t)> callback);
 
     void disableConnectionAttempts();
     void enableConnectionAttempts();
+
+    // Clear the locked TLS certificate decision (device settings button).
+    void resetCertificateTrust();
 
     // Error callback for server responses carrying an error field
     void setErrorCallback(std::function<void(const char *title, const char *message)> callback);
@@ -267,7 +318,11 @@ public:
 
 private:
     Logger logger;
+#ifdef DEMO_MODE
+    DemoWebsocket websocket;
+#else
     Websocket websocket;
+#endif
 
     void updateSateInfo();
 
@@ -278,8 +333,14 @@ private:
 
     std::function<void(const ResourceList &)> resourceListUpdateCallback;
     std::function<void(CardAuthenticationDetailsResponse)> cardAuthenticationDetailsResponseCallback;
+    std::function<void(SupervisionRequestResult)> supervisionRequestResultCallback;
+    std::function<void(SupervisorCardAuthenticationResponse)> supervisorCardAuthenticationResponseCallback;
+    std::function<void(SupervisionResolvedResult)> supervisionResolvedCallback;
+    void onSupervisionRequestResult(JsonObject data);
+    void onSupervisorCardAuthenticationData(JsonObject data);
+    void onSupervisionResolved(JsonObject data);
 
-    std::function<void(String)> deviceNameCallback;
+    std::function<void(std::string)> deviceNameCallback;
     std::function<void(uint8_t)> ledBrightnessChangedCallback;
 
     uint32_t lastRequestedProjectsOfUserPage = -1;
@@ -287,7 +348,7 @@ private:
 
     void sendAck(const char *type);
     void sendMessage(const char *type);
-    void sendMessage(const char *type, JsonObject payload);
+    bool sendMessage(const char *type, JsonObject payload);
     static constexpr size_t JSON_INBUF = 4608;
     static constexpr size_t JSON_OUTBUF_SMALL = 256;
     static constexpr size_t JSON_OUTBUF_AUTH = 1024;
@@ -334,9 +395,9 @@ private:
     void resetResourceUsageFormField(ResourceUsageFormField &field);
     void serializeFormPageSubmission(JsonObject payload, const FormPageSubmission &page);
 
-    std::function<void(String username)> enrollNewCardGetAvailableKeyNoCallback;
-    std::function<void(uint8_t keyNo, String key)> enrollNewCardCallback;
-    std::function<void(String error)> enrollNewCardErrorCallback;
+    std::function<void(std::string username)> enrollNewCardGetAvailableKeyNoCallback;
+    std::function<void(uint8_t keyNo, std::string key)> enrollNewCardCallback;
+    std::function<void(std::string error)> enrollNewCardErrorCallback;
 
     void onEnrollNewCardGetAvailableKeyNo(JsonObject data);
     void onEnrollNewCard(JsonObject data);
@@ -344,7 +405,7 @@ private:
     // back to the reader (e.g. CARD_ALREADY_ENROLLED).
     void onEnrollNewCardRequestNFCKeyError(JsonObject data);
 
-    std::function<void(String username, uint8_t keyNo, String key)> resetNfcCardCallback;
+    std::function<void(std::string username, uint8_t keyNo, std::string key)> resetNfcCardCallback;
     void onResetNfcCard(JsonObject data);
 
     std::function<void(const char *title, const char *message)> errorCallback;
@@ -354,11 +415,11 @@ private:
     // Firmware update progress callback with status enum
 public:
     void setFirmwareUpdateProgressCallback(std::function<void(int)> callback);
-    void setFirmwareUpdateMetaCallback(std::function<void(String availableVersion)> callback);
+    void setFirmwareUpdateMetaCallback(std::function<void(std::string availableVersion)> callback);
 
 private:
     std::function<void(int)> firmwareUpdateProgressCallback;
-    std::function<void(String availableVersion)> firmwareUpdateMetaCallback;
+    std::function<void(std::string availableVersion)> firmwareUpdateMetaCallback;
 
     OtaUpdater firmware;
 };

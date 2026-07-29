@@ -1,4 +1,17 @@
 services:
+  valkey:
+    image: valkey/valkey:8-alpine
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    volumes:
+      - valkey-data:/data
+    healthcheck:
+      test: ['CMD', 'valkey-cli', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
   mailpit:
     image: axllent/mailpit:v1.29.7
     ports:
@@ -185,8 +198,12 @@ services:
     command:
       - >
         set -e &&
-        rm -rf /grafana-provisioning/* /grafana-provisioning/.[!.]* 2>/dev/null || true &&
-        cp -rT /src/provisioning /grafana-provisioning &&
+        if [ -f /src/sync-managed-files.sh ]; then
+          sh /src/sync-managed-files.sh /src/provisioning /grafana-provisioning;
+        else
+          rm -rf /grafana-provisioning/* /grafana-provisioning/.[!.]* /grafana-provisioning/..?* 2>/dev/null || true;
+          cp -rT /src/provisioning /grafana-provisioning;
+        fi &&
         sh /src/prepare-provisioning.sh /grafana-provisioning
     volumes:
       - ./monitoring/grafana:/src:ro
@@ -239,4 +256,6 @@ volumes:
   grafana-data:
     driver: local
   grafana-provisioning:
+    driver: local
+  valkey-data:
     driver: local

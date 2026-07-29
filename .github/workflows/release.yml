@@ -59,7 +59,7 @@ jobs:
       - name: Build all projects
         env:
           NODE_ENV: production
-        run: pnpm nx run-many --target=build --parallel=5 --exclude=tag:scope:hardware,tag:type:plugin
+        run: pnpm nx run-many --target=build --parallel=5 --exclude=tag:scope:hardware,tag:type:plugin,tag:scope:companion
 
   plugins:
     runs-on: ubuntu-latest
@@ -91,36 +91,25 @@ jobs:
           files: dist/plugin-zips/*.zip
           fail_on_unmatched_files: true
 
+  build-companion:
+    uses: ./.github/workflows/build-companion-binaries.yml
+    secrets: inherit
+
   containerize:
-    needs: [lint, typecheck, test, build]
+    needs: [lint, typecheck, test, build, build-companion]
+    if: always() && !failure() && !cancelled()
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: ./.github/actions/build-attractap-firmware
 
-      - name: Login to Docker Hub
-        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Get Node.js Version
-        id: node-version
-        run: echo "NODE_VERSION=$(cat .nvmrc | tr -d '[:space:]')" >> $GITHUB_OUTPUT
+      - uses: ./.github/actions/download-companion
 
       - name: Get short SHA
         id: vars
         run: echo "SHORT_SHA=$(echo $GITHUB_SHA | cut -c1-7)" >> $GITHUB_OUTPUT
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
 
       - name: Compute Docker tags
         id: docker-tags
@@ -129,22 +118,21 @@ jobs:
           TAGS="${TAGS},${{ env.DOCKERHUB_IMAGE_NAME }}:${{ env.RELEASE_VERSION }}"
           TAGS="${TAGS},ghcr.io/${{ env.GHCR_IMAGE_NAME }}:${{ env.RELEASE_VERSION }}-${{ steps.vars.outputs.SHORT_SHA }}"
           TAGS="${TAGS},${{ env.DOCKERHUB_IMAGE_NAME }}:${{ env.RELEASE_VERSION }}-${{ steps.vars.outputs.SHORT_SHA }}"
-          if [[ "${{ github.event.release.prerelease }}" == "false" && "${{ github.event.release.target_commitish }}" == "main" ]]; then
+          # nx release sets target_commitish to a commit SHA (not "main"), so
+          # also accept the release's own commit — it was just pushed to main.
+          if [[ "${{ github.event.release.prerelease }}" == "false" && ("${{ github.event.release.target_commitish }}" == "main" || "${{ github.event.release.target_commitish }}" == "${{ github.sha }}") ]]; then
             TAGS="${TAGS},ghcr.io/${{ env.GHCR_IMAGE_NAME }}:latest"
             TAGS="${TAGS},${{ env.DOCKERHUB_IMAGE_NAME }}:latest"
           fi
           echo "TAGS=${TAGS}" >> $GITHUB_OUTPUT
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@b66d8774c665b789105b440514f0c97e6f19b06f
+        uses: ./.github/actions/docker-build-push
         with:
-          context: .
-          push: true
           tags: ${{ steps.docker-tags.outputs.TAGS }}
-          build-args: |
-            NODE_VERSION=${{ steps.node-version.outputs.NODE_VERSION }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          ghcr-token: ${{ secrets.GITHUB_TOKEN }}
+          dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
+          dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Update GitHub Release
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844
@@ -176,11 +164,15 @@ jobs:
           append_body: true
 
   balena:
-    needs: [lint, typecheck, test, build]
+    needs: [lint, typecheck, test, build, build-companion]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+
+      - uses: ./.github/actions/build-attractap-firmware
+
+      - uses: ./.github/actions/download-companion
 
       - uses: ./.github/actions/balena-push
         with:

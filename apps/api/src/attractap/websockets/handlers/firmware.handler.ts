@@ -117,7 +117,7 @@ export class AttractapFirmwareHandler {
             },
           }),
         );
-        this.metricsService.attractapFirmwareUpdatesTotal.inc();
+        this.metricsService.attractapFirmwareUpdatesTotal.inc({ reader_id: String(socket.readerId) });
       } catch (err) {
         this.logger.error(`Failed to prepare firmware update notice: ${(err as Error).message}`);
       }

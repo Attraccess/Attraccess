@@ -1,6 +1,8 @@
 {
   "title": "Flows für {{resourceName}}",
   "subtitle": "Mit Flows kannst du Arbeitsabläufe für deine Ressourcen automatisieren und beispielsweise Smarte Steckdosen oder Lampen ansteuern.",
+  "loading": "Flow wird geladen…",
+  "loadError": "Flow konnte nicht geladen werden. Bitte versuche es erneut.",
   "actions": {
     "export": "Exportieren",
     "import": "Importieren",

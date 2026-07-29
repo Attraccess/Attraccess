@@ -22,6 +22,14 @@ export enum AttractapEventType {
   RESOURCE_LIST = 'RESOURCE_LIST',
   REQUEST_CARD_AUTHENTICATION_DATA = 'REQUEST_CARD_AUTHENTICATION_DATA',
   CARD_AUTHENTICATION_DATA = 'CARD_AUTHENTICATION_DATA',
+  // Two-card supervision (ATT-493): a non-introduced user taps first, then a
+  // qualified supervisor either taps their card at the reader OR approves via
+  // the web popup (same pending request, two resolution channels).
+  SUPERVISION_REQUEST = 'SUPERVISION_REQUEST',
+  REQUEST_SUPERVISOR_CARD_AUTHENTICATION_DATA = 'REQUEST_SUPERVISOR_CARD_AUTHENTICATION_DATA',
+  SUPERVISOR_CARD_AUTHENTICATION_DATA = 'SUPERVISOR_CARD_AUTHENTICATION_DATA',
+  SUPERVISION_RESOLVED = 'SUPERVISION_RESOLVED',
+  SUPERVISION_CANCEL = 'SUPERVISION_CANCEL',
   START_RESOURCE_USAGE_SESSION = 'START_RESOURCE_USAGE_SESSION',
   STOP_RESOURCE_USAGE_SESSION = 'STOP_RESOURCE_USAGE_SESSION',
   LOCK_DOOR = 'LOCK_DOOR',
@@ -86,6 +94,7 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
   messageCount: number;
   id: string;
   readerId: Attractap['id'] | null;
+  readerName: string | null;
   sendMessage: (message: AttractapMessage) => Promise<void>;
   sendBinaryData: (data: Buffer) => void;
   state: {
@@ -99,6 +108,20 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
       cardId: number;
       key: string;
       keyNo: number;
+    } | null;
+    // Two-card supervision flow (ATT-493). Present while the reader is waiting
+    // for a supervisor to authorise a non-introduced user's session — either by
+    // tapping their card at the reader, or by approving the web popup. The
+    // requester stays in `lastAuthenticatedUserId`; the supervisor is tracked
+    // here separately so the session starts attributed to the requester with
+    // the supervisor attached.
+    supervisionFlow?: {
+      resourceId: number;
+      requesterUserId: number;
+      /** The in-memory supervision request id shared with the web-approval channel (null until created). */
+      requestId: string | null;
+      /** Set once a supervisor card has been validated at the reader; consumed by the session-start handler. */
+      approvedSupervisorUserId: number | null;
     } | null;
     ota?: {
       path: string;

@@ -1,6 +1,5 @@
 #pragma once
 
-#include <Arduino.h>
 #include "../settings/settings.hpp"
 #include "../logger/logger.hpp"
 

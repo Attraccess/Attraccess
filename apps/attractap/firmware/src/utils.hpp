@@ -1,9 +1,87 @@
 #pragma once
 
-#include <Arduino.h>
+#include <cstdint>
+#include <ctime>
+#include <string>
 
-String hexToString(uint8_t *uid, uint8_t uidLength);
-bool stringToHexArray(String hexString, uint8_t *array, uint8_t arrayLength);
+#include "driver/i2c_master.h"
+
+/**
+ * Shared I2C bus clock (Hz). GT911 touch, PN532 NFC and the PCA9555 IO expander
+ * all support 400 kHz Fast Mode, but field testing on reader-21 showed the bus
+ * wedging once NFC traffic starts (ATT-554 crash + follow-up reports), so the
+ * 400 kHz change (item 3) is reverted to the proven 100 kHz while the I2C
+ * problems are isolated. Must be re-applied after every Wire.begin(), because
+ * library begin() calls (SensorLib, Adafruit BusIO) re-invoke Wire.begin() and
+ * can reset the clock - same pitfall as the Wire.setTimeOut(50) restores.
+ */
+static constexpr uint32_t ATTRACTAP_I2C_CLOCK_HZ = 400000;
+
+/**
+ * Per-transaction I2C timeout, parity with the old Wire.setTimeOut(50):
+ * prevents a stuck slave from stalling a task indefinitely.
+ */
+static constexpr int ATTRACTAP_I2C_XFER_TIMEOUT_MS = 50;
+
+/**
+ * Shared I2C master bus (i2c_master driver). One physical bus on every
+ * variant: PN532 NFC, touch controller and IO expander all hang off it.
+ * initSharedI2CBus() must run once in app_main before any device is added;
+ * the clock is configured per device in addSharedI2CDevice (the new driver
+ * has no bus-global clock, which retires the old "library X reset my bus
+ * clock" workarounds for good).
+ */
+bool initSharedI2CBus(int sda, int scl);
+i2c_master_bus_handle_t getSharedI2CBus();
+i2c_master_dev_handle_t addSharedI2CDevice(uint8_t address7bit, uint32_t sclSpeedHz = ATTRACTAP_I2C_CLOCK_HZ);
+
+std::string hexToString(const uint8_t *uid, uint8_t uidLength);
+bool stringToHexArray(const std::string &hexString, uint8_t *array, uint8_t arrayLength);
+
+// In-place ASCII whitespace trim (replacement for Arduino String::trim()).
+void trimString(std::string &s);
+
+/**
+ * Global lock serializing all traffic on the shared I2C bus.
+ *
+ * PN532 (NfcTask), GT911 touch (LvglTask) and the IO expander (main loop /
+ * LVGL callbacks) share one physical bus but run on different FreeRTOS tasks
+ * since ATT-554. TwoWire's internal lock only serializes single transactions;
+ * a PN532 conversation (write command, poll ready, read frame — with clock
+ * stretching in between) interleaved with GT911/IO-expander transactions can
+ * wedge the ESP-IDF I2C driver: a field coredump showed LvglTask stuck inside
+ * an I2C read holding the TwoWire lock, NfcTask blocked forever on that lock
+ * while holding its NFC op mutex, and loopTask blocked on lv_lock until the
+ * task watchdog rebooted the reader.
+ *
+ * Rules:
+ * - Hold the lock for one complete logical transaction/conversation
+ *   (full PN532 command+response exchange, one GT911 point read, one IO
+ *   expander register access).
+ * - The lock is strictly a LEAF lock: while holding it, never take lv_lock,
+ *   never fire application callbacks, never block on queues/other mutexes.
+ * - Recursive, so nested NFC helpers (e.g. getAvailableKeyNo -> authenticate)
+ *   are safe on the same task.
+ */
+class I2CBusLock
+{
+public:
+    // Must run before any secondary task can touch the bus (called from setup()
+    // in main.cpp right after Wire.begin()).
+    static void init();
+    static void lock();
+    static void unlock();
+};
+
+// RAII guard for I2CBusLock — every exit path releases the bus.
+class I2CBusGuard
+{
+public:
+    I2CBusGuard() { I2CBusLock::lock(); }
+    ~I2CBusGuard() { I2CBusLock::unlock(); }
+    I2CBusGuard(const I2CBusGuard &) = delete;
+    I2CBusGuard &operator=(const I2CBusGuard &) = delete;
+};
 
 /**
  * @brief Recover a stuck I2C bus by bit-banging 9 SCL clock pulses then a STOP.
@@ -22,7 +100,7 @@ void recoverI2CBus(int sda, int scl);
  * @param millis The milliseconds to convert
  * @return The time string
  */
-String millisToTimeString(double millis);
+std::string millisToTimeString(double millis);
 
 /**
  * @brief Convert a UTC time_t to a time string in the format "DD.MM. HH:MM"
@@ -30,7 +108,7 @@ String millisToTimeString(double millis);
  * @param utcOffsetMinutes Minutes east of UTC to apply before formatting (0 = render UTC)
  * @return The time string
  */
-String timeToTimeString(time_t time, int utcOffsetMinutes = 0);
+std::string timeToTimeString(time_t time, int utcOffsetMinutes = 0);
 
 /**
  * @brief Parse an ISO8601 datetime string (e.g. "2025-10-16T12:34:56Z" or with offset) to time_t (UTC)
@@ -43,7 +121,7 @@ String timeToTimeString(time_t time, int utcOffsetMinutes = 0);
  *
  * Returns (time_t)-1 on parse failure.
  */
-time_t parseIso8601ToTimeT(const String &iso8601);
+time_t parseIso8601ToTimeT(const std::string &iso8601);
 
 /**
  * @brief Translate a machine error key from the server into a human-readable
@@ -57,4 +135,4 @@ time_t parseIso8601ToTimeT(const String &iso8601);
  * @param errorKey The error key/string received from the server
  * @return Human-readable German error message
  */
-String translateReaderError(const String &errorKey);
+std::string translateReaderError(const std::string &errorKey);

@@ -24,6 +24,12 @@ function loadYaml(relativePath: string): string {
   return readFileSync(join(MONITORING_ROOT, relativePath), 'utf-8');
 }
 
+function expectAlertNoDataState(rulesYaml: string, title: string, noDataState: 'NoData' | 'OK'): void {
+  const block = rulesYaml.match(new RegExp(`title: ${title}[\\s\\S]*?(?=\\n\\s+- uid:|\\n\\s*$)`))?.[0];
+  expect(block).toBeDefined();
+  expect(block).toContain(`noDataState: ${noDataState}`);
+}
+
 function collectMetricNames(): Set<string> {
   const names = new Set<string>();
   const definitionsDir = join(METRICS_ROOT, 'definitions');
@@ -237,6 +243,7 @@ describe('Monitoring configuration consistency', () => {
       'HighHttpErrorRate',
       'HighRequestLatency',
       'HighFailedLoginRate',
+      'HighSsoLoginFailureRate',
       'OverdueMaintenance',
       // ATT-517 device + system health additions
       'AttractapAllReadersOffline',
@@ -248,17 +255,28 @@ describe('Monitoring configuration consistency', () => {
       'MqttServersUnhealthy',
       'EmailDeliveryFailures',
       'HighEventLoopLag',
-      'HighMemoryUsage',
+      'HighHostMemoryUsage',
+      'HighHostDiskUsage',
+      'HighAttraccessContainerMemoryUsage',
     ];
-
-    it('legacy prometheus alerts.yml no longer exists', () => {
-      expect(() => loadYaml('prometheus/alerts.yml')).toThrow();
-    });
 
     it('Grafana provisioned rules define all required alerts', () => {
       expect(grafanaRules).toContain('groups:');
       for (const alert of requiredAlerts) {
         expect(grafanaRules).toContain(alert);
+      }
+    });
+
+    it('only availability checks alert on missing data', () => {
+      const availabilityAlerts = ['AttractapServiceDown', 'ScrapeFailures'];
+      const metricValueAlerts = requiredAlerts.filter((alert) => !availabilityAlerts.includes(alert));
+
+      for (const alert of availabilityAlerts) {
+        expectAlertNoDataState(grafanaRules, alert, 'NoData');
+      }
+
+      for (const alert of metricValueAlerts) {
+        expectAlertNoDataState(grafanaRules, alert, 'OK');
       }
     });
 

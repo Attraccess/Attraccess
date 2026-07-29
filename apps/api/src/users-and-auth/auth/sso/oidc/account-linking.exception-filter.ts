@@ -3,12 +3,17 @@ import { Request, Response } from 'express';
 import { AccountLinkingRequiredException } from './exceptions/account-linking-required.exception';
 import { SSOLinkTokenService } from '../link-token.service';
 import { getRedirectToFromRequest } from './oidc-cookie-state-store';
+import { MetricsService } from '../../../../metrics/metrics.service';
+import { recordSsoLoginFailure } from '../sso-metrics';
 
 @Catch(AccountLinkingRequiredException)
 export class AccountLinkingExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(AccountLinkingExceptionFilter.name);
 
-  constructor(private readonly linkTokenService: SSOLinkTokenService) {}
+  constructor(
+    private readonly linkTokenService: SSOLinkTokenService,
+    private readonly metricsService: MetricsService,
+  ) {}
 
   async catch(exception: AccountLinkingRequiredException, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
@@ -16,6 +21,7 @@ export class AccountLinkingExceptionFilter implements ExceptionFilter {
     const request = ctx.getRequest() as Request;
 
     this.logger.log(`Account linking required for email: ${exception.email}`);
+    recordSsoLoginFailure(this.metricsService, exception.providerType, 'linking_failed', this.logger);
 
     const redirectTo = getRedirectToFromRequest(
       request as unknown as Record<string, unknown>,

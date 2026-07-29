@@ -4,11 +4,12 @@ import { SSOService } from './sso.service';
 import { AuthService } from '../auth.service';
 import { SessionService } from '../session.service';
 import { AuthenticationDetail, AuthenticationType, SSOProvider, SSOProviderType } from '@attraccess/database-entities';
-import { BadRequestException, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { CreateSSOProviderDto } from './dto/create-sso-provider.dto';
 import { UpdateSSOProviderDto } from './dto/update-sso-provider.dto';
 import { UsersService } from '../../users/users.service';
+import { RbacService } from '../../rbac/rbac.service';
 import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import type { Response, Request } from 'express';
 import { CookieConfigService } from '../../../common/services/cookie-config.service';
@@ -22,6 +23,7 @@ import { MetricsService } from '../../../metrics/metrics.service';
 
 const mockMetricsService = {
   authSsoLoginTotal: { inc: jest.fn() },
+  authSsoLoginFailuresTotal: { inc: jest.fn() },
 };
 
 describe('SsoController', () => {
@@ -46,14 +48,14 @@ describe('SsoController', () => {
       userInfoURL: 'https://test-issuer.com/userinfo',
       clientId: 'test-client-id',
       clientSecret: 'test-client-secret',
-      permissionMappings: {
-        canManageUsers: ['attraccess_admin'],
+      roleMappings: {
+        'user-manager': ['attraccess_admin'],
       },
       createdAt: new Date(),
       updatedAt: new Date(),
       ssoProvider: null,
     },
-  } as SSOProvider;
+  } as unknown as SSOProvider;
 
   const mockSamlProvider: SSOProvider = {
     id: 2,
@@ -72,14 +74,14 @@ describe('SsoController', () => {
       wantAuthnResponseSigned: true,
       forceAuthn: false,
       provisioningSecret: 'saml-secret',
-      permissionMappings: {
-        canManageBilling: ['billing-role'],
+      roleMappings: {
+        'billing-manager': ['billing-role'],
       },
       createdAt: new Date(),
       updatedAt: new Date(),
       ssoProvider: null,
     },
-  } as SSOProvider;
+  } as unknown as SSOProvider;
 
   beforeEach(async () => {
     module = await Test.createTestingModule({
@@ -121,6 +123,12 @@ describe('SsoController', () => {
             findOneBySSO: jest.fn(),
             updateOne: jest.fn(),
             deleteOne: jest.fn(),
+          },
+        },
+        {
+          provide: RbacService,
+          useValue: {
+            syncSsoRoles: jest.fn().mockResolvedValue(undefined),
           },
         },
         {
@@ -238,10 +246,28 @@ describe('SsoController', () => {
         name: 'Updated Provider',
       };
 
-      const result = await controller.updateOne('1', updateDto);
+      // Provider without permission mappings — no ceiling check triggered.
+      jest.spyOn(ssoService, 'getProviderById').mockResolvedValueOnce({
+        ...mockSSOProvider,
+        oidcConfiguration: { ...mockSSOProvider.oidcConfiguration, roleMappings: {} },
+      } as SSOProvider);
+
+      const mockReq = { user: { id: 1, effectivePermissions: new Set(['users.roles.manage']) } } as unknown as AuthenticatedRequest;
+      const result = await controller.updateOne('1', updateDto, mockReq);
 
       expect(result).toEqual(mockSSOProvider);
       expect(ssoService.updateProvider).toHaveBeenCalledWith(1, updateDto);
+    });
+
+    it('gates explicit null roleMappings behind users.roles.manage', async () => {
+      const updateDto = {
+        oidcConfiguration: { roleMappings: null },
+      } as unknown as UpdateSSOProviderDto;
+
+      const mockReq = { user: { id: 1, effectivePermissions: new Set<string>() } } as unknown as AuthenticatedRequest;
+
+      await expect(controller.updateOne('1', updateDto, mockReq)).rejects.toThrow(ForbiddenException);
+      expect(ssoService.updateProvider).not.toHaveBeenCalled();
     });
   });
 
@@ -612,10 +638,7 @@ describe('SsoController', () => {
       const usersService = module.get<UsersService>(UsersService);
       const sessionService = module.get<SessionService>(SessionService);
 
-      (usersService.findOneBySSO as jest.Mock).mockResolvedValue({
-        id: 55,
-        systemPermissions: {},
-      });
+      (usersService.findOneBySSO as jest.Mock).mockResolvedValue({ id: 55 });
 
       const mockRequest = {
         headers: { authorization: 'Bearer test-client-secret' },
@@ -630,10 +653,7 @@ describe('SsoController', () => {
     it('deletes users for oidc delete requests', async () => {
       const usersService = module.get<UsersService>(UsersService);
 
-      (usersService.findOneBySSO as jest.Mock).mockResolvedValue({
-        id: 77,
-        systemPermissions: {},
-      });
+      (usersService.findOneBySSO as jest.Mock).mockResolvedValue({ id: 77 });
 
       const mockRequest = {
         headers: { authorization: 'Bearer test-client-secret' },
@@ -645,18 +665,11 @@ describe('SsoController', () => {
       expect(usersService.deleteOne).toHaveBeenCalledWith(77);
     });
 
-    it('updates permissions for oidc permission requests', async () => {
+    it('does not sync RBAC roles when roles field is absent (incremental provisioning)', async () => {
       const usersService = module.get<UsersService>(UsersService);
+      const rbacService = module.get<RbacService>(RbacService);
 
-      (usersService.findOneBySSO as jest.Mock).mockResolvedValue({
-        id: 88,
-        systemPermissions: {
-          canManageResources: false,
-          canManageSystemConfiguration: false,
-          canManageUsers: false,
-          canManageBilling: false,
-        },
-      });
+      (usersService.findOneBySSO as jest.Mock).mockResolvedValue({ id: 88 });
 
       const mockRequest = {
         headers: { authorization: 'Bearer test-client-secret' },
@@ -664,33 +677,17 @@ describe('SsoController', () => {
 
       const result = await controller.oidcUpdatePermissions('1', mockRequest as unknown as Request, {
         subject: 'sub-3',
-        canManageUsers: true,
-        canManageBilling: true,
       });
 
       expect(result).toEqual({ OK: true });
-      expect(usersService.updateOne).toHaveBeenCalledWith(88, {
-        systemPermissions: {
-          canManageResources: false,
-          canManageSystemConfiguration: false,
-          canManageUsers: true,
-          canManageBilling: true,
-        },
-      });
+      expect(rbacService.syncSsoRoles).not.toHaveBeenCalled();
     });
 
     it('maps role names using provider permission mappings', async () => {
       const usersService = module.get<UsersService>(UsersService);
+      const rbacService = module.get<RbacService>(RbacService);
 
-      (usersService.findOneBySSO as jest.Mock).mockResolvedValue({
-        id: 99,
-        systemPermissions: {
-          canManageResources: false,
-          canManageSystemConfiguration: false,
-          canManageUsers: false,
-          canManageBilling: false,
-        },
-      });
+      (usersService.findOneBySSO as jest.Mock).mockResolvedValue({ id: 99 });
 
       const mockRequest = {
         headers: { authorization: 'Bearer test-client-secret' },
@@ -702,14 +699,13 @@ describe('SsoController', () => {
       });
 
       expect(result).toEqual({ OK: true });
-      expect(usersService.updateOne).toHaveBeenCalledWith(99, {
-        systemPermissions: {
-          canManageResources: false,
-          canManageSystemConfiguration: false,
-          canManageUsers: true,
-          canManageBilling: false,
-        },
-      });
+      // 'attraccess_admin' → 'user-manager' via provider's roleMappings
+      expect(rbacService.syncSsoRoles).toHaveBeenCalledWith(
+        99,
+        expect.arrayContaining([expect.objectContaining({ roleKey: 'user-manager' })]),
+        SSOProviderType.OIDC,
+        1,
+      );
     });
 
     it('handles SAML provisioning logout', async () => {
@@ -721,7 +717,6 @@ describe('SsoController', () => {
         id: 101,
         externalIdentifier: 'saml-user',
         authenticationDetails: [],
-        systemPermissions: {},
       });
 
       const mockRequest = {
@@ -742,7 +737,6 @@ describe('SsoController', () => {
         id: 102,
         externalIdentifier: 'saml-user-2',
         authenticationDetails: [],
-        systemPermissions: {},
       });
 
       const mockRequest = {
@@ -757,18 +751,13 @@ describe('SsoController', () => {
 
     it('handles SAML provisioning permission updates', async () => {
       const usersService = module.get<UsersService>(UsersService);
+      const rbacService = module.get<RbacService>(RbacService);
       jest.spyOn(ssoService, 'getProviderByTypeAndIdWithConfiguration').mockResolvedValueOnce(mockSamlProvider);
 
       (usersService.findOne as jest.Mock).mockResolvedValue({
         id: 103,
         externalIdentifier: 'saml-user-3',
         authenticationDetails: [],
-        systemPermissions: {
-          canManageResources: false,
-          canManageSystemConfiguration: false,
-          canManageUsers: false,
-          canManageBilling: false,
-        },
       });
 
       const mockRequest = {
@@ -781,14 +770,13 @@ describe('SsoController', () => {
       });
 
       expect(result).toEqual({ OK: true });
-      expect(usersService.updateOne).toHaveBeenCalledWith(103, {
-        systemPermissions: {
-          canManageResources: false,
-          canManageSystemConfiguration: false,
-          canManageUsers: false,
-          canManageBilling: true,
-        },
-      });
+      // 'billing-role' → 'billing-manager' via SAML provider's roleMappings
+      expect(rbacService.syncSsoRoles).toHaveBeenCalledWith(
+        103,
+        expect.arrayContaining([expect.objectContaining({ roleKey: 'billing-manager' })]),
+        SSOProviderType.SAML,
+        2,
+      );
     });
   });
 });

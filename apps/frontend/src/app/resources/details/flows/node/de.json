@@ -125,6 +125,85 @@
           }
         }
       },
+      "companion": {
+        "idle": {
+          "title": "Companion: Gerät inaktiv",
+          "description": "Wird ausgelöst, wenn das Gerät eines Companion-Geräts für die konfigurierte Zeit inaktiv war.",
+          "outputs": {
+            "output": "Ausgabe"
+          },
+          "config": {
+            "deviceId": {
+              "label": "Companion-Gerät",
+              "placeholder": "Gerät auswählen..."
+            }
+          }
+        },
+        "active": {
+          "title": "Companion: Gerät aktiv",
+          "description": "Wird ausgelöst, wenn das Gerät eines Companion-Geräts wieder aktiv wird.",
+          "outputs": {
+            "output": "Ausgabe"
+          },
+          "config": {
+            "deviceId": {
+              "label": "Companion-Gerät",
+              "placeholder": "Gerät auswählen..."
+            }
+          }
+        },
+        "foreground_app_changed": {
+          "title": "Companion: Vordergrund-App geändert",
+          "description": "Wird ausgelöst, wenn sich die fokussierte Anwendung auf einem Companion-Gerät ändert. Payload enthält appName, bundleId (nur macOS) und pid.",
+          "outputs": {
+            "output": "Ausgabe"
+          },
+          "config": {
+            "deviceId": {
+              "label": "Companion-Gerät",
+              "placeholder": "Gerät auswählen..."
+            }
+          }
+        },
+        "usb_device_connected": {
+          "title": "Companion: USB-Gerät verbunden",
+          "description": "Wird ausgelöst, wenn ein USB-Gerät mit einem Companion-Gerät verbunden wird. Payload enthält vendorId, productId, manufacturer, product und serialNumber.",
+          "outputs": {
+            "output": "Ausgabe"
+          },
+          "config": {
+            "deviceId": {
+              "label": "Companion-Gerät",
+              "placeholder": "Gerät auswählen..."
+            },
+            "vendorId": {
+              "label": "Hersteller-ID Filter (optional, dezimal)"
+            },
+            "productId": {
+              "label": "Produkt-ID Filter (optional, dezimal)"
+            }
+          }
+        },
+        "usb_device_disconnected": {
+          "title": "Companion: USB-Gerät getrennt",
+          "description": "Wird ausgelöst, wenn ein USB-Gerät von einem Companion-Gerät getrennt wird. Payload enthält vendorId und productId.",
+          "outputs": {
+            "output": "Ausgabe"
+          },
+          "config": {
+            "deviceId": {
+              "label": "Companion-Gerät",
+              "placeholder": "Gerät auswählen..."
+            },
+            "vendorId": {
+              "label": "Hersteller-ID Filter (optional, dezimal)"
+            },
+            "productId": {
+              "label": "Produkt-ID Filter (optional, dezimal)"
+            }
+          }
+        }
+      },
       "variable": {
         "changed": {
           "title": "Variable geändert",
@@ -445,6 +524,32 @@
               }
             },
             "retain": { "label": "Nachricht behalten (retain)" }
+          }
+        }
+      },
+      "companion": {
+        "lock-pc": {
+          "title": "PC sperren",
+          "description": "Sperrt den Bildschirm eines registrierten Companion-Geräts.",
+          "inputs": { "input": "Eingabe" },
+          "outputs": { "output": "Ausgabe" },
+          "config": {
+            "deviceId": {
+              "label": "Companion-Gerät",
+              "placeholder": "Gerät auswählen..."
+            }
+          }
+        },
+        "unlock-pc": {
+          "title": "PC entsperren",
+          "description": "Entsperrt den Bildschirm eines registrierten Companion-Geräts.",
+          "inputs": { "input": "Eingabe" },
+          "outputs": { "output": "Ausgabe" },
+          "config": {
+            "deviceId": {
+              "label": "Companion-Gerät",
+              "placeholder": "Gerät auswählen..."
+            }
           }
         }
       },

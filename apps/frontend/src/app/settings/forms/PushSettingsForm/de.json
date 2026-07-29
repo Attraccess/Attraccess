@@ -1,0 +1,38 @@
+{
+  "loading": "Push-Konfiguration wird geladen...",
+  "publicKeyLabel": "VAPID-öffentlicher Schlüssel",
+  "copyButton": "Kopieren",
+  "copied": {
+    "title": "Kopiert",
+    "description": "Der öffentliche Schlüssel wurde in die Zwischenablage kopiert."
+  },
+  "copyFailed": {
+    "title": "Kopieren fehlgeschlagen",
+    "description": "Konnte nicht in die Zwischenablage kopieren."
+  },
+  "regenerateButton": "Schlüssel neu erzeugen",
+  "overrideTitle": "Eigene Schlüssel verwenden",
+  "overrideDescription": "Füge ein mit `npx web-push generate-vapid-keys` erzeugtes Schlüsselpaar ein. Beide Schlüssel sind erforderlich.",
+  "publicKeyInputLabel": "Eigener öffentlicher Schlüssel",
+  "privateKeyInputLabel": "Eigener privater Schlüssel",
+  "applyCustomButton": "Eigene Schlüssel anwenden",
+  "keysReplaced": {
+    "title": "VAPID-Schlüssel aktualisiert",
+    "description": "{{count}} Push-Abonnement(e) mit dem alten Schlüssel entfernt. Betroffene Nutzer müssen Push auf ihren Geräten erneut aktivieren."
+  },
+  "errors": {
+    "replaceFailed": "VAPID-Schlüssel konnten nicht aktualisiert werden."
+  },
+  "confirmWarning": {
+    "title": "VAPID-Schlüssel ersetzen?",
+    "description": "Dies löscht alle {{count}} Push-Abonnement(e). Jeder Nutzer muss Push-Benachrichtigungen auf jedem Gerät erneut aktivieren.",
+    "continue": "Weiter",
+    "cancel": "Abbrechen"
+  },
+  "confirmFinal": {
+    "title": "Bist du sicher?",
+    "description": "Dies kann nicht rückgängig gemacht werden. Nutzer erhalten keine Push-Benachrichtigungen mehr, bis sie den Schalter wieder aktivieren.",
+    "confirm": "Schlüssel ersetzen",
+    "cancel": "Zurück"
+  }
+}

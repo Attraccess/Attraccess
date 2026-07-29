@@ -1,18 +1,67 @@
-import { ResourceIntroducer, ResourceIntroducerType } from '@attraccess/database-entities';
-import { Inject, Injectable } from '@nestjs/common';
+import { ResourceIntroducer, ResourceIntroducerType, User } from '@attraccess/database-entities';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
 import { ResourceIntroducerChangedEvent } from './events/resource-introducer-changed.event';
+import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
+import { NotificationCategory } from '../../notifications/notification-types';
+import { createTranslator } from '../../i18n/translate';
+import * as en from './resourceIntroducers.en.json';
+import * as de from './resourceIntroducers.de.json';
+
+const t = createTranslator({ en, de });
 
 @Injectable()
 export class ResourceIntroducersService {
+  private readonly logger = new Logger(ResourceIntroducersService.name);
+
   constructor(
     @InjectRepository(ResourceIntroducer)
     private readonly resourceIntroducerRepository: Repository<ResourceIntroducer>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
     @Inject(EventEmitter2)
     private readonly eventEmitter: EventEmitter2,
+    private readonly notifications: NotificationDispatchService,
   ) {}
+
+  private notifyAccessChange(resourceId: number, userId: number, type: ResourceIntroducerType, granted: boolean): void {
+    const url = `/resources/${resourceId}`;
+    const bodyKey =
+      type === ResourceIntroducerType.MAINTAINER
+        ? granted
+          ? 'grantedMaintainer'
+          : 'revokedMaintainer'
+        : granted
+          ? 'grantedIntroducer'
+          : 'revokedIntroducer';
+
+    void this.userRepository
+      .findOne({ where: { id: userId }, select: ['id', 'locale'] })
+      .then((user) => {
+        const recipient = user ?? ({ id: userId } as User);
+        return this.notifications.dispatch({
+          category: NotificationCategory.ACCESS_CHANGES,
+          recipients: [recipient],
+          title: (r) => t(r.locale, 'title'),
+          body: (r) => t(r.locale, bodyKey, { resourceId }),
+          url,
+          dedupeKey: `resource-access-${resourceId}-${userId}-${bodyKey}`,
+          sendEmail: (r) =>
+            this.notifications.sendEmailTemplate(r, NotificationCategory.ACCESS_CHANGES, {
+              accessChange: {
+                title: t(r.locale, 'title'),
+                body: t(r.locale, bodyKey, { resourceId }),
+                url,
+              },
+            }),
+        });
+      })
+      .catch((error) => {
+        this.logger.error(`Failed to notify user ${userId} about resource access changes: ${(error as Error).message}`);
+      });
+  }
 
   public async getMany(resourceId: number, type?: ResourceIntroducerType): Promise<ResourceIntroducer[]> {
     const directIntroducers = await this.resourceIntroducerRepository.find({
@@ -68,6 +117,7 @@ export class ResourceIntroducersService {
       if (existingIntroducer.type !== type) {
         existingIntroducer.type = type;
         await this.resourceIntroducerRepository.save(existingIntroducer);
+        this.notifyAccessChange(resourceId, userId, type, true);
         this.eventEmitter.emit(
           ResourceIntroducerChangedEvent.EVENT_NAME,
           new ResourceIntroducerChangedEvent(resourceId, userId),
@@ -78,6 +128,7 @@ export class ResourceIntroducersService {
 
     const introducer = this.resourceIntroducerRepository.create({ resourceId, userId, type });
     const savedIntroducer = await this.resourceIntroducerRepository.save(introducer);
+    this.notifyAccessChange(resourceId, userId, type, true);
     this.eventEmitter.emit(
       ResourceIntroducerChangedEvent.EVENT_NAME,
       new ResourceIntroducerChangedEvent(resourceId, userId),
@@ -92,6 +143,7 @@ export class ResourceIntroducersService {
     }
 
     await this.resourceIntroducerRepository.remove(introducer);
+    this.notifyAccessChange(resourceId, userId, introducer.type, false);
     this.eventEmitter.emit(
       ResourceIntroducerChangedEvent.EVENT_NAME,
       new ResourceIntroducerChangedEvent(resourceId, userId),

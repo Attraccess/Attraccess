@@ -74,7 +74,6 @@ describe('UserRegistrationService', () => {
         id: 1,
         username: 'testuser',
         email: 'test@example.com',
-        systemPermissions: {},
       } as User;
 
       jest.spyOn(usersService, 'createOne').mockResolvedValue(user);
@@ -122,7 +121,6 @@ describe('UserRegistrationService', () => {
         id: 2,
         username: 'alice',
         email: 'alice@allowed.com',
-        systemPermissions: {},
       } as User;
 
       jest.spyOn(usersService, 'createOne').mockResolvedValue(user);
@@ -154,12 +152,6 @@ describe('UserRegistrationService', () => {
       username: 'admin',
       email: 'wrong@example.com',
       isEmailVerified: false,
-      systemPermissions: {
-        canManageResources: true,
-        canManageSystemConfiguration: true,
-        canManageUsers: true,
-        canManageBilling: true,
-      },
     } as User;
 
     const newAdmin = { ...unverifiedAdmin, id: 2, email: 'correct@example.com' } as User;

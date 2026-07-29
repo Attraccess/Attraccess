@@ -31,8 +31,9 @@ describe('HttpMetricsInterceptor', () => {
     method = 'GET',
     path = '/api/test',
     statusCode = 200,
+    headers: Record<string, string> = {},
   ): { context: ExecutionContext; next: CallHandler } {
-    const request = { method, path, route: { path } };
+    const request = { method, path, route: { path }, headers };
     const response = { statusCode };
     const context = {
       getType: () => 'http',
@@ -173,5 +174,24 @@ describe('HttpMetricsInterceptor', () => {
     interceptor.intercept(context, next);
     expect(toggle.isEnabledCached).toHaveBeenCalledWith('http');
     expect(toggle.isEnabledCached).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips SSE requests to avoid recording connection lifetime as HTTP latency', (done) => {
+    const { context } = createHttpContext('GET', '/api/resources/1/flow/logs/live', 200, {
+      accept: 'text/event-stream',
+    });
+    const handle = jest.fn(() => of('sse-event'));
+    const next = { handle } as unknown as CallHandler;
+
+    interceptor.intercept(context, next).subscribe({
+      next: (value) => {
+        expect(value).toBe('sse-event');
+      },
+      complete: () => {
+        expect(metrics.duration.observe).not.toHaveBeenCalled();
+        expect(metrics.total.inc).not.toHaveBeenCalled();
+        done();
+      },
+    });
   });
 });

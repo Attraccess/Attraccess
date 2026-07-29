@@ -29,6 +29,13 @@ const cases: Array<[ResourceFlowNodeType, Domain]> = [
   [ResourceFlowNodeType.INPUT_VARIABLE_CHANGED, 'logic'],
   [ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT, 'health'],
   [ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_SET, 'health'],
+  [ResourceFlowNodeType.OUTPUT_COMPANION_LOCK_PC, 'companion'],
+  [ResourceFlowNodeType.OUTPUT_COMPANION_UNLOCK_PC, 'companion'],
+  [ResourceFlowNodeType.INPUT_COMPANION_IDLE, 'companion'],
+  [ResourceFlowNodeType.INPUT_COMPANION_ACTIVE, 'companion'],
+  [ResourceFlowNodeType.INPUT_COMPANION_FOREGROUND_APP_CHANGED, 'companion'],
+  [ResourceFlowNodeType.INPUT_COMPANION_USB_DEVICE_CONNECTED, 'companion'],
+  [ResourceFlowNodeType.INPUT_COMPANION_USB_DEVICE_DISCONNECTED, 'companion'],
 ];
 
 describe('nodeTypeDomain', () => {

@@ -7,11 +7,11 @@ export function generateHeaderColumns(
   t: TFunction,
   resource: Resource,
   showAllUsers: boolean,
-  canManageResources: boolean,
+  canUpdateResources: boolean,
 ): ReactElement<TableColumnProps>[] {
   const headers: ReactElement<TableColumnProps>[] = [];
 
-  const showUser = canManageResources && showAllUsers;
+  const showUser = canUpdateResources && showAllUsers;
 
   if (showUser) {
     headers.push(<TableColumn key="user" id="user" isRowHeader>{t('headers.user')}</TableColumn>);
@@ -20,14 +20,14 @@ export function generateHeaderColumns(
   if (resource.type === 'machine') {
     headers.push(
       <TableColumn key="startTime" id="startTime" isRowHeader={!showUser}>{t('headers.machine.startTime')}</TableColumn>,
-      <TableColumn key="endTime" id="endTime" className="hidden md:table-cell">
+      <TableColumn key="endTime" id="endTime" className="hidden lg:table-cell">
         {t('headers.machine.endTime')}
       </TableColumn>,
       <TableColumn key="duration" id="duration">{t('headers.machine.duration')}</TableColumn>,
       <TableColumn key="project" id="project" className="hidden 2xl:table-cell">
         {t('headers.machine.project')}
       </TableColumn>,
-      <TableColumn key="supervisor" id="supervisor" className="hidden xl:table-cell">
+      <TableColumn key="supervisor" id="supervisor" className="hidden md:table-cell">
         {t('headers.machine.supervisor')}
       </TableColumn>,
     );

@@ -20,6 +20,7 @@ import { TokenHashService } from '../../encryption/token-hash.service';
 import { PasswordPolicyService } from './password-policy.service';
 import { HibpClient } from './hibp.client';
 import { ZxcvbnService } from './zxcvbn.service';
+import { RbacService } from '../rbac/rbac.service';
 import { PasswordPolicyViolationException } from './password-policy.errors';
 import { BruteForceProtectionService } from '../rate-limiting/brute-force.service';
 import { AuthAuditLogger } from '../rate-limiting/auth-audit.logger';
@@ -131,6 +132,7 @@ describe('Register flow + password policy (integration)', () => {
           },
         },
         { provide: AuthAuditLogger, useValue: { log: jest.fn() } },
+        { provide: RbacService, useValue: { getEffectivePermissions: jest.fn(async () => new Set<string>()) } },
       ],
     }).compile();
     service = module.get(UserRegistrationService);
@@ -212,6 +214,7 @@ describe('Register flow + password policy (integration)', () => {
           },
         },
         { provide: AuthAuditLogger, useValue: { log: jest.fn() } },
+        { provide: RbacService, useValue: { getEffectivePermissions: jest.fn(async () => new Set<string>()) } },
       ],
     }).compile();
     const ctrl = moduleRef.get(UserRegistrationService);

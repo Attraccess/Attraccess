@@ -1,5 +1,6 @@
 import { Alert, AlertContent, AlertDescription, AlertTitle, Input, Label, Skeleton, TextField } from '@heroui/react';
 import { Button } from '../../../components/button';
+import { OneTimeCodeInput } from '../../../components/OneTimeCodeInput';
 import { QRCode } from 'react-qrcode-logo';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -123,10 +124,13 @@ export function TwoFactorCard() {
                 <Input />
               </TextField>
 
-              <TextField value={setupCode} onChange={setSetupCode} isDisabled={isBusy}>
-                <Label>{t('setup.codeLabel')}</Label>
-                <Input inputMode="numeric" autoComplete="one-time-code" maxLength={6} />
-              </TextField>
+              <OneTimeCodeInput
+                label={t('setup.codeLabel')}
+                value={setupCode}
+                onChange={setSetupCode}
+                isDisabled={isBusy}
+                data-cy="two-factor-setup-code-input"
+              />
 
               <Button onPress={handleVerify} isPending={isVerifying} isDisabled={isBusy || !setupCode.trim()}>
                 {t('setup.verifyButton')}
@@ -138,10 +142,13 @@ export function TwoFactorCard() {
 
       {!showSetup && (
         <div className="flex flex-col gap-4">
-          <TextField value={disableCode} onChange={setDisableCode} isDisabled={isBusy}>
-            <Label>{t('disable.codeLabel')}</Label>
-            <Input inputMode="numeric" autoComplete="one-time-code" maxLength={6} />
-          </TextField>
+          <OneTimeCodeInput
+            label={t('disable.codeLabel')}
+            value={disableCode}
+            onChange={setDisableCode}
+            isDisabled={isBusy}
+            data-cy="two-factor-disable-code-input"
+          />
           <Button variant="danger" onPress={handleDisable} isPending={isDisabling} isDisabled={isBusy || !disableCode.trim()}>
             {t('disable.button')}
           </Button>

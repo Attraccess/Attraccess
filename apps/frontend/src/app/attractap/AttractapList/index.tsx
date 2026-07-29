@@ -1,8 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, AlertContent, AlertDescription, AlertTitle, Button, Card, Chip, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow, TableScrollContainer } from '@heroui/react';
+import {
+  Button,
+  Card,
+  Chip,
+  Table,
+  TableBody,
+  TableCell,
+  TableColumn,
+  TableContent,
+  TableHeader,
+  TableRow,
+  TableScrollContainer,
+} from '@heroui/react';
 import { ActivityIcon, ArrowRightIcon, CpuIcon, LogsIcon, PencilIcon, Trash2Icon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { AlertStatusIcon } from '../../../components/AlertStatusIcon';
 import { EmptyState } from '../../../components/emptyState';
 import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { AttractapEditor } from '../AttractapEditor/AttractapEditor';
@@ -10,6 +21,7 @@ import {
   Attractap,
   useAttractapServiceGetFirmwares,
   useAttractapServiceGetReaders,
+  useLicenseServiceGetLicenseInformation,
 } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../components/toastProvider';
 import { PageAction, PageHeader } from '../../../components/pageHeader';
@@ -27,12 +39,11 @@ export function AttractapList() {
     en,
   });
 
+  const { data: license } = useLicenseServiceGetLicenseInformation();
+
   const { data: firmwares } = useAttractapServiceGetFirmwares();
 
-  const {
-    data: allReaders,
-    error: readersError,
-  } = useAttractapServiceGetReaders(undefined, {
+  const { data: allReaders, error: readersError } = useAttractapServiceGetReaders(undefined, {
     refetchInterval: 5000,
   });
 
@@ -100,6 +111,10 @@ export function AttractapList() {
     [firmwares],
   );
 
+  if (license && !license.modules.includes('attractap')) {
+    return null;
+  }
+
   return (
     <>
       <AttractapHardwareSetup
@@ -113,35 +128,29 @@ export function AttractapList() {
               <PageHeader
                 title={t('page.title')}
                 backTo="/attractap"
-                actions={[
-                  {
-                    key: 'serial-console',
-                    label: t('page.actions.openSerialConsole'),
-                    icon: <LogsIcon className="w-4 h-4" />,
-                    onPress: onOpenSerialConsole,
-                    dataCy: 'attractap-list-open-console-button',
-                  },
-                  {
-                    key: 'hardware-setup',
-                    label: t('page.actions.openHardwareSetup'),
-                    icon: <CpuIcon className="w-4 h-4" />,
-                    onPress: onOpenHardwareSetup,
-                    dataCy: 'attractap-list-open-flasher-button',
-                  },
-                ] satisfies PageAction[]}
+                actions={
+                  [
+                    {
+                      key: 'serial-console',
+                      label: t('page.actions.openSerialConsole'),
+                      icon: <LogsIcon className="w-4 h-4" />,
+                      onPress: onOpenSerialConsole,
+                      dataCy: 'attractap-list-open-console-button',
+                    },
+                    {
+                      key: 'hardware-setup',
+                      label: t('page.actions.openHardwareSetup'),
+                      icon: <CpuIcon className="w-4 h-4" />,
+                      onPress: onOpenHardwareSetup,
+                      dataCy: 'attractap-list-open-flasher-button',
+                    },
+                  ] satisfies PageAction[]
+                }
               />
             )}
           </WebSerialConsole>
         )}
       </AttractapHardwareSetup>
-
-      <Alert status="danger" className="mb-4">
-        <AlertStatusIcon status="danger" />
-        <AlertContent>
-          <AlertTitle>{t('workInProgressTitle')}</AlertTitle>
-          <AlertDescription>{t('workInProgress')}</AlertDescription>
-        </AlertContent>
-      </Alert>
 
       <AttractapEditor
         readerId={openedReaderEditor ?? undefined}

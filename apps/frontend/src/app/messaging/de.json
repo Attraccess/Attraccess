@@ -20,5 +20,11 @@
     "send": "Senden",
     "attachedResource": "Ressource",
     "removeReference": "Angehängte Ressource entfernen"
-  }
+  },
+  "toast": {
+    "newMessageTitle": "Neue Nachricht von {{sender}}",
+    "newMessageFallbackSender": "Jemand",
+    "openMessage": "Öffnen"
+  },
+  "settingsButton": "Einstellungen"
 }

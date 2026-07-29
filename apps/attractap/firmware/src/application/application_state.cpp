@@ -2,14 +2,30 @@
 // FEATURE: application-state
 
 #include "application.hpp"
+#include "platform.hpp"
 
 void Application::processState() {
 #ifdef HAS_WS2812_LED
   this->updateLedState();
 #endif
 
+#ifdef DEMO_MODE
+  // In demo mode, handle a pending card scan for the settings screen.
+  if (this->demoPendingScanReady) {
+    this->demoPendingScanReady = false;
+    this->nfc.disableCardDetection();
+    Display::demoSettingsScreen.onCardScanned(this->demoScanUid);
+    this->demoScanUid.clear();
+    return;
+  }
+  // In demo mode the settings screen is always accessible and connection
+  // config / PIN prompts are suppressed.
+  if (this->state == APPLICATION_STATE_CONFIGURATION_REQUIRED) {
+    return;
+  }
+#else
   AttraccessApiConfig attraccessApiConfig = Settings::getAttraccessApiConfig();
-  bool connectionIsConfigured = !attraccessApiConfig.hostname.isEmpty() &&
+  bool connectionIsConfigured = !attraccessApiConfig.hostname.empty() &&
                                 attraccessApiConfig.hostname != "" &&
                                 attraccessApiConfig.port > 0;
 
@@ -33,6 +49,7 @@ void Application::processState() {
     {
         return;
     }
+#endif // DEMO_MODE
 
 #ifdef HAS_LVGL_DISPLAY
   if (!this->bootDone &&
@@ -45,6 +62,7 @@ void Application::processState() {
     return;
   }
 
+#ifndef DEMO_MODE
   bool pinIsSet = Settings::getDeviceConfig().passCode != "0000";
   if (!pinIsSet) {
     if (this->state == APPLICATION_STATE_PIN_NOT_SET) {
@@ -57,7 +75,8 @@ void Application::processState() {
     Display::transitionToScreen(&Display::setPinScreen);
     return;
   }
-#endif
+#endif // !DEMO_MODE
+#endif // HAS_LVGL_DISPLAY
 
   State::ApiState apiState = State::getApiState();
   State::NetworkState networkState = State::getNetworkState();
@@ -83,6 +102,19 @@ void Application::processState() {
         this->resetPhase != RESET_PHASE_NONE) {
       this->externalState = EXTERNAL_STATE_NONE;
       this->resetPhase = RESET_PHASE_NONE;
+    }
+    // Drop any in-progress supervision flow: the server-side request is gone after a disconnect, so
+    // a stale screen/phase would otherwise hang until timeout.
+    if (this->state == APPLICATION_STATE_SUPERVISION ||
+        this->supervisionPhase != SUPERVISION_PHASE_NONE) {
+      this->supervisionPhase = SUPERVISION_PHASE_NONE;
+      this->supervisionCardDetected = false;
+      this->supervisionKeyReady = false;
+      this->supervisionResolvedByWeb = false;
+      this->supervisionFailed = false;
+      this->supervisionCardRejected = false;
+      this->supervisionCancelRequested = false;
+      this->autoStartAfterSupervision = false;
     }
 #endif
         if (this->state == APPLICATION_STATE_INIT)
@@ -136,6 +168,14 @@ void Application::processState() {
     this->processReset();
     return;
   }
+
+  // Two-card supervision is a sticky, self-contained sub-flow like enrollment/reset — it owns the
+  // screen until success, cancel or timeout. beginSupervision() is entered from the card-auth path
+  // (processCardAuthenticationData) rather than via externalState.
+  if (this->state == APPLICATION_STATE_SUPERVISION) {
+    this->processSupervision();
+    return;
+  }
 #endif
 
 #ifndef HAS_LVGL_DISPLAY
@@ -153,6 +193,19 @@ void Application::processState() {
   }
 #endif
 
+  // A late or duplicate card-auth response (double-tap on the lockscreen sends
+  // two requests; the websocket task sets the trigger asynchronously) must not
+  // hijack the state machine while the user is already unlocked. Otherwise
+  // state flips to AUTHENTICATE_CARD with the resource-details screen still
+  // shown and the early-return below wedges the UI: buttons are guarded on
+  // state == UNLOCKED and the logout timeout is never evaluated (ATT-718).
+  if (this->externalState == EXTERNAL_STATE_AUTHENTICATE_CARD &&
+      this->unlocked) {
+    this->logger.debug(
+        "Dropping card-auth trigger while unlocked (stale/duplicate response)");
+    this->externalState = EXTERNAL_STATE_NONE;
+  }
+
   if (this->externalState == EXTERNAL_STATE_AUTHENTICATE_CARD) {
     if (this->state == APPLICATION_STATE_AUTHENTICATE_CARD) {
       return;
@@ -164,7 +217,8 @@ void Application::processState() {
             .username = this->cardAuthenticationData.username,
             .canManageResource = this->cardAuthenticationData.canManageResource,
             .hasIntroduction = this->cardAuthenticationData.hasIntroduction,
-            .isIntroducer = this->cardAuthenticationData.isIntroducer});
+            .isIntroducer = this->cardAuthenticationData.isIntroducer,
+            .requiresSupervisor = this->cardAuthenticationData.requiresSupervisor});
 #endif
 
     this->state = APPLICATION_STATE_AUTHENTICATE_CARD;
@@ -258,7 +312,8 @@ void Application::processState() {
 
         Display::lockscreen.setResourceName(resource.name);
         Display::lockscreen.setUsageInfo(resource.hasActiveUsage,
-                                         resource.activeUser);
+                                         resource.activeUser,
+                                         resource.isUnderMaintenance);
 
         // Directly pass the native struct to the screen so it can avoid String
         // conversions
@@ -298,6 +353,21 @@ void Application::processState() {
   }
 
   if (this->state == APPLICATION_STATE_UNLOCKED) {
+    // Auto-start the session right after a supervisor approved by tapping their card at the reader
+    // (ATT-493). The web-approval channel starts the session server-side instead, so this only fires
+    // for the on-reader card path.
+    if (this->autoStartAfterSupervision) {
+      this->autoStartAfterSupervision = false;
+      Display::resourceDetailsScreen.showActionProgress("Starte Sitzung");
+      this->beginActionPause();
+      this->pendingActionType = PENDING_ACTION_START_SESSION;
+      this->pendingActionResourceId = this->selectedResourceId;
+      this->pendingActionProjectId = this->selectedProjectId;
+      this->hasPendingFormRequest = false;
+      this->api.startResourceUsageSession(this->selectedResourceId,
+                                          this->selectedProjectId);
+    }
+
     // Subtract any accumulated pause time while actions were in-progress.
     // accumulatedPauseMs only gets the elapsed delta added once an action
     // finishes (endActionPause). While an action is still running -- most
@@ -457,7 +527,7 @@ void Application::processEnrollment() {
     this->enrollErrorPending = false;
     this->beeper.errorBeep();
     Display::enrollmentScreen.setStatus(EnrollmentScreen::STATUS_ERROR);
-    Display::enrollmentScreen.setStatusMessage(String(this->enrollErrorMessage));
+    Display::enrollmentScreen.setStatusMessage(this->enrollErrorMessage);
     this->enrollPhase = ENROLL_PHASE_ERROR;
     this->enrollPhaseChangedMs = now;
     return;
@@ -484,10 +554,16 @@ void Application::processEnrollment() {
       this->enrollPhase = ENROLL_PHASE_REQUESTED_KEY;
       this->enrollPhaseChangedMs = now;
     } else {
-      // Card slipped away or has no writable key — re-arm the detection loop
-      // and keep waiting.
+      // Card slipped away or has no writable key. Surface the failure instead
+      // of silently re-arming, otherwise DESFire setup/auth failures look like
+      // the reader ignored the card.
+      this->beeper.errorBeep();
+      Display::enrollmentScreen.setStatus(EnrollmentScreen::STATUS_ERROR);
+      Display::enrollmentScreen.setStatusMessage(
+          "Karte konnte nicht\nvorbereitet werden");
+      this->enrollPhase = ENROLL_PHASE_ERROR;
+      this->enrollPhaseChangedMs = now;
       this->nfc.resetCardPresence();
-      this->nfc.enableCardDetection();
     }
     break;
   }
@@ -507,7 +583,8 @@ void Application::processEnrollment() {
   case ENROLL_PHASE_WRITING: {
     bool ok = this->nfc.changeKey(
         this->apiEnrollNewCardData.keyNo, this->nfc.FACTORY_KEY,
-        this->nfc.FACTORY_KEY, this->apiEnrollNewCardData.keyBytes);
+        this->nfc.FACTORY_KEY, this->apiEnrollNewCardData.keyBytes,
+        NFC::CARD_KEY_VERSION_ENROLLED);
     this->api.sendEnrollNewCard(ok);
     if (ok) {
       this->beeper.successBeep();
@@ -625,7 +702,8 @@ void Application::processReset() {
     bool ok = this->nfc.changeKey(this->apiResetNfcCardData.keyNo,
                                   this->nfc.FACTORY_KEY,
                                   this->apiResetNfcCardData.keyBytes,
-                                  this->nfc.FACTORY_KEY);
+                                  this->nfc.FACTORY_KEY,
+                                  NFC::CARD_KEY_VERSION_FREE);
     this->api.sendResetNfcCard(ok);
     if (ok) {
       this->beeper.successBeep();

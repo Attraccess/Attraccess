@@ -1,8 +1,7 @@
 // Shelly management plugin — frontend half.
 //
 // A module-federation remote that registers the device-registry page and a
-// sidebar entry. Access is gated behind `canManageResources`, matching the
-// backend controller and the host MQTT servers settings page.
+// sidebar entry. Access is gated behind `resources.update`.
 import { WifiIcon } from 'lucide-react';
 import type {
   AttraccessFrontendPlugin,
@@ -43,7 +42,7 @@ export default class ShellyPlugin implements AttraccessFrontendPlugin {
   }
 
   getRoutes(): RouteConfig[] {
-    return [{ path: '/shelly', authRequired: 'canManageResources', element: <DevicesPage /> }];
+    return [{ path: '/shelly', authRequired: 'resources.update', element: <DevicesPage /> }];
   }
 
   getSidebarItems(): PluginSidebarItem[] {

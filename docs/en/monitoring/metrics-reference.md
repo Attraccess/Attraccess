@@ -38,7 +38,8 @@ rate(attraccess_http_requests_total{status_code=~"5.."}[5m])
 |--------|------|--------|-------------|
 | `attraccess_auth_login_total` | Counter | `method`, `status` | Login attempts (includes unknown-username attempts). `method`: `local` or `sso`. `status`: `success` or `fail` |
 | `attraccess_auth_active_sessions` | Gauge | -- | Number of active authenticated sessions |
-| `attraccess_auth_sso_login_total` | Counter | `provider_type` | SSO login attempts. `provider_type`: `oidc` or `saml` |
+| `attraccess_auth_sso_login_total` | Counter | `provider_type` | Successful SSO login attempts. `provider_type`: `oidc` or `saml` |
+| `attraccess_auth_sso_login_failures_total` | Counter | `provider_type`, `reason` | Failed SSO login attempts. `provider_type`: `oidc` or `saml`; `reason`: `guard_rejected`, `invalid_assertion`, `linking_failed`, or `provider_error` |
 | `attraccess_auth_2fa_usage_total` | Counter | `action` | Two-factor authentication actions |
 
 ### Example PromQL Queries
@@ -49,6 +50,9 @@ sum(increase(attraccess_auth_login_total{status="fail"}[5m]))
 
 # SSO vs local login comparison
 sum by (method) (rate(attraccess_auth_login_total{status="success"}[1h]))
+
+# Failed SSO logins in the last 5 minutes by provider type and reason
+sum by (provider_type, reason) (increase(attraccess_auth_sso_login_failures_total[5m]))
 ```
 
 ## User Metrics
@@ -102,8 +106,11 @@ attraccess_resource_maintenance_overdue > 0
 sum by (reset_reason) (increase(attraccess_attractap_crash_reports_total[1h]))
 
 # Alert signal: all readers offline (but some were connected recently)
-attraccess_attractap_devices_connected == 0
-  and max_over_time(attraccess_attractap_devices_connected[1h]) > 0
+sum(
+  (attraccess_attractap_devices_connected == bool 0)
+  *
+  (max_over_time(attraccess_attractap_devices_connected[1h]) > bool 0)
+) or vector(0)
 ```
 
 ## Billing Metrics
@@ -279,6 +286,40 @@ nodejs_heap_size_used_bytes / 1024 / 1024
 
 # Event loop lag
 nodejs_eventloop_lag_seconds
+```
+
+## Host and Container Metrics
+
+Bundled Coolify and Balena compose deployments scrape standard exporter metrics in addition to the Attraccess API metrics:
+
+| Source | Example Metrics | Description |
+|--------|-----------------|-------------|
+| `node-exporter` | `node_memory_MemAvailable_bytes`, `node_memory_MemTotal_bytes`, `node_filesystem_avail_bytes`, `node_filesystem_size_bytes` | Host RAM and filesystem capacity |
+| `cadvisor` | `container_memory_working_set_bytes`, `container_spec_memory_limit_bytes` | Docker container memory usage and configured limits |
+
+### Example PromQL Queries
+
+```promql
+# Host RAM usage ratio
+1 - (node_memory_MemAvailable_bytes{job="node-exporter"} / node_memory_MemTotal_bytes{job="node-exporter"})
+
+# Host filesystem usage ratio by mountpoint
+1 - (node_filesystem_avail_bytes{job="node-exporter"} / node_filesystem_size_bytes{job="node-exporter"})
+
+# Attraccess container memory usage ratio, when a container memory limit exists
+max(
+  (
+    container_memory_working_set_bytes{job="cadvisor",container_label_com_docker_compose_service="attraccess"}
+    /
+    (container_spec_memory_limit_bytes{job="cadvisor",container_label_com_docker_compose_service="attraccess"} > 0)
+  )
+  or
+  (
+    container_memory_working_set_bytes{job="cadvisor",container_label_io_balena_service_name="attraccess"}
+    /
+    (container_spec_memory_limit_bytes{job="cadvisor",container_label_io_balena_service_name="attraccess"} > 0)
+  )
+)
 ```
 
 ## See Also

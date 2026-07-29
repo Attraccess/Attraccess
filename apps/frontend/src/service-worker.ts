@@ -64,3 +64,60 @@ registerRoute(
     ],
   }),
 );
+
+// Web Push: show incoming pushes as notifications.
+// Payload shape (see api PushNotificationPayload): { title, body, url?, tag?, icon? }
+interface PushPayload {
+  title?: string;
+  body?: string;
+  url?: string;
+  tag?: string;
+  icon?: string;
+}
+
+self.addEventListener('push', (event) => {
+  if (!event.data) {
+    return;
+  }
+
+  let payload: PushPayload;
+  try {
+    payload = event.data.json() as PushPayload;
+  } catch {
+    payload = { body: event.data.text() };
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(payload.title ?? 'Attraccess', {
+      body: payload.body,
+      icon: payload.icon ?? '/icon-192.png',
+      badge: '/icon-192.png',
+      tag: payload.tag,
+      data: { url: payload.url ?? '/' },
+    }),
+  );
+});
+
+// Clicking a notification focuses an existing app window (and navigates it) or opens a new one.
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  const url = (event.notification.data as { url?: string } | undefined)?.url ?? '/';
+
+  event.waitUntil(
+    (async () => {
+      const windowClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+
+      const existingClient = windowClients.find((client) => 'focus' in client);
+      if (existingClient) {
+        await existingClient.focus();
+        if ('navigate' in existingClient) {
+          await existingClient.navigate(url);
+        }
+        return;
+      }
+
+      await self.clients.openWindow(url);
+    })(),
+  );
+});

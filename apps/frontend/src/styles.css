@@ -24,6 +24,21 @@ body,
   overflow: hidden;
 }
 
+/* PullToRefresh wraps the app in .ptr__children. Keep real app scrolling in nested
+   containers such as main; otherwise focus/scrollIntoView can park scrollTop on
+   this wrapper and shift the entire app shell upward. */
+.ptr__children {
+  overflow: clip !important;
+  overflow-x: clip !important;
+  overflow-y: clip !important;
+}
+
+/* Keep long routed pages from contributing scroll height to the document root.
+   Focus and scrollIntoView should move the app's scroll container, not the shell. */
+.app-scroll-container {
+  contain: paint;
+}
+
 /* Expressive form validation errors: larger, bolder, with leading warning glyph */
 .field-error[data-visible="true"] {
   @apply text-sm font-medium flex items-start gap-1;
@@ -32,6 +47,13 @@ body,
 .field-error[data-visible="true"]::before {
   content: "⚠";
   @apply text-base leading-none;
+}
+
+/* Dark mode: raise overlay lightness so popovers/modals/menus are visually
+   distinct from the page background (bg ≈ 12% L vs default overlay ≈ 21% L). */
+.dark {
+  --overlay: oklch(0.32 0.006 285.89);
+  --overlay-shadow: 0 4px 20px 0 rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
 /* You can add global styles to this file, and also import other style files */

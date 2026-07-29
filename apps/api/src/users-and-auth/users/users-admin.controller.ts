@@ -28,6 +28,7 @@ import { ChangeUsernameDto } from './dtos/changeUsername.dto';
 import { ChangeEmailDto } from './dtos/changeEmail.dto';
 import { ChangeBillingFactorDto } from './dtos/changeBillingFactor.dto';
 import { mapEmailSendError } from './email-send-error.util';
+import { computeNextPage } from '../../types/response';
 
 @ApiTags('Users')
 @Controller('users')
@@ -60,8 +61,8 @@ export class UsersAdminController {
   async getOneById(@Param('id', ParseIntPipe) id: number, @Req() request: AuthenticatedRequest): Promise<User> {
     const authenticatedUser = request.user;
 
-    // Allow access if the user is requesting their own data or has canManageUsers permission
-    if (authenticatedUser?.id !== id && !authenticatedUser.systemPermissions.canManageUsers) {
+    // Allow access if the user is requesting their own data or has users.read permission
+    if (authenticatedUser?.id !== id && !authenticatedUser.effectivePermissions?.has('users.read')) {
       this.logger.debug(
         `Access denied - User ID ${authenticatedUser.id} attempting to access user ID ${id} without required permissions`,
       );
@@ -78,7 +79,7 @@ export class UsersAdminController {
   }
 
   @Delete(':id')
-  @Auth('canManageUsers')
+  @Auth('users.delete')
   @ApiOperation({ summary: 'Delete a user', operationId: 'deleteUser' })
   @ApiResponse({
     status: 200,
@@ -106,17 +107,25 @@ export class UsersAdminController {
   })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - User does not have permission to manage users.',
+    description: 'Forbidden - includeRoles requires users.read permission.',
   })
-  async findMany(@Query() query: FindManyUsersQueryDto): Promise<PaginatedUsersResponseDto> {
-    const result = (await this.usersService.findMany({
+  async findMany(@Query() query: FindManyUsersQueryDto, @Req() request: AuthenticatedRequest): Promise<PaginatedUsersResponseDto> {
+    // ponytail: role data is sensitive; only expose it to users.read holders
+    if (query.includeRoles && !request.user.effectivePermissions?.has('users.read')) {
+      throw new ForbiddenException();
+    }
+    const result = await this.usersService.findMany({
       page: query.page,
       limit: query.limit,
       search: query.search,
       ids: query.ids,
-    })) as PaginatedUsersResponseDto;
+      includeRoles: query.includeRoles,
+    });
     this.logger.debug(`Found ${result.total} users total, returning ${result.data.length} users`);
-    return result;
+    return {
+      ...result,
+      nextPage: computeNextPage(result.page, result.limit, result.total),
+    };
   }
 
   @Post(':id/password')
@@ -150,7 +159,7 @@ export class UsersAdminController {
   }
 
   @Patch(':id/username')
-  @Auth('canManageUsers')
+  @Auth('users.update')
   @ApiOperation({ summary: "Admin: Change a user's username (no limit)", operationId: 'changeUserUsername' })
   @ApiResponse({ status: 200, description: 'Username changed.', type: User })
   async changeUserUsername(
@@ -162,7 +171,7 @@ export class UsersAdminController {
   }
 
   @Patch(':id/email')
-  @Auth('canManageUsers')
+  @Auth('users.update')
   @ApiOperation({ summary: "Admin: Change a user's email address", operationId: 'changeUserEmail' })
   @ApiResponse({ status: 200, description: 'Email changed.', type: User })
   async changeUserEmail(
@@ -178,7 +187,7 @@ export class UsersAdminController {
   }
 
   @Patch(':id/billing-factor')
-  @Auth('canManageBilling')
+  @Auth('billing.manage')
   @ApiOperation({ summary: "Change a user's billing factor", operationId: 'changeUserBillingFactor' })
   @ApiResponse({ status: 200, description: 'Billing factor changed.', type: User })
   async changeUserBillingFactor(

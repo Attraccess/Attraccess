@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { PageHeader, PageAction } from '../../components/pageHeader';
-import { AttraccessUser, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { AttraccessUser, useDebounce, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   Button,
   Chip,
@@ -19,20 +19,18 @@ import {
   TooltipTrigger,
 } from '@heroui/react';
 import {
-  CreditCardIcon,
   KeyIcon,
   SearchIcon,
-  Settings2Icon,
   ShieldCheckIcon,
   ShieldOffIcon,
   UserPlusIcon,
   Users,
-  WrenchIcon,
 } from 'lucide-react';
 import { TableToolbar } from '../../components/TableToolbar';
 import {
   SSOProvider,
   User,
+  UserRole,
   useAuthenticationServiceGetAllSsoProviders,
   useLicenseServiceGetLicenseInformation,
   useUsersServiceFindMany,
@@ -41,12 +39,12 @@ import { EmptyState } from '../../components/emptyState';
 
 import en from './en.json';
 import de from './de.json';
-import { useDebounce } from '../../hooks/useDebounce';
-import { AllowedSignupDomainsEditorModal } from './allowed-signup-domains-editor-modal';
-import { TwoFactorPolicyModal } from './two-factor-policy-modal';
 import { InviteUserModal } from './invite-user-modal';
 import { useNavigate } from 'react-router-dom';
 import { SimplePagination } from '../../components/simplePagination';
+
+// Role keys that are considered "default" and not worth showing in the list
+const DEFAULT_ROLE_KEYS = new Set(['user']);
 
 export const UserManagementPage: React.FC = () => {
   const { t } = useTranslations({ en, de });
@@ -63,6 +61,7 @@ export const UserManagementPage: React.FC = () => {
     limit,
     page,
     search: debouncedSearch,
+    includeRoles: true,
   });
 
   const totalPages = useMemo(() => {
@@ -112,33 +111,6 @@ export const UserManagementPage: React.FC = () => {
                 <InviteUserModal>{(onOpen) => <Button {...triggerProps} onPress={onOpen} />}</InviteUserModal>
               ),
             },
-            {
-              key: 'two-factor-policy',
-              label: t('actions.twoFactorPolicy'),
-              icon: <ShieldCheckIcon className="w-4 h-4" />,
-              renderTrigger: (triggerProps) => (
-                <TwoFactorPolicyModal>
-                  {(onOpenTwoFactorPolicy) => <Button {...triggerProps} onPress={onOpenTwoFactorPolicy} />}
-                </TwoFactorPolicyModal>
-              ),
-            },
-            {
-              key: 'allowed-signup-domains',
-              label: t('actions.editAllowedSignupDomains'),
-              icon: <Settings2Icon className="w-4 h-4" />,
-              renderTrigger: (triggerProps) => (
-                <AllowedSignupDomainsEditorModal>
-                  {(onOpen) => <Button {...triggerProps} onPress={onOpen} />}
-                </AllowedSignupDomainsEditorModal>
-              ),
-            },
-            {
-              key: 'sso',
-              label: t('actions.sso'),
-              icon: <KeyIcon className="w-4 h-4" />,
-              isHidden: !license?.modules.includes('sso'),
-              onPress: () => navigate('/sso/providers'),
-            },
           ] satisfies PageAction[]
         }
       />
@@ -167,10 +139,10 @@ export const UserManagementPage: React.FC = () => {
                 <TableColumn width="0">{t('table.columns.id')}</TableColumn>
                 <TableColumn isRowHeader>{t('table.columns.username')}</TableColumn>
                 <TableColumn className="hidden md:table-cell">{t('table.columns.externalIdentifier')}</TableColumn>
+                <TableColumn className="hidden lg:table-cell">{t('table.columns.roles')}</TableColumn>
                 <TableColumn width="0" className="text-center">
                   {t('table.columns.ssoLinked')}
                 </TableColumn>
-                <TableColumn className="text-center">{t('table.columns.permissions')}</TableColumn>
               </TableHeader>
 
               <TableBody items={searchResult?.data ?? []} renderEmptyState={() => <EmptyState />}>
@@ -196,6 +168,16 @@ export const UserManagementPage: React.FC = () => {
                     .join(', ');
                   const isSsoLinked = ssoDetails.length > 0;
 
+                  // Elevated roles (non-default) for display
+                  const elevatedRoles = ((user.userRoles ?? []) as UserRole[])
+                    .filter((ur) => ur.role && !DEFAULT_ROLE_KEYS.has(ur.role.key))
+                    .reduce<{ id: number; name: string; key: string }[]>((acc, ur) => {
+                      if (ur.role && !acc.some((r) => r.id === ur.role?.id)) {
+                        acc.push({ id: ur.role.id, name: ur.role.name, key: ur.role.key });
+                      }
+                      return acc;
+                    }, []);
+
                   return (
                     <TableRow
                       key={user.id}
@@ -211,6 +193,19 @@ export const UserManagementPage: React.FC = () => {
                         <AttraccessUser user={user} />
                       </TableCell>
                       <TableCell className="hidden md:table-cell">{user.externalIdentifier}</TableCell>
+                      <TableCell className="hidden lg:table-cell">
+                        {elevatedRoles.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {elevatedRoles.map((role) => (
+                              <Chip key={role.id} size="sm" color="accent" variant="secondary" data-cy={`user-role-chip-${role.key}`}>
+                                {role.name}
+                              </Chip>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-default-400">{t('table.noRoles')}</span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-center">
                         {isSsoLinked ? (
                           <Tooltip>
@@ -226,60 +221,6 @@ export const UserManagementPage: React.FC = () => {
                         ) : (
                           <span className="text-default-300">-</span>
                         )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1 justify-center">
-                          {[
-                            {
-                              key: 'canManageResources',
-                              enabled: user.systemPermissions?.canManageResources,
-                              label: t('table.columns.canManageResources'),
-                              icon: <WrenchIcon className="w-3.5 h-3.5" />,
-                            },
-                            {
-                              key: 'canManageSystemConfiguration',
-                              enabled: user.systemPermissions?.canManageSystemConfiguration,
-                              label: t('table.columns.canManageSystemConfiguration'),
-                              icon: <Settings2Icon className="w-3.5 h-3.5" />,
-                            },
-                            {
-                              key: 'canManageUsers',
-                              enabled: user.systemPermissions?.canManageUsers,
-                              label: t('table.columns.canManageUsers'),
-                              icon: <Users className="w-3.5 h-3.5" />,
-                            },
-                            {
-                              key: 'canManageBilling',
-                              enabled: user.systemPermissions?.canManageBilling,
-                              label: t('table.columns.canManageBilling'),
-                              icon: <CreditCardIcon className="w-3.5 h-3.5" />,
-                            },
-                          ]
-                            .filter((permission) => permission.enabled)
-                            .map((permission) => (
-                              <Tooltip key={permission.key}>
-                                <TooltipTrigger tabIndex={0}>
-                                  <Chip
-                                    variant="soft"
-                                    color="accent"
-                                    className="min-w-0 px-2"
-                                    data-cy={`user-permission-chip-${permission.key}`}
-                                  >
-                                    {permission.icon}
-                                  </Chip>
-                                </TooltipTrigger>
-                                <TooltipContent showArrow>{permission.label}</TooltipContent>
-                              </Tooltip>
-                            ))}
-                          {![
-                            user.systemPermissions?.canManageResources,
-                            user.systemPermissions?.canManageSystemConfiguration,
-                            user.systemPermissions?.canManageUsers,
-                            user.systemPermissions?.canManageBilling,
-                          ].some(Boolean) && (
-                            <span className="text-default-400 text-sm">{t('table.noPermissions')}</span>
-                          )}
-                        </div>
                       </TableCell>
                     </TableRow>
                   );

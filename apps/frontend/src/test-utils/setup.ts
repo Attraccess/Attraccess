@@ -4,58 +4,37 @@ import { vi } from 'vitest';
 // Ensure React uses the non-production build in tests so act() is available
 process.env.NODE_ENV = 'test';
 
-class TestStorage implements Storage {
-  private readonly items = new Map<string, string>();
+// ponytail: suppress happy-dom's AbortError thrown during iframe/fetch teardown
+// on Node.js 26. The error originates inside happy-dom's DetachedWindowAPI.abort()
+// and is harmless — all tests have already completed by then — but it crashes the
+// vitest worker, making the entire test file appear to fail.
+process.on('uncaughtException', (err) => {
+  if (err instanceof DOMException && err.name === 'AbortError') return;
+  throw err;
+});
 
-  get length() {
-    return this.items.size;
-  }
+function createStorageMock(): Storage {
+  const store = new Map<string, string>();
 
-  clear() {
-    this.items.clear();
-  }
-
-  getItem(key: string) {
-    return this.items.get(key) ?? null;
-  }
-
-  key(index: number) {
-    return Array.from(this.items.keys())[index] ?? null;
-  }
-
-  removeItem(key: string) {
-    this.items.delete(key);
-  }
-
-  setItem(key: string, value: string) {
-    this.items.set(key, value);
-  }
+  return {
+    get length() {
+      return store.size;
+    },
+    clear: vi.fn(() => store.clear()),
+    getItem: vi.fn((key: string) => store.get(key) ?? null),
+    key: vi.fn((index: number) => Array.from(store.keys())[index] ?? null),
+    removeItem: vi.fn((key: string) => {
+      store.delete(key);
+    }),
+    setItem: vi.fn((key: string, value: string) => {
+      store.set(key, String(value));
+    }),
+  };
 }
 
-Object.defineProperty(globalThis, 'Storage', {
-  value: TestStorage,
-  configurable: true,
-});
-
-Object.defineProperty(window, 'Storage', {
-  value: TestStorage,
-  configurable: true,
-});
-
-const defineStorage = (name: 'localStorage' | 'sessionStorage') => {
-  const storage = new TestStorage();
-  Object.defineProperty(globalThis, name, {
-    value: storage,
-    configurable: true,
-  });
-  Object.defineProperty(window, name, {
-    value: storage,
-    configurable: true,
-  });
-};
-
-defineStorage('localStorage');
-defineStorage('sessionStorage');
+const localStorageMock = createStorageMock();
+Object.defineProperty(window, 'localStorage', { value: localStorageMock, configurable: true });
+Object.defineProperty(globalThis, 'localStorage', { value: localStorageMock, configurable: true });
 
 // Mock Web Serial API globally for all tests
 const mockSerialPort = {

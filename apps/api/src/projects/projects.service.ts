@@ -19,6 +19,8 @@ import { ProjectAccessService } from './project-access.service';
 import { ProjectWithAccessDto } from './dto/project-access.dto';
 import { EmailService } from '../email/email.service';
 import { MetricsService } from '../metrics/metrics.service';
+import { NotificationDispatchService } from '../notifications/notification-dispatch.service';
+import { NotificationCategory } from '../notifications/notification-types';
 
 @Injectable()
 export class ProjectsService {
@@ -37,6 +39,7 @@ export class ProjectsService {
     private readonly projectAccessService: ProjectAccessService,
     private readonly emailService: EmailService,
     private readonly metricsService: MetricsService,
+    private readonly notifications: NotificationDispatchService,
   ) {}
 
   public async findMany(userId: number, query: FindManyProjectsQueryDto): Promise<ProjectWithAccessDto[]> {
@@ -221,7 +224,7 @@ export class ProjectsService {
     });
 
     const hydratedInvitation = await this.getInvitationWithRelations(invitation.id);
-    await this.emailService.sendProjectInvitationEmail(invitedUser, project, hydratedInvitation);
+    await this.dispatchProjectInvitationNotification(invitedUser, project, hydratedInvitation);
     return hydratedInvitation;
   }
 
@@ -241,7 +244,7 @@ export class ProjectsService {
       throw new BadRequestException('Only pending invitations can be resent');
     }
 
-    await this.emailService.sendProjectInvitationEmail(invitation.invitedUser, invitation.project, invitation);
+    await this.dispatchProjectInvitationNotification(invitation.invitedUser, invitation.project, invitation);
     invitation.updatedAt = new Date();
     await this.projectInvitationRepository.save(invitation);
 
@@ -347,5 +350,21 @@ export class ProjectsService {
     }
 
     return invitation;
+  }
+
+  private async dispatchProjectInvitationNotification(
+    invitedUser: User,
+    project: Project,
+    invitation: ProjectInvitation,
+  ): Promise<void> {
+    await this.notifications.dispatch({
+      category: NotificationCategory.PROJECT_INVITATIONS,
+      recipients: [invitedUser],
+      actorId: invitation.inviterId,
+      title: `You have been invited to ${project.name}`,
+      body: `${invitation.inviter?.username ?? 'A project owner'} invited you to join ${project.name}.`,
+      url: `/projects?invitation=${invitation.id}`,
+      sendEmail: (recipient) => this.emailService.sendProjectInvitationEmail(recipient, project, invitation),
+    });
   }
 }

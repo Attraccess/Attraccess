@@ -20,6 +20,8 @@ import {
   Request,
   Sse,
 } from '@nestjs/common';
+import { LicenseModuleType } from '../license/license.service';
+import { RequiresLicense } from '../license/require-license.decorator';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { BillingService } from './billing.service';
 import { PaginationOptionsDto } from '../types/request';
@@ -36,6 +38,7 @@ import { SetBillingConfigurationDto } from './dto/set-configuration.dto';
 import { SumupTopUpDto } from './dto/sumup/top-up.dto';
 import { SumupTransactionCallbackDto } from './dto/sumup/sumup-transaction-callback.dto';
 import { Observable } from 'rxjs';
+import { finalize } from 'rxjs/operators';
 import { LiveNotificationsService } from './liveNotificationsService';
 import { SumUpConfigurationDto } from './dto/sumup/sumup-configuration.dto';
 import { ResourceBillingConfigurationDto } from './dto/resource-billing-configuration.dto';
@@ -43,6 +46,7 @@ import { ResourceFlowsService } from '../resources/flows/resource-flows.service'
 import { RefundTransactionDto } from './dto/refund-transaction.dto';
 import { SseInstrumentation } from '../metrics/instrumentation/sse/sse.helper';
 
+@RequiresLicense(LicenseModuleType.BILLING)
 @ApiTags('Billing')
 @Controller()
 export class BillingController {
@@ -64,7 +68,7 @@ export class BillingController {
     @Param('userId', ParseIntPipe) userId: number,
     @Req() request: AuthenticatedRequest,
   ): Promise<BalanceDto> {
-    if (request.user.id !== userId && !request.user.systemPermissions.canManageBilling) {
+    if (request.user.id !== userId && !request.user.effectivePermissions?.has('billing.manage')) {
       throw new ForbiddenException('You are not allowed to get the billing balance for this user.');
     }
 
@@ -85,7 +89,7 @@ export class BillingController {
     @Query() query: PaginationOptionsDto,
     @Req() request: AuthenticatedRequest,
   ): Promise<TransactionsDto> {
-    if (userId !== request.user.id && !request.user.systemPermissions.canManageBilling) {
+    if (userId !== request.user.id && !request.user.effectivePermissions?.has('billing.manage')) {
       throw new ForbiddenException('You are not allowed to get the billing transactions for this user.');
     }
 
@@ -106,7 +110,7 @@ export class BillingController {
   @Post('/users/:userId/billing/transactions')
   @ApiOperation({ summary: 'Top up or charge the billing balance for a user', operationId: 'createManualTransaction' })
   @ApiResponse({ status: 200, description: 'The billing balance for the user has been topped up.', type: Number })
-  @Auth('canManageBilling')
+  @Auth('billing.manage')
   async createManualTransaction(
     @Param('userId', ParseIntPipe) userId: number,
     @Req() request: AuthenticatedRequest,
@@ -148,7 +152,7 @@ export class BillingController {
   }
 
   @Post('/resources/:resourceId/billing/configuration')
-  @Auth('canManageBilling')
+  @Auth('billing.manage')
   @ApiOperation({
     summary: 'Update the billing configuration for a resource',
     operationId: 'updateResourceBillingConfiguration',
@@ -166,7 +170,7 @@ export class BillingController {
   }
 
   @Post('/billing/sumup/configuration/api-key')
-  @Auth('canManageBilling')
+  @Auth('billing.manage')
   @ApiOperation({
     summary: 'Set the SumUp configuration',
     operationId: 'setSumUpApiKey',
@@ -178,7 +182,7 @@ export class BillingController {
   }
 
   @Post('/billing/configuration')
-  @Auth('canManageBilling')
+  @Auth('billing.manage')
   @ApiOperation({
     summary: 'Set the billing configuration',
     operationId: 'setBillingConfiguration',
@@ -222,7 +226,7 @@ export class BillingController {
   }
 
   @Post('/billing/sumup/readers/pair')
-  @Auth('canManageBilling')
+  @Auth('billing.manage')
   @ApiOperation({
     summary: 'Pair a SumUp reader',
     operationId: 'pairSumUpReader',
@@ -233,7 +237,7 @@ export class BillingController {
   }
 
   @Delete('/billing/sumup/readers/:readerId')
-  @Auth('canManageBilling')
+  @Auth('billing.manage')
   @ApiOperation({
     summary: 'Remove a SumUp reader',
     operationId: 'removeSumUpReader',
@@ -277,15 +281,18 @@ export class BillingController {
   async streamEvents(@Request() request: AuthenticatedRequest): Promise<Observable<{ data: BillingTransaction }>> {
     this.logger.log(`Client connected to SSE for user ${request.user.id}`);
 
-    // Get the subject for this resource
-    const subject = this.liveNotificationsService.getTransactionSubject(request.user.id);
-
-    // Create an observable from the subject
-    return this.sse.wrap('billing', subject.asObservable());
+    const { id: userId } = request.user;
+    const subject = this.liveNotificationsService.getTransactionSubject(userId);
+    return this.sse.wrap(
+      'billing',
+      subject.asObservable().pipe(
+        finalize(() => this.liveNotificationsService.deleteSubjectIfUnobserved(userId)),
+      ),
+    );
   }
 
   @Post('/billing/transactions/:transactionId/refund')
-  @Auth('canManageBilling')
+  @Auth('billing.manage')
   @ApiOperation({
     summary: 'Refund a billing transaction',
     operationId: 'refundTransaction',

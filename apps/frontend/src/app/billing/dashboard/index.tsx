@@ -7,12 +7,18 @@ import { SummaryCard } from './summary';
 import { BillingDashboardTopupCard } from './topup';
 import { useAuth } from '../../../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
+import { useLicenseServiceGetLicenseInformation } from '@attraccess/react-query-client';
 
 export function BillingDashboardPage() {
   const { t } = useTranslations({ en, de });
   const navigate = useNavigate();
+  const { data: license } = useLicenseServiceGetLicenseInformation();
 
   const { hasPermission } = useAuth();
+
+  if (license && !license.modules.includes('billing')) {
+    return null;
+  }
 
   return (
     <div>
@@ -24,7 +30,7 @@ export function BillingDashboardPage() {
             key: 'administration',
             label: t('actions.administration'),
             icon: <Settings2Icon />,
-            isHidden: !hasPermission('canManageBilling'),
+            isHidden: !hasPermission('billing.manage'),
             onPress: () => navigate('/billing/administration'),
           },
         ]}

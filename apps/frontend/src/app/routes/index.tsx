@@ -1,6 +1,9 @@
 import { Navigate } from 'react-router-dom';
 import { ResourceTabsLayout } from '../resources/details/layout/ResourceTabsLayout';
 import { ResourceOverviewTab } from '../resources/details/overview/ResourceOverviewTab';
+import { KioskLayout } from '../kiosk/layout/KioskLayout';
+import { KioskResourcePage } from '../kiosk/resources/KioskResourcePage';
+import { KioskCompanionPage } from '../kiosk/companion/KioskCompanionPage';
 import { ResourceHistoryTab } from '../resources/details/history/ResourceHistoryTab';
 import { ResourcePeopleTab } from '../resources/details/people/ResourcePeopleTab';
 import { ResourceGroupsTab } from '../resources/details/groups/ResourceGroupsTab';
@@ -20,7 +23,7 @@ import { NfcCardList } from '../attractap/NfcCardList';
 import { CsvExport } from '../csv-export';
 import { DocumentationEditor, DocumentationView } from '../resources/documentation';
 import { EmailTemplatesPage } from '../email-templates/EmailTemplatesPage';
-import { EditEmailTemplatePage } from '../email-templates/edit';
+import { EmailsPage } from '../emails/EmailsPage';
 import { ResourceGroupEditPage } from '../resource-groups';
 import { ResourceOverview } from '../resourceOverview';
 import { Dependencies } from '../dependencies';
@@ -40,12 +43,40 @@ import { MessagesPage } from '../messaging';
 import { ProjectDetailsPage } from '../projects/details';
 import { ProjectTeamPage } from '../projects/details/team';
 import SystemSettingsPage from '../settings';
+import { RolesPage } from '../roles';
 import FirstTimeSetupPage from '../first-time-setup';
 import { UnauthorizedLayout } from '../unauthorized/unauthorized-layout/layout';
 
 const PasswordPolicySettingsPage = lazy(() => import('../settings/password-policy'));
+const CompanionSettingsPage = lazy(() => import('../settings/companion'));
+const EmailLayoutPage = lazy(() => import('../email-layout/EmailLayoutPage'));
+// GrapesJS is heavy — keep the visual template editor out of the main bundle
+const EditEmailTemplatePage = lazy(() => import('../email-templates/edit'));
+const UserSecurityPage = lazy(() => import('../user-management/security'));
+const MessagingSettingsPage = lazy(() => import('../messaging/settings'));
+const MonitoringPage = lazy(() => import('../monitoring'));
 
 const coreRoutes: RouteConfig[] = [
+  {
+    path: '/kiosk/resources/:id',
+    element: (
+      <KioskLayout>
+        <KioskResourcePage />
+      </KioskLayout>
+    ),
+    authRequired: false,
+    noLayout: true,
+  },
+  {
+    path: '/kiosk/companion',
+    element: (
+      <KioskLayout>
+        <KioskCompanionPage />
+      </KioskLayout>
+    ),
+    authRequired: false,
+    noLayout: true,
+  },
   {
     path: '/',
     element: <Navigate to="/resources" replace />,
@@ -114,7 +145,7 @@ const coreRoutes: RouteConfig[] = [
         <ResourceGroupsTab />
       </ResourceTabsLayout>
     ),
-    authRequired: 'canManageResources',
+    authRequired: 'resources.update',
   },
   {
     path: '/resources/:id/flows',
@@ -132,12 +163,12 @@ const coreRoutes: RouteConfig[] = [
         <FormListPage />
       </ResourceTabsLayout>
     ),
-    authRequired: 'canManageResources',
+    authRequired: 'resources.update',
   },
   {
     path: '/resources/:id/forms/:formId',
     element: <FormEditorPage />,
-    authRequired: 'canManageResources',
+    authRequired: 'resources.update',
   },
   {
     path: '/resources/:id/documentation',
@@ -147,7 +178,7 @@ const coreRoutes: RouteConfig[] = [
   {
     path: '/resources/:id/documentation/edit',
     element: <DocumentationEditor />,
-    authRequired: 'canManageResources',
+    authRequired: 'resources.update',
   },
   {
     path: '/resources/:id/maintenance',
@@ -164,44 +195,44 @@ const coreRoutes: RouteConfig[] = [
     authRequired: true,
   },
   {
-    path: '/mqtt/servers',
+    path: '/devices/mqtt/servers',
     element: <MqttServersPage />,
-    authRequired: 'canManageResources',
+    authRequired: 'resources.update',
   },
   {
-    path: '/mqtt/servers/:serverId',
+    path: '/devices/mqtt/servers/:serverId',
     element: <EditMqttServerPage />,
-    authRequired: 'canManageResources',
+    authRequired: 'resources.update',
   },
   {
     path: '/sso/providers',
     element: <SSOProvidersPage />,
-    authRequired: 'canManageSystemConfiguration',
+    authRequired: 'system.sso.manage',
   },
   {
     path: '/sso/providers/new',
     element: <SSOProviderFormPage />,
-    authRequired: 'canManageSystemConfiguration',
+    authRequired: 'system.sso.manage',
   },
   {
     path: '/sso/providers/:providerId',
     element: <SSOProviderFormPage />,
-    authRequired: 'canManageSystemConfiguration',
+    authRequired: 'system.sso.manage',
   },
   {
     path: '/balena',
     element: <BalenaPage />,
-    authRequired: 'canManageSystemConfiguration',
+    authRequired: 'system.settings.manage',
   },
   {
     path: '/users',
     element: <UserManagementPage />,
-    authRequired: 'canManageUsers',
+    authRequired: 'users.read',
   },
   {
     path: '/users/:id',
     element: <UserManagementDetailsPage />,
-    authRequired: 'canManageUsers',
+    authRequired: 'users.read',
   },
   {
     path: '/attractap',
@@ -216,12 +247,12 @@ const coreRoutes: RouteConfig[] = [
   {
     path: '/attractap/readers',
     element: <AttractapList />,
-    authRequired: 'canManageResources',
+    authRequired: 'resources.update',
   },
   {
     path: '/attractap/readers/:readerId/diagnostics',
     element: <AttractapDiagnosticsPage />,
-    authRequired: 'canManageResources',
+    authRequired: 'resources.update',
   },
   {
     path: '/billing',
@@ -231,51 +262,114 @@ const coreRoutes: RouteConfig[] = [
   {
     path: '/billing/administration',
     element: <BillingAdministrationPage />,
-    authRequired: 'canManageBilling',
+    authRequired: 'billing.manage',
   },
   {
     path: '/csv-export',
     element: <CsvExport />,
-    authRequired: 'canManageBilling',
+    authRequired: 'billing.manage',
   },
   {
     path: '/billing/administration/sumup',
     element: <SumUpPage />,
-    authRequired: 'canManageBilling',
+    authRequired: 'billing.manage',
   },
   {
     path: '/plugins',
     element: <PluginsList />,
-    authRequired: 'canManageSystemConfiguration',
+    authRequired: 'system.plugins.manage',
   },
   {
     path: '/settings',
     element: <SystemSettingsPage />,
-    authRequired: 'canManageSystemConfiguration',
+    authRequired: 'system.settings.manage',
   },
   {
-    path: '/settings/security/password-policy',
+    path: '/settings/roles',
+    element: <RolesPage />,
+    authRequired: 'system.settings.manage',
+  },
+  // User security section
+  {
+    path: '/users/security',
+    element: (
+      <Suspense fallback={<div className="flex items-center justify-center p-8"><Spinner size="sm" /></div>}>
+        <UserSecurityPage />
+      </Suspense>
+    ),
+    authRequired: 'system.settings.manage',
+  },
+  {
+    path: '/users/security/password-policy',
     element: (
       <Suspense fallback={<div className="flex items-center justify-center p-8"><Spinner size="sm" /></div>}>
         <PasswordPolicySettingsPage />
       </Suspense>
     ),
-    authRequired: 'canManageSystemConfiguration',
+    authRequired: 'system.settings.manage',
+  },
+  // Messaging settings
+  {
+    path: '/messages/settings',
+    element: (
+      <Suspense fallback={<div className="flex items-center justify-center p-8"><Spinner size="sm" /></div>}>
+        <MessagingSettingsPage />
+      </Suspense>
+    ),
+    authRequired: 'system.settings.manage',
+  },
+  // Monitoring
+  {
+    path: '/monitoring',
+    element: (
+      <Suspense fallback={<div className="flex items-center justify-center p-8"><Spinner size="sm" /></div>}>
+        <MonitoringPage />
+      </Suspense>
+    ),
+    authRequired: 'system.settings.manage',
+  },
+  {
+    path: '/devices/companion',
+    element: (
+      <Suspense fallback={<div className="flex items-center justify-center p-8"><Spinner size="sm" /></div>}>
+        <CompanionSettingsPage />
+      </Suspense>
+    ),
+    authRequired: 'system.settings.manage',
   },
   {
     path: '/account',
     element: <AccountPage />,
     authRequired: true,
   },
+  // Emails section
   {
-    path: '/email-templates',
-    element: <EmailTemplatesPage />,
-    authRequired: 'canManageSystemConfiguration',
+    path: '/emails',
+    element: <EmailsPage />,
+    authRequired: 'system.settings.manage',
   },
   {
-    path: '/email-templates/:type',
-    element: <EditEmailTemplatePage />,
-    authRequired: 'canManageSystemConfiguration',
+    path: '/emails/templates',
+    element: <EmailTemplatesPage />,
+    authRequired: 'system.settings.manage',
+  },
+  {
+    path: '/emails/templates/:type',
+    element: (
+      <Suspense fallback={<div className="flex items-center justify-center p-8"><Spinner size="sm" /></div>}>
+        <EditEmailTemplatePage />
+      </Suspense>
+    ),
+    authRequired: 'system.settings.manage',
+  },
+  {
+    path: '/emails/layout',
+    element: (
+      <Suspense fallback={<div className="flex items-center justify-center p-8"><Spinner size="sm" /></div>}>
+        <EmailLayoutPage />
+      </Suspense>
+    ),
+    authRequired: 'system.settings.manage',
   },
   {
     path: '/messages',

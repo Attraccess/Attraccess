@@ -2,6 +2,7 @@
 #include <lvgl.h>
 #include <time.h>
 #include <stdio.h>
+#include "platform.hpp"
 
 void ResourceDetailsScreen::updateElapsedTimeDisplay()
 {
@@ -18,7 +19,9 @@ void ResourceDetailsScreen::updateElapsedTimeDisplay()
    // difftime returns seconds; convert to milliseconds for formatter
    double elapsedSeconds = difftime(currentTime, this->sessionStartTime);
    double elapsedMillis = elapsedSeconds * 1000.0;
-   lv_label_set_text(this->elapsedTime, millisToTimeString(elapsedMillis).c_str());
+   // The formatted value only changes once per second; raw lv_label_set_text from
+   // loop() would invalidate (re-render) the label every tick (ATT-554 item 5).
+   setLabelTextIfChanged(this->elapsedTime, millisToTimeString(elapsedMillis).c_str());
 }
 void ResourceDetailsScreen::setSessionTimeoutTime(uint32_t sessionTimeoutTime)
 {

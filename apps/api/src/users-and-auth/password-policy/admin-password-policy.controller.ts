@@ -38,7 +38,7 @@ export class AdminPasswordPolicyController {
   constructor(private readonly service: PasswordPolicyService) {}
 
   @Get()
-  @Auth('canManageSystemConfiguration')
+  @Auth('system.settings.manage')
   @ApiOperation({ summary: 'Get the global password policy', operationId: 'getAdminPasswordPolicy' })
   @ApiResponse({ status: 200, description: 'The global password policy.', type: PasswordPolicyDto })
   async getPolicy(): Promise<PasswordPolicyDto> {
@@ -46,7 +46,7 @@ export class AdminPasswordPolicyController {
   }
 
   @Patch()
-  @Auth('canManageSystemConfiguration')
+  @Auth('system.settings.manage')
   @ApiOperation({ summary: 'Update the global password policy', operationId: 'updateAdminPasswordPolicy' })
   @ApiResponse({ status: 200, description: 'Password policy updated.', type: PasswordPolicyDto })
   async updatePolicy(
@@ -61,7 +61,7 @@ export class AdminPasswordPolicyController {
 
   @Post('preview')
   @HttpCode(HttpStatus.OK)
-  @Auth('canManageSystemConfiguration')
+  @Auth('system.settings.manage')
   @ApiOperation({
     summary: 'Server-side preview: evaluate a candidate password against the current (or draft) policy',
     operationId: 'previewAdminPasswordPolicy',
@@ -82,7 +82,7 @@ export class AdminPasswordPolicyController {
   }
 
   @Get('overrides')
-  @Auth('canManageSystemConfiguration')
+  @Auth('system.settings.manage')
   @ApiOperation({ summary: 'List all per-role password policy overrides', operationId: 'listPasswordPolicyOverrides' })
   @ApiResponse({ status: 200, description: 'All defined overrides.', type: [PasswordPolicyOverrideDto] })
   async listOverrides(): Promise<PasswordPolicyOverrideDto[]> {
@@ -91,7 +91,7 @@ export class AdminPasswordPolicyController {
   }
 
   @Get('overrides/:role')
-  @Auth('canManageSystemConfiguration')
+  @Auth('system.settings.manage')
   @ApiParam({ name: 'role', enum: PasswordPolicyRole, enumName: 'PasswordPolicyRole' })
   @ApiOperation({ summary: 'Get the per-role override for a single role', operationId: 'getPasswordPolicyOverride' })
   @ApiResponse({ status: 200, description: 'The override row, or null if unset.', type: PasswordPolicyOverrideDto, nullable: true })
@@ -103,7 +103,7 @@ export class AdminPasswordPolicyController {
   }
 
   @Put('overrides/:role')
-  @Auth('canManageSystemConfiguration')
+  @Auth('system.settings.manage')
   @ApiParam({ name: 'role', enum: PasswordPolicyRole, enumName: 'PasswordPolicyRole' })
   @ApiOperation({ summary: 'Upsert a per-role password policy override', operationId: 'upsertPasswordPolicyOverride' })
   @ApiResponse({ status: 200, description: 'The saved override row.', type: PasswordPolicyOverrideDto })
@@ -120,7 +120,7 @@ export class AdminPasswordPolicyController {
 
   @Delete('overrides/:role')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @Auth('canManageSystemConfiguration')
+  @Auth('system.settings.manage')
   @ApiParam({ name: 'role', enum: PasswordPolicyRole, enumName: 'PasswordPolicyRole' })
   @ApiOperation({ summary: 'Delete a per-role password policy override', operationId: 'deletePasswordPolicyOverride' })
   @ApiResponse({ status: 204, description: 'Override removed.' })

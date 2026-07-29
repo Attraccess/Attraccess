@@ -35,6 +35,8 @@ import {
 } from '@attraccess/shared';
 import { HibpClient } from './hibp.client';
 import { ZxcvbnService } from './zxcvbn.service';
+import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
+import { RbacService } from '../rbac/rbac.service';
 
 export const POLICY_FIELDS: Array<keyof PasswordPolicyConfig> = [
   'minLength',
@@ -94,6 +96,7 @@ export class PasswordPolicyService implements OnModuleInit {
     private readonly dataSource: DataSource,
     private readonly hibp: HibpClient,
     private readonly zxcvbn: ZxcvbnService,
+    private readonly rbacService: RbacService,
   ) {}
 
   public async onModuleInit(): Promise<void> {
@@ -136,14 +139,16 @@ export class PasswordPolicyService implements OnModuleInit {
     return this.toPublic(policy);
   }
 
-  public resolveRole(user: User | null | undefined): PasswordPolicyRole | undefined {
-    if (!user) {
-      return undefined;
+  public async resolveRole(user: User | null | undefined): Promise<PasswordPolicyRole | undefined> {
+    if (!user) return undefined;
+    const effectivePerms = (user as AuthenticatedUser).effectivePermissions;
+    if (effectivePerms !== undefined) {
+      // request-bound user: use pre-computed permissions (no extra DB query)
+      return effectivePerms.has('system.settings.manage') ? PasswordPolicyRole.ADMIN : undefined;
     }
-    if (user.systemPermissions?.canManageSystemConfiguration) {
-      return PasswordPolicyRole.ADMIN;
-    }
-    return undefined;
+    // DB-loaded user: query permissions so admin policy applies to password resets / invitations
+    const perms = await this.rbacService.getEffectivePermissions(user.id);
+    return perms.has('system.settings.manage') ? PasswordPolicyRole.ADMIN : undefined;
   }
 
   public async updatePolicy(

@@ -6,7 +6,14 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Resource, ResourceHealthStatus, ResourceIntroducer, User } from '@attraccess/database-entities';
 import { ResourceHealthChangedEvent } from './events/resource-health-changed.event';
-import { EmailService } from '../../email/email.service';
+import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
+import { NotificationCategory } from '../../notifications/notification-types';
+import { RbacService } from '../../users-and-auth/rbac/rbac.service';
+import { createTranslator } from '../../i18n/translate';
+import * as en from './resource-health-notification.en.json';
+import * as de from './resource-health-notification.de.json';
+
+const t = createTranslator({ en, de });
 
 @Injectable()
 export class ResourceHealthNotificationListener {
@@ -19,7 +26,8 @@ export class ResourceHealthNotificationListener {
     private readonly resourceIntroducerRepository: Repository<ResourceIntroducer>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
-    private readonly emailService: EmailService,
+    private readonly notifications: NotificationDispatchService,
+    private readonly rbacService: RbacService,
   ) {}
 
   @OnEvent(ResourceHealthChangedEvent.EVENT_NAME)
@@ -43,31 +51,32 @@ export class ResourceHealthNotificationListener {
         return;
       }
 
-      this.logger.log(
-        `Dispatching health-change emails to ${recipients.length} user(s) for resource ${resource.id} (${event.previousStatus} -> ${event.status})`,
-      );
-
-      await Promise.all(
-        recipients.map((recipient) =>
-          this.emailService
-            .sendResourceHealthChangedEmail(
-              recipient,
-              { id: resource.id, name: resource.name },
-              {
-                status: event.status,
-                previousStatus: event.previousStatus,
-                reason: event.reason,
-                identifier: event.identifier,
-              },
-            )
-            .catch((error) => {
-              this.logger.error(
-                `Failed to send health-change email to user ${recipient.id} for resource ${resource.id}: ${error.message}`,
-                error.stack,
-              );
-            }),
-        ),
-      );
+      const becameUnhealthy = event.status === ResourceHealthStatus.UNHEALTHY;
+      await this.notifications.dispatch({
+        category: NotificationCategory.RESOURCE_HEALTH,
+        recipients,
+        title: (recipient) =>
+          t(recipient.locale, becameUnhealthy ? 'titleDegraded' : 'titleRecovered', { resourceName: resource.name }),
+        body: (recipient) =>
+          event.reason ??
+          t(recipient.locale, 'bodyStatusChanged', {
+            resourceName: resource.name,
+            previousStatus: event.previousStatus ?? t(recipient.locale, 'statusUnknown'),
+            status: event.status,
+          }),
+        url: `/resources/${resource.id}`,
+        severity: becameUnhealthy ? 'warning' : 'info',
+        sendEmail: (recipient) =>
+          this.notifications.sendEmailTemplate(recipient, NotificationCategory.RESOURCE_HEALTH, {
+            resource: { id: resource.id, name: resource.name },
+            health: {
+              status: event.status,
+              previousStatus: event.previousStatus,
+              reason: event.reason,
+              identifier: event.identifier,
+            },
+          }),
+      });
     } catch (error) {
       this.logger.error(
         `Failed to process health-change notification for resource ${event.resourceId}: ${error.message}`,
@@ -79,10 +88,8 @@ export class ResourceHealthNotificationListener {
   private async collectRecipients(resource: Resource): Promise<User[]> {
     const groupIds = (resource.groups ?? []).map((group) => group.id);
 
-    const admins = await this.userRepository
-      .createQueryBuilder('user')
-      .where('user.canManageResources = :value', { value: true })
-      .getMany();
+    const adminIds = await this.rbacService.getUserIdsWithPermission('resources.maintenance.manage');
+    const admins = adminIds.length > 0 ? await this.userRepository.findBy({ id: In(adminIds) }) : [];
 
     const introducerWhere: Array<Record<string, unknown>> = [{ resourceId: resource.id }];
     if (groupIds.length > 0) {

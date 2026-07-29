@@ -5,7 +5,7 @@ import { AlertCircle, AwardIcon, ShieldCheckIcon, WrenchIcon } from 'lucide-reac
 import { User } from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { Select } from '../../../components/select';
-import { AddPersonModal } from './AddPersonModal';
+import { AddPersonDrawer } from './AddPersonDrawer';
 import { HistoryModalLoader } from './HistoryModalLoader';
 import { IntroductionCommentModal } from './IntroductionCommentModal';
 import { PeopleHeader } from './PeopleHeader';
@@ -66,7 +66,6 @@ export function PeopleManagement(props: Readonly<PeopleManagementProps & Omit<Ca
         await mutations.grantMaintainer(user.id);
       } else {
         await mutations.grantIntroduction(user.id, addComment);
-        setAddComment('');
       }
     },
     [addMode, addComment, mutations],
@@ -171,7 +170,7 @@ export function PeopleManagement(props: Readonly<PeopleManagementProps & Omit<Ca
 
   const modals = (
     <>
-      <AddPersonModal
+      <AddPersonDrawer
         t={t}
         isOpen={isAddOpen}
         mode={addMode}

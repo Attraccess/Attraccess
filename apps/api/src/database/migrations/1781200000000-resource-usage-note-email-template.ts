@@ -24,7 +24,7 @@ const RESOURCE_USAGE_NOTE_ADDED_MJML = `
         <mj-text>
           <strong>{{note.authorName}}</strong> left a note when {{note.phaseAction}} <strong>{{resource.name}}</strong>.
         </mj-text>
-        <mj-text font-size="14px" color="#111827" background-color="#F3F4F6" padding="12px" border-radius="4px">
+        <mj-text font-size="14px" color="#111827" padding="12px" container-background-color="#F3F4F6">
           {{note.content}}
         </mj-text>
         <mj-button href="{{resource.url}}" align="left">

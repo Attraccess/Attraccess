@@ -8,14 +8,17 @@ import { MessageCreatedEvent } from './events/message-created.event';
 describe('MessagingLiveService', () => {
   let service: MessagingLiveService;
   let participantRepository: { find: jest.Mock };
+  let messageRepository: { findOne: jest.Mock };
 
   beforeEach(async () => {
     participantRepository = { find: jest.fn() };
+    messageRepository = { findOne: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MessagingLiveService,
         { provide: getRepositoryToken(ConversationParticipant), useValue: participantRepository },
+        { provide: getRepositoryToken(Message), useValue: messageRepository },
       ],
     }).compile();
 
@@ -49,6 +52,8 @@ describe('MessagingLiveService', () => {
     ]);
 
     const message = { id: 3, conversationId: 1, senderId: 5 } as Message;
+    const messageWithSender = { ...message, sender: { id: 5, username: 'sender' } } as Message;
+    messageRepository.findOne.mockResolvedValue(messageWithSender);
 
     const recipientEvents = firstValueFrom(
       service.getUserMessageSubject(9).pipe(take(1), toArray()),
@@ -59,7 +64,8 @@ describe('MessagingLiveService', () => {
 
     await service.notifyNewMessage(new MessageCreatedEvent(message));
 
-    await expect(recipientEvents).resolves.toEqual([{ data: message }]);
+    expect(messageRepository.findOne).toHaveBeenCalledWith({ where: { id: 3 }, relations: ['sender'] });
+    await expect(recipientEvents).resolves.toEqual([{ data: messageWithSender }]);
     expect(senderEvents).toHaveLength(0);
   });
 });

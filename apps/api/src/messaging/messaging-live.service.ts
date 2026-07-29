@@ -14,6 +14,8 @@ export class MessagingLiveService {
   public constructor(
     @InjectRepository(ConversationParticipant)
     private readonly participantRepository: Repository<ConversationParticipant>,
+    @InjectRepository(Message)
+    private readonly messageRepository: Repository<Message>,
   ) {}
 
   public getUserMessageSubject(userId: number): Subject<{ data: Message }> {
@@ -53,12 +55,21 @@ export class MessagingLiveService {
       this.connectionCounts.set(userId, next);
     } else {
       this.connectionCounts.delete(userId);
+      const subject = this.messageSubjects.get(userId);
+      if (subject && !subject.observed) {
+        this.messageSubjects.delete(userId);
+      }
     }
   }
 
   @OnEvent(MessageCreatedEvent.EVENT_NAME)
   public async notifyNewMessage(event: MessageCreatedEvent): Promise<void> {
     const message = event.message;
+    const messageWithSender =
+      (await this.messageRepository.findOne({
+        where: { id: message.id },
+        relations: ['sender'],
+      })) ?? message;
 
     const participants = await this.participantRepository.find({
       where: { conversationId: message.conversationId },
@@ -68,7 +79,7 @@ export class MessagingLiveService {
       if (participant.userId === message.senderId) {
         continue;
       }
-      this.getUserMessageSubject(participant.userId).next({ data: message });
+      this.getUserMessageSubject(participant.userId).next({ data: messageWithSender });
     }
   }
 }

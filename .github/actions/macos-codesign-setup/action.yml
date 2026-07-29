@@ -1,0 +1,36 @@
+name: 'macOS Code-Sign Setup'
+description: >
+  Import an Apple Developer ID certificate into a temporary keychain and export
+  CSC_LINK, CSC_KEY_PASSWORD, and KEYCHAIN_PATH as environment variables so that
+  electron-builder can sign the app automatically.
+
+inputs:
+  certificate:
+    description: 'Base64-encoded .p12 certificate (APPLE_CERTIFICATE secret)'
+    required: true
+  certificate-password:
+    description: 'Password for the .p12 file (APPLE_CERTIFICATE_PASSWORD secret)'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Import Apple Developer certificate
+      shell: bash
+      env:
+        APPLE_CERTIFICATE: ${{ inputs.certificate }}
+        APPLE_CERTIFICATE_PASSWORD: ${{ inputs.certificate-password }}
+      run: |
+        set -euo pipefail
+        KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+        KEYCHAIN_PASSWORD="$(openssl rand -hex 16)"
+        echo "$APPLE_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+        security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+        security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+        security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+        security import "$RUNNER_TEMP/certificate.p12" -P "$APPLE_CERTIFICATE_PASSWORD" \
+          -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+        security list-keychain -d user -s "$KEYCHAIN_PATH"
+        echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
+        echo "CSC_LINK=$RUNNER_TEMP/certificate.p12" >> "$GITHUB_ENV"
+        echo "CSC_KEY_PASSWORD=$APPLE_CERTIFICATE_PASSWORD" >> "$GITHUB_ENV"

@@ -18,6 +18,8 @@ import {
 } from '../errors';
 import { LicenseModuleType, LicenseService } from '../../../../license/license.service';
 import { OidcCookieStateStore } from './oidc-cookie-state-store';
+import { MetricsService } from '../../../../metrics/metrics.service';
+import { recordSsoLoginFailure } from '../sso-metrics';
 
 @Injectable()
 export class SSOOIDCGuard implements CanActivate {
@@ -29,6 +31,7 @@ export class SSOOIDCGuard implements CanActivate {
     private settingsService: SettingsService,
     private licenseService: LicenseService,
     private stateStore: OidcCookieStateStore,
+    private metricsService: MetricsService,
   ) { }
 
   async canActivate(context: ExecutionContext) {
@@ -41,6 +44,7 @@ export class SSOOIDCGuard implements CanActivate {
     } catch (error) {
       const reason = error instanceof Error ? error.message : 'SSO not permitted by license';
       this.logger.warn(`Blocking SSO request due to license: ${reason}`);
+      recordSsoLoginFailure(this.metricsService, SSOProviderType.OIDC, 'guard_rejected', this.logger);
       throw new ForbiddenException('SSO is not permitted by the current license');
     }
 
@@ -48,6 +52,7 @@ export class SSOOIDCGuard implements CanActivate {
     const url = await this.settingsService.getUrl();
     if (!url) {
       this.logger.error('Application URL not configured. Cannot construct URLs.');
+      recordSsoLoginFailure(this.metricsService, SSOProviderType.OIDC, 'guard_rejected', this.logger);
       return false;
     }
     const requestURL = new URL(url + req.url);
@@ -61,11 +66,13 @@ export class SSOOIDCGuard implements CanActivate {
 
     if (isNaN(providerId)) {
       this.logger.error(`Invalid SSO provider ID: ${providerIdString}`);
+      recordSsoLoginFailure(this.metricsService, SSOProviderType.OIDC, 'guard_rejected', this.logger);
       throw new InvalidSSOProviderIdException();
     }
 
     if (ssoType !== SSOProviderType.OIDC) {
       this.logger.error(`Invalid SSO provider type: ${ssoType}, expected: ${SSOProviderType.OIDC}`);
+      recordSsoLoginFailure(this.metricsService, SSOProviderType.OIDC, 'guard_rejected', this.logger);
       throw new InvalidSSOProviderTypeException();
     }
 
@@ -74,6 +81,7 @@ export class SSOOIDCGuard implements CanActivate {
 
     if (!provider) {
       this.logger.error(`SSO provider not found for type: ${ssoType} and id: ${providerId}`);
+      recordSsoLoginFailure(this.metricsService, SSOProviderType.OIDC, 'guard_rejected', this.logger);
       throw new SSOProviderNotFoundException();
     }
 
@@ -81,11 +89,13 @@ export class SSOOIDCGuard implements CanActivate {
 
     if (!oidcConfig) {
       this.logger.error(`OIDC configuration not found for provider id: ${providerId}`);
+      recordSsoLoginFailure(this.metricsService, SSOProviderType.OIDC, 'guard_rejected', this.logger);
       throw new SSOProviderNotFoundException();
     }
 
     const isCallbackRoute = routeAction === 'callback';
     if (!isCallbackRoute && !requestURL.searchParams.has('redirectTo')) {
+      recordSsoLoginFailure(this.metricsService, SSOProviderType.OIDC, 'guard_rejected', this.logger);
       throw new BadRequestException('No redirectTo found in query params');
     }
     const redirectTo = requestURL.searchParams.get('redirectTo') ?? '';

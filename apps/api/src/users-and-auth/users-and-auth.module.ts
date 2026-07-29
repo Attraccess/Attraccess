@@ -18,10 +18,21 @@ import { AuthService } from './auth/auth.service';
 import { AuthController } from './auth/auth.controller';
 import { TwoFactorController } from './auth/two-factor.controller';
 import { SessionService } from './auth/session.service';
+import { SESSION_STORE, SessionStore } from './auth/session-store/session-store';
+import { SqliteSessionStore } from './auth/session-store/sqlite.session-store';
+import { ValkeySessionStore } from './auth/session-store/valkey.session-store';
+import { VALKEY_CLIENT } from '../valkey/valkey.module';
+import { TokenHashService } from '../encryption/token-hash.service';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import type { Redis } from 'ioredis';
 
 // Strategies
 import { LocalStrategy } from './strategies/local.strategy';
 import { SessionStrategy } from './strategies/session.strategy';
+
+import { RbacModule } from './rbac/rbac.module';
+import { RbacController } from './rbac/rbac.controller';
 
 // Constants and Entities
 
@@ -43,8 +54,10 @@ import { SSOController } from './auth/sso/sso.controller';
 import { CookieConfigService } from '../common/services/cookie-config.service';
 import { LicenseModule } from '../license/license.module';
 import { SSOOIDCGuard } from './auth/sso/oidc/oidc.guard';
+import { SSOOIDCPassportGuard } from './auth/sso/oidc/oidc-passport.guard';
 import { OidcCookieStateStore } from './auth/sso/oidc/oidc-cookie-state-store';
 import { SSOSamlGuard } from './auth/sso/saml/saml.guard';
+import { SSOSamlPassportGuard } from './auth/sso/saml/saml-passport.guard';
 import { SSOSamlStrategy } from './auth/sso/saml/saml.strategy';
 import { EncryptionModule } from '../encryption/encryption.module';
 import { SSOLinkTokenService } from './auth/sso/link-token.service';
@@ -57,6 +70,7 @@ import { AuthAuditLogger } from './rate-limiting/auth-audit.logger';
 import { AuthRateLimitInterceptor } from './rate-limiting/auth-rate-limit.interceptor';
 import { LoginRateLimitGuard } from './rate-limiting/login.rate-limit.guard';
 import { PasswordPolicyModule } from './password-policy/password-policy.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -76,8 +90,30 @@ import { PasswordPolicyModule } from './password-policy/password-policy.module';
     LicenseModule,
     SettingsModule,
     PasswordPolicyModule,
+    NotificationsModule,
+    RbacModule,
   ],
   providers: [
+    {
+      provide: SESSION_STORE,
+      inject: [
+        { token: VALKEY_CLIENT, optional: true },
+        getRepositoryToken(Session),
+        getRepositoryToken(User),
+        TokenHashService,
+      ],
+      useFactory: (
+        valkeyClient: Redis | null,
+        sessionRepo: Repository<Session>,
+        userRepo: Repository<User>,
+        tokenHashService: TokenHashService,
+      ): SessionStore => {
+        if (valkeyClient) {
+          return new ValkeySessionStore(valkeyClient, userRepo, tokenHashService);
+        }
+        return new SqliteSessionStore(sessionRepo, tokenHashService);
+      },
+    },
     UsersService,
     SignupDomainService,
     UserRegistrationService,
@@ -93,7 +129,9 @@ import { PasswordPolicyModule } from './password-policy/password-policy.module';
     CookieConfigService,
     OidcCookieStateStore,
     SSOOIDCGuard,
+    SSOOIDCPassportGuard,
     SSOSamlGuard,
+    SSOSamlPassportGuard,
     SSOSamlStrategy,
     SSOLinkTokenService,
     AccountLinkingExceptionFilter,
@@ -124,12 +162,6 @@ import { PasswordPolicyModule } from './password-policy/password-policy.module';
       inject: [ModuleRef, SettingsService, OidcCookieStateStore],
     },
   ],
-  // Controller order is load-bearing: NestJS registers routes per-controller in
-  // array order, and Express matches first-registered-wins. Controllers holding
-  // static GET/PATCH routes (me, local-signup-*) MUST precede the ones holding
-  // ':id'/':id/*' routes so those static paths are not shadowed by ':id'.
-  // UserPermissionsController is intentionally kept last so GET 'with-permission'
-  // stays shadowed by GET ':id' — preserving the existing (pre-refactor) behavior.
   controllers: [
     UsersRegistrationController,
     UserInvitationsController,
@@ -139,7 +171,8 @@ import { PasswordPolicyModule } from './password-policy/password-policy.module';
     AuthController,
     TwoFactorController,
     SSOController,
+    RbacController,
   ],
-  exports: [UsersService, AuthService, SessionService, BruteForceProtectionService, AuthAuditLogger],
+  exports: [UsersService, AuthService, SessionService, BruteForceProtectionService, AuthAuditLogger, RbacModule],
 })
 export class UsersAndAuthModule {}

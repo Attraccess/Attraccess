@@ -5,8 +5,11 @@ import {
   User,
   useAuthenticationServiceGetAllSsoProviders,
   useLicenseServiceGetLicenseInformation,
+  useRbacServiceListPermissions,
+  useRbacServiceListRoles,
   useUsersServiceDeleteUser,
   useUsersServiceGetOneUserById,
+  useUsersServiceGetUserRoleAssignments,
 } from '@attraccess/react-query-client';
 
 import { PageHeader } from '../../../components/pageHeader';
@@ -19,14 +22,73 @@ import { ChangeEmailForm } from './components/changeEmail';
 
 import en from './en.json';
 import de from './de.json';
-import { Card, Chip, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Separator, useOverlayState } from '@heroui/react';
+import { Card, Chip, ModalBody, ModalFooter, ModalHeader, Separator, useOverlayState } from '@heroui/react';
 import { Button } from '../../../components/button';
+import { StandardModal } from '../../../components/standardModal';
 import { useToastMessage } from '../../../components/toastProvider';
 import API_ERROR_TRANSLATIONS_EN from '../../../global-translations/api-errors.en.json';
 import API_ERROR_TRANSLATIONS_DE from '../../../global-translations/api-errors.de.json';
 import { useAuth } from '../../../hooks/useAuth';
 import { useMemo } from 'react';
 import { getSsoManagedPermissionKeys, hasConfiguredPermissionMapping } from '@attraccess/shared';
+
+function EffectivePermissionsSection({ userId, t }: { userId: number; t: ReturnType<typeof useTranslations>['t'] }) {
+  const { data: allRoles, isLoading: isLoadingRoles } = useRbacServiceListRoles();
+  const { data: allPermissions, isLoading: isLoadingPerms } = useRbacServiceListPermissions();
+  const { data: userRoles, isLoading: isLoadingUserRoles } = useUsersServiceGetUserRoleAssignments({ id: userId });
+
+  const effectivePermKeys = useMemo(() => {
+    if (!allRoles || !userRoles) return new Set<string>();
+    const assignedRoleIds = new Set(userRoles.map((ur) => ur.roleId));
+    const keys = new Set<string>();
+    for (const role of allRoles) {
+      if (!assignedRoleIds.has(role.id)) continue;
+      for (const rp of role.rolePermissions ?? []) {
+        keys.add(rp.permissionKey);
+      }
+    }
+    return keys;
+  }, [allRoles, userRoles]);
+
+  // Group effective permissions by category using the full permission list
+  const permsByCategory = useMemo(() => {
+    const map = new Map<string, { key: string; label: string; description: string }[]>();
+    for (const perm of allPermissions ?? []) {
+      if (!effectivePermKeys.has(perm.key)) continue;
+      const cat = perm.category || t('effectivePermissions.uncategorized');
+      const bucket = map.get(cat) ?? [];
+      bucket.push(perm);
+      map.set(cat, bucket);
+    }
+    return map;
+  }, [allPermissions, effectivePermKeys, t]);
+
+  if (isLoadingRoles || isLoadingPerms || isLoadingUserRoles) {
+    return <p className="text-sm text-default-400">{t('effectivePermissions.loading')}</p>;
+  }
+
+  if (effectivePermKeys.size === 0) {
+    return <p className="text-sm text-default-400">{t('effectivePermissions.empty')}</p>;
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      {[...permsByCategory.entries()].map(([category, perms], idx, arr) => (
+        <div key={category} className="flex flex-col gap-1.5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-default-500">{category}</p>
+          <div className="flex flex-wrap gap-1">
+            {perms.map((p) => (
+              <Chip key={p.key} size="sm" color="accent" variant="secondary" title={p.description}>
+                {p.label}
+              </Chip>
+            ))}
+          </div>
+          {idx < arr.length - 1 ? <Separator className="mt-1" /> : null}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export function UserManagementDetailsPage() {
   const { id: idParam } = useParams<{ id: string }>();
@@ -87,14 +149,14 @@ export function UserManagementDetailsPage() {
         return;
       }
 
-      const permissionMappings =
+      const roleMappings =
         detail.providerType === SSOProviderType.OIDC
-          ? provider.oidcConfiguration?.permissionMappings
+          ? provider.oidcConfiguration?.roleMappings
           : detail.providerType === SSOProviderType.SAML
-            ? provider.samlConfiguration?.permissionMappings
+            ? provider.samlConfiguration?.roleMappings
             : undefined;
 
-      if (hasConfiguredPermissionMapping(permissionMappings)) {
+      if (hasConfiguredPermissionMapping(roleMappings)) {
         labels.add(provider.name ?? `${detail.providerType} #${detail.providerId}`);
       }
     });
@@ -115,14 +177,14 @@ export function UserManagementDetailsPage() {
         return;
       }
 
-      const permissionMappings =
+      const roleMappings =
         detail.providerType === SSOProviderType.OIDC
-          ? provider.oidcConfiguration?.permissionMappings
+          ? provider.oidcConfiguration?.roleMappings
           : detail.providerType === SSOProviderType.SAML
-            ? provider.samlConfiguration?.permissionMappings
+            ? provider.samlConfiguration?.roleMappings
             : undefined;
 
-      getSsoManagedPermissionKeys(permissionMappings).forEach((key) => keys.add(key));
+      getSsoManagedPermissionKeys(roleMappings).forEach((key) => keys.add(key));
     });
 
     return keys;
@@ -166,7 +228,17 @@ export function UserManagementDetailsPage() {
                 user={user}
                 ssoManagedProviders={ssoManagedProviders}
                 ssoManagedPermissionKeys={ssoManagedPermissionKeys}
+                providersById={providersById}
               />
+            </Card.Content>
+          </Card>
+
+          <Card className="w-full" data-cy="user-details-effective-permissions-card">
+            <Card.Content className="flex flex-col gap-4">
+              <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
+                {t('effectivePermissions.title')}
+              </h3>
+              <EffectivePermissionsSection userId={id} t={t} />
             </Card.Content>
           </Card>
 
@@ -275,35 +347,29 @@ export function UserManagementDetailsPage() {
         </div>
       )}
 
-      <Modal isOpen={isOpen} onOpenChange={setOpen}>
-        <ModalBackdrop>
-          <ModalContainer size="sm">
-            <ModalDialog>
-              {({ close: modalClose }) => (
-                <>
-                  <ModalHeader>{t('delete.modal.title')}</ModalHeader>
-                  <ModalBody>
-                    <p className="text-sm text-default-500">{t('delete.modal.description')}</p>
-                  </ModalBody>
-                  <ModalFooter>
-                    <Button variant="ghost" onPress={modalClose} isDisabled={isDeleting}>
-                      {t('delete.actions.cancel')}
-                    </Button>
-                    <Button
-                      variant="danger"
-                      onPress={() => user && deleteUser({ id: user.id })}
-                      isPending={isDeleting}
-                      data-cy="admin-delete-user-confirm-button"
-                    >
-                      {t('delete.actions.confirm')}
-                    </Button>
-                  </ModalFooter>
-                </>
-              )}
-            </ModalDialog>
-          </ModalContainer>
-        </ModalBackdrop>
-      </Modal>
+      <StandardModal isOpen={isOpen} onOpenChange={setOpen} size="sm">
+        {({ close: modalClose }) => (
+          <>
+            <ModalHeader>{t('delete.modal.title')}</ModalHeader>
+            <ModalBody>
+              <p className="text-sm text-default-500">{t('delete.modal.description')}</p>
+            </ModalBody>
+            <ModalFooter>
+              <Button variant="ghost" onPress={modalClose} isDisabled={isDeleting}>
+                {t('delete.actions.cancel')}
+              </Button>
+              <Button
+                variant="danger"
+                onPress={() => user && deleteUser({ id: user.id })}
+                isPending={isDeleting}
+                data-cy="admin-delete-user-confirm-button"
+              >
+                {t('delete.actions.confirm')}
+              </Button>
+            </ModalFooter>
+          </>
+        )}
+      </StandardModal>
     </div>
   );
 }

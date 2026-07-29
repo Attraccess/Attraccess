@@ -43,10 +43,14 @@ export function NodeEditor(props: Props) {
     if (!formRef.current.checkValidity()) {
       return;
     }
-
     updateNodeData(nodeId as string, data);
     close();
   }, [nodeId, data, updateNodeData, close]);
+
+  const onFormSubmit = useCallback((e: React.FormEvent) => {
+    e.preventDefault();
+    onSave();
+  }, [onSave]);
 
   const onInputChange = useCallback((propertyName: string, value: unknown) => {
     setData((prev) => ({ ...prev, [propertyName]: value }));
@@ -62,7 +66,7 @@ export function NodeEditor(props: Props) {
         </DrawerHeader>
 
         <DrawerBody className="flex flex-col gap-2">
-          <Form onSubmit={onSave} ref={formRef} className="flex flex-col gap-4">
+          <Form onSubmit={onFormSubmit} ref={formRef} className="flex flex-col gap-4">
             {Object.entries(schema.configSchema.properties as Record<string, Property<unknown>>).map(
               ([propertyName, property]) => (
                 <PropertyInput

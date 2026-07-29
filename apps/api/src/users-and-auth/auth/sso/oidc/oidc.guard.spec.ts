@@ -7,6 +7,7 @@ import { LicenseService } from '../../../../license/license.service';
 import { OidcCookieStateStore } from './oidc-cookie-state-store';
 import { ModuleRef } from '@nestjs/core';
 import { SSOProvider } from '@attraccess/database-entities';
+import { MetricsService } from '../../../../metrics/metrics.service';
 
 // Mock the strategy module so `new SSOOIDCStrategy(...)` doesn't invoke
 // the real passport constructor but lets us assert it was called correctly.
@@ -25,6 +26,7 @@ describe('SSOOIDCGuard', () => {
   let licenseService: jest.Mocked<Pick<LicenseService, 'verifyLicense'>>;
   let mockModuleRef: ModuleRef;
   let mockStateStore: OidcCookieStateStore;
+  let metricsService: jest.Mocked<Pick<MetricsService, 'authSsoLoginFailuresTotal'>>;
 
   const mockOidcProvider = {
     id: 1,
@@ -68,6 +70,9 @@ describe('SSOOIDCGuard', () => {
 
     mockModuleRef = {} as ModuleRef;
     mockStateStore = {} as OidcCookieStateStore;
+    metricsService = {
+      authSsoLoginFailuresTotal: { inc: jest.fn() } as never,
+    };
 
     guard = new SSOOIDCGuard(
       ssoService as unknown as SSOService,
@@ -75,6 +80,7 @@ describe('SSOOIDCGuard', () => {
       settingsService as unknown as SettingsService,
       licenseService as unknown as LicenseService,
       mockStateStore,
+      metricsService as unknown as MetricsService,
     );
   });
 
@@ -115,6 +121,19 @@ describe('SSOOIDCGuard', () => {
     expect(result).toBe(true);
     expect(req[SSO_OIDC_CALLBACK_URL_REQUEST_KEY]).toBe('https://api.example.com/api/auth/sso/OIDC/1/callback');
     expect(req[SSO_OIDC_STATE_REQUEST_KEY]).toBeUndefined();
+  });
+
+  it('records OIDC guard rejections as SSO login failures', async () => {
+    const req: Record<string, unknown> = {
+      url: '/api/auth/sso/OIDC/not-a-number/login?redirectTo=/dashboard',
+    };
+
+    await expect(guard.canActivate(createContext(req))).rejects.toThrow();
+
+    expect(metricsService.authSsoLoginFailuresTotal.inc).toHaveBeenCalledWith({
+      provider_type: 'oidc',
+      reason: 'guard_rejected',
+    });
   });
 
   // ─── Regression guards: strategy must be created per request with real config ──

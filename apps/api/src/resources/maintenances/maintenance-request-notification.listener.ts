@@ -5,8 +5,15 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Resource, ResourceIntroducer, ResourceMaintenanceRequest, User } from '@attraccess/database-entities';
-import { MaintenanceRequestCreatedEvent } from './events/maintenance-request-created.event';
-import { EmailService } from '../../email/email.service';
+import { ResourceMaintenanceRequestCreatedEvent } from './events/maintenance-request-created.event';
+import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
+import { NotificationCategory } from '../../notifications/notification-types';
+import { RbacService } from '../../users-and-auth/rbac/rbac.service';
+import { createTranslator } from '../../i18n/translate';
+import * as en from './maintenance-request-notification.en.json';
+import * as de from './maintenance-request-notification.de.json';
+
+const t = createTranslator({ en, de });
 
 @Injectable()
 export class MaintenanceRequestNotificationListener {
@@ -21,11 +28,12 @@ export class MaintenanceRequestNotificationListener {
     private readonly requestRepository: Repository<ResourceMaintenanceRequest>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
-    private readonly emailService: EmailService,
+    private readonly notifications: NotificationDispatchService,
+    private readonly rbacService: RbacService,
   ) {}
 
-  @OnEvent(MaintenanceRequestCreatedEvent.EVENT_NAME)
-  async handleRequestCreated(event: MaintenanceRequestCreatedEvent): Promise<void> {
+  @OnEvent(ResourceMaintenanceRequestCreatedEvent.EVENT_NAME)
+  async handleRequestCreated(event: ResourceMaintenanceRequestCreatedEvent): Promise<void> {
     try {
       const request = await this.requestRepository.findOne({
         where: { id: event.requestId },
@@ -49,28 +57,27 @@ export class MaintenanceRequestNotificationListener {
         return;
       }
 
-      const requestedBy = request.createdByUser?.username ?? 'A user';
+      const requestedByUsername = request.createdByUser?.username;
 
-      this.logger.log(
-        `Dispatching maintenance-request emails to ${recipients.length} user(s) for resource ${resource.id}`,
-      );
-
-      await Promise.all(
-        recipients.map((recipient) =>
-          this.emailService
-            .sendMaintenanceRequestedEmail(
-              recipient,
-              { id: resource.id, name: resource.name },
-              { id: request.id, reason: request.reason, requestedBy },
-            )
-            .catch((error) => {
-              this.logger.error(
-                `Failed to send maintenance-request email to user ${recipient.id} for resource ${resource.id}: ${error.message}`,
-                error.stack,
-              );
-            }),
-        ),
-      );
+      await this.notifications.dispatch({
+        category: NotificationCategory.MAINTENANCE_REQUESTS,
+        recipients,
+        title: (recipient) => t(recipient.locale, 'title', { resourceName: resource.name }),
+        body: (recipient) => {
+          const requestedBy = requestedByUsername ?? t(recipient.locale, 'fallbackUser');
+          return t(recipient.locale, 'body', { requestedBy, reason: request.reason });
+        },
+        url: `/resources/${resource.id}/maintenance`,
+        sendEmail: (recipient) =>
+          this.notifications.sendEmailTemplate(recipient, NotificationCategory.MAINTENANCE_REQUESTS, {
+            resource: { id: resource.id, name: resource.name },
+            request: {
+              id: request.id,
+              reason: request.reason,
+              requestedBy: requestedByUsername ?? t(recipient.locale, 'fallbackUser'),
+            },
+          }),
+      });
     } catch (error) {
       this.logger.error(
         `Failed to process maintenance-request notification for resource ${event.resourceId}: ${error.message}`,
@@ -82,10 +89,8 @@ export class MaintenanceRequestNotificationListener {
   private async collectRecipients(resource: Resource): Promise<User[]> {
     const groupIds = (resource.groups ?? []).map((group) => group.id);
 
-    const admins = await this.userRepository
-      .createQueryBuilder('user')
-      .where('user.canManageResources = :value', { value: true })
-      .getMany();
+    const adminIds = await this.rbacService.getUserIdsWithPermission('resources.maintenance.manage');
+    const admins = adminIds.length > 0 ? await this.userRepository.findBy({ id: In(adminIds) }) : [];
 
     const introducerWhere: Array<Record<string, unknown>> = [{ resourceId: resource.id }];
     if (groupIds.length > 0) {

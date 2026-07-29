@@ -1,10 +1,19 @@
 #include "ioexpander.hpp"
+#include "../platform.hpp"
+#include "../utils.hpp"
 
 void IOExpander::setup()
 {
     i2cAddress = IOEXPANDER_I2C_ADDR;
     delay(10); // Allow IO expander to complete power-on reset
     logger.infof("Using IO expander at 0x%02X", i2cAddress);
+
+    dev = addSharedI2CDevice(i2cAddress);
+    if (!dev)
+    {
+        logger.error("Failed to add IO expander to the shared I2C bus");
+        return;
+    }
 
 #ifdef IO_EXPANDER_16BIT
     // V4 hardware: XL9555 / PCA9555-compatible 16-bit IO expander.
@@ -70,6 +79,22 @@ void IOExpander::resetTouchPanel()
     setPin(IOEXP_BIT_TP_RST, true);
     delay(50);
     logger.info("Touch panel reset complete");
+}
+
+void IOExpander::powerOff()
+{
+#ifdef IO_EXPANDER_16BIT
+    if (!initialized)
+    {
+        logger.warn("powerOff: called before init — ignoring power-off request");
+        return;
+    }
+    logger.info("Power off: driving SYS_EN low (reg 0x03 bit 5)");
+    outputState1 &= ~(uint8_t(1 << IOEXP_BIT_SYS_EN));
+    writeRegister(IOEXP_REG_OUTPUT_1, outputState1);
+#else
+    logger.warn("powerOff: no SYS_EN latch on this hardware — ignoring");
+#endif
 }
 
 void IOExpander::beeperOn()
@@ -158,31 +183,30 @@ void IOExpander::dumpRegisters()
 
 bool IOExpander::writeRegister(uint8_t reg, uint8_t value)
 {
-    Wire.beginTransmission(i2cAddress);
-    Wire.write(reg);
-    Wire.write(value);
-    uint8_t err = Wire.endTransmission();
-    if (err != 0)
+    // One register access = one atomic conversation on the shared I2C bus —
+    // never interleaved with PN532/GT911 traffic from other tasks (ATT-554).
+    if (!dev)
     {
-        logger.warnf("writeRegister(0x%02X, 0x%02X) FAILED err=%d (0=ok,2=NACK addr,3=NACK data,5=timeout)",
-                     reg, value, err);
+        return false;
     }
-    return err == 0;
+    I2CBusGuard busGuard;
+    uint8_t buf[2] = {reg, value};
+    esp_err_t err = i2c_master_transmit(dev, buf, sizeof(buf), ATTRACTAP_I2C_XFER_TIMEOUT_MS);
+    if (err != ESP_OK)
+    {
+        logger.warnf("writeRegister(0x%02X, 0x%02X) FAILED err=%s", reg, value, esp_err_to_name(err));
+    }
+    return err == ESP_OK;
 }
 
 bool IOExpander::readRegister(uint8_t reg, uint8_t &value)
 {
-    Wire.beginTransmission(i2cAddress);
-    Wire.write(reg);
-    if (Wire.endTransmission(false) != 0)
+    if (!dev)
     {
         return false;
     }
-
-    if (Wire.requestFrom((int)i2cAddress, 1) != 1)
-    {
-        return false;
-    }
-    value = Wire.read();
-    return true;
+    I2CBusGuard busGuard;
+    // Write register pointer, repeated-start read — same wire sequence as the
+    // old Wire.endTransmission(false) + requestFrom pair.
+    return i2c_master_transmit_receive(dev, &reg, 1, &value, 1, ATTRACTAP_I2C_XFER_TIMEOUT_MS) == ESP_OK;
 }
