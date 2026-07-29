@@ -92,3 +92,30 @@ export function setAdminPassword(
 ): Promise<ShellyDevice> {
   return request<ShellyDevice>(`/devices/${id}/auth`, { method: 'POST', body: input });
 }
+
+export interface DiscoveredDevice {
+  deviceId: number;
+  ipAddress: string;
+  name: string;
+  generation: number;
+  model: string | null;
+  authState: AuthState;
+  /** True when this run added the device; false when it was already registered. */
+  isNew: boolean;
+  source: 'mdns' | 'scan';
+}
+
+export interface DiscoveryResult {
+  subnets: string[];
+  probed: number;
+  devices: DiscoveredDevice[];
+}
+
+/**
+ * Runs discovery on the server (mDNS + subnet scan) and returns what it found.
+ * Slow by nature — a /24 scan takes a few seconds — so callers must show a
+ * pending state.
+ */
+export function discoverDevices(input: { cidr?: string } = {}): Promise<DiscoveryResult> {
+  return request<DiscoveryResult>('/discovery', { method: 'POST', body: input });
+}
