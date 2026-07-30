@@ -2,8 +2,12 @@
   "title": "Passkeys",
   "description": "Melde dich mit Fingerabdruck, Gesicht oder Passwortmanager an statt mit einem Passwort.",
   "empty": "Du hast noch keinen Passkey hinzugefügt.",
-  "added": "Hinzugefügt",
-  "lastUsed": "Zuletzt genutzt",
+  "neverUsed": "Nie",
+  "columns": {
+    "name": "Name",
+    "lastUsed": "Zuletzt genutzt",
+    "actions": "Aktionen"
+  },
   "nameLabel": "Name",
   "namePlaceholder": "z.B. MacBook Touch ID",
   "actions": {

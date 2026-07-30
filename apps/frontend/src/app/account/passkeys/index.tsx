@@ -1,5 +1,18 @@
 import { useCallback, useState } from 'react';
-import { Input, Label, Skeleton, TextField } from '@heroui/react';
+import {
+  Input,
+  Label,
+  Skeleton,
+  Table,
+  TableBody,
+  TableCell,
+  TableColumn,
+  TableContent,
+  TableHeader,
+  TableRow,
+  TableScrollContainer,
+  TextField,
+} from '@heroui/react';
 import { KeyRound, Trash2 } from 'lucide-react';
 import { browserSupportsWebAuthn, startRegistration } from '@simplewebauthn/browser';
 import type { PublicKeyCredentialCreationOptionsJSON } from '@simplewebauthn/browser';
@@ -11,6 +24,7 @@ import {
   type Passkey,
 } from '@attraccess/react-query-client';
 import { Button } from '../../../components/button';
+import { EmptyState } from '../../../components/emptyState';
 import { useToastMessage } from '../../../components/toastProvider';
 import en from './en.json';
 import de from './de.json';
@@ -85,47 +99,49 @@ export function PasskeysCard() {
         <div className="text-sm text-default-500">{t('description')}</div>
       </div>
 
-      {passkeys?.length === 0 ? (
-        <div className="text-sm text-default-500" data-cy="passkeys-empty">
-          {t('empty')}
-        </div>
-      ) : (
-        <ul className="flex flex-col gap-2">
-          {passkeys?.map((passkey) => (
-            <li
-              key={passkey.id}
-              className="flex items-center gap-3 rounded-medium bg-default-100 px-3 py-2"
-              data-cy={`passkey-item-${passkey.id}`}
+      <Table data-cy="passkeys-table">
+        <TableScrollContainer>
+          <TableContent aria-label={t('title')}>
+            <TableHeader>
+              <TableColumn id="name" isRowHeader>
+                {t('columns.name')}
+              </TableColumn>
+              <TableColumn id="lastUsed">{t('columns.lastUsed')}</TableColumn>
+              {/* ponytail: header text is sr-only - the icon buttons carry their own labels, and the visible
+                  word costs ~50px the Security column cannot spare at tablet width */}
+              <TableColumn id="actions">
+                <span className="sr-only">{t('columns.actions')}</span>
+              </TableColumn>
+            </TableHeader>
+            <TableBody
+              items={passkeys ?? []}
+              dependencies={[isDeleting]}
+              renderEmptyState={() => <EmptyState message={t('empty')} />}
             >
-              <KeyRound size={16} className="shrink-0 text-default-500" />
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-medium">{passkey.name}</div>
-                <div className="text-xs text-default-500">
-                  {passkey.lastUsedAt ? (
-                    <>
-                      {t('lastUsed')} <DateTimeDisplay date={passkey.lastUsedAt} />
-                    </>
-                  ) : (
-                    <>
-                      {t('added')} <DateTimeDisplay date={passkey.createdAt} />
-                    </>
-                  )}
-                </div>
-              </div>
-              <Button
-                variant="ghost"
-                isIconOnly
-                aria-label={t('actions.delete', { name: passkey.name })}
-                onPress={() => handleDelete(passkey)}
-                isDisabled={isDeleting}
-                data-cy={`passkey-delete-${passkey.id}`}
-              >
-                <Trash2 size={16} className="text-danger" />
-              </Button>
-            </li>
-          ))}
-        </ul>
-      )}
+              {(passkey) => (
+                <TableRow key={passkey.id} id={passkey.id} data-cy={`passkey-item-${passkey.id}`}>
+                  <TableCell>{passkey.name}</TableCell>
+                  <TableCell>
+                    {passkey.lastUsedAt ? <DateTimeDisplay date={passkey.lastUsedAt} /> : t('neverUsed')}
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      variant="ghost"
+                      isIconOnly
+                      aria-label={t('actions.delete', { name: passkey.name })}
+                      onPress={() => handleDelete(passkey)}
+                      isDisabled={isDeleting}
+                      data-cy={`passkey-delete-${passkey.id}`}
+                    >
+                      <Trash2 size={16} className="text-danger" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </TableContent>
+        </TableScrollContainer>
+      </Table>
 
       <TextField value={name} onChange={setName} isDisabled={isRegistering}>
         <Label>{t('nameLabel')}</Label>
