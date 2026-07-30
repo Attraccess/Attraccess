@@ -279,6 +279,7 @@ to merge your pages into the app router.
 ```tsx
 import { Card, Chip, Spinner } from '@heroui/react';
 import { HandIcon } from 'lucide-react';
+import { createPluginApiClient } from '@attraccess/plugins-frontend-sdk';
 import type {
   AttraccessFrontendPlugin,
   AttraccessFrontendPluginAuthData,
@@ -287,14 +288,16 @@ import type {
 import type { IPluginStore } from 'react-pluggable';
 import { useEffect, useState } from 'react';
 
+const api = createPluginApiClient('/api/hello-world');
+
 function HelloWorldPage() {
   const [greetings, setGreetings] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('/api/hello-world/greetings', { credentials: 'include' })
-      .then((res) => res.json())
-      .then((data: { greetings: string[] }) => setGreetings(data.greetings))
+    api
+      .request<{ greetings: string[] }>('/greetings')
+      .then((data) => setGreetings(data.greetings))
       .finally(() => setLoading(false));
   }, []);
 
@@ -342,6 +345,33 @@ export default class HelloWorldPlugin implements AttraccessFrontendPlugin {
   }
 }
 ```
+
+### Calling the API
+
+Do **not** hand-roll a fetch wrapper. The SDK ships a preconfigured client —
+`createPluginApiClient(basePath?)` — that already knows the host's API origin,
+sends the session cookie, serialises JSON, and turns a failed response into an
+error carrying the backend's message:
+
+```ts
+import { createPluginApiClient, PluginApiError } from '@attraccess/plugins-frontend-sdk';
+
+// Your backend routes are mounted under `/api/<plugin-name>`.
+const api = createPluginApiClient('/api/hello-world');
+
+await api.request<Greeting[]>('/greetings');                                  // GET, parsed JSON
+await api.request<Greeting>('/greetings', { method: 'POST', body: { text } }); // JSON body
+await api.request<void>('/greetings/1', { method: 'DELETE' });                 // empty body → null
+await api.request<Result>('/detection/7', { query: { refresh: true } });       // query string
+```
+
+| Member | Purpose |
+|--------|---------|
+| `request<T>(path, options?)` | JSON in, JSON out. `options` takes any `RequestInit` field plus `body` (serialised automatically) and `query`. Throws `PluginApiError` (with `.status`) on a non-2xx response; an empty body resolves to `null`. |
+| `fetch(path, init?)` | Escape hatch for non-JSON responses (downloads, streams). Still resolves the base URL and sends credentials. |
+| `url(path, query?)` | The absolute URL, e.g. for an `<a href>` or an `EventSource`. |
+
+Omit `basePath` to address the host API directly (`api.request('/api/users/me')`).
 
 ### Routes
 

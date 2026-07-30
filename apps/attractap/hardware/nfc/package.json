@@ -6,7 +6,7 @@
   "dependencies": {
     "@attraccess/attractap-hw-shared": "workspace:*",
     "@tscircuit/cli": "0.1.1399",
-    "playwright": "1.56.1",
+    "playwright": "1.62.0",
     "tscircuit": "0.0.1774",
     "tsx": "^4.20.3"
   }

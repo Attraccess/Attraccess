@@ -2,7 +2,7 @@ version: '2.4'
 
 services:
   proxy:
-    image: 'jc21/nginx-proxy-manager:2.14.0'
+    image: 'jc21/nginx-proxy-manager:2.15.1'
     restart: unless-stopped
     ports:
       - '80:80' # HTTP
@@ -84,7 +84,7 @@ services:
       - grafana-dashboards:/grafana-dashboards
 
   mailpit:
-    image: axllent/mailpit:v1.29.7
+    image: axllent/mailpit:v1.30.6
     restart: unless-stopped
     expose:
       - '8025'
@@ -106,7 +106,7 @@ services:
       - .env.docker-compose
 
   rabbitmq:
-    image: rabbitmq:4.3.0-management
+    image: rabbitmq:4.3.4-management
     hostname: rabbitmq
     restart: unless-stopped
     command: '/bin/bash -c "rabbitmq-plugins enable --offline rabbitmq_mqtt rabbitmq_web_mqtt rabbitmq_amqp1_0; rabbitmq-server"'
@@ -135,7 +135,7 @@ services:
       interval: 30s
 
   zigbee2mqtt:
-    image: ghcr.io/koenkk/zigbee2mqtt:2.10.1
+    image: ghcr.io/koenkk/zigbee2mqtt:2.12.1
     restart: unless-stopped
     expose:
       - '8080'
@@ -183,7 +183,7 @@ services:
       - .env.docker-compose
 
   node-exporter:
-    image: prom/node-exporter:v1.9.1
+    image: prom/node-exporter:v1.12.1
     restart: unless-stopped
     expose:
       - '9100'
@@ -196,7 +196,7 @@ services:
       io.balena.features.sysfs: '1'
 
   cadvisor:
-    image: gcr.io/cadvisor/cadvisor:v0.51.0
+    image: gcr.io/cadvisor/cadvisor:v0.55.1
     restart: unless-stopped
     expose:
       - '8080'
@@ -212,7 +212,7 @@ services:
       io.balena.features.balena-socket: '1'
 
   prometheus:
-    image: prom/prometheus:v3.11.3
+    image: prom/prometheus:v3.13.1
     restart: unless-stopped
     expose:
       - '9090'
@@ -230,7 +230,7 @@ services:
       - '--web.enable-lifecycle'
 
   grafana:
-    image: grafana/grafana:13.0.1
+    image: grafana/grafana:13.1.1
     restart: unless-stopped
     expose:
       - '3001'
@@ -252,7 +252,7 @@ services:
       - monitoring-init
 
   duplicati:
-    image: duplicati/duplicati:2.3.0.1-stable
+    image: duplicati/duplicati:2.3.0.4-stable
     expose:
       - '8200'
     volumes:

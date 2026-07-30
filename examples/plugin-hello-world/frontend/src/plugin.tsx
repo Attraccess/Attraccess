@@ -39,13 +39,15 @@ import type {
   PluginSlotContribution,
   RouteConfig,
 } from '@attraccess/plugins-frontend-sdk';
+import { createPluginApiClient } from '@attraccess/plugins-frontend-sdk';
 import type { IPluginStore } from 'react-pluggable';
 import type { ComponentType } from 'react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
-// The endpoint the example backend plugin adds to the host API.
-const GREETINGS_ENDPOINT = '/api/hello-world/greetings';
+// The SDK's ready-made client: the host's API origin, the session cookie and
+// JSON/error handling are already wired up, so plugins never build their own.
+const api = createPluginApiClient('/api/hello-world');
 
 // Shared shell so both pages get the title, intro and cross-links. Tailwind
 // utility classes (`text-default-*`, `border-default-*`, …) resolve against the
@@ -84,10 +86,9 @@ function HelloWorldPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Cookies carry the session, so just include credentials.
-    fetch(GREETINGS_ENDPOINT, { credentials: 'include' })
-      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
-      .then((data: { greetings: string[] }) => setGreetings(data.greetings))
+    api
+      .request<{ greetings: string[] }>('/greetings')
+      .then((data) => setGreetings(data.greetings))
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false));
   }, []);

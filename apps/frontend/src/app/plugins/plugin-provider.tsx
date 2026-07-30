@@ -8,7 +8,11 @@ import {
   // eslint-disable-next-line
   // @ts-ignore
 } from 'virtual:__federation__';
-import { AttraccessFrontendPlugin, AttraccessFrontendPluginAuthData } from '@attraccess/plugins-frontend-sdk';
+import {
+  AttraccessFrontendPlugin,
+  AttraccessFrontendPluginAuthData,
+  setApiBaseUrl,
+} from '@attraccess/plugins-frontend-sdk';
 import { ToastType, useToastMessage } from '../../components/toastProvider';
 import { useAuth } from '../../hooks/useAuth';
 import { getBaseUrl } from '../../api';
@@ -29,6 +33,10 @@ export function PluginProvider(props: PropsWithChildren) {
 
   useEffect(() => {
     console.debug('Attraccess Plugin System: initializing');
+
+    // Publish the API origin before any plugin bundle loads, so the SDK's
+    // preconfigured client (createPluginApiClient) knows where to send requests.
+    setApiBaseUrl(getBaseUrl());
 
     console.debug('Attraccess Plugin System: installing renderer plugin');
     const rendererPlugin = new RendererPlugin();
