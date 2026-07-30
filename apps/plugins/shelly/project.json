@@ -19,9 +19,20 @@
         "command": "eslint backend frontend/src"
       }
     },
+    "test-frontend": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["{projectRoot}/frontend/**/*"],
+      "outputs": [],
+      "options": {
+        "cwd": "apps/plugins/shelly",
+        "command": "pnpm exec vitest run --root frontend"
+      }
+    },
     "test": {
       "executor": "@nx/jest:jest",
       "cache": true,
+      "dependsOn": ["test-frontend"],
       "inputs": ["default", "^production", "{workspaceRoot}/jest.preset.js", { "externalDependencies": ["jest"] }],
       "outputs": ["{workspaceRoot}/coverage/apps/plugins/shelly"],
       "options": {

@@ -17,7 +17,13 @@ describe('ShellyController ATT-498 device info and auth', () => {
 
   beforeEach(() => {
     jest.resetAllMocks();
-    controller = new ShellyController(registry as never, probe as never, discovery as never, deviceApi as never);
+    controller = new ShellyController(
+      registry as never,
+      probe as never,
+      discovery as never,
+      deviceApi as never,
+      {} as never
+    );
   });
 
   it('returns device status and config for a registered device', async () => {

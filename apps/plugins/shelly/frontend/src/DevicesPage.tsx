@@ -31,6 +31,7 @@ import {
   useOverlayState,
 } from '@heroui/react';
 import {
+  CpuIcon,
   InfoIcon,
   KeyRoundIcon,
   MehIcon,
@@ -48,7 +49,16 @@ import { AdminPasswordDrawer } from './AdminPasswordDrawer';
 import { DeviceInfoDrawer } from './DeviceInfoDrawer';
 import { DiscoverDrawer } from './DiscoverDrawer';
 import { StatusAlert } from './StatusAlert';
-import { deleteDevice, listDevices, reprobeDevice, type AuthState, type ShellyDevice } from './api';
+import { FirmwareCell, FirmwareDrawer, UpdateAvailableIndicator } from './FirmwareDrawer';
+import {
+  deleteDevice,
+  listDevices,
+  listFirmware,
+  reprobeDevice,
+  type AuthState,
+  type FirmwareOverviewEntry,
+  type ShellyDevice,
+} from './api';
 
 function generationLabel(generation: number | null): string {
   if (generation === null) return 'Unknown';
@@ -89,10 +99,11 @@ function ProbeErrorIndicator({ message }: { message: string }) {
   );
 }
 
-function RowActions({
+export function RowActions({
   deviceId,
   isBusy,
   onInfo,
+  onFirmware,
   onAuth,
   onReprobe,
   onDelete,
@@ -100,6 +111,7 @@ function RowActions({
   deviceId: number;
   isBusy: boolean;
   onInfo: () => void;
+  onFirmware: () => void;
   onAuth: () => void;
   onReprobe: () => void;
   onDelete: () => void;
@@ -137,6 +149,9 @@ function RowActions({
         </DropdownTrigger>
         <DropdownPopover>
           <DropdownMenu aria-label="Device actions">
+            <DropdownItem id="firmware" onPress={onFirmware} data-cy={`shelly-device-firmware-${deviceId}`}>
+              <CpuIcon className="sh:mr-2 sh:inline sh:h-4 sh:w-4" /> Manage firmware
+            </DropdownItem>
             <DropdownItem id="auth" onPress={onAuth} data-cy={`shelly-device-auth-${deviceId}`}>
               <KeyRoundIcon className="sh:mr-2 sh:inline sh:h-4 sh:w-4" /> Set admin password
             </DropdownItem>
@@ -172,21 +187,38 @@ export function DevicesPage() {
   const [rowBusyId, setRowBusyId] = useState<number | null>(null);
   const [infoDevice, setInfoDevice] = useState<ShellyDevice | null>(null);
   const [authDevice, setAuthDevice] = useState<ShellyDevice | null>(null);
+  const [firmwareDevice, setFirmwareDevice] = useState<ShellyDevice | null>(null);
+  const [firmware, setFirmware] = useState<Record<number, FirmwareOverviewEntry>>({});
   const [deleteTarget, setDeleteTarget] = useState<ShellyDevice | null>(null);
   const [deleting, setDeleting] = useState(false);
   const addDrawer = useOverlayState();
   const discoverDrawer = useOverlayState();
 
+  // Firmware checks talk to every device (and, on Gen2+, to the Shelly update
+  // server), so they run after the list rather than holding the table hostage.
+  // A failure only degrades the firmware column.
+  const refreshFirmware = useCallback(async (known: ShellyDevice[] = []) => {
+    try {
+      const entries = await listFirmware();
+      setFirmware(Object.fromEntries(entries.map((entry) => [entry.deviceId, entry])));
+    } catch (err) {
+      const error = err instanceof Error ? err.message : String(err);
+      setFirmware(Object.fromEntries(known.map((device) => [device.id, { deviceId: device.id, status: null, error }])));
+    }
+  }, []);
+
   const refresh = useCallback(async () => {
     try {
-      setDevices(await listDevices());
+      const next = await listDevices();
+      setDevices(next);
       setPageError(null);
+      void refreshFirmware(next);
     } catch (err) {
       setPageError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [refreshFirmware]);
 
   useEffect(() => {
     void refresh();
@@ -261,9 +293,17 @@ export function DevicesPage() {
                 <TableColumn className="sh:hidden sh:sm:table-cell sh:md:hidden sh:lg:table-cell">Address</TableColumn>
                 <TableColumn className="sh:hidden sh:lg:table-cell">Model</TableColumn>
                 <TableColumn className="sh:hidden sh:sm:table-cell">Auth</TableColumn>
+                <TableColumn className="sh:hidden sh:xl:table-cell">Firmware</TableColumn>
                 <TableColumn className="sh:text-end">Actions</TableColumn>
               </TableHeader>
-              <TableBody items={devices} renderEmptyState={() => <EmptyDevices onAdd={addDrawer.open} />}>
+              {/* `dependencies` is required: without it react-aria caches the rendered
+                  rows, and the row closure keeps the firmware/busy state it was first
+                  rendered with. */}
+              <TableBody
+                items={devices}
+                dependencies={[firmware, rowBusyId]}
+                renderEmptyState={() => <EmptyDevices onAdd={addDrawer.open} />}
+              >
                 {(device) => (
                   <TableRow key={device.id} id={device.id} data-cy={`shelly-device-row-${device.id}`}>
                     <TableCell className="sh:whitespace-nowrap">
@@ -272,6 +312,7 @@ export function DevicesPage() {
                           {device.name}
                         </span>
                         {device.lastProbeError && <ProbeErrorIndicator message={device.lastProbeError} />}
+                        <UpdateAvailableIndicator entry={firmware[device.id]} />
                       </div>
                       <div className="sh:text-xs sh:text-default-500 sh:sm:hidden sh:md:block sh:lg:hidden">{device.ipAddress}</div>
                     </TableCell>
@@ -291,11 +332,15 @@ export function DevicesPage() {
                     <TableCell className="sh:hidden sh:whitespace-nowrap sh:sm:table-cell">
                       <AuthChip state={device.authState} />
                     </TableCell>
+                    <TableCell className="sh:hidden sh:whitespace-nowrap sh:xl:table-cell">
+                      <FirmwareCell entry={firmware[device.id]} />
+                    </TableCell>
                     <TableCell className="sh:whitespace-nowrap">
                       <RowActions
                         deviceId={device.id}
                         isBusy={rowBusyId === device.id}
                         onInfo={() => setInfoDevice(device)}
+                        onFirmware={() => setFirmwareDevice(device)}
                         onAuth={() => setAuthDevice(device)}
                         onReprobe={() => withRowBusy(device.id, () => reprobeDevice(device.id))}
                         onDelete={() => setDeleteTarget(device)}
@@ -317,6 +362,11 @@ export function DevicesPage() {
       />
       <DeviceInfoDrawer device={infoDevice} onOpenChange={(open) => !open && setInfoDevice(null)} />
       <AdminPasswordDrawer device={authDevice} onOpenChange={(open) => !open && setAuthDevice(null)} onSaved={refresh} />
+      <FirmwareDrawer
+        device={firmwareDevice}
+        onOpenChange={(open) => !open && setFirmwareDevice(null)}
+        onUpdated={() => void refreshFirmware(devices)}
+      />
 
       <Modal
         isOpen={!!deleteTarget}

@@ -123,7 +123,7 @@ function AuthProtectedForm({
   );
 }
 
-function DeviceInfoCards({ info }: { info: ShellyDeviceInfo }) {
+export function DeviceInfoCards({ info }: { info: ShellyDeviceInfo }) {
   const status = info.status;
   const config = info.config;
   const output = firstValue(status, ['switch:0.output', 'relays.0.ison', 'lights.0.ison']);
