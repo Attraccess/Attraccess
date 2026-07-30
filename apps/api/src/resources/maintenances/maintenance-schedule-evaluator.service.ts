@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import {
   ResourceMaintenance,
   ResourceMaintenanceSchedule,
@@ -13,8 +13,9 @@ import {
 } from '@attraccess/database-entities';
 import { ResourceMaintenanceService } from './maintenance.service';
 import { ResourceMaintenanceChangedEvent } from './events/resource-maintenance-changed.event';
-import { ResourceSessionStartedEvent } from '../usage/events/resource-usage.events';
+import { ResourceUsageSessionEndedEvent } from '../usage/events/resource-usage.events';
 import { CronTimer } from '../../metrics/instrumentation/cron/cron.helper';
+import { MetricsService } from '../../metrics/metrics.service';
 
 /**
  * Evaluates maintenance schedules and creates ResourceMaintenance when a schedule's condition is met.
@@ -28,6 +29,14 @@ export class MaintenanceScheduleEvaluatorService {
   private readonly logger = new Logger(MaintenanceScheduleEvaluatorService.name);
   private evaluationLock = false;
 
+  /** Debounce window in ms: evaluation is delayed until no new events arrive within this window. */
+  private readonly usageEvalDebounceMs = 5_000;
+  /** Maximum wait in ms: evaluation fires even if events keep arriving, preventing indefinite starvation. */
+  private readonly usageEvalMaxWaitMs = 30_000;
+  private readonly pendingUsageEvals = new Map<number, ReturnType<typeof setTimeout>>();
+  /** Timestamp (Date.now()) of the first unprocessed usage event per resource, for maxWait tracking. */
+  private readonly usageEvalFirstEventAt = new Map<number, number>();
+
   constructor(
     @InjectRepository(ResourceMaintenanceSchedule)
     private readonly scheduleRepository: Repository<ResourceMaintenanceSchedule>,
@@ -39,6 +48,7 @@ export class MaintenanceScheduleEvaluatorService {
     private readonly usageRepository: Repository<ResourceUsage>,
     private readonly maintenanceService: ResourceMaintenanceService,
     private readonly cronTimer: CronTimer,
+    private readonly metricsService: MetricsService,
   ) { }
 
   /**
@@ -69,7 +79,7 @@ export class MaintenanceScheduleEvaluatorService {
   /**
    * Sum usage minutes for the resource since baseline (completed sessions only).
    */
-  async getUsageMinutesSince(resourceId: number, since: Date): Promise<number> {
+  private async getUsageMinutesSince(resourceId: number, since: Date): Promise<number> {
     const result = await this.usageRepository
       .createQueryBuilder('usage')
       .select('COALESCE(SUM(usage.usageInMinutes), 0)', 'total')
@@ -84,7 +94,7 @@ export class MaintenanceScheduleEvaluatorService {
   /**
    * Count usage sessions for the resource since baseline (completed sessions only).
    */
-  async getUsageSessionCountSince(resourceId: number, since: Date): Promise<number> {
+  private async getUsageSessionCountSince(resourceId: number, since: Date): Promise<number> {
     return this.usageRepository
       .createQueryBuilder('usage')
       .where('usage.resourceId = :resourceId', { resourceId })
@@ -110,36 +120,70 @@ export class MaintenanceScheduleEvaluatorService {
   }
 
   /**
+   * Pure comparison: given pre-fetched usage numbers and elapsed time, returns true if the schedule
+   * threshold is met. Both shouldTrigger() and shouldTriggerInMemory() delegate here so the
+   * switch-on-triggerType logic lives in exactly one place.
+   */
+  private evaluateTriggerThreshold(
+    schedule: ResourceMaintenanceSchedule,
+    baseline: Date,
+    now: Date,
+    usageMinutes: number,
+    usageCount: number,
+  ): boolean {
+    switch (schedule.triggerType) {
+      case ResourceMaintenanceScheduleTriggerType.USAGE_HOURS: {
+        const config = schedule.usageHoursConfig;
+        if (!config) return false;
+        return usageMinutes >= this.durationToMinutes(config.duration, config.unit);
+      }
+      case ResourceMaintenanceScheduleTriggerType.USAGE_COUNT: {
+        const config = schedule.usageCountConfig;
+        if (!config) return false;
+        return usageCount >= config.thresholdSessions;
+      }
+      case ResourceMaintenanceScheduleTriggerType.TIME_INTERVAL: {
+        const config = schedule.timeIntervalConfig;
+        if (!config) return false;
+        const elapsedMinutes = (now.getTime() - baseline.getTime()) / (60 * 1000);
+        return elapsedMinutes >= this.durationToMinutes(config.duration, config.unit);
+      }
+      default:
+        return false;
+    }
+  }
+
+  /**
    * Returns true if the schedule's condition is met.
    */
   async shouldTrigger(schedule: ResourceMaintenanceSchedule, resourceId: number): Promise<boolean> {
     const baseline = await this.getBaselineDate(resourceId, schedule.id);
     const now = new Date();
+    let usageMinutes = 0;
+    let usageCount = 0;
 
-    switch (schedule.triggerType) {
-      case ResourceMaintenanceScheduleTriggerType.USAGE_HOURS: {
-        const config = schedule.usageHoursConfig;
-        if (!config) return false;
-        const minutes = await this.getUsageMinutesSince(resourceId, baseline);
-        const thresholdMinutes = this.durationToMinutes(config.duration, config.unit);
-        return minutes >= thresholdMinutes;
-      }
-      case ResourceMaintenanceScheduleTriggerType.USAGE_COUNT: {
-        const config = schedule.usageCountConfig;
-        if (!config) return false;
-        const count = await this.getUsageSessionCountSince(resourceId, baseline);
-        return count >= config.thresholdSessions;
-      }
-      case ResourceMaintenanceScheduleTriggerType.TIME_INTERVAL: {
-        const config = schedule.timeIntervalConfig;
-        if (!config) return false;
-        const durationMinutes = this.durationToMinutes(config.duration, config.unit);
-        const elapsedMinutes = (now.getTime() - baseline.getTime()) / (60 * 1000);
-        return elapsedMinutes >= durationMinutes;
-      }
-      default:
-        return false;
+    if (schedule.triggerType === ResourceMaintenanceScheduleTriggerType.USAGE_HOURS) {
+      usageMinutes = await this.getUsageMinutesSince(resourceId, baseline);
+    } else if (schedule.triggerType === ResourceMaintenanceScheduleTriggerType.USAGE_COUNT) {
+      usageCount = await this.getUsageSessionCountSince(resourceId, baseline);
     }
+
+    return this.evaluateTriggerThreshold(schedule, baseline, now, usageMinutes, usageCount);
+  }
+
+  /**
+   * Evaluate trigger condition for a schedule using pre-fetched in-memory aggregates.
+   * Used by evaluateAll() to avoid per-resource queries.
+   */
+  private shouldTriggerInMemory(
+    schedule: ResourceMaintenanceSchedule,
+    resourceId: number,
+    baseline: Date,
+    now: Date,
+    usageAggByResource: Map<number, { totalMinutes: number; totalCount: number }>,
+  ): boolean {
+    const { totalMinutes, totalCount } = usageAggByResource.get(resourceId) ?? { totalMinutes: 0, totalCount: 0 };
+    return this.evaluateTriggerThreshold(schedule, baseline, now, totalMinutes, totalCount);
   }
 
   /**
@@ -250,22 +294,45 @@ export class MaintenanceScheduleEvaluatorService {
   /**
    * On usage events (session ended): evaluate schedules for that resource so USAGE_HOURS and USAGE_COUNT
    * triggers take effect immediately instead of waiting for the next cron run.
+   *
+   * Debounced per resource with a maximum wait: rapid session end/start bursts collapse into a single
+   * evaluation, but evaluation is guaranteed to fire within usageEvalMaxWaitMs regardless of how
+   * frequently events arrive (preventing indefinite starvation under sustained load).
    */
-  @OnEvent(ResourceSessionStartedEvent.EVENT_NAME)
-  async onResourceUsage(event: ResourceSessionStartedEvent): Promise<void> {
+  @OnEvent(ResourceUsageSessionEndedEvent.EVENT_NAME)
+  onResourceUsage(event: ResourceUsageSessionEndedEvent): void {
     const resourceId = event.usage?.resource?.id;
     if (resourceId == null) return;
     // Only re-evaluate when a session was ended (endTime set); that's when usage minutes and session count increase.
     if (event.usage.endTime == null) return;
 
-    try {
-      await this.evaluateResource(resourceId);
-    } catch (err) {
-      this.logger.error(
-        `Error evaluating schedules for resource ${resourceId} after usage event: ${err}`,
-        (err as Error)?.stack,
-      );
+    const now = Date.now();
+
+    // Record the timestamp of the first event in the current debounce window
+    if (!this.usageEvalFirstEventAt.has(resourceId)) {
+      this.usageEvalFirstEventAt.set(resourceId, now);
     }
+
+    const firstEventAt = this.usageEvalFirstEventAt.get(resourceId) ?? now;
+    const msUntilMaxWait = this.usageEvalMaxWaitMs - (now - firstEventAt);
+    // Fire after the debounce window, but no later than the maxWait deadline
+    const delay = Math.min(this.usageEvalDebounceMs, Math.max(0, msUntilMaxWait));
+
+    const existing = this.pendingUsageEvals.get(resourceId);
+    if (existing) clearTimeout(existing);
+
+    const timer = setTimeout(() => {
+      this.pendingUsageEvals.delete(resourceId);
+      this.usageEvalFirstEventAt.delete(resourceId);
+      this.evaluateResource(resourceId).catch((err) => {
+        this.logger.error(
+          `Error evaluating schedules for resource ${resourceId} after usage event: ${err}`,
+          (err as Error)?.stack,
+        );
+      });
+    }, delay);
+
+    this.pendingUsageEvals.set(resourceId, timer);
   }
 
   /**
@@ -292,7 +359,16 @@ export class MaintenanceScheduleEvaluatorService {
   }
 
   /**
-   * Evaluate all resources that have at least one enabled schedule. Uses a simple in-process lock to avoid overlapping runs.
+   * Evaluate all resources that have at least one enabled schedule.
+   *
+   * Bulk pre-fetch strategy (O(1) queries instead of O(resources) sequential transactions):
+   * 1. Load all enabled schedules + configs in one query.
+   * 2. Load last-completed-maintenance per (resource, schedule) pair for baseline dates.
+   * 3. Load resource createdAt dates as fallback baselines.
+   * 4. Load active maintenances to skip resources/schedules already under maintenance.
+   * 5. For usage-based triggers: aggregate SUM/COUNT per resource in SQL with per-resource baseline
+   *    filtering via CASE WHEN — no raw usage rows loaded into memory.
+   * 6. Write all triggered maintenances in a single batched transaction.
    */
   async evaluateAll(): Promise<void> {
     if (this.evaluationLock) {
@@ -301,18 +377,198 @@ export class MaintenanceScheduleEvaluatorService {
     }
     this.evaluationLock = true;
     try {
-      const schedules = await this.scheduleRepository.find({
+      const now = new Date();
+
+      // --- BULK READ PHASE ---
+
+      // 1. All enabled schedules with trigger configs
+      const allSchedules = await this.scheduleRepository.find({
         where: { enabled: true },
-        select: ['id', 'resourceId'],
+        relations: ['usageHoursConfig', 'usageCountConfig', 'timeIntervalConfig'],
       });
-      const resourceIds = [...new Set(schedules.map((s) => s.resourceId))];
-      for (const resourceId of resourceIds) {
-        try {
-          await this.evaluateResource(resourceId);
-        } catch (err) {
-          this.logger.error(`Error evaluating schedules for resource ${resourceId}: ${err}`, (err as Error)?.stack);
+
+      if (allSchedules.length === 0) return;
+
+      const scheduleIds = allSchedules.map((s) => s.id);
+      // ponytail: reduce+Set avoids intermediate array from map() before Set construction
+      const resourceIds = [...allSchedules.reduce((s, a) => s.add(a.resourceId), new Set<number>())];
+
+      // 2. Last completed maintenance per (resource, schedule) — provides baseline dates
+      const lastDoneRaw = await this.maintenanceRepository
+        .createQueryBuilder('m')
+        .select('m.resourceId', 'resourceId')
+        .addSelect('m.maintenanceScheduleId', 'scheduleId')
+        .addSelect('MAX(m.endTime)', 'lastEndTime')
+        .where('m.maintenanceScheduleId IN (:...scheduleIds)', { scheduleIds })
+        .andWhere('m.endTime IS NOT NULL')
+        .groupBy('m.resourceId')
+        .addGroupBy('m.maintenanceScheduleId')
+        .getRawMany<{ resourceId: number; scheduleId: number; lastEndTime: string }>();
+
+      // Map: `${scheduleId}:${resourceId}` -> last done Date
+      const baselineMap = new Map<string, Date>();
+      for (const row of lastDoneRaw) {
+        baselineMap.set(`${row.scheduleId}:${row.resourceId}`, new Date(row.lastEndTime));
+      }
+
+      // 3. Resource createdAt — fallback baseline when no prior maintenance for a schedule
+      const resources = await this.resourceRepository.find({
+        where: { id: In(resourceIds) },
+        select: ['id', 'createdAt'],
+      });
+      const resourceCreatedAtMap = new Map<number, Date>(resources.map((r) => [r.id, r.createdAt]));
+
+      // Warn and skip schedules for resources missing from DB (orphaned foreign keys)
+      const knownResourceIds = new Set(resources.map((r) => r.id));
+      const orphanedResourceIds = resourceIds.filter((id) => !knownResourceIds.has(id));
+      if (orphanedResourceIds.length > 0) {
+        this.logger.warn(
+          `${orphanedResourceIds.length} resource(s) have enabled schedules but no matching resource record — skipping: [${orphanedResourceIds.join(', ')}]`,
+        );
+      }
+
+      const getBaseline = (resourceId: number, scheduleId: number): Date =>
+        baselineMap.get(`${scheduleId}:${resourceId}`) ??
+        resourceCreatedAtMap.get(resourceId) ??
+        now; // unreachable: orphaned resources are filtered out above
+
+      // 4. Active maintenances per (resource, schedule) — skip these in evaluation
+      const activeRaw = await this.maintenanceRepository
+        .createQueryBuilder('m')
+        .select('m.resourceId', 'resourceId')
+        .addSelect('m.maintenanceScheduleId', 'scheduleId')
+        .where('m.resourceId IN (:...resourceIds)', { resourceIds })
+        .andWhere('m.maintenanceScheduleId IN (:...scheduleIds)', { scheduleIds })
+        .andWhere('m.startTime <= :now', { now })
+        .andWhere('m.endTime IS NULL')
+        .getRawMany<{ resourceId: number; scheduleId: number }>();
+
+      // Set of `${scheduleId}:${resourceId}` pairs already in active maintenance
+      const activeSet = new Set(activeRaw.map((m) => `${m.scheduleId}:${m.resourceId}`));
+
+      // 5. Bulk-fetch usage aggregates for resources with usage-based schedules.
+      //    Uses SQL SUM/COUNT with per-resource CASE WHEN baseline filtering so no raw rows are
+      //    loaded into memory and per-resource date accuracy is maintained in the DB engine.
+      const usageCandidates = allSchedules.filter(
+        (s) =>
+          knownResourceIds.has(s.resourceId) &&
+          !activeSet.has(`${s.id}:${s.resourceId}`) &&
+          (s.triggerType === ResourceMaintenanceScheduleTriggerType.USAGE_HOURS ||
+            s.triggerType === ResourceMaintenanceScheduleTriggerType.USAGE_COUNT),
+      );
+
+      const usageAggByResource = new Map<number, { totalMinutes: number; totalCount: number }>();
+
+      if (usageCandidates.length > 0) {
+        const usageResourceIds = [...usageCandidates.reduce((s, a) => s.add(a.resourceId), new Set<number>())];
+
+        // Per-resource earliest baseline across all usage-based schedules for that resource.
+        // No 1-year clamp: rarely-used machines need their full history to accumulate to the threshold.
+        const minBaselineByResource = new Map<number, Date>();
+        for (const s of usageCandidates) {
+          const baseline = getBaseline(s.resourceId, s.id);
+          const existing = minBaselineByResource.get(s.resourceId);
+          if (!existing || baseline < existing) {
+            minBaselineByResource.set(s.resourceId, baseline);
+          }
+        }
+
+        // Observe query window sizes so we can alert if they grow unexpectedly large.
+        const msPerDay = 24 * 60 * 60 * 1000;
+        for (const baseline of minBaselineByResource.values()) {
+          this.metricsService.maintenanceUsageQueryWindowDays.observe(
+            (now.getTime() - baseline.getTime()) / msPerDay,
+          );
+        }
+
+        // Global minimum used for the outer WHERE range scan (index efficiency).
+        // Per-resource accuracy is enforced by the CASE WHEN inside the aggregate below.
+        // ponytail: reduce avoids Math.min(...spread) which breaks at ~65k args
+        const globalMinBaseline = new Date(
+          [...minBaselineByResource.values()].reduce(
+            (min, d) => Math.min(min, d.getTime()),
+            Infinity,
+          ),
+        );
+
+        // Build per-resource baseline CASE expression for SQL-side filtering.
+        // resourceId values are integers from the DB; baseline dates come from our own queries — safe to interpolate.
+        const baselineExpr = usageResourceIds
+          .map((id) => `WHEN u.resourceId = ${id} THEN '${(minBaselineByResource.get(id) ?? now).toISOString()}'`)
+          .join(' ');
+
+        const aggregates = await this.usageRepository
+          .createQueryBuilder('u')
+          .select('u.resourceId', 'resourceId')
+          .addSelect(
+            `COALESCE(SUM(CASE WHEN u.endTime >= CASE u.resourceId ${baselineExpr} END THEN u.usageInMinutes ELSE 0 END), 0)`,
+            'totalMinutes',
+          )
+          .addSelect(
+            `COALESCE(SUM(CASE WHEN u.endTime >= CASE u.resourceId ${baselineExpr} END THEN 1 ELSE 0 END), 0)`,
+            'totalCount',
+          )
+          .where('u.resourceId IN (:...usageResourceIds)', { usageResourceIds })
+          .andWhere('u.endTime IS NOT NULL')
+          .andWhere('u.endTime >= :globalMinBaseline', { globalMinBaseline })
+          .groupBy('u.resourceId')
+          .getRawMany<{ resourceId: number; totalMinutes: string; totalCount: string }>();
+
+        for (const row of aggregates) {
+          usageAggByResource.set(Number(row.resourceId), {
+            totalMinutes: Number(row.totalMinutes ?? 0),
+            totalCount: Number(row.totalCount ?? 0),
+          });
         }
       }
+
+      // --- IN-MEMORY EVALUATION PHASE ---
+
+      // Group schedules by resource (only known resources) to preserve "first trigger wins" per resource
+      const schedulesByResource = new Map<number, ResourceMaintenanceSchedule[]>();
+      for (const s of allSchedules.filter((s) => knownResourceIds.has(s.resourceId))) {
+        const arr = schedulesByResource.get(s.resourceId) ?? [];
+        arr.push(s);
+        schedulesByResource.set(s.resourceId, arr);
+      }
+
+      const toCreate: Array<{ resourceId: number; schedule: ResourceMaintenanceSchedule }> = [];
+
+      for (const [resourceId, schedules] of schedulesByResource) {
+        for (const schedule of schedules) {
+          if (activeSet.has(`${schedule.id}:${resourceId}`)) continue;
+
+          const baseline = getBaseline(resourceId, schedule.id);
+          if (this.shouldTriggerInMemory(schedule, resourceId, baseline, now, usageAggByResource)) {
+            toCreate.push({ resourceId, schedule });
+            break; // Only one maintenance at a time per resource
+          }
+        }
+      }
+
+      if (toCreate.length === 0) return;
+
+      // --- BULK WRITE PHASE ---
+      // ponytail: hasActiveMaintenance re-check inside the transaction guards against races between
+      // the bulk read and now. If many resources trigger simultaneously this issues N×2 queries
+      // inside one write lock — acceptable because this path runs at most once per cron tick.
+      // Upgrade path: batch hasActiveMaintenance into one EXISTS subquery before this loop.
+      await this.scheduleRepository.manager.transaction(async (em) => {
+        for (const { resourceId, schedule } of toCreate) {
+          // Re-check inside transaction to guard against races between the bulk read and now
+          const hasActive = await this.maintenanceService.hasActiveMaintenance(
+            { resourceId, scheduleId: schedule.id },
+            em,
+          );
+          if (hasActive) continue;
+
+          const reason = this.buildMaintenanceReasonFromScheduleDefinition(schedule);
+          await this.maintenanceService.createMaintenanceFromSchedule(resourceId, schedule.id, reason, em);
+          this.logger.log(
+            `Schedule ${schedule.id} triggered for resource ${resourceId}: created maintenance. Reason: ${reason}`,
+          );
+        }
+      });
     } finally {
       this.evaluationLock = false;
     }
