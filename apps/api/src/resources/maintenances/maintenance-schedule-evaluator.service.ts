@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -18,6 +18,48 @@ import { CronTimer } from '../../metrics/instrumentation/cron/cron.helper';
 import { MetricsService } from '../../metrics/metrics.service';
 
 /**
+ * SQLite stores `datetime` columns as `YYYY-MM-DD HH:mm:ss.SSS` in UTC (TypeORM's
+ * DateUtils.mixedDateToUtcDatetimeString). `new Date(...)` parses that as *local* time, and
+ * `.toISOString()` produces a `T`/`Z` form that doesn't compare correctly against stored values.
+ * These two helpers are the only places that bridge the formats.
+ */
+const parseDbDate = (value: string | Date): Date =>
+  value instanceof Date ? value : new Date(value.includes('T') ? value : `${value.replace(' ', 'T')}Z`);
+
+export const formatDbDate = (date: Date): string => date.toISOString().replace('T', ' ').replace('Z', '');
+
+/**
+ * Per-(resource, schedule) usage totals in one query. The `(resourceId, scheduleId, baseline)`
+ * triples are supplied as bound parameters forming an inline table, so each schedule is filtered by
+ * its own baseline inside the DB engine and nothing is interpolated into the SQL text.
+ * ponytail: `SELECT ? ... UNION ALL` because SQLite has no `VALUES (...) AS t(col, ...)`.
+ */
+export const buildUsageAggregateQuery = (usageTable: string, pairCount: number): string => {
+  const baselineTable = Array.from(
+    { length: pairCount },
+    () => 'SELECT ? AS resourceId, ? AS scheduleId, ? AS baseline',
+  ).join(' UNION ALL ');
+
+  return `SELECT b.resourceId AS resourceId,
+                 b.scheduleId AS scheduleId,
+                 COALESCE(SUM(u.usageInMinutes), 0) AS totalMinutes,
+                 COUNT(u.id) AS totalCount
+          FROM (${baselineTable}) b
+          LEFT JOIN "${usageTable}" u
+            ON u.resourceId = b.resourceId
+           AND u.endTime IS NOT NULL
+           AND u.endTime >= b.baseline
+          GROUP BY b.resourceId, b.scheduleId`;
+};
+
+/**
+ * Rows per usage-aggregate query. Each row binds 3 parameters, so 300 rows = 900 bound
+ * parameters — under SQLite's most conservative SQLITE_MAX_VARIABLE_NUMBER (999).
+ * ponytail: fixed chunk size beats computing the driver's real limit; upgrade path is a temp table.
+ */
+const USAGE_AGG_CHUNK_SIZE = 300;
+
+/**
  * Evaluates maintenance schedules and creates ResourceMaintenance when a schedule's condition is met.
  * Baseline for all trigger types: when the last maintenance created by this schedule was marked done
  * (that maintenance's endTime/completedAt). If none, uses resource.createdAt.
@@ -25,7 +67,7 @@ import { MetricsService } from '../../metrics/metrics.service';
  * Runs via cron (periodic) and on usage events (session ended) so USAGE_HOURS and USAGE_COUNT triggers take effect immediately.
  */
 @Injectable()
-export class MaintenanceScheduleEvaluatorService {
+export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
   private readonly logger = new Logger(MaintenanceScheduleEvaluatorService.name);
   private evaluationLock = false;
 
@@ -50,6 +92,13 @@ export class MaintenanceScheduleEvaluatorService {
     private readonly cronTimer: CronTimer,
     private readonly metricsService: MetricsService,
   ) { }
+
+  /** Drop pending debounce timers so shutdown isn't held up (and they don't fire against a closed DB). */
+  onModuleDestroy(): void {
+    for (const timer of this.pendingUsageEvals.values()) clearTimeout(timer);
+    this.pendingUsageEvals.clear();
+    this.usageEvalFirstEventAt.clear();
+  }
 
   /**
    * Get the baseline date for a schedule: when the last maintenance created by this schedule was done,
@@ -180,9 +229,12 @@ export class MaintenanceScheduleEvaluatorService {
     resourceId: number,
     baseline: Date,
     now: Date,
-    usageAggByResource: Map<number, { totalMinutes: number; totalCount: number }>,
+    usageAggBySchedule: Map<string, { totalMinutes: number; totalCount: number }>,
   ): boolean {
-    const { totalMinutes, totalCount } = usageAggByResource.get(resourceId) ?? { totalMinutes: 0, totalCount: 0 };
+    const { totalMinutes, totalCount } = usageAggBySchedule.get(`${schedule.id}:${resourceId}`) ?? {
+      totalMinutes: 0,
+      totalCount: 0,
+    };
     return this.evaluateTriggerThreshold(schedule, baseline, now, totalMinutes, totalCount);
   }
 
@@ -366,9 +418,9 @@ export class MaintenanceScheduleEvaluatorService {
    * 2. Load last-completed-maintenance per (resource, schedule) pair for baseline dates.
    * 3. Load resource createdAt dates as fallback baselines.
    * 4. Load active maintenances to skip resources/schedules already under maintenance.
-   * 5. For usage-based triggers: aggregate SUM/COUNT per resource in SQL with per-resource baseline
-   *    filtering via CASE WHEN — no raw usage rows loaded into memory.
-   * 6. Write all triggered maintenances in a single batched transaction.
+   * 5. For usage-based triggers: aggregate SUM/COUNT per (resource, schedule) in SQL by joining
+   *    against an inline baseline table — no raw usage rows loaded into memory.
+   * 6. Write only the schedules that actually triggered, one short transaction each.
    */
   async evaluateAll(): Promise<void> {
     if (this.evaluationLock) {
@@ -408,7 +460,9 @@ export class MaintenanceScheduleEvaluatorService {
       // Map: `${scheduleId}:${resourceId}` -> last done Date
       const baselineMap = new Map<string, Date>();
       for (const row of lastDoneRaw) {
-        baselineMap.set(`${row.scheduleId}:${row.resourceId}`, new Date(row.lastEndTime));
+        // getRawMany bypasses TypeORM's column hydration, so the driver's raw datetime string
+        // needs explicit UTC parsing (see parseDbDate).
+        baselineMap.set(`${row.scheduleId}:${row.resourceId}`, parseDbDate(row.lastEndTime));
       }
 
       // 3. Resource createdAt — fallback baseline when no prior maintenance for a schedule
@@ -457,68 +511,47 @@ export class MaintenanceScheduleEvaluatorService {
             s.triggerType === ResourceMaintenanceScheduleTriggerType.USAGE_COUNT),
       );
 
-      const usageAggByResource = new Map<number, { totalMinutes: number; totalCount: number }>();
+      // Keyed by `${scheduleId}:${resourceId}` — each schedule has its own baseline, so a resource
+      // with two usage-based schedules on different baselines gets two distinct totals.
+      const usageAggBySchedule = new Map<string, { totalMinutes: number; totalCount: number }>();
 
       if (usageCandidates.length > 0) {
-        const usageResourceIds = [...usageCandidates.reduce((s, a) => s.add(a.resourceId), new Set<number>())];
-
-        // Per-resource earliest baseline across all usage-based schedules for that resource.
-        // No 1-year clamp: rarely-used machines need their full history to accumulate to the threshold.
-        const minBaselineByResource = new Map<number, Date>();
-        for (const s of usageCandidates) {
-          const baseline = getBaseline(s.resourceId, s.id);
-          const existing = minBaselineByResource.get(s.resourceId);
-          if (!existing || baseline < existing) {
-            minBaselineByResource.set(s.resourceId, baseline);
-          }
-        }
+        const pairs = usageCandidates.map((s) => ({
+          resourceId: s.resourceId,
+          scheduleId: s.id,
+          baseline: getBaseline(s.resourceId, s.id),
+        }));
 
         // Observe query window sizes so we can alert if they grow unexpectedly large.
+        // No lookback clamp: rarely-used machines need their full history to reach the threshold.
         const msPerDay = 24 * 60 * 60 * 1000;
-        for (const baseline of minBaselineByResource.values()) {
+        for (const { baseline } of pairs) {
           this.metricsService.maintenanceUsageQueryWindowDays.observe(
             (now.getTime() - baseline.getTime()) / msPerDay,
           );
         }
 
-        // Global minimum used for the outer WHERE range scan (index efficiency).
-        // Per-resource accuracy is enforced by the CASE WHEN inside the aggregate below.
-        // ponytail: reduce avoids Math.min(...spread) which breaks at ~65k args
-        const globalMinBaseline = new Date(
-          [...minBaselineByResource.values()].reduce(
-            (min, d) => Math.min(min, d.getTime()),
-            Infinity,
-          ),
-        );
+        const usageTable = this.usageRepository.metadata.tableName;
 
-        // Build per-resource baseline CASE expression for SQL-side filtering.
-        // resourceId values are integers from the DB; baseline dates come from our own queries — safe to interpolate.
-        const baselineExpr = usageResourceIds
-          .map((id) => `WHEN u.resourceId = ${id} THEN '${(minBaselineByResource.get(id) ?? now).toISOString()}'`)
-          .join(' ');
+        for (let offset = 0; offset < pairs.length; offset += USAGE_AGG_CHUNK_SIZE) {
+          const chunk = pairs.slice(offset, offset + USAGE_AGG_CHUNK_SIZE);
 
-        const aggregates = await this.usageRepository
-          .createQueryBuilder('u')
-          .select('u.resourceId', 'resourceId')
-          .addSelect(
-            `COALESCE(SUM(CASE WHEN u.endTime >= CASE u.resourceId ${baselineExpr} END THEN u.usageInMinutes ELSE 0 END), 0)`,
-            'totalMinutes',
-          )
-          .addSelect(
-            `COALESCE(SUM(CASE WHEN u.endTime >= CASE u.resourceId ${baselineExpr} END THEN 1 ELSE 0 END), 0)`,
-            'totalCount',
-          )
-          .where('u.resourceId IN (:...usageResourceIds)', { usageResourceIds })
-          .andWhere('u.endTime IS NOT NULL')
-          .andWhere('u.endTime >= :globalMinBaseline', { globalMinBaseline })
-          .groupBy('u.resourceId')
-          .getRawMany<{ resourceId: number; totalMinutes: string; totalCount: string }>();
+          const aggregates: Array<{
+            resourceId: number;
+            scheduleId: number;
+            totalMinutes: number | string | null;
+            totalCount: number | string | null;
+          }> = await this.usageRepository.query(
+            buildUsageAggregateQuery(usageTable, chunk.length),
+            chunk.flatMap((p) => [p.resourceId, p.scheduleId, formatDbDate(p.baseline)]),
+          );
 
-        for (const row of aggregates) {
-          usageAggByResource.set(Number(row.resourceId), {
-            totalMinutes: Number(row.totalMinutes ?? 0),
-            totalCount: Number(row.totalCount ?? 0),
-          });
+          for (const row of aggregates) {
+            usageAggBySchedule.set(`${row.scheduleId}:${row.resourceId}`, {
+              totalMinutes: Number(row.totalMinutes ?? 0),
+              totalCount: Number(row.totalCount ?? 0),
+            });
+          }
         }
       }
 
@@ -539,7 +572,7 @@ export class MaintenanceScheduleEvaluatorService {
           if (activeSet.has(`${schedule.id}:${resourceId}`)) continue;
 
           const baseline = getBaseline(resourceId, schedule.id);
-          if (this.shouldTriggerInMemory(schedule, resourceId, baseline, now, usageAggByResource)) {
+          if (this.shouldTriggerInMemory(schedule, resourceId, baseline, now, usageAggBySchedule)) {
             toCreate.push({ resourceId, schedule });
             break; // Only one maintenance at a time per resource
           }
@@ -548,27 +581,34 @@ export class MaintenanceScheduleEvaluatorService {
 
       if (toCreate.length === 0) return;
 
-      // --- BULK WRITE PHASE ---
-      // ponytail: hasActiveMaintenance re-check inside the transaction guards against races between
-      // the bulk read and now. If many resources trigger simultaneously this issues N×2 queries
-      // inside one write lock — acceptable because this path runs at most once per cron tick.
-      // Upgrade path: batch hasActiveMaintenance into one EXISTS subquery before this loop.
-      await this.scheduleRepository.manager.transaction(async (em) => {
-        for (const { resourceId, schedule } of toCreate) {
-          // Re-check inside transaction to guard against races between the bulk read and now
-          const hasActive = await this.maintenanceService.hasActiveMaintenance(
-            { resourceId, scheduleId: schedule.id },
-            em,
-          );
-          if (hasActive) continue;
+      // --- WRITE PHASE ---
+      // One short transaction per triggered schedule: the re-check guards against races between the
+      // bulk read and now, and a failure (e.g. resource deleted mid-run) only skips its own item.
+      // ponytail: this is O(triggered), not O(resources) — normally a handful per tick, which is the
+      // whole point of the bulk read above. Upgrade path if a mass trigger ever hurts: batch into
+      // chunked transactions.
+      for (const { resourceId, schedule } of toCreate) {
+        try {
+          await this.scheduleRepository.manager.transaction(async (em) => {
+            const hasActive = await this.maintenanceService.hasActiveMaintenance(
+              { resourceId, scheduleId: schedule.id },
+              em,
+            );
+            if (hasActive) return;
 
-          const reason = this.buildMaintenanceReasonFromScheduleDefinition(schedule);
-          await this.maintenanceService.createMaintenanceFromSchedule(resourceId, schedule.id, reason, em);
-          this.logger.log(
-            `Schedule ${schedule.id} triggered for resource ${resourceId}: created maintenance. Reason: ${reason}`,
+            const reason = this.buildMaintenanceReasonFromScheduleDefinition(schedule);
+            await this.maintenanceService.createMaintenanceFromSchedule(resourceId, schedule.id, reason, em);
+            this.logger.log(
+              `Schedule ${schedule.id} triggered for resource ${resourceId}: created maintenance. Reason: ${reason}`,
+            );
+          });
+        } catch (err) {
+          this.logger.error(
+            `Error creating maintenance for resource ${resourceId} from schedule ${schedule.id}: ${err}`,
+            (err as Error)?.stack,
           );
         }
-      });
+      }
     } finally {
       this.evaluationLock = false;
     }

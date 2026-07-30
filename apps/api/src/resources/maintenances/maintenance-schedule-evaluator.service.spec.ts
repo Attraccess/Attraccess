@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { MaintenanceScheduleEvaluatorService } from './maintenance-schedule-evaluator.service';
+import { MaintenanceScheduleEvaluatorService, formatDbDate } from './maintenance-schedule-evaluator.service';
 import { ResourceMaintenanceService } from './maintenance.service';
 import { ResourceMaintenanceChangedEvent } from './events/resource-maintenance-changed.event';
 import { ResourceUsageSessionEndedEvent } from '../usage/events/resource-usage.events';
@@ -85,6 +85,8 @@ describe('MaintenanceScheduleEvaluatorService', () => {
         {
           provide: getRepositoryToken(ResourceUsage),
           useValue: {
+            metadata: { tableName: 'resource_usage' },
+            query: jest.fn().mockResolvedValue([]),
             createQueryBuilder: jest.fn(() => ({
               ...createQueryBuilderMock(),
               getRawOne: jest.fn().mockResolvedValue({ total: '0' }),
@@ -390,11 +392,9 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       ]);
 
       // SQL aggregation returns totalMinutes=120 (>= 60 threshold) and totalCount
-      const usageQb = createQueryBuilderMock();
-      usageQb.getRawMany.mockResolvedValue([
-        { resourceId: 1, totalMinutes: '120', totalCount: '3' },
+      jest.spyOn(usageRepository, 'query').mockResolvedValue([
+        { resourceId: 1, scheduleId, totalMinutes: '120', totalCount: '3' },
       ]);
-      jest.spyOn(usageRepository, 'createQueryBuilder').mockReturnValue(usageQb as any); // eslint-disable-line @typescript-eslint/no-explicit-any
 
       await service.evaluateAll();
 
@@ -427,11 +427,9 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       ]);
 
       // 100 minutes < 600 minutes threshold
-      const usageQb = createQueryBuilderMock();
-      usageQb.getRawMany.mockResolvedValue([
-        { resourceId: 1, totalMinutes: '100', totalCount: '2' },
+      jest.spyOn(usageRepository, 'query').mockResolvedValue([
+        { resourceId: 1, scheduleId, totalMinutes: '100', totalCount: '2' },
       ]);
-      jest.spyOn(usageRepository, 'createQueryBuilder').mockReturnValue(usageQb as any); // eslint-disable-line @typescript-eslint/no-explicit-any
 
       await service.evaluateAll();
 
@@ -462,11 +460,9 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       ]);
 
       // SQL aggregation returns totalCount=7 (>= 5 threshold)
-      const usageQb = createQueryBuilderMock();
-      usageQb.getRawMany.mockResolvedValue([
-        { resourceId: 1, totalMinutes: '0', totalCount: '7' },
+      jest.spyOn(usageRepository, 'query').mockResolvedValue([
+        { resourceId: 1, scheduleId, totalMinutes: '0', totalCount: '7' },
       ]);
-      jest.spyOn(usageRepository, 'createQueryBuilder').mockReturnValue(usageQb as any); // eslint-disable-line @typescript-eslint/no-explicit-any
 
       await service.evaluateAll();
 
@@ -501,15 +497,116 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       ]);
 
       // 3 sessions < 10 threshold
-      const usageQb = createQueryBuilderMock();
-      usageQb.getRawMany.mockResolvedValue([
-        { resourceId: 1, totalMinutes: '0', totalCount: '3' },
+      jest.spyOn(usageRepository, 'query').mockResolvedValue([
+        { resourceId: 1, scheduleId, totalMinutes: '0', totalCount: '3' },
       ]);
-      jest.spyOn(usageRepository, 'createQueryBuilder').mockReturnValue(usageQb as any); // eslint-disable-line @typescript-eslint/no-explicit-any
 
       await service.evaluateAll();
 
       expect(maintenanceService.createMaintenanceFromSchedule).not.toHaveBeenCalled();
+    });
+
+    it('should evaluate each usage-based schedule against its own baseline, not a shared one', async () => {
+      const otherScheduleId = scheduleId + 1;
+      const resourceCreatedAt = new Date('2024-01-01T00:00:00.000Z');
+      const recentlyServiced = new Date('2026-06-01T00:00:00.000Z');
+
+      jest.spyOn(scheduleRepository, 'find').mockResolvedValue([
+        // Never serviced -> baseline is resource createdAt, plenty of usage accumulated
+        {
+          id: scheduleId,
+          resourceId: 1,
+          enabled: true,
+          triggerType: ResourceMaintenanceScheduleTriggerType.USAGE_HOURS,
+          usageHoursConfig: { duration: 10, unit: 'HOURS' as const }, // 600 min
+          usageCountConfig: null,
+          timeIntervalConfig: null,
+        } as ResourceMaintenanceSchedule,
+        // Serviced recently -> its own baseline, only a little usage since
+        {
+          id: otherScheduleId,
+          resourceId: 1,
+          enabled: true,
+          triggerType: ResourceMaintenanceScheduleTriggerType.USAGE_HOURS,
+          usageHoursConfig: { duration: 10, unit: 'HOURS' as const },
+          usageCountConfig: null,
+          timeIntervalConfig: null,
+        } as ResourceMaintenanceSchedule,
+      ]);
+
+      const maintenanceQb = createQueryBuilderMock();
+      maintenanceQb.getRawMany
+        .mockResolvedValueOnce([
+          { resourceId: 1, scheduleId: otherScheduleId, lastEndTime: recentlyServiced.toISOString() },
+        ])
+        .mockResolvedValueOnce([]);
+      jest.spyOn(maintenanceRepository, 'createQueryBuilder').mockReturnValue(maintenanceQb as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+
+      jest.spyOn(resourceRepository, 'find').mockResolvedValue([
+        { id: 1, createdAt: resourceCreatedAt } as Resource,
+      ]);
+
+      // Same resource, different per-schedule windows: 900 min since createdAt, 30 min since service
+      const querySpy = jest.spyOn(usageRepository, 'query').mockResolvedValue([
+        { resourceId: 1, scheduleId, totalMinutes: '900', totalCount: '9' },
+        { resourceId: 1, scheduleId: otherScheduleId, totalMinutes: '30', totalCount: '1' },
+      ]);
+
+      await service.evaluateAll();
+
+      // Both schedules must be sent to SQL with their own baseline
+      const params = querySpy.mock.calls[0][1] as unknown[];
+      expect(params).toEqual([
+        1, scheduleId, formatDbDate(resourceCreatedAt),
+        1, otherScheduleId, formatDbDate(recentlyServiced),
+      ]);
+
+      // Only the never-serviced schedule crossed its threshold
+      expect(maintenanceService.createMaintenanceFromSchedule).toHaveBeenCalledTimes(1);
+      expect(maintenanceService.createMaintenanceFromSchedule).toHaveBeenCalledWith(
+        1, scheduleId, expect.any(String), expect.anything(),
+      );
+    });
+
+    it('should isolate failures so one bad schedule does not block the rest', async () => {
+      jest.spyOn(scheduleRepository, 'find').mockResolvedValue([
+        {
+          id: scheduleId,
+          resourceId: 1,
+          enabled: true,
+          triggerType: ResourceMaintenanceScheduleTriggerType.TIME_INTERVAL,
+          usageHoursConfig: null,
+          usageCountConfig: null,
+          timeIntervalConfig: { duration: 1, unit: 'DAYS' },
+        } as ResourceMaintenanceSchedule,
+        {
+          id: scheduleId + 1,
+          resourceId: 2,
+          enabled: true,
+          triggerType: ResourceMaintenanceScheduleTriggerType.TIME_INTERVAL,
+          usageHoursConfig: null,
+          usageCountConfig: null,
+          timeIntervalConfig: { duration: 1, unit: 'DAYS' },
+        } as ResourceMaintenanceSchedule,
+      ]);
+
+      const maintenanceQb = createQueryBuilderMock();
+      maintenanceQb.getRawMany.mockResolvedValue([]);
+      jest.spyOn(maintenanceRepository, 'createQueryBuilder').mockReturnValue(maintenanceQb as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+
+      jest.spyOn(resourceRepository, 'find').mockResolvedValue([
+        { id: 1, createdAt: new Date('2024-01-01T00:00:00.000Z') } as Resource,
+        { id: 2, createdAt: new Date('2024-01-01T00:00:00.000Z') } as Resource,
+      ]);
+
+      jest
+        .spyOn(maintenanceService, 'createMaintenanceFromSchedule')
+        .mockRejectedValueOnce(new Error('resource vanished mid-run'))
+        .mockResolvedValueOnce({ id: 2 } as ResourceMaintenance);
+
+      await expect(service.evaluateAll()).resolves.toBeUndefined();
+
+      expect(maintenanceService.createMaintenanceFromSchedule).toHaveBeenCalledTimes(2);
     });
 
     it('should do nothing when no enabled schedules exist', async () => {

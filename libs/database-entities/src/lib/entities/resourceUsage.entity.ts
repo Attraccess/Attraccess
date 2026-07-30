@@ -20,6 +20,7 @@ import { FormSubmission } from './form';
 @Index('IDX_resource_usage_resourceId', ['resourceId'])
 @Index('IDX_resource_usage_endTime', ['endTime'])
 @Index('IDX_resource_usage_userId', ['userId'])
+@Index('IDX_resource_usage_resourceId_endTime', ['resourceId', 'endTime'])
 @Entity()
 export class ResourceUsage {
   @PrimaryGeneratedColumn()
