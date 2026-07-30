@@ -7,7 +7,7 @@ import { TFunction, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { StandardDrawer } from '../../../../../components/standardDrawer';
 import { CatalogContent } from './catalogContent';
 import { useNodeCatalog } from './useNodeCatalog';
-import { DOMAINS } from './domains';
+import { getDomainDef, getPluginDomainLabel } from './domains';
 import de from './de.json';
 import en from './en.json';
 
@@ -78,8 +78,9 @@ export const NodeCatalogPanel = forwardRef<NodeCatalogHandle, Props>(function No
           {loadingSpinner ?? (collapsed ? (
             <ul className="flex flex-col items-center gap-1">
               {groups.map((group) => {
-                const def = DOMAINS[group.domain];
+                const def = getDomainDef(group.domain);
                 const Icon = def.icon;
+                const label = getPluginDomainLabel(group.domain) ?? t('domains.' + group.domain);
                 return (
                   <li key={group.domain}>
                     <button
@@ -92,7 +93,7 @@ export const NodeCatalogPanel = forwardRef<NodeCatalogHandle, Props>(function No
                             ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                         });
                       }}
-                      aria-label={t('domains.' + group.domain)}
+                      aria-label={label}
                       className={`flex items-center justify-center w-8 h-8 rounded-md ${def.iconBg} ${def.iconFg} hover:ring-2 hover:ring-primary-300 focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none`}
                     >
                       <Icon className="w-4 h-4" />

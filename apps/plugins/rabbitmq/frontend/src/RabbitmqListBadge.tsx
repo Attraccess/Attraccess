@@ -18,7 +18,7 @@ export function RabbitmqListBadge({ mqttServerId }: { mqttServerId: number }) {
 
   return (
     <Chip data-cy={`rabbitmq-list-badge-${mqttServerId}`} color="accent" variant="soft" size="sm">
-      <RabbitIcon className="w-3.5 h-3.5" />
+      <RabbitIcon className="rmq:w-3.5 rmq:h-3.5" />
       RabbitMQ
     </Chip>
   );

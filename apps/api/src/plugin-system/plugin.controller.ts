@@ -67,10 +67,10 @@ export class PluginController {
 
     this.logger.log(`Serving frontend file ${fileName} for plugin ${pluginName} from ${fullFilePath}`);
 
-    // stream the file
+    // stream the file — browsers enforce strict MIME checking for stylesheets
     const fileStream = createReadStream(fullFilePath);
     return new StreamableFile(fileStream, {
-      type: 'application/javascript',
+      type: fileName.endsWith('.css') ? 'text/css' : 'application/javascript',
     });
   }
 

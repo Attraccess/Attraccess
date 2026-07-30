@@ -154,37 +154,70 @@ export class PluginService {
     // unzip file
     PluginService.logger.debug(`Unzipping file ${zipFile.originalname}`);
     const tempFolder = join(PluginService.PLUGIN_PATH, 'temp', randomBytes(16).toString('base64url').slice(0, 21));
-    await decompress(zipFile.buffer, tempFolder);
 
-    // read manifest
-    PluginService.logger.debug(`Reading manifest from ${tempFolder}`);
-    const manifestPath = join(tempFolder, 'plugin.json');
-    const manifestContent = JSON.parse(readFileSync(manifestPath, 'utf8'));
+    try {
+      let extracted: unknown[] = [];
+      try {
+        extracted = await decompress(zipFile.buffer, tempFolder);
+      } catch (error) {
+        PluginService.logger.error(`Failed to extract ${zipFile.originalname}`, error as Error);
+      }
 
-    // validate manifest
-    PluginService.logger.debug(`Validating manifest`, manifestContent);
-    const manifest = PluginManifestSchema.parse(manifestContent);
+      // a non-zip buffer decompresses to nothing instead of throwing
+      if (extracted.length === 0) {
+        throw new BadRequestException('File could not be extracted, it must be a valid zip file');
+      }
 
-    // if folder exists throw error
-    const pluginFolder = join(PluginService.PLUGIN_PATH, manifest.name);
-    PluginService.logger.debug(`Checking if plugin folder ${pluginFolder} exists`, pluginFolder);
-    if (existsSync(pluginFolder)) {
-      PluginService.logger.error(`Plugin ${manifest.name} already exists`);
-      throw new BadRequestException('Plugin already exists');
+      // read manifest, tolerating the single wrapper folder that Finder and most GUI zip tools add
+      const sourceFolder = PluginService.findManifestFolder(tempFolder);
+      PluginService.logger.debug(`Reading manifest from ${sourceFolder}`);
+      const manifestContent = JSON.parse(readFileSync(join(sourceFolder, 'plugin.json'), 'utf8'));
+
+      // validate manifest
+      PluginService.logger.debug(`Validating manifest`, manifestContent);
+      const manifest = PluginManifestSchema.parse(manifestContent);
+
+      // if folder exists throw error
+      const pluginFolder = join(PluginService.PLUGIN_PATH, manifest.name);
+      PluginService.logger.debug(`Checking if plugin folder ${pluginFolder} exists`, pluginFolder);
+      if (existsSync(pluginFolder)) {
+        PluginService.logger.error(`Plugin ${manifest.name} already exists`);
+        throw new BadRequestException('Plugin already exists');
+      }
+
+      // move plugin to plugins folder
+      PluginService.logger.debug(`Moving plugin to plugins folder ${pluginFolder}`);
+      await rename(sourceFolder, pluginFolder);
+
+      // restart app in 1 second
+      setTimeout(() => {
+        this.restartApp();
+      }, 1000);
+
+      // return manifest
+      PluginService.logger.debug(`Returning manifest ${manifest}`);
+      return manifest;
+    } finally {
+      await rm(tempFolder, { recursive: true, force: true });
+    }
+  }
+
+  private static findManifestFolder(tempFolder: string): string {
+    if (existsSync(join(tempFolder, 'plugin.json'))) {
+      return tempFolder;
     }
 
-    // move plugin to plugins folder
-    PluginService.logger.debug(`Moving plugin to plugins folder ${pluginFolder}`);
-    await rename(tempFolder, pluginFolder);
+    // ponytail: only one level deep - nobody nests a plugin twice
+    const candidates = readdirSync(tempFolder, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory() && entry.name !== '__MACOSX' && !entry.name.startsWith('.'))
+      .map((entry) => join(tempFolder, entry.name))
+      .filter((dir) => existsSync(join(dir, 'plugin.json')));
 
-    // restart app in 1 second
-    setTimeout(() => {
-      this.restartApp();
-    }, 1000);
+    if (candidates.length !== 1) {
+      throw new BadRequestException('Zip file must contain a plugin.json, either at its root or in a single folder');
+    }
 
-    // return manifest
-    PluginService.logger.debug(`Returning manifest ${manifest}`);
-    return manifest;
+    return candidates[0];
   }
 
   private restartApp() {

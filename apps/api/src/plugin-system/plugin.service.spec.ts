@@ -1,5 +1,5 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { PluginPermission } from '@attraccess/plugins-backend-sdk';
@@ -195,6 +195,48 @@ describe('PluginService', () => {
       expect(restartSpy).not.toHaveBeenCalled();
       flushScheduledRestart();
       expect(restartSpy).toHaveBeenCalledTimes(1);
+    });
+
+    // Finder ("Compress" on an unpacked folder) and most GUI zip tools wrap the
+    // contents in a single top-level folder. Before, that surfaced as a raw
+    // ENOENT on <temp>/plugin.json.
+    it('unpacks a plugin whose contents sit in a single wrapper folder', async () => {
+      const service = new PluginService();
+      const file = zipFileUpload({
+        'plugin-shelly/plugin.json': JSON.stringify(VALID_MANIFEST),
+        'plugin-shelly/dist/index.js': 'module.exports = {};',
+        '__MACOSX/._plugin.json': 'junk',
+      });
+
+      const manifest = await service.uploadPlugin(file);
+
+      expect(manifest.name).toBe('uploaded-plugin');
+      expect(existsSync(join(root, 'uploaded-plugin', 'plugin.json'))).toBe(true);
+      expect(existsSync(join(root, 'uploaded-plugin', 'dist', 'index.js'))).toBe(true);
+      expect(existsSync(join(root, 'temp'))).toBe(true);
+      expect(readdirSync(join(root, 'temp'))).toEqual([]);
+    });
+
+    it('rejects a zip without a plugin.json instead of throwing ENOENT', async () => {
+      const service = new PluginService();
+      const file = zipFileUpload({ 'dist/index.js': 'module.exports = {};' });
+
+      await expect(service.uploadPlugin(file)).rejects.toThrow(/plugin\.json/);
+    });
+
+    it('rejects a file that cannot be extracted', async () => {
+      const service = new PluginService();
+      const file = zipFileUpload({ 'plugin.json': '{}' }, { buffer: Buffer.from('not a zip at all') });
+
+      await expect(service.uploadPlugin(file)).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('cleans up the temp folder when the upload is rejected', async () => {
+      const service = new PluginService();
+      const file = zipFileUpload({ 'plugin.json': JSON.stringify({ name: 'x' }) });
+
+      await expect(service.uploadPlugin(file)).rejects.toBeDefined();
+      expect(readdirSync(join(root, 'temp'))).toEqual([]);
     });
 
     it('rejects a manifest that fails schema validation', async () => {

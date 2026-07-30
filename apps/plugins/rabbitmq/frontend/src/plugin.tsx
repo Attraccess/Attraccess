@@ -5,6 +5,7 @@
 // connection-status panel in the MQTT server detail view, both driven by the
 // plugin's backend detection endpoint. The host stays RabbitMQ-agnostic — it
 // only exposes the generic slots and renders whatever we contribute.
+import './styles.css';
 import { Card } from '@heroui/react';
 import { RabbitIcon } from 'lucide-react';
 import type {
@@ -45,7 +46,7 @@ function RabbitmqDetailSlot({ mqttServerId }: { mqttServerId: number }) {
   }
 
   return (
-    <div className="flex flex-col gap-4 w-full">
+    <div className="rmq:flex rmq:flex-col rmq:gap-4 rmq:w-full">
       <RabbitmqStatusPanel mqttServerId={mqttServerId} />
       <RabbitmqUserPanel mqttServerId={mqttServerId} />
     </div>
@@ -54,14 +55,14 @@ function RabbitmqDetailSlot({ mqttServerId }: { mqttServerId: number }) {
 
 function RabbitmqPage() {
   return (
-    <div className="flex flex-col gap-6 p-6 max-w-4xl mx-auto">
-      <div className="flex items-center gap-3">
-        <RabbitIcon className="w-6 h-6 text-primary" />
-        <h1 className="text-2xl font-semibold text-default-800">RabbitMQ</h1>
+    <div className="rmq:flex rmq:flex-col rmq:gap-6 rmq:p-6 rmq:max-w-4xl rmq:mx-auto">
+      <div className="rmq:flex rmq:items-center rmq:gap-3">
+        <RabbitIcon className="rmq:w-6 rmq:h-6 rmq:text-primary" />
+        <h1 className="rmq:text-2xl rmq:font-semibold rmq:text-default-800">RabbitMQ</h1>
       </div>
-      <Card className="border border-default-200 dark:border-default-100">
+      <Card className="rmq:border rmq:border-default-200 rmq:dark:border-default-100">
         <Card.Content>
-          <p className="text-sm text-default-500">
+          <p className="rmq:text-sm rmq:text-default-500">
             RabbitMQ management plugin. RabbitMQ MQTT servers show a detection badge and connection-status panel in
             the MQTT settings, and broker users can be managed (create, edit, permissions, delete) from the MQTT
             server detail view.
@@ -111,7 +112,7 @@ export default class RabbitmqPlugin implements AttraccessFrontendPlugin {
       {
         label: 'RabbitMQ',
         path: '/rabbitmq',
-        icon: <RabbitIcon className="w-5 h-5" />,
+        icon: <RabbitIcon className="rmq:w-5 rmq:h-5" />,
       },
     ];
   }

@@ -47,6 +47,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResourceHealthService } from '../health/resource-health.service';
 import { CronTimer } from '../../metrics/instrumentation/cron/cron.helper';
 import { FlowTimer } from '../../metrics/instrumentation/flow/flow.helper';
+import { getPluginFlowNode } from '../../plugin-system/plugin-flow-node-registry';
 import {
   ActivityTrackExecutor,
   BillingSetAdditionalItemsExecutor,
@@ -610,8 +611,23 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     input: object,
     transactionManager?: EntityManager,
   ): Promise<NodeProcessingResult> {
-    const executor = this.nodeExecutors[node.type];
-    return executor.execute(node, input, this.buildExecutionContext(transactionManager));
+    // Core node types are looked up in the exhaustive record.
+    const executor = this.nodeExecutors[node.type as ResourceFlowNodeType];
+    if (executor) {
+      return executor.execute(node, input, this.buildExecutionContext(transactionManager));
+    }
+
+    // Plugin-contributed node types fall through to the plugin registry.
+    const pluginNode = getPluginFlowNode(node.type);
+    if (pluginNode) {
+      return pluginNode.execute(
+        { id: node.id, type: node.type, data: node.data as Record<string, unknown> },
+        input,
+        this.buildExecutionContext(transactionManager),
+      );
+    }
+
+    throw new Error(`No executor found for flow node type: ${node.type}`);
   }
 
   private async processNode(

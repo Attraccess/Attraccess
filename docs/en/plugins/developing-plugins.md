@@ -48,7 +48,7 @@ versions it supports, and the permissions it needs:
   "version": "1.0.0",
   "main": {
     "backend": { "directory": "dist", "entryPoint": "index.js" },
-    "frontend": { "directory": "frontend", "entryPoint": "remoteEntry.js" }
+    "frontend": { "directory": "frontend", "entryPoint": "remoteEntry.js", "styles": "style.css" }
   },
   "attraccessVersion": { "min": "1.0.0" },
   "permissions": ["READ_USERS", "LISTEN_EVENTS"]
@@ -60,6 +60,7 @@ versions it supports, and the permissions it needs:
 | `name` | yes | Unique identifier; also the on-disk folder name. |
 | `version` | yes | Your plugin's semantic version. |
 | `main.backend` / `main.frontend` | at least one | `directory` + `entryPoint`, relative to the ZIP root. |
+| `main.frontend.styles` | no | Stylesheet relative to the frontend directory; the host injects it as a `<link>` when the plugin loads. See [Styling](#styling-bundle-your-own-css). |
 | `main.migrations` | no | `directory` + `entryPoint` of a module exporting TypeORM migration classes. See [Database Migrations](plugins/database-migrations.md). |
 | `attraccessVersion` | yes | Compatibility range — at least one of `min`, `max`, `exact`. |
 | `permissions` | no | Backend capabilities you need (see [Permissions](#backend-plugin-permissions)). Defaults to `[]`. |
@@ -266,11 +267,14 @@ to merge your pages into the app router.
 > [Packaging the frontend](#packaging-the-frontend)). Import them instead of
 > hand-rolling styles and your pages look native, stay consistent, and inherit
 > the host's **light/dark theme automatically** — HeroUI components read the
-> active theme from the host, and Tailwind utility classes (`text-default-500`,
-> `border-default-200`, …) resolve against the host's stylesheet because your
-> page renders inside the host DOM. Because these packages are *shared*, the
-> host serves its single copy at runtime, so your plugin bundle only carries its
-> own code.
+> active theme from the host because your page renders inside the host DOM.
+> Because these packages are *shared*, the host serves its single copy at
+> runtime, so your plugin bundle only carries its own code.
+>
+> Raw Tailwind utility classes (`flex`, `gap-6`, `text-default-500`, …) are
+> **not** covered by the host stylesheet — the host only ships the classes *it*
+> uses. Bundle your own prefixed utilities as described in
+> [Styling](#styling-bundle-your-own-css).
 
 ```tsx
 import { Card, Chip, Spinner } from '@heroui/react';
@@ -298,17 +302,17 @@ function HelloWorldPage() {
   }, []);
 
   return (
-    <div className="flex flex-col gap-6 p-6 max-w-4xl mx-auto">
-      <div className="flex items-center gap-3">
-        <HandIcon className="w-6 h-6 text-primary" />
-        <h1 className="text-2xl font-semibold text-default-800">Hello World Plugin</h1>
+    <div className="hw:flex hw:flex-col hw:gap-6 hw:p-6 hw:max-w-4xl hw:mx-auto">
+      <div className="hw:flex hw:items-center hw:gap-3">
+        <HandIcon className="hw:w-6 hw:h-6 hw:text-primary" />
+        <h1 className="hw:text-2xl hw:font-semibold hw:text-default-800">Hello World Plugin</h1>
       </div>
-      <Card className="border border-default-200 dark:border-default-100">
+      <Card className="hw:border hw:border-default-200 hw:dark:border-default-100">
         <Card.Content>
           {loading ? (
             <Spinner size="sm" />
           ) : (
-            <ul className="flex flex-col gap-2">
+            <ul className="hw:flex hw:flex-col hw:gap-2">
               {greetings.map((g) => (
                 <li key={g}>
                   <Chip color="accent" variant="soft">{g}</Chip>
@@ -451,10 +455,12 @@ shares: `react`, `react-dom`, `react-router-dom`, `react-pluggable`,
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import federation from '@originjs/vite-plugin-federation';
+import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
   plugins: [
     react(),
+    tailwindcss(), // compiles src/styles.css — see "Styling" below
     federation({
       name: 'plugin-hello-world',
       filename: 'remoteEntry.js',
@@ -464,13 +470,71 @@ export default defineConfig({
       shared: ['react', 'react-dom', 'react-router-dom', '@heroui/react', 'lucide-react'],
     }),
   ],
-  // Emit remoteEntry.js at the output root so the manifest entryPoint resolves.
-  build: { target: 'esnext', minify: false, cssCodeSplit: false, assetsDir: '' },
+  build: {
+    target: 'esnext',
+    minify: false,
+    cssCodeSplit: false,
+    // Emit remoteEntry.js and style.css at the output root, un-hashed, so the
+    // manifest's entryPoint and styles fields resolve.
+    assetsDir: '',
+    rollupOptions: { output: { assetFileNames: '[name][extname]' } },
+  },
 });
 ```
 
 This emits `frontend/remoteEntry.js` (plus chunks) — point your manifest's
 `main.frontend.entryPoint` at it.
+
+### Styling: bundle your own CSS
+
+Your plugin renders inside the host DOM, but the host's stylesheet only
+contains the Tailwind utility classes used by the *host's own* sources. Any
+class your plugin uses beyond that set would silently render unstyled — so
+every plugin bundles its own CSS and declares it in the manifest via
+`main.frontend.styles`. The host then injects it as a `<link>` when it loads
+your plugin.
+
+Your utilities must be **prefixed** (pick a short unique prefix, e.g. your
+plugin's initials). Two complete, unprefixed Tailwind builds in one document
+break each other: your `.fixed` rule would defeat the host's responsive
+`md:relative`, and the host's `.p-4` your `md:p-6`, because cascade-layer
+priority beats source order across stylesheets. DOM-scoping is no alternative
+either — HeroUI drawers and modals portal to `<body>`, outside any wrapper
+element. Prefixed class names travel with your markup, so they work everywhere
+(portals included) and can never collide with host classes in either
+direction.
+
+With Tailwind (`@tailwindcss/vite`, shown in the config above), create
+`src/styles.css` and import it from your `plugin.tsx`:
+
+```css
+/* Emit ONLY the utilities used by this plugin's sources, under your prefix —
+   no preflight, since the host document already provides it. Theme tokens are
+   emitted as --hw-* variables, so they don't clash with the host's. The HeroUI
+   token map is `@theme inline` and referenced, so utilities like
+   `hw:bg-surface` compile straight to the host-defined CSS variables. */
+@import 'tailwindcss/theme.css' prefix(hw);
+@import '@heroui/styles/themes/shared/theme.css' theme(reference);
+@import 'tailwindcss/utilities.css' source(none);
+@source './';
+
+/* Must match the host's dark-mode variant. */
+@custom-variant dark (&:where(.dark, .dark *));
+```
+
+Then write every utility class with the prefix — it goes first, before
+variants:
+
+```tsx
+<div className="hw:flex hw:flex-col hw:gap-6 hw:p-4 hw:md:p-6">
+  <h1 className="hw:text-2xl hw:font-semibold hw:dark:text-default-800">…</h1>
+</div>
+```
+
+With `cssCodeSplit: false` and the `assetFileNames` shown above, the build
+emits a single `frontend/style.css` — point `main.frontend.styles` at it.
+HeroUI *components* need none of this (they are styled by the host), only the
+utility classes in your own markup do.
 
 ## Build, ZIP and upload
 
@@ -484,6 +548,7 @@ plugin-hello-world.zip
 ├── dist/index.js               # backend (CommonJS)
 └── frontend/                   # frontend federation remote
     ├── remoteEntry.js
+    ├── style.css               # plugin-bundled CSS (main.frontend.styles)
     └── ...chunks
 ```
 

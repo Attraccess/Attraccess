@@ -2,6 +2,7 @@
 //
 // A module-federation remote that registers the device-registry page and a
 // sidebar entry. Access is gated behind `resources.update`.
+import './styles.css';
 import { WifiIcon } from 'lucide-react';
 import type {
   AttraccessFrontendPlugin,
@@ -50,7 +51,7 @@ export default class ShellyPlugin implements AttraccessFrontendPlugin {
       {
         label: 'Shelly',
         path: '/shelly',
-        icon: <WifiIcon className="w-5 h-5" />,
+        icon: <WifiIcon className="sh:w-5 sh:h-5" />,
       },
     ];
   }

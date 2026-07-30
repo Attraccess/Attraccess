@@ -16,7 +16,7 @@ function ResultSummary({ result }: { result: DiscoveryResult }) {
   const scanned = result.subnets.length > 0 ? result.subnets.join(', ') : 'no subnet (mDNS only)';
 
   return (
-    <div className="flex flex-col gap-3" data-cy="shelly-discover-result">
+    <div className="sh:flex sh:flex-col sh:gap-3" data-cy="shelly-discover-result">
       <StatusAlert
         status={result.devices.length > 0 ? 'success' : 'warning'}
         title={result.devices.length > 0 ? `Found ${result.devices.length}, added ${added}` : 'No devices found'}
@@ -25,22 +25,22 @@ function ResultSummary({ result }: { result: DiscoveryResult }) {
       </StatusAlert>
 
       {result.devices.length === 0 && (
-        <p className="text-sm text-muted">
+        <p className="sh:text-sm sh:text-muted">
           Nothing answered <code>GET /shelly</code>. If Attraccess runs in a container, enter the subnet your devices
           are on — the container's own network is not your LAN.
         </p>
       )}
 
-      <ul className="flex flex-col gap-2">
+      <ul className="sh:flex sh:flex-col sh:gap-2">
         {result.devices.map((device) => (
           <li
             key={device.deviceId}
-            className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-surface px-3 py-2"
+            className="sh:flex sh:flex-wrap sh:items-center sh:justify-between sh:gap-2 sh:rounded-lg sh:bg-surface sh:px-3 sh:py-2"
             data-cy={`shelly-discovered-${device.deviceId}`}
           >
-            <div className="min-w-0">
-              <div className="truncate font-medium text-foreground">{device.name}</div>
-              <div className="text-xs text-muted">
+            <div className="sh:min-w-0">
+              <div className="sh:truncate sh:font-medium sh:text-foreground">{device.name}</div>
+              <div className="sh:text-xs sh:text-muted">
                 {device.ipAddress} · Gen {device.generation} · via {device.source === 'mdns' ? 'mDNS' : 'subnet scan'}
               </div>
             </div>
@@ -97,10 +97,10 @@ export function DiscoverDrawer({
   return (
     <StandardDrawer isOpen={isOpen} onOpenChange={onOpenChange}>
       <DrawerHeader>
-        <div className="flex w-full items-start justify-between gap-3">
-          <div className="flex flex-col gap-1">
-            <h2 className="text-lg font-semibold">Discover devices</h2>
-            <p className="text-sm text-muted">
+        <div className="sh:flex sh:w-full sh:items-start sh:justify-between sh:gap-3">
+          <div className="sh:flex sh:flex-col sh:gap-1">
+            <h2 className="sh:text-lg sh:font-semibold">Discover devices</h2>
+            <p className="sh:text-sm sh:text-muted">
               Listens for Shelly devices announcing over mDNS, then probes every address of a subnet. Everything found
               is added to the registry.
             </p>
@@ -111,7 +111,7 @@ export function DiscoverDrawer({
         </div>
       </DrawerHeader>
       <DrawerBody>
-        <Form onSubmit={submit} className="flex flex-col gap-4">
+        <Form onSubmit={submit} className="sh:flex sh:flex-col sh:gap-4">
           <TextFieldRow
             label="Subnet to scan (optional)"
             value={cidr}
@@ -128,7 +128,7 @@ export function DiscoverDrawer({
           )}
 
           {running && (
-            <div className="flex items-center gap-3 text-sm text-muted">
+            <div className="sh:flex sh:items-center sh:gap-3 sh:text-sm sh:text-muted">
               <Spinner color="accent" size="sm" />
               Probing addresses — a /24 takes a few seconds.
             </div>
@@ -136,7 +136,7 @@ export function DiscoverDrawer({
 
           {result && !running && <ResultSummary result={result} />}
 
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="sh:flex sh:justify-end sh:gap-2 sh:pt-2">
             <Button variant="secondary" onPress={close}>
               {result ? 'Done' : 'Cancel'}
             </Button>
@@ -147,7 +147,7 @@ export function DiscoverDrawer({
               onPress={submit}
               data-cy="shelly-discover-submit"
             >
-              <SearchIcon className="h-4 w-4" /> Start discovery
+              <SearchIcon className="sh:h-4 sh:w-4" /> Start discovery
             </Button>
           </div>
           <input type="submit" hidden />

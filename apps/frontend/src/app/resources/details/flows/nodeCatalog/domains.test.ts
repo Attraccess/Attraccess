@@ -1,8 +1,8 @@
-// Tests for domain mapping: nodeTypeDomain, DOMAINS, and DOMAIN_ORDER
+// Tests for domain mapping: nodeTypeDomain, getDomainDef, getPluginDomainLabel, DOMAINS, and DOMAIN_ORDER
 // FEATURE: Node catalog redesign — domain grouping
 import { describe, expect, it } from 'vitest';
 import { ResourceFlowNodeType } from '@attraccess/react-query-client';
-import { DOMAINS, DOMAIN_ORDER, nodeTypeDomain, type Domain } from './domains';
+import { DOMAINS, DOMAIN_ORDER, getDomainDef, getPluginDomainLabel, nodeTypeDomain, type Domain } from './domains';
 
 const cases: Array<[ResourceFlowNodeType, Domain]> = [
   [ResourceFlowNodeType.INPUT_BUTTON, 'manual'],
@@ -46,13 +46,22 @@ describe('nodeTypeDomain', () => {
   it('cases cover every ResourceFlowNodeType value', () => {
     expect(cases.map(([t]) => t).sort()).toEqual(Object.values(ResourceFlowNodeType).sort());
   });
+
+  it('maps plugin nodes to a per-plugin domain', () => {
+    expect(nodeTypeDomain('plugin.shelly.send-on')).toBe('plugin.shelly');
+    expect(nodeTypeDomain('plugin.homeassistant.turn-on')).toBe('plugin.homeassistant');
+  });
 });
 
 describe('DOMAIN_ORDER', () => {
-  it('contains every domain referenced by the case table', () => {
+  it('contains every core domain referenced by the case table', () => {
     for (const [, domain] of cases) {
       expect(DOMAIN_ORDER).toContain(domain);
     }
+  });
+
+  it('does not contain the generic plugin domain (plugins get per-plugin domains)', () => {
+    expect(DOMAIN_ORDER).not.toContain('plugin');
   });
 });
 
@@ -61,5 +70,29 @@ describe('DOMAINS', () => {
     for (const domain of DOMAIN_ORDER) {
       expect(DOMAINS[domain]).toBeDefined();
     }
+  });
+});
+
+describe('getDomainDef', () => {
+  it('returns the correct def for a known domain', () => {
+    expect(getDomainDef('manual')).toBe(DOMAINS['manual']);
+  });
+
+  it('returns the plugin fallback def for an unknown plugin domain', () => {
+    const def = getDomainDef('plugin.shelly');
+    expect(def).toBeDefined();
+    expect(def.icon).toBeDefined();
+  });
+});
+
+describe('getPluginDomainLabel', () => {
+  it('capitalises the plugin name from a plugin domain', () => {
+    expect(getPluginDomainLabel('plugin.shelly')).toBe('Shelly');
+    expect(getPluginDomainLabel('plugin.homeassistant')).toBe('Homeassistant');
+  });
+
+  it('returns null for static core domains', () => {
+    expect(getPluginDomainLabel('manual')).toBeNull();
+    expect(getPluginDomainLabel('logic')).toBeNull();
   });
 });

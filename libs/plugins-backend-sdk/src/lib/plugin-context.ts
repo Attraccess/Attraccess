@@ -1,4 +1,5 @@
 import { DynamicModule, LoggerService, Type } from '@nestjs/common';
+import type { PluginFlowNodeDefinition } from './plugin-flow-node';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource, EntityTarget, ObjectLiteral, Repository } from 'typeorm';
 import { SystemEvent, SystemEventHandler, SystemEventPayload, SystemEventSubscription } from './plugin.interface';
@@ -121,4 +122,13 @@ export interface PluginBackendModule {
    * the DATABASE_ACCESS permission. See `docs/en/plugins/database-migrations.md`.
    */
   entities?: PluginEntityClass[];
+
+  /**
+   * Optional custom flow node types this plugin contributes. The host registers
+   * them into the flow engine so they appear in the frontend node catalog and
+   * can be executed like built-in node types. No extra permission is required.
+   *
+   * Type naming convention: "plugin.<pluginName>.<nodeName>".
+   */
+  flowNodes?: PluginFlowNodeDefinition[];
 }
