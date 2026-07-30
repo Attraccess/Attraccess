@@ -1,3 +1,5 @@
+// Vitest runs without globals here, so the test API is imported explicitly.
+import { describe, expect, it } from 'vitest';
 import { provisionWifiOverBle, ShellyBleRpc, type GattCharacteristic, type RpcChannel } from './ble';
 
 const noSleep = () => Promise.resolve();
