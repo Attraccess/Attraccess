@@ -41,6 +41,8 @@ export function TextFieldRow({
   required,
   description,
   dataCy,
+  type,
+  autoComplete = 'off',
 }: {
   label: string;
   value: string;
@@ -49,11 +51,13 @@ export function TextFieldRow({
   required?: boolean;
   description?: ReactNode;
   dataCy?: string;
+  type?: 'text' | 'password';
+  autoComplete?: string;
 }) {
   return (
     <TextField value={value} onChange={onChange} isRequired={required}>
       <Label>{label}</Label>
-      <Input placeholder={placeholder} autoComplete="off" data-cy={dataCy} />
+      <Input type={type} placeholder={placeholder} autoComplete={autoComplete} data-cy={dataCy} />
       {description && <p className="sh:mt-1 sh:text-xs sh:text-muted">{description}</p>}
     </TextField>
   );
@@ -80,17 +84,19 @@ export function PasswordFieldRow({
 
   return (
     <div className="sh:relative">
+      {/* The browser masks the value natively, so `value` is always the real
+          password — never a masked stand-in that could be typed back over it. */}
       <TextFieldRow
         label={label}
-        value={visible ? value : value.replace(/./g, '•')}
+        value={value}
         onChange={onChange}
-        placeholder={visible ? 'enter password' : '••••••••'}
+        type={visible ? 'text' : 'password'}
+        placeholder="enter password"
         required={required}
         description={description}
         dataCy={dataCy}
+        autoComplete={autoComplete}
       />
-      {/* ponytail: native input[type=password] not used — TextFieldRow wraps
-          a plain Input; toggle visibility via state instead */}
       <Button
         isIconOnly
         variant="ghost"
@@ -101,16 +107,6 @@ export function PasswordFieldRow({
       >
         {visible ? <EyeOffIcon className="sh:h-4 sh:w-4" /> : <EyeIcon className="sh:h-4 sh:w-4" />}
       </Button>
-      {/* Feed the actual (unmasked) value into the form for submission. */}
-      <input
-        type={visible ? 'text' : 'password'}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        autoComplete={autoComplete}
-        className="sh:sr-only"
-        aria-hidden="true"
-        tabIndex={-1}
-      />
     </div>
   );
 }
