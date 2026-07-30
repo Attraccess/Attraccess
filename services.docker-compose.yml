@@ -13,13 +13,13 @@ services:
       retries: 5
 
   mailpit:
-    image: axllent/mailpit:v1.29.7
+    image: axllent/mailpit:v1.30.6
     ports:
       - '8025:8025'
       - '1025:1025'
 
   rabbitmq:
-    image: rabbitmq:4.3.0-management
+    image: rabbitmq:4.3.4-management
     hostname: rabbitmq
     restart: unless-stopped
     command: '/bin/bash -c "rabbitmq-plugins enable --offline rabbitmq_mqtt rabbitmq_web_mqtt rabbitmq_amqp1_0; rabbitmq-server"'
@@ -50,7 +50,7 @@ services:
       - webhook-site:/storage
 
   keycloak:
-    image: quay.io/keycloak/keycloak:26.6.1
+    image: quay.io/keycloak/keycloak:26.7.0
     command: start-dev
     environment:
       - KEYCLOAK_ADMIN=admin
@@ -67,7 +67,7 @@ services:
       retries: 3
 
   authentik-postgresql:
-    image: docker.io/library/postgres:18.3-alpine
+    image: docker.io/library/postgres:18.4-alpine
     restart: unless-stopped
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -d authentik -U authentik']
@@ -83,7 +83,7 @@ services:
       POSTGRES_DB: authentik
 
   authentik-redis:
-    image: docker.io/library/redis:8.6.3-alpine
+    image: docker.io/library/redis:8.8.1-alpine
     command: --save 60 1 --loglevel warning
     restart: unless-stopped
     healthcheck:
@@ -96,7 +96,7 @@ services:
       - authentik-redis:/data
 
   authentik-server:
-    image: ghcr.io/goauthentik/server:2026.2.2
+    image: ghcr.io/goauthentik/server:2026.5.6
     restart: unless-stopped
     command: server
     environment:
@@ -119,7 +119,7 @@ services:
         condition: service_healthy
 
   authentik-worker:
-    image: ghcr.io/goauthentik/server:2026.2.2
+    image: ghcr.io/goauthentik/server:2026.5.6
     restart: unless-stopped
     command: worker
     environment:
@@ -148,7 +148,7 @@ services:
         condition: service_healthy
 
   zigbee2mqtt:
-    image: ghcr.io/koenkk/zigbee2mqtt:2.10.1
+    image: ghcr.io/koenkk/zigbee2mqtt:2.12.1
     restart: unless-stopped
     expose:
       - '8080'
@@ -170,7 +170,7 @@ services:
       - prometheus-config:/etc/prometheus
 
   prometheus:
-    image: prom/prometheus:v3.11.3
+    image: prom/prometheus:v3.13.1
     ports:
       - '9090:9090'
     volumes:
@@ -188,7 +188,7 @@ services:
   # without Pushover configured (ATT-539). Dashboards stay bind-mounted for live
   # editing; only provisioning is snapshotted here.
   grafana-provisioning-init:
-    image: grafana/grafana:13.0.1
+    image: grafana/grafana:13.1.1
     restart: 'no'
     user: root
     entrypoint: ['/bin/sh', '-c']
@@ -210,7 +210,7 @@ services:
       - grafana-provisioning:/grafana-provisioning
 
   grafana:
-    image: grafana/grafana:13.0.1
+    image: grafana/grafana:13.1.1
     ports:
       - '3001:3001'
     environment:
