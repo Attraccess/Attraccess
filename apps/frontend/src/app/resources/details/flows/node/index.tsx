@@ -154,6 +154,13 @@ export function AttraccessNode(props: Props) {
 
   const previewRows = useNodePreviewRows({ schema, tNodeTranslations: t });
 
+  // Plugin-contributed node types have no entries in the static i18n JSON files.
+  // Fall back to the label/description the plugin declared in its schema definition.
+  const titleKey = 'nodes.' + schema.type + '.title';
+  const descriptionKey = 'nodes.' + schema.type + '.description';
+  const nodeTitle = tNodeExists?.(titleKey) ? t(titleKey) : (schema.label ?? schema.type);
+  const nodeDescription = tNodeExists?.(descriptionKey) ? t(descriptionKey) : (schema.description ?? '');
+
   return (
     <NodeEditor schema={schema} tNodeTranslations={t} tNodeExists={tNodeExists}>
       {(openEditor) => (
@@ -162,7 +169,7 @@ export function AttraccessNode(props: Props) {
             isOpen={showDeleteConfirmation}
             onClose={userDoesNotWantToDelete}
             onConfirm={remove}
-            itemName={t('nodes.' + schema.type + '.title')}
+            itemName={nodeTitle}
           />
 
           <NodeToolbar isVisible={data?.forceToolbarVisible || undefined} position={data?.toolbarPosition}>
@@ -182,7 +189,7 @@ export function AttraccessNode(props: Props) {
             <Card.Header className="flex flex-col gap-1">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center min-w-0">
-                  <span className="font-bold text-sm truncate">{t('nodes.' + schema.type + '.title')}</span>
+                  <span className="font-bold text-sm truncate">{nodeTitle}</span>
                 </div>
                 {!previewMode && (
                   <Tooltip>
@@ -213,7 +220,7 @@ export function AttraccessNode(props: Props) {
                 )}
               </div>
               {previewMode && (
-                <span className="text-xs text-default-500 text-wrap">{t('nodes.' + schema.type + '.description')}</span>
+                <span className="text-xs text-default-500 text-wrap">{nodeDescription}</span>
               )}
             </Card.Header>
 

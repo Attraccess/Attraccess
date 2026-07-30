@@ -41,6 +41,7 @@ import { z } from 'zod';
 import { MqttClientService } from '../../mqtt/mqtt-client.service';
 import { ResourceFlowChangedEvent } from './events/resource-flow-changed.event';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { getPluginFlowNode, getRegisteredPluginFlowNodes } from '../../plugin-system/plugin-flow-node-registry';
 
 export interface ValidationError {
   nodeId: string;
@@ -96,11 +97,25 @@ export class ResourceFlowsService {
     return { nodes, edges };
   }
 
-  private validateNodeData(nodeData: { id: string; type: ResourceFlowNodeType; data: unknown }): ValidationError[] {
+  private validateNodeData(nodeData: { id: string; type: string; data: unknown }): ValidationError[] {
     const errors: ValidationError[] = [];
 
+    // Non-core types must belong to a registered plugin; reject unknown types at save time.
+    if (!Object.values(ResourceFlowNodeType).includes(nodeData.type as ResourceFlowNodeType)) {
+      if (!getPluginFlowNode(nodeData.type)) {
+        errors.push({
+          nodeId: nodeData.id,
+          nodeType: nodeData.type,
+          field: 'type',
+          message: `Unknown node type: ${nodeData.type}`,
+        });
+      }
+      // Plugin owns its own data validation — skip core schema check regardless.
+      return errors;
+    }
+
     try {
-      const schema = getNodeDataSchema(nodeData.type);
+      const schema = getNodeDataSchema(nodeData.type as ResourceFlowNodeType);
       schema.parse(nodeData.data);
     } catch (error) {
       // Handle Zod validation errors
@@ -195,7 +210,7 @@ export class ResourceFlowsService {
       const newNodes = flowData.nodes.map((nodeData) => {
         const node = new ResourceFlowNode();
         node.id = nodeData.id;
-        node.type = nodeData.type;
+        node.type = nodeData.type as ResourceFlowNodeType;
         node.position = {
           x: nodeData.position.x,
           y: nodeData.position.y,
@@ -319,7 +334,7 @@ export class ResourceFlowsService {
       throw new ResourceNotFoundException(resourceId);
     }
 
-    return Object.values(ResourceFlowNodeType).map((type) => {
+    const coreSchemas = Object.values(ResourceFlowNodeType).map((type) => {
       const schema: ResourceFlowNodeSchemaDto = {
         type,
         configSchema: {},
@@ -509,5 +524,19 @@ export class ResourceFlowsService {
 
       return schema;
     });
+
+    // Append plugin-contributed node schemas.
+    const pluginSchemas: ResourceFlowNodeSchemaDto[] = getRegisteredPluginFlowNodes().map((def) => ({
+      type: def.type,
+      label: def.label,
+      description: def.description,
+      configSchema: def.configSchema,
+      inputs: def.inputs,
+      outputs: def.outputs,
+      supportedByResource: def.supportedByAllResources !== false,
+      isOutput: def.isOutput ?? false,
+    }));
+
+    return [...coreSchemas, ...pluginSchemas];
   }
 }

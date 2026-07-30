@@ -1,7 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsEnum, IsObject, ValidateNested } from 'class-validator';
+import { IsString, IsObject, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
-import { ResourceFlowNodeType } from '@attraccess/database-entities';
 import { ResourceFlowNodePositionDto } from './resource-flow-node-position.dto';
 
 export class ResourceFlowNodeDto {
@@ -14,13 +13,12 @@ export class ResourceFlowNodeDto {
   id: string;
 
   @ApiProperty({
-    description: 'The type of the node',
-    example: ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED,
-    enum: ResourceFlowNodeType,
-    enumName: 'ResourceFlowNodeType',
+    description: 'The type of the node. Core types use the ResourceFlowNodeType enum values; plugin-contributed types use "plugin.<pluginName>.<nodeName>".',
+    example: 'input.resource.usage.started',
+    type: 'string',
   })
-  @IsEnum(ResourceFlowNodeType)
-  type: ResourceFlowNodeType;
+  @IsString()
+  type: string;
 
   @ApiProperty({
     description: 'The position of the node',

@@ -2,10 +2,10 @@
 // FEATURE: Node catalog redesign — domain header
 import { ChevronDownIcon, ChevronRightIcon } from 'lucide-react';
 import { TFunction } from '@attraccess/plugins-frontend-ui';
-import { Domain, DOMAINS } from './domains';
+import { getDomainDef, getPluginDomainLabel } from './domains';
 
 interface Props {
-  domain: Domain;
+  domain: string;
   count: number;
   expanded: boolean;
   onToggle: () => void;
@@ -13,9 +13,11 @@ interface Props {
 }
 
 export function CatalogDomainHeader({ domain, count, expanded, onToggle, tCatalog }: Props) {
-  const def = DOMAINS[domain];
+  const def = getDomainDef(domain);
   const Icon = def.icon;
   const Chevron = expanded ? ChevronDownIcon : ChevronRightIcon;
+  // Plugin domains supply their own label; static domains use i18n.
+  const label = getPluginDomainLabel(domain) ?? tCatalog('domains.' + domain);
 
   return (
     <button
@@ -27,7 +29,7 @@ export function CatalogDomainHeader({ domain, count, expanded, onToggle, tCatalo
       <span className={`flex-none w-6 h-6 rounded flex items-center justify-center ${def.iconBg} ${def.iconFg}`}>
         <Icon className="w-3.5 h-3.5" />
       </span>
-      <span className="flex-1 text-sm font-semibold text-left">{tCatalog('domains.' + domain)}</span>
+      <span className="flex-1 text-sm font-semibold text-left">{label}</span>
       <span className="text-xs text-default-400">{count}</span>
       <Chevron className="w-4 h-4 text-default-400" />
     </button>
