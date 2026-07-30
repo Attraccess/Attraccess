@@ -1,67 +1,11 @@
 // Admin password drawer (ATT-498): set or change the admin password of a
 // Shelly device via the plugin backend.
 import { Button, DrawerBody, DrawerFooter, DrawerHeader, Form } from '@heroui/react';
-import { EyeIcon, EyeOffIcon, KeyRoundIcon, XIcon } from 'lucide-react';
+import { KeyRoundIcon, XIcon } from 'lucide-react';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { setAdminPassword, type ShellyDevice } from './api';
-import { StandardDrawer, TextFieldRow } from './drawer';
+import { PasswordFieldRow, StandardDrawer } from './drawer';
 import { StatusAlert } from './StatusAlert';
-
-function PasswordFieldRow({
-  label,
-  value,
-  onChange,
-  description,
-  required,
-  dataCy,
-  autoComplete,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  description?: string;
-  required?: boolean;
-  dataCy?: string;
-  autoComplete?: string;
-}) {
-  const [visible, setVisible] = useState(false);
-
-  return (
-    <div className="sh:relative">
-      <TextFieldRow
-        label={label}
-        value={visible ? value : value.replace(/./g, '•')}
-        onChange={onChange}
-        placeholder={visible ? 'enter password' : '••••••••'}
-        required={required}
-        description={description}
-        dataCy={dataCy}
-      />
-      {/* ponytail: native input[type=password] not used — TextFieldRow wraps
-          a plain Input; toggle visibility via state instead */}
-      <Button
-        isIconOnly
-        variant="ghost"
-        size="sm"
-        aria-label={visible ? 'Hide password' : 'Show password'}
-        className="sh:absolute sh:right-1 sh:top-6"
-        onPress={() => setVisible((v) => !v)}
-      >
-        {visible ? <EyeOffIcon className="sh:h-4 sh:w-4" /> : <EyeIcon className="sh:h-4 sh:w-4" />}
-      </Button>
-      {/* Feed the actual (unmasked) value into the form for submission. */}
-      <input
-        type={visible ? 'text' : 'password'}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        autoComplete={autoComplete}
-        className="sh:sr-only"
-        aria-hidden="true"
-        tabIndex={-1}
-      />
-    </div>
-  );
-}
 
 export function AdminPasswordDrawer({
   device,
