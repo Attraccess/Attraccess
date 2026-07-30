@@ -227,7 +227,7 @@ export function DeviceInfoDrawer({
   }, [device]); // ponytail: intentionally omit `load` — it changes on every password keystroke; auto-load only on device open
 
   return (
-    <StandardDrawer isOpen={!!device} onOpenChange={onOpenChange}>
+    <StandardDrawer isOpen={!!device} onOpenChange={onOpenChange} label="Device info">
       <DrawerHeader>
         <div className="sh:flex sh:w-full sh:items-start sh:justify-between sh:gap-3">
           <div className="sh:flex sh:min-w-0 sh:flex-col sh:gap-1">

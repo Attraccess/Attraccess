@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from 'crypto';
 import { Injectable } from '@nestjs/common';
+import type { ZigbeeNetworkState } from './types';
 
 const REQUEST_TIMEOUT_MS = 8000;
 
@@ -22,6 +23,12 @@ export interface ShellyDeviceInfo {
 
 export interface SetAdminPasswordInput extends DeviceTarget, DeviceCredentials {
   password: string;
+}
+
+/** Live Zigbee radio state read over HTTP RPC (ATT-789). */
+export interface ZigbeeStatus {
+  enabled: boolean;
+  networkState: ZigbeeNetworkState | null;
 }
 
 @Injectable()
@@ -64,6 +71,46 @@ export class ShellyDeviceApiService {
       realm,
       ha1: md5(`${username}:${realm}:${input.password}`),
     }, input);
+  }
+
+  /**
+   * Reads the Zigbee radio state (ATT-789). Gen4 only — anything older answers
+   * 404 "Method not found", which surfaces as a thrown error here.
+   */
+  async getZigbeeStatus(target: DeviceTarget & DeviceCredentials): Promise<ZigbeeStatus> {
+    const [config, status] = (await Promise.all([
+      this.getJson(`http://${target.ipAddress}/rpc/Zigbee.GetConfig`, target),
+      this.getJson(`http://${target.ipAddress}/rpc/Zigbee.GetStatus`, target),
+    ])) as [{ enable?: boolean }, { network_state?: string }];
+
+    return {
+      enabled: config.enable === true,
+      networkState: (status.network_state as ZigbeeNetworkState | undefined) ?? null,
+    };
+  }
+
+  /**
+   * Switches the Zigbee radio on. The device answers `{"restart_required":true}`
+   * and reboots; callers must wait for it to come back before steering. WiFi
+   * survives the switch (Gen4 is dual-stack) but other settings may not — see
+   * the ATT-789 spike.
+   */
+  async enableZigbee(target: DeviceTarget & DeviceCredentials): Promise<{ restartRequired: boolean }> {
+    const result = (await this.postJson(
+      `http://${target.ipAddress}/rpc/Zigbee.SetConfig`,
+      { config: { enable: true } },
+      target
+    )) as { restart_required?: boolean };
+    return { restartRequired: result?.restart_required === true };
+  }
+
+  /**
+   * Asks the device to look for an open Zigbee network to join. Returns as soon
+   * as the device accepts the call — the outcome shows up as `network_state`
+   * here, and as a `device_joined` event on the gateway side.
+   */
+  async startNetworkSteering(target: DeviceTarget & DeviceCredentials): Promise<void> {
+    await this.postJson(`http://${target.ipAddress}/rpc/Zigbee.StartNetworkSteering`, {}, target);
   }
 
   private getJson(url: string, credentials: DeviceCredentials): Promise<unknown> {

@@ -15,16 +15,23 @@ const FIELD_CONTRAST_STYLE: CSSProperties = {
 export function StandardDrawer({
   isOpen,
   onOpenChange,
+  label,
   children,
 }: {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
+  /**
+   * Accessible name for the dialog. Our headers render a plain <h2> rather than
+   * a HeroUI `<Heading slot="title">`, so react-aria cannot infer a name and
+   * warns "a dialog must have a title" — this supplies one explicitly.
+   */
+  label: string;
   children: ReactNode;
 }) {
   return (
     <DrawerBackdrop isOpen={isOpen} onOpenChange={onOpenChange}>
       <DrawerContent>
-        <DrawerDialog className={DRAWER_DIALOG_CLASSNAME} style={FIELD_CONTRAST_STYLE}>
+        <DrawerDialog aria-label={label} className={DRAWER_DIALOG_CLASSNAME} style={FIELD_CONTRAST_STYLE}>
           {children}
         </DrawerDialog>
       </DrawerContent>

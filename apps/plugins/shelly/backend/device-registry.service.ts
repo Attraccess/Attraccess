@@ -26,6 +26,12 @@ export interface DeviceProbeFields {
   authState: AuthState;
   lastProbeAt: string | null;
   lastProbeError: string | null;
+  /**
+   * Whether the device answered `Zigbee.GetConfig`. Null means "not determined
+   * by this probe" and leaves the stored value alone — a transient RPC failure
+   * must not downgrade a device we already know to be Zigbee-capable.
+   */
+  zigbeeCapable?: boolean | null;
 }
 
 @Injectable()
@@ -69,6 +75,12 @@ export class DeviceRegistryService {
       authState: input.authState,
       lastProbeAt: input.lastProbeAt,
       lastProbeError: input.lastProbeError,
+      // New devices are driven over WiFi until they are actually paired to the
+      // gateway — being Zigbee-*capable* is not the same as being on Zigbee.
+      transport: 'wifi-mqtt',
+      zigbeeCapable: input.zigbeeCapable ?? null,
+      zigbeeIeeeAddress: null,
+      zigbeeFriendlyName: null,
       createdAt: now,
       updatedAt: now,
     });
@@ -82,6 +94,32 @@ export class DeviceRegistryService {
       authState: patch.authState,
       lastProbeAt: patch.lastProbeAt,
       lastProbeError: patch.lastProbeError,
+      // Undefined/null means the probe could not tell — keep what we had.
+      ...(patch.zigbeeCapable == null ? {} : { zigbeeCapable: patch.zigbeeCapable }),
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
+  /** Records a successful pairing and flips the device onto the Zigbee transport. */
+  async linkZigbeeDevice(id: number, link: { ieeeAddress: string; friendlyName: string }): Promise<void> {
+    await this.devices.update(id, {
+      transport: 'zigbee',
+      zigbeeCapable: true,
+      zigbeeIeeeAddress: link.ieeeAddress,
+      zigbeeFriendlyName: link.friendlyName,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
+  /**
+   * Drops the gateway link and puts the device back on the WiFi transport. The
+   * radio is still Zigbee-capable, so that flag stays.
+   */
+  async unlinkZigbeeDevice(id: number): Promise<void> {
+    await this.devices.update(id, {
+      transport: 'wifi-mqtt',
+      zigbeeIeeeAddress: null,
+      zigbeeFriendlyName: null,
       updatedAt: new Date().toISOString(),
     });
   }

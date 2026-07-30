@@ -11,15 +11,17 @@
 // probe used for manual adds, so a device only lands in the registry if it
 // really is a Shelly. Known IPs are refreshed rather than duplicated.
 //
-// Both sources are IP-based, so this only ever finds WiFi devices. Zigbee-only
-// Shellys have no IP of their own and are discovered through zigbee2mqtt's
-// `bridge/devices` topic instead — out of scope here, see ATT-789.
+// Both sources are IP-based. That still covers Zigbee hardware: a Gen4 in Zigbee
+// mode keeps its WiFi station, HTTP RPC endpoint and mDNS responder (ATT-789
+// spike), so it turns up here like any other device — the probe additionally
+// records whether it is Zigbee-capable. Note its mDNS/`app` string carries a
+// `ZB` suffix (`Mini1G4ZB`), which is why nothing here matches on `app`.
 import { Inject, Injectable } from '@nestjs/common';
 import { DeviceRegistryService } from './device-registry.service';
 import { discoverViaMdns } from './mdns-discovery';
 import { expandCidr, isPrivateIpv4, localScanTargets } from './network-scan';
 import { SCAN_PROBE_TIMEOUT_MS, ShellyProbeService } from './shelly-probe.service';
-import type { AuthState } from './types';
+import type { AuthState, ProbeResult } from './types';
 
 /** Simultaneous in-flight probes. Chosen so a /24 completes in a few seconds. */
 const SCAN_CONCURRENCY = 64;
@@ -31,6 +33,8 @@ export interface DiscoveredDevice {
   generation: number;
   model: string | null;
   authState: AuthState;
+  /** Whether the device exposes the Zigbee RPC surface; null if undetermined. */
+  zigbeeCapable: boolean | null;
   /** True when this run added the device; false when it was already registered. */
   isNew: boolean;
   /** Which source turned the address up first. */
@@ -119,25 +123,34 @@ export class DiscoveryService {
   private async persist(
     ipAddress: string,
     source: 'mdns' | 'scan',
-    result: { generation: number; model: string | null; authState: AuthState }
+    result: ProbeResult
   ): Promise<DiscoveredDevice> {
+    const zigbeeCapable = result.zigbee?.capable ?? null;
     const probeFields = {
       generation: result.generation,
       model: result.model,
       authState: result.authState,
       lastProbeAt: new Date().toISOString(),
       lastProbeError: null,
+      zigbeeCapable,
+    };
+
+    const summary = {
+      generation: result.generation,
+      model: result.model,
+      authState: result.authState,
+      zigbeeCapable,
     };
 
     const existing = await this.registry.findByIp(ipAddress);
     if (existing) {
       // Refresh what the probe just told us, but leave the operator's name alone.
       await this.registry.updateProbe(existing.id, probeFields);
-      return { deviceId: existing.id, ipAddress, name: existing.name, ...result, isNew: false, source };
+      return { deviceId: existing.id, ipAddress, name: existing.name, ...summary, isNew: false, source };
     }
 
     const name = result.model ? `${result.model} (${ipAddress})` : ipAddress;
     const created = await this.registry.create({ name, ipAddress, ...probeFields });
-    return { deviceId: created.id, ipAddress, name, ...result, isNew: true, source };
+    return { deviceId: created.id, ipAddress, name, ...summary, isNew: true, source };
   }
 }

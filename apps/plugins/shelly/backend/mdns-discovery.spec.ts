@@ -63,7 +63,10 @@ describe('parseShellyAddresses', () => {
 });
 
 describe('discoverViaMdns', () => {
-  it('resolves to an empty list when nothing answers, instead of hanging or throwing', async () => {
-    await expect(discoverViaMdns(50)).resolves.toEqual([]);
+  // Asserts termination, not emptiness: the developer machine running this may
+  // well have a real Shelly on the LAN answering _shelly._tcp within the window,
+  // which used to fail this test for anyone who owns the hardware.
+  it('always resolves within the timeout, instead of hanging or throwing', async () => {
+    await expect(discoverViaMdns(50)).resolves.toBeInstanceOf(Array);
   });
 });

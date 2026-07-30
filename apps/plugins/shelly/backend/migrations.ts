@@ -6,3 +6,4 @@
 // Export migration classes as named exports, mirroring the host's
 // migrations/index.ts. See docs/en/plugins/database-migrations.md.
 export * from './migrations/1749470400000-create-shelly-devices';
+export * from './migrations/1749470500000-add-zigbee-support';

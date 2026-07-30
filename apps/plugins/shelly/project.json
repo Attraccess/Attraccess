@@ -20,13 +20,17 @@
       }
     },
     "test": {
-      "executor": "@nx/jest:jest",
+      "executor": "nx:run-commands",
       "cache": true,
-      "inputs": ["default", "^production", "{workspaceRoot}/jest.preset.js", { "externalDependencies": ["jest"] }],
+      "inputs": ["default", "^production", "{workspaceRoot}/jest.preset.js", { "externalDependencies": ["jest", "vitest"] }],
       "outputs": ["{workspaceRoot}/coverage/apps/plugins/shelly"],
       "options": {
-        "jestConfig": "apps/plugins/shelly/jest.config.ts",
-        "passWithNoTests": true
+        "cwd": "apps/plugins/shelly",
+        "commands": [
+          "pnpm exec jest --config jest.config.ts --passWithNoTests",
+          "pnpm exec vitest run --config frontend/vite.config.ts --passWithNoTests"
+        ],
+        "parallel": false
       }
     },
     "build-backend": {

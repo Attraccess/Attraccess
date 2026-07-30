@@ -116,7 +116,7 @@ export function AdminPasswordDrawer({
   );
 
   return (
-    <StandardDrawer isOpen={!!device} onOpenChange={onOpenChange}>
+    <StandardDrawer isOpen={!!device} onOpenChange={onOpenChange} label="Admin password">
       <DrawerHeader>
         <div className="sh:flex sh:w-full sh:items-start sh:justify-between sh:gap-3">
           <div className="sh:flex sh:min-w-0 sh:flex-col sh:gap-1">

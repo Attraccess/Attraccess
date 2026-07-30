@@ -1,63 +1,68 @@
 // @vitest-environment jsdom
+//
+// Covers the transport-aware branches of the devices table (ATT-789): a Zigbee
+// device must never be offered device-side auth, and only a device that actually
+// answered the Zigbee RPC surface may be offered pairing.
 import '@testing-library/jest-dom/vitest';
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { DeviceInfoDetails, RowActions } from './DevicesPage';
+import { RowActions, TransportChip } from './DevicesPage';
+import type { ShellyDevice } from './api';
 
 afterEach(() => {
+  // Explicit: Testing Library only auto-registers cleanup when vitest runs with
+  // `globals: true`, and this config does not.
+  cleanup();
   vi.restoreAllMocks();
 });
 
-describe('DeviceInfoDetails', () => {
-  it('renders device info as readable fields instead of raw JSON textareas', () => {
-    render(
-      <DeviceInfoDetails
-        info={{
-          generation: 2,
-          fetchedAt: '2026-06-12T15:00:00.000Z',
-          status: {
-            wifi: { sta_ip: '192.168.1.50', ssid: 'Workshop WiFi', rssi: -58 },
-            'switch:0': { output: true, apower: 42.5, voltage: 231.2, current: 0.18 },
-            sys: { uptime: 12345, ram_free: 103424 },
-          },
-          config: {
-            sys: { device: { name: 'Workshop Dimmer' }, location: { tz: 'Europe/Amsterdam' } },
-          },
-        }}
-      />
-    );
+function makeDevice(overrides: Partial<ShellyDevice> = {}): ShellyDevice {
+  return {
+    id: 1,
+    name: 'Workshop Dimmer',
+    ipAddress: '192.168.1.50',
+    generation: 4,
+    model: 'S4SW-001P16EU',
+    authState: 'none',
+    lastProbeAt: '2026-06-12T15:00:00.000Z',
+    lastProbeError: null,
+    transport: 'wifi-mqtt',
+    zigbeeCapable: null,
+    zigbeeIeeeAddress: null,
+    zigbeeFriendlyName: null,
+    createdAt: '2026-06-12T15:00:00.000Z',
+    updatedAt: '2026-06-12T15:00:00.000Z',
+    ...overrides,
+  };
+}
 
-    expect(screen.getByText('Workshop Dimmer')).toBeInTheDocument();
-    expect(screen.getByText('192.168.1.50')).toBeInTheDocument();
-    expect(screen.getByText('On')).toBeInTheDocument();
-    expect(screen.getByText('42.5 W')).toBeInTheDocument();
-    expect(screen.queryByDisplayValue(/switch:0/)).not.toBeInTheDocument();
+function renderRowActions(device: ShellyDevice, handlers: Partial<Parameters<typeof RowActions>[0]> = {}) {
+  const noop = () => undefined;
+  render(
+    <RowActions
+      device={device}
+      isBusy={false}
+      onInfo={noop}
+      onAuth={noop}
+      onReprobe={noop}
+      onDelete={noop}
+      onPair={noop}
+      onZigbeeControl={noop}
+      {...handlers}
+    />
+  );
+}
+
+describe('TransportChip', () => {
+  it('labels a gateway-driven device as Zigbee', () => {
+    render(<TransportChip device={makeDevice({ transport: 'zigbee' })} />);
+    expect(screen.getByText('Zigbee')).toBeInTheDocument();
   });
 
-  it('reads Gen1 status through arrays (relays/meters)', () => {
-    render(
-      <DeviceInfoDetails
-        info={{
-          generation: 1,
-          fetchedAt: '2026-06-12T15:00:00.000Z',
-          status: {
-            relays: [{ ison: true }],
-            meters: [{ power: 12.3 }],
-          },
-          config: {},
-        }}
-      />
-    );
-
-    expect(screen.getAllByText('On').length).toBeGreaterThan(0);
-    expect(screen.getByText('12.3 W')).toBeInTheDocument();
-  });
-
-  it('shows an empty state before info is loaded', () => {
-    render(<DeviceInfoDetails info={null} />);
-
-    expect(screen.getByText('No device info loaded yet.')).toBeInTheDocument();
+  it('labels everything else as WiFi', () => {
+    render(<TransportChip device={makeDevice()} />);
+    expect(screen.getByText('WiFi')).toBeInTheDocument();
   });
 });
 
@@ -65,17 +70,7 @@ describe('RowActions', () => {
   it('shows an icon-only info action and collapses the rest into an overflow menu', async () => {
     const user = userEvent.setup();
     const onAuth = vi.fn();
-
-    render(
-      <RowActions
-        deviceId={1}
-        isBusy={false}
-        onInfo={() => undefined}
-        onAuth={onAuth}
-        onReprobe={() => undefined}
-        onDelete={() => undefined}
-      />
-    );
+    renderRowActions(makeDevice(), { onAuth });
 
     expect(screen.getByRole('button', { name: 'View device info' })).toHaveTextContent('');
 
@@ -87,5 +82,44 @@ describe('RowActions', () => {
 
     await user.click(authItem);
     expect(onAuth).toHaveBeenCalledTimes(1);
+  });
+
+  it('offers pairing only once a probe has confirmed the Zigbee RPC surface', async () => {
+    const user = userEvent.setup();
+    renderRowActions(makeDevice({ zigbeeCapable: null }));
+
+    await user.click(screen.getByRole('button', { name: 'More actions' }));
+
+    // Undetermined capability must not render a button that the backend rejects.
+    expect(screen.queryByRole('menuitem', { name: /Pair to Zigbee/ })).not.toBeInTheDocument();
+  });
+
+  it('offers pairing for a Zigbee-capable device still on WiFi', async () => {
+    const user = userEvent.setup();
+    const onPair = vi.fn();
+    renderRowActions(makeDevice({ zigbeeCapable: true }), { onPair });
+
+    await user.click(screen.getByRole('button', { name: 'More actions' }));
+    await user.click(await screen.findByRole('menuitem', { name: /Pair to Zigbee/ }));
+
+    expect(onPair).toHaveBeenCalledTimes(1);
+  });
+
+  it('replaces admin password with Zigbee control once the device is paired', async () => {
+    const user = userEvent.setup();
+    const onZigbeeControl = vi.fn();
+    renderRowActions(
+      makeDevice({ transport: 'zigbee', zigbeeCapable: true, zigbeeIeeeAddress: '0x90fd9ffffe6494fc' }),
+      { onZigbeeControl }
+    );
+
+    await user.click(screen.getByRole('button', { name: 'More actions' }));
+
+    // A Zigbee device has no device-side login, and is already paired.
+    expect(screen.queryByRole('menuitem', { name: /Set admin password/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /Pair to Zigbee/ })).not.toBeInTheDocument();
+
+    await user.click(await screen.findByRole('menuitem', { name: /Zigbee control/ }));
+    expect(onZigbeeControl).toHaveBeenCalledTimes(1);
   });
 });

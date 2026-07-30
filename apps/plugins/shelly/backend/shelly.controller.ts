@@ -9,6 +9,7 @@ import {
   Delete,
   Get,
   Inject,
+  Logger,
   NotFoundException,
   Param,
   ParseIntPipe,
@@ -16,6 +17,7 @@ import {
 } from '@nestjs/common';
 import { Auth } from '@attraccess/plugins-backend-sdk';
 import { DeviceRegistryService } from './device-registry.service';
+import { ZigbeePairingService } from './zigbee-pairing.service';
 import { DiscoveryService, type DiscoveryResult } from './discovery.service';
 import { InvalidCidrError } from './network-scan';
 import { ShellyDeviceApiService, type ShellyDeviceInfo } from './shelly-device-api.service';
@@ -55,11 +57,14 @@ interface ProbeOutcome {
 export class ShellyController {
   // esbuild does not emit decorator metadata, so Nest cannot infer constructor
   // types for injection — always inject by an explicit token.
+  private readonly logger = new Logger(ShellyController.name);
+
   constructor(
     @Inject(DeviceRegistryService) private readonly registry: DeviceRegistryService,
     @Inject(ShellyProbeService) private readonly probe: ShellyProbeService,
     @Inject(DiscoveryService) private readonly discovery: DiscoveryService,
-    @Inject(ShellyDeviceApiService) private readonly deviceApi: ShellyDeviceApiService
+    @Inject(ShellyDeviceApiService) private readonly deviceApi: ShellyDeviceApiService,
+    @Inject(ZigbeePairingService) private readonly pairing: ZigbeePairingService
   ) {}
 
   // Runs inline rather than as a background job: a /24 is ~250 probes at a 1s
@@ -108,6 +113,7 @@ export class ShellyController {
       authState: probed.result?.authState ?? 'unknown',
       lastProbeAt: probed.at,
       lastProbeError: probed.error,
+      zigbeeCapable: probed.result?.zigbee?.capable ?? null,
     });
   }
 
@@ -126,6 +132,7 @@ export class ShellyController {
       authState: probed.result?.authState ?? device.authState,
       lastProbeAt: probed.at,
       lastProbeError: probed.error,
+      zigbeeCapable: probed.result?.zigbee?.capable ?? null,
     });
     const updated = await this.registry.findById(id);
     if (!updated) {
@@ -179,8 +186,21 @@ export class ShellyController {
 
   @Delete('devices/:id')
   async remove(@Param('id', ParseIntPipe) id: number): Promise<{ deleted: boolean }> {
-    if (!(await this.registry.findById(id))) {
+    const device = await this.registry.findById(id);
+    if (!device) {
       throw new NotFoundException(`device ${id} not found`);
+    }
+    // A paired Zigbee device must also leave the network, or it lingers in z2m
+    // as an orphan the operator can only clean up from the z2m frontend.
+    // Best-effort: a gateway that is down must not make the device undeletable.
+    if (device.zigbeeIeeeAddress) {
+      try {
+        await this.pairing.unpair(device);
+      } catch (err) {
+        this.logger.warn(
+          `deleting device ${id} without removing it from zigbee2mqtt: ${err instanceof Error ? err.message : String(err)}`
+        );
+      }
     }
     await this.registry.delete(id);
     return { deleted: true };

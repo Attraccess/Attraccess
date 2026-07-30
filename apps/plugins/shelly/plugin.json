@@ -19,5 +19,5 @@
   "attraccessVersion": {
     "min": "1.0.0"
   },
-  "permissions": ["DATABASE_ACCESS"]
+  "permissions": ["DATABASE_ACCESS", "ACCESS_MQTT_SERVERS"]
 }

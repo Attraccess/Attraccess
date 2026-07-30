@@ -5,6 +5,12 @@ import { createPluginApiClient } from '@attraccess/plugins-frontend-sdk';
 
 export type AuthState = 'unknown' | 'none' | 'required';
 
+/**
+ * How Attraccess reaches a device. Zigbee devices go through the zigbee2mqtt
+ * gateway and never get device-side MQTT config or an admin password (ATT-789).
+ */
+export type DeviceTransport = 'wifi-mqtt' | 'zigbee';
+
 export interface ShellyDevice {
   id: number;
   name: string;
@@ -14,6 +20,11 @@ export interface ShellyDevice {
   authState: AuthState;
   lastProbeAt: string | null;
   lastProbeError: string | null;
+  transport: DeviceTransport;
+  /** Whether the device answers the Zigbee RPC surface; null if undetermined. */
+  zigbeeCapable: boolean | null;
+  zigbeeIeeeAddress: string | null;
+  zigbeeFriendlyName: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -62,6 +73,7 @@ export interface DiscoveredDevice {
   generation: number;
   model: string | null;
   authState: AuthState;
+  zigbeeCapable: boolean | null;
   /** True when this run added the device; false when it was already registered. */
   isNew: boolean;
   source: 'mdns' | 'scan';
@@ -80,4 +92,98 @@ export interface DiscoveryResult {
  */
 export function discoverDevices(input: { cidr?: string } = {}): Promise<DiscoveryResult> {
   return api.request<DiscoveryResult>('/discovery', { method: 'POST', body: input });
+}
+
+// ------------------------------------------------------- Zigbee (ATT-789) --
+
+export interface GatewayStatus {
+  configured: boolean;
+  connected: boolean;
+  /** zigbee2mqtt itself reported `online` on its retained bridge/state topic. */
+  bridgeOnline: boolean;
+  mqttServerId: number | null;
+  baseTopic: string | null;
+  deviceCount: number;
+  permitJoin: boolean;
+  permitJoinEnd: number | null;
+  error: string | null;
+}
+
+export type PairingStep =
+  | 'opening-network'
+  | 'enabling-zigbee'
+  | 'waiting-for-reboot'
+  | 'network-steering'
+  | 'waiting-for-join'
+  | 'waiting-for-interview'
+  | 'linking';
+
+export interface PairingJob {
+  deviceId: number;
+  status: 'running' | 'succeeded' | 'failed';
+  step: PairingStep;
+  error: string | null;
+  ieeeAddress: string | null;
+  friendlyName: string | null;
+  startedAt: string;
+  finishedAt: string | null;
+}
+
+export interface ZigbeeDeviceState {
+  ieeeAddress: string;
+  friendlyName: string | null;
+  gatewayDevice: {
+    ieee_address: string;
+    friendly_name: string;
+    supported?: boolean;
+    model_id?: string;
+    definition?: { model?: string; vendor?: string; description?: string } | null;
+  } | null;
+  state: Record<string, unknown> | null;
+}
+
+export function getGatewayStatus(): Promise<GatewayStatus> {
+  return api.request<GatewayStatus>('/zigbee/gateway');
+}
+
+export function saveGateway(input: { mqttServerId: number; baseTopic: string }): Promise<GatewayStatus> {
+  return api.request<GatewayStatus>('/zigbee/gateway', { method: 'PUT', body: input });
+}
+
+/** Starts pairing. Returns immediately — poll {@link getPairingJob} for progress. */
+export function startPairing(id: number, input: { currentPassword?: string } = {}): Promise<PairingJob> {
+  return api.request<PairingJob>(`/devices/${id}/zigbee/pair`, { method: 'POST', body: input });
+}
+
+export function getPairingJob(id: number): Promise<PairingJob | null> {
+  return api.request<PairingJob | null>(`/devices/${id}/zigbee/pair`);
+}
+
+export function unpairDevice(id: number): Promise<ShellyDevice> {
+  return api.request<ShellyDevice>(`/devices/${id}/zigbee/pair`, { method: 'DELETE' });
+}
+
+export function getZigbeeState(id: number): Promise<ZigbeeDeviceState> {
+  return api.request<ZigbeeDeviceState>(`/devices/${id}/zigbee/state`);
+}
+
+/** Publishes a z2m `/set` payload, e.g. `{state: 'TOGGLE'}`. */
+export function setZigbeeState(id: number, payload: Record<string, unknown>): Promise<{ published: boolean }> {
+  return api.request<{ published: boolean }>(`/devices/${id}/zigbee/state`, { method: 'POST', body: payload });
+}
+
+export interface MqttServerSummary {
+  id: number;
+  name: string;
+  host: string;
+  port: number;
+}
+
+// The MQTT server list is a host resource, not a plugin one, so it needs a
+// client scoped to the host's own route rather than `/api/shelly`.
+const hostApi = createPluginApiClient('/api');
+
+export async function listMqttServers(): Promise<MqttServerSummary[]> {
+  const servers = await hostApi.request<MqttServerSummary[]>('/mqtt/servers');
+  return servers ?? [];
 }

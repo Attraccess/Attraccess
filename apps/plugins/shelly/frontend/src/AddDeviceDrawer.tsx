@@ -51,7 +51,7 @@ export function AddDeviceDrawer({
   }, [ipAddress, name, onAdded, close]);
 
   return (
-    <StandardDrawer isOpen={isOpen} onOpenChange={onOpenChange}>
+    <StandardDrawer isOpen={isOpen} onOpenChange={onOpenChange} label="Add device">
       <DrawerHeader>
         <div className="sh:flex sh:w-full sh:items-start sh:justify-between sh:gap-3">
           <div className="sh:flex sh:flex-col sh:gap-1">

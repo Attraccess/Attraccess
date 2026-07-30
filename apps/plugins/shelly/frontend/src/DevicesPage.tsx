@@ -35,7 +35,9 @@ import {
   KeyRoundIcon,
   MehIcon,
   MoreVerticalIcon,
+  PlugZapIcon,
   PlusIcon,
+  RadioTowerIcon,
   RefreshCwIcon,
   SearchIcon,
   Trash2Icon,
@@ -48,11 +50,42 @@ import { AdminPasswordDrawer } from './AdminPasswordDrawer';
 import { DeviceInfoDrawer } from './DeviceInfoDrawer';
 import { DiscoverDrawer } from './DiscoverDrawer';
 import { StatusAlert } from './StatusAlert';
-import { deleteDevice, listDevices, reprobeDevice, type AuthState, type ShellyDevice } from './api';
+import { GatewayStatusChips, ZigbeeGatewayDrawer } from './ZigbeeGatewayDrawer';
+import { ZigbeeControlDrawer } from './ZigbeeControlDrawer';
+import { ZigbeePairDrawer } from './ZigbeePairDrawer';
+import {
+  deleteDevice,
+  getGatewayStatus,
+  listDevices,
+  reprobeDevice,
+  type AuthState,
+  type GatewayStatus,
+  type ShellyDevice,
+} from './api';
 
 function generationLabel(generation: number | null): string {
   if (generation === null) return 'Unknown';
   return generation === 1 ? 'Gen 1' : `Gen ${generation}+`;
+}
+
+/**
+ * The transport is the single most consequential thing about a device: it
+ * decides whether control goes through the gateway or the device's own MQTT
+ * client, and whether an admin password applies at all.
+ */
+export function TransportChip({ device }: { device: ShellyDevice }) {
+  if (device.transport === 'zigbee') {
+    return (
+      <Chip variant="soft" color="accent" size="sm" className="sh:whitespace-nowrap" data-cy="shelly-transport-zigbee">
+        <RadioTowerIcon className="sh:mr-1 sh:inline sh:h-3 sh:w-3" /> Zigbee
+      </Chip>
+    );
+  }
+  return (
+    <Chip variant="soft" size="sm" className="sh:whitespace-nowrap" data-cy="shelly-transport-wifi">
+      <WifiIcon className="sh:mr-1 sh:inline sh:h-3 sh:w-3" /> WiFi
+    </Chip>
+  );
 }
 
 function AuthChip({ state }: { state: AuthState }) {
@@ -89,21 +122,30 @@ function ProbeErrorIndicator({ message }: { message: string }) {
   );
 }
 
-function RowActions({
-  deviceId,
+export function RowActions({
+  device,
   isBusy,
   onInfo,
   onAuth,
   onReprobe,
   onDelete,
+  onPair,
+  onZigbeeControl,
 }: {
-  deviceId: number;
+  device: ShellyDevice;
   isBusy: boolean;
   onInfo: () => void;
   onAuth: () => void;
   onReprobe: () => void;
   onDelete: () => void;
+  onPair: () => void;
+  onZigbeeControl: () => void;
 }) {
+  const deviceId = device.id;
+  const isZigbee = device.transport === 'zigbee';
+  // Offer pairing for anything that answered the Zigbee RPC surface. Devices we
+  // could not determine are excluded rather than shown a button that 400s.
+  const canPair = !isZigbee && device.zigbeeCapable === true;
   return (
     <div className="sh:flex sh:flex-row sh:items-center sh:justify-end sh:gap-1 sh:whitespace-nowrap">
       <Tooltip>
@@ -137,9 +179,22 @@ function RowActions({
         </DropdownTrigger>
         <DropdownPopover>
           <DropdownMenu aria-label="Device actions">
-            <DropdownItem id="auth" onPress={onAuth} data-cy={`shelly-device-auth-${deviceId}`}>
-              <KeyRoundIcon className="sh:mr-2 sh:inline sh:h-4 sh:w-4" /> Set admin password
-            </DropdownItem>
+            {/* A Zigbee device is reached through the gateway, so it has no
+                device-side MQTT config and no admin password to set. */}
+            {isZigbee ? (
+              <DropdownItem id="zigbee" onPress={onZigbeeControl} data-cy={`shelly-device-zigbee-${deviceId}`}>
+                <PlugZapIcon className="sh:mr-2 sh:inline sh:h-4 sh:w-4" /> Zigbee control
+              </DropdownItem>
+            ) : (
+              <DropdownItem id="auth" onPress={onAuth} data-cy={`shelly-device-auth-${deviceId}`}>
+                <KeyRoundIcon className="sh:mr-2 sh:inline sh:h-4 sh:w-4" /> Set admin password
+              </DropdownItem>
+            )}
+            {canPair && (
+              <DropdownItem id="pair" onPress={onPair} data-cy={`shelly-device-pair-${deviceId}`}>
+                <RadioTowerIcon className="sh:mr-2 sh:inline sh:h-4 sh:w-4" /> Pair to Zigbee
+              </DropdownItem>
+            )}
             <DropdownItem id="reprobe" onPress={onReprobe} data-cy={`shelly-device-reprobe-${deviceId}`}>
               <RefreshCwIcon className="sh:mr-2 sh:inline sh:h-4 sh:w-4" /> Re-probe device
             </DropdownItem>
@@ -172,10 +227,14 @@ export function DevicesPage() {
   const [rowBusyId, setRowBusyId] = useState<number | null>(null);
   const [infoDevice, setInfoDevice] = useState<ShellyDevice | null>(null);
   const [authDevice, setAuthDevice] = useState<ShellyDevice | null>(null);
+  const [pairDevice, setPairDevice] = useState<ShellyDevice | null>(null);
+  const [zigbeeDevice, setZigbeeDevice] = useState<ShellyDevice | null>(null);
+  const [gateway, setGateway] = useState<GatewayStatus | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ShellyDevice | null>(null);
   const [deleting, setDeleting] = useState(false);
   const addDrawer = useOverlayState();
   const discoverDrawer = useOverlayState();
+  const gatewayDrawer = useOverlayState();
 
   const refresh = useCallback(async () => {
     try {
@@ -187,6 +246,20 @@ export function DevicesPage() {
       setLoading(false);
     }
   }, []);
+
+  // Gateway status is a separate, best-effort read: a broker that is down must
+  // not stop the device list from rendering.
+  const refreshGateway = useCallback(async () => {
+    try {
+      setGateway(await getGatewayStatus());
+    } catch {
+      setGateway(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshGateway();
+  }, [refreshGateway]);
 
   useEffect(() => {
     void refresh();
@@ -233,6 +306,9 @@ export function DevicesPage() {
           </div>
         </div>
         <div className="sh:flex sh:flex-wrap sh:gap-2">
+          <Button variant="secondary" onPress={gatewayDrawer.open} data-cy="shelly-gateway-open">
+            <RadioTowerIcon className="sh:h-4 sh:w-4" /> Zigbee gateway
+          </Button>
           <Button variant="secondary" onPress={discoverDrawer.open} data-cy="shelly-discover-open">
             <SearchIcon className="sh:h-4 sh:w-4" /> Discover
           </Button>
@@ -241,6 +317,15 @@ export function DevicesPage() {
           </Button>
         </div>
       </div>
+
+      {/* Only worth surfacing once a gateway exists — an unconfigured one is the
+          default state, not a problem to report. */}
+      {gateway?.configured && (
+        <div className="sh:flex sh:flex-wrap sh:items-center sh:gap-2" data-cy="shelly-gateway-banner">
+          <span className="sh:text-xs sh:font-medium sh:text-muted">Zigbee gateway</span>
+          <GatewayStatusChips status={gateway} />
+        </div>
+      )}
 
       {pageError && (
         <StatusAlert status="danger" title="Failed to load devices">
@@ -260,17 +345,24 @@ export function DevicesPage() {
                 <TableColumn isRowHeader>Device</TableColumn>
                 <TableColumn className="sh:hidden sh:sm:table-cell sh:md:hidden sh:lg:table-cell">Address</TableColumn>
                 <TableColumn className="sh:hidden sh:lg:table-cell">Model</TableColumn>
-                <TableColumn className="sh:hidden sh:sm:table-cell">Auth</TableColumn>
+                {/* Same breakpoints as Address: at md the sidebar is expanded but
+                    the viewport is not yet wide, and a third column pushes the
+                    Actions column off the edge. */}
+                <TableColumn className="sh:hidden sh:sm:table-cell sh:md:hidden sh:lg:table-cell">Auth</TableColumn>
                 <TableColumn className="sh:text-end">Actions</TableColumn>
               </TableHeader>
               <TableBody items={devices} renderEmptyState={() => <EmptyDevices onAdd={addDrawer.open} />}>
                 {(device) => (
                   <TableRow key={device.id} id={device.id} data-cy={`shelly-device-row-${device.id}`}>
                     <TableCell className="sh:whitespace-nowrap">
-                      <div className="sh:flex sh:items-center sh:gap-1">
-                        <span className="sh:max-w-36 sh:truncate sh:font-medium sh:text-default-800 sh:sm:max-w-48" title={device.name}>
+                      <div className="sh:flex sh:items-center sh:gap-1.5">
+                        <span className="sh:max-w-28 sh:truncate sh:font-medium sh:text-default-800 sh:sm:max-w-40" title={device.name}>
                           {device.name}
                         </span>
+                        {/* Inline rather than its own column: on a phone every
+                            other column is hidden, and the transport is the one
+                            thing that must never be guessed. */}
+                        <TransportChip device={device} />
                         {device.lastProbeError && <ProbeErrorIndicator message={device.lastProbeError} />}
                       </div>
                       <div className="sh:text-xs sh:text-default-500 sh:sm:hidden sh:md:block sh:lg:hidden">{device.ipAddress}</div>
@@ -288,17 +380,25 @@ export function DevicesPage() {
                         </Chip>
                       </div>
                     </TableCell>
-                    <TableCell className="sh:hidden sh:whitespace-nowrap sh:sm:table-cell">
-                      <AuthChip state={device.authState} />
+                    <TableCell className="sh:hidden sh:whitespace-nowrap sh:sm:table-cell sh:md:hidden sh:lg:table-cell">
+                      {/* Device auth is a WiFi/RPC concept — a Zigbee device is
+                          reached through the gateway and has no login of its own. */}
+                      {device.transport === 'zigbee' ? (
+                        <span className="sh:text-xs sh:text-default-400">n/a</span>
+                      ) : (
+                        <AuthChip state={device.authState} />
+                      )}
                     </TableCell>
                     <TableCell className="sh:whitespace-nowrap">
                       <RowActions
-                        deviceId={device.id}
+                        device={device}
                         isBusy={rowBusyId === device.id}
                         onInfo={() => setInfoDevice(device)}
                         onAuth={() => setAuthDevice(device)}
                         onReprobe={() => withRowBusy(device.id, () => reprobeDevice(device.id))}
                         onDelete={() => setDeleteTarget(device)}
+                        onPair={() => setPairDevice(device)}
+                        onZigbeeControl={() => setZigbeeDevice(device)}
                       />
                     </TableCell>
                   </TableRow>
@@ -317,6 +417,27 @@ export function DevicesPage() {
       />
       <DeviceInfoDrawer device={infoDevice} onOpenChange={(open) => !open && setInfoDevice(null)} />
       <AdminPasswordDrawer device={authDevice} onOpenChange={(open) => !open && setAuthDevice(null)} onSaved={refresh} />
+      <ZigbeeGatewayDrawer
+        isOpen={gatewayDrawer.isOpen}
+        onOpenChange={gatewayDrawer.setOpen}
+        onSaved={refreshGateway}
+      />
+      <ZigbeePairDrawer
+        device={pairDevice}
+        onOpenChange={(open) => !open && setPairDevice(null)}
+        onPaired={() => {
+          void refresh();
+          void refreshGateway();
+        }}
+      />
+      <ZigbeeControlDrawer
+        device={zigbeeDevice}
+        onOpenChange={(open) => !open && setZigbeeDevice(null)}
+        onChanged={() => {
+          void refresh();
+          void refreshGateway();
+        }}
+      />
 
       <Modal
         isOpen={!!deleteTarget}
@@ -334,7 +455,10 @@ export function DevicesPage() {
               <ModalBody>
                 <p>
                   Remove <span className="sh:font-semibold">{deleteTarget?.name}</span> ({deleteTarget?.ipAddress}) from the
-                  registry? The device itself is not changed.
+                  registry?{' '}
+                  {deleteTarget?.transport === 'zigbee'
+                    ? 'It is also removed from the zigbee2mqtt network, so it stops responding until it is paired again.'
+                    : 'The device itself is not changed.'}
                 </p>
               </ModalBody>
               <ModalFooter>
