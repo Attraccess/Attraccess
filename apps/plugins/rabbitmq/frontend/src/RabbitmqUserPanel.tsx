@@ -39,10 +39,10 @@ import { RabbitmqUserFormModal } from './RabbitmqUserFormModal';
 
 function PermissionChips({ user }: { user: RabbitmqUser }) {
   if (user.permissions.length === 0) {
-    return <span className="text-xs text-default-400">none</span>;
+    return <span className="rmq:text-xs rmq:text-default-400">none</span>;
   }
   return (
-    <div className="flex flex-wrap gap-1">
+    <div className="rmq:flex rmq:flex-wrap rmq:gap-1">
       {user.permissions.map((permission) => (
         <Chip key={permission.vhost} size="sm" variant="soft" title={
           `configure: ${permission.configure}\nwrite: ${permission.write}\nread: ${permission.read}`
@@ -137,14 +137,14 @@ export function RabbitmqUserPanel({ mqttServerId }: { mqttServerId: number }) {
   return (
     <Card
       data-cy={`rabbitmq-user-panel-${mqttServerId}`}
-      className="w-full border border-default-200 dark:border-default-100"
+      className="rmq:w-full rmq:border rmq:border-default-200 rmq:dark:border-default-100"
     >
-      <Card.Header className="flex flex-row items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <UsersIcon className="w-5 h-5 text-primary" />
-          <p className="text-base font-semibold text-default-700">RabbitMQ users</p>
+      <Card.Header className="rmq:flex rmq:flex-row rmq:items-center rmq:justify-between rmq:gap-2">
+        <div className="rmq:flex rmq:items-center rmq:gap-2">
+          <UsersIcon className="rmq:w-5 rmq:h-5 rmq:text-primary" />
+          <p className="rmq:text-base rmq:font-semibold rmq:text-default-700">RabbitMQ users</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="rmq:flex rmq:items-center rmq:gap-2">
           <Button
             isIconOnly
             size="sm"
@@ -154,7 +154,7 @@ export function RabbitmqUserPanel({ mqttServerId }: { mqttServerId: number }) {
             isDisabled={loading}
             data-cy={`rabbitmq-user-panel-reload-${mqttServerId}`}
           >
-            {loading ? <Spinner size="sm" /> : <RefreshCwIcon className="w-4 h-4" />}
+            {loading ? <Spinner size="sm" /> : <RefreshCwIcon className="rmq:w-4 rmq:h-4" />}
           </Button>
           <Button
             size="sm"
@@ -165,12 +165,12 @@ export function RabbitmqUserPanel({ mqttServerId }: { mqttServerId: number }) {
             }}
             data-cy={`rabbitmq-user-panel-create-button-${mqttServerId}`}
           >
-            <PlusIcon className="w-4 h-4" />
+            <PlusIcon className="rmq:w-4 rmq:h-4" />
             Add user
           </Button>
         </div>
       </Card.Header>
-      <Card.Content className="flex flex-col gap-3">
+      <Card.Content className="rmq:flex rmq:flex-col rmq:gap-3">
         {loadError && (
           <Alert status="danger" data-cy="rabbitmq-user-panel-error-alert">
             <AlertContent>
@@ -180,7 +180,7 @@ export function RabbitmqUserPanel({ mqttServerId }: { mqttServerId: number }) {
         )}
 
         {!data && !loadError && (
-          <div className="flex items-center justify-center p-4">
+          <div className="rmq:flex rmq:items-center rmq:justify-center rmq:p-4">
             <Spinner data-cy="rabbitmq-user-panel-loading-spinner" />
           </div>
         )}
@@ -198,12 +198,12 @@ export function RabbitmqUserPanel({ mqttServerId }: { mqttServerId: number }) {
                 <TableBody items={data.users}>
                   {(user) => (
                     <TableRow key={user.name} id={user.name}>
-                      <TableCell className="whitespace-nowrap font-medium">{user.name}</TableCell>
+                      <TableCell className="rmq:whitespace-nowrap rmq:font-medium">{user.name}</TableCell>
                       <TableCell>
                         {user.tags.length === 0 ? (
-                          <span className="text-xs text-default-400">none</span>
+                          <span className="rmq:text-xs rmq:text-default-400">none</span>
                         ) : (
-                          <div className="flex flex-wrap gap-1">
+                          <div className="rmq:flex rmq:flex-wrap rmq:gap-1">
                             {user.tags.map((tag) => (
                               <Chip key={tag} size="sm" color="accent" variant="soft">
                                 {tag}
@@ -216,7 +216,7 @@ export function RabbitmqUserPanel({ mqttServerId }: { mqttServerId: number }) {
                         <PermissionChips user={user} />
                       </TableCell>
                       <TableCell>
-                        <div className="flex flex-row gap-1">
+                        <div className="rmq:flex rmq:flex-row rmq:gap-1">
                           <Button
                             isIconOnly
                             size="sm"
@@ -228,7 +228,7 @@ export function RabbitmqUserPanel({ mqttServerId }: { mqttServerId: number }) {
                             }}
                             data-cy={`rabbitmq-user-edit-button-${user.name}`}
                           >
-                            <PencilIcon className="w-4 h-4" />
+                            <PencilIcon className="rmq:w-4 rmq:h-4" />
                           </Button>
                           <Button
                             isIconOnly
@@ -238,7 +238,7 @@ export function RabbitmqUserPanel({ mqttServerId }: { mqttServerId: number }) {
                             onPress={() => setPermissionsUser(user)}
                             data-cy={`rabbitmq-user-permissions-button-${user.name}`}
                           >
-                            <KeyRoundIcon className="w-4 h-4" />
+                            <KeyRoundIcon className="rmq:w-4 rmq:h-4" />
                           </Button>
                           <Button
                             isIconOnly
@@ -251,7 +251,7 @@ export function RabbitmqUserPanel({ mqttServerId }: { mqttServerId: number }) {
                             }}
                             data-cy={`rabbitmq-user-delete-button-${user.name}`}
                           >
-                            <Trash2Icon className="w-4 h-4 text-danger" />
+                            <Trash2Icon className="rmq:w-4 rmq:h-4 rmq:text-danger" />
                           </Button>
                         </div>
                       </TableCell>
@@ -297,7 +297,7 @@ export function RabbitmqUserPanel({ mqttServerId }: { mqttServerId: number }) {
                   <ModalHeader>
                     <ModalHeading>Delete user</ModalHeading>
                   </ModalHeader>
-                  <ModalBody className="flex flex-col gap-3">
+                  <ModalBody className="rmq:flex rmq:flex-col rmq:gap-3">
                     <p>
                       Delete the RabbitMQ user <strong>{userToDelete?.name}</strong>? Connected clients using this
                       account will be disconnected and its permissions removed.

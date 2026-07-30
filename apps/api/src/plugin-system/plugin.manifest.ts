@@ -14,6 +14,14 @@ export class PluginMainFrontend {
     example: 'index.mjs',
   })
   entryPoint: string;
+
+  @ApiProperty({
+    description:
+      "The plugin's stylesheet, relative to the frontend directory. When present, the host injects it as a <link> when the plugin loads. Plugins must bundle every CSS class they use (e.g. a Tailwind build over their own sources) — host utility classes are not a stable contract.",
+    example: 'style.css',
+    required: false,
+  })
+  styles?: string;
 }
 
 export class PluginMainBackend {
@@ -163,7 +171,7 @@ const mainSchema = z.object({
 export const PluginManifestSchema = z.object({
   name: z.string(),
   main: z.object({
-    frontend: mainSchema,
+    frontend: mainSchema.extend({ styles: z.string().optional() }),
     backend: mainSchema,
     migrations: mainSchema.optional(),
   }),

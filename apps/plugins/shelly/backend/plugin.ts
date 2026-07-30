@@ -2,7 +2,8 @@
 //
 // A persisted device registry with a manual add-by-IP flow and a
 // generation/model probe (ATT-496), plus mDNS + subnet-scan auto-discovery that
-// populates it (ATT-497). Built as a first-class nx app (tag type:plugin); see
+// populates it (ATT-497), and device info + admin password management (ATT-498).
+// Built as a first-class nx app (tag type:plugin); see
 // apps/plugins/scripts for the shared esbuild/Vite/zip recipe.
 //
 // The plugin registers a NestJS module whose controller is mounted into the host
@@ -17,6 +18,7 @@ import { DiscoveryService } from './discovery.service';
 import { ShellyDevice } from './shelly-device.entity';
 import { ShellyProbeService } from './shelly-probe.service';
 import { ShellyController } from './shelly.controller';
+import { ShellyDeviceApiService } from './shelly-device-api.service';
 
 // The host hands each plugin its PluginContext under this token. Recreate it
 // locally (do not import the value) so the artifact has no runtime dependency on
@@ -39,6 +41,7 @@ const plugin: PluginBackendModule = {
         DeviceRegistryService,
         ShellyProbeService,
         DiscoveryService,
+        ShellyDeviceApiService,
       ],
     };
   },

@@ -62,11 +62,11 @@ function PermissionEditor({
 }) {
   return (
     <div
-      className="flex flex-col gap-3 rounded-lg border border-default-200 dark:border-default-100 p-3"
+      className="rmq:flex rmq:flex-col rmq:gap-3 rmq:rounded-lg rmq:border rmq:border-default-200 rmq:dark:border-default-100 rmq:p-3"
       data-cy={`rabbitmq-permissions-row-${row.vhost}`}
     >
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-semibold text-default-700">
+      <div className="rmq:flex rmq:items-center rmq:justify-between rmq:gap-2">
+        <span className="rmq:text-sm rmq:font-semibold rmq:text-default-700">
           Vhost <code>{row.vhost}</code>
         </span>
         <Button
@@ -78,11 +78,11 @@ function PermissionEditor({
           isDisabled={busy}
           data-cy={`rabbitmq-permissions-remove-button-${row.vhost}`}
         >
-          <Trash2Icon className="w-4 h-4 text-danger" />
+          <Trash2Icon className="rmq:w-4 rmq:h-4 rmq:text-danger" />
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <div className="rmq:grid rmq:grid-cols-1 rmq:md:grid-cols-3 rmq:gap-3">
         <TextField value={row.configure} onChange={(v) => onChange({ ...row, configure: v })}>
           <Label>Configure</Label>
           <Input autoComplete="off" data-cy={`rabbitmq-permissions-configure-input-${row.vhost}`} />
@@ -97,7 +97,7 @@ function PermissionEditor({
         </TextField>
       </div>
 
-      <div className="flex justify-end gap-2">
+      <div className="rmq:flex rmq:justify-end rmq:gap-2">
         <Button
           size="sm"
           variant="ghost"
@@ -222,9 +222,9 @@ export function RabbitmqPermissionsModal({
             <ModalHeader>
               <ModalHeading>Permissions of "{user.name}"</ModalHeading>
             </ModalHeader>
-            <ModalBody className="flex flex-col gap-4 w-full">
+            <ModalBody className="rmq:flex rmq:flex-col rmq:gap-4 rmq:w-full">
               {rows.length === 0 && (
-                <p className="text-sm text-default-500" data-cy="rabbitmq-permissions-empty">
+                <p className="rmq:text-sm rmq:text-default-500" data-cy="rabbitmq-permissions-empty">
                   This user has no permissions on any vhost — it cannot connect yet.
                 </p>
               )}
@@ -240,8 +240,8 @@ export function RabbitmqPermissionsModal({
                 />
               ))}
 
-              <div className="flex items-end gap-2">
-                <TextField value={newVhost} onChange={setNewVhost} className="flex-1">
+              <div className="rmq:flex rmq:items-end rmq:gap-2">
+                <TextField value={newVhost} onChange={setNewVhost} className="rmq:flex-1">
                   <Label>Add vhost{unusedVhosts.length > 0 ? ` (available: ${unusedVhosts.join(', ')})` : ''}</Label>
                   <Input placeholder="/" autoComplete="off" data-cy="rabbitmq-permissions-add-vhost-input" />
                 </TextField>
@@ -251,7 +251,7 @@ export function RabbitmqPermissionsModal({
                   isDisabled={newVhost.trim().length === 0}
                   data-cy="rabbitmq-permissions-add-vhost-button"
                 >
-                  <PlusIcon className="w-4 h-4" />
+                  <PlusIcon className="rmq:w-4 rmq:h-4" />
                   Add
                 </Button>
               </div>

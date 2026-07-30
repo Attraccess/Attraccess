@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import federation from '@originjs/vite-plugin-federation';
+import tailwindcss from '@tailwindcss/vite';
 
 // Builds the frontend plugin as a Vite module federation *remote*. The host
 // loads it at runtime and pulls the exposed `./plugin` module.
@@ -19,6 +20,11 @@ import federation from '@originjs/vite-plugin-federation';
 export default defineConfig({
   plugins: [
     react(),
+    // Compiles src/styles.css into a self-contained style.css holding the
+    // Tailwind utilities this plugin's markup uses. The host injects it via the
+    // manifest's `main.frontend.styles` — host utility classes are not a
+    // stable contract, bundle your own.
+    tailwindcss(),
     federation({
       name: 'plugin-hello-world',
       filename: 'remoteEntry.js',
@@ -45,7 +51,9 @@ export default defineConfig({
     minify: false,
     cssCodeSplit: false,
     // Emit remoteEntry.js and its chunks at the output root (not assets/) so the
-    // manifest entryPoint "remoteEntry.js" resolves directly.
+    // manifest entryPoint "remoteEntry.js" resolves directly. Un-hashed asset
+    // names so the manifest's `styles` field can reference style.css statically.
     assetsDir: '',
+    rollupOptions: { output: { assetFileNames: '[name][extname]' } },
   },
 });

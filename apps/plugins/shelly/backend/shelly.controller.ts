@@ -1,6 +1,7 @@
 // REST surface for the Shelly device registry, mounted into the host API under
 // `/shelly`. Gated behind `resources.update` (device management is an admin-ish capability).
 import {
+  BadGatewayException,
   BadRequestException,
   Body,
   ConflictException,
@@ -17,6 +18,7 @@ import { Auth } from '@attraccess/plugins-backend-sdk';
 import { DeviceRegistryService } from './device-registry.service';
 import { DiscoveryService, type DiscoveryResult } from './discovery.service';
 import { InvalidCidrError } from './network-scan';
+import { ShellyDeviceApiService, type ShellyDeviceInfo } from './shelly-device-api.service';
 import { ShellyProbeService } from './shelly-probe.service';
 import { ShellyDevice } from './shelly-device.entity';
 import type { ProbeResult } from './types';
@@ -29,6 +31,17 @@ interface AddDeviceBody {
 interface DiscoverBody {
   /** Subnet to scan, e.g. `192.168.1.0/24`. Omitted: the host's own networks. */
   cidr?: string;
+}
+
+interface DeviceInfoBody {
+  username?: string;
+  currentPassword?: string;
+}
+
+interface SetAuthBody {
+  username?: string;
+  currentPassword?: string;
+  password?: string;
 }
 
 interface ProbeOutcome {
@@ -45,7 +58,8 @@ export class ShellyController {
   constructor(
     @Inject(DeviceRegistryService) private readonly registry: DeviceRegistryService,
     @Inject(ShellyProbeService) private readonly probe: ShellyProbeService,
-    @Inject(DiscoveryService) private readonly discovery: DiscoveryService
+    @Inject(DiscoveryService) private readonly discovery: DiscoveryService,
+    @Inject(ShellyDeviceApiService) private readonly deviceApi: ShellyDeviceApiService
   ) {}
 
   // Runs inline rather than as a background job: a /24 is ~250 probes at a 1s
@@ -120,6 +134,49 @@ export class ShellyController {
     return updated;
   }
 
+  // POST rather than GET: the request can carry the device admin password, and a
+  // query string would leak it into access logs and browser history.
+  @Post('devices/:id/info')
+  async info(@Param('id', ParseIntPipe) id: number, @Body() body: DeviceInfoBody): Promise<ShellyDeviceInfo> {
+    const device = await this.requireDeviceWithGeneration(id);
+    try {
+      return await this.deviceApi.getDeviceInfo({
+        ipAddress: device.ipAddress,
+        generation: device.generation,
+        username: body?.username,
+        currentPassword: body?.currentPassword,
+      });
+    } catch (err) {
+      throw toDeviceCommunicationException(err);
+    }
+  }
+
+  @Post('devices/:id/auth')
+  async setAuth(@Param('id', ParseIntPipe) id: number, @Body() body: SetAuthBody): Promise<ShellyDevice> {
+    const password = body?.password?.trim();
+    if (!password) {
+      throw new BadRequestException('password is required');
+    }
+    const device = await this.requireDeviceWithGeneration(id);
+    try {
+      await this.deviceApi.setAdminPassword({
+        ipAddress: device.ipAddress,
+        generation: device.generation,
+        username: body.username,
+        currentPassword: body.currentPassword,
+        password,
+      });
+    } catch (err) {
+      throw toDeviceCommunicationException(err);
+    }
+    await this.registry.updateAuthState(id, 'required');
+    const updated = await this.registry.findById(id);
+    if (!updated) {
+      throw new NotFoundException(`device ${id} not found`);
+    }
+    return updated;
+  }
+
   @Delete('devices/:id')
   async remove(@Param('id', ParseIntPipe) id: number): Promise<{ deleted: boolean }> {
     if (!(await this.registry.findById(id))) {
@@ -127,6 +184,33 @@ export class ShellyController {
     }
     await this.registry.delete(id);
     return { deleted: true };
+  }
+
+  private async requireDeviceWithGeneration(id: number): Promise<ShellyDevice & { generation: number }> {
+    const device = await this.registry.findById(id);
+    if (!device) {
+      throw new NotFoundException(`device ${id} not found`);
+    }
+    if (device.generation !== null) {
+      return device as ShellyDevice & { generation: number };
+    }
+
+    const probed = await this.tryProbe(device.ipAddress);
+    if (!probed.result) {
+      throw new BadRequestException(`device generation is unknown; probe failed: ${probed.error}`);
+    }
+    await this.registry.updateProbe(id, {
+      generation: probed.result.generation,
+      model: probed.result.model,
+      authState: probed.result.authState,
+      lastProbeAt: probed.at,
+      lastProbeError: null,
+    });
+    const updated = await this.registry.findById(id);
+    if (!updated?.generation) {
+      throw new NotFoundException(`device ${id} not found`);
+    }
+    return updated as ShellyDevice & { generation: number };
   }
 
   private async tryProbe(ipAddress: string): Promise<ProbeOutcome> {
@@ -137,4 +221,12 @@ export class ShellyController {
       return { result: null, error: err instanceof Error ? err.message : String(err), at };
     }
   }
+}
+
+/**
+ * Talking to the device failed (unreachable, rejected credentials, …). Surface
+ * the reason as a 502 instead of letting it bubble up as an opaque 500.
+ */
+function toDeviceCommunicationException(err: unknown): BadGatewayException {
+  return new BadGatewayException(err instanceof Error ? err.message : String(err));
 }

@@ -6,7 +6,7 @@
 import { DrawerBackdrop, DrawerContent, DrawerDialog, Input, Label, TextField } from '@heroui/react';
 import type { CSSProperties, ReactNode } from 'react';
 
-const DRAWER_DIALOG_CLASSNAME = 'md:max-w-2xl md:mx-auto bg-surface-secondary';
+const DRAWER_DIALOG_CLASSNAME = 'sh:md:max-w-2xl sh:md:mx-auto sh:bg-surface-secondary';
 const FIELD_CONTRAST_STYLE: CSSProperties = {
   ['--field-border' as never]: 'var(--border-secondary)',
   ['--border-width-field' as never]: '1px',
@@ -53,7 +53,7 @@ export function TextFieldRow({
     <TextField value={value} onChange={onChange} isRequired={required}>
       <Label>{label}</Label>
       <Input placeholder={placeholder} autoComplete="off" data-cy={dataCy} />
-      {description && <p className="mt-1 text-xs text-muted">{description}</p>}
+      {description && <p className="sh:mt-1 sh:text-xs sh:text-muted">{description}</p>}
     </TextField>
   );
 }

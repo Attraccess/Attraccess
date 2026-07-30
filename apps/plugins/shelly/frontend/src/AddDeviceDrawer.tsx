@@ -53,10 +53,10 @@ export function AddDeviceDrawer({
   return (
     <StandardDrawer isOpen={isOpen} onOpenChange={onOpenChange}>
       <DrawerHeader>
-        <div className="flex w-full items-start justify-between gap-3">
-          <div className="flex flex-col gap-1">
-            <h2 className="text-lg font-semibold">Add a device</h2>
-            <p className="text-sm text-muted">
+        <div className="sh:flex sh:w-full sh:items-start sh:justify-between sh:gap-3">
+          <div className="sh:flex sh:flex-col sh:gap-1">
+            <h2 className="sh:text-lg sh:font-semibold">Add a device</h2>
+            <p className="sh:text-sm sh:text-muted">
               Enter the device's IP address. We probe <code>GET /shelly</code> to detect its generation and model.
             </p>
           </div>
@@ -66,7 +66,7 @@ export function AddDeviceDrawer({
         </div>
       </DrawerHeader>
       <DrawerBody>
-        <Form onSubmit={submit} className="flex flex-col gap-4">
+        <Form onSubmit={submit} className="sh:flex sh:flex-col sh:gap-4">
           <TextFieldRow
             label="IP address"
             value={ipAddress}
@@ -87,12 +87,12 @@ export function AddDeviceDrawer({
               {error}
             </StatusAlert>
           )}
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="sh:flex sh:justify-end sh:gap-2 sh:pt-2">
             <Button variant="secondary" onPress={close}>
               Cancel
             </Button>
             <Button variant="primary" type="submit" isPending={submitting} onPress={submit} data-cy="shelly-add-submit">
-              <PlusIcon className="h-4 w-4" /> Add device
+              <PlusIcon className="sh:h-4 sh:w-4" /> Add device
             </Button>
           </div>
           <input type="submit" hidden />
