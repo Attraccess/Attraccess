@@ -66,7 +66,7 @@ importers:
         version: 3.2.2(tailwind-merge@3.6.0)(tailwindcss@4.3.3)
       '@hookform/resolvers':
         specifier: ^5.4.0
-        version: 5.5.7(@sinclair/typebox@0.34.48)(@standard-schema/spec@1.1.0)(ajv-errors@3.0.0(ajv@8.20.0))(ajv-formats@2.1.1(ajv@8.20.0))(ajv@8.20.0)(class-transformer@0.5.1)(class-validator@0.15.1)(effect@3.22.0)(react-hook-form@7.56.4(react@19.2.8))(typanion@3.14.0)(zod@4.4.3)
+        version: 5.5.7(@sinclair/typebox@0.34.48)(@standard-schema/spec@1.1.0)(ajv-errors@3.0.0(ajv@8.20.0))(ajv-formats@2.1.1(ajv@8.20.0))(ajv@8.20.0)(class-transformer@0.5.1)(class-validator@0.15.1)(effect@3.22.1)(react-hook-form@7.56.4(react@19.2.8))(typanion@3.14.0)(zod@4.4.3)
       '@icons-pack/react-simple-icons':
         specifier: ^13.13.0
         version: 13.13.0(react@19.2.8)
@@ -189,7 +189,7 @@ importers:
         version: 0.5.0
       axios:
         specifier: ^1.18.1
-        version: 1.18.1
+        version: 1.19.0
       balena-sdk:
         specifier: ^23.2.12
         version: 23.2.14(@balena/sbvr-types@11.1.4)(encoding@0.1.13)
@@ -945,6 +945,9 @@ packages:
 
   '@asyncapi/parser@3.6.0':
     resolution: {integrity: sha512-6S0Yr8vI418a1IrpGsOYbfWVo9+aHvSqN2oSkiY0YJltS/C7oDOt9e0mo6hSld8bg+EeKrtgkVmpW4obh1JFvA==}
+
+  '@asyncapi/parser@3.6.1':
+    resolution: {integrity: sha512-pqacvPdtkCI6DUOHxMfhumaqRwXAGaV05JzHIP3CxF3Jd3EMu25PWqsiVmbeLf8YDCy0K5UWm4NXW6TpwXwlSw==}
 
   '@asyncapi/protobuf-schema-parser@3.6.0':
     resolution: {integrity: sha512-z6zVRAMi2bkkgjREoCIvUg7KcacyoEh+VIwQmEni/JPuPFMOD3oPv4kwoftEeiF2+gGiioeIxpkI5x7rmHf2Nw==}
@@ -8385,8 +8388,8 @@ packages:
   axios@1.16.0:
     resolution: {integrity: sha512-6hp5CwvTPlN2A31g5dxnwAX0orzM7pmCRDLnZSX772mv8WDqICwFjowHuPs04Mc8deIld1+ejhtaMn5vp6b+1w==}
 
-  axios@1.18.1:
-    resolution: {integrity: sha512-3nTvFlvpn9Zu/RkHUqtc7/+al4UpRW5az71ap5zccp6e8RAYEzhMTecX8Dz1wWDYrPpUoB1HAQEGEAEvUr7S9g==}
+  axios@1.19.0:
+    resolution: {integrity: sha512-ht/iuYZXEjFxLH/Hkezgd7m6JKlHHXEUSneaDz8uZe1Gj5QZtCnpyDsckvAiEnT89OEbCLmnte4R4sn7P0EKFw==}
 
   axobject-query@4.1.0:
     resolution: {integrity: sha512-qIj0G9wZbMGNLjLmg1PT6v2mE9AH2zlnADJD/2tC6E00hgmhUOfEB6greHPAfLRSufHqROIUTkw6E+M3lH0PTQ==}
@@ -8713,8 +8716,8 @@ packages:
   brace-expansion@1.1.16:
     resolution: {integrity: sha512-IDw48K2/2kRkg9LdJxurvq3lV3aBgq0REY89duEqFRthjlPdXHKMj7EnQOXVckxzgisinf3nHfrcE2FufFLXMw==}
 
-  brace-expansion@1.1.17:
-    resolution: {integrity: sha512-w+aeW/mkgM4PyRMOJCgi3fOrTm5Q8QY1OSfn2TO2iuDj3ezIHqejmuxbjfPrqUkgqRew1iqkyAn0tr0ZwHD9+w==}
+  brace-expansion@1.1.18:
+    resolution: {integrity: sha512-Edep/X9fGqVNmzKBVsDYIOtD+z1tuezV70LBjdCst9Tqu76lsnvRiZ6oTic1n+/BIwX6QDGAO94PN4N2SADvtw==}
 
   brace-expansion@2.1.2:
     resolution: {integrity: sha512-w5JZcKgdhDOgOwm8H+KgbosopHMuGcl6qbulwjtz3SM7I7P3yW1eAjzMPLrIE+NQ9vjgANKHWeMHnrT0OXW1oA==}
@@ -10275,8 +10278,8 @@ packages:
   eecircuit-engine@1.7.0:
     resolution: {integrity: sha512-ZDpr/w/H81uCH3n2vjf0vohxOQqQ4NCsvaXkoYwcH+LCxIGKpBdvAIvGN5IdozW6AFJ8tojquKvDya3337yjSQ==}
 
-  effect@3.22.0:
-    resolution: {integrity: sha512-jhYFe0zTlIRqYFrKTS+6luhmS/Tm0f+JLo0K9KUxvtFab1SUGEszQi2ehOP6QzAZvy831lDmTwwzvVDZSPNz3g==}
+  effect@3.22.1:
+    resolution: {integrity: sha512-TNoXushmPOBAjJlthF5d2QwnX2xBPEtcNJr5XKNKbRLbDvBcOYkXlYDfvGfSA0zriwLFuCll5MDtNMAdZL17PQ==}
 
   ejs@3.1.10:
     resolution: {integrity: sha512-UeJmFfOrAQS8OJWPZ4qtgHyWExa088/MtK5UEyoJGFH67cDEXkZSviOiKRCZ4Xij0zxI3JECgYs3oKx+AizQBA==}
@@ -11100,10 +11103,6 @@ packages:
 
   form-data@3.0.5:
     resolution: {integrity: sha512-j23EibVLnp4zNXGW7LjryXYa2X6U/M96yoOX+ybZxwkYajdxRNEqYY3zhh7y0i6kfISKS2jr+EJq1YTUDEv5+w==}
-    engines: {node: '>= 6'}
-
-  form-data@4.0.5:
-    resolution: {integrity: sha512-8RipRLol37bNs2bhoV67fiTEvdTrbMUYcFTiy3+wuuOnUog2QBHCZWXDRijWQfAkhBj2Uf5UnVaiWwA5vdd82w==}
     engines: {node: '>= 6'}
 
   form-data@4.0.6:
@@ -15551,8 +15550,8 @@ packages:
     resolution: {integrity: sha512-57frrGM/OCTLqLOAh0mhVA9VBMHd+9U7Zb2THMGdBUoZVOtGbJzjxsYGDJ3A9AYYCP4hn6y1TVbaOfzWtm5GFg==}
     engines: {node: '>= 12.13.0'}
 
-  recast@0.23.12:
-    resolution: {integrity: sha512-dEWRjcINDu/F4l2dYx57ugBtD7HV9KXESyxhzw/MqWLeglJrsjJKqACPyUPg+6AF8mIgm+Zi0dZ3ACoIg+QtpA==}
+  recast@0.23.14:
+    resolution: {integrity: sha512-BKJtMmXIWhoelOcBc6vcCkvPI8gZgkm1xIPsYnrpuTSAe2xOIiqho6gHGj/tj5a2ZHj69oqZiB7t1sIuU4kiZg==}
     engines: {node: '>= 4'}
 
   recharts@3.10.1:
@@ -18971,6 +18970,30 @@ snapshots:
     transitivePeerDependencies:
       - encoding
 
+  '@asyncapi/parser@3.6.1(encoding@0.1.13)':
+    dependencies:
+      '@asyncapi/specs': 6.11.1
+      '@openapi-contrib/openapi-schema-to-json-schema': 3.2.0
+      '@stoplight/json': 3.21.0
+      '@stoplight/json-ref-readers': 1.2.2(encoding@0.1.13)
+      '@stoplight/json-ref-resolver': 3.1.6
+      '@stoplight/spectral-core': 1.23.1(encoding@0.1.13)
+      '@stoplight/spectral-functions': 1.10.5(encoding@0.1.13)
+      '@stoplight/spectral-parsers': 1.0.5
+      '@stoplight/spectral-ref-resolver': 1.0.5(encoding@0.1.13)
+      '@stoplight/types': 13.20.0
+      '@types/json-schema': 7.0.15
+      '@types/urijs': 1.19.26
+      ajv: 8.20.0
+      ajv-errors: 3.0.0(ajv@8.20.0)
+      ajv-formats: 2.1.1(ajv@8.20.0)
+      avsc: 5.7.9
+      js-yaml: 4.3.0
+      jsonpath-plus: 10.4.0
+      node-fetch: 2.6.7(encoding@0.1.13)
+    transitivePeerDependencies:
+      - encoding
+
   '@asyncapi/protobuf-schema-parser@3.6.0(encoding@0.1.13)':
     dependencies:
       '@asyncapi/parser': 3.6.0(encoding@0.1.13)
@@ -21960,7 +21983,7 @@ snapshots:
     dependencies:
       hono: 4.12.21
 
-  '@hookform/resolvers@5.5.7(@sinclair/typebox@0.34.48)(@standard-schema/spec@1.1.0)(ajv-errors@3.0.0(ajv@8.20.0))(ajv-formats@2.1.1(ajv@8.20.0))(ajv@8.20.0)(class-transformer@0.5.1)(class-validator@0.15.1)(effect@3.22.0)(react-hook-form@7.56.4(react@19.2.8))(typanion@3.14.0)(zod@4.4.3)':
+  '@hookform/resolvers@5.5.7(@sinclair/typebox@0.34.48)(@standard-schema/spec@1.1.0)(ajv-errors@3.0.0(ajv@8.20.0))(ajv-formats@2.1.1(ajv@8.20.0))(ajv@8.20.0)(class-transformer@0.5.1)(class-validator@0.15.1)(effect@3.22.1)(react-hook-form@7.56.4(react@19.2.8))(typanion@3.14.0)(zod@4.4.3)':
     dependencies:
       '@standard-schema/utils': 0.3.0
       react-hook-form: 7.56.4(react@19.2.8)
@@ -21972,7 +21995,7 @@ snapshots:
       ajv-formats: 2.1.1(ajv@8.20.0)
       class-transformer: 0.5.1
       class-validator: 0.15.1
-      effect: 3.22.0
+      effect: 3.22.1
       typanion: 3.14.0
       zod: 4.4.3
 
@@ -22768,9 +22791,9 @@ snapshots:
       ast-types: 0.14.2
       cli-high: 0.4.3
       diff: 5.2.2
-      effect: 3.22.0
+      effect: 3.22.1
       nanoid: 5.1.16
-      recast: 0.23.12
+      recast: 0.23.14
       xycolors: 0.1.2
 
   '@million/lint@1.0.14(encoding@0.1.13)(rollup@4.62.3)':
@@ -25745,7 +25768,7 @@ snapshots:
       '@asyncapi/protobuf-schema-parser': 3.6.0(encoding@0.1.13)
       '@asyncapi/raml-dt-schema-parser': 4.0.24(encoding@0.1.13)
       parserv2: '@asyncapi/parser@2.1.0(encoding@0.1.13)'
-      parserv3: '@asyncapi/parser@3.6.0(encoding@0.1.13)'
+      parserv3: '@asyncapi/parser@3.6.1(encoding@0.1.13)'
     transitivePeerDependencies:
       - encoding
 
@@ -28395,10 +28418,10 @@ snapshots:
     transitivePeerDependencies:
       - debug
 
-  axios@1.18.1:
+  axios@1.19.0:
     dependencies:
       follow-redirects: 1.16.0(debug@4.4.3)
-      form-data: 4.0.5
+      form-data: 4.0.6
       https-proxy-agent: 5.0.1
       proxy-from-env: 2.1.0
     transitivePeerDependencies:
@@ -28878,7 +28901,7 @@ snapshots:
       balanced-match: 1.0.2
       concat-map: 0.0.1
 
-  brace-expansion@1.1.17:
+  brace-expansion@1.1.18:
     dependencies:
       balanced-match: 1.0.2
       concat-map: 0.0.1
@@ -30579,7 +30602,7 @@ snapshots:
 
   eecircuit-engine@1.7.0: {}
 
-  effect@3.22.0:
+  effect@3.22.1:
     dependencies:
       '@standard-schema/spec': 1.1.0
       fast-check: 3.23.2
@@ -30826,7 +30849,7 @@ snapshots:
       has-property-descriptors: 1.0.2
       has-proto: 1.2.0
       has-symbols: 1.1.0
-      hasown: 2.0.4
+      hasown: 2.0.2
       internal-slot: 1.1.0
       is-array-buffer: 3.0.5
       is-callable: 1.2.7
@@ -30969,7 +30992,7 @@ snapshots:
 
   es-shim-unscopables@1.1.0:
     dependencies:
-      hasown: 2.0.4
+      hasown: 2.0.2
 
   es-to-primitive@1.3.0:
     dependencies:
@@ -31859,14 +31882,6 @@ snapshots:
   form-data-encoder@4.1.0: {}
 
   form-data@3.0.5:
-    dependencies:
-      asynckit: 0.4.0
-      combined-stream: 1.0.8
-      es-set-tostringtag: 2.1.0
-      hasown: 2.0.4
-      mime-types: 2.1.35
-
-  form-data@4.0.5:
     dependencies:
       asynckit: 0.4.0
       combined-stream: 1.0.8
@@ -33047,7 +33062,7 @@ snapshots:
       call-bound: 1.0.4
       gopd: 1.2.0
       has-tostringtag: 1.0.2
-      hasown: 2.0.4
+      hasown: 2.0.2
 
   is-regexp@1.0.0: {}
 
@@ -34926,7 +34941,7 @@ snapshots:
 
   minimatch@3.0.8:
     dependencies:
-      brace-expansion: 1.1.17
+      brace-expansion: 1.1.18
     optional: true
 
   minimatch@3.1.5:
@@ -37604,7 +37619,7 @@ snapshots:
 
   real-require@0.2.0: {}
 
-  recast@0.23.12:
+  recast@0.23.14:
     dependencies:
       ast-types: 0.16.1
       esprima: 4.0.1
