@@ -38,7 +38,7 @@ runs:
     - name: Cache ESP-IDF
       if: inputs.esp-idf == 'true'
       id: cache-esp-idf
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: |
           ~/esp/esp-idf
