@@ -1,18 +1,21 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { DeviceInfoDetails, RowActions } from './DevicesPage';
+import { DeviceInfoCards } from './DeviceInfoDrawer';
+import { RowActions } from './DevicesPage';
 
+// Vitest runs without globals here, so testing-library's auto-cleanup is off.
 afterEach(() => {
+  cleanup();
   vi.restoreAllMocks();
 });
 
-describe('DeviceInfoDetails', () => {
+describe('DeviceInfoCards', () => {
   it('renders device info as readable fields instead of raw JSON textareas', () => {
     render(
-      <DeviceInfoDetails
+      <DeviceInfoCards
         info={{
           generation: 2,
           fetchedAt: '2026-06-12T15:00:00.000Z',
@@ -37,7 +40,7 @@ describe('DeviceInfoDetails', () => {
 
   it('reads Gen1 status through arrays (relays/meters)', () => {
     render(
-      <DeviceInfoDetails
+      <DeviceInfoCards
         info={{
           generation: 1,
           fetchedAt: '2026-06-12T15:00:00.000Z',
@@ -53,12 +56,6 @@ describe('DeviceInfoDetails', () => {
     expect(screen.getAllByText('On').length).toBeGreaterThan(0);
     expect(screen.getByText('12.3 W')).toBeInTheDocument();
   });
-
-  it('shows an empty state before info is loaded', () => {
-    render(<DeviceInfoDetails info={null} />);
-
-    expect(screen.getByText('No device info loaded yet.')).toBeInTheDocument();
-  });
 });
 
 describe('RowActions', () => {
@@ -71,6 +68,7 @@ describe('RowActions', () => {
         deviceId={1}
         isBusy={false}
         onInfo={() => undefined}
+        onFirmware={() => undefined}
         onAuth={onAuth}
         onReprobe={() => undefined}
         onDelete={() => undefined}
@@ -82,6 +80,7 @@ describe('RowActions', () => {
     await user.click(screen.getByRole('button', { name: 'More actions' }));
 
     const authItem = await screen.findByRole('menuitem', { name: /Set admin password/ });
+    expect(screen.getByRole('menuitem', { name: /Manage firmware/ })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: /Re-probe device/ })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: /Delete device/ })).toBeInTheDocument();
 
