@@ -1,9 +1,15 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
-import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
-import { FirmwareCell, FirmwareDetails, UpdateAvailableIndicator } from './FirmwareDrawer';
-import type { FirmwareOverviewEntry, FirmwareStatus } from './api';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { FirmwareCell, FirmwareDetails, FirmwareDrawer, UpdateAvailableIndicator } from './FirmwareDrawer';
+import { getFirmware, startFirmwareUpdate, type FirmwareOverviewEntry, type FirmwareStatus, type ShellyDevice } from './api';
+
+vi.mock('./api', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./api')>()),
+  getFirmware: vi.fn(),
+  startFirmwareUpdate: vi.fn(),
+}));
 
 // Vitest runs without globals here, so testing-library's auto-cleanup is off.
 afterEach(cleanup);
@@ -113,5 +119,57 @@ describe('FirmwareDetails', () => {
     render(<FirmwareDetails status={null} />);
 
     expect(screen.getByText('No firmware info loaded yet.')).toBeInTheDocument();
+  });
+});
+
+describe('FirmwareDrawer install polling', () => {
+  const device: ShellyDevice = {
+    id: 1,
+    name: 'Workshop Dimmer',
+    ipAddress: '192.168.1.50',
+    generation: 2,
+    model: 'SNSW-001P16EU',
+    authState: 'none',
+    lastProbeAt: null,
+    lastProbeError: null,
+    createdAt: '2026-07-28T10:00:00.000Z',
+    updatedAt: '2026-07-28T10:00:00.000Z',
+  };
+
+  // Regression: the 5-minute deadline used to be checked only in the poll's
+  // catch branch. A device that stays reachable but never reports the target
+  // version never throws, so "Installing…" spun forever with no terminal state.
+  it('gives up after the deadline even while the device keeps answering', async () => {
+    vi.mocked(getFirmware).mockResolvedValue({
+      generation: 2,
+      currentVersion: '1.4.4',
+      available: { stable: '1.5.1', beta: null },
+      hasUpdate: true,
+      state: 'idle',
+      fetchedAt: '2026-07-28T10:00:00.000Z',
+    });
+    vi.mocked(startFirmwareUpdate).mockResolvedValue(undefined as never);
+
+    render(<FirmwareDrawer device={device} onOpenChange={() => undefined} onUpdated={() => undefined} />);
+    const install = await screen.findByRole('button', { name: 'Install stable firmware 1.5.1' });
+
+    // Fake timers only from here: RTL's waitFor polls on setInterval, which
+    // vitest fakes, so findBy* deadlocks once they are installed.
+    vi.useFakeTimers();
+    try {
+      await act(async () => {
+        fireEvent.click(install);
+      });
+      expect(screen.getByText(/Installing the stable firmware/)).toBeInTheDocument();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5 * 60 * 1000 + 5000);
+      });
+
+      expect(screen.getByText(/did not report the expected firmware version within 5 minutes/)).toBeInTheDocument();
+      expect(screen.queryByText(/Installing the stable firmware/)).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

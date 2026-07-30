@@ -182,12 +182,23 @@ export function FirmwareDrawer({
   );
 
   // While an update runs the device reboots and stops answering — failed polls
-  // are expected, so they are swallowed until the deadline passes.
+  // are expected, so they are swallowed. The deadline is checked on every tick,
+  // not just on failure: a device that stays reachable but never reports the
+  // target version (silent rollback, or a version string that doesn't match
+  // byte-for-byte) would otherwise leave "Installing…" spinning forever.
   useEffect(() => {
     if (!installing || !device) return;
     let cancelled = false;
 
     const poll = async () => {
+      if (cancelled) return;
+      if (Date.now() > deadline.current) {
+        setInstalling(null);
+        setError(
+          'The device did not report the expected firmware version within 5 minutes. Check it and re-check the firmware manually.'
+        );
+        return;
+      }
       try {
         const next = await fetchStatus();
         if (cancelled || !next) return;
@@ -199,10 +210,8 @@ export function FirmwareDrawer({
           onUpdated();
         }
       } catch {
-        if (!cancelled && Date.now() > deadline.current) {
-          setInstalling(null);
-          setError('The device did not come back within 5 minutes. Check it and re-check the firmware manually.');
-        }
+        // Expected while the device reboots; the deadline check above is the
+        // only exit condition that doesn't depend on the device answering.
       }
     };
 

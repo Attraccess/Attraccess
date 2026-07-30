@@ -21,6 +21,11 @@ export interface FirmwareStatus {
   currentVersion: string | null;
   /** Version offered on each channel, or null when the channel has nothing newer. */
   available: Record<FirmwareStage, string | null>;
+  /**
+   * Stable channel only, on purpose: this drives the "update available" nag in
+   * the device table, and a device permanently offering a beta would nag
+   * forever. `available.beta` still surfaces the beta in the drawer.
+   */
   hasUpdate: boolean;
   state: FirmwareState;
   fetchedAt: string;

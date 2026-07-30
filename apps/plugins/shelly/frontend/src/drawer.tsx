@@ -3,7 +3,18 @@
 // StandardDrawer mirrors the host's apps/frontend/src/components/standardDrawer.tsx,
 // replicated here because host components aren't shared with plugins over module
 // federation — only @heroui/react primitives are.
-import { Button, DrawerBackdrop, DrawerContent, DrawerDialog, Input, Label, TextField } from '@heroui/react';
+import {
+  Button,
+  Description,
+  DrawerBackdrop,
+  DrawerContent,
+  DrawerDialog,
+  Input,
+  InputGroup,
+  Label,
+  TextField,
+  Tooltip,
+} from '@heroui/react';
 import { EyeIcon, EyeOffIcon } from 'lucide-react';
 import { useState, type CSSProperties, type ReactNode } from 'react';
 
@@ -77,40 +88,28 @@ export function PasswordFieldRow({
   autoComplete?: string;
 }) {
   const [visible, setVisible] = useState(false);
+  const toggleLabel = visible ? 'Hide password' : 'Show password';
 
+  // Masking is the browser's job via input[type=password]. Never derive the
+  // displayed value from `value` — a controlled input that rewrites its own
+  // value accumulates the mask characters into the source of truth.
   return (
-    <div className="sh:relative">
-      <TextFieldRow
-        label={label}
-        value={visible ? value : value.replace(/./g, '•')}
-        onChange={onChange}
-        placeholder={visible ? 'enter password' : '••••••••'}
-        required={required}
-        description={description}
-        dataCy={dataCy}
-      />
-      {/* ponytail: native input[type=password] not used — TextFieldRow wraps
-          a plain Input; toggle visibility via state instead */}
-      <Button
-        isIconOnly
-        variant="ghost"
-        size="sm"
-        aria-label={visible ? 'Hide password' : 'Show password'}
-        className="sh:absolute sh:right-1 sh:top-6"
-        onPress={() => setVisible((v) => !v)}
-      >
-        {visible ? <EyeOffIcon className="sh:h-4 sh:w-4" /> : <EyeIcon className="sh:h-4 sh:w-4" />}
-      </Button>
-      {/* Feed the actual (unmasked) value into the form for submission. */}
-      <input
-        type={visible ? 'text' : 'password'}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        autoComplete={autoComplete}
-        className="sh:sr-only"
-        aria-hidden="true"
-        tabIndex={-1}
-      />
-    </div>
+    <TextField value={value} onChange={onChange} isRequired={required}>
+      <Label>{label}</Label>
+      <InputGroup>
+        <InputGroup.Input type={visible ? 'text' : 'password'} autoComplete={autoComplete} data-cy={dataCy} />
+        <InputGroup.Suffix>
+          <Tooltip>
+            <Tooltip.Trigger>
+              <Button isIconOnly variant="ghost" aria-label={toggleLabel} onPress={() => setVisible((v) => !v)}>
+                {visible ? <EyeOffIcon className="sh:h-4 sh:w-4" /> : <EyeIcon className="sh:h-4 sh:w-4" />}
+              </Button>
+            </Tooltip.Trigger>
+            <Tooltip.Content>{toggleLabel}</Tooltip.Content>
+          </Tooltip>
+        </InputGroup.Suffix>
+      </InputGroup>
+      {description && <Description>{description}</Description>}
+    </TextField>
   );
 }
