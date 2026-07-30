@@ -1,4 +1,31 @@
-import { resolveAppVersion } from './app.config';
+import * as path from 'path';
+import { AppEnvSchema, resolveAppVersion } from './app.config';
+
+describe('PLUGIN_DIR', () => {
+  const baseEnv = { AUTH_SESSION_SECRET: 'secret' };
+  const originalStorageRoot = process.env.STORAGE_ROOT;
+
+  afterEach(() => {
+    if (originalStorageRoot === undefined) delete process.env.STORAGE_ROOT;
+    else process.env.STORAGE_ROOT = originalStorageRoot;
+  });
+
+  it('falls back to <STORAGE_ROOT>/plugins so plugin upload never joins an undefined path', () => {
+    process.env.STORAGE_ROOT = '/data/storage';
+
+    expect(AppEnvSchema.parse(baseEnv).PLUGIN_DIR).toBe(path.join('/data/storage', 'plugins'));
+  });
+
+  it('falls back to ./storage/plugins when STORAGE_ROOT is unset too', () => {
+    delete process.env.STORAGE_ROOT;
+
+    expect(AppEnvSchema.parse(baseEnv).PLUGIN_DIR).toBe(path.join(process.cwd(), 'storage', 'plugins'));
+  });
+
+  it('keeps an explicit PLUGIN_DIR', () => {
+    expect(AppEnvSchema.parse({ ...baseEnv, PLUGIN_DIR: '/somewhere/else' }).PLUGIN_DIR).toBe('/somewhere/else');
+  });
+});
 
 describe('resolveAppVersion', () => {
   it('prefers the webpack-injected build-time version over any env var', () => {
