@@ -3,7 +3,18 @@
 // StandardDrawer mirrors the host's apps/frontend/src/components/standardDrawer.tsx,
 // replicated here because host components aren't shared with plugins over module
 // federation — only @heroui/react primitives are.
-import { Button, DrawerBackdrop, DrawerContent, DrawerDialog, Input, Label, TextField } from '@heroui/react';
+import {
+  Button,
+  Description,
+  DrawerBackdrop,
+  DrawerContent,
+  DrawerDialog,
+  Input,
+  InputGroup,
+  Label,
+  TextField,
+  Tooltip,
+} from '@heroui/react';
 import { EyeIcon, EyeOffIcon } from 'lucide-react';
 import { useState, type CSSProperties, type ReactNode } from 'react';
 
@@ -41,8 +52,6 @@ export function TextFieldRow({
   required,
   description,
   dataCy,
-  type,
-  autoComplete = 'off',
 }: {
   label: string;
   value: string;
@@ -51,13 +60,11 @@ export function TextFieldRow({
   required?: boolean;
   description?: ReactNode;
   dataCy?: string;
-  type?: 'text' | 'password';
-  autoComplete?: string;
 }) {
   return (
     <TextField value={value} onChange={onChange} isRequired={required}>
       <Label>{label}</Label>
-      <Input type={type} placeholder={placeholder} autoComplete={autoComplete} data-cy={dataCy} />
+      <Input placeholder={placeholder} autoComplete="off" data-cy={dataCy} />
       {description && <p className="sh:mt-1 sh:text-xs sh:text-muted">{description}</p>}
     </TextField>
   );
@@ -81,32 +88,28 @@ export function PasswordFieldRow({
   autoComplete?: string;
 }) {
   const [visible, setVisible] = useState(false);
+  const toggleLabel = visible ? 'Hide password' : 'Show password';
 
+  // Masking is the browser's job via input[type=password]. Never derive the
+  // displayed value from `value` — a controlled input that rewrites its own
+  // value accumulates the mask characters into the source of truth.
   return (
-    <div className="sh:relative">
-      {/* The browser masks the value natively, so `value` is always the real
-          password — never a masked stand-in that could be typed back over it. */}
-      <TextFieldRow
-        label={label}
-        value={value}
-        onChange={onChange}
-        type={visible ? 'text' : 'password'}
-        placeholder="enter password"
-        required={required}
-        description={description}
-        dataCy={dataCy}
-        autoComplete={autoComplete}
-      />
-      <Button
-        isIconOnly
-        variant="ghost"
-        size="sm"
-        aria-label={visible ? 'Hide password' : 'Show password'}
-        className="sh:absolute sh:right-1 sh:top-6"
-        onPress={() => setVisible((v) => !v)}
-      >
-        {visible ? <EyeOffIcon className="sh:h-4 sh:w-4" /> : <EyeIcon className="sh:h-4 sh:w-4" />}
-      </Button>
-    </div>
+    <TextField value={value} onChange={onChange} isRequired={required}>
+      <Label>{label}</Label>
+      <InputGroup>
+        <InputGroup.Input type={visible ? 'text' : 'password'} autoComplete={autoComplete} data-cy={dataCy} />
+        <InputGroup.Suffix>
+          <Tooltip>
+            <Tooltip.Trigger>
+              <Button isIconOnly variant="ghost" aria-label={toggleLabel} onPress={() => setVisible((v) => !v)}>
+                {visible ? <EyeOffIcon className="sh:h-4 sh:w-4" /> : <EyeIcon className="sh:h-4 sh:w-4" />}
+              </Button>
+            </Tooltip.Trigger>
+            <Tooltip.Content>{toggleLabel}</Tooltip.Content>
+          </Tooltip>
+        </InputGroup.Suffix>
+      </InputGroup>
+      {description && <Description>{description}</Description>}
+    </TextField>
   );
 }

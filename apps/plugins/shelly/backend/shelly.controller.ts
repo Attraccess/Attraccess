@@ -13,12 +13,14 @@ import {
   Param,
   ParseIntPipe,
   Post,
+  Query,
 } from '@nestjs/common';
 import { Auth } from '@attraccess/plugins-backend-sdk';
 import { DeviceRegistryService } from './device-registry.service';
 import { DiscoveryService, type DiscoveryResult } from './discovery.service';
 import { InvalidCidrError } from './network-scan';
 import { ShellyDeviceApiService, type ShellyDeviceInfo } from './shelly-device-api.service';
+import { ShellyFirmwareService, type FirmwareStage, type FirmwareStatus } from './shelly-firmware.service';
 import { ShellyProbeService } from './shelly-probe.service';
 import { ShellyDevice } from './shelly-device.entity';
 import type { ProbeResult } from './types';
@@ -44,6 +46,17 @@ interface SetAuthBody {
   password?: string;
 }
 
+interface FirmwareUpdateBody extends DeviceInfoQuery {
+  stage?: FirmwareStage;
+}
+
+/** One row of the firmware overview: either a status or the reason it failed. */
+interface FirmwareOverviewEntry {
+  deviceId: number;
+  status: FirmwareStatus | null;
+  error: string | null;
+}
+
 interface ProbeOutcome {
   result: ProbeResult | null;
   error: string | null;
@@ -59,7 +72,8 @@ export class ShellyController {
     @Inject(DeviceRegistryService) private readonly registry: DeviceRegistryService,
     @Inject(ShellyProbeService) private readonly probe: ShellyProbeService,
     @Inject(DiscoveryService) private readonly discovery: DiscoveryService,
-    @Inject(ShellyDeviceApiService) private readonly deviceApi: ShellyDeviceApiService
+    @Inject(ShellyDeviceApiService) private readonly deviceApi: ShellyDeviceApiService,
+    @Inject(ShellyFirmwareService) private readonly firmware: ShellyFirmwareService
   ) {}
 
   // Runs inline rather than as a background job: a /24 is ~250 probes at a 1s
@@ -109,6 +123,66 @@ export class ShellyController {
       lastProbeAt: probed.at,
       lastProbeError: probed.error,
     });
+  }
+
+  // Declared before the `devices/:id/...` routes so `firmware` is never parsed
+  // as a device id. Best-effort by design: one unreachable or password-protected
+  // device must not blank out the whole overview.
+  @Get('devices/firmware')
+  async firmwareOverview(): Promise<FirmwareOverviewEntry[]> {
+    const devices = await this.registry.list();
+    return Promise.all(
+      devices.map(async (device): Promise<FirmwareOverviewEntry> => {
+        if (device.generation === null) {
+          return { deviceId: device.id, status: null, error: 'device generation is unknown; probe it first' };
+        }
+        try {
+          const status = await this.firmware.getStatus({
+            ipAddress: device.ipAddress,
+            generation: device.generation,
+          });
+          return { deviceId: device.id, status, error: null };
+        } catch (err) {
+          return { deviceId: device.id, status: null, error: err instanceof Error ? err.message : String(err) };
+        }
+      })
+    );
+  }
+
+  @Get('devices/:id/firmware')
+  async firmwareStatus(
+    @Param('id', ParseIntPipe) id: number,
+    @Query() query: DeviceInfoQuery
+  ): Promise<FirmwareStatus> {
+    const device = await this.requireDeviceWithGeneration(id);
+    return this.firmware.getStatus({
+      ipAddress: device.ipAddress,
+      generation: device.generation,
+      username: query.username,
+      currentPassword: query.currentPassword,
+    });
+  }
+
+  @Post('devices/:id/firmware/update')
+  async startFirmwareUpdate(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: FirmwareUpdateBody
+  ): Promise<{ started: true; stage: FirmwareStage }> {
+    const stage = body?.stage ?? 'stable';
+    if (stage !== 'stable' && stage !== 'beta') {
+      throw new BadRequestException(`stage must be "stable" or "beta"`);
+    }
+    const device = await this.requireDeviceWithGeneration(id);
+    await this.firmware.startUpdate(
+      {
+        ipAddress: device.ipAddress,
+        generation: device.generation,
+        username: body?.username,
+        currentPassword: body?.currentPassword,
+      },
+      stage
+    );
+    return { started: true, stage };
   }
 
   @Post('devices/:id/probe')

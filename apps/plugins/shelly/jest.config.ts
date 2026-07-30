@@ -2,6 +2,9 @@ module.exports = {
   displayName: 'plugin-shelly',
   preset: '../../../jest.preset.js',
   testEnvironment: 'node',
+  // Backend only — the frontend specs are jsdom/React and run under Vitest
+  // (the `test-frontend` target).
+  testMatch: ['<rootDir>/backend/**/*.spec.ts'],
   transform: {
     '^.+\\.[tj]s$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.spec.json', isolatedModules: true }],
   },
