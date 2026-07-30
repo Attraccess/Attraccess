@@ -2,6 +2,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   ManyToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
@@ -11,6 +12,8 @@ import { Resource } from './resource.entity';
 import { User } from './user.entity';
 import { ResourceMaintenanceSchedule } from './resource-maintenance-schedule.entity';
 
+@Index('IDX_resource_maintenance_scheduleId_endTime', ['maintenanceSchedule', 'endTime'])
+@Index('IDX_resource_maintenance_resourceId_endTime', ['resourceId', 'endTime'])
 @Entity()
 export class ResourceMaintenance {
   @PrimaryGeneratedColumn()
