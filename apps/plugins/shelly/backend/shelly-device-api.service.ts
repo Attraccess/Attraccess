@@ -1,7 +1,7 @@
 // Live device calls for status/config and admin credentials. Transport (timeouts,
 // Basic/Digest auth replay) lives in ShellyHttpClient.
 import { Inject, Injectable } from '@nestjs/common';
-import { md5, ShellyHttpClient, type DeviceCredentials } from './shelly-http.client';
+import { sha256, ShellyHttpClient, type DeviceCredentials } from './shelly-http.client';
 
 export type { DeviceCredentials } from './shelly-http.client';
 
@@ -44,11 +44,10 @@ export class ShellyDeviceApiService {
   }
 
   async setAdminPassword(input: SetAdminPasswordInput): Promise<void> {
-    const username = input.username?.trim() || 'admin';
     if (input.generation === 1) {
       const url = new URL(`http://${input.ipAddress}/settings/login`);
       url.searchParams.set('enabled', '1');
-      url.searchParams.set('username', username);
+      url.searchParams.set('username', input.username?.trim() || 'admin');
       url.searchParams.set('password', input.password);
       await this.http.getJson(url.toString(), input);
       return;
@@ -60,12 +59,15 @@ export class ShellyDeviceApiService {
       throw new Error('Shelly.SetAuth requires the device id from GET /shelly');
     }
 
+    // Gen2+ supports exactly one user ("admin") and hashes ha1 with SHA-256, not
+    // MD5 — the device answers HTTP 500 for anything else.
+    const gen2User = 'admin';
     await this.http.postJson(
       `http://${input.ipAddress}/rpc/Shelly.SetAuth`,
       {
-        user: username,
+        user: gen2User,
         realm,
-        ha1: md5(`${username}:${realm}:${input.password}`),
+        ha1: sha256(`${gen2User}:${realm}:${input.password}`),
       },
       input
     );

@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 // eslint-disable-next-line @nx/enforce-module-boundaries -- test covers host behavior against plugin device API integration.
 import { ShellyDeviceApiService } from '../../../plugins/shelly/backend/shelly-device-api.service';
 // eslint-disable-next-line @nx/enforce-module-boundaries -- test covers host behavior against plugin device API integration.
@@ -79,10 +80,36 @@ describe('ShellyDeviceApiService', () => {
         body: JSON.stringify({
           user: 'admin',
           realm: 'shellyplus1pm-aabbcc',
-          ha1: 'f18bfc7a82bc27bd078d10b0a1da0a1d',
+          ha1: createHash('sha256').update('admin:shellyplus1pm-aabbcc:new secret').digest('hex'),
         }),
       })
     );
+  });
+
+  it('forces the Gen2+ user to admin because the device supports no other user', async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ id: 'shellyplus1pm-aabbcc' }))
+      .mockResolvedValueOnce(jsonResponse({ restart_required: true }));
+
+    await service.setAdminPassword({ ipAddress: '192.168.1.13', generation: 2, username: 'operator', password: 'new secret' });
+
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({
+      user: 'admin',
+      realm: 'shellyplus1pm-aabbcc',
+      ha1: createHash('sha256').update('admin:shellyplus1pm-aabbcc:new secret').digest('hex'),
+    });
+  });
+
+  it('includes the device error body when a request fails', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      text: async () => '{"code":-103,"message":"Argument \'ha1\' is invalid"}',
+    } as Response);
+
+    await expect(
+      service.setAdminPassword({ ipAddress: '192.168.1.13', generation: 2, password: 'new secret' })
+    ).rejects.toThrow("Argument 'ha1' is invalid");
   });
 });
 
