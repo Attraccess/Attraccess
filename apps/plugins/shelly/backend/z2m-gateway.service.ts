@@ -201,6 +201,12 @@ export class Z2mGatewayService implements OnModuleDestroy {
     if (this.connecting) {
       return this.connecting;
     }
+    // A client that exists but is not connected is mid-auto-reconnect. Connecting
+    // again would leave the old one alive — still reconnecting, still feeding
+    // onMessage — so retire it first rather than stacking clients on the broker.
+    if (this.client) {
+      this.disconnect();
+    }
 
     this.connecting = this.connect(config).finally(() => {
       this.connecting = null;

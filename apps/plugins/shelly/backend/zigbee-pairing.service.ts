@@ -139,49 +139,66 @@ export class ZigbeePairingService {
     const known = new Set(this.gateway.listDevices().map((entry) => entry.ieee_address));
     const joined = this.awaitJoin(known, job);
 
-    job.step = 'opening-network';
-    await this.gateway.permitJoin(MAX_PERMIT_JOIN_SECONDS);
+    // Every step below can throw on an ordinary failure (device offline, auth
+    // required, a gateway request timing out). The join wait must be cancelled
+    // on the way out, or its watchdog would reject a promise nobody awaits —
+    // an unhandled rejection that takes the API process down minutes later.
+    try {
+      job.step = 'opening-network';
+      await this.gateway.permitJoin(MAX_PERMIT_JOIN_SECONDS);
 
-    const status = await this.deviceApi.getZigbeeStatus(target);
-    if (!status.enabled) {
-      job.step = 'enabling-zigbee';
-      const { restartRequired } = await this.deviceApi.enableZigbee(target);
-      if (restartRequired) {
-        job.step = 'waiting-for-reboot';
-        await this.awaitReboot(target);
+      const status = await this.deviceApi.getZigbeeStatus(target);
+      if (!status.enabled) {
+        job.step = 'enabling-zigbee';
+        const { restartRequired } = await this.deviceApi.enableZigbee(target);
+        if (restartRequired) {
+          job.step = 'waiting-for-reboot';
+          await this.awaitReboot(target);
+        }
       }
+
+      job.step = 'network-steering';
+      await this.deviceApi.startNetworkSteering(target);
+
+      job.step = 'waiting-for-join';
+      const ieeeAddress = await joined.promise;
+      job.ieeeAddress = ieeeAddress;
+
+      job.step = 'linking';
+      const friendlyName = friendlyNameFor(device.id);
+      // Rename by IEEE rather than `{last: true}`: the join we matched is the one
+      // we want, and IEEE cannot be raced by an unrelated device joining after it.
+      await this.gateway.renameDevice(ieeeAddress, friendlyName);
+      await this.registry.linkZigbeeDevice(device.id, { ieeeAddress, friendlyName });
+      job.friendlyName = friendlyName;
+      // We just changed the inventory, so make sure our copy reflects it instead
+      // of waiting for a push that may never arrive.
+      await this.gateway.refreshDevices();
+    } finally {
+      joined.cancel();
     }
-
-    job.step = 'network-steering';
-    await this.deviceApi.startNetworkSteering(target);
-
-    job.step = 'waiting-for-join';
-    const ieeeAddress = await joined;
-    job.ieeeAddress = ieeeAddress;
-
-    job.step = 'linking';
-    const friendlyName = friendlyNameFor(device.id);
-    // Rename by IEEE rather than `{last: true}`: the join we matched is the one
-    // we want, and IEEE cannot be raced by an unrelated device joining after it.
-    await this.gateway.renameDevice(ieeeAddress, friendlyName);
-    await this.registry.linkZigbeeDevice(device.id, { ieeeAddress, friendlyName });
-    job.friendlyName = friendlyName;
-    // We just changed the inventory, so make sure our copy reflects it instead
-    // of waiting for a push that may never arrive.
-    await this.gateway.refreshDevices();
   }
 
   /**
    * Resolves with the IEEE address of the first device that joins and completes
    * its interview, ignoring devices the gateway already knew about.
+   *
+   * `cancel()` drops the watchdog and the subscription and leaves the promise
+   * unsettled — the caller is abandoning it, so it must not reject at anyone.
    */
-  private awaitJoin(known: Set<string>, job: PairingJob): Promise<string> {
-    return new Promise<string>((resolve, reject) => {
+  private awaitJoin(known: Set<string>, job: PairingJob): { promise: Promise<string>; cancel: () => void } {
+    let cancel = () => undefined as void;
+    const promise = new Promise<string>((resolve, reject) => {
       let candidate: string | null = null;
 
-      const finish = (err: Error | null, ieeeAddress?: string) => {
+      const stop = () => {
         clearTimeout(timer);
         unsubscribe();
+      };
+      cancel = stop;
+
+      const finish = (err: Error | null, ieeeAddress?: string) => {
+        stop();
         if (err) reject(err);
         else resolve(ieeeAddress as string);
       };
@@ -218,6 +235,7 @@ export class ZigbeePairingService {
         }
       });
     });
+    return { promise, cancel: () => cancel() };
   }
 
   /** Polls the device until its RPC endpoint answers again after a reboot. */

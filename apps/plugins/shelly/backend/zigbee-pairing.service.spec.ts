@@ -170,6 +170,23 @@ describe('ZigbeePairingService.start', () => {
 
     const job = await waitForJob(service, DEVICE.id, (j) => j.status === 'failed');
     expect(job.error).toContain('HTTP 401');
+    // The join wait must be torn down on this path too. Left running, its 254s
+    // watchdog would reject a promise nobody awaits — an unhandled rejection
+    // that kills the API process long after the job already reported failure.
+    expect(gateway.listenerCount).toBe(0);
+  });
+
+  it('tears the join wait down when the device is unreachable before steering', async () => {
+    const gateway = makeGateway();
+    const deviceApi = makeDeviceApi();
+    deviceApi.getZigbeeStatus.mockRejectedValue(new Error('connect ECONNREFUSED'));
+    const { service } = build(gateway, deviceApi);
+
+    service.start(DEVICE, {});
+
+    const job = await waitForJob(service, DEVICE.id, (j) => j.status === 'failed');
+    expect(job.error).toContain('ECONNREFUSED');
+    expect(gateway.listenerCount).toBe(0);
   });
 });
 

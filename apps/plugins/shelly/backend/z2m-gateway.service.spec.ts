@@ -201,6 +201,32 @@ describe('Z2mGatewayService requests', () => {
     expect(subscriptions).toEqual([`${BASE}/bridge/devices`]);
   });
 
+  it('retires a client that is mid-reconnect instead of opening a second one', async () => {
+    const service = new Z2mGatewayService({} as unknown as PluginContext);
+    const ended: string[] = [];
+    // mqtt.js keeps the client object around while it auto-reconnects, so a call
+    // arriving in that window used to fall straight through into a second
+    // mqtt.connect() and orphan this one — still live, still feeding onMessage.
+    const stale = { connected: false, end: () => ended.push('stale') };
+    const fresh = { connected: true, end: () => ended.push('fresh') };
+    const internals = service as unknown as {
+      client: unknown;
+      connectedTo: unknown;
+      getConfig: () => Promise<unknown>;
+      connect: () => Promise<unknown>;
+    };
+    internals.client = stale;
+    internals.connectedTo = { mqttServerId: 1, baseTopic: BASE };
+    internals.getConfig = async () => ({ mqttServerId: 1, baseTopic: BASE });
+    internals.connect = async () => {
+      internals.client = fresh;
+      return fresh;
+    };
+
+    await expect(service.ensureConnected()).resolves.toBe(fresh);
+    expect(ended).toEqual(['stale']);
+  });
+
   it('addresses control topics by IEEE address rather than friendly name', async () => {
     const { service, published } = build();
 
