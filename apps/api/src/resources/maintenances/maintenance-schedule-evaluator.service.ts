@@ -13,7 +13,7 @@ import {
 } from '@attraccess/database-entities';
 import { ResourceMaintenanceService } from './maintenance.service';
 import { ResourceMaintenanceChangedEvent } from './events/resource-maintenance-changed.event';
-import { ResourceUsageSessionEndedEvent } from '../usage/events/resource-usage.events';
+import { ResourceSessionStartedEvent } from '../usage/events/resource-usage.events';
 import { CronTimer } from '../../metrics/instrumentation/cron/cron.helper';
 import { MetricsService } from '../../metrics/metrics.service';
 
@@ -53,11 +53,14 @@ export const buildUsageAggregateQuery = (usageTable: string, pairCount: number):
 };
 
 /**
- * Rows per usage-aggregate query. Each row binds 3 parameters, so 300 rows = 900 bound
- * parameters — under SQLite's most conservative SQLITE_MAX_VARIABLE_NUMBER (999).
- * ponytail: fixed chunk size beats computing the driver's real limit; upgrade path is a temp table.
+ * Pairs per usage-aggregate query. Each pair contributes a `SELECT ? AS ...` clause and 3 bound
+ * parameters, so chunking keeps the generated SQL text bounded.
+ *
+ * ponytail: the bundled sqlite3 (3.44) caps bound parameters at 32766, which is also the ceiling for
+ * the unchunked `IN (:...)` lists in the bulk reads below — comfortably above this ticket's 5k target,
+ * so they stay unchunked. If an install ever exceeds ~32k schedules, those need chunking too.
  */
-const USAGE_AGG_CHUNK_SIZE = 300;
+const USAGE_AGG_CHUNK_SIZE = 500;
 
 /**
  * Evaluates maintenance schedules and creates ResourceMaintenance when a schedule's condition is met.
@@ -350,9 +353,14 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
    * Debounced per resource with a maximum wait: rapid session end/start bursts collapse into a single
    * evaluation, but evaluation is guaranteed to fire within usageEvalMaxWaitMs regardless of how
    * frequently events arrive (preventing indefinite starvation under sustained load).
+   *
+   * Listens to ResourceSessionStartedEvent rather than ResourceUsageSessionEndedEvent: despite the
+   * name, ResourceUsageService.emitUsageEvent() fires it on every session start *and* end (with the
+   * usage re-read after commit, so endTime is set). ResourceUsageSessionEndedEvent only fires on
+   * takeover/flow-ended sessions, which would miss the common case of a user ending their own session.
    */
-  @OnEvent(ResourceUsageSessionEndedEvent.EVENT_NAME)
-  onResourceUsage(event: ResourceUsageSessionEndedEvent): void {
+  @OnEvent(ResourceSessionStartedEvent.EVENT_NAME)
+  onResourceUsage(event: ResourceSessionStartedEvent): void {
     const resourceId = event.usage?.resource?.id;
     if (resourceId == null) return;
     // Only re-evaluate when a session was ended (endTime set); that's when usage minutes and session count increase.

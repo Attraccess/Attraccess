@@ -4,7 +4,7 @@ import { Repository } from 'typeorm';
 import { MaintenanceScheduleEvaluatorService, formatDbDate } from './maintenance-schedule-evaluator.service';
 import { ResourceMaintenanceService } from './maintenance.service';
 import { ResourceMaintenanceChangedEvent } from './events/resource-maintenance-changed.event';
-import { ResourceUsageSessionEndedEvent } from '../usage/events/resource-usage.events';
+import { ResourceSessionStartedEvent } from '../usage/events/resource-usage.events';
 import { CronTimer } from '../../metrics/instrumentation/cron/cron.helper';
 import { MetricsService } from '../../metrics/metrics.service';
 import {
@@ -15,8 +15,8 @@ import {
   ResourceMaintenanceScheduleTriggerType,
 } from '@attraccess/database-entities';
 
-const usageEndedEvent = (usage: Record<string, unknown>) =>
-  new ResourceUsageSessionEndedEvent(usage as never, null);
+// emitUsageEvent() fires ResourceSessionStartedEvent on session end too, with endTime set.
+const usageEndedEvent = (usage: Record<string, unknown>) => new ResourceSessionStartedEvent(usage as never);
 
 const createQueryBuilderMock = () => ({
   where: jest.fn().mockReturnThis(),
