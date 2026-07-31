@@ -24,6 +24,8 @@ import {
   MqttServer,
   NFCCard,
   NotificationPreference,
+  Passkey,
+  PasskeyChallenge,
   PasswordHistory,
   PasswordPolicyAudit,
   PasswordPolicyAuditEvent,
@@ -184,6 +186,8 @@ const seedDatabase = async (dataSource: DataSource) => {
   const notificationPreferenceRepo = dataSource.getRepository(NotificationPreference);
   const pushSubscriptionRepo = dataSource.getRepository(PushSubscription);
   const companionDeviceRepo = dataSource.getRepository(CompanionDevice);
+  const passkeyRepo = dataSource.getRepository(Passkey);
+  const passkeyChallengeRepo = dataSource.getRepository(PasskeyChallenge);
 
   const resourceGroup = await ensureEntity(resourceGroupRepo, () => ({
     name: `Seed Group ${seedTag}`,
@@ -586,6 +590,23 @@ const seedDatabase = async (dataSource: DataSource) => {
   await ensureEntity(companionDeviceRepo, () => ({
     name: `Seed Companion ${seedTag}`,
     tokenHash: '$2b$10$seed.hash.placeholder.for.migration.testing.only',
+  }));
+
+  await ensureEntity(passkeyRepo, () => ({
+    userId: primaryUser.id,
+    credentialId: `seed-credential-${seedTag}`,
+    publicKey: 'seed-cose-public-key',
+    counter: 0,
+    transports: 'internal,hybrid',
+    name: `Seed Passkey ${seedTag}`,
+    backedUp: true,
+    lastUsedAt: null,
+  }));
+
+  await ensureEntity(passkeyChallengeRepo, () => ({
+    challenge: `seed-challenge-${seedTag}`,
+    userId: primaryUser.id,
+    expiresAt: new Date(Date.now() + 5 * 60 * 1000),
   }));
 
   const roleRepo = dataSource.getRepository(Role);
