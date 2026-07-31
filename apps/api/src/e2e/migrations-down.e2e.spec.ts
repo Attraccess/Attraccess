@@ -40,8 +40,6 @@ import {
   Resource,
   ResourceBillingConfiguration,
   ResourceFlowEdge,
-  ResourceFlowLog,
-  ResourceFlowLogType,
   ResourceFlowNode,
   ResourceFlowNodeType,
   ResourceFlowVariable,
@@ -162,7 +160,6 @@ const seedDatabase = async (dataSource: DataSource) => {
   );
   const flowNodeRepo = dataSource.getRepository(ResourceFlowNode);
   const flowEdgeRepo = dataSource.getRepository(ResourceFlowEdge);
-  const flowLogRepo = dataSource.getRepository(ResourceFlowLog);
   const flowVariableRepo = dataSource.getRepository(ResourceFlowVariable);
   const usageRepo = dataSource.getRepository(ResourceUsage);
   const billingTransactionRepo = dataSource.getRepository(BillingTransaction);
@@ -401,14 +398,6 @@ const seedDatabase = async (dataSource: DataSource) => {
     key: `seed-var-${seedTag}`,
     value: '"seed"',
     valueType: 'string' as const,
-  }));
-
-  await ensureEntity(flowLogRepo, () => ({
-    flowRunId: `seed-flow-run-${seedTag}`,
-    type: ResourceFlowLogType.FLOW_START,
-    resourceId: flowNode.resourceId,
-    nodeId: flowNode.id,
-    payload: 'Seed log',
   }));
 
   const usage = await ensureEntity(usageRepo, () => ({

@@ -58,7 +58,6 @@ import {
   ResourceHealthSource,
 } from './entities/resourceHealthState.entity';
 import { ResourceFlowEdge } from './entities/resourceFlowEdge';
-import { ResourceFlowLog, ResourceFlowLogType } from './entities/resourceFlowLog';
 import { ResourceMaintenance } from './entities/resource.maintenance';
 import { ResourceMaintenanceRequest, MaintenanceRequestStatus } from './entities/resource-maintenance-request.entity';
 import {
@@ -140,8 +139,6 @@ export {
   HttpRequestNodeDataSchema,
   MqttSendMessageNodeDataSchema,
   WaitNodeDataSchema,
-  ResourceFlowLog,
-  ResourceFlowLogType,
   AttractapFirmwareVersion,
   ResourceMaintenance,
   ResourceMaintenanceRequest,
@@ -246,7 +243,6 @@ export const entities = {
   EmailTemplateTranslation,
   ResourceFlowNode,
   ResourceFlowEdge,
-  ResourceFlowLog,
   ResourceMaintenance,
   ResourceMaintenanceRequest,
   ResourceMaintenanceSchedule,
