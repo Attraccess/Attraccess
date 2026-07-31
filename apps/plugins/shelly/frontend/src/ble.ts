@@ -265,3 +265,21 @@ export async function provisionWifiOverBle(
     await sleep(pollIntervalMs);
   }
 }
+
+/**
+ * Switch the device's Bluetooth radio off, once it is on the network and in the
+ * registry. Provisioning is the only thing we need BLE for, and Shelly's RPC
+ * over GATT is unauthenticated by default — leaving it enabled hands anyone in
+ * radio range the same control the operator just used.
+ *
+ * Called after registration, never before: an aborted onboarding has to stay
+ * reachable over Bluetooth for the retry.
+ */
+export async function disableBleRadio(rpc: Pick<ShellyBleRpc, 'call'>): Promise<void> {
+  const result = await rpc.call<{ restart_required?: boolean }>('BLE.SetConfig', { config: { enable: false } });
+  if (result?.restart_required) {
+    // The answer may never arrive — the device can drop the link as it reboots.
+    // It still rebooted, so that is not a failure.
+    await rpc.call('Shelly.Reboot').catch(() => undefined);
+  }
+}

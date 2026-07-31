@@ -9,11 +9,11 @@ import { Button, Chip, DrawerBody, DrawerHeader, Form, Spinner } from '@heroui/r
 import { BluetoothIcon, CheckCircle2Icon, CircleIcon, XIcon } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { addDevice, type ShellyDevice } from './api';
-import { connectShellyOverBle, getBluetooth, provisionWifiOverBle, type ProvisionStage } from './ble';
+import { connectShellyOverBle, disableBleRadio, getBluetooth, provisionWifiOverBle, type ProvisionStage } from './ble';
 import { PasswordFieldRow, StandardDrawer, TextFieldRow } from './drawer';
 import { StatusAlert } from './StatusAlert';
 
-type Step = 'connecting' | ProvisionStage | 'registering';
+type Step = 'connecting' | ProvisionStage | 'registering' | 'disabling-bluetooth';
 
 const STEPS: { id: Step; label: string }[] = [
   { id: 'connecting', label: 'Connect over Bluetooth' },
@@ -21,6 +21,7 @@ const STEPS: { id: Step; label: string }[] = [
   { id: 'sending-credentials', label: 'Send WiFi credentials' },
   { id: 'joining', label: 'Wait for the device to join' },
   { id: 'registering', label: 'Add to the registry' },
+  { id: 'disabling-bluetooth', label: "Turn off the device's Bluetooth" },
 ];
 
 function StepList({ current }: { current: Step }) {
@@ -51,6 +52,8 @@ interface Outcome {
   /** Set once the device joined and we could read its address. */
   device: ShellyDevice | null;
   restartRequired: boolean;
+  /** null while the device was never registered, so its radio was left alone. */
+  bluetoothDisabled: boolean | null;
 }
 
 export function BleProvisionDrawer({
@@ -99,18 +102,28 @@ export function BleProvisionDrawer({
       const result = await provisionWifiOverBle(connection.rpc, { ssid: network, password }, { onStage: setStep });
 
       let device: ShellyDevice | null = null;
+      let bluetoothDisabled: boolean | null = null;
       if (result.ipAddress) {
         setStep('registering');
         // Name it after the advertisement; the registry would otherwise fall
         // back to the IP address and show it twice in the same row.
         device = await addDevice({ ipAddress: result.ipAddress, name: connection.advertisedName });
         onProvisioned();
+
+        // Only now, with the device onboarded, is its radio surplus. A failure
+        // here does not undo any of the above, so it is reported, not thrown.
+        setStep('disabling-bluetooth');
+        bluetoothDisabled = await disableBleRadio(connection.rpc).then(
+          () => true,
+          () => false
+        );
       }
       setOutcome({
         advertisedName: connection.advertisedName,
         model: result.info.model,
         device,
         restartRequired: result.restartRequired,
+        bluetoothDisabled,
       });
     } catch (err) {
       // The chooser's "cancel" surfaces as NotFoundError; not worth an alert.
@@ -193,7 +206,14 @@ export function BleProvisionDrawer({
                   </StatusAlert>
                 ) : (
                   <StatusAlert status="success" title="Device provisioned">
-                    {outcome.advertisedName} joined {ssid.trim()} and was added to the registry.
+                    {outcome.advertisedName} joined {ssid.trim()} and was added to the registry
+                    {outcome.bluetoothDisabled ? ", and its Bluetooth was switched off" : ''}.
+                  </StatusAlert>
+                )}
+                {outcome.bluetoothDisabled === false && (
+                  <StatusAlert status="warning" title="Bluetooth is still on" dataCy="shelly-ble-still-enabled">
+                    The device is onboarded, but it refused to switch its Bluetooth off. Turn it off in the device's own
+                    settings — an enabled Shelly radio accepts commands from anyone in range.
                   </StatusAlert>
                 )}
                 {outcome.device && (

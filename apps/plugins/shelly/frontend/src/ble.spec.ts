@@ -1,6 +1,6 @@
 // Vitest runs without globals here, so the test API is imported explicitly.
 import { describe, expect, it } from 'vitest';
-import { provisionWifiOverBle, ShellyBleRpc, type GattCharacteristic, type RpcChannel } from './ble';
+import { disableBleRadio, provisionWifiOverBle, ShellyBleRpc, type GattCharacteristic, type RpcChannel } from './ble';
 
 const noSleep = () => Promise.resolve();
 
@@ -193,5 +193,52 @@ describe('provisionWifiOverBle', () => {
     await expect(
       provisionWifiOverBle(rpc, { ssid: 'Workshop', password: 'wrong' }, { sleep: noSleep, joinTimeoutMs: 0 })
     ).rejects.toThrow(/did not join "Workshop".*last status: disconnected.*2\.4 GHz/s);
+  });
+});
+
+describe('disableBleRadio', () => {
+  function rpcSpy(reply: (method: string) => unknown) {
+    const calls: { method: string; params?: Record<string, unknown> }[] = [];
+    return {
+      calls,
+      rpc: {
+        call: async <T,>(method: string, params?: Record<string, unknown>): Promise<T> => {
+          calls.push({ method, params });
+          const result = reply(method);
+          if (result instanceof Error) throw result;
+          return result as T;
+        },
+      },
+    };
+  }
+
+  it('disables the radio without a reboot when the device does not ask for one', async () => {
+    const { rpc, calls } = rpcSpy(() => ({ restart_required: false }));
+
+    await disableBleRadio(rpc);
+
+    expect(calls).toEqual([{ method: 'BLE.SetConfig', params: { config: { enable: false } } }]);
+  });
+
+  it('reboots when the setting only takes effect after a restart', async () => {
+    const { rpc, calls } = rpcSpy(() => ({ restart_required: true }));
+
+    await disableBleRadio(rpc);
+
+    expect(calls.map((c) => c.method)).toEqual(['BLE.SetConfig', 'Shelly.Reboot']);
+  });
+
+  it('treats a lost link during the reboot as success', async () => {
+    const { rpc } = rpcSpy((method) =>
+      method === 'Shelly.Reboot' ? new Error('GATT server disconnected') : { restart_required: true }
+    );
+
+    await expect(disableBleRadio(rpc)).resolves.toBeUndefined();
+  });
+
+  it('propagates a device that refuses to disable its radio', async () => {
+    const { rpc } = rpcSpy(() => new Error('BLE.SetConfig failed: no handler (code -103)'));
+
+    await expect(disableBleRadio(rpc)).rejects.toThrow(/no handler/);
   });
 });
