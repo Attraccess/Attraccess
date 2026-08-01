@@ -249,7 +249,7 @@ importers:
         version: 13.0.6
       grapesjs:
         specifier: ^0.23.2
-        version: 0.23.3
+        version: 0.23.4
       grapesjs-mjml:
         specifier: ^1.0.8
         version: 1.0.8
@@ -9502,6 +9502,7 @@ packages:
   cron-parser@4.9.0:
     resolution: {integrity: sha512-p0SaNjrHOnQeR8/VnfGbmg9te2kfyYSQ7Sc/j/6DtPL3JQvKxmjO9TSjNFpujqV3vEYYBvNNvXSxzyksBWAx1Q==}
     engines: {node: '>=12.0.0'}
+    deprecated: v4 is no longer maintained, upgrade to v5
 
   cron@4.4.0:
     resolution: {integrity: sha512-fkdfq+b+AHI4cKdhZlppHveI/mgz2qpiYxcm+t5E5TsxX7QrLS1VE0+7GENEk9z0EeGPcpSciGv6ez24duWhwQ==}
@@ -11316,8 +11317,8 @@ packages:
   grapesjs-mjml@1.0.8:
     resolution: {integrity: sha512-cgaKwuGcBVgFCyqqK39kraPfw5DiA8qIyHKsDoMpOUqPY+ubMznx6U2M1NC9UKwD+gDCy/VVctyhb/aJAgyPNw==}
 
-  grapesjs@0.23.3:
-    resolution: {integrity: sha512-TB14/KBs2WmllfdoQ9p6m0Icdt/Aj+XMEMFivFZwb4WD+nDOgOXQIokmPGrLqphIFXcIjWnHE2FloLwfx63oZA==}
+  grapesjs@0.23.4:
+    resolution: {integrity: sha512-fe3+ZRU1YsR8cFqdjl0TFlNywgBPjlQjDLevyavP8UmT9dfVla5JnfQrFc66gzMBdN1ftNPA23YRdTQJRFTKQA==}
 
   grapheme-splitter@1.0.4:
     resolution: {integrity: sha512-bzh50DW9kTPM00T8y4o8vQg89Di9oLJVLW/KaOGIXJWP/iqCN6WKYkbNOF04vFLJhwcpYUh9ydh/+5vpOqV4YQ==}
@@ -32144,7 +32145,7 @@ snapshots:
       '@types/mjml': 4.7.4
       mjml-browser: 4.18.0
 
-  grapesjs@0.23.3:
+  grapesjs@0.23.4:
     dependencies:
       '@types/backbone': 1.4.15
       backbone: 1.4.1
