@@ -45,6 +45,8 @@
     "@nx/devkit": "22.7.7",
     "@react-stately/data": "^3.16.1",
     "@rollup/plugin-replace": "^6.0.3",
+    "@simplewebauthn/browser": "^13.3.0",
+    "@simplewebauthn/server": "^13.3.2",
     "@sumup/sdk": "^0.1.8",
     "@tailwindcss/typography": "^0.5.20",
     "@tailwindcss/vite": "^4.3.3",
