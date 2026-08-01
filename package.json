@@ -297,9 +297,9 @@
     ],
     "patchedDependencies": {
       "@nestjs/swagger@11.4.4": "patches/@nestjs__swagger@11.4.4.patch",
-      "@swc-node/register@1.11.1": "patches/@swc-node__register@1.11.1.patch",
       "ts-api-utils@2.5.0": "patches/ts-api-utils@2.5.0.patch",
-      "typescript@7.0.2": "patches/typescript@7.0.2.patch"
+      "typescript@7.0.2": "patches/typescript@7.0.2.patch",
+      "@swc-node/register@1.12.1": "patches/@swc-node__register@1.12.1.patch"
     }
   }
 }
