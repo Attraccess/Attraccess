@@ -1,8 +1,8 @@
 diff --git a/lib/read-default-tsconfig.js b/lib/read-default-tsconfig.js
-index 105cea013d6750ca038a631f87ab17199db64c3c..aab062bac53d9fd5c6ebfbd25638412e5b71783f 100644
+index f792048176508d8955dc8230dc2987714dc91f06..8f33c0807df7f57b1b2ef61103e4b56d9c7c2c8b 100644
 --- a/lib/read-default-tsconfig.js
 +++ b/lib/read-default-tsconfig.js
-@@ -42,7 +42,11 @@ const fs_1 = require("fs");
+@@ -43,7 +43,11 @@ const fs_1 = require("fs");
  const path_1 = require("path");
  const colorette_1 = require("colorette");
  const debug_1 = __importDefault(require("debug"));
@@ -14,4 +14,4 @@ index 105cea013d6750ca038a631f87ab17199db64c3c..aab062bac53d9fd5c6ebfbd25638412e
 +}
  const debug = (0, debug_1.default)('@swc-node');
  const configCache = {};
- function readDefaultTsConfig(tsConfigPath) {
+ // Keep compatibility with the legacy SWC_NODE_INLINE_SOURCE_MAP env by
