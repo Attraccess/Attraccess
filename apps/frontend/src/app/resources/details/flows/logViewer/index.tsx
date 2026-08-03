@@ -53,6 +53,15 @@ const DURATION_OPTIONS = [
 ];
 const DEFAULT_DURATION_MINUTES = '15';
 
+// Payloads over the recorder's limit arrive truncated, so they are no longer valid JSON.
+export function prettyPayload(raw: string) {
+  try {
+    return JSON.stringify(JSON.parse(raw), null, 2);
+  } catch {
+    return raw;
+  }
+}
+
 function useCountdown(until: Date | string | null | undefined) {
   const [now, setNow] = useState(() => Date.now());
 
@@ -255,7 +264,7 @@ export function LogViewer(props: Props) {
                                 readOnly
                                 rows={16}
                                 className="font-mono text-sm w-full"
-                                value={JSON.stringify(JSON.parse(log.payload), null, 2)}
+                                value={prettyPayload(log.payload)}
                               />
                             )}
                           </AccordionBody>
