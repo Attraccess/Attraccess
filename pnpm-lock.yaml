@@ -10,7 +10,7 @@ overrides:
   '@swc-node/register>typescript': npm:@typescript/typescript6@^6.0.0
   ts-api-utils>typescript: npm:@typescript/typescript6@^6.0.0
   '@typescript-eslint/typescript-estree>typescript': npm:@typescript/typescript6@^6.0.0
-  '@internationalized/date': 3.12.2
+  '@internationalized/date': 3.12.3
   react: 19.2.8
   react-dom: 19.2.8
   tscircuit>zod: 3.25.76
@@ -71,8 +71,8 @@ importers:
         specifier: ^13.13.0
         version: 13.13.0(react@19.2.8)
       '@internationalized/date':
-        specifier: 3.12.2
-        version: 3.12.2
+        specifier: 3.12.3
+        version: 3.12.3
       '@khmyznikov/pwa-install':
         specifier: ^0.6.4
         version: 0.6.4(@lit/react@1.0.7(@types/react@19.2.17))(@types/dom-chromium-installation-events@101.0.4)(@types/web-app-manifest@1.0.9)(lit@3.3.0)
@@ -3317,8 +3317,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@internationalized/date@3.12.2':
-    resolution: {integrity: sha512-FY1Y+H64NDs+HAF6omlnWxm3mEpfgaCSWtL5l551ZZfImA+kGjPFgrnJrGjH6lfmLL0g8Z/mBu1R3kufeCp6Jw==}
+  '@internationalized/date@3.12.3':
+    resolution: {integrity: sha512-fuLX+3ZKLsxI73y8b01EG/WjHb6gE6weCqlfawPO27kBWGMh9G1yH6Csv1uU7/cac9H2GHmOMt6CjmuQ1aia4Q==}
 
   '@internationalized/message@3.1.10':
     resolution: {integrity: sha512-nc0Or6EdWHqZRcsXb6P9hBIpLsfSl/ILh0rk5h/OVBpzmhdExXtPy2cQtWsq8XKRBpRHwDNnAHt4OpolcB7dog==}
@@ -18664,7 +18664,7 @@ snapshots:
 
   '@adobe/react-spectrum@3.47.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
     dependencies:
-      '@internationalized/date': 3.12.2
+      '@internationalized/date': 3.12.3
       '@react-types/shared': 3.36.1(react@19.2.8)
       '@spectrum-icons/ui': 3.7.1(@adobe/react-spectrum@3.47.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@spectrum-icons/workflow': 4.3.1(@adobe/react-spectrum@3.47.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -18681,7 +18681,7 @@ snapshots:
 
   '@adobe/react-spectrum@3.47.2(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
     dependencies:
-      '@internationalized/date': 3.12.2
+      '@internationalized/date': 3.12.3
       '@react-types/shared': 3.36.0(react@19.2.8)
       '@spectrum-icons/ui': 3.7.1(@adobe/react-spectrum@3.47.2(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@spectrum-icons/workflow': 4.3.1(@adobe/react-spectrum@3.47.2(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -22138,7 +22138,7 @@ snapshots:
   '@img/sharp-win32-x64@0.35.3':
     optional: true
 
-  '@internationalized/date@3.12.2':
+  '@internationalized/date@3.12.3':
     dependencies:
       '@swc/helpers': 0.5.23
 
@@ -25056,7 +25056,7 @@ snapshots:
 
   '@react-aria/i18n@3.13.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
     dependencies:
-      '@internationalized/date': 3.12.2
+      '@internationalized/date': 3.12.3
       '@internationalized/message': 3.1.10
       '@internationalized/string': 3.2.9
       '@swc/helpers': 0.5.23
@@ -37357,7 +37357,7 @@ snapshots:
 
   react-aria-components@1.17.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8):
     dependencies:
-      '@internationalized/date': 3.12.2
+      '@internationalized/date': 3.12.3
       '@react-types/shared': 3.36.1(react@19.2.8)
       '@swc/helpers': 0.5.23
       client-only: 0.0.1
@@ -37368,7 +37368,7 @@ snapshots:
 
   react-aria-components@1.19.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8):
     dependencies:
-      '@internationalized/date': 3.12.2
+      '@internationalized/date': 3.12.3
       '@react-types/shared': 3.36.0(react@19.2.8)
       '@swc/helpers': 0.5.23
       client-only: 0.0.1
@@ -37379,7 +37379,7 @@ snapshots:
 
   react-aria@3.48.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8):
     dependencies:
-      '@internationalized/date': 3.12.2
+      '@internationalized/date': 3.12.3
       '@internationalized/number': 3.6.7
       '@internationalized/string': 3.2.10
       '@react-types/shared': 3.36.1(react@19.2.8)
@@ -37393,7 +37393,7 @@ snapshots:
 
   react-aria@3.50.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8):
     dependencies:
-      '@internationalized/date': 3.12.2
+      '@internationalized/date': 3.12.3
       '@internationalized/number': 3.6.7
       '@internationalized/string': 3.2.9
       '@react-types/shared': 3.36.0(react@19.2.8)
@@ -37527,7 +37527,7 @@ snapshots:
 
   react-stately@3.46.0(react@19.2.8):
     dependencies:
-      '@internationalized/date': 3.12.2
+      '@internationalized/date': 3.12.3
       '@internationalized/number': 3.6.7
       '@internationalized/string': 3.2.10
       '@react-types/shared': 3.36.1(react@19.2.8)
@@ -37537,7 +37537,7 @@ snapshots:
 
   react-stately@3.48.0(react@19.2.8):
     dependencies:
-      '@internationalized/date': 3.12.2
+      '@internationalized/date': 3.12.3
       '@internationalized/number': 3.6.7
       '@internationalized/string': 3.2.9
       '@react-types/shared': 3.36.0(react@19.2.8)
