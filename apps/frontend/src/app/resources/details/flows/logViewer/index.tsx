@@ -62,6 +62,12 @@ export function prettyPayload(raw: string) {
   }
 }
 
+// Logs are newest-first and a run's oldest entry is the synthetic flow.start, which has
+// no node — so the node that triggered the run is the oldest entry that does have one.
+export function triggerNodeOfRun<T extends { node?: ResourceFlowNodeDto }>(logsNewestFirst: T[]) {
+  return [...logsNewestFirst].reverse().find((log) => log.node)?.node;
+}
+
 function useCountdown(until: Date | string | null | undefined) {
   const [now, setNow] = useState(() => Date.now());
 
@@ -167,17 +173,19 @@ export function LogViewer(props: Props) {
     );
   }, [logsOrdered]);
 
-  const firstNodeOfRun = useCallback(
-    (runId: string) => {
-      const logsOfRun = logsOrdered.filter((log) => log.flowRunId === runId);
-      return logsOfRun[logsOfRun.length - 1];
-    },
-    [logsOrdered],
-  );
-
   const formatDateTime = useDateTimeFormatter({
     showSeconds: true,
   });
+
+  const runHeader = useCallback(
+    (logsOfRun: typeof logsOrdered) => {
+      return {
+        title: t('nodes.' + (triggerNodeOfRun(logsOfRun)?.type ?? 'flow') + '.title'),
+        subtitle: formatDateTime(logsOfRun[logsOfRun.length - 1]?.createdAt),
+      };
+    },
+    [t, formatDateTime],
+  );
 
   const durationItems = useMemo(
     () => DURATION_OPTIONS.map(({ minutes, labelKey }) => ({ key: String(minutes), label: t(labelKey) })),
@@ -245,11 +253,7 @@ export function LogViewer(props: Props) {
             {Object.entries(logsByRunId).map(([runId, logsOfRun], index, self) => (
               <div key={`${runId}-logs`}>
                 <div>
-                  <PageHeader
-                    title={t('nodes.' + (firstNodeOfRun(runId)?.node?.type ?? 'flow') + '.title')}
-                    subtitle={formatDateTime(firstNodeOfRun(runId)?.createdAt)}
-                    noMargin
-                  />
+                  <PageHeader {...runHeader(logsOfRun)} noMargin />
 
                   <Accordion className="mt-2">
                     {logsOfRun.map((log) => (
