@@ -135,7 +135,7 @@ describe('SumUpService', () => {
 
   describe('setApiKey', () => {
     it('stores encrypted API key and merchant code via update when existing', async () => {
-      mockSumUpGet.mockResolvedValue({ merchant_code: 'M123' });
+      mockSumUpGet.mockResolvedValue({ merchant_profile: { merchant_code: 'M123' } });
       settingRepository.findOneBy.mockResolvedValue({ id: 1, value: 'enc' });
       encryptionService.encrypt.mockReturnValue('encrypted');
 
@@ -147,7 +147,7 @@ describe('SumUpService', () => {
     });
 
     it('stores encrypted API key and merchant code via insert when missing', async () => {
-      mockSumUpGet.mockResolvedValue({ merchant_code: 'M123' });
+      mockSumUpGet.mockResolvedValue({ merchant_profile: { merchant_code: 'M123' } });
       settingRepository.findOneBy.mockResolvedValue(null);
       encryptionService.encrypt.mockReturnValue('encrypted');
 
@@ -155,6 +155,15 @@ describe('SumUpService', () => {
 
       expect(settingRepository.insert).toHaveBeenCalledWith({ parent: 'sumup', key: 'apiKey', value: 'encrypted' });
       expect(settingRepository.insert).toHaveBeenCalledWith({ parent: 'sumup', key: 'merchantCode', value: 'M123' });
+      expect(settingRepository.update).not.toHaveBeenCalled();
+    });
+
+    it('throws and stores nothing when /me has no merchant_profile.merchant_code', async () => {
+      mockSumUpGet.mockResolvedValue({ account: { username: 'x' } });
+      settingRepository.findOneBy.mockResolvedValue(null);
+
+      await expect(service.setApiKey('token')).rejects.toBeInstanceOf(BadRequestException);
+      expect(settingRepository.insert).not.toHaveBeenCalled();
       expect(settingRepository.update).not.toHaveBeenCalled();
     });
 
