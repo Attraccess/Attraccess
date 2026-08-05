@@ -1,7 +1,7 @@
 {
   "name": "@attraccess/source",
   "version": "1.9.0",
-  "license": "MIT",
+  "license": "SEE LICENSE IN LICENSE.md",
   "scripts": {
     "serve": "node --experimental-strip-types scripts/dev-serve.mts",
     "lint:strict": "nx affected -t lint -- --max-warnings=0",
