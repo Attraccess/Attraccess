@@ -158,8 +158,14 @@ describe('SumUpService', () => {
       expect(settingRepository.update).not.toHaveBeenCalled();
     });
 
-    it('throws and stores nothing when /me has no merchant_profile.merchant_code', async () => {
-      mockSumUpGet.mockResolvedValue({ account: { username: 'x' } });
+    it.each([
+      ['merchant_profile is absent', { account: { username: 'x' }, personal_profile: { first_name: 'A' } }],
+      [
+        'merchant_profile carries no merchant_code',
+        { account: { username: 'x' }, merchant_profile: { company_name: 'Attraccess' } },
+      ],
+    ])('throws and stores nothing when %s', async (_case, meResponse) => {
+      mockSumUpGet.mockResolvedValue(meResponse);
       settingRepository.findOneBy.mockResolvedValue(null);
 
       await expect(service.setApiKey('token')).rejects.toBeInstanceOf(BadRequestException);

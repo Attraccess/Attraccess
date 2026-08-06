@@ -39,19 +39,19 @@ export class SumUpService {
 
   async setApiKey(token: string): Promise<void> {
     const sumUp = new SumUp({ apiKey: token });
-    let merchantCode: string | undefined;
-    try {
-      // /v0.1/me nests the code under merchant_profile, it is not a top-level field
-      const me = await this.externalCallTimer.time('sumup', 'me', () =>
+    const me = await this.externalCallTimer
+      .time('sumup', 'me', () =>
         sumUp.get<{ merchant_profile?: { merchant_code?: string } }>({ path: '/v0.1/me' }),
-      );
-      merchantCode = me.merchant_profile?.merchant_code;
-    } catch (error) {
-      this.logger.error('Invalid API key', { error });
-      throw new BadRequestException('Invalid API key');
-    }
+      )
+      .catch((error) => {
+        this.logger.error('Invalid API key', { error });
+        throw new BadRequestException('Invalid API key');
+      });
 
+    // /v0.1/me nests the code under merchant_profile, it is not a top-level field
+    const merchantCode = me.merchant_profile?.merchant_code;
     if (!merchantCode) {
+      this.logger.error('SumUp /v0.1/me returned no merchant_profile.merchant_code');
       throw new BadRequestException('SumUp returned no merchant code for this API key');
     }
 
