@@ -87,7 +87,7 @@ importers:
         version: 4.7.0(monaco-editor@0.52.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@nestjs-modules/mailer':
         specifier: ^2.3.7
-        version: 2.3.7(@nestjs/common@11.1.28(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28)(@nestjs/event-emitter@3.1.0(@nestjs/common@11.1.28(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28))(chokidar@3.6.0)(nodemailer@9.0.3)(relateurl@0.2.7)(svgo@4.0.1)(terser@5.49.2)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+        version: 2.3.7(@nestjs/common@11.1.28(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28)(@nestjs/event-emitter@3.1.0(@nestjs/common@11.1.28(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28))(chokidar@3.6.0)(nodemailer@9.0.4)(relateurl@0.2.7)(svgo@4.0.1)(terser@5.49.2)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
       '@nestjs/common':
         specifier: ^11.1.28
         version: 11.1.28(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -219,7 +219,7 @@ importers:
         version: 2.1.1
       csv:
         specifier: ^6.6.1
-        version: 6.6.2
+        version: 6.6.3
       csv-parse:
         specifier: ^6.2.1
         version: 6.2.1
@@ -302,8 +302,8 @@ importers:
         specifier: ^1.1.0
         version: 1.1.0
       nodemailer:
-        specifier: ^9.0.2
-        version: 9.0.3
+        specifier: ^9.0.4
+        version: 9.0.4
       otplib:
         specifier: ^13.4.1
         version: 13.4.1
@@ -952,8 +952,8 @@ packages:
   '@asyncapi/parser@3.6.0':
     resolution: {integrity: sha512-6S0Yr8vI418a1IrpGsOYbfWVo9+aHvSqN2oSkiY0YJltS/C7oDOt9e0mo6hSld8bg+EeKrtgkVmpW4obh1JFvA==}
 
-  '@asyncapi/parser@3.6.1':
-    resolution: {integrity: sha512-pqacvPdtkCI6DUOHxMfhumaqRwXAGaV05JzHIP3CxF3Jd3EMu25PWqsiVmbeLf8YDCy0K5UWm4NXW6TpwXwlSw==}
+  '@asyncapi/parser@3.6.2':
+    resolution: {integrity: sha512-ys9QOqjkKuX3Z0rwpaw/exejXSHBIq3lZE1Ts6SsjihYYank4AVRpo17HsK/UvyZxgzBbcUNe5+xIRQnJHvGrw==}
 
   '@asyncapi/protobuf-schema-parser@3.6.0':
     resolution: {integrity: sha512-z6zVRAMi2bkkgjREoCIvUg7KcacyoEh+VIwQmEni/JPuPFMOD3oPv4kwoftEeiF2+gGiioeIxpkI5x7rmHf2Nw==}
@@ -9745,11 +9745,11 @@ packages:
   csv-parse@7.0.2:
     resolution: {integrity: sha512-uKZghv9UmPkMVLYy//KZ9HFAIJsl7wkhoEdIL0+rhuSY9pZQlhaeGEDPIe+/w7eh81MOql8Q/9+inAGWG6ZHYA==}
 
-  csv-stringify@6.8.2:
-    resolution: {integrity: sha512-V0md5rBGlZb5WOfUmBWM8tr1+vvbe00EC2+ZhIYPKypA1GLvGuh0NzWEK0L+yRplocH7r37YGoT9uK0r1TtqBQ==}
+  csv-stringify@6.8.3:
+    resolution: {integrity: sha512-gIeSCvq5F4VtXV3naV3VAewLhBkiZBz+PPhTOA8H3Y8h/ELa+R1ml0GZck/4/Nzo9ep2lvOluilJ6MJlbZsKMA==}
 
-  csv@6.6.2:
-    resolution: {integrity: sha512-PamKQ1LVzr9BfcwPPeJkuj9XRAbPFFLokHDRuYDNptI8dSeWofms0DBsZYFuhVWLM5oxa+ZFyVLQ8Lg+qRfnjQ==}
+  csv@6.6.3:
+    resolution: {integrity: sha512-X2AnOgcxqV+OdLm1M2FOl+bPQrM1LK1jwo4FhEoq8hi8JTR0tQ8ZWv3x3N2gVMIuUmpb4CLrV08rTP49IdFQ8w==}
     engines: {node: '>= 0.1.90'}
 
   cwise-compiler@1.1.3:
@@ -14034,6 +14034,10 @@ packages:
 
   nodemailer@9.0.3:
     resolution: {integrity: sha512-n+YP+NKwR5zRWa60k3GiQ6Q3B4KXCoAw40dAKeCtYn020iNN74aWK2liXIC3ZEATeGql7we3tE3t8QwhY0eskw==}
+    engines: {node: '>=6.0.0'}
+
+  nodemailer@9.0.4:
+    resolution: {integrity: sha512-LmJNRVRtfSCULxcZpy0Cpg4WWenlUZ9+zbmTO+S7v9wD6XreYLjXRFtDjtV/4F0HT5p1GyZfA0Ux/myxHb18CQ==}
     engines: {node: '>=6.0.0'}
 
   nopt@10.0.1:
@@ -18985,7 +18989,7 @@ snapshots:
     transitivePeerDependencies:
       - encoding
 
-  '@asyncapi/parser@3.6.1(encoding@0.1.13)':
+  '@asyncapi/parser@3.6.2(encoding@0.1.13)':
     dependencies:
       '@asyncapi/specs': 6.11.1
       '@openapi-contrib/openapi-schema-to-json-schema': 3.2.0
@@ -23112,13 +23116,13 @@ snapshots:
       '@tybys/wasm-util': 0.10.3
     optional: true
 
-  '@nestjs-modules/mailer@2.3.7(@nestjs/common@11.1.28(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28)(@nestjs/event-emitter@3.1.0(@nestjs/common@11.1.28(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28))(chokidar@3.6.0)(nodemailer@9.0.3)(relateurl@0.2.7)(svgo@4.0.1)(terser@5.49.2)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))':
+  '@nestjs-modules/mailer@2.3.7(@nestjs/common@11.1.28(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28)(@nestjs/event-emitter@3.1.0(@nestjs/common@11.1.28(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28))(chokidar@3.6.0)(nodemailer@9.0.4)(relateurl@0.2.7)(svgo@4.0.1)(terser@5.49.2)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))':
     dependencies:
       '@css-inline/css-inline': 0.20.0
       '@nestjs/common': 11.1.28(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/core': 11.1.28(@nestjs/common@11.1.28(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@11.1.28)(@nestjs/websockets@11.1.28)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       glob: 13.0.6
-      nodemailer: 9.0.3
+      nodemailer: 9.0.4
       tslib: 2.8.1
     optionalDependencies:
       '@nestjs/event-emitter': 3.1.0(@nestjs/common@11.1.28(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28)
@@ -25796,7 +25800,7 @@ snapshots:
       '@asyncapi/protobuf-schema-parser': 3.6.0(encoding@0.1.13)
       '@asyncapi/raml-dt-schema-parser': 4.0.24(encoding@0.1.13)
       parserv2: '@asyncapi/parser@2.1.0(encoding@0.1.13)'
-      parserv3: '@asyncapi/parser@3.6.1(encoding@0.1.13)'
+      parserv3: '@asyncapi/parser@3.6.2(encoding@0.1.13)'
     transitivePeerDependencies:
       - encoding
 
@@ -30067,13 +30071,13 @@ snapshots:
 
   csv-parse@7.0.2: {}
 
-  csv-stringify@6.8.2: {}
+  csv-stringify@6.8.3: {}
 
-  csv@6.6.2:
+  csv@6.6.3:
     dependencies:
       csv-generate: 4.6.1
       csv-parse: 7.0.2
-      csv-stringify: 6.8.2
+      csv-stringify: 6.8.3
       stream-transform: 3.5.1
 
   cwise-compiler@1.1.3:
@@ -35803,7 +35807,10 @@ snapshots:
   nodemailer@8.0.11:
     optional: true
 
-  nodemailer@9.0.3: {}
+  nodemailer@9.0.3:
+    optional: true
+
+  nodemailer@9.0.4: {}
 
   nopt@10.0.1:
     dependencies:
