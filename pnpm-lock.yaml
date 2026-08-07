@@ -234,7 +234,7 @@ importers:
         version: 4.4.4(encoding@0.1.13)
       esptool-js:
         specifier: ^0.6.0
-        version: 0.6.0
+        version: 0.6.1
       express:
         specifier: 4.22.2
         version: 4.22.2
@@ -10669,8 +10669,8 @@ packages:
     engines: {node: '>=4'}
     hasBin: true
 
-  esptool-js@0.6.0:
-    resolution: {integrity: sha512-ZyuSBXvmS+4DRKM6GrDHfCscnq3YSNlRfM+Zw0DoS7uC3SdkyC262s/ji4MjDYVmMH8SE2BiYx3/dZ1J23Xiew==}
+  esptool-js@0.6.1:
+    resolution: {integrity: sha512-WNgQTfaEIgHyEiT56pI5v7Tq6Pzjc2XaibLxAtWY4v3zE2Ofk5ImkJY5foEUr0JrdkfHWf6rNizAewN4/kSpHw==}
 
   esquery@1.7.0:
     resolution: {integrity: sha512-Ap6G0WQwcU/LHsvLwON1fAQX9Zp0A2Y6Y/cJBl9r/JbW90Zyg4/zbG6zzKa2OTALELarYHmKu0GhpM5EO+7T0g==}
@@ -14422,6 +14422,9 @@ packages:
 
   pako@2.1.0:
     resolution: {integrity: sha512-w+eufiZ1WuJYgPXbV/PO3NCMEc3xqylkKHzp8bxp1uW4qaSNQUkwmLLEc3kKsfz8lpV1F8Ht3U1Cm+9Srog2ug==}
+
+  pako@2.2.0:
+    resolution: {integrity: sha512-zJq6RP/5q+TO2OpFV3FHzlPnFjmkb7Nc99a5SNjJE+uu/PkpChs+NIZSSzbBoD+6kjiISXjfYdwj1ZRQ81dz/w==}
 
   parcel@2.16.4:
     resolution: {integrity: sha512-RQlrqs4ujYNJpTQi+dITqPKNhRWEqpjPd1YBcGp50Wy3FcJHpwu0/iRm7XWz2dKU/Bwp2qCcVYPIeEDYi2uOUw==}
@@ -31334,10 +31337,10 @@ snapshots:
 
   esprima@4.0.1: {}
 
-  esptool-js@0.6.0:
+  esptool-js@0.6.1:
     dependencies:
       atob-lite: 2.0.0
-      pako: 2.1.0
+      pako: 2.2.0
       tslib: 2.8.1
 
   esquery@1.7.0:
@@ -36357,6 +36360,8 @@ snapshots:
   pako@0.2.9: {}
 
   pako@2.1.0: {}
+
+  pako@2.2.0: {}
 
   parcel@2.16.4(@swc/helpers@0.5.23):
     dependencies:
