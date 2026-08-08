@@ -86,9 +86,10 @@ export function ResourceUsageSession({
   const canStartSession = canUpdateResources || access?.canControl || isIntroducer;
 
   // A not-introduced user may still start via a supervisor when the resource allows it.
-  const supervisionEnabled =
-    resource.supervisionMode === SupervisionMode.SUPERVISION_ALLOWED ||
-    resource.supervisionMode === SupervisionMode.SUPERVISION_REQUIRED;
+  // supervision_required goes further: nobody may start solo (the backend rejects it), so the
+  // supervisor picker has to open even for users who could otherwise control the resource.
+  const supervisionRequired = resource.supervisionMode === SupervisionMode.SUPERVISION_REQUIRED;
+  const supervisionEnabled = resource.supervisionMode === SupervisionMode.SUPERVISION_ALLOWED || supervisionRequired;
 
   const { data: activeMaintenances } = useResourceMaintenancesServiceFindMaintenances({
     resourceId,
@@ -124,7 +125,7 @@ export function ResourceUsageSession({
       <StartSessionControls
         resourceId={resourceId}
         insufficientBalanceDesiredAmount={insufficientBalanceDesiredAmount}
-        requiresSupervision={!canStartSession}
+        requiresSupervision={!canStartSession || supervisionRequired}
       />
     );
   };
