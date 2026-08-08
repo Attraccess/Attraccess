@@ -1,9 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ForbiddenException, NotFoundException, RequestTimeoutException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException, RequestTimeoutException } from '@nestjs/common';
 import { ResourceUsage, User } from '@attraccess/database-entities';
 import { SupervisionService } from './supervision.service';
 import { SupervisionLiveService } from './supervision-live.service';
 import { ResourceUsageService } from '../usage/resourceUsage.service';
+import { ResourceIntroducersService } from '../introducers/resourceIntroducers.service';
 import { RequestSupervisedSessionDto } from './dtos/requestSupervisedSession.dto';
 import { SupervisionLiveEventType } from './dtos/supervisionLiveEvent.dto';
 // Lets pending request promises settle/flush without depending on real timers.
@@ -11,7 +12,12 @@ const flush = () => new Promise((resolve) => setImmediate(resolve));
 
 describe('SupervisionService', () => {
   let service: SupervisionService;
-  let resourceUsageService: { validateSupervisedStart: jest.Mock; startSession: jest.Mock };
+  let resourceUsageService: {
+    validateSupervisedStart: jest.Mock;
+    startSession: jest.Mock;
+    assertSupportsSupervision: jest.Mock;
+  };
+  let introducers: { getMany: jest.Mock };
   let live: { emitToSupervisor: jest.Mock; getSupervisorSubject: jest.Mock };
   const requester: User = { id: 1, username: 'requester' } as User;
   const supervisor: User = { id: 2, username: 'supervisor' } as User;
@@ -22,6 +28,10 @@ describe('SupervisionService', () => {
     resourceUsageService = {
       validateSupervisedStart: jest.fn().mockResolvedValue(undefined),
       startSession: jest.fn().mockResolvedValue(startedSession),
+      assertSupportsSupervision: jest.fn().mockResolvedValue({ id: 5 }),
+    };
+    introducers = {
+      getMany: jest.fn().mockResolvedValue([{ userId: 1 }, { userId: 2 }, { userId: 3 }]),
     };
     live = {
       emitToSupervisor: jest.fn(),
@@ -32,6 +42,7 @@ describe('SupervisionService', () => {
       providers: [
         SupervisionService,
         { provide: ResourceUsageService, useValue: resourceUsageService },
+        { provide: ResourceIntroducersService, useValue: introducers },
         { provide: SupervisionLiveService, useValue: live },
       ],
     }).compile();
@@ -239,6 +250,106 @@ describe('SupervisionService', () => {
       jest.advanceTimersByTime(SupervisionService.APPROVAL_TTL_MS);
 
       expect(onFailed).toHaveBeenCalledWith(expect.any(RequestTimeoutException));
+    });
+  });
+
+  describe('web-initiated reader requests (ATT-816)', () => {
+    let armer: { arm: jest.Mock };
+    let readerCallbacks: { onResolved: jest.Mock; onFailed: jest.Mock };
+    const readerDto: RequestSupervisedSessionDto = { readerId: 7, notes: 'at the machine' };
+
+    beforeEach(() => {
+      readerCallbacks = { onResolved: jest.fn(), onFailed: jest.fn() };
+      armer = { arm: jest.fn().mockResolvedValue(readerCallbacks) };
+      service.setReaderArmer(armer);
+    });
+
+    const requestAtReader = async () => {
+      const pending = service.requestSupervisedSession(5, requester, readerDto);
+      pending.catch(() => undefined);
+      await flush();
+      const requestedEvent = live.emitToSupervisor.mock.calls.find(
+        (c) => c[1].type === SupervisionLiveEventType.REQUESTED,
+      );
+      return { pending, requestId: requestedEvent?.[1].requestId as string };
+    };
+
+    it('arms the reader and broadcasts to every eligible supervisor except the requester', async () => {
+      const { requestId } = await requestAtReader();
+
+      expect(armer.arm).toHaveBeenCalledWith({
+        readerId: 7,
+        resourceId: 5,
+        requester,
+        requestId,
+      });
+      const notified = live.emitToSupervisor.mock.calls
+        .filter((c) => c[1].type === SupervisionLiveEventType.REQUESTED)
+        .map((c) => c[0]);
+      expect(notified.sort()).toEqual([2, 3]);
+    });
+
+    it('starts the session and resolves the requester when a supervisor taps at the reader', async () => {
+      const { pending, requestId } = await requestAtReader();
+
+      await service.approve(requestId, supervisor);
+
+      await expect(pending).resolves.toBe(startedSession);
+      expect(resourceUsageService.startSession).toHaveBeenCalledWith(5, requester, readerDto, {
+        supervisorUserId: 2,
+      });
+      // The reader is told through the callbacks the armer handed back.
+      expect(readerCallbacks.onResolved).toHaveBeenCalledWith(startedSession, { id: 2, username: 'supervisor' });
+    });
+
+    it('fails the waiting requester when the reader cancels, instead of hanging', async () => {
+      const { pending, requestId } = await requestAtReader();
+
+      service.cancelReaderRequest(requestId);
+
+      await expect(pending).rejects.toBeInstanceOf(RequestTimeoutException);
+    });
+
+    it('times the requester out after 30s', async () => {
+      // The reader path awaits validation, eligibility and arming before the timer is armed, so the
+      // request must be fully created before time is advanced — keep setImmediate real to flush it.
+      jest.useFakeTimers({ doNotFake: ['setImmediate'] });
+      const pending = service.requestSupervisedSession(5, requester, readerDto);
+      pending.catch(() => undefined);
+      await flush();
+
+      jest.advanceTimersByTime(SupervisionService.APPROVAL_TTL_MS);
+
+      await expect(pending).rejects.toBeInstanceOf(RequestTimeoutException);
+      expect(readerCallbacks.onFailed).toHaveBeenCalled();
+    });
+
+    it('rejects when neither channel is given', async () => {
+      await expect(service.requestSupervisedSession(5, requester, {})).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('rejects when both channels are given', async () => {
+      await expect(
+        service.requestSupervisedSession(5, requester, { supervisorUserId: 2, readerId: 7 }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('rejects before arming when the resource has no other eligible supervisor', async () => {
+      introducers.getMany.mockResolvedValueOnce([{ userId: requester.id }]);
+
+      await expect(service.requestSupervisedSession(5, requester, readerDto)).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      expect(armer.arm).not.toHaveBeenCalled();
+    });
+
+    it('propagates an arming failure (offline/busy reader) without leaving a pending request', async () => {
+      armer.arm.mockRejectedValueOnce(new BadRequestException('The selected reader is offline'));
+
+      await expect(service.requestSupervisedSession(5, requester, readerDto)).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      expect(live.emitToSupervisor).not.toHaveBeenCalled();
     });
   });
 });

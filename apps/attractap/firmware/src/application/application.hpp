@@ -222,7 +222,15 @@ private:
     // When set, the next entry into APPLICATION_STATE_UNLOCKED auto-starts the session (the supervisor
     // approved by tapping their card; the web channel starts the session server-side instead).
     bool autoStartAfterSupervision = false;
+    // Web-initiated supervision (ATT-816): the server armed this reader for a requester who is not
+    // here, so the reader confirms the card auth instead of starting the session itself.
+    bool supervisionWebInitiated = false;
+    volatile bool supervisionStartRequested = false;
+    char supervisionRequesterName[64] = {0};
+    uint32_t supervisionRequestedResourceId = 0;
+    void enterSupervisionScreen(const std::string &requesterName, const std::string &hint);
     void beginSupervision();
+    void beginWebInitiatedSupervision();
     void processSupervision();
     void exitSupervision(bool unlockResource, bool autoStart);
 #endif

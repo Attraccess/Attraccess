@@ -169,6 +169,17 @@ void Application::processState() {
     return;
   }
 
+  // The server can arm supervision without anyone tapping first (ATT-816): the requester picked this
+  // reader in the web UI. Claim the screen from whatever is showing, as long as no other sticky
+  // sub-flow (enrollment/reset, handled above by their early returns) owns it.
+  if (this->supervisionStartRequested) {
+    this->supervisionStartRequested = false;
+    if (this->state != APPLICATION_STATE_SUPERVISION) {
+      this->beginWebInitiatedSupervision();
+    }
+    return;
+  }
+
   // Two-card supervision is a sticky, self-contained sub-flow like enrollment/reset — it owns the
   // screen until success, cancel or timeout. beginSupervision() is entered from the card-auth path
   // (processCardAuthenticationData) rather than via externalState.

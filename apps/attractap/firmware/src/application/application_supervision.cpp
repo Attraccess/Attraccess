@@ -6,7 +6,10 @@
 
 #ifdef HAS_LVGL_DISPLAY
 
-void Application::beginSupervision() {
+// Shared setup for both entry points: clear the flow flags, re-arm card detection and put the
+// supervision screen up. Re-arming matters because the requester's card may still be on the reader
+// (mirrors the enrollment/reset re-arm rationale).
+void Application::enterSupervisionScreen(const std::string &requesterName, const std::string &hint) {
   this->supervisionPhase = SUPERVISION_PHASE_WAIT_FOR_CARD;
   this->supervisionCardDetected = false;
   this->supervisionKeyReady = false;
@@ -21,21 +24,33 @@ void Application::beginSupervision() {
   this->supervisionStartTimeMs = millis();
   this->supervisionPhaseChangedMs = this->supervisionStartTimeMs;
 
-  // Re-arm detection so the next presented (supervisor) card is picked up reliably, even if the
-  // requester's card is still on the reader (mirrors the enrollment/reset re-arm rationale).
   this->nfc.resetCardPresence();
   this->nfc.enableCardDetection();
 
-  Display::supervisionScreen.setRequesterName(this->cardAuthenticationData.username);
+  Display::supervisionScreen.setRequesterName(requesterName);
   Display::supervisionScreen.setTimeoutTime(this->supervisionStartTimeMs +
                                             SUPERVISION_TIMEOUT_MS);
   Display::supervisionScreen.setStatus(SupervisionScreen::STATUS_WAITING);
-  Display::supervisionScreen.setSupervisorHint(
-      "Tutor-Karte auflegen oder per\nApp/Web bestaetigen");
+  Display::supervisionScreen.setSupervisorHint(hint);
   Display::transitionToScreen(&Display::supervisionScreen);
 
   this->state = APPLICATION_STATE_SUPERVISION;
   this->externalState = EXTERNAL_STATE_NONE;
+}
+
+// Server-armed entry (ATT-816). The requester started in the web UI and is not at the reader, so
+// their name comes from the server and no request is opened here — the server already made one.
+void Application::beginWebInitiatedSupervision() {
+  this->supervisionWebInitiated = true;
+  this->selectedResourceId = this->supervisionRequestedResourceId;
+  this->enterSupervisionScreen(this->supervisionRequesterName,
+                               "Tutor-Karte auflegen");
+}
+
+void Application::beginSupervision() {
+  this->supervisionWebInitiated = false;
+  this->enterSupervisionScreen(this->cardAuthenticationData.username,
+                               "Tutor-Karte auflegen oder per\nApp/Web bestaetigen");
 
   // Ask the server to open the request and broadcast it to eligible supervisors (web channel).
   this->api.requestSupervision(this->selectedResourceId);
@@ -49,6 +64,7 @@ void Application::exitSupervision(bool unlockResource, bool autoStart) {
   this->supervisionFailed = false;
   this->supervisionCardRejected = false;
   this->supervisionCancelRequested = false;
+  this->supervisionWebInitiated = false;
   this->externalState = EXTERNAL_STATE_NONE;
   this->unlocked = unlockResource;
   this->autoStartAfterSupervision = autoStart;
@@ -150,7 +166,16 @@ void Application::processSupervision() {
 
     bool ok = this->nfc.authenticate(this->apiSupervisorCardData.keyNo,
                                      this->apiSupervisorCardData.keyBytes);
-    if (ok) {
+    if (ok && this->supervisionWebInitiated) {
+      // The requester is not here — starting a session on this reader would attribute it to nobody.
+      // Confirm the auth instead and let the server approve the pending web request; the outcome
+      // comes back as SUPERVISION_RESOLVED.
+      this->beeper.successBeep();
+      this->api.confirmSupervisorCardAuth(this->selectedResourceId);
+      Display::supervisionScreen.setStatus(SupervisionScreen::STATUS_VERIFYING);
+      this->supervisionPhase = SUPERVISION_PHASE_STARTING;
+      this->supervisionPhaseChangedMs = now;
+    } else if (ok) {
       // Supervisor card is genuine and authorised. Hand off to the unlocked session screen and
       // auto-start there; the server attaches the supervisor recorded for this socket.
       this->beeper.successBeep();
@@ -168,13 +193,17 @@ void Application::processSupervision() {
   }
 
   case SUPERVISION_PHASE_STARTING:
-    // exitSupervision() already handed control to the session screen; nothing to do here.
+    // Card-tap flow: exitSupervision() already handed control to the session screen.
+    // Web-initiated flow: waiting for the server's SUPERVISION_RESOLVED, which arrives as
+    // supervisionResolvedByWeb (success) or supervisionFailed, both handled above.
     break;
 
   case SUPERVISION_PHASE_SUCCESS: {
     if (now - this->supervisionPhaseChangedMs > SUPERVISION_SUCCESS_DWELL_MS) {
       // Web-approval success: the session is live server-side, just show the unlocked screen.
-      this->exitSupervision(true, false);
+      // For a web-initiated flow nobody is authenticated at this reader, so hand back to the normal
+      // screen routing instead of opening an unlocked session for an absent user.
+      this->exitSupervision(!this->supervisionWebInitiated, false);
     }
     break;
   }
