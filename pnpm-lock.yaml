@@ -51,7 +51,7 @@ importers:
         version: 1.6.2(commander@14.0.3)(glob@13.0.6)(magicast@0.3.5)(ts-morph@28.0.0)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
       '@dagrejs/dagre':
         specifier: ^3.0.0
-        version: 3.1.0
+        version: 3.1.1
       '@eslint/js':
         specifier: ^9.39.4
         version: 9.39.5
@@ -952,8 +952,8 @@ packages:
   '@asyncapi/parser@3.6.0':
     resolution: {integrity: sha512-6S0Yr8vI418a1IrpGsOYbfWVo9+aHvSqN2oSkiY0YJltS/C7oDOt9e0mo6hSld8bg+EeKrtgkVmpW4obh1JFvA==}
 
-  '@asyncapi/parser@3.6.2':
-    resolution: {integrity: sha512-ys9QOqjkKuX3Z0rwpaw/exejXSHBIq3lZE1Ts6SsjihYYank4AVRpo17HsK/UvyZxgzBbcUNe5+xIRQnJHvGrw==}
+  '@asyncapi/parser@3.6.3':
+    resolution: {integrity: sha512-MUC8xIUMcS2qNvqrqyx/ie0txu3d/OdIsrXs7UCzawdyR6P07gh35DpOqPz/z57s1UA3vERVpcheZYl3h8cVtw==}
 
   '@asyncapi/protobuf-schema-parser@3.6.0':
     resolution: {integrity: sha512-z6zVRAMi2bkkgjREoCIvUg7KcacyoEh+VIwQmEni/JPuPFMOD3oPv4kwoftEeiF2+gGiioeIxpkI5x7rmHf2Nw==}
@@ -2534,11 +2534,11 @@ packages:
     resolution: {integrity: sha512-y20e+e6dFYkOUUJLVUZTsJRuTiXZaUQ32WD+R/ux/HBybbTx4ge7cNINcua0pU8+SNkKuRbOF12mBmzuzM8n5w==}
     engines: {node: '>= 14.17.0'}
 
-  '@dagrejs/dagre@3.1.0':
-    resolution: {integrity: sha512-22SWJOfiQVCSFF0qN43SMiYS7Ch9Z6HZoO8+5PycGzGgmtdXIvHoZ2DoT5BweVGf+wwHxBFZu4eO0do0RIYQaw==}
+  '@dagrejs/dagre@3.1.1':
+    resolution: {integrity: sha512-zroZB1dFOFiGgv4Xcrn1DckB1o4aOikPqD2NDQPV0WM//CXGcS6xiD0rNkqHmw6FEg4tabt4nxPLwgCWT+Vb2A==}
 
-  '@dagrejs/graphlib@4.0.3':
-    resolution: {integrity: sha512-9kvysNliOxG5m3lr1Qq5uCc+SYxx+BaLDM2SDGkgoZvKJ1bSESzbZ3gn4rSxqX1xR07swcSdeuGyKYQhAURxAA==}
+  '@dagrejs/graphlib@4.0.5':
+    resolution: {integrity: sha512-7xrBTqIts3o+PMUZX97wSc+7TUbW+/rULzGNCTP6yooNVDXbzw4Wutg/H/xOutTB/c/k0YqOAavgPh4/Zk9PFA==}
 
   '@develar/schema-utils@2.6.5':
     resolution: {integrity: sha512-0cp4PsWQ/9avqTVMCtZ+GirikIA36ikvjtHweU4/j8yLtgObI0+JUPhYFScgwlteveGB1rt3Cm8UhN04XayDig==}
@@ -14679,8 +14679,8 @@ packages:
     peerDependencies:
       pg: '>=8.0'
 
-  pg-protocol@1.15.0:
-    resolution: {integrity: sha512-cq9sECI5s0+uPUXjbz8ioyPJni6RzsRib0US67i5IoTZKw8fNeYlVE7u8F4dG7vEJJtc5wdD1K189lCCUwqWTQ==}
+  pg-protocol@1.16.0:
+    resolution: {integrity: sha512-sILXutLVjCLjcDuOmvhX5e2Z4cS5qG/6Bu3VkpFwdf/633ElGLpEh9bgmuI5I4sqKqkifQiGyiCcx1HdtrK7tg==}
 
   pg-types@2.2.0:
     resolution: {integrity: sha512-qTAAlrEsl8s4OiEQY69wDvcMIdQN6wdz5ojQiOy6YRMuynxenON0O5oCpJI6lshc6scgAY8qvJ2On/p+CXY0GA==}
@@ -19050,7 +19050,7 @@ snapshots:
     transitivePeerDependencies:
       - encoding
 
-  '@asyncapi/parser@3.6.2(encoding@0.1.13)':
+  '@asyncapi/parser@3.6.3(encoding@0.1.13)':
     dependencies:
       '@asyncapi/specs': 6.11.1
       '@openapi-contrib/openapi-schema-to-json-schema': 3.2.0
@@ -21600,11 +21600,11 @@ snapshots:
       tough-cookie: 5.1.2
       tunnel-agent: 0.6.0
 
-  '@dagrejs/dagre@3.1.0':
+  '@dagrejs/dagre@3.1.1':
     dependencies:
-      '@dagrejs/graphlib': 4.0.3
+      '@dagrejs/graphlib': 4.0.5
 
-  '@dagrejs/graphlib@4.0.3': {}
+  '@dagrejs/graphlib@4.0.5': {}
 
   '@develar/schema-utils@2.6.5':
     dependencies:
@@ -25836,7 +25836,7 @@ snapshots:
       '@asyncapi/protobuf-schema-parser': 3.6.0(encoding@0.1.13)
       '@asyncapi/raml-dt-schema-parser': 4.0.24(encoding@0.1.13)
       parserv2: '@asyncapi/parser@2.1.0(encoding@0.1.13)'
-      parserv3: '@asyncapi/parser@3.6.2(encoding@0.1.13)'
+      parserv3: '@asyncapi/parser@3.6.3(encoding@0.1.13)'
     transitivePeerDependencies:
       - encoding
 
@@ -36712,7 +36712,7 @@ snapshots:
       pg: 8.15.6
     optional: true
 
-  pg-protocol@1.15.0:
+  pg-protocol@1.16.0:
     optional: true
 
   pg-types@2.2.0:
@@ -36728,7 +36728,7 @@ snapshots:
     dependencies:
       pg-connection-string: 2.14.0
       pg-pool: 3.14.0(pg@8.15.6)
-      pg-protocol: 1.15.0
+      pg-protocol: 1.16.0
       pg-types: 2.2.0
       pgpass: 1.0.6
     optionalDependencies:
