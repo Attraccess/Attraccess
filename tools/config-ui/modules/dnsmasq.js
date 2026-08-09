@@ -147,17 +147,21 @@ function startDnsmasq() {
     // ,*.conf restricts conf-dir to *.conf files so the addn-hosts file
     // (/etc/dnsmasq.d/custom-hosts) is NOT parsed as a config file. Without it
     // dnsmasq dies with "bad option at line 1 of .../custom-hosts".
-    dnsmasqProcess = spawn('dnsmasq', ['--no-daemon', '--conf-dir=/etc/dnsmasq.d/,*.conf'], {
+    const proc = spawn('dnsmasq', ['--no-daemon', '--conf-dir=/etc/dnsmasq.d/,*.conf'], {
       stdio: ['ignore', 'pipe', 'pipe'],
     });
-    dnsmasqProcess.stdout.on('data', (data) => log(`${data.toString().trim()}`));
-    dnsmasqProcess.stderr.on('data', (data) => log(`${data.toString().trim()}`));
-    dnsmasqProcess.on('exit', (code) => {
+    dnsmasqProcess = proc;
+    proc.stdout.on('data', (data) => log(`${data.toString().trim()}`));
+    proc.stderr.on('data', (data) => log(`${data.toString().trim()}`));
+    proc.on('exit', (code) => {
       log(`exited with code ${code}`);
+      // A killed process exits after its replacement has spawned; ignore that
+      // event or it clears the live reference and respawns a second dnsmasq.
+      if (dnsmasqProcess !== proc) return;
       dnsmasqProcess = null;
       scheduleRestart();
     });
-    log(`started (pid ${dnsmasqProcess.pid})`);
+    log(`started (pid ${proc.pid})`);
   } catch (err) {
     log(`failed to start: ${err.message}`);
     dnsmasqProcess = null;

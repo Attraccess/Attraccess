@@ -225,34 +225,67 @@ describe('dnsmasq init generates config + hosts files with sane defaults', () =>
     );
   });
 
+  // loadModule resets modules, so the spawn mock must be grabbed after it.
+  function mockSpawnedProcesses() {
+    const { spawn } = require('child_process');
+    const procs = [];
+    const exitHandlers = [];
+    spawn.mockImplementation(() => {
+      const proc = {
+        pid: 100 + procs.length,
+        stdout: { on: jest.fn() },
+        stderr: { on: jest.fn() },
+        kill: jest.fn(),
+        on: (event, cb) => { if (event === 'exit') exitHandlers.push(cb); },
+      };
+      procs.push(proc);
+      return proc;
+    });
+    return { spawn, procs, exitHandlers };
+  }
+
   it('respawns dnsmasq after an unexpected exit, and stops once shut down', () => {
     // On balena reboot the LAN interface / port 53 isn't ready yet, dnsmasq exits
     // immediately, and without a retry it stayed dead until someone hit Save.
     jest.useFakeTimers();
-    const { mod, restore } = loadModule({ DNS_SERVER_ENABLED: 'true' });
-    // loadModule resets modules, so grab the spawn mock the module actually sees.
-    const { spawn } = require('child_process');
-    const exitHandlers = [];
-    spawn.mockImplementation(() => ({
-      pid: 123,
-      stdout: { on: jest.fn() },
-      stderr: { on: jest.fn() },
-      kill: jest.fn(),
-      on: (event, cb) => { if (event === 'exit') exitHandlers.push(cb); },
-    }));
+    const { mod, restore } = loadModule({ DNS_SERVER_ENABLED: 'true', DNS_RESTART_DELAY_MS: '1000' });
+    const { spawn, exitHandlers } = mockSpawnedProcesses();
 
     mod.init();
     restore();
     expect(spawn).toHaveBeenCalledTimes(1);
 
     exitHandlers[0](1);
-    jest.advanceTimersByTime(5000);
+    jest.advanceTimersByTime(1000);
     expect(spawn).toHaveBeenCalledTimes(2);
 
     mod.shutdown();
     exitHandlers[1](0);
     jest.advanceTimersByTime(60000);
     expect(spawn).toHaveBeenCalledTimes(2);
+
+    jest.useRealTimers();
+  });
+
+  it('ignores the exit of a process that a restart already replaced', async () => {
+    // The killed process exits only after its replacement is spawned. Acting on
+    // that late event would drop the live process and respawn a second dnsmasq.
+    jest.useFakeTimers();
+    const { mod, restore } = loadModule({ DNS_SERVER_ENABLED: 'true', DNS_RESTART_DELAY_MS: '1000' });
+    const { spawn, procs, exitHandlers } = mockSpawnedProcesses();
+
+    mod.init();
+    await invokeHandler(mod, 'PUT', '/settings', ['settings'], { upstream1: '9.9.9.9' });
+    restore();
+    expect(spawn).toHaveBeenCalledTimes(2);
+
+    exitHandlers[0](null); // old process finally reports its SIGTERM exit
+    jest.advanceTimersByTime(60000);
+
+    expect(spawn).toHaveBeenCalledTimes(2);
+    // The replacement is still the tracked process, so shutdown reaches it.
+    mod.shutdown();
+    expect(procs[1].kill).toHaveBeenCalledWith('SIGTERM');
 
     jest.useRealTimers();
   });
