@@ -60,26 +60,13 @@ function renderSession(supervisionMode: SupervisionMode) {
   return render(<ResourceUsageSession resourceId={7} resource={resource} />);
 }
 
-describe('ResourceUsageSession supervision gating', () => {
+// This component decides *routing* only: introduction gate vs. start controls, and whether the user
+// can start solo. Whether supervision_required forces a supervisor is decided inside
+// StartSessionControls (see its own test) so that every call site inherits it — ATT-815.
+describe('ResourceUsageSession routing', () => {
   beforeEach(() => {
     canControl.value = true;
     hasPermission.value = false;
-  });
-
-  // ATT-815: an introduced user used to get a direct start here, which the backend rejects.
-  it('requires supervision on supervision_required even when the user can control the resource', () => {
-    renderSession(SupervisionMode.SUPERVISION_REQUIRED);
-
-    expect(screen.getByTestId('start-controls')).toHaveAttribute('data-requires-supervision', 'true');
-  });
-
-  it('requires supervision on supervision_required for a resources.update admin', () => {
-    canControl.value = false;
-    hasPermission.value = true;
-
-    renderSession(SupervisionMode.SUPERVISION_REQUIRED);
-
-    expect(screen.getByTestId('start-controls')).toHaveAttribute('data-requires-supervision', 'true');
   });
 
   it('lets an introduced user start solo on supervision_allowed', () => {
@@ -94,6 +81,15 @@ describe('ResourceUsageSession supervision gating', () => {
     renderSession(SupervisionMode.SUPERVISION_ALLOWED);
 
     expect(screen.getByTestId('start-controls')).toHaveAttribute('data-requires-supervision', 'true');
+  });
+
+  it('offers the start controls on supervision_required rather than the introduction gate', () => {
+    canControl.value = false;
+
+    renderSession(SupervisionMode.SUPERVISION_REQUIRED);
+
+    expect(screen.getByTestId('start-controls')).toBeInTheDocument();
+    expect(screen.queryByTestId('introduction-required')).not.toBeInTheDocument();
   });
 
   it('still shows the introduction gate on introduction_required', () => {
