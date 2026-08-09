@@ -100,7 +100,18 @@ export class AttractapSupervisionHandler implements OnModuleInit {
       throw new BadRequestException('The selected reader is offline');
     }
 
-    if (sockets.some((socket) => socket.state.supervisionFlow || socket.state.enrollNewCardData)) {
+    // "Busy" has to mean "someone would notice", not just "in one of two named sub-flows". Arming
+    // seizes the screen, and exiting supervision drops back to the lockscreen — so a reader mid
+    // enrollment, mid card-reset, or with a user partway through a session would lose their context.
+    if (
+      sockets.some(
+        (socket) =>
+          socket.state.supervisionFlow ||
+          socket.state.enrollNewCardData ||
+          socket.state.resetNfcCardData ||
+          socket.state.lastAuthenticatedUserId,
+      )
+    ) {
       throw new ConflictException('The selected reader is busy with another operation');
     }
 
@@ -155,31 +166,42 @@ export class AttractapSupervisionHandler implements OnModuleInit {
    * requester is not here, so the reader must not start the session — approving the pending web
    * request does it, and resolves the requester's blocked call.
    */
-  public async handleSupervisorCardAuthConfirmed(socket: AuthenticatedWebSocket) {
+  public async handleSupervisorCardAuthConfirmed(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
+    const { resourceId } = (data.payload ?? {}) as { resourceId?: number };
+
     const flow = socket.state.supervisionFlow;
+    const fail = async (error: string) => {
+      socket.state.supervisionFlow = null;
+      await socket.sendMessage(new AttractapEvent(AttractapEventType.SUPERVISION_RESOLVED, { success: false, error }));
+    };
+
     if (!flow?.requestId || !flow.approvedSupervisorUserId) {
-      await socket.sendMessage(
-        new AttractapEvent(AttractapEventType.SUPERVISION_RESOLVED, {
-          success: false,
-          error: 'NO_SUPERVISION_IN_PROGRESS',
-        }),
-      );
+      await fail('NO_SUPERVISION_IN_PROGRESS');
+      return;
+    }
+
+    // The reader states which resource it authenticated for; refuse a confirmation that has drifted
+    // from the flow this socket is actually running.
+    if (resourceId != null && resourceId !== flow.resourceId) {
+      await fail('RESOURCE_MISMATCH');
       return;
     }
 
     const supervisor = await this.usersService.findOne({ id: flow.approvedSupervisorUserId });
     if (!supervisor) {
-      await socket.sendMessage(
-        new AttractapEvent(AttractapEventType.SUPERVISION_RESOLVED, { success: false, error: 'USER_NOT_FOUND' }),
-      );
+      await fail('USER_NOT_FOUND');
       return;
     }
 
     try {
-      // Resolution is reported to the reader by the armer's callbacks, which approve() invokes.
+      // On success the armer's callbacks report SUPERVISION_RESOLVED, so nothing to send here.
       await this.supervisionService.approve(flow.requestId, supervisor);
     } catch (error) {
+      // approve() only invokes the callbacks for failures raised *inside* it — an authorization or
+      // not-found throw happens before that, and would leave the reader sitting in its "starting"
+      // phase until its own timeout with no explanation. Tell it directly.
       this.logger.debug(`Web-initiated supervision approval failed: ${(error as Error).message}`);
+      await fail((error as Error).message ?? 'SUPERVISION_FAILED');
     }
   }
 

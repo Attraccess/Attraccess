@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   Logger,
@@ -164,6 +165,14 @@ export class SupervisionService {
       throw new ServiceUnavailableException('Reader-based supervision is unavailable');
     }
 
+    // One armed reader per requester at a time. Arming claims a shared physical screen for 30s, so
+    // without this a single user could hold several readers hostage, or re-arm one in a loop.
+    for (const pending of this.pending.values()) {
+      if (pending.readerCallbacks && pending.requester.id === requester.id && pending.supervisorUserId === null) {
+        throw new ConflictException('You already have a supervision request waiting at a reader');
+      }
+    }
+
     await this.resourceUsageService.assertSupportsSupervision(resourceId);
 
     const eligibleSupervisorIds = await this.getEligibleSupervisorIds(resourceId, requester.id);
@@ -228,11 +237,16 @@ export class SupervisionService {
   }): { requestId: string; expiresAt: Date } {
     const { callbacks, ...rest } = params;
 
-    const { id, expiresAt } = this.createPending({
+    const { id, expiresAt, promise } = this.createPending({
       ...rest,
       supervisorUserId: null,
       readerCallbacks: callbacks,
     });
+
+    // This flow has no HTTP caller — the outcome travels via readerCallbacks — so nothing awaits the
+    // promise and its rejection would surface as an unhandled one. Swallowed here rather than inside
+    // createPending, so the flows that *are* awaited keep propagating normally.
+    promise.catch(() => undefined);
 
     this.logger.debug(
       `Reader supervision request ${id} created for resource ${params.resourceId} (requester ${params.requester.id}, ${params.eligibleSupervisorIds.length} eligible supervisors)`,
@@ -286,9 +300,6 @@ export class SupervisionService {
       });
     });
 
-    // Nobody awaits the reader-originated promise; without this, its rejection is unhandled.
-    promise.catch(() => undefined);
-
     return { id, expiresAt, promise };
   }
 
@@ -317,8 +328,12 @@ export class SupervisionService {
     if (!request) {
       return;
     }
-    request.settled = true;
     this.clear(request);
+    // Fail rather than mark settled: `clear()` has just dropped the expiry timer, so a web-initiated
+    // request (ATT-816) with an HTTP caller would otherwise never settle and hold the connection.
+    // Failing is also the honest answer — the session that started belongs to whoever tapped at the
+    // reader, not to the requester waiting here.
+    this.fail(request, new ForbiddenException('Another user started a session at the reader first'));
     this.emitToEligible(request, SupervisionLiveEventType.RESOLVED);
   }
 
@@ -343,7 +358,8 @@ export class SupervisionService {
    * supervisor attached, then resolves the waiting requester.
    */
   public async approve(requestId: string, supervisor: User): Promise<ResourceUsage> {
-    const request = this.getPendingForSupervisorOrThrow(requestId, supervisor);
+    const request = this.getPendingForSupervisorOrThrow(requestId, supervisor, { allowAnyAuthorized: true });
+    await this.assertMayApprove(request, supervisor);
     this.clear(request);
 
     try {
@@ -394,22 +410,46 @@ export class SupervisionService {
     return requests;
   }
 
-  private getPendingForSupervisorOrThrow(requestId: string, supervisor: User): PendingSupervisionRequest {
+  private getPendingForSupervisorOrThrow(
+    requestId: string,
+    supervisor: User,
+    opts: { allowAnyAuthorized?: boolean } = {},
+  ): PendingSupervisionRequest {
     const request = this.pending.get(requestId);
     if (!request) {
       throw new NotFoundException('Supervision request not found or already expired');
     }
-    // Web flow: a single named supervisor. Reader flow (supervisorUserId === null): any of the
-    // supervisors the request was broadcast to. Eligibility against the resource is re-checked by
-    // startSession/validateSupervisedStart when the session actually starts.
+    // Web flow: a single named supervisor. Broadcast flow (supervisorUserId === null): any of the
+    // supervisors the request was broadcast to — or, when the caller will run assertMayApprove,
+    // anyone that check accepts.
     const allowed =
       request.supervisorUserId === null
-        ? request.eligibleSupervisorIds.includes(supervisor.id)
+        ? opts.allowAnyAuthorized || request.eligibleSupervisorIds.includes(supervisor.id)
         : request.supervisorUserId === supervisor.id;
     if (!allowed) {
       throw new ForbiddenException('You are not the requested supervisor for this session');
     }
     return request;
+  }
+
+  /**
+   * Second gate for broadcast requests, kept deliberately identical to the one the reader applies
+   * to a presented card (`validateSupervisedStart`).
+   *
+   * `eligibleSupervisorIds` is introducers/maintainers only, so a global `resources.update` holder
+   * is missing from it — yet the reader accepts their card, hands out key material and beeps
+   * success. Without this fallback their approval would then be refused, stranding both the reader
+   * and the requester.
+   */
+  private async assertMayApprove(request: PendingSupervisionRequest, supervisor: User): Promise<void> {
+    if (request.supervisorUserId !== null || request.eligibleSupervisorIds.includes(supervisor.id)) {
+      return;
+    }
+    try {
+      await this.resourceUsageService.validateSupervisedStart(request.resourceId, request.requester, supervisor.id);
+    } catch {
+      throw new ForbiddenException('You are not authorized to supervise this session');
+    }
   }
 
   private expire(requestId: string): void {

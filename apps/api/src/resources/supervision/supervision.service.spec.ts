@@ -1,5 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, ForbiddenException, NotFoundException, RequestTimeoutException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+  RequestTimeoutException,
+} from '@nestjs/common';
 import { ResourceUsage, User } from '@attraccess/database-entities';
 import { SupervisionService } from './supervision.service';
 import { SupervisionLiveService } from './supervision-live.service';
@@ -207,7 +213,10 @@ describe('SupervisionService', () => {
       expect(service.listPendingForSupervisor(2)).toHaveLength(0);
     });
 
-    it('rejects approval from a supervisor that was not broadcast to', async () => {
+    // Not being on the broadcast list is no longer decisive on its own — the resource gets the final
+    // say, so that a global resources.update holder whose card the reader accepts can also approve.
+    it('rejects approval from a supervisor the resource does not authorize', async () => {
+      resourceUsageService.validateSupervisedStart.mockRejectedValueOnce(new ForbiddenException('nope'));
       const { requestId } = createReaderRequest();
       const stranger = { id: 9, username: 'stranger' } as User;
 
@@ -332,6 +341,47 @@ describe('SupervisionService', () => {
       await expect(
         service.requestSupervisedSession(5, requester, { supervisorUserId: 2, readerId: 7 }),
       ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    // Review finding: settleByCard cleared the expiry timer but only marked the request settled, so
+    // a web-initiated caller waited forever. Reachable whenever the reader starts a session on its
+    // own during the window — old firmware ignoring the arm, or a tap already in flight.
+    it('fails the waiting requester when the reader starts a session of its own instead', async () => {
+      const { pending, requestId } = await requestAtReader();
+
+      service.settleByCard(requestId);
+
+      await expect(pending).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('refuses a second reader arm while one is already waiting', async () => {
+      await requestAtReader();
+
+      await expect(service.requestSupervisedSession(5, requester, { readerId: 9 })).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+    });
+
+    // The reader accepts a global resources.update holder's card (validateSupervisedStart does), but
+    // they are not in the broadcast list — so approval has to accept them too, or the card beeps
+    // success and then nothing happens.
+    it('accepts an approval from an authorized supervisor who was not broadcast to', async () => {
+      const { pending, requestId } = await requestAtReader();
+      const globalManager = { id: 99, username: 'admin' } as User;
+
+      await service.approve(requestId, globalManager);
+
+      await expect(pending).resolves.toBe(startedSession);
+      expect(resourceUsageService.validateSupervisedStart).toHaveBeenCalledWith(5, requester, 99);
+    });
+
+    it('still refuses an approval from someone the resource does not authorize', async () => {
+      resourceUsageService.validateSupervisedStart.mockRejectedValueOnce(new ForbiddenException('nope'));
+      const { requestId } = await requestAtReader();
+      const stranger = { id: 98, username: 'stranger' } as User;
+
+      await expect(service.approve(requestId, stranger)).rejects.toBeInstanceOf(ForbiddenException);
+      expect(resourceUsageService.startSession).not.toHaveBeenCalled();
     });
 
     it('rejects before arming when the resource has no other eligible supervisor', async () => {

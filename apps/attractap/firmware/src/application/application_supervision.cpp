@@ -40,11 +40,20 @@ void Application::enterSupervisionScreen(const std::string &requesterName, const
 
 // Server-armed entry (ATT-816). The requester started in the web UI and is not at the reader, so
 // their name comes from the server and no request is opened here — the server already made one.
+// Deliberately does NOT touch selectedResourceId: that is the reader's own long-lived selection,
+// driven by selectResource(), and the requester's resource may not even be linked to this reader.
+// processSupervision() uses supervisionResourceId() for the two calls that need an id.
 void Application::beginWebInitiatedSupervision() {
   this->supervisionWebInitiated = true;
-  this->selectedResourceId = this->supervisionRequestedResourceId;
   this->enterSupervisionScreen(this->supervisionRequesterName,
                                "Tutor-Karte auflegen");
+}
+
+// The resource this supervision flow is about — the server's for a web-initiated arm, the reader's
+// own selection for the card-tap flow.
+uint32_t Application::supervisionResourceId() const {
+  return this->supervisionWebInitiated ? this->supervisionRequestedResourceId
+                                       : this->selectedResourceId;
 }
 
 void Application::beginSupervision() {
@@ -149,7 +158,7 @@ void Application::processSupervision() {
     this->nfc.disableCardDetection();
     this->api.requestSupervisorCardAuthenticationData(
         this->supervisionCardUid, this->supervisionCardUidLength,
-        this->selectedResourceId);
+        this->supervisionResourceId());
     this->supervisionPhase = SUPERVISION_PHASE_REQUESTED_AUTH;
     this->supervisionPhaseChangedMs = now;
     break;
@@ -171,7 +180,7 @@ void Application::processSupervision() {
       // Confirm the auth instead and let the server approve the pending web request; the outcome
       // comes back as SUPERVISION_RESOLVED.
       this->beeper.successBeep();
-      this->api.confirmSupervisorCardAuth(this->selectedResourceId);
+      this->api.confirmSupervisorCardAuth(this->supervisionResourceId());
       Display::supervisionScreen.setStatus(SupervisionScreen::STATUS_VERIFYING);
       this->supervisionPhase = SUPERVISION_PHASE_STARTING;
       this->supervisionPhaseChangedMs = now;

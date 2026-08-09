@@ -475,6 +475,9 @@ void Application::setup() {
         strlcpy(this->supervisionRequesterName, command.requesterUsername.c_str(),
                 sizeof(this->supervisionRequesterName));
         this->supervisionRequestedResourceId = command.resourceId;
+        this->supervisionRequestedAtMs = millis();
+        this->supervisionRequestedTimeoutMs =
+            command.timeoutMs > 0 ? command.timeoutMs : SUPERVISION_TIMEOUT_MS;
         this->supervisionStartRequested = true;
       });
 

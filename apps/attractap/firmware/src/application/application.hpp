@@ -228,6 +228,12 @@ private:
     volatile bool supervisionStartRequested = false;
     char supervisionRequesterName[64] = {0};
     uint32_t supervisionRequestedResourceId = 0;
+    // Arrival time of the arm command, and the server's own TTL for it. The flag alone cannot tell
+    // "arm me now" from "arm me, five minutes ago" — a sticky sub-flow (enrollment/reset) defers
+    // consumption, potentially well past the point where the server already expired the request.
+    uint32_t supervisionRequestedAtMs = 0;
+    uint32_t supervisionRequestedTimeoutMs = 0;
+    uint32_t supervisionResourceId() const;
     void enterSupervisionScreen(const std::string &requesterName, const std::string &hint);
     void beginSupervision();
     void beginWebInitiatedSupervision();

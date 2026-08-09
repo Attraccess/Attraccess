@@ -123,18 +123,15 @@ export function SupervisedStartModal({
             onApproved(session as ResourceUsage);
           },
           onError: (error) => {
-            if (error instanceof ApiError && error.status === 408) {
+            const status = error instanceof ApiError ? error.status : 0;
+            if (status === 408) {
               setPhase('timeout');
               return;
             }
-            // A reader that is offline, busy or unsupported fails immediately — that is a different
-            // story from a supervisor saying no, so don't dress it up as a rejection.
-            if (error instanceof ApiError && (error.status === 400 || error.status === 404 || error.status === 409)) {
-              setPhase('error');
-              return;
-            }
-            // 403 covers both an explicit rejection and an unauthorized supervisor.
-            setPhase('rejected');
+            // 403 covers both an explicit rejection and an unauthorized supervisor. Everything else
+            // — offline, busy or unsupported reader, and anything unexpected — is the request
+            // failing to land, which is a different story from a supervisor saying no.
+            setPhase(status === 403 ? 'rejected' : 'error');
           },
         },
       );

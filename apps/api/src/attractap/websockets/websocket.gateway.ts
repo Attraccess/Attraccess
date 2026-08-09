@@ -438,7 +438,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
         await this.supervisionHandler.handleSupervisorCardAuthRequest(socket, eventData);
         break;
       case AttractapEventType.SUPERVISOR_CARD_AUTH_CONFIRMED:
-        await this.supervisionHandler.handleSupervisorCardAuthConfirmed(socket);
+        await this.supervisionHandler.handleSupervisorCardAuthConfirmed(socket, eventData);
         break;
       case AttractapEventType.SUPERVISION_CANCEL:
         await this.supervisionHandler.handleSupervisionCancel(socket);

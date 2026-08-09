@@ -170,11 +170,19 @@ void Application::processState() {
   }
 
   // The server can arm supervision without anyone tapping first (ATT-816): the requester picked this
-  // reader in the web UI. Claim the screen from whatever is showing, as long as no other sticky
-  // sub-flow (enrollment/reset, handled above by their early returns) owns it.
+  // reader in the web UI. Enrollment and reset return before this point, so the flag may sit unread
+  // for as long as one of those runs — check it against the server's TTL rather than assuming the
+  // request is still live, and tell the server when we cannot serve it.
   if (this->supervisionStartRequested) {
     this->supervisionStartRequested = false;
-    if (this->state != APPLICATION_STATE_SUPERVISION) {
+    bool stale = millis() - this->supervisionRequestedAtMs > this->supervisionRequestedTimeoutMs;
+    if (stale) {
+      this->logger.debug("Ignoring supervision arm that outlived its request");
+    } else if (this->state == APPLICATION_STATE_SUPERVISION) {
+      // Already running a flow; release the server's request rather than dropping it silently.
+      this->logger.debug("Supervision already in progress, releasing the new request");
+      this->api.cancelSupervision();
+    } else {
       this->beginWebInitiatedSupervision();
     }
     return;
