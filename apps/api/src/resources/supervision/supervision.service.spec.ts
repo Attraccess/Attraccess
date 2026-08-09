@@ -375,6 +375,21 @@ describe('SupervisionService', () => {
       expect(resourceUsageService.validateSupervisedStart).toHaveBeenCalledWith(5, requester, 99);
     });
 
+    // The authorization fallback hits the DB, which is long enough for the 30s timer to fire. If it
+    // does, the request has already been failed for both the requester and the reader — starting a
+    // session anyway would leave a physical machine unlocked with nobody aware of it.
+    it('does not start a session when the request expires during the authorization check', async () => {
+      const { pending, requestId } = await requestAtReader();
+      const globalManager = { id: 99, username: 'admin' } as User;
+      resourceUsageService.validateSupervisedStart.mockImplementationOnce(async () => {
+        service.cancelReaderRequest(requestId); // stands in for expire() firing mid-query
+      });
+
+      await expect(service.approve(requestId, globalManager)).rejects.toBeInstanceOf(NotFoundException);
+      expect(resourceUsageService.startSession).not.toHaveBeenCalled();
+      await expect(pending).rejects.toBeInstanceOf(RequestTimeoutException);
+    });
+
     it('still refuses an approval from someone the resource does not authorize', async () => {
       resourceUsageService.validateSupervisedStart.mockRejectedValueOnce(new ForbiddenException('nope'));
       const { requestId } = await requestAtReader();

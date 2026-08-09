@@ -360,6 +360,14 @@ export class SupervisionService {
   public async approve(requestId: string, supervisor: User): Promise<ResourceUsage> {
     const request = this.getPendingForSupervisorOrThrow(requestId, supervisor, { allowAnyAuthorized: true });
     await this.assertMayApprove(request, supervisor);
+
+    // assertMayApprove can hit the DB, which is long enough for the 30s timer to fire underneath us.
+    // Without this the request would already be failed and reported as such to both the requester
+    // and the reader, while startSession below still opened a real session on a physical machine.
+    if (this.pending.get(requestId) !== request || request.settled) {
+      throw new NotFoundException('Supervision request not found or already expired');
+    }
+
     this.clear(request);
 
     try {

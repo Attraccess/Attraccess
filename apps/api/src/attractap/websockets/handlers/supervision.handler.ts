@@ -102,17 +102,25 @@ export class AttractapSupervisionHandler implements OnModuleInit {
 
     // "Busy" has to mean "someone would notice", not just "in one of two named sub-flows". Arming
     // seizes the screen, and exiting supervision drops back to the lockscreen — so a reader mid
-    // enrollment, mid card-reset, or with a user partway through a session would lose their context.
+    // enrollment or mid card-reset would lose that user's context.
+    //
+    // Deliberately NOT keyed on `lastAuthenticatedUserId`: that records the last card ever tapped on
+    // this socket and is only cleared by the enrollment paths, so it survives for the life of the
+    // websocket. Using it would make every reader that has been touched once permanently "busy".
     if (
       sockets.some(
-        (socket) =>
-          socket.state.supervisionFlow ||
-          socket.state.enrollNewCardData ||
-          socket.state.resetNfcCardData ||
-          socket.state.lastAuthenticatedUserId,
+        (socket) => socket.state.supervisionFlow || socket.state.enrollNewCardData || socket.state.resetNfcCardData,
       )
     ) {
       throw new ConflictException('The selected reader is busy with another operation');
+    }
+
+    // A live session is the other thing a user would notice losing. Asked of the source of truth
+    // rather than mirrored into socket state, so it cannot go stale.
+    for (const linkedResource of reader.resources ?? []) {
+      if (await this.resourceUsageService.getActiveSession(linkedResource.id, false)) {
+        throw new ConflictException('The selected reader has a session in progress');
+      }
     }
 
     for (const socket of sockets) {
@@ -171,6 +179,13 @@ export class AttractapSupervisionHandler implements OnModuleInit {
 
     const flow = socket.state.supervisionFlow;
     const fail = async (error: string) => {
+      // Tear the server-side request down alongside the socket state — the two belong together (see
+      // cancelForSocket). Leaving it pending would make the requester wait out the full TTL for a
+      // generic timeout instead of this reason, and block them from arming any reader until it
+      // expired. Safe no-op when approve() already settled the request itself.
+      if (flow?.requestId) {
+        this.supervisionService.cancelReaderRequest(flow.requestId);
+      }
       socket.state.supervisionFlow = null;
       await socket.sendMessage(new AttractapEvent(AttractapEventType.SUPERVISION_RESOLVED, { success: false, error }));
     };
