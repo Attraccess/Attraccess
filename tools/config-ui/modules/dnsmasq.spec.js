@@ -225,6 +225,38 @@ describe('dnsmasq init generates config + hosts files with sane defaults', () =>
     );
   });
 
+  it('respawns dnsmasq after an unexpected exit, and stops once shut down', () => {
+    // On balena reboot the LAN interface / port 53 isn't ready yet, dnsmasq exits
+    // immediately, and without a retry it stayed dead until someone hit Save.
+    jest.useFakeTimers();
+    const { mod, restore } = loadModule({ DNS_SERVER_ENABLED: 'true' });
+    // loadModule resets modules, so grab the spawn mock the module actually sees.
+    const { spawn } = require('child_process');
+    const exitHandlers = [];
+    spawn.mockImplementation(() => ({
+      pid: 123,
+      stdout: { on: jest.fn() },
+      stderr: { on: jest.fn() },
+      kill: jest.fn(),
+      on: (event, cb) => { if (event === 'exit') exitHandlers.push(cb); },
+    }));
+
+    mod.init();
+    restore();
+    expect(spawn).toHaveBeenCalledTimes(1);
+
+    exitHandlers[0](1);
+    jest.advanceTimersByTime(5000);
+    expect(spawn).toHaveBeenCalledTimes(2);
+
+    mod.shutdown();
+    exitHandlers[1](0);
+    jest.advanceTimersByTime(60000);
+    expect(spawn).toHaveBeenCalledTimes(2);
+
+    jest.useRealTimers();
+  });
+
   it('emits listen-address when DNS_LISTEN_ADDRESS is set', () => {
     const { mod, writes, restore } = loadModule({
       DNS_SERVER_ENABLED: 'true',

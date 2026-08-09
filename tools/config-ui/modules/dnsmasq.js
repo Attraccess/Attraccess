@@ -123,9 +123,26 @@ function writeDnsmasqConfig(records, settings) {
 }
 
 let dnsmasqProcess = null;
+let restartTimer = null;
+let stopped = false;
+const RESTART_DELAY_MS = Number(process.env.DNS_RESTART_DELAY_MS) || 5000;
+
+// ponytail: fixed 5s retry, no backoff. The boot failure is transient — at reboot
+// the LAN interface (listen-address + bind-interfaces) or port 53 isn't free yet,
+// which clears within seconds. Add backoff if a permanent misconfig spams the log.
+function scheduleRestart() {
+  if (stopped || restartTimer) return;
+  restartTimer = setTimeout(() => {
+    restartTimer = null;
+    log('retrying start');
+    startDnsmasq();
+  }, RESTART_DELAY_MS);
+  if (restartTimer.unref) restartTimer.unref();
+}
 
 function startDnsmasq() {
   if (dnsmasqProcess) return;
+  stopped = false;
   try {
     // ,*.conf restricts conf-dir to *.conf files so the addn-hosts file
     // (/etc/dnsmasq.d/custom-hosts) is NOT parsed as a config file. Without it
@@ -138,10 +155,24 @@ function startDnsmasq() {
     dnsmasqProcess.on('exit', (code) => {
       log(`exited with code ${code}`);
       dnsmasqProcess = null;
+      scheduleRestart();
     });
     log(`started (pid ${dnsmasqProcess.pid})`);
   } catch (err) {
     log(`failed to start: ${err.message}`);
+    dnsmasqProcess = null;
+    scheduleRestart();
+  }
+}
+
+function stopDnsmasq() {
+  stopped = true;
+  if (restartTimer) {
+    clearTimeout(restartTimer);
+    restartTimer = null;
+  }
+  if (dnsmasqProcess) {
+    dnsmasqProcess.kill('SIGTERM');
     dnsmasqProcess = null;
   }
 }
@@ -167,10 +198,7 @@ function writeHostsAndReload(records) {
 }
 
 function restartDnsmasq(records, settings) {
-  if (dnsmasqProcess) {
-    dnsmasqProcess.kill('SIGTERM');
-    dnsmasqProcess = null;
-  }
+  stopDnsmasq();
   writeDnsmasqConfig(records, settings);
   startDnsmasq();
 }
@@ -207,10 +235,7 @@ const dnsmasqModule = {
   },
 
   shutdown() {
-    if (dnsmasqProcess) {
-      dnsmasqProcess.kill('SIGTERM');
-      dnsmasqProcess = null;
-    }
+    stopDnsmasq();
   },
 
   async handleRequest(method, subPath, subParts, req, res, helpers) {
