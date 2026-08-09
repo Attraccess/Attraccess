@@ -86,6 +86,8 @@ export function ResourceUsageSession({
   const canStartSession = canUpdateResources || access?.canControl || isIntroducer;
 
   // A not-introduced user may still start via a supervisor when the resource allows it.
+  // The stricter supervision_required case is decided inside StartSessionControls, so that every
+  // call site of those controls gets it — including the maintenance view (ATT-815).
   const supervisionEnabled =
     resource.supervisionMode === SupervisionMode.SUPERVISION_ALLOWED ||
     resource.supervisionMode === SupervisionMode.SUPERVISION_REQUIRED;
