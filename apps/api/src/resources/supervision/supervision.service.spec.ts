@@ -362,6 +362,52 @@ describe('SupervisionService', () => {
       );
     });
 
+    // The guard exists to stop someone deliberately claiming several screens, and that person fires
+    // requests in parallel rather than one after another — the case the sequential test never covers.
+    it('refuses concurrent reader arms from the same requester', async () => {
+      const rejections: unknown[] = [];
+      // The winner's promise stays pending by design (it is waiting for approval), so collect
+      // rejections as they land rather than awaiting all three.
+      [7, 8, 9].forEach((readerId) => {
+        service.requestSupervisedSession(5, requester, { readerId }).catch((error) => rejections.push(error));
+      });
+      await flush();
+
+      expect(armer.arm).toHaveBeenCalledTimes(1);
+      expect(rejections).toHaveLength(2);
+      expect(rejections[0]).toBeInstanceOf(ConflictException);
+    });
+
+    // Arming can take seconds (ACK retries). The request has to be resolvable for that whole window,
+    // or a disconnect/tap during it hits an empty map and no-ops, stranding the requester for the TTL.
+    it('settles a request cancelled while the reader was still being armed', async () => {
+      let capturedId: string | undefined;
+      armer.arm.mockImplementationOnce(async ({ requestId }: { requestId: string }) => {
+        capturedId = requestId;
+        // Stands in for the reader disconnecting mid-arm.
+        service.cancelReaderRequest(requestId);
+        return readerCallbacks;
+      });
+
+      const pending = service.requestSupervisedSession(5, requester, { readerId: 7 });
+
+      await expect(pending).rejects.toBeInstanceOf(RequestTimeoutException);
+      expect(capturedId).toBeDefined();
+      // The reader is told to stop waiting rather than being left on a live-looking screen.
+      expect(readerCallbacks.onFailed).toHaveBeenCalled();
+    });
+
+    it('unwinds the registration when arming fails, so the requester can try again', async () => {
+      armer.arm.mockRejectedValueOnce(new BadRequestException('The selected reader is offline'));
+
+      await expect(service.requestSupervisedSession(5, requester, { readerId: 7 })).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+
+      // No orphan left behind: a retry is not blocked by the one-arm-per-requester guard.
+      await expect(requestAtReader()).resolves.toBeDefined();
+    });
+
     // The reader accepts a global resources.update holder's card (validateSupervisedStart does), but
     // they are not in the broadcast list — so approval has to accept them too, or the card beeps
     // success and then nothing happens.

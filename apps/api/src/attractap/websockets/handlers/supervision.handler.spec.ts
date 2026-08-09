@@ -21,7 +21,7 @@ describe('AttractapSupervisionHandler', () => {
     ({
       id: 'socket-1',
       readerId: READER_ID,
-      sendMessage: jest.fn().mockResolvedValue(undefined),
+      sendMessage: jest.fn().mockResolvedValue(true),
       state: {
         lastAuthenticatedUserId: null,
         enrollNewCardData: null,
@@ -142,6 +142,43 @@ describe('AttractapSupervisionHandler', () => {
 
       await expect(arm()).rejects.toBeInstanceOf(NotFoundException);
     });
+
+    // sendMessage resolves false after exhausting its ACK retries rather than throwing, so a reader
+    // that is connected but not listening used to arm "successfully" — 200 plus a 30s countdown at a
+    // screen that never appeared.
+    it('refuses a reader that never acknowledges, and leaves no flow behind', async () => {
+      const socket = makeSocket();
+      (socket.sendMessage as jest.Mock).mockResolvedValue(false);
+      websocketService.sockets.set('a', socket);
+
+      await expect(arm()).rejects.toBeInstanceOf(BadRequestException);
+      expect(socket.state.supervisionFlow).toBeNull();
+    });
+
+    it('arms when at least one of the reader sockets acknowledges', async () => {
+      const stale = makeSocket();
+      (stale.sendMessage as jest.Mock).mockResolvedValue(false);
+      const live = makeSocket();
+      websocketService.sockets.set('a', stale);
+      websocketService.sockets.set('b', live);
+
+      await expect(arm()).resolves.toBeDefined();
+      expect(live.state.supervisionFlow).not.toBeNull();
+    });
+
+    // The session lookup is a DB round-trip; with it after the socket check, two concurrent arms
+    // both passed the check before either claimed the socket, and the second silently overwrote the
+    // first — leaving the first requester with no resolution and no failure.
+    it('does not let a concurrent arm overwrite an in-flight one', async () => {
+      const socket = makeSocket();
+      websocketService.sockets.set('a', socket);
+
+      const results = await Promise.allSettled([arm(), arm()]);
+
+      const rejected = results.filter((r) => r.status === 'rejected') as PromiseRejectedResult[];
+      expect(rejected).toHaveLength(1);
+      expect(rejected[0].reason).toBeInstanceOf(ConflictException);
+    });
   });
 
   describe('handleSupervisorCardAuthConfirmed', () => {
@@ -192,7 +229,7 @@ describe('AttractapSupervisionHandler', () => {
 
       await confirm(socket, { resourceId: RESOURCE_ID });
 
-      expect(supervisionService.cancelReaderRequest).toHaveBeenCalledWith('req-1');
+      expect(supervisionService.cancelReaderRequest).toHaveBeenCalledWith('req-1', expect.any(String));
       expect(socket.state.supervisionFlow).toBeNull();
     });
 
@@ -202,7 +239,7 @@ describe('AttractapSupervisionHandler', () => {
 
       await confirm(socket, { resourceId: RESOURCE_ID });
 
-      expect(supervisionService.cancelReaderRequest).toHaveBeenCalledWith('req-1');
+      expect(supervisionService.cancelReaderRequest).toHaveBeenCalledWith('req-1', expect.any(String));
     });
   });
 });

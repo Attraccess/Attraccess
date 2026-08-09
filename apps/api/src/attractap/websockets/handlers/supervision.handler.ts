@@ -100,27 +100,30 @@ export class AttractapSupervisionHandler implements OnModuleInit {
       throw new BadRequestException('The selected reader is offline');
     }
 
-    // "Busy" has to mean "someone would notice", not just "in one of two named sub-flows". Arming
-    // seizes the screen, and exiting supervision drops back to the lockscreen — so a reader mid
-    // enrollment or mid card-reset would lose that user's context.
+    // A live session is something a user would notice losing. Asked of the source of truth rather
+    // than mirrored into socket state, so it cannot go stale.
     //
-    // Deliberately NOT keyed on `lastAuthenticatedUserId`: that records the last card ever tapped on
-    // this socket and is only cleared by the enrollment paths, so it survives for the life of the
-    // websocket. Using it would make every reader that has been touched once permanently "busy".
+    // Checked BEFORE the socket state below, deliberately: this is a DB round-trip, and an await
+    // between the socket check and the assignment would let two concurrent arms of the same reader
+    // both pass and the second silently overwrite the first.
+    for (const linkedResource of reader.resources ?? []) {
+      if (await this.resourceUsageService.getActiveSession(linkedResource.id, false)) {
+        throw new ConflictException('The selected reader has a session in progress');
+      }
+    }
+
+    // --- no awaits from here to the assignment, so check-and-claim stays atomic ---
+
+    // "Busy" also means a sub-flow that owns the screen. Deliberately NOT keyed on
+    // `lastAuthenticatedUserId`: that records the last card ever tapped on this socket and is only
+    // cleared by the enrollment paths, so it survives for the life of the websocket. Using it would
+    // make every reader that has been touched once permanently "busy".
     if (
       sockets.some(
         (socket) => socket.state.supervisionFlow || socket.state.enrollNewCardData || socket.state.resetNfcCardData,
       )
     ) {
       throw new ConflictException('The selected reader is busy with another operation');
-    }
-
-    // A live session is the other thing a user would notice losing. Asked of the source of truth
-    // rather than mirrored into socket state, so it cannot go stale.
-    for (const linkedResource of reader.resources ?? []) {
-      if (await this.resourceUsageService.getActiveSession(linkedResource.id, false)) {
-        throw new ConflictException('The selected reader has a session in progress');
-      }
     }
 
     for (const socket of sockets) {
@@ -134,22 +137,35 @@ export class AttractapSupervisionHandler implements OnModuleInit {
     }
 
     // Send to every socket for this reader so a stale/disconnecting one cannot swallow the event.
-    await Promise.all(
-      sockets.map(async (socket) => {
-        try {
-          await socket.sendMessage(
+    const acknowledged = await Promise.all(
+      sockets.map((socket) =>
+        socket
+          .sendMessage(
             new AttractapEvent(AttractapEventType.SUPERVISION_START, {
               requestId,
               resourceId,
               requesterUsername: requester.username,
               timeoutMs: SupervisionService.APPROVAL_TTL_MS,
             }),
-          );
-        } catch (error) {
-          this.logger.debug(`Failed to send SUPERVISION_START to client ${socket.id}: ${String(error)}`);
-        }
-      }),
+          )
+          .catch((error) => {
+            this.logger.debug(`Failed to send SUPERVISION_START to client ${socket.id}: ${String(error)}`);
+            return false;
+          }),
+      ),
     );
+
+    // A connected-but-unresponsive reader used to arm "successfully": the caller got a 200 and a 30s
+    // countdown at a screen that never appeared. One ACK is enough — with several sockets for one
+    // reader, the others may legitimately be stale.
+    if (!acknowledged.some(Boolean)) {
+      for (const socket of sockets) {
+        if (socket.state.supervisionFlow?.requestId === requestId) {
+          socket.state.supervisionFlow = null;
+        }
+      }
+      throw new BadRequestException('The selected reader did not respond');
+    }
 
     const notifyReader = (payload: Record<string, unknown>) => {
       for (const socket of sockets) {
@@ -184,7 +200,7 @@ export class AttractapSupervisionHandler implements OnModuleInit {
       // generic timeout instead of this reason, and block them from arming any reader until it
       // expired. Safe no-op when approve() already settled the request itself.
       if (flow?.requestId) {
-        this.supervisionService.cancelReaderRequest(flow.requestId);
+        this.supervisionService.cancelReaderRequest(flow.requestId, `Supervision failed at the reader: ${error}`);
       }
       socket.state.supervisionFlow = null;
       await socket.sendMessage(new AttractapEvent(AttractapEventType.SUPERVISION_RESOLVED, { success: false, error }));

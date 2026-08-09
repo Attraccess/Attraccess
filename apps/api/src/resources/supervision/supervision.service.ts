@@ -40,6 +40,11 @@ interface PendingSupervisionRequest {
   settled: boolean;
   /** Present for reader-originated requests (ATT-493); drives reader-websocket notifications. */
   readerCallbacks?: ReaderSupervisionCallbacks;
+  /**
+   * The reader this request armed from the web (ATT-816). Set synchronously at registration, before
+   * arming, so the one-armed-reader-per-requester scan sees concurrent requests.
+   */
+  readerId?: number;
 }
 
 /**
@@ -165,14 +170,6 @@ export class SupervisionService {
       throw new ServiceUnavailableException('Reader-based supervision is unavailable');
     }
 
-    // One armed reader per requester at a time. Arming claims a shared physical screen for 30s, so
-    // without this a single user could hold several readers hostage, or re-arm one in a loop.
-    for (const pending of this.pending.values()) {
-      if (pending.readerCallbacks && pending.requester.id === requester.id && pending.supervisorUserId === null) {
-        throw new ConflictException('You already have a supervision request waiting at a reader');
-      }
-    }
-
     await this.resourceUsageService.assertSupportsSupervision(resourceId);
 
     const eligibleSupervisorIds = await this.getEligibleSupervisorIds(resourceId, requester.id);
@@ -180,20 +177,51 @@ export class SupervisionService {
       throw new BadRequestException('This resource has no other introducer or maintainer who could supervise');
     }
 
-    // Arm before registering the request: a rejected reader (offline, busy) must fail the caller
-    // immediately rather than leave them watching a countdown nobody can answer.
-    const id = randomUUID();
-    const callbacks = await this.readerArmer.arm({ readerId, resourceId, requester, requestId: id });
+    // --- no awaits from here until the request is registered ---
 
-    const { promise } = this.createPending({
-      id,
+    // One armed reader per requester at a time. Arming claims a shared physical screen for 30s, so
+    // without this a single user could hold several readers hostage, or re-arm one in a loop. The
+    // scan and the registration below must stay in the same synchronous run, or N parallel requests
+    // all see an empty map and all arm — which is exactly what someone abusing this would do.
+    for (const pending of this.pending.values()) {
+      if (pending.readerId !== undefined && pending.requester.id === requester.id) {
+        throw new ConflictException('You already have a supervision request waiting at a reader');
+      }
+    }
+
+    // Registered before arming, so the id the reader is about to carry is already resolvable. Arming
+    // can take seconds (ACK retries); a disconnect or a card tap in that window used to hit
+    // `pending.get(id) === undefined` and no-op, leaving the requester to wait out the full TTL.
+    const { id, promise } = this.createPending({
       resourceId,
       requester,
       dto,
       supervisorUserId: null,
       eligibleSupervisorIds,
-      readerCallbacks: callbacks,
+      readerId,
     });
+    const request = this.pending.get(id);
+
+    let callbacks: ReaderSupervisionCallbacks;
+    try {
+      callbacks = await this.readerArmer.arm({ readerId, resourceId, requester, requestId: id });
+    } catch (error) {
+      // A rejected reader (offline, busy, unresponsive) fails the caller immediately rather than
+      // leaving them watching a countdown nobody can answer. Unwind the registration.
+      this.clear(request);
+      this.fail(request, error as Error);
+      promise.catch(() => undefined);
+      throw error;
+    }
+
+    // Settled while we were arming — the reader disconnected, or a card tap started a session. The
+    // requester's promise already carries that outcome; just make sure the reader stops waiting.
+    if (this.pending.get(id) !== request) {
+      callbacks.onFailed(new RequestTimeoutException('The supervision request ended before the reader was ready'));
+      return promise;
+    }
+
+    request.readerCallbacks = callbacks;
 
     this.logger.debug(
       `Supervision request ${id} created for resource ${resourceId} at reader ${readerId} ` +
@@ -271,6 +299,7 @@ export class SupervisionService {
     supervisorUserId: number | null;
     eligibleSupervisorIds: number[];
     readerCallbacks?: ReaderSupervisionCallbacks;
+    readerId?: number;
   }): { id: string; expiresAt: Date; promise: Promise<ResourceUsage> } {
     const id = params.id ?? randomUUID();
     const createdAt = new Date();
@@ -297,6 +326,7 @@ export class SupervisionService {
         reject,
         settled: false,
         readerCallbacks: params.readerCallbacks,
+        readerId: params.readerId,
       });
     });
 
@@ -341,7 +371,7 @@ export class SupervisionService {
    * Cancels a reader request because the reader timed out, was disconnected, or the requester
    * aborted. Dismisses the web popups; does not invoke the reader callbacks (the reader already knows).
    */
-  public cancelReaderRequest(requestId: string): void {
+  public cancelReaderRequest(requestId: string, reason?: string): void {
     const request = this.pending.get(requestId);
     if (!request) {
       return;
@@ -349,7 +379,8 @@ export class SupervisionService {
     this.clear(request);
     // Fail rather than just mark settled: a web-initiated request (ATT-816) has a caller blocked on
     // this promise, and its expiry timer has just been cleared — marking it settled would hang them.
-    this.fail(request, new RequestTimeoutException('The supervision request was cancelled at the reader'));
+    // `reason` lets the caller hear what actually killed it instead of a generic timeout.
+    this.fail(request, new RequestTimeoutException(reason ?? 'The supervision request was cancelled at the reader'));
     this.emitToEligible(request, SupervisionLiveEventType.EXPIRED);
   }
 

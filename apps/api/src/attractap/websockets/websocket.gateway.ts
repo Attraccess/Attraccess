@@ -212,8 +212,10 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
         this.logger.error(
           `Client did not send ACK for ${message.data.type} after ${RETRY_COUNT} attempts. Won't try again.`,
         );
-        return;
+        return false;
       }
+
+      return true;
     };
 
     const sendBinaryData = (data: Buffer) => {
