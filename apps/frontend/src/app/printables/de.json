@@ -1,0 +1,17 @@
+{
+  "pageTitle": "3D-Modelle",
+  "pageSubtitle": "Druckbare Teile für Attraccess. Alles wird direkt im Browser erzeugt.",
+  "cardTitle": "NFC-Schlüsselanhänger",
+  "cardDescription": "Ein 60 x 40 x 2 mm großer Anhänger mit Schlüsselring-Loch und Aussparung für einen 25-mm-NFC-Sticker.",
+  "labelField": "Beschriftung",
+  "labelPlaceholder": "Makerspace",
+  "labelDescription": "Erscheint groß in der Mitte der Karte. Wird bei Bedarf automatisch verkleinert.",
+  "format": "Format",
+  "formatStl": "STL (ZIP, zwei Teile)",
+  "format3mf": "3MF (eine Datei, farbig)",
+  "download": "Herunterladen",
+  "rendering": "Wird erzeugt...",
+  "downloadScad": "OpenSCAD-Quelldatei herunterladen",
+  "printTip": "Zweifarbig: beide Teile gemeinsam importieren. Den Druck bei Z = 1,125 mm pausieren, den NFC-Sticker einlegen und fortsetzen.",
+  "errorTitle": "Modell konnte nicht erzeugt werden"
+}

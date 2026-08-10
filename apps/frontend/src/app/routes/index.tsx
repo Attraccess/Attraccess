@@ -55,6 +55,8 @@ const EditEmailTemplatePage = lazy(() => import('../email-templates/edit'));
 const UserSecurityPage = lazy(() => import('../user-management/security'));
 const MessagingSettingsPage = lazy(() => import('../messaging/settings'));
 const MonitoringPage = lazy(() => import('../monitoring'));
+// three.js + the OpenSCAD loader are large; keep them out of the main bundle.
+const PrintablesPage = lazy(() => import('../printables'));
 
 const coreRoutes: RouteConfig[] = [
   {
@@ -374,6 +376,15 @@ const coreRoutes: RouteConfig[] = [
   {
     path: '/messages',
     element: <MessagesPage />,
+    authRequired: true,
+  },
+  {
+    path: '/printables',
+    element: (
+      <Suspense fallback={<div className="flex items-center justify-center p-8"><Spinner size="sm" /></div>}>
+        <PrintablesPage />
+      </Suspense>
+    ),
     authRequired: true,
   },
   {

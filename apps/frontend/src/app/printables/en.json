@@ -1,0 +1,17 @@
+{
+  "pageTitle": "3D Models",
+  "pageSubtitle": "Printable parts that work with Attraccess. Everything is generated in your browser.",
+  "cardTitle": "NFC Keychain Card",
+  "cardDescription": "A 60 x 40 x 2 mm tag with a keyring hole and a pocket for a 25 mm NFC sticker.",
+  "labelField": "Label",
+  "labelPlaceholder": "Makerspace",
+  "labelDescription": "Shown large in the middle of the card. Shrinks automatically to fit.",
+  "format": "Format",
+  "formatStl": "STL (zip, two parts)",
+  "format3mf": "3MF (single file, coloured)",
+  "download": "Download",
+  "rendering": "Generating...",
+  "downloadScad": "Download the OpenSCAD source",
+  "printTip": "Two colours: import both parts together. Pause the print at Z = 1.125 mm to drop in the NFC sticker, then resume.",
+  "errorTitle": "Could not generate the model"
+}

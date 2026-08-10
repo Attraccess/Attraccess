@@ -1,6 +1,7 @@
 import {
   ActivityIcon,
   BookOpenIcon,
+  BoxIcon,
   BugIcon,
   CogIcon,
   CreditCardIcon,
@@ -75,6 +76,11 @@ export function useSidebarItems(): (SidebarItem | SidebarItemGroup)[] {
         path: '/messages',
         icon: MessageSquareIcon,
         badgeCount: unread?.total,
+      },
+      {
+        translationKey: 'printables',
+        path: '/printables',
+        icon: BoxIcon,
       },
     ];
 
