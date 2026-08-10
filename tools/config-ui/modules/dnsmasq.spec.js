@@ -286,6 +286,39 @@ describe('dnsmasq init generates config + hosts files with sane defaults', () =>
     jest.useRealTimers();
   });
 
+  it('survives an EMFILE spawn, where stdio is never created', () => {
+    // On EMFILE/ENFILE spawn returns a process with no stdout/stderr but still
+    // queues an error emit. Wiring stdio throws, so the error listener has to be
+    // attached first or the emit is unhandled and takes config-ui down.
+    jest.useFakeTimers();
+    const { mod, restore } = loadModule({ DNS_SERVER_ENABLED: 'true', DNS_RESTART_DELAY_MS: '1000' });
+    const { spawn, procs } = mockSpawnedProcesses();
+    spawn.mockImplementationOnce(() => {
+      const handlers = {};
+      const proc = {
+        pid: undefined,
+        stdout: undefined,
+        stderr: undefined,
+        kill: jest.fn(),
+        on: (event, cb) => { handlers[event] = cb; },
+        emit: (event, arg) => handlers[event](arg),
+      };
+      procs.push(proc);
+      return proc;
+    });
+
+    mod.init();
+    restore();
+
+    // Would throw "handlers.error is not a function" if stdio wiring came first.
+    expect(() => procs[0].emit('error', new Error('spawn dnsmasq EMFILE'))).not.toThrow();
+    jest.advanceTimersByTime(1000);
+    expect(spawn).toHaveBeenCalledTimes(2); // one retry, not two
+
+    mod.shutdown();
+    jest.useRealTimers();
+  });
+
   it('ignores the exit of a process that a restart already replaced', async () => {
     // The killed process exits only after its replacement is spawned. Acting on
     // that late event would drop the live process and respawn a second dnsmasq.

@@ -151,28 +151,29 @@ function startDnsmasq() {
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     dnsmasqProcess = proc;
-    proc.stdout.on('data', (data) => log(`${data.toString().trim()}`));
-    proc.stderr.on('data', (data) => log(`${data.toString().trim()}`));
-    // A killed process exits after its replacement has spawned; ignoring events
-    // from a superseded proc keeps it from clearing the live reference and
-    // respawning a second dnsmasq.
-    proc.on('exit', (code) => {
-      log(`exited with code ${code}`);
-      if (dnsmasqProcess !== proc) return;
-      dnsmasqProcess = null;
-      scheduleRestart();
-    });
     // spawn reports a failed exec (ENOENT, EAGAIN under memory pressure at boot)
     // as an async error event, not a throw — and an unhandled one kills config-ui.
+    // Attach before touching proc.stdout: on EMFILE/ENFILE the stdio streams are
+    // never created, so wiring them throws and would leave 'error' unhandled.
+    // Events from a superseded proc are ignored so a process killed by a restart
+    // can't clear the live reference and respawn a second dnsmasq.
     proc.on('error', (err) => {
       log(`failed to start: ${err.message}`);
       if (dnsmasqProcess !== proc) return;
       dnsmasqProcess = null;
       scheduleRestart();
     });
+    proc.on('exit', (code) => {
+      log(`exited with code ${code}`);
+      if (dnsmasqProcess !== proc) return;
+      dnsmasqProcess = null;
+      scheduleRestart();
+    });
+    proc.stdout.on('data', (data) => log(`${data.toString().trim()}`));
+    proc.stderr.on('data', (data) => log(`${data.toString().trim()}`));
     log(`started (pid ${proc.pid})`);
   } catch (err) {
-    // Only malformed args/options reach here; a failed exec emits 'error'.
+    // Malformed args/options, or EMFILE/ENFILE leaving proc.stdout undefined.
     log(`failed to start: ${err.message}`);
     dnsmasqProcess = null;
     scheduleRestart();
