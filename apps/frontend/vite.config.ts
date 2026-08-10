@@ -77,6 +77,8 @@ export default defineConfig(({ command }) => {
         workbox: {
           clientsClaim: true,
           skipWaiting: true,
+          // Deliberately excludes `wasm`: apps/frontend/public/openscad/openscad.wasm
+          // is 10.3 MB and is fetched on demand by the /printables page only.
           globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg,jpeg,webp,bin,json}'],
           cleanupOutdatedCaches: true,
         },
@@ -90,6 +92,13 @@ export default defineConfig(({ command }) => {
           minify: process.env.NODE_ENV === 'production',
           enableWorkboxModulesLogs: false,
           maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+          // With strategies: 'injectManifest', workbox-build reads globPatterns from
+          // *this* object, not from the `workbox` option above (that one only applies
+          // to the 'generateSW' strategy and is otherwise inert here). Its own default
+          // is ['**/*.{js,wasm,css,html}'], which WOULD precache openscad.wasm.
+          // Deliberately excludes `wasm`: apps/frontend/public/openscad/openscad.wasm
+          // is 10.3 MB and is fetched on demand by the /printables page only.
+          globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg,jpeg,webp,bin,json}'],
         },
         devOptions: {
           enabled: true,
