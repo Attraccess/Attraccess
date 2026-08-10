@@ -22,9 +22,21 @@ export function toGeometry(mesh: Mesh): THREE.BufferGeometry {
   return geometry;
 }
 
+/**
+ * Removes `group`'s meshes from `scene` and disposes their geometries and materials. Exported so
+ * disposal can be exercised in tests without standing up a `WebGLRenderer` (which happy-dom
+ * cannot provide) — a `THREE.Scene`/`THREE.Mesh` graph needs no GL context to build or tear down.
+ */
+export function disposeMeshGroup(scene: THREE.Scene, group: THREE.Mesh[]): void {
+  for (const mesh of group) {
+    scene.remove(mesh);
+    mesh.geometry.dispose();
+    (mesh.material as THREE.Material).dispose();
+  }
+}
+
 export function Preview({ body, letters }: PreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const meshesRef = useRef<THREE.Mesh[]>([]);
   const sceneRef = useRef<THREE.Scene | null>(null);
 
   // Scene setup runs once; only the geometry changes as the label is edited.
@@ -84,15 +96,13 @@ export function Preview({ body, letters }: PreviewProps) {
     };
   }, []);
 
+  // Rebuilds the mesh pair whenever the STL data changes. The cleanup below disposes exactly the
+  // group this run created (captured by closure, not read back from a ref), so it fires both when
+  // swapping to a newer pair and on unmount — no pair is ever left undisposed, and because each
+  // run's cleanup only ever touches its own group, two runs can never dispose the same objects.
   useEffect(() => {
     const scene = sceneRef.current;
     if (!scene) return;
-
-    for (const mesh of meshesRef.current) {
-      scene.remove(mesh);
-      mesh.geometry.dispose();
-      (mesh.material as THREE.Material).dispose();
-    }
 
     // The card is modelled in the first octant; centre it so it orbits about itself.
     const group: THREE.Mesh[] = [
@@ -111,7 +121,7 @@ export function Preview({ body, letters }: PreviewProps) {
       scene.add(mesh);
     }
 
-    meshesRef.current = group;
+    return () => disposeMeshGroup(scene, group);
   }, [body, letters]);
 
   return <div ref={containerRef} className="h-80 w-full" />;
