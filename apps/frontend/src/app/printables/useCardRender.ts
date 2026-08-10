@@ -67,6 +67,13 @@ export function useCardRender(label: string): {
   }, []);
 
   useEffect(() => {
+    // Advance the generation here rather than inside the debounced callback. A render already
+    // in flight for the previous label has to become stale the instant the label changes:
+    // otherwise its response still matches `requestId.current`, flips status back to 'ready',
+    // and the download button briefly hands out the OLD geometry under the NEW label's
+    // filename. Bumping on every label change closes that window.
+    const id = ++requestId.current;
+
     setStatus('rendering');
     // Clear a previous failure as soon as this render starts (not inside the debounced
     // callback below) so it doesn't linger through the whole next render. This runs once per
@@ -74,7 +81,7 @@ export function useCardRender(label: string): {
     // back while the user is still typing.
     setError(null);
     const timer = setTimeout(() => {
-      const request: RenderRequest = { id: ++requestId.current, label };
+      const request: RenderRequest = { id, label };
       workerRef.current?.postMessage(request);
     }, DEBOUNCE_MS);
 

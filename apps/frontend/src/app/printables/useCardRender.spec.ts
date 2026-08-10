@@ -46,7 +46,9 @@ describe('useCardRender', () => {
 
     const worker = FakeWorker.instances[0];
     expect(worker.postMessage).toHaveBeenCalledTimes(1);
-    expect(worker.postMessage).toHaveBeenCalledWith({ id: 1, label: 'ABC' });
+    // The id is a generation counter bumped on every label change (3 renders here), not a
+    // count of posted messages — that is what makes an in-flight render stale immediately.
+    expect(worker.postMessage).toHaveBeenCalledWith({ id: 3, label: 'ABC' });
   });
 
   it('ignores a stale response but still adopts the response matching the latest request', () => {
@@ -91,6 +93,37 @@ describe('useCardRender', () => {
     expect(result.current.result?.lettersStl).toBe(currentLetters);
     expect(parseBinaryStl).toHaveBeenCalledWith(currentBody);
     expect(parseBinaryStl).toHaveBeenCalledWith(currentLetters);
+  });
+
+  it('rejects an in-flight response once the label changes, before the next render is posted', () => {
+    const { result, rerender } = renderHook(({ label }) => useCardRender(label), { initialProps: { label: 'A' } });
+
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+
+    const worker = FakeWorker.instances[0];
+    const posted = worker.postMessage.mock.calls[0][0] as { id: number };
+
+    // The user types again while that render is still running. The new render has NOT been
+    // posted yet — it is still inside the 500ms debounce — so this is the window where a
+    // response for the old label used to be accepted and offered for download under the new
+    // label's filename.
+    rerender({ label: 'AB' });
+
+    const inFlightResponse: RenderResponse = {
+      id: posted.id,
+      ok: true,
+      body: new ArrayBuffer(8),
+      letters: new ArrayBuffer(4),
+    };
+    act(() => {
+      worker.onmessage?.({ data: inFlightResponse } as MessageEvent<RenderResponse>);
+    });
+
+    expect(result.current.status).toBe('rendering');
+    expect(result.current.result).toBeNull();
+    expect(parseBinaryStl).not.toHaveBeenCalled();
   });
 
   it('clears a stale error as soon as a new render starts, not only once it succeeds', () => {
