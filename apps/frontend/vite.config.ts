@@ -106,10 +106,10 @@ export default defineConfig(({ command }) => {
         },
       }),
     ],
-    // Uncomment this if you are using workers.
-    // worker: {
-    //  plugins: [ nxViteTsPaths() ],
-    // },
+    worker: {
+      format: 'es',
+      plugins: () => [nxViteTsPaths()],
+    },
     build: {
       outDir: '../../dist/apps/frontend',
       emptyOutDir: true,

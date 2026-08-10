@@ -35,4 +35,13 @@ module.exports = [
       ...reactCompilerRulesAsWarn,
     },
   },
+  {
+    // Web worker entry points run outside a window: `self` is the legitimate global
+    // (there is no `window`), not the confusing-browser-global that this rule guards
+    // against in ordinary app code.
+    files: ['**/*.worker.ts'],
+    rules: {
+      'no-restricted-globals': 'off',
+    },
+  },
 ];
