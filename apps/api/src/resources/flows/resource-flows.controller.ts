@@ -162,6 +162,20 @@ export class ResourceFlowsController {
     return this.flowLogs.getLogs(resourceId);
   }
 
+  @Get('logs/recording')
+  @ApiOperation({
+    summary: 'Get flow log recording status',
+    description:
+      'Retrieve only whether a recording is currently active and when it started and expires. Cheap enough to poll: unlike the logs endpoint it never returns the collected entries.',
+    operationId: 'getFlowLogRecordingStatus',
+  })
+  @ApiParam({ name: 'resourceId', type: 'integer', example: 1 })
+  @ApiResponse({ status: 200, description: 'Recording status retrieved successfully', type: FlowLogRecordingDto })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions to manage resources' })
+  getFlowLogRecordingStatus(@Param('resourceId', ParseIntPipe) resourceId: number): FlowLogRecordingDto {
+    return this.flowLogs.getStatus(resourceId);
+  }
+
   @Post('logs/recording')
   @ApiOperation({
     summary: 'Start recording flow logs',

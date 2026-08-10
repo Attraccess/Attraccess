@@ -21,9 +21,10 @@ import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-front
 import {
   ResourceFlowLog,
   ResourceFlowNodeDto,
+  useResourceFlowsServiceGetFlowLogRecordingStatus,
+  useResourceFlowsServiceGetFlowLogRecordingStatusKey,
   useResourceFlowsServiceGetResourceFlow,
   useResourceFlowsServiceGetResourceFlowLogs,
-  useResourceFlowsServiceGetResourceFlowLogsKey,
   useResourceFlowsServiceStartFlowLogRecording,
   useResourceFlowsServiceStopFlowLogRecording,
 } from '@attraccess/react-query-client';
@@ -113,27 +114,41 @@ export function LogViewer(props: Props) {
   const queryClient = useQueryClient();
 
   const { data: flowData } = useResourceFlowsServiceGetResourceFlow({ resourceId: props.resourceId });
-  const { data: logs } = useResourceFlowsServiceGetResourceFlowLogs(
+
+  // Recording expires on its own; poll while the drawer is open to notice. Status only —
+  // polling the logs endpoint would re-ship the whole buffer every tick.
+  const { data: recording } = useResourceFlowsServiceGetFlowLogRecordingStatus(
     { resourceId: props.resourceId },
     undefined,
-    // Recording expires on its own; poll while the drawer is open to notice.
     { refetchInterval: isOpen ? 10_000 : false },
   );
 
-  const invalidateLogs = useCallback(
-    () => queryClient.invalidateQueries({ queryKey: [useResourceFlowsServiceGetResourceFlowLogsKey] }),
+  const isRecording = recording?.isRecording ?? false;
+
+  // Fetched once per recording to pick up whatever was collected before the drawer opened;
+  // everything after that arrives over SSE, so this never refetches.
+  const { data: logs } = useResourceFlowsServiceGetResourceFlowLogs(
+    { resourceId: props.resourceId },
+    // The generated key defaults to [{ resourceId }]; startedAt makes it per-recording.
+    [{ resourceId: props.resourceId }, recording?.startedAt],
+    { enabled: isOpen && isRecording, refetchInterval: false, staleTime: Infinity },
+  );
+
+  // Only the status needs invalidating: starting changes startedAt, which is part of the
+  // logs query key, and stopping disables that query altogether.
+  const invalidateStatus = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: [useResourceFlowsServiceGetFlowLogRecordingStatusKey] }),
     [queryClient],
   );
 
   const { mutate: startRecording, isPending: isStarting } = useResourceFlowsServiceStartFlowLogRecording({
-    onSuccess: invalidateLogs,
+    onSuccess: invalidateStatus,
   });
   const { mutate: stopRecording, isPending: isStopping } = useResourceFlowsServiceStopFlowLogRecording({
-    onSuccess: invalidateLogs,
+    onSuccess: invalidateStatus,
   });
 
-  const isRecording = logs?.recording.isRecording ?? false;
-  const countdown = useCountdown(isRecording ? logs?.recording.expiresAt : null);
+  const countdown = useCountdown(isRecording ? recording?.expiresAt : null);
 
   const logsWithNodes = useMemo(() => {
     if (!isRecording) {
@@ -142,7 +157,7 @@ export function LogViewer(props: Props) {
 
     // The SSE stream accumulates for the lifetime of the page, so drop anything
     // that predates the running recording — those logs are already deleted.
-    const recordingStart = new Date(logs?.recording.startedAt ?? 0).getTime();
+    const recordingStart = new Date(recording?.startedAt ?? 0).getTime();
     const allLogs = [...(logs?.logs ?? []), ...(sseLogs ?? [])].filter(
       (log) => new Date(log.createdAt).getTime() >= recordingStart,
     );
@@ -157,7 +172,7 @@ export function LogViewer(props: Props) {
         title: `${t('nodes.' + (nodeOfLog?.type ?? 'flow') + '.title')} -> ${log.type}`,
       };
     });
-  }, [flowData, logs, sseLogs, t, isRecording]);
+  }, [flowData, logs, recording, sseLogs, t, isRecording]);
 
   const logsOrdered = useMemo(() => {
     return [...logsWithNodes].sort((a, b) => b.id - a.id);
