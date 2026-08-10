@@ -244,6 +244,9 @@ importers:
       fetch-event-stream:
         specifier: ^0.1.6
         version: 0.1.6
+      fflate:
+        specifier: ^0.8.3
+        version: 0.8.3
       glob:
         specifier: ^13.0.6
         version: 13.0.6

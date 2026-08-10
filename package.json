@@ -78,6 +78,7 @@
     "express": "4.22.2",
     "express-session": "^1.19.0",
     "fetch-event-stream": "^0.1.6",
+    "fflate": "^0.8.3",
     "glob": "^13.0.6",
     "grapesjs": "^0.23.2",
     "grapesjs-mjml": "^1.0.8",
