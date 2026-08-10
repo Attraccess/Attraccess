@@ -161,6 +161,24 @@ describe('3MF container validity', () => {
       }
     }
   });
+
+  it('never emits a vertex coordinate in scientific notation', () => {
+    // Float32 noise near zero (e.g. from a CSG boolean) prints as scientific notation via plain
+    // string interpolation — `${1e-8}` is `"1e-8"`, which is a legal XSD double but a real risk
+    // for the lenient float parsers used by real-world slicer 3MF readers. The emitted vertex
+    // must use the same fixed-point precision the vertex was deduped under instead.
+    const noisyMesh: Mesh = {
+      positions: new Float32Array([1e-8, -1e-9, 0, 1, 0, 0, 0, 1, 0]),
+      triangleCount: 1,
+    };
+    const xml = model(unzipSync(buildThreeMf([{ name: 'Body', color: '#B4B4B4', mesh: noisyMesh }])));
+    const vertexTags = xml.match(/<vertex[^/]*\/>/g) ?? [];
+    expect(vertexTags.length).toBeGreaterThan(0);
+    for (const tag of vertexTags) {
+      expect(tag).not.toMatch(/e[+-]/i);
+    }
+    expect(xml).toContain('<vertex x="0.0000" y="-0.0000" z="0.0000" />');
+  });
 });
 
 describe('toFileSlug', () => {
@@ -170,5 +188,14 @@ describe('toFileSlug', () => {
 
   it('falls back when the label has no usable characters', () => {
     expect(toFileSlug('!!!')).toBe('nfc-keychain-card');
+  });
+
+  it('does not leave a trailing hyphen when truncation lands right after one', () => {
+    // 40 'a's, then a run of separator characters that collapse to a single hyphen landing
+    // exactly at the 40-character truncation boundary.
+    const label = `${'a'.repeat(40)}   overflow`;
+    const slug = toFileSlug(label);
+    expect(slug).toBe('a'.repeat(40));
+    expect(slug.endsWith('-')).toBe(false);
   });
 });

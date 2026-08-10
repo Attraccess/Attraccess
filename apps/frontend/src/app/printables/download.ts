@@ -10,8 +10,8 @@ export function toFileSlug(label: string): string {
   const slug = label
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 40);
+    .slice(0, 40)
+    .replace(/^-+|-+$/g, '');
   return slug || 'nfc-keychain-card';
 }
 
@@ -21,6 +21,24 @@ export function buildStlZip(render: CardRender): Uint8Array<ArrayBuffer> {
     'body.stl': new Uint8Array(render.bodyStl),
     'letters.stl': new Uint8Array(render.lettersStl),
   });
+}
+
+/**
+ * Triggers a browser download of `data` as `filename`, via a throwaway object URL and an
+ * off-DOM anchor click. Shared by every download in this feature (STL/3MF here, the .scad
+ * source elsewhere) so the object-URL lifetime bug below only has to be fixed once.
+ *
+ * `URL.revokeObjectURL` is deferred to a macrotask rather than called synchronously after
+ * `click()`: Firefox and older Safari can abort the download if the URL is revoked before the
+ * click has actually been dispatched to the download handler.
+ */
+export function triggerDownload(data: BlobPart, filename: string): void {
+  const url = URL.createObjectURL(new Blob([data], { type: 'application/octet-stream' }));
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 export function downloadCard(render: CardRender, label: string, format: 'stl' | '3mf'): void {
@@ -37,10 +55,5 @@ export function downloadCard(render: CardRender, label: string, format: 'stl' | 
           `${slug}.3mf`,
         ];
 
-  const url = URL.createObjectURL(new Blob([data], { type: 'application/octet-stream' }));
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = filename;
-  anchor.click();
-  URL.revokeObjectURL(url);
+  triggerDownload(data, filename);
 }

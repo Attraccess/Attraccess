@@ -36,7 +36,11 @@ function meshXml(mesh: Mesh): string {
       if (index === undefined) {
         index = vertices.length;
         indexOf.set(k, index);
-        vertices.push(`<vertex x="${x}" y="${y}" z="${z}" />`);
+        // Emit the same rounded precision the vertex was deduped under (`key`, above). Writing
+        // the raw float instead can (a) print in scientific notation for float32 noise near
+        // zero — legal XSD double, but a real risk for lenient slicer 3MF float parsers — and
+        // (b) disagree with the coordinate the dedup key actually represents.
+        vertices.push(`<vertex x="${x.toFixed(4)}" y="${y.toFixed(4)}" z="${z.toFixed(4)}" />`);
       }
       corners.push(index);
     }
