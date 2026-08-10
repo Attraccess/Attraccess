@@ -71,7 +71,12 @@ export function Preview({ body, letters, ariaLabel }: PreviewProps) {
     const resize = () => {
       const { clientWidth, clientHeight } = container;
       if (!clientWidth || !clientHeight) return;
-      renderer.setSize(clientWidth, clientHeight, false);
+      // Let three write canvas.style width/height too (updateStyle defaults to true). Passing
+      // `false` would only be correct if something else sized the canvas in CSS — nothing does:
+      // the canvas is appended raw with no class, styles.css has no canvas rule, and Tailwind
+      // preflight scopes max-width to img/video. Combined with setPixelRatio above, the canvas
+      // would then lay out at devicePixelRatio× its container and overflow on any HiDPI display.
+      renderer.setSize(clientWidth, clientHeight);
       camera.aspect = clientWidth / clientHeight;
       camera.updateProjectionMatrix();
     };

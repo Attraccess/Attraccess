@@ -137,19 +137,52 @@ export function renderErrorReason(errors: string[]): string {
   return assertionMessage(errors) ?? NO_OUTPUT_ERROR;
 }
 
-self.onmessage = async (event: MessageEvent<RenderRequest>) => {
+/**
+ * Serialises submitted work so at most one task runs at a time, and drops any task already
+ * superseded by a later submission before its turn comes.
+ *
+ * Renders need this because each one builds two Emscripten instances. The compiled wasm module
+ * is shared via the vendored loader's cache, but each instance still gets its own linear
+ * memory, and the Manifold booleans in the .scad are where the allocation actually happens.
+ * The main thread's 500 ms debounce does not prevent overlap — it only bounds how fast requests
+ * arrive, and a render takes longer than that on anything but a fast desktop — so without a
+ * queue, requests stack up unboundedly with nothing tearing down the superseded ones.
+ *
+ * Note the supersede check applies to any task that has not started yet, including the most
+ * recently submitted one if a newer submission lands before the microtask queue drains. That
+ * is intended: only the newest request's result is ever consumed.
+ */
+export function createSerialQueue(): (id: number, task: () => Promise<void>) => void {
+  let tail: Promise<void> = Promise.resolve();
+  let latestId = 0;
+
+  return (id, task) => {
+    latestId = id;
+    tail = tail
+      .then(() => (id === latestId ? task() : undefined))
+      // A rejection must not poison the chain for every later submission.
+      .catch(() => undefined);
+  };
+}
+
+const submit = createSerialQueue();
+
+self.onmessage = (event: MessageEvent<RenderRequest>) => {
   const { id, label } = event.data;
-  try {
-    const body = await renderPart(label, 'body');
-    const letters = await renderPart(label, 'letters');
-    const response: RenderResponse = { id, ok: true, body, letters };
-    (self as unknown as Worker).postMessage(response, [body, letters]);
-  } catch (error) {
-    const response: RenderResponse = {
-      id,
-      ok: false,
-      error: error instanceof Error ? error.message : String(error),
-    };
-    (self as unknown as Worker).postMessage(response);
-  }
+
+  submit(id, async () => {
+    try {
+      const body = await renderPart(label, 'body');
+      const letters = await renderPart(label, 'letters');
+      const response: RenderResponse = { id, ok: true, body, letters };
+      (self as unknown as Worker).postMessage(response, [body, letters]);
+    } catch (error) {
+      const response: RenderResponse = {
+        id,
+        ok: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+      (self as unknown as Worker).postMessage(response);
+    }
+  });
 };

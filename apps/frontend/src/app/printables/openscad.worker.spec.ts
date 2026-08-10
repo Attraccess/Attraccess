@@ -1,6 +1,88 @@
 import { describe, expect, it } from 'vitest';
-import { assertionMessage, renderErrorReason } from './openscad.worker';
+import { assertionMessage, createSerialQueue, renderErrorReason } from './openscad.worker';
 import { NO_OUTPUT_ERROR } from './errors';
+
+describe('createSerialQueue', () => {
+  /** A task that reports when it starts and finishes, and only resolves when told to. */
+  function controllable(log: string[], name: string) {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const task = async () => {
+      log.push(`start:${name}`);
+      await gate;
+      log.push(`end:${name}`);
+    };
+    return { task, release };
+  }
+
+  const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  it('runs one task at a time instead of overlapping them', async () => {
+    const log: string[] = [];
+    const submit = createSerialQueue();
+    const first = controllable(log, 'first');
+    const second = controllable(log, 'second');
+
+    submit(1, first.task);
+    await flush();
+    expect(log).toEqual(['start:first']);
+
+    // Submitted while the first is still in flight: it must wait rather than run concurrently.
+    submit(2, second.task);
+    await flush();
+    expect(log).toEqual(['start:first']);
+
+    first.release();
+    await flush();
+    expect(log).toEqual(['start:first', 'end:first', 'start:second']);
+
+    second.release();
+    await flush();
+    expect(log).toEqual(['start:first', 'end:first', 'start:second', 'end:second']);
+  });
+
+  it('drops a queued task that was superseded before its turn came', async () => {
+    const log: string[] = [];
+    const submit = createSerialQueue();
+    const running = controllable(log, 'running');
+    const superseded = controllable(log, 'superseded');
+    const latest = controllable(log, 'latest');
+
+    submit(1, running.task);
+    await flush();
+
+    // Two more arrive while id 1 is rendering; only the newest is still worth running.
+    submit(2, superseded.task);
+    submit(3, latest.task);
+
+    running.release();
+    latest.release();
+    await flush();
+
+    expect(log).not.toContain('start:superseded');
+    expect(log).toEqual(['start:running', 'end:running', 'start:latest', 'end:latest']);
+  });
+
+  it('keeps processing later tasks after one rejects', async () => {
+    const log: string[] = [];
+    const submit = createSerialQueue();
+
+    submit(1, async () => {
+      log.push('boom');
+      throw new Error('render failed');
+    });
+    await flush();
+    expect(log).toEqual(['boom']);
+
+    submit(2, async () => {
+      log.push('after');
+    });
+    await flush();
+    expect(log).toEqual(['boom', 'after']);
+  });
+});
 
 describe('assertionMessage', () => {
   it('extracts a clean message from a real OpenSCAD assert() failure, despite embedded quotes', () => {
