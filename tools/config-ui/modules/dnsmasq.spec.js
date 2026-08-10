@@ -229,19 +229,20 @@ describe('dnsmasq init generates config + hosts files with sane defaults', () =>
   function mockSpawnedProcesses() {
     const { spawn } = require('child_process');
     const procs = [];
-    const exitHandlers = [];
     spawn.mockImplementation(() => {
+      const handlers = {};
       const proc = {
         pid: 100 + procs.length,
         stdout: { on: jest.fn() },
         stderr: { on: jest.fn() },
         kill: jest.fn(),
-        on: (event, cb) => { if (event === 'exit') exitHandlers.push(cb); },
+        on: (event, cb) => { handlers[event] = cb; },
+        emit: (event, arg) => handlers[event](arg),
       };
       procs.push(proc);
       return proc;
     });
-    return { spawn, procs, exitHandlers };
+    return { spawn, procs };
   }
 
   it('respawns dnsmasq after an unexpected exit, and stops once shut down', () => {
@@ -249,21 +250,39 @@ describe('dnsmasq init generates config + hosts files with sane defaults', () =>
     // immediately, and without a retry it stayed dead until someone hit Save.
     jest.useFakeTimers();
     const { mod, restore } = loadModule({ DNS_SERVER_ENABLED: 'true', DNS_RESTART_DELAY_MS: '1000' });
-    const { spawn, exitHandlers } = mockSpawnedProcesses();
+    const { spawn, procs } = mockSpawnedProcesses();
 
     mod.init();
     restore();
     expect(spawn).toHaveBeenCalledTimes(1);
 
-    exitHandlers[0](1);
+    procs[0].emit('exit', 1);
     jest.advanceTimersByTime(1000);
     expect(spawn).toHaveBeenCalledTimes(2);
 
     mod.shutdown();
-    exitHandlers[1](0);
+    procs[1].emit('exit', 0);
     jest.advanceTimersByTime(60000);
     expect(spawn).toHaveBeenCalledTimes(2);
 
+    jest.useRealTimers();
+  });
+
+  it('retries when spawn reports a failed exec via the async error event', () => {
+    // A failed exec (ENOENT, or EAGAIN under boot memory pressure) emits 'error'
+    // and no 'exit'. Unhandled, it would kill config-ui instead of retrying.
+    jest.useFakeTimers();
+    const { mod, restore } = loadModule({ DNS_SERVER_ENABLED: 'true', DNS_RESTART_DELAY_MS: '1000' });
+    const { spawn, procs } = mockSpawnedProcesses();
+
+    mod.init();
+    restore();
+
+    procs[0].emit('error', new Error('spawn dnsmasq EAGAIN'));
+    jest.advanceTimersByTime(1000);
+    expect(spawn).toHaveBeenCalledTimes(2);
+
+    mod.shutdown();
     jest.useRealTimers();
   });
 
@@ -272,14 +291,14 @@ describe('dnsmasq init generates config + hosts files with sane defaults', () =>
     // that late event would drop the live process and respawn a second dnsmasq.
     jest.useFakeTimers();
     const { mod, restore } = loadModule({ DNS_SERVER_ENABLED: 'true', DNS_RESTART_DELAY_MS: '1000' });
-    const { spawn, procs, exitHandlers } = mockSpawnedProcesses();
+    const { spawn, procs } = mockSpawnedProcesses();
 
     mod.init();
     await invokeHandler(mod, 'PUT', '/settings', ['settings'], { upstream1: '9.9.9.9' });
     restore();
     expect(spawn).toHaveBeenCalledTimes(2);
 
-    exitHandlers[0](null); // old process finally reports its SIGTERM exit
+    procs[0].emit('exit', null); // old process finally reports its SIGTERM exit
     jest.advanceTimersByTime(60000);
 
     expect(spawn).toHaveBeenCalledTimes(2);

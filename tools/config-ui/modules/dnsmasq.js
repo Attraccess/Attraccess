@@ -153,16 +153,26 @@ function startDnsmasq() {
     dnsmasqProcess = proc;
     proc.stdout.on('data', (data) => log(`${data.toString().trim()}`));
     proc.stderr.on('data', (data) => log(`${data.toString().trim()}`));
+    // A killed process exits after its replacement has spawned; ignoring events
+    // from a superseded proc keeps it from clearing the live reference and
+    // respawning a second dnsmasq.
     proc.on('exit', (code) => {
       log(`exited with code ${code}`);
-      // A killed process exits after its replacement has spawned; ignore that
-      // event or it clears the live reference and respawns a second dnsmasq.
+      if (dnsmasqProcess !== proc) return;
+      dnsmasqProcess = null;
+      scheduleRestart();
+    });
+    // spawn reports a failed exec (ENOENT, EAGAIN under memory pressure at boot)
+    // as an async error event, not a throw — and an unhandled one kills config-ui.
+    proc.on('error', (err) => {
+      log(`failed to start: ${err.message}`);
       if (dnsmasqProcess !== proc) return;
       dnsmasqProcess = null;
       scheduleRestart();
     });
     log(`started (pid ${proc.pid})`);
   } catch (err) {
+    // Only malformed args/options reach here; a failed exec emits 'error'.
     log(`failed to start: ${err.message}`);
     dnsmasqProcess = null;
     scheduleRestart();
