@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ResourceUsageModule } from '../usage/resourceUsage.module';
+import { ResourceIntroducersModule } from '../introducers/resourceIntroducers.module';
 import { SupervisionController } from './supervision.controller';
 import { SupervisionService } from './supervision.service';
 import { SupervisionLiveService } from './supervision-live.service';
@@ -8,7 +9,7 @@ import { SupervisionLiveService } from './supervision-live.service';
  * (or 30s timeout) -> start the session via the existing usage start path with the supervisor attached.
  */
 @Module({
-  imports: [ResourceUsageModule],
+  imports: [ResourceUsageModule, ResourceIntroducersModule],
   controllers: [SupervisionController],
   providers: [SupervisionService, SupervisionLiveService],
   exports: [SupervisionService, SupervisionLiveService],

@@ -133,7 +133,10 @@ export class AttractapController {
     type: [Attractap],
   })
   async getReaders(): Promise<Attractap[]> {
-    return await this.attractapService.getAllReaders();
+    // `resources` is a plain ManyToMany with no eager loading, so without this the relation is
+    // absent from the response entirely. Callers that group readers by resource — the supervised
+    // start popup (ATT-816) — silently see every reader as unattached.
+    return await this.attractapService.getAllReaders({ relations: ['resources'] });
   }
 
   @Get(':readerId')
