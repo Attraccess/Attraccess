@@ -33,9 +33,13 @@ export function useCardRender(label: string): {
       // Ignore responses superseded by a newer keystroke.
       if (event.data.id !== requestId.current) return;
 
-      // `=== true`/`=== false` (rather than plain truthiness) works around a discriminated-union
-      // narrowing bug in the TypeScript 7 (native) checker at this workspace's program size: a
-      // plain `if (event.data.ok)` fails to narrow away the other arm in the `else` branch.
+      // `=== true`/`=== false` (rather than plain truthiness) works around discriminated-union
+      // narrowing being weakened by `strictNullChecks: false` in tsconfig.base.json (`strict:
+      // true` in this project's tsconfig.json does not re-enable it — TS resolves strict-family
+      // flags individually and an explicit setting earlier in the extends chain wins). With
+      // strictNullChecks off, a plain `if (event.data.ok)` fails to narrow away the other arm in
+      // the `else` branch. This affects any `if (x.discriminant)` narrowing anywhere in this
+      // project while strictNullChecks stays off, not just this file.
       if (event.data.ok === true) {
         setResult({
           bodyStl: event.data.body,

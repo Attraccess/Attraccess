@@ -49,7 +49,7 @@ describe('useCardRender', () => {
     expect(worker.postMessage).toHaveBeenCalledWith({ id: 1, label: 'ABC' });
   });
 
-  it('ignores a response whose id no longer matches the latest request', () => {
+  it('ignores a stale response but still adopts the response matching the latest request', () => {
     const { result, rerender } = renderHook(({ label }) => useCardRender(label), { initialProps: { label: 'A' } });
 
     act(() => {
@@ -66,6 +66,7 @@ describe('useCardRender', () => {
     const worker = FakeWorker.instances[0];
     expect(worker.postMessage).toHaveBeenCalledTimes(2);
 
+    // A stale response (superseded request id 1) must not update state...
     const staleResponse: RenderResponse = { id: 1, ok: true, body: new ArrayBuffer(0), letters: new ArrayBuffer(0) };
     act(() => {
       worker.onmessage?.({ data: staleResponse } as MessageEvent<RenderResponse>);
@@ -74,5 +75,21 @@ describe('useCardRender', () => {
     expect(result.current.status).not.toBe('ready');
     expect(result.current.result).toBeNull();
     expect(parseBinaryStl).not.toHaveBeenCalled();
+
+    // ...but a response matching the current request id (2) must still be adopted. Without this
+    // assertion, an implementation that drops every message (not just stale ones) would also
+    // pass the assertions above.
+    const currentBody = new ArrayBuffer(8);
+    const currentLetters = new ArrayBuffer(4);
+    const currentResponse: RenderResponse = { id: 2, ok: true, body: currentBody, letters: currentLetters };
+    act(() => {
+      worker.onmessage?.({ data: currentResponse } as MessageEvent<RenderResponse>);
+    });
+
+    expect(result.current.status).toBe('ready');
+    expect(result.current.result?.bodyStl).toBe(currentBody);
+    expect(result.current.result?.lettersStl).toBe(currentLetters);
+    expect(parseBinaryStl).toHaveBeenCalledWith(currentBody);
+    expect(parseBinaryStl).toHaveBeenCalledWith(currentLetters);
   });
 });

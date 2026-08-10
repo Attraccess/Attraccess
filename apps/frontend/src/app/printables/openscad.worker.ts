@@ -101,10 +101,24 @@ async function renderPart(label: string, part: 'body' | 'letters'): Promise<Arra
   return new Uint8Array(data).buffer;
 }
 
-/** OpenSCAD reports assert() failures on stderr; surface the message rather than a generic failure. */
-function assertionMessage(errors: string[]): string | null {
+/**
+ * OpenSCAD reports assert() failures on stderr; surface the message rather than a generic
+ * failure. A compile-time assert line looks like:
+ *   Assertion '<condition>' failed: "<message>" in file /card.scad, line 69
+ * `<message>` is itself an OpenSCAD string (built with `str(...)` in nfc-keychain-card.scad) and
+ * may contain embedded, unescaped quotes of its own — e.g. `Label too long: "TOO LONG" does not
+ * fit...`. So the outer quotes wrapping `<message>` can't be found by looking for *any* quote;
+ * anchor on the ` in file ` marker that OpenSCAD always appends after the location, and take
+ * everything back to the first quote after `failed:` (greedy `.*` backtracks to the last quote
+ * before that marker, i.e. the real outer closing quote).
+ */
+export function assertionMessage(errors: string[]): string | null {
   const line = errors.find((e) => /Assertion .* failed/.test(e));
   if (!line) return null;
+  const withLocation = /failed:\s*"(.*)"\s+in file\b/.exec(line);
+  if (withLocation) return withLocation[1];
+  // Fallback for a stderr line without the "in file ..." suffix (e.g. a differently-shaped
+  // assert message): best effort, quotes stripped only if present at both ends.
   const quoted = /failed:\s*"?(.*?)"?\s*$/.exec(line);
   return quoted?.[1] ?? line;
 }
