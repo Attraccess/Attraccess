@@ -313,6 +313,11 @@ void Application::setup() {
   Display::connectionConfigurationScreen.setOnResetCertificateCallback(
       [this]() { this->api.resetCertificateTrust(); });
 
+#ifdef HAS_POWER_BUTTON
+  Display::connectionConfigurationScreen.setOnPowerOffCallback(
+      [this]() { this->ioExpander.powerOff(); });
+#endif
+
   Display::initScreen.setOnOpenSettingsCallback([this]() {
 #ifdef DEMO_MODE
     Display::transitionToScreen(&Display::demoSettingsScreen);
