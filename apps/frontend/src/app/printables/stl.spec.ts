@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { boundingBox, parseBinaryStl } from './stl';
+import { parseBinaryStl } from './stl';
+import { boundingBox } from './testBoundingBox';
 
 /** One triangle, as a minimal binary STL: 80-byte header, uint32 count, 50 bytes/triangle. */
 function oneTriangleStl(): ArrayBuffer {

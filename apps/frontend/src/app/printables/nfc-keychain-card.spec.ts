@@ -10,7 +10,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { boundingBox, parseBinaryStl, type Mesh } from './stl';
+import { parseBinaryStl, type Mesh } from './stl';
+import { boundingBox } from './testBoundingBox';
 
 const PUBLIC_DIR = join(__dirname, '../../../public/openscad');
 const SCAD = readFileSync(join(__dirname, 'nfc-keychain-card.scad'), 'utf8');

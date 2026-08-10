@@ -11,7 +11,10 @@
   "format3mf": "3MF (single file, coloured)",
   "download": "Download",
   "rendering": "Generating...",
+  "renderReady": "Model updated.",
+  "previewAriaLabel": "3D preview of the keychain card. Drag to rotate.",
   "downloadScad": "Download the OpenSCAD source",
-  "printTip": "Two colours: import both parts together. Pause the print at Z = 1.125 mm to drop in the NFC sticker, then resume.",
-  "errorTitle": "Could not generate the model"
+  "printTip": "Two colours: import both parts together. Pause at Z = 1.125 mm to drop in the NFC sticker, then pause again at Z = 1.6 mm to switch filament for the letters, and resume.",
+  "errorTitle": "Could not generate the model",
+  "errorNoOutput": "Some characters in this label can't be engraved. Try letters, numbers and basic punctuation."
 }

@@ -92,4 +92,30 @@ describe('useCardRender', () => {
     expect(parseBinaryStl).toHaveBeenCalledWith(currentBody);
     expect(parseBinaryStl).toHaveBeenCalledWith(currentLetters);
   });
+
+  it('clears a stale error as soon as a new render starts, not only once it succeeds', () => {
+    const { result, rerender } = renderHook(({ label }) => useCardRender(label), { initialProps: { label: 'A' } });
+
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    // Request id 1 posted for label 'A'.
+
+    const worker = FakeWorker.instances[0];
+    const errorResponse: RenderResponse = { id: 1, ok: false, error: 'Label too long' };
+    act(() => {
+      worker.onmessage?.({ data: errorResponse } as MessageEvent<RenderResponse>);
+    });
+
+    expect(result.current.status).toBe('error');
+    expect(result.current.error).toBe('Label too long');
+
+    // Fixing the label starts a new render. The old error must disappear immediately — it
+    // shouldn't linger through the whole next render, only to be cleared once that render
+    // succeeds (or replaced only if it fails again).
+    rerender({ label: 'A short label' });
+
+    expect(result.current.status).toBe('rendering');
+    expect(result.current.error).toBeNull();
+  });
 });

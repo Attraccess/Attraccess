@@ -17,11 +17,13 @@ Attraccess.
 
 ### Modifications
 
-OpenSCAD itself is **unmodified**. The Emscripten-generated loader shim in
-`openscad.js` was replaced by `tools/vendor-openscad.mjs` so that the WebAssembly
-module is loaded from an external `openscad.wasm` file and the compiled module is
-cached between instances, instead of being decoded from an inlined base64 string on
-every render. That script reproduces this directory exactly and documents the change.
+OpenSCAD itself is **unmodified**: Emscripten's own output, beginning at
+`var OpenSCAD = (() => {` in `openscad.js`, is untouched. What
+`tools/vendor-openscad.mjs` replaces is the loader shim that `@rollup/plugin-wasm`
+generated when the upstream `openscad-wasm` package was bundled — the code that
+inlined the wasm module as base64 and decoded it on every instance — with one that
+loads an external `openscad.wasm` file and caches the compiled module between
+instances. That script reproduces this directory exactly and documents the change.
 
 Corresponding source for the version distributed here is available from the upstream
 repository above; run `node tools/vendor-openscad.mjs` to regenerate.

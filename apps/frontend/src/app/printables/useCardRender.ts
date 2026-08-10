@@ -68,6 +68,11 @@ export function useCardRender(label: string): {
 
   useEffect(() => {
     setStatus('rendering');
+    // Clear a previous failure as soon as this render starts (not inside the debounced
+    // callback below) so it doesn't linger through the whole next render. This runs once per
+    // label change rather than once per debounce tick, so it can't flash the error away and
+    // back while the user is still typing.
+    setError(null);
     const timer = setTimeout(() => {
       const request: RenderRequest = { id: ++requestId.current, label };
       workerRef.current?.postMessage(request);

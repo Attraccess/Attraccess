@@ -7,6 +7,8 @@ import type { Mesh } from './stl';
 interface PreviewProps {
   body: Mesh;
   letters: Mesh;
+  /** Accessible name for the canvas container; the canvas itself has no text content. */
+  ariaLabel: string;
 }
 
 /**
@@ -35,7 +37,7 @@ export function disposeMeshGroup(scene: THREE.Scene, group: THREE.Mesh[]): void 
   }
 }
 
-export function Preview({ body, letters }: PreviewProps) {
+export function Preview({ body, letters, ariaLabel }: PreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
 
@@ -90,6 +92,10 @@ export function Preview({ body, letters }: PreviewProps) {
       cancelAnimationFrame(frame);
       observer.disconnect();
       controls.dispose();
+      // `dispose()` alone frees GPU-side buffers but does not release the WebGL context
+      // itself (three r185); without `forceContextLoss()` every mount leaks a context, and
+      // Chrome starts logging "Too many active WebGL contexts" after ~16 of them.
+      renderer.forceContextLoss();
       renderer.dispose();
       container.removeChild(renderer.domElement);
       sceneRef.current = null;
@@ -124,5 +130,5 @@ export function Preview({ body, letters }: PreviewProps) {
     return () => disposeMeshGroup(scene, group);
   }, [body, letters]);
 
-  return <div ref={containerRef} className="h-80 w-full" />;
+  return <div ref={containerRef} role="img" aria-label={ariaLabel} className="h-80 w-full" />;
 }

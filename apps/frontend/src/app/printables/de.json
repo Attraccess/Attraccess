@@ -11,7 +11,10 @@
   "format3mf": "3MF (eine Datei, farbig)",
   "download": "Herunterladen",
   "rendering": "Wird erzeugt...",
+  "renderReady": "Modell aktualisiert.",
+  "previewAriaLabel": "3D-Vorschau des Schlüsselanhängers. Zum Drehen ziehen.",
   "downloadScad": "OpenSCAD-Quelldatei herunterladen",
-  "printTip": "Zweifarbig: beide Teile gemeinsam importieren. Den Druck bei Z = 1,125 mm pausieren, den NFC-Sticker einlegen und fortsetzen.",
-  "errorTitle": "Modell konnte nicht erzeugt werden"
+  "printTip": "Zweifarbig: beide Teile gemeinsam importieren. Bei Z = 1,125 mm pausieren, den NFC-Sticker einlegen, bei Z = 1,6 mm erneut pausieren, das Filament für die Schrift wechseln und fortsetzen.",
+  "errorTitle": "Modell konnte nicht erzeugt werden",
+  "errorNoOutput": "Manche Zeichen in dieser Beschriftung können nicht graviert werden. Bitte Buchstaben, Zahlen und einfache Satzzeichen verwenden."
 }

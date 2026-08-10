@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Alert, AlertContent, AlertDescription, AlertTitle, Card, Description, Input, Label, Spinner, TextField } from '@heroui/react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useTranslations, type TFunction } from '@attraccess/plugins-frontend-ui';
 import scadSource from './nfc-keychain-card.scad?raw';
 import { Button } from '../../components/button';
 import { Select } from '../../components/select';
@@ -8,10 +8,23 @@ import { AlertStatusIcon } from '../../components/AlertStatusIcon';
 import { Preview } from './Preview';
 import { downloadCard, triggerDownload } from './download';
 import { useCardRender } from './useCardRender';
+import { NO_OUTPUT_ERROR } from './errors';
 import de from './de.json';
 import en from './en.json';
 
 type Format = 'stl' | '3mf';
+
+/**
+ * The worker reports `NO_OUTPUT_ERROR` — a stable, non-prose reason code — for a render that
+ * produced no file at all (rather than an OpenSCAD assert() message, which is already
+ * user-facing text). Map it to a translated string here; any other error string is OpenSCAD's
+ * own assert() message, which comes out in English and is surfaced as-is (see
+ * `renderErrorReason` in openscad.worker.ts).
+ */
+export function resolveErrorMessage(error: string | null, t: TFunction): string | null {
+  if (error === null) return null;
+  return error === NO_OUTPUT_ERROR ? t('errorNoOutput') : error;
+}
 
 export function NfcKeychainCard() {
   const { t } = useTranslations({ de, en });
@@ -19,6 +32,7 @@ export function NfcKeychainCard() {
   const [format, setFormat] = useState<Format>('3mf');
 
   const { status, result, error } = useCardRender(label);
+  const errorMessage = resolveErrorMessage(error, t);
 
   const formatOptions = useMemo(
     () => [
@@ -50,12 +64,14 @@ export function NfcKeychainCard() {
           data-cy="printables-format-select"
         />
 
-        {error !== null && (
-          <Alert status="danger" data-cy="printables-error">
+        {errorMessage !== null && (
+          // `role="alert"` makes HeroUI's otherwise-presentational Alert an assertive live
+          // region, so screen readers announce it as soon as it mounts.
+          <Alert status="danger" role="alert" data-cy="printables-error">
             <AlertStatusIcon status="danger" />
             <AlertContent>
               <AlertTitle>{t('errorTitle')}</AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
+              <AlertDescription>{errorMessage}</AlertDescription>
             </AlertContent>
           </Alert>
         )}
@@ -63,13 +79,22 @@ export function NfcKeychainCard() {
         {/* min-h matches Preview's own height so the first render — when there is no canvas
             yet — still has somewhere to show the spinner instead of collapsing to nothing. */}
         <div className="relative min-h-80 rounded-lg bg-default-100">
-          {result !== null && <Preview body={result.body} letters={result.letters} />}
+          {result !== null && (
+            <Preview body={result.body} letters={result.letters} ariaLabel={t('previewAriaLabel')} />
+          )}
           {status === 'rendering' && (
             <div className="absolute inset-0 flex items-center justify-center gap-2">
               <Spinner size="sm" />
               <span className="text-sm text-default-500">{t('rendering')}</span>
             </div>
           )}
+          {/* A single, permanently-mounted live region rather than putting aria-live on the
+              overlay above: the overlay unmounts on completion, so its own removal would never
+              be announced. Staying mounted lets this announce both that a render has started
+              and, via the text change below, that it has finished. */}
+          <span className="sr-only" role="status" aria-live="polite">
+            {status === 'rendering' ? t('rendering') : status === 'ready' ? t('renderReady') : ''}
+          </span>
         </div>
 
         <Alert status="accent">

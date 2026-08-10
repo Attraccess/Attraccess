@@ -1,5 +1,6 @@
 /// <reference lib="webworker" />
 import scadSource from './nfc-keychain-card.scad?raw';
+import { NO_OUTPUT_ERROR } from './errors';
 
 // OpenSCAD is GPL-licensed and deliberately kept at arm's length: it is fetched as an
 // unbundled static asset and driven through argv + a virtual filesystem, exactly like the
@@ -94,7 +95,7 @@ async function renderPart(label: string, part: 'body' | 'letters'): Promise<Arra
   try {
     data = instance.FS.readFile('/out.stl');
   } catch {
-    throw new Error(assertionMessage(errors) ?? `OpenSCAD produced no output for part "${part}".`);
+    throw new Error(renderErrorReason(errors));
   }
 
   // Copy out of the wasm heap before the instance is collected.
@@ -121,6 +122,19 @@ export function assertionMessage(errors: string[]): string | null {
   // assert message): best effort, quotes stripped only if present at both ends.
   const quoted = /failed:\s*"?(.*?)"?\s*$/.exec(line);
   return quoted?.[1] ?? line;
+}
+
+/**
+ * Reason to report when a part rendered with no /out.stl file. If OpenSCAD raised its own
+ * assert() (e.g. "Label too long: ..."), that message is genuinely useful and specific, so it
+ * is surfaced as-is — it comes from OpenSCAD in English and can't be translated, which is
+ * acceptable. Otherwise the render simply produced nothing (for example a label made entirely
+ * of glyphs missing from the vendored font); that case has no useful detail to report, so a
+ * stable, translatable reason code is returned instead of prose — and, importantly, instead of
+ * naming the internal OpenSCAD part ("body"/"letters") to the user.
+ */
+export function renderErrorReason(errors: string[]): string {
+  return assertionMessage(errors) ?? NO_OUTPUT_ERROR;
 }
 
 self.onmessage = async (event: MessageEvent<RenderRequest>) => {
