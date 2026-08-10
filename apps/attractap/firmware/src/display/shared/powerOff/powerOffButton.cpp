@@ -104,4 +104,9 @@ void PowerOffButton::hideConfirm()
     }
 }
 
+bool PowerOffButton::isConfirmVisible()
+{
+    return g_confirm != nullptr;
+}
+
 #endif // HAS_POWER_BUTTON

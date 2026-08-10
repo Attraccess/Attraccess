@@ -18,6 +18,11 @@ namespace PowerOffButton
 
     // Closes the modal if open. Call from onScreenLeave().
     void hideConfirm();
+
+    // True while the confirm modal is up. The drawer gesture is not LVGL
+    // hit-tested, so Display::handleGestureSample() has to check this itself —
+    // otherwise a top-edge swipe opens the drawer behind the modal, invisibly.
+    bool isConfirmVisible();
 }
 
 #endif // HAS_POWER_BUTTON
