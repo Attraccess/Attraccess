@@ -4,7 +4,7 @@
   "cardTitle": "NFC Keychain Card",
   "cardDescription": "A 60 x 40 x 2 mm tag with a keyring hole and a pocket for a 25 mm NFC sticker.",
   "labelField": "Label",
-  "labelPlaceholder": "Makerspace",
+  "labelPlaceholder": "Tobias J.",
   "labelDescription": "Shown large in the middle of the card. Shrinks automatically to fit.",
   "format": "Format",
   "formatStl": "STL (zip, two parts)",

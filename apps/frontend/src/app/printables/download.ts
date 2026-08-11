@@ -2,8 +2,12 @@ import { zipSync } from 'fflate';
 import { buildThreeMf } from './threemf';
 import type { CardRender } from './useCardRender';
 
-export const BODY_COLOR = '#B4B4B4';
-export const LETTER_COLOR = '#1D9BF0';
+/**
+ * Part colours, shared by the three.js preview and the 3MF `displaycolor`, so the file opens in
+ * a slicer looking like what the preview showed.
+ */
+export const BODY_COLOR = '#0D746B';
+export const LETTER_COLOR = '#FFFFFF';
 
 /** Turns a label into something safe for a filename, falling back when nothing survives. */
 export function toFileSlug(label: string): string {

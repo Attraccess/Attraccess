@@ -28,7 +28,7 @@ export function resolveErrorMessage(error: string | null, t: TFunction): string 
 
 export function NfcKeychainCard() {
   const { t } = useTranslations({ de, en });
-  const [label, setLabel] = useState('Makerspace');
+  const [label, setLabel] = useState('Tobias J.');
   const [format, setFormat] = useState<DownloadFormat>('3mf');
 
   const { status, result, error } = useCardRender(label);
@@ -55,7 +55,7 @@ export function NfcKeychainCard() {
   };
 
   return (
-    <div className="flex w-full flex-col gap-6 lg:flex-row lg:items-start">
+    <div className="flex w-full max-w-[1050px] flex-col gap-6 lg:flex-row lg:items-start">
       {/* Configuration — plain column, deliberately not a Card. */}
       <div className="flex w-full flex-col gap-4 lg:max-w-sm lg:shrink-0">
         <div>

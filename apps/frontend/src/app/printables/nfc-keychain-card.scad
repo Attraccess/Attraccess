@@ -9,7 +9,7 @@
 //             true  = cut through the bottom face (drop sticker in afterwards)
 
 PART = "body";
-LABEL = "Makerspace";
+LABEL = "Tobias J.";
 POCKET_OPEN = false;
 FONT = "Liberation Sans";
 

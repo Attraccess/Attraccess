@@ -4,7 +4,7 @@
   "cardTitle": "NFC-Schlüsselanhänger",
   "cardDescription": "Ein 60 x 40 x 2 mm großer Anhänger mit Schlüsselring-Loch und Aussparung für einen 25-mm-NFC-Sticker.",
   "labelField": "Beschriftung",
-  "labelPlaceholder": "Makerspace",
+  "labelPlaceholder": "Tobias J.",
   "labelDescription": "Erscheint groß in der Mitte der Karte. Wird bei Bedarf automatisch verkleinert.",
   "format": "Format",
   "formatStl": "STL (ZIP, zwei Teile)",
