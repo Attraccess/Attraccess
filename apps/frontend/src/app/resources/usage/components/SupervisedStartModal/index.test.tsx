@@ -35,6 +35,26 @@ vi.mock('@attraccess/react-query-client', () => ({
     ],
   }),
   useResourcesServiceResourceUsageRequestSupervisedSession: () => ({ mutate: requestMutate }),
+  useAttractapServiceGetReaders: () => ({
+    data: [
+      // Attached to this resource.
+      {
+        id: 5,
+        name: 'Workshop reader',
+        resources: [{ id: 42 }],
+        firmware: { capabilities: { cardEnrollment: true } },
+      },
+      // Elsewhere in the building — offered behind the disclosure.
+      { id: 6, name: 'Lobby reader', resources: [{ id: 7 }], firmware: { capabilities: { cardEnrollment: true } } },
+      // No display, so it cannot run the supervision screen at all.
+      {
+        id: 7,
+        name: 'Lite reader',
+        resources: [{ id: 42 }],
+        firmware: { capabilities: { cardEnrollment: false } },
+      },
+    ],
+  }),
 }));
 
 const getLastCallbacks = () => requestMutate.mock.calls[requestMutate.mock.calls.length - 1][1];
@@ -101,5 +121,46 @@ describe('SupervisedStartModal', () => {
     const session = { id: 99 };
     act(() => getLastCallbacks().onSuccess(session));
     expect(onApproved).toHaveBeenCalledWith(session);
+  });
+
+  describe('reader authentication (ATT-816)', () => {
+    it("offers the resource's own readers and hides display-less ones", () => {
+      renderModal();
+
+      expect(screen.getByText('Workshop reader')).toBeInTheDocument();
+      // Attached to this resource, but has no screen to run the supervision flow on.
+      expect(screen.queryByText('Lite reader')).not.toBeInTheDocument();
+    });
+
+    it('puts readers belonging to other resources behind a disclosure', async () => {
+      renderModal();
+
+      // The accordion keeps its panel mounted, so assert on visibility rather than presence.
+      expect(screen.getByText('Lobby reader')).not.toBeVisible();
+
+      await userEvent.click(screen.getByText('select.otherReaders'));
+      expect(screen.getByText('Lobby reader')).toBeVisible();
+    });
+
+    it('requests supervision at the selected reader and names it while waiting', async () => {
+      renderModal();
+      await userEvent.click(screen.getByText('Workshop reader'));
+
+      expect(requestMutate).toHaveBeenCalledWith(
+        { resourceId: 42, requestBody: { notes: 'hi', readerId: 5 } },
+        expect.any(Object),
+      );
+      expect(screen.getByText('waiting.atReader')).toBeInTheDocument();
+    });
+
+    it('distinguishes an unusable reader from a supervisor declining', async () => {
+      renderModal();
+      await userEvent.click(screen.getByText('Workshop reader'));
+
+      // 409: the reader is busy with another flow — not a rejection.
+      act(() => getLastCallbacks().onError(new ApiErrorMock(409)));
+      expect(screen.getByText('error.description')).toBeInTheDocument();
+      expect(screen.queryByText('rejected.description')).not.toBeInTheDocument();
+    });
   });
 });

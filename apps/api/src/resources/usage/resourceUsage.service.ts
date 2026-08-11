@@ -202,21 +202,7 @@ export class ResourceUsageService {
     transactionalEntityManager?: EntityManager,
     preloadedResource?: Resource,
   ): Promise<void> {
-    const resourceRepository = transactionalEntityManager
-      ? transactionalEntityManager.getRepository(Resource)
-      : this.resourceRepository;
-
-    const resource = preloadedResource ?? (await resourceRepository.findOne({ where: { id: resourceId } }));
-    if (!resource) {
-      throw new ResourceNotFoundException(resourceId);
-    }
-
-    if (
-      resource.supervisionMode !== SupervisionMode.SUPERVISION_ALLOWED &&
-      resource.supervisionMode !== SupervisionMode.SUPERVISION_REQUIRED
-    ) {
-      throw new BadRequestException('This resource does not support supervised sessions');
-    }
+    await this.assertSupportsSupervision(resourceId, transactionalEntityManager, preloadedResource);
 
     if (supervisorUserId === requester.id) {
       throw new BadRequestException('You cannot supervise your own session');
@@ -243,6 +229,35 @@ export class ResourceUsageService {
     if (!supervisorCanManage && !supervisorCanMaintain) {
       throw new ForbiddenException('The selected supervisor is not authorized to supervise this resource');
     }
+  }
+
+  /**
+   * Resolves the resource and asserts its supervisionMode permits supervised sessions at all.
+   * Split out of {@link validateSupervisedStart} because the reader-armed flow (ATT-816) has no
+   * named supervisor to validate yet — any eligible one may show up and tap.
+   */
+  public async assertSupportsSupervision(
+    resourceId: number,
+    transactionalEntityManager?: EntityManager,
+    preloadedResource?: Resource,
+  ): Promise<Resource> {
+    const resourceRepository = transactionalEntityManager
+      ? transactionalEntityManager.getRepository(Resource)
+      : this.resourceRepository;
+
+    const resource = preloadedResource ?? (await resourceRepository.findOne({ where: { id: resourceId } }));
+    if (!resource) {
+      throw new ResourceNotFoundException(resourceId);
+    }
+
+    if (
+      resource.supervisionMode !== SupervisionMode.SUPERVISION_ALLOWED &&
+      resource.supervisionMode !== SupervisionMode.SUPERVISION_REQUIRED
+    ) {
+      throw new BadRequestException('This resource does not support supervised sessions');
+    }
+
+    return resource;
   }
 
   private async getResource(

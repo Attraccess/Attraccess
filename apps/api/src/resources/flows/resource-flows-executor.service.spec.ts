@@ -1,19 +1,17 @@
 import { ResourceFlowsExecutorService } from './resource-flows-executor.service';
-import { ConfigService } from '@nestjs/config';
+import { FlowLogRecorderService } from './flow-log-recorder.service';
 import { Logger } from '@nestjs/common';
 import { Repository, SelectQueryBuilder } from 'typeorm';
 import {
   Resource,
   ResourceFlowNode,
   ResourceFlowNodeType,
-  ResourceFlowLog,
   ResourceFlowEdge,
   BillingTransactionItem,
   ResourceType,
 } from '@attraccess/database-entities';
 import { MqttClientService } from '../../mqtt/mqtt-client.service';
 import { ResourceUsageService } from '../usage/resourceUsage.service';
-import { FlowConfigType } from './flow.config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MqttMessageEvent as MqttMessageReceivedEvent } from '../../mqtt/mqtt-message.event';
 import { NoUsageSessionError } from './errors/no-usage-session.error';
@@ -47,9 +45,8 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
   // Repositories and dependencies
   let flowNodeRepository: Partial<Repository<ResourceFlowNode>>;
   let flowEdgeRepository: Partial<Repository<Edge>>;
-  let flowLogRepository: Partial<Repository<ResourceFlowLog>>;
+  let flowLogs: FlowLogRecorderService;
   let resourceRepository: Partial<Repository<Resource>>;
-  let configService: Partial<ConfigService>;
   let mqttClientService: MqttClientService;
   let resourceUsageService: ResourceUsageService;
   let eventEmitter: EventEmitter2;
@@ -99,10 +96,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       }),
     } as unknown as Repository<ResourceFlowEdge>;
 
-    flowLogRepository = {
-      create: jest.fn((data) => ({ id: Math.random().toString(36), ...data })),
-      save: jest.fn(async (data) => data),
-    } as unknown as Repository<ResourceFlowLog>;
+    flowLogs = new FlowLogRecorderService();
 
     resourceRepository = {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -113,10 +107,6 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
         metadata: { zone: 'A' },
       })),
     } as unknown as Repository<Resource>;
-
-    configService = {
-      get: jest.fn(() => ({ FLOW_LOG_TTL_DAYS: 7 }) as unknown as FlowConfigType),
-    } as unknown as ConfigService;
 
     mqttClientService = {
       publish: jest.fn(async () => undefined),
@@ -157,9 +147,8 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     service = new ResourceFlowsExecutorService(
       flowNodeRepository as Repository<ResourceFlowNode>,
       flowEdgeRepository as unknown as Repository<ResourceFlowEdge>,
-      flowLogRepository as Repository<ResourceFlowLog>,
       resourceRepository as Repository<Resource>,
-      configService as ConfigService,
+      flowLogs,
       mqttClientService,
       resourceUsageService,
       billingItemRepoMock,
@@ -900,9 +889,8 @@ describe('ResourceFlowsExecutorService MQTT', () => {
   let service: ResourceFlowsExecutorService;
   let flowNodeRepository: Partial<Repository<ResourceFlowNode>>;
   let flowEdgeRepository: Partial<Repository<ResourceFlowEdge>>;
-  let flowLogRepository: Partial<Repository<ResourceFlowLog>>;
+  let flowLogs: FlowLogRecorderService;
   let resourceRepository: Partial<Repository<Resource>>;
-  let configService: Partial<ConfigService>;
   let mqttClientService: MqttClientService;
   let resourceUsageService: ResourceUsageService;
   let eventEmitter: EventEmitter2;
@@ -946,10 +934,7 @@ describe('ResourceFlowsExecutorService MQTT', () => {
       }),
     } as unknown as Repository<ResourceFlowEdge>;
 
-    flowLogRepository = {
-      create: jest.fn((data) => ({ id: Math.random().toString(36), ...data })),
-      save: jest.fn(async (data) => data),
-    } as unknown as Repository<ResourceFlowLog>;
+    flowLogs = new FlowLogRecorderService();
 
     resourceRepository = {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -960,10 +945,6 @@ describe('ResourceFlowsExecutorService MQTT', () => {
         metadata: { zone: 'A' },
       })),
     } as unknown as Repository<Resource>;
-
-    configService = {
-      get: jest.fn(() => ({ FLOW_LOG_TTL_DAYS: 7 }) as unknown as FlowConfigType),
-    } as unknown as ConfigService;
 
     mqttClientService = {
       publish: jest.fn(async () => undefined),
@@ -1003,9 +984,8 @@ describe('ResourceFlowsExecutorService MQTT', () => {
     service = new ResourceFlowsExecutorService(
       flowNodeRepository as Repository<ResourceFlowNode>,
       flowEdgeRepository as unknown as Repository<ResourceFlowEdge>,
-      flowLogRepository as Repository<ResourceFlowLog>,
       resourceRepository as Repository<Resource>,
-      configService as ConfigService,
+      flowLogs,
       mqttClientService,
       resourceUsageService,
       billingItemRepoMock,

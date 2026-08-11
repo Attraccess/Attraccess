@@ -1,5 +1,6 @@
 #include "display.hpp"
 #include <functional>
+#include "shared/powerOff/powerOffButton.hpp"
 
 // Hidden maintenance drawer rendered on the LVGL top layer. It is revealed by a
 // pull-down gesture that starts at the very top edge of the screen and drags
@@ -262,6 +263,18 @@ void Display::showRebootConfirm()
 void Display::handleGestureSample(int16_t x, int16_t y, bool pressed)
 {
     (void)x;
+
+#ifdef HAS_POWER_BUTTON
+    // The power-off confirm modal also lives on the top layer, above the drawer.
+    // This gesture is not LVGL hit-tested, so without this check a top-edge
+    // swipe would open the drawer behind the modal, completely invisibly.
+    if (PowerOffButton::isConfirmVisible())
+    {
+        Display::gesturePrevPressed = pressed;
+        Display::gestureCandidate = false;
+        return;
+    }
+#endif
 
     if (!pressed)
     {
