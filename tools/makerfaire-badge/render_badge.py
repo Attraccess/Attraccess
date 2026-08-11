@@ -1,10 +1,10 @@
-"""Render the Attraccess Maker Faire Hannover 2026 badge animation.
+"""Render the Attraccess round badge animation.
 
 A 360x360 seamless loop for a round wearable badge display, told as one
 continuous timeline rather than a slideshow: the keyhole motif is born, becomes
 the brand lockup, morphs into an Attractap reader for the scan-to-start moment,
-scatters into gears for the Maker Faire card, and hands off to the mascot for
-the personal greeting before blooming back into the opening beat.
+then hands off to the mascot for the personal greeting before blooming back
+into the opening beat.
 
     python3 tools/makerfaire-badge/prepare_assets.py
     python3 tools/makerfaire-badge/render_badge.py
@@ -37,7 +37,12 @@ GS = S // 2  # glow layers render at half resolution, then blur+upscale
 GU = GS / SIZE  # glow-layer units per badge unit
 
 FPS = 25
-DURATION = 14.0  # seconds per loop
+
+# Scenes are authored on a "story" clock; playback runs it faster. Keeping the
+# two separate means the beat timings below stay readable when the pace changes.
+STORY_DURATION = 11.40  # seconds of authored timeline
+SPEED = 1.2  # playback multiplier
+DURATION = STORY_DURATION / SPEED  # 9.5 s of actual footage per loop
 
 # ---------------------------------------------------------------- palette ---
 # Brand values from flyer-assets/brand/brand-colors.json.
@@ -52,7 +57,6 @@ MUTED = (139, 148, 169)
 INK = (24, 24, 27)  # marke.wordmark_licht
 BLUE = (5, 132, 247)  # ui.primaer_aktion
 GREEN = (23, 201, 100)  # ui.erfolg
-AMBER = (244, 165, 37)  # ui.warnung
 PANEL = (36, 42, 58)
 PANEL_DARK = (22, 26, 37)
 LINE = (58, 66, 84)
@@ -402,10 +406,9 @@ def draw_orbit(draw, prog):
 # Windows overlap deliberately: every hand-off is a move or a morph, never a cut.
 
 A0, A1 = 0.00, 2.60  # wake — the keyhole is born
-B0, B1 = 2.40, 5.35  # brand — lockup + claim
+B0, B1 = 2.40, 5.35  # brand — lockup, claim, url
 C0, C1 = 5.20, 8.75  # scan — card taps the reader, machine runs
-D0, D1 = 8.55, 11.35  # fair — Maker Faire Hannover card
-E0, E1 = 11.15, 14.00  # me — the greeting
+E0, E1 = 8.55, 11.40  # me — the greeting
 
 
 def keyhole_state(t):
@@ -428,7 +431,7 @@ def keyhole_state(t):
 def scene_wake(main, glow, dm, dg, t, assets):
     """0.0-2.6s — bloom, keyhole snaps in, mascot rises, scan pulses."""
     # Seam bloom: wrapped time keeps it continuous across the loop point.
-    tb = t if t < 2.0 else t - DURATION
+    tb = t if t < 2.0 else t - STORY_DURATION
     if -0.5 < tb < 0.85:
         a = bell(seg(tb, -0.5, 0.85)) * 0.85
         r = 30 + 120 * seg(tb, -0.5, 0.85)
@@ -489,7 +492,11 @@ def scene_brand(main, glow, dm, dg, t, assets):
 
     cp = ease_out_cubic(seg(t, 3.65, 4.30))
     if cp > 0:
-        text_center(dm, 180, 279 + 5 * (1 - cp), "Dein Schlüssel zum Makerspace", font("Outfit-Regular", 14.5), rgba(MUTED, cp * out))
+        text_center(dm, 180, 277 + 5 * (1 - cp), "Dein Schlüssel zum Makerspace", font("Outfit-Regular", 14.5), rgba(MUTED, cp * out))
+
+    up = ease_out_cubic(seg(t, 4.10, 4.65))
+    if up > 0:
+        text_center(dm, 180, 302 + 4 * (1 - up), "attraccess.org", font("Outfit-Bold", 13.5), rgba(ROSE_HI, up * out))
 
 
 def scene_scan(main, glow, dm, dg, t, assets):
@@ -586,87 +593,15 @@ def build_card(assets):
     return card
 
 
-# Confetti for the Maker Faire beat.
-_crng = random.Random(1516)
-CONFETTI = [
-    {
-        "a": _crng.uniform(0, 2 * math.pi),
-        "v": _crng.uniform(90, 210),
-        "size": _crng.uniform(3.0, 6.5),
-        "spin": _crng.uniform(-9, 9),
-        "col": _crng.choice([ROSE, ROSE_HI, BLUE, GREEN, AMBER, WHITE]),
-        "sq": _crng.random() < 0.6,
-        "delay": _crng.uniform(0, 0.22),
-    }
-    for _ in range(46)
-]
-
-
-def scene_fair(main, glow, dm, dg, t, assets):
-    """8.55-11.35s — the Maker Faire card, gears carried over from the scan."""
-    if not (D0 <= t <= D1 + 0.2):
-        return
-    out = 1 - ease_in_out_cubic(seg(t, 10.98, D1))
-    inn = ease_out_cubic(seg(t, D0, 9.05))
-
-    # Background gears: the pair from scene C, grown, slowed and joined.
-    gear_col = mix(LINE, ROSE, 0.18)
-    for cxg, cyg, rg, spin, al in ((58, 296, 52, 0.45, 0.55), (312, 70, 38, -0.55, 0.5), (296, 296, 30, 0.7, 0.45)):
-        draw_gear(main, cxg, cyg, rg * inn, (t - D0) * spin, rgba(gear_col, al * inn * out), teeth=11)
-
-    # Confetti sits under the type so the headline always stays legible.
-    for c in CONFETTI:
-        age = t - (8.92 + c["delay"])
-        if not (0 < age < 2.4):
-            continue
-        d = c["v"] * age * (1 - age / 4.2)
-        x = 180 + math.cos(c["a"]) * d
-        y = 165 + math.sin(c["a"]) * d * 0.72 + 46 * age * age
-        al = clamp(1 - age / 2.0) * out * 0.9
-        if al <= 0.01 or math.hypot(x - 180, y - 180) > 182:
-            continue
-        s = c["size"]
-        ang = c["spin"] * age
-        if c["sq"]:
-            pts = [polar(x, y, s * 0.72, ang + k * math.pi / 2 + math.pi / 4) for k in range(4)]
-            dm.polygon([(px * SS, py * SS) for px, py in pts], fill=rgba(c["col"], al))
-        else:
-            dm.ellipse([(x - s / 2) * SS, (y - s / 2) * SS, (x + s / 2) * SS, (y + s / 2) * SS], fill=rgba(c["col"], al))
-
-    def line_in(at):
-        return ease_out_cubic(seg(t, at, at + 0.5))
-
-    p = line_in(8.72)
-    text_center(dm, 180, 116 + 7 * (1 - p), "ATTRACCESS AUF DER", font("Outfit-Bold", 12.5), rgba(MUTED, p * out), tracking=2.4)
-
-    p = line_in(8.86)
-    text_center(dm, 180, 152 + 10 * (1 - p), "MAKER FAIRE", font("Outfit-Bold", 33), rgba(WHITE, p * out), tracking=0.4)
-
-    p = line_in(9.00)
-    text_center(dm, 180, 187 + 10 * (1 - p), "HANNOVER", font("Outfit-Bold", 25), rgba(ROSE_HI, p * out), tracking=3.0)
-
-    p = ease_out_cubic(seg(t, 9.20, 9.75))
-    if p > 0:
-        dm.rounded_rectangle(
-            [(180 - 76 * p) * SS, 207 * SS, (180 + 76 * p) * SS, 208.6 * SS], radius=SS, fill=rgba(ROSE, 0.85 * out)
-        )
-
-    p = line_in(9.34)
-    text_center(dm, 180, 229 + 7 * (1 - p), "15.–16. AUGUST 2026", font("JetBrainsMono-Bold", 13), rgba(WHITE, 0.88 * p * out))
-
-    p = line_in(9.62)
-    text_center(dm, 180, 256 + 6 * (1 - p), "attraccess.org", font("Outfit-Bold", 14.5), rgba(ROSE_HI, p * out))
-
-
 def scene_me(main, glow, dm, dg, t, assets):
-    """11.15-14.0s — the mascot hands over to the person wearing the badge."""
+    """8.55-11.4s — the mascot hands over to the person wearing the badge."""
     if t < E0:
         return
     # Must reach zero *before* the loop point, or the mascot pops on the seam.
-    out = 1 - ease_in_out_cubic(seg(t, 13.22, 13.95))
+    out = 1 - ease_in_out_cubic(seg(t, 10.62, 11.35))
 
     # Mascot rises from the bottom with a friendly sway.
-    rp = ease_out_cubic(seg(t, E0, 11.80))
+    rp = ease_out_cubic(seg(t, E0, 9.32))
     if rp > 0:
         sway = math.sin((t - E0) * 3.1) * 2.6
         bob = math.sin((t - E0) * 2.2) * 2.0
@@ -676,12 +611,12 @@ def scene_me(main, glow, dm, dg, t, assets):
         blit_center(main, fade(racc, out), cx, cy)
 
     # Speech bubble.
-    bp = ease_out_back(seg(t, 11.62, 12.18))
+    bp = ease_out_back(seg(t, 9.02, 9.58))
     if bp <= 0:
         return
     bcx, bcy, bw, bh = 200, 111, 182, 98
     w2, h2 = bw * bp / 2, bh * bp / 2
-    alpha = clamp(seg(t, 11.62, 11.95)) * out
+    alpha = clamp(seg(t, 9.02, 9.35)) * out
     dm.rounded_rectangle(
         [(bcx - w2) * SS, (bcy - h2) * SS, (bcx + w2) * SS, (bcy + h2) * SS],
         radius=17 * SS,
@@ -691,23 +626,25 @@ def scene_me(main, glow, dm, dg, t, assets):
         tail = [(bcx - w2 + 26, bcy + h2 - 3), (bcx - w2 + 8, bcy + h2 + 20), (bcx - w2 + 52, bcy + h2 - 3)]
         dm.polygon([(x * SS, y * SS) for x, y in tail], fill=rgba(WHITE, alpha))
 
-    tp = ease_out_cubic(seg(t, 11.98, 12.40))
+    tp = ease_out_cubic(seg(t, 9.38, 9.80))
     if tp > 0:
         a = tp * out
         text_center(dm, bcx, 84, "Moin, ich bin", font("Outfit-Regular", 13.5), rgba((90, 96, 112), a))
         text_center(dm, bcx, 111, "Jan Jaap", font("Outfit-Bold", 26), rgba(INK, a))
-        p2 = ease_out_cubic(seg(t, 12.34, 12.76))
+        p2 = ease_out_cubic(seg(t, 9.74, 10.16))
         text_center(dm, bcx, 138, "Frag mich was!", font("Outfit-Bold", 14), rgba(ROSE_DEEP, p2 * out))
 
 
-SCENES = (scene_wake, scene_brand, scene_scan, scene_fair, scene_me)
+SCENES = (scene_wake, scene_brand, scene_scan, scene_me)
 
 
 # ------------------------------------------------------------ compositing ---
 
 
 def render_frame(t, assets):
-    prog = (t % DURATION) / DURATION
+    """``t`` is playback time; scenes are authored in story time (see SPEED)."""
+    st = (t % DURATION) * SPEED
+    prog = st / STORY_DURATION
     main = assets["bg"].copy()
     glow = Image.new("RGBA", (GS, GS), (0, 0, 0, 0))
     dm = Pen(main)
@@ -715,7 +652,7 @@ def render_frame(t, assets):
 
     draw_particles(dm, prog)
     for scene in SCENES:
-        scene(main, glow, dm, dg, t, assets)
+        scene(main, glow, dm, dg, st, assets)
     draw_orbit(dm, prog)
 
     # Blur and lay the accumulated glow underneath-ish (additive-looking bloom).
