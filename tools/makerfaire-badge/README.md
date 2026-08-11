@@ -5,21 +5,27 @@ Maker Faire Hannover (15.–16. August 2026).
 
 | Output | Size | Notes |
 |---|---|---|
-| `dist/attraccess-badge-360.gif` | ~1.4 MB, 20 fps, 190 frames | 50 ms frame delay, `loop=0` |
-| `dist/attraccess-badge-360.mp4` | ~380 KB, 25 fps | H.264 / yuv420p, no audio |
+| `dist/attraccess-badge-360.gif` | ~1.45 MB, 12.5 fps, 187 frames | 80 ms frame delay, `loop=0` |
+| `dist/attraccess-badge-360.mp4` | ~500 KB, 25 fps | H.264 / yuv420p, no audio |
 
-Both are 9.5 s and loop seamlessly — the last frame steps into the first with
-the same magnitude as any other frame pair, so there is no visible stitch.
+Both are **14.96 s** and loop seamlessly — the last frame steps into the first
+with the same magnitude as any other frame pair, so there is no visible stitch.
 
-Badge storage is the binding constraint, so if the default doesn't fit:
+Two badge limits shape the defaults, and they pull against each other: clips cap
+at 15 s, and storage caps somewhere above 1.5 MB but below 2.2 MB. Filling the
+full 15 s at 20 fps costs 2.3 MB and does not fit; 12.5 fps gets the same
+duration into ~1.45 MB. That is not a smoothness compromise — motion per frame
+is `SPEED / fps`, which at 0.762/12.5 matches the earlier, shorter 20 fps cut
+almost exactly.
+
+If it still doesn't fit:
 
 | Command | Result |
 |---|---|
-| `--gif-fps 12.5` | ~1.0 MB |
-| `--gif-fps 10 --gif-colors 128` | ~0.77 MB |
-| `--gif-fps 8 --gif-colors 128` | ~0.6 MB |
+| `--gif-fps 12.5 --gif-colors 128` | ~1.36 MB |
+| `--gif-fps 10 --gif-colors 128` | ~1.13 MB |
 
-Same animation each time — only the frame count changes.
+Below that, shorten `DURATION` rather than degrading the image further.
 
 ## The timeline
 
@@ -29,9 +35,9 @@ A rose comet on the rim orbits exactly twice per loop, and a drifting mote field
 runs underneath the whole thing — both are phase-driven, so they cross the loop
 point without a jump.
 
-Beats are authored on an 11.4 s *story* clock and played back at `SPEED = 1.2`,
-giving 9.5 s of footage. The table below is story time; divide by 1.2 for
-playback time.
+Beats are authored on an 11.4 s *story* clock and stretched to fill the badge's
+maximum clip length, giving `SPEED = 11.4 / 14.96 = 0.762`. The table below is
+story time; divide by 0.762 for playback time.
 
 | Story time | Beat | What carries over |
 |---|---|---|
@@ -63,9 +69,11 @@ either, the GIF still builds and only the MP4 step fails.
 
 ## Notes for editing
 
-- **Retiming:** change `SPEED` for pace, or the scene constants (`A0`…`E1`) for
-  structure. `STORY_DURATION` must match the end of the last beat, and every
-  scene's fade-out has to reach zero before it.
+- **Retiming:** set `DURATION` to the target clip length and `SPEED` follows;
+  change the scene constants (`A0`…`E1`) for structure. `STORY_DURATION` must
+  match the end of the last beat, and every scene's fade-out has to reach zero
+  before it. Keep `DURATION * gif_fps` a whole number so the encoded clip length
+  matches exactly.
 - **Layout units are badge pixels** (360×360, centre `180,180`). Everything is
   drawn at 3× and downsampled, so keep coordinates in badge units and let `SS`
   do the work. Keep text inside a radius of about 150 — a round display cuts the

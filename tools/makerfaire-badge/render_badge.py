@@ -38,11 +38,15 @@ GU = GS / SIZE  # glow-layer units per badge unit
 
 FPS = 25
 
-# Scenes are authored on a "story" clock; playback runs it faster. Keeping the
-# two separate means the beat timings below stay readable when the pace changes.
+# Scenes are authored on a "story" clock and stretched to fill the badge's
+# maximum clip length. Keeping the two separate means the beat timings below
+# stay readable whatever the target duration is.
 STORY_DURATION = 11.40  # seconds of authored timeline
-SPEED = 1.2  # playback multiplier
-DURATION = STORY_DURATION / SPEED  # 9.5 s of actual footage per loop
+# The badge caps clips at 15 s. 14.96 is the closest length that is also a whole
+# number of GIF frames at the default 12.5 fps (187 x 80 ms), so the encoded
+# clip lands just under the cap instead of overrunning it at 15.04.
+DURATION = 14.96
+SPEED = STORY_DURATION / DURATION  # 0.762x: story seconds per playback second
 
 # ---------------------------------------------------------------- palette ---
 # Brand values from flyer-assets/brand/brand-colors.json.
@@ -736,9 +740,10 @@ def write_mp4(frames, path, fps):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
-    # 20 fps keeps the GIF frame delay at a round 50 ms, which badge firmware
-    # honours more reliably than 40 ms; the MP4 has no such constraint.
-    ap.add_argument("--gif-fps", type=float, default=20)
+    # 12.5 fps (an exact 80 ms delay) is what keeps a 15 s loop inside the
+    # badge's storage. It also lands on the same motion-per-frame as the older,
+    # shorter 20 fps cut -- SPEED/fps is unchanged -- so it is no less smooth.
+    ap.add_argument("--gif-fps", type=float, default=12.5)
     ap.add_argument("--mp4-fps", type=float, default=FPS)
     ap.add_argument("--gif-colors", type=int, default=256)
     ap.add_argument("--stills", help="comma-separated timestamps to dump as PNG instead of encoding")
