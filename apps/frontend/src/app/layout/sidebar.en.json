@@ -14,7 +14,6 @@
         "resources": "Resources",
         "projects": "Projects",
         "messages": "Messages",
-        "printables": "3D Models",
         "billing": "Billing",
         "attractap": "NFC-Cards"
       }
@@ -49,7 +48,6 @@
     }
   },
   "endItems": {
-    "docs": "Documentation",
     "dependencies": "Dependencies",
     "changelog": "Changelog",
     "groups": {
@@ -58,6 +56,13 @@
         "items": {
           "reportBug": "Report a Bug",
           "requestFeature": "Request a Feature"
+        }
+      },
+      "docsAndTools": {
+        "label": "Docs & Tools",
+        "items": {
+          "docs": "Documentation",
+          "printables": "3D Models"
         }
       }
     }

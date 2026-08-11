@@ -1,5 +1,36 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { triggerDownload } from './download';
+import { scadWithLabel, triggerDownload } from './download';
+import scadSource from './nfc-keychain-card.scad?raw';
+
+describe('scadWithLabel', () => {
+  it('rewrites the LABEL default so the downloaded source matches what the preview showed', () => {
+    expect(scadWithLabel('PART = "body";\nLABEL = "Makerspace";\nW = 60;', 'Robot Lab')).toBe(
+      'PART = "body";\nLABEL = "Robot Lab";\nW = 60;',
+    );
+  });
+
+  it('escapes quotes and backslashes so the result stays a valid OpenSCAD string', () => {
+    expect(scadWithLabel('LABEL = "Makerspace";', 'He said "hi" \\ bye')).toBe(
+      'LABEL = "He said \\"hi\\" \\\\ bye";',
+    );
+  });
+
+  it('leaves other assignments alone', () => {
+    const out = scadWithLabel('LABEL = "a";\nBRAND = "Attraccess";\nLABEL_CAP_MAX = 10;', 'b');
+    expect(out).toContain('BRAND = "Attraccess";');
+    expect(out).toContain('LABEL_CAP_MAX = 10;');
+  });
+
+  it('throws rather than silently returning the wrong label', () => {
+    expect(() => scadWithLabel('W = 60;', 'x')).toThrow(/LABEL assignment/);
+  });
+
+  it('matches the .scad actually shipped, so the pattern cannot drift unnoticed', () => {
+    // Without this, renaming or reformatting the LABEL line in nfc-keychain-card.scad would make
+    // every .scad download throw, and only in the browser.
+    expect(scadWithLabel(scadSource, 'Robot Lab')).toContain('LABEL = "Robot Lab";');
+  });
+});
 
 describe('triggerDownload', () => {
   afterEach(() => {

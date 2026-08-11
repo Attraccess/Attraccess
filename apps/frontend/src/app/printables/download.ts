@@ -41,7 +41,30 @@ export function triggerDownload(data: BlobPart, filename: string): void {
   setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
-export function downloadCard(render: CardRender, label: string, format: 'stl' | '3mf'): void {
+/** Formats that need a finished render. */
+export type MeshFormat = 'stl' | '3mf';
+/** Everything offered in the format picker. `scad` is the source and needs no render. */
+export type DownloadFormat = MeshFormat | 'scad';
+
+/**
+ * Rewrites the `.scad` source so its `LABEL` default is the label the user actually typed,
+ * making the downloaded source reproduce what the preview shows rather than the built-in
+ * default. `JSON.stringify` escapes quotes and backslashes, which OpenSCAD string literals
+ * accept in the same form.
+ *
+ * Throws rather than silently returning the source unchanged if the assignment cannot be
+ * found: a quiet no-op would hand the user a file with somebody else's label. `download.spec.ts`
+ * pins the shipped `.scad` against this pattern so it cannot drift unnoticed.
+ */
+export function scadWithLabel(source: string, label: string): string {
+  const pattern = /^LABEL\s*=.*$/m;
+  if (!pattern.test(source)) {
+    throw new Error('Could not find the LABEL assignment in the .scad source');
+  }
+  return source.replace(pattern, `LABEL = ${JSON.stringify(label)};`);
+}
+
+export function downloadCard(render: CardRender, label: string, format: MeshFormat): void {
   const slug = toFileSlug(label);
 
   const [data, filename] =
