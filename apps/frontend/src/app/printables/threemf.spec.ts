@@ -182,12 +182,13 @@ describe('3MF container validity', () => {
 });
 
 describe('toFileSlug', () => {
-  it('lowercases and hyphenates', () => {
-    expect(toFileSlug('Laser Cutter 2')).toBe('laser-cutter-2');
+  it('lowercases and hyphenates, behind a fixed product prefix', () => {
+    expect(toFileSlug('Laser Cutter 2')).toBe('attraccess-nfc-card-laser-cutter-2');
   });
 
-  it('falls back when the label has no usable characters', () => {
-    expect(toFileSlug('!!!')).toBe('nfc-keychain-card');
+  it('drops the separator entirely when the label has no usable characters', () => {
+    // Not 'attraccess-nfc-card-': a dangling trailing hyphen would look like a truncated name.
+    expect(toFileSlug('!!!')).toBe('attraccess-nfc-card');
   });
 
   it('does not leave a trailing hyphen when truncation lands right after one', () => {
@@ -195,7 +196,7 @@ describe('toFileSlug', () => {
     // exactly at the 40-character truncation boundary.
     const label = `${'a'.repeat(40)}   overflow`;
     const slug = toFileSlug(label);
-    expect(slug).toBe('a'.repeat(40));
+    expect(slug).toBe(`attraccess-nfc-card-${'a'.repeat(40)}`);
     expect(slug.endsWith('-')).toBe(false);
   });
 });

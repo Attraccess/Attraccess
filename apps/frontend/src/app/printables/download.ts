@@ -6,7 +6,7 @@ import type { CardRender } from './useCardRender';
  * Part colours, shared by the three.js preview and the 3MF `displaycolor`, so the file opens in
  * a slicer looking like what the preview showed.
  */
-export const BODY_COLOR = '#0D746B';
+export const BODY_COLOR = '#256D7B';
 export const LETTER_COLOR = '#FFFFFF';
 
 /** Turns a label into something safe for a filename, falling back when nothing survives. */
@@ -16,7 +16,10 @@ export function toFileSlug(label: string): string {
     .replace(/[^a-z0-9]+/g, '-')
     .slice(0, 40)
     .replace(/^-+|-+$/g, '');
-  return slug || 'nfc-keychain-card';
+
+  // A label with nothing filename-safe in it (e.g. "!!!") would otherwise leave a dangling
+  // separator: "attraccess-nfc-card-".
+  return slug ? `attraccess-nfc-card-${slug}` : 'attraccess-nfc-card';
 }
 
 /** The STLs come straight from OpenSCAD; both share one coordinate space, so import them together. */
