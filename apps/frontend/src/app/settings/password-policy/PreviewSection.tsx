@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Card, Chip, Input, Label, Spinner, TextField } from '@heroui/react';
+import { Button, Chip, Input, Label, Spinner, TextField } from '@heroui/react';
 import { CheckIcon, EyeIcon, EyeOffIcon, XIcon } from 'lucide-react';
 import type { PolicyError } from '@attraccess/shared';
 import {
@@ -80,12 +80,11 @@ export function PreviewSection({ policy }: Props) {
   useEffect(() => () => inflight.current?.cancel(), []);
 
   return (
-    <Card>
-      <Card.Header className="flex flex-col items-start gap-1">
+    <section className="flex flex-col gap-4">
+      <header className="flex flex-col items-start gap-1">
         <span className="text-base font-semibold">{t('preview.title')}</span>
         <span className="text-sm text-default-500">{t('preview.subtitle')}</span>
-      </Card.Header>
-      <Card.Content className="flex flex-col gap-4">
+      </header>
         <TextField value={candidate} onChange={setCandidate} data-testid="policy-preview-input">
           <Label>{t('preview.passwordLabel')}</Label>
           <Input type={reveal ? 'text' : 'password'} autoComplete="new-password" />
@@ -126,8 +125,7 @@ export function PreviewSection({ policy }: Props) {
             ) : null}
           </div>
         )}
-      </Card.Content>
-    </Card>
+    </section>
   );
 }
 

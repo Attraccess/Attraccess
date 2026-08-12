@@ -1,5 +1,10 @@
 {
-  "title": "Rollen & Berechtigungen",
+  "permissions": {
+    "resource-manager": "Ressourcen verwalten",
+    "system-admin": "Systemkonfiguration verwalten",
+    "user-manager": "Benutzer verwalten",
+    "billing-manager": "Zahlungen verwalten"
+  },
   "actions": {
     "save": "Speichern"
   },

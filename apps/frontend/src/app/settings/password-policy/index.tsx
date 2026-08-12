@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Card, Spinner } from '@heroui/react';
+import { Spinner } from '@heroui/react';
 import { Button } from '../../../components/button';
 import { ShieldCheckIcon } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -85,26 +85,24 @@ export function PasswordPolicySettingsPage() {
       <PageHeader title={t('title')} subtitle={t('subtitle')} icon={<ShieldCheckIcon size={20} />} />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <Card.Header className="flex flex-col items-start gap-1">
+        <section className="lg:col-span-2 flex flex-col gap-4">
+          <header className="flex flex-col items-start gap-1">
             <span className="text-base font-semibold">{t('global.title')}</span>
             <span className="text-sm text-default-500">{t('global.subtitle')}</span>
-          </Card.Header>
-          <Card.Content className="flex flex-col gap-4">
-            <PolicyFields value={form} onChange={setForm} testIdPrefix="global-policy" />
-            <div>
-              <Button
-                variant="primary"
-                onPress={() => setConfirmOpen(true)}
-                isDisabled={!isDirty}
-                isPending={isPending}
-                data-testid="policy-save-button"
-              >
-                {t('global.saveButton')}
-              </Button>
-            </div>
-          </Card.Content>
-        </Card>
+          </header>
+          <PolicyFields value={form} onChange={setForm} testIdPrefix="global-policy" />
+          <div>
+            <Button
+              variant="primary"
+              onPress={() => setConfirmOpen(true)}
+              isDisabled={!isDirty}
+              isPending={isPending}
+              data-testid="policy-save-button"
+            >
+              {t('global.saveButton')}
+            </Button>
+          </div>
+        </section>
 
         <PreviewSection policy={form} />
       </div>
