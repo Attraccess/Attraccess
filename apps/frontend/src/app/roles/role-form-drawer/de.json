@@ -25,12 +25,6 @@
     "cannotGrantHint": "Gesperrte Berechtigungen besitzt du selbst nicht und kannst sie nicht vergeben.",
     "lockedTagIndicator": "(gesperrt)"
   },
-  "categories": {
-    "resources": "Ressourcen",
-    "users": "Benutzer",
-    "system": "System",
-    "billing": "Abrechnung"
-  },
   "actions": {
     "cancel": "Abbrechen",
     "close": "Schließen",

@@ -29,10 +29,12 @@ import { useToastMessage } from '../../../components/toastProvider';
 import API_ERROR_TRANSLATIONS_EN from '../../../global-translations/api-errors.en.json';
 import API_ERROR_TRANSLATIONS_DE from '../../../global-translations/api-errors.de.json';
 import { useAuth } from '../../../hooks/useAuth';
+import { useRbacCatalogTranslations } from '../../../hooks/useRbacCatalogTranslations';
 import { useMemo } from 'react';
 import { getSsoManagedPermissionKeys, hasConfiguredPermissionMapping } from '@attraccess/shared';
 
 function EffectivePermissionsSection({ userId, t }: { userId: number; t: ReturnType<typeof useTranslations>['t'] }) {
+  const { permissionLabel, permissionDescription, permissionCategory } = useRbacCatalogTranslations();
   const { data: allRoles, isLoading: isLoadingRoles } = useRbacServiceListRoles();
   const { data: allPermissions, isLoading: isLoadingPerms } = useRbacServiceListPermissions();
   const { data: userRoles, isLoading: isLoadingUserRoles } = useUsersServiceGetUserRoleAssignments({ id: userId });
@@ -75,11 +77,13 @@ function EffectivePermissionsSection({ userId, t }: { userId: number; t: ReturnT
     <div className="flex flex-col gap-3">
       {[...permsByCategory.entries()].map(([category, perms], idx, arr) => (
         <div key={category} className="flex flex-col gap-1.5">
-          <p className="text-xs font-semibold uppercase tracking-wide text-default-500">{category}</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-default-500">
+            {permissionCategory(category)}
+          </p>
           <div className="flex flex-wrap gap-1">
             {perms.map((p) => (
-              <Chip key={p.key} size="sm" color="accent" variant="secondary" title={p.description}>
-                {p.label}
+              <Chip key={p.key} size="sm" color="accent" variant="secondary" title={permissionDescription(p)}>
+                {permissionLabel(p)}
               </Chip>
             ))}
           </div>
@@ -272,9 +276,7 @@ export function UserManagementDetailsPage() {
           <Card className="w-full" data-cy="user-details-sso-section">
             <Card.Content className="flex flex-col gap-4">
               <div className="flex items-center justify-between gap-2">
-                <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
-                  {t('sso.title')}
-                </h3>
+                <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">{t('sso.title')}</h3>
                 <Chip
                   color={ssoDetails.length > 0 ? 'accent' : 'default'}
                   variant={ssoDetails.length > 0 ? 'secondary' : 'primary'}
@@ -304,17 +306,13 @@ export function UserManagementDetailsPage() {
                     return (
                       <div key={itemKey} className="flex flex-col gap-2">
                         <div className="flex flex-col gap-1">
-                          <span className="text-xs uppercase tracking-wide text-default-500">
-                            {t('sso.provider')}
-                          </span>
+                          <span className="text-xs uppercase tracking-wide text-default-500">{t('sso.provider')}</span>
                           <div className="text-sm font-semibold text-default-900 break-words">{providerLabel}</div>
                           <div className="text-xs text-default-500">{detail.providerType ?? '-'}</div>
                         </div>
                         <div className="flex flex-col gap-1">
                           <span className="text-xs uppercase tracking-wide text-default-500">{t('sso.userId')}</span>
-                          <div className="font-mono text-xs text-default-800 break-all">
-                            {detail.ssoSubject ?? '-'}
-                          </div>
+                          <div className="font-mono text-xs text-default-800 break-all">{detail.ssoSubject ?? '-'}</div>
                         </div>
                         {index < ssoDetails.length - 1 ? <Separator /> : null}
                       </div>
@@ -327,17 +325,10 @@ export function UserManagementDetailsPage() {
 
           <Card className="w-full" data-cy="user-details-delete-section">
             <Card.Content className="flex flex-col gap-4">
-              <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
-                {t('delete.title')}
-              </h3>
+              <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">{t('delete.title')}</h3>
               <p className="text-sm text-default-500">{t('delete.description')}</p>
               <div className="flex w-full justify-end">
-                <Button
-                  variant="danger-soft"
-                  onPress={open}
-                  isDisabled={isSelf}
-                  data-cy="admin-delete-user-open-modal"
-                >
+                <Button variant="danger-soft" onPress={open} isDisabled={isSelf} data-cy="admin-delete-user-open-modal">
                   {t('delete.actions.open')}
                 </Button>
               </div>

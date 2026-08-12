@@ -1,0 +1,79 @@
+{
+  "categories": {
+    "resources": "Resources",
+    "users": "Users",
+    "system": "System",
+    "billing": "Billing"
+  },
+  "permissions": {
+    "resources": {
+      "read": { "label": "Read Resources", "description": "Allows reading resource information" },
+      "create": { "label": "Create Resources", "description": "Allows creating new resources" },
+      "update": { "label": "Update Resources", "description": "Allows updating existing resources" },
+      "delete": { "label": "Delete Resources", "description": "Allows deleting resources" },
+      "access": {
+        "manage": { "label": "Manage Resource Access", "description": "Allows managing who can access resources" }
+      },
+      "maintenance": {
+        "manage": {
+          "label": "Manage Resource Maintenance",
+          "description": "Allows managing resource maintenance schedules and requests"
+        }
+      }
+    },
+    "users": {
+      "read": { "label": "Read Users", "description": "Allows reading user information" },
+      "create": { "label": "Create Users", "description": "Allows creating new users" },
+      "update": { "label": "Update Users", "description": "Allows updating existing users" },
+      "delete": { "label": "Delete Users", "description": "Allows deleting users" },
+      "roles": {
+        "manage": { "label": "Manage User Roles", "description": "Allows assigning and revoking roles for users" }
+      }
+    },
+    "system": {
+      "settings": {
+        "manage": { "label": "Manage System Settings", "description": "Allows changing system configuration" }
+      },
+      "sso": { "manage": { "label": "Manage SSO", "description": "Allows managing SSO provider configuration" } },
+      "plugins": {
+        "manage": { "label": "Manage Plugins", "description": "Allows installing and configuring plugins" }
+      }
+    },
+    "billing": {
+      "read": {
+        "label": "Read Billing",
+        "description": "Allows reading billing information and transactions"
+      },
+      "manage": {
+        "label": "Manage Billing",
+        "description": "Allows managing billing configuration and transactions"
+      }
+    }
+  },
+  "roles": {
+    "user": {
+      "name": "User",
+      "description": "Basic authenticated user with read-only access to resources"
+    },
+    "resource-manager": {
+      "name": "Resource Manager",
+      "description": "Can create, update, delete, and manage access to resources"
+    },
+    "user-manager": {
+      "name": "User Manager",
+      "description": "Can manage users and their role assignments"
+    },
+    "billing-manager": {
+      "name": "Billing Manager",
+      "description": "Can read and manage billing information"
+    },
+    "system-admin": {
+      "name": "System Administrator",
+      "description": "Can manage system settings, SSO, and plugins"
+    },
+    "owner": {
+      "name": "Owner",
+      "description": "Has all permissions in the system"
+    }
+  }
+}
