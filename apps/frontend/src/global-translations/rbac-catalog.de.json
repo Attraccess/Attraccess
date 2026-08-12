@@ -85,8 +85,8 @@
       "name": "Systemadministrator",
       "description": "Kann Systemeinstellungen, SSO und Plugins verwalten"
     },
-    "owner": {
-      "name": "Eigentümer",
+    "administrator": {
+      "name": "Administrator",
       "description": "Besitzt alle Berechtigungen im System"
     }
   }

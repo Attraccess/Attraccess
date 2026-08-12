@@ -22,7 +22,7 @@ const mockMetricsService = {
 const mockRbacService = {
   assignRoleByKey: jest.fn().mockResolvedValue(undefined),
   assignDefaultRoles: jest.fn().mockResolvedValue(undefined),
-  isLastOwner: jest.fn().mockResolvedValue(false),
+  isLastAdministrator: jest.fn().mockResolvedValue(false),
 };
 
 describe('UsersService', () => {
@@ -33,8 +33,8 @@ describe('UsersService', () => {
   beforeEach(async () => {
     mockRbacService.assignRoleByKey.mockClear();
     mockRbacService.assignDefaultRoles.mockClear();
-    mockRbacService.isLastOwner.mockClear();
-    mockRbacService.isLastOwner.mockResolvedValue(false);
+    mockRbacService.isLastAdministrator.mockClear();
+    mockRbacService.isLastAdministrator.mockResolvedValue(false);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -154,7 +154,7 @@ describe('UsersService', () => {
   });
 
   describe('createOne', () => {
-    it('the first created user should be assigned the owner role via RBAC', async () => {
+    it('the first created user should be assigned the administrator role via RBAC', async () => {
       jest.spyOn(userRepository, 'findOne').mockResolvedValue(null);
       jest.spyOn(userRepository, 'save').mockImplementation(async (data) => ({
         id: 1,
@@ -166,7 +166,7 @@ describe('UsersService', () => {
       jest.spyOn(userRepository, 'count').mockResolvedValue(0);
 
       await service.createOne({ username: 'test', email: 'test@example.com', externalIdentifier: null });
-      expect(mockRbacService.assignRoleByKey).toHaveBeenCalledWith(1, 'owner', expect.anything());
+      expect(mockRbacService.assignRoleByKey).toHaveBeenCalledWith(1, 'administrator', expect.anything());
     });
 
     it('a subsequent user should be assigned default roles via RBAC', async () => {
@@ -548,17 +548,17 @@ describe('UsersService', () => {
   describe('confirmSelfDeletion', () => {
     const futureDate = new Date(Date.now() + 86_400_000);
 
-    it('throws ForbiddenException when user is the last owner', async () => {
+    it('throws ForbiddenException when user is the last administrator', async () => {
       jest.spyOn(userRepository, 'findOne').mockResolvedValue({
         id: 1,
-        email: 'owner@example.com',
+        email: 'admin@example.com',
         deletedAt: null,
         deleteAccountToken: 'hashed:tok',
         deleteAccountTokenExpiresAt: futureDate,
       } as unknown as User);
-      mockRbacService.isLastOwner.mockResolvedValue(true);
+      mockRbacService.isLastAdministrator.mockResolvedValue(true);
 
-      await expect(service.confirmSelfDeletion('owner@example.com', 'tok')).rejects.toThrow(ForbiddenException);
+      await expect(service.confirmSelfDeletion('admin@example.com', 'tok')).rejects.toThrow(ForbiddenException);
     });
   });
 });

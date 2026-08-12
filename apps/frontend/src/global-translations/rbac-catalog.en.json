@@ -71,8 +71,8 @@
       "name": "System Administrator",
       "description": "Can manage system settings, SSO, and plugins"
     },
-    "owner": {
-      "name": "Owner",
+    "administrator": {
+      "name": "Administrator",
       "description": "Has all permissions in the system"
     }
   }
