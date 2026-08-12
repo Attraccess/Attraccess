@@ -18,6 +18,7 @@ import {
   MonitorSmartphoneIcon,
   NfcIcon,
   PackageIcon,
+  PuzzleIcon,
   SendIcon,
   Settings2Icon,
   ServerIcon,
@@ -194,7 +195,7 @@ export const SIDEBAR_ITEMS: (SidebarItem | SidebarItemGroup)[] = [
       {
         path: '/plugins',
         translationKey: 'plugins',
-        icon: PackageIcon,
+        icon: PuzzleIcon,
       },
       {
         path: '/monitoring',
@@ -210,9 +211,7 @@ export function useSidebarItems(): (SidebarItem | SidebarItemGroup)[] {
   const { data: unread } = useMessagingServiceMessagingGetUnreadCount();
 
   const allItems = useMemo(() => {
-    return SIDEBAR_ITEMS.map((item) =>
-      'showsUnreadCount' in item ? { ...item, badgeCount: unread?.total } : item,
-    );
+    return SIDEBAR_ITEMS.map((item) => ('showsUnreadCount' in item ? { ...item, badgeCount: unread?.total } : item));
   }, [unread?.total]);
 
   return useMemo(() => {
@@ -297,10 +296,23 @@ export const useSidebarEndItems = () => {
     }),
   });
 
+  return buildSidebarEndItems(reportBugUrl, requestFeatureUrl);
+};
+
+/**
+ * The bottom nav tree. Split out of the hook so sidebarItems.spec.tsx can check it for icon
+ * collisions against SIDEBAR_ITEMS — both trees render in the same sidebar at the same time.
+ * The two GitHub issue URLs are the only parts that need the hook's context.
+ */
+export const buildSidebarEndItems = (
+  reportBugUrl: string,
+  requestFeatureUrl: string,
+): (SidebarItem | SidebarItemGroup)[] => {
   return [
     {
       isGroup: true,
-      icon: MailIcon,
+      // A child's glyph: MailIcon belongs to Notifications › Emails and is not what Feedback does.
+      icon: LightbulbIcon,
       translationKey: 'feedback',
       items: [
         {

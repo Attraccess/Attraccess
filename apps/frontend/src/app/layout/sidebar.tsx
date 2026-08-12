@@ -7,7 +7,7 @@ import {
   ExternalLink,
   Languages,
   Check,
-  PackageIcon,
+  PuzzleIcon,
   PanelLeftClose,
   PanelLeftOpen,
 } from 'lucide-react';
@@ -316,7 +316,7 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
               <NavLink
                 key={item.path}
                 href={item.path}
-                icon={item.icon ?? <PackageIcon size={16} aria-hidden />}
+                icon={item.icon ?? <PuzzleIcon size={16} aria-hidden />}
                 label={item.label}
                 data-cy={`sidebar-plugin-nav-${item.path?.replace(/\//g, '-')}`}
                 collapsed={isCollapsed}

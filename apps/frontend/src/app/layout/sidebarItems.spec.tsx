@@ -1,19 +1,33 @@
 import { describe, expect, it } from 'vitest';
-import { SIDEBAR_ITEMS } from './sidebarItems';
+import { buildSidebarEndItems, SIDEBAR_ITEMS } from './sidebarItems';
 import de from './sidebar.de.json';
 import en from './sidebar.en.json';
 
-// `isGroup` discriminates the union, so this narrows to SidebarItem[] without a cast.
-const navigableItems = SIDEBAR_ITEMS.flatMap((item) => (item.isGroup ? item.items : [item]));
+// Both trees render in the same sidebar at the same time, so collisions are only meaningful
+// across their union. The end tree's URLs are stubbed; nothing here depends on their contents.
+const ALL_ITEMS = [
+  ...SIDEBAR_ITEMS,
+  ...buildSidebarEndItems('https://github.com/stub/bug', 'https://github.com/stub/feature'),
+];
 
-describe('SIDEBAR_ITEMS', () => {
+// `isGroup` discriminates the union, so this narrows to SidebarItem[] without a cast.
+const navigableItems = ALL_ITEMS.flatMap((item) => (item.isGroup ? item.items : [item]));
+
+describe('sidebar items', () => {
   it('gives every navigable entry a distinct icon', () => {
-    // Group headers are excluded on purpose: they expand/collapse rather than navigate, so
-    // reusing their most representative child's glyph is a deliberate decision, not a collision.
-    const icons = navigableItems.map((item) => item.icon);
+    // A group header may reuse one of its own children's glyphs — it expands/collapses rather
+    // than navigates — but borrowing any other entry's glyph is a collision like any other.
+    const icons = ALL_ITEMS.flatMap((item) => {
+      if (!item.isGroup) {
+        return [item.icon];
+      }
+
+      const childIcons = item.items.map((child) => child.icon);
+      return childIcons.includes(item.icon) ? childIcons : [item.icon, ...childIcons];
+    });
     const duplicates = icons.filter((icon, index) => icons.indexOf(icon) !== index);
 
-    expect(duplicates).toEqual([]);
+    expect(duplicates.map((icon) => icon.displayName ?? icon.name)).toEqual([]);
   });
 
   it('links every navigable entry to exactly one path', () => {
@@ -36,7 +50,10 @@ describe('SIDEBAR_ITEMS', () => {
         }
 
         for (const child of item.isGroup ? item.items : [item]) {
-          expect(group.items[child.translationKey as string], `missing "${groupKey}.${child.translationKey}"`).toBeTruthy();
+          expect(
+            group.items[child.translationKey as string],
+            `missing "${groupKey}.${child.translationKey}"`,
+          ).toBeTruthy();
         }
       }
     }
