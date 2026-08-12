@@ -48,7 +48,6 @@
     }
   },
   "endItems": {
-    "docs": "Dokumentation",
     "dependencies": "Abhängigkeiten",
     "changelog": "Änderungsprotokoll",
     "groups": {
@@ -57,6 +56,13 @@
         "items": {
           "reportBug": "Fehler melden",
           "requestFeature": "Funktion vorschlagen"
+        }
+      },
+      "docsAndTools": {
+        "label": "Doku & Werkzeuge",
+        "items": {
+          "docs": "Dokumentation",
+          "printables": "3D-Modelle"
         }
       }
     }
