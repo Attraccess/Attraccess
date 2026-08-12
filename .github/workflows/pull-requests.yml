@@ -27,6 +27,8 @@ jobs:
         with:
           fetch-depth: 0
       - uses: ./.github/actions/setup
+        with:
+          esp-idf: 'false'
       - name: Run precommit checks
         run: pnpm precommit
 
@@ -39,6 +41,8 @@ jobs:
         with:
           fetch-depth: 0
       - uses: ./.github/actions/setup
+        with:
+          esp-idf: 'false'
       - name: Validate PR title
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
@@ -64,6 +68,8 @@ jobs:
         with:
           fetch-depth: 0
       - uses: ./.github/actions/setup
+        with:
+          esp-idf: 'false'
       - name: Lint affected projects
         run: pnpm nx affected --target=lint --parallel=5 --base=${{ env.NX_AFFECTED_BASE }} --exclude=tag:scope:hardware,tag:type:plugin
       - name: Typecheck affected projects
@@ -77,6 +83,8 @@ jobs:
         with:
           fetch-depth: 0
       - uses: ./.github/actions/setup
+        with:
+          esp-idf: 'false'
       - name: Test affected projects
         run: pnpm nx affected --target=test,e2e --parallel=5 --base=${{ env.NX_AFFECTED_BASE }} --exclude=tag:scope:hardware,tag:type:plugin
 
@@ -88,6 +96,8 @@ jobs:
         with:
           fetch-depth: 0
       - uses: ./.github/actions/setup
+        with:
+          esp-idf: 'false'
 
       # Only affected plugins are linted/packaged. The `*,!tag:type:plugin`
       # exclude keeps the affected set restricted to plugin apps, so a PR that
@@ -183,6 +193,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
       - uses: ./.github/actions/setup
+        with:
+          esp-idf: 'false'
       - name: Validate docker-compose.balena.yml with balena's parser
         run: node scripts/check-balena-compose.mjs
 
