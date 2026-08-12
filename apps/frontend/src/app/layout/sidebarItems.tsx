@@ -46,6 +46,8 @@ export type SidebarItem = {
   isGroup?: false;
   licenseModule?: string;
   badgeCount?: number;
+  /** Entry displays the unread-message count. Set on the entry so the badge never keys off a path string. */
+  showsUnreadCount?: true;
 };
 
 export type SidebarItemGroup = {
@@ -56,7 +58,11 @@ export type SidebarItemGroup = {
   licenseModule?: string;
 };
 
-const BalenaSidebarIcon = (props: React.SVGProps<SVGSVGElement>) => <BalenaIcon {...props} width={16} height={16} />;
+// Takes LucideProps like every other sidebar icon, so callers can size it the same way. `size` is
+// lucide-only and would land on the <svg> as an invalid attribute, so it is translated here.
+const BalenaSidebarIcon = ({ size = 16, ...props }: LucideProps) => (
+  <BalenaIcon {...props} width={size} height={size} />
+);
 
 /**
  * The navigation tree. Groups are named after what an operator is looking for, never after
@@ -81,6 +87,7 @@ export const SIDEBAR_ITEMS: (SidebarItem | SidebarItemGroup)[] = [
     translationKey: 'messages',
     path: '/messages',
     icon: MessageSquareIcon,
+    showsUnreadCount: true,
   },
   {
     translationKey: 'attractap',
@@ -204,7 +211,7 @@ export function useSidebarItems(): (SidebarItem | SidebarItemGroup)[] {
 
   const allItems = useMemo(() => {
     return SIDEBAR_ITEMS.map((item) =>
-      'path' in item && item.path === '/messages' ? { ...item, badgeCount: unread?.total } : item,
+      'showsUnreadCount' in item ? { ...item, badgeCount: unread?.total } : item,
     );
   }, [unread?.total]);
 

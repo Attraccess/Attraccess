@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { SIDEBAR_ITEMS, SidebarItem } from './sidebarItems';
+import { SIDEBAR_ITEMS } from './sidebarItems';
 import de from './sidebar.de.json';
 import en from './sidebar.en.json';
 
-const navigableItems = SIDEBAR_ITEMS.flatMap((item) => (item.isGroup ? item.items : [item])) as SidebarItem[];
+// `isGroup` discriminates the union, so this narrows to SidebarItem[] without a cast.
+const navigableItems = SIDEBAR_ITEMS.flatMap((item) => (item.isGroup ? item.items : [item]));
 
 describe('SIDEBAR_ITEMS', () => {
   it('gives every navigable entry a distinct icon', () => {
