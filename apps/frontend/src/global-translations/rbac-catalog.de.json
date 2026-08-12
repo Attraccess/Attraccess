@@ -1,0 +1,93 @@
+{
+  "categories": {
+    "resources": "Ressourcen",
+    "users": "Benutzer",
+    "system": "System",
+    "billing": "Abrechnung"
+  },
+  "permissions": {
+    "resources": {
+      "read": { "label": "Ressourcen lesen", "description": "Erlaubt das Lesen von Ressourcen-Informationen" },
+      "create": { "label": "Ressourcen erstellen", "description": "Erlaubt das Erstellen neuer Ressourcen" },
+      "update": { "label": "Ressourcen bearbeiten", "description": "Erlaubt das Bearbeiten bestehender Ressourcen" },
+      "delete": { "label": "Ressourcen löschen", "description": "Erlaubt das Löschen von Ressourcen" },
+      "access": {
+        "manage": {
+          "label": "Ressourcen-Zugriff verwalten",
+          "description": "Erlaubt das Verwalten, wer auf Ressourcen zugreifen darf"
+        }
+      },
+      "maintenance": {
+        "manage": {
+          "label": "Ressourcen-Wartung verwalten",
+          "description": "Erlaubt das Verwalten von Wartungsplänen und Wartungsanfragen"
+        }
+      }
+    },
+    "users": {
+      "read": { "label": "Benutzer lesen", "description": "Erlaubt das Lesen von Benutzerinformationen" },
+      "create": { "label": "Benutzer erstellen", "description": "Erlaubt das Anlegen neuer Benutzer" },
+      "update": { "label": "Benutzer bearbeiten", "description": "Erlaubt das Bearbeiten bestehender Benutzer" },
+      "delete": { "label": "Benutzer löschen", "description": "Erlaubt das Löschen von Benutzern" },
+      "roles": {
+        "manage": {
+          "label": "Benutzerrollen verwalten",
+          "description": "Erlaubt das Zuweisen und Entziehen von Rollen"
+        }
+      }
+    },
+    "system": {
+      "settings": {
+        "manage": {
+          "label": "Systemeinstellungen verwalten",
+          "description": "Erlaubt das Ändern der Systemkonfiguration"
+        }
+      },
+      "sso": {
+        "manage": { "label": "SSO verwalten", "description": "Erlaubt das Verwalten der SSO-Anbieter-Konfiguration" }
+      },
+      "plugins": {
+        "manage": {
+          "label": "Plugins verwalten",
+          "description": "Erlaubt das Installieren und Konfigurieren von Plugins"
+        }
+      }
+    },
+    "billing": {
+      "read": {
+        "label": "Abrechnung lesen",
+        "description": "Erlaubt das Lesen von Abrechnungsinformationen und Transaktionen"
+      },
+      "manage": {
+        "label": "Abrechnung verwalten",
+        "description": "Erlaubt das Verwalten der Abrechnungskonfiguration und Transaktionen"
+      }
+    }
+  },
+  "roles": {
+    "user": {
+      "name": "Benutzer",
+      "description": "Angemeldeter Benutzer mit lesendem Zugriff auf Ressourcen"
+    },
+    "resource-manager": {
+      "name": "Ressourcen-Verwalter",
+      "description": "Kann Ressourcen erstellen, bearbeiten, löschen und deren Zugriff verwalten"
+    },
+    "user-manager": {
+      "name": "Benutzer-Verwalter",
+      "description": "Kann Benutzer und deren Rollenzuweisungen verwalten"
+    },
+    "billing-manager": {
+      "name": "Abrechnungs-Verwalter",
+      "description": "Kann Abrechnungsinformationen lesen und verwalten"
+    },
+    "system-admin": {
+      "name": "Systemadministrator",
+      "description": "Kann Systemeinstellungen, SSO und Plugins verwalten"
+    },
+    "owner": {
+      "name": "Eigentümer",
+      "description": "Besitzt alle Berechtigungen im System"
+    }
+  }
+}

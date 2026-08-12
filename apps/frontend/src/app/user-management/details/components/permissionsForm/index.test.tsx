@@ -37,41 +37,9 @@ const USER_ROLE_ASSIGNMENTS_WITH_SSO = [
 let currentUserRoles: typeof USER_ROLE_ASSIGNMENTS_MANUAL | typeof USER_ROLE_ASSIGNMENTS_WITH_SSO =
   USER_ROLE_ASSIGNMENTS_MANUAL;
 
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: () => {
-    const translations: Record<string, string> = {
-      title: 'Roles & Permissions',
-      'permissions.resource-manager': 'Manage resources',
-      'permissions.system-admin': 'Manage system configuration',
-      'permissions.user-manager': 'Manage users',
-      'permissions.billing-manager': 'Manage billing',
-      'actions.save': 'Save',
-      'messages.updated': 'Roles updated',
-      'ssoManaged.title': 'Managed by SSO',
-      'ssoManaged.description':
-        'Some roles are managed by {{providers}} and cannot be edited here.',
-      'ssoManaged.providerFallback': 'the SSO provider',
-      'ssoAssignment.assignedBy': 'Via SSO',
-      'ssoAssignment.provider': 'Provider: {{name}}',
-      'ssoAssignment.externalValue': 'Group: {{value}}',
-      'ssoOnlyRoles.title': 'SSO-managed roles',
-      'ssoOnlyRoles.subtitle': 'These roles are controlled entirely by SSO.',
-    };
-
-    const t = (key: string, vars?: Record<string, unknown>) => {
-      let value = translations[key] ?? key;
-      if (vars) {
-        Object.entries(vars).forEach(([varKey, varValue]) => {
-          value = value.replace(`{{${varKey}}}`, String(varValue));
-        });
-      }
-      return value;
-    };
-
-    const tExists = (key: string) => Boolean(translations[key]);
-    return { t, tExists };
-  },
-}));
+// Translations are NOT mocked: the component's labels come from the real RBAC catalog
+// via useRbacCatalogTranslations, so the fixture names above (e.g. 'System Admin') must
+// not appear in the output — the catalog name ('System Administrator') must.
 
 vi.mock('../../../../../components/labeledSwitch', () => ({
   LabeledSwitch: ({ children, isSelected, isDisabled, onChange, ...props }: Record<string, unknown>) => (
@@ -119,10 +87,12 @@ describe('UserPermissionForm', () => {
     const user = { id: 7 } as User;
     render(<UserPermissionForm user={user} ssoManagedProviders={[]} />, { wrapper: TestWrapper });
 
-    await waitFor(() => expect(screen.getByLabelText('Manage resources')).toBeChecked());
-    expect(screen.getByLabelText('Manage users')).toBeChecked();
-    expect(screen.getByLabelText('Manage system configuration')).not.toBeChecked();
-    expect(screen.getByLabelText('Manage billing')).not.toBeChecked();
+    await waitFor(() => expect(screen.getByLabelText('Resource Manager')).toBeChecked());
+    expect(screen.getByLabelText('User Manager')).toBeChecked();
+    // Catalog name, not the fixture's 'System Admin'
+    expect(screen.getByLabelText('System Administrator')).not.toBeChecked();
+    expect(screen.queryByLabelText('System Admin')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Billing Manager')).not.toBeChecked();
   });
 
   it('calls assignRole and revokeRole on save', async () => {
@@ -130,9 +100,9 @@ describe('UserPermissionForm', () => {
     render(<UserPermissionForm user={user} ssoManagedProviders={[]} />, { wrapper: TestWrapper });
 
     // Toggle: uncheck resource-manager (id=1), check billing-manager (id=4)
-    await waitFor(() => expect(screen.getByLabelText('Manage resources')).toBeInTheDocument());
-    await userEvent.click(screen.getByLabelText('Manage resources'));
-    await userEvent.click(screen.getByLabelText('Manage billing'));
+    await waitFor(() => expect(screen.getByLabelText('Resource Manager')).toBeInTheDocument());
+    await userEvent.click(screen.getByLabelText('Resource Manager'));
+    await userEvent.click(screen.getByLabelText('Billing Manager'));
 
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
@@ -145,14 +115,19 @@ describe('UserPermissionForm', () => {
   it('shows SSO badge with external value for SSO-assigned manageable roles', async () => {
     currentUserRoles = USER_ROLE_ASSIGNMENTS_WITH_SSO;
     const user = { id: 5 } as User;
-    render(<UserPermissionForm user={user} ssoManagedProviders={['MyOIDC']} ssoManagedPermissionKeys={new Set(['system-admin'])} />, {
-      wrapper: TestWrapper,
-    });
+    render(
+      <UserPermissionForm
+        user={user}
+        ssoManagedProviders={['MyOIDC']}
+        ssoManagedPermissionKeys={new Set(['system-admin'])}
+      />,
+      {
+        wrapper: TestWrapper,
+      },
+    );
 
     // system-admin is SSO-managed: should show the badge
-    await waitFor(() =>
-      expect(screen.getByText(/Via SSO: #10 · admins/)).toBeInTheDocument()
-    );
+    await waitFor(() => expect(screen.getByText(/Via SSO: #10 · admins/)).toBeInTheDocument());
   });
 
   it('shows SSO-only roles section for non-manageable SSO roles', async () => {
@@ -161,10 +136,7 @@ describe('UserPermissionForm', () => {
     render(<UserPermissionForm user={user} ssoManagedProviders={['MyOIDC']} />, { wrapper: TestWrapper });
 
     await waitFor(() =>
-      expect(screen.getByTestId !== undefined
-        ? screen.getByText('SSO-managed roles')
-        : true
-      ).toBeTruthy()
+      expect(screen.getByTestId !== undefined ? screen.getByText('SSO-managed roles') : true).toBeTruthy(),
     );
 
     // Owner role should appear in the SSO-only section
@@ -184,7 +156,7 @@ describe('UserPermissionForm', () => {
     );
 
     await waitFor(() => {
-      const systemAdminCheckbox = screen.getByLabelText('Manage system configuration');
+      const systemAdminCheckbox = screen.getByLabelText('System Administrator');
       expect(systemAdminCheckbox).toBeDisabled();
     });
   });
@@ -193,7 +165,7 @@ describe('UserPermissionForm', () => {
     const user = { id: 7 } as User;
     render(<UserPermissionForm user={user} ssoManagedProviders={[]} />, { wrapper: TestWrapper });
 
-    await waitFor(() => expect(screen.getByLabelText('Manage resources')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByLabelText('Resource Manager')).toBeInTheDocument());
     // 'user' is in NON_MANAGEABLE_ROLE_KEYS — no toggle should be rendered for it
     expect(screen.queryByLabelText('User')).not.toBeInTheDocument();
   });

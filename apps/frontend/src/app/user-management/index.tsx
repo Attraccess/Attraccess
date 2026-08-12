@@ -18,14 +18,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@heroui/react';
-import {
-  KeyIcon,
-  SearchIcon,
-  ShieldCheckIcon,
-  ShieldOffIcon,
-  UserPlusIcon,
-  Users,
-} from 'lucide-react';
+import { KeyIcon, SearchIcon, ShieldCheckIcon, ShieldOffIcon, UserPlusIcon, Users } from 'lucide-react';
 import { TableToolbar } from '../../components/TableToolbar';
 import {
   SSOProvider,
@@ -42,12 +35,14 @@ import de from './de.json';
 import { InviteUserModal } from './invite-user-modal';
 import { useNavigate } from 'react-router-dom';
 import { SimplePagination } from '../../components/simplePagination';
+import { useRbacCatalogTranslations } from '../../hooks/useRbacCatalogTranslations';
 
 // Role keys that are considered "default" and not worth showing in the list
 const DEFAULT_ROLE_KEYS = new Set(['user']);
 
 export const UserManagementPage: React.FC = () => {
   const { t } = useTranslations({ en, de });
+  const { roleName } = useRbacCatalogTranslations();
 
   const [limit] = useState(10);
   const [page, setPage] = useState(1);
@@ -197,8 +192,14 @@ export const UserManagementPage: React.FC = () => {
                         {elevatedRoles.length > 0 ? (
                           <div className="flex flex-wrap gap-1">
                             {elevatedRoles.map((role) => (
-                              <Chip key={role.id} size="sm" color="accent" variant="secondary" data-cy={`user-role-chip-${role.key}`}>
-                                {role.name}
+                              <Chip
+                                key={role.id}
+                                size="sm"
+                                color="accent"
+                                variant="secondary"
+                                data-cy={`user-role-chip-${role.key}`}
+                              >
+                                {roleName(role)}
                               </Chip>
                             ))}
                           </div>

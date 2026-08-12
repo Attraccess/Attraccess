@@ -25,12 +25,6 @@
     "cannotGrantHint": "Locked permissions are ones you do not hold yourself and cannot grant.",
     "lockedTagIndicator": "(locked)"
   },
-  "categories": {
-    "resources": "Resources",
-    "users": "Users",
-    "system": "System",
-    "billing": "Billing"
-  },
   "actions": {
     "cancel": "Cancel",
     "close": "Close",

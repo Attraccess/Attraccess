@@ -36,6 +36,7 @@ import {
 import { StandardDrawer } from '../../../components/standardDrawer';
 import { useToastMessage } from '../../../components/toastProvider';
 import { useAuth } from '../../../hooks/useAuth';
+import { useRbacCatalogTranslations } from '../../../hooks/useRbacCatalogTranslations';
 import en from './en.json';
 import de from './de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../global-translations/api-errors.en.json';
@@ -55,6 +56,8 @@ export function RoleFormDrawer({ isOpen, onOpenChange, role }: Props) {
     en: { ...en, api: API_ERROR_TRANSLATIONS_EN },
     de: { ...de, api: API_ERROR_TRANSLATIONS_DE },
   });
+  const { permissionLabel, permissionDescription, permissionCategory, roleName, roleDescription } =
+    useRbacCatalogTranslations();
   const toast = useToastMessage();
   const queryClient = useQueryClient();
   const { hasPermission } = useAuth();
@@ -71,10 +74,10 @@ export function RoleFormDrawer({ isOpen, onOpenChange, role }: Props) {
 
   useEffect(() => {
     if (!isOpen) return;
-    setName(role?.name ?? '');
-    setDescription(role?.description ?? '');
+    setName(role ? roleName(role) : '');
+    setDescription(role ? roleDescription(role) : '');
     setSelectedKeys(new Set((role?.rolePermissions ?? []).map((rp) => rp.permissionKey)));
-  }, [isOpen, role]);
+  }, [isOpen, role, roleName, roleDescription]);
 
   const permissionByKey = useMemo(() => new Map((permissions ?? []).map((p) => [p.key, p])), [permissions]);
 
@@ -102,15 +105,16 @@ export function RoleFormDrawer({ isOpen, onOpenChange, role }: Props) {
   // Pre-computed outside the Autocomplete render prop to avoid recomputing on every render
   const selectedTagItems = useMemo(
     () =>
-      [...selectedKeys].map((k) => ({
-        key: k,
-        label: permissionByKey.get(k)?.label ?? k,
-        isLocked: nonGrantableKeys.includes(k),
-      })),
-    [selectedKeys, permissionByKey, nonGrantableKeys],
+      [...selectedKeys].map((k) => {
+        const permission = permissionByKey.get(k);
+        return {
+          key: k,
+          label: permission ? permissionLabel(permission) : k,
+          isLocked: nonGrantableKeys.includes(k),
+        };
+      }),
+    [selectedKeys, permissionByKey, nonGrantableKeys, permissionLabel],
   );
-
-  const categoryLabel = (category: string) => (tExists(`categories.${category}`) ? t(`categories.${category}`) : category);
 
   // Locked keys can be neither added nor removed, no matter how the change was triggered
   const applySelection = (keys: Iterable<Key>) => {
@@ -219,12 +223,12 @@ export function RoleFormDrawer({ isOpen, onOpenChange, role }: Props) {
                 .map(({ category, selected }) => (
                   <div key={category} className="flex flex-col gap-1.5">
                     <p className="text-xs font-semibold text-default-500 uppercase tracking-wide">
-                      {categoryLabel(category)}
+                      {permissionCategory(category)}
                     </p>
                     <div className="flex flex-wrap gap-1">
                       {selected.map((permission) => (
                         <Chip key={permission.key} size="sm" variant="secondary">
-                          {permission.label}
+                          {permissionLabel(permission)}
                         </Chip>
                       ))}
                     </div>
@@ -297,17 +301,17 @@ export function RoleFormDrawer({ isOpen, onOpenChange, role }: Props) {
                   >
                     {permissionsByCategory.map(({ category, permissions: categoryPermissions }) => (
                       <ListBox.Section key={category} id={category}>
-                        <Header>{categoryLabel(category)}</Header>
+                        <Header>{permissionCategory(category)}</Header>
                         {categoryPermissions.map((permission) => (
                           <ListBox.Item
                             key={permission.key}
                             id={permission.key}
-                            textValue={permission.label}
+                            textValue={permissionLabel(permission)}
                             data-cy={`role-form-drawer-permission-${permission.key}`}
                           >
                             <div className="flex flex-col">
-                              <Label>{permission.label}</Label>
-                              <Description>{permission.description}</Description>
+                              <Label>{permissionLabel(permission)}</Label>
+                              <Description>{permissionDescription(permission)}</Description>
                             </div>
                             {nonGrantableKeys.includes(permission.key) ? (
                               <LockIcon className="w-3.5 h-3.5 text-default-400 shrink-0" />
