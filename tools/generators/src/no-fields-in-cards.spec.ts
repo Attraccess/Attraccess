@@ -18,6 +18,8 @@ import * as path from 'path';
  *
  * `generators` lists the projects scanned here under implicitDependencies, so `nx affected`
  * runs this whenever one of them changes — otherwise the guard would never fire in CI.
+ * Hardware boards are not scanned, and a test asserts every scanned project is listed, so
+ * the two cannot drift apart silently.
  */
 
 // typescript@7's package exports no longer expose the classic compiler API to the type
@@ -74,6 +76,29 @@ function listTsxFiles(dir: string, out: string[] = []): string[] {
     else if (entry.name.endsWith('.tsx')) out.push(full);
   }
   return out;
+}
+
+/** The Nx project that owns `file`, resolved from the nearest ancestor `project.json`. */
+function owningProject(file: string): { name: string; tags: string[] } | null {
+  let dir = path.dirname(file);
+  while (true) {
+    const projectJson = path.join(dir, 'project.json');
+    if (fs.existsSync(projectJson)) {
+      const raw = JSON.parse(fs.readFileSync(projectJson, 'utf-8')) as { name?: string; tags?: string[] };
+      return { name: raw.name ?? path.basename(dir), tags: raw.tags ?? [] };
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+}
+
+/**
+ * The files the guard scans: every `.tsx` under `apps`/`libs` except hardware boards
+ * (tscircuit definitions tagged `scope:hardware`), which never render HeroUI fields.
+ */
+function scannedTsxFiles(): string[] {
+  return SCAN_DIRS.flatMap((dir) => listTsxFiles(path.join(ROOT, dir))).filter((file) => !owningProject(file)?.tags.includes('scope:hardware'));
 }
 
 const sourceCache = new Map<string, Node>();
@@ -466,11 +491,27 @@ describe('form fields are not wrapped in Cards (ATT-294 / ATT-834)', () => {
   });
 
   it('finds no HeroUI field rendered on a Card surface', () => {
-    const files = SCAN_DIRS.flatMap((dir) => listTsxFiles(path.join(ROOT, dir)));
+    const files = scannedTsxFiles();
     expect(files.length).toBeGreaterThan(100);
 
     const violations = files.flatMap(findViolations).filter((violation) => !ALLOWLIST.has(violation.location));
 
     expect(violations.map((v) => `${v.location} — ${v.detail}`).join('\n')).toBe('');
+  });
+
+  it('scans only projects wired into nx affected via generators.implicitDependencies', () => {
+    const generatorsJson = JSON.parse(
+      fs.readFileSync(path.join(ROOT, 'tools', 'generators', 'project.json'), 'utf-8'),
+    ) as { implicitDependencies?: string[] };
+    const wired = new Set(generatorsJson.implicitDependencies ?? []);
+
+    const owners = new Set<string>();
+    for (const file of scannedTsxFiles()) {
+      const project = owningProject(file);
+      if (project) owners.add(project.name);
+    }
+
+    const unwired = [...owners].filter((name) => !wired.has(name));
+    expect(unwired.join('\n')).toBe('');
   });
 });

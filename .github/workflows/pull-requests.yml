@@ -30,7 +30,13 @@ jobs:
         with:
           esp-idf: 'false'
       - name: Run precommit checks
-        run: pnpm precommit
+        # `pnpm precommit` uses `--uncommitted`, which is always empty on a clean
+        # CI checkout — so it ran zero tasks. Use `--base` like the sibling jobs.
+        # `build` is intentionally omitted: it reaches `attractap-firmware:build`
+        # through `api:build`'s dependsOn (which `--exclude` cannot filter) and would
+        # need the ESP-IDF toolchain; a PR-level production build is already covered
+        # by `containerize`.
+        run: pnpm nx affected --nxBail --target=lint,typecheck,test,e2e --parallel=5 --base=${{ env.NX_AFFECTED_BASE }} --exclude=tag:scope:hardware,tag:type:plugin
 
   commitlint:
     if: github.event_name == 'pull_request'
