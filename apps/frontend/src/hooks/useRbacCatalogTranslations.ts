@@ -30,8 +30,10 @@ export function useRbacCatalogTranslations() {
       permissionDescription: (permission: PermissionLike) =>
         tr(`permissions.${permission.key}.description`, permission.description ?? ''),
       permissionCategory: (category: string) => tr(`categories.${category}`, category),
-      roleName: (role: RoleLike) => tr(`roles.${role.key}.name`, role.name ?? role.key ?? ''),
-      roleDescription: (role: RoleLike) => tr(`roles.${role.key}.description`, role.description ?? ''),
+      // Without a key there is nothing stable to look up — use the API value as-is
+      roleName: (role: RoleLike) => (role.key ? tr(`roles.${role.key}.name`, role.name ?? role.key) : (role.name ?? '')),
+      roleDescription: (role: RoleLike) =>
+        role.key ? tr(`roles.${role.key}.description`, role.description ?? '') : (role.description ?? ''),
     };
   }, [t, tExists]);
 }
