@@ -32,7 +32,7 @@ export function UrlStep({
       <>
         <div>
           <Heading>Attraccess Companion</Heading>
-          <p className="text-sm text-default-500">{serverUrl}</p>
+          <p className="text-sm leading-5 text-muted">{serverUrl}</p>
         </div>
         <div className="flex items-center gap-2 text-sm">
           <span
@@ -62,7 +62,7 @@ export function UrlStep({
     <>
       <div>
         <Heading>Attraccess Companion</Heading>
-        <p className="text-sm text-default-500">Enter the URL of your Attraccess server to get started.</p>
+        <p className="text-sm leading-5 text-muted">Enter the URL of your Attraccess server to get started.</p>
       </div>
       <TextField value={serverUrl} onChange={onServerUrlChange} type="url" isInvalid={!!connectError} fullWidth>
         <Label>Server URL</Label>

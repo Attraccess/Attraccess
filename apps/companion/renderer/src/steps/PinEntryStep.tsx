@@ -15,7 +15,7 @@ export function PinEntryStep({ title, description, submitLabel, pinEntry, error,
     <>
       <div>
         <Heading>{title}</Heading>
-        <p className="text-sm text-default-500">{description}</p>
+        <p className="text-sm leading-5 text-muted">{description}</p>
       </div>
       <TextField value={pinEntry} onChange={onPinEntryChange} type="password" isInvalid={!!error} fullWidth>
         <Label>PIN</Label>

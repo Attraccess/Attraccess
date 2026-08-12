@@ -28,7 +28,7 @@ export function SettingsStep({ settings, onSave, onBack }: Props) {
     <>
       <div>
         <Heading>Settings</Heading>
-        <p className="text-sm text-default-500">Configure companion app behaviour.</p>
+        <p className="text-sm leading-5 text-muted">Configure companion app behaviour.</p>
       </div>
       <TextField value={idleTimeout} onChange={setIdleTimeout} type="number" isInvalid={!!error} fullWidth>
         <Label>Idle timeout (minutes, 0 = disabled)</Label>

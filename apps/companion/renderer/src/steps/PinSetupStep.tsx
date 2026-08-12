@@ -14,7 +14,7 @@ export function PinSetupStep({ pinInput, pinConfirm, error, onPinInputChange, on
     <>
       <div>
         <Heading>Set a PIN</Heading>
-        <p className="text-sm text-default-500">You'll need this PIN to access settings and quit the app.</p>
+        <p className="text-sm leading-5 text-muted">You'll need this PIN to access settings and quit the app.</p>
       </div>
       <TextField value={pinInput} onChange={onPinInputChange} type="password" isInvalid={!!error} fullWidth>
         <Label>PIN</Label>

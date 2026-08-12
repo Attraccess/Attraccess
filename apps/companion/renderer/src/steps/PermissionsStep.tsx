@@ -11,7 +11,7 @@ export function PermissionsStep({ perms, onGrant }: Props) {
     <>
       <div>
         <Heading>Permissions required</Heading>
-        <p className="text-sm text-default-500">Grant the following permissions before connecting to your server.</p>
+        <p className="text-sm leading-5 text-muted">Grant the following permissions before connecting to your server.</p>
       </div>
       <div className="flex items-center justify-between gap-4 py-3">
         <div className="flex-1 min-w-0">

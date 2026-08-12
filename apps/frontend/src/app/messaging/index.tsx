@@ -106,7 +106,7 @@ export function MessagesPage() {
 
       {/* Outlined rather than a Card: the composer TextArea inside renders at --field-background,
           which equals --surface, so on a Card it would be invisible (ATT-834). */}
-      <section className="min-h-0 flex-1 overflow-hidden rounded-large border border-default-200">
+      <section className="min-h-0 flex-1 overflow-hidden rounded-lg border border-separator">
         <div className="grid h-full grid-cols-1 lg:grid-cols-[320px_1fr]">
           <div
             className={cn(

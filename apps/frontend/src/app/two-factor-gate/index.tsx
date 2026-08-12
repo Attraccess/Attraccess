@@ -20,9 +20,9 @@ export function TwoFactorGate({ children }: TwoFactorGateProps) {
   return (
     <div className="flex w-full justify-center px-4 py-8">
       <section className="max-w-lg w-full flex flex-col gap-6">
-        <header className="flex flex-col gap-2 border-b border-divider pb-4">
+        <header className="flex flex-col gap-2 border-b border-separator pb-4">
           <h2 className="text-2xl font-bold">{t('title')}</h2>
-          <p className="text-sm text-default-500">
+          <p className="text-sm text-muted">
             {gate.needsTwoFactorSetup ? t('requiredDescription') : t('optionalDescription')}
           </p>
         </header>

@@ -9,7 +9,7 @@ export function DoneStep({ deviceId }: Props) {
     <>
       <div>
         <Heading className="text-success">Setup complete!</Heading>
-        <p className="text-sm text-default-500">
+        <p className="text-sm leading-5 text-muted">
           This device has been registered. Name it in the Attraccess admin panel.
         </p>
       </div>
