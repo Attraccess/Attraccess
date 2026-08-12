@@ -236,21 +236,30 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
 
   const sidebarEndItems = useSidebarEndItems();
 
+  // Filtered through showNavItem exactly like navigationGroups above. The end items
+  // were all public routes until an authRequired one was added here, at which point
+  // an unfiltered list would advertise links that land on Unauthorized for logged-out
+  // visitors on public in-layout pages such as /dependencies. Filtering the whole list
+  // keeps that from recurring with the next gated entry.
   const { groups: sidebarEndGroups, soloItems: sidebarEndSoloItems } = useMemo(() => {
     const groups: SidebarItemGroup[] = [];
     const soloItems: SidebarItem[] = [];
 
     sidebarEndItems.forEach((item) => {
       if ((item as SidebarItemGroup).isGroup) {
-        groups.push(item as SidebarItemGroup);
+        const group = item as SidebarItemGroup;
+        const items = (group.items ?? []).filter(showNavItem);
+        // Drop a group whose every entry was filtered out, rather than render an
+        // empty heading.
+        if (items.length > 0) groups.push({ ...group, items });
         return;
       }
 
-      soloItems.push(item as SidebarItem);
+      if (showNavItem(item as SidebarItem)) soloItems.push(item as SidebarItem);
     });
 
     return { groups, soloItems };
-  }, [sidebarEndItems]);
+  }, [sidebarEndItems, showNavItem]);
 
   return (
     <>

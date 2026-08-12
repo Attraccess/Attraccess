@@ -192,11 +192,13 @@ describe('toFileSlug', () => {
   });
 
   it('does not leave a trailing hyphen when truncation lands right after one', () => {
-    // 40 'a's, then a run of separator characters that collapse to a single hyphen landing
-    // exactly at the 40-character truncation boundary.
-    const label = `${'a'.repeat(40)}   overflow`;
+    // 39 'a's, so the separator run collapses to a hyphen sitting at index 39 — the last
+    // character kept by slice(0, 40). With 40 the hyphen falls at index 40 and is cut off
+    // by the slice itself, leaving nothing for the trailing strip to do, which silently
+    // stops this test from covering the `-+$` half of it at all.
+    const label = `${'a'.repeat(39)}   overflow`;
     const slug = toFileSlug(label);
-    expect(slug).toBe(`attraccess-nfc-card-${'a'.repeat(40)}`);
+    expect(slug).toBe(`attraccess-nfc-card-${'a'.repeat(39)}`);
     expect(slug.endsWith('-')).toBe(false);
   });
 });
