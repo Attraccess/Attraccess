@@ -20,23 +20,16 @@ permissions:
 
 jobs:
   precommit-check:
+    # lint/typecheck/test/e2e are the pre-commit checks, and they already run as
+    # dedicated jobs below. This job is a gate, not a runner: re-running the same
+    # affected graph here would double the work (every job is a cold-Nx-cache
+    # runner). `pnpm precommit` remains the local hook, where `--uncommitted` is
+    # the right selector; on CI it is always empty.
+    needs: [lint-and-typecheck, test]
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-      - uses: ./.github/actions/setup
-        with:
-          esp-idf: 'false'
-      - name: Run precommit checks
-        # `pnpm precommit` uses `--uncommitted`, which is always empty on a clean
-        # CI checkout — so it ran zero tasks. Use `--base` like the sibling jobs.
-        # `build` is intentionally omitted: it reaches `attractap-firmware:build`
-        # through `api:build`'s dependsOn (which `--exclude` cannot filter) and would
-        # need the ESP-IDF toolchain; a PR-level production build is already covered
-        # by `containerize`.
-        run: pnpm nx affected --nxBail --target=lint,typecheck,test,e2e --parallel=5 --base=${{ env.NX_AFFECTED_BASE }} --exclude=tag:scope:hardware,tag:type:plugin
+      - name: Gate on lint, typecheck, test and e2e
+        run: echo "Covered by lint-and-typecheck and test jobs."
 
   commitlint:
     if: github.event_name == 'pull_request'
