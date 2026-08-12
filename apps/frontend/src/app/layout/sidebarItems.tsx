@@ -1,6 +1,7 @@
 import {
   ActivityIcon,
   BookOpenIcon,
+  BoxIcon,
   BugIcon,
   CogIcon,
   CreditCardIcon,
@@ -309,10 +310,22 @@ export const useSidebarEndItems = () => {
       translationKey: 'changelog',
     },
     {
-      path: getBaseUrl() + '/docs',
+      isGroup: true,
       icon: BookOpenIcon,
-      translationKey: 'docs',
-      isExternal: true,
+      translationKey: 'docsAndTools',
+      items: [
+        {
+          path: getBaseUrl() + '/docs',
+          icon: BookOpenIcon,
+          translationKey: 'docs',
+          isExternal: true,
+        },
+        {
+          path: '/printables',
+          icon: BoxIcon,
+          translationKey: 'printables',
+        },
+      ],
     },
   ] as (SidebarItem | SidebarItemGroup)[];
 };

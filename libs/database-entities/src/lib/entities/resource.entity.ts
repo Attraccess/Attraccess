@@ -19,7 +19,6 @@ import { ResourceGroup } from './resourceGroup.entity';
 import { DocumentationType } from '../types/documentationType.enum';
 import { ResourceFlowNode } from './resourceFlowNode';
 import { ResourceFlowEdge } from './resourceFlowEdge';
-import { ResourceFlowLog } from './resourceFlowLog';
 import { ResourceFlowVariable } from './resourceFlowVariable';
 import { Attractap } from './attractap.entity';
 import { ResourceMaintenance } from './resource.maintenance';
@@ -241,8 +240,6 @@ export class Resource {
   @OneToMany(() => ResourceFlowVariable, (variable) => variable.resource)
   flowVariables!: ResourceFlowVariable[];
 
-  @OneToMany(() => ResourceFlowLog, (log) => log.resource)
-  flowLogs!: ResourceFlowLog[];
 
   @OneToMany(() => ResourceIntroducer, (introducer) => introducer.resource)
   introducers!: ResourceIntroducer[];

@@ -226,10 +226,20 @@ function DocumentationEditorComponent() {
           >
             <Label className="sr-only">{t('documentationType.label')}</Label>
             <Radio value={DocumentationType.MARKDOWN} data-cy="documentation-editor-type-markdown-radio">
-              {t('documentationType.markdown')}
+              <Radio.Content>
+                <Radio.Control>
+                  <Radio.Indicator />
+                </Radio.Control>
+                {t('documentationType.markdown')}
+              </Radio.Content>
             </Radio>
             <Radio value={DocumentationType.URL} data-cy="documentation-editor-type-url-radio">
-              {t('documentationType.url')}
+              <Radio.Content>
+                <Radio.Control>
+                  <Radio.Indicator />
+                </Radio.Control>
+                {t('documentationType.url')}
+              </Radio.Content>
             </Radio>
           </RadioGroup>
         </section>

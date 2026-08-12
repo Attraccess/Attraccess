@@ -32,8 +32,13 @@ function createStorageMock(): Storage {
   };
 }
 
+// Guarded: some specs (e.g. those loading vendored WASM modules that rely on
+// Node's real `import.meta.url` semantics) opt into `// @vitest-environment node`,
+// where `window` does not exist. This file's setup still runs for them.
 const localStorageMock = createStorageMock();
-Object.defineProperty(window, 'localStorage', { value: localStorageMock, configurable: true });
+if (typeof window !== 'undefined') {
+  Object.defineProperty(window, 'localStorage', { value: localStorageMock, configurable: true });
+}
 Object.defineProperty(globalThis, 'localStorage', { value: localStorageMock, configurable: true });
 
 // Mock Web Serial API globally for all tests
@@ -58,23 +63,27 @@ const mockSerial = {
 };
 
 // Add Web Serial API to global navigator
-Object.defineProperty(global.navigator, 'serial', {
-  value: mockSerial,
-  writable: true,
-  configurable: true,
-});
+if (typeof global.navigator !== 'undefined') {
+  Object.defineProperty(global.navigator, 'serial', {
+    value: mockSerial,
+    writable: true,
+    configurable: true,
+  });
+}
 
 // Mock window.matchMedia for components using media queries
-Object.defineProperty(window, 'matchMedia', {
-  writable: true,
-  value: vi.fn().mockImplementation((query) => ({
-    matches: false,
-    media: query,
-    onchange: null,
-    addListener: vi.fn(), // deprecated
-    removeListener: vi.fn(), // deprecated
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-    dispatchEvent: vi.fn(),
-  })),
-});
+if (typeof window !== 'undefined') {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: vi.fn().mockImplementation((query) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(), // deprecated
+      removeListener: vi.fn(), // deprecated
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  });
+}
