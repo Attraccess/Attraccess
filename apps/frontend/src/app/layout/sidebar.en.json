@@ -15,14 +15,16 @@
         "projects": "Projects",
         "messages": "Messages",
         "billing": "Billing",
+        "csvExport": "CSV Export",
         "attractap": "NFC-Cards"
       }
     },
     "users": {
-      "label": "Users",
+      "label": "Users & Access",
       "items": {
         "userList": "User List",
-        "userSecurity": "Security",
+        "roles": "Roles",
+        "userSecurity": "Login Security",
         "sso": "Single Sign-On"
       }
     },
@@ -30,20 +32,23 @@
       "label": "Devices",
       "items": {
         "mqttServers": "MQTT Servers",
-        "companion": "Companion App"
+        "companion": "Companion App",
+        "balena": "Balena"
       }
     },
-    "system": {
-      "label": "System",
+    "notifications": {
+      "label": "Notifications",
       "items": {
-        "plugins": "Plugins",
         "emails": "Emails",
-        "messagingSettings": "Messaging Settings",
-        "csvExport": "CSV Export",
-        "balena": "Balena",
+        "messagingSettings": "Messaging Settings"
+      }
+    },
+    "instance": {
+      "label": "Instance",
+      "items": {
         "settings": "Settings",
-        "monitoring": "Monitoring",
-        "roles": "Roles"
+        "plugins": "Plugins",
+        "monitoring": "Monitoring"
       }
     }
   },

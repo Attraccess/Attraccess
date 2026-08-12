@@ -305,7 +305,7 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
               <NavLink
                 key={item.path}
                 href={item.path}
-                icon={<item.icon size={16} />}
+                icon={<item.icon size={16} aria-hidden />}
                 label={t('groups.##default##.items.' + item.translationKey)}
                 data-cy={`sidebar-nav-${item.path?.replace('/', '')}`}
                 badgeCount={item.badgeCount}
@@ -316,7 +316,7 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
               <NavLink
                 key={item.path}
                 href={item.path}
-                icon={item.icon ?? <PackageIcon size={16} />}
+                icon={item.icon ?? <PackageIcon size={16} aria-hidden />}
                 label={item.label}
                 data-cy={`sidebar-plugin-nav-${item.path?.replace(/\//g, '-')}`}
                 collapsed={isCollapsed}
@@ -327,12 +327,12 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
                 <CollapsedGroupDropdown
                   key={group.translationKey}
                   label={t('groups.' + group.translationKey + '.label')}
-                  icon={<group.icon size={16} />}
+                  icon={<group.icon size={16} aria-hidden />}
                   data-cy={`sidebar-group-${group.translationKey}`}
                   items={group.items.map((item) => ({
                     key: item.path,
                     path: item.path,
-                    icon: <item.icon size={16} />,
+                    icon: <item.icon size={16} aria-hidden />,
                     label: t('groups.' + group.translationKey + '.items.' + item.translationKey),
                   }))}
                 />
@@ -347,7 +347,7 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
                       <AccordionTrigger className="px-2 py-2 text-sm font-normal rounded-md">
                         <span className="flex items-center">
                           <span className="mr-3 flex items-center">
-                            <group.icon size={16} />
+                            <group.icon size={16} aria-hidden />
                           </span>
                           {t('groups.' + group.translationKey + '.label')}
                         </span>
@@ -360,7 +360,7 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
                           <NavLink
                             key={item.path}
                             href={item.path}
-                            icon={<item.icon size={16} />}
+                            icon={<item.icon size={16} aria-hidden />}
                             label={t('groups.' + group.translationKey + '.items.' + item.translationKey)}
                             data-cy={`sidebar-nav-${item.path?.replace('/', '')}`}
                             indent
@@ -383,12 +383,12 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
                 <CollapsedGroupDropdown
                   key={group.translationKey}
                   label={t('endItems.groups.' + group.translationKey + '.label')}
-                  icon={<group.icon size={16} />}
+                  icon={<group.icon size={16} aria-hidden />}
                   data-cy={`sidebar-group-${group.translationKey}`}
                   items={group.items.map((item) => ({
                     key: item.path,
                     path: item.path,
-                    icon: <item.icon size={16} />,
+                    icon: <item.icon size={16} aria-hidden />,
                     label: t('endItems.groups.' + group.translationKey + '.items.' + item.translationKey),
                     isExternal: item.isExternal,
                   }))}
@@ -405,7 +405,7 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
                       <AccordionTrigger className="px-2 py-2 text-sm font-normal rounded-md">
                         <span className="flex items-center">
                           <span className="mr-3 flex items-center">
-                            <group.icon size={16} />
+                            <group.icon size={16} aria-hidden />
                           </span>
                           {t('endItems.groups.' + group.translationKey + '.label')}
                         </span>
@@ -418,7 +418,7 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
                           <NavLink
                             key={item.path}
                             href={item.path}
-                            icon={<item.icon size={16} />}
+                            icon={<item.icon size={16} aria-hidden />}
                             label={t('endItems.groups.' + group.translationKey + '.items.' + item.translationKey)}
                             isExternal={item.isExternal}
                             indent
@@ -434,7 +434,7 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
               <NavLink
                 key={item.path}
                 href={item.path}
-                icon={<item.icon size={16} />}
+                icon={<item.icon size={16} aria-hidden />}
                 label={t('endItems.' + item.translationKey)}
                 data-cy={`sidebar-nav-${item.path?.replace('/', '')}`}
                 isExternal={item.isExternal}

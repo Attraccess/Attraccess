@@ -1,13 +1,15 @@
 import {
   ActivityIcon,
+  BellIcon,
   BookOpenIcon,
   BugIcon,
   CogIcon,
   CreditCardIcon,
   DatabaseIcon,
-  FileIcon,
+  FileSpreadsheetIcon,
   FolderIcon,
   GiftIcon,
+  IdCardIcon,
   KeyRoundIcon,
   LightbulbIcon,
   LucideProps,
@@ -16,6 +18,7 @@ import {
   MonitorSmartphoneIcon,
   NfcIcon,
   PackageIcon,
+  SendIcon,
   Settings2Icon,
   ServerIcon,
   ShieldIcon,
@@ -53,147 +56,156 @@ export type SidebarItemGroup = {
   licenseModule?: string;
 };
 
+const BalenaSidebarIcon = (props: React.SVGProps<SVGSVGElement>) => <BalenaIcon {...props} width={16} height={16} />;
+
+/**
+ * The navigation tree. Groups are named after what an operator is looking for, never after
+ * the absence of a better name — the former "System" catch-all is split into "Notifications"
+ * and "Instance", and identity/authorisation lives in a single "Users & Access" group.
+ *
+ * Every navigable entry carries a distinct icon; group headers may reuse their most
+ * representative child's glyph since they only expand/collapse. Guarded by sidebarItems.spec.tsx.
+ */
+export const SIDEBAR_ITEMS: (SidebarItem | SidebarItemGroup)[] = [
+  {
+    translationKey: 'resources',
+    path: '/resources',
+    icon: DatabaseIcon,
+  },
+  {
+    translationKey: 'projects',
+    path: '/projects',
+    icon: FolderIcon,
+  },
+  {
+    translationKey: 'messages',
+    path: '/messages',
+    icon: MessageSquareIcon,
+  },
+  {
+    translationKey: 'attractap',
+    path: '/attractap/nfc-cards',
+    icon: NfcIcon,
+    licenseModule: 'attractap',
+  },
+  {
+    path: '/billing',
+    translationKey: 'billing',
+    icon: CreditCardIcon,
+    licenseModule: 'billing',
+  },
+  {
+    // Sits next to Billing rather than in a group: it is billing.manage while every other
+    // admin page here is system.settings.manage, and a group spanning two permissions shows
+    // different operators different, incoherent versions of itself.
+    path: '/csv-export',
+    translationKey: 'csvExport',
+    icon: FileSpreadsheetIcon,
+  },
+  {
+    // Who can log in, and what they're allowed to do.
+    translationKey: 'users',
+    isGroup: true,
+    icon: UsersIcon,
+    items: [
+      {
+        path: '/users',
+        translationKey: 'userList',
+        icon: UsersIcon,
+      },
+      {
+        path: '/settings/roles',
+        translationKey: 'roles',
+        icon: IdCardIcon,
+      },
+      {
+        path: '/users/security',
+        translationKey: 'userSecurity',
+        icon: ShieldIcon,
+      },
+      {
+        path: '/sso/providers',
+        translationKey: 'sso',
+        icon: KeyRoundIcon,
+        licenseModule: 'sso',
+      },
+    ],
+  },
+  {
+    // Hardware and fleets this instance talks to.
+    translationKey: 'devices',
+    isGroup: true,
+    icon: MonitorSmartphoneIcon,
+    items: [
+      {
+        path: '/devices/mqtt/servers',
+        translationKey: 'mqttServers',
+        icon: ServerIcon,
+      },
+      {
+        path: '/devices/companion',
+        translationKey: 'companion',
+        icon: MonitorSmartphoneIcon,
+      },
+      {
+        path: '/balena',
+        translationKey: 'balena',
+        icon: BalenaSidebarIcon,
+        licenseModule: 'balena',
+      },
+    ],
+  },
+  {
+    // How the instance sends messages out.
+    translationKey: 'notifications',
+    isGroup: true,
+    icon: BellIcon,
+    items: [
+      {
+        path: '/emails',
+        translationKey: 'emails',
+        icon: MailIcon,
+      },
+      {
+        path: '/messages/settings',
+        translationKey: 'messagingSettings',
+        icon: SendIcon,
+      },
+    ],
+  },
+  {
+    // This installation itself: its configuration, extensions, and health.
+    translationKey: 'instance',
+    isGroup: true,
+    icon: CogIcon,
+    items: [
+      {
+        path: '/settings',
+        translationKey: 'settings',
+        icon: Settings2Icon,
+      },
+      {
+        path: '/plugins',
+        translationKey: 'plugins',
+        icon: PackageIcon,
+      },
+      {
+        path: '/monitoring',
+        translationKey: 'monitoring',
+        icon: ActivityIcon,
+      },
+    ],
+  },
+];
+
 export function useSidebarItems(): (SidebarItem | SidebarItemGroup)[] {
   const { data: license } = useLicenseServiceGetLicenseInformation();
   const { data: unread } = useMessagingServiceMessagingGetUnreadCount();
 
   const allItems = useMemo(() => {
-    // Resources group
-    const items: (SidebarItem | SidebarItemGroup)[] = [
-      {
-        translationKey: 'resources',
-        path: '/resources',
-        icon: DatabaseIcon,
-      },
-      {
-        translationKey: 'projects',
-        path: '/projects',
-        icon: FolderIcon,
-      },
-      {
-        translationKey: 'messages',
-        path: '/messages',
-        icon: MessageSquareIcon,
-        badgeCount: unread?.total,
-      },
-    ];
-
-    items.push({
-      translationKey: 'attractap',
-      path: '/attractap/nfc-cards',
-      icon: NfcIcon,
-      licenseModule: 'attractap',
-    });
-
-    items.push({
-      path: '/billing',
-      translationKey: 'billing',
-      icon: CreditCardIcon,
-      licenseModule: 'billing',
-    });
-
-    // Users group
-    const usersGroup: SidebarItemGroup = {
-      translationKey: 'users',
-      isGroup: true,
-      icon: UsersIcon,
-      items: [
-        {
-          path: '/users',
-          translationKey: 'userList',
-          icon: UsersIcon,
-        },
-        {
-          path: '/users/security',
-          translationKey: 'userSecurity',
-          icon: ShieldIcon,
-        },
-        {
-          path: '/sso/providers',
-          translationKey: 'sso',
-          icon: KeyRoundIcon,
-          licenseModule: 'sso',
-        },
-      ],
-    };
-
-    items.push(usersGroup);
-
-    // Devices group
-    const devicesGroup: SidebarItemGroup = {
-      translationKey: 'devices',
-      isGroup: true,
-      icon: MonitorSmartphoneIcon,
-      items: [
-        {
-          path: '/devices/mqtt/servers',
-          translationKey: 'mqttServers',
-          icon: ServerIcon,
-        },
-        {
-          path: '/devices/companion',
-          translationKey: 'companion',
-          icon: MonitorSmartphoneIcon,
-        },
-      ],
-    };
-
-    items.push(devicesGroup);
-
-    // System group
-    const systemGroup: SidebarItemGroup = {
-      translationKey: 'system',
-      isGroup: true,
-      icon: CogIcon,
-      items: [
-        {
-          path: '/plugins',
-          translationKey: 'plugins',
-          icon: PackageIcon,
-        },
-        {
-          path: '/emails',
-          translationKey: 'emails',
-          icon: MailIcon,
-        },
-        {
-          path: '/messages/settings',
-          translationKey: 'messagingSettings',
-          icon: MessageSquareIcon,
-        },
-        {
-          path: '/settings',
-          translationKey: 'settings',
-          icon: Settings2Icon,
-        },
-        {
-          path: '/settings/roles',
-          translationKey: 'roles',
-          icon: ShieldIcon,
-        },
-        {
-          path: '/monitoring',
-          translationKey: 'monitoring',
-          icon: ActivityIcon,
-        },
-        {
-          path: '/csv-export',
-          translationKey: 'csvExport',
-          icon: FileIcon,
-        },
-      ],
-    };
-
-    systemGroup.items.push({
-      path: '/balena',
-      translationKey: 'balena',
-      icon: (props: React.SVGProps<SVGSVGElement>) => <BalenaIcon {...props} width={16} height={16} />,
-      licenseModule: 'balena',
-    });
-
-    items.push(systemGroup);
-
-    return items;
+    return SIDEBAR_ITEMS.map((item) =>
+      'path' in item && item.path === '/messages' ? { ...item, badgeCount: unread?.total } : item,
+    );
   }, [unread?.total]);
 
   return useMemo(() => {
