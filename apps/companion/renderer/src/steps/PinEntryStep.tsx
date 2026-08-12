@@ -1,4 +1,4 @@
-import { Button, CardDescription, FieldError, Heading, Input, Label, TextField } from '@heroui/react';
+import { Button, FieldError, Heading, Input, Label, TextField } from '@heroui/react';
 
 interface Props {
   title: string;
@@ -15,7 +15,7 @@ export function PinEntryStep({ title, description, submitLabel, pinEntry, error,
     <>
       <div>
         <Heading>{title}</Heading>
-        <CardDescription>{description}</CardDescription>
+        <p className="text-sm text-default-500">{description}</p>
       </div>
       <TextField value={pinEntry} onChange={onPinEntryChange} type="password" isInvalid={!!error} fullWidth>
         <Label>PIN</Label>
