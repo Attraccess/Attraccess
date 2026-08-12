@@ -114,12 +114,14 @@ export function DeleteRoleModal({ isOpen, onClose, role, allRoles }: Props) {
                     <Label className="sr-only">{t('title')}</Label>
                     {(['remove', 'reassign'] as DeleteMode[]).map((option) => (
                       <Radio key={option} value={option} data-cy={`delete-role-modal-mode-${option}`}>
-                        <Radio.Control>
-                          <Radio.Indicator />
-                        </Radio.Control>
-                        <Radio.Content className="flex flex-col">
-                          <span className="text-small">{t(`options.${option}.label`)}</span>
-                          <span className="text-xs text-default-400">{t(`options.${option}.description`)}</span>
+                        <Radio.Content>
+                          <Radio.Control>
+                            <Radio.Indicator />
+                          </Radio.Control>
+                          <span className="flex flex-col">
+                            <span className="text-small">{t(`options.${option}.label`)}</span>
+                            <span className="text-xs text-default-400">{t(`options.${option}.description`)}</span>
+                          </span>
                         </Radio.Content>
                       </Radio>
                     ))}
