@@ -140,7 +140,9 @@ export function MessageThread(props: Props) {
                     'max-w-[75%] whitespace-pre-wrap break-words rounded-2xl px-3 py-2 text-small',
                     isOwn
                       ? 'bg-blue-600 text-white'
-                      : 'bg-zinc-100 text-zinc-900 dark:bg-zinc-700 dark:text-zinc-50',
+                      // zinc-200, not zinc-100: the thread sits on the page background now that
+                      // the Card is gone, and zinc-100 is the same colour as it in light mode.
+                      : 'bg-zinc-200 text-zinc-900 dark:bg-zinc-700 dark:text-zinc-50',
                   )}
                 >
                   {message.content}
