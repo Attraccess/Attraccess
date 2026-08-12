@@ -11,7 +11,7 @@
 PART = "body";
 LABEL = "Tobias J.";
 POCKET_OPEN = false;
-FONT = "Liberation Sans";
+FONT = "Sansation";
 
 /* ---- fixed geometry ---------------------------------------------------- */
 

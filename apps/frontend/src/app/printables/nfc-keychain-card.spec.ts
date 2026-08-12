@@ -33,23 +33,35 @@ interface OpenScadInstance {
   callMain(args: string[]): void;
 }
 
-let createOpenSCAD: (options: Record<string, unknown>) => Promise<{ getInstance(): Promise<OpenScadInstance> }>;
+let createOpenSCAD: (options: Record<string, unknown>) => Promise<OpenScadInstance>;
+let wasmModule: WebAssembly.Module;
 
 beforeAll(async () => {
-  const mod = await import(/* @vite-ignore */ pathToFileURL(join(PUBLIC_DIR, 'openscad.js')).href);
-  ({ createOpenSCAD } = mod);
+  const mod = await import(/* @vite-ignore */ pathToFileURL(join(PUBLIC_DIR, 'openscad.wasm.js')).href);
+  createOpenSCAD = mod.default;
+  // This build's glue only fetches its wasm over HTTP — its non-browser branch is empty —
+  // so under Node we compile the file ourselves and hand it over via `instantiateWasm`,
+  // the same hook the worker uses. Compiling once keeps the suite quick.
+  wasmModule = await WebAssembly.compile(readFileSync(join(PUBLIC_DIR, 'openscad.wasm')));
 });
 
 async function render(defines: Record<string, string | boolean>): Promise<RenderResult> {
   const errors: string[] = [];
-  const api = await createOpenSCAD({ printErr: (t: string) => errors.push(t), print: () => undefined });
-  const instance = await api.getInstance();
+  const instance = await createOpenSCAD({
+    noInitialRun: true,
+    printErr: (t: string) => errors.push(t),
+    print: () => undefined,
+    instantiateWasm: (imports: WebAssembly.Imports, done: (i: WebAssembly.Instance) => void) => {
+      WebAssembly.instantiate(wasmModule, imports).then(done);
+      return {};
+    },
+  });
 
   instance.FS.mkdir('/fonts');
   instance.FS.writeFile('/fonts/fonts.conf', readFileSync(join(PUBLIC_DIR, 'fonts/fonts.conf')));
   instance.FS.writeFile(
-    '/fonts/LiberationSans-Regular.ttf',
-    readFileSync(join(PUBLIC_DIR, 'fonts/LiberationSans-Regular.ttf'))
+    '/fonts/Sansation_Regular.ttf',
+    readFileSync(join(PUBLIC_DIR, 'fonts/Sansation_Regular.ttf'))
   );
   instance.ENV.FONTCONFIG_FILE = '/fonts/fonts.conf';
   instance.FS.writeFile('/card.scad', SCAD);

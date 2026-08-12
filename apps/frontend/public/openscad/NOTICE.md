@@ -1,35 +1,43 @@
 # Third-party components in this directory
 
-## OpenSCAD (openscad.js, openscad.wasm)
+## OpenSCAD (openscad.wasm.js, openscad.wasm)
 
-OpenSCAD `2025.07.18`, compiled to WebAssembly, from the
-[openscad-wasm](https://www.npmjs.com/package/openscad-wasm) package version
-0.0.4. Upstream source: <https://github.com/openscad/openscad>.
+OpenSCAD 2025.07.18 compiled to WebAssembly, downloaded verbatim from the
+`wasm-latest` release of <https://github.com/Attraccess/openscad-wasm>.
 
 Licensed under the **GNU General Public License, version 2 or (at your option) any
 later version** — see `COPYING`. Attraccess elects to receive OpenSCAD under the
 terms of **GPL version 3**.
 
-OpenSCAD is executed as a separate program: it is loaded as an unbundled static asset
-into a dedicated Web Worker and driven through a command-line argument vector and a
-virtual filesystem — the same interface as the `openscad` CLI. It is not linked into
-Attraccess.
-
 ### Modifications
 
-OpenSCAD itself is **unmodified**: Emscripten's own output, beginning at
-`var OpenSCAD = (() => {` in `openscad.js`, is untouched. What
-`tools/vendor-openscad.mjs` replaces is the loader shim that `@rollup/plugin-wasm`
-generated when the upstream `openscad-wasm` package was bundled — the code that
-inlined the wasm module as base64 and decoded it on every instance — with one that
-loads an external `openscad.wasm` file and caches the compiled module between
-instances. That script reproduces this directory exactly and documents the change.
+That build applies one patch to OpenSCAD, `openscad-freetype-no-hinting.patch`,
+which loads glyph outlines with `FT_LOAD_NO_HINTING`. OpenSCAD only decomposes
+glyphs into 2D geometry, so hinting is pointless there — and under Emscripten the
+autohinter it would otherwise reach traps the module for any font without a
+TrueType bytecode program, which is most modern fonts.
 
-Corresponding source for the version distributed here is available from the upstream
-repository above; run `node tools/vendor-openscad.mjs` to regenerate.
+**Corresponding source** for the version distributed here, including that patch and
+the build pipeline that produced these files, is at
+<https://github.com/Attraccess/openscad-wasm>. Nothing in this directory is modified after
+download; `tools/vendor-openscad.mjs` only copies it into place.
 
-## Liberation Sans (fonts/LiberationSans-Regular.ttf)
+OpenSCAD runs as a separate program: it is loaded as an unbundled static asset into
+a dedicated Web Worker and driven through a command-line argument vector and a
+virtual filesystem — the same interface as the `openscad` CLI. It is not linked
+into Attraccess.
 
-Liberation Fonts 2.1.5, licensed under the SIL Open Font License 1.1 —
-see `fonts/LICENSE-liberation.txt`. Source:
-<https://github.com/liberationfonts/liberation-fonts>.
+## Sansation (fonts/Sansation_Regular.ttf)
+
+Sansation 1.31 by Bernd Montag, © 2011, All Rights Reserved.
+
+Freeware, redistributable: the author's terms permit sharing the font on websites
+and in software, for personal and commercial use, provided the files are not
+renamed, not modified, not sold, and travel together with his ReadMe. All of those
+conditions are met here — `fonts/Sansation_1.31_ReadMe.txt` is his
+original text, distributed unchanged alongside the font.
+
+Note that Sansation is **not** SIL OFL licensed, despite what several font
+aggregator sites claim. The ReadMe above is the authoritative statement of terms.
+
+Source: <https://www.dafont.com/sansation.font>

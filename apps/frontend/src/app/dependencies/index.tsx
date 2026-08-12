@@ -27,14 +27,18 @@ const VENDORED_DEPENDENCIES: Dependency[] = [
     version: '2025.07.18',
     author: 'Marius Kintel, Clifford Wolf and contributors',
     license: 'GPL-2.0-or-later',
-    url: 'https://github.com/openscad/openscad',
+    // Our build, carrying the FT_LOAD_NO_HINTING patch; also where the
+    // corresponding source lives, per the GPL.
+    url: 'https://github.com/Attraccess/openscad-wasm',
   },
   {
-    name: 'Liberation Sans',
-    version: '2.1.5',
-    author: 'Red Hat, Inc.',
-    license: 'OFL-1.1',
-    url: 'https://github.com/liberationfonts/liberation-fonts',
+    name: 'Sansation',
+    version: '1.31',
+    author: 'Bernd Montag',
+    // Not OFL, despite what font aggregator sites claim: the author's own ReadMe
+    // grants redistribution as freeware. See NOTICE.md.
+    license: 'Freeware (redistributable)',
+    url: 'https://www.dafont.com/sansation.font',
   },
 ];
 

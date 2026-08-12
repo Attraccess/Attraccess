@@ -1,110 +1,108 @@
 #!/usr/bin/env node
-// Vendors OpenSCAD (wasm) and Liberation Sans into apps/frontend/public/openscad/.
+// Vendors OpenSCAD (wasm) and the Sansation font into apps/frontend/public/openscad/.
 // Run manually; the output is committed. Not part of the build.
 //
 //   node tools/vendor-openscad.mjs
 //
-// Why this exists: the openscad-wasm npm package inlines a 10.3 MB wasm module as
-// base64 inside a 13.9 MB JS file, and ships no fonts. We extract the real .wasm so
-// the browser can stream-compile and cache it, and we bundle one font because
-// OpenSCAD's text() needs fontconfig to find something.
+// The wasm comes from Attraccess/openscad-wasm rather than upstream. That fork
+// carries a one-line patch loading glyph outlines with FT_LOAD_NO_HINTING; without
+// it the module traps on any font that ships without a TrueType bytecode program
+// (no cvt/fpgm/prep), which includes Sansation and most modern fonts. See that
+// repo's patches/ directory for the full reasoning.
+//
+// Nothing downloaded here is modified. The previous revision of this script
+// patched the Emscripten loader to load an external .wasm and cache the compiled
+// module; that is no longer necessary — the worker supplies its own
+// `instantiateWasm` with a cached WebAssembly.Module instead, so everything under
+// public/openscad/ is now byte-for-byte what upstream produced.
 
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync, rmSync, copyFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// apps/frontend/src/app/dependencies/index.tsx hardcodes the OpenSCAD and Liberation Sans
-// version strings shown on the /dependencies page (openscad-wasm's published version doesn't
-// map 1:1 to the OpenSCAD release it embeds, and Liberation's font version isn't otherwise
-// discoverable at build time). If either version below changes, update that file's `version`
-// fields too — nothing enforces they stay in sync.
-const OPENSCAD_WASM_VERSION = '0.0.4';
-const LIBERATION_VERSION = '2.1.5';
-const LIBERATION_URL =
-  'https://github.com/liberationfonts/liberation-fonts/files/7261482/liberation-fonts-ttf-2.1.5.tar.gz';
+const WASM_REPO = 'Attraccess/openscad-wasm';
+const WASM_RELEASE = 'wasm-latest';
+const OPENSCAD_VERSION = '2025.07.18';
+
+// The author's own recommended source (his ReadMe points at dafont).
+const SANSATION_URL = 'https://dl.dafont.com/dl/?f=sansation';
+const SANSATION_VERSION = '1.31';
+
 const OPENSCAD_COPYING_URL = 'https://raw.githubusercontent.com/openscad/openscad/master/COPYING';
+
+// Pinned so a re-run cannot silently pull something different.
+const EXPECTED = {
+  'Sansation_Regular.ttf': 'c0770982633d933a09da349cf0dde6cfd70d6f9d91f1df436410c4d014a3216d',
+  'Sansation_1.31_ReadMe.txt': '60163875037aa25f15a06e28e9aef6d05fecb7e71d201129455305d50eb613bc',
+};
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const outDir = join(root, 'apps/frontend/public/openscad');
 const fontDir = join(outDir, 'fonts');
 const tmp = mkdtempSync(join(tmpdir(), 'vendor-openscad-'));
 
+const sha256 = (buf) => createHash('sha256').update(buf).digest('hex');
+
+function checkPinned(name, path) {
+  const expected = EXPECTED[name];
+  if (!expected) return;
+  const actual = sha256(readFileSync(path));
+  if (actual !== expected) {
+    throw new Error(`${name} does not match its pinned checksum.\n  expected ${expected}\n  actual   ${actual}`);
+  }
+}
+
 mkdirSync(fontDir, { recursive: true });
 
 try {
-  // --- OpenSCAD wasm -------------------------------------------------------
-  console.log(`Fetching openscad-wasm@${OPENSCAD_WASM_VERSION}...`);
-  execFileSync('npm', ['pack', `openscad-wasm@${OPENSCAD_WASM_VERSION}`, '--pack-destination', tmp], {
-    stdio: 'inherit',
-  });
-  execFileSync('tar', ['xzf', join(tmp, `openscad-wasm-${OPENSCAD_WASM_VERSION}.tgz`), '-C', tmp]);
-
-  const src = readFileSync(join(tmp, 'package/openscad.js'), 'utf8');
-
-  // The wasm arrives as the third argument of the loader call.
-  const call = /_loadWasmModule\(\s*0\s*,\s*null\s*,\s*'([A-Za-z0-9+/=]+)'/.exec(src);
-  if (!call) throw new Error('Could not find the inlined wasm payload — upstream packaging changed.');
-
-  const wasm = Buffer.from(call[1], 'base64');
-  if (wasm.subarray(0, 4).toString('binary') !== '\0asm') {
-    throw new Error('Extracted payload is not a WebAssembly module.');
-  }
-  writeFileSync(join(outDir, 'openscad.wasm'), wasm);
-  console.log(`  openscad.wasm  ${(wasm.length / 1e6).toFixed(1)} MB`);
-
-  // Replace the loader (everything before `function wasm(`) with one that fetches the
-  // external .wasm and caches the compiled module, so repeated renders don't recompile.
-  const bodyStart = src.indexOf('\nfunction wasm(');
-  if (bodyStart < 0) throw new Error('Could not find the wasm() entry point — upstream packaging changed.');
-
-  const patchedLoader = `// MODIFIED by tools/vendor-openscad.mjs (Attraccess).
-// Upstream inlined the wasm as base64 and recompiled it on every instance. This
-// version loads an external openscad.wasm and caches the compiled module.
-// Only this loader was changed; OpenSCAD itself is unmodified. See NOTICE.md.
-let __wasmModulePromise = null;
-function _loadWasmModule() {
-  if (!__wasmModulePromise) {
-    const url = new URL('./openscad.wasm', import.meta.url);
-    __wasmModulePromise =
-      typeof process !== 'undefined' && process.versions != null && process.versions.node != null
-        ? Promise.all([import('node:fs/promises'), import('node:url')]).then(([fs, u]) =>
-            fs.readFile(u.fileURLToPath(url)).then((b) => WebAssembly.compile(b))
-          )
-        : WebAssembly.compileStreaming(fetch(url));
-  }
-  return __wasmModulePromise;
-}
-`;
-
-  const patched = (patchedLoader + src.slice(bodyStart)).replace(
-    /_loadWasmModule\(\s*0\s*,\s*null\s*,\s*'[A-Za-z0-9+/=]+'\s*,?\s*/,
-    '_loadWasmModule('
+  // --- OpenSCAD wasm, from our patched build -------------------------------
+  console.log(`Fetching ${WASM_REPO} release ${WASM_RELEASE}...`);
+  execFileSync(
+    'gh',
+    ['release', 'download', WASM_RELEASE, '--repo', WASM_REPO, '--dir', tmp,
+     '--pattern', 'openscad.wasm', '--pattern', 'openscad.wasm.js'],
+    { stdio: 'inherit' },
   );
-  writeFileSync(join(outDir, 'openscad.js'), patched);
-  console.log(`  openscad.js    ${(patched.length / 1e3).toFixed(0)} KB`);
 
-  // --- Licence texts -------------------------------------------------------
+  for (const name of ['openscad.wasm.js', 'openscad.wasm']) {
+    const src = join(tmp, name);
+    const bytes = readFileSync(src);
+    if (name.endsWith('.wasm') && bytes.subarray(0, 4).toString('binary') !== '\0asm') {
+      throw new Error('Downloaded openscad.wasm is not a WebAssembly module.');
+    }
+    copyFileSync(src, join(outDir, name));
+    console.log(`  ${name.padEnd(18)} ${(bytes.length / 1e6).toFixed(1)} MB  sha256 ${sha256(bytes).slice(0, 16)}…`);
+  }
+
   const copying = await fetch(OPENSCAD_COPYING_URL).then((r) => {
     if (!r.ok) throw new Error(`COPYING fetch failed: ${r.status}`);
     return r.text();
   });
   writeFileSync(join(outDir, 'COPYING'), copying);
 
-  // --- Liberation Sans -----------------------------------------------------
-  console.log(`Fetching Liberation Fonts ${LIBERATION_VERSION}...`);
-  const tarPath = join(tmp, 'liberation.tar.gz');
-  const tar = Buffer.from(await fetch(LIBERATION_URL).then((r) => {
-    if (!r.ok) throw new Error(`Font fetch failed: ${r.status}`);
-    return r.arrayBuffer();
-  }));
-  writeFileSync(tarPath, tar);
-  execFileSync('tar', ['xzf', tarPath, '-C', tmp]);
+  // --- Sansation -----------------------------------------------------------
+  // Its licence requires that the files keep their names and travel with the
+  // author's ReadMe, so both are copied verbatim.
+  console.log(`Fetching Sansation ${SANSATION_VERSION}...`);
+  const zipPath = join(tmp, 'sansation.zip');
+  const zip = Buffer.from(
+    await fetch(SANSATION_URL, { headers: { 'User-Agent': 'Mozilla/5.0' } }).then((r) => {
+      if (!r.ok) throw new Error(`Font fetch failed: ${r.status}`);
+      return r.arrayBuffer();
+    }),
+  );
+  writeFileSync(zipPath, zip);
+  execFileSync('unzip', ['-o', '-q', zipPath, '-d', join(tmp, 'sansation')]);
 
-  const fontSrc = join(tmp, `liberation-fonts-ttf-${LIBERATION_VERSION}`);
-  copyFileSync(join(fontSrc, 'LiberationSans-Regular.ttf'), join(fontDir, 'LiberationSans-Regular.ttf'));
-  copyFileSync(join(fontSrc, 'LICENSE'), join(fontDir, 'LICENSE-liberation.txt'));
+  for (const name of ['Sansation_Regular.ttf', `Sansation_${SANSATION_VERSION}_ReadMe.txt`]) {
+    const src = join(tmp, 'sansation', name);
+    checkPinned(name, src);
+    copyFileSync(src, join(fontDir, name));
+    console.log(`  ${name}`);
+  }
 
   writeFileSync(
     join(fontDir, 'fonts.conf'),
@@ -114,50 +112,60 @@ function _loadWasmModule() {
   <dir>/fonts</dir>
   <cachedir>/tmp</cachedir>
 </fontconfig>
-`
+`,
   );
 
   writeFileSync(
     join(outDir, 'NOTICE.md'),
     `# Third-party components in this directory
 
-## OpenSCAD (openscad.js, openscad.wasm)
+## OpenSCAD (openscad.wasm.js, openscad.wasm)
 
-OpenSCAD ${'`'}2025.07.18${'`'}, compiled to WebAssembly, from the
-[openscad-wasm](https://www.npmjs.com/package/openscad-wasm) package version
-${OPENSCAD_WASM_VERSION}. Upstream source: <https://github.com/openscad/openscad>.
+OpenSCAD ${OPENSCAD_VERSION} compiled to WebAssembly, downloaded verbatim from the
+${'`'}${WASM_RELEASE}${'`'} release of <https://github.com/${WASM_REPO}>.
 
 Licensed under the **GNU General Public License, version 2 or (at your option) any
 later version** — see ${'`'}COPYING${'`'}. Attraccess elects to receive OpenSCAD under the
 terms of **GPL version 3**.
 
-OpenSCAD is executed as a separate program: it is loaded as an unbundled static asset
-into a dedicated Web Worker and driven through a command-line argument vector and a
-virtual filesystem — the same interface as the ${'`'}openscad${'`'} CLI. It is not linked into
-Attraccess.
-
 ### Modifications
 
-OpenSCAD itself is **unmodified**: Emscripten's own output, beginning at
-${'`'}var OpenSCAD = (() => {${'`'} in ${'`'}openscad.js${'`'}, is untouched. What
-${'`'}tools/vendor-openscad.mjs${'`'} replaces is the loader shim that ${'`'}@rollup/plugin-wasm${'`'}
-generated when the upstream ${'`'}openscad-wasm${'`'} package was bundled — the code that
-inlined the wasm module as base64 and decoded it on every instance — with one that
-loads an external ${'`'}openscad.wasm${'`'} file and caches the compiled module between
-instances. That script reproduces this directory exactly and documents the change.
+That build applies one patch to OpenSCAD, ${'`'}openscad-freetype-no-hinting.patch${'`'},
+which loads glyph outlines with ${'`'}FT_LOAD_NO_HINTING${'`'}. OpenSCAD only decomposes
+glyphs into 2D geometry, so hinting is pointless there — and under Emscripten the
+autohinter it would otherwise reach traps the module for any font without a
+TrueType bytecode program, which is most modern fonts.
 
-Corresponding source for the version distributed here is available from the upstream
-repository above; run ${'`'}node tools/vendor-openscad.mjs${'`'} to regenerate.
+**Corresponding source** for the version distributed here, including that patch and
+the build pipeline that produced these files, is at
+<https://github.com/${WASM_REPO}>. Nothing in this directory is modified after
+download; ${'`'}tools/vendor-openscad.mjs${'`'} only copies it into place.
 
-## Liberation Sans (fonts/LiberationSans-Regular.ttf)
+OpenSCAD runs as a separate program: it is loaded as an unbundled static asset into
+a dedicated Web Worker and driven through a command-line argument vector and a
+virtual filesystem — the same interface as the ${'`'}openscad${'`'} CLI. It is not linked
+into Attraccess.
 
-Liberation Fonts ${LIBERATION_VERSION}, licensed under the SIL Open Font License 1.1 —
-see ${'`'}fonts/LICENSE-liberation.txt${'`'}. Source:
-<https://github.com/liberationfonts/liberation-fonts>.
-`
+## Sansation (fonts/Sansation_Regular.ttf)
+
+Sansation ${SANSATION_VERSION} by Bernd Montag, © 2011, All Rights Reserved.
+
+Freeware, redistributable: the author's terms permit sharing the font on websites
+and in software, for personal and commercial use, provided the files are not
+renamed, not modified, not sold, and travel together with his ReadMe. All of those
+conditions are met here — ${'`'}fonts/Sansation_${SANSATION_VERSION}_ReadMe.txt${'`'} is his
+original text, distributed unchanged alongside the font.
+
+Note that Sansation is **not** SIL OFL licensed, despite what several font
+aggregator sites claim. The ReadMe above is the authoritative statement of terms.
+
+Source: <https://www.dafont.com/sansation.font>
+`,
   );
 
   console.log('\nVendored into apps/frontend/public/openscad/');
+  console.log('Reminder: apps/frontend/src/app/dependencies/index.tsx carries the');
+  console.log('OpenSCAD and font versions as literals — update them alongside this.');
 } finally {
   rmSync(tmp, { recursive: true, force: true });
 }

@@ -6,7 +6,7 @@ import { NO_OUTPUT_ERROR } from './errors';
 // unbundled static asset and driven through argv + a virtual filesystem, exactly like the
 // CLI. See apps/frontend/public/openscad/NOTICE.md. Do not import it into the main bundle.
 const OPENSCAD_BASE = '/openscad';
-const FONT_FILE = 'LiberationSans-Regular.ttf';
+const FONT_FILE = 'Sansation_Regular.ttf';
 
 export interface RenderRequest {
   id: number;
@@ -28,46 +28,61 @@ interface OpenScadInstance {
 }
 
 type CreateOpenSCAD = (options: {
+  noInitialRun?: boolean;
   print?: (text: string) => void;
   printErr?: (text: string) => void;
-}) => Promise<{ getInstance(): Promise<OpenScadInstance> }>;
+  instantiateWasm?: (
+    imports: WebAssembly.Imports,
+    done: (instance: WebAssembly.Instance) => void,
+  ) => Record<string, never>;
+}) => Promise<OpenScadInstance>;
 
-let createOpenSCAD: CreateOpenSCAD | null = null;
-let fontData: Uint8Array | null = null;
-let fontConfig: string | null = null;
+let factoryPromise: Promise<CreateOpenSCAD> | null = null;
+let modulePromise: Promise<WebAssembly.Module> | null = null;
+let assetsPromise: Promise<{ font: Uint8Array; config: string }> | null = null;
 
-async function load(): Promise<CreateOpenSCAD> {
-  if (!createOpenSCAD) {
-    const module = await import(/* @vite-ignore */ `${OPENSCAD_BASE}/openscad.js`);
-    createOpenSCAD = module.createOpenSCAD as CreateOpenSCAD;
-  }
-  if (!fontData) {
-    const [font, config] = await Promise.all([
-      fetch(`${OPENSCAD_BASE}/fonts/${FONT_FILE}`).then((r) => r.arrayBuffer()),
-      fetch(`${OPENSCAD_BASE}/fonts/fonts.conf`).then((r) => r.text()),
-    ]);
-    fontData = new Uint8Array(font);
-    fontConfig = config;
-  }
-  return createOpenSCAD;
+/**
+ * The vendored build is unmodified, so it compiles the 11 MB wasm on every instance and
+ * every render needs two instances. Compiling once here and handing the result to each
+ * instance via `instantiateWasm` — the one loading hook this build honours — keeps that
+ * cost to the first render without patching any GPL-licensed file.
+ */
+function load(): Promise<[CreateOpenSCAD, WebAssembly.Module, { font: Uint8Array; config: string }]> {
+  factoryPromise ??= import(/* @vite-ignore */ `${OPENSCAD_BASE}/openscad.wasm.js`).then(
+    (module) => module.default as CreateOpenSCAD,
+  );
+  modulePromise ??= WebAssembly.compileStreaming(fetch(`${OPENSCAD_BASE}/openscad.wasm`));
+  assetsPromise ??= Promise.all([
+    fetch(`${OPENSCAD_BASE}/fonts/${FONT_FILE}`).then((r) => r.arrayBuffer()),
+    fetch(`${OPENSCAD_BASE}/fonts/fonts.conf`).then((r) => r.text()),
+  ]).then(([font, config]) => ({ font: new Uint8Array(font), config }));
+
+  return Promise.all([factoryPromise, modulePromise, assetsPromise]);
 }
 
 /**
  * Renders one part. A fresh instance per call is required: Emscripten tears the runtime
- * down after callMain, so a second call on the same instance throws. Instances are cheap
- * (~20 ms) because the compiled wasm module is cached by the vendored loader.
+ * down after callMain, so a second call on the same instance throws. Instances stay cheap
+ * because `load()` compiles the wasm once and every instance reuses that module.
  */
 async function renderPart(label: string, part: 'body' | 'letters'): Promise<ArrayBuffer> {
-  const factory = await load();
+  const [factory, wasmModule, assets] = await load();
   const errors: string[] = [];
   // Silence stdout: without an explicit `print`, Emscripten's default writes OpenSCAD's
   // normal ECHO/status chatter to the browser console.
-  const api = await factory({ printErr: (t) => errors.push(t), print: () => undefined });
-  const instance = await api.getInstance();
+  const instance = await factory({
+    noInitialRun: true,
+    printErr: (t) => errors.push(t),
+    print: () => undefined,
+    instantiateWasm: (imports, done) => {
+      WebAssembly.instantiate(wasmModule, imports).then(done);
+      return {};
+    },
+  });
 
   instance.FS.mkdir('/fonts');
-  instance.FS.writeFile('/fonts/fonts.conf', fontConfig as string);
-  instance.FS.writeFile(`/fonts/${FONT_FILE}`, fontData as Uint8Array);
+  instance.FS.writeFile('/fonts/fonts.conf', assets.config);
+  instance.FS.writeFile(`/fonts/${FONT_FILE}`, assets.font);
   instance.ENV.FONTCONFIG_FILE = '/fonts/fonts.conf';
   instance.FS.writeFile('/card.scad', scadSource);
 

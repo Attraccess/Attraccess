@@ -22,10 +22,11 @@ module.exports = [
   ...baseConfig,
   ...nx.configs['flat/react'],
   {
-    // Vendored, Emscripten-generated output (see tools/vendor-openscad.mjs). It is
-    // not authored code and is not typechecked either; only the documented loader
-    // patch at the top of the file is ours.
-    ignores: ['public/openscad/openscad.js'],
+    // Vendored, Emscripten-generated output (see tools/vendor-openscad.mjs).
+    // Downloaded verbatim and not authored here, so it is neither linted nor
+    // typechecked. Ignoring the directory rather than one filename, since the
+    // build's output filenames are upstream's to choose.
+    ignores: ['public/openscad/**'],
   },
   {
     files: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx'],
