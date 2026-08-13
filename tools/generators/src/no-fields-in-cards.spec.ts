@@ -332,6 +332,20 @@ function resolveExport(file: string, name: string, seen = new Set<string>()): Ex
 }
 
 /**
+ * Where `<Tag>` used in `file` is declared: the leaf modules behind a local import, or `file`
+ * itself when the component sits beside its user.
+ *
+ * One resolver for both the Card entry point and the recursive walk. They were written
+ * separately and drifted twice — each time leaving one side blind to a shape the other
+ * handled (a same-file component under a Card; an imported component behind `memo`).
+ */
+function resolveComponent(file: string, source: Node, imports: Map<string, string>, name: string): Export[] {
+  const imported = imports.get(name);
+  if (imported) return resolveExport(imported, name);
+  return findLocalDeclaration(source, name) ? [{ file, name }] : [];
+}
+
+/**
  * Does the component `name` in `file` render a HeroUI field outside a portal — directly, via a
  * same-file helper component, or via a locally imported one (resolved name-aware through
  * re-export barrels)?
@@ -366,12 +380,17 @@ function rendersField(
   const imports = localImports(source);
   let found = false;
 
-  /** Follow a same-file name — a helper component, an HOC argument, or a JSX variable. */
+  /** Follow a name — a helper component, an HOC argument, or a JSX variable, local or imported. */
   const follow = (identifier: string): void => {
-    if (found || !findLocalDeclaration(source, identifier)) return;
+    if (found) return;
     const childTruncated = { hit: false };
-    if (rendersField(file, identifier, seen, childTruncated)) found = true;
-    else if (childTruncated.hit) truncated.hit = true;
+    for (const leaf of resolveComponent(file, source, imports, identifier)) {
+      if (rendersField(leaf.file, leaf.name, seen, childTruncated)) {
+        found = true;
+        return;
+      }
+    }
+    if (childTruncated.hit) truncated.hit = true;
   };
 
   // `export const Form = memo(FormBase)` — the declaration holds a call, not JSX, so the
@@ -388,21 +407,7 @@ function rendersField(
       found = true;
       return;
     }
-    const imported = imports.get(tag);
-    if (imported) {
-      const childTruncated = { hit: false };
-      for (const leaf of resolveExport(imported, tag)) {
-        if (rendersField(leaf.file, leaf.name, seen, childTruncated)) {
-          found = true;
-          return;
-        }
-      }
-      if (childTruncated.hit) truncated.hit = true;
-    } else {
-      // A helper component declared beside this one — `const Inner = () => <TextField />`
-      // used by the exported component. Scoping to the declaration would miss it otherwise.
-      follow(tag);
-    }
+    follow(tag);
   });
 
   // `const field = <TextField />` referenced as `<div>{field}</div>`.
@@ -444,11 +449,10 @@ function findViolations(file: string): Violation[] {
         report(element, `<${tag}> renders directly inside a <Card>`);
         return;
       }
-      const imported = imports.get(tag);
-      if (!imported) return;
-      for (const leaf of resolveExport(imported, tag)) {
+      for (const leaf of resolveComponent(file, source, imports, tag)) {
         if (rendersField(leaf.file, leaf.name)) {
-          report(element, `<${tag}> (${path.relative(ROOT, leaf.file)}) renders a field inside a <Card>`);
+          const where = leaf.file === file ? 'same file' : path.relative(ROOT, leaf.file);
+          report(element, `<${tag}> (${where}) renders a field inside a <Card>`);
           return;
         }
       }
@@ -624,6 +628,49 @@ describe('form fields are not wrapped in Cards (ATT-294 / ATT-834)', () => {
        import { TextField } from '@heroui/react';
        const FormBase = () => <TextField />;
        export const Form = memo(FormBase);`,
+    );
+    fs.writeFileSync(
+      path.join(dir, 'page.tsx'),
+      `import { Card } from '@heroui/react';
+       import { Form } from './Form';
+       export const Page = () => <Card><Card.Content><Form /></Card.Content></Card>;`,
+    );
+
+    const violations = findViolations(path.join(dir, 'page.tsx'));
+    fs.rmSync(dir, { recursive: true, force: true });
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0].detail).toContain('<Form>');
+  });
+
+  it('flags a field reached through a component declared in the same file as the Card', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'att834-'));
+    fs.writeFileSync(
+      path.join(dir, 'page.tsx'),
+      `import { Card, TextField } from '@heroui/react';
+       const ProfileForm = () => <TextField />;
+       export const Page = () => <Card><Card.Content><ProfileForm /></Card.Content></Card>;`,
+    );
+
+    const violations = findViolations(path.join(dir, 'page.tsx'));
+    fs.rmSync(dir, { recursive: true, force: true });
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0].detail).toContain('<ProfileForm>');
+  });
+
+  it('follows an HOC-wrapped export to a component imported from another file', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'att834-'));
+    fs.writeFileSync(
+      path.join(dir, 'FormBase.tsx'),
+      `import { TextField } from '@heroui/react';
+       export const FormBase = () => <TextField />;`,
+    );
+    fs.writeFileSync(
+      path.join(dir, 'Form.tsx'),
+      `import { memo, forwardRef } from 'react';
+       import { FormBase } from './FormBase';
+       export const Form = memo(forwardRef(FormBase));`,
     );
     fs.writeFileSync(
       path.join(dir, 'page.tsx'),
