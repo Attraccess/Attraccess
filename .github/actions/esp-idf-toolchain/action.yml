@@ -36,6 +36,36 @@ runs:
           ~/.espressif
         key: esp-idf-v5.5-esp32s3-py${{ steps.py.outputs.v }}-v2-${{ runner.os }}
 
+    # The venv's name carries <major>.<minor>, which is why that is what the key
+    # above derives — but its *contents* are pinned harder than that: bin/python3
+    # is a symlink to the exact interpreter that built it,
+    # /opt/hostedtoolcache/Python/<major>.<minor>.<patch>/x64/bin/python3. When the
+    # runner image moves across a patch release the symlink dangles, and
+    # `python -m venv` onto a directory holding a dangling bin/python3 fails outright
+    # rather than rebuilding it:
+    #
+    #   Error: [Errno 2] No such file or directory: '.../idf5.5_py3.13_env/bin/python3'
+    #
+    # so install.sh's idempotence does not cover this one. Observed going *backwards*,
+    # 3.13.15 -> 3.13.14, so pinning a floor would not have helped either.
+    #
+    # Dropping just the venv is deliberate: putting the patch version in the cache key
+    # would also discard the toolchains, which are hundreds of megabytes and entirely
+    # patch-independent. install.sh rebuilds the venv alone in about a minute. On a
+    # cache hit that repair is not saved (the save step is gated on a miss), so this
+    # re-runs each time until the key rotates — still far cheaper than re-downloading
+    # the toolchain on every patch bump.
+    - name: Discard an IDF virtualenv left dangling by a Python patch bump
+      run: |
+        shopt -s nullglob
+        for env in ~/.espressif/python_env/*/; do
+          if [ ! -e "$env/bin/python3" ]; then
+            echo "Discarding stale IDF virtualenv (interpreter symlink dangles): $env"
+            rm -rf "$env"
+          fi
+        done
+      shell: bash
+
     - name: Install ESP-IDF v5.5
       # Always run, not just on cache miss: `install.sh` is idempotent and
       # repairs a cache restore that is missing the Python virtualenv.

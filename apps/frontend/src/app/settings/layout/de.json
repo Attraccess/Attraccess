@@ -1,0 +1,20 @@
+{
+  "title": "Einstellungen",
+  "subtitle": "Systemkonfiguration verwalten",
+  "navLabel": "Einstellungsbereiche",
+  "backToSettings": "Einstellungen",
+  "groups": {
+    "instance": "Instanz",
+    "operations": "Betrieb"
+  },
+  "sections": {
+    "general": {
+      "label": "Allgemein",
+      "description": "Basis-URLs und Lizenz"
+    },
+    "monitoring": {
+      "label": "Überwachung",
+      "description": "Metrik-Endpunkt und Instrumentierung"
+    }
+  }
+}

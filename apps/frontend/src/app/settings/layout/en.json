@@ -1,0 +1,20 @@
+{
+  "title": "Settings",
+  "subtitle": "Manage system configuration",
+  "navLabel": "Settings sections",
+  "backToSettings": "Settings",
+  "groups": {
+    "instance": "Instance",
+    "operations": "Operations"
+  },
+  "sections": {
+    "general": {
+      "label": "General",
+      "description": "Base URLs and license"
+    },
+    "monitoring": {
+      "label": "Monitoring",
+      "description": "Metrics endpoint and instrumentation"
+    }
+  }
+}
