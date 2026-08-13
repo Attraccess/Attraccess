@@ -473,14 +473,23 @@ function containsChildrenSlot(node: Node): boolean {
  * that renders a Card of its own and puts children beside it is not a Card surface, and treating
  * it as one would report fields that never touch a Card.
  */
-function wrapsChildrenInCard(file: string, name: string, seen = new Set<string>()): boolean {
+function wrapsChildrenInCard(
+  file: string,
+  name: string,
+  seen = new Set<string>(),
+  truncated: { hit: boolean } = { hit: false },
+): boolean {
   const key = `${file}#${name}`;
   const cached = wrapsChildrenCache.get(key);
   if (cached !== undefined) return cached;
-  // `seen` stops infinite recursion. Unlike `rendersField` this needs no truncation flag:
-  // cutting a cycle can only ever suppress a path that is itself a cycle, and a cycle never
-  // terminates at a `<Card>`, so a `false` reached that way is the right answer.
-  if (seen.has(key)) return false;
+  // As in `rendersField`. The cut suppresses a cyclic *path*, but the `false` it returns is
+  // folded into the descendant's aggregate — and for that descendant the route through the
+  // still-in-progress ancestor is not a cycle and may well end at a `<Card>`. Caching it
+  // poisons the descendant permanently, so the answer depends on file scan order.
+  if (seen.has(key)) {
+    truncated.hit = true;
+    return false;
+  }
   seen.add(key);
 
   const source = parse(file);
@@ -499,18 +508,20 @@ function wrapsChildrenInCard(file: string, name: string, seen = new Set<string>(
       }
       // A wrapper of a wrapper is still a Card surface: `PanelCard` handing its `{children}`
       // to `SectionCard` puts them on the same Card, one hop further out.
+      const childTruncated = { hit: false };
       for (const leaf of resolveComponent(file, source, imports, tag)) {
-        if (wrapsChildrenInCard(leaf.file, leaf.name, seen)) {
+        if (wrapsChildrenInCard(leaf.file, leaf.name, seen, childTruncated)) {
           found = true;
           return;
         }
       }
+      if (childTruncated.hit) truncated.hit = true;
     }
     node.forEachChild(visit);
   };
   visit(declaration);
 
-  wrapsChildrenCache.set(key, found);
+  if (found || !truncated.hit) wrapsChildrenCache.set(key, found);
   return found;
 }
 
@@ -893,6 +904,40 @@ describe('form fields are not wrapped in Cards (ATT-294 / ATT-834)', () => {
        export const Page = () => <PanelCard><TextField /></PanelCard>;`,
     );
 
+    const violations = findViolations(path.join(dir, 'page.tsx'));
+    fs.rmSync(dir, { recursive: true, force: true });
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0].detail).toContain('<TextField>');
+  });
+
+  it('does not cache a false wrapper result computed under a truncated cycle', () => {
+    // A is a Card surface directly; B only via A. A reaches <B> before its own <Card>, so
+    // evaluating A first would cache B=false before A ever resolves to true — making the
+    // answer depend on scan order.
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'att834-'));
+    fs.writeFileSync(
+      path.join(dir, 'A.tsx'),
+      `import { Card } from '@heroui/react';
+       import { B } from './B';
+       export function A({ children }) {
+         return <div><B>{children}</B><Card><Card.Content>{children}</Card.Content></Card></div>;
+       }`,
+    );
+    fs.writeFileSync(
+      path.join(dir, 'B.tsx'),
+      `import { A } from './A';
+       export function B({ children }) { return <A>{children}</A>; }`,
+    );
+    fs.writeFileSync(
+      path.join(dir, 'page.tsx'),
+      `import { TextField } from '@heroui/react';
+       import { B } from './B';
+       export const Page = () => <B><TextField /></B>;`,
+    );
+
+    // Warm A first — this is the scan order that poisons B.
+    wrapsChildrenInCard(path.join(dir, 'A.tsx'), 'A');
     const violations = findViolations(path.join(dir, 'page.tsx'));
     fs.rmSync(dir, { recursive: true, force: true });
 
