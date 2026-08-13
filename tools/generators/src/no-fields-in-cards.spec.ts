@@ -422,20 +422,36 @@ interface Violation {
   detail: string;
 }
 
+/**
+ * The initializer bound to `name` as seen from `node`, resolved outwards through enclosing
+ * scopes — `const body = <div />` in the component holding the Card, not the `const body` in
+ * a sibling component further down the file.
+ *
+ * A file-wide map keyed by bare name (which this was) lets one component's variable answer for
+ * another's, reporting a field at a line no Card ever contained. Same failure the `<file>#<name>`
+ * cache key exists to prevent, arriving by the variable path instead of the export path.
+ */
+function lookupVariable(node: Node, name: string): Node | null {
+  for (let scope = node.parent as Node | undefined; scope; scope = scope.parent as Node | undefined) {
+    // Blocks and the source file are the only `const` scopes that matter here.
+    const statements = scope.statements as Node[] | undefined;
+    if (!statements) continue;
+    for (const statement of statements) {
+      if (!ts.isVariableStatement(statement)) continue;
+      for (const declaration of (statement.declarationList as Node).declarations as Node[]) {
+        if (ts.isIdentifier(declaration.name) && (declaration.name as Node).text === name && declaration.initializer) {
+          return declaration.initializer as Node;
+        }
+      }
+    }
+  }
+  return null;
+}
+
 function findViolations(file: string): Violation[] {
   const source = parse(file);
   const imports = localImports(source);
   const violations: Violation[] = [];
-
-  /** Same-file `const body = <div>…</div>`, so `<Card.Content>{body}</Card.Content>` is not a blind spot. */
-  const jsxVariables = new Map<string, Node>();
-  const collectVariables = (node: Node): void => {
-    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
-      jsxVariables.set((node.name as Node).text as string, node.initializer as Node);
-    }
-    node.forEachChild(collectVariables);
-  };
-  collectVariables(source);
 
   const report = (node: Node, detail: string) => {
     const { line } = ts.getLineAndCharacterOfPosition(source, node.getStart(source));
@@ -468,7 +484,7 @@ function findViolations(file: string): Violation[] {
         if (isJsx(child) && isPortal(tagOf(child))) return;
         if (ts.isJsxExpression(child) && child.expression && ts.isIdentifier(child.expression)) {
           const name = (child.expression as Node).text as string;
-          const initializer = jsxVariables.get(name);
+          const initializer = lookupVariable(child, name);
           if (initializer && !expanded.has(name)) {
             expanded.add(name);
             if (isJsx(initializer)) checkElement(initializer);
@@ -706,6 +722,27 @@ describe('form fields are not wrapped in Cards (ATT-294 / ATT-834)', () => {
 
     expect(violations).toHaveLength(1);
     expect(violations[0].detail).toContain('<Form>');
+  });
+
+  it('does not resolve a JSX variable belonging to a different component in the same file', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'att834-'));
+    fs.writeFileSync(
+      path.join(dir, 'page.tsx'),
+      `import { Card, TextField } from '@heroui/react';
+       export const InnocentPanel = () => {
+         const body = <div>just text</div>;
+         return <Card><Card.Content>{body}</Card.Content></Card>;
+       };
+       export const RealForm = () => {
+         const body = <TextField />;
+         return <div>{body}</div>;
+       };`,
+    );
+
+    const violations = findViolations(path.join(dir, 'page.tsx'));
+    fs.rmSync(dir, { recursive: true, force: true });
+
+    expect(violations).toEqual([]);
   });
 
   it('flags a field held directly in a same-file JSX variable', () => {

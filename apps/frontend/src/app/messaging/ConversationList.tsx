@@ -48,12 +48,19 @@ export function ConversationList(props: Props) {
             data-cy={`conversation-item-${conversation.id}`}
             onClick={() => onSelect(conversation.id)}
             className={cn(
-              'flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800',
-              selectedConversationId === conversation.id && 'bg-zinc-100 dark:bg-zinc-800',
+              // zinc-200, not zinc-100: the list sits on the page background now that the Card
+              // is gone, and zinc-100 is the same colour as it in light mode (≈1.007:1).
+              // The fill alone is only ~1.15:1 though, so the selected state carries a primary
+              // accent bar for a ≥3:1 indicator — a fill-only fix would repeat ATT-834 itself.
+              // The bar is transparent when unselected so selecting one does not shift the row.
+              'flex w-full items-center gap-3 border-l-4 border-l-transparent px-4 py-3 text-left transition-colors hover:bg-zinc-200 dark:hover:bg-zinc-800',
+              selectedConversationId === conversation.id && 'border-l-primary bg-zinc-200 dark:bg-zinc-800',
             )}
           >
             <div className="relative shrink-0">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-200 text-small font-medium uppercase text-zinc-600 dark:bg-zinc-700 dark:text-zinc-200">
+              {/* zinc-300: the row's selected/hover fill is zinc-200, so a zinc-200 avatar
+                  would vanish exactly when the row is active. */}
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-300 text-small font-medium uppercase text-zinc-600 dark:bg-zinc-700 dark:text-zinc-200">
                 {username.charAt(0)}
               </div>
               {conversation.otherParticipantOnline && (
