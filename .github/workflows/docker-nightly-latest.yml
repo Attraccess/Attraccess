@@ -22,6 +22,8 @@ jobs:
         with:
           fetch-depth: 0
       - uses: ./.github/actions/setup
+        with:
+          esp-idf: 'false'
       - name: Lint all projects
         run: pnpm nx run-many --target=lint --parallel=5 --exclude=tag:scope:hardware
 
@@ -33,6 +35,8 @@ jobs:
         with:
           fetch-depth: 0
       - uses: ./.github/actions/setup
+        with:
+          esp-idf: 'false'
       - name: Typecheck all projects
         run: pnpm nx run-many --target=typecheck --parallel=5 --exclude=tag:scope:hardware
 
@@ -44,6 +48,8 @@ jobs:
         with:
           fetch-depth: 0
       - uses: ./.github/actions/setup
+        with:
+          esp-idf: 'false'
       - name: Test all projects
         run: pnpm nx run-many --target=test,e2e --parallel=5 --exclude=tag:scope:hardware
 

@@ -174,9 +174,7 @@ export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({
   }
 
   return (
-    <section className="w-full flex flex-col gap-4" data-cy="user-permission-form-section">
-      <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">{t('title')}</h3>
-
+    <div className="w-full flex flex-col gap-4" data-cy="user-permission-form-section">
       {isSsoManaged ? (
         <div
           className="rounded-md border border-warning-200 bg-warning-50 px-3 py-2 text-warning-700"
@@ -238,6 +236,6 @@ export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({
           {t('actions.save')}
         </Button>
       </div>
-    </section>
+    </div>
   );
 };

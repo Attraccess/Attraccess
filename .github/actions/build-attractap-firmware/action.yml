@@ -12,7 +12,10 @@ runs:
     - name: Setup Python
       uses: actions/setup-python@v7
       with:
-        python-version: '3.x'
+        # Pinned: ESP-IDF v5.5 supports Python up to 3.13. `3.x` drifted to
+        # 3.14, which no longer matches the cached IDF virtualenv
+        # (idf5.5_py3.13_env) and breaks the firmware build.
+        python-version: '3.13'
 
     - name: Install ESP tools
       run: |
@@ -20,23 +23,7 @@ runs:
         pip install esptool
       shell: bash
 
-    - name: Cache ESP-IDF
-      id: cache-esp-idf
-      uses: actions/cache@v6
-      with:
-        path: |
-          ~/esp/esp-idf
-          ~/.espressif
-        key: esp-idf-v5.5-esp32s3-${{ runner.os }}
-
-    - name: Install ESP-IDF v5.5
-      if: steps.cache-esp-idf.outputs.cache-hit != 'true'
-      run: |
-        mkdir -p ~/esp
-        git clone --depth 1 --shallow-submodules --recursive -b v5.5 \
-          https://github.com/espressif/esp-idf.git ~/esp/esp-idf
-        ~/esp/esp-idf/install.sh esp32s3
-      shell: bash
+    - uses: ./.github/actions/esp-idf-toolchain
 
     - name: Build all firmware variants
       run: |

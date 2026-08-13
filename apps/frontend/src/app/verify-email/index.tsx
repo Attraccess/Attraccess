@@ -118,53 +118,51 @@ export function VerifyEmail() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Card className="max-w-md w-full" data-cy="verify-email-error-card">
-          <Card.Header className="text-center">
-            <h2 className="text-3xl font-bold">{t('error.title')}</h2>
-          </Card.Header>
-          <Card.Content className="flex flex-col gap-4">
-            <Alert status="danger" data-cy="verify-email-error-alert">
+      <div className="min-h-screen flex items-center justify-center px-4 py-8">
+        <div className="max-w-md w-full flex flex-col gap-4" data-cy="verify-email-error-card">
+          <h2 className="text-3xl font-bold text-center">{t('error.title')}</h2>
+
+          <Alert status="danger" data-cy="verify-email-error-alert">
+            <AlertContent>
+              <AlertTitle>{t('error.errorTitle')}</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </AlertContent>
+          </Alert>
+
+          {resendSuccess ? (
+            <Alert status="success" data-testid="resend-success-alert">
               <AlertContent>
-                <AlertTitle>{t('error.errorTitle')}</AlertTitle>
-                <AlertDescription>{error}</AlertDescription>
+                <AlertTitle>{t('resend.successTitle')}</AlertTitle>
+                <AlertDescription>{t('resend.successMessage')}</AlertDescription>
               </AlertContent>
             </Alert>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-sm text-gray-600 dark:text-gray-400">{t('resend.prompt')}</p>
+              <TextField value={resendEmail} onChange={setResendEmail}>
+                <Label>{t('resend.emailLabel')}</Label>
+                <Input type="email" data-testid="resend-email-input" />
+              </TextField>
+              <Button
+                variant="secondary"
+                className="w-full"
+                onPress={() => {
+                  const trimmed = resendEmail.trim();
+                  if (!isValidEmail(trimmed)) {
+                    return;
+                  }
+                  resendVerification.mutate({ requestBody: { email: trimmed } });
+                }}
+                isPending={resendVerification.isPending}
+                isDisabled={!isValidEmail(resendEmail.trim()) || resendVerification.isPending}
+                data-testid="resend-verification-button"
+              >
+                {t('resend.button')}
+              </Button>
+            </div>
+          )}
 
-            {resendSuccess ? (
-              <Alert status="success" data-testid="resend-success-alert">
-                <AlertContent>
-                  <AlertTitle>{t('resend.successTitle')}</AlertTitle>
-                  <AlertDescription>{t('resend.successMessage')}</AlertDescription>
-                </AlertContent>
-              </Alert>
-            ) : (
-              <div className="space-y-2">
-                <p className="text-sm text-gray-600 dark:text-gray-400">{t('resend.prompt')}</p>
-                <TextField value={resendEmail} onChange={setResendEmail}>
-                  <Label>{t('resend.emailLabel')}</Label>
-                  <Input type="email" data-testid="resend-email-input" />
-                </TextField>
-                <Button
-                  variant="secondary"
-                  className="w-full"
-                  onPress={() => {
-                    const trimmed = resendEmail.trim();
-                    if (!isValidEmail(trimmed)) {
-                      return;
-                    }
-                    resendVerification.mutate({ requestBody: { email: trimmed } });
-                  }}
-                  isPending={resendVerification.isPending}
-                  isDisabled={!isValidEmail(resendEmail.trim()) || resendVerification.isPending}
-                  data-testid="resend-verification-button"
-                >
-                  {t('resend.button')}
-                </Button>
-              </div>
-            )}
-          </Card.Content>
-          <Card.Footer className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2">
             <Button
               variant="primary"
               className="w-full"
@@ -181,8 +179,8 @@ export function VerifyEmail() {
             >
               {t('error.backToLogin')}
             </Button>
-          </Card.Footer>
-        </Card>
+          </div>
+        </div>
       </div>
     );
   }

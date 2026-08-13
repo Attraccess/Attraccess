@@ -4,7 +4,7 @@ import {
   useMessagingServiceMessagingListConversations,
   useMessagingServiceMessagingMarkConversationRead,
 } from '@attraccess/react-query-client';
-import { Card, cn } from '@heroui/react';
+import { cn } from '@heroui/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -104,7 +104,9 @@ export function MessagesPage() {
         />
       </div>
 
-      <Card className="min-h-0 flex-1 overflow-hidden">
+      {/* Outlined rather than a Card: the composer TextArea inside renders at --field-background,
+          which equals --surface, so on a Card it would be invisible (ATT-834). */}
+      <section className="min-h-0 flex-1 overflow-hidden rounded-lg border border-separator">
         <div className="grid h-full grid-cols-1 lg:grid-cols-[320px_1fr]">
           <div
             className={cn(
@@ -157,7 +159,7 @@ export function MessagesPage() {
             )}
           </div>
         </div>
-      </Card>
+      </section>
     </div>
   );
 }

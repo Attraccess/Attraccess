@@ -20,15 +20,56 @@ permissions:
 
 jobs:
   precommit-check:
+    # Lint/typecheck/test/e2e already run as dedicated jobs below. This job is a
+    # gate, not a runner: re-running the same affected graph here would double
+    # the work (every job is a cold-Nx-cache runner). `pnpm precommit` remains
+    # the local hook, where `--uncommitted` is the right selector; on CI it is
+    # always empty.
+    #
+    # `if: always()` is load-bearing: with plain `needs:` an upstream failure
+    # *skips* this job, and a skipped job reports Success to branch protection.
+    # `test` is not itself a required check, so this gate is what makes a test
+    # failure block a merge.
+    #
+    # Everything in `needs` is gated, so adding a job here is the whole change.
+    # Only `lint-and-typecheck` is a required check in its own right; the rest
+    # would otherwise be able to fail without blocking a merge. `plugins` is the
+    # sharpest of those — lint/typecheck/test all `--exclude=tag:type:plugin`,
+    # so it is the only job in this workflow that compiles the plugin apps.
+    #
+    # Deliberately NOT gated:
+    #   `commitlint`   — `if: github.event_name == 'pull_request'`, so it reports
+    #                    `skipped` in the merge queue and would deadlock it. It
+    #                    is a required check already.
+    #   `containerize` — required already, and its Docker build would serialize
+    #                    a 3-second gate behind ~45 minutes. It covers `pnpm
+    #                    precommit`'s `build` step. Note it is
+    #                    `needs: [build-companion]` + `if: ... && !failure()`,
+    #                    so a companion failure *skips* it and it reports
+    #                    Success — which is why `build-companion` is gated here.
+    #
+    # Every gated job runs unconditionally under both `pull_request` and
+    # `merge_group`, so a strict `== success` cannot trip over a legitimately
+    # skipped dependency.
+    needs:
+      [
+        lint-and-typecheck,
+        test,
+        build-companion,
+        plugins,
+        attractap-firmware-version,
+        balena-compose-check,
+        fail2ban-smoke,
+        grafana-provisioning-smoke,
+      ]
+    if: always()
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-      - uses: ./.github/actions/setup
-      - name: Run precommit checks
-        run: pnpm precommit
+      - name: Gate on every upstream job
+        run: |
+          results='${{ join(needs.*.result, ' ') }}'
+          echo "$results"
+          for result in $results; do [[ "$result" == "success" ]] || exit 1; done
 
   commitlint:
     if: github.event_name == 'pull_request'
@@ -39,6 +80,8 @@ jobs:
         with:
           fetch-depth: 0
       - uses: ./.github/actions/setup
+        with:
+          esp-idf: 'false'
       - name: Validate PR title
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
@@ -64,6 +107,8 @@ jobs:
         with:
           fetch-depth: 0
       - uses: ./.github/actions/setup
+        with:
+          esp-idf: 'false'
       - name: Lint affected projects
         run: pnpm nx affected --target=lint --parallel=5 --base=${{ env.NX_AFFECTED_BASE }} --exclude=tag:scope:hardware,tag:type:plugin
       - name: Typecheck affected projects
@@ -77,6 +122,8 @@ jobs:
         with:
           fetch-depth: 0
       - uses: ./.github/actions/setup
+        with:
+          esp-idf: 'false'
       - name: Test affected projects
         run: pnpm nx affected --target=test,e2e --parallel=5 --base=${{ env.NX_AFFECTED_BASE }} --exclude=tag:scope:hardware,tag:type:plugin
 
@@ -88,6 +135,8 @@ jobs:
         with:
           fetch-depth: 0
       - uses: ./.github/actions/setup
+        with:
+          esp-idf: 'false'
 
       # Only affected plugins are linted/packaged. The `*,!tag:type:plugin`
       # exclude keeps the affected set restricted to plugin apps, so a PR that
@@ -183,6 +232,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
       - uses: ./.github/actions/setup
+        with:
+          esp-idf: 'false'
       - name: Validate docker-compose.balena.yml with balena's parser
         run: node scripts/check-balena-compose.mjs
 
