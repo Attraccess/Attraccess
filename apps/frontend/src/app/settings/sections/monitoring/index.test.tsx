@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -20,7 +20,10 @@ vi.mock('@attraccess/react-query-client', () => ({
 vi.mock('@attraccess/plugins-frontend-ui', () => ({
   useTranslations: () => ({ t: (key: string) => key }),
 }));
-vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: vi.fn() }) }));
+const { setQueryData } = vi.hoisted(() => ({ setQueryData: vi.fn() }));
+vi.mock('@tanstack/react-query', () => ({
+  useQueryClient: () => ({ invalidateQueries: vi.fn(), setQueryData }),
+}));
 vi.mock('../../../../components/toastProvider', () => ({
   useToastMessage: () => ({ success: vi.fn(), error: vi.fn() }),
 }));
@@ -99,5 +102,46 @@ describe('MonitoringSection', () => {
     render(<MonitoringSection />);
 
     expect(screen.getByLabelText('slowQueryThreshold.label')).toHaveValue('1');
+  });
+
+  it('releases the draft after a save, so a later server-side change is not a phantom edit', async () => {
+    // The draft has to win over the server while the operator is typing, but the pin must be
+    // released once the value is committed. Held past the save, the field ignores the server for
+    // the lifetime of the mount: someone else changing the threshold then shows up as an "unsaved
+    // changes" bar the operator never caused, holding a stale value, whose Save reverts them.
+    let onSuccess: ((data: unknown) => void) | undefined;
+    vi.mocked(useSettingsServiceUpdateMetricsSettings).mockImplementation(
+      (options?: { onSuccess?: (data: unknown) => void }) => {
+        onSuccess = options?.onSuccess;
+        return { mutate: vi.fn(), isPending: false } as unknown as ReturnType<
+          typeof useSettingsServiceUpdateMetricsSettings
+        >;
+      },
+    );
+
+    const { container, rerender } = render(<MonitoringSection />);
+
+    const input = screen.getByLabelText('slowQueryThreshold.label');
+    await userEvent.clear(input);
+    await userEvent.type(input, '2');
+    await userEvent.tab();
+    expect(container.querySelector('[data-slot="settings-save-bar"]')).toBeInTheDocument();
+
+    // The PATCH resolves with the authoritative post-write state.
+    const afterSave = { apiKeyConfigured: true, toggles: TOGGLES, slowQueryThresholdSeconds: 2 };
+    await act(async () => onSuccess?.(afterSave));
+
+    expect(setQueryData).toHaveBeenCalledWith(['metrics'], afterSave);
+    expect(container.querySelector('[data-slot="settings-save-bar"]')).toBeNull();
+
+    // Now somebody else moves it to 5 and a refetch brings that in.
+    vi.mocked(useSettingsServiceGetMetricsSettings).mockReturnValue({
+      data: { apiKeyConfigured: true, toggles: TOGGLES, slowQueryThresholdSeconds: 5 },
+      isLoading: false,
+    } as ReturnType<typeof useSettingsServiceGetMetricsSettings>);
+    rerender(<MonitoringSection />);
+
+    expect(screen.getByLabelText('slowQueryThreshold.label')).toHaveValue('5');
+    expect(container.querySelector('[data-slot="settings-save-bar"]')).toBeNull();
   });
 });

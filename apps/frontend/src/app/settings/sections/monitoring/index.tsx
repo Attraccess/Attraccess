@@ -113,8 +113,18 @@ export function MonitoringSection() {
   });
 
   const { mutate: updateThreshold, isPending: isSavingThreshold } = useSettingsServiceUpdateMetricsSettings({
-    onSuccess() {
-      queryClient.invalidateQueries({ queryKey: UseSettingsServiceGetMetricsSettingsKeyFn() });
+    onSuccess(data) {
+      // Release the draft pin, or `threshold` would ignore the server for the lifetime of this
+      // mount: a later change by someone else then shows a phantom "unsaved changes" bar holding a
+      // stale value, whose Save silently reverts them.
+      //
+      // Priming the cache from the response rather than invalidating and releasing is what keeps
+      // that release from flashing the pre-save value for a frame — PATCH returns the full
+      // MetricsSettingsDto, so this is the authoritative post-write state and also covers the
+      // server normalising what we sent (with the pin held, a normalised value would leave the bar
+      // stuck dirty forever).
+      queryClient.setQueryData(UseSettingsServiceGetMetricsSettingsKeyFn(), data);
+      setThresholdDraft(undefined);
       toast.success({ title: t('slowQueryThreshold.savedTitle'), description: t('slowQueryThreshold.savedDescription') });
     },
     onError() {
