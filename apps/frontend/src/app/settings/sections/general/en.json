@@ -1,0 +1,23 @@
+{
+  "title": "General",
+  "description": "The URLs this instance is reached at, and its license.",
+  "loading": "Loading settings...",
+  "inputs": {
+    "url": {
+      "label": "Application URL",
+      "description": "The URL users access Attraccess at (used for redirects, links, and API callbacks)."
+    },
+    "publicInternetUrl": {
+      "label": "Public Internet URL",
+      "description": "Optional URL used for external callbacks (e.g. SumUp)."
+    },
+    "licenseKey": {
+      "label": "License Key",
+      "description": "Paste a new license key to update. Leave empty to keep the current one."
+    }
+  },
+  "success": {
+    "title": "Settings saved",
+    "description": "Your changes have been applied."
+  }
+}

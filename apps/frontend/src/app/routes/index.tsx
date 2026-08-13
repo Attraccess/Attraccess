@@ -42,7 +42,10 @@ import { ProjectsListPage } from '../projects';
 import { MessagesPage } from '../messaging';
 import { ProjectDetailsPage } from '../projects/details';
 import { ProjectTeamPage } from '../projects/details/team';
-import SystemSettingsPage from '../settings';
+import { SettingsLayout } from '../settings/layout/SettingsLayout';
+import { SettingsIndexPage } from '../settings/layout/SettingsIndexPage';
+import { GeneralSection } from '../settings/sections/general';
+import { MonitoringSection } from '../settings/sections/monitoring';
 import { RolesPage } from '../roles';
 import FirstTimeSetupPage from '../first-time-setup';
 import { UnauthorizedLayout } from '../unauthorized/unauthorized-layout/layout';
@@ -281,9 +284,30 @@ const coreRoutes: RouteConfig[] = [
     element: <PluginsList />,
     authRequired: 'system.plugins.manage',
   },
+  // Settings shell (ATT-864). Section routes are flat and wrap their own layout, as RouteConfig
+  // has no nested-route form; the registry in settings/layout/settingsSections.ts is what keeps
+  // these paths and the rail in agreement.
   {
     path: '/settings',
-    element: <SystemSettingsPage />,
+    element: <SettingsIndexPage />,
+    authRequired: 'system.settings.manage',
+  },
+  {
+    path: '/settings/general',
+    element: (
+      <SettingsLayout>
+        <GeneralSection />
+      </SettingsLayout>
+    ),
+    authRequired: 'system.settings.manage',
+  },
+  {
+    path: '/settings/monitoring',
+    element: (
+      <SettingsLayout>
+        <MonitoringSection />
+      </SettingsLayout>
+    ),
     authRequired: 'system.settings.manage',
   },
   {
