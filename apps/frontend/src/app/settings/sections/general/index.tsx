@@ -118,7 +118,16 @@ export function GeneralSection() {
     <SettingsSection title={t('title')} description={t('description')}>
       {/* A real <form> so the fields' native constraints exist to be validated; submitting it (the
           Enter key) routes to the same guarded save the save bar uses. */}
+      {/* `validationBehavior="aria"` is load-bearing, not decoration. RAC's Form defaults to
+          "native" and sets `noValidate` only when it is not — so with the default, the browser's
+          own constraint check runs first on implicit submission (Enter) and swallows the `submit`
+          event whenever `isRequired`/`type="url"` fail. handleSave would never run, so
+          hasAttemptedSave would never flip, so the FieldError would never render, and react-aria
+          suppresses the native bubble on top: pressing Enter on an empty URL would do nothing at
+          all. In "aria" mode the constraints become advisory (aria-required) and submit always
+          reaches the guard below, which is the only validator now. */}
       <Form
+        validationBehavior="aria"
         className="flex flex-col"
         onSubmit={(event) => {
           event.preventDefault();

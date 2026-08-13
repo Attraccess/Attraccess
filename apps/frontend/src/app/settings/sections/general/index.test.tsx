@@ -118,3 +118,44 @@ describe('GeneralSection', () => {
     });
   });
 });
+
+// Every test above drives the save-bar button. The form has a second, independent entry point —
+// implicit submission — and it is the one that breaks silently: RAC's Form defaults to
+// validationBehavior="native", so the browser's constraint check swallows the submit event before
+// onSubmit runs, and react-aria suppresses the bubble it would otherwise show. The result is a
+// keystroke that does nothing at all. Both cases below fail without validationBehavior="aria".
+describe('GeneralSection — Enter key', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(useSettingsServiceGetSystemSettings).mockReturnValue({
+      data: { app: { url: 'https://example.org', publicInternetUrl: '' } },
+      isLoading: false,
+    } as ReturnType<typeof useSettingsServiceGetSystemSettings>);
+    vi.mocked(useSettingsServiceUpdateSystemSettings).mockReturnValue({
+      mutate: saveSettings,
+      isPending: false,
+    } as unknown as ReturnType<typeof useSettingsServiceUpdateSystemSettings>);
+  });
+
+  it('reports an invalid URL rather than silently doing nothing', async () => {
+    render(<GeneralSection />);
+    const field = screen.getByLabelText('inputs.url.label');
+
+    await userEvent.clear(field);
+    await userEvent.type(field, '{Enter}');
+
+    expect(saveSettings).not.toHaveBeenCalled();
+    expect(screen.getByText('inputs.url.errors.required')).toBeInTheDocument();
+  });
+
+  it('submits a valid edit', async () => {
+    render(<GeneralSection />);
+    const field = screen.getByLabelText('inputs.url.label');
+
+    await userEvent.type(field, '/app{Enter}');
+
+    expect(saveSettings).toHaveBeenCalledWith({
+      requestBody: { app: { url: 'https://example.org/app', publicInternetUrl: undefined, licenseKey: undefined } },
+    });
+  });
+});
