@@ -27,6 +27,8 @@ import * as path from 'path';
  *
  *   - `export default Foo` resolves to nothing (`definesLocally` only considers named exports),
  *     so a component reached that way is never followed. `messaging/index.tsx` uses this form.
+ *     This gates Card-wrapper detection too, not just field resolution: a default-exported
+ *     `SectionCard` is not recognised as a Card surface either.
  *   - `import { X } from './x'; export { X };` makes `definesLocally` claim the barrel declares
  *     `X`, so resolution stops at the barrel and finds no declaration. The
  *     `export { X } from './x'` form is handled correctly.
@@ -475,18 +477,34 @@ function wrapsChildrenInCard(file: string, name: string, seen = new Set<string>(
   const key = `${file}#${name}`;
   const cached = wrapsChildrenCache.get(key);
   if (cached !== undefined) return cached;
+  // `seen` stops infinite recursion. Unlike `rendersField` this needs no truncation flag:
+  // cutting a cycle can only ever suppress a path that is itself a cycle, and a cycle never
+  // terminates at a `<Card>`, so a `false` reached that way is the right answer.
   if (seen.has(key)) return false;
   seen.add(key);
 
-  const declaration = declarationOf(parse(file), name);
+  const source = parse(file);
+  const declaration = declarationOf(source, name);
   if (!declaration) return false;
+  const imports = localImports(source);
 
   let found = false;
   const visit = (node: Node): void => {
     if (found) return;
-    if (isJsx(node) && tagOf(node) === 'Card' && containsChildrenSlot(node)) {
-      found = true;
-      return;
+    if (isJsx(node) && containsChildrenSlot(node)) {
+      const tag = tagOf(node);
+      if (tag === 'Card') {
+        found = true;
+        return;
+      }
+      // A wrapper of a wrapper is still a Card surface: `PanelCard` handing its `{children}`
+      // to `SectionCard` puts them on the same Card, one hop further out.
+      for (const leaf of resolveComponent(file, source, imports, tag)) {
+        if (wrapsChildrenInCard(leaf.file, leaf.name, seen)) {
+          found = true;
+          return;
+        }
+      }
     }
     node.forEachChild(visit);
   };
@@ -845,6 +863,34 @@ describe('form fields are not wrapped in Cards (ATT-294 / ATT-834)', () => {
       `import { TextField } from '@heroui/react';
        import { SectionCard } from './SectionCard';
        export const Page = () => <SectionCard><TextField /></SectionCard>;`,
+    );
+
+    const violations = findViolations(path.join(dir, 'page.tsx'));
+    fs.rmSync(dir, { recursive: true, force: true });
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0].detail).toContain('<TextField>');
+  });
+
+  it('follows a wrapper of a wrapper to the Card underneath', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'att834-'));
+    fs.writeFileSync(
+      path.join(dir, 'SectionCard.tsx'),
+      `import { Card } from '@heroui/react';
+       export function SectionCard({ children }) {
+         return <Card><Card.Content>{children}</Card.Content></Card>;
+       }`,
+    );
+    fs.writeFileSync(
+      path.join(dir, 'PanelCard.tsx'),
+      `import { SectionCard } from './SectionCard';
+       export function PanelCard({ children }) { return <SectionCard>{children}</SectionCard>; }`,
+    );
+    fs.writeFileSync(
+      path.join(dir, 'page.tsx'),
+      `import { TextField } from '@heroui/react';
+       import { PanelCard } from './PanelCard';
+       export const Page = () => <PanelCard><TextField /></PanelCard>;`,
     );
 
     const violations = findViolations(path.join(dir, 'page.tsx'));
