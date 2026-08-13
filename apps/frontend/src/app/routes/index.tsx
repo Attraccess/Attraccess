@@ -46,7 +46,6 @@ import { SettingsLayout } from '../settings/layout/SettingsLayout';
 import { SettingsIndexPage } from '../settings/layout/SettingsIndexPage';
 import { GeneralSection } from '../settings/sections/general';
 import { MonitoringSection } from '../settings/sections/monitoring';
-import { AboutSection } from '../settings/sections/about';
 import { RolesPage } from '../roles';
 import FirstTimeSetupPage from '../first-time-setup';
 import { UnauthorizedLayout } from '../unauthorized/unauthorized-layout/layout';
@@ -307,15 +306,6 @@ const coreRoutes: RouteConfig[] = [
     element: (
       <SettingsLayout>
         <MonitoringSection />
-      </SettingsLayout>
-    ),
-    authRequired: 'system.settings.manage',
-  },
-  {
-    path: '/settings/about',
-    element: (
-      <SettingsLayout>
-        <AboutSection />
       </SettingsLayout>
     ),
     authRequired: 'system.settings.manage',

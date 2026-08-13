@@ -15,10 +15,6 @@
     "monitoring": {
       "label": "Überwachung",
       "description": "Metrik-Endpunkt und Instrumentierung"
-    },
-    "about": {
-      "label": "Über",
-      "description": "Version, Updates und Systemübersicht"
     }
   }
 }

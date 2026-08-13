@@ -15,10 +15,6 @@
     "monitoring": {
       "label": "Monitoring",
       "description": "Metrics endpoint and instrumentation"
-    },
-    "about": {
-      "label": "About",
-      "description": "Version, updates, and system overview"
     }
   }
 }
