@@ -1,0 +1,48 @@
+name: 'ESP-IDF Toolchain'
+description: >
+  Restore (or build) the ESP-IDF v5.5 esp32s3 toolchain at ~/esp/esp-idf +
+  ~/.espressif. Single source of the cache key: two copies of it drifting apart
+  is how a poisoned entry stayed poisoned. Assumes Python 3.13 is already set up
+  — the cached virtualenv is named idf5.5_py3.13_env and will not match another.
+
+runs:
+  using: 'composite'
+  steps:
+    # restore/save are split (rather than one `actions/cache`) so the save can
+    # be gated on `install.sh` succeeding. `actions/cache` saves unconditionally
+    # in its post step, so an install that dies partway — a dl.espressif.com or
+    # PyPI 503 — persists a tree with the toolchain present and the venv
+    # missing. That is the entry that broke the firmware build: the key is
+    # constant and `actions/cache` skips its post-save on an exact hit, so
+    # nothing could ever overwrite it. `-v2` abandons the poisoned entry.
+    - name: Restore ESP-IDF cache
+      id: cache-esp-idf
+      uses: actions/cache/restore@v6
+      with:
+        path: |
+          ~/esp/esp-idf
+          ~/.espressif
+        key: esp-idf-v5.5-esp32s3-py3.13-v2-${{ runner.os }}
+
+    - name: Install ESP-IDF v5.5
+      # Always run, not just on cache miss: `install.sh` is idempotent and
+      # repairs a cache restore that is missing the Python virtualenv.
+      run: |
+        if [ ! -d ~/esp/esp-idf/.git ]; then
+          mkdir -p ~/esp
+          git clone --depth 1 --shallow-submodules --recursive -b v5.5 \
+            https://github.com/espressif/esp-idf.git ~/esp/esp-idf
+        fi
+        ~/esp/esp-idf/install.sh esp32s3
+      shell: bash
+
+    - name: Save ESP-IDF cache
+      # No explicit success() needed — a step's default `if` already skips this
+      # when a prior step (i.e. install.sh) failed.
+      if: steps.cache-esp-idf.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v6
+      with:
+        path: |
+          ~/esp/esp-idf
+          ~/.espressif
+        key: esp-idf-v5.5-esp32s3-py3.13-v2-${{ runner.os }}

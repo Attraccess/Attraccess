@@ -23,28 +23,7 @@ runs:
         pip install esptool
       shell: bash
 
-    - name: Cache ESP-IDF
-      id: cache-esp-idf
-      uses: actions/cache@v6
-      with:
-        path: |
-          ~/esp/esp-idf
-          ~/.espressif
-        key: esp-idf-v5.5-esp32s3-py3.13-${{ runner.os }}
-
-    - name: Install ESP-IDF v5.5
-      # Always run, not just on cache miss: `install.sh` is idempotent and
-      # repairs a cache restore that is missing the Python virtualenv. The
-      # toolchain and the venv live in separate parts of ~/.espressif, and a
-      # truncated/raced save can drop the venv while keeping the toolchain.
-      run: |
-        if [ ! -d ~/esp/esp-idf/.git ]; then
-          mkdir -p ~/esp
-          git clone --depth 1 --shallow-submodules --recursive -b v5.5 \
-            https://github.com/espressif/esp-idf.git ~/esp/esp-idf
-        fi
-        ~/esp/esp-idf/install.sh esp32s3
-      shell: bash
+    - uses: ./.github/actions/esp-idf-toolchain
 
     - name: Build all firmware variants
       run: |

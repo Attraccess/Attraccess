@@ -20,16 +20,23 @@ permissions:
 
 jobs:
   precommit-check:
-    # lint/typecheck/test/e2e are the pre-commit checks, and they already run as
-    # dedicated jobs below. This job is a gate, not a runner: re-running the same
-    # affected graph here would double the work (every job is a cold-Nx-cache
-    # runner). `pnpm precommit` remains the local hook, where `--uncommitted` is
-    # the right selector; on CI it is always empty.
+    # Lint/typecheck/test/e2e already run as dedicated jobs below (`pnpm
+    # precommit` also runs `build`, covered by `containerize`). This job is a
+    # gate, not a runner: re-running the same affected graph here would double
+    # the work (every job is a cold-Nx-cache runner). `pnpm precommit` remains
+    # the local hook, where `--uncommitted` is the right selector; on CI it is
+    # always empty.
+    #
+    # `if: always()` is load-bearing: with plain `needs:` an upstream failure
+    # *skips* this job, and a skipped job reports Success to branch protection.
     needs: [lint-and-typecheck, test]
+    if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Gate on lint, typecheck, test and e2e
-        run: echo "Covered by lint-and-typecheck and test jobs."
+        run: |
+          echo "lint-and-typecheck=${{ needs.lint-and-typecheck.result }} test=${{ needs.test.result }}"
+          [[ "${{ needs.lint-and-typecheck.result }}" == "success" && "${{ needs.test.result }}" == "success" ]]
 
   commitlint:
     if: github.event_name == 'pull_request'
