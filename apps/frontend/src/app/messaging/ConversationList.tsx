@@ -47,6 +47,10 @@ export function ConversationList(props: Props) {
             type="button"
             data-cy={`conversation-item-${conversation.id}`}
             onClick={() => onSelect(conversation.id)}
+            // Without this the accent bar below is the only channel carrying "this thread is
+            // open" — visible, but not conveyed (WCAG 1.4.1). The bar makes the state seeable;
+            // this makes it announceable.
+            aria-current={selectedConversationId === conversation.id ? 'true' : undefined}
             className={cn(
               // zinc-200, not zinc-100: the list sits on the page background now that the Card
               // is gone, and zinc-100 is the same colour as it in light mode (1.01:1).
