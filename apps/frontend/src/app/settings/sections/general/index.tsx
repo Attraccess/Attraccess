@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Input, Spinner, TextField } from '@heroui/react';
+import { Form, Input, Spinner, TextField } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   ApiError,
@@ -32,6 +32,7 @@ export function GeneralSection() {
 
   const { data: settings, isLoading } = useSettingsServiceGetSystemSettings();
   const [draft, setDraft] = useState(emptyDraft);
+  const formRef = useRef<HTMLFormElement>(null);
 
   // Same query/mutation contract as the old AppSettingsForm — only the presentation changed.
   const baseline = useMemo(
@@ -61,7 +62,13 @@ export function GeneralSection() {
     draft.publicInternetUrl !== baseline.publicInternetUrl ||
     draft.licenseKey.trim() !== '';
 
-  const handleSave = () =>
+  const handleSave = () => {
+    // `isRequired` and `type="url"` are native constraints that only fire on form submission, so
+    // without this gate an empty or malformed URL reaches the API and comes back a generic 400
+    // toast. `reportValidity` also paints the message on the offending field, which the old
+    // `checkValidity` gate in AppSettingsForm did not.
+    if (!formRef.current?.reportValidity()) return;
+
     saveSettings({
       requestBody: {
         app: {
@@ -71,6 +78,7 @@ export function GeneralSection() {
         },
       },
     });
+  };
 
   if (isLoading) {
     return (
@@ -83,7 +91,16 @@ export function GeneralSection() {
 
   return (
     <SettingsSection title={t('title')} description={t('description')}>
-      <div className="flex flex-col">
+      {/* A real <form> so the fields' native constraints exist to be validated; submitting it (the
+          Enter key) routes to the same guarded save the save bar uses. */}
+      <Form
+        ref={formRef}
+        className="flex flex-col"
+        onSubmit={(event) => {
+          event.preventDefault();
+          handleSave();
+        }}
+      >
         <SettingsRow stacked label={t('inputs.url.label')} hint={t('inputs.url.description')}>
           <TextField
             isRequired
@@ -125,7 +142,8 @@ export function GeneralSection() {
             />
           </div>
         </SettingsRow>
-      </div>
+        <input type="submit" hidden />
+      </Form>
 
       <SettingsSaveBar
         isDirty={isDirty}

@@ -35,4 +35,12 @@ export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
     group: 'operations',
     permission: 'system.settings.manage',
   },
+  {
+    // Brought forward from 2/3: `/settings` was the only mount point for the version and system-info
+    // cards, so without this section the redesign would drop them until 2/3 landed.
+    key: 'about',
+    path: '/settings/about',
+    group: 'operations',
+    permission: 'system.settings.manage',
+  },
 ];
