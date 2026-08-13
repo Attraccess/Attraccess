@@ -49,10 +49,16 @@ runs:
         key: esp-idf-v5.5-esp32s3-py3.13-${{ runner.os }}
 
     - name: Install ESP-IDF v5.5
-      if: inputs.esp-idf == 'true' && steps.cache-esp-idf.outputs.cache-hit != 'true'
+      # Always run, not just on cache miss: `install.sh` is idempotent and
+      # repairs a cache restore that is missing the Python virtualenv. The
+      # toolchain and the venv live in separate parts of ~/.espressif, and a
+      # truncated/raced save can drop the venv while keeping the toolchain.
+      if: inputs.esp-idf == 'true'
       run: |
-        mkdir -p ~/esp
-        git clone --depth 1 --shallow-submodules --recursive -b v5.5 \
-          https://github.com/espressif/esp-idf.git ~/esp/esp-idf
+        if [ ! -d ~/esp/esp-idf/.git ]; then
+          mkdir -p ~/esp
+          git clone --depth 1 --shallow-submodules --recursive -b v5.5 \
+            https://github.com/espressif/esp-idf.git ~/esp/esp-idf
+        fi
         ~/esp/esp-idf/install.sh esp32s3
       shell: bash
