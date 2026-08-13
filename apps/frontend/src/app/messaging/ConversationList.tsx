@@ -49,12 +49,19 @@ export function ConversationList(props: Props) {
             onClick={() => onSelect(conversation.id)}
             className={cn(
               // zinc-200, not zinc-100: the list sits on the page background now that the Card
-              // is gone, and zinc-100 is the same colour as it in light mode (≈1.007:1).
-              // The fill alone is only ~1.15:1 though, so the selected state carries a primary
-              // accent bar for a ≥3:1 indicator — a fill-only fix would repeat ATT-834 itself.
-              // The bar is transparent when unselected so selecting one does not shift the row.
+              // is gone, and zinc-100 is the same colour as it in light mode (1.01:1).
+              // zinc-200 only reaches 1.16:1 though, so selection is carried by the accent bar,
+              // not the fill — 3.38:1 in light and 5.51:1 in dark against the page background,
+              // which is the surface the *unselected* rows show. (Against the selected row's own
+              // fill it is 2.90:1 light / 4.05:1 dark; the page comparison is the one that says
+              // "this row is marked and those are not".) A fill-only fix would repeat ATT-834.
+              //
+              // `accent`, not `primary`: HeroUI v3 has no primary token, so `border-l-primary`
+              // emits no CSS at all and tailwind-merge drops the transparent fallback with it,
+              // leaving the bar to inherit --border at 1.02:1. The bar is transparent when
+              // unselected so selecting a row does not shift its contents.
               'flex w-full items-center gap-3 border-l-4 border-l-transparent px-4 py-3 text-left transition-colors hover:bg-zinc-200 dark:hover:bg-zinc-800',
-              selectedConversationId === conversation.id && 'border-l-primary bg-zinc-200 dark:bg-zinc-800',
+              selectedConversationId === conversation.id && 'border-l-accent bg-zinc-200 dark:bg-zinc-800',
             )}
           >
             <div className="relative shrink-0">
