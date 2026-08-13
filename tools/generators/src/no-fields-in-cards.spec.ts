@@ -184,6 +184,35 @@ function walkJsx(node: Node, visit: (element: Node) => void): void {
   });
 }
 
+/**
+ * Walks `node`, skipping portaled subtrees, calling `visit` on the identifier of every
+ * `{someName}` expression. `<div>{field}</div>` is a JsxExpression, not a JsxElement, so
+ * `walkJsx` never sees the reference.
+ */
+function walkJsxExpressionIdentifiers(node: Node, visit: (name: string) => void): void {
+  node.forEachChild((child) => {
+    if (isJsx(child) && isPortal(tagOf(child))) return;
+    if (ts.isJsxExpression(child) && child.expression && ts.isIdentifier(child.expression)) {
+      visit((child.expression as Node).text as string);
+    }
+    walkJsxExpressionIdentifiers(child, visit);
+  });
+}
+
+/**
+ * Identifiers passed as arguments to a call, through nesting — `memo(Base)`,
+ * `memo(forwardRef(Base))`. The declaration of an HOC-wrapped export holds a call, not JSX,
+ * so the wrapped component is reachable only as an argument.
+ */
+function callArgumentIdentifiers(node: Node, out: string[] = []): string[] {
+  if (ts.isIdentifier(node)) {
+    out.push(node.text as string);
+  } else if (ts.isCallExpression(node)) {
+    for (const argument of node.arguments as Node[]) callArgumentIdentifiers(argument, out);
+  }
+  return out;
+}
+
 /** A component export, pinned to the module that declares it. */
 interface Export {
   file: string;
@@ -337,6 +366,21 @@ function rendersField(
   const imports = localImports(source);
   let found = false;
 
+  /** Follow a same-file name — a helper component, an HOC argument, or a JSX variable. */
+  const follow = (identifier: string): void => {
+    if (found || !findLocalDeclaration(source, identifier)) return;
+    const childTruncated = { hit: false };
+    if (rendersField(file, identifier, seen, childTruncated)) found = true;
+    else if (childTruncated.hit) truncated.hit = true;
+  };
+
+  // `export const Form = memo(FormBase)` — the declaration holds a call, not JSX, so the
+  // wrapped component is reachable only through the call's arguments.
+  const initializer = declaration.initializer as Node | undefined;
+  if (initializer && ts.isCallExpression(initializer)) {
+    for (const identifier of callArgumentIdentifiers(initializer)) follow(identifier);
+  }
+
   walkJsx(declaration, (element) => {
     if (found) return;
     const tag = tagOf(element);
@@ -344,25 +388,25 @@ function rendersField(
       found = true;
       return;
     }
-    const childTruncated = { hit: false };
     const imported = imports.get(tag);
     if (imported) {
+      const childTruncated = { hit: false };
       for (const leaf of resolveExport(imported, tag)) {
         if (rendersField(leaf.file, leaf.name, seen, childTruncated)) {
           found = true;
           return;
         }
       }
-    } else if (findLocalDeclaration(source, tag)) {
+      if (childTruncated.hit) truncated.hit = true;
+    } else {
       // A helper component declared beside this one — `const Inner = () => <TextField />`
       // used by the exported component. Scoping to the declaration would miss it otherwise.
-      if (rendersField(file, tag, seen, childTruncated)) {
-        found = true;
-        return;
-      }
+      follow(tag);
     }
-    if (childTruncated.hit) truncated.hit = true;
   });
+
+  // `const field = <TextField />` referenced as `<div>{field}</div>`.
+  walkJsxExpressionIdentifiers(declaration, follow);
 
   if (found || !truncated.hit) rendersFieldCache.set(key, found);
   return found;
@@ -555,6 +599,53 @@ describe('form fields are not wrapped in Cards (ATT-294 / ATT-834)', () => {
       `import { TextField } from '@heroui/react';
        const Inner = () => <TextField />;
        export const Form = () => <Inner />;`,
+    );
+    fs.writeFileSync(
+      path.join(dir, 'page.tsx'),
+      `import { Card } from '@heroui/react';
+       import { Form } from './Form';
+       export const Page = () => <Card><Card.Content><Form /></Card.Content></Card>;`,
+    );
+
+    const violations = findViolations(path.join(dir, 'page.tsx'));
+    fs.rmSync(dir, { recursive: true, force: true });
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0].detail).toContain('<Form>');
+  });
+
+  it('follows an HOC-wrapped export to the component it wraps', () => {
+    // `export const DocumentationEditor = memo(DocumentationEditorComponent)` — four
+    // components in the tree have this shape. The declaration holds a call, not JSX.
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'att834-'));
+    fs.writeFileSync(
+      path.join(dir, 'Form.tsx'),
+      `import { memo } from 'react';
+       import { TextField } from '@heroui/react';
+       const FormBase = () => <TextField />;
+       export const Form = memo(FormBase);`,
+    );
+    fs.writeFileSync(
+      path.join(dir, 'page.tsx'),
+      `import { Card } from '@heroui/react';
+       import { Form } from './Form';
+       export const Page = () => <Card><Card.Content><Form /></Card.Content></Card>;`,
+    );
+
+    const violations = findViolations(path.join(dir, 'page.tsx'));
+    fs.rmSync(dir, { recursive: true, force: true });
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0].detail).toContain('<Form>');
+  });
+
+  it('follows a top-level JSX variable referenced from the exported component', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'att834-'));
+    fs.writeFileSync(
+      path.join(dir, 'Form.tsx'),
+      `import { TextField } from '@heroui/react';
+       const field = <TextField />;
+       export const Form = () => <div>{field}</div>;`,
     );
     fs.writeFileSync(
       path.join(dir, 'page.tsx'),
