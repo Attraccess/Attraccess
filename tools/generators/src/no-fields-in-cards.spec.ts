@@ -184,12 +184,59 @@ function walkJsx(node: Node, visit: (element: Node) => void): void {
   });
 }
 
+/** A component export, pinned to the module that declares it. */
+interface Export {
+  file: string;
+  name: string;
+}
+
+/** Keyed `<file>#<export name>`, not by file — see `rendersField`. */
 const rendersFieldCache = new Map<string, boolean>();
 
 /** `export function Name` / `export class Name` / `export const Name` carry this modifier. */
 function hasExportModifier(node: Node): boolean {
   const modifiers = node.modifiers as Node[] | undefined;
   return !!modifiers && modifiers.some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
+}
+
+/** The top-level declaration of `name` in `source`, exported or not. */
+function findLocalDeclaration(source: Node, name: string): Node | null {
+  for (const statement of source.statements as Node[]) {
+    if (ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement)) {
+      if (statement.name && (statement.name as Node).text === name) return statement;
+    } else if (ts.isVariableStatement(statement)) {
+      for (const decl of (statement.declarationList as Node).declarations as Node[]) {
+        if (ts.isIdentifier(decl.name) && (decl.name as Node).text === name) return decl;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * The declaration `name` refers to in `source`, resolving `export { Local as Name }` back to
+ * `Local`. Used to scope the field walk to one component rather than the whole module.
+ */
+function declarationOf(source: Node, name: string): Node | null {
+  const direct = findLocalDeclaration(source, name);
+  if (direct) return direct;
+  for (const statement of source.statements as Node[]) {
+    if (
+      !ts.isExportDeclaration(statement) ||
+      statement.moduleSpecifier ||
+      !statement.exportClause ||
+      !ts.isNamedExports(statement.exportClause)
+    ) {
+      continue;
+    }
+    for (const element of (statement.exportClause as Node).elements as Node[]) {
+      if ((element.name as Node).text !== name) continue;
+      const localName = element.propertyName ? ((element.propertyName as Node).text as string) : name;
+      const decl = findLocalDeclaration(source, localName);
+      if (decl) return decl;
+    }
+  }
+  return null;
 }
 
 /** Does `source` declare `name` as a local export, as opposed to re-exporting it? */
@@ -223,12 +270,13 @@ function definesLocally(source: Node, name: string): boolean {
  * re-exports both fields and non-fields (e.g. `@attraccess/plugins-frontend-ui`) must resolve
  * the specific name, or every consumer of that barrel would read as a field.
  */
-function resolveExport(file: string, name: string, seen = new Set<string>()): string[] {
-  if (seen.has(file)) return [];
-  seen.add(file);
+function resolveExport(file: string, name: string, seen = new Set<string>()): Export[] {
+  const key = `${file}#${name}`;
+  if (seen.has(key)) return [];
+  seen.add(key);
   const source = parse(file);
   const fromDir = path.dirname(file);
-  const results: string[] = [];
+  const results: Export[] = [];
 
   for (const statement of source.statements as Node[]) {
     if (!ts.isExportDeclaration(statement) || !statement.moduleSpecifier) continue;
@@ -243,57 +291,80 @@ function resolveExport(file: string, name: string, seen = new Set<string>()): st
     } else if (ts.isNamedExports(clause)) {
       for (const element of clause.elements as Node[]) {
         if ((element.name as Node).text !== name) continue;
-        const sourceName = element.propertyName ? (element.propertyName as Node).text as string : name;
+        const sourceName = element.propertyName ? ((element.propertyName as Node).text as string) : name;
         results.push(...resolveExport(target, sourceName, seen));
       }
     }
     // `export * as ns from './X'` does not re-export `name` directly; skip.
   }
 
-  if (definesLocally(source, name)) results.push(file);
+  if (definesLocally(source, name)) results.push({ file, name });
   return results;
 }
 
 /**
- * Does this module render a HeroUI field outside a portal — directly, or via a locally
- * imported component (resolved name-aware through re-export barrels)?
+ * Does the component `name` in `file` render a HeroUI field outside a portal — directly, via a
+ * same-file helper component, or via a locally imported one (resolved name-aware through
+ * re-export barrels)?
+ *
+ * Scoped to the one declaration, not the whole module: a file that exports both a field
+ * component and a plain one (`ResourceSelector` next to `ListboxWrapper`) would otherwise
+ * report the plain one as rendering a field. Naming an innocent component is the failure this
+ * guard can least afford — a misattributed cause is what made the previous ESLint attempt look
+ * wrong. Hence the cache key carries the name too.
  *
  * `seen` guards against import cycles; `truncated` is set when the walk was cut short by one,
  * because a `false` produced under truncation is unreliable and must not be cached.
  */
-function rendersField(file: string, seen = new Set<string>(), truncated: { hit: boolean } = { hit: false }): boolean {
-  const cached = rendersFieldCache.get(file);
+function rendersField(
+  file: string,
+  name: string,
+  seen = new Set<string>(),
+  truncated: { hit: boolean } = { hit: false },
+): boolean {
+  const key = `${file}#${name}`;
+  const cached = rendersFieldCache.get(key);
   if (cached !== undefined) return cached;
-  if (seen.has(file)) {
+  if (seen.has(key)) {
     truncated.hit = true;
     return false;
   }
-  seen.add(file);
+  seen.add(key);
 
   const source = parse(file);
+  const declaration = declarationOf(source, name);
+  if (!declaration) return false;
   const imports = localImports(source);
   let found = false;
 
-  walkJsx(source, (element) => {
+  walkJsx(declaration, (element) => {
     if (found) return;
     const tag = tagOf(element);
     if (FIELD_PRIMITIVES.has(tag)) {
       found = true;
       return;
     }
+    const childTruncated = { hit: false };
     const imported = imports.get(tag);
-    if (!imported) return;
-    for (const leaf of resolveExport(imported, tag)) {
-      const childTruncated = { hit: false };
-      if (rendersField(leaf, seen, childTruncated)) {
+    if (imported) {
+      for (const leaf of resolveExport(imported, tag)) {
+        if (rendersField(leaf.file, leaf.name, seen, childTruncated)) {
+          found = true;
+          return;
+        }
+      }
+    } else if (findLocalDeclaration(source, tag)) {
+      // A helper component declared beside this one — `const Inner = () => <TextField />`
+      // used by the exported component. Scoping to the declaration would miss it otherwise.
+      if (rendersField(file, tag, seen, childTruncated)) {
         found = true;
         return;
       }
-      if (childTruncated.hit) truncated.hit = true;
     }
+    if (childTruncated.hit) truncated.hit = true;
   });
 
-  if (found || !truncated.hit) rendersFieldCache.set(file, found);
+  if (found || !truncated.hit) rendersFieldCache.set(key, found);
   return found;
 }
 
@@ -332,8 +403,8 @@ function findViolations(file: string): Violation[] {
       const imported = imports.get(tag);
       if (!imported) return;
       for (const leaf of resolveExport(imported, tag)) {
-        if (rendersField(leaf)) {
-          report(element, `<${tag}> (${path.relative(ROOT, leaf)}) renders a field inside a <Card>`);
+        if (rendersField(leaf.file, leaf.name)) {
+          report(element, `<${tag}> (${path.relative(ROOT, leaf.file)}) renders a field inside a <Card>`);
           return;
         }
       }
@@ -445,6 +516,60 @@ describe('form fields are not wrapped in Cards (ATT-294 / ATT-834)', () => {
     expect(violations[0].detail).toContain('<UserSearch>');
   });
 
+  it('does not taint a plain component exported beside a field component in the same module', () => {
+    // The shape of ResourceSelector.tsx (ListboxWrapper next to ResourceSelector) and of
+    // SerialConfigurator/Auth (AttractapSerialCommProvider next to AttractapSerialCommGate).
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'att834-'));
+    fs.writeFileSync(
+      path.join(dir, 'ResourceSelector.tsx'),
+      `import { TextField } from '@heroui/react';
+       export const ListboxWrapper = ({ children }) => <div>{children}</div>;
+       const Hint = () => <TextField />;
+       export const ResourceSelector = () => <><Hint /><TextField /></>;`,
+    );
+    fs.writeFileSync(
+      path.join(dir, 'page.tsx'),
+      `import { Card } from '@heroui/react';
+       import { ListboxWrapper, ResourceSelector } from './ResourceSelector';
+       export const Page = () => (
+         <Card>
+           <Card.Content>
+             <ListboxWrapper />
+             <ResourceSelector />
+           </Card.Content>
+         </Card>
+       );`,
+    );
+
+    const violations = findViolations(path.join(dir, 'page.tsx'));
+    fs.rmSync(dir, { recursive: true, force: true });
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0].detail).toContain('<ResourceSelector>');
+  });
+
+  it('follows a same-file helper component that renders the field', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'att834-'));
+    fs.writeFileSync(
+      path.join(dir, 'Form.tsx'),
+      `import { TextField } from '@heroui/react';
+       const Inner = () => <TextField />;
+       export const Form = () => <Inner />;`,
+    );
+    fs.writeFileSync(
+      path.join(dir, 'page.tsx'),
+      `import { Card } from '@heroui/react';
+       import { Form } from './Form';
+       export const Page = () => <Card><Card.Content><Form /></Card.Content></Card>;`,
+    );
+
+    const violations = findViolations(path.join(dir, 'page.tsx'));
+    fs.rmSync(dir, { recursive: true, force: true });
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0].detail).toContain('<Form>');
+  });
+
   it('flags a field held directly in a same-file JSX variable', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'att834-'));
     fs.writeFileSync(
@@ -482,7 +607,7 @@ describe('form fields are not wrapped in Cards (ATT-294 / ATT-834)', () => {
     );
 
     // Warm A first: the A -> B -> A cycle truncates inside B, and B's `false` must not be cached.
-    rendersField(path.join(dir, 'A.tsx'));
+    rendersField(path.join(dir, 'A.tsx'), 'A');
     const violations = findViolations(path.join(dir, 'page.tsx'));
     fs.rmSync(dir, { recursive: true, force: true });
 
