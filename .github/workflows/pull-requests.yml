@@ -20,8 +20,7 @@ permissions:
 
 jobs:
   precommit-check:
-    # Lint/typecheck/test/e2e already run as dedicated jobs below (`pnpm
-    # precommit` also runs `build`, covered by `containerize`). This job is a
+    # Lint/typecheck/test/e2e already run as dedicated jobs below. This job is a
     # gate, not a runner: re-running the same affected graph here would double
     # the work (every job is a cold-Nx-cache runner). `pnpm precommit` remains
     # the local hook, where `--uncommitted` is the right selector; on CI it is
@@ -29,14 +28,27 @@ jobs:
     #
     # `if: always()` is load-bearing: with plain `needs:` an upstream failure
     # *skips* this job, and a skipped job reports Success to branch protection.
-    needs: [lint-and-typecheck, test]
+    # `test` is not itself a required check, so this gate is what makes a test
+    # failure block a merge.
+    #
+    # `build-companion` is here for the same skipped-reports-Success reason:
+    # `containerize` covers `pnpm precommit`'s `build` step (the image build
+    # compiles the apps), but it is `needs: [build-companion]` +
+    # `if: ... && !failure()`, so a build-companion failure *skips* it — and it
+    # is a required check, so it would report Success. The companion jobs are
+    # not required checks in their own right. Gating on the result here is
+    # cheap; adding `containerize` itself would serialize a 3s gate behind a
+    # 45-minute Docker build.
+    needs: [lint-and-typecheck, test, build-companion]
     if: always()
     runs-on: ubuntu-latest
     steps:
-      - name: Gate on lint, typecheck, test and e2e
+      - name: Gate on lint, typecheck, test, e2e and the companion build
         run: |
-          echo "lint-and-typecheck=${{ needs.lint-and-typecheck.result }} test=${{ needs.test.result }}"
-          [[ "${{ needs.lint-and-typecheck.result }}" == "success" && "${{ needs.test.result }}" == "success" ]]
+          echo "lint-and-typecheck=${{ needs.lint-and-typecheck.result }} test=${{ needs.test.result }} build-companion=${{ needs.build-companion.result }}"
+          [[ "${{ needs.lint-and-typecheck.result }}" == "success" \
+            && "${{ needs.test.result }}" == "success" \
+            && "${{ needs.build-companion.result }}" == "success" ]]
 
   commitlint:
     if: github.event_name == 'pull_request'

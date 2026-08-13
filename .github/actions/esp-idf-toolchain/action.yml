@@ -2,12 +2,24 @@ name: 'ESP-IDF Toolchain'
 description: >
   Restore (or build) the ESP-IDF v5.5 esp32s3 toolchain at ~/esp/esp-idf +
   ~/.espressif. Single source of the cache key: two copies of it drifting apart
-  is how a poisoned entry stayed poisoned. Assumes Python 3.13 is already set up
-  — the cached virtualenv is named idf5.5_py3.13_env and will not match another.
+  is how a poisoned entry stayed poisoned. Requires Python to already be set up;
+  its version goes in the cache key, since the IDF virtualenv is named after it.
 
 runs:
   using: 'composite'
   steps:
+    # The venv is named idf5.5_py<major>.<minor>_env, so the interpreter version
+    # is part of what the cache holds. Read it rather than hand-asserting it:
+    # `setup/action.yml` records `3.x` once drifting to 3.14 and breaking the
+    # build against idf5.5_py3.13_env. A hardcoded version would let a caller on
+    # a different Python save an entry under a key claiming 3.13 — permanently,
+    # since keys are immutable and the save below is skipped on an exact hit.
+    # Deriving it turns that drift into a cache miss, which self-heals.
+    - name: Resolve Python version for the cache key
+      id: py
+      run: python -c "import sys; print(f'v={sys.version_info.major}.{sys.version_info.minor}')" >> "$GITHUB_OUTPUT"
+      shell: bash
+
     # restore/save are split (rather than one `actions/cache`) so the save can
     # be gated on `install.sh` succeeding. `actions/cache` saves unconditionally
     # in its post step, so an install that dies partway — a dl.espressif.com or
@@ -22,7 +34,7 @@ runs:
         path: |
           ~/esp/esp-idf
           ~/.espressif
-        key: esp-idf-v5.5-esp32s3-py3.13-v2-${{ runner.os }}
+        key: esp-idf-v5.5-esp32s3-py${{ steps.py.outputs.v }}-v2-${{ runner.os }}
 
     - name: Install ESP-IDF v5.5
       # Always run, not just on cache miss: `install.sh` is idempotent and
@@ -45,4 +57,4 @@ runs:
         path: |
           ~/esp/esp-idf
           ~/.espressif
-        key: esp-idf-v5.5-esp32s3-py3.13-v2-${{ runner.os }}
+        key: esp-idf-v5.5-esp32s3-py${{ steps.py.outputs.v }}-v2-${{ runner.os }}
