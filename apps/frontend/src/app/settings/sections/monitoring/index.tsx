@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   Alert,
   AlertContent,
@@ -54,7 +54,11 @@ export function MonitoringSection() {
 
   const [generatedKey, setGeneratedKey] = useState<string | null>(null);
   const [pendingToggle, setPendingToggle] = useState<ToggleKey | null>(null);
-  const [threshold, setThreshold] = useState<number | undefined>(undefined);
+  // `undefined` means "untouched in this session"; the displayed value then falls back to the
+  // server's. Seeding this from an effect instead left the NumberField without a value for the
+  // first commit after loading finished, painting the field empty for a frame, and let a background
+  // refetch clobber edits the operator had not saved yet.
+  const [thresholdDraft, setThresholdDraft] = useState<number | undefined>(undefined);
 
   const rerollModal = useOverlayState();
   const removeModal = useOverlayState();
@@ -63,7 +67,9 @@ export function MonitoringSection() {
   const { data: metricsSettings, isLoading } = useSettingsServiceGetMetricsSettings();
 
   const savedThreshold = metricsSettings?.slowQueryThresholdSeconds;
-  useEffect(() => setThreshold(savedThreshold), [savedThreshold]);
+  // NaN is React Aria's representation of an empty NumberField, so it keeps the field controlled
+  // even when there is nothing to show.
+  const threshold = thresholdDraft ?? savedThreshold ?? NaN;
 
   const metricsEndpointUrl = useMemo(() => `${window.location.origin}/api/metrics`, []);
   const prometheusSnippet = useMemo(
@@ -132,8 +138,10 @@ export function MonitoringSection() {
     [toast, t],
   );
 
-  const isThresholdDirty =
-    threshold !== undefined && !Number.isNaN(threshold) && threshold >= 0 && threshold !== savedThreshold;
+  const isThresholdSavable = Number.isFinite(threshold) && threshold >= 0;
+  // Clearing the field yields NaN, which is still a departure from the saved value: the bar has to
+  // stay mounted because Discard is the only way back to it. It just must not be committable.
+  const isThresholdDirty = isThresholdSavable ? threshold !== savedThreshold : savedThreshold !== undefined;
 
   if (isLoading) {
     return (
@@ -274,7 +282,7 @@ export function MonitoringSection() {
         <SettingsRow label={t('slowQueryThreshold.title')} hint={t('slowQueryThreshold.description')}>
           <NumberField
             value={threshold}
-            onChange={setThreshold}
+            onChange={setThresholdDraft}
             minValue={0}
             step={0.1}
             aria-label={t('slowQueryThreshold.label')}
@@ -291,8 +299,14 @@ export function MonitoringSection() {
       <SettingsSaveBar
         isDirty={isThresholdDirty}
         isSaving={isSavingThreshold}
-        onSave={() => updateThreshold({ requestBody: { slowQueryThresholdSeconds: threshold } })}
-        onDiscard={() => setThreshold(savedThreshold)}
+        isSaveDisabled={!isThresholdSavable}
+        onSave={() => {
+          if (!isThresholdSavable) {
+            return;
+          }
+          updateThreshold({ requestBody: { slowQueryThresholdSeconds: threshold } });
+        }}
+        onDiscard={() => setThresholdDraft(undefined)}
       />
 
       <StandardModal isOpen={rerollModal.isOpen} onOpenChange={(open) => !open && rerollModal.close()} size="sm">

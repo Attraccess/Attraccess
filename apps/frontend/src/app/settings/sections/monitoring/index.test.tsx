@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   useSettingsServiceDeleteMetricsApiKey,
@@ -68,5 +69,35 @@ describe('MonitoringSection', () => {
     const { container } = render(<MonitoringSection />);
 
     expect(container.querySelector('[data-slot="settings-save-bar"]')).toBeNull();
+  });
+
+  it('keeps the save bar reachable when the threshold is cleared, and Discard restores the saved value', async () => {
+    // Clearing a NumberField makes React Aria emit NaN. Treating that as "not dirty" unmounted the
+    // whole save bar, stranding the operator with an empty field and no way back to the saved value.
+    const { container } = render(<MonitoringSection />);
+
+    const input = screen.getByLabelText('slowQueryThreshold.label');
+    expect(input).toHaveValue('1');
+
+    await userEvent.clear(input);
+    await userEvent.tab(); // React Aria only commits the NaN on blur.
+
+    expect(input).toHaveValue('');
+    expect(container.querySelector('[data-slot="settings-save-bar"]')).toBeInTheDocument();
+
+    const discard = screen.getByRole('button', { name: 'saveBar.discard' });
+    expect(discard).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'saveBar.save' })).toBeDisabled();
+
+    await userEvent.click(discard);
+
+    expect(screen.getByLabelText('slowQueryThreshold.label')).toHaveValue('1');
+    expect(container.querySelector('[data-slot="settings-save-bar"]')).toBeNull();
+  });
+
+  it('shows the saved threshold as the field value', () => {
+    render(<MonitoringSection />);
+
+    expect(screen.getByLabelText('slowQueryThreshold.label')).toHaveValue('1');
   });
 });

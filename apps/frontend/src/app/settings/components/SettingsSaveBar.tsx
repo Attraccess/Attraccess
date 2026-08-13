@@ -6,6 +6,11 @@ import de from './de.json';
 interface SettingsSaveBarProps {
   isDirty: boolean;
   isSaving?: boolean;
+  /**
+   * Edited into a state that cannot be committed (e.g. a required field cleared). The bar stays
+   * mounted so Discard remains reachable — only Save is blocked.
+   */
+  isSaveDisabled?: boolean;
   onSave: () => void;
   onDiscard: () => void;
 }
@@ -15,7 +20,7 @@ interface SettingsSaveBarProps {
  * something has been edited. Nothing to save means nothing on screen — no permanently greyed-out
  * Save button whose disabled state the operator has to interpret.
  */
-export function SettingsSaveBar({ isDirty, isSaving, onSave, onDiscard }: SettingsSaveBarProps) {
+export function SettingsSaveBar({ isDirty, isSaving, isSaveDisabled, onSave, onDiscard }: SettingsSaveBarProps) {
   const { t } = useTranslations({ en, de });
 
   if (!isDirty) {
@@ -31,7 +36,7 @@ export function SettingsSaveBar({ isDirty, isSaving, onSave, onDiscard }: Settin
       <Button variant="ghost" size="sm" onPress={onDiscard} isDisabled={isSaving}>
         {t('saveBar.discard')}
       </Button>
-      <Button variant="primary" size="sm" onPress={onSave} isPending={isSaving}>
+      <Button variant="primary" size="sm" onPress={onSave} isPending={isSaving} isDisabled={isSaveDisabled}>
         {t('saveBar.save')}
       </Button>
     </div>
