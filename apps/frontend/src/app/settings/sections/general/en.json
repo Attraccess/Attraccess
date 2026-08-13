@@ -5,11 +5,18 @@
   "inputs": {
     "url": {
       "label": "Application URL",
-      "description": "The URL users access Attraccess at (used for redirects, links, and API callbacks)."
+      "description": "The URL users access Attraccess at (used for redirects, links, and API callbacks).",
+      "errors": {
+        "required": "An application URL is required.",
+        "invalid": "Enter a full URL, including http:// or https://."
+      }
     },
     "publicInternetUrl": {
       "label": "Public Internet URL",
-      "description": "Optional URL used for external callbacks (e.g. SumUp)."
+      "description": "Optional URL used for external callbacks (e.g. SumUp).",
+      "errors": {
+        "invalid": "Enter a full URL, including http:// or https://."
+      }
     },
     "licenseKey": {
       "label": "License Key",

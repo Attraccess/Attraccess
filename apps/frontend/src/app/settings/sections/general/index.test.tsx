@@ -58,18 +58,20 @@ describe('GeneralSection', () => {
     expect(saveBar(container)).toBeNull();
   });
 
-  it('refuses to save an empty required URL instead of round-tripping a 400', async () => {
-    // `isRequired` and `type="url"` are native constraints; without the <Form> gate the save bar
-    // would happily post `app.url: ''` and surface a generic API-error toast.
+  it('refuses to save an empty required URL, and says it is missing', async () => {
+    // The visible message is asserted, not just the blocked mutation. Blocking alone would leave
+    // the operator with a red box and no reason for it — and a mutation-only assertion passes
+    // either way, so it would not pin the behaviour this test exists to guarantee.
     render(<GeneralSection />);
 
     await userEvent.clear(urlField());
     await userEvent.click(screen.getByRole('button', { name: 'saveBar.save' }));
 
     expect(saveSettings).not.toHaveBeenCalled();
+    expect(screen.getByText('inputs.url.errors.required')).toBeInTheDocument();
   });
 
-  it('refuses to save a malformed URL', async () => {
+  it('refuses to save a malformed URL, and distinguishes it from a missing one', async () => {
     render(<GeneralSection />);
 
     await userEvent.clear(urlField());
@@ -77,6 +79,32 @@ describe('GeneralSection', () => {
     await userEvent.click(screen.getByRole('button', { name: 'saveBar.save' }));
 
     expect(saveSettings).not.toHaveBeenCalled();
+    expect(screen.getByText('inputs.url.errors.invalid')).toBeInTheDocument();
+    expect(screen.queryByText('inputs.url.errors.required')).not.toBeInTheDocument();
+  });
+
+  it('rejects a malformed optional URL but accepts an empty one', async () => {
+    render(<GeneralSection />);
+    const publicField = screen.getByLabelText('inputs.publicInternetUrl.label');
+
+    await userEvent.type(publicField, 'ftp://nope');
+    await userEvent.click(screen.getByRole('button', { name: 'saveBar.save' }));
+    expect(saveSettings).not.toHaveBeenCalled();
+    expect(screen.getByText('inputs.publicInternetUrl.errors.invalid')).toBeInTheDocument();
+
+    await userEvent.clear(publicField);
+    await userEvent.type(urlField(), '/app');
+    await userEvent.click(screen.getByRole('button', { name: 'saveBar.save' }));
+    expect(saveSettings).toHaveBeenCalledOnce();
+  });
+
+  it('stays quiet until the first save attempt', async () => {
+    // Flagging a half-typed URL red on every keystroke is noise, not help.
+    render(<GeneralSection />);
+
+    await userEvent.clear(urlField());
+
+    expect(screen.queryByText('inputs.url.errors.required')).not.toBeInTheDocument();
   });
 
   it('saves a valid edit', async () => {

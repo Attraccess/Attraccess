@@ -5,11 +5,18 @@
   "inputs": {
     "url": {
       "label": "Anwendungs-URL",
-      "description": "URL, unter der Benutzer Attraccess erreichen (für Weiterleitungen, Links und API-Callbacks)."
+      "description": "URL, unter der Benutzer Attraccess erreichen (für Weiterleitungen, Links und API-Callbacks).",
+      "errors": {
+        "required": "Eine Anwendungs-URL ist erforderlich.",
+        "invalid": "Gib eine vollständige URL an, inklusive http:// oder https://."
+      }
     },
     "publicInternetUrl": {
       "label": "Öffentliche Internet-URL",
-      "description": "Optionale URL für externe Callbacks (z. B. SumUp)."
+      "description": "Optionale URL für externe Callbacks (z. B. SumUp).",
+      "errors": {
+        "invalid": "Gib eine vollständige URL an, inklusive http:// oder https://."
+      }
     },
     "licenseKey": {
       "label": "Lizenzschlüssel",

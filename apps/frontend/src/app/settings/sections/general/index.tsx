@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Form, Input, Spinner, TextField } from '@heroui/react';
+import { FieldError, Form, Input, Spinner, TextField } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   ApiError,
@@ -22,6 +22,16 @@ import de from './de.json';
 /** A never-persisted license key reads as "unchanged", so the baseline for it is always empty. */
 const emptyDraft = { url: '', publicInternetUrl: '', licenseKey: '' };
 
+/** Mirrors the API's `@IsUrl()`: a full absolute URL, scheme included. */
+const isAbsoluteUrl = (value: string) => {
+  try {
+    const { protocol } = new URL(value);
+    return protocol === 'http:' || protocol === 'https:';
+  } catch {
+    return false;
+  }
+};
+
 export function GeneralSection() {
   const { t, tExists } = useTranslations({
     en: { ...en, api: API_ERROR_TRANSLATIONS_EN },
@@ -32,7 +42,7 @@ export function GeneralSection() {
 
   const { data: settings, isLoading } = useSettingsServiceGetSystemSettings();
   const [draft, setDraft] = useState(emptyDraft);
-  const formRef = useRef<HTMLFormElement>(null);
+  const [hasAttemptedSave, setHasAttemptedSave] = useState(false);
 
   // Same query/mutation contract as the old AppSettingsForm — only the presentation changed.
   const baseline = useMemo(
@@ -62,12 +72,27 @@ export function GeneralSection() {
     draft.publicInternetUrl !== baseline.publicInternetUrl ||
     draft.licenseKey.trim() !== '';
 
+  const trimmedUrl = draft.url.trim();
+  const trimmedPublicUrl = draft.publicInternetUrl.trim();
+
+  // Validated here rather than left to `isRequired` + `type="url"`. Those are native constraints,
+  // and react-aria cancels the `invalid` event to suppress the browser's bubble (`useFormValidation`
+  // calls `e.preventDefault()` and blanks `title`), so nothing would be shown unless a `<FieldError>`
+  // has text to render. Native messages also follow the *browser* locale, which would hand a German
+  // string to an operator running the UI in English.
+  const urlError = !trimmedUrl
+    ? t('inputs.url.errors.required')
+    : !isAbsoluteUrl(trimmedUrl)
+      ? t('inputs.url.errors.invalid')
+      : null;
+  const publicUrlError =
+    trimmedPublicUrl && !isAbsoluteUrl(trimmedPublicUrl) ? t('inputs.publicInternetUrl.errors.invalid') : null;
+
   const handleSave = () => {
-    // `isRequired` and `type="url"` are native constraints that only fire on form submission, so
-    // without this gate an empty or malformed URL reaches the API and comes back a generic 400
-    // toast. `reportValidity` also paints the message on the offending field, which the old
-    // `checkValidity` gate in AppSettingsForm did not.
-    if (!formRef.current?.reportValidity()) return;
+    // Errors stay hidden until the first save attempt — flagging a half-typed URL red on every
+    // keystroke is noise, not help.
+    setHasAttemptedSave(true);
+    if (urlError || publicUrlError) return;
 
     saveSettings({
       requestBody: {
@@ -94,7 +119,6 @@ export function GeneralSection() {
       {/* A real <form> so the fields' native constraints exist to be validated; submitting it (the
           Enter key) routes to the same guarded save the save bar uses. */}
       <Form
-        ref={formRef}
         className="flex flex-col"
         onSubmit={(event) => {
           event.preventDefault();
@@ -107,9 +131,11 @@ export function GeneralSection() {
             className="w-full"
             aria-label={t('inputs.url.label')}
             value={draft.url}
+            isInvalid={hasAttemptedSave && !!urlError}
             onChange={(url) => setDraft((current) => ({ ...current, url }))}
           >
             <Input type="url" />
+            <FieldError>{urlError}</FieldError>
           </TextField>
         </SettingsRow>
 
@@ -122,9 +148,11 @@ export function GeneralSection() {
             className="w-full"
             aria-label={t('inputs.publicInternetUrl.label')}
             value={draft.publicInternetUrl}
+            isInvalid={hasAttemptedSave && !!publicUrlError}
             onChange={(publicInternetUrl) => setDraft((current) => ({ ...current, publicInternetUrl }))}
           >
             <Input type="url" />
+            <FieldError>{publicUrlError}</FieldError>
           </TextField>
         </SettingsRow>
 
