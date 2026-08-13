@@ -20,6 +20,18 @@ import * as path from 'path';
  * runs this whenever one of them changes — otherwise the guard would never fire in CI.
  * Hardware boards are not scanned, and a test asserts every scanned project is listed, so
  * the two cannot drift apart silently.
+ *
+ * KNOWN GAPS — a green run means "none of the shapes below", not "no field on a Card surface".
+ * None of these hides a violation today; they are listed so the next reader does not over-trust
+ * a pass. Each is a resolution gap, not a detection one:
+ *
+ *   - `export default Foo` resolves to nothing (`definesLocally` only considers named exports),
+ *     so a component reached that way is never followed. `messaging/index.tsx` uses this form.
+ *   - `import { X } from './x'; export { X };` makes `definesLocally` claim the barrel declares
+ *     `X`, so resolution stops at the barrel and finds no declaration. The
+ *     `export { X } from './x'` form is handled correctly.
+ *   - Only a bare identifier in a JSX expression slot is followed. `{renderBody()}` and
+ *     `{cond ? <A /> : <B />}` are dropped — `schedules-tab.tsx` passes `{renderBody()}`.
  */
 
 // typescript@7's package exports no longer expose the classic compiler API to the type
@@ -422,6 +434,68 @@ interface Violation {
   detail: string;
 }
 
+const wrapsChildrenCache = new Map<string, boolean>();
+
+/** Is there a `{children}` / `{props.children}` slot anywhere below `node`? */
+function containsChildrenSlot(node: Node): boolean {
+  let found = false;
+  const visit = (child: Node): void => {
+    if (found) return;
+    if (ts.isJsxExpression(child) && child.expression) {
+      const expression = child.expression as Node;
+      if (ts.isIdentifier(expression) && (expression.text as string) === 'children') {
+        found = true;
+        return;
+      }
+      if (
+        ts.isPropertyAccessExpression(expression) &&
+        ts.isIdentifier(expression.name) &&
+        ((expression.name as Node).text as string) === 'children'
+      ) {
+        found = true;
+        return;
+      }
+    }
+    child.forEachChild(visit);
+  };
+  node.forEachChild(visit);
+  return found;
+}
+
+/**
+ * Does `name` render its `{children}` inside a `<Card>`? Such a component *is* a Card surface
+ * for its callers: `<SectionCard><TextField /></SectionCard>` puts a field on a Card exactly as
+ * `<Card><TextField /></Card>` does, but a literal-tag check never sees it.
+ *
+ * `{children}` must be inside the Card, not merely a Card somewhere in the module — a component
+ * that renders a Card of its own and puts children beside it is not a Card surface, and treating
+ * it as one would report fields that never touch a Card.
+ */
+function wrapsChildrenInCard(file: string, name: string, seen = new Set<string>()): boolean {
+  const key = `${file}#${name}`;
+  const cached = wrapsChildrenCache.get(key);
+  if (cached !== undefined) return cached;
+  if (seen.has(key)) return false;
+  seen.add(key);
+
+  const declaration = declarationOf(parse(file), name);
+  if (!declaration) return false;
+
+  let found = false;
+  const visit = (node: Node): void => {
+    if (found) return;
+    if (isJsx(node) && tagOf(node) === 'Card' && containsChildrenSlot(node)) {
+      found = true;
+      return;
+    }
+    node.forEachChild(visit);
+  };
+  visit(declaration);
+
+  wrapsChildrenCache.set(key, found);
+  return found;
+}
+
 /**
  * The initializer bound to `name` as seen from `node`, resolved outwards through enclosing
  * scopes — `const body = <div />` in the component holding the Card, not the `const body` in
@@ -498,7 +572,18 @@ function findViolations(file: string): Violation[] {
   };
 
   walkJsx(source, (element) => {
-    if (tagOf(element) === 'Card') scanCardSubtree(element, new Set());
+    const tag = tagOf(element);
+    if (tag === 'Card') {
+      scanCardSubtree(element, new Set());
+      return;
+    }
+    // `<SectionCard>` and friends are Card surfaces for whatever they are given.
+    for (const leaf of resolveComponent(file, source, imports, tag)) {
+      if (wrapsChildrenInCard(leaf.file, leaf.name)) {
+        scanCardSubtree(element, new Set());
+        return;
+      }
+    }
   });
 
   // `Card` and `Card.Content` both scan as Card roots, so the same field is reached twice.
@@ -737,6 +822,52 @@ describe('form fields are not wrapped in Cards (ATT-294 / ATT-834)', () => {
          const body = <TextField />;
          return <div>{body}</div>;
        };`,
+    );
+
+    const violations = findViolations(path.join(dir, 'page.tsx'));
+    fs.rmSync(dir, { recursive: true, force: true });
+
+    expect(violations).toEqual([]);
+  });
+
+  it('treats a component that wraps its children in a Card as a Card surface', () => {
+    // The shape of maintenance-hub/section-card.tsx, which has 7 call sites.
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'att834-'));
+    fs.writeFileSync(
+      path.join(dir, 'SectionCard.tsx'),
+      `import { Card } from '@heroui/react';
+       export function SectionCard({ children }) {
+         return <Card><Card.Content>{children}</Card.Content></Card>;
+       }`,
+    );
+    fs.writeFileSync(
+      path.join(dir, 'page.tsx'),
+      `import { TextField } from '@heroui/react';
+       import { SectionCard } from './SectionCard';
+       export const Page = () => <SectionCard><TextField /></SectionCard>;`,
+    );
+
+    const violations = findViolations(path.join(dir, 'page.tsx'));
+    fs.rmSync(dir, { recursive: true, force: true });
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0].detail).toContain('<TextField>');
+  });
+
+  it('does not treat a component that renders a Card beside its children as a Card surface', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'att834-'));
+    fs.writeFileSync(
+      path.join(dir, 'Sidebar.tsx'),
+      `import { Card } from '@heroui/react';
+       export function Sidebar({ children }) {
+         return <div><Card><Card.Content>fixed blurb</Card.Content></Card><div>{children}</div></div>;
+       }`,
+    );
+    fs.writeFileSync(
+      path.join(dir, 'page.tsx'),
+      `import { TextField } from '@heroui/react';
+       import { Sidebar } from './Sidebar';
+       export const Page = () => <Sidebar><TextField /></Sidebar>;`,
     );
 
     const violations = findViolations(path.join(dir, 'page.tsx'));
