@@ -14,6 +14,9 @@ permissions:
 
 env:
   RENDERS_BRANCH: hardware-renders
+  # Nx remote cache, read-only — see pull-requests.yml for why PRs never write.
+  NX_SELF_HOSTED_REMOTE_CACHE_SERVER: ${{ secrets.NX_CACHE_TOKEN_RO && vars.NX_CACHE_URL || '' }}
+  NX_SELF_HOSTED_REMOTE_CACHE_ACCESS_TOKEN: ${{ secrets.NX_CACHE_TOKEN_RO }}
 
 jobs:
   build-and-render:

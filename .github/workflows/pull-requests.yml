@@ -12,6 +12,13 @@ env:
   DOCKER_BUILDKIT: 1
   # merge_group has no pull_request payload; base_sha is the queue target (main).
   NX_AFFECTED_BASE: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || format('origin/{0}', github.event.pull_request.base.ref) }}
+  # Self-hosted Nx remote cache (jappyjan/nx-cache-server). Fork PRs get no
+  # secrets, so the server URL resolves to '' and caching turns itself off.
+  # PR and merge-queue builds only ever get the read-only token: workflow files
+  # are not part of the Nx hash, so a PR that could write would be able to plant
+  # an artifact under a hash main later restores (CVE-2025-36852).
+  NX_SELF_HOSTED_REMOTE_CACHE_SERVER: ${{ secrets.NX_CACHE_TOKEN_RO && vars.NX_CACHE_URL || '' }}
+  NX_SELF_HOSTED_REMOTE_CACHE_ACCESS_TOKEN: ${{ secrets.NX_CACHE_TOKEN_RO }}
 
 permissions:
   contents: read
