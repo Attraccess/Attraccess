@@ -266,10 +266,20 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
 
               <div className="flex flex-col gap-2 w-full">
                 <Tabs selectedKey={formData.type} onSelectionChange={(k) => setField('type', k as ResourceType)}>
-                  <TabList>
-                    <Tab id="machine">{t('inputs.type.options.machine')}</Tab>
-                    <Tab id="door">{t('inputs.type.options.door')}</Tab>
-                  </TabList>
+                  <Tabs.ListContainer>
+                    <TabList>
+                      {/* Tabs.Indicator paints the selected pill; without it the active
+                          tab differs only by text colour. */}
+                      <Tab id="machine">
+                        <Tabs.Indicator />
+                        {t('inputs.type.options.machine')}
+                      </Tab>
+                      <Tab id="door">
+                        <Tabs.Indicator />
+                        {t('inputs.type.options.door')}
+                      </Tab>
+                    </TabList>
+                  </Tabs.ListContainer>
                   <TabPanel id="machine">
                     <MachineTab t={t} formData={formData} setField={setField} />
                   </TabPanel>

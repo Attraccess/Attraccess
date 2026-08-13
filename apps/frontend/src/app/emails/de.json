@@ -10,5 +10,9 @@
       "title": "Globales Layout",
       "description": "Konfigurieren Sie die gemeinsame Kopfzeile, Fußzeile und Stile für alle E-Mails."
     }
+  },
+  "passwordStatus": {
+    "configured": "Passwort konfiguriert",
+    "missing": "Passwort fehlt"
   }
 }

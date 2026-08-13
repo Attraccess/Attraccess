@@ -10,5 +10,9 @@
       "title": "Global Layout",
       "description": "Configure the shared header, footer, and styles for all emails."
     }
+  },
+  "passwordStatus": {
+    "configured": "Password configured",
+    "missing": "Password missing"
   }
 }

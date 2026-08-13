@@ -209,7 +209,8 @@ export function MetricsSettingsForm() {
             isSelected={metricsSettings.toggles[subsystem]}
             onChange={(value) => handleToggleChange(subsystem, value)}
             isDisabled={isUpdatingToggles && pendingToggle !== null}
-            className="inline-flex flex-row-reverse items-start justify-between max-w-full w-full"
+            className="w-full"
+            contentClassName="w-full items-start"
           >
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-2 text-sm font-medium">

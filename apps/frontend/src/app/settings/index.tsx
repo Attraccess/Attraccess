@@ -13,7 +13,8 @@ export function SystemSettingsPage() {
   return (
     <div>
       <PageHeader title={t('title')} subtitle={t('subtitle')} icon={<Settings2Icon size={20} />} />
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+      {/* No items-start: grid items stretch so cards in a row share one height. */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <VersionInfoCard />
         <SystemInfoCard />
         <AppSettingsCard variant="standalone" className="lg:col-span-2" />

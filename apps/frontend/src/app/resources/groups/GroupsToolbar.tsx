@@ -40,8 +40,8 @@ export function GroupsToolbar({
   ];
 
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-3">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3 flex-1 min-w-0">
+    <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3 flex-1 min-w-0">
         <TextField value={search} onChange={onSearchChange} className="sm:max-w-xs w-full">
           <InputGroup>
             <InputGroup.Prefix>
