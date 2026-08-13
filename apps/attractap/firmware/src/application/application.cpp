@@ -430,7 +430,7 @@ void Application::setup() {
           // No eligible supervisor / resource doesn't support supervision: abort the flow.
           strlcpy(this->supervisionErrorMessage,
                   result.error == "NO_SUPERVISORS_AVAILABLE"
-                      ? "Kein Tutor verfuegbar"
+                      ? "Keine Aufsicht verfuegbar"
                       : translateReaderError(result.error).c_str(),
                   sizeof(this->supervisionErrorMessage));
           this->supervisionFailed = true;
@@ -439,7 +439,7 @@ void Application::setup() {
 
         // Build the secondary hint: who may approve + the web fallback note. Runs on the websocket
         // task, so write the fixed buffer and publish via the volatile flag (set last).
-        std::string hint = "Tutor-Karte auflegen oder per\nApp/Web bestaetigen";
+        std::string hint = "Aufsichts-Karte auflegen oder per\nApp/Web bestaetigen";
         if (result.supervisorCount > 0) {
           hint += "\n";
           for (uint8_t i = 0; i < result.supervisorCount; i++) {
@@ -459,7 +459,7 @@ void Application::setup() {
         if (response.error.length() > 0 || response.keyLen != 16) {
           strlcpy(this->supervisionErrorMessage,
                   response.error == "SUPERVISOR_NOT_AUTHORIZED"
-                      ? "Karte nicht als Tutor\nberechtigt"
+                      ? "Karte nicht als Aufsicht\nberechtigt"
                       : translateReaderError(response.error).c_str(),
                   sizeof(this->supervisionErrorMessage));
           this->supervisionCardRejected = true;
