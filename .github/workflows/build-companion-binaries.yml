@@ -9,10 +9,13 @@ on:
   workflow_call:
 
 env:
-  # Nx remote cache. github.event_name here is the caller's event, so PR and
-  # manual-dispatch callers read only; push-to-main and release callers write.
+  # Nx remote cache. github.event_name and github.ref here are the caller's, so
+  # PR and manual-dispatch callers read only; push-to-main and release callers
+  # write. The ref check has to be push-specific — a release event's ref is the
+  # tag — and it is what stops a future push-triggered caller on some other
+  # branch from inheriting a write credential.
   NX_SELF_HOSTED_REMOTE_CACHE_SERVER: ${{ secrets.NX_CACHE_TOKEN_RO && vars.NX_CACHE_URL || '' }}
-  NX_SELF_HOSTED_REMOTE_CACHE_ACCESS_TOKEN: ${{ (github.event_name == 'push' || github.event_name == 'release') && secrets.NX_CACHE_TOKEN_RW || secrets.NX_CACHE_TOKEN_RO }}
+  NX_SELF_HOSTED_REMOTE_CACHE_ACCESS_TOKEN: ${{ ((github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'release') && secrets.NX_CACHE_TOKEN_RW || secrets.NX_CACHE_TOKEN_RO }}
 
 jobs:
   build-companion-linux:

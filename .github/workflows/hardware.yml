@@ -14,9 +14,10 @@ permissions:
 
 env:
   RENDERS_BRANCH: hardware-renders
-  # Nx remote cache, read-only — see pull-requests.yml for why PRs never write.
-  NX_SELF_HOSTED_REMOTE_CACHE_SERVER: ${{ secrets.NX_CACHE_TOKEN_RO && vars.NX_CACHE_URL || '' }}
-  NX_SELF_HOSTED_REMOTE_CACHE_ACCESS_TOKEN: ${{ secrets.NX_CACHE_TOKEN_RO }}
+  # No Nx remote cache here on purpose: this is the only workflow that runs
+  # tag:scope:hardware targets, and it only ever holds a read-only token, so
+  # every lookup would be a guaranteed miss. Wire it up if a workflow with the
+  # write token ever starts building those projects on main.
 
 jobs:
   build-and-render:
