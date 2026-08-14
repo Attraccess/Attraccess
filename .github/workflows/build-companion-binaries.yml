@@ -43,7 +43,7 @@ jobs:
           path: |
             apps/companion/dist/companion_linux_x86_64.AppImage
             apps/companion/dist/companion_linux_arm64.AppImage
-          if-no-files-found: warn
+          if-no-files-found: error
 
   build-companion-macos:
     runs-on: macos-latest
@@ -75,7 +75,7 @@ jobs:
         with:
           name: companion-macos-${{ github.run_id }}
           path: apps/companion/dist/companion_mac_universal.dmg
-          if-no-files-found: warn
+          if-no-files-found: error
 
   build-companion-windows:
     runs-on: windows-latest
@@ -100,4 +100,4 @@ jobs:
         with:
           name: companion-windows-${{ github.run_id }}
           path: apps/companion/dist/companion_win_x64.exe
-          if-no-files-found: warn
+          if-no-files-found: error
