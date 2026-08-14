@@ -11,6 +11,7 @@ import { SupervisionService } from './supervision.service';
 import { SupervisionLiveService } from './supervision-live.service';
 import { ResourceUsageService } from '../usage/resourceUsage.service';
 import { ResourceIntroducersService } from '../introducers/resourceIntroducers.service';
+import { RbacService } from '../../users-and-auth/rbac/rbac.service';
 import { RequestSupervisedSessionDto } from './dtos/requestSupervisedSession.dto';
 import { SupervisionLiveEventType } from './dtos/supervisionLiveEvent.dto';
 // Lets pending request promises settle/flush without depending on real timers.
@@ -25,6 +26,7 @@ describe('SupervisionService', () => {
   };
   let introducers: { getMany: jest.Mock };
   let live: { emitToSupervisor: jest.Mock; getSupervisorSubject: jest.Mock };
+  let rbac: { getUserIdsWithPermission: jest.Mock };
   const requester: User = { id: 1, username: 'requester' } as User;
   const supervisor: User = { id: 2, username: 'supervisor' } as User;
   const dto: RequestSupervisedSessionDto = { supervisorUserId: 2, notes: 'please supervise' };
@@ -37,11 +39,14 @@ describe('SupervisionService', () => {
       assertSupportsSupervision: jest.fn().mockResolvedValue({ id: 5 }),
     };
     introducers = {
-      getMany: jest.fn().mockResolvedValue([{ userId: 1 }, { userId: 2 }, { userId: 3 }]),
+      getMany: jest.fn().mockResolvedValue([{ userId: 1, user: {} }, { userId: 2, user: {} }, { userId: 3, user: {} }]),
     };
     live = {
       emitToSupervisor: jest.fn(),
       getSupervisorSubject: jest.fn(),
+    };
+    rbac = {
+      getUserIdsWithPermission: jest.fn().mockResolvedValue([]),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -50,6 +55,7 @@ describe('SupervisionService', () => {
         { provide: ResourceUsageService, useValue: resourceUsageService },
         { provide: ResourceIntroducersService, useValue: introducers },
         { provide: SupervisionLiveService, useValue: live },
+        { provide: RbacService, useValue: rbac },
       ],
     }).compile();
 
@@ -260,6 +266,48 @@ describe('SupervisionService', () => {
 
       expect(onFailed).toHaveBeenCalledWith(expect.any(RequestTimeoutException));
     });
+
+    // ATT-867: a resource with no introducers falls back to the managers, who are then on the
+    // broadcast list like anyone else — so they get the popup, can reject as well as approve, and
+    // are named to the requester. A hidden fallback would have given them none of that.
+    it('treats a stand-in manager as a full supervisor: SSE, approve and reject', async () => {
+      const manager = { id: 42, username: 'manager' } as User;
+      service.createReaderRequest({
+        resourceId: 5,
+        requester,
+        dto: {},
+        eligibleSupervisorIds: [manager.id],
+        callbacks: { onResolved: jest.fn(), onFailed: jest.fn() },
+      });
+
+      const requestId = live.emitToSupervisor.mock.calls.find(
+        (c) => c[1].type === SupervisionLiveEventType.REQUESTED,
+      )?.[1].requestId as string;
+      // Popped over SSE, and visible on reconnect — no special-casing needed on the pull.
+      expect(live.emitToSupervisor).toHaveBeenCalledWith(manager.id, expect.objectContaining({ requestId }));
+      expect(service.listPendingForSupervisor(manager.id)).toHaveLength(1);
+      // Nobody else sees it.
+      expect(service.listPendingForSupervisor(7)).toHaveLength(0);
+
+      // Rejecting used to 403 for a manager, silently leaving the requester to wait out the TTL.
+      expect(service.reject(requestId, manager)).toEqual({ status: 'rejected', requestId });
+      expect(service.listPendingForSupervisor(manager.id)).toHaveLength(0);
+    });
+
+    it('lets a stand-in manager approve', async () => {
+      const manager = { id: 42, username: 'manager' } as User;
+      const { requestId } = service.createReaderRequest({
+        resourceId: 5,
+        requester,
+        dto: {},
+        eligibleSupervisorIds: [manager.id],
+        callbacks: { onResolved: jest.fn(), onFailed: jest.fn() },
+      });
+
+      await service.approve(requestId, manager);
+
+      expect(resourceUsageService.startSession).toHaveBeenCalledWith(5, requester, {}, { supervisorUserId: 42 });
+    });
   });
 
   describe('web-initiated reader requests (ATT-816)', () => {
@@ -331,6 +379,51 @@ describe('SupervisionService', () => {
 
       await expect(pending).rejects.toBeInstanceOf(RequestTimeoutException);
       expect(readerCallbacks.onFailed).toHaveBeenCalled();
+    });
+
+    // ATT-867: the broadcast list holds introducers/maintainers only, so a resource whose sole
+    // possible supervisor is a resource manager (the usual case for a freshly created machine, and
+    // the requester is often that manager's only colleague) refused the request outright — even
+    // though a manager can walk up to the reader and tap.
+    it('arms the reader when only a resource manager could supervise', async () => {
+      introducers.getMany.mockResolvedValue([{ userId: requester.id, user: {} }]);
+      rbac.getUserIdsWithPermission.mockResolvedValue([requester.id, 42]);
+
+      await requestAtReader();
+
+      expect(armer.arm).toHaveBeenCalled();
+    });
+
+    // The managers are a fallback, not an addition: a resource that has introducers must not pop a
+    // request at every admin.
+    it('falls back to managers only when the resource has no introducer left', async () => {
+      rbac.getUserIdsWithPermission.mockResolvedValue([requester.id, 42]);
+
+      introducers.getMany.mockResolvedValue([{ userId: requester.id, user: {} }, { userId: 3, user: {} }]);
+      expect(await service.getEligibleSupervisorIds(5, requester.id)).toEqual([3]);
+
+      introducers.getMany.mockResolvedValue([{ userId: requester.id, user: {} }]);
+      expect(await service.getEligibleSupervisorIds(5, requester.id)).toEqual([42]);
+    });
+
+    // The grant outlives the account, so the sole introducer having left must not hold off the
+    // fallback and broadcast the request to a user who cannot log in (`user` is null once the
+    // account is soft-deleted).
+    it('ignores an introducer whose account was deleted', async () => {
+      rbac.getUserIdsWithPermission.mockResolvedValue([42]);
+      introducers.getMany.mockResolvedValue([{ userId: 9, user: null }]);
+
+      expect(await service.getEligibleSupervisorIds(5, requester.id)).toEqual([42]);
+    });
+
+    it('refuses when nobody but the requester could supervise', async () => {
+      introducers.getMany.mockResolvedValue([{ userId: requester.id, user: {} }]);
+      rbac.getUserIdsWithPermission.mockResolvedValue([requester.id]);
+
+      await expect(service.requestSupervisedSession(5, requester, readerDto)).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      expect(armer.arm).not.toHaveBeenCalled();
     });
 
     it('rejects when neither channel is given', async () => {
@@ -446,7 +539,7 @@ describe('SupervisionService', () => {
     });
 
     it('rejects before arming when the resource has no other eligible supervisor', async () => {
-      introducers.getMany.mockResolvedValueOnce([{ userId: requester.id }]);
+      introducers.getMany.mockResolvedValueOnce([{ userId: requester.id, user: {} }]);
 
       await expect(service.requestSupervisedSession(5, requester, readerDto)).rejects.toBeInstanceOf(
         BadRequestException,

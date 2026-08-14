@@ -32,6 +32,9 @@ void Application::enterSupervisionScreen(const std::string &requesterName, const
                                             SUPERVISION_TIMEOUT_MS);
   Display::supervisionScreen.setStatus(SupervisionScreen::STATUS_WAITING);
   Display::supervisionScreen.setSupervisorHint(hint);
+  // Card-tap entry opens this screen straight from a button press, so the cancel button must ignore
+  // clicks that come out of that same press (ATT-867).
+  Display::supervisionScreen.armCancelGuard();
   Display::transitionToScreen(&Display::supervisionScreen);
 
   this->state = APPLICATION_STATE_SUPERVISION;
@@ -46,7 +49,7 @@ void Application::enterSupervisionScreen(const std::string &requesterName, const
 void Application::beginWebInitiatedSupervision() {
   this->supervisionWebInitiated = true;
   this->enterSupervisionScreen(this->supervisionRequesterName,
-                               "Tutor-Karte auflegen");
+                               "Aufsichts-Karte auflegen");
 }
 
 // The resource this supervision flow is about — the server's for a web-initiated arm, the reader's
@@ -59,7 +62,7 @@ uint32_t Application::supervisionResourceId() const {
 void Application::beginSupervision() {
   this->supervisionWebInitiated = false;
   this->enterSupervisionScreen(this->cardAuthenticationData.username,
-                               "Tutor-Karte auflegen oder per\nApp/Web bestaetigen");
+                               "Aufsichts-Karte auflegen oder per\nApp/Web bestaetigen");
 
   // Ask the server to open the request and broadcast it to eligible supervisors (web channel).
   this->api.requestSupervision(this->selectedResourceId);

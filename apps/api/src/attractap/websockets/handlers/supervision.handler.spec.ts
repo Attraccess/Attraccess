@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
-import { User } from '@attraccess/database-entities';
+import { SupervisionMode, User } from '@attraccess/database-entities';
 import { AttractapSupervisionHandler } from './supervision.handler';
 import { AttractapEventType, AuthenticatedWebSocket } from '../websocket.types';
 
@@ -10,8 +10,15 @@ describe('AttractapSupervisionHandler', () => {
   let attractapService: { findReaderById: jest.Mock };
   let websocketService: { sockets: Map<string, AuthenticatedWebSocket> };
   let resourceUsageService: { getActiveSession: jest.Mock; validateSupervisedStart: jest.Mock };
-  let supervisionService: { setReaderArmer: jest.Mock; approve: jest.Mock; cancelReaderRequest: jest.Mock };
+  let supervisionService: {
+    setReaderArmer: jest.Mock;
+    approve: jest.Mock;
+    cancelReaderRequest: jest.Mock;
+    getEligibleSupervisorIds: jest.Mock;
+    createReaderRequest: jest.Mock;
+  };
   let usersService: { findOne: jest.Mock };
+  let resourceRepository: { findOne: jest.Mock };
 
   const requester = { id: 1, username: 'requester' } as User;
   const READER_ID = 3;
@@ -57,8 +64,13 @@ describe('AttractapSupervisionHandler', () => {
       setReaderArmer: jest.fn(),
       approve: jest.fn().mockResolvedValue({ id: 7 }),
       cancelReaderRequest: jest.fn(),
+      getEligibleSupervisorIds: jest.fn().mockResolvedValue([2]),
+      createReaderRequest: jest.fn().mockReturnValue({ requestId: 'req-1', expiresAt: new Date(0) }),
     };
     usersService = { findOne: jest.fn().mockResolvedValue({ id: 2, username: 'supervisor' }) };
+    resourceRepository = {
+      findOne: jest.fn().mockResolvedValue({ id: RESOURCE_ID, supervisionMode: SupervisionMode.SUPERVISION_REQUIRED }),
+    };
 
     handler = new AttractapSupervisionHandler();
     Object.assign(handler, {
@@ -67,6 +79,7 @@ describe('AttractapSupervisionHandler', () => {
       resourceUsageService,
       supervisionService,
       usersService,
+      resourceRepository,
     });
   });
 
@@ -178,6 +191,75 @@ describe('AttractapSupervisionHandler', () => {
       const rejected = results.filter((r) => r.status === 'rejected') as PromiseRejectedResult[];
       expect(rejected).toHaveLength(1);
       expect(rejected[0].reason).toBeInstanceOf(ConflictException);
+    });
+  });
+
+  describe('handleSupervisionRequest', () => {
+    const request = (socket: AuthenticatedWebSocket) =>
+      handler.handleSupervisionRequest(socket, {
+        type: AttractapEventType.SUPERVISION_REQUEST,
+        payload: { resourceId: RESOURCE_ID },
+      });
+
+    const tappedSocket = () => {
+      const socket = makeSocket({ lastAuthenticatedUserId: requester.id });
+      usersService.findOne.mockResolvedValue(requester);
+      return socket;
+    };
+
+    const errorSent = (socket: AuthenticatedWebSocket) =>
+      (socket.sendMessage as jest.Mock).mock.calls.at(-1)?.[0]?.data?.payload?.error;
+
+    it('opens the request and answers with the supervisors to broadcast to', async () => {
+      const socket = tappedSocket();
+
+      await request(socket);
+
+      expect(supervisionService.createReaderRequest).toHaveBeenCalled();
+      expect(socket.state.supervisionFlow).toMatchObject({ requestId: 'req-1', resourceId: RESOURCE_ID });
+    });
+
+    // ATT-867: the reader screen closed itself a second after opening on any resource without
+    // introducers. getEligibleSupervisorIds() now falls back to the global resource managers for
+    // exactly that case, so a non-empty list here can be manager-only and the request opens.
+    it('opens the request when only a resource manager could supervise', async () => {
+      const socket = tappedSocket();
+      supervisionService.getEligibleSupervisorIds.mockResolvedValue([42]);
+
+      await request(socket);
+
+      expect(errorSent(socket)).toBeUndefined();
+      expect(supervisionService.createReaderRequest).toHaveBeenCalled();
+    });
+
+    it('still refuses when nobody but the requester could supervise', async () => {
+      const socket = tappedSocket();
+      supervisionService.getEligibleSupervisorIds.mockResolvedValue([]);
+
+      await request(socket);
+
+      expect(errorSent(socket)).toBe('NO_SUPERVISORS_AVAILABLE');
+      expect(supervisionService.createReaderRequest).not.toHaveBeenCalled();
+    });
+
+    it('refuses before anyone has tapped a card', async () => {
+      const socket = makeSocket();
+
+      await request(socket);
+
+      expect(errorSent(socket)).toBe('USER_NOT_SET');
+    });
+
+    it('refuses a resource that does not allow supervised sessions', async () => {
+      const socket = tappedSocket();
+      resourceRepository.findOne.mockResolvedValue({
+        id: RESOURCE_ID,
+        supervisionMode: SupervisionMode.INTRODUCTION_REQUIRED,
+      });
+
+      await request(socket);
+
+      expect(errorSent(socket)).toBe('SUPERVISION_NOT_SUPPORTED');
     });
   });
 

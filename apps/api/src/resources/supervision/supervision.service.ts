@@ -17,6 +17,7 @@ import { RequestSupervisedSessionDto } from './dtos/requestSupervisedSession.dto
 import { SupervisionRequestDto } from './dtos/supervisionRequest.dto';
 import { SupervisionDecisionResponseDto } from './dtos/supervisionDecision.response.dto';
 import { SupervisionLiveService } from './supervision-live.service';
+import { RbacService } from '../../users-and-auth/rbac/rbac.service';
 import { SupervisionLiveEventType } from './dtos/supervisionLiveEvent.dto';
 
 interface PendingSupervisionRequest {
@@ -99,6 +100,7 @@ export class SupervisionService {
     private readonly resourceUsageService: ResourceUsageService,
     private readonly resourceIntroducersService: ResourceIntroducersService,
     private readonly supervisionLive: SupervisionLiveService,
+    private readonly rbacService: RbacService,
   ) {}
 
   /** Registered by the Attractap module at startup; see {@link ReaderSupervisionArmer}. */
@@ -174,7 +176,7 @@ export class SupervisionService {
 
     const eligibleSupervisorIds = await this.getEligibleSupervisorIds(resourceId, requester.id);
     if (eligibleSupervisorIds.length === 0) {
-      throw new BadRequestException('This resource has no other introducer or maintainer who could supervise');
+      throw new BadRequestException('Nobody else can supervise on this resource');
     }
 
     // --- no awaits from here until the request is registered ---
@@ -233,18 +235,39 @@ export class SupervisionService {
 
   /**
    * The users who may supervise on this resource: its introducers and maintainers (including
-   * group-level), minus the requester. Global resource managers can still approve a request that
-   * reaches them, but are not broadcast to.
+   * group-level), minus the requester.
+   *
+   * When that leaves nobody, global resource managers stand in. They are valid supervisors —
+   * {@link ResourceUsageService.validateSupervisedStart} accepts anyone holding `resources.update`,
+   * and the docs define a supervisor as an introducer, maintainer *or* resource manager — but they
+   * are normally kept out of this list, because it drives the SSE broadcast and popping a request at
+   * every admin is not wanted. A resource with no introducers (the manager who set it up is usually
+   * the only candidate, and is often the requester) used to dead-end on the empty list instead
+   * (ATT-867), so for exactly that case the admins *are* the only people who can help, and this adds
+   * no traffic to any request that does have introducers.
+   *
+   * Being one list rather than a broadcast list plus a hidden fallback is what makes the rest work:
+   * managers get the SSE event and the terminal RESOLVED/EXPIRED/REJECTED, they can approve *and*
+   * reject through the normal path, and the reader can name them to the requester.
    */
   public async getEligibleSupervisorIds(resourceId: number, requesterId: number): Promise<number[]> {
     const introducers = await this.resourceIntroducersService.getMany(resourceId);
     const ids = new Set<number>();
     for (const introducer of introducers) {
-      if (introducer.userId !== requesterId) {
+      // `resource_introducer` rows outlive the account: anonymizeAndSoftDelete() drops auth details
+      // and sessions but no grants, so a departed maker stays the "sole introducer" forever. Left in,
+      // a tombstone would hold off the manager fallback below and get broadcast to nobody — the same
+      // dead-end this is meant to close. getMany() eager-loads `user` and TypeORM leaves it null for
+      // a soft-deleted one, so this costs no extra query.
+      if (introducer.userId !== requesterId && introducer.user) {
         ids.add(introducer.userId);
       }
     }
-    return Array.from(ids);
+    if (ids.size > 0) {
+      return Array.from(ids);
+    }
+    const managerIds = await this.rbacService.getUserIdsWithPermission('resources.update');
+    return managerIds.filter((id) => id !== requesterId);
   }
 
   /**
