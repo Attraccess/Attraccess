@@ -12,8 +12,8 @@ Bevor Sie beginnen, benoetigen Sie:
 
 ## MQTT-Server hinzufuegen
 
-1. Navigieren Sie zu **MQTT** in der Seitenleiste
-2. Klicken Sie auf **Server**
+1. Oeffnen Sie die Gruppe **Geraete** in der Seitenleiste
+2. Klicken Sie auf **MQTT-Server**
 3. Klicken Sie auf **Server hinzufuegen**
 4. Geben Sie die Verbindungsdetails ein:
 

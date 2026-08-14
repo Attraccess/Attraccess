@@ -467,7 +467,9 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
               )}
               <Dropdown data-cy="sidebar-settings-dropdown">
                 <DropdownTrigger
-                  aria-label="Settings"
+                  // Not "Settings": that name now belongs to the nav entry two rows up. This menu
+                  // is language, account and logout.
+                  aria-label={t('userMenu')}
                   data-cy="sidebar-settings-button"
                   className={`${buttonVariants({ variant: 'ghost', isIconOnly: true })} !inline-flex items-center justify-center`}
                 >

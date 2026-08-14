@@ -127,7 +127,6 @@ export function AttractapList() {
             {(onOpenSerialConsole) => (
               <PageHeader
                 title={t('page.title')}
-                backTo="/attractap"
                 actions={
                   [
                     {

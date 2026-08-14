@@ -16,15 +16,15 @@ Attractap readers support OTA (Over-The-Air) firmware updates. This means you ca
 
 ### Viewing Available Firmware
 
-1. Navigate to **Attractap** in the sidebar
-2. Click on **Firmware**
+1. Open the **Devices** group in the sidebar
+2. Click on **Attractap Readers**
 3. You see a list of all uploaded firmware versions
 
 <!-- TODO: Screenshot of the firmware list -->
 
 ### Uploading New Firmware
 
-1. Navigate to **Attractap** > **Firmware**
+1. Navigate to **Devices** > **Attractap Readers**
 2. Click **Upload Firmware**
 3. Fill in the firmware details:
 
@@ -42,7 +42,7 @@ Attractap readers support OTA (Over-The-Air) firmware updates. This means you ca
 
 ### Pushing Updates to Readers
 
-1. Navigate to **Attractap** > **Readers**
+1. Navigate to **Devices** > **Attractap Readers**
 2. Select the reader(s) you want to update
 3. Choose the target firmware version
 4. Click **Update Firmware**

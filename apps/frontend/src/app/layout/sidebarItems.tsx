@@ -1,29 +1,21 @@
 import {
-  ActivityIcon,
-  BellIcon,
   BookOpenIcon,
   BoxIcon,
   BugIcon,
-  CogIcon,
   CreditCardIcon,
   DatabaseIcon,
   FileSpreadsheetIcon,
   FolderIcon,
   GiftIcon,
-  IdCardIcon,
-  KeyRoundIcon,
   LightbulbIcon,
   LucideProps,
-  MailIcon,
   MessageSquareIcon,
   MonitorSmartphoneIcon,
   NfcIcon,
   PackageIcon,
-  PuzzleIcon,
-  SendIcon,
+  ScanLineIcon,
   Settings2Icon,
   ServerIcon,
-  ShieldIcon,
   UsersIcon,
 } from 'lucide-react';
 import newGithubIssueUrl from 'new-github-issue-url';
@@ -68,8 +60,9 @@ const BalenaSidebarIcon = ({ size = 16, ...props }: LucideProps) => (
 
 /**
  * The navigation tree. Groups are named after what an operator is looking for, never after
- * the absence of a better name — the former "System" catch-all is split into "Notifications"
- * and "Instance", and identity/authorisation lives in a single "Users & Access" group.
+ * the absence of a better name. Everything an operator configures about this installation now
+ * lives behind the single "Settings" entry and its rail, so the former "Notifications" and
+ * "Instance" groups are gone and "Users & Access" is back to one entry: the user list.
  *
  * Every navigable entry carries a distinct icon; group headers may reuse their most
  * representative child's glyph since they only expand/collapse. Guarded by sidebarItems.spec.tsx.
@@ -112,33 +105,11 @@ export const SIDEBAR_ITEMS: (SidebarItem | SidebarItemGroup)[] = [
     icon: FileSpreadsheetIcon,
   },
   {
-    // Who can log in, and what they're allowed to do.
+    // Who can log in. What they're allowed to do — roles, login security, SSO — is configuration,
+    // and lives in Settings with the rest of it.
+    path: '/users',
     translationKey: 'users',
-    isGroup: true,
     icon: UsersIcon,
-    items: [
-      {
-        path: '/users',
-        translationKey: 'userList',
-        icon: UsersIcon,
-      },
-      {
-        path: '/settings/roles',
-        translationKey: 'roles',
-        icon: IdCardIcon,
-      },
-      {
-        path: '/users/security',
-        translationKey: 'userSecurity',
-        icon: ShieldIcon,
-      },
-      {
-        path: '/sso/providers',
-        translationKey: 'sso',
-        icon: KeyRoundIcon,
-        licenseModule: 'sso',
-      },
-    ],
   },
   {
     // Hardware and fleets this instance talks to.
@@ -146,6 +117,12 @@ export const SIDEBAR_ITEMS: (SidebarItem | SidebarItemGroup)[] = [
     isGroup: true,
     icon: MonitorSmartphoneIcon,
     items: [
+      {
+        path: '/attractap/readers',
+        translationKey: 'attractapReaders',
+        icon: ScanLineIcon,
+        licenseModule: 'attractap',
+      },
       {
         path: '/devices/mqtt/servers',
         translationKey: 'mqttServers',
@@ -165,45 +142,10 @@ export const SIDEBAR_ITEMS: (SidebarItem | SidebarItemGroup)[] = [
     ],
   },
   {
-    // How the instance sends messages out.
-    translationKey: 'notifications',
-    isGroup: true,
-    icon: BellIcon,
-    items: [
-      {
-        path: '/emails',
-        translationKey: 'emails',
-        icon: MailIcon,
-      },
-      {
-        path: '/messages/settings',
-        translationKey: 'messagingSettings',
-        icon: SendIcon,
-      },
-    ],
-  },
-  {
-    // This installation itself: its configuration, extensions, and health.
-    translationKey: 'instance',
-    isGroup: true,
-    icon: CogIcon,
-    items: [
-      {
-        path: '/settings',
-        translationKey: 'settings',
-        icon: Settings2Icon,
-      },
-      {
-        path: '/plugins',
-        translationKey: 'plugins',
-        icon: PuzzleIcon,
-      },
-      {
-        path: '/monitoring',
-        translationKey: 'monitoring',
-        icon: ActivityIcon,
-      },
-    ],
+    // One way in to everything about this installation: its configuration, extensions and health.
+    path: '/settings',
+    translationKey: 'settings',
+    icon: Settings2Icon,
   },
 ];
 
@@ -312,7 +254,7 @@ export const buildSidebarEndItems = (
   return [
     {
       isGroup: true,
-      // A child's glyph: MailIcon belongs to Notifications › Emails and is not what Feedback does.
+      // A child's glyph rather than an envelope: Feedback opens GitHub issues, it does not send mail.
       icon: LightbulbIcon,
       translationKey: 'feedback',
       items: [

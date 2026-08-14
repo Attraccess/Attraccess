@@ -12,8 +12,8 @@ Before you begin, you need:
 
 ## Adding an MQTT Server
 
-1. Navigate to **MQTT** in the sidebar
-2. Click on **Servers**
+1. Open the **Devices** group in the sidebar
+2. Click on **MQTT Servers**
 3. Click **Add Server**
 4. Enter the connection details:
 

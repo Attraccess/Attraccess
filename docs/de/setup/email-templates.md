@@ -4,7 +4,7 @@ Attraccess verwendet E-Mail-Vorlagen für automatisierte Nachrichten wie Registr
 
 ## Vorlagen verwalten
 
-Navigieren Sie zu **E-Mail-Vorlagen** in der Seitenleiste. Sie benötigen die Berechtigung **Systemkonfiguration verwalten**.
+Öffnen Sie **Einstellungen** in der Seitenleiste, wählen Sie den Bereich **E-Mail** und öffnen Sie **Vorlagen**. Sie benötigen die Berechtigung **Systemkonfiguration verwalten**.
 
 <!-- TODO: Screenshot der E-Mail-Vorlagen-Seite einfügen -->
 

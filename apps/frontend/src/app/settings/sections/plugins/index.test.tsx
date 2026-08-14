@@ -2,10 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { MemoryRouter } from 'react-router-dom';
-import { PluginsList } from './PluginsList';
-
-const renderPage = () => render(<PluginsList />, { wrapper: MemoryRouter });
+import { PluginsSection } from './index';
 
 interface DeleteOptions {
   onSuccess?: () => void;
@@ -30,7 +27,7 @@ vi.mock('@attraccess/react-query-client', () => ({
   usePluginsServiceUploadPlugin: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
-vi.mock('../../components/toastProvider', () => ({
+vi.mock('../../../../components/toastProvider', () => ({
   useToastMessage: () => ({
     success: hoisted.successToast,
     error: hoisted.errorToast,
@@ -61,13 +58,14 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('PluginsList', () => {
-  it('renders the title, upload button and table headers', () => {
-    renderPage();
+describe('PluginsSection', () => {
+  it('renders the section heading, upload button and table headers', () => {
+    render(<PluginsSection />);
 
-    expect(screen.getByText('Installed Plugins')).toBeInTheDocument();
-    expect(screen.getByText('Upload Plugin')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Plugins' })).toBeInTheDocument();
+    expect(screen.getByText('Upload plugin')).toBeInTheDocument();
     expect(screen.getByText('Name')).toBeInTheDocument();
+    expect(screen.getByText('Version')).toBeInTheDocument();
     expect(screen.getByText('Directory')).toBeInTheDocument();
     expect(screen.getByText('Permissions')).toBeInTheDocument();
     expect(screen.getByText('Status')).toBeInTheDocument();
@@ -76,26 +74,27 @@ describe('PluginsList', () => {
 
   it('flags a plugin whose backend failed to load', () => {
     hoisted.plugins = [makePlugin({ status: 'error', error: "Cannot find module '@nestjs/common'" })];
-    renderPage();
+    render(<PluginsSection />);
 
     expect(screen.getByText('Failed to load')).toBeInTheDocument();
   });
 
   it('marks a successfully loaded plugin', () => {
     hoisted.plugins = [makePlugin({ status: 'loaded', error: null })];
-    renderPage();
+    render(<PluginsSection />);
 
     expect(screen.getByText('Loaded')).toBeInTheDocument();
   });
 
   it('shows the empty state when no plugins are installed', () => {
-    renderPage();
+    render(<PluginsSection />);
+
     expect(screen.getByText('No entries found')).toBeInTheDocument();
   });
 
   it('renders a row per plugin with name, version, directory and permission chips', () => {
     hoisted.plugins = [makePlugin()];
-    renderPage();
+    render(<PluginsSection />);
 
     expect(screen.getByText('Cool Plugin')).toBeInTheDocument();
     expect(screen.getByText('1.2.3')).toBeInTheDocument();
@@ -106,7 +105,7 @@ describe('PluginsList', () => {
 
   it('falls back to a dash for a missing directory and "None requested" for no permissions', () => {
     hoisted.plugins = [makePlugin({ pluginDirectory: '', permissions: [] })];
-    renderPage();
+    render(<PluginsSection />);
 
     expect(screen.getByText('-')).toBeInTheDocument();
     expect(screen.getByText('None requested')).toBeInTheDocument();
@@ -114,43 +113,35 @@ describe('PluginsList', () => {
 
   it('opens the upload drawer when the upload button is pressed', async () => {
     const user = userEvent.setup();
-    renderPage();
+    render(<PluginsSection />);
 
     expect(document.querySelector('[data-cy="upload-plugin-modal"]')).not.toBeInTheDocument();
 
-    await user.click(screen.getByText('Upload Plugin'));
+    await user.click(screen.getByText('Upload plugin'));
 
-    await waitFor(() =>
-      expect(document.querySelector('[data-cy="upload-plugin-modal"]')).toBeInTheDocument()
-    );
+    await waitFor(() => expect(document.querySelector('[data-cy="upload-plugin-modal"]')).toBeInTheDocument());
   });
 
   it('opens the delete confirmation modal when a delete button is pressed', async () => {
     hoisted.plugins = [makePlugin()];
     const user = userEvent.setup();
-    renderPage();
+    render(<PluginsSection />);
 
-    await user.click(
-      document.querySelector('[data-cy="plugins-list-delete-plugin-button-plugin-1"]') as Element
-    );
+    await user.click(document.querySelector('[data-cy="plugins-list-delete-plugin-button-plugin-1"]') as Element);
 
     await waitFor(() =>
-      expect(
-        document.querySelector('[data-cy="plugins-list-delete-confirmation-delete-button"]')
-      ).toBeInTheDocument()
+      expect(document.querySelector('[data-cy="plugins-list-delete-confirmation-delete-button"]')).toBeInTheDocument(),
     );
   });
 
   it('calls deletePlugin with the plugin id when deletion is confirmed', async () => {
     hoisted.plugins = [makePlugin()];
     const user = userEvent.setup();
-    renderPage();
+    render(<PluginsSection />);
 
-    await user.click(
-      document.querySelector('[data-cy="plugins-list-delete-plugin-button-plugin-1"]') as Element
-    );
+    await user.click(document.querySelector('[data-cy="plugins-list-delete-plugin-button-plugin-1"]') as Element);
     const confirm = await waitFor(() =>
-      document.querySelector('[data-cy="plugins-list-delete-confirmation-delete-button"]')
+      document.querySelector('[data-cy="plugins-list-delete-confirmation-delete-button"]'),
     );
     await user.click(confirm as Element);
 
@@ -158,39 +149,36 @@ describe('PluginsList', () => {
   });
 
   it('shows a success toast after a successful delete', () => {
+    // The success handler also schedules a full page reload; fake timers keep that out of the test.
     vi.useFakeTimers();
     hoisted.plugins = [makePlugin()];
-    renderPage();
+    render(<PluginsSection />);
 
     hoisted.deleteOptions?.onSuccess?.();
 
-    expect(hoisted.successToast).toHaveBeenCalledWith(
-      expect.objectContaining({ title: 'Success' })
-    );
+    expect(hoisted.successToast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Plugin removed' }));
     vi.useRealTimers();
   });
 
-  it('shows an error toast when the delete fails', async () => {
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  it('shows an error toast when the delete fails', () => {
     hoisted.plugins = [makePlugin()];
-    renderPage();
+    render(<PluginsSection />);
 
     hoisted.deleteOptions?.onError?.(new Error('boom'));
 
-    expect(hoisted.errorToast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Error' }));
-    expect(consoleError).toHaveBeenCalled();
+    expect(hoisted.errorToast).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Could not remove the plugin' }),
+    );
   });
 
   it('cancels the delete without calling the mutation', async () => {
     hoisted.plugins = [makePlugin()];
     const user = userEvent.setup();
-    renderPage();
+    render(<PluginsSection />);
 
-    await user.click(
-      document.querySelector('[data-cy="plugins-list-delete-plugin-button-plugin-1"]') as Element
-    );
+    await user.click(document.querySelector('[data-cy="plugins-list-delete-plugin-button-plugin-1"]') as Element);
     const cancel = await waitFor(() =>
-      document.querySelector('[data-cy="plugins-list-delete-confirmation-cancel-button"]')
+      document.querySelector('[data-cy="plugins-list-delete-confirmation-cancel-button"]'),
     );
     await user.click(cancel as Element);
 
@@ -199,7 +187,7 @@ describe('PluginsList', () => {
 
   it('renders permission chips scoped to the plugin row', () => {
     hoisted.plugins = [makePlugin({ id: 'p-perms', permissions: ['admin'] })];
-    renderPage();
+    render(<PluginsSection />);
 
     const container = document.querySelector('[data-cy="plugins-list-permissions-p-perms"]') as HTMLElement;
     expect(container).toBeInTheDocument();

@@ -4,7 +4,7 @@ Attraccess uses email templates for automated messages such as registration conf
 
 ## Managing Templates
 
-Navigate to **Email Templates** in the sidebar. You need the **Manage System Configuration** permission.
+Open **Settings** in the sidebar, select the **Email** section and open **Templates**. You need the **Manage System Configuration** permission.
 
 <!-- TODO: Add screenshot of email templates page -->
 

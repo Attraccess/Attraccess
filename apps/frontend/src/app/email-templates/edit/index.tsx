@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useEmailBasePath } from '../../../hooks/useEmailBasePath';
 import {
   useEmailTemplatesServiceEmailTemplateControllerFindOne as useFindOneEmailTemplate,
   useEmailTemplatesServiceEmailTemplateControllerUpdate as useUpdateEmailTemplate,
@@ -39,7 +38,7 @@ import * as deTranslationsFile from './de.json';
 
 export function EditEmailTemplatePage() {
   const navigate = useNavigate();
-  const basePath = useEmailBasePath();
+  const basePath = '/settings/email';
   const { t, language } = useTranslations({ en: enTranslationsFile, de: deTranslationsFile });
   const { type: templateType } = useParams<{ type: EmailTemplateType }>();
   const toast = useToastMessage();

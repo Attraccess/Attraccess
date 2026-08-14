@@ -16,15 +16,15 @@ Attractap-Leser unterstuetzen OTA-Firmware-Updates (Over-The-Air). Das bedeutet,
 
 ### Verfuegbare Firmware anzeigen
 
-1. Navigieren Sie zu **Attractap** in der Seitenleiste
-2. Klicken Sie auf **Firmware**
+1. Oeffnen Sie die Gruppe **Geraete** in der Seitenleiste
+2. Klicken Sie auf **Attractap-Lesegeraete**
 3. Sie sehen eine Liste aller hochgeladenen Firmware-Versionen
 
 <!-- TODO: Screenshot der Firmware-Liste -->
 
 ### Neue Firmware hochladen
 
-1. Navigieren Sie zu **Attractap** > **Firmware**
+1. Navigieren Sie zu **Geraete** > **Attractap-Lesegeraete**
 2. Klicken Sie auf **Firmware hochladen**
 3. Fuellen Sie die Firmware-Details aus:
 
@@ -42,7 +42,7 @@ Attractap-Leser unterstuetzen OTA-Firmware-Updates (Over-The-Air). Das bedeutet,
 
 ### Updates an Leser uebertragen
 
-1. Navigieren Sie zu **Attractap** > **Leser**
+1. Navigieren Sie zu **Geraete** > **Attractap-Lesegeraete**
 2. Waehlen Sie den/die Leser aus, die Sie aktualisieren moechten
 3. Waehlen Sie die Ziel-Firmware-Version
 4. Klicken Sie auf **Firmware aktualisieren**

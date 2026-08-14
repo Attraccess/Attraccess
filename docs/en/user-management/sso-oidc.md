@@ -10,7 +10,7 @@ OpenID Connect (OIDC) is the recommended SSO protocol for most use cases.
 
 ## Creating a Provider
 
-1. Navigate to **SSO Providers** in the sidebar
+1. Open **Settings** in the sidebar and select the **Single sign-on** section
 2. Click **Add New Provider**
 3. Select **OIDC** as the type
 4. Enter a name for the provider

@@ -10,12 +10,10 @@ import { ResourceGroupsTab } from '../resources/details/groups/ResourceGroupsTab
 import { lazy, Suspense, useMemo } from 'react';
 import { Spinner } from '@heroui/react';
 import { MqttServersPage, EditMqttServerPage } from '../mqtt';
-import { SSOProvidersPage } from '../sso/SSOProvidersPage';
 import { SSOProviderFormPage } from '../sso/providers/SSOProviderFormPage';
 import { UserManagementPage } from '../user-management';
 import { RouteConfig } from '@attraccess/plugins-frontend-sdk';
 import { PluginRouteBoundary } from '../../components/pluginRouteBoundary';
-import { PluginsList } from '../plugins/PluginsList';
 import usePluginState, { PluginManifestWithPlugin } from '../plugins/plugin.state';
 import { AttractapList } from '../attractap/AttractapList';
 import { AttractapDiagnosticsPage } from '../attractap/AttractapDiagnosticsPage';
@@ -23,7 +21,6 @@ import { NfcCardList } from '../attractap/NfcCardList';
 import { CsvExport } from '../csv-export';
 import { DocumentationEditor, DocumentationView } from '../resources/documentation';
 import { EmailTemplatesPage } from '../email-templates/EmailTemplatesPage';
-import { EmailsPage } from '../emails/EmailsPage';
 import { ResourceGroupEditPage } from '../resource-groups';
 import { ResourceOverview } from '../resourceOverview';
 import { Dependencies } from '../dependencies';
@@ -58,14 +55,10 @@ import { SecuritySection } from '../settings/sections/security';
 import FirstTimeSetupPage from '../first-time-setup';
 import { UnauthorizedLayout } from '../unauthorized/unauthorized-layout/layout';
 
-const PasswordPolicySettingsPage = lazy(() => import('../settings/password-policy'));
 const CompanionSettingsPage = lazy(() => import('../settings/companion'));
 const EmailLayoutPage = lazy(() => import('../email-layout/EmailLayoutPage'));
 // GrapesJS is heavy — keep the visual template editor out of the main bundle
 const EditEmailTemplatePage = lazy(() => import('../email-templates/edit'));
-const UserSecurityPage = lazy(() => import('../user-management/security'));
-const MessagingSettingsPage = lazy(() => import('../messaging/settings'));
-const MonitoringPage = lazy(() => import('../monitoring'));
 // three.js + the OpenSCAD loader are large; keep them out of the main bundle.
 const PrintablesPage = lazy(() => import('../printables'));
 
@@ -218,21 +211,6 @@ const coreRoutes: RouteConfig[] = [
     authRequired: 'resources.update',
   },
   {
-    path: '/sso/providers',
-    element: <SSOProvidersPage />,
-    authRequired: 'system.sso.manage',
-  },
-  {
-    path: '/sso/providers/new',
-    element: <SSOProviderFormPage />,
-    authRequired: 'system.sso.manage',
-  },
-  {
-    path: '/sso/providers/:providerId',
-    element: <SSOProviderFormPage />,
-    authRequired: 'system.sso.manage',
-  },
-  {
     path: '/balena',
     element: <BalenaPage />,
     authRequired: 'system.settings.manage',
@@ -286,11 +264,6 @@ const coreRoutes: RouteConfig[] = [
     path: '/billing/administration/sumup',
     element: <SumUpPage />,
     authRequired: 'billing.manage',
-  },
-  {
-    path: '/plugins',
-    element: <PluginsList />,
-    authRequired: 'system.plugins.manage',
   },
   // Settings shell (ATT-864). Section routes are flat and wrap their own layout, as RouteConfig
   // has no nested-route form; the registry in settings/layout/settingsSections.ts is what keeps
@@ -436,45 +409,6 @@ const coreRoutes: RouteConfig[] = [
     ),
     authRequired: 'system.plugins.manage',
   },
-  // User security section
-  {
-    path: '/users/security',
-    element: (
-      <Suspense fallback={<div className="flex items-center justify-center p-8"><Spinner size="sm" /></div>}>
-        <UserSecurityPage />
-      </Suspense>
-    ),
-    authRequired: 'system.settings.manage',
-  },
-  {
-    path: '/users/security/password-policy',
-    element: (
-      <Suspense fallback={<div className="flex items-center justify-center p-8"><Spinner size="sm" /></div>}>
-        <PasswordPolicySettingsPage />
-      </Suspense>
-    ),
-    authRequired: 'system.settings.manage',
-  },
-  // Messaging settings
-  {
-    path: '/messages/settings',
-    element: (
-      <Suspense fallback={<div className="flex items-center justify-center p-8"><Spinner size="sm" /></div>}>
-        <MessagingSettingsPage />
-      </Suspense>
-    ),
-    authRequired: 'system.settings.manage',
-  },
-  // Monitoring
-  {
-    path: '/monitoring',
-    element: (
-      <Suspense fallback={<div className="flex items-center justify-center p-8"><Spinner size="sm" /></div>}>
-        <MonitoringPage />
-      </Suspense>
-    ),
-    authRequired: 'system.settings.manage',
-  },
   {
     path: '/devices/companion',
     element: (
@@ -488,35 +422,6 @@ const coreRoutes: RouteConfig[] = [
     path: '/account',
     element: <AccountPage />,
     authRequired: true,
-  },
-  // Emails section
-  {
-    path: '/emails',
-    element: <EmailsPage />,
-    authRequired: 'system.settings.manage',
-  },
-  {
-    path: '/emails/templates',
-    element: <EmailTemplatesPage />,
-    authRequired: 'system.settings.manage',
-  },
-  {
-    path: '/emails/templates/:type',
-    element: (
-      <Suspense fallback={<div className="flex items-center justify-center p-8"><Spinner size="sm" /></div>}>
-        <EditEmailTemplatePage />
-      </Suspense>
-    ),
-    authRequired: 'system.settings.manage',
-  },
-  {
-    path: '/emails/layout',
-    element: (
-      <Suspense fallback={<div className="flex items-center justify-center p-8"><Spinner size="sm" /></div>}>
-        <EmailLayoutPage />
-      </Suspense>
-    ),
-    authRequired: 'system.settings.manage',
   },
   {
     path: '/messages',
