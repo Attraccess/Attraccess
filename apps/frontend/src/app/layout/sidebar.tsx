@@ -32,6 +32,7 @@ import {
 } from '@heroui/react';
 import { buttonVariants } from '@heroui/styles';
 import { useAllRoutes } from '../routes';
+import { hasRequiredPermissions } from '../routes/routeAccess';
 import de from './sidebar.de.json';
 import en from './sidebar.en.json';
 import { Logo } from '../../components/logo';
@@ -187,11 +188,7 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
         return true;
       }
 
-      const requiredPermissions = (
-        Array.isArray(routeOfItem?.authRequired) ? routeOfItem?.authRequired : [routeOfItem?.authRequired]
-      ) as string[];
-
-      return requiredPermissions.every(hasPermission);
+      return hasRequiredPermissions(routeOfItem.authRequired, hasPermission);
     },
     [user, hasPermission, routes],
   );

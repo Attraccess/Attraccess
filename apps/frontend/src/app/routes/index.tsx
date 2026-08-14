@@ -41,6 +41,7 @@ import { ProjectDetailsPage } from '../projects/details';
 import { ProjectTeamPage } from '../projects/details/team';
 import { SettingsLayout } from '../settings/layout/SettingsLayout';
 import { SettingsIndexPage } from '../settings/layout/SettingsIndexPage';
+import { SETTINGS_SECTION_PERMISSIONS } from '../settings/layout/settingsSections';
 import { GeneralSection } from '../settings/sections/general';
 import { MonitoringSection } from '../settings/sections/monitoring';
 import { AboutSection } from '../settings/sections/about';
@@ -268,10 +269,13 @@ const coreRoutes: RouteConfig[] = [
   // Settings shell (ATT-864). Section routes are flat and wrap their own layout, as RouteConfig
   // has no nested-route form; the registry in settings/layout/settingsSections.ts is what keeps
   // these paths and the rail in agreement.
+  // Any one of the section permissions gets in: the shell is the only route to SSO and Plugins now,
+  // so gating it on `system.settings.manage` alone would lock out the operators those sections
+  // exist for. The index page then redirects to the first section they may actually open.
   {
     path: '/settings',
     element: <SettingsIndexPage />,
-    authRequired: 'system.settings.manage',
+    authRequired: SETTINGS_SECTION_PERMISSIONS,
   },
   {
     path: '/settings/general',

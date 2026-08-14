@@ -86,3 +86,18 @@ export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
     permission: 'system.plugins.manage',
   },
 ];
+
+/**
+ * Every distinct permission that opens at least one section, in registry order.
+ *
+ * `/settings` is gated on *any* of these rather than on `system.settings.manage`, because the shell
+ * is now the only door to SSO and Plugins: gating it on the general settings permission would hide
+ * the entry from — and 403 — an operator who holds only `system.sso.manage`, whose section renders
+ * perfectly well once they get there.
+ *
+ * Derived rather than written out, so a future section carrying a new permission opens the door by
+ * existing instead of by someone remembering this list.
+ */
+export const SETTINGS_SECTION_PERMISSIONS: SystemPermission[] = [
+  ...new Set(SETTINGS_SECTIONS.map((section) => section.permission)),
+];

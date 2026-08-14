@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SETTINGS_GROUPS, SETTINGS_SECTIONS } from './settingsSections';
+import { SETTINGS_GROUPS, SETTINGS_SECTION_PERMISSIONS, SETTINGS_SECTIONS } from './settingsSections';
 import de from './de.json';
 import en from './en.json';
 
@@ -19,6 +19,13 @@ describe('settings section registry', () => {
     // A section without a permission is a section the rail cannot hide, which is how an operator
     // ends up clicking through to a 403.
     expect(SETTINGS_SECTIONS.filter((section) => !section.permission)).toEqual([]);
+  });
+
+  it('opens the /settings gate to every section permission, listed once each', () => {
+    // This list is what `/settings` is gated on. A permission missing from it is a section whose
+    // operator cannot reach the shell that now contains it.
+    expect(new Set(SETTINGS_SECTION_PERMISSIONS)).toEqual(new Set(SETTINGS_SECTIONS.map((s) => s.permission)));
+    expect(SETTINGS_SECTION_PERMISSIONS.length).toBe(new Set(SETTINGS_SECTION_PERMISSIONS).size);
   });
 
   it('declares no group without sections and no section outside a declared group', () => {
