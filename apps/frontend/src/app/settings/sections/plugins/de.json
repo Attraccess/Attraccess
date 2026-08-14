@@ -1,0 +1,44 @@
+{
+  "title": "Plugins",
+  "description": "Auf dieser Instanz installierte Plugins und was davon geladen wurde.",
+  "uploadButton": "Plugin hochladen",
+  "docsButton": "Dokumentation",
+  "columns": {
+    "name": "Name",
+    "version": "Version",
+    "directory": "Verzeichnis",
+    "permissions": "Berechtigungen",
+    "status": "Status",
+    "actions": "Aktionen"
+  },
+  "status": {
+    "loaded": "Geladen",
+    "error": "Laden fehlgeschlagen",
+    "unknown": "Nur Frontend",
+    "errorTooltip": "Dieses Plugin konnte auf dem Server nicht geladen werden: {{message}}"
+  },
+  "noPermissions": "Keine angefordert",
+  "deleteTooltip": "Plugin entfernen",
+  "aside": {
+    "title": "Ein Plugin schreiben",
+    "description": "Plugins erweitern API und Frontend aus einem einzigen Bundle. Der Entwicklerleitfaden beschreibt Manifest, Berechtigungsmodell und lokale Entwicklung."
+  },
+  "deleteConfirmation": {
+    "title": "Plugin entfernen?",
+    "message": "Das Plugin {{pluginName}} entfernen? Das lässt sich nicht rückgängig machen; die App lädt anschließend neu.",
+    "cancel": "Abbrechen",
+    "delete": "Entfernen"
+  },
+  "error": {
+    "delete": {
+      "title": "Plugin konnte nicht entfernt werden",
+      "description": "Das Plugin ist weiterhin installiert. Bitte erneut versuchen."
+    }
+  },
+  "success": {
+    "delete": {
+      "title": "Plugin entfernt",
+      "description": "Die App lädt in wenigen Sekunden neu, um den Code des Plugins zu verwerfen."
+    }
+  }
+}

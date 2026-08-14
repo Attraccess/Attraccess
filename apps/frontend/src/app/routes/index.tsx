@@ -46,7 +46,15 @@ import { SettingsLayout } from '../settings/layout/SettingsLayout';
 import { SettingsIndexPage } from '../settings/layout/SettingsIndexPage';
 import { GeneralSection } from '../settings/sections/general';
 import { MonitoringSection } from '../settings/sections/monitoring';
-import { RolesPage } from '../roles';
+import { AboutSection } from '../settings/sections/about';
+import { RolesSection } from '../settings/sections/roles';
+import { SsoSection } from '../settings/sections/sso';
+import { EmailSection } from '../settings/sections/email';
+import { MessagingSection } from '../settings/sections/messaging';
+import { PluginsSection } from '../settings/sections/plugins';
+// Not lazy: the strength preview is evaluated server-side, so this section pulls in nothing the
+// main bundle does not already carry — and a Suspense boundary here only buys a spinner.
+import { SecuritySection } from '../settings/sections/security';
 import FirstTimeSetupPage from '../first-time-setup';
 import { UnauthorizedLayout } from '../unauthorized/unauthorized-layout/layout';
 
@@ -311,9 +319,90 @@ const coreRoutes: RouteConfig[] = [
     authRequired: 'system.settings.manage',
   },
   {
-    path: '/settings/roles',
-    element: <RolesPage />,
+    path: '/settings/email',
+    element: (
+      <SettingsLayout>
+        <EmailSection />
+      </SettingsLayout>
+    ),
     authRequired: 'system.settings.manage',
+  },
+  // Templates and the shared layout are sub-routes of Email rather than sections of their own: both
+  // are full-screen editors, and neither is redesigned here. The rail keeps Email highlighted while
+  // one is open.
+  {
+    path: '/settings/email/templates',
+    element: (
+      <SettingsLayout>
+        <EmailTemplatesPage />
+      </SettingsLayout>
+    ),
+    authRequired: 'system.settings.manage',
+  },
+  {
+    path: '/settings/email/layout',
+    element: (
+      <SettingsLayout>
+        <Suspense fallback={<div className="flex items-center justify-center p-8"><Spinner size="sm" /></div>}>
+          <EmailLayoutPage />
+        </Suspense>
+      </SettingsLayout>
+    ),
+    authRequired: 'system.settings.manage',
+  },
+  {
+    path: '/settings/messaging',
+    element: (
+      <SettingsLayout>
+        <MessagingSection />
+      </SettingsLayout>
+    ),
+    authRequired: 'system.settings.manage',
+  },
+  {
+    path: '/settings/about',
+    element: (
+      <SettingsLayout>
+        <AboutSection />
+      </SettingsLayout>
+    ),
+    authRequired: 'system.settings.manage',
+  },
+  {
+    path: '/settings/security',
+    element: (
+      <SettingsLayout>
+        <SecuritySection />
+      </SettingsLayout>
+    ),
+    authRequired: 'system.settings.manage',
+  },
+  {
+    path: '/settings/roles',
+    element: (
+      <SettingsLayout>
+        <RolesSection />
+      </SettingsLayout>
+    ),
+    authRequired: 'system.settings.manage',
+  },
+  {
+    path: '/settings/sso',
+    element: (
+      <SettingsLayout>
+        <SsoSection />
+      </SettingsLayout>
+    ),
+    authRequired: 'system.sso.manage',
+  },
+  {
+    path: '/settings/plugins',
+    element: (
+      <SettingsLayout>
+        <PluginsSection />
+      </SettingsLayout>
+    ),
+    authRequired: 'system.plugins.manage',
   },
   // User security section
   {

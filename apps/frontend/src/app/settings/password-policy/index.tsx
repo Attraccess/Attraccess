@@ -17,7 +17,7 @@ import { PolicyFields } from './PolicyFields';
 import { PreviewSection } from './PreviewSection';
 import { OverridesSection } from './OverridesSection';
 import { ConfirmDiffModal } from './ConfirmDiffModal';
-import { POLICY_FIELD_KEYS } from './policy-fields';
+import { POLICY_FIELD_KEYS } from '../sections/security/policy-fields';
 import en from './en.json';
 import de from './de.json';
 

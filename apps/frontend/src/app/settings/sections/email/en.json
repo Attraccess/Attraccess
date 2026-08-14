@@ -1,0 +1,65 @@
+{
+  "title": "Email",
+  "description": "The SMTP transport Attraccess sends all outgoing mail through.",
+  "loading": "Loading email settings…",
+  "service": {
+    "smtp": "SMTP",
+    "outlook": "Outlook 365"
+  },
+  "inputs": {
+    "service": {
+      "label": "Service",
+      "description": "Outlook 365 pins the host and port to the values Microsoft accepts."
+    },
+    "host": {
+      "label": "Host",
+      "description": "SMTP server host name.",
+      "errors": { "required": "A host is required." }
+    },
+    "port": {
+      "label": "Port",
+      "description": "SMTP server port.",
+      "errors": { "required": "A port is required.", "invalid": "Enter a port between 1 and 65535." }
+    },
+    "secure": {
+      "label": "Use TLS",
+      "description": "Connect over an implicit TLS socket rather than upgrading with STARTTLS."
+    },
+    "user": {
+      "label": "Username",
+      "description": "Optional username for SMTP authentication."
+    },
+    "pass": {
+      "label": "Password",
+      "description": "Leave empty to keep the current password."
+    },
+    "from": {
+      "label": "From address",
+      "description": "Default sender address for outgoing emails.",
+      "errors": { "required": "A sender address is required." }
+    }
+  },
+  "passwordStatus": {
+    "configured": "Password configured",
+    "missing": "Password missing"
+  },
+  "aside": {
+    "statusTitle": "Credentials",
+    "statusHint": "The stored password is never sent back to the browser, so the field above is always empty.",
+    "contentTitle": "Message content"
+  },
+  "subPages": {
+    "templates": {
+      "title": "Templates",
+      "description": "The emails sent to users."
+    },
+    "layout": {
+      "title": "Global layout",
+      "description": "Shared header, footer and styles."
+    }
+  },
+  "success": {
+    "title": "Email settings saved",
+    "description": "New messages will be sent through this transport."
+  }
+}

@@ -1,0 +1,73 @@
+{
+  "title": "Messaging",
+  "description": "How many messages a user may send, and the key pair push notifications are signed with.",
+  "loading": "Loading messaging settings…",
+  "fields": {
+    "sendMaxPerWindow": {
+      "label": "Max messages",
+      "description": "Messages a single user may send within the send window before being throttled."
+    },
+    "sendWindowSeconds": {
+      "label": "Send window (seconds)",
+      "description": "Time window during which sent messages are counted."
+    },
+    "contactMaxPerWindow": {
+      "label": "Max new conversations",
+      "description": "Conversations a single user may open within the contact window before being throttled."
+    },
+    "contactWindowSeconds": {
+      "label": "Contact window (seconds)",
+      "description": "Time window during which opened conversations are counted."
+    }
+  },
+  "saved": {
+    "title": "Rate limits saved",
+    "description": "New thresholds take effect immediately."
+  },
+  "error": {
+    "title": "Could not save",
+    "description": "Check the values and try again."
+  },
+  "push": {
+    "regenerateLabel": "VAPID key pair",
+    "regenerateHint": "Generate a fresh pair. Every existing push subscription is bound to the old key and will be dropped."
+  },
+  "publicKeyLabel": "VAPID public key",
+  "copyButton": "Copy",
+  "copied": {
+    "title": "Copied",
+    "description": "The public key was copied to your clipboard."
+  },
+  "copyFailed": {
+    "title": "Copy failed",
+    "description": "Could not copy to the clipboard."
+  },
+  "aside": {
+    "publicKeyHint": "Browsers use this key to verify push messages from this instance. {{count}} subscription(s) are currently bound to it."
+  },
+  "regenerateButton": "Regenerate keys",
+  "overrideTitle": "Use custom keys",
+  "overrideDescription": "Paste a pair generated with `npx web-push generate-vapid-keys`. Both keys are required.",
+  "publicKeyInputLabel": "Custom public key",
+  "privateKeyInputLabel": "Custom private key",
+  "applyCustomButton": "Apply custom keys",
+  "keysReplaced": {
+    "title": "VAPID keys updated",
+    "description": "Removed {{count}} push subscription(s) bound to the old key. Affected users must re-enable push on their devices."
+  },
+  "errors": {
+    "replaceFailed": "Could not update the VAPID keys."
+  },
+  "confirmWarning": {
+    "title": "Replace VAPID keys?",
+    "description": "This deletes all {{count}} push subscription(s). Every user must re-enable push notifications on each device.",
+    "continue": "Continue",
+    "cancel": "Cancel"
+  },
+  "confirmFinal": {
+    "title": "Are you sure?",
+    "description": "This cannot be undone. Users will stop receiving push notifications until they turn the toggle back on.",
+    "confirm": "Replace keys",
+    "cancel": "Go back"
+  }
+}

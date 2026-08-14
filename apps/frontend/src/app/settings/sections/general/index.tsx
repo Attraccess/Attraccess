@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { FieldError, Form, Input, Spinner, TextField } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -19,9 +19,6 @@ import API_ERROR_TRANSLATIONS_EN from '../../../../global-translations/api-error
 import en from './en.json';
 import de from './de.json';
 
-/** A never-persisted license key reads as "unchanged", so the baseline for it is always empty. */
-const emptyDraft = { url: '', publicInternetUrl: '', licenseKey: '' };
-
 /** Mirrors the API's `@IsUrl()`: a full absolute URL, scheme included. */
 const isAbsoluteUrl = (value: string) => {
   try {
@@ -41,39 +38,43 @@ export function GeneralSection() {
   const queryClient = useQueryClient();
 
   const { data: settings, isLoading } = useSettingsServiceGetSystemSettings();
-  const [draft, setDraft] = useState(emptyDraft);
+  // Derived draft, not a seeded one: a key absent from `draft` means "untouched in this session",
+  // and the displayed value falls back to the server's. The alternative — an effect that reassigns
+  // the whole draft whenever the query object changes — overwrites edits the operator has not saved
+  // yet as soon as a background refetch lands (ATT-868).
+  const [draft, setDraft] = useState<Partial<Record<'url' | 'publicInternetUrl' | 'licenseKey', string>>>({});
   const [hasAttemptedSave, setHasAttemptedSave] = useState(false);
 
   // Same query/mutation contract as the old AppSettingsForm — only the presentation changed.
-  const baseline = useMemo(
-    () => ({
-      url: settings?.app.url ?? '',
-      publicInternetUrl: settings?.app.publicInternetUrl ?? '',
-      licenseKey: '',
-    }),
-    [settings],
-  );
+  // A license key is never returned by the API, so its baseline is always empty and any non-empty
+  // draft is a change.
+  const savedUrl = settings?.app.url ?? '';
+  const savedPublicUrl = settings?.app.publicInternetUrl ?? '';
 
-  useEffect(() => setDraft(baseline), [baseline]);
+  const url = draft.url ?? savedUrl;
+  const publicInternetUrl = draft.publicInternetUrl ?? savedPublicUrl;
+  const licenseKey = draft.licenseKey ?? '';
 
   const { mutate: saveSettings, isPending: isSaving } = useSettingsServiceUpdateSystemSettings({
-    onSuccess() {
+    onSuccess(data) {
       toast.success({ title: t('success.title'), description: t('success.description') });
-      queryClient.invalidateQueries({ queryKey: UseSettingsServiceGetSystemSettingsKeyFn() });
-      setDraft((current) => ({ ...current, licenseKey: '' }));
+      // Prime the cache from the response and release the pin in the same tick. Invalidating and
+      // then clearing the draft would flash the pre-save value for a frame while the refetch is in
+      // flight, and holding the pin past the commit would make the fields ignore the server for the
+      // lifetime of the mount — a later change by another operator would then surface as a phantom
+      // "unsaved changes" bar whose Save reverts them.
+      queryClient.setQueryData(UseSettingsServiceGetSystemSettingsKeyFn(), data);
+      setDraft({});
     },
     onError(error: Error) {
       toast.apiError({ error: error as ApiError, t, tExists, baseTranslationKey: 'api' });
     },
   });
 
-  const isDirty =
-    draft.url !== baseline.url ||
-    draft.publicInternetUrl !== baseline.publicInternetUrl ||
-    draft.licenseKey.trim() !== '';
+  const isDirty = url !== savedUrl || publicInternetUrl !== savedPublicUrl || licenseKey.trim() !== '';
 
-  const trimmedUrl = draft.url.trim();
-  const trimmedPublicUrl = draft.publicInternetUrl.trim();
+  const trimmedUrl = url.trim();
+  const trimmedPublicUrl = publicInternetUrl.trim();
 
   // Validated here rather than left to `isRequired` + `type="url"`. Those are native constraints,
   // and react-aria cancels the `invalid` event to suppress the browser's bubble (`useFormValidation`
@@ -97,9 +98,9 @@ export function GeneralSection() {
     saveSettings({
       requestBody: {
         app: {
-          url: draft.url.trim(),
-          publicInternetUrl: draft.publicInternetUrl.trim() || undefined,
-          licenseKey: draft.licenseKey.trim() || undefined,
+          url: trimmedUrl,
+          publicInternetUrl: trimmedPublicUrl || undefined,
+          licenseKey: licenseKey.trim() || undefined,
         },
       },
     });
@@ -139,9 +140,9 @@ export function GeneralSection() {
             isRequired
             className="w-full"
             aria-label={t('inputs.url.label')}
-            value={draft.url}
+            value={url}
             isInvalid={hasAttemptedSave && !!urlError}
-            onChange={(url) => setDraft((current) => ({ ...current, url }))}
+            onChange={(next) => setDraft((current) => ({ ...current, url: next }))}
           >
             <Input type="url" />
             <FieldError>{urlError}</FieldError>
@@ -156,9 +157,9 @@ export function GeneralSection() {
           <TextField
             className="w-full"
             aria-label={t('inputs.publicInternetUrl.label')}
-            value={draft.publicInternetUrl}
+            value={publicInternetUrl}
             isInvalid={hasAttemptedSave && !!publicUrlError}
-            onChange={(publicInternetUrl) => setDraft((current) => ({ ...current, publicInternetUrl }))}
+            onChange={(next) => setDraft((current) => ({ ...current, publicInternetUrl: next }))}
           >
             <Input type="url" />
             <FieldError>{publicUrlError}</FieldError>
@@ -170,12 +171,12 @@ export function GeneralSection() {
             <PasswordInput
               aria-label={t('inputs.licenseKey.label')}
               autoComplete="off"
-              value={draft.licenseKey}
-              onChange={(licenseKey) => setDraft((current) => ({ ...current, licenseKey }))}
+              value={licenseKey}
+              onChange={(next) => setDraft((current) => ({ ...current, licenseKey: next }))}
             />
             <CommunityLicenseButton
               isDisabled={isSaving}
-              onAccept={(licenseKey) => setDraft((current) => ({ ...current, licenseKey }))}
+              onAccept={(next) => setDraft((current) => ({ ...current, licenseKey: next }))}
             />
           </div>
         </SettingsRow>
@@ -186,7 +187,7 @@ export function GeneralSection() {
         isDirty={isDirty}
         isSaving={isSaving}
         onSave={handleSave}
-        onDiscard={() => setDraft(baseline)}
+        onDiscard={() => setDraft({})}
       />
     </SettingsSection>
   );

@@ -35,7 +35,10 @@ export function SettingsLayout({ children }: { children: ReactNode }) {
               {t(`groups.${group.key}`)}
             </div>
             {group.sections.map((section) => {
-              const isActive = pathname === section.path;
+              // Sub-routes count as the section: Email owns /settings/email/templates and
+              // /settings/email/layout, and an exact match would leave the rail with nothing
+              // highlighted the moment the operator opened one of them.
+              const isActive = pathname === section.path || pathname.startsWith(`${section.path}/`);
               return (
                 <Link
                   key={section.key}

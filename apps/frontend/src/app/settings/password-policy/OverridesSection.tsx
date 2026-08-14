@@ -36,7 +36,7 @@ import {
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { StandardModal } from '../../../components/standardModal';
 import { useToastMessage } from '../../../components/toastProvider';
-import { POLICY_BOOL_FIELDS, POLICY_FIELD_KEYS, POLICY_NUMBER_FIELDS } from './policy-fields';
+import { POLICY_BOOL_FIELDS, POLICY_FIELD_KEYS, POLICY_NUMBER_FIELDS } from '../sections/security/policy-fields';
 import en from './en.json';
 import de from './de.json';
 

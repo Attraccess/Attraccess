@@ -1,0 +1,26 @@
+{
+  "title": "Über",
+  "description": "Version, Update-Status und was diese Instanz aktuell enthält.",
+  "version": {
+    "title": "Version & Updates",
+    "currentVersion": "Aktuelle Version",
+    "commitHash": "Commit",
+    "noCommit": "Unbekannt",
+    "devVersion": "Entwicklungs-Build",
+    "updateAvailable": "Update verfügbar",
+    "upToDate": "Aktuell",
+    "checkFailed": "Update-Prüfung fehlgeschlagen",
+    "latestVersion": "Neuestes Release",
+    "viewRelease": "Release ansehen"
+  },
+  "system": {
+    "title": "Systemübersicht",
+    "users": "Benutzer",
+    "resources": "Ressourcen",
+    "projects": "Projekte",
+    "activeAuthSessions": "Aktive Sitzungen",
+    "activeResourceUsageSessions": "Aktive Ressourcennutzung",
+    "uptime": "Laufzeit",
+    "nodeVersion": "Node.js"
+  }
+}

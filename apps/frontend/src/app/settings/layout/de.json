@@ -5,6 +5,7 @@
   "backToSettings": "Einstellungen",
   "groups": {
     "instance": "Instanz",
+    "access": "Zugang",
     "operations": "Betrieb"
   },
   "sections": {
@@ -12,9 +13,37 @@
       "label": "Allgemein",
       "description": "Basis-URLs und Lizenz"
     },
+    "email": {
+      "label": "E-Mail",
+      "description": "Postausgang, Vorlagen und Layout"
+    },
+    "messaging": {
+      "label": "Nachrichten",
+      "description": "Nachrichtenlimits und Push-Benachrichtigungen"
+    },
+    "about": {
+      "label": "Über",
+      "description": "Version, Updates und Systeminformationen"
+    },
+    "security": {
+      "label": "Sicherheit",
+      "description": "Anmeldedrosselung, Passwortrichtlinie, 2FA und Registrierungs-Domains"
+    },
+    "roles": {
+      "label": "Rollen",
+      "description": "Rollen und ihre Berechtigungen"
+    },
+    "sso": {
+      "label": "Single Sign-on",
+      "description": "Externe Identitätsanbieter"
+    },
     "monitoring": {
       "label": "Überwachung",
       "description": "Metrik-Endpunkt und Instrumentierung"
+    },
+    "plugins": {
+      "label": "Plugins",
+      "description": "Installierte Plugins"
     }
   }
 }

@@ -5,6 +5,7 @@
   "backToSettings": "Settings",
   "groups": {
     "instance": "Instance",
+    "access": "Access",
     "operations": "Operations"
   },
   "sections": {
@@ -12,9 +13,37 @@
       "label": "General",
       "description": "Base URLs and license"
     },
+    "email": {
+      "label": "Email",
+      "description": "Outgoing mail, templates and layout"
+    },
+    "messaging": {
+      "label": "Messaging",
+      "description": "Message rate limits and push notifications"
+    },
+    "about": {
+      "label": "About",
+      "description": "Version, updates and system information"
+    },
+    "security": {
+      "label": "Security",
+      "description": "Sign-in throttling, password policy, 2FA and signup domains"
+    },
+    "roles": {
+      "label": "Roles",
+      "description": "Roles and their permission sets"
+    },
+    "sso": {
+      "label": "Single sign-on",
+      "description": "External identity providers"
+    },
     "monitoring": {
       "label": "Monitoring",
       "description": "Metrics endpoint and instrumentation"
+    },
+    "plugins": {
+      "label": "Plugins",
+      "description": "Installed plugins"
     }
   }
 }
