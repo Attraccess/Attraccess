@@ -254,7 +254,12 @@ export class SupervisionService {
     const introducers = await this.resourceIntroducersService.getMany(resourceId);
     const ids = new Set<number>();
     for (const introducer of introducers) {
-      if (introducer.userId !== requesterId) {
+      // `resource_introducer` rows outlive the account: anonymizeAndSoftDelete() drops auth details
+      // and sessions but no grants, so a departed maker stays the "sole introducer" forever. Left in,
+      // a tombstone would hold off the manager fallback below and get broadcast to nobody — the same
+      // dead-end this is meant to close. getMany() eager-loads `user` and TypeORM leaves it null for
+      // a soft-deleted one, so this costs no extra query.
+      if (introducer.userId !== requesterId && introducer.user) {
         ids.add(introducer.userId);
       }
     }

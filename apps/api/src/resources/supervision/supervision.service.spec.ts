@@ -39,7 +39,7 @@ describe('SupervisionService', () => {
       assertSupportsSupervision: jest.fn().mockResolvedValue({ id: 5 }),
     };
     introducers = {
-      getMany: jest.fn().mockResolvedValue([{ userId: 1 }, { userId: 2 }, { userId: 3 }]),
+      getMany: jest.fn().mockResolvedValue([{ userId: 1, user: {} }, { userId: 2, user: {} }, { userId: 3, user: {} }]),
     };
     live = {
       emitToSupervisor: jest.fn(),
@@ -386,7 +386,7 @@ describe('SupervisionService', () => {
     // the requester is often that manager's only colleague) refused the request outright — even
     // though a manager can walk up to the reader and tap.
     it('arms the reader when only a resource manager could supervise', async () => {
-      introducers.getMany.mockResolvedValue([{ userId: requester.id }]);
+      introducers.getMany.mockResolvedValue([{ userId: requester.id, user: {} }]);
       rbac.getUserIdsWithPermission.mockResolvedValue([requester.id, 42]);
 
       await requestAtReader();
@@ -399,15 +399,25 @@ describe('SupervisionService', () => {
     it('falls back to managers only when the resource has no introducer left', async () => {
       rbac.getUserIdsWithPermission.mockResolvedValue([requester.id, 42]);
 
-      introducers.getMany.mockResolvedValue([{ userId: requester.id }, { userId: 3 }]);
+      introducers.getMany.mockResolvedValue([{ userId: requester.id, user: {} }, { userId: 3, user: {} }]);
       expect(await service.getEligibleSupervisorIds(5, requester.id)).toEqual([3]);
 
-      introducers.getMany.mockResolvedValue([{ userId: requester.id }]);
+      introducers.getMany.mockResolvedValue([{ userId: requester.id, user: {} }]);
+      expect(await service.getEligibleSupervisorIds(5, requester.id)).toEqual([42]);
+    });
+
+    // The grant outlives the account, so the sole introducer having left must not hold off the
+    // fallback and broadcast the request to a user who cannot log in (`user` is null once the
+    // account is soft-deleted).
+    it('ignores an introducer whose account was deleted', async () => {
+      rbac.getUserIdsWithPermission.mockResolvedValue([42]);
+      introducers.getMany.mockResolvedValue([{ userId: 9, user: null }]);
+
       expect(await service.getEligibleSupervisorIds(5, requester.id)).toEqual([42]);
     });
 
     it('refuses when nobody but the requester could supervise', async () => {
-      introducers.getMany.mockResolvedValue([{ userId: requester.id }]);
+      introducers.getMany.mockResolvedValue([{ userId: requester.id, user: {} }]);
       rbac.getUserIdsWithPermission.mockResolvedValue([requester.id]);
 
       await expect(service.requestSupervisedSession(5, requester, readerDto)).rejects.toBeInstanceOf(
@@ -529,7 +539,7 @@ describe('SupervisionService', () => {
     });
 
     it('rejects before arming when the resource has no other eligible supervisor', async () => {
-      introducers.getMany.mockResolvedValueOnce([{ userId: requester.id }]);
+      introducers.getMany.mockResolvedValueOnce([{ userId: requester.id, user: {} }]);
 
       await expect(service.requestSupervisedSession(5, requester, readerDto)).rejects.toBeInstanceOf(
         BadRequestException,
