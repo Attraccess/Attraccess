@@ -267,27 +267,46 @@ describe('SupervisionService', () => {
       expect(onFailed).toHaveBeenCalledWith(expect.any(RequestTimeoutException));
     });
 
-    // A request that was broadcast to nobody (ATT-867) is only servable by a manager, who gets no
-    // SSE event by design — the pull list is their only way to find it.
-    it('shows a manager-only request to a manager, but keeps normal ones out of their list', () => {
+    // ATT-867: a resource with no introducers falls back to the managers, who are then on the
+    // broadcast list like anyone else — so they get the popup, can reject as well as approve, and
+    // are named to the requester. A hidden fallback would have given them none of that.
+    it('treats a stand-in manager as a full supervisor: SSE, approve and reject', async () => {
+      const manager = { id: 42, username: 'manager' } as User;
       service.createReaderRequest({
         resourceId: 5,
         requester,
         dto: {},
-        eligibleSupervisorIds: [],
+        eligibleSupervisorIds: [manager.id],
         callbacks: { onResolved: jest.fn(), onFailed: jest.fn() },
       });
 
-      const manager = 42;
-      expect(service.listPendingForSupervisor(manager, true)).toHaveLength(1);
-      // Not a manager, and not on the (empty) broadcast list.
-      expect(service.listPendingForSupervisor(manager, false)).toHaveLength(0);
-      // A manager never sees their own request, even when nobody else was broadcast to.
-      expect(service.listPendingForSupervisor(requester.id, true)).toHaveLength(0);
+      const requestId = live.emitToSupervisor.mock.calls.find(
+        (c) => c[1].type === SupervisionLiveEventType.REQUESTED,
+      )?.[1].requestId as string;
+      // Popped over SSE, and visible on reconnect — no special-casing needed on the pull.
+      expect(live.emitToSupervisor).toHaveBeenCalledWith(manager.id, expect.objectContaining({ requestId }));
+      expect(service.listPendingForSupervisor(manager.id)).toHaveLength(1);
+      // Nobody else sees it.
+      expect(service.listPendingForSupervisor(7)).toHaveLength(0);
 
-      createReaderRequest();
-      // The second request has eligible supervisors, so it stays out of every admin's list.
-      expect(service.listPendingForSupervisor(manager, true)).toHaveLength(1);
+      // Rejecting used to 403 for a manager, silently leaving the requester to wait out the TTL.
+      expect(service.reject(requestId, manager)).toEqual({ status: 'rejected', requestId });
+      expect(service.listPendingForSupervisor(manager.id)).toHaveLength(0);
+    });
+
+    it('lets a stand-in manager approve', async () => {
+      const manager = { id: 42, username: 'manager' } as User;
+      const { requestId } = service.createReaderRequest({
+        resourceId: 5,
+        requester,
+        dto: {},
+        eligibleSupervisorIds: [manager.id],
+        callbacks: { onResolved: jest.fn(), onFailed: jest.fn() },
+      });
+
+      await service.approve(requestId, manager);
+
+      expect(resourceUsageService.startSession).toHaveBeenCalledWith(5, requester, {}, { supervisorUserId: 42 });
     });
   });
 
@@ -373,6 +392,18 @@ describe('SupervisionService', () => {
       await requestAtReader();
 
       expect(armer.arm).toHaveBeenCalled();
+    });
+
+    // The managers are a fallback, not an addition: a resource that has introducers must not pop a
+    // request at every admin.
+    it('falls back to managers only when the resource has no introducer left', async () => {
+      rbac.getUserIdsWithPermission.mockResolvedValue([requester.id, 42]);
+
+      introducers.getMany.mockResolvedValue([{ userId: requester.id }, { userId: 3 }]);
+      expect(await service.getEligibleSupervisorIds(5, requester.id)).toEqual([3]);
+
+      introducers.getMany.mockResolvedValue([{ userId: requester.id }]);
+      expect(await service.getEligibleSupervisorIds(5, requester.id)).toEqual([42]);
     });
 
     it('refuses when nobody but the requester could supervise', async () => {

@@ -175,7 +175,7 @@ export class SupervisionService {
     await this.resourceUsageService.assertSupportsSupervision(resourceId);
 
     const eligibleSupervisorIds = await this.getEligibleSupervisorIds(resourceId, requester.id);
-    if (eligibleSupervisorIds.length === 0 && !(await this.hasResourceManagerBesides(requester.id))) {
+    if (eligibleSupervisorIds.length === 0) {
       throw new BadRequestException('Nobody else can supervise on this resource');
     }
 
@@ -235,8 +235,20 @@ export class SupervisionService {
 
   /**
    * The users who may supervise on this resource: its introducers and maintainers (including
-   * group-level), minus the requester. Global resource managers can still approve a request that
-   * reaches them, but are not broadcast to.
+   * group-level), minus the requester.
+   *
+   * When that leaves nobody, global resource managers stand in. They are valid supervisors —
+   * {@link ResourceUsageService.validateSupervisedStart} accepts anyone holding `resources.update`,
+   * and the docs define a supervisor as an introducer, maintainer *or* resource manager — but they
+   * are normally kept out of this list, because it drives the SSE broadcast and popping a request at
+   * every admin is not wanted. A resource with no introducers (the manager who set it up is usually
+   * the only candidate, and is often the requester) used to dead-end on the empty list instead
+   * (ATT-867), so for exactly that case the admins *are* the only people who can help, and this adds
+   * no traffic to any request that does have introducers.
+   *
+   * Being one list rather than a broadcast list plus a hidden fallback is what makes the rest work:
+   * managers get the SSE event and the terminal RESOLVED/EXPIRED/REJECTED, they can approve *and*
+   * reject through the normal path, and the reader can name them to the requester.
    */
   public async getEligibleSupervisorIds(resourceId: number, requesterId: number): Promise<number[]> {
     const introducers = await this.resourceIntroducersService.getMany(resourceId);
@@ -246,33 +258,11 @@ export class SupervisionService {
         ids.add(introducer.userId);
       }
     }
-    return Array.from(ids);
-  }
-
-  /**
-   * Whether a global resource manager other than the requester exists.
-   *
-   * Managers are valid supervisors — {@link ResourceUsageService.validateSupervisedStart} accepts
-   * anyone holding `resources.update`, and the docs define a supervisor as an introducer, maintainer
-   * *or* resource manager. They are deliberately kept out of {@link getEligibleSupervisorIds}
-   * because that list drives the SSE broadcast, and popping a request at every admin is not wanted.
-   *
-   * They can still walk up to the reader and tap their card, so an empty broadcast list on its own
-   * must not refuse a request: a resource with no introducers (the manager who set it up is usually
-   * the only candidate, and is often the requester) used to dead-end immediately (ATT-867).
-   */
-  public async hasResourceManagerBesides(requesterId: number): Promise<boolean> {
+    if (ids.size > 0) {
+      return Array.from(ids);
+    }
     const managerIds = await this.rbacService.getUserIdsWithPermission('resources.update');
-    return managerIds.some((id) => id !== requesterId);
-  }
-
-  /**
-   * Whether this user is a global resource manager. Used to widen
-   * {@link listPendingForSupervisor} for the manager-only case.
-   */
-  public async isResourceManager(userId: number): Promise<boolean> {
-    const managerIds = await this.rbacService.getUserIdsWithPermission('resources.update');
-    return managerIds.includes(userId);
+    return managerIds.filter((id) => id !== requesterId);
   }
 
   /**
@@ -462,21 +452,13 @@ export class SupervisionService {
 
   /**
    * Lists the requests currently awaiting a given supervisor (used for SSE reconnect/initial state).
-   *
-   * `isResourceManager` additionally surfaces requests that were broadcast to nobody — the
-   * manager-only case {@link hasResourceManagerBesides} lets through. Those are invisible over SSE
-   * by design, so this pull is the only way the one person who can serve them ever learns they
-   * exist; {@link approve} already accepts them (ATT-867). Requests that do have eligible
-   * supervisors stay out of every admin's list.
    */
-  public listPendingForSupervisor(supervisorUserId: number, isResourceManager = false): SupervisionRequestDto[] {
+  public listPendingForSupervisor(supervisorUserId: number): SupervisionRequestDto[] {
     const requests: SupervisionRequestDto[] = [];
     for (const request of this.pending.values()) {
-      const managerOnly =
-        isResourceManager && request.eligibleSupervisorIds.length === 0 && request.requester.id !== supervisorUserId;
       const targetsSupervisor =
         request.supervisorUserId === null
-          ? request.eligibleSupervisorIds.includes(supervisorUserId) || managerOnly
+          ? request.eligibleSupervisorIds.includes(supervisorUserId)
           : request.supervisorUserId === supervisorUserId;
       if (targetsSupervisor) {
         requests.push(this.toDto(request, supervisorUserId));

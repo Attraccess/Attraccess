@@ -15,7 +15,6 @@ describe('AttractapSupervisionHandler', () => {
     approve: jest.Mock;
     cancelReaderRequest: jest.Mock;
     getEligibleSupervisorIds: jest.Mock;
-    hasResourceManagerBesides: jest.Mock;
     createReaderRequest: jest.Mock;
   };
   let usersService: { findOne: jest.Mock };
@@ -66,7 +65,6 @@ describe('AttractapSupervisionHandler', () => {
       approve: jest.fn().mockResolvedValue({ id: 7 }),
       cancelReaderRequest: jest.fn(),
       getEligibleSupervisorIds: jest.fn().mockResolvedValue([2]),
-      hasResourceManagerBesides: jest.fn().mockResolvedValue(false),
       createReaderRequest: jest.fn().mockReturnValue({ requestId: 'req-1', expiresAt: new Date(0) }),
     };
     usersService = { findOne: jest.fn().mockResolvedValue({ id: 2, username: 'supervisor' }) };
@@ -222,13 +220,11 @@ describe('AttractapSupervisionHandler', () => {
     });
 
     // ATT-867: the reader screen closed itself a second after opening on any resource without
-    // introducers. getEligibleSupervisorIds() is the SSE broadcast list; a resource manager is a
-    // valid supervisor who can tap their card at the reader, but is deliberately never broadcast
-    // to — so an empty list on its own says nothing about whether the request can be served.
+    // introducers. getEligibleSupervisorIds() now falls back to the global resource managers for
+    // exactly that case, so a non-empty list here can be manager-only and the request opens.
     it('opens the request when only a resource manager could supervise', async () => {
       const socket = tappedSocket();
-      supervisionService.getEligibleSupervisorIds.mockResolvedValue([]);
-      supervisionService.hasResourceManagerBesides.mockResolvedValue(true);
+      supervisionService.getEligibleSupervisorIds.mockResolvedValue([42]);
 
       await request(socket);
 
@@ -239,7 +235,6 @@ describe('AttractapSupervisionHandler', () => {
     it('still refuses when nobody but the requester could supervise', async () => {
       const socket = tappedSocket();
       supervisionService.getEligibleSupervisorIds.mockResolvedValue([]);
-      supervisionService.hasResourceManagerBesides.mockResolvedValue(false);
 
       await request(socket);
 
