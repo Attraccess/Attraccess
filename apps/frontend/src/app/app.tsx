@@ -28,6 +28,7 @@ import { AttraccessUserActionsBridge } from '../components/attraccessUserActions
 import { SupervisorApprovalListener } from '../components/supervisorApproval/SupervisorApprovalListener';
 import { KioskGuard } from './kiosk/KioskGuard';
 import { useLocaleSync } from '../hooks/useLocaleSync';
+import { NotFound } from './not-found';
 
 // Exported for settingsAccess.spec.tsx, which drives the real route table through this gate.
 export function useRoutesWithAuthElements(routes: RouteConfig[]) {
@@ -142,7 +143,8 @@ function AppLayout(props: PropsWithChildren) {
   );
 }
 
-function AppContent() {
+// Exported for notFound.spec.tsx, which drives the real route table (catch-all included).
+export function AppRoutes() {
   const { isAuthenticated } = useAuth();
   const allRoutes = useAllRoutes();
 
@@ -153,34 +155,48 @@ function AppContent() {
   const layoutRouteElements = useRoutesWithAuthElements(layoutRoutes);
 
   return (
+    <Routes>
+      <Route path="/verify-email" element={<VerifyEmail />} />
+      <Route
+        path="/accept-invitation"
+        element={
+          <UnauthorizedLayout>
+            <AcceptInvitation />
+          </UnauthorizedLayout>
+        }
+      />
+      <Route
+        path="/reset-password"
+        element={
+          <UnauthorizedLayout>
+            <ResetPassword />
+          </UnauthorizedLayout>
+        }
+      />
+
+      {bareRouteElements}
+
+      <Route
+        element={
+          <Layout>
+            <Outlet />
+          </Layout>
+        }
+      >
+        {layoutRouteElements}
+        {/* Without this a logged-in operator on an unknown path matched nothing at all, so the
+            layout route never rendered and the document came up blank (ATT-869). */}
+        <Route path="*" element={isAuthenticated ? <NotFound /> : <Unauthorized />} />
+      </Route>
+    </Routes>
+  );
+}
+
+function AppContent() {
+  return (
     <TwoFactorGate>
       <KioskGuard />
-      <Routes>
-        <Route path="/verify-email" element={<VerifyEmail />} />
-        <Route
-          path="/accept-invitation"
-          element={
-            <UnauthorizedLayout>
-              <AcceptInvitation />
-            </UnauthorizedLayout>
-          }
-        />
-        <Route
-          path="/reset-password"
-          element={
-            <UnauthorizedLayout>
-              <ResetPassword />
-            </UnauthorizedLayout>
-          }
-        />
-
-        {bareRouteElements}
-
-        <Route element={<Layout><Outlet /></Layout>}>
-          {layoutRouteElements}
-          {!isAuthenticated && <Route path="*" element={<Unauthorized />} />}
-        </Route>
-      </Routes>
+      <AppRoutes />
     </TwoFactorGate>
   );
 }
