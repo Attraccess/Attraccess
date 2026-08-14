@@ -23,8 +23,8 @@ import de from './de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../../global-translations/api-errors.en.json';
 import API_ERROR_TRANSLATIONS_DE from '../../../../../global-translations/api-errors.de.json';
 
-// 'user' is auto-assigned to all users; 'owner' is the initial system owner — neither should be toggled manually
-const NON_MANAGEABLE_ROLE_KEYS = ['user', 'owner'];
+// 'user' is auto-assigned to all users; 'administrator' is the initial system administrator — neither should be toggled manually
+const NON_MANAGEABLE_ROLE_KEYS = ['user', 'administrator'];
 
 interface UserPermissionFormProps {
   user: User;
@@ -108,7 +108,7 @@ export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({
     ssoAssignmentsByRoleId.set(ur.roleId, existing);
   }
 
-  // Roles that are SSO-assigned but NOT in the manageable list (e.g. owner, user)
+  // Roles that are SSO-assigned but NOT in the manageable list (e.g. administrator, user)
   const ssoOnlyRoles = (userRoles ?? [])
     .filter((ur) => ur.source === 'sso' && !manageableRoleIds.has(ur.roleId))
     .reduce<{ role: UserRole['role']; assignments: UserRole[] }[]>((acc, ur) => {
