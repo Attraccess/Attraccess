@@ -406,6 +406,27 @@ const coreRoutes: RouteConfig[] = [
     ),
     authRequired: 'system.sso.manage',
   },
+  // The provider form is a sub-route of the section rather than a section of its own — same shape as
+  // the email editors above. Without these the in-shell targets `useSsoProvidersBasePath` produces
+  // have nowhere to resolve.
+  {
+    path: '/settings/sso/providers/new',
+    element: (
+      <SettingsLayout>
+        <SSOProviderFormPage />
+      </SettingsLayout>
+    ),
+    authRequired: 'system.sso.manage',
+  },
+  {
+    path: '/settings/sso/providers/:providerId',
+    element: (
+      <SettingsLayout>
+        <SSOProviderFormPage />
+      </SettingsLayout>
+    ),
+    authRequired: 'system.sso.manage',
+  },
   {
     path: '/settings/plugins',
     element: (

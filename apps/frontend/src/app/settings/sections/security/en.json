@@ -55,6 +55,7 @@
   "rateLimit": {
     "heading": "Sign-in throttling",
     "description": "Throttle failed authentication attempts per IP and lock accounts after repeated failures.",
+    "loadFailed": "The throttling settings could not be loaded, so they cannot be edited from here. Reload the page to try again — the other groups on this page are unaffected.",
     "fields": {
       "maxAttempts": {
         "label": "Max attempts",
@@ -88,7 +89,8 @@
   },
   "policy": {
     "heading": "Password policy",
-    "description": "What counts as an acceptable password. Changes apply at the next password validation, not retroactively."
+    "description": "What counts as an acceptable password. Changes apply at the next password validation, not retroactively.",
+    "loadFailed": "The password policy could not be loaded, so it and the per-role overrides cannot be edited from here. Reload the page to try again — the other groups on this page are unaffected."
   },
   "fields": {
     "minLength": {

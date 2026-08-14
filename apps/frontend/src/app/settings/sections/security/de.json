@@ -55,6 +55,7 @@
   "rateLimit": {
     "heading": "Anmeldedrosselung",
     "description": "Fehlgeschlagene Anmeldeversuche pro IP drosseln und Konten nach wiederholten Fehlversuchen sperren.",
+    "loadFailed": "Die Drosselungseinstellungen konnten nicht geladen werden und lassen sich hier nicht bearbeiten. Bitte die Seite neu laden — die übrigen Gruppen auf dieser Seite sind nicht betroffen.",
     "fields": {
       "maxAttempts": {
         "label": "Max. Versuche",
@@ -88,7 +89,8 @@
   },
   "policy": {
     "heading": "Passwortrichtlinie",
-    "description": "Was als zulässiges Passwort gilt. Änderungen greifen bei der nächsten Passwortprüfung, nicht rückwirkend."
+    "description": "Was als zulässiges Passwort gilt. Änderungen greifen bei der nächsten Passwortprüfung, nicht rückwirkend.",
+    "loadFailed": "Die Passwortrichtlinie konnte nicht geladen werden; sie und die rollenspezifischen Ausnahmen lassen sich hier nicht bearbeiten. Bitte die Seite neu laden — die übrigen Gruppen auf dieser Seite sind nicht betroffen."
   },
   "fields": {
     "minLength": {

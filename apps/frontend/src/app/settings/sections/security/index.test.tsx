@@ -125,6 +125,53 @@ describe('SecuritySection', () => {
     expect(screen.getByTestId('policy-overrides-table')).toBeInTheDocument();
   });
 
+  it('reports a failed policy query instead of spinning forever, and keeps the rest editable', () => {
+    // On error `isLoading` goes false while the data stays undefined. Folding `!policy` into the
+    // loading gate rendered the *loading* state permanently — and took 2FA, the domain whitelist and
+    // throttling down with it, none of which come from this query.
+    vi.mocked(usePasswordPolicyAdminServiceGetAdminPasswordPolicy).mockReturnValue({
+      data: undefined,
+      isLoading: false,
+    } as ReturnType<typeof usePasswordPolicyAdminServiceGetAdminPasswordPolicy>);
+
+    render(<SecuritySection />);
+
+    expect(screen.queryByText('loading')).not.toBeInTheDocument();
+    expect(screen.getByTestId('policy-load-failed')).toHaveTextContent('policy.loadFailed');
+    expect(screen.queryByTestId('policy-row-minLength')).not.toBeInTheDocument();
+
+    // The three unrelated groups are still reachable.
+    expect(screen.getByLabelText('twoFactor.label')).toBeInTheDocument();
+    expect(screen.getByTestId('signup-domains-row')).toBeInTheDocument();
+    expect(screen.getByLabelText('rateLimit.fields.maxAttempts.label')).toBeInTheDocument();
+  });
+
+  it('reports a failed throttling query without taking the password policy with it', () => {
+    vi.mocked(useSettingsServiceGetAuthRateLimitSettings).mockReturnValue({
+      data: undefined,
+      isLoading: false,
+    } as ReturnType<typeof useSettingsServiceGetAuthRateLimitSettings>);
+
+    render(<SecuritySection />);
+
+    expect(screen.queryByText('loading')).not.toBeInTheDocument();
+    expect(screen.getByTestId('rate-limit-load-failed')).toHaveTextContent('rateLimit.loadFailed');
+    expect(screen.queryByLabelText('rateLimit.fields.maxAttempts.label')).not.toBeInTheDocument();
+    expect(screen.getByTestId('policy-row-minLength')).toBeInTheDocument();
+  });
+
+  it('still shows the spinner while the queries are genuinely in flight', () => {
+    vi.mocked(usePasswordPolicyAdminServiceGetAdminPasswordPolicy).mockReturnValue({
+      data: undefined,
+      isLoading: true,
+    } as ReturnType<typeof usePasswordPolicyAdminServiceGetAdminPasswordPolicy>);
+
+    render(<SecuritySection />);
+
+    expect(screen.getByText('loading')).toBeInTheDocument();
+    expect(screen.queryByTestId('policy-load-failed')).not.toBeInTheDocument();
+  });
+
   it('keeps the strength preview in the aside, not the content column', () => {
     const { container } = render(<SecuritySection />);
 

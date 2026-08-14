@@ -143,6 +143,25 @@ describe('EmailSection', () => {
     expect(saveBar(container)).toBeNull();
   });
 
+  it('restores the stored host and port when the service is switched back off Outlook', async () => {
+    // Switching to Outlook writes the constants into the draft. If they survive the switch back,
+    // they mask the stored relay for the rest of the mount — and Save repoints outbound mail at
+    // smtp.office365.com under a save bar that names no fields.
+    const { container } = render(<EmailSection />);
+
+    await userEvent.click(screen.getByRole('button', { name: /service/i }));
+    await userEvent.click(await screen.findByRole('option', { name: 'service.outlook' }));
+    expect(screen.getByLabelText('inputs.host.label')).toHaveValue('smtp.office365.com');
+
+    await userEvent.click(screen.getByRole('button', { name: /service/i }));
+    await userEvent.click(await screen.findByRole('option', { name: 'service.smtp' }));
+
+    expect(screen.getByLabelText('inputs.host.label')).toHaveValue('mail.example.org');
+    expect(screen.getByLabelText('inputs.port.label')).toHaveValue('587');
+    // The round trip is a no-op, so there is nothing to save.
+    expect(saveBar(container)).toBeNull();
+  });
+
   it('refuses to save a port outside the valid range, and says why', async () => {
     render(<EmailSection />);
 

@@ -294,7 +294,11 @@ export function SecuritySection() {
     setDomainToAdd('');
   };
 
-  if (isPolicyLoading || isRateLimitLoading || !policy || !rateLimit) {
+  // Loading only. Folding `!policy || !rateLimit` in here conflated "not arrived yet" with "arrived
+  // empty": on error `isLoading` goes false while the data stays undefined, so the spinner became
+  // permanent — and it took 2FA, the domain whitelist and the overrides down with it, none of which
+  // come from these two queries. Same distinction `areDomainsReady` and `areLimitsReady` draw.
+  if (isPolicyLoading || isRateLimitLoading) {
     return (
       <div className="flex items-center gap-2 text-sm text-muted">
         <Spinner />
@@ -303,9 +307,19 @@ export function SecuritySection() {
     );
   }
 
+  const loadFailed = (message: string) => (
+    <Alert status="danger">
+      <AlertStatusIcon status="danger" />
+      <AlertContent>
+        <AlertDescription>{message}</AlertDescription>
+      </AlertContent>
+    </Alert>
+  );
+
   // Everything the operator needs while editing is on the left; the aside is the one thing that is
-  // purely reference — a live, server-evaluated read on the policy being written.
-  const aside = <PasswordPreview policy={{ ...policy, ...policyDraft }} t={t} />;
+  // purely reference — a live, server-evaluated read on the policy being written. Without a policy
+  // there is nothing to preview against.
+  const aside = policy ? <PasswordPreview policy={{ ...policy, ...policyDraft }} t={t} /> : undefined;
 
   return (
     <SettingsSection title={t('title')} description={t('description')} aside={aside}>
@@ -414,156 +428,168 @@ export function SecuritySection() {
             </div>
           )}
         </SettingsRow>
-
       </div>
 
       <SubHeading title={t('rateLimit.heading')} description={t('rateLimit.description')} />
 
       <div className="flex flex-col">
-        {RATE_LIMIT_NUMBERS.map((key) => (
-          <SettingsRow
-            key={key}
-            label={t(`rateLimit.fields.${key}.label`)}
-            hint={t(`rateLimit.fields.${key}.description`)}
-          >
-            <NumberField
-              aria-label={t(`rateLimit.fields.${key}.label`)}
-              value={rateValue(key)}
-              minValue={1}
-              onChange={(next) => setRateDraft((current) => ({ ...current, [key]: next }))}
+        {!rateLimit ? (
+          // Settled with nothing usable. The other three groups are separate queries and stay
+          // editable — only throttling is unreachable.
+          <div data-testid="rate-limit-load-failed">{loadFailed(t('rateLimit.loadFailed'))}</div>
+        ) : (
+          <>
+            {RATE_LIMIT_NUMBERS.map((key) => (
+              <SettingsRow
+                key={key}
+                label={t(`rateLimit.fields.${key}.label`)}
+                hint={t(`rateLimit.fields.${key}.description`)}
+              >
+                <NumberField
+                  aria-label={t(`rateLimit.fields.${key}.label`)}
+                  value={rateValue(key)}
+                  minValue={1}
+                  onChange={(next) => setRateDraft((current) => ({ ...current, [key]: next }))}
+                >
+                  <NumberFieldGroup>
+                    <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
+                    <NumberFieldInput />
+                    <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
+                  </NumberFieldGroup>
+                </NumberField>
+              </SettingsRow>
+            ))}
+
+            <SettingsRow
+              label={t('rateLimit.fields.exponentialBackoff.label')}
+              hint={t('rateLimit.fields.exponentialBackoff.description')}
             >
-              <NumberFieldGroup>
-                <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
-                <NumberFieldInput />
-                <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
-              </NumberFieldGroup>
-            </NumberField>
-          </SettingsRow>
-        ))}
+              <LabeledSwitch
+                aria-label={t('rateLimit.fields.exponentialBackoff.label')}
+                isSelected={exponentialBackoff}
+                onChange={(next) => setRateDraft((current) => ({ ...current, exponentialBackoff: next }))}
+              />
+            </SettingsRow>
 
-        <SettingsRow
-          label={t('rateLimit.fields.exponentialBackoff.label')}
-          hint={t('rateLimit.fields.exponentialBackoff.description')}
-        >
-          <LabeledSwitch
-            aria-label={t('rateLimit.fields.exponentialBackoff.label')}
-            isSelected={exponentialBackoff}
-            onChange={(next) => setRateDraft((current) => ({ ...current, exponentialBackoff: next }))}
-          />
-        </SettingsRow>
-
-        <SettingsRow
-          label={t('rateLimit.fields.backoffMultiplier.label')}
-          hint={t('rateLimit.fields.backoffMultiplier.description')}
-        >
-          <NumberField
-            aria-label={t('rateLimit.fields.backoffMultiplier.label')}
-            value={rateValue('backoffMultiplier')}
-            minValue={1}
-            step={0.1}
-            isDisabled={!exponentialBackoff}
-            onChange={(next) => setRateDraft((current) => ({ ...current, backoffMultiplier: next }))}
-          >
-            <NumberFieldGroup>
-              <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
-              <NumberFieldInput />
-              <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
-            </NumberFieldGroup>
-          </NumberField>
-        </SettingsRow>
-
+            <SettingsRow
+              label={t('rateLimit.fields.backoffMultiplier.label')}
+              hint={t('rateLimit.fields.backoffMultiplier.description')}
+            >
+              <NumberField
+                aria-label={t('rateLimit.fields.backoffMultiplier.label')}
+                value={rateValue('backoffMultiplier')}
+                minValue={1}
+                step={0.1}
+                isDisabled={!exponentialBackoff}
+                onChange={(next) => setRateDraft((current) => ({ ...current, backoffMultiplier: next }))}
+              >
+                <NumberFieldGroup>
+                  <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
+                  <NumberFieldInput />
+                  <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
+                </NumberFieldGroup>
+              </NumberField>
+            </SettingsRow>
+          </>
+        )}
       </div>
 
       <SubHeading title={t('policy.heading')} description={t('policy.description')} />
 
       <div className="flex flex-col">
-        {POLICY_NUMBER_FIELDS.map(({ key, min, max }) => (
-          <SettingsRow
-            key={String(key)}
-            data-testid={`policy-row-${String(key)}`}
-            label={t(`fields.${key}.label`)}
-            hint={t(`fields.${key}.description`)}
-          >
-            <NumberField
-              aria-label={t(`fields.${key}.label`)}
-              value={policyValue(key) as number}
-              minValue={min}
-              maxValue={max}
-              onChange={(next) => setPolicyDraft((current) => ({ ...current, [key]: next }))}
-            >
-              <NumberFieldGroup>
-                <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
-                <NumberFieldInput />
-                <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
-              </NumberFieldGroup>
-            </NumberField>
-          </SettingsRow>
-        ))}
+        {!policy ? (
+          <div data-testid="policy-load-failed">{loadFailed(t('policy.loadFailed'))}</div>
+        ) : (
+          <>
+            {POLICY_NUMBER_FIELDS.map(({ key, min, max }) => (
+              <SettingsRow
+                key={String(key)}
+                data-testid={`policy-row-${String(key)}`}
+                label={t(`fields.${key}.label`)}
+                hint={t(`fields.${key}.description`)}
+              >
+                <NumberField
+                  aria-label={t(`fields.${key}.label`)}
+                  value={policyValue(key) as number}
+                  minValue={min}
+                  maxValue={max}
+                  onChange={(next) => setPolicyDraft((current) => ({ ...current, [key]: next }))}
+                >
+                  <NumberFieldGroup>
+                    <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
+                    <NumberFieldInput />
+                    <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
+                  </NumberFieldGroup>
+                </NumberField>
+              </SettingsRow>
+            ))}
 
-        {POLICY_BOOL_FIELDS.map((key) => (
-          <SettingsRow
-            key={String(key)}
-            data-testid={`policy-row-${String(key)}`}
-            label={t(`fields.${key}.label`)}
-            hint={t(`fields.${key}.description`)}
-          >
-            <LabeledSwitch
-              aria-label={t(`fields.${key}.label`)}
-              isSelected={policyValue(key) as boolean}
-              onChange={(next) => setPolicyDraft((current) => ({ ...current, [key]: next }))}
-            />
-          </SettingsRow>
-        ))}
+            {POLICY_BOOL_FIELDS.map((key) => (
+              <SettingsRow
+                key={String(key)}
+                data-testid={`policy-row-${String(key)}`}
+                label={t(`fields.${key}.label`)}
+                hint={t(`fields.${key}.description`)}
+              >
+                <LabeledSwitch
+                  aria-label={t(`fields.${key}.label`)}
+                  isSelected={policyValue(key) as boolean}
+                  onChange={(next) => setPolicyDraft((current) => ({ ...current, [key]: next }))}
+                />
+              </SettingsRow>
+            ))}
 
-        <SettingsRow stacked label={t('overrides.title')} hint={t('overrides.subtitle')}>
-          <Table data-testid="policy-overrides-table">
-            <TableScrollContainer>
-              <TableContent aria-label={t('overrides.title')}>
-                <TableHeader>
-                  <TableColumn isRowHeader>{t('overrides.role')}</TableColumn>
-                  <TableColumn>{t('overrides.status')}</TableColumn>
-                  <TableColumn width="0" className="text-right">
-                    {t('overrides.actions')}
-                  </TableColumn>
-                </TableHeader>
-                <TableBody>
-                  {OVERRIDE_ROLES.map((role) => {
-                    const row = overridesByRole.get(role);
-                    const count = row
-                      ? POLICY_FIELD_KEYS.filter((key) => row[key as keyof typeof row] !== null).length
-                      : 0;
-                    return (
-                      <TableRow key={role} id={role} data-testid={`policy-override-row-${role}`}>
-                        <TableCell>{t(`overrides.roles.${role}`)}</TableCell>
-                        <TableCell>
-                          {count === 0 ? (
-                            <Chip variant="soft">{t('overrides.statusInherits')}</Chip>
-                          ) : (
-                            <Chip color="warning" variant="soft">
-                              {t('overrides.statusCustom', { count })}
-                            </Chip>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex justify-end">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onPress={() => setEditingRole(role)}
-                              data-testid={`policy-override-edit-${role}`}
-                            >
-                              {t('overrides.edit')}
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </TableContent>
-            </TableScrollContainer>
-          </Table>
-        </SettingsRow>
+            <SettingsRow stacked label={t('overrides.title')} hint={t('overrides.subtitle')}>
+              <Table data-testid="policy-overrides-table">
+                <TableScrollContainer>
+                  <TableContent aria-label={t('overrides.title')}>
+                    <TableHeader>
+                      <TableColumn isRowHeader>{t('overrides.role')}</TableColumn>
+                      <TableColumn>{t('overrides.status')}</TableColumn>
+                      <TableColumn width="0" className="text-right">
+                        {t('overrides.actions')}
+                      </TableColumn>
+                    </TableHeader>
+                    <TableBody>
+                      {OVERRIDE_ROLES.map((role) => {
+                        const row = overridesByRole.get(role);
+                        const count = row
+                          ? POLICY_FIELD_KEYS.filter((key) => row[key as keyof typeof row] !== null).length
+                          : 0;
+                        return (
+                          <TableRow key={role} id={role} data-testid={`policy-override-row-${role}`}>
+                            <TableCell>{t(`overrides.roles.${role}`)}</TableCell>
+                            <TableCell>
+                              {count === 0 ? (
+                                <Chip variant="soft">{t('overrides.statusInherits')}</Chip>
+                              ) : (
+                                <Chip color="warning" variant="soft">
+                                  {t('overrides.statusCustom', { count })}
+                                </Chip>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex justify-end">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onPress={() => setEditingRole(role)}
+                                  data-testid={`policy-override-edit-${role}`}
+                                >
+                                  {t('overrides.edit')}
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </TableContent>
+                </TableScrollContainer>
+              </Table>
+            </SettingsRow>
+          </>
+        )}
       </div>
 
       <SettingsSaveBar
@@ -578,13 +604,15 @@ export function SecuritySection() {
           resolves server-side against what is *stored* — so seeding an override from an unsaved edit
           would pin it to a value that never existed on the instance (and could then be Discarded),
           while the "inherit: N" hint would name a number no role would actually get. */}
-      <RoleOverridesModal
-        role={editingRole}
-        existing={editingRole ? overridesByRole.get(editingRole) : undefined}
-        globalPolicy={policy}
-        t={t}
-        onClose={() => setEditingRole(null)}
-      />
+      {policy && (
+        <RoleOverridesModal
+          role={editingRole}
+          existing={editingRole ? overridesByRole.get(editingRole) : undefined}
+          globalPolicy={policy}
+          t={t}
+          onClose={() => setEditingRole(null)}
+        />
+      )}
 
       <StandardModal isOpen={isConfirmOpen} onOpenChange={(open) => !open && setIsConfirmOpen(false)} size="lg">
         {({ close }) => (

@@ -27,14 +27,23 @@ import {
   getDefaultSamlConfiguration,
   RoleMappingEntry,
 } from './formDefaults';
+import { useSsoProvidersBasePath } from '../../../hooks/useSsoProvidersBasePath';
 import en from './en.json';
 import de from './de.json';
 
+/**
+ * The standalone root. Kept as the fallback that {@link useSsoProvidersBasePath} returns off the
+ * settings shell; call sites derive the root rather than importing this directly, so the same pages
+ * work under `/settings/sso` too.
+ */
 export const SSO_PROVIDERS_PATH = '/sso/providers';
 
 export const useSSOProviderForm = (providerId?: number) => {
   const { t } = useTranslations({ en, de });
   const navigate = useNavigate();
+  // Where this form is mounted, not where the standalone pages live — otherwise saving from the
+  // settings shell lands the operator on `/sso/providers` with no rail and no way back.
+  const { list: providersListPath } = useSsoProvidersBasePath();
   const isEditing = providerId !== undefined;
   const [formValues, setFormValues] = useState<CreateSSOProviderDto>(defaultProviderValues);
   const [showClientSecret, setShowClientSecret] = useState(false);
@@ -254,8 +263,8 @@ export const useSSOProviderForm = (providerId?: number) => {
   }, []);
 
   const handleCancel = useCallback(() => {
-    navigate(SSO_PROVIDERS_PATH);
-  }, [navigate]);
+    navigate(providersListPath);
+  }, [navigate, providersListPath]);
 
   const handleSubmit = useCallback(async () => {
     try {
@@ -390,7 +399,7 @@ export const useSSOProviderForm = (providerId?: number) => {
           description: t('providerCreatedDesc'),
         });
       }
-      navigate(SSO_PROVIDERS_PATH);
+      navigate(providersListPath);
     } catch (err) {
       const errorDescription = isEditing ? t('failedToUpdate') : t('failedToCreate');
       showError({
@@ -399,6 +408,7 @@ export const useSSOProviderForm = (providerId?: number) => {
       });
     }
   }, [
+    providersListPath,
     createSSOProvider,
     emailAttributeKeysInput,
     emailClaimPathsInput,

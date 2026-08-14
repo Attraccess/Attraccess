@@ -195,9 +195,13 @@ export function EmailSection() {
               setDraft((current) =>
                 // Choosing Outlook fills in the host and port Microsoft accepts, as a visible draft
                 // edit rather than a pin — so it shows in the save bar and Discard undoes it.
+                // Switching back drops those two keys rather than leaving them in the draft: they
+                // derive draft-then-stored, so surviving constants would mask the instance's real
+                // relay and Save would repoint outbound mail at smtp.office365.com. Undefined makes
+                // the round trip a no-op instead of a change.
                 key === SmtpServiceType.OUTLOOK365
                   ? { ...current, service: key, host: OUTLOOK_HOST, port: OUTLOOK_PORT }
-                  : { ...current, service: key },
+                  : { ...current, service: key, host: undefined, port: undefined },
               )
             }
             items={[
