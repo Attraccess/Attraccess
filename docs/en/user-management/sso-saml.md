@@ -10,7 +10,7 @@ SAML (Security Assertion Markup Language) is commonly used in enterprise and edu
 
 ## Creating a Provider
 
-1. Navigate to **SSO Providers** in the sidebar
+1. Open **Settings** in the sidebar and select the **Single sign-on** section
 2. Click **Add New Provider**
 3. Select **SAML** as the type
 4. Enter a name for the provider

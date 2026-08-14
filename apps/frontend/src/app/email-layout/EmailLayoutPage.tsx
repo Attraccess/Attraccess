@@ -18,7 +18,6 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../components/toastProvider';
 import { StandardDrawer } from '../../components/standardDrawer';
 import { StandardModal } from '../../components/standardModal';
-import { useEmailBasePath } from '../../hooks/useEmailBasePath';
 import { MjmlVisualEditor } from '../email-templates/edit/MjmlVisualEditor';
 import { CONTENT_PLACEHOLDER, splitHead } from '../email-templates/edit/mjmlLayout';
 import {
@@ -54,7 +53,7 @@ const toStorable = (editedDoc: string, head: string) =>
 
 export function EmailLayoutPage() {
   const navigate = useNavigate();
-  const basePath = useEmailBasePath();
+  const basePath = '/settings/email';
   const { t, language } = useTranslations({ en, de });
   const { theme } = useTheme();
   const toast = useToastMessage();

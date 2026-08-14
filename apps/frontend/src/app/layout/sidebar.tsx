@@ -32,6 +32,7 @@ import {
 } from '@heroui/react';
 import { buttonVariants } from '@heroui/styles';
 import { useAllRoutes } from '../routes';
+import { hasRequiredPermissions } from '../routes/routeAccess';
 import de from './sidebar.de.json';
 import en from './sidebar.en.json';
 import { Logo } from '../../components/logo';
@@ -187,11 +188,7 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
         return true;
       }
 
-      const requiredPermissions = (
-        Array.isArray(routeOfItem?.authRequired) ? routeOfItem?.authRequired : [routeOfItem?.authRequired]
-      ) as string[];
-
-      return requiredPermissions.every(hasPermission);
+      return hasRequiredPermissions(routeOfItem.authRequired, hasPermission);
     },
     [user, hasPermission, routes],
   );
@@ -467,7 +464,9 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
               )}
               <Dropdown data-cy="sidebar-settings-dropdown">
                 <DropdownTrigger
-                  aria-label="Settings"
+                  // Not "Settings": that name now belongs to the nav entry two rows up. This menu
+                  // is language, account and logout.
+                  aria-label={t('userMenu')}
                   data-cy="sidebar-settings-button"
                   className={`${buttonVariants({ variant: 'ghost', isIconOnly: true })} !inline-flex items-center justify-center`}
                 >

@@ -6,22 +6,18 @@ import { SettingsSection } from '../../components/SettingsSection';
 import { Button } from '../../../../components/button';
 import { SSOProvidersList } from '../../../sso/providers/SSOProvidersList';
 import { useAuth } from '../../../../hooks/useAuth';
-import { useSsoProvidersBasePath } from '../../../../hooks/useSsoProvidersBasePath';
 import en from './en.json';
 import de from './de.json';
 
 /**
- * Single sign-on, moved here from `/sso/providers`. The provider list and its per-provider form are
- * unchanged — each provider is its own resource with its own editor, so this section has no fields
- * of its own and therefore no save bar.
+ * Single sign-on. The provider list and its per-provider form are unchanged — each provider is its
+ * own resource with its own editor, so this section has no fields of its own and therefore no save
+ * bar.
  */
 export function SsoSection() {
   const { t } = useTranslations({ en, de });
   const { hasPermission } = useAuth();
   const navigate = useNavigate();
-  // Stays inside the settings shell. Hard-coding `/sso/providers` dropped the operator out of
-  // Settings on the first click, with the rail gone and the form's back button pointing elsewhere.
-  const { form: providerFormPath } = useSsoProvidersBasePath();
   const { data: license } = useLicenseServiceGetLicenseInformation();
 
   // Belt and braces with the route guard: the rail hides the section, but a typed URL should not
@@ -45,7 +41,7 @@ export function SsoSection() {
           <Button
             variant="primary"
             size="sm"
-            onPress={() => navigate(`${providerFormPath}/new`)}
+            onPress={() => navigate('/settings/sso/providers/new')}
             data-cy="sso-providers-page-header-add-new-provider-button"
           >
             <PlusIcon size={16} />

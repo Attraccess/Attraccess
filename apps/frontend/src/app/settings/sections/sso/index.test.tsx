@@ -2,8 +2,8 @@ import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/react';
 import { useLicenseServiceGetLicenseInformation } from '@attraccess/react-query-client';
 import { describe, expect, it, vi } from 'vitest';
-import { useAuth } from '../../hooks/useAuth';
-import { SSOProvidersPage } from './SSOProvidersPage';
+import { useAuth } from '../../../../hooks/useAuth';
+import { SsoSection } from './index';
 
 vi.mock('@attraccess/react-query-client', () => ({
   useLicenseServiceGetLicenseInformation: vi.fn(),
@@ -15,12 +15,9 @@ vi.mock('react-router-dom', () => ({
   useNavigate: () => vi.fn(),
   Navigate: ({ to }: { to: string }) => <div data-testid={`redirect-${to}`} />,
 }));
-vi.mock('../../hooks/useAuth', () => ({ useAuth: vi.fn() }));
-vi.mock('./providers/SSOProvidersList', () => ({
+vi.mock('../../../../hooks/useAuth', () => ({ useAuth: vi.fn() }));
+vi.mock('../../../sso/providers/SSOProvidersList', () => ({
   SSOProvidersList: () => <div data-testid="providers-list" />,
-}));
-vi.mock('../../components/pageHeader', () => ({
-  PageHeader: ({ title }: { title: string }) => <h1>{title}</h1>,
 }));
 
 function mockLicense(modules: string[] | undefined) {
@@ -31,37 +28,40 @@ function mockLicense(modules: string[] | undefined) {
 
 function mockAuth(canManage: boolean) {
   vi.mocked(useAuth).mockReturnValue({
-    hasPermission: (p: string) => p === 'system.sso.manage' ? canManage : false,
+    hasPermission: (p: string) => (p === 'system.sso.manage' ? canManage : false),
   } as ReturnType<typeof useAuth>);
 }
 
-describe('SSOProvidersPage license gate', () => {
-  it('renders nothing when sso module is absent from license', () => {
+// Ported from the standalone SSOProvidersPage's test when that page was removed (ATT-866). The gates
+// are the same two; only the unlicensed branch differs — a section explains itself in the rail
+// rather than rendering nothing, which off a settings rail would read as a broken page.
+describe('SsoSection gates', () => {
+  it('explains itself instead of listing providers when sso is absent from the license', () => {
     mockAuth(true);
     mockLicense([]);
-    const { container } = render(<SSOProvidersPage />);
-    expect(container).toBeEmptyDOMElement();
+    render(<SsoSection />);
+    expect(screen.getByText('notLicensed')).toBeInTheDocument();
+    expect(screen.queryByTestId('providers-list')).not.toBeInTheDocument();
   });
 
-  it('renders page when sso module is present', () => {
+  it('renders the provider list when sso is present', () => {
     mockAuth(true);
     mockLicense(['sso']);
-    render(<SSOProvidersPage />);
-    expect(screen.getByRole('heading')).toBeInTheDocument();
+    render(<SsoSection />);
     expect(screen.getByTestId('providers-list')).toBeInTheDocument();
   });
 
-  it('renders page while license is loading (undefined)', () => {
+  it('renders the provider list while the license is still loading', () => {
     mockAuth(true);
     mockLicense(undefined);
-    render(<SSOProvidersPage />);
-    expect(screen.getByRole('heading')).toBeInTheDocument();
+    render(<SsoSection />);
+    expect(screen.getByTestId('providers-list')).toBeInTheDocument();
   });
 
-  it('redirects when user lacks system.sso.manage permission', () => {
+  it('redirects when the user lacks system.sso.manage', () => {
     mockAuth(false);
     mockLicense(['sso']);
-    render(<SSOProvidersPage />);
+    render(<SsoSection />);
     expect(screen.getByTestId('redirect-/')).toBeInTheDocument();
   });
 });

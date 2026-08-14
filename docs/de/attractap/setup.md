@@ -32,8 +32,8 @@ Stellen Sie vor Beginn sicher, dass:
 ## Schritt 2: Leser in Attraccess registrieren
 
 1. Oeffnen Sie Attraccess in Ihrem Browser
-2. Navigieren Sie zu **Attractap** in der Seitenleiste
-3. Klicken Sie auf **Leser**
+2. Oeffnen Sie die Gruppe **Geraete** in der Seitenleiste
+3. Klicken Sie auf **Attractap-Lesegeraete**
 4. Klicken Sie auf **Leser hinzufuegen**
 5. Geben Sie die Leserdetails ein:
 

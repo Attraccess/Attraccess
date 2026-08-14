@@ -15,7 +15,6 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../../components/pageHeader';
 import { EmptyState } from '../../components/emptyState';
-import { useEmailBasePath } from '../../hooks/useEmailBasePath';
 
 import en from './en.json';
 import de from './de.json';
@@ -24,7 +23,8 @@ import { useCallback, useMemo } from 'react';
 export function EmailTemplatesPage() {
   const { t } = useTranslations({ en, de });
   const navigate = useNavigate();
-  const basePath = useEmailBasePath();
+  // The Email settings section — these editors are sub-routes of it and navigate to its siblings.
+  const basePath = '/settings/email';
 
   const { data: emailTemplates } = useEmailTemplatesServiceEmailTemplateControllerFindAll();
 

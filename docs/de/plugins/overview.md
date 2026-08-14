@@ -14,7 +14,7 @@ Ein Plugin kann:
 
 ## Plugin-Verwaltung
 
-Plugins werden im Bereich **Plugins** in der Seitenleiste verwaltet. Von dort aus koennen Administratoren:
+Plugins werden im Bereich **Plugins** der **Einstellungen** verwaltet. Von dort aus koennen Administratoren:
 
 - Alle installierten Plugins einsehen
 - Neue Plugins hochladen

@@ -8,6 +8,7 @@
     "de": "Deutsch"
   },
   "account": "Konto",
+  "userMenu": "Benutzermenü",
   "groups": {
     "##default##": {
       "items": {
@@ -16,39 +17,18 @@
         "messages": "Nachrichten",
         "billing": "Zahlungen",
         "csvExport": "CSV-Export",
-        "attractap": "NFC-Karten"
-      }
-    },
-    "users": {
-      "label": "Benutzer & Zugriff",
-      "items": {
-        "userList": "Benutzerliste",
-        "roles": "Rollen",
-        "userSecurity": "Anmeldesicherheit",
-        "sso": "Single Sign-On"
+        "attractap": "NFC-Karten",
+        "users": "Benutzer",
+        "settings": "Einstellungen"
       }
     },
     "devices": {
       "label": "Geräte",
       "items": {
+        "attractapReaders": "Attractap-Lesegeräte",
         "mqttServers": "MQTT-Server",
         "companion": "Companion-App",
         "balena": "Balena"
-      }
-    },
-    "notifications": {
-      "label": "Benachrichtigungen",
-      "items": {
-        "emails": "E-Mails",
-        "messagingSettings": "Nachrichteneinstellungen"
-      }
-    },
-    "instance": {
-      "label": "Instanz",
-      "items": {
-        "settings": "Einstellungen",
-        "plugins": "Plugins",
-        "monitoring": "Überwachung"
       }
     }
   },

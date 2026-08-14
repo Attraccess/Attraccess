@@ -98,7 +98,7 @@ export function MessagesPage() {
           icon={<MailIcon />}
           actions={
             hasPermission('system.settings.manage')
-              ? [{ key: 'settings', label: t('settingsButton'), icon: <Settings2Icon size={16} />, onPress: () => navigate('/messages/settings') }]
+              ? [{ key: 'settings', label: t('settingsButton'), icon: <Settings2Icon size={16} />, onPress: () => navigate('/settings/messaging') }]
               : undefined
           }
         />

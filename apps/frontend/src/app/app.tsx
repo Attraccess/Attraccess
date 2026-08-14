@@ -9,7 +9,7 @@ import { ToastProvider } from '../components/toastProvider';
 import { I18nProvider, RouterProvider, Spinner, useTheme } from '@heroui/react';
 import { OpenAPI } from '@attraccess/react-query-client';
 import { RouteConfig } from '@attraccess/plugins-frontend-sdk';
-import { type SystemPermission } from '@attraccess/shared';
+import { hasRequiredPermissions } from './routes/routeAccess';
 import PullToRefresh from 'react-simple-pull-to-refresh';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -29,16 +29,13 @@ import { SupervisorApprovalListener } from '../components/supervisorApproval/Sup
 import { KioskGuard } from './kiosk/KioskGuard';
 import { useLocaleSync } from '../hooks/useLocaleSync';
 
-function useRoutesWithAuthElements(routes: RouteConfig[]) {
+// Exported for settingsAccess.spec.tsx, which drives the real route table through this gate.
+export function useRoutesWithAuthElements(routes: RouteConfig[]) {
   const { user, hasPermission } = useAuth();
 
   const routesWithAuthElements = useMemo(() => {
     return routes.map((route) => {
       if (!route.authRequired) {
-        return route;
-      }
-
-      if (route.authRequired === true && user) {
         return route;
       }
 
@@ -49,15 +46,12 @@ function useRoutesWithAuthElements(routes: RouteConfig[]) {
         };
       }
 
-      const requiredPermissions = (
-        Array.isArray(route.authRequired) ? route.authRequired : [route.authRequired]
-      ) as SystemPermission[];
+      // `true` = any logged-in user, which the check above just established.
+      if (route.authRequired === true) {
+        return route;
+      }
 
-      const userHasAllRequiredPermissions = requiredPermissions.every(
-        (permission) => hasPermission(permission),
-      );
-
-      if (!userHasAllRequiredPermissions) {
+      if (!hasRequiredPermissions(route.authRequired, hasPermission)) {
         return {
           ...route,
           element: <AccessDenied />,

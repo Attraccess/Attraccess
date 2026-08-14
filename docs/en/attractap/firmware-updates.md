@@ -1,54 +1,38 @@
 # Firmware Updates
 
-Attractap readers support OTA (Over-The-Air) firmware updates. This means you can update reader firmware remotely through the Attraccess backend without physically accessing the device.
+Attractap readers support OTA (Over-The-Air) firmware updates. This means reader firmware is updated remotely through the Attraccess backend without physically accessing the device.
 
 ## How Firmware Updates Work
 
-1. A new firmware version is uploaded to the Attraccess backend
-2. The firmware is assigned to one or more reader devices
-3. The reader downloads and installs the update over the network
-4. The reader restarts with the new firmware
+Reader firmware ships with Attraccess itself: every Attraccess release bundles the firmware build for each hardware variant. There is nothing to upload and no update to schedule.
+
+1. A reader connects to the backend and reports its firmware name, variant and version
+2. The backend compares that version with the one bundled in the running Attraccess release
+3. If the two differ, the backend sends the bundled image to the reader over the same connection
+4. The reader installs the update and restarts with the new firmware
+
+The way to update your readers is therefore to update Attraccess. Once the backend runs a release carrying newer reader firmware, every reader picks it up the next time it connects.
 
 > [!NOTE]
 > During a firmware update, the reader is temporarily unavailable. The update typically takes less than a minute.
 
-## Managing Firmware
+## Checking Reader Firmware
 
-### Viewing Available Firmware
+1. Open the **Devices** group in the sidebar
+2. Click on **Attractap Readers**
+3. Each reader row names its firmware and variant and carries a version chip
 
-1. Navigate to **Attractap** in the sidebar
-2. Click on **Firmware**
-3. You see a list of all uploaded firmware versions
+That chip is the entire firmware display:
 
-<!-- TODO: Screenshot of the firmware list -->
+| Chip | Meaning |
+|------|---------|
+| `v1.2.0` | The reader runs the firmware bundled with this Attraccess release |
+| `v1.1.0 -> v1.2.0`, highlighted | A different version is bundled; the reader will take it on its next connection |
 
-### Uploading New Firmware
-
-1. Navigate to **Attractap** > **Firmware**
-2. Click **Upload Firmware**
-3. Fill in the firmware details:
-
-| Field | Description |
-|-------|-------------|
-| **Version** | Version number of the firmware (e.g. "1.2.0") |
-| **Variant** | Hardware variant this firmware is for (Lite, Touch, etc.) |
-| **File** | The firmware binary file (.bin) |
-| **Release Notes** | Optional description of changes in this version |
-
-4. Click **Upload**
+<!-- TODO: Screenshot of the reader list showing an available firmware update -->
 
 > [!NOTE]
-> Different hardware variants require different firmware files. Make sure you select the correct variant when uploading.
-
-### Pushing Updates to Readers
-
-1. Navigate to **Attractap** > **Readers**
-2. Select the reader(s) you want to update
-3. Choose the target firmware version
-4. Click **Update Firmware**
-5. The update is pushed to the selected reader(s)
-
-<!-- TODO: Screenshot of the firmware update dialog -->
+> The web interface has no firmware upload and no manual "update this reader" control. Both would be ways to run a reader on firmware that does not match the backend it talks to, which is exactly what bundling the firmware with the release prevents.
 
 ## Firmware Variants
 
@@ -60,26 +44,17 @@ Each hardware variant requires its own firmware build:
 | Attractap Touch WiFi | `touch-wifi` |
 | Attractap Touch Ethernet | `touch-ethernet` |
 
+A reader is only ever offered the build matching the variant it reports, so a reader cannot be updated with the wrong image.
+
 > [!TIP]
-> Always test a firmware update on a single reader before pushing it to all devices.
-
-## Update Status
-
-After pushing an update, you can monitor the progress in the Readers list:
-
-| Status | Description |
-|--------|-------------|
-| **Up to date** | Reader is running the latest assigned firmware |
-| **Update pending** | Update has been pushed but not yet installed |
-| **Updating** | Reader is currently downloading and installing the update |
-| **Update failed** | Update could not be installed -- check reader connectivity |
+> All readers of a variant follow the release together -- there is no per-reader rollout. To try a new firmware before your members meet it, point a single spare reader at a test instance running the new Attraccess version.
 
 ## Troubleshooting
 
 | Problem | Solution |
 |---------|----------|
-| Update stays in "pending" state | Verify the reader is connected to the network and can reach the backend |
-| Update fails repeatedly | Ensure you uploaded the correct firmware variant for the reader hardware |
+| A reader keeps showing an available update | Verify it is connected to the network and can reach the backend -- the update is only offered while it is connected |
+| The update never completes | Make sure the reader's connection stays up for the whole transfer; the reader retries the next time it connects |
 | Reader unresponsive after update | Wait a few minutes for the reader to restart. If it does not recover, a manual reflash may be required |
 
 ## See Also

@@ -10,7 +10,7 @@ OpenID Connect (OIDC) ist das empfohlene SSO-Protokoll für die meisten Anwendun
 
 ## Anbieter anlegen
 
-1. Navigieren Sie zu **SSO-Anbieter** in der Seitenleiste
+1. Öffnen Sie **Einstellungen** in der Seitenleiste und wählen Sie den Bereich **Single Sign-on**
 2. Klicken Sie auf **Neuen Anbieter hinzufügen**
 3. Wählen Sie **OIDC** als Typ
 4. Geben Sie einen Namen für den Anbieter ein
