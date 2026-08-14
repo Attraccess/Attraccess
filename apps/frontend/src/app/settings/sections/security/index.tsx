@@ -592,10 +592,16 @@ export function SecuritySection() {
         )}
       </div>
 
+      {/* Each half of `isSaveDisabled` is scoped to its own group. A bare `!isPolicySavable` was
+          unconditionally true whenever the policy query failed — `policyValue` returns undefined and
+          `Number.isInteger(undefined)` is false — so an edit to 2FA or the domain whitelist raised
+          the bar with Save greyed out and nothing saying why. `isPolicyDirty` is false in that state
+          (`policyDraft` is empty, so `policyDiff` is too), and true for a cleared policy field, which
+          is the case that must still block. */}
       <SettingsSaveBar
         isDirty={isDirty}
         isSaving={isSaving}
-        isSaveDisabled={(isRateDirty && !isRateSavable) || !isPolicySavable}
+        isSaveDisabled={(isRateDirty && !isRateSavable) || (isPolicyDirty && !isPolicySavable)}
         onSave={handleSave}
         onDiscard={discard}
       />

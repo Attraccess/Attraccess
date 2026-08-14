@@ -17,7 +17,11 @@ import { SecuritySection } from './index';
 vi.mock('@attraccess/react-query-client', () => ({
   TwoFactorPolicy: { OPTIONAL: 'optional', REQUIRED_FOR_PRIVILEGED: 'privileged', REQUIRED_FOR_ALL: 'all' },
   PasswordPolicyRole: { ADMIN: 'admin' },
-  PasswordPolicyAdminService: { previewAdminPasswordPolicy: vi.fn(() => Object.assign(Promise.resolve({ ok: true, errors: [] }), { cancel: vi.fn() })) },
+  PasswordPolicyAdminService: {
+    previewAdminPasswordPolicy: vi.fn(() =>
+      Object.assign(Promise.resolve({ ok: true, errors: [] }), { cancel: vi.fn() }),
+    ),
+  },
   usePasswordPolicyAdminServiceGetAdminPasswordPolicy: vi.fn(),
   usePasswordPolicyAdminServiceUpdateAdminPasswordPolicy: vi.fn(),
   usePasswordPolicyAdminServiceListPasswordPolicyOverrides: vi.fn(() => ({ data: [] })),
@@ -146,6 +150,29 @@ describe('SecuritySection', () => {
     expect(screen.getByLabelText('rateLimit.fields.maxAttempts.label')).toBeInTheDocument();
   });
 
+  it('still commits an edit to a healthy group while the policy query is down', async () => {
+    // Rendering the other groups is not enough — they have to be *savable*. A bare
+    // `!isPolicySavable` on the bar was unconditionally true with no policy (`Number.isInteger(
+    // undefined)` is false), so the bar came up on a 2FA edit with Save greyed out and nothing
+    // saying why, and Discard was the only way out.
+    vi.mocked(usePasswordPolicyAdminServiceGetAdminPasswordPolicy).mockReturnValue({
+      data: undefined,
+      isLoading: false,
+    } as ReturnType<typeof usePasswordPolicyAdminServiceGetAdminPasswordPolicy>);
+
+    const { container } = render(<SecuritySection />);
+
+    await userEvent.click(screen.getByRole('button', { name: /twoFactor/i }));
+    await userEvent.click(await screen.findByRole('option', { name: /twoFactor.options.all/ }));
+
+    expect(saveBar(container)).toBeInTheDocument();
+    expect(saveButton()).not.toBeDisabled();
+
+    await userEvent.click(saveButton());
+    expect(saveTwoFactor).toHaveBeenCalledWith({ requestBody: { policy: 'all' } });
+    expect(savePolicy).not.toHaveBeenCalled();
+  });
+
   it('reports a failed throttling query without taking the password policy with it', () => {
     vi.mocked(useSettingsServiceGetAuthRateLimitSettings).mockReturnValue({
       data: undefined,
@@ -241,7 +268,9 @@ describe('SecuritySection', () => {
 
     await userEvent.click(screen.getByTestId('policy-override-edit-admin'));
     fireEvent.click(
-      screen.getByTestId('override-admin-minLength-toggle').querySelector('[data-slot="switch-control"]') as HTMLElement,
+      screen
+        .getByTestId('override-admin-minLength-toggle')
+        .querySelector('[data-slot="switch-control"]') as HTMLElement,
     );
 
     expect(screen.getByTestId('override-admin-minLength-value')).toHaveValue('12');
