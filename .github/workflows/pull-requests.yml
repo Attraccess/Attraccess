@@ -34,9 +34,10 @@ jobs:
   precommit-check:
     # Lint/typecheck/test/e2e already run as dedicated jobs below. This job is a
     # gate, not a runner: re-running the same affected graph here would double
-    # the work (every job is a cold-Nx-cache runner). `pnpm precommit` remains
-    # the local hook, where `--uncommitted` is the right selector; on CI it is
-    # always empty.
+    # the work (the remote cache turns the repeat into restores, not into
+    # nothing — a gate should not be walking the task graph). `pnpm precommit`
+    # remains the local hook, where `--uncommitted` is the right selector; on CI
+    # it is always empty.
     #
     # `if: always()` is load-bearing: with plain `needs:` an upstream failure
     # *skips* this job, and a skipped job reports Success to branch protection.

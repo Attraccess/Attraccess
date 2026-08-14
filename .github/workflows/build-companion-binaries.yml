@@ -14,6 +14,13 @@ env:
   # write. The ref check has to be push-specific — a release event's ref is the
   # tag — and it is what stops a future push-triggered caller on some other
   # branch from inheriting a write credential.
+  #
+  # The three jobs below run the same nx command on three different OSes and
+  # share one cache, so every cached target reached from here must either be
+  # platform-independent or carry a platform input. companion:build is the one
+  # that is not — electron-builder emits host-only artifacts — so it declares a
+  # runtime input in apps/companion/project.json. Check that before adding a
+  # target here, or two of the three runners will restore the wrong binaries.
   NX_SELF_HOSTED_REMOTE_CACHE_SERVER: ${{ secrets.NX_CACHE_TOKEN_RO && vars.NX_CACHE_URL || '' }}
   NX_SELF_HOSTED_REMOTE_CACHE_ACCESS_TOKEN: ${{ ((github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'release') && secrets.NX_CACHE_TOKEN_RW || secrets.NX_CACHE_TOKEN_RO }}
 
