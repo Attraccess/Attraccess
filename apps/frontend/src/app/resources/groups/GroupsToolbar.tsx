@@ -39,8 +39,10 @@ export function GroupsToolbar({
     { value: 'available', label: filterLabels.available, badge: availableCount },
   ];
 
+  // Stacked below sm: the filter ButtonGroup can't shrink below its ~275px min-content
+  // (nowrap buttons), so a single wrapping row overlaps the New-group button on phones.
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between mb-3">
       <div className="flex flex-wrap items-center gap-2 sm:gap-3 flex-1 min-w-0">
         <TextField value={search} onChange={onSearchChange} className="sm:max-w-xs w-full">
           <InputGroup>

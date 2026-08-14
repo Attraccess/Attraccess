@@ -91,6 +91,14 @@ function SortableField({ field, index, onChange, onRemove, t, labelInputRef }: S
                 className="cursor-grab active:cursor-grabbing p-1 rounded hover:bg-default-100 touch-none"
                 {...attributes}
                 {...listeners}
+                // The trigger's press handling works off pointer events that bubble up from
+                // this nested button — without stopPropagation, grabbing the grip also
+                // toggles the panel.
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  listeners?.onPointerDown?.(e);
+                }}
+                onClick={(e) => e.stopPropagation()}
                 aria-label={t('editor.reorderField')}
               >
                 <GripVertical className="w-4 h-4 text-default-400" />

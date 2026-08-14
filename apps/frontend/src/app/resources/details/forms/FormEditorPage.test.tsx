@@ -53,4 +53,17 @@ describe('FormEditorPage field accordion', () => {
     await user.click(fieldTrigger());
     expect(fieldTrigger()).toHaveAttribute('aria-expanded', 'true');
   });
+
+  // The drag grip is nested inside the trigger; its presses must not bubble up and toggle
+  // the panel (they would otherwise toggle on every grab and after every reorder).
+  it('does not toggle the field when the drag grip is clicked', async () => {
+    const user = userEvent.setup();
+    renderEditor();
+
+    await user.click(document.querySelector('[data-cy="form-editor-add-field-button"]') as HTMLElement);
+    expect(fieldTrigger()).toHaveAttribute('aria-expanded', 'true');
+
+    await user.click(screen.getByRole('button', { name: 'editor.reorderField' }));
+    expect(fieldTrigger()).toHaveAttribute('aria-expanded', 'true');
+  });
 });
