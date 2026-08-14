@@ -15,7 +15,7 @@ const ROLES = [
   { id: 2, key: 'system-admin', name: 'System Admin', rolePermissions: [] },
   { id: 3, key: 'user-manager', name: 'User Manager', rolePermissions: [] },
   { id: 4, key: 'billing-manager', name: 'Billing Manager', rolePermissions: [] },
-  { id: 5, key: 'owner', name: 'Owner', rolePermissions: [] },
+  { id: 5, key: 'administrator', name: 'Administrator', rolePermissions: [] },
   { id: 6, key: 'user', name: 'User', rolePermissions: [] },
   { id: 7, key: 'my-custom-role', name: 'My Custom Role', rolePermissions: [] },
 ];
@@ -30,8 +30,8 @@ const USER_ROLE_ASSIGNMENTS_MANUAL = [
 const USER_ROLE_ASSIGNMENTS_WITH_SSO = [
   { roleId: 1, source: 'manual', role: ROLES[0] },
   { roleId: 2, source: 'sso', ssoProviderId: 10, ssoProviderType: 'oidc', externalValue: 'admins', role: ROLES[1] },
-  // owner via SSO — not in manageable list
-  { roleId: 5, source: 'sso', ssoProviderId: 10, ssoProviderType: 'oidc', externalValue: 'owners', role: ROLES[4] },
+  // administrator via SSO — not in manageable list
+  { roleId: 5, source: 'sso', ssoProviderId: 10, ssoProviderType: 'oidc', externalValue: 'administrators', role: ROLES[4] },
 ];
 
 let currentUserRoles: typeof USER_ROLE_ASSIGNMENTS_MANUAL | typeof USER_ROLE_ASSIGNMENTS_WITH_SSO =
@@ -139,8 +139,8 @@ describe('UserPermissionForm', () => {
       expect(screen.getByTestId !== undefined ? screen.getByText('SSO-managed roles') : true).toBeTruthy(),
     );
 
-    // Owner role should appear in the SSO-only section
-    await waitFor(() => expect(screen.getByText('Owner')).toBeInTheDocument());
+    // Administrator role should appear in the SSO-only section
+    await waitFor(() => expect(screen.getByText('Administrator')).toBeInTheDocument());
   });
 
   it('disables toggle for SSO-managed role keys', async () => {
