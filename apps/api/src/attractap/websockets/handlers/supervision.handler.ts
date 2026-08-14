@@ -275,8 +275,15 @@ export class AttractapSupervisionHandler implements OnModuleInit {
       return;
     }
 
+    // An empty broadcast list is not the same as nobody being able to supervise: resource managers
+    // are valid supervisors who can tap their card here, but are deliberately not broadcast to. A
+    // resource with no introducers used to dead-end on this check, closing the screen a second
+    // after it opened (ATT-867).
     const eligibleSupervisorIds = await this.supervisionService.getEligibleSupervisorIds(resourceId, requester.id);
-    if (eligibleSupervisorIds.length === 0) {
+    if (
+      eligibleSupervisorIds.length === 0 &&
+      !(await this.supervisionService.hasResourceManagerBesides(requester.id))
+    ) {
       await socket.sendMessage(
         new AttractapEvent(AttractapEventType.SUPERVISION_REQUEST, { error: 'NO_SUPERVISORS_AVAILABLE' }),
       );

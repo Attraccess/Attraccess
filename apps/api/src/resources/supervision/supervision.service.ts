@@ -17,6 +17,7 @@ import { RequestSupervisedSessionDto } from './dtos/requestSupervisedSession.dto
 import { SupervisionRequestDto } from './dtos/supervisionRequest.dto';
 import { SupervisionDecisionResponseDto } from './dtos/supervisionDecision.response.dto';
 import { SupervisionLiveService } from './supervision-live.service';
+import { RbacService } from '../../users-and-auth/rbac/rbac.service';
 import { SupervisionLiveEventType } from './dtos/supervisionLiveEvent.dto';
 
 interface PendingSupervisionRequest {
@@ -99,6 +100,7 @@ export class SupervisionService {
     private readonly resourceUsageService: ResourceUsageService,
     private readonly resourceIntroducersService: ResourceIntroducersService,
     private readonly supervisionLive: SupervisionLiveService,
+    private readonly rbacService: RbacService,
   ) {}
 
   /** Registered by the Attractap module at startup; see {@link ReaderSupervisionArmer}. */
@@ -173,8 +175,8 @@ export class SupervisionService {
     await this.resourceUsageService.assertSupportsSupervision(resourceId);
 
     const eligibleSupervisorIds = await this.getEligibleSupervisorIds(resourceId, requester.id);
-    if (eligibleSupervisorIds.length === 0) {
-      throw new BadRequestException('This resource has no other introducer or maintainer who could supervise');
+    if (eligibleSupervisorIds.length === 0 && !(await this.hasResourceManagerBesides(requester.id))) {
+      throw new BadRequestException('Nobody else can supervise on this resource');
     }
 
     // --- no awaits from here until the request is registered ---
@@ -245,6 +247,23 @@ export class SupervisionService {
       }
     }
     return Array.from(ids);
+  }
+
+  /**
+   * Whether a global resource manager other than the requester exists.
+   *
+   * Managers are valid supervisors — {@link ResourceUsageService.validateSupervisedStart} accepts
+   * anyone holding `resources.update`, and the docs define a supervisor as an introducer, maintainer
+   * *or* resource manager. They are deliberately kept out of {@link getEligibleSupervisorIds}
+   * because that list drives the SSE broadcast, and popping a request at every admin is not wanted.
+   *
+   * They can still walk up to the reader and tap their card, so an empty broadcast list on its own
+   * must not refuse a request: a resource with no introducers (the manager who set it up is usually
+   * the only candidate, and is often the requester) used to dead-end immediately (ATT-867).
+   */
+  public async hasResourceManagerBesides(requesterId: number): Promise<boolean> {
+    const managerIds = await this.rbacService.getUserIdsWithPermission('resources.update');
+    return managerIds.some((id) => id !== requesterId);
   }
 
   /**
