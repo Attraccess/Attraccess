@@ -14,6 +14,10 @@ permissions:
 
 env:
   RENDERS_BRANCH: hardware-renders
+  # No Nx remote cache here on purpose: this is the only workflow that runs
+  # tag:scope:hardware targets, and it only ever holds a read-only token, so
+  # every lookup would be a guaranteed miss. Wire it up if a workflow with the
+  # write token ever starts building those projects on main.
 
 jobs:
   build-and-render:

@@ -9,6 +9,10 @@ env:
   DOCKERHUB_IMAGE_NAME: ${{ vars.DOCKERHUB_IMAGE_NAME }}
   DOCKER_BUILDKIT: 1
   RELEASE_VERSION: ${{ github.event.release.tag_name }}
+  # Nx remote cache — releases build off main, so they may write. Falls back to
+  # the read-only token if RW is missing, so a rotation gap degrades to reads.
+  NX_SELF_HOSTED_REMOTE_CACHE_SERVER: ${{ secrets.NX_CACHE_TOKEN_RO && vars.NX_CACHE_URL || '' }}
+  NX_SELF_HOSTED_REMOTE_CACHE_ACCESS_TOKEN: ${{ secrets.NX_CACHE_TOKEN_RW || secrets.NX_CACHE_TOKEN_RO }}
 
 permissions:
   contents: write

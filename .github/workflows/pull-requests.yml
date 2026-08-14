@@ -12,6 +12,18 @@ env:
   DOCKER_BUILDKIT: 1
   # merge_group has no pull_request payload; base_sha is the queue target (main).
   NX_AFFECTED_BASE: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || format('origin/{0}', github.event.pull_request.base.ref) }}
+  # Self-hosted Nx remote cache (jappyjan/nx-cache-server). Fork PRs get no
+  # secrets, so the server URL resolves to '' and caching turns itself off.
+  # PR and merge-queue builds only ever get the read-only token: only the four
+  # workflows in nx.json sharedGlobals are part of the Nx hash, so a PR that
+  # could write would be able to plant an artifact under a hash main later
+  # restores (CVE-2025-36852).
+  # Kill switch: clear the NX_CACHE_URL repo variable to disable the cache
+  # everywhere. Nx exits 1 when the server is unreachable or rejects a token —
+  # it does not degrade to "no cache" — so clear it before taking the server
+  # down or rotating tokens.
+  NX_SELF_HOSTED_REMOTE_CACHE_SERVER: ${{ secrets.NX_CACHE_TOKEN_RO && vars.NX_CACHE_URL || '' }}
+  NX_SELF_HOSTED_REMOTE_CACHE_ACCESS_TOKEN: ${{ secrets.NX_CACHE_TOKEN_RO }}
 
 permissions:
   contents: read
@@ -22,9 +34,10 @@ jobs:
   precommit-check:
     # Lint/typecheck/test/e2e already run as dedicated jobs below. This job is a
     # gate, not a runner: re-running the same affected graph here would double
-    # the work (every job is a cold-Nx-cache runner). `pnpm precommit` remains
-    # the local hook, where `--uncommitted` is the right selector; on CI it is
-    # always empty.
+    # the work (the remote cache turns the repeat into restores, not into
+    # nothing — a gate should not be walking the task graph). `pnpm precommit`
+    # remains the local hook, where `--uncommitted` is the right selector; on CI
+    # it is always empty.
     #
     # `if: always()` is load-bearing: with plain `needs:` an upstream failure
     # *skips* this job, and a skipped job reports Success to branch protection.

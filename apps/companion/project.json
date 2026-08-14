@@ -31,7 +31,8 @@
       "executor": "nx:run-commands",
       "cache": true,
       "dependsOn": ["companion-ws-client:build", "build-renderer"],
-      "inputs": ["production", "^production"],
+      "// inputs": "electron-builder with no target flag builds for the host only, so this target's outputs are platform-specific while its file inputs are identical on every runner. The runtime input keeps the three CI runners (linux/mac/windows) on separate hashes — without it they share one entry in the remote cache and two of the three restore the wrong platform's dist/.",
+      "inputs": ["production", "^production", { "runtime": "node -p \"process.platform + '-' + process.arch\"" }],
       "outputs": ["{projectRoot}/out", "{projectRoot}/dist"],
       "options": {
         "cwd": "apps/companion",

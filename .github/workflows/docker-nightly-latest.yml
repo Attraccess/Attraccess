@@ -8,6 +8,10 @@ env:
   GHCR_IMAGE_NAME: ${{ vars.GHCR_IMAGE_NAME }}
   DOCKERHUB_IMAGE_NAME: ${{ vars.DOCKERHUB_IMAGE_NAME }}
   DOCKER_BUILDKIT: 1
+  # Nx remote cache — main is the only branch that writes it. Falls back to the
+  # read-only token if RW is missing, so a rotation gap degrades to reads.
+  NX_SELF_HOSTED_REMOTE_CACHE_SERVER: ${{ secrets.NX_CACHE_TOKEN_RO && vars.NX_CACHE_URL || '' }}
+  NX_SELF_HOSTED_REMOTE_CACHE_ACCESS_TOKEN: ${{ secrets.NX_CACHE_TOKEN_RW || secrets.NX_CACHE_TOKEN_RO }}
 
 permissions:
   contents: read
