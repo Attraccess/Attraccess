@@ -58,15 +58,13 @@ const EMPTY_FORM: EditableForm = {
 interface SortableFieldProps {
   field: EditableFormField;
   index: number;
-  isExpanded: boolean;
-  onToggle: () => void;
   onChange: (field: EditableFormField) => void;
   onRemove: () => void;
   t: (key: string, vars?: Record<string, unknown>) => string;
   labelInputRef?: React.RefObject<HTMLInputElement | null>;
 }
 
-function SortableField({ field, index, isExpanded, onToggle, onChange, onRemove, t, labelInputRef }: SortableFieldProps) {
+function SortableField({ field, index, onChange, onRemove, t, labelInputRef }: SortableFieldProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: field._id ?? `field-${field.id}`,
   });
@@ -84,13 +82,23 @@ function SortableField({ field, index, isExpanded, onToggle, onChange, onRemove,
     <div ref={setNodeRef} style={style}>
       <AccordionItem key={key} id={key} aria-label={`${t('fields.label')} #${index + 1}`}>
         <AccordionHeading>
-          <AccordionTrigger onPress={onToggle}>
+          {/* No onPress here: the Accordion already toggles via onExpandedChange, and a
+              second handler would toggle straight back, making clicks a no-op. */}
+          <AccordionTrigger>
             <div className="flex items-center gap-2 flex-1">
               <button
                 type="button"
                 className="cursor-grab active:cursor-grabbing p-1 rounded hover:bg-default-100 touch-none"
                 {...attributes}
                 {...listeners}
+                // The trigger's press handling works off pointer events that bubble up from
+                // this nested button — without stopPropagation, grabbing the grip also
+                // toggles the panel.
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  listeners?.onPointerDown?.(e);
+                }}
+                onClick={(e) => e.stopPropagation()}
                 aria-label={t('editor.reorderField')}
               >
                 <GripVertical className="w-4 h-4 text-default-400" />
@@ -271,22 +279,6 @@ export function FormEditorPage() {
     [form.fields],
   );
 
-  const handleToggleField = useCallback(
-    (key: string) => {
-      setExpandedFieldKeys((prev) => {
-        if (prev === 'all') return prev;
-        const next = new Set(prev);
-        if (next.has(key)) {
-          next.delete(key);
-        } else {
-          next.add(key);
-        }
-        return next;
-      });
-    },
-    [],
-  );
-
   const hasUnsavedChanges = useMemo(() => {
     if (isCreateMode && form.fields.length === 0 && form.name === '') {
       return false;
@@ -434,22 +426,17 @@ export function FormEditorPage() {
                     expandedKeys={expandedFieldKeys}
                     onExpandedChange={setExpandedFieldKeys}
                   >
-                    {form.fields.map((field, index) => {
-                      const key = `field-${field.id ?? field._id}`;
-                      return (
-                        <SortableField
-                          key={field._id ?? `field-${field.id}`}
-                          field={field}
-                          index={index}
-                          isExpanded={expandedFieldKeys === 'all' || (expandedFieldKeys instanceof Set && expandedFieldKeys.has(key))}
-                          onToggle={() => handleToggleField(key)}
-                          onChange={(value) => updateField(index, value)}
-                          onRemove={() => removeField(index)}
-                          t={t}
-                          labelInputRef={index === form.fields.length - 1 ? lastLabelInputRef : undefined}
-                        />
-                      );
-                    })}
+                    {form.fields.map((field, index) => (
+                      <SortableField
+                        key={field._id ?? `field-${field.id}`}
+                        field={field}
+                        index={index}
+                        onChange={(value) => updateField(index, value)}
+                        onRemove={() => removeField(index)}
+                        t={t}
+                        labelInputRef={index === form.fields.length - 1 ? lastLabelInputRef : undefined}
+                      />
+                    ))}
                   </Accordion>
                 </SortableContext>
               </DndContext>
