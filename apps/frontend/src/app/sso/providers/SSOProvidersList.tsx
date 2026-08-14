@@ -10,13 +10,14 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { SSOProvidersTable } from './SSOProvidersTable';
 import { useToastMessage } from '../../../components/toastProvider';
-import { SSO_PROVIDERS_PATH } from './useSSOProviderForm';
+import { useSsoProvidersBasePath } from '../../../hooks/useSsoProvidersBasePath';
 import en from './en.json';
 import de from './de.json';
 
 export const SSOProvidersList = () => {
   const { t } = useTranslations({ en, de });
   const navigate = useNavigate();
+  const { form: providerFormPath } = useSsoProvidersBasePath();
   const queryClient = useQueryClient();
   const { success, error: showError } = useToastMessage();
   const { data: providers, error } = useAuthenticationServiceGetAllSsoProviders();
@@ -31,9 +32,9 @@ export const SSOProvidersList = () => {
 
   const handleEdit = useCallback(
     (provider: SSOProvider) => {
-      navigate(`${SSO_PROVIDERS_PATH}/${provider.id}`);
+      navigate(`${providerFormPath}/${provider.id}`);
     },
-    [navigate],
+    [navigate, providerFormPath],
   );
 
   const handleDelete = useCallback(

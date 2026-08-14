@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -16,7 +16,10 @@ vi.mock('@attraccess/react-query-client', () => ({
 vi.mock('@attraccess/plugins-frontend-ui', () => ({
   useTranslations: () => ({ t: (key: string) => key, tExists: () => false }),
 }));
-vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: vi.fn() }) }));
+const { setQueryData } = vi.hoisted(() => ({ setQueryData: vi.fn() }));
+vi.mock('@tanstack/react-query', () => ({
+  useQueryClient: () => ({ invalidateQueries: vi.fn(), setQueryData }),
+}));
 vi.mock('../../../../components/toastProvider', () => ({
   useToastMessage: () => ({ success: vi.fn(), error: vi.fn(), apiError: vi.fn() }),
 }));
@@ -114,8 +117,80 @@ describe('GeneralSection', () => {
     await userEvent.click(screen.getByRole('button', { name: 'saveBar.save' }));
 
     expect(saveSettings).toHaveBeenCalledWith({
-      requestBody: { app: { url: 'https://example.org/app', publicInternetUrl: undefined, licenseKey: undefined } },
+      requestBody: { app: { url: 'https://example.org/app', publicInternetUrl: null, licenseKey: undefined } },
     });
+  });
+
+  it('sends null when the public URL is cleared, so the stored value is actually removed', async () => {
+    // `undefined` is dropped by JSON.stringify and the API only writes the key when it is present,
+    // so emptying the field used to be a no-op that still reported success — and the old value came
+    // straight back a frame later when the response primed the cache.
+    vi.mocked(useSettingsServiceGetSystemSettings).mockReturnValue({
+      data: { app: { url: 'https://example.org', publicInternetUrl: 'https://public.example' } },
+      isLoading: false,
+    } as ReturnType<typeof useSettingsServiceGetSystemSettings>);
+
+    render(<GeneralSection />);
+
+    await userEvent.clear(screen.getByLabelText('inputs.publicInternetUrl.label'));
+    await userEvent.click(screen.getByRole('button', { name: 'saveBar.save' }));
+
+    expect(saveSettings).toHaveBeenCalledWith({
+      requestBody: { app: { url: 'https://example.org', publicInternetUrl: null, licenseKey: undefined } },
+    });
+  });
+
+  it('does not clobber an unsaved edit when a background refetch lands', async () => {
+    // The old pattern seeded the draft from an effect keyed on the query result, so any refetch —
+    // window focus, poll, another mutation's invalidation — reassigned the whole draft and threw
+    // away whatever the operator had typed (ATT-868). The derived draft cannot do that: an edited
+    // field is pinned until it is committed or discarded.
+    const { rerender } = render(<GeneralSection />);
+
+    await userEvent.type(urlField(), '/typing');
+
+    vi.mocked(useSettingsServiceGetSystemSettings).mockReturnValue({
+      data: { app: { url: 'https://example.org', publicInternetUrl: '' } },
+      isLoading: false,
+    } as ReturnType<typeof useSettingsServiceGetSystemSettings>);
+    rerender(<GeneralSection />);
+
+    expect(urlField()).toHaveValue('https://example.org/typing');
+  });
+
+  it('releases the draft after a save, so a later server-side change is not a phantom edit', async () => {
+    // The mirror image of the test above: pinned past the commit, the field would ignore the server
+    // for the lifetime of the mount, and someone else's change would surface as an "unsaved
+    // changes" bar the operator never caused, whose Save reverts them.
+    let onSuccess: ((data: unknown) => void) | undefined;
+    vi.mocked(useSettingsServiceUpdateSystemSettings).mockImplementation(
+      (options?: { onSuccess?: (data: unknown) => void }) => {
+        onSuccess = options?.onSuccess;
+        return { mutate: saveSettings, isPending: false } as unknown as ReturnType<
+          typeof useSettingsServiceUpdateSystemSettings
+        >;
+      },
+    );
+
+    const { container, rerender } = render(<GeneralSection />);
+
+    await userEvent.type(urlField(), '/app');
+    expect(saveBar(container)).toBeInTheDocument();
+
+    const afterSave = { app: { url: 'https://example.org/app', publicInternetUrl: '' } };
+    await act(async () => onSuccess?.(afterSave));
+
+    expect(setQueryData).toHaveBeenCalledWith(['settings'], afterSave);
+    expect(saveBar(container)).toBeNull();
+
+    vi.mocked(useSettingsServiceGetSystemSettings).mockReturnValue({
+      data: { app: { url: 'https://elsewhere.example', publicInternetUrl: '' } },
+      isLoading: false,
+    } as ReturnType<typeof useSettingsServiceGetSystemSettings>);
+    rerender(<GeneralSection />);
+
+    expect(urlField()).toHaveValue('https://elsewhere.example');
+    expect(saveBar(container)).toBeNull();
   });
 });
 
@@ -155,7 +230,7 @@ describe('GeneralSection — Enter key', () => {
     await userEvent.type(field, '/app{Enter}');
 
     expect(saveSettings).toHaveBeenCalledWith({
-      requestBody: { app: { url: 'https://example.org/app', publicInternetUrl: undefined, licenseKey: undefined } },
+      requestBody: { app: { url: 'https://example.org/app', publicInternetUrl: null, licenseKey: undefined } },
     });
   });
 });

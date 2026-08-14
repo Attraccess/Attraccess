@@ -9,7 +9,8 @@ import { PageHeader } from '../../../components/pageHeader';
 import { OIDCConfigForm } from './form/OIDCConfigForm';
 import { SAMLConfigForm } from './form/SAMLConfigForm';
 import { SetupInstructionsSection } from './form/SetupInstructionsSection';
-import { SSO_PROVIDERS_PATH, useSSOProviderForm } from './useSSOProviderForm';
+import { useSSOProviderForm } from './useSSOProviderForm';
+import { useSsoProvidersBasePath } from '../../../hooks/useSsoProvidersBasePath';
 import { useSSOProviderSetupUrls } from './useSSOProviderSetupUrls';
 import en from './en.json';
 import de from './de.json';
@@ -24,6 +25,7 @@ export const SSOProviderFormPage = () => {
   const parsedProviderId = providerIdParam ? Number(providerIdParam) : undefined;
   const providerId = parsedProviderId !== undefined && Number.isFinite(parsedProviderId) ? parsedProviderId : undefined;
 
+  const { list: providersListPath } = useSsoProvidersBasePath();
   const form = useSSOProviderForm(providerId);
   const setupUrls = useSSOProviderSetupUrls(providerId);
 
@@ -60,10 +62,7 @@ export const SSOProviderFormPage = () => {
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8" data-cy="sso-provider-form-page">
-      <PageHeader
-        title={isEditing ? t('editProvider') : t('createNewProvider')}
-        backTo={SSO_PROVIDERS_PATH}
-      />
+      <PageHeader title={isEditing ? t('editProvider') : t('createNewProvider')} backTo={providersListPath} />
 
       <div className="flex flex-col gap-8" data-cy="sso-provider-form">
         <section className="w-full flex flex-col gap-4 pt-6 border-t border-default-200 first:pt-0 first:border-t-0">
