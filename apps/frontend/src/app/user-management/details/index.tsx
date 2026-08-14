@@ -34,6 +34,7 @@ import { useAuth } from '../../../hooks/useAuth';
 import { useRbacCatalogTranslations } from '../../../hooks/useRbacCatalogTranslations';
 import { useMemo } from 'react';
 import { getSsoManagedPermissionKeys, hasConfiguredPermissionMapping } from '@attraccess/shared';
+import { NotFound } from '../../not-found';
 
 function EffectivePermissionsSection({ userId, t }: { userId: number; t: ReturnType<typeof useTranslations>['t'] }) {
   const { permissionLabel, permissionDescription, permissionCategory } = useRbacCatalogTranslations();
@@ -96,9 +97,19 @@ function EffectivePermissionsSection({ userId, t }: { userId: number; t: ReturnT
   );
 }
 
+// `/users/:id` also matches paths like `/users/security`, which used to render a detail page for a
+// user that cannot exist — heading `(ID: )`, empty body. A non-numeric segment is not a user (ATT-869).
 export function UserManagementDetailsPage() {
-  const { id: idParam } = useParams<{ id: string }>();
+  const { id } = useParams<{ id: string }>();
 
+  if (!/^\d+$/.test(id ?? '')) {
+    return <NotFound />;
+  }
+
+  return <UserDetails id={Number(id)} />;
+}
+
+function UserDetails({ id }: { id: number }) {
   const { t, tExists } = useTranslations({
     en: { ...en, apiErrors: API_ERROR_TRANSLATIONS_EN },
     de: { ...de, apiErrors: API_ERROR_TRANSLATIONS_DE },
@@ -108,8 +119,6 @@ export function UserManagementDetailsPage() {
   const toast = useToastMessage();
   const { isOpen, open, setOpen } = useOverlayState();
   const { user: me } = useAuth();
-
-  const id = parseInt(idParam || '', 10);
 
   const { data: user } = useUsersServiceGetOneUserById({ id });
   const { data: license } = useLicenseServiceGetLicenseInformation();
