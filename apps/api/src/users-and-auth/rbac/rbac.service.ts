@@ -288,6 +288,10 @@ export class RbacService {
     const rows = await this.userRoleRepository
       .createQueryBuilder('ur')
       .innerJoin('role_permission', 'rp', 'rp.roleId = ur.roleId')
+      // Soft-deleted users keep their user_role rows (anonymizeAndSoftDelete only drops auth
+      // details and sessions), so without this a deleted admin still counts as a permission
+      // holder forever — e.g. as a supervisor who provably cannot supervise (ATT-867).
+      .innerJoin('ur.user', 'u', 'u.deletedAt IS NULL')
       .select('DISTINCT ur.userId', 'userId')
       .where('rp.permissionKey = :permKey', { permKey: permissionKey })
       .getRawMany<{ userId: number }>();

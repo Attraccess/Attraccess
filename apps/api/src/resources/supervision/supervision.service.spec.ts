@@ -266,6 +266,29 @@ describe('SupervisionService', () => {
 
       expect(onFailed).toHaveBeenCalledWith(expect.any(RequestTimeoutException));
     });
+
+    // A request that was broadcast to nobody (ATT-867) is only servable by a manager, who gets no
+    // SSE event by design — the pull list is their only way to find it.
+    it('shows a manager-only request to a manager, but keeps normal ones out of their list', () => {
+      service.createReaderRequest({
+        resourceId: 5,
+        requester,
+        dto: {},
+        eligibleSupervisorIds: [],
+        callbacks: { onResolved: jest.fn(), onFailed: jest.fn() },
+      });
+
+      const manager = 42;
+      expect(service.listPendingForSupervisor(manager, true)).toHaveLength(1);
+      // Not a manager, and not on the (empty) broadcast list.
+      expect(service.listPendingForSupervisor(manager, false)).toHaveLength(0);
+      // A manager never sees their own request, even when nobody else was broadcast to.
+      expect(service.listPendingForSupervisor(requester.id, true)).toHaveLength(0);
+
+      createReaderRequest();
+      // The second request has eligible supervisors, so it stays out of every admin's list.
+      expect(service.listPendingForSupervisor(manager, true)).toHaveLength(1);
+    });
   });
 
   describe('web-initiated reader requests (ATT-816)', () => {

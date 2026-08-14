@@ -267,6 +267,15 @@ export class SupervisionService {
   }
 
   /**
+   * Whether this user is a global resource manager. Used to widen
+   * {@link listPendingForSupervisor} for the manager-only case.
+   */
+  public async isResourceManager(userId: number): Promise<boolean> {
+    const managerIds = await this.rbacService.getUserIdsWithPermission('resources.update');
+    return managerIds.includes(userId);
+  }
+
+  /**
    * Creates a reader-originated supervision request (ATT-493). The non-introduced requester has
    * already tapped at the reader; this fans the request out to every eligible supervisor via SSE so
    * any of them can approve from their phone/PC, while the reader simultaneously waits for one of
@@ -453,13 +462,21 @@ export class SupervisionService {
 
   /**
    * Lists the requests currently awaiting a given supervisor (used for SSE reconnect/initial state).
+   *
+   * `isResourceManager` additionally surfaces requests that were broadcast to nobody — the
+   * manager-only case {@link hasResourceManagerBesides} lets through. Those are invisible over SSE
+   * by design, so this pull is the only way the one person who can serve them ever learns they
+   * exist; {@link approve} already accepts them (ATT-867). Requests that do have eligible
+   * supervisors stay out of every admin's list.
    */
-  public listPendingForSupervisor(supervisorUserId: number): SupervisionRequestDto[] {
+  public listPendingForSupervisor(supervisorUserId: number, isResourceManager = false): SupervisionRequestDto[] {
     const requests: SupervisionRequestDto[] = [];
     for (const request of this.pending.values()) {
+      const managerOnly =
+        isResourceManager && request.eligibleSupervisorIds.length === 0 && request.requester.id !== supervisorUserId;
       const targetsSupervisor =
         request.supervisorUserId === null
-          ? request.eligibleSupervisorIds.includes(supervisorUserId)
+          ? request.eligibleSupervisorIds.includes(supervisorUserId) || managerOnly
           : request.supervisorUserId === supervisorUserId;
       if (targetsSupervisor) {
         requests.push(this.toDto(request, supervisorUserId));

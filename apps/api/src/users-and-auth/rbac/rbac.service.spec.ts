@@ -180,6 +180,22 @@ describe('RbacService', () => {
     });
   });
 
+  // ─────────────────────── getUserIdsWithPermission ──────────────────────────
+
+  describe('getUserIdsWithPermission', () => {
+    // Soft-deleting a user leaves their user_role rows behind, so without this join a deleted
+    // admin stays a permission holder forever — e.g. counted as an available supervisor (ATT-867).
+    it('excludes soft-deleted users', async () => {
+      const mockQb = createMockQueryBuilder({ getRawMany: jest.fn().mockResolvedValue([{ userId: 10 }]) });
+      userRoleRepo.createQueryBuilder.mockReturnValue(mockQb as any);
+
+      const ids = await service.getUserIdsWithPermission('resources.update');
+
+      expect(ids).toEqual([10]);
+      expect(mockQb.innerJoin).toHaveBeenCalledWith('ur.user', 'u', 'u.deletedAt IS NULL');
+    });
+  });
+
   // ───────────────────────────── assignRole ──────────────────────────────────
 
   describe('assignRole', () => {
