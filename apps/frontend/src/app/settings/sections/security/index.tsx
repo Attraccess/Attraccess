@@ -113,7 +113,7 @@ export function SecuritySection() {
   const { data: policy, isLoading: isPolicyLoading } = usePasswordPolicyAdminServiceGetAdminPasswordPolicy();
   const { data: rateLimit, isLoading: isRateLimitLoading } = useSettingsServiceGetAuthRateLimitSettings();
   const { data: twoFactor } = useTwoFactorAuthenticationServiceGetTwoFactorPolicy();
-  const { data: savedDomains } = useUsersServiceGetLocalSignupDomainWhitelist();
+  const { data: savedDomains, isLoading: isDomainsLoading } = useUsersServiceGetLocalSignupDomainWhitelist();
   const { data: overrides = [] } = usePasswordPolicyAdminServiceListPasswordPolicyOverrides();
 
   // Derived drafts throughout: an untouched field falls back to the server's value, so a background
@@ -134,6 +134,12 @@ export function SecuritySection() {
   const rateValue = (key: RateLimitKey): number => rateDraft[key] ?? rateLimit?.[key] ?? NaN;
   const exponentialBackoff = rateDraft.exponentialBackoff ?? rateLimit?.exponentialBackoff ?? false;
   const twoFactorValue = twoFactorDraft ?? twoFactor?.policy;
+  // `savedDomains === undefined` means the whitelist has not arrived — loading, or the request
+  // failed. It must not read as an empty list: PUT is a full replace, so staging one addition off
+  // an empty fallback and saving would delete every domain the instance actually has. The row shows
+  // its own state instead of the section blocking on it, because a failed request would otherwise
+  // strand the whole of Security behind a spinner that never resolves.
+  const areDomainsReady = savedDomains !== undefined;
   const domains = domainsDraft ?? savedDomains ?? [];
 
   const policyDiff = useMemo(() => {
@@ -207,17 +213,24 @@ export function SecuritySection() {
       exponentialBackoff !== rateLimit.exponentialBackoff);
   // Clearing a NumberField yields NaN. That is still a departure from the saved value, so the bar
   // stays mounted and Discard stays reachable — only Save is blocked.
+  //
+  // Integer, not merely finite: the three throttling counters and every policy number are `@IsInt()`
+  // on the API, and none of these steppers sets a `step`, so `2.5` is typeable. `Number.isFinite`
+  // let it through to a 400 rendered as a generic toast that names no field.
+  // `backoffMultiplier` is the one genuine `@IsNumber()`, so it only has to be finite and >= 1.
   const isRateSavable =
-    RATE_LIMIT_NUMBERS.every((key) => Number.isFinite(rateValue(key)) && rateValue(key) >= 1) &&
-    Number.isFinite(rateValue('backoffMultiplier'));
-  const isPolicySavable = POLICY_NUMBER_FIELDS.every(({ key }) => Number.isFinite(policyValue(key) as number));
+    RATE_LIMIT_NUMBERS.every((key) => Number.isInteger(rateValue(key)) && rateValue(key) >= 1) &&
+    Number.isFinite(rateValue('backoffMultiplier')) &&
+    rateValue('backoffMultiplier') >= 1;
+  const isPolicySavable = POLICY_NUMBER_FIELDS.every(({ key }) => Number.isInteger(policyValue(key) as number));
 
   const isPolicyDirty = policyDiff.length > 0 || (!isPolicySavable && Object.keys(policyDraft).length > 0);
   const isTwoFactorDirty = twoFactorValue !== undefined && twoFactorValue !== twoFactor?.policy;
   const isDomainsDirty =
+    areDomainsReady &&
     domainsDraft !== undefined &&
-    (domainsDraft.length !== (savedDomains?.length ?? 0) ||
-      domainsDraft.some((domain, index) => domain !== savedDomains?.[index]));
+    (domainsDraft.length !== savedDomains.length ||
+      domainsDraft.some((domain, index) => domain !== savedDomains[index]));
 
   const isDirty = isRateDirty || isPolicyDirty || isTwoFactorDirty || isDomainsDirty;
   const isSaving = isSavingPolicy || isSavingRateLimit || isSavingTwoFactor || isSavingDomains;
@@ -268,6 +281,10 @@ export function SecuritySection() {
   };
 
   const addDomain = () => {
+    // Guarded as well as disabled: Enter reaches this without going through the button.
+    if (!areDomainsReady) {
+      return;
+    }
     const value = domainToAdd.trim().toLowerCase();
     if (!value || domains.includes(value)) {
       setDomainToAdd('');
@@ -312,7 +329,9 @@ export function SecuritySection() {
                 ),
               }))}
             />
-            {twoFactorValue !== TwoFactorPolicy.OPTIONAL && (
+            {/* `!== OPTIONAL` alone is true while the query is still undefined, which flashed the
+                warning for a frame on instances that have 2FA optional. */}
+            {twoFactorValue !== undefined && twoFactorValue !== TwoFactorPolicy.OPTIONAL && (
               <Alert status="warning">
                 <AlertStatusIcon status="warning" />
                 <AlertContent>
@@ -324,60 +343,76 @@ export function SecuritySection() {
         </SettingsRow>
 
         <SettingsRow stacked label={t('domains.label')} hint={t('domains.hint')} data-testid="signup-domains-row">
-          <div className="flex w-full flex-col gap-2">
-            {/* Wraps rather than clipping: on a tablet the content column is narrow enough that the
-                button would otherwise be pushed past its right edge. */}
-            <div className="flex flex-wrap items-end gap-2">
-              <TextField
-                className="min-w-[12rem] flex-1"
-                value={domainToAdd}
-                onChange={setDomainToAdd}
-                aria-label={t('domains.addLabel')}
-                data-testid="signup-domain-input"
-              >
-                <Input
-                  placeholder={t('domains.addPlaceholder')}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
-                      // There is no <form> here, but the browser still treats Enter in a lone text
-                      // input as a submit attempt — which would reload the page.
-                      event.preventDefault();
-                      addDomain();
-                    }
-                  }}
-                />
-              </TextField>
-              <Button variant="secondary" size="sm" onPress={addDomain} isDisabled={!domainToAdd.trim()}>
-                <PlusIcon size={16} />
-                {t('domains.addButton')}
-              </Button>
+          {isDomainsLoading ? (
+            <div className="flex items-center gap-2 text-sm text-muted">
+              <Spinner size="sm" />
+              {t('domains.loading')}
             </div>
+          ) : !areDomainsReady ? (
+            // The list is unknown, not empty. Editing from here would stage a change against a
+            // fallback that is not the instance's state, and Save is a full replace.
+            <Alert status="danger">
+              <AlertStatusIcon status="danger" />
+              <AlertContent>
+                <AlertDescription>{t('domains.loadFailed')}</AlertDescription>
+              </AlertContent>
+            </Alert>
+          ) : (
+            <div className="flex w-full flex-col gap-2">
+              {/* Wraps rather than clipping: on a tablet the content column is narrow enough that the
+                  button would otherwise be pushed past its right edge. */}
+              <div className="flex flex-wrap items-end gap-2">
+                <TextField
+                  className="min-w-[12rem] flex-1"
+                  value={domainToAdd}
+                  onChange={setDomainToAdd}
+                  aria-label={t('domains.addLabel')}
+                  data-testid="signup-domain-input"
+                >
+                  <Input
+                    placeholder={t('domains.addPlaceholder')}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        // There is no <form> here, but the browser still treats Enter in a lone text
+                        // input as a submit attempt — which would reload the page.
+                        event.preventDefault();
+                        addDomain();
+                      }
+                    }}
+                  />
+                </TextField>
+                <Button variant="secondary" size="sm" onPress={addDomain} isDisabled={!domainToAdd.trim()}>
+                  <PlusIcon size={16} />
+                  {t('domains.addButton')}
+                </Button>
+              </div>
 
-            {domains.length === 0 ? (
-              <p className="text-xs text-muted">{t('domains.empty')}</p>
-            ) : (
-              <ul className="flex flex-col">
-                {domains.map((domain) => (
-                  <li
-                    key={domain}
-                    data-testid={`signup-domain-${domain}`}
-                    className="flex items-center justify-between gap-2 border-b border-separator py-1.5 last:border-b-0"
-                  >
-                    <span className="truncate font-mono text-sm text-foreground">{domain}</span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      isIconOnly
-                      aria-label={t('domains.remove', { domain })}
-                      onPress={() => setDomainsDraft(domains.filter((entry) => entry !== domain))}
+              {domains.length === 0 ? (
+                <p className="text-xs text-muted">{t('domains.empty')}</p>
+              ) : (
+                <ul className="flex flex-col">
+                  {domains.map((domain) => (
+                    <li
+                      key={domain}
+                      data-testid={`signup-domain-${domain}`}
+                      className="flex items-center justify-between gap-2 border-b border-separator py-1.5 last:border-b-0"
                     >
-                      <Trash2Icon size={14} />
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+                      <span className="truncate font-mono text-sm text-foreground">{domain}</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        isIconOnly
+                        aria-label={t('domains.remove', { domain })}
+                        onPress={() => setDomainsDraft(domains.filter((entry) => entry !== domain))}
+                      >
+                        <Trash2Icon size={14} />
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
         </SettingsRow>
 
       </div>

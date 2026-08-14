@@ -15,6 +15,7 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../../components/pageHeader';
 import { EmptyState } from '../../components/emptyState';
+import { useEmailBasePath } from '../../hooks/useEmailBasePath';
 
 import en from './en.json';
 import de from './de.json';
@@ -23,14 +24,15 @@ import { useCallback, useMemo } from 'react';
 export function EmailTemplatesPage() {
   const { t } = useTranslations({ en, de });
   const navigate = useNavigate();
+  const basePath = useEmailBasePath();
 
   const { data: emailTemplates } = useEmailTemplatesServiceEmailTemplateControllerFindAll();
 
   const openEditor = useCallback(
     (type: string) => {
-      navigate(`/emails/templates/${type}`);
+      navigate(`${basePath}/templates/${type}`);
     },
-    [navigate],
+    [navigate, basePath],
   );
 
   const tableItems = useMemo(() => {
@@ -52,7 +54,7 @@ export function EmailTemplatesPage() {
         title={t('title')}
         subtitle={t('subtitle')}
         icon={<Mail className="w-6 h-6" />}
-        backTo="/emails"
+        backTo={basePath}
       />
 
       <Table>

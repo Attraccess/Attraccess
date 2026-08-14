@@ -40,6 +40,8 @@
     "addButton": "Add this domain",
     "addPlaceholder": "example.org",
     "empty": "No domains listed — self-registration is disabled.",
+    "loading": "Loading the domain list…",
+    "loadFailed": "The domain list could not be loaded, so it cannot be edited from here. Reload the page to try again — saving would replace the whole list, and this view does not know what is in it.",
     "remove": "Remove {{domain}}",
     "saved": {
       "title": "Signup domains saved",

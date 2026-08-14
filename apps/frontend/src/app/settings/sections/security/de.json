@@ -40,6 +40,8 @@
     "addButton": "Diese Domain hinzufügen",
     "addPlaceholder": "beispiel.de",
     "empty": "Keine Domains eingetragen — Selbstregistrierung ist deaktiviert.",
+    "loading": "Domainliste wird geladen …",
+    "loadFailed": "Die Domainliste konnte nicht geladen werden und lässt sich hier nicht bearbeiten. Bitte die Seite neu laden — Speichern würde die gesamte Liste ersetzen, und diese Ansicht kennt ihren Inhalt nicht.",
     "remove": "{{domain}} entfernen",
     "saved": {
       "title": "Registrierungs-Domains gespeichert",

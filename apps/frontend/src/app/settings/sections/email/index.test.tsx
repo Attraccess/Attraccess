@@ -86,6 +86,47 @@ describe('EmailSection', () => {
     });
   });
 
+  it('does not mount dirty on an Outlook instance whose stored transport differs from the constants', () => {
+    // Pinning host/port/secure to the Outlook constants made these instances mount with a save bar
+    // that had no edit behind it, that Discard could not clear (the pinned values never came from
+    // the draft), and whose Save silently rewrote the stored transport.
+    vi.mocked(useSettingsServiceGetSystemSettings).mockReturnValue({
+      data: {
+        smtp: {
+          service: 'outlook365',
+          host: 'smtp-legacy.office365.com',
+          port: 25,
+          secure: true,
+          user: 'postmaster',
+          from: 'noreply@example.org',
+          passConfigured: true,
+        },
+      },
+      isLoading: false,
+    } as ReturnType<typeof useSettingsServiceGetSystemSettings>);
+
+    const { container } = render(<EmailSection />);
+
+    expect(saveBar(container)).toBeNull();
+    expect(screen.getByLabelText('inputs.host.label')).toHaveValue('smtp-legacy.office365.com');
+    expect(screen.getByLabelText('inputs.port.label')).toHaveValue('25');
+  });
+
+  it('fills in the Outlook host and port as a discardable edit when the service is switched', async () => {
+    const { container } = render(<EmailSection />);
+
+    await userEvent.click(screen.getByRole('button', { name: /service/i }));
+    await userEvent.click(await screen.findByRole('option', { name: 'service.outlook' }));
+
+    expect(screen.getByLabelText('inputs.host.label')).toHaveValue('smtp.office365.com');
+    expect(screen.getByLabelText('inputs.port.label')).toHaveValue('587');
+
+    await userEvent.click(screen.getByRole('button', { name: 'saveBar.discard' }));
+
+    expect(screen.getByLabelText('inputs.host.label')).toHaveValue('mail.example.org');
+    expect(saveBar(container)).toBeNull();
+  });
+
   it('refuses to save a port outside the valid range, and says why', async () => {
     render(<EmailSection />);
 

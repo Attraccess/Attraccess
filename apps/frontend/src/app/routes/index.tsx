@@ -340,6 +340,17 @@ const coreRoutes: RouteConfig[] = [
     authRequired: 'system.settings.manage',
   },
   {
+    path: '/settings/email/templates/:type',
+    element: (
+      <SettingsLayout>
+        <Suspense fallback={<div className="flex items-center justify-center p-8"><Spinner size="sm" /></div>}>
+          <EditEmailTemplatePage />
+        </Suspense>
+      </SettingsLayout>
+    ),
+    authRequired: 'system.settings.manage',
+  },
+  {
     path: '/settings/email/layout',
     element: (
       <SettingsLayout>

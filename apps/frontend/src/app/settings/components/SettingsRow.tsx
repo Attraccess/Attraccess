@@ -34,7 +34,10 @@ export function SettingsRow({ label, hint, stacked, children, 'data-testid': tes
         stacked ? 'flex-col items-stretch' : 'flex-wrap items-start justify-between',
       )}
     >
-      <div className={cn('flex min-w-0 flex-col gap-1', !stacked && 'flex-1 basis-[min(100%,16rem)]')}>
+      {/* `grow`, not `flex-1`: the shorthand sets flex-basis to 0 as well, so pairing it with an
+          explicit basis leaves the outcome to whichever utility Tailwind emits last. `grow` only
+          touches flex-grow, so the basis stands whatever the order. */}
+      <div className={cn('flex min-w-0 flex-col gap-1', !stacked && 'grow basis-[min(100%,16rem)]')}>
         <div className="text-sm font-medium text-foreground">{label}</div>
         {hint ? <div className="text-xs text-muted">{hint}</div> : null}
       </div>

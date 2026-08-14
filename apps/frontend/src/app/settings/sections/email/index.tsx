@@ -57,11 +57,15 @@ export function EmailSection() {
 
   const service = (draft.service as SmtpServiceType | undefined) ?? savedService;
   const isOutlook = service === SmtpServiceType.OUTLOOK365;
-  // Outlook's host/port are fixed by the provider, not by what happens to be stored, so they are
-  // shown as the constants the API will accept rather than as editable values.
-  const host = isOutlook ? OUTLOOK_HOST : ((draft.host as string | undefined) ?? savedHost);
-  const port = isOutlook ? OUTLOOK_PORT : ((draft.port as string | undefined) ?? savedPort);
-  const secure = isOutlook ? false : ((draft.secure as boolean | undefined) ?? savedSecure);
+  // Every field derives from draft-then-stored, including the ones Outlook locks. Pinning them to
+  // the constants instead meant an existing Outlook instance whose stored host, port or `secure`
+  // differed from them mounted permanently dirty: a save bar with no edit behind it, which Discard
+  // could not clear (the pinned values never came from `draft`) and whose Save silently rewrote the
+  // stored transport. Switching *to* Outlook writes the constants into the draft below, so the
+  // change is one the operator made and can discard.
+  const host = (draft.host as string | undefined) ?? savedHost;
+  const port = (draft.port as string | undefined) ?? savedPort;
+  const secure = (draft.secure as boolean | undefined) ?? savedSecure;
   const user = (draft.user as string | undefined) ?? savedUser;
   const from = (draft.from as string | undefined) ?? savedFrom;
   // A stored password is never returned, so an empty box means "keep the current one" and any
@@ -183,7 +187,15 @@ export function EmailSection() {
           <Select
             aria-label={t('inputs.service.label')}
             value={service}
-            onChange={(key) => setDraft((current) => ({ ...current, service: key }))}
+            onChange={(key) =>
+              setDraft((current) =>
+                // Choosing Outlook fills in the host and port Microsoft accepts, as a visible draft
+                // edit rather than a pin — so it shows in the save bar and Discard undoes it.
+                key === SmtpServiceType.OUTLOOK365
+                  ? { ...current, service: key, host: OUTLOOK_HOST, port: OUTLOOK_PORT }
+                  : { ...current, service: key },
+              )
+            }
             items={[
               { key: SmtpServiceType.SMTP, label: t('service.smtp') },
               { key: SmtpServiceType.OUTLOOK365, label: t('service.outlook') },

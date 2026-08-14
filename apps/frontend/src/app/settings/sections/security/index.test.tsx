@@ -91,7 +91,8 @@ describe('SecuritySection', () => {
     } as ReturnType<typeof useTwoFactorAuthenticationServiceGetTwoFactorPolicy>);
     vi.mocked(useUsersServiceGetLocalSignupDomainWhitelist).mockReturnValue({
       data: ['example.org'],
-    } as ReturnType<typeof useUsersServiceGetLocalSignupDomainWhitelist>);
+      isLoading: false,
+    } as unknown as ReturnType<typeof useUsersServiceGetLocalSignupDomainWhitelist>);
 
     vi.mocked(usePasswordPolicyAdminServiceUpdateAdminPasswordPolicy).mockReturnValue(
       idle(savePolicy) as unknown as ReturnType<typeof usePasswordPolicyAdminServiceUpdateAdminPasswordPolicy>,
@@ -200,13 +201,60 @@ describe('SecuritySection', () => {
   it('adds and removes signup domains without touching the server until Save', async () => {
     render(<SecuritySection />);
 
-    await userEvent.type(screen.getByLabelText('domains.addLabel'), 'new.example{Enter}');
+    await userEvent.type(screen.getByRole('textbox', { name: 'domains.addLabel' }), 'new.example{Enter}');
 
     expect(screen.getByTestId('signup-domain-new.example')).toBeInTheDocument();
     expect(saveDomains).not.toHaveBeenCalled();
 
     await userEvent.click(saveButton());
     expect(saveDomains).toHaveBeenCalledWith({ requestBody: ['example.org', 'new.example'] });
+  });
+
+  it('refuses to edit the domain list before it has loaded', async () => {
+    // PUT is a full replace. While the whitelist is undefined the fallback is `[]`, so an add would
+    // stage a one-element draft that pins — and Save would delete every domain the instance has.
+    vi.mocked(useUsersServiceGetLocalSignupDomainWhitelist).mockReturnValue({
+      data: undefined,
+      isLoading: true,
+    } as unknown as ReturnType<typeof useUsersServiceGetLocalSignupDomainWhitelist>);
+
+    const { container } = render(<SecuritySection />);
+
+    expect(screen.queryByRole('textbox', { name: 'domains.addLabel' })).not.toBeInTheDocument();
+    expect(screen.getByTestId('signup-domains-row')).toHaveTextContent('domains.loading');
+    expect(saveBar(container)).toBeNull();
+  });
+
+  it('says so rather than showing an empty list when the whitelist cannot be loaded', () => {
+    // An errored query leaves `data` undefined too. Rendering that as "no domains configured" is a
+    // lie that one add and a Save turns into data loss — and blocking the whole section behind a
+    // spinner that will never resolve is no better.
+    vi.mocked(useUsersServiceGetLocalSignupDomainWhitelist).mockReturnValue({
+      data: undefined,
+      isLoading: false,
+    } as unknown as ReturnType<typeof useUsersServiceGetLocalSignupDomainWhitelist>);
+
+    render(<SecuritySection />);
+
+    expect(screen.getByTestId('signup-domains-row')).toHaveTextContent('domains.loadFailed');
+    expect(screen.queryByRole('textbox', { name: 'domains.addLabel' })).not.toBeInTheDocument();
+    // The rest of the section is still usable.
+    expect(screen.getByTestId('policy-row-minLength')).toBeInTheDocument();
+  });
+
+  it('blocks Save on a non-integer where the API validates @IsInt()', async () => {
+    // None of these steppers sets a `step`, so 2.5 is typeable. Number.isFinite let it through to a
+    // 400 rendered as a generic toast naming no field.
+    const { container } = render(<SecuritySection />);
+
+    const attempts = screen.getByLabelText('rateLimit.fields.maxAttempts.label');
+    await userEvent.clear(attempts);
+    await userEvent.type(attempts, '2.5');
+    await userEvent.tab();
+
+    expect(saveBar(container)).toBeInTheDocument();
+    expect(saveButton()).toBeDisabled();
+    expect(saveRateLimit).not.toHaveBeenCalled();
   });
 
   it('does not clobber an unsaved edit when a background refetch lands', async () => {

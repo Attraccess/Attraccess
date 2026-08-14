@@ -30,17 +30,8 @@ import { POLICY_BOOL_FIELDS, POLICY_FIELD_KEYS, POLICY_NUMBER_FIELDS } from './p
 type Translate = (key: string, vars?: Record<string, string | number>) => string;
 
 type OverrideKey = keyof PasswordPolicyOverrideDto;
-
-function emptyOverride(role: PasswordPolicyRole): PasswordPolicyOverrideDto {
-  const out = { role } as PasswordPolicyOverrideDto;
-  for (const key of POLICY_FIELD_KEYS) {
-    (out as unknown as Record<string, unknown>)[key as string] = null;
-  }
-  return out;
-}
-
-const isAllInherit = (draft: PasswordPolicyOverrideDto) =>
-  POLICY_FIELD_KEYS.every((key) => draft[key as OverrideKey] === null);
+/** `null` is a real value here — "inherit" — so an untouched field is `undefined`, not `null`. */
+type OverrideDraft = Partial<Record<string, number | boolean | null>>;
 
 interface Props {
   role: PasswordPolicyRole | null;
@@ -64,11 +55,22 @@ interface Props {
 export function RoleOverridesModal({ role, existing, globalPolicy, t, onClose }: Props) {
   const toast = useToastMessage();
   const queryClient = useQueryClient();
-  const [draft, setDraft] = useState<PasswordPolicyOverrideDto | null>(null);
+  // Derived, like every other draft in this section. Seeding a full copy from `existing` meant the
+  // effect re-ran on every refetch of the overrides list — and the query client has
+  // `refetchOnWindowFocus: true` with no `staleTime`, so tabbing away and back mid-edit replaced
+  // twelve fields of in-progress work with the server row. That is exactly the ATT-868 clobber the
+  // rest of this section exists to remove.
+  const [draft, setDraft] = useState<OverrideDraft>({});
 
-  useEffect(() => {
-    setDraft(role ? { ...(existing ?? emptyOverride(role)) } : null);
-  }, [role, existing]);
+  // Keyed on the role alone, so it fires when the editor opens or closes — never on a refetch.
+  useEffect(() => setDraft({}), [role]);
+
+  const valueOf = (key: OverrideKey) =>
+    key in draft ? (draft[key as string] ?? null) : ((existing?.[key] ?? null) as number | boolean | null);
+  const setValue = (key: OverrideKey, value: number | boolean | null) =>
+    setDraft((current) => ({ ...current, [key as string]: value }));
+
+  const isAllInherit = POLICY_FIELD_KEYS.every((key) => valueOf(key as OverrideKey) === null);
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: UsePasswordPolicyAdminServiceListPasswordPolicyOverridesKeyFn() });
@@ -100,12 +102,12 @@ export function RoleOverridesModal({ role, existing, globalPolicy, t, onClose }:
   const isSaving = isUpserting || isRemoving;
 
   const handleSave = () => {
-    if (!role || !draft) return;
+    if (!role) return;
 
     // Turning every field back to "inherit" is how an operator deletes an override; there is no
     // separate Remove inside the editor because "override nothing" and "no override" are the same
     // state, and storing an all-null row would be a lie about intent.
-    if (isAllInherit(draft)) {
+    if (isAllInherit) {
       if (existing) {
         remove({ role });
       } else {
@@ -116,7 +118,7 @@ export function RoleOverridesModal({ role, existing, globalPolicy, t, onClose }:
 
     const requestBody: UpsertPasswordPolicyOverrideDto = {};
     POLICY_FIELD_KEYS.forEach((key) => {
-      (requestBody as Record<string, unknown>)[key as string] = draft[key as OverrideKey];
+      (requestBody as Record<string, unknown>)[key as string] = valueOf(key as OverrideKey);
     });
     upsert({ role, requestBody });
   };
@@ -128,89 +130,85 @@ export function RoleOverridesModal({ role, existing, globalPolicy, t, onClose }:
         <span className="text-sm font-normal text-muted">{t('overrides.modal.subtitle')}</span>
       </ModalHeader>
       <ModalBody>
-        {draft && (
-          <div className="flex flex-col">
-            {POLICY_NUMBER_FIELDS.map(({ key, min, max }) => {
-              const value = draft[key as OverrideKey] as number | null;
-              const fallback = globalPolicy[key as keyof PasswordPolicyDto] as number;
-              return (
-                <SettingsRow
-                  key={String(key)}
-                  stacked
-                  label={t(`fields.${key}.label`)}
-                  hint={t(`fields.${key}.description`)}
-                >
-                  <div className="flex w-full flex-col gap-2">
-                    <LabeledSwitch
-                      isSelected={value !== null}
-                      onChange={(on) => setDraft({ ...draft, [key]: on ? fallback : null })}
-                      data-testid={`override-${role}-${String(key)}-toggle`}
+        <div className="flex flex-col">
+          {POLICY_NUMBER_FIELDS.map(({ key, min, max }) => {
+            const value = valueOf(key as OverrideKey) as number | null;
+            const fallback = globalPolicy[key as keyof PasswordPolicyDto] as number;
+            return (
+              <SettingsRow
+                key={String(key)}
+                stacked
+                label={t(`fields.${key}.label`)}
+                hint={t(`fields.${key}.description`)}
+              >
+                <div className="flex w-full flex-col gap-2">
+                  <LabeledSwitch
+                    isSelected={value !== null}
+                    onChange={(on) => setValue(key as OverrideKey, on ? fallback : null)}
+                    data-testid={`override-${role}-${String(key)}-toggle`}
+                  >
+                    <span className="text-sm">{value !== null ? t('overrides.override') : t('overrides.inherit')}</span>
+                  </LabeledSwitch>
+                  {value !== null ? (
+                    <NumberField
+                      aria-label={t(`fields.${key}.label`)}
+                      value={value}
+                      minValue={min}
+                      maxValue={max}
+                      onChange={(next) => setValue(key as OverrideKey, next)}
                     >
-                      <span className="text-sm">{value !== null ? t('overrides.override') : t('overrides.inherit')}</span>
-                    </LabeledSwitch>
-                    {value !== null ? (
-                      <NumberField
-                        aria-label={t(`fields.${key}.label`)}
-                        value={value}
-                        minValue={min}
-                        maxValue={max}
-                        onChange={(next) => setDraft({ ...draft, [key]: next })}
-                      >
-                        <NumberFieldGroup>
-                          <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
-                          <NumberFieldInput data-testid={`override-${role}-${String(key)}-value`} />
-                          <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
-                        </NumberFieldGroup>
-                      </NumberField>
-                    ) : (
-                      <span className="text-xs text-muted">
-                        ↳ {t('overrides.inherit')}: {fallback}
-                      </span>
-                    )}
-                  </div>
-                </SettingsRow>
-              );
-            })}
+                      <NumberFieldGroup>
+                        <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
+                        <NumberFieldInput data-testid={`override-${role}-${String(key)}-value`} />
+                        <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
+                      </NumberFieldGroup>
+                    </NumberField>
+                  ) : (
+                    <span className="text-xs text-muted">
+                      ↳ {t('overrides.inherit')}: {fallback}
+                    </span>
+                  )}
+                </div>
+              </SettingsRow>
+            );
+          })}
 
-            {POLICY_BOOL_FIELDS.map((key) => {
-              const value = draft[key as OverrideKey] as boolean | null;
-              const fallback = globalPolicy[key as keyof PasswordPolicyDto] as boolean;
-              return (
-                <SettingsRow
-                  key={String(key)}
-                  stacked
-                  label={t(`fields.${key}.label`)}
-                  hint={t(`fields.${key}.description`)}
-                >
-                  <div className="flex w-full flex-col gap-2">
+          {POLICY_BOOL_FIELDS.map((key) => {
+            const value = valueOf(key as OverrideKey) as boolean | null;
+            const fallback = globalPolicy[key as keyof PasswordPolicyDto] as boolean;
+            return (
+              <SettingsRow
+                key={String(key)}
+                stacked
+                label={t(`fields.${key}.label`)}
+                hint={t(`fields.${key}.description`)}
+              >
+                <div className="flex w-full flex-col gap-2">
+                  <LabeledSwitch
+                    isSelected={value !== null}
+                    onChange={(on) => setValue(key as OverrideKey, on ? fallback : null)}
+                    data-testid={`override-${role}-${String(key)}-toggle`}
+                  >
+                    <span className="text-sm">{value !== null ? t('overrides.override') : t('overrides.inherit')}</span>
+                  </LabeledSwitch>
+                  {value !== null ? (
                     <LabeledSwitch
-                      isSelected={value !== null}
-                      onChange={(on) => setDraft({ ...draft, [key]: on ? fallback : null })}
-                      data-testid={`override-${role}-${String(key)}-toggle`}
+                      isSelected={Boolean(value)}
+                      onChange={(next) => setValue(key as OverrideKey, next)}
+                      data-testid={`override-${role}-${String(key)}-value`}
                     >
-                      <span className="text-sm">{value !== null ? t('overrides.override') : t('overrides.inherit')}</span>
+                      <span className="text-sm">{value ? t('overrides.enabled') : t('overrides.disabled')}</span>
                     </LabeledSwitch>
-                    {value !== null ? (
-                      <LabeledSwitch
-                        isSelected={Boolean(value)}
-                        onChange={(next) => setDraft({ ...draft, [key]: next })}
-                        data-testid={`override-${role}-${String(key)}-value`}
-                      >
-                        <span className="text-sm">
-                          {value ? t('overrides.enabled') : t('overrides.disabled')}
-                        </span>
-                      </LabeledSwitch>
-                    ) : (
-                      <span className="text-xs text-muted">
-                        ↳ {t('overrides.inherit')}: {fallback ? t('overrides.enabled') : t('overrides.disabled')}
-                      </span>
-                    )}
-                  </div>
-                </SettingsRow>
-              );
-            })}
-          </div>
-        )}
+                  ) : (
+                    <span className="text-xs text-muted">
+                      ↳ {t('overrides.inherit')}: {fallback ? t('overrides.enabled') : t('overrides.disabled')}
+                    </span>
+                  )}
+                </div>
+              </SettingsRow>
+            );
+          })}
+        </div>
       </ModalBody>
       <ModalFooter>
         <Button variant="ghost" onPress={onClose} isDisabled={isSaving}>
