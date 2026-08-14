@@ -15,15 +15,25 @@ interface UsbDevice {
   getStringDescriptor(index: number, cb: (err: Error | null, val?: string) => void): void;
 }
 
-// ponytail: lazy require keeps the native usb module out of jest/test contexts
+type UsbLib = {
+  on(event: 'attach' | 'detach', cb: (d: UsbDevice) => void): void;
+  off(event: 'attach' | 'detach', cb: (d: UsbDevice) => void): void;
+};
+
+// ponytail: lazy require keeps the native usb module out of jest/test contexts, and the
+// catch keeps a packaged build without the prebuilt binary from taking down the whole app —
+// USB triggers just go silent instead.
 export function startUsbWatcher(
   onAdd: (d: UsbDeviceInfo) => void,
   onRemove: (d: UsbDeviceInfo) => void,
 ): () => void {
-  const lib = require('usb') as {
-    on(event: 'attach' | 'detach', cb: (d: UsbDevice) => void): void;
-    off(event: 'attach' | 'detach', cb: (d: UsbDevice) => void): void;
-  };
+  let lib: UsbLib;
+  try {
+    lib = require('usb') as UsbLib;
+  } catch (err) {
+    console.warn('[usb] native module unavailable, USB device events disabled:', err);
+    return () => undefined;
+  }
 
   const toBasic = (d: UsbDevice): UsbDeviceInfo => ({
     vendorId: d.deviceDescriptor.idVendor,
